@@ -9102,6 +9102,7 @@ Then the call to action."]</div>
           .hk2-fields label span{flex:0 0 74px;text-align:right}
           .hk2-fields select{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13px;padding:8px 10px;outline:none;min-width:0}
           .hk2-fields select:focus{border-color:var(--accent)}
+          .hk2-static{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-weight:600;padding:8px 10px}
           .hk2-other{overflow:hidden;max-height:0;transition:max-height .28s ease}
           .hk2-other.open{max-height:240px}
           .hk2-other-in{display:flex;flex-direction:column;gap:6px;padding:2px 0 8px}
@@ -32520,14 +32521,14 @@ function _hk2CardHtml(r, pos, total, isTop) {
   } else {
     // A reply that PROPOSES a time carries the slot as structured data (Zoran
     // 2026-07-10: approve every proposed time as a Hawkeye field, not prose).
-    // Same pickers as the Book-it card; the message is still what sends.
+    // Read-only here: this is just an offer ("does X work?"), nothing books on
+    // send. No slot picker - that only belongs on the Book-it card, where send
+    // actually books (Zoran 2026-07-11). To offer a different time, edit the
+    // message; the verified slot stays stamped for the structured field.
     const proposal = (r._kind === 'reply' && r.book_slot_at) ? `
       <div class="hk2-lbl">Proposed time - a verified open slot</div>
-      <div class="hk2-fields">
-        <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
-        <label><span>Slot</span><select${id.slot} onchange="_hk2Edited()"><option value="${escapeHTML(r.book_slot_at)}" selected>${escapeHTML(_hk2SlotLabel(r.book_slot_at))}</option></select></label>
-      </div>
-      <div class="hk2-note">This is the time the message offers. Pick a different slot = update the message to match; the text is what sends.</div>` : '';
+      <div class="hk2-static">${escapeHTML(_hk2SlotLabel(r.book_slot_at))}${r.book_group ? ' · ' + escapeHTML(r.book_group) : ''}</div>
+      <div class="hk2-note">The message offers this time. Nothing books yet - it books only after the lead says yes and a Book-it card fires.</div>` : '';
     body = `${_hk2ThreadHtml(r)}${proposal}
       <div class="hk2-lbl">${r._kind === 'enroll' ? 'The reply, sign-up link included · edit it right here' : 'Proposed message · edit it right here'}</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
@@ -32631,8 +32632,8 @@ function _hk2Render(opts) {
     <div class="hk2-deck">${deck}</div>
     <div class="hk2-hint">every card resolves here - approve it or move the lead (no skip)<br>edits flip the button to "Confirm edits" and the teach-why note becomes required</div>`;
   const top = _hk2Top();
-  // Book cards AND reply cards that PROPOSE a time both need the live pickers.
-  if (top && (top._kind === 'book' || (top._kind === 'reply' && top.book_slot_at))) _hk2EnsureBookOpts();
+  // Only Book-it cards have live pickers. Proposal cards show the slot read-only.
+  if (top && top._kind === 'book') _hk2EnsureBookOpts();
 }
 // ── Book-it pickers: the academy's trial calendars + open slots ──
 async function _hk2EnsureBookOpts() {
@@ -32645,7 +32646,7 @@ async function _hk2EnsureBookOpts() {
   _hk2FillBookOpts();
 }
 function _hk2FillBookOpts() {
-  const r = _hk2Top(); if (!r || !(r._kind === 'book' || (r._kind === 'reply' && r.book_slot_at))) return;
+  const r = _hk2Top(); if (!r || r._kind !== 'book') return;
   const cal = document.getElementById('hk2-cal'); if (!cal) return;
   const cals = _HK2.bookOpts || [];
   if (!cals.length) return;   // keep the agent's guess-only options
