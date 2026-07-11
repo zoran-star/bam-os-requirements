@@ -32,6 +32,7 @@ import { moveStage, setStatus, findOpenOpp } from "./agent/_store.js";
 import { routeTransition } from "./agent/_router.js";
 import { DEFAULT_BOOKING_AUTOMATIONS, getBookingAutomations, automationsLive as bookingAutosLive, nextDueStep as bookingNextStep } from "./agent/booking-automations.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
+import { buildGoogleCalUrl, buildIcalUrl } from "./agent/confirm-automations.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -123,6 +124,8 @@ const REPLY_TOOL = {
       book:            { type: "boolean", description: "True if you are BOOKING the lead into a free trial — ONLY after ALL of: (1) they confirmed a specific day/time, (2) you verified that exact slot is open via check_availability, AND (3) they explicitly said yes to YOU booking it for them (you asked 'want me to book it for you?' and they agreed). If you have a time but have NOT yet gotten that yes, set book=false and make your reply the confirmation question instead. A human approves before it's created. Your 'reply' is the confirmation you'd send." },
       book_group:      { type: "string", description: "If book: the group by athlete age — 'Group 1' (elementary, 9-13) or 'Group 2' (high school, 14+)." },
       book_slot_at:    { type: "string", description: "If book: the EXACT ISO datetime of the open slot the lead confirmed (must be one of the open_slots from check_availability)." },
+      propose_group:   { type: "string", description: "If your reply OFFERS or SUGGESTS a specific session day/time to the lead WITHOUT booking yet: 'Group 1' (elementary, 9-13) or 'Group 2' (high school, 14+)." },
+      propose_slot_at: { type: "string", description: "If your reply names a specific day/time to the lead (book=false): the EXACT ISO datetime of that open slot - it MUST come from check_availability. NEVER name a time in a reply that you have not verified as an open slot. Empty when your reply names no specific time." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
@@ -284,6 +287,10 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   // A booking proposal: the agent set book=true with a concrete slot it verified.
   const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForGroup(calendars, out.book_group) : null;
   const book = !!(out.book && out.book_slot_at && bookCal);
+  // A time PROPOSAL: the reply names a specific slot without booking yet. Zoran
+  // approves every proposed time as a structured Hawkeye field (2026-07-10), so
+  // the slot rides the card instead of living only in prose. Future slots only.
+  const prop = normalizeProposal(out, book, calendars);
   return {
     conversation_id: conversationId,
     reply: out.reply || "",
@@ -295,9 +302,9 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     recommend_lost: !!out.recommend_lost,
     lost_reason: out.lost_reason || null,
     book,
-    book_group: book ? out.book_group : null,
-    book_slot_at: book ? out.book_slot_at : null,
-    book_calendar_id: book ? bookCal.key : null,
+    book_group: book ? out.book_group : prop.group,
+    book_slot_at: book ? out.book_slot_at : prop.slotAt,
+    book_calendar_id: book ? bookCal.key : prop.calendarId,
     summary: out.summary ? String(out.summary).slice(0, 600) : null,
     last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
     last_outbound: (() => { const ours = [...messages].reverse().find(m => m.role === "agent"); return ours ? String(ours.text).slice(0, 500) : null; })(),
@@ -307,6 +314,21 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   };
 }
 
+// A time PROPOSAL in a non-booking reply: validate + map it onto the card's
+// book_* fields (same columns the Book-it card uses; kind stays 'reply', so
+// nothing books until the lead says yes and a real Book-it card is approved).
+// Guards: never on a booking card, must parse, must be in the future, and the
+// group must resolve to a real calendar - otherwise silently no proposal.
+function normalizeProposal(out, book, calendars) {
+  const none = { group: null, slotAt: null, calendarId: null };
+  if (book || !out || !out.propose_slot_at || !out.propose_group) return none;
+  const cal = calendarForGroup(calendars || [], out.propose_group);
+  if (!cal) return none;
+  const t = new Date(out.propose_slot_at).getTime();
+  if (!Number.isFinite(t) || t <= Date.now()) return none;
+  return { group: out.propose_group, slotAt: new Date(t).toISOString(), calendarId: cal.key };
+}
+
 // Draft a cold OPENER for a Responded lead that entered with context but hasn't
 // messaged (no thread). Returns the structured proposal or throws.
 async function draftOpener(token, locationId, clientId, contactId, cfg, calendars) {
@@ -314,6 +336,7 @@ async function draftOpener(token, locationId, clientId, contactId, cfg, calendar
   const out = await runOpener(system, { calendars: calendars || [], token, timezone: "America/Toronto", clientId });
   const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForGroup(calendars || [], out.book_group) : null;
   const book = !!(out.book && out.book_slot_at && bookCal);
+  const prop = normalizeProposal(out, book, calendars);
   return {
     reply: out.reply || "",
     reasoning: out.reasoning || "",
@@ -321,8 +344,8 @@ async function draftOpener(token, locationId, clientId, contactId, cfg, calendar
     escalate: !!out.escalate,
     asked_to_book: !!out.asked_to_book || BOOK_ASK.test(out.reply || ""),
     summary: out.summary ? String(out.summary).slice(0, 600) : null,
-    book, book_group: book ? out.book_group : null, book_slot_at: book ? out.book_slot_at : null,
-    book_calendar_id: book ? bookCal.key : null,
+    book, book_group: book ? out.book_group : prop.group, book_slot_at: book ? out.book_slot_at : prop.slotAt,
+    book_calendar_id: book ? bookCal.key : prop.calendarId,
   };
 }
 
@@ -611,6 +634,9 @@ async function detectForClient(client) {
           client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
           contact_name: item.name || null, draft_message: d.reply, reasoning: d.reasoning || null, confidence: d.confidence,
           asked_to_book: d.asked_to_book, reply_count: d.reply_count, booking_asks: d.booking_asks, last_message: d.last_message || null, last_outbound: d.last_outbound || null, summary: d.summary || null, thread_tail: d.thread_tail || null,
+          // A PROPOSED time (reply names a verified open slot without booking):
+          // rides the same book_* columns so the deck shows it structured.
+          book_calendar_id: d.book_calendar_id || null, book_slot_at: d.book_slot_at || null, book_group: d.book_group || null,
           last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
         }]) });
         drafted++;
@@ -682,7 +708,7 @@ async function detectForClient(client) {
           await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
             client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: null,
             contact_name: nm, kind: isBook ? "book" : "reply",
-            book_calendar_id: isBook ? d.book_calendar_id : null, book_slot_at: isBook ? d.book_slot_at : null, book_group: isBook ? d.book_group : null,
+            book_calendar_id: d.book_calendar_id || null, book_slot_at: d.book_slot_at || null, book_group: d.book_group || null,
             draft_message: d.reply, reasoning: d.reasoning || "First touch (cold opener from entry context).",
             confidence: d.confidence, asked_to_book: d.asked_to_book, summary: d.summary || null,
             status: "pending", created_by: "opener",
@@ -728,7 +754,7 @@ async function detectForClient(client) {
           await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
             client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: null,
             contact_name: nm, kind: isBook ? "book" : "reply",
-            book_calendar_id: isBook ? d.book_calendar_id : null, book_slot_at: isBook ? d.book_slot_at : null, book_group: isBook ? d.book_group : null,
+            book_calendar_id: d.book_calendar_id || null, book_slot_at: d.book_slot_at || null, book_group: d.book_group || null,
             draft_message: d.reply, reasoning: d.reasoning || "First rebook touch (confirm agent handed this lead back to rebook).",
             confidence: d.confidence, asked_to_book: d.asked_to_book, summary: d.summary || null,
             status: "pending", created_by: "rebook-opener",
@@ -942,6 +968,11 @@ async function handler(req, res) {
       if (!rsSend || !(await contactInRespondedStage(token, locationId, b.contact_id, rsSend, { clientId, sb }))) {
         return res.status(409).json({ error: "This lead is no longer in the Responded stage - not sending." });
       }
+      // Proposal cards: the deck passes the FINAL picked slot so a picker change
+      // is recorded on the row - the structured proposed time stays truthful.
+      const propPatch = {};
+      if (typeof b.proposed_slot_at === "string" && b.proposed_slot_at) { const _pt = new Date(b.proposed_slot_at).getTime(); if (Number.isFinite(_pt)) propPatch.book_slot_at = new Date(_pt).toISOString(); }
+      if (typeof b.proposed_calendar_id === "string" && b.proposed_calendar_id) propPatch.book_calendar_id = b.proposed_calendar_id;
       // QUIET HOURS: a human approved this after 9:30pm / before 8am. Don't text the
       // parent now — hold the approved reply and let the detect cron flush it at 8am.
       if (!withinQuietHours(new Date(), quietTz(client))) {
@@ -952,6 +983,7 @@ async function handler(req, res) {
           confidence: typeof b.confidence === "number" ? b.confidence : null, reply_count: typeof b.reply_count === "number" ? b.reply_count : null,
           booking_asks: typeof b.booking_asks === "number" ? b.booking_asks : null,
           status: "approved", send_after: sendAfter, approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          ...propPatch,
         };
         try {
           if (b.ready_id) await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(held) });
@@ -1020,7 +1052,7 @@ async function handler(req, res) {
       } catch (_) {}
       // If this approval came from a queued ready reply, close out that row.
       if (b.ready_id) {
-        try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+        try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...propPatch }) }); } catch (_) {}
       }
       return res.status(200).json({ ok: true, sent: true, lesson_id: lessonId });
     }
@@ -1196,8 +1228,35 @@ async function handler(req, res) {
         // (caught live on GTA 2026-07-10, Mike Sandhu). Prefers the deck's edited
         // text (b.reply), falls back to the detector's draft. Human-approved +
         // time-sensitive -> sends immediately (same exemption as lost goodbyes).
-        const confirmMsg = ((typeof b.reply === "string" ? b.reply : "") || row.draft_message || "").trim();
-        if (confirmMsg) { try { await sendReplyViaGhl(token, contactId, confirmMsg, clientId); confirmationSent = true; } catch (_) {} }
+        // Add-to-calendar links ride along (same links the scripted confirmation
+        // template carries), so this message fully replaces that step.
+        let confirmMsg = ((typeof b.reply === "string" ? b.reply : "") || row.draft_message || "").trim();
+        if (confirmMsg) {
+          try {
+            const startMs = new Date(startIso).getTime();
+            const cal = { startMs, endMs: startMs + 3600000, title: "Free Trial" };
+            confirmMsg += `\n\nAdd it to your calendar:\n\nApple: ${buildIcalUrl(cal)}\n\nGoogle: ${buildGoogleCalUrl(cal)}`;
+          } catch (_) {}
+          try { await sendReplyViaGhl(token, contactId, confirmMsg, clientId); confirmationSent = true; } catch (_) {}
+        }
+        // Mark the confirm agent's scripted "Booking confirmation" (when:
+        // immediate) as handled for THIS trial - without this marker the next
+        // confirm cron self-sends the template minutes later and the parent
+        // gets two booking confirmations back to back. The same-day reminder
+        // still fires (different step_key). fireScriptedStep matches
+        // kind=confirm_auto + step_key + same trial_at (epoch compare).
+        if (confirmationSent) {
+          try {
+            await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+              client_id: clientId, ghl_contact_id: String(contactId), contact_name: row.contact_name || null,
+              kind: "confirm_auto", step_key: "confirm", draft_message: confirmMsg, confidence: 1,
+              trial_at: startIso, status: "sent", auto_sent: false, approved_by: staffEmail,
+              approved_at: new Date().toISOString(), sent_at: new Date().toISOString(),
+              reasoning: "Booking confirmation sent with the Book-it approval (replaces the scripted immediate step).",
+              created_by: staffEmail,
+            }]) });
+          } catch (_) { /* marker is dedup only - never block the booking */ }
+        }
       } else {
         try {
           appt = await ghl("POST", `/calendars/events/appointments`, { token, body: {
