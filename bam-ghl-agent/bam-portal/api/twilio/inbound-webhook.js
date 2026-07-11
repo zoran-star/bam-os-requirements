@@ -18,6 +18,7 @@ import { respondedStage, contactInRespondedStage, interestedStage, nurtureStage,
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
+import { cancelReignitions } from "../agent/_reignite.js";
 import { decryptSecret } from "../messaging/_crypto.js";
 
 const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -131,6 +132,9 @@ async function handler(req, res) {
       await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
       await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
       await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+      // 🔥 A parked "yes, but later" lead who texts back re-engaged early: clear
+      // their scheduled reignition - the owning agent works them normally now.
+      await cancelReignitions(client.id, String(ghlContactId), "lead replied before the reignition date");
     } catch (e) { console.error("twilio inbound draft-cancel:", e.message); }
 
     // Replied while in a portal automation → exit (keyless exit spares 🎉 onboarding) +

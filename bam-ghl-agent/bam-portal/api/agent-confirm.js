@@ -50,6 +50,7 @@ import { confirmAgentMode, modeIsOn, shouldAutoSend, shouldAutoSendScripted } fr
 import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
+import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, dueReignitions, markReignition } from "./agent/_reignite.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -106,7 +107,8 @@ const CONFIRM_TRAILER =
   `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
   `'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human. ` +
   `If the lead CAN'T make their booked time / needs to reschedule, set 'recommend_handoff' = true with a clear 'handoff_note' capturing the dropped slot + any reason or constraint they gave (this note is what the booking assistant reads to rebook them) — do NOT propose new times yourself; put a warm acknowledgement in 'reply'. ` +
-  `If your confirm_lost criteria say the lead no longer wants the trial at all, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms handoff/lost before anything changes.\n</live_confirm>`;
+  `If your confirm_lost criteria say the lead no longer wants the trial at all, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms handoff/lost before anything changes. ` +
+  `REIGNITION: if the lead still WANTS the trial but only at a clearly LATER date ("after summer", "once the season ends", "text us in September") - not just a different time this week or next (that's a handoff to rebook) - set 'reignite_at' (YYYY-MM-DD - resolve a vague timeframe to a concrete date, e.g. "after summer" = Sep 01; a bare "later" = about 30 days out) and 'reignite_message' = the exact re-engagement text to open with ON that date. Make 'reply' the warm acknowledgement to send NOW. A human confirms the date + both messages before anything is scheduled.\n</live_confirm>`;
 function buildSystem({ lessons, overrides, examples }) {
   return buildAgentSystem({ lessons, overrides, examples, trailer: CONFIRM_TRAILER, agent: "confirm" });
 }
@@ -127,6 +129,8 @@ const REPLY_TOOL = {
       handoff_note:      { type: "string", description: "If recommend_handoff: the context the booking assistant needs — which slot they're dropping (day/time) and any reason/constraint they gave. If they gave no reason, say so." },
       recommend_lost:    { type: "boolean", description: "True only if the lead no longer wants the trial AT ALL (not just this time) — a human confirms before anything changes." },
       lost_reason:       { type: "string", description: "If recommend_lost: closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Opted out / Other)." },
+      reignite_at:       { type: "string", description: "YYYY-MM-DD. ONLY when the lead still wants the trial but at a clearly LATER date (a season away, not a rebook): the concrete day to re-engage. A human confirms before anything is scheduled." },
+      reignite_message:  { type: "string", description: "If reignite_at: the exact re-engagement text to open with on that date - warm, references what they told us, moves toward getting the trial back on the books." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
@@ -258,6 +262,10 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     handoff_note: out.handoff_note || null,
     recommend_lost: !!out.recommend_lost,
     lost_reason: out.lost_reason || null,
+    // 🔥 Reignition: "still want it, but later" with a concrete date + pre-written
+    // re-engagement message. Invalid/past dates drop out.
+    reignite_at: normalizeReigniteAt(out.reignite_at),
+    reignite_message: (out.reignite_message && String(out.reignite_message).trim()) || null,
     trial_at: appt ? toIso(appt.startTime) : null,
     summary: out.summary ? String(out.summary).slice(0, 600) : null,
     last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
@@ -526,6 +534,29 @@ async function detectForClient(client) {
   // Loaded before the flush so a held send at a MUTED lead is canceled, not sent.
   const mutedSet = await mutedContactIdSet(client.id, "confirm");
 
+  // 🔥 Reignition: the parked "still want it, but later" set (proactive touches
+  // below skip them) + fire due parks into a kind='reignite_due' card on this
+  // deck. NO passedTrial cancel here: a park in this stage voided the dropped
+  // slot at confirm-reignite time, and a lingering passed slot must not kill the
+  // plan. Left-stage cancels only when the membership fetch is trusted.
+  let reignited = 0;
+  const reignSet = await reigniteContactIdSet(client.id);
+  for (const r of await dueReignitions(client.id, "confirm")) {
+    const cid = String(r.ghl_contact_id);
+    if (mutedSet.has(cid)) { await markReignition(r.id, "canceled", { cancel_reason: "bot muted on this lead" }); reignSet.delete(cid); continue; }
+    if (stageSetTrusted && !scheduledIds.has(cid)) { await markReignition(r.id, "canceled", { cancel_reason: "left Scheduled-Trial stage" }); reignSet.delete(cid); continue; }
+    try {
+      await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+        client_id: client.id, ghl_contact_id: cid, contact_name: r.contact_name || null,
+        kind: "reignite_due", draft_message: r.message, reignite_at: r.reignite_at,
+        reasoning: r.reason ? `Reignition day - ${r.reason}` : "Reignition day - the lead asked us to circle back today.",
+        confidence: 1, status: "pending", created_by: "reignition",
+      }]) });
+      await markReignition(r.id, "carded");
+      reignSet.delete(cid); reignited++;
+    } catch (e) { console.error("[agent-confirm] reignite fire:", cid, e.message); }   // active card in the way -> retry next run
+  }
+
   // Flush quiet-hours holds (approved confirm cards whose send time arrived).
   let flushed = 0;
   if (withinQuietHours(new Date(), quietTz(client))) {
@@ -585,7 +616,7 @@ async function detectForClient(client) {
   } catch (_) {}
   queue = queue.filter(q => (q.last_direction || "") === "inbound" || !_confActiveCarded.has(String(q.contact_id)));
 
-  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, handoffs = 0, lostProposed = 0, deferred = 0;
+  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, handoffs = 0, lostProposed = 0, deferred = 0, reigniteProposed = 0;
   const reasons = [];
   let _first = true;
   for (const item of queue.slice(0, DETECT_CAP)) {
@@ -603,6 +634,15 @@ async function detectForClient(client) {
     if (await isLiveMember(client.id, contactId, token)) { skipped++; reasons.push(`${item.name || contactId}: already a live member`); continue; }
 
     const reactive = item.last_direction === "inbound";
+
+    // 🔥 Parked "later" leads: no proactive touches (silence is the plan). A lead
+    // who texted back re-engaged early - clear the park (belt + suspenders with
+    // the inbound webhook's cancel) and work them normally.
+    if (reignSet.has(String(contactId))) {
+      if (!reactive) { skipped++; reasons.push(`${item.name || contactId}: parked for reignition`); continue; }
+      await cancelReignitions(client.id, contactId, "lead replied before the reignition date");
+      reignSet.delete(String(contactId));
+    }
 
     // SCRIPTED INITIAL AUTOMATIONS (proactive only). When the academy's sequence is
     // live + approved, the timed scripted touches OWN the proactive path (they
@@ -669,6 +709,21 @@ async function detectForClient(client) {
       continue;
     }
 
+    // 🔥 Reignition proposal: "still want it, but later" with a timeframe. ALWAYS
+    // queue for a human - the card carries the editable ack (sends on ✓), the
+    // pre-written future message, and the date. Nothing schedules until
+    // confirm-reignite.
+    if (d.reignite_at && d.reignite_message) {
+      try {
+        await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          ...baseRow, kind: "reignite", reignite_at: d.reignite_at, reignite_message: d.reignite_message,
+          draft_message: (d.reply && String(d.reply).trim()) ? d.reply : "", status: "pending", created_by: "detector",
+        }]) });
+        reigniteProposed++;
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: reignite-insert failed — ${e.message}`); }
+      continue;
+    }
+
     // Escalation: no message to send, but a human should see it. draft_message
     // stays EMPTY - the card explains itself via escalate_reason, and an empty
     // draft can't be one-tap texted to the parent (the old "(agent escalated ...)"
@@ -731,6 +786,8 @@ async function detectForClient(client) {
       const contactId = item.contact_id;
       if (!contactId) continue;
       if (mutedSet.has(String(contactId))) continue;
+      // Parked for reignition: leaving them alone IS the plan - never nag.
+      if (reignSet.has(String(contactId))) continue;
       // Portal academies: these leads already get the REAL post-trial form card
       // in list-ready - an overdue "did they show up?" nag would be a duplicate.
       if (passedTrial.has(String(contactId))) continue;
@@ -778,7 +835,7 @@ async function detectForClient(client) {
     }
   } catch (e) { reasons.push(`overdue pass: ${e.message}`); }
 
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, handoffs, lost_proposed: lostProposed, auto_sent: autoSent, deferred, flushed, escalated, overdue, skipped, pruned, reasons };
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, handoffs, lost_proposed: lostProposed, reignite_proposed: reigniteProposed, reignited, auto_sent: autoSent, deferred, flushed, escalated, overdue, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {
@@ -868,7 +925,11 @@ async function handler(req, res) {
             // follow the latest reviewed trial, so filling the form still hides it.
             const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=trial_booking_id`) || [];
             const reviewedBookings = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.trial_booking_id || "")).filter(Boolean));
-            const unreviewed = due.filter(t => !reviewedBookings.has(String(t.id)));
+            // 🔥 Parked for reignition: leaving them alone IS the plan - no
+            // post-trial form card while a reignition is scheduled (their dropped
+            // slot was voided at park time; this guards the stragglers).
+            const reignSet = await reigniteContactIdSet(clientId);
+            const unreviewed = due.filter(t => !reviewedBookings.has(String(t.id)) && !reignSet.has(String(t.ghl_contact_id || "")));
             // Read-time gate (Zoran 2026-07-09, mirrors Booking's): once the
             // trial has run, this agent's own reply/handoff/reminder cards for
             // that lead are stale - a pre-trial "see you Tuesday!" draft must
@@ -1110,6 +1171,7 @@ async function handler(req, res) {
         try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
       await clearConfirmCards(clientId, contactId, "handed off to booking");
+      await cancelReignitions(clientId, contactId, "handed off to booking to rebook");
       // Park the held acknowledgement AFTER the card sweep above, so it's the
       // contact's one active row (partial unique index: one pending/approved
       // per contact). PATCH revives the just-cleared ready row; contact-direct
@@ -1133,6 +1195,68 @@ async function handler(req, res) {
         } catch (_) {}
       }
       return res.status(200).json({ ok: true, handed_off: true, moved_to_responded: moved, opportunity_id: oppId, ack_deferred: holdAck, ack_send_after: ackAfter });
+    }
+
+    // 🔥 Confirm a Reignition: send the (editable) ack now, park the lead in place
+    // (agent_reignitions), and VOID any upcoming portal trial slot they're
+    // dropping (same cancel as confirm-handoff - otherwise the passed slot spawns
+    // a bogus post-trial form card while they're parked). The lead STAYS in
+    // Scheduled-Trial; the detect cron fires the pre-written message as a
+    // reignite_due card on this deck when the date arrives.
+    if (b.action === "confirm-reignite") {
+      let row = null, contactId = b.contact_id || null;
+      if (b.ready_id) {
+        [row] = await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        if (!row) return res.status(404).json({ error: "not found" });
+        contactId = row.ghl_contact_id;
+      }
+      if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
+      const reigniteAt = normalizeReigniteAt((typeof b.reignite_at === "string" && b.reignite_at) || (row && row.reignite_at) || "");
+      if (!reigniteAt) return res.status(400).json({ error: "A future reignite date is required (up to ~18 months out)." });
+      const message = String((typeof b.message === "string" && b.message.trim()) ? b.message : ((row && row.reignite_message) || "")).trim();
+      if (!message) return res.status(400).json({ error: "The re-engagement message for that date is required." });
+      const ack = ((typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "").trim();
+      let ackSent = false;
+      if (ack) { try { await sendReplyViaGhl(token, contactId, ack, clientId); ackSent = true; } catch (_) {} }
+      try {
+        await scheduleReignition({
+          clientId, contactId, contactName: (row && row.contact_name) || b.contact_name || null,
+          agent: "confirm", reigniteAt, message,
+          reason: (typeof b.reason === "string" && b.reason.trim()) || (row && row.reasoning) || null,
+          source: row && row.kind === "reignite" ? "agent" : "manual", createdBy: staffEmail,
+        });
+      } catch (e) { return res.status(500).json({ error: `couldn't schedule: ${e.message}` }); }
+      // Void the upcoming slot(s) they're dropping (portal spine, best-effort).
+      try {
+        if ((await bookingProviderOf(clientId)) === "portal") {
+          const nowIso = new Date().toISOString();
+          const bks = await sb(`trial_bookings?tenant_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.BOOKED&select=id,schedule_slots(start_time)&order=created_at.desc`);
+          for (const t of (Array.isArray(bks) ? bks : [])) {
+            const st = t.schedule_slots && t.schedule_slots.start_time;
+            if (st && st <= nowIso) continue;
+            await sb(`rpc/cancel_trial_booking`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ p_tenant_id: clientId, p_trial_booking_id: t.id }) });
+          }
+        }
+      } catch (_) { /* best-effort - the park already landed */ }
+      // Optional teach-why lesson (an edited date/message trains the agent).
+      let lessonId = null;
+      if (b.lesson && String(b.lesson).trim()) {
+        try {
+          const [lrow] = await sb(`agent_lessons`, { method: "POST", headers: { Prefer: "return=representation" },
+            body: JSON.stringify([{ client_id: clientId, agent: "confirm", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: contactId, reignite_at: reigniteAt, sent: ack || null } }]) });
+          lessonId = lrow?.id || null;
+        } catch (_) {}
+      }
+      // Truthful bookkeeping: acted-on row 'sent' only when the ack went out.
+      if (b.ready_id) {
+        const done = ackSent
+          ? { status: "sent", reignite_at: reigniteAt, reignite_message: message, approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+          : { status: "canceled", send_error: "parked for reignition", reignite_at: reigniteAt, reignite_message: message, approved_by: staffEmail, updated_at: new Date().toISOString() };
+        try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(done) }); } catch (_) {}
+      }
+      await clearConfirmCards(clientId, contactId, "parked for reignition");
+      try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: (row && row.contact_name) || null, final_reply: `[reignite ${reigniteAt.slice(0, 10)}]${ackSent ? " + ack sent" : ""}`, reasoning: (row && row.reasoning) || null, status: "sent", created_by: staffEmail }); } catch (_) {}
+      return res.status(200).json({ ok: true, scheduled_for: reigniteAt, ack_sent: ackSent, lesson_id: lessonId });
     }
 
     // Confirm a Lost suggestion: optional warm closing, then mark the opp Lost.
@@ -1180,6 +1304,7 @@ async function handler(req, res) {
         try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(done) }); } catch (_) {}
       }
       await clearConfirmCards(clientId, contactId, "marked lost");
+      await cancelReignitions(clientId, contactId, routedToNurture ? "moved to nurture" : "marked lost");
       return res.status(200).json({ ok: true, marked_lost: !routedToNurture, routed_to_nurture: routedToNurture, opportunity_id: oppId, reason });
     }
 
@@ -1219,6 +1344,7 @@ async function handler(req, res) {
         try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(done) }); } catch (_) {}
       }
       await clearConfirmCards(clientId, contactId, "marked unqualified");
+      await cancelReignitions(clientId, contactId, "marked unqualified");
       return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });
     }
 

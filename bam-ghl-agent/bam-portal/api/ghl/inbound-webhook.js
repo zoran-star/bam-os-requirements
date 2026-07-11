@@ -5,6 +5,7 @@ import { respondedStage, contactInRespondedStage, scheduledTrialStage, intereste
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
+import { cancelReignitions } from "../agent/_reignite.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
 //
 //   POST /api/ghl/inbound-webhook
@@ -268,6 +269,9 @@ async function handler(req, res) {
       // And the closing agent: a stale closing card can't be sent at a now-talking
       // lead; the closing detector re-drafts so the AI can answer what they just said.
       await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
+      // 🔥 A parked "yes, but later" lead who texts back re-engaged early: clear
+      // their scheduled reignition - the owning agent works them normally now.
+      await cancelReignitions(client.id, String(contactId), "lead replied before the reignition date");
     }
   } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }
 

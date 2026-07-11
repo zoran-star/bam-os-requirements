@@ -15652,6 +15652,37 @@ async function _contactsOpenDrawer(idx) {
   _renderTagEditor('cd-tags', c.ghl_contact_id, (_CDRAWER.ghl && _CDRAWER.ghl.tags) || c.tags || []);
   _contactsLoadStripe(c);
   _cdLoadMemory(c);
+  try { _cdReigniteChip(c.ghl_contact_id); } catch (_) {}
+}
+// 🔥 Reignition chip on the contact drawer: "Reignite <date>" + cancel. Reads
+// the parked map (fetches it once if home hasn't loaded it yet). Best-effort.
+async function _cdReigniteChip(cid) {
+  if (!cid || typeof _plIsV2 !== 'function' || !_plIsV2()) return;
+  if (typeof _PL_REIGN === 'undefined' || !_PL_REIGN) {
+    try {
+      const j = await _apxPost('/api/agent-approvals', 'list-reignitions', {});
+      const m = new Map();
+      for (const r of ((j && j.reignitions) || [])) { if (r.ghl_contact_id) m.set(String(r.ghl_contact_id), r); }
+      _PL_REIGN = m;
+    } catch (_) { return; }
+  }
+  const rg = _PL_REIGN.get(String(cid)); if (!rg) return;
+  const body = document.getElementById('contacts-drawer-body'); if (!body) return;
+  let when = '';
+  try { when = new Date(rg.reignite_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }); } catch (_) {}
+  body.insertAdjacentHTML('afterbegin', `
+    <div id="cd-reignite" style="display:flex;align-items:center;gap:9px;margin:0 0 12px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--gold,#D4B65C) 45%,transparent);border-radius:9px;background:color-mix(in srgb,var(--gold,#D4B65C) 10%,transparent)">
+      <div style="min-width:0;flex:1;font-size:12.5px;color:var(--text);line-height:1.4"><b>Reignite ${escapeHTML(when || 'soon')}</b><span style="color:var(--text-sub)"> · parked, agents leave them alone until then</span></div>
+      <button onclick="_cdReigniteCancel('${escapeHTML(String(rg.id))}','${escapeHTML(String(cid))}')" style="background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--text-sub);font:inherit;font-size:11.5px;padding:4px 10px;cursor:pointer">Cancel</button>
+    </div>`);
+}
+async function _cdReigniteCancel(id, cid) {
+  try {
+    await _apxPost('/api/agent-approvals', 'cancel-reignition', { reignition_id: id });
+    if (_PL_REIGN) _PL_REIGN.delete(String(cid));
+    const el = document.getElementById('cd-reignite'); if (el) el.remove();
+    if (typeof _apxToast === 'function') _apxToast('Reignition canceled - agents work this lead normally again', true);
+  } catch (e) { if (typeof _apxToast === 'function') _apxToast('Could not cancel: ' + (e.message || e), false); }
 }
 // ── Reusable contact-tag editor (Contacts drawer + Inbox thread) ──
 // View current tags as chips (× to remove) + an "add tag" dropdown sourced from
@@ -30699,16 +30730,21 @@ let _PL_NEEDS = null;
 // Not "needs you" (staff already acted), but the system owns them - the stuck-
 // list safety net must not flag these leads as "not flowing".
 let _PL_HELD = null;
+// 🔥 Contacts PARKED for reignition ("yes, but later"): Map<contactId, row>
+// (row = { id, reignite_at, agent, message, reason }). Drives the cascade/drawer
+// "Reignite <date>" chips and exempts parked leads from the stuck list.
+let _PL_REIGN = null;
 // If one lead somehow has more than one pending card, show the most decisive one.
-const _PL_NEED_PRIO = { book: 4, mark_lost: 3, reply: 2, ghost: 1 };
+const _PL_NEED_PRIO = { book: 4, mark_lost: 3, reignite: 3, reignite_due: 3, reply: 2, ghost: 1 };
 async function _plLoadNeedsAction() {
   try {
     // V2: the needs map spans ALL THREE agents (deck + simple-view highlights).
     // V1.5 keeps the booking-only behaviour (its board only badges Responded).
-    const [j, jc, jl] = await Promise.all([
+    const [j, jc, jl, jr] = await Promise.all([
       _apxPost('/api/agent-approvals', 'list-ready', {}),
       _plIsV2() ? _apxPost('/api/agent-confirm', 'list-ready', {}).catch(() => ({})) : Promise.resolve({}),
       _plIsV2() ? _apxPost('/api/agent-closing', 'list-ready', {}).catch(() => ({})) : Promise.resolve({}),
+      _plIsV2() ? _apxPost('/api/agent-approvals', 'list-reignitions', {}).catch(() => ({})) : Promise.resolve({}),
     ]);
     // PENDING rows = a card the deck will actually show ("N need you" must match
     // the deck exactly - counting approved rows sent staff to an All-clear deck).
@@ -30729,6 +30765,10 @@ async function _plLoadNeedsAction() {
     add(j.ready); add(jc.ready); add(jl.ready);
     _PL_NEEDS = map;
     _PL_HELD = heldSet;
+    // 🔥 Scheduled reignitions -> the parked-lead map (chips + stuck-list exempt).
+    const rmap = new Map();
+    for (const r of ((jr && jr.reignitions) || [])) { if (r.ghl_contact_id) rmap.set(String(r.ghl_contact_id), r); }
+    _PL_REIGN = rmap;
   } catch (e) {
     // Permission denied → this viewer can't read agent status; hide the badges
     // entirely (don't paint everything green). Transient error → keep prior.
@@ -32228,6 +32268,8 @@ const _HK2_KIND = {
   plan:    { pill: 'Follow-up plan',  color: 'var(--accent)',          cls: '',      go: 'Approve plan - sends 1 day apart', goEdit: 'Confirm edits and approve plan' },
   lost:    { pill: 'Suggested lost',  color: 'var(--red,#F07060)',     cls: 'red',   go: 'Mark lost',                     goEdit: 'Confirm edits and mark lost' },
   form:    { pill: 'Post-trial form', color: 'var(--accent)',          cls: '',      go: 'Submit post-trial form',        goEdit: 'Submit post-trial form' },
+  reignite:     { pill: 'Wants to start later', color: 'var(--gold,#D4B65C)', cls: '', go: 'Send ack + schedule reignite', goEdit: 'Confirm edits and schedule' },
+  reignite_due: { pill: 'Reignition day',       color: 'var(--gold,#D4B65C)', cls: '', go: 'Approve and send',             goEdit: 'Confirm edits and send' },
 };
 
 // ── Sales focus overlays (Zoran 2026-07-09) ────────────────────────────────
@@ -32321,8 +32363,9 @@ async function _hk2Load() {
     _apxPost('/api/agent-closing', 'list-ready', {}).catch(() => ({})),
   ]);
   const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
-  const booking = pend(b).map(r => ({ ...r, _kind: r.kind === 'book' ? 'book' : r.kind === 'ghost' ? 'ghost' : r.kind === 'mark_lost' ? 'lost' : 'reply' }));
-  const confirm = pend(c).map(r => ({ ...r, _kind: r.kind === 'confirm_handoff' ? 'handoff' : r.kind === 'confirm_lost' ? 'lost' : r.kind === 'post_trial' ? 'form' : 'reply' }));
+  const reig = r => r.kind === 'reignite' ? 'reignite' : r.kind === 'reignite_due' ? 'reignite_due' : null;
+  const booking = pend(b).map(r => ({ ...r, _kind: reig(r) || (r.kind === 'book' ? 'book' : r.kind === 'ghost' ? 'ghost' : r.kind === 'mark_lost' ? 'lost' : 'reply') }));
+  const confirm = pend(c).map(r => ({ ...r, _kind: reig(r) || (r.kind === 'confirm_handoff' ? 'handoff' : r.kind === 'confirm_lost' ? 'lost' : r.kind === 'post_trial' ? 'form' : 'reply') }));
   const clRows = pend(l);
   const plans = new Map(), rest = [];
   for (const r of clRows) {
@@ -32330,7 +32373,7 @@ async function _hk2Load() {
     else rest.push(r);
   }
   const closing = [
-    ...rest.map(r => ({ ...r, _kind: r.kind === 'closing_enroll' ? 'enroll' : r.kind === 'closing_lost' ? 'lost' : 'reply' })),
+    ...rest.map(r => ({ ...r, _kind: reig(r) || (r.kind === 'closing_enroll' ? 'enroll' : r.kind === 'closing_lost' ? 'lost' : 'reply') })),
     ...[...plans.values()].map(rows => ({
       _kind: 'plan', id: 'plan:' + rows[0].ghl_contact_id, ghl_contact_id: rows[0].ghl_contact_id,
       ghl_conversation_id: rows[0].ghl_conversation_id, contact_name: rows[0].contact_name,
@@ -32454,8 +32497,27 @@ function _hk2Moves(r) {
   } else {
     if (k !== 'lost') m.push([_hk2MoveLabel('lost', hasMsg), 'lost']);
   }
+  // 🔥 Any card can park the lead for a later date instead ("yes, but later").
+  if (k !== 'reignite') m.push(['Reignite later', 'reignite']);
+  if (k === 'reignite' && r._origKind) m.unshift(['Back to the card', 'unreignite']);
   m.push([_hk2MoveLabel('unq', hasMsg), 'unq']);
   return m;
+}
+// "Reignite later" from the Other menu: flip the card into the reignite layout
+// (date + future message + optional ack) - the normal confirm flow schedules it.
+function _hk2ReigniteMode() {
+  const r = _hk2Top(); if (!r) return;
+  if (r._kind === 'form') return;   // the form card has no moves anyway
+  r._origKind = r._kind;
+  r._kind = 'reignite';
+  if (!r.reignite_message) r.reignite_message = '';
+  _hk2Render();
+}
+function _hk2ReigniteBack() {
+  const r = _hk2Top(); if (!r || !r._origKind) return;
+  r._kind = r._origKind;
+  r._origKind = null;
+  _hk2Render();
 }
 function _hk2CardHtml(r, pos, total, isTop) {
   const km = _HK2_KIND[r._kind];
@@ -32497,6 +32559,20 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <div class="hk2-lbl">Optional goodbye - sends with the move${reason}</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       <div class="hk2-note">Approving routes them to Nurture (the long game). You confirm - nothing moves on its own.</div>`;
+  } else if (r._kind === 'reignite') {
+    // 🔥 The PARK card: an ack that sends now, the date, and the pre-written
+    // message that fires ON that date. All three editable; message edits demand
+    // the teach note, the date is logistics (no note, like a slot change).
+    const dt = r.reignite_at ? String(r.reignite_at).slice(0, 10) : '';
+    const minDt = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    body = `${_hk2ThreadHtml(r)}
+      <div class="hk2-lbl">Acknowledgement - sends now (clear it for a silent park)</div>
+      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+      <div class="hk2-lbl">Reignition date - when we circle back</div>
+      <div class="hk2-fields"><label><span>Fires on</span><input type="date"${isTop ? ' id="hk2-reig-date"' : ''} value="${escapeHTML(dt)}" min="${minDt}" onchange="_hk2Edited(true)" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px"></label></div>
+      <div class="hk2-lbl">The message that fires on that date - written now, final ✓ then</div>
+      <textarea class="hk2-draft"${isTop ? ' id="hk2-reig-msg"' : ''} oninput="_hk2Edited()">${escapeHTML(r.reignite_message || '')}</textarea>
+      <div class="hk2-note">The lead stays right where they are - every agent and automation leaves them alone until the date, then this message comes back as a card for your final ✓. A text from them, a booking, or a close cancels the park automatically.</div>`;
   } else if (r._kind === 'form') {
     // The post-trial form, right in the deck (Zoran 2026-07-09). Same fields
     // as the board form; submitting routes the lead via /api/ghl/post-trial.
@@ -32528,8 +32604,12 @@ function _hk2CardHtml(r, pos, total, isTop) {
         <label><span>Slot</span><select${id.slot} onchange="_hk2Edited()"><option value="${escapeHTML(r.book_slot_at)}" selected>${escapeHTML(_hk2SlotLabel(r.book_slot_at))}</option></select></label>
       </div>
       <div class="hk2-note">This is the time the message offers. Pick a different slot = update the message to match; the text is what sends.</div>` : '';
-    body = `${_hk2ThreadHtml(r)}${proposal}
-      <div class="hk2-lbl">${r._kind === 'enroll' ? 'The reply, sign-up link included · edit it right here' : 'Proposed message · edit it right here'}</div>
+    // 🔥 The fired reignition: the message pre-written at park time, back for
+    // its final ✓ on the day the lead asked for.
+    const reigBanner = (r._kind === 'reignite_due' && r.reignite_at)
+      ? `<div class="hk2-booked"><span class="hk2-booked-check">✓</span> Reignition day - they asked us to circle back ${escapeHTML((() => { try { return new Date(r.reignite_at).toLocaleDateString([], { month: 'short', day: 'numeric' }); } catch (_) { return 'today'; } })())}</div>` : '';
+    body = `${_hk2ThreadHtml(r)}${reigBanner}${proposal}
+      <div class="hk2-lbl">${r._kind === 'enroll' ? 'The reply, sign-up link included · edit it right here' : r._kind === 'reignite_due' ? 'The re-engagement message you locked in · edit before it sends' : 'Proposed message · edit it right here'}</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       ${r._kind === 'enroll' ? '<div class="hk2-note">The opportunity is marked won automatically when they pay on the link.</div>' : ''}`;
   }
@@ -32538,7 +32618,11 @@ function _hk2CardHtml(r, pos, total, isTop) {
   // primary button into the two terminal closes (Zoran 2026-07-10).
   const _pp = _HK2.ptf || {};
   const ptfNotFit = isForm && _pp.showed === true && _pp.fit === false;
-  const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) => op === 'write' ? `<button class="hk2-x" onclick="_hk2Write()">${lab}</button>` : `<button class="hk2-x" data-op="${op}" data-orig="${escapeHTML(lab)}" onclick="_hk2Move('${op}', this)">${lab}</button>`).join('');
+  const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) =>
+    op === 'write' ? `<button class="hk2-x" onclick="_hk2Write()">${lab}</button>`
+    : op === 'reignite' ? `<button class="hk2-x" onclick="_hk2ReigniteMode()">${lab}</button>`
+    : op === 'unreignite' ? `<button class="hk2-x" onclick="_hk2ReigniteBack()">${lab}</button>`
+    : `<button class="hk2-x" data-op="${op}" data-orig="${escapeHTML(lab)}" onclick="_hk2Move('${op}', this)">${lab}</button>`).join('');
   // Two-line header: athlete on top, parent underneath. No athlete name = fall
   // back to the single contact name + confidence, exactly as before.
   const athlete = r.athlete_name ? String(r.athlete_name).trim() : '';
@@ -32760,11 +32844,21 @@ function _hk2Confirm() {
   const before = r.draft_message || '';
   const k = r._kind;
   const writeMode = k === 'ghost' && r._writeMode;
-  if ((k === 'reply' || k === 'enroll' || writeMode) && !reply) { _apxToast('Message is empty', false); r._hk2Busy = false; return; }
+  if ((k === 'reply' || k === 'enroll' || k === 'reignite_due' || writeMode) && !reply) { _apxToast('Message is empty', false); r._hk2Busy = false; return; }
   // Capture every input NOW - the deck advances to the next card immediately,
   // which tears down this card's DOM before the deferred API call runs.
   const calEl = document.getElementById('hk2-cal'), slotEl = document.getElementById('hk2-slot');
   const calV = (calEl && calEl.value) || r.book_calendar_id, slotV = (slotEl && slotEl.value) || r.book_slot_at;
+  // 🔥 Reignite card: the date + the future message are both required. The ack
+  // (main box) is optional - empty = silent park.
+  const reigDateEl = document.getElementById('hk2-reig-date'), reigMsgEl = document.getElementById('hk2-reig-msg');
+  const reigDate = k === 'reignite' ? ((reigDateEl && reigDateEl.value) || (r.reignite_at ? String(r.reignite_at).slice(0, 10) : '')) : null;
+  const reigMsg = k === 'reignite' ? ((reigMsgEl ? reigMsgEl.value : r.reignite_message || '').trim()) : null;
+  if (k === 'reignite' && !reigDate) { _apxToast('Pick the reignition date first', false); r._hk2Busy = false; return; }
+  if (k === 'reignite' && !reigMsg) { _apxToast('Write the message that fires on that date', false); r._hk2Busy = false; return; }
+  // A ready row exists for every card except the synthesized ones; a plan card
+  // flipped into reignite mode rides its first row's id.
+  const reigReadyId = k === 'reignite' ? (r._origKind === 'plan' ? (r.rows && r.rows[0] && r.rows[0].id) : (String(r.id || '').startsWith('ptf:') ? null : r.id)) : null;
   const planEdits = k === 'plan' ? (r.rows || []).map((row, i) => { const el = document.getElementById('hk2-plan-' + i); return { id: row.id, reply: (el ? el.value : row.draft_message || '').trim() }; }) : null;
   let ptf = null;
   if (k === 'form') {
@@ -32811,6 +32905,17 @@ function _hk2Confirm() {
     } else if (k === 'lost') {
       chk(await _apxPost(ep, 'confirm-lost', { ready_id: r.id, reply, lost_reason: r.lost_reason || 'Other' }));
       _apxToast('Marked lost - Nurture takes over', true);
+    } else if (k === 'reignite') {
+      // 🔥 Park it: ack (if any) sends now, the message fires as a new card on
+      // the date. Works from an agent-proposed reignite card OR any card flipped
+      // via "Reignite later" (contact_id covers the synthesized ones).
+      chk(await _apxPost(ep, 'confirm-reignite', {
+        ready_id: reigReadyId || undefined, contact_id: r.ghl_contact_id, contact_name: r.contact_name || null,
+        reignite_at: reigDate, message: reigMsg, reply, reason: r.reasoning || null,
+      }));
+      const nice = (() => { try { return new Date(reigDate + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' }); } catch (_) { return reigDate; } })();
+      _apxToast(reply ? `Ack sent + reignite set for ${nice}` : `Reignite set for ${nice}`, true);
+      try { if (_PL_REIGN && r.ghl_contact_id) _PL_REIGN.set(String(r.ghl_contact_id), { id: 'fresh', ghl_contact_id: String(r.ghl_contact_id), reignite_at: reigDate + 'T14:00:00Z', agent }); } catch (_) {}
     } else if (k === 'form') {
       const token = await _mreqAuthToken();
       const res = await fetch('/api/ghl/post-trial?client_id=' + encodeURIComponent(CLIENT_ID), { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(ptf) });
@@ -32866,7 +32971,8 @@ function _hk2Move(op, btn) {
   r._hk2Busy = true;
   const agent = _HK2.agent;
   const ep = _HK2_META[agent].ep;
-  const readyId = r._kind === 'plan' ? (r.rows && r.rows[0] && r.rows[0].id) : r.id;
+  // A plan card keeps its first row's id even after "Reignite later" flipped it.
+  const readyId = (r._kind === 'plan' || r._origKind === 'plan') ? (r.rows && r.rows[0] && r.rows[0].id) : r.id;
   if (!readyId) return;
   // Capture the lesson AND the message box NOW - the deck advances at 480ms and
   // tears this DOM down. Nurture/Unqualified send the box when it has text (the
@@ -33213,6 +33319,12 @@ function _plo2Cascade(stage, nav) {
     confirm_handoff: 'reschedule · needs a new time', confirm_lost: 'lost suggested',
     closing: 'reply · draft ready', closing_enroll: 'ready to enroll', closing_lost: 'lost suggested',
     post_trial: 'post-trial form to fill',
+    reignite: 'wants to start later · reignite to confirm', reignite_due: 'reignition day · message ready',
+  };
+  const reigTxt = (cid) => {
+    const rg = (typeof _PL_REIGN !== 'undefined' && _PL_REIGN) ? _PL_REIGN.get(cid) : null;
+    if (!rg || !rg.reignite_at) return null;
+    try { return 'reignite ' + new Date(rg.reignite_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' · parked until then'; } catch (_) { return 'parked for reignition'; }
   };
   const enr = (o) => (kind === 'automation' && typeof _PL_ENR !== 'undefined' && _PL_ENR) ? _PL_ENR.get(String(o.contactId || '')) : null;
   // Subtitle for an automation-stage lead: WHEN the next step fires, not step
@@ -33245,6 +33357,7 @@ function _plo2Cascade(stage, nav) {
     const nm = (o.contact && o.contact.name) || o.name || 'Lead';
     const e = enr(o);
     const st = need ? (NEED_TXT[need] || 'needs you in Hawkeye')
+             : reigTxt(String(o.contactId || '')) ? reigTxt(String(o.contactId || ''))
              : kind === 'agent' ? 'agent handling it'
              : kind === 'automation' ? nextStepTxt(e)
              : (o.athlete ? 'athlete: ' + o.athlete : '');
@@ -33367,6 +33480,7 @@ function _ccStuckCards() {
       const cid = String(o.contactId || ''); if (!cid) continue;
       if (typeof _PL_NEEDS !== 'undefined' && _PL_NEEDS && _PL_NEEDS.get(cid)) continue;   // has a Hawkeye action
       if (typeof _PL_HELD !== 'undefined' && _PL_HELD && _PL_HELD.has(cid)) continue;      // parked send awaits the 8am flush
+      if (typeof _PL_REIGN !== 'undefined' && _PL_REIGN && _PL_REIGN.get(cid)) continue;   // parked for reignition - silence is the plan
       if (typeof _PL_ENR !== 'undefined' && _PL_ENR && _PL_ENR.get(cid)) continue;         // in a running automation
       const lm = (typeof _PL_LASTMSG !== 'undefined' && _PL_LASTMSG) ? _PL_LASTMSG.get(cid) : null;
       const last = lm && lm.date ? new Date(lm.date).getTime()

@@ -42,6 +42,7 @@ import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
+import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, dueReignitions, markReignition } from "./agent/_reignite.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -88,7 +89,8 @@ const CLOSING_TRAILER =
   `If the lead is READY to enroll, set 'recommend_enroll' = true with a short 'enroll_note' (which plan/frequency they want, if known) and put a warm message in 'reply' — the academy's sign-up link is appended to your message and a human approves before it sends. ` +
   `If your closing_lost criteria say the good-fit attendee won't enroll, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms enroll/lost before anything changes. ` +
   `Silence alone is NEVER a lost signal: quiet leads are handled by the follow-up loop, which recommends Lost automatically after 3 unanswered follow-ups. Reserve 'recommend_lost' for an explicit no (too expensive, chose another program, not interested). ` +
-  `Follow-up timing: proactive follow-ups default to the NEXT DAY. But if the lead names a specific date or timeframe for their decision ("we'll decide after the weekend", "after the 15th", "once report cards are out"), set 'followup_on' (YYYY-MM-DD) to the day right after it so we don't nag them before they said they'd know.\n</live_closing>`;
+  `Follow-up timing: proactive follow-ups default to the NEXT DAY. But if the lead names a specific date or timeframe for their decision ("we'll decide after the weekend", "after the 15th", "once report cards are out"), set 'followup_on' (YYYY-MM-DD) to the day right after it so we don't nag them before they said they'd know. ` +
+  `REIGNITION (different from followup_on): if the lead clearly WANTS to enroll but only at a distinctly LATER date ("we'll start after summer", "once basketball season ends", "sign us up in September") - a start-later, not a decide-soon - set 'reignite_at' (YYYY-MM-DD - resolve a vague timeframe to a concrete date, e.g. "after summer" = Sep 01; a bare "later" = about 30 days out) and 'reignite_message' = the exact re-engagement text to open with ON that date. Make 'reply' the warm acknowledgement to send NOW. A human confirms the date + both messages before anything is scheduled.\n</live_closing>`;
 function buildSystem({ lessons, overrides, examples }) {
   return buildAgentSystem({ lessons, overrides, examples, trailer: CLOSING_TRAILER, agent: "closing" });
 }
@@ -110,6 +112,8 @@ const REPLY_TOOL = {
       recommend_lost:   { type: "boolean", description: "True only if the good-fit attendee clearly won't enroll — a human confirms before anything changes." },
       lost_reason:      { type: "string", description: "If recommend_lost: closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Opted out / Other)." },
       followup_on:      { type: "string", description: "YYYY-MM-DD. ONLY when the lead named a specific date/timeframe for their decision: the day right after it (the earliest day we should proactively follow up). Omit otherwise - the default cadence is next-day." },
+      reignite_at:      { type: "string", description: "YYYY-MM-DD. ONLY when the lead wants to enroll but at a distinctly LATER date (start-later, not decide-soon): the concrete day to re-engage. A human confirms before anything is scheduled." },
+      reignite_message: { type: "string", description: "If reignite_at: the exact re-engagement text to open with on that date - warm, references what they told us, moves toward enrolling." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
@@ -300,6 +304,10 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     lost_reason: out.lost_reason || null,
     // Lead named a decision date ("after the 15th") → earliest day to follow up.
     followup_on: (typeof out.followup_on === "string" && /^\d{4}-\d{2}-\d{2}$/.test(out.followup_on)) ? out.followup_on : null,
+    // 🔥 Reignition: "we'll enroll, but later" with a concrete date + pre-written
+    // re-engagement message. Invalid/past dates drop out.
+    reignite_at: normalizeReigniteAt(out.reignite_at),
+    reignite_message: (out.reignite_message && String(out.reignite_message).trim()) || null,
     trial_at: null,
     summary: out.summary ? String(out.summary).slice(0, 600) : null,
     last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
@@ -566,8 +574,29 @@ async function detectForClient(client) {
       return new Date(a.last_at || 0) - new Date(b.last_at || 0);               // then oldest silence first
     });
 
-  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, enrollsProposed = 0, lostProposed = 0, deferred = 0;
+  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, enrollsProposed = 0, lostProposed = 0, deferred = 0, reigniteProposed = 0, reignited = 0;
   const reasons = [];
+
+  // 🔥 Reignition: the parked "we'll enroll later" set (the proactive opener +
+  // follow-up loop below skip them) + fire due parks into a kind='reignite_due'
+  // card on this deck. Fire-time guards: muted / left-Done-Trial parks cancel.
+  const reignSet = await reigniteContactIdSet(client.id);
+  for (const r of await dueReignitions(client.id, "closing")) {
+    const cid = String(r.ghl_contact_id);
+    if (mutedSet.has(cid)) { await markReignition(r.id, "canceled", { cancel_reason: "bot muted on this lead" }); reignSet.delete(cid); continue; }
+    if (!doneIds.has(cid)) { await markReignition(r.id, "canceled", { cancel_reason: "left Done-Trial stage" }); reignSet.delete(cid); continue; }
+    try {
+      await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+        client_id: client.id, ghl_contact_id: cid, contact_name: r.contact_name || null,
+        kind: "reignite_due", draft_message: r.message, reignite_at: r.reignite_at,
+        reasoning: r.reason ? `Reignition day - ${r.reason}` : "Reignition day - the lead asked us to circle back today.",
+        confidence: 1, status: "pending", created_by: "reignition",
+      }]) });
+      await markReignition(r.id, "carded");
+      reignSet.delete(cid); reignited++;
+    } catch (e) { reasons.push(`reignite ${cid}: ${e.message}`); }   // active card in the way -> retry next run
+  }
+
   let _first = true;
   for (const item of queue.slice(0, DETECT_CAP)) {
     if (!_first) await new Promise(r => setTimeout(r, 300));
@@ -592,12 +621,23 @@ async function detectForClient(client) {
           if (oppId) { try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: client.id, opportunity_id: oppId, status: "won", reason: "auto: already a paying member" }]) }); } catch (_) {} }
         }
         await clearClosingCards(client.id, contactId, "auto-won: already a paying member");
+        await cancelReignitions(client.id, contactId, "already a paying member");
         skipped++; reasons.push(`${item.name || contactId}: paying member - auto-marked won`);
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: member auto-won failed - ${e.message}`); }
       continue;
     }
 
     const reactive = item.last_direction === "inbound";
+
+    // 🔥 Parked "later" leads: no proactive touches (silence is the plan). A lead
+    // who texted back re-engaged early - clear the park (belt + suspenders with
+    // the inbound webhook's cancel) and work them normally.
+    if (reignSet.has(String(contactId))) {
+      if (!reactive) { skipped++; reasons.push(`${item.name || contactId}: parked for reignition`); continue; }
+      await cancelReignitions(client.id, contactId, "lead replied before the reignition date");
+      reignSet.delete(String(contactId));
+    }
+
     if (reactive) {
       // A reply cancels whatever plan was scheduled AND any stale reply/enroll/
       // lost card drafted for an OLDER inbound: those made the dedup below skip
@@ -706,6 +746,21 @@ async function detectForClient(client) {
       continue;
     }
 
+    // 🔥 Reignition proposal: "we'll enroll, but later" with a timeframe. ALWAYS
+    // queue for a human - the card carries the editable ack (sends on ✓), the
+    // pre-written future message, and the date. Nothing schedules until
+    // confirm-reignite.
+    if (d.reignite_at && d.reignite_message) {
+      try {
+        await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          ...baseRow, kind: "reignite", reignite_at: d.reignite_at, reignite_message: d.reignite_message,
+          draft_message: (d.reply && String(d.reply).trim()) ? d.reply : "", status: "pending", created_by: "detector",
+        }]) });
+        reigniteProposed++;
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: reignite-insert failed — ${e.message}`); }
+      continue;
+    }
+
     // Escalation: no message to send, but a human should see it.
     if (d.error || !d.reply || !String(d.reply).trim()) {
       if (d.escalate) {
@@ -750,7 +805,7 @@ async function detectForClient(client) {
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: pending-insert failed — ${e.message}`); }
     }
   }
-  const summary = { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, enrolls_proposed: enrollsProposed, lost_proposed: lostProposed, auto_sent: autoSent, deferred, flushed, escalated, skipped, pruned, reasons };
+  const summary = { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, enrolls_proposed: enrollsProposed, lost_proposed: lostProposed, reignite_proposed: reigniteProposed, reignited, auto_sent: autoSent, deferred, flushed, escalated, skipped, pruned, reasons };
   // Persist the run summary - cron responses vanish, so per-lead skip reasons
   // were invisible. Read the latest via:
   //   select payload from automation_events where type='closing_detect_summary'
@@ -988,7 +1043,56 @@ async function handler(req, res) {
         try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
       await clearClosingCards(clientId, contactId, "enroll link sent");
+      await cancelReignitions(clientId, contactId, "enroll link sent");
       return res.status(200).json({ ok: true, enrolled: true, link_sent: !!signupUrl, opportunity_id: oppId, won_on: "payment" });
+    }
+
+    // 🔥 Confirm a Reignition: send the (editable) ack now, then park the lead in
+    // place (agent_reignitions) with the date + the pre-written re-engagement
+    // message. The lead STAYS in Done-Trial; the detect cron fires the message as
+    // a reignite_due card on this deck when the date arrives.
+    if (b.action === "confirm-reignite") {
+      let row = null, contactId = b.contact_id || null;
+      if (b.ready_id) {
+        [row] = await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        if (!row) return res.status(404).json({ error: "not found" });
+        contactId = row.ghl_contact_id;
+      }
+      if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
+      const reigniteAt = normalizeReigniteAt((typeof b.reignite_at === "string" && b.reignite_at) || (row && row.reignite_at) || "");
+      if (!reigniteAt) return res.status(400).json({ error: "A future reignite date is required (up to ~18 months out)." });
+      const message = String((typeof b.message === "string" && b.message.trim()) ? b.message : ((row && row.reignite_message) || "")).trim();
+      if (!message) return res.status(400).json({ error: "The re-engagement message for that date is required." });
+      const ack = ((typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "").trim();
+      let ackSent = false;
+      if (ack) { try { await sendReplyViaGhl(token, contactId, ack, clientId); ackSent = true; } catch (_) {} }
+      try {
+        await scheduleReignition({
+          clientId, contactId, contactName: (row && row.contact_name) || b.contact_name || null,
+          agent: "closing", reigniteAt, message,
+          reason: (typeof b.reason === "string" && b.reason.trim()) || (row && row.reasoning) || null,
+          source: row && row.kind === "reignite" ? "agent" : "manual", createdBy: staffEmail,
+        });
+      } catch (e) { return res.status(500).json({ error: `couldn't schedule: ${e.message}` }); }
+      // Optional teach-why lesson (an edited date/message trains the agent).
+      let lessonId = null;
+      if (b.lesson && String(b.lesson).trim()) {
+        try {
+          const [lrow] = await sb(`agent_lessons`, { method: "POST", headers: { Prefer: "return=representation" },
+            body: JSON.stringify([{ client_id: clientId, agent: "closing", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: contactId, reignite_at: reigniteAt, sent: ack || null } }]) });
+          lessonId = lrow?.id || null;
+        } catch (_) {}
+      }
+      // Truthful bookkeeping: acted-on row 'sent' only when the ack went out.
+      if (b.ready_id) {
+        const done = ackSent
+          ? { status: "sent", reignite_at: reigniteAt, reignite_message: message, approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+          : { status: "canceled", send_error: "parked for reignition", reignite_at: reigniteAt, reignite_message: message, approved_by: staffEmail, updated_at: new Date().toISOString() };
+        try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(done) }); } catch (_) {}
+      }
+      await clearClosingCards(clientId, contactId, "parked for reignition");
+      try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: (row && row.contact_name) || null, final_reply: `[reignite ${reigniteAt.slice(0, 10)}]${ackSent ? " + ack sent" : ""}`, reasoning: (row && row.reasoning) || null, status: "sent", created_by: staffEmail }); } catch (_) {}
+      return res.status(200).json({ ok: true, scheduled_for: reigniteAt, ack_sent: ackSent, lesson_id: lessonId });
     }
 
     // Confirm a Lost suggestion: optional warm closing, then mark the opp Lost.
@@ -1045,6 +1149,7 @@ async function handler(req, res) {
         try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(done) }); } catch (_) {}
       }
       await clearClosingCards(clientId, contactId, "marked lost");
+      await cancelReignitions(clientId, contactId, routedToNurture ? "moved to nurture" : "marked lost");
       return res.status(200).json({ ok: true, marked_lost: !routedToNurture, routed_to_nurture: routedToNurture, opportunity_id: oppId, reason });
     }
 
@@ -1084,6 +1189,7 @@ async function handler(req, res) {
         try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(done) }); } catch (_) {}
       }
       await clearClosingCards(clientId, contactId, "marked unqualified");
+      await cancelReignitions(clientId, contactId, "marked unqualified");
       return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });
     }
 
