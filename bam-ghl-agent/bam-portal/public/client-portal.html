@@ -9053,6 +9053,8 @@ Then the call to action."]</div>
         <style>
           #pl-hawkeye{max-width:680px;margin:0 auto;padding:4px 0 44px}
           .hk2-topbar{display:flex;align-items:center;gap:16px;margin:2px 0 14px;flex-wrap:wrap}
+          .hk2-back{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;border:1.5px solid var(--border);background:var(--surface);color:var(--text-sub);border-radius:999px;padding:7px 13px 7px 10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+          .hk2-back:hover{color:var(--text);border-color:var(--border-med)}
           .hk2-title{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:800;color:var(--text);flex:0 0 auto}
           .hk2-tabs{display:flex;gap:8px;flex:1 1 auto;min-width:0}
           .hk2-tab{flex:1;display:flex;align-items:center;justify-content:space-between;gap:7px;border-radius:999px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-sub);padding:9px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;min-width:0}
@@ -9121,6 +9123,7 @@ Then the call to action."]</div>
           .hk2-clear b{color:var(--text);font-size:16px}
           .hk2-clear .big{width:56px;height:56px;border-radius:50%;background:rgba(76,199,106,.14);color:var(--green,#4CC76A);display:flex;align-items:center;justify-content:center;font-size:26px}
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
+          .hk2-quietbar{display:flex;align-items:center;gap:7px;margin:0 0 12px;padding:8px 12px;border:1px solid color-mix(in srgb, var(--gold) 45%, transparent);background:color-mix(in srgb, var(--gold) 10%, transparent);color:var(--gold);border-radius:var(--r-8,8px);font-size:12px;font-weight:600}
           .hk2-load{min-height:300px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-sub);font-size:13px}
           .hk2-seg{display:flex;gap:8px;margin-bottom:4px}
           .hk2-segbtn{flex:1;background:var(--surface);border:1.5px solid var(--border-med);color:var(--text-sub);border-radius:8px;padding:9px 10px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:border-color .15s,background .15s}
@@ -13590,6 +13593,18 @@ function _ibStatusIcon(msg) {
   return '<span class="v15ib-status sent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>';
 }
 
+// Caption for a status:'scheduled' thread bubble - an approved Hawkeye send
+// parked by quiet hours (send_after). "Scheduled - sends Sat 8:00 AM".
+function _ibSchedLabel(m) {
+  try {
+    const t = m && m.send_after ? new Date(m.send_after) : null;
+    if (t && !isNaN(t.getTime()) && t.getTime() > Date.now()) {
+      return 'Scheduled - sends ' + t.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    }
+  } catch (_) {}
+  return 'Approved - sending soon';
+}
+
 // Initials for the row avatar - first letters of up to two name words; falls
 // back to a generic glyph for phone-number / nameless contacts.
 function _ibInitials(name) {
@@ -14581,18 +14596,20 @@ function _v15ibRenderThread() {
         lastDateLabel = dl;
       }
       const out = (m.direction || '').toLowerCase() === 'outbound';
+      const sched = m.status === 'scheduled';
       const tailParts = [];
       if (m._unconfirmed) tailParts.push('not confirmed in GHL');
       else if (m._optimistic) tailParts.push('sending...');
+      else if (sched) tailParts.push(escapeHTML(_ibSchedLabel(m)));
       else {
         tailParts.push(escapeHTML(_ghlChannelLabel(m.type)));
         if (m.date) tailParts.push(escapeHTML(new Date(m.date).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })));
       }
-      // #14: Delivery status for outbound
-      const statusHtml = out ? _ibStatusIcon(m) : '';
+      // #14: Delivery status for outbound (scheduled = not sent yet, no check)
+      const statusHtml = out && !sched ? _ibStatusIcon(m) : '';
       const tailClass = m._unconfirmed ? 'v15ib-tail warn' : 'v15ib-tail';
       const bubbleClass = out ? 'v15ib-bubble out' : 'v15ib-bubble in';
-      bubblesHtml += `<div class="${bubbleClass}">${escapeHTML((m.body || '(no body)').trim())}<div class="${tailClass}">${tailParts.join(' · ')}${statusHtml}</div></div>`;
+      bubblesHtml += `<div class="${bubbleClass}"${sched ? ' style="opacity:.65"' : ''}>${escapeHTML((m.body || '(no body)').trim())}<div class="${tailClass}">${tailParts.join(' · ')}${statusHtml}</div></div>`;
     });
   } else {
     bubblesHtml = '<div style="color:var(--text-mute);font-size:13px;text-align:center;padding:20px">No messages yet.</div>';
@@ -15648,6 +15665,18 @@ async function _contactsOpenDrawer(idx) {
   } catch (e) {
     _CDRAWER.ghl = { name: c.name, email: c.email, phone: c.phone, tags: c.tags || [], _error: e.message || String(e) };
   }
+  // Backfill phone/email onto the stub contact from the hydrated GHL record. When
+  // the drawer is opened from the Hawkeye deck (or any non-Contacts-tab entry) the
+  // contact is a bare stub with no phone/email, so the composer wrongly showed "No
+  // phone or email on file - can't message" even though we just loaded both
+  // (Zoran 2026-07-10). _cdComposer/_contactsMsgType/_contactsSendMsg all read
+  // _CDRAWER.contact, so fill it in place.
+  if (_CDRAWER.ghl && !_CDRAWER.ghl._error) {
+    if (!c.phone && _CDRAWER.ghl.phone) c.phone = _CDRAWER.ghl.phone;
+    if (!c.email && _CDRAWER.ghl.email) c.email = _CDRAWER.ghl.email;
+    if ((!c.tags || !c.tags.length) && Array.isArray(_CDRAWER.ghl.tags)) c.tags = _CDRAWER.ghl.tags;
+    if (!_CDRAWER.msgType || (_CDRAWER.msgType === 'Email' && c.phone)) _CDRAWER.msgType = c.phone ? 'SMS' : 'Email';
+  }
   const body = document.getElementById('contacts-drawer-body');
   if (body) body.innerHTML = _cdBody();
   _renderTagEditor('cd-tags', c.ghl_contact_id, (_CDRAWER.ghl && _CDRAWER.ghl.tags) || c.tags || []);
@@ -15679,6 +15708,17 @@ async function _cdReigniteChip(cid) {
 }
 async function _cdReigniteCancel(id, cid) {
   try {
+    // A just-parked lead may still carry the 'fresh' placeholder id (or none) if
+    // the park response didn't return the row - resolve the real id from the
+    // server before cancelling, else PostgREST 400s on the invalid uuid.
+    if (!id || id === 'fresh') {
+      try {
+        const j = await _apxPost('/api/agent-approvals', 'list-reignitions', {});
+        const hit = ((j && j.reignitions) || []).find(x => String(x.ghl_contact_id) === String(cid));
+        if (hit && hit.id) id = hit.id;
+      } catch (_) {}
+    }
+    if (!id || id === 'fresh') throw new Error('still saving - try again in a moment');
     await _apxPost('/api/agent-approvals', 'cancel-reignition', { reignition_id: id });
     if (_PL_REIGN) _PL_REIGN.delete(String(cid));
     const el = document.getElementById('cd-reignite'); if (el) el.remove();
@@ -17237,7 +17277,9 @@ async function _hmMsgPeek(convId, focusReply) {
       .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0))
       .slice(-8);
     box.innerHTML = msgs.length
-      ? msgs.map(m => `<div class="hm-peek-bub ${String(m.direction || '').toLowerCase() === 'inbound' ? 'in' : 'out'}">${escapeHTML(m.body)}</div>`).join('')
+      ? msgs.map(m => m.status === 'scheduled'
+          ? `<div class="hm-peek-bub out" style="opacity:.6">${escapeHTML(m.body)}<div style="font-size:10px;margin-top:3px;color:var(--text-mute)">${escapeHTML(_ibSchedLabel(m))}</div></div>`
+          : `<div class="hm-peek-bub ${String(m.direction || '').toLowerCase() === 'inbound' ? 'in' : 'out'}">${escapeHTML(m.body)}</div>`).join('')
       : '<div class="req-empty" style="padding:12px 0">No messages to show.</div>';
     box.scrollTop = box.scrollHeight;
   } catch (e) {
@@ -31631,7 +31673,11 @@ function _plSelectPipeline(pipelineId) {
 // trials up top + glow" treatment on the Sales board.
 function _plIsTrialToday(raw) {
   if (!raw) return false;
-  const d = new Date(raw); if (isNaN(d.getTime())) return false;
+  // Date-only ("2026-06-13") must parse as LOCAL midnight, not UTC - a raw
+  // new Date() shifts it to the evening before in Toronto and flags "today" a
+  // day early (same fix as _plTrialInfo).
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(raw).trim());
+  const d = new Date(dateOnly ? raw + 'T00:00:00' : raw); if (isNaN(d.getTime())) return false;
   const n = new Date();
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 }
@@ -32603,9 +32649,25 @@ async function _hk2Load() {
       }
     } catch (_) { /* names are a nicety - never block the deck */ }
   }
-  return { booking, confirm, closing };
+  // Quiet-hours state (from list-ready): outside 8:00am-9:30pm the deck warns
+  // upfront that approvals park until morning - the deferred toast alone was
+  // missed (approved 9:38pm, "message never sent" report, 2026-07-10).
+  // booking_provider drives the Book-it card copy (portal sends the confirmation
+  // text from the deck; GHL lets its own automation send it - #3).
+  _HK2.bookingProvider = (b && b.booking_provider) || 'ghl';
+  return { booking, confirm, closing, quiet: (b && b.quiet) || null };
 }
 function _hk2Pick(a) { _HK2.agent = a; _hk2Render(); }
+// "tomorrow at 8:00 AM" / "Sat at 8:00 AM" for the after-hours deck bar.
+function _hk2QuietWhen(iso) {
+  try {
+    const t = new Date(iso); if (isNaN(t.getTime())) return 'in the morning';
+    const day = t.toDateString() === new Date().toDateString() ? 'today'
+      : t.toDateString() === new Date(Date.now() + 86400000).toDateString() ? 'tomorrow'
+      : t.toLocaleDateString([], { weekday: 'short' });
+    return day + ' at ' + t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  } catch (_) { return 'in the morning'; }
+}
 // Name tap on a deck card -> the contact drawer. The drawer overlay sits at
 // z-index 9000; on mobile the deck modal is 10050, so raise the overlay above
 // it or the drawer would open BEHIND the deck.
@@ -32734,15 +32796,23 @@ function _hk2CardHtml(r, pos, total, isTop) {
   let body = '';
   if (r._kind === 'book') {
     const guessSlot = r.book_slot_at || '';
+    // Only portal-booking academies send the confirmation text from the deck. On
+    // GHL-calendar academies GHL's own booked-trial automation sends it, so we
+    // must NOT show an editable "sends the moment you book it" box that then gets
+    // dropped on the floor (#3). Copy is provider-aware.
+    const isPortalBooking = (_HK2 && _HK2.bookingProvider) === 'portal';
+    const confBlock = isPortalBooking
+      ? `<div class="hk2-lbl">Confirmation text - sends the moment you book it</div>
+      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+      <div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed, your confirmation text sends, and the Confirm agent takes over (reminders send from config).</div>`
+      : `<div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed in your calendar and its booked-trial automation sends the confirmation + location. The Confirm agent then takes over.</div>`;
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-lbl">Booking details - the agent's pick, change if needed</div>
       <div class="hk2-fields">
         <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
         <label><span>Slot</span><select${id.slot} onchange="_hk2Edited(true)"><option value="${escapeHTML(guessSlot)}" selected>${escapeHTML(guessSlot ? _hk2SlotLabel(guessSlot) : 'Loading open slots…')}</option></select></label>
       </div>
-      <div class="hk2-lbl">Confirmation text - sends the moment you book it</div>
-      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
-      <div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed, your confirmation text sends, and the Confirm agent takes over (reminders send from config).</div>`;
+      ${confBlock}`;
   } else if (r._kind === 'ghost') {
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-note">Nothing sends now - the Ghosted automation takes over with its nudges. A reply bounces them straight back to Booking.</div>
@@ -32918,11 +32988,18 @@ function _hk2Render(opts) {
     ? `<div class="hk2-clear"><div class="big">&#10003;</div><b>All clear</b><span>No actions waiting in this stage</span></div>`
     : `${q[1] ? `<div class="hk2-card hk2-behind">${_hk2CardHtml(q[1], 2, q.length, false)}</div>` : ''}
        <div class="hk2-card hk2-top" id="hk2-topcard">${_hk2CardHtml(q[0], 1, q.length, true)}</div>`;
+  const quietBar = _HK2.q.quiet ? `<div class="hk2-quietbar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>After hours - approved messages will send ${escapeHTML(_hk2QuietWhen(_HK2.q.quiet.until))}</div>` : '';
+  // In the overlay path (command center on) the outer modal has its own Back. In
+  // the inline path (cc opted out) the deck fills the pipelines view with NO way
+  // back - add an in-deck Back so the user isn't trapped (Zoran 2026-07-10).
+  const inlineBack = (typeof _sfUseOverlay === 'function' && _sfUseOverlay()) ? '' : `<button class="hk2-back" onclick="_hk2Back()" title="Back to Sales"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg> Sales</button>`;
   host.innerHTML = `
     <div class="hk2-topbar">
+      ${inlineBack}
       <div class="hk2-title">${_plIcon('eye', 17)} Hawkeye</div>
       <div class="hk2-tabs">${tabs}</div>
     </div>
+    ${quietBar}
     <div class="hk2-deck">${deck}</div>
     <div class="hk2-hint">every card resolves here - approve it or move the lead (no skip)<br>edits flip the button to "Confirm edits" and the teach-why note becomes required</div>`;
   const top = _hk2Top();
@@ -33078,8 +33155,10 @@ function _hk2Confirm() {
   let ptf = null;
   if (k === 'form') {
     const p = _HK2.ptf || {};
-    if (p.showed !== true && p.showed !== false) { _apxToast('Pick Showed up or No show first', false); return; }
-    if (p.showed === true && p.fit !== true && p.fit !== false) { _apxToast('Pick Good fit or Not a fit', false); return; }
+    // Reset the re-entry latch on every early-return or the card wedges: all later
+    // taps hit `if (r._hk2Busy) return` and do nothing (Zoran 2026-07-10).
+    if (p.showed !== true && p.showed !== false) { _apxToast('Pick Showed up or No show first', false); r._hk2Busy = false; return; }
+    if (p.showed === true && p.fit !== true && p.fit !== false) { _apxToast('Pick Good fit or Not a fit', false); r._hk2Busy = false; return; }
     const msgEl = document.getElementById('hk2-ptf-msg'), notesEl = document.getElementById('hk2-ptf-notes'), linkEl = document.getElementById('hk2-ptf-link');
     const notFit = p.showed === true && p.fit === false;
     ptf = {
@@ -33124,20 +33203,29 @@ function _hk2Confirm() {
       // 🔥 Park it: ack (if any) sends now, the message fires as a new card on
       // the date. Works from an agent-proposed reignite card OR any card flipped
       // via "Reignite later" (contact_id covers the synthesized ones).
-      chk(await _apxPost(ep, 'confirm-reignite', {
+      const reigResp = chk(await _apxPost(ep, 'confirm-reignite', {
         ready_id: reigReadyId || undefined, contact_id: r.ghl_contact_id, contact_name: r.contact_name || null,
         reignite_at: reigDate, message: reigMsg, reply, reason: r.reasoning || null,
       }));
       const nice = (() => { try { return new Date(reigDate + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' }); } catch (_) { return reigDate; } })();
-      _apxToast(reply ? `Ack sent + reignite set for ${nice}` : `Reignite set for ${nice}`, true);
-      try { if (_PL_REIGN && r.ghl_contact_id) _PL_REIGN.set(String(r.ghl_contact_id), { id: 'fresh', ghl_contact_id: String(r.ghl_contact_id), reignite_at: reigDate + 'T14:00:00Z', agent }); } catch (_) {}
+      // Honest toast: the park is set, but if the ack was requested and did NOT
+      // send, say so - don't claim "Ack sent" off the box being non-empty.
+      if (reply && reigResp && reigResp.ack_sent === false) _apxToast(`Reignite set for ${nice}, but the ack did NOT send`, false);
+      else _apxToast(reply ? `Ack sent + reignite set for ${nice}` : `Reignite set for ${nice}`, true);
+      // Stamp the REAL reignition id (not the 'fresh' placeholder) so the contact
+      // drawer's Cancel works immediately after parking - 'fresh' 400'd (Zoran 2026-07-10).
+      try { if (_PL_REIGN && r.ghl_contact_id) _PL_REIGN.set(String(r.ghl_contact_id), { id: (reigResp && reigResp.reignition_id) || 'fresh', ghl_contact_id: String(r.ghl_contact_id), reignite_at: reigDate + 'T14:00:00Z', agent }); } catch (_) {}
     } else if (k === 'form') {
       const token = await _mreqAuthToken();
       const res = await fetch('/api/ghl/post-trial?client_id=' + encodeURIComponent(CLIENT_ID), { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(ptf) });
       const j = await _safeJson(res); if (!res.ok) throw new Error((j && j.error) || ('HTTP ' + res.status));
-      // A good-fit whose stage move failed server-side (move_ok === false): warn,
-      // don't claim success - the review saved but the lead didn't reach Done Trial.
+      // A terminal write that failed server-side (move_ok / lost_ok / unqualified_ok
+      // === false): warn, don't claim success - the review saved (form card gone)
+      // but the lead never actually moved/closed, so it must be retried.
+      const notFit = ptf.showed_up === true && ptf.good_fit === false;
       if (ptf.good_fit && j && j.move_ok === false) throw new Error('Saved, but the move to Done Trial did not land - reopen the card and retry.');
+      if (notFit && ptf.outcome === 'lost' && j && j.lost_ok === false) throw new Error('Saved, but the Lost close did not land - reopen the card and retry.');
+      if (notFit && ptf.outcome !== 'lost' && j && j.unqualified_ok === false) throw new Error("Saved, but the Unqualified close did not land (no post-trial not-a-fit route set up) - use Mark lost, or set up the route.");
       _apxToast(ptf.showed_up === false ? 'No-show logged - Booking drafts the rebook' : ptf.good_fit ? 'Routed to Done Trial - Closing takes over' : ptf.outcome === 'lost' ? 'Marked lost - Nurture takes over' : 'Closed as unqualified', true);
     } else if (k === 'plan') {
       const edits = planEdits;
@@ -33194,10 +33282,22 @@ function _hk2Move(op, btn) {
   // button label said so); an empty box keeps the move silent.
   const teachEl = document.getElementById('hk2-teach');
   const lesson = (op === 'lost' || op === 'unq') && teachEl ? teachEl.value.trim() : '';
-  const reply = (op === 'lost' || op === 'unq') ? (((document.getElementById('hk2-draft') || {}).value) || '').trim() : '';
+  // Only capture the box as a goodbye on kinds whose move LABEL discloses the send
+  // (the same allow-list _hk2Moves uses for hasMsg). A book/reignite/reignite_due
+  // card has a PREFILLED box but silent-labeled moves - capturing it would text the
+  // parent a confirmation/re-engagement they never approved (Zoran 2026-07-10).
+  const canSendOnMove = ['reply', 'enroll', 'lost', 'handoff'].includes(r._kind);
+  const reply = ((op === 'lost' || op === 'unq') && canSendOnMove) ? (((document.getElementById('hk2-draft') || {}).value) || '').trim() : '';
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   const label = op === 'ghost' ? 'Sent to Ghosted' : op === 'handoff' ? 'Handed to Booking'
     : op === 'lost' ? (reply ? 'Sent + Nurture' : 'Marked lost') : (reply ? 'Sent + Unqualified' : 'Unqualified');
+  // Honest toast: the close is the primary action and it succeeded, but if a
+  // goodbye was requested and the backend reports it did NOT send, say so - never
+  // claim "Message sent" off the request payload alone (Zoran's #1 complaint class).
+  const goodbyeToast = (resp, okMsg) => {
+    if (reply && resp && resp.goodbye_requested && resp.goodbye_sent === false) _apxToast('Done, but the message did NOT send - text them another way', false);
+    else _apxToast(okMsg, true);
+  };
   let undone = false;
   _hawkDefer({ cardId: 'hk2-topcard', label, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
     if (op === 'ghost') {
@@ -33208,11 +33308,11 @@ function _hk2Move(op, btn) {
       chk(await _apxPost(ep, 'confirm-handoff', { ready_id: readyId, reply: '', handoff_note: r.handoff_note || 'Needs a new time - rebook.' }));
       _apxToast('Handed back to Booking', true);
     } else if (op === 'lost') {
-      chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply, lost_reason: r.lost_reason || 'Other' }));
-      _apxToast(reply ? 'Message sent + moved to Nurture' : (lesson ? 'Marked lost + taught' : 'Marked lost - Nurture takes over'), true);
+      const resp = chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply, lost_reason: r.lost_reason || 'Other' }));
+      goodbyeToast(resp, reply ? 'Message sent + moved to Nurture' : (lesson ? 'Marked lost + taught' : 'Marked lost - Nurture takes over'));
     } else {
-      chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: readyId, reply }));
-      _apxToast(reply ? 'Message sent + marked unqualified' : (lesson ? 'Marked unqualified + taught' : 'Marked unqualified'), true);
+      const resp = chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: readyId, reply }));
+      goodbyeToast(resp, reply ? 'Message sent + marked unqualified' : (lesson ? 'Marked unqualified + taught' : 'Marked unqualified'));
     }
     if (lesson) await _hk2Teach(r, lesson, r.draft_message || null, reply || (op === 'lost' ? '(marked lost)' : '(marked unqualified)'), agent);
   } });
@@ -33699,8 +33799,11 @@ function _ccStuckCards() {
       if (typeof _PL_ENR !== 'undefined' && _PL_ENR && _PL_ENR.get(cid)) continue;         // in a running automation
       // Booked trial still ahead = FLOWING: the confirm sequence's same-day
       // check-in is queued for 9am on trial day, so quiet days in between are
-      // by design, not a stall (Zoran 2026-07-10).
-      if (o.trialDate && new Date(o.trialDate).getTime() > now) continue;
+      // by design, not a stall (Zoran 2026-07-10). Use _plTrialInfo so a DATE-ONLY
+      // trialDate ("2026-06-13") stays exempt through end of trial day - a raw
+      // new Date() parses it as UTC midnight and expired the exemption the evening
+      // before (Toronto), re-flagging the lead all evening + trial-day morning.
+      if (o.trialDate) { const _tr = _plTrialInfo(o.trialDate); if (_tr && !_tr.passed) continue; }
       const lm = (typeof _PL_LASTMSG !== 'undefined' && _PL_LASTMSG) ? _PL_LASTMSG.get(cid) : null;
       const last = lm && lm.date ? new Date(lm.date).getTime()
                  : (o.updatedAt ? new Date(o.updatedAt).getTime()
@@ -34665,12 +34768,14 @@ function _plRenderThread(messages) {
   host.innerHTML = sorted.length
     ? sorted.map(m => {
         const out = (m.direction || '').toLowerCase() === 'outbound';
+        const sched = m.status === 'scheduled';
         const atts = _ibRenderAttachments(m.attachments);
         const hasBody = (m.body || '').trim().length > 0;
         const sender = out ? 'You' : escapeHTML(contactFirst);
         const channel = escapeHTML(_ghlChannelLabel(m.type));
         const when = escapeHTML(_ibFormatDate(m.date));
-        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(m.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
+        const meta = sched ? `${sender} · ${escapeHTML(_ibSchedLabel(m))}` : `${sender} · ${channel}${when ? ' · ' + when : ''}`;
+        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}"${sched ? ' style="opacity:.65"' : ''}>${hasBody ? escapeHTML(m.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${meta}</div></div>`;
       }).join('')
     : `<div style="color:var(--text-mute);font-size:13px">No messages yet - send the first one below.</div>`;
   // Scroll the whole thread (messages + the inline agent suggestion at the bottom).
@@ -36202,6 +36307,13 @@ function _hawkUndo() {
   try { e.restore(); } catch (_) {}
   _apxToast('↩ Undone', true);
 }
+// The 6s undo timer FREEZES when the app backgrounds (phone lock, app switch),
+// and iOS can kill the page before it resumes - the approved action would
+// silently evaporate while the deck already showed it done. Commit any pending
+// action the moment the page hides: forfeits the rest of the undo window,
+// guarantees the send.
+document.addEventListener('visibilitychange', () => { if (document.hidden) _hawkFlush(); });
+window.addEventListener('pagehide', () => { _hawkFlush(); });
 function _hawkUndoPill() {
   let pill = document.getElementById('hawk-undo-pill');
   if (!_HAWK_PENDING) { if (pill) pill.remove(); return; }
@@ -50182,8 +50294,10 @@ function _ccCRRow(x, kind) {
   const sub = [_ccCRDay(x.trial_date), x.trainer].filter(Boolean).join(' · ');
   const plan = kind === 'won' && x.plan ? `<div class="cccr-plan">${escapeHTML(x.plan)}</div>` : '';
   const name = _ccCapName(String(x.name || 'Athlete').split(' ').filter(Boolean).slice(0, 2).join(' '));
-  const cid = escapeHTML(String(x.contact_id || ''));
-  const onclick = x.contact_id ? `onclick="event.stopPropagation();_hk2OpenContact('${cid}','${escapeHTML(name)}')"` : '';
+  // Pass the (lead-typed) name via dataset, NOT interpolated into the JS string -
+  // an apostrophe broke the tap and a crafted name was click-triggered XSS. Same
+  // safe pattern as the deck name-link (line ~32673).
+  const onclick = x.contact_id ? `onclick="event.stopPropagation();_hk2OpenContact(this.dataset.cid,this.dataset.nm)" data-cid="${escapeHTML(String(x.contact_id))}" data-nm="${escapeHTML(name)}"` : '';
   return `<div class="cccr-row" ${onclick}>
     <div class="cccr-av ${kind}">${escapeHTML(_ccCRInitials(name))}</div>
     <div class="cccr-rn"><div class="n">${escapeHTML(name)}</div><div class="s">${escapeHTML(sub)}</div>${plan}</div>
@@ -50205,10 +50319,13 @@ function _ccCRRender(j, picked) {
     const ar = d > 0 ? '▲' : d < 0 ? '▼' : '=';
     trend = `<div class="cccr-trend ${cls}">${ar} ${Math.abs(d)} pts vs prior period</div>`;
   }
-  // Date inputs: default to the response's own range (to is exclusive, so the
-  // displayed end is one day back).
+  // Date inputs: default to the response's own range. On the DEFAULT load the
+  // server's `to` is "now" (data INCLUDES today), so the To input must show TODAY -
+  // subtracting a day showed yesterday, and tapping Apply then dropped today's
+  // trials out of the window (Zoran 2026-07-10). After an explicit Apply we use the
+  // user's picked dates verbatim.
   const fromY = picked ? picked.from : _ccCRymd(Date.parse(j.range && j.range.from) || (Date.now() - 45 * 86400000));
-  const toY = picked ? picked.to : _ccCRymd((Date.parse(j.range && j.range.to) || Date.now()) - 86400000);
+  const toY = picked ? picked.to : _ccCRymd(Date.parse(j.range && j.range.to) || Date.now());
   const numd = (nWon + nLost > 0)
     ? `<div class="a">${nWon} of ${nWon + nLost} closed</div><div class="b">${pend.length} still pending</div>`
     : `<div class="a">No resolved trials</div><div class="b">${pend.length} still pending</div>`;
@@ -50221,8 +50338,7 @@ function _ccCRRender(j, picked) {
   const chips = pend.length
     ? pend.map(x => {
         const name = _ccCapName(String(x.name || 'Athlete').split(' ').filter(Boolean).slice(0, 2).join(' '));
-        const cid = escapeHTML(String(x.contact_id || ''));
-        const oc = x.contact_id ? `onclick="_hk2OpenContact('${cid}','${escapeHTML(name)}')"` : '';
+        const oc = x.contact_id ? `onclick="_hk2OpenContact(this.dataset.cid,this.dataset.nm)" data-cid="${escapeHTML(String(x.contact_id))}" data-nm="${escapeHTML(name)}"` : '';
         return `<div class="cccr-chip" ${oc}><div class="cccr-av pend">${escapeHTML(_ccCRInitials(name))}</div><span class="n">${escapeHTML(name)}</span></div>`;
       }).join('')
     : '<div class="cccr-empty">No pending good-fit trials</div>';

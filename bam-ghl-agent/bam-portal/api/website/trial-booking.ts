@@ -181,6 +181,18 @@ async function createTrialBooking(req: RuntimeApiRequest) {
 
   if (error) throw publicRpcError(error.message);
   if (typeof data !== "string") throw new Error("Expected book_trial_slot to return an id.");
+  // A parked "come back later" lead who self-books is back NOW - cancel any
+  // scheduled reignition so the re-engagement card doesn't fire at a family that
+  // already rebooked (#19). Best-effort; uses the client already in scope.
+  if (request.ghlContactId) {
+    try {
+      await supabase.from("agent_reignitions")
+        .update({ status: "canceled", cancel_reason: "self-booked a trial", updated_at: new Date().toISOString() })
+        .eq("client_id", request.clientId)
+        .eq("ghl_contact_id", request.ghlContactId)
+        .eq("status", "scheduled");
+    } catch { /* best-effort - never block a booking */ }
+  }
   return { trial_booking_id: data, status: "BOOKED" };
 }
 

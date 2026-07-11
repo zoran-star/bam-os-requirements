@@ -160,11 +160,15 @@ export function toIso(v) {
 export async function computeQueue(token, locationId, ctx = {}) {
   const rs = await respondedStage(token, locationId, ctx);
   if (!rs) return { rs: null, queue: [] };
+  // idsTrusted: false when the GHL stage-membership fetch FAILED (empty set from a
+  // blip, NOT a genuinely empty stage) - mirrors computeConfirmQueue. Fire-time
+  // reignition guards must NOT cancel a park against an untrusted/empty set.
+  let idsTrusted = true;
   let respondedContactIds = await portalStageContactIds(rs, "responded", ctx);
   if (respondedContactIds === null) {
     const oppParams = new URLSearchParams({ location_id: locationId, pipeline_id: rs.pipelineId, pipeline_stage_id: rs.stageId, limit: "100" });
     let opps = [];
-    try { const od = await ghl("GET", `/opportunities/search?${oppParams}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
+    try { const od = await ghl("GET", `/opportunities/search?${oppParams}`, { token }); opps = od.opportunities || od.data || []; } catch (_) { idsTrusted = false; }
     respondedContactIds = openOppContactIds(opps);
   }
   const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
@@ -193,7 +197,7 @@ export async function computeQueue(token, locationId, ctx = {}) {
   queue = queue
     .filter(q => q.last_direction === "inbound")
     .sort((a, b) => new Date(b.last_at || 0) - new Date(a.last_at || 0));
-  return { rs, queue, respondedIds: respondedContactIds };
+  return { rs, queue, respondedIds: respondedContactIds, idsTrusted };
 }
 
 // Just the set of contact ids currently in the Responded stage (any message
@@ -352,11 +356,12 @@ export async function doneTrialStage(token, locationId, ctx = {}) {
 export async function computeClosingQueue(token, locationId, ctx = {}) {
   const dts = await doneTrialStage(token, locationId, ctx);
   if (!dts) return { dts: null, queue: [] };
+  let idsTrusted = true;
   let ids = await portalStageContactIds(dts, "done_trial", ctx);
   if (ids === null) {
     const oppParams = new URLSearchParams({ location_id: locationId, pipeline_id: dts.pipelineId, pipeline_stage_id: dts.stageId, limit: "100" });
     let opps = [];
-    try { const od = await ghl("GET", `/opportunities/search?${oppParams}`, { token }); opps = od.opportunities || od.data || []; } catch (_) {}
+    try { const od = await ghl("GET", `/opportunities/search?${oppParams}`, { token }); opps = od.opportunities || od.data || []; } catch (_) { idsTrusted = false; }
     ids = openOppContactIds(opps);
   }
   const cd = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, limit: "100" })}`, { token });
@@ -387,7 +392,7 @@ export async function computeClosingQueue(token, locationId, ctx = {}) {
   for (const id of ids) {
     if (!_inQ.has(id)) queue.push({ contact_id: id, conversation_id: null, name: null, last_message: "", last_direction: "", last_at: null });
   }
-  return { dts, queue, doneIds: ids };
+  return { dts, queue, doneIds: ids, idsTrusted };
 }
 
 // Throws on GHL failure (callers fail open), null when there's no Done-Trial stage.

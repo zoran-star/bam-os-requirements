@@ -92,12 +92,17 @@ async function scheduleStepJob({ clientId, automationId, enrollmentId, step, con
     contact_id: String(contactId), channel: step.channel, run_after: runAfter.toISOString(),
     status: "pending", dedupe_key: `${enrollmentId}:${step.id}`,
   };
+  // Return whether the job actually got queued so callers don't record a healthy
+  // active enrollment with ZERO pending jobs (the "looks healthy, sends nothing"
+  // stall). Deterministic every-insert failure can't recur post dedupe-constraint
+  // fix, but a transient PostgREST error would strand one enrollment silently (#27).
   try {
     await sb(`automation_jobs?on_conflict=dedupe_key`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify([row]) });
+    return { ok: true, runAfter };
   } catch (e) {
     console.error(`[automations] scheduleStepJob FAILED (enrollment ${enrollmentId}, step ${step.id}): ${e.message}`);
+    return { ok: false, runAfter, error: e.message || String(e) };
   }
-  return runAfter;
 }
 
 // ── EXPORTED: enroll a contact into an academy's automation (called by P6 triggers) ──
@@ -121,7 +126,13 @@ export async function enrollContact({ clientId, automationKey, contactId }) {
   } catch (_) { return { skipped: "enroll race (already active)" }; }
   if (!enrollment) return { skipped: "enroll failed" };
 
-  await scheduleStepJob({ clientId, automationId: auto.id, enrollmentId: enrollment.id, step: steps[0], contactId, fromDate: new Date() });
+  const sched = await scheduleStepJob({ clientId, automationId: auto.id, enrollmentId: enrollment.id, step: steps[0], contactId, fromDate: new Date() });
+  if (!sched.ok) {
+    // The first job never queued: don't leave a phantom-active enrollment that
+    // will never send. Exit it with a visible reason so it's not silently stalled.
+    try { await sb(`automation_enrollments?id=eq.${enrollment.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "exited", exited_at: new Date().toISOString(), exit_reason: `first step not scheduled: ${(sched.error || "unknown").slice(0, 160)}` }) }); } catch (_) {}
+    return { error: "could not schedule the first step", detail: sched.error };
+  }
   await logEvent({ clientId, contactId, automationId: auto.id, type: "enrolled", payload: { automation_key: automationKey } });
   return { ok: true, enrollment_id: enrollment.id };
 }
@@ -251,9 +262,15 @@ async function runWork(res) {
     const advance = async (steps, curPos) => {
       const next = enabledSteps(steps).find(s => s.position > curPos);
       if (next) {
-        await scheduleStepJob({ clientId: job.client_id, automationId: job.automation_id, enrollmentId: job.enrollment_id, step: next, contactId: job.contact_id, fromDate: new Date() });
-        await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ current_position: next.position }) }).catch(() => {});
-        advanced++;
+        const sched = await scheduleStepJob({ clientId: job.client_id, automationId: job.automation_id, enrollmentId: job.enrollment_id, step: next, contactId: job.contact_id, fromDate: new Date() });
+        if (sched.ok) {
+          await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ current_position: next.position }) }).catch(() => {});
+          advanced++;
+        } else {
+          // Next step never queued - don't bump position onto a phantom-active
+          // enrollment. Exit it with a visible reason instead of a silent stall (#27).
+          await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "exited", exited_at: new Date().toISOString(), exit_reason: `next step not scheduled: ${(sched.error || "unknown").slice(0, 160)}` }) }).catch(() => {});
+        }
       } else {
         await sb(`automation_enrollments?id=eq.${job.enrollment_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "completed", exited_at: new Date().toISOString(), exit_reason: "sequence complete" }) }).catch(() => {});
         await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "completed", payload: null });
