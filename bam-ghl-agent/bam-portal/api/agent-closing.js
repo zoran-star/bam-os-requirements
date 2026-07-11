@@ -81,18 +81,40 @@ async function loadConfig(clientId) {
   return { lessons: Array.isArray(lessonRows) ? lessonRows : [], overrides, examples: Array.isArray(exRows) ? exRows : [] };
 }
 
-const CLOSING_TRAILER =
-  `<live_closing>\n` +
+// ── Follow-up strategy (Zoran 2026-07-10) ───────────────────────────────────
+// The academy-configurable cadence for quiet Done-Trial leads. gaps[i] = days
+// between message i and the one before it (gaps[0] counts from our last
+// message), so the DEFAULT [1, 2] = follow-up #1 the next day ("just checking
+// you saw my message"), #2 two days after that ("still interested?"), then the
+// Lost suggestion `lost_after` quiet days after the final follow-up. Configured
+// per academy at clients.ghl_kpi_config.closing_followups via agent-config
+// (the Follow-ups tab in the training flow); the WORDING lives in the trainable
+// closing_followup brain section.
+const FOLLOWUP_DEFAULT_GAPS = [1, 2];
+const FOLLOWUP_DEFAULT_LOST_AFTER = 2;
+export function closingFollowupStrategy(client) {
+  const raw = ((client && client.ghl_kpi_config) || {}).closing_followups || {};
+  let gaps = Array.isArray(raw.gaps) ? raw.gaps : FOLLOWUP_DEFAULT_GAPS;
+  gaps = gaps.map(n => Math.max(1, Math.min(14, Math.round(Number(n) || 1)))).slice(0, 5);
+  if (!gaps.length) gaps = FOLLOWUP_DEFAULT_GAPS;
+  const lostAfter = Math.max(1, Math.min(14, Math.round(Number(raw.lost_after) || FOLLOWUP_DEFAULT_LOST_AFTER)));
+  return { gaps, lostAfter };
+}
+
+function closingTrailer(strat) {
+  const n = (strat && strat.gaps && strat.gaps.length) || FOLLOWUP_DEFAULT_GAPS.length;
+  return `<live_closing>\n` +
   `You are drafting the next SMS to a REAL lead whose athlete just ATTENDED a free trial and was marked a GOOD FIT (they're in the "Done Trial" stage). Your goal is to convert them into a PAYING MEMBER — a warm post-trial follow-up, handle price/schedule objections, and guide them to enroll. The close = sending the academy's sign-up link (from your config). You do NOT take payment yourself. A human reviews your draft before it sends. ` +
   `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
   `'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human. ` +
   `If the lead is READY to enroll, set 'recommend_enroll' = true with a short 'enroll_note' (which plan/frequency they want, if known) and put a warm message in 'reply' — the academy's sign-up link is appended to your message and a human approves before it sends. ` +
   `If your closing_lost criteria say the good-fit attendee won't enroll, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms enroll/lost before anything changes. ` +
-  `Silence alone is NEVER a lost signal: quiet leads are handled by the follow-up loop, which recommends Lost automatically after 3 unanswered follow-ups. Reserve 'recommend_lost' for an explicit no (too expensive, chose another program, not interested). ` +
-  `Follow-up timing: proactive follow-ups default to the NEXT DAY. But if the lead names a specific date or timeframe for their decision ("we'll decide after the weekend", "after the 15th", "once report cards are out"), set 'followup_on' (YYYY-MM-DD) to the day right after it so we don't nag them before they said they'd know. ` +
+  `Silence alone is NEVER a lost signal: quiet leads are handled by the follow-up loop, which recommends Lost automatically after ${n} unanswered follow-up${n === 1 ? "" : "s"}. Reserve 'recommend_lost' for an explicit no (too expensive, chose another program, not interested). ` +
+  `Follow-up timing: your follow-up schedule is preplanned (see your follow-up timing guidance). But if the lead names a specific date or timeframe for their decision ("we'll decide after the weekend", "after the 15th", "once report cards are out"), set 'followup_on' (YYYY-MM-DD) to the day right after it so we don't nag them before they said they'd know. ` +
   `REIGNITION (different from followup_on): if the lead clearly WANTS to enroll but only at a distinctly LATER date ("we'll start after summer", "once basketball season ends", "sign us up in September") - a start-later, not a decide-soon - set 'reignite_at' (YYYY-MM-DD - resolve a vague timeframe to a concrete date, e.g. "after summer" = Sep 01; a bare "later" = about 30 days out) and 'reignite_message' = the exact re-engagement text to open with ON that date. Make 'reply' the warm acknowledgement to send NOW. A human confirms the date + both messages before anything is scheduled.\n</live_closing>`;
-function buildSystem({ lessons, overrides, examples }) {
-  return buildAgentSystem({ lessons, overrides, examples, trailer: CLOSING_TRAILER, agent: "closing" });
+}
+function buildSystem({ lessons, overrides, examples, strategy }) {
+  return buildAgentSystem({ lessons, overrides, examples, trailer: closingTrailer(strategy), agent: "closing" });
 }
 
 const REPLY_TOOL = {
@@ -119,35 +141,50 @@ const REPLY_TOOL = {
   },
 };
 
-// The follow-up PLAN for a quiet Done-Trial lead: up to 3 messages drafted in one
-// pass, approved as a batch in Hawkeye, then sent 1 day apart - each only if the
-// previous got no reply. A reply at any point cancels the rest.
-const PLAN_TOOL = {
-  name: "propose_followup_plan",
-  description: "Propose the follow-up plan for a quiet Done-Trial lead. A human approves the whole plan; messages then send ONE DAY APART, each only if the previous got no reply.",
-  input_schema: {
-    type: "object",
-    properties: {
-      followup_1: { type: "string", description: "Day 1: short, warm, fresh nudge toward signing up. Never repeats or rephrases earlier messages." },
-      followup_2: { type: "string", description: "Day 2 (sends only if #1 got no reply): a DIFFERENT angle - value, schedule fit, or a light question. Must read naturally after silence." },
-      followup_3: { type: "string", description: "Day 3 (sends only if #2 got no reply): friendly, no-pressure close-out that leaves the door open." },
-      summary:    { type: "string", description: "2-3 sentence reviewer summary: who the lead is, their trial, where enrollment stands." },
-      reasoning:  { type: "string", description: "1-2 sentences on the plan's angle." },
-      confidence: { type: "number", description: "0..1" },
-      followup_on:{ type: "string", description: "YYYY-MM-DD. ONLY if the lead named a decision date/timeframe: the day after it - the plan starts sending then." },
+// The follow-up PLAN for a quiet Done-Trial lead: the remaining messages of the
+// academy's cadence drafted in one pass, approved as a batch in Hawkeye, then
+// sent on the configured day gaps - each only if the previous got no reply. A
+// reply at any point cancels the rest. Built per draft because the message
+// count + gaps come from the academy's follow-up strategy.
+function buildPlanTool(gapsLeft) {
+  const n = Math.max(1, gapsLeft.length);
+  const props = {};
+  for (let i = 0; i < n; i++) {
+    const gap = gapsLeft[i] || 1;
+    const when = i === 0
+      ? `Sends ${gap} day${gap === 1 ? "" : "s"} after our last message if they stay quiet`
+      : `Sends ${gap} day${gap === 1 ? "" : "s"} after message #${i} and ONLY if it got no reply`;
+    const what = i === 0 && n > 1
+      ? "a light, warm did-you-see-my-message check-in. Never repeats or rephrases earlier messages."
+      : i === n - 1
+      ? "asks if they're still interested, then leaves the door open - friendly, zero pressure."
+      : "a DIFFERENT angle - value, schedule fit, or a light question. Must read naturally after silence.";
+    props[`followup_${i + 1}`] = { type: "string", description: `${when}: ${what}` };
+  }
+  props.summary     = { type: "string", description: "2-3 sentence reviewer summary: who the lead is, their trial, where enrollment stands." };
+  props.reasoning   = { type: "string", description: "1-2 sentences on the plan's angle." };
+  props.confidence  = { type: "number", description: "0..1" };
+  props.followup_on = { type: "string", description: "YYYY-MM-DD. ONLY if the lead named a decision date/timeframe: the day after it - the plan starts sending then." };
+  return {
+    name: "propose_followup_plan",
+    description: "Propose the follow-up plan for a quiet Done-Trial lead. A human approves the whole plan; messages then send on the schedule described per field, each only if the previous got no reply.",
+    input_schema: {
+      type: "object",
+      properties: props,
+      required: [...Array.from({ length: n }, (_, i) => `followup_${i + 1}`), "reasoning", "confidence"],
     },
-    required: ["followup_1", "followup_2", "followup_3", "reasoning", "confidence"],
-  },
-};
+  };
+}
 
-async function runClosingPlan(system, messages, { seed }) {
+async function runClosingPlan(system, messages, { seed, tool }) {
   let convo = messages
     .filter(m => m && typeof m.text === "string" && m.text.trim() !== "")
     .map(m => ({ role: m.role === "agent" ? "assistant" : "user", content: m.text }));
   convo.push({ role: "user", content: seed });
   while (convo.length && convo[0].role === "assistant") convo.shift();
+  const planTool = tool || buildPlanTool(FOLLOWUP_DEFAULT_GAPS);
   const data = await anthropicCall({
-    model: ANTHROPIC_MODEL, max_tokens: 1024, system, tools: [PLAN_TOOL],
+    model: ANTHROPIC_MODEL, max_tokens: 1024, system, tools: [planTool],
     tool_choice: { type: "tool", name: "propose_followup_plan" }, messages: convo,
   });
   const out = (data.content || []).find(b => b.type === "tool_use" && b.name === "propose_followup_plan");
@@ -264,16 +301,19 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
 
   const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
 
-  // PLAN MODE (the follow-up loop): draft the whole up-to-3-message plan in one
-  // pass instead of a single reply. Same system prompt + contact memory + thread.
+  // PLAN MODE (the follow-up loop): draft the whole remaining plan in one pass
+  // instead of a single reply. Same system prompt + contact memory + thread.
+  // opts.planTool carries the strategy-sized tool (message count + day gaps).
   if (opts.planMode) {
     let planOut;
-    try { planOut = await runClosingPlan(system, messages, { seed }); }
+    const planTool = opts.planTool || buildPlanTool(FOLLOWUP_DEFAULT_GAPS);
+    try { planOut = await runClosingPlan(system, messages, { seed, tool: planTool }); }
     catch (e) { return { error: e.message }; }
     const agentMsgs = messages.filter(m => m.role === "agent");
+    const planCount = Object.keys(planTool.input_schema.properties).filter(k => /^followup_\d+$/.test(k)).length;
     return {
       conversation_id: conversationId,
-      plan: [planOut.followup_1, planOut.followup_2, planOut.followup_3].map(s => String(s || "").trim()),
+      plan: Array.from({ length: planCount }, (_, i) => String(planOut[`followup_${i + 1}`] || "").trim()),
       reasoning: planOut.reasoning || "",
       summary: planOut.summary ? String(planOut.summary).slice(0, 600) : null,
       confidence: typeof planOut.confidence === "number" ? planOut.confidence : null,
@@ -381,23 +421,23 @@ async function buildEnrollUrl(clientId, token, locationId, contactId) {
   return { signupUrl, enrollUrl, oppId };
 }
 
-// ── Proactive follow-up loop (Zoran, 2026-07-02) ────────────────────────────
-// When the scripted sequence has nothing (more) due and a Done-Trial lead has
-// gone quiet, the agent writes the NEXT follow-up fresh - ONE at a time, each
-// re-reading the thread + the coach's post-trial notes (contact_memory). Every
-// follow-up is AI-written, so it ALWAYS queues in Hawkeye for a human ✓ (never
-// auto-sends). After FOLLOWUP_MAX follow-ups sit unanswered, the lead graduates
-// to the Nurture stage + the Lead Nurture automation (the long game) - the same
-// routing "Mark as lost" uses. A reply at any point resets the strike count
-// (strikes are counted from the lead's most recent known reply).
-const FOLLOWUP_GAP_DAYS = 1;  // follow-ups happen the NEXT DAY by default (Zoran's rule)
-const FOLLOWUP_MAX = 3;       // unanswered follow-ups before recommending Lost → Nurture
+// ── Proactive follow-up loop (Zoran, 2026-07-02; always-scheduled 2026-07-10) ─
+// The moment we're waiting on a quiet Done-Trial lead (our message is the last
+// one and no card is live), the agent drafts the WHOLE remaining follow-up plan
+// as a Hawkeye card - so a Done-Trial lead ALWAYS has its next follow-up either
+// scheduled or awaiting approval (Zoran's rule; the old 24h silence gate left
+// cards action-less for a day). Every message is AI-written and queues for a
+// human ✓ - approving schedules the sends on the academy's configured day gaps
+// (default: next day, then +2 days), each sending only if the previous got no
+// reply. After the final follow-up sits unanswered `lostAfter` days, the lead
+// gets a Lost suggestion (approve = Nurture routing, the long game). A reply at
+// any point cancels the rest and resets the count.
+const DAY_MS = 86400000;
 
-async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId }) {
+async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId, strat }) {
   const clientId = client.id;
+  strat = strat || closingFollowupStrategy(client);
   if (!item.last_at) return "no thread to follow up on";
-  const silenceDays = (Date.now() - new Date(item.last_at).getTime()) / 86400000;
-  if (silenceDays < FOLLOWUP_GAP_DAYS) return "waiting on the lead (next-day gap not reached)";
 
   let rows = [];
   try {
@@ -406,10 +446,9 @@ async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, ite
   rows = Array.isArray(rows) ? rows : [];
   if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
 
-  // Exception to next-day cadence: the lead named a decision date ("we'll know
-  // after the 15th") - hold every proactive nudge until then.
+  // The lead named a decision date ("we'll know after the 15th") - the plan
+  // still cards NOW, but its schedule anchors at that date, not the cadence.
   const holdUntil = rows.reduce((m, r) => Math.max(m, r.followup_not_before ? new Date(r.followup_not_before).getTime() : 0), 0);
-  if (holdUntil && Date.now() < holdUntil) return `holding until the lead's decision date (${new Date(holdUntil).toISOString().slice(0, 10)})`;
 
   // Strikes = follow-ups SENT since the lead's last known reply (rows stamp
   // last_lead_at at draft time, so a reply in between restarts the count).
@@ -417,49 +456,71 @@ async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, ite
   const fuSent = rows.filter(r => (r.step_key || "").startsWith("followup_") && r.status === "sent"
     && new Date(r.sent_at || r.created_at).getTime() > lastInboundMs);
 
-  if (fuSent.length >= FOLLOWUP_MAX) {
-    // Three strikes: RECOMMEND Lost in Hawkeye (never move anyone silently).
+  if (fuSent.length >= strat.gaps.length) {
+    // Cadence exhausted. Give the final follow-up `lostAfter` quiet days to land
+    // a reply, then RECOMMEND Lost in Hawkeye (never move anyone silently).
     // Approving the Lost card marks the opp lost and auto-routes them to the
     // Nurture stage + Lead Nurture automation (existing confirm-lost path).
     // One skip from a human = permanent snooze for this lead (they own it now).
+    const lastFuMs = fuSent.reduce((m, r) => Math.max(m, new Date(r.sent_at || r.created_at).getTime()), 0);
+    const lostDueMs = Math.max(lastFuMs, holdUntil) + strat.lostAfter * DAY_MS;
+    if (Date.now() < lostDueMs) return `all follow-ups sent - Lost suggestion on ${new Date(lostDueMs).toISOString().slice(0, 10)} if still quiet`;
     if (rows.some(r => r.kind === "closing_lost" && r.created_by === "followup-loop" && r.status === "skipped")) {
       return "lost recommendation was skipped by a human - leaving this lead alone";
     }
+    const n = strat.gaps.length;
     await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
       client_id: clientId, ghl_contact_id: String(contactId), contact_name: item.name || null,
       kind: "closing_lost", lost_reason: "Not locked in", draft_message: "",
-      reasoning: `${FOLLOWUP_MAX} follow-ups sent with no reply. Recommend marking Lost - on approve they auto-route to the Nurture stage + Lead Nurture texts (the long game).`,
-      summary: `No response to ${FOLLOWUP_MAX} personalized follow-ups after their trial.`,
+      reasoning: `${n} follow-up${n === 1 ? "" : "s"} sent with no reply. Recommend marking Lost - on approve they auto-route to the Nurture stage + Lead Nurture texts (the long game).`,
+      summary: `No response to ${n} personalized follow-up${n === 1 ? "" : "s"} after their trial.`,
       confidence: 1, last_lead_at: null, status: "pending", created_by: "followup-loop",
     }]) });
     return "lost-recommended";
   }
 
   // Draft the WHOLE remaining plan in one pass (Zoran: approve all follow-ups at
-  // once; they send 1 day apart). Strikes already sent this silence-streak shrink
-  // the plan: e.g. 1 sent -> a 2-message plan (followup_2, followup_3).
-  const remaining = FOLLOWUP_MAX - fuSent.length;
+  // once). Strikes already sent this silence-streak shrink the plan: e.g. 1 sent
+  // of a 2-message cadence -> a 1-message plan (followup_2 only).
+  const gapsLeft = strat.gaps.slice(fuSent.length);
+  const remaining = gapsLeft.length;
   const startK = fuSent.length + 1;
-  const seed = `[No reply from the lead since our last message ~${Math.max(1, Math.floor(silenceDays))} day(s) ago. Draft the follow-up PLAN: ${remaining} short, warm message(s) that will send ONE DAY APART, each only if the previous one got no reply. Re-read the conversation and the coach's post-trial notes in contact_memory. Every message must feel fresh (no repeats, different angles); the final one is a friendly, no-pressure close-out that leaves the door open. A human approves the whole plan before anything sends.${remaining < 3 ? ` Provide the plan in followup_1..followup_${remaining} and leave the rest as empty strings.` : ""}]`;
+  const silenceDays = Math.max(0, Math.floor((Date.now() - new Date(item.last_at).getTime()) / DAY_MS));
+  const schedDesc = gapsLeft.map((g, i) => i === 0
+    ? `message 1 goes ${g} day${g === 1 ? "" : "s"} after our last message`
+    : `message ${i + 1} goes ${g} day${g === 1 ? "" : "s"} after message ${i}`).join("; ");
+  const seed = `[The lead has not replied to our last message${silenceDays ? ` (~${silenceDays} day(s) quiet)` : " yet"}. Draft the follow-up PLAN now so it's scheduled: ${remaining} short, warm message(s) that will send IF they stay quiet - ${schedDesc}; a reply at any point cancels the rest. Follow your follow-up timing guidance for what each message should say${remaining > 1 ? " (the first is a light did-you-see-my-message check-in; the final one asks if they're still interested and leaves the door open, no pressure)" : ""}. Re-read the conversation and the coach's post-trial notes in contact_memory. Every message must feel fresh (no repeats, different angles). A human approves the whole plan before anything sends.]`;
   const d = await draftForContact(token, locationId, clientId, contactId, cfg, {
-    dts, conversationId: item.conversation_id, skipStageGuard: true, lastDirection: item.last_direction, seed, planMode: true,
+    dts, conversationId: item.conversation_id, skipStageGuard: true, lastDirection: item.last_direction, seed,
+    planMode: true, planTool: buildPlanTool(gapsLeft),
   });
   if (d.skip) return d.skip;
   if (d.error) return d.error;
   const texts = (d.plan || []).filter(t => t && t.trim()).slice(0, remaining);
   if (!texts.length) return "agent returned an empty plan";
   const nb = d.followup_on ? `${d.followup_on}T14:00:00Z` : null;
-  const planRows = texts.map((t, i) => ({
-    client_id: clientId, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
-    contact_name: item.name || null, kind: "closing", step_key: `followup_${startK + i}`,
-    draft_message: t,
-    reasoning: i === 0 ? (d.reasoning || `Follow-up plan: ${texts.length} message(s), 1 day apart.`) : `Plan message ${startK + i} of ${FOLLOWUP_MAX} - sends 1 day after the previous one if no reply.`,
-    summary: i === 0 ? d.summary : null,
-    confidence: d.confidence, trial_at: null,
-    last_message: d.last_message || null, last_outbound: d.last_outbound || null,
-    thread_tail: i === 0 ? d.thread_tail : null, reply_count: d.reply_count,
-    followup_not_before: nb, status: "pending", created_by: "followup-plan",
-  }));
+  // Planned send times, stamped at draft: cumulative day gaps from the last
+  // message, with the first slot pushed to any decision date (the agent's
+  // followup_on or a prior card's hold). The deck shows these dates; approve
+  // keeps the spacing and just slides the plan forward if approved late.
+  const anchorMs = new Date(item.last_at).getTime();
+  const holdMs = Math.max(holdUntil || 0, nb ? new Date(nb).getTime() : 0);
+  let plannedMs = 0;
+  const planRows = texts.map((t, i) => {
+    plannedMs = i === 0 ? Math.max(anchorMs + gapsLeft[0] * DAY_MS, holdMs) : plannedMs + gapsLeft[i] * DAY_MS;
+    return {
+      client_id: clientId, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
+      contact_name: item.name || null, kind: "closing", step_key: `followup_${startK + i}`,
+      draft_message: t,
+      reasoning: i === 0 ? (d.reasoning || `Follow-up plan: ${texts.length} message(s) on the configured schedule.`) : `Plan message ${startK + i} of ${strat.gaps.length} - sends ${gapsLeft[i]} day${gapsLeft[i] === 1 ? "" : "s"} after the previous one if no reply.`,
+      summary: i === 0 ? d.summary : null,
+      confidence: d.confidence, trial_at: null,
+      last_message: d.last_message || null, last_outbound: d.last_outbound || null,
+      thread_tail: i === 0 ? d.thread_tail : null, reply_count: d.reply_count,
+      followup_not_before: nb, send_after: new Date(plannedMs).toISOString(),
+      status: "pending", created_by: "followup-plan",
+    };
+  });
   await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(planRows) });
   return "plan-drafted";
 }
@@ -544,6 +605,8 @@ async function detectForClient(client) {
   }
 
   const cfg = await loadConfig(client.id);
+  const strat = closingFollowupStrategy(client);
+  cfg.strategy = strat;   // buildSystem reads it (trailer states the real cadence)
 
   // NEVER STARVE THE BACKLOG (Zoran 2026-07-09): DETECT_CAP used to slice a
   // newest-first queue, so once the top DETECT_CAP Done-Trial cards were carded,
@@ -686,9 +749,9 @@ async function detectForClient(client) {
       }
       if (engaged) {
         try {
-          const fu = await maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId });
+          const fu = await maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, item, contactId, strat });
           if (fu === "plan-drafted" || fu === "drafted") drafted++;
-          else if (fu === "lost-recommended") { lostProposed++; reasons.push(`${item.name || contactId}: ${FOLLOWUP_MAX} follow-ups unanswered - Lost recommended in Hawkeye`); }
+          else if (fu === "lost-recommended") { lostProposed++; reasons.push(`${item.name || contactId}: ${strat.gaps.length} follow-ups unanswered - Lost recommended in Hawkeye`); }
           else { skipped++; reasons.push(`${item.name || contactId}: ${fu}`); }
         } catch (e) { skipped++; reasons.push(`${item.name || contactId}: follow-up - ${e.message}`); }
         continue;
@@ -915,6 +978,7 @@ async function handler(req, res) {
       if (!b.contact_id) return res.status(400).json({ error: "contact_id required" });
       if (await isMuted(clientId, b.contact_id, "closing")) return res.status(200).json({ error: "muted", muted: true });
       const cfg = await loadConfig(clientId);
+      cfg.strategy = closingFollowupStrategy(client);
       const d = await draftForContact(token, locationId, clientId, b.contact_id, cfg);
       if (d.error) return res.status(200).json({ error: d.error });
       if (d.skip) return res.status(200).json({ skip: d.skip });
@@ -922,21 +986,28 @@ async function handler(req, res) {
     }
 
     // Approve the whole follow-up PLAN in one tap: each pending followup_N row
-    // gets the (possibly edited) text and a send_after staggered 1 DAY APART.
-    // The detector's flush delivers each when due; a reply cancels the rest.
+    // gets the (possibly edited) text and its send_after locked in. The rows
+    // carry planned times stamped at draft (cadence gaps from the last message);
+    // approval KEEPS that spacing and just slides the whole plan forward if the
+    // first slot already passed (late approval never collapses the gaps). The
+    // detector's flush delivers each when due; a reply cancels the rest.
     if (b.action === "approve-plan") {
       if (!b.contact_id || !Array.isArray(b.edits) || !b.edits.length) return res.status(400).json({ error: "contact_id and edits required" });
       const dtsP = await doneTrialStage(token, locationId, { clientId, sb });
       if (!dtsP || !(await contactInRespondedStage(token, locationId, b.contact_id, dtsP, { clientId, sb, role: "done_trial" }))) {
         return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not scheduling." });
       }
-      let planRows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(b.contact_id)}&status=eq.pending&select=id,step_key,followup_not_before&order=created_at.asc`);
+      let planRows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(b.contact_id)}&status=eq.pending&select=id,step_key,followup_not_before,send_after&order=created_at.asc`);
       planRows = (Array.isArray(planRows) ? planRows : []).filter(r => (r.step_key || "").startsWith("followup_"));
       if (!planRows.length) return res.status(404).json({ error: "no pending follow-up plan for this lead" });
       const editById = new Map(b.edits.map(e => [String(e.id), String(e.reply || "").trim()]));
       // The lead's decision date (if the agent extracted one) pushes the whole plan.
       const holdMs = planRows.reduce((m, r) => Math.max(m, r.followup_not_before ? new Date(r.followup_not_before).getTime() : 0), 0);
-      const base = Math.max(Date.now(), holdMs || 0);
+      const kept = planRows.filter(r => editById.get(String(r.id)));
+      // Slide = how far past the first KEPT slot we are (0 when approved on time).
+      // Rows drafted before planned times existed fall back to day-apart spacing.
+      const firstPlanned = kept.length && kept[0].send_after ? new Date(kept[0].send_after).getTime() : 0;
+      const slide = Math.max(0, Date.now() - (firstPlanned || Date.now()), holdMs - (firstPlanned || Date.now()));
       let scheduled = 0, dropped = 0, dayIdx = 0;
       for (const row of planRows) {
         const text = editById.get(String(row.id));
@@ -946,7 +1017,10 @@ async function handler(req, res) {
           dropped++;
           continue;
         }
-        const sendAfter = nextSendableTime(new Date(base + dayIdx * 86400000), quietTz(client)).toISOString();
+        const plannedMs = row.send_after
+          ? new Date(row.send_after).getTime() + slide
+          : Math.max(Date.now(), holdMs || 0) + dayIdx * 86400000;
+        const sendAfter = nextSendableTime(new Date(plannedMs), quietTz(client)).toISOString();
         await sb(`agent_closing_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({
           status: "approved", draft_message: text, send_after: sendAfter,
           approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),

@@ -16562,6 +16562,14 @@ function _hv2Style() {
     '#home-v2 .hm-ib-row:hover .hm-ib-time{display:none}' +
     '#home-v2 .hm-ib-act{border:none;background:var(--surface-el,rgba(255,255,255,.08));color:var(--text-mute);font-size:11px;font-weight:600;font-family:inherit;padding:4px 10px;border-radius:6px;cursor:pointer;transition:color .12s,background .12s;white-space:nowrap}' +
     '#home-v2 .hm-ib-act:hover{color:var(--gold);background:rgba(212,182,92,.1)}' +
+    /* Hawkeye chip: shown on rows whose contact has a pending deck card.
+       Always visible (mobile has no hover); on desktop hover the quick-action
+       bar takes over the right edge, so the chip yields to its labeled twin. */
+    '#home-v2 .hm-ib-hawk{flex:none;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(212,182,92,.35);background:rgba(212,182,92,.12);color:var(--gold,#D4B65C);border-radius:999px;width:26px;height:22px;padding:0;cursor:pointer;transition:background .12s,border-color .12s}' +
+    '#home-v2 .hm-ib-hawk svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '#home-v2 .hm-ib-hawk:hover{background:rgba(212,182,92,.24);border-color:rgba(212,182,92,.55)}' +
+    '#home-v2 .hm-ib-row:hover .hm-ib-hawk{display:none}' +
+    '#home-v2 .hm-ib-act-hawk{color:var(--gold,#D4B65C);background:rgba(212,182,92,.12);font-weight:700}' +
     /* #4: System notification grouping accordion */
     '#home-v2 .hm-ib-group{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}' +
     '#home-v2 .hm-ib-group:hover{background:rgba(212,182,92,.04)}' +
@@ -17536,7 +17544,7 @@ function _hmInboxTimeStr(msgDate) {
   return Math.round(mins / 1440) + 'd';
 }
 
-function _hmInboxRow(c, opts) {
+function _hmInboxRow(c, hawkAgent) {
   (window._hmIbById = window._hmIbById || {})[c.id] = c;
   const unread = c.unreadCount > 0;
   const name = _ccCapName((c.contactName || c.fullName || 'Unknown').split(' ').slice(0, 2).join(' '));
@@ -17550,13 +17558,52 @@ function _hmInboxRow(c, opts) {
   let urgStyle = '';
   if (unread && ageHrs > 24) urgStyle = 'border-left:3px solid #B08E30;';       // overdue (unread > 24h) - deep amber, on-system
   else if (unread && ageHrs <= 4) urgStyle = 'border-left:3px solid var(--gold);';   // fresh unread
+  // Pending Hawkeye card for this contact: a lil eye button that jumps
+  // straight to that card in the deck (chip when idle, labeled on hover).
+  const hawkCid = (hawkAgent && c.contactId) ? String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '') : '';
+  const hawkGo = hawkAgent ? `_hk2Open('${hawkAgent}'${hawkCid ? `,'${hawkCid}'` : ''})` : '';
+  const hawkChip = hawkAgent ? `<button type="button" class="hm-ib-hawk" title="Hawkeye has an action waiting" onclick="event.stopPropagation();${hawkGo}">${_HV2_ICONS.eye}</button>` : '';
+  const hawkAct = hawkAgent ? `<button class="hm-ib-act hm-ib-act-hawk" onclick="event.stopPropagation();${hawkGo}">Hawkeye</button>` : '';
   return `<div class="hm-ib-row${unread ? ' hm-ib-unread' : ''}" data-cid="${escapeHTML(String(c.id))}" onclick="_hmMsgPeek('${escapeHTML(String(c.id))}')" style="${urgStyle}">
     ${unread ? '<span class="hm-ib-dot"></span>' : '<span style="width:7px;flex:none"></span>'}
     <span class="hm-ib-av">${escapeHTML(initials)}</span>
     <div style="flex:1;min-width:0"><div class="hm-ib-name">${escapeHTML(name)}</div><div class="hm-ib-prev">${escapeHTML(preview)}</div></div>
+    ${hawkChip}
     <span class="hm-ib-time">${timeStr}</span>
-    <span class="hm-ib-actions"><button class="hm-ib-act" onclick="event.stopPropagation();_hmMsgPeek('${escapeHTML(String(c.id))}', true)">Reply</button><button class="hm-ib-act" onclick="event.stopPropagation();switchView('v15inbox')">Open inbox</button></span>
+    <span class="hm-ib-actions">${hawkAct}<button class="hm-ib-act" onclick="event.stopPropagation();_hmMsgPeek('${escapeHTML(String(c.id))}', true)">Reply</button><button class="hm-ib-act" onclick="event.stopPropagation();switchView('v15inbox')">Open inbox</button></span>
   </div>`;
+}
+
+// ── Home ↔ Hawkeye alignment ─────────────────────────────────────────────
+// One shared fetch of the SAME three pending queues the Hawkeye deck reads
+// (_hk2Load: booking + confirm + closing), so everything on Home agrees with
+// what the deck actually shows. Coalesced for 5s - the inbox preview and the
+// activity feed load together and shouldn't double-hit the API.
+function _hmHawkFetch() {
+  if (window._hmHawkP) return window._hmHawkP;
+  const p = Promise.all([
+    _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})),
+    _apxPost('/api/agent-confirm', 'list-ready', {}).catch(() => ({})),
+    _apxPost('/api/agent-closing', 'list-ready', {}).catch(() => ({})),
+  ]);
+  window._hmHawkP = p;
+  setTimeout(() => { if (window._hmHawkP === p) window._hmHawkP = null; }, 5000);
+  return p;
+}
+// Index the queues by contact + conversation -> which agent's deck owns the card.
+function _hmHawkIndex(res) {
+  if (!res) return null;
+  const idx = { byContact: {}, byConv: {} };
+  const put = (r, agent) => {
+    for (const row of ((r && r.ready) || [])) {
+      if (row.status !== 'pending') continue;
+      const cid = String(row.ghl_contact_id || ''), vid = String(row.ghl_conversation_id || '');
+      if (cid && !idx.byContact[cid]) idx.byContact[cid] = agent;
+      if (vid && !idx.byConv[vid]) idx.byConv[vid] = agent;
+    }
+  };
+  put(res[0], 'booking'); put(res[1], 'confirm'); put(res[2], 'closing');
+  return idx;
 }
 
 async function _hmLoadInboxPreview() {
@@ -17566,10 +17613,28 @@ async function _hmLoadInboxPreview() {
   body._loaded = true;
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const [r, hawkRes] = await Promise.all([
+      fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }),
+      _hmHawkFetch().catch(() => null),
+    ]);
     const j = await _safeJson(r);
     if (!r.ok || !j.conversations) throw new Error('no data');
-    const convos = (j.conversations || []).slice(0, 8);
+    const hawk = _hmHawkIndex(hawkRes);
+    const hawkAgentFor = c => hawk ? (hawk.byConv[String(c.id || '')] || (c.contactId && hawk.byContact[String(c.contactId)]) || null) : null;
+    const all = j.conversations || [];
+    const convos = all.slice(0, 8);
+    // Line up with Hawkeye: a conversation with a pending deck card must make
+    // the preview even when newer chatter would push it out - swap the oldest
+    // non-flagged row for it.
+    for (const f of all.slice(8).filter(c => hawkAgentFor(c))) {
+      if (convos.length >= 8) {
+        let drop = -1;
+        for (let i = convos.length - 1; i >= 0; i--) if (!hawkAgentFor(convos[i])) { drop = i; break; }
+        if (drop < 0) break;
+        convos.splice(drop, 1);
+      }
+      convos.push(f);
+    }
     const unreadCount = convos.filter(c => c.unreadCount > 0).length;
     if (pill) { pill._count = unreadCount; pill.textContent = unreadCount; pill.style.display = (unreadCount > 0 && window._hmActiveTab === 'inbox') ? '' : 'none'; }
     if (!convos.length) {
@@ -17583,7 +17648,7 @@ async function _hmLoadInboxPreview() {
       if (_HM_SYSTEM_SENDERS.test(name)) system.push(c);
       else people.push(c);
     });
-    let html = people.map(c => _hmInboxRow(c)).join('');
+    let html = people.map(c => _hmInboxRow(c, hawkAgentFor(c))).join('');
     // Render system group as collapsible accordion if any exist
     if (system.length) {
       const gid = 'hm-ib-sysgroup';
@@ -17594,7 +17659,7 @@ async function _hmLoadInboxPreview() {
         <span class="hm-ib-group-chevron">\u203A</span>
       </div>
       <div class="hm-ib-group-items" id="${gid}">
-        ${system.map(c => _hmInboxRow(c)).join('')}
+        ${system.map(c => _hmInboxRow(c, hawkAgentFor(c))).join('')}
       </div>`;
     }
     body.innerHTML = html;
@@ -17993,12 +18058,30 @@ async function _hmLoadRailBottom() {
   // Try Hawkeye first
   let hawkData = null, hawkTotal = 0;
   try {
-    const [fu, rd] = await Promise.all([
+    const [fu, hk] = await Promise.all([
       _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})),
-      _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})),
+      _hmHawkFetch(),
     ]);
+    const [rd, cf, cl] = hk;
     hawkData = _apxSplit(fu, rd);
-    hawkTotal = (hawkData.followups || []).length + (hawkData.ready || []).length + (hawkData.lost || []).length + (hawkData.book || []).length + (hawkData.ghost || []).length;
+    // Confirm + closing queues too, so Home shows the same workload as the
+    // Hawkeye deck (_hk2Load) - it was booking-only and the counts drifted.
+    const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
+    hawkData.confirm = pend(cf);
+    hawkData.closing = [];
+    const clSeen = new Set();
+    for (const r of pend(cl)) {
+      if ((r.step_key || '').startsWith('followup_')) {   // one plan card per contact, like the deck
+        const k = String(r.ghl_contact_id);
+        if (clSeen.has(k)) continue;
+        clSeen.add(k);
+        hawkData.closing.push({ ...r, _plan: true });
+      } else hawkData.closing.push(r);
+    }
+    // Total = what the deck would show: pending booking rows + confirm rows +
+    // closing cards. Scheduled (not-yet-due) followups render in the feed but
+    // don't count - they aren't deck cards waiting on the owner.
+    hawkTotal = pend(rd).length + hawkData.confirm.length + hawkData.closing.length;
     // Check if Hawkeye is actually configured: if both APIs returned valid
     // structures (even if empty), Hawkeye is on. If they errored, fall back.
     const hawkOn = (fu && (fu.followups || fu.error === undefined)) || (rd && (rd.ready || rd.error === undefined));
@@ -18015,22 +18098,35 @@ function _hmRenderHawkFeed(host, d, total) {
                     mark_lost: { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x, verb: 'Mark as lost' } };
   for (const r of (d.ready || [])) {
     const k = kindMap[r.kind] || { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, verb: 'Reply drafted' };
-    items.push({ name: r.contact_name || 'Lead', desc: k.verb, icon: k.icon, svg: k.svg });
+    items.push({ name: r.contact_name || 'Lead', desc: k.verb, icon: k.icon, svg: k.svg, agent: 'booking', cid: r.ghl_contact_id });
+  }
+  for (const r of (d.confirm || [])) {
+    const verb = r.kind === 'confirm_handoff' ? 'Handoff to booking' : r.kind === 'confirm_lost' ? 'Confirm as lost' : r.kind === 'post_trial' ? 'Post-trial form to send' : 'Trial confirmation drafted';
+    items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, agent: 'confirm', cid: r.ghl_contact_id });
+  }
+  for (const r of (d.closing || [])) {
+    const verb = r._plan ? 'Follow-up plan to approve' : r.kind === 'closing_enroll' ? 'Enroll in closing plan' : r.kind === 'closing_lost' ? 'Confirm as lost' : 'Closing reply drafted';
+    items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, agent: 'closing', cid: r.ghl_contact_id });
   }
   for (const f of (d.followups || [])) {
     const when = f.scheduled_at ? new Date(f.scheduled_at) : null;
     const desc = when ? 'Follow-up ' + when.toLocaleDateString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'Follow-up queued';
     items.push({ name: f.contact_name || 'Lead', desc, icon: 'hm-feed-ic-fu', svg: _HV2_ICONS.refresh });
   }
-  for (const b of (d.book || [])) items.push({ name: b.contact_name || 'Lead', desc: 'Trial booking to confirm', icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check });
-  for (const g of (d.ghost || [])) items.push({ name: g.contact_name || 'Lead', desc: 'Move to ghosted', icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost });
-  for (const l of (d.lost || [])) items.push({ name: l.contact_name || 'Lead', desc: 'Confirm as lost', icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x });
+  for (const b of (d.book || [])) items.push({ name: b.contact_name || 'Lead', desc: 'Trial booking to confirm', icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, agent: 'booking', cid: b.ghl_contact_id });
+  for (const g of (d.ghost || [])) items.push({ name: g.contact_name || 'Lead', desc: 'Move to ghosted', icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost, agent: 'booking', cid: g.ghl_contact_id });
+  for (const l of (d.lost || [])) items.push({ name: l.contact_name || 'Lead', desc: 'Confirm as lost', icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x, agent: 'booking', cid: l.ghl_contact_id });
 
-  const rows = items.slice(0, 8).map(i => `
-    <div class="hm-feed-item" onclick="_hv2OpenHawkeye()">
+  // Each row deep-links to its own card in the deck (agent tab + contact on top).
+  const rows = items.slice(0, 8).map(i => {
+    const cid = i.cid ? String(i.cid).replace(/[^A-Za-z0-9_-]/g, '') : '';
+    const go = i.agent ? `_hk2Open('${i.agent}'${cid ? `,'${cid}'` : ''})` : '_hv2OpenHawkeye()';
+    return `
+    <div class="hm-feed-item" onclick="${go}">
       <div class="hm-feed-ic ${i.icon}">${i.svg}</div>
       <div class="hm-feed-text"><div class="hm-feed-name">${escapeHTML(_hmStripEm(i.name))}</div><div class="hm-feed-desc">${escapeHTML(_hmStripEm(i.desc))}</div></div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   host.innerHTML = `<div class="hm-feed">
     <div class="hm-feed-head">
@@ -22781,7 +22877,8 @@ function openTrainAgentView() {
   // academy too - they can turn their own agents off / Hawkeye (self-drive stays
   // blocked); the server enforces it's their own academy.
   if (isAgent) {
-    if (!['test', 'lessons', 'knowledge', 'mode'].includes(_TA.tab)) _TA.tab = 'test';
+    const okTabs = _TA.target === 'closing' ? ['test', 'lessons', 'followups', 'knowledge', 'mode'] : ['test', 'lessons', 'knowledge', 'mode'];
+    if (!okTabs.includes(_TA.tab)) _TA.tab = 'test';
   }
   const pill = (k, label, active) => `<button onclick="_taPick('${k}')" style="background:${active ? 'var(--gold)' : 'transparent'};color:${active ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${active ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer">${label}</button>`;
   const tab = (k, label) => `<button onclick="_taTab('${k}')" style="background:${_TA.tab === k ? 'var(--gold)' : 'transparent'};color:${_TA.tab === k ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${_TA.tab === k ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">${label}</button>`;
@@ -22807,6 +22904,7 @@ function openTrainAgentView() {
     ${isAgent ? `<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
       ${tab('test', 'Test')}
       ${tab('lessons', 'Lessons')}
+      ${_TA.target === 'closing' ? tab('followups', 'Follow-ups') : ''}
       ${tab('knowledge', 'Knowledge')}
       ${tab('mode', 'Autonomy')}
     </div>` : ''}
@@ -22820,6 +22918,7 @@ function _taRenderPanel() {
   if (_taIsEntry()) return _taRenderEntryPoints();     // an entry point -> its routing config
   if (!_taIsAgent()) return _taRenderAutomations();   // an automation is selected -> its step-builder
   if (_TA.tab === 'lessons') return _taRenderLessons();
+  if (_TA.tab === 'followups' && _TA.target === 'closing') return _taRenderFollowups();
   if (_TA.tab === 'knowledge') return _taRenderKnowledge();
   if (_TA.tab === 'mode') return _taRenderMode();
   return _taRenderTest();
@@ -22980,6 +23079,112 @@ async function _taEpApi(action, extra) {
   if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
   return json;
 }
+// ── Follow-ups tab: the closing agent's quiet-lead strategy (Zoran 2026-07-10) ─
+// Two halves, one page: the SCHEDULE (day gaps between follow-ups + how long the
+// final one waits before the Lost suggestion; stored per academy via
+// agent-config closing_followups) and the WORDING (the trainable
+// closing_followup brain section - same store the Knowledge tab edits). Every
+// quiet Done-Trial lead ALWAYS gets this plan as a Hawkeye card; this page
+// shapes what that card proposes.
+let _TA_FU = null;
+async function _taRenderFollowups() {
+  const p = document.getElementById('ta-panel'); if (!p) return;
+  p.innerHTML = `<div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>`;
+  let gaps = [1, 2], lostAfter = 2, sec = null;
+  try {
+    const [c, secs] = await Promise.all([
+      _taConfigApi('get-closing-followups', { client_id: CLIENT_ID }),
+      _taApi('sections', {}),
+    ]);
+    if (c && Array.isArray(c.gaps) && c.gaps.length) { gaps = c.gaps; lostAfter = c.lost_after || 2; }
+    sec = ((secs && secs.sections) || []).find(s => s.key === 'closing_followup') || null;
+  } catch (e) { p.innerHTML = `<div style="color:var(--red);font-size:13px">Could not load - ${escapeHTML(e.message || String(e))}</div>`; return; }
+  _TA_FU = { gaps: gaps.slice(), lost_after: lostAfter, sec };
+  _taFuPaint();
+}
+function _taFuPaint() {
+  const p = document.getElementById('ta-panel'); if (!p || !_TA_FU) return;
+  const f = _TA_FU;
+  const node = (title, sub, color) => `
+    <div style="background:var(--surface);border:1px solid ${color || 'var(--border)'};border-radius:12px;padding:11px 14px">
+      <div style="font-weight:700;font-size:13.5px">${title}</div>
+      ${sub ? `<div style="font-size:12px;color:var(--text-sub);margin-top:2px;line-height:1.45">${sub}</div>` : ''}
+    </div>`;
+  const gapRow = (i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:2px 0 2px 22px">
+      <span style="width:1px;align-self:stretch;background:var(--border);margin-right:8px"></span>
+      <span style="font-size:12px;color:var(--text-sub)">after</span>
+      <input type="number" min="1" max="14" value="${f.gaps[i]}" onchange="_taFuGap(${i}, this.value)" style="width:56px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font:inherit;font-size:13px;text-align:center">
+      <span style="font-size:12px;color:var(--text-sub)">quiet day${f.gaps[i] === 1 ? '' : 's'}</span>
+    </div>`;
+  const fuNode = (i) => {
+    const last = i === f.gaps.length - 1;
+    const hint = i === 0 && f.gaps.length > 1 ? 'Light did-you-see-my-message check-in'
+      : last ? 'Asks if they are still interested - leaves the door open' : 'A fresh angle - value, schedule fit, or a light question';
+    return `<div style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1">${node(`Follow-up ${i + 1}`, hint, 'var(--accent-border,rgba(212,182,92,.35))')}</div>
+      ${f.gaps.length > 1 ? `<button title="Remove this follow-up" onclick="_taFuRemove(${i})" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer">Remove</button>` : ''}
+    </div>`;
+  };
+  const secWarn = f.sec && f.sec.scope === 'global'
+    ? `<div style="font-size:11.5px;color:var(--gold);background:rgba(212,182,92,.08);border:1px solid rgba(212,182,92,.33);border-radius:8px;padding:7px 10px;margin:0 0 8px;line-height:1.45">This wording is <b>global</b> - saving changes it for every academy's closing agent, not just yours.</div>` : '';
+  p.innerHTML = `
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.55;max-width:640px">When a Done-Trial lead goes quiet, the agent always queues this plan in Hawkeye - you approve it once and the messages send themselves on the schedule below, each only if the lead still hasn't replied. A reply cancels the rest instantly.</p>
+    <div style="display:flex;flex-direction:column;gap:6px;max-width:560px">
+      ${node('Our last message goes unanswered', 'The clock starts at the most recent message in the thread.')}
+      ${f.gaps.map((_, i) => gapRow(i) + fuNode(i)).join('')}
+      <div style="display:flex;align-items:center;gap:8px;padding:2px 0 2px 22px">
+        <span style="width:1px;align-self:stretch;background:var(--border);margin-right:8px"></span>
+        <span style="font-size:12px;color:var(--text-sub)">after</span>
+        <input type="number" min="1" max="14" value="${f.lost_after}" onchange="_taFuLost(this.value)" style="width:56px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font:inherit;font-size:13px;text-align:center">
+        <span style="font-size:12px;color:var(--text-sub)">more quiet day${f.lost_after === 1 ? '' : 's'}</span>
+      </div>
+      ${node('Suggest marking Lost', 'A card asks you to confirm - approving routes them to the long-game nurture texts. Nothing moves on its own.', 'rgba(240,112,96,.4)')}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap">
+      ${f.gaps.length < 5 ? `<button style="${_TA_BTN2}" onclick="_taFuAdd()">+ Add a follow-up</button>` : ''}
+      <button style="${_TA_BTN}" onclick="_taFuSaveSchedule()">Save schedule</button>
+      <span id="ta-fu-note" style="font-size:12px"></span>
+    </div>
+    <div style="margin-top:26px;max-width:640px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px">What the follow-ups say</div>
+      <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 8px;line-height:1.5">The agent writes each message fresh per lead, guided by this. Teach it the style you want - the schedule above controls when, this controls what.</p>
+      ${secWarn}
+      ${!f.sec
+        ? `<div style="font-size:12.5px;color:var(--text-sub)">The wording lives in Knowledge - open the Knowledge tab and edit "Closing agent - Follow-up strategy".</div>`
+        : f.sec.editable
+        ? `<textarea id="ta-fu-wording" rows="9" style="width:100%;box-sizing:border-box;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit;line-height:1.5">${escapeHTML(f.sec.body || '')}</textarea>
+          <div style="display:flex;gap:10px;margin-top:8px;align-items:center">
+            <button style="${_TA_BTN}" onclick="_taFuSaveWording()">Save wording</button>
+            <span id="ta-fu-wnote" style="font-size:12px"></span>
+          </div>`
+        : `<div style="font-size:12.5px;color:var(--text-sub);background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;line-height:1.5">The follow-up wording is managed by BAM. Your schedule above is fully yours to set.</div>`}
+    </div>`;
+}
+function _taFuGap(i, v) { if (!_TA_FU) return; _TA_FU.gaps[i] = Math.max(1, Math.min(14, Math.round(Number(v) || 1))); _taFuPaint(); }
+function _taFuLost(v) { if (!_TA_FU) return; _TA_FU.lost_after = Math.max(1, Math.min(14, Math.round(Number(v) || 1))); _taFuPaint(); }
+function _taFuAdd() { if (!_TA_FU || _TA_FU.gaps.length >= 5) return; _TA_FU.gaps.push(2); _taFuPaint(); }
+function _taFuRemove(i) { if (!_TA_FU || _TA_FU.gaps.length <= 1) return; _TA_FU.gaps.splice(i, 1); _taFuPaint(); }
+async function _taFuSaveSchedule() {
+  if (!_TA_FU) return;
+  const note = document.getElementById('ta-fu-note');
+  try {
+    await _taConfigApi('set-closing-followups', { client_id: CLIENT_ID, gaps: _TA_FU.gaps, lost_after: _TA_FU.lost_after });
+    if (note) { note.style.color = 'var(--green,#4CC76A)'; note.textContent = 'Saved - new plans use this schedule.'; setTimeout(() => { if (note) note.textContent = ''; }, 3500); }
+  } catch (e) { if (note) { note.style.color = 'var(--red)'; note.textContent = e.message || 'Could not save'; } }
+}
+async function _taFuSaveWording() {
+  if (!_TA_FU || !_TA_FU.sec) return;
+  const ta = document.getElementById('ta-fu-wording');
+  const note = document.getElementById('ta-fu-wnote');
+  if (!ta) return;
+  try {
+    await _taApi('update-section', { key: 'closing_followup', body: ta.value });
+    _TA_FU.sec.body = ta.value;
+    if (note) { note.style.color = 'var(--green,#4CC76A)'; note.textContent = 'Saved - the agent uses this on its next drafts.'; setTimeout(() => { if (note) note.textContent = ''; }, 3500); }
+  } catch (e) { if (note) { note.style.color = 'var(--red)'; note.textContent = e.message || 'Could not save'; } }
+}
+
 async function _taRenderEntryPoints() {
   const p = document.getElementById('ta-panel');
   if (!p) return;
@@ -32313,7 +32518,7 @@ const _HK2_KIND = {
   ghost:   { pill: 'Went quiet',      color: 'var(--gold,#D4B65C)',    cls: '',      go: 'Send to Ghosted',               goEdit: 'Send to Ghosted' },
   handoff: { pill: 'Reschedule',      color: 'var(--blue,#5A8FB8)',    cls: 'green', go: 'Approve handoff',               goEdit: 'Confirm edits and hand off' },
   enroll:  { pill: 'Ready to enroll', color: 'var(--green,#4CC76A)',   cls: 'green', go: 'Approve and send',              goEdit: 'Confirm edits and send' },
-  plan:    { pill: 'Follow-up plan',  color: 'var(--accent)',          cls: '',      go: 'Approve plan - sends 1 day apart', goEdit: 'Confirm edits and approve plan' },
+  plan:    { pill: 'Follow-up plan',  color: 'var(--accent)',          cls: '',      go: 'Approve follow-up schedule', goEdit: 'Confirm edits and schedule' },
   lost:    { pill: 'Suggested lost',  color: 'var(--red,#F07060)',     cls: 'red',   go: 'Mark lost',                     goEdit: 'Confirm edits and mark lost' },
   form:    { pill: 'Post-trial form', color: 'var(--accent)',          cls: '',      go: 'Submit post-trial form',        goEdit: 'Submit post-trial form' },
   reignite:     { pill: 'Wants to start later', color: 'var(--gold,#D4B65C)', cls: '', go: 'Send ack + schedule reignite', goEdit: 'Confirm edits and schedule' },
@@ -32616,9 +32821,13 @@ function _hk2CardHtml(r, pos, total, isTop) {
         <textarea class="hk2-draft"${id.draft} oninput="_hk2SyncMoveLabels()" placeholder="Write a message instead of ghosting..."></textarea>
       </div>`;
   } else if (r._kind === 'plan') {
+    // Each row carries its planned send time (stamped at draft on the academy's
+    // cadence) - show the real day so approving reads as locking a schedule.
+    const _fuDay = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-lbl">The plan - every message editable · clear a box to drop that step</div>
-      ${(r.rows || []).map((row, i) => `<div class="hk2-lbl" style="margin-top:2px">Day ${i + 1}${i === r.rows.length - 1 ? ' · final, no-pressure' : ''}</div><textarea class="hk2-draft sm"${isTop ? ` id="hk2-plan-${i}"` : ''} oninput="_hk2Edited()">${escapeHTML(row.draft_message || '')}</textarea>`).join('')}`;
+      ${(r.rows || []).map((row, i) => { const when = _fuDay(row.send_after); const last = i === r.rows.length - 1; return `<div class="hk2-lbl" style="margin-top:2px">${when ? `Sends ${when}` : `Message ${i + 1}`} · only if still no reply${last ? ' · final, no-pressure' : ''}</div><textarea class="hk2-draft sm"${isTop ? ` id="hk2-plan-${i}"` : ''} oninput="_hk2Edited()">${escapeHTML(row.draft_message || '')}</textarea>`; }).join('')}
+      <div class="hk2-note">Approve = the schedule locks in and each message sends itself on its day, only while the lead stays quiet. A reply cancels the rest instantly. Change the cadence in the stage config (gear) under Follow-ups.</div>`;
   } else if (r._kind === 'handoff') {
     const note = r.handoff_note ? `<div class="hk2-note"><b style="color:var(--text)">Reason:</b> ${escapeHTML(r.handoff_note)}</div>` : '';
     body = `${_hk2ThreadHtml(r)}${note}
@@ -33023,7 +33232,7 @@ function _hk2Confirm() {
       const token = await _mreqAuthToken();
       const res = await fetch('/api/agent-closing', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve-plan', client_id: CLIENT_ID, contact_id: r.ghl_contact_id, edits }) });
       const j = await _safeJson(res); if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
-      _apxToast(`Plan scheduled - ${j.scheduled} message(s), 1 day apart`, true);
+      _apxToast(`Follow-up schedule locked in - ${j.scheduled} message(s)`, true);
     } else {
       // reply
       let resp;
@@ -33716,6 +33925,8 @@ function _plRenderFocus(stage, stages, idx) {
   let engineBody;
   if (kind === 'agent') {
     const tabs = [['test', 'Test'], ['lessons', 'Lessons'], ['knowledge', 'Knowledge'], ['mode', 'Autonomy']];
+    // The closing agent's quiet-lead cadence is configurable (Zoran 2026-07-10).
+    if (bot.key === 'closing') tabs.splice(2, 0, ['followups', 'Follow-ups']);
     engineBody = `<div class="plf-tabs">${tabs.map(([k, l]) => `<button class="plf-tab${_TA.tab === k ? ' on' : ''}" data-tab="${k}" onclick="_plFocusTab('${k}')">${l}</button>`).join('')}</div><div id="ta-panel"></div>`;
   } else if (kind === 'automation') {
     engineBody = `<div id="ta-panel"></div>`;
@@ -33733,7 +33944,8 @@ function _plRenderFocus(stage, stages, idx) {
     ${exitSec}`;
   if (kind === 'agent' || kind === 'automation') {
     _TA.target = bot.key;
-    if (kind === 'agent' && !['test', 'lessons', 'knowledge', 'mode'].includes(_TA.tab)) _TA.tab = 'test';
+    const okTabs = bot.key === 'closing' ? ['test', 'lessons', 'followups', 'knowledge', 'mode'] : ['test', 'lessons', 'knowledge', 'mode'];
+    if (kind === 'agent' && !okTabs.includes(_TA.tab)) _TA.tab = 'test';
     try { _taRenderPanel(); } catch (e) { const pp = document.getElementById('ta-panel'); if (pp) pp.innerHTML = '<div style="color:var(--red);font-size:13px">Could not load - ' + escapeHTML(e.message || String(e)) + '</div>'; }
   }
 }
@@ -35156,7 +35368,7 @@ function _aclxRender() {
   if (!body) return;
   if (!_ACLX_DATA.length) { body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no closings waiting.') + '</div>'; return; }
   // Follow-up PLAN grouping: a contact with 2+ pending followup_N rows renders
-  // as ONE plan card (all messages editable, approved together, sent 1 day apart).
+  // as ONE plan card (all messages editable, approved together, sent on the cadence).
   const _isPlanRow = r => (r.step_key || '').startsWith('followup_') && r.status === 'pending';
   const _planCount = new Map();
   for (const r of _ACLX_DATA) if (_isPlanRow(r)) _planCount.set(r.ghl_contact_id, (_planCount.get(r.ghl_contact_id) || 0) + 1);
@@ -35174,15 +35386,17 @@ function _aclxRender() {
   _ACLX_DATA.forEach(r => { if (!_notesDone.has(r.ghl_contact_id)) { _notesDone.add(r.ghl_contact_id); _aclxLoadNotes(r); } });   // lazy-fill team notes (one per lead)
 }
 
-// One card for the whole follow-up plan: every message editable, one ✓ schedules
-// them 1 day apart (the agent cancels the rest the moment the lead replies).
+// One card for the whole follow-up plan: every message editable, one ✓ locks the
+// schedule in (each row carries its planned send day; the agent cancels the rest
+// the moment the lead replies).
 function _aclxPlanCard(rows) {
   const first = rows[0];
+  const _fuDay = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
   const boxes = rows.map((r, i) => `
-    <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:${i ? '10px' : '2px'} 0 4px">Day ${i + 1}${i === rows.length - 1 ? ' · final, no-pressure' : ''} · clear the box to drop this step</div>
+    <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:${i ? '10px' : '2px'} 0 4px">${_fuDay(r.send_after) ? 'sends ' + _fuDay(r.send_after) : 'message ' + (i + 1)}${i === rows.length - 1 ? ' · final, no-pressure' : ''} · clear the box to drop this step</div>
     ${_aclxBox(r)}`).join('');
   return `<div id="aclx-plan-${escapeHTML(first.ghl_contact_id)}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(212,182,92,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
-    ${_aclxHeader(first, `follow-up plan · ${rows.length} messages, 1 day apart`, 'var(--accent)')}
+    ${_aclxHeader(first, `follow-up plan · ${rows.length} messages`, 'var(--accent)')}
     ${first.reasoning ? `<div style="font-size:11.5px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(first.reasoning)}</div>` : ''}
     ${_aclxContext(first)}
     ${boxes}
@@ -35190,7 +35404,7 @@ function _aclxPlanCard(rows) {
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_aclxSkipPlan('${escapeHTML(first.ghl_contact_id)}')" title="Skip the whole plan" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
       <button onclick="_aclxUnqualifiedPlan('${escapeHTML(first.ghl_contact_id)}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
-      <button onclick="_aclxApprovePlan('${escapeHTML(first.ghl_contact_id)}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve plan - sends 1 day apart</button>
+      <button onclick="_aclxApprovePlan('${escapeHTML(first.ghl_contact_id)}')" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">✓ Approve follow-up schedule</button>
     </div>
   </div>`;
 }
@@ -35205,7 +35419,7 @@ async function _aclxApprovePlan(contactId) {
     if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
     _ACLX_DATA = _ACLX_DATA.filter(x => !rows.some(r => r.id === x.id));
     document.getElementById('aclx-plan-' + contactId)?.remove();
-    _apxToast(`Plan scheduled - ${j.scheduled} message(s), 1 day apart`, true);
+    _apxToast(`Follow-up schedule locked in - ${j.scheduled} message(s)`, true);
     if (!_ACLX_DATA.length) _aclxRender();
   } catch (e) { alert('Could not schedule the plan: ' + (e.message || e)); }
 }
@@ -35282,9 +35496,9 @@ function _aclxBox(r, ph) {
 function _aclxReplyCard(r) {
   const esc = r.escalate ? `<div style="font-size:11.5px;color:#e0a020;margin-bottom:6px">agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
   // Proactive follow-up loop cards carry step_key 'followup_N' - badge shows
-  // where the lead is in the 3-strike cadence.
+  // where the lead is in the cadence.
   const _fu = /^followup_(\d+)$/.exec(r.step_key || '');
-  const _pill = r.kind === 'closing_auto' ? 'automated reminder' : _fu ? `follow-up ${_fu[1]} of 3` : 'follow-up';
+  const _pill = r.kind === 'closing_auto' ? 'automated reminder' : _fu ? `follow-up ${_fu[1]}` : 'follow-up';
   return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(212,182,92,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
     ${_aclxHeader(r, _pill, 'var(--accent)')}${esc}${_aclxContext(r)}
     <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">proposed message · edit it right here</div>

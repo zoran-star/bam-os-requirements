@@ -302,8 +302,44 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   _plLoadNeedsAction (list-reignitions), cascade rows show "reignite Sep 1 ·
   parked until then", contact drawer gets a gold chip + Cancel
   (_cdReigniteChip), stuck list exempts parked leads. NOT prod-verified yet.
+- 🔥 CLOSING FOLLOW-UPS ALWAYS SCHEDULED + CONFIGURABLE (2026-07-11, Zoran: Done-Trial
+  cards had NO follow-up action showing). TWO bugs found: (1) the plan insert 409'd on
+  `agent_closing_replies_one_active_per_contact` - it was unique on (client_id,
+  ghl_contact_id) for active rows, so a multi-row followup_N plan could never insert
+  (migration 20260711030000 widened it to include coalesce(step_key,'') - reply/enroll/
+  lost/reignite all share the '' bucket = still one active card, but plan rows coexist).
+  (2) the follow-up loop had a 24h silence GATE (`silenceDays < 1 -> "waiting on the
+  lead"`), so a quiet lead sat card-less for a day. FIX: the plan now cards the MOMENT
+  we're waiting (our msg last + no active card) - a Done-Trial lead ALWAYS has its next
+  follow-up either scheduled or awaiting ✓. CADENCE is per-academy configurable at
+  clients.ghl_kpi_config.closing_followups = { gaps:[1,2], lost_after:2 } (gaps[i] =
+  days between follow-up i and the prior msg; default = next day "did you see my msg",
+  then +2 days "still interested?", then Lost suggestion 2 quiet days after the last
+  follow-up -> Nurture on approve). `closingFollowupStrategy(client)` in agent-closing.js;
+  PLAN_TOOL is now buildPlanTool(gapsLeft) (dynamic count + per-field send timing);
+  send_after stamped at DRAFT on the cadence (deck + V1.5 plan card show the real send
+  DAY, not "Day 1/2/3"); approve-plan preserves spacing + slides forward if approved
+  late. Config API: agent-config get/set-closing-followups (owner or staff). WORDING is
+  the trainable closing_followup brain section (relabeled "Follow-up strategy", layer
+  goal = GLOBAL/BAM-managed, GTA can edit as a global editor). NEW "Follow-ups" tab
+  (closing agent only) in BOTH the focus-mode Engine tabs and the Train Agent view
+  (`_taRenderFollowups`/`_taFuPaint`): a schedule timeline editor (day gaps + lost_after)
+  + the wording editor (gated on section.editable). All "1 day apart" copy killed.
+  Nothing auto-sends (GTA closing_mode=hawkeye, self-drive globally off) - safe. Applied
+  to GTA (default cadence). NOT prod-verified end-to-end yet.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch
-  incl. reignition end-to-end.
+  incl. reignition + always-scheduled closing follow-ups end-to-end.
+- HOME <-> HAWKEYE ALIGNMENT (2026-07-10, Zoran: "make sure the home inbox lines up
+  with hawkeye + lil hawkeye buttons"): V2 Home inbox preview rows whose contact has
+  a pending deck card get a gold eye chip (`hm-ib-hawk`, hover twin `hm-ib-act-hawk`)
+  that deep-links `_hk2Open(agent, contactId)`; flagged convos are guaranteed a slot
+  in the 8-row preview (oldest non-flagged row swapped out). Shared fetch
+  `_hmHawkFetch()` (5s-coalesced, same 3 list-ready queues as `_hk2Load`) +
+  `_hmHawkIndex()` map. Right-rail "Hawkeye activity" feed now includes confirm +
+  closing queues (was booking-only - counts drifted from the deck); `_hmHawkTotal` =
+  deck-card count (pending booking rows + confirm rows + closing cards, plans
+  collapsed; scheduled followups render but don't count) and each feed row
+  deep-links to its card.
 - 🐞 BUG SWEEP (2026-07-11, 41-agent adversarial review of the 2026-07-10 batch;
   27 confirmed). FIXED this pass:
   * CRIT: silent parks self-canceled every detector cron - a park with an empty
