@@ -35274,6 +35274,9 @@ function _aclxRender() {
       _planRendered.add(r.ghl_contact_id);
       return _aclxPlanCard(_ACLX_DATA.filter(x => _isPlanRow(x) && x.ghl_contact_id === r.ghl_contact_id));
     }
+    // Already approved and sitting on its cadence - render a "scheduled" card that
+    // shows when it sends and lets staff fire it early (Send now) or drop it.
+    if (r.status === 'approved' && r.kind !== 'closing_enroll' && r.kind !== 'closing_lost') return _aclxScheduledCard(r);
     return r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : _aclxReplyCard(r);
   }).join('');
   body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
@@ -35406,6 +35409,26 @@ function _aclxReplyCard(r) {
     </div>
   </div>`;
 }
+// An already-approved follow-up waiting on its cadence (status 'approved',
+// send_after in the future). The detector's flush delivers it when due - this card
+// just shows when that is and lets staff fire it early or drop it. The box stays
+// editable; Send now uses whatever's in it.
+function _aclxScheduledCard(r) {
+  const _fu = /^followup_(\d+)$/.exec(r.step_key || '');
+  const pill = r.kind === 'closing_auto' ? 'automated reminder' : _fu ? `follow-up ${_fu[1]}` : 'follow-up';
+  const future = r.send_after && new Date(r.send_after).getTime() > Date.now();
+  const when = r.send_after ? (future ? 'sends ' + _apxWhen(r.send_after) : 'due now') : 'scheduled';
+  return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(r, pill, 'var(--accent)')}${_aclxContext(r)}
+    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">⏰ scheduled · ${escapeHTML(when)} · edit below, then send whenever</div>
+    ${_aclxBox(r)}
+    ${_aclxNotesBlock(r)}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkip('${r.id}')" title="Skip this scheduled message" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxSendNow('${r.id}')" title="Send now instead of waiting for the scheduled time" style="flex:2;background:var(--accent);border:1px solid var(--accent);color:#08080A;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Send now</button>
+    </div>
+  </div>`;
+}
 function _aclxEnrollCard(r) {
   const note = r.enroll_note ? `<div style="font-size:12px;color:var(--text-sub);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:4px 0 8px"><b style="color:var(--text)">Plan / context:</b> ${escapeHTML(r.enroll_note)}</div>` : '';
   return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid #3DBE8B;border-radius:11px;padding:12px 14px;margin-bottom:9px">
@@ -35452,6 +35475,19 @@ function _aclxSend(id) {
   if (!reply) { _apxToast('Message is empty', false); return; }
   _hawkDefer({ cardId: 'aclx-' + id, label: 'Sent', restore: _aclxRender, run: async () => {
     const resp = await _apxPost('/api/agent-closing', 'send', { ready_id: id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, confidence: r.confidence, reasoning: r.reasoning });
+    _aclxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
+  } });
+}
+// Fire an already-scheduled follow-up right now (its send_after is in the future).
+// Sends whatever is in the box; the backend still defers to morning in quiet hours.
+function _aclxSendNow(id) {
+  if (!_sendGuard('aclxSendNow-' + id)) return;
+  const r = _ACLX_DATA.find(x => x.id === id); if (!r) return;
+  const ta = document.getElementById('aclx-edit-' + id);
+  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
+  if (!reply) { _apxToast('Message is empty', false); return; }
+  _hawkDefer({ cardId: 'aclx-' + id, label: 'Sent now', restore: _aclxRender, run: async () => {
+    const resp = await _apxPost('/api/agent-closing', 'send-now', { id, reply });
     _aclxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
   } });
 }
