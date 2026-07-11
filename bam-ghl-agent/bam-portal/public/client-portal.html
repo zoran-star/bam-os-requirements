@@ -32518,7 +32518,17 @@ function _hk2CardHtml(r, pos, total, isTop) {
       </div>
       <div class="hk2-note">One submit routes them: good fit moves to Done Trial, no-show hands Booking the rebook, not a fit closes as unqualified or lost.</div>`;
   } else {
-    body = `${_hk2ThreadHtml(r)}
+    // A reply that PROPOSES a time carries the slot as structured data (Zoran
+    // 2026-07-10: approve every proposed time as a Hawkeye field, not prose).
+    // Same pickers as the Book-it card; the message is still what sends.
+    const proposal = (r._kind === 'reply' && r.book_slot_at) ? `
+      <div class="hk2-lbl">Proposed time - a verified open slot</div>
+      <div class="hk2-fields">
+        <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
+        <label><span>Slot</span><select${id.slot} onchange="_hk2Edited()"><option value="${escapeHTML(r.book_slot_at)}" selected>${escapeHTML(_hk2SlotLabel(r.book_slot_at))}</option></select></label>
+      </div>
+      <div class="hk2-note">This is the time the message offers. Pick a different slot = update the message to match; the text is what sends.</div>` : '';
+    body = `${_hk2ThreadHtml(r)}${proposal}
       <div class="hk2-lbl">${r._kind === 'enroll' ? 'The reply, sign-up link included · edit it right here' : 'Proposed message · edit it right here'}</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       ${r._kind === 'enroll' ? '<div class="hk2-note">The opportunity is marked won automatically when they pay on the link.</div>' : ''}`;
@@ -32621,7 +32631,8 @@ function _hk2Render(opts) {
     <div class="hk2-deck">${deck}</div>
     <div class="hk2-hint">every card resolves here - approve it or move the lead (no skip)<br>edits flip the button to "Confirm edits" and the teach-why note becomes required</div>`;
   const top = _hk2Top();
-  if (top && top._kind === 'book') _hk2EnsureBookOpts();
+  // Book cards AND reply cards that PROPOSE a time both need the live pickers.
+  if (top && (top._kind === 'book' || (top._kind === 'reply' && top.book_slot_at))) _hk2EnsureBookOpts();
 }
 // ── Book-it pickers: the academy's trial calendars + open slots ──
 async function _hk2EnsureBookOpts() {
@@ -32634,7 +32645,7 @@ async function _hk2EnsureBookOpts() {
   _hk2FillBookOpts();
 }
 function _hk2FillBookOpts() {
-  const r = _hk2Top(); if (!r || r._kind !== 'book') return;
+  const r = _hk2Top(); if (!r || !(r._kind === 'book' || (r._kind === 'reply' && r.book_slot_at))) return;
   const cal = document.getElementById('hk2-cal'); if (!cal) return;
   const cals = _HK2.bookOpts || [];
   if (!cals.length) return;   // keep the agent's guess-only options
@@ -32818,7 +32829,10 @@ function _hk2Confirm() {
       // reply
       let resp;
       if (_HK2.agent === 'booking') {
-        resp = await _apxPost(ep, 'send', { contact_id: r.ghl_contact_id, reply, conversation_id: r.ghl_conversation_id || null, contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence, reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id, adjusted: reply !== before, suggested_reply: before || null });
+        // A proposal card: record the FINAL picked slot on the row so the
+        // structured proposed-time stays truthful after any picker change.
+        const prop = r.book_slot_at ? { proposed_calendar_id: calV || null, proposed_slot_at: slotV || null } : {};
+        resp = await _apxPost(ep, 'send', { contact_id: r.ghl_contact_id, reply, conversation_id: r.ghl_conversation_id || null, contact_name: r.contact_name || null, reasoning: r.reasoning || null, confidence: r.confidence, reply_count: r.reply_count, booking_asks: r.booking_asks, ready_id: r.id, adjusted: reply !== before, suggested_reply: before || null, ...prop });
       } else {
         resp = await _apxPost(ep, 'send', { ready_id: r.id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, confidence: r.confidence, reasoning: r.reasoning });
       }

@@ -190,6 +190,26 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   gates since the bounce is intentional). STILL SEND IMMEDIATELY on after-hours
   ✓ (Zoran's call: leave for now): lost-card warm goodbyes (all 3 agents),
   closing enroll-link message, post-trial form first message (+link).
+- PROPOSED TIMES = STRUCTURED HAWKEYE FIELDS (2026-07-10, Zoran: "I approve all
+  of the proposed times to book"): the booking agent's propose_reply tool got
+  propose_group/propose_slot_at ("never name a time you have not verified as an
+  open slot via check_availability"); normalizeProposal validates (future +
+  real calendar) and stamps the reply card's book_* columns (kind stays
+  'reply' - nothing books on send). Deck reply cards with a proposed slot show
+  the SAME Calendar/Slot pickers as Book-it ("Proposed time - a verified open
+  slot"); the send action records the final pick (proposed_slot_at/calendar_id
+  patch). Audit result: every time-proposal path was ALREADY Hawkeye-gated
+  (reply cards, Book-it, rebook/no-show openers); scripted confirm reminders
+  state the BOOKED time only (approved-once templates, self-send by design).
+- POST-BOOKING MESSAGE CHAIN (locked 2026-07-10): Book-it approve = slot
+  claimed + confirmation text sends instantly (with Apple/Google calendar
+  links appended server-side) + a kind=confirm_auto step_key=confirm marker
+  row (status sent, trial_at=slot) is written so the confirm agent's scripted
+  IMMEDIATE "Booking confirmation" step does NOT self-send a second
+  confirmation minutes later. The scripted same-day 9am check-in still fires
+  (different step_key). Lead replies at any point -> scripted stops, AI
+  confirm agent takes over (an AI confirm-kind card about the same trial
+  blocks ALL scripted steps for that trial - fireScriptedStep line ~389).
 - BOOK-IT NOW TEXTS THE PARENT (2026-07-10, Mike Sandhu case): on portal-booking
   academies confirm-book claimed the slot but sent NOTHING (GHL academies get
   GHL's toNotify; portal leads who said "yes please" heard silence until the
