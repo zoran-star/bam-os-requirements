@@ -35,6 +35,7 @@ import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { buildGoogleCalUrl, buildIcalUrl } from "./agent/confirm-automations.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
+import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, dueReignitions, markReignition, listReignitions } from "./agent/_reignite.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -90,7 +91,8 @@ const LIVE_BOOKING_TRAILER =
   `CONFIRM BEFORE BOOKING: when the lead offers or agrees to a day/time, do NOT book it yet - first ASK them to confirm you should book it (for example "Want me to lock that in and book it for you?"). Only set book=true AFTER they clearly say yes to you booking it (e.g. "yes please", "go ahead"). If they have only named a time but not yet okayed you booking it, your reply IS that confirmation question, with book=false. ` +
   `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
   `'asked_to_book' = true if your reply invites them to book/come in; 'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human instead of replying. ` +
-  `If your lost_criteria say this lead should be closed out, set 'recommend_lost' = true with a short 'lost_reason' from the taxonomy, and put your warm closing message in 'reply' (a human confirms the Lost before anything changes).\n</live_booking>`;
+  `If your lost_criteria say this lead should be closed out, set 'recommend_lost' = true with a short 'lost_reason' from the taxonomy, and put your warm closing message in 'reply' (a human confirms the Lost before anything changes). ` +
+  `REIGNITION: if the lead clearly WANTS to proceed but only at a LATER date ("after summer", "once school starts", "text me in September"), do NOT mark them lost and do NOT keep pushing. Set 'reignite_at' (YYYY-MM-DD - resolve a vague timeframe to a concrete date, e.g. "after summer" = Sep 01; a bare "later" with no timeframe = about 30 days out) and 'reignite_message' = the exact re-engagement text we should open with ON that date (warm, references what they told us, moves toward booking). Make 'reply' the acknowledgement to send NOW ("No problem, I'll check back in September!"). A human confirms the date + both messages before anything is scheduled.\n</live_booking>`;
 function buildSystem({ lessons, overrides, examples }) {
   return buildAgentSystem({ lessons, overrides, examples, trailer: LIVE_BOOKING_TRAILER });
 }
@@ -126,6 +128,8 @@ const REPLY_TOOL = {
       book_slot_at:    { type: "string", description: "If book: the EXACT ISO datetime of the open slot the lead confirmed (must be one of the open_slots from check_availability)." },
       propose_group:   { type: "string", description: "If your reply OFFERS or SUGGESTS a specific session day/time to the lead WITHOUT booking yet: 'Group 1' (elementary, 9-13) or 'Group 2' (high school, 14+)." },
       propose_slot_at: { type: "string", description: "If your reply names a specific day/time to the lead (book=false): the EXACT ISO datetime of that open slot - it MUST come from check_availability. NEVER name a time in a reply that you have not verified as an open slot. Empty when your reply names no specific time." },
+      reignite_at:      { type: "string", description: "YYYY-MM-DD. ONLY when the lead wants to proceed but at a LATER date: the concrete day to re-engage (resolve vague timeframes; bare 'later' = ~30 days out). A human confirms before anything is scheduled." },
+      reignite_message: { type: "string", description: "If reignite_at: the exact re-engagement text to open with on that date - warm, references what they told us, moves toward booking." },
     },
     required: ["reply", "reasoning", "confidence", "escalate"],
   },
@@ -305,6 +309,10 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     book_group: book ? out.book_group : prop.group,
     book_slot_at: book ? out.book_slot_at : prop.slotAt,
     book_calendar_id: book ? bookCal.key : prop.calendarId,
+    // 🔥 Reignition: "yes, but later" with a concrete re-engagement date + the
+    // pre-written message to open with on that date. Invalid/past dates drop out.
+    reignite_at: normalizeReigniteAt(out.reignite_at),
+    reignite_message: (out.reignite_message && String(out.reignite_message).trim()) || null,
     summary: out.summary ? String(out.summary).slice(0, 600) : null,
     last_message: (() => { const lead = [...messages].reverse().find(m => m.role === "parent"); return lead ? String(lead.text).slice(0, 500) : null; })(),
     last_outbound: (() => { const ours = [...messages].reverse().find(m => m.role === "agent"); return ours ? String(ours.text).slice(0, 500) : null; })(),
@@ -476,9 +484,31 @@ async function detectForClient(client) {
   } catch (_) {}
 
   const cfg = await loadConfig(client.id);
-  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0, deferred = 0, flushed = 0, escalationCards = 0;
+  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0, deferred = 0, flushed = 0, escalationCards = 0, reignited = 0, reigniteProposed = 0;
   const reasons = [];   // diagnostic: why each contact was skipped
   const mutedSet = await mutedContactIdSet(client.id, "booking");
+
+  // 🔥 Reignition: (a) the parked-lead set (proactive passes below skip them -
+  // they said "later", silence is the plan); (b) fire due parks into a
+  // kind='reignite_due' card in this deck. Fire-time guards mirror the prune:
+  // muted / trial-ran / left-Responded parks are canceled, not fired.
+  const reignSet = await reigniteContactIdSet(client.id);
+  for (const r of await dueReignitions(client.id, "booking")) {
+    const cid = String(r.ghl_contact_id);
+    if (mutedSet.has(cid)) { await markReignition(r.id, "canceled", { cancel_reason: "bot muted on this lead" }); reignSet.delete(cid); continue; }
+    if (passedTrial.has(cid)) { await markReignition(r.id, "canceled", { cancel_reason: "trial ran - handed to post-trial form" }); reignSet.delete(cid); continue; }
+    if (!respondedIds.has(cid)) { await markReignition(r.id, "canceled", { cancel_reason: "left Responded stage" }); reignSet.delete(cid); continue; }
+    try {
+      await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+        client_id: client.id, ghl_contact_id: cid, contact_name: r.contact_name || null,
+        kind: "reignite_due", draft_message: r.message, reignite_at: r.reignite_at,
+        reasoning: r.reason ? `Reignition day - ${r.reason}` : "Reignition day - the lead asked us to circle back today.",
+        confidence: 1, status: "pending", created_by: "reignition",
+      }]) });
+      await markReignition(r.id, "carded");
+      reignSet.delete(cid); reignited++;
+    } catch (e) { reasons.push(`reignite ${cid}: ${e.message}`); }   // active card in the way -> retry next run
+  }
 
   // Flush held replies: drafts parked during quiet hours (8:00am-9:30pm) whose
   // send time has now arrived. Only inside the window; only if the lead is STILL in
@@ -522,6 +552,9 @@ async function detectForClient(client) {
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId in queue item`); continue; }
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
     if (passedTrial.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: trial already ran → post-trial form`); continue; }
+    // A parked lead who texted back re-engaged early: clear the park (belt +
+    // suspenders with the inbound webhook's cancel) and reply normally.
+    if (reignSet.has(String(contactId))) { await cancelReignitions(client.id, contactId, "lead replied before the reignition date"); reignSet.delete(String(contactId)); }
     // Fresh inbound only: if the lead's last message is ≥24h old, we dropped the
     // ball — hand them to the ghost engine (Send to Ghosted) instead of a late
     // reply. Keeps the two engines from fighting and stops stale leads falling
@@ -578,6 +611,25 @@ async function detectForClient(client) {
         }]) });
         drafted++;
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: book-insert failed — ${e.message}`); }
+      continue;
+    }
+
+    // 🔥 Reignition proposal: the lead said "yes, but later" with a timeframe.
+    // ALWAYS queue for a human - the card carries the editable ack (draft_message,
+    // sends on ✓), the pre-written future message, and the date. Nothing is
+    // scheduled until confirm-reignite.
+    if (d.reignite_at && d.reignite_message) {
+      try {
+        await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
+          contact_name: item.name || null, kind: "reignite",
+          reignite_at: d.reignite_at, reignite_message: d.reignite_message,
+          draft_message: (d.reply && String(d.reply).trim()) ? d.reply : "", reasoning: d.reasoning || null,
+          last_message: d.last_message || null, last_outbound: d.last_outbound || null, summary: d.summary || null, thread_tail: d.thread_tail || null,
+          confidence: d.confidence, last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
+        }]) });
+        reigniteProposed++;
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: reignite-insert failed — ${e.message}`); }
       continue;
     }
 
@@ -661,7 +713,7 @@ async function detectForClient(client) {
     // so the cold-opener guards would skip them anyway).
     rebookIds = new Set(entryRows.filter(n => /^Entry:\s*Rebook/i.test(String(n.note || ""))).map(n => String(n.ghl_contact_id)).filter(Boolean));
     let candidates = [...new Set(entryRows.map(n => String(n.ghl_contact_id)).filter(Boolean))]
-      .filter(id => respondedIds.has(id) && !mutedSet.has(id) && !rebookIds.has(id));
+      .filter(id => respondedIds.has(id) && !mutedSet.has(id) && !rebookIds.has(id) && !reignSet.has(id));
     if (candidates.length) {
       // HANDOFF GUARD: when an academy has the form INTRO automation on
       // (contact_form / trial_form), that timed first-touch IS the cold open - the
@@ -729,7 +781,7 @@ async function detectForClient(client) {
   // needed" memory note gives it context), queue it for Hawkeye, then CONSUME the
   // trigger note (active=false) so a lead is opened exactly once.
   try {
-    const rebookCandidates = [...rebookIds].filter(id => respondedIds.has(id) && !mutedSet.has(id));
+    const rebookCandidates = [...rebookIds].filter(id => respondedIds.has(id) && !mutedSet.has(id) && !reignSet.has(id));
     if (rebookCandidates.length) {
       const calendars = await loadCalendars(sb, client.id);
       for (const contactId of rebookCandidates) {
@@ -772,7 +824,7 @@ async function detectForClient(client) {
     }
   } catch (e) { reasons.push(`rebook pass: ${e.message}`); }
 
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, openers, rebook_openers: rebookOpeners, auto_sent: autoSent, deferred, flushed, escalated, escalation_cards: escalationCards, lost_proposed: lostProposed, skipped, pruned, reasons };
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, openers, rebook_openers: rebookOpeners, auto_sent: autoSent, deferred, flushed, escalated, escalation_cards: escalationCards, lost_proposed: lostProposed, reignite_proposed: reigniteProposed, reignited, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {
@@ -791,7 +843,7 @@ async function runDetect(res, onlyClientId) {
       // Count EVERY card kind the detector can queue: replies/books, lost
       // proposals, escalations, and the opener/rebook-opener passes (these
       // queued silently before, so staff got no push for them).
-      const fresh = (r.drafted || 0) + (r.lost_proposed || 0) + (r.escalation_cards || 0) + (r.openers || 0) + (r.rebook_openers || 0);
+      const fresh = (r.drafted || 0) + (r.lost_proposed || 0) + (r.escalation_cards || 0) + (r.openers || 0) + (r.rebook_openers || 0) + (r.reignite_proposed || 0) + (r.reignited || 0);
       if (fresh > 0) notifyClientPush(client.id, "hawkeye-ready", { count: fresh }).catch(() => {});
     }
     catch (e) { out.push({ client_id: client.id, error: e.message }); }
@@ -899,6 +951,17 @@ async function handler(req, res) {
       if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
       // Scope the patch to this academy so an actor can't skip another's row.
       await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
+      return res.status(200).json({ ok: true });
+    }
+    // 🔥 Scheduled reignitions (all 3 agents' parks): feeds the deck badge chips,
+    // the lead drawer, and the stuck-list exemption. Read-only.
+    if (b.action === "list-reignitions") {
+      return res.status(200).json({ reignitions: await listReignitions(clientId) });
+    }
+    // Cancel a park by hand (drawer / badge chip).
+    if (b.action === "cancel-reignition") {
+      if (!b.reignition_id) return res.status(400).json({ error: "reignition_id required" });
+      await sb(`agent_reignitions?id=eq.${encodeURIComponent(b.reignition_id)}&client_id=eq.${clientId}&status=eq.scheduled`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", cancel_reason: `canceled in the portal by ${staffEmail || "staff"}`, updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
     // Booking initial-automations editor (per-entry scripted openers) - read.
@@ -1057,6 +1120,57 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, sent: true, lesson_id: lessonId });
     }
 
+    // 🔥 Confirm a Reignition: send the (editable) ack now, then park the lead in
+    // place - write the agent_reignitions row with the date + the pre-written
+    // re-engagement message. The lead STAYS in their stage; the detect cron fires
+    // the message as a reignite_due card when the date arrives. Works from a
+    // reignite card (ready_id) OR any deck card via the "Reignite later" move
+    // (contact_id + explicit date/message).
+    if (b.action === "confirm-reignite") {
+      let row = null, contactId = b.contact_id || null;
+      if (b.ready_id) {
+        [row] = await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        if (!row) return res.status(404).json({ error: "not found" });
+        contactId = row.ghl_contact_id;
+      }
+      if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
+      const reigniteAt = normalizeReigniteAt((typeof b.reignite_at === "string" && b.reignite_at) || (row && row.reignite_at) || "");
+      if (!reigniteAt) return res.status(400).json({ error: "A future reignite date is required (up to ~18 months out)." });
+      const message = String((typeof b.message === "string" && b.message.trim()) ? b.message : ((row && row.reignite_message) || "")).trim();
+      if (!message) return res.status(400).json({ error: "The re-engagement message for that date is required." });
+      // Ack now (optional; empty = silent park). Human-approved + time-sensitive
+      // warmth -> immediate send, same exemption as lost goodbyes / move+message.
+      const ack = ((typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "").trim();
+      let ackSent = false;
+      if (ack) { try { await sendReplyViaGhl(token, contactId, ack, clientId); ackSent = true; } catch (_) {} }
+      try {
+        await scheduleReignition({
+          clientId, contactId, contactName: (row && row.contact_name) || b.contact_name || null,
+          agent: "booking", reigniteAt, message,
+          reason: (typeof b.reason === "string" && b.reason.trim()) || (row && row.reasoning) || null,
+          source: row && row.kind === "reignite" ? "agent" : "manual", createdBy: staffEmail,
+        });
+      } catch (e) { return res.status(500).json({ error: `couldn't schedule: ${e.message}` }); }
+      // Optional teach-why lesson (an edited date/message trains the agent).
+      let lessonId = null;
+      if (b.lesson && String(b.lesson).trim()) {
+        try {
+          const [lrow] = await sb(`agent_lessons`, { method: "POST", headers: { Prefer: "return=representation" },
+            body: JSON.stringify([{ client_id: clientId, kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: contactId, reignite_at: reigniteAt, sent: ack || null } }]) });
+          lessonId = lrow?.id || null;
+        } catch (_) {}
+      }
+      // Truthful bookkeeping: acted-on row 'sent' only when the ack went out;
+      // every other queued card for this lead is parked away, never fake-'sent'.
+      try {
+        if (row && ackSent) await sb(`agent_ready_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", reignite_at: reigniteAt, reignite_message: message, approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+        await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "parked for reignition", approved_by: staffEmail, updated_at: new Date().toISOString() }) });
+      } catch (_) {}
+      try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "parked for reignition", updated_at: new Date().toISOString() }) }); } catch (_) {}
+      try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: (row && row.contact_name) || null, final_reply: `[reignite ${reigniteAt.slice(0, 10)}]${ackSent ? " + ack sent" : ""}`, reasoning: (row && row.reasoning) || null, status: "sent", lesson_id: lessonId, created_by: staffEmail }); } catch (_) {}
+      return res.status(200).json({ ok: true, scheduled_for: reigniteAt, ack_sent: ackSent, lesson_id: lessonId });
+    }
+
     // Confirm a Lost suggestion: optionally send the warm closing message, then
     // mark the lead's opportunity Lost in GHL with the reason, and close the row.
     if (b.action === "confirm-lost") {
@@ -1123,6 +1237,7 @@ async function handler(req, res) {
         await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked lost", approved_by: staffEmail, updated_at: new Date().toISOString() }) });
       } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked lost", updated_at: new Date().toISOString() }) }); } catch (_) {}
+      await cancelReignitions(clientId, contactId, routedToNurture ? "moved to nurture" : "marked lost");
       return res.status(200).json({ ok: true, marked_lost: !routedToNurture, routed_to_nurture: routedToNurture, opportunity_id: oppId, reason });
     }
 
@@ -1165,6 +1280,7 @@ async function handler(req, res) {
         await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "marked unqualified", approved_by: staffEmail, updated_at: new Date().toISOString() }) });
       } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "abandoned", updated_at: new Date().toISOString() }) }); } catch (_) {}
+      await cancelReignitions(clientId, contactId, "marked unqualified");
       return res.status(200).json({ ok: true, marked_abandoned: true, unqualified: true, opportunity_id: oppId, reason });
     }
 
@@ -1294,6 +1410,7 @@ async function handler(req, res) {
         }
       } catch (_) {}
       try { await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
+      await cancelReignitions(clientId, contactId, "trial booked");
       try { await logApproval({ client_id: clientId, ghl_contact_id: contactId, contact_name: row.contact_name || null, final_reply: `[booked ${row.book_group || "trial"} @ ${startIso}]${confirmationSent ? " + confirmation text sent" : ""}`, status: "sent", created_by: staffEmail }); } catch (_) {}
       return res.status(200).json({ ok: true, booked: true, confirmation_sent: confirmationSent, appointment_id: appt?.id || appt?.appointment?.id || trialBookingId || null, slot_at: startIso });
     }
@@ -1346,6 +1463,7 @@ async function handler(req, res) {
       // Ghosting sends nothing itself - swept cards are 'canceled', never fake-'sent'.
       try { await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "sent to ghosted", approved_by: staffEmail, updated_at: new Date().toISOString() }) }); } catch (_) {}
       try { await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "sent to ghosted", updated_at: new Date().toISOString() }) }); } catch (_) {}
+      await cancelReignitions(clientId, contactId, "sent to ghosted");
       return res.status(200).json({ ok: true, ghosted: true, portal: portalGhosted, workflow_id: workflowId, opportunity_id: oppId });
     }
 

@@ -31,6 +31,7 @@ import { maybeSendSmsViaProvider, smsProvider } from "./messaging/provider.js";
 import { readStoreThreadAgent, listStoreThreads } from "./messaging/read-thread.js";
 import { toIso, respondedContactIds, respondedContactIdSetCached, peekRespondedIdSet } from "./agent/_stage.js";
 import { withinQuietHours, nextSendableTime } from "./agent/_quiet.js";
+import { reigniteContactIdSet } from "./agent/_reignite.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
@@ -156,10 +157,14 @@ async function detectForClient(client) {
     }
   } catch (_) { _introSet = new Set(); }
 
+  // 🔥 Parked "yes, but later" leads (scheduled reignitions): quiet is the PLAN -
+  // never propose Send-to-Ghosted on them; their card fires at the reignite date.
+  const _reignSet = await reigniteContactIdSet(client.id);
+
   const candidates = [];
   for (const cid of respondedIds) {
     // Don't spend a cap slot on a lead that already has a card or is mid-intro.
-    if (_cardedSet.has(String(cid)) || _introSet.has(String(cid))) continue;
+    if (_cardedSet.has(String(cid)) || _introSet.has(String(cid)) || _reignSet.has(String(cid))) continue;
     let c = byContact.get(cid);
     if (!c && usingStore) {
       // Cold lead outside the newest-200 window: look their thread up directly.

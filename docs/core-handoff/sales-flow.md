@@ -3,7 +3,7 @@ domain: sales-flow
 review_state: ready-for-review
 prototype_status: partial
 core_parity: not-reviewed
-last_reviewed: "2026-07-06"
+last_reviewed: "2026-07-10"
 prototype_commit: working-tree
 core_commit_reviewed: unavailable
 ---
@@ -72,10 +72,35 @@ post-trial router: good_fit→done_trial · not_fit→unqualified · no_show→r
 `interested` (Ghosted auto): went_quiet→in; replied→responded · ghosted_ran_out→nurture.
 `nurture` (Lead Nurture auto): ghosted_ran_out + any lost(non-unqualified)→in; replied→responded.
 
+## 🔥 Reignition (added 2026-07-10, LIVE in prod)
+
+Park a "yes, but later" lead **in place** with a scheduled re-engagement message that
+returns as a Hawkeye card at the date. Migration `20260710210000_agent_reignitions`
+(**applied** to prod project `jnojmfmpnsfmtqmwhopz`).
+
+| Concept | Purpose | Relationships and scope |
+|---|---|---|
+| `agent_reignitions` (table) | One scheduled re-engagement per parked lead | `id` uuid pk · `client_id` (tenant, FK clients cascade) · `ghl_contact_id` (provider link, matches the agents' card tables) · `agent` enum-check (booking/confirm/closing = who parked + whose deck the card returns to) · `reignite_at` · `message` (pre-written draft, locked at park) · `reason` · `source` (agent/manual) · `status` scheduled→carded→done, or canceled (+`cancel_reason`) · `carded_at`/`done_at`/`created_by`/`created_at`/`updated_at`. Partial unique: ONE `scheduled` row per (client, contact) - a re-park cancels-then-inserts. RLS `is_staff() OR my_client_ids()`. |
+| `reignite_at`/`reignite_message` cols | Structured fields on the park card | Added to `agent_ready_replies`, `agent_confirm_replies`, `agent_closing_replies`; card kinds widened with `reignite` (park proposal) + `reignite_due` (fired card). |
+
+Lifecycle: detector/manual → kind=`reignite` card (human ✓) → `confirm-reignite` action
+sends the ack + inserts `scheduled` → the owning agent's 15-min detect cron fires due rows
+into a kind=`reignite_due` card (`carded`) → normal send path (`done`). Auto-cancel
+(`canceled` + reason) on real inbound (both webhooks), book/enroll/lost/unqualified/ghosted
+moves, muted, or leaving the agent's stage at fire time. Proactive agent passes skip
+contacts with a `scheduled` row.
+
+**Core mapping (proposed):** a `lead_reengagement_schedule` (or `pipeline_snooze`) concept in
+the sales-automation domain - a per-lead, tenant-scoped scheduled touch with a lifecycle and
+audit trail. Status transitions are recoverable (never deleted, always canceled+reason).
+Deviation: contact linkage is `ghl_contact_id` (consistent with every agent table today), not
+a core contact FK - migrate via the existing contact mapping.
+
 ## Parity
 
 | Prototype concept | Core mapping | Status | Next action |
 |---|---|---|---|
+| `agent_reignitions` park/schedule | core lead re-engagement / snooze model | `missing` | Review once core is accessible; likely a new sales-automation concept |
 | `stage_role` / `stage_engine` enums | core pipeline/stage model | `decision-needed` | Review core pipeline domain once accessible |
 | `stage_transition` edges | core workflow / pipeline-rule | `decision-needed` | Confirm core has (or wants) a transition-rule table vs hardcoded |
 | `transition_trigger`/`destination` enums | core enums | `decision-needed` | Align enum values / naming with core |

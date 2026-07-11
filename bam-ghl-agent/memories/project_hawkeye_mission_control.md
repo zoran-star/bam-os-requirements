@@ -266,7 +266,44 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   GHL route matches stage id, role-agnostic - non-portal academies unaffected.
   GOTCHA: despite its name, contactInRespondedStage guards ALL THREE stages -
   pass ctx.role for anything portal-side that isn't Responded.
-- STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch.
+- 🔥 REIGNITION (2026-07-10, Zoran's design via Q&A): a lead in ANY agent stage who
+  says "yes, but later / after summer" gets PARKED IN PLACE with a pre-written
+  re-engagement message that fires as a Hawkeye card at the date. Locked decisions:
+  both auto-detect + manual "Reignite later" deck move · lead STAYS in its stage ·
+  card returns to the agent who parked it · message PRE-WRITTEN at park time (edits
+  teach) · ack sends at park (editable, empty = silent) · auto-cancel on real
+  inbound / book / enroll / lost / unqualified / ghosted / left-stage · AI resolves
+  vague dates ("after summer" = Sep 01, bare "later" = ~30d), human confirms.
+  BUILD: table `agent_reignitions` (migration 20260710210000, APPLIED to prod;
+  one scheduled row per contact - partial unique idx; statuses scheduled/carded/
+  done/canceled) + reignite_at/reignite_message cols on all 3 replies tables +
+  kinds 'reignite' (park card) / 'reignite_due' (fired card). Shared helper
+  api/agent/_reignite.js (normalizeReigniteAt: bare date -> T14:00Z ≈ 10am
+  Toronto, future-only, <=550d; scheduleReignition supersedes old park;
+  reigniteContactIdSet = proactive-skip set; dueReignitions/markReignition;
+  cancelReignitions best-effort). All 3 agents: propose_reply gained reignite_at
+  + reignite_message (+ trailer guidance; closing distinguishes it from
+  followup_on = decide-soon vs start-later), detector queues kind='reignite'
+  (never auto-sends), fires due parks into kind='reignite_due' on its own deck
+  (fire guards cancel on muted/left-stage; booking also passed-trial; confirm
+  deliberately NOT passed-trial - its confirm-reignite VOIDS upcoming portal
+  slots like confirm-handoff so no bogus post-trial form spawns), proactive
+  passes skip parked leads (openers/rebook/ghost builder/scripted confirms/
+  overdue/followup loop), reactive path cancels the park + replies normally.
+  `confirm-reignite` action on ALL 3 APIs (ack sends immediately - Zoran's
+  lost-goodbye exemption; optional lesson; sweeps other cards 'parked for
+  reignition'). agent-approvals also has `list-reignitions` + `cancel-reignition`
+  (cross-agent reads). Both inbound webhooks (ghl + twilio) cancel on real reply.
+  FRONT-END: _HK2_KIND reignite/reignite_due, park card = ack box + date input
+  (min tomorrow; date change = logistics, no teach note) + future-message box,
+  "Reignite later" in every card's Other menu (flips the card via
+  _hk2ReigniteMode; Back to the card undoes; plan cards ride rows[0].id),
+  reignite_due = reply card + gold "Reignition day" bar, _PL_REIGN map loaded in
+  _plLoadNeedsAction (list-reignitions), cascade rows show "reignite Sep 1 ·
+  parked until then", contact drawer gets a gold chip + Cancel
+  (_cdReigniteChip), stuck list exempts parked leads. NOT prod-verified yet.
+- STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch
+  incl. reignition end-to-end.
 
 ## Open item (ask Zoran before building)
 Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-commit.
