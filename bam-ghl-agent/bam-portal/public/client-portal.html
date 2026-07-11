@@ -8663,14 +8663,14 @@ Then the call to action."]</div>
       #ib-drawer .ib-d-sub { font-size:12px; color:var(--text-mute); margin-top:3px; }
       #ib-drawer .ib-d-close { background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:22px; padding:4px 10px; }
       #ib-drawer .ib-d-thread { flex:1; overflow-y:auto; padding:18px 20px; display:flex; flex-direction:column; gap:10px; }
-      #ib-drawer .ib-msg, #pl-drawer .ib-msg, #member-inbox-section .ib-msg {
+      #ib-drawer .ib-msg, #pl-drawer .ib-msg, #member-inbox-section .ib-msg, #contacts-drawer-body .ib-msg {
         max-width:80%; padding:8px 12px; border-radius:14px; font-size:13px; line-height:1.45;
         word-wrap:break-word; white-space:pre-wrap;
       }
-      #ib-drawer .ib-msg-in,  #pl-drawer .ib-msg-in,  #member-inbox-section .ib-msg-in  { background:rgba(255,255,255,0.04); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px; }
-      #ib-drawer .ib-msg-out, #pl-drawer .ib-msg-out, #member-inbox-section .ib-msg-out { background:var(--accent); color:#0B0B0D; align-self:flex-end; border-bottom-right-radius:4px; }
-      #ib-drawer .ib-msg-meta, #pl-drawer .ib-msg-meta, #member-inbox-section .ib-msg-meta { font-size:10px; color:var(--text-mute); margin-top:3px; }
-      #pl-drawer .ib-msg-out .ib-msg-meta, #member-inbox-section .ib-msg-out .ib-msg-meta { color:rgba(11,11,13,0.55); }
+      #ib-drawer .ib-msg-in,  #pl-drawer .ib-msg-in,  #member-inbox-section .ib-msg-in,  #contacts-drawer-body .ib-msg-in  { background:rgba(255,255,255,0.04); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px; }
+      #ib-drawer .ib-msg-out, #pl-drawer .ib-msg-out, #member-inbox-section .ib-msg-out, #contacts-drawer-body .ib-msg-out { background:var(--accent); color:#0B0B0D; align-self:flex-end; border-bottom-right-radius:4px; }
+      #ib-drawer .ib-msg-meta, #pl-drawer .ib-msg-meta, #member-inbox-section .ib-msg-meta, #contacts-drawer-body .ib-msg-meta { font-size:10px; color:var(--text-mute); margin-top:3px; }
+      #pl-drawer .ib-msg-out .ib-msg-meta, #member-inbox-section .ib-msg-out .ib-msg-meta, #contacts-drawer-body .ib-msg-out .ib-msg-meta { color:rgba(11,11,13,0.55); }
       #ib-drawer .ib-d-reply { border-top:1px solid var(--border); padding:14px 20px; flex-shrink:0; }
       #ib-drawer .ib-d-reply textarea { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px; font:inherit; font-size:13px; color:var(--text); resize:vertical; min-height:60px; outline:none; }
       #ib-drawer .ib-d-reply-actions { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; }
@@ -8822,12 +8822,12 @@ Then the call to action."]</div>
       }
 
       /* Drawer journey timeline */
-      #pl-drawer .pl-tl-step { display:flex; align-items:center; gap:9px; font-size:13px; padding:4px 0; }
-      #pl-drawer .pl-tl-dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
-      #pl-drawer .pl-tl-dot.ok { background:var(--green); }
-      #pl-drawer .pl-tl-dot.bad { background:var(--red); }
-      #pl-drawer .pl-tl-label { font-weight:600; }
-      #pl-drawer .pl-tl-sub { color:var(--text-mute); font-size:12px; margin-left:auto; }
+      #pl-drawer .pl-tl-step, #contacts-drawer-body .pl-tl-step { display:flex; align-items:center; gap:9px; font-size:13px; padding:4px 0; }
+      #pl-drawer .pl-tl-dot, #contacts-drawer-body .pl-tl-dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+      #pl-drawer .pl-tl-dot.ok, #contacts-drawer-body .pl-tl-dot.ok { background:var(--green); }
+      #pl-drawer .pl-tl-dot.bad, #contacts-drawer-body .pl-tl-dot.bad { background:var(--red); }
+      #pl-drawer .pl-tl-label, #contacts-drawer-body .pl-tl-label { font-weight:600; }
+      #pl-drawer .pl-tl-sub, #contacts-drawer-body .pl-tl-sub { color:var(--text-mute); font-size:12px; margin-left:auto; }
       #view-pipelines .pl-card-trial.is-past { color:var(--amber); }
       #view-pipelines .pl-card-notrial { border-color:rgba(240,184,74,0.75); background:rgba(240,184,74,0.09); }
       #view-pipelines .pl-card-flag { font-size:11px; color:var(--amber); font-weight:700; margin-top:5px; }
@@ -15648,12 +15648,34 @@ async function _contactsOpenDrawer(idx) {
   } catch (e) {
     _CDRAWER.ghl = { name: c.name, email: c.email, phone: c.phone, tags: c.tags || [], _error: e.message || String(e) };
   }
+  // Entry points like Hawkeye / automations / voicemail seed a stub row with
+  // null email/phone (only ghl_contact_id + name). The fetch above has the real
+  // values on _CDRAWER.ghl - backfill the seed row so the composer, Stripe
+  // lookup, and SMS/Email default all use them instead of showing "no phone or
+  // email on file". Only fills blanks, so full Contacts-list rows are untouched.
+  const _g = _CDRAWER.ghl || {};
+  if (_g.name && !c.name) c.name = _g.name;
+  if (_g.email && !c.email) c.email = _g.email;
+  if (_g.phone && !c.phone) c.phone = _g.phone;
+  if (!_CDRAWER.msgType || (_CDRAWER.msgType === 'Email' && c.phone)) _CDRAWER.msgType = c.phone ? 'SMS' : 'Email';
   const body = document.getElementById('contacts-drawer-body');
   if (body) body.innerHTML = _cdBody();
   _renderTagEditor('cd-tags', c.ghl_contact_id, (_CDRAWER.ghl && _CDRAWER.ghl.tags) || c.tags || []);
   _contactsLoadStripe(c);
   _cdLoadMemory(c);
+  _cdLoadLeadDetail(c);
+  _cdLoadThread(c);
   try { _cdReigniteChip(c.ghl_contact_id); } catch (_) {}
+}
+// Find this contact's pipeline opportunity (if the pipeline has been loaded this
+// session) - gives trial date, coach, journey status without an extra fetch.
+function _cdFindOpp(contactId) {
+  if (!contactId || typeof _PL_DATA === 'undefined' || !_PL_DATA) return null;
+  for (const pl of (_PL_DATA.pipelines || [])) {
+    const f = (pl.opportunities || []).find(o => String(o.contactId || '') === String(contactId));
+    if (f) return f;
+  }
+  return null;
 }
 // 🔥 Reignition chip on the contact drawer: "Reignite <date>" + cancel. Reads
 // the parked map (fetches it once if home hasn't loaded it yet). Best-effort.
@@ -15776,11 +15798,17 @@ function _cdBody() {
     : '';
   return `${ghlHtml}
     ${callBtn}
+    <div id="cd-lead"></div>
+    <div id="cd-journey"></div>
     ${sect('Agent memory')}
     <div id="cd-memory"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Loading…</div></div>
+    ${sect('Conversation')}
+    <div id="cd-thread" style="max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:2px 0 4px">
+      <div id="cd-thread-msgs" style="display:flex;flex-direction:column;gap:8px"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Loading…</div></div>
+    </div>
+    ${_cdComposer()}
     ${sect('Billing (Stripe)')}
-    <div id="cd-stripe"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Checking Stripe…</div></div>
-    ${_cdComposer()}`;
+    <div id="cd-stripe"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Checking Stripe…</div></div>`;
 }
 
 // Agent memory: what the bot knows about this contact - post-trial facts +
@@ -15796,9 +15824,106 @@ async function _cdLoadMemory(c) {
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     const el = host(); if (el) el.innerHTML = _cdMemoryHtml(j);
+    // Journey uses the same post-trial review + the pipeline opp (trial date,
+    // won/lost) when it's loaded. Renders into the placeholder above memory.
+    const jr = document.getElementById('cd-journey');
+    if (jr) jr.innerHTML = _cdJourneyHtml(j.post_trial, _cdFindOpp(contactId), _CDRAWER.ghl);
   } catch (e) {
     const el = host(); if (el) el.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Memory unavailable - ${escapeHTML(e.message || String(e))}</div>`;
   }
+}
+// Journey timeline from what we know: lead created → trial booked → showed/no-show
+// → good fit/not a fit (+ coach) → won/lost. Each step renders only if we have it.
+function _cdJourneyHtml(pt, opp, ghl) {
+  const fmt = (iso) => { if (!iso) return null; const d = new Date(iso); if (isNaN(d.getTime())) return null; return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+  const steps = [];
+  const created = (opp && opp.formFilledAt) || (ghl && ghl.dateAdded) || null;
+  if (created) steps.push(['Lead created', fmt(created), true]);
+  if (opp && opp.trialDate) { const tr = _plTrialInfo(opp.trialDate); if (tr.str) steps.push(['Trial booked', tr.str, true]); }
+  const rv = (opp && opp.review) || pt || null;
+  if (rv) {
+    if (rv.showed_up === true) steps.push(['Showed up', null, true]);
+    else if (rv.showed_up === false) steps.push(['No show', null, false]);
+    if (rv.good_fit === true) steps.push(['Good fit', rv.trainer ? 'Coach ' + rv.trainer : null, true]);
+    else if (rv.good_fit === false) steps.push(['Not a fit', null, false]);
+  }
+  if (opp && opp.status === 'won') steps.push(['Won', null, true]);
+  else if (opp && opp.status === 'lost') steps.push(['Lost', null, false]);
+  if (!steps.length) return '';
+  return `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Journey</div>` +
+    steps.map(([t, sub, ok]) => `<div class="pl-tl-step"><span class="pl-tl-dot ${ok ? 'ok' : 'bad'}"></span><span class="pl-tl-label">${escapeHTML(t)}</span>${sub ? `<span class="pl-tl-sub">${escapeHTML(sub)}</span>` : ''}</div>`).join('');
+}
+// Lead section: athlete name + age + last trial + coach, then every other
+// captured field (start-when, location, referral…). Pulls from GHL contact-detail
+// (all custom fields) and the pipeline opp for trial date + coach. Best-effort:
+// non-GHL academies or a failed fetch just leave the section empty.
+async function _cdLoadLeadDetail(c) {
+  const host = document.getElementById('cd-lead');
+  if (!host) return;
+  const contactId = c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id);
+  if (!contactId) { host.innerHTML = ''; return; }
+  const opp = _cdFindOpp(contactId);
+  const row = (k, v) => v ? `<div style="display:flex;gap:8px;padding:3px 0;font-size:13px"><span style="color:var(--text-mute);min-width:80px">${escapeHTML(k)}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
+  const wrap = (inner) => inner.replace(/\s+/g, '') ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Lead</div>${inner}` : '';
+  const oppTrial = (opp && opp.trialDate) ? (_plTrialInfo(opp.trialDate).str || '') : '';
+  const oppCoach = (opp && opp.trainer) || '';
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/contact-detail?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(contactId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const d = await _safeJson(r);
+    if (!r.ok) throw new Error(d.error || 'detail failed');
+    const fields = d.fields || [];
+    const findF = (re) => { const f = fields.find(x => re.test((x.label || '').trim())); return (f && f.value) ? f.value : ''; };
+    const athlete = findF(/athlete'?s?\s*(full\s*)?name/i) || (opp && opp.athlete) || '';
+    const age = findF(/athlete'?s?\s*age|^age$/i);
+    const shown = new Set(['parent', 'athlete', 'phone', 'email', "athlete's full name", "athlete's name", "athlete's age", 'athlete age', 'age', 'name']);
+    const rest = fields.filter(f => f.label && f.value && !shown.has(f.label.toLowerCase().trim()));
+    host.innerHTML = wrap([
+      row('Athlete', athlete), row('Athlete age', age),
+      row('Last trial', oppTrial), row('Coach', oppCoach),
+      ...rest.map(f => row(f.label, f.value)),
+    ].join(''));
+  } catch (e) {
+    // Fall back to whatever the opp gives us (GHL detail unavailable).
+    host.innerHTML = wrap([
+      row('Athlete', opp && opp.athlete), row('Last trial', oppTrial), row('Coach', oppCoach),
+    ].join(''));
+  }
+}
+// Conversation thread for the drawer - reuses the GHL inbox endpoint + the same
+// bubble markup as the pipeline/inbox drawers. Read-only history; the composer
+// below sends replies.
+async function _cdLoadThread(c) {
+  const host = document.getElementById('cd-thread-msgs');
+  if (!host) return;
+  const contactId = c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id);
+  if (!contactId) { host.innerHTML = `<div style="color:var(--text-mute);font-size:12px">No linked contact - no message history.</div>`; return; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(contactId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _cdRenderThread(j.messages || []);
+  } catch (e) {
+    host.innerHTML = `<div style="color:var(--text-mute);font-size:12px">Couldn't load messages - ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+function _cdRenderThread(messages) {
+  const host = document.getElementById('cd-thread-msgs'); if (!host) return;
+  const first = (((_CDRAWER.ghl && _CDRAWER.ghl.name) || (_CDRAWER.contact && _CDRAWER.contact.name) || '').trim().split(/\s+/)[0]) || 'Them';
+  const sorted = [...messages].filter(m => !_ibIsActivity(m)).sort((a, b) => (a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0));
+  host.innerHTML = sorted.length
+    ? sorted.map(m => {
+        const out = (m.direction || '').toLowerCase() === 'outbound';
+        const atts = _ibRenderAttachments(m.attachments);
+        const hasBody = (m.body || '').trim().length > 0;
+        const sender = out ? 'You' : escapeHTML(first);
+        const channel = escapeHTML(_ghlChannelLabel(m.type));
+        const when = escapeHTML(_ibFormatDate(m.date));
+        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(m.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
+      }).join('')
+    : `<div style="color:var(--text-mute);font-size:12px">No messages yet.</div>`;
+  try { _scrollToBottom(document.getElementById('cd-thread') || host); } catch (_) {}
 }
 function _cdMemoryHtml(j) {
   const pt = j.post_trial;
