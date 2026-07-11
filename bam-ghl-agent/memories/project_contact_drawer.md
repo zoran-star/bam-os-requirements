@@ -17,19 +17,30 @@ below. Fix = after the fetch, backfill the stub with `_CDRAWER.ghl` name/email/p
 
 ## Sections (top → bottom) and their data sources
 - **Contact / Tags / Call in GHL** — `_CDRAWER.ghl` (`/api/ghl/calendars-v15?action=contact`)
-- **Lead** (`#cd-lead`, `_cdLoadLeadDetail`) — athlete name+age + last trial + coach + every
-  other captured field. From `/api/ghl/contact-detail` (all custom fields) + pipeline opp.
-- **Journey** (`#cd-journey`, `_cdJourneyHtml`) — created → trial booked → showed/no-show →
-  good fit/not-a-fit (+coach) → won/lost. From `post_trial_reviews` + pipeline opp.
+- **Lead** (`#cd-lead`, `_cdRenderLead`) — athlete name+age + last trial + coach + every
+  other captured field.
+- **Journey** (`#cd-journey`, `_cdRenderJourney`) — created → trial booked → showed/no-show →
+  good fit/not-a-fit (+coach) → won/lost.
 - **Agent memory** (`#cd-memory`, `_cdLoadMemory`) — post_trial facts + editable team notes
   (`/api/agent-contact-notes`; notes feed the sales agent's prompt).
 - **Conversation** (`#cd-thread`, `_cdLoadThread`/`_cdRenderThread`) — read-only history via
   `/api/ghl/inbox`, reuses the shared `.ib-msg*` bubbles. Composer below sends.
 - **Billing (Stripe)** — `/api/stripe/contact` matched by ghl_contact_id/email/phone.
 
-`_cdFindOpp(contactId)` finds the pipeline opp in `_PL_DATA` (only if the pipeline was
-loaded this session) — trial date / coach / won-lost degrade to empty otherwise. All new
-sections are best-effort and render empty on missing data / failed GHL endpoints.
+## Shared-context render model (Lead + Journey)
+Lead + Journey both paint from `_CDRAWER.ctx` and are re-rendered by whichever loader
+resolves. `ctx` is seeded synchronously from `_cdFindOpp(contactId)` (the pipeline opp in
+`_PL_DATA`, only present if the Pipeline tab was opened this session), then filled by three
+async loaders that each call `_cdRenderLead()` + `_cdRenderJourney()`:
+- `_cdLoadMemory` → `ctx.postTrial` (showed/fit) + coach fallback (`post_trial.trainer`)
+- `_cdLoadLeadDetail` → `/api/ghl/contact-detail` custom fields → athlete/age/other fields
+  + a "free trial date" custom field fallback
+- `_cdLoadTrialCoach` → **`GET /api/ghl/calendars-v15?action=contact-trial&id=<cid>`** — the
+  per-contact trial date + coach so they show **even when the pipeline was never loaded**.
+  Server action is **Supabase-only + provider-agnostic** (runs before the portal split, no
+  GHL token): coach = latest `post_trial_reviews.trainer`; trial date = newest
+  `trial_bookings.schedule_slots(start_time)` → else `website_leads.fields.booked_slot`.
+Everything is best-effort and renders empty on missing data / failed endpoints.
 
 Related: [[project_sales_crew_guardrails]] (the "…→ contact drawer" drill-down),
 [[project_v2_sales_board]].

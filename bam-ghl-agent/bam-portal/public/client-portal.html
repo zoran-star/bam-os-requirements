@@ -15661,9 +15661,24 @@ async function _contactsOpenDrawer(idx) {
   const body = document.getElementById('contacts-drawer-body');
   if (body) body.innerHTML = _cdBody();
   _renderTagEditor('cd-tags', c.ghl_contact_id, (_CDRAWER.ghl && _CDRAWER.ghl.tags) || c.tags || []);
+  // Shared context the Lead + Journey sections render from. Seeded synchronously
+  // from the pipeline opp (if loaded this session); the async loaders below fill
+  // the gaps and re-render, so whichever resolves first still paints correctly.
+  const _opp = _cdFindOpp(c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id));
+  _CDRAWER.ctx = {
+    opp: _opp,
+    postTrial: null,
+    athlete: (_opp && _opp.athlete) || null,
+    age: null,
+    trialDate: (_opp && _opp.trialDate) || null,
+    trialStatus: null,
+    coach: (_opp && _opp.trainer) || null,
+    leadFields: [],
+  };
   _contactsLoadStripe(c);
   _cdLoadMemory(c);
   _cdLoadLeadDetail(c);
+  _cdLoadTrialCoach(c);
   _cdLoadThread(c);
   try { _cdReigniteChip(c.ghl_contact_id); } catch (_) {}
 }
@@ -15676,6 +15691,23 @@ function _cdFindOpp(contactId) {
     if (f) return f;
   }
   return null;
+}
+// Per-contact trial date + coach - always available (not just when the pipeline
+// tab was opened). Supabase-only endpoint; fills any gaps the opp didn't, then
+// re-renders Lead + Journey.
+async function _cdLoadTrialCoach(c) {
+  const contactId = c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id);
+  if (!contactId || !_CDRAWER.ctx) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/calendars-v15?action=contact-trial&client_id=${encodeURIComponent(CLIENT_ID)}&id=${encodeURIComponent(contactId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    if (!_CDRAWER.ctx.trialDate && j.trial_date) _CDRAWER.ctx.trialDate = j.trial_date;
+    if (j.trial_status) _CDRAWER.ctx.trialStatus = j.trial_status;
+    if (!_CDRAWER.ctx.coach && j.coach) _CDRAWER.ctx.coach = j.coach;
+    _cdRenderLead(); _cdRenderJourney();
+  } catch (_) { /* best-effort */ }
 }
 // 🔥 Reignition chip on the contact drawer: "Reignite <date>" + cancel. Reads
 // the parked map (fetches it once if home hasn't loaded it yet). Best-effort.
@@ -15824,49 +15856,65 @@ async function _cdLoadMemory(c) {
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     const el = host(); if (el) el.innerHTML = _cdMemoryHtml(j);
-    // Journey uses the same post-trial review + the pipeline opp (trial date,
-    // won/lost) when it's loaded. Renders into the placeholder above memory.
-    const jr = document.getElementById('cd-journey');
-    if (jr) jr.innerHTML = _cdJourneyHtml(j.post_trial, _cdFindOpp(contactId), _CDRAWER.ghl);
+    // Feed the post-trial review into the shared context (coach + showed/fit) and
+    // repaint Lead + Journey with it.
+    if (_CDRAWER.ctx) {
+      _CDRAWER.ctx.postTrial = j.post_trial || null;
+      if (!_CDRAWER.ctx.coach && j.post_trial && j.post_trial.trainer) _CDRAWER.ctx.coach = j.post_trial.trainer;
+      _cdRenderLead(); _cdRenderJourney();
+    }
   } catch (e) {
     const el = host(); if (el) el.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Memory unavailable - ${escapeHTML(e.message || String(e))}</div>`;
   }
 }
-// Journey timeline from what we know: lead created → trial booked → showed/no-show
-// → good fit/not a fit (+ coach) → won/lost. Each step renders only if we have it.
-function _cdJourneyHtml(pt, opp, ghl) {
+// Journey timeline from the shared context: lead created → trial booked →
+// showed/no-show → good fit/not a fit (+ coach) → won/lost. Re-run by any loader
+// as context fills in; renders only the steps we actually know.
+function _cdRenderJourney() {
+  const jr = document.getElementById('cd-journey'); if (!jr || !_CDRAWER.ctx) return;
+  const ctx = _CDRAWER.ctx, opp = ctx.opp, pt = ctx.postTrial, ghl = _CDRAWER.ghl || {};
   const fmt = (iso) => { if (!iso) return null; const d = new Date(iso); if (isNaN(d.getTime())) return null; return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
   const steps = [];
-  const created = (opp && opp.formFilledAt) || (ghl && ghl.dateAdded) || null;
+  const created = (opp && opp.formFilledAt) || ghl.dateAdded || null;
   if (created) steps.push(['Lead created', fmt(created), true]);
-  if (opp && opp.trialDate) { const tr = _plTrialInfo(opp.trialDate); if (tr.str) steps.push(['Trial booked', tr.str, true]); }
+  if (ctx.trialDate) { let s = ''; try { s = _plTrialInfo(ctx.trialDate).str || ''; } catch (_) {} steps.push(['Trial booked', s || fmt(ctx.trialDate), true]); }
   const rv = (opp && opp.review) || pt || null;
   if (rv) {
     if (rv.showed_up === true) steps.push(['Showed up', null, true]);
     else if (rv.showed_up === false) steps.push(['No show', null, false]);
-    if (rv.good_fit === true) steps.push(['Good fit', rv.trainer ? 'Coach ' + rv.trainer : null, true]);
+    const coach = rv.trainer || ctx.coach;
+    if (rv.good_fit === true) steps.push(['Good fit', coach ? 'Coach ' + coach : null, true]);
     else if (rv.good_fit === false) steps.push(['Not a fit', null, false]);
   }
   if (opp && opp.status === 'won') steps.push(['Won', null, true]);
   else if (opp && opp.status === 'lost') steps.push(['Lost', null, false]);
-  if (!steps.length) return '';
-  return `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Journey</div>` +
-    steps.map(([t, sub, ok]) => `<div class="pl-tl-step"><span class="pl-tl-dot ${ok ? 'ok' : 'bad'}"></span><span class="pl-tl-label">${escapeHTML(t)}</span>${sub ? `<span class="pl-tl-sub">${escapeHTML(sub)}</span>` : ''}</div>`).join('');
+  jr.innerHTML = steps.length
+    ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Journey</div>` +
+      steps.map(([t, sub, ok]) => `<div class="pl-tl-step"><span class="pl-tl-dot ${ok ? 'ok' : 'bad'}"></span><span class="pl-tl-label">${escapeHTML(t)}</span>${sub ? `<span class="pl-tl-sub">${escapeHTML(sub)}</span>` : ''}</div>`).join('')
+    : '';
 }
-// Lead section: athlete name + age + last trial + coach, then every other
-// captured field (start-when, location, referral…). Pulls from GHL contact-detail
-// (all custom fields) and the pipeline opp for trial date + coach. Best-effort:
-// non-GHL academies or a failed fetch just leave the section empty.
-async function _cdLoadLeadDetail(c) {
-  const host = document.getElementById('cd-lead');
-  if (!host) return;
-  const contactId = c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id);
-  if (!contactId) { host.innerHTML = ''; return; }
-  const opp = _cdFindOpp(contactId);
+// Lead section rendered from the shared context: athlete + age + last trial +
+// coach, then every other captured field. Any loader can call this as data lands.
+function _cdRenderLead() {
+  const host = document.getElementById('cd-lead'); if (!host || !_CDRAWER.ctx) return;
+  const ctx = _CDRAWER.ctx;
   const row = (k, v) => v ? `<div style="display:flex;gap:8px;padding:3px 0;font-size:13px"><span style="color:var(--text-mute);min-width:80px">${escapeHTML(k)}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
-  const wrap = (inner) => inner.replace(/\s+/g, '') ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Lead</div>${inner}` : '';
-  const oppTrial = (opp && opp.trialDate) ? (_plTrialInfo(opp.trialDate).str || '') : '';
-  const oppCoach = (opp && opp.trainer) || '';
+  let trialStr = '';
+  if (ctx.trialDate) { try { trialStr = _plTrialInfo(ctx.trialDate).str || ''; } catch (_) {} if (!trialStr) { const d = new Date(ctx.trialDate); trialStr = isNaN(d.getTime()) ? String(ctx.trialDate) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } }
+  const inner = [
+    row('Athlete', ctx.athlete), row('Athlete age', ctx.age),
+    row('Last trial', trialStr), row('Coach', ctx.coach),
+    ...(ctx.leadFields || []).map(f => row(f.label, f.value)),
+  ].join('');
+  host.innerHTML = inner.replace(/\s+/g, '') ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Lead</div>${inner}` : '';
+}
+// Fetch the captured custom fields (athlete name/age, start-when, referral…) +
+// a "free trial date" field if the academy stores one, into the shared context.
+// Best-effort: non-GHL academies or a failed fetch just keep the opp-seeded view.
+async function _cdLoadLeadDetail(c) {
+  if (!_CDRAWER.ctx) return;
+  const contactId = c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id);
+  if (!contactId) { _cdRenderLead(); return; }
   try {
     const token = await _mreqAuthToken();
     const r = await fetch(`/api/ghl/contact-detail?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(contactId)}`, { headers: { Authorization: 'Bearer ' + token } });
@@ -15874,21 +15922,16 @@ async function _cdLoadLeadDetail(c) {
     if (!r.ok) throw new Error(d.error || 'detail failed');
     const fields = d.fields || [];
     const findF = (re) => { const f = fields.find(x => re.test((x.label || '').trim())); return (f && f.value) ? f.value : ''; };
-    const athlete = findF(/athlete'?s?\s*(full\s*)?name/i) || (opp && opp.athlete) || '';
+    const athlete = findF(/athlete'?s?\s*(full\s*)?name/i);
     const age = findF(/athlete'?s?\s*age|^age$/i);
-    const shown = new Set(['parent', 'athlete', 'phone', 'email', "athlete's full name", "athlete's name", "athlete's age", 'athlete age', 'age', 'name']);
-    const rest = fields.filter(f => f.label && f.value && !shown.has(f.label.toLowerCase().trim()));
-    host.innerHTML = wrap([
-      row('Athlete', athlete), row('Athlete age', age),
-      row('Last trial', oppTrial), row('Coach', oppCoach),
-      ...rest.map(f => row(f.label, f.value)),
-    ].join(''));
-  } catch (e) {
-    // Fall back to whatever the opp gives us (GHL detail unavailable).
-    host.innerHTML = wrap([
-      row('Athlete', opp && opp.athlete), row('Last trial', oppTrial), row('Coach', oppCoach),
-    ].join(''));
-  }
+    const trialField = findF(/free\s*trial\s*date|trial\s*date/i);
+    if (athlete && !_CDRAWER.ctx.athlete) _CDRAWER.ctx.athlete = athlete;
+    if (age) _CDRAWER.ctx.age = age;
+    if (trialField && !_CDRAWER.ctx.trialDate) _CDRAWER.ctx.trialDate = trialField;
+    const shown = new Set(['parent', 'athlete', 'phone', 'email', "athlete's full name", "athlete's name", "athlete's age", 'athlete age', 'age', 'name', 'free trial date', 'trial date']);
+    _CDRAWER.ctx.leadFields = fields.filter(f => f.label && f.value && !shown.has(f.label.toLowerCase().trim()));
+  } catch (_) { /* keep the opp-seeded context */ }
+  _cdRenderLead(); _cdRenderJourney();
 }
 // Conversation thread for the drawer - reuses the GHL inbox endpoint + the same
 // bubble markup as the pipeline/inbox drawers. Read-only history; the composer
