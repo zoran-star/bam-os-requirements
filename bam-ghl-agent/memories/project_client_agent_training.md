@@ -2,6 +2,135 @@
 
 Two related changes to the BAM GTA booking agent, both V2/agent-only (zero V1 impact).
 
+## ⭐ TRAINING LOOP AUDIT + PRESET MODEL (2026-07-10, later session)
+Zoran's framing (authoritative): today's agents implement ONLY the **training
+offer + free trial sales system presets**; more presets come later for academies
+that sell differently. So "general" lessons are preset-relative, and every
+academy-specific lesson is ALSO a signal for what BAM must collect from future
+clients at onboarding. Changes shipped:
+- **/consolidate-lessons rewritten**: 4-way routing (brain FACT -> update the 9
+  agent_prompt_sections fact sections, never keep facts as OVERRIDE lessons /
+  academy lesson / general lesson with `context.preset` = free_trial|universal /
+  drop), plus a mandatory **Step 4 intake-gap mining** step: every academy
+  lesson answers "which client fact collected at onboarding would have prevented
+  this?" -> candidates ledger `docs/onboarding-intake-candidates.md` (IC-xxx,
+  rejected-is-final) -> accepted ones become rows in the Notion Onboarding Data
+  Points DB (49be4ce65ada4d45b736070e11452edb).
+- **lessons-io.mjs hardened**: FIXED broken archive (patched a nonexistent
+  updated_at column -> every archive silently failed; verified column absent in
+  prod); dump now requires clientId, exports `context`+`promotion_reason`
+  (ai_drafted/you_sent = classification evidence), separates kind='good' rows,
+  and warns on legacy scope=general+client_id rows (2 exist for GTA, they need
+  reclassification on the next run); apply validates agent enum + em-dash/emoji,
+  scopes archive PATCHes by client, stamps lineage context {source_ids,
+  intake_gap, preset}, counts real archived rows (exit 1 on failure), and writes
+  a plan.applied re-run guard.
+- **Owner teach 403 FIXED**: agent-train resolveTrainer now matches _auth.js
+  (role=owner OR can_train_agent, + email fallback). Before, an academy OWNER
+  editing in Hawkeye had their teach-why silently dropped (fire-and-forget catch
+  swallowed the 403). _hk2Teach/_apxTeach now toast on save failure.
+- **Auto-promote fully retired in code**: agent-train teach always writes
+  promotion_status='none' (classifier verdict kept only as a [local]/[general-
+  craft?] prefix in promotion_reason as a consolidation hint); client copy no
+  longer says "sent to BAM to review".
+- **Preview = live**: agent-train + agent-sandbox activeLessons now use the same
+  or=(client_id.eq.X,and(client_id.is.null,scope.eq.general)) + agent filter as
+  the live readers; sandbox teach now stamps the right `agent`.
+- **Slot-only edits no longer force a teach-why** (hk2 slot select passes
+  isSlot=true, per Zoran's 2026-07-10 rule); teach placeholders now nudge for
+  the missing FACT (price/schedule/capacity).
+- **Rollout checklist**: `docs/agent-academy-rollout.md` = ordered steps to get
+  any academy onto Hawkeye (access -> brain fill with no-GTA-defaults check ->
+  GHL prep -> mode -> verify the lesson loop -> consolidation cadence).
+- Cadence: run /consolidate-lessons at 15+ raw lessons per agent or every 2
+  weeks per live academy.
+- Zoran refinements (2026-07-10, same day): (1) assume EVERYTHING is the
+  free_trial preset for now - don't agonize over free_trial vs universal tags;
+  (2) intake-gap candidates are only DONE when built: the skill must recommend
+  a concrete V2 UI placement (BB card / offer setup / onboarding side page /
+  Knowledge section wording / Settings), workshop it with Zoran via popup, then
+  BUILD the question with storage wired in the same session. Ledger status
+  'accepted' = question exists in the UI.
+- STILL OPEN (deliberately not built): preset column + reader filtering (tag
+  lives in context.preset until preset #2 exists), training-health metrics
+  (lessons per academy, % edited, % edits-with-lesson from agent_approvals),
+  can_train_agent staff toggle UI, V1.5 optional-teach surfaces, GHL-direct
+  replies bypassing the loop.
+- **Pipeline-preset architecture DESIGNED (2026-07-10, not built):** target =
+  pipeline_presets + preset_stages (open role_key, not the 7-value enum) +
+  preset_transitions + agent_templates, stamped per academy by apply_preset;
+  preset-scoped training. Design page `docs/agent-preset-architecture.html`
+  (+ training explainer `docs/agent-training-architecture.html`, both served by
+  the `agent-docs` launch config, port 5178); core handoff
+  `docs/core-handoff/pipeline-presets.md` (ready-for-review; fc-core-srvc
+  UNREACHABLE from zoran-star account - parity unverified). Open Loop (High)
+  logged in Notion. **DECISIONS LOCKED (Zoran, same day):** (1) preset hangs on
+  the OFFER (pipeline_stages/stage_transitions/agent config gain offer_id;
+  entry_points already routes by offer); (2) presets authored by BAM in CODE
+  (versioned registry, NO template tables, no authoring UI); (3) per-instance
+  tuning = automations + agent training ONLY, structure locked (BAM can
+  re-stamp preset upgrades safely); (4) preset #2 = discovery_trial: responded
+  -> discovery_call_booked (NEW stage) -> trial_booked -> done_trial + same
+  ghosted/nurture automations; reuses trial_confirm + closing agent templates
+  as-is; new = call_booking mission + call_confirm agent. Training scopes by
+  AGENT TEMPLATE (shared templates share craft across presets; different
+  missions never bleed). Remaining: build phases 2-4, core review, BAM GTA
+  offer_id backfill.
+- **Phase 1 SHIPPED + applied to prod (2026-07-10):** migration
+  `bam-portal/supabase/migrations/20260710170000_open_stage_role_vocabulary.sql`
+  opened the closed stage-role vocabulary - dropped the 7-value CHECKs on
+  `pipeline_stages.role` + `opportunities.stage_role`, converted
+  `stage_transitions` from/to_stage_role enum→text, dropped the `stage_role`
+  enum, added a `^[a-z][a-z0-9_]*$` soft format check. Idempotent, widening-only,
+  V2-only.
+- **Phase 2 SHIPPED + applied to prod (2026-07-10):** the preset registry lives
+  in CODE at `bam-portal/api/agent/presets.js` = `AGENT_TEMPLATES` (reusable
+  worker = runtime + mission + lessonKey) + `PRESETS`. `free_trial` = today's
+  exact model (dry-run reproduces the live 5 stages + 20 edges verbatim);
+  `discovery_trial` (preset #2) defined (6 stages incl. discovery_call_booked,
+  26 edges, reuses trial_confirm + closing). `applyPreset({clientId, offerId,
+  presetKey, dryRun})` + pure `buildPresetRows()`; CLI `scripts/apply-preset.mjs`
+  (`--list`, `--dry-run`). Migration
+  `20260710180000_stage_transitions_offer_id.sql`: added `offer_id` to
+  stage_transitions (pipeline_stages + opportunities already had it from the
+  offer-spine wave) + recreated the edge unique as `UNIQUE NULLS NOT DISTINCT
+  (client_id, offer_id, from/trigger/to...)` - same name so the legacy seed's
+  ON CONFLICT still works, AND it fixes a latent dup bug (every edge key has a
+  NULL, old NULLS-distinct unique never matched). Verified in prod + rolled back:
+  dry-run == live, same-offer re-stamp idempotent, same edge OK under 2 offers,
+  BAM GTA untouched (20 edges / 0 offer-tagged). SCOPE: works for NEW academies
+  (1 offer/pipeline); applyPreset REFUSES one-academy-two-offers because the
+  readers (resolveStage/resolveEdge/buildPortalBoard/shadowUpsertStageRegistry)
+  still key by (client, role) - making them offer-aware + adding offer_id to the
+  pipeline_stages unique + backfilling the 2 live pipelines' offers = NEXT (Phase 3).
+- **Phase 3a SHIPPED (2026-07-10):** offer data + read seam. Backfilled the 20 BAM GTA
+  `stage_transitions` edges to the Training offer (pipeline_stages + opportunities were
+  ALREADY offer-backfilled by the offer-spine wave; both live academies map to Training
+  per Zoran). Added a DORMANT optional `offerId` filter to `resolveFromRegistry`/
+  `resolveStage` (`api/agent/_store.js`) + `resolveEdge`/`routeTransition`
+  (`api/agent/_router.js`) - no caller passes it, so prod is byte-identical (grep-verified).
+  Pipeline_stages unique + self-seed UNCHANGED (still one pipeline per academy).
+- **Phase 4 SHIPPED (2026-07-10): template-scoped training.** Turned out lessons were
+  ALREADY template-scoped by the Phase 2 design - `agent_lessons.agent` = the agent
+  template's lessonKey, and free_trial's templates reuse the runtime names
+  (trial_booking→'booking', trial_confirm→'confirm', closing→'closing'), so the readers
+  already isolate by agent=eq.<templateKey> and a general call_booking lesson never loads
+  in the booking runtime. ZERO backfill (verified: prod lessons key on booking/closing =
+  valid template keys). Wired lessons-io.mjs to validate `agent` against
+  presets.js AGENT_TEMPLATES lessonKeys (booking|confirm|closing|call_booking|call_confirm)
+  - renamed internal AGENTS→TEMPLATE_KEYS, motion-tag list →PRESET_TAGS. consolidate-lessons.md
+  gained a "scoped by agent TEMPLATE" section + requires stating a general lesson's BLAST
+  RADIUS (template + which presets reuse it). Gated on the parked engine only for LOADING a
+  new template's lessons at runtime (the runtime must identify as that template = Phase 3b).
+- **Phase 3b PARKED (Zoran, 2026-07-10) - spec ready in docs/core-handoff/pipeline-presets.md.**
+  TRIGGER to build: the first gym that sells with a non-free-trial motion (e.g. discovery-call)
+  signs up and needs its own preset live. The work: collapse the 3 agent APIs into one detector
+  parameterized by (academy, offer, stage, agent_template); thread per-opp offer_id through
+  queues/self-seed; flip pipeline_stages unique to (client, offer, role) + shadowUpsertStageRegistry
+  on_conflict. Parked because it rewrites LIVE SMS routing for BAM GTA + DETAIL Miami and isn't worth
+  the risk while every gym is single-preset. Build it as a focused/canaried effort (canary BAM GTA
+  single-offer = behavior must stay identical). This is what enables one-academy-two-pipelines.
+
 ## ⭐ LESSON MODEL REVISED (2026-07-10, Zoran) - consolidation skill replaces auto-promote
 The old "AI classifier -> promotion_status=pending -> staff approves -> scope flips
 to general" flow is RETIRED, and the audit-flagged gap ("global scope was just a

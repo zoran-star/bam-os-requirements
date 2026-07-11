@@ -22653,7 +22653,8 @@ async function _bbRenderAgentLearnings(panel) {
 
 // ════════════════════════════════════════════════════════════════════════
 // TRAIN AGENT - client-side trainer surface (granted users only).
-// Local knowledge only: lessons (AI auto-routes global craft to BAM approval)
+// Local knowledge only: lessons are born local to the academy; the
+// /consolidate-lessons skill later routes general craft to the shared brain.
 // + the academy's own brain facts (schedule/pricing/coaches/policies).
 // All writes go to /api/agent-train, which enforces local-only server-side.
 // ════════════════════════════════════════════════════════════════════════
@@ -23432,7 +23433,7 @@ async function _taChatTeachSave(i) {
   try {
     const res = await _taApi('teach', { lesson: text });
     if (note) note.innerHTML = res.proposed_global
-      ? `<span style="color:var(--gold)">Looks like global strategy - sent to BAM for approval.</span>`
+      ? `<span style="color:var(--gold)">Saved to your academy. Looks like general sales craft - it will be considered for the shared brain at the next consolidation pass.</span>`
       : `<span style="color:#5BBF7B">Saved to your academy.</span>`;
     ta.value = '';
   } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`; }
@@ -23477,7 +23478,7 @@ function _taRenderLessons() {
   p.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:18px">
       <div style="font-weight:600;font-size:14px;margin-bottom:8px">Teach a lesson</div>
-      <textarea id="ta-teach-input" rows="3" placeholder="e.g. When a parent asks about parking, mention there's free lot parking out front." style="width:100%;box-sizing:border-box;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
+      <textarea id="ta-teach-input" rows="3" placeholder="e.g. When a parent asks about parking, mention there's free lot parking out front. If the agent was missing a fact (price, schedule, capacity), include the fact." style="width:100%;box-sizing:border-box;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;resize:vertical;font-family:inherit"></textarea>
       <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
         <button id="ta-teach-btn" style="${_TA_BTN}" onclick="_taTeach()">Teach lesson</button>
         <div id="ta-teach-note" style="font-size:12.5px"></div>
@@ -23497,7 +23498,7 @@ async function _taTeach() {
     const res = await _taApi('teach', { lesson: text });
     ta.value = '';
     if (note) note.innerHTML = res.proposed_global
-      ? `<span style="color:var(--gold)">Looks like global strategy - sent to BAM for approval. It already applies to your academy.</span>`
+      ? `<span style="color:var(--gold)">Saved to your academy. Looks like general sales craft - it will be considered for the shared brain at the next consolidation pass.</span>`
       : `<span style="color:#5BBF7B">Saved to your academy.</span>`;
     await _taLoadLessons();
   } catch (e) { if (note) note.innerHTML = `<span style="color:#E5736A">${escapeHTML(e.message)}</span>`; }
@@ -23512,7 +23513,7 @@ async function _taLoadLessons() {
     if (!lessons.length) { host.innerHTML = `<div class="bb-empty">No lessons yet. Teach the agent something above, or correct it in the Test tab.</div>`; return; }
     host.innerHTML = lessons.map(l => {
       let badge;
-      if (l.promotion_status === 'pending') badge = `<span style="color:var(--gold)">pending BAM approval (global)</span>`;
+      if (l.promotion_status === 'pending' || (l.promotion_reason || '').startsWith('[general-craft?]')) badge = `<span style="color:var(--gold)">general-craft candidate (next consolidation)</span>`;
       else if (l.scope === 'general') badge = `<span style="color:#7FB2F0">shared brain</span>`;
       else badge = `<span style="color:var(--text-mute)">your academy</span>`;
       return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px">
@@ -32470,7 +32471,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <div class="hk2-lbl">Booking details - the agent's pick, change if needed</div>
       <div class="hk2-fields">
         <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
-        <label><span>Slot</span><select${id.slot} onchange="_hk2Edited()"><option value="${escapeHTML(guessSlot)}" selected>${escapeHTML(guessSlot ? _hk2SlotLabel(guessSlot) : 'Loading open slots…')}</option></select></label>
+        <label><span>Slot</span><select${id.slot} onchange="_hk2Edited(true)"><option value="${escapeHTML(guessSlot)}" selected>${escapeHTML(guessSlot ? _hk2SlotLabel(guessSlot) : 'Loading open slots…')}</option></select></label>
       </div>
       <div class="hk2-lbl">Confirmation text - sends the moment you book it</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
@@ -32579,7 +32580,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
     ${trialLine}
     ${ctx ? `<div class="hk2-ctx">${escapeHTML(ctx)}</div>` : ''}
     ${body}
-    <input class="hk2-teach"${id.teach} style="display:none" placeholder="Required: teach the agent why you changed it (saved as a lesson)">
+    <input class="hk2-teach"${id.teach} style="display:none" placeholder="Required: why did you change it? If the bot was missing a fact (price, schedule, capacity), include the fact.">
     ${isForm ? '' : `<div class="hk2-other"${id.other}><div class="hk2-other-in"><span class="hk2-lbl">Move the lead</span>${moves}</div></div>`}
     <div class="hk2-bar">
       ${isForm ? '' : `<button class="hk2-otherbtn" onclick="_hk2ToggleOther(this)">Other</button>`}
@@ -32698,7 +32699,11 @@ async function _hk2Teach(r, lesson, before, after, agent) {
     // instead saved lessons to the WRONG agent whenever the deck auto-jumped
     // tabs (resolve fires at 480ms, this call up to 6s later on the undo flush).
     await _apxPost('/api/agent-train', 'teach', { agent: agent || _HK2.agent, lesson, kind: 'fix', context: { source: 'hawkeye-deck', contact: r.contact_name || null, ai_drafted: before || null, you_sent: after || null } });
-  } catch (_) { /* the action already landed - never block on the lesson */ }
+  } catch (_) {
+    // The action already landed - never block on the lesson. But a silently
+    // dropped lesson kills the training loop, so at least SAY it failed.
+    try { _apxToast('Sent, but the lesson did not save (training call failed)', false); } catch (__) {}
+  }
 }
 function _hk2NoteOk() {
   if (!_HK2.edited) return true;
@@ -35903,10 +35908,9 @@ function _apxRemove(id) {
   if (span) span.textContent = n || '';
 }
 
-// When you fix a draft, optionally teach the agent WHY. Routes through the same
-// classify-and-promote pipeline as the Train Agent tab: born local to this
-// academy, applied to the next draft immediately, and (if the AI judges it
-// general sales-craft) queued for BAM to promote into the shared brain.
+// When you fix a draft, optionally teach the agent WHY. Born local to this
+// academy and applied to the next draft immediately; /consolidate-lessons later
+// merges the pile and decides what graduates to the shared general brain.
 // Teach a lesson (already captured from the edit modal - no prompt).
 async function _apxTeach(lesson, before, after, context) {
   if (!lesson || !lesson.trim()) return;
@@ -35915,7 +35919,7 @@ async function _apxTeach(lesson, before, after, context) {
       lesson: lesson.trim(), kind: 'fix',
       context: { ...(context || {}), ai_drafted: before, you_sent: after },
     });
-    _apxToast(j && j.proposed_global ? 'Lesson saved - sent to BAM to review' : 'Lesson saved + applied', true);
+    _apxToast(j && j.proposed_global ? 'Lesson saved + applied (flagged as general craft)' : 'Lesson saved + applied', true);
   } catch (e) { _apxToast('Edit kept, but lesson not saved: ' + _apxErr(e), false); }
 }
 

@@ -60,10 +60,12 @@ async function requireStaff(req) {
   return Array.isArray(staff) && staff[0] ? (user.email || "staff") : null;
 }
 
-async function activeLessons(clientId) {
+async function activeLessons(clientId, agent = "booking") {
+  // Same shape as the LIVE readers: this academy's lessons + the shared general
+  // set, filtered to ONE agent - so the sandbox previews the brain that sends.
   try {
     const rows = await sb(
-      `agent_lessons?client_id=eq.${clientId}&active=eq.true&select=lesson,kind&order=created_at.asc`
+      `agent_lessons?or=(client_id.eq.${clientId},and(client_id.is.null,scope.eq.general))&agent=eq.${encodeURIComponent(agent)}&active=eq.true&select=lesson,kind&order=created_at.asc`
     );
     return Array.isArray(rows) ? rows : [];
   } catch (_) { return []; }
@@ -122,12 +124,12 @@ async function handleChat(messages, clientId, leadContext, res, agent = "booking
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured on server" });
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: "messages required" });
 
-  // The confirm agent (Scheduled-Trial) does NOT use the booking agent's lessons,
-  // but every agent now previews from ITS OWN saved examples (agent-scoped), exactly
-  // like it runs live - so a booking example never bleeds into a confirm/closing test.
-  const isConfirm = agent === "confirm";
+  // Every agent previews from ITS OWN lessons + the shared general set and ITS OWN
+  // saved examples (agent-scoped), exactly like it runs live. (The old confirm
+  // exclusion predates the agent filter on lessons - it would preview a brain
+  // missing the confirm lessons that DO ride the live confirm prompt.)
   const [lessons, overrides, examples] = await Promise.all([
-    isConfirm ? [] : activeLessons(clientId), sectionOverrides(clientId), savedExamples(clientId, agent),
+    activeLessons(clientId, agent), sectionOverrides(clientId), savedExamples(clientId, agent),
   ]);
   const system = buildAgentSystem({ lessons, overrides, examples, leadContext, trailer: SANDBOX_TRAILER, agent });
 
@@ -232,6 +234,7 @@ async function handler(req, res) {
         headers: { Prefer: "return=representation" },
         body: JSON.stringify([{
           client_id:  clientId,
+          agent:      pickAgent(b.agent), // MUST be set per-agent or the row silently trains booking
           kind:       b.kind || "lesson",
           lesson:     String(b.lesson).trim(),
           context:    b.context || {},

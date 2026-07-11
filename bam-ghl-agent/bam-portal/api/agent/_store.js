@@ -95,13 +95,20 @@ async function ghlFindStage(ghl, token, locationId, role) {
 // Returns the finder-shaped object, or null to mean "fall back to live GHL".
 // Returns null (fall back) when the row is missing OR has no usable GHL stage id,
 // so a portal academy that has not seeded a stage still behaves like the regex.
-async function resolveFromRegistry(sb, clientId, role) {
+async function resolveFromRegistry(sb, clientId, role, offerId) {
   const sbGet = typeof sb === "function" ? sb : defaultSbGet;
   const clientRows = await sbGet(`clients?id=eq.${encodeURIComponent(clientId)}&select=pipeline_provider&limit=1`);
   const provider = clientRows && clientRows[0] && clientRows[0].pipeline_provider;
   if (provider !== "portal") return null;
+  // Phase 3 offer seam (DORMANT): filter to one offer's pipeline ONLY when the
+  // caller threads an offerId. No caller does today, so this is byte-identical to
+  // the pre-seam single-pipeline lookup. The engine turns it on when an academy
+  // runs more than one offer pipeline and the (client, role) lookup would be
+  // ambiguous. pipeline_stages.offer_id is fully backfilled, so a filtered lookup
+  // resolves the same row an unfiltered one does today.
+  const offerClause = offerId ? `&offer_id=eq.${encodeURIComponent(offerId)}` : "";
   const rows = await sbGet(
-    `pipeline_stages?client_id=eq.${encodeURIComponent(clientId)}&role=eq.${encodeURIComponent(role)}` +
+    `pipeline_stages?client_id=eq.${encodeURIComponent(clientId)}&role=eq.${encodeURIComponent(role)}${offerClause}` +
     `&select=ghl_pipeline_id,ghl_stage_id,ghl_stage_name&limit=1`
   );
   const row = rows && rows[0];
@@ -111,15 +118,16 @@ async function resolveFromRegistry(sb, clientId, role) {
 
 // The seam. Same return contract as the _stage.js finders: { pipelineId,
 // stageId, stageName } or null, and GHL errors propagate.
-export async function resolveStage(sb, ghl, { clientId, token, locationId, role } = {}) {
+export async function resolveStage(sb, ghl, { clientId, token, locationId, role, offerId } = {}) {
   const ghlFn = ghl || ghlDefault;
   // Registry path is only attempted when a clientId is threaded in. No current
   // finder call site passes one, so today this branch never runs and resolveStage
   // is byte-identical to the old regex finders. A registry miss/error also falls
-  // through to live GHL, never breaking an existing path.
+  // through to live GHL, never breaking an existing path. offerId is the dormant
+  // Phase 3 seam (see resolveFromRegistry) — optional, off by default.
   if (clientId) {
     try {
-      const fromRegistry = await resolveFromRegistry(sb, clientId, role);
+      const fromRegistry = await resolveFromRegistry(sb, clientId, role, offerId);
       if (fromRegistry) return fromRegistry;
     } catch (_) { /* fall through to live GHL */ }
   }
