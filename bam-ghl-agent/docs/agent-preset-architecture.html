@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Presets - The Scaling Plan</title>
+<style>
+  :root{
+    --canvas:#F4F1EA; --ink:#2A2A2E; --sub:#5B5B66; --mute:#8A8A96;
+    --yellow:#FFE68A; --yellow-b:#E8C64A;
+    --blue:#A9D3F5; --blue-b:#5FA8E0;
+    --green:#B7E4B0; --green-b:#5FBF62;
+    --purple:#D6BEF2; --purple-b:#A579DC;
+    --pink:#FFC4CE; --pink-b:#F07E92;
+    --red:#FFB3A7; --red-b:#E06450;
+    --white:#FFFFFF; --line:#3A3A40;
+    --font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --hand:"Bradley Hand","Segoe Print","Comic Sans MS",cursive;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:var(--font);color:var(--ink);background-color:var(--canvas);
+    background-image:radial-gradient(circle,#d8d3c6 1.2px,transparent 1.3px);background-size:26px 26px;
+    -webkit-font-smoothing:antialiased;line-height:1.4;padding:34px 22px 90px}
+  .wrap{max-width:1200px;margin:0 auto}
+  header{margin-bottom:10px}
+  .kicker{font-family:var(--hand);font-size:20px;color:var(--purple-b);transform:rotate(-1.5deg);display:inline-block}
+  h1{font-size:38px;margin:2px 0 6px;letter-spacing:-1px;line-height:1.05}
+  .lede{font-size:16px;color:var(--sub);max-width:820px}
+  .lede b{color:var(--ink)}
+  .tterm{background:#2A2A2E;color:#fff;padding:1px 7px;border-radius:6px;font-size:12.5px;font-weight:600;font-family:ui-monospace,Menlo,monospace}
+  .plain{color:var(--green-b);font-weight:700}
+  .convention{margin:12px 0 4px;font-size:14px;color:var(--sub)}
+
+  .stage{position:relative;margin:46px 0 0;padding:32px 22px 26px;border:2.5px dashed var(--line);border-radius:22px;background:rgba(255,255,255,.35)}
+  .stage-tab{position:absolute;top:-18px;left:22px;padding:6px 16px;border:2.5px solid var(--line);border-radius:12px;font-weight:800;font-size:15px;box-shadow:3px 3px 0 rgba(0,0,0,.14);display:flex;gap:9px;align-items:center}
+  .stage-tab .n{font-family:var(--hand);font-size:19px}
+  .stage-sub{position:absolute;top:-16px;right:22px;font-family:var(--hand);font-size:16px;color:var(--sub);background:var(--canvas);padding:2px 12px;border-radius:14px}
+  .sA .stage-tab{background:var(--green)} .sB .stage-tab{background:var(--red)}
+  .sC .stage-tab{background:var(--blue)} .sD .stage-tab{background:var(--purple)}
+  .sE .stage-tab{background:var(--yellow)} .sF .stage-tab{background:var(--pink)}
+
+  .row{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;justify-content:center}
+  .card{position:relative;width:262px;background:var(--white);border:2.5px solid var(--line);border-radius:14px;padding:14px 15px 15px;box-shadow:5px 5px 0 rgba(0,0,0,.13)}
+  .card.y{background:var(--yellow)} .card.b{background:var(--blue)} .card.g{background:var(--green)}
+  .card.p{background:var(--purple)} .card.k{background:var(--pink)} .card.r{background:var(--red)}
+  .card .h{font-weight:800;font-size:15px;margin-bottom:6px;display:flex;gap:7px;align-items:baseline}
+  .card .t{font-size:13px;color:#33333a}
+  .card .t code{background:rgba(0,0,0,.14);padding:0 5px;border-radius:5px;font-size:11.5px;font-family:ui-monospace,Menlo,monospace}
+  .card .say{display:block;margin-top:8px;font-family:var(--hand);font-size:14px;color:#1f5f22;line-height:1.3}
+  .card.r .say,.card.k .say{color:#7a2417}
+  .card.b .say,.card.p .say{color:#153f5f}
+  .tilt1{transform:rotate(-1.2deg)} .tilt2{transform:rotate(1deg)} .tilt3{transform:rotate(-.6deg)}
+
+  .between{display:flex;flex-direction:column;align-items:center;margin:4px auto 0}
+  .between .big{font-size:40px;line-height:.7;color:var(--line)}
+  .between .lab{font-family:var(--hand);font-size:15px;color:var(--purple-b);background:var(--canvas);padding:2px 12px;border-radius:20px;border:2px dashed var(--line);margin-bottom:2px}
+  .arrow{align-self:center;font-size:30px;color:var(--line);font-weight:700;padding:0 2px}
+  .arrow.d{width:100%;text-align:center;font-size:34px;margin:6px 0 -6px}
+
+  .callout{margin:16px auto 0;max-width:860px;background:#2A2A2E;color:#f3f3f3;border-radius:16px;padding:16px 20px;box-shadow:5px 5px 0 rgba(0,0,0,.2);font-size:14px}
+  .callout b{color:var(--yellow-b)} .callout .why{color:var(--green);font-weight:700}
+  .note{margin:14px auto 0;max-width:720px;text-align:center;font-size:13px;color:var(--mute);font-style:italic}
+
+  /* entity map boxes */
+  .entity{width:250px;background:var(--white);border:2.5px solid var(--line);border-radius:12px;box-shadow:5px 5px 0 rgba(0,0,0,.13);overflow:hidden}
+  .entity .eh{padding:8px 12px;font-weight:800;font-size:14px;border-bottom:2.5px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .entity .eh .tag{font-family:var(--hand);font-size:13px;font-weight:400}
+  .entity ul{margin:0;padding:9px 12px 11px 26px;font-size:12.5px;color:#33333a}
+  .entity li{margin:3px 0}
+  .entity li b{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:rgba(0,0,0,.08);padding:0 4px;border-radius:4px}
+  .e-preset .eh{background:var(--blue)} .e-tpl .eh{background:var(--purple)}
+  .e-inst .eh{background:var(--green)} .e-train .eh{background:var(--pink)}
+
+  /* phases */
+  .phase{display:flex;gap:14px;align-items:flex-start;margin:18px 0;flex-wrap:wrap}
+  .ph-badge{min-width:120px;text-align:center;padding:10px 12px;border:2.5px solid var(--line);border-radius:12px;font-weight:800;box-shadow:4px 4px 0 rgba(0,0,0,.13)}
+  .ph-badge small{display:block;font-family:var(--hand);font-weight:400;font-size:13px;margin-top:2px}
+  .ph-body{flex:1;min-width:280px;background:var(--white);border:2.5px solid var(--line);border-radius:14px;padding:12px 16px;box-shadow:4px 4px 0 rgba(0,0,0,.13);font-size:13.5px}
+  .ph-body b.k{font-size:14px}
+  .ph-body .unlock{display:block;margin-top:7px;font-family:var(--hand);font-size:14.5px;color:#1f5f22}
+  .ph-body .risk{display:inline-block;margin-top:7px;font-size:12px;background:var(--red);border:2px solid var(--line);border-radius:8px;padding:1px 8px;font-weight:700}
+  .p0{background:var(--green)} .p1{background:var(--yellow)} .p2{background:var(--blue)} .p3{background:var(--purple)} .p4{background:var(--pink)}
+
+  .decisions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .dec{width:262px;background:var(--yellow);border:2.5px solid var(--line);border-radius:4px 22px 4px 20px;padding:13px 15px;box-shadow:5px 6px 0 rgba(0,0,0,.16);font-size:13px;transform:rotate(-1deg)}
+  .dec:nth-child(2n){transform:rotate(1.1deg)}
+  .dec b{display:block;font-size:14px;margin-bottom:5px}
+  .dec .q{font-family:var(--hand);font-size:14px;color:#6b4d00}
+
+  footer{margin-top:40px;text-align:center;font-size:12.5px;color:var(--mute)}
+  @media(max-width:640px){h1{font-size:28px}.card,.entity,.dec{width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="kicker">the scaling question ✎</span>
+  <h1>Pipeline Presets: Can We Scale It?</h1>
+  <p class="lede">The ask: <b>create new pipeline presets</b> (not just free-trial), <b>configure the agents and automations per stage</b> in each preset, and have <b>training flow per preset</b>. Verdict: the foundation is real, three things are still welded shut, and there's a clean 4-phase path. Tech terms in <span class="tterm">black chips</span>, plain English in <span class="plain">green handwriting</span>.</p>
+</header>
+
+<!-- A: WHAT EXISTS -->
+<section class="stage sA">
+  <div class="stage-tab"><span class="n">A</span> ALREADY BUILT &mdash; stronger than it looks</div>
+  <div class="stage-sub">the pipeline is already becoming data we own</div>
+  <div class="row">
+    <div class="card g tilt1">
+      <div class="h">🗺️ Stage registry</div>
+      <div class="t"><code>pipeline_stages</code> table: one row per stage per academy, with a <code>role</code> + the GHL ids it maps to. A <code>pipeline_provider</code> flag flips reads from GHL to our own table.</div>
+      <span class="say">The stages live in OUR database now, not just inside GoHighLevel.</span>
+    </div>
+    <div class="card g tilt2">
+      <div class="h">🕸️ Transition graph</div>
+      <div class="t"><code>stage_transitions</code>: an edge per row - <code>(from_stage, trigger) → destination</code>. LIVE in prod, seeded for BAM GTA (20 edges), and <code>routeTransition()</code> is already called by all 3 agents.</div>
+      <span class="say">"When a lead does X in stage Y, send them to Z" is already data, not code.</span>
+    </div>
+    <div class="card g tilt3">
+      <div class="h">⚙️ Automations engine</div>
+      <div class="t"><code>automations</code> + steps / enrollments / jobs / events tables run the Ghosted and Nurture sequences portal-side.</div>
+      <span class="say">Drip sequences are our system, not GHL workflows.</span>
+    </div>
+    <div class="card g tilt1">
+      <div class="h">🧠 Brain-as-data + lessons</div>
+      <div class="t">Each agent's prompt = 30 named <code>sections</code> overridable per academy. Lessons carry <code>agent</code> + <code>scope</code>, and shared ones are already tagged <code>preset: free_trial</code>.</div>
+      <span class="say">The personality and training are editable content, not hardcode... mostly.</span>
+    </div>
+  </div>
+  <p class="note">Even the "seed BAM GTA's flow" function is a primitive preset stamp - it just only knows ONE flow.</p>
+</section>
+
+<div class="between"><span class="lab">but three things are welded shut ↓</span><span class="big">↓</span></div>
+
+<!-- B: WELDED -->
+<section class="stage sB">
+  <div class="stage-tab"><span class="n">B</span> WELDED SHUT &mdash; the 3 blockers</div>
+  <div class="stage-sub">why a new preset can't exist today</div>
+  <div class="row">
+    <div class="card r tilt1">
+      <div class="h">🔒 Closed stage list</div>
+      <div class="t"><code>stage_role</code> is a 7-value database <code>enum</code>: responded, interested, scheduled_trial, done_trial, nurture, won, unqualified. A CHECK constraint rejects anything else.</div>
+      <span class="say">You literally cannot add an "Assessment Booked" stage - the database says no.</span>
+    </div>
+    <div class="card r tilt2">
+      <div class="h">🔒 3 hardcoded agents</div>
+      <div class="t"><code>AGENT_SPECS</code> = booking / confirm / closing, each welded to one stage AND with "get them to book a free trial" written into its default prompt text in code.</div>
+      <span class="say">There's no way to say "make me a 4th agent" or "same agent, different mission."</span>
+    </div>
+    <div class="card r tilt3">
+      <div class="h">🔒 No preset object</div>
+      <div class="t">Nothing represents "a sales system" as a thing. The free-trial flow exists only as the union of hardcoded defaults + one seed function.</div>
+      <span class="say">You can't create, name, copy, or assign a playbook - it isn't a noun in the system yet.</span>
+    </div>
+  </div>
+  <div class="callout"><b>Training is the least-blocked layer.</b> Lessons already carry agent + scope + a preset tag. <span class="why">What's missing:</span> the readers don't FILTER by preset yet (harmless while only free-trial exists), and lessons key on the agent's hardcoded name instead of a template id.</div>
+</section>
+
+<div class="between"><span class="lab">the target shape ↓</span><span class="big">↓</span></div>
+
+<!-- C: TARGET ENTITY MAP -->
+<section class="stage sC">
+  <div class="stage-tab"><span class="n">C</span> TARGET STATE &mdash; the entity map <span style="font-family:var(--hand);font-weight:400">(updated with Zoran's decisions)</span></div>
+  <div class="stage-sub">presets live in CODE · an academy's OFFER runs an instance</div>
+
+  <div class="row">
+    <div class="entity e-preset">
+      <div class="eh">preset definitions <span class="tag">in code, BAM-only</span></div>
+      <ul>
+        <li>a versioned code registry (like <b>prompt-structure.js</b> today), not DB rows - only BAM edits it, in git</li>
+        <li>each preset = <b>key</b> ('free_trial', 'discovery_trial') + stage list (open <b>role_key</b>s) + transition graph + which worker runs each stage</li>
+        <li>no authoring UI to build or secure - a preset ships like a feature</li>
+      </ul>
+    </div>
+    <div class="arrow">＋</div>
+    <div class="entity e-tpl">
+      <div class="eh">agent templates <span class="tag">in code, reusable</span></div>
+      <ul>
+        <li><b>key</b> 'trial_booking', 'call_confirm', 'trial_confirm', 'closing'...</li>
+        <li>mission + default prompt sections + tool config (reply / book / schedule / suggest-lost)</li>
+        <li><b>shared across presets</b>: preset #2 reuses trial_confirm + closing verbatim - only its booking mission is new</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="arrow d">⇒ <span style="font-family:var(--hand);font-size:14px">apply_preset(academy, OFFER, preset_key) stamps the instance</span></div>
+
+  <div class="row">
+    <div class="entity e-inst">
+      <div class="eh">per-OFFER instance <span class="tag">what actually runs</span></div>
+      <ul>
+        <li>pipelines hang on the <b>offer</b>, not the academy - one academy can run free-trial youth training AND a discovery-call elite program side by side</li>
+        <li><b>pipeline_stages</b> + <b>stage_transitions</b> (both live today) gain an <b>offer_id</b>; keys become (client, offer, role)</li>
+        <li><b>client_agents</b>: (client × offer × agent_template) + mode (off / hawkeye / self_drive)</li>
+        <li>leads already route by offer: <b>entry_points</b> has offer_id today</li>
+      </ul>
+    </div>
+    <div class="arrow">→</div>
+    <div class="entity e-inst">
+      <div class="eh">customization envelope <span class="tag">locked vs open</span></div>
+      <ul>
+        <li>🔒 stages + transitions + agent missions: <b>locked to the preset</b> (BAM re-stamps safely on preset upgrades)</li>
+        <li>🔓 <b>automations</b>: timings + message copy tunable per instance</li>
+        <li>🔓 <b>agent training</b>: lessons, brain facts, examples, mode - fully per academy</li>
+      </ul>
+    </div>
+    <div class="arrow">→</div>
+    <div class="entity e-train">
+      <div class="eh">training <span class="tag">scoped by template</span></div>
+      <ul>
+        <li>lessons key on <b>agent_template</b>, not a hardcoded name</li>
+        <li>general lessons attach to the TEMPLATE - craft taught to trial_confirm helps EVERY preset that reuses trial_confirm, automatically</li>
+        <li>booking-for-trial vs booking-for-call are different templates, so their craft never cross-bleeds</li>
+        <li>/consolidate-lessons runs per template; intake mining feeds preset-specific onboarding questions</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout"><b>Why code-authored presets simplify everything:</b> <span class="why">no template tables, no authoring UI, no permissions.</span> A preset is reviewed and shipped like code (because it is code). And because academies can't restructure stages or transitions, BAM can safely RE-STAMP an improved preset onto existing instances - only automations + training are per-academy, and those survive the re-stamp.</div>
+</section>
+
+<div class="between"><span class="lab">how we get there without breaking BAM GTA ↓</span><span class="big">↓</span></div>
+
+<!-- D: PHASES -->
+<section class="stage sD">
+  <div class="stage-tab"><span class="n">D</span> THE PATH &mdash; 4 phases, no big-bang rewrite</div>
+  <div class="stage-sub">each phase ships value on its own</div>
+
+  <div class="phase">
+    <div class="ph-badge p0">Phase 0<small>done ✓</small></div>
+    <div class="ph-body"><b class="k">Foundation (already live).</b> Stage registry, transition graph + router, automations engine, brain-as-data, preset-tagged lessons, Hawkeye training loop.
+      <span class="unlock">This is why the answer is "3 pieces away," not "rewrite."</span></div>
+  </div>
+
+  <div class="phase">
+    <div class="ph-badge p0">Phase 1<small>done ✓ 2026-07-10</small></div>
+    <div class="ph-body"><b class="k">Unweld the stage list. SHIPPED + applied to prod.</b> Migration <code>20260710170000_open_stage_role_vocabulary</code>: dropped the closed 7-value CHECKs on <code>pipeline_stages.role</code> + <code>opportunities.stage_role</code>, converted <code>stage_transitions</code>' <code>stage_role</code> enum to text, dropped the enum, added a soft lowercase-snake_case format check. Verified in prod: a new role (<code>discovery_call_booked</code>) inserts, garbage rejects, all 119 existing rows intact, free-trial flow byte-identical.
+      <span class="unlock">New stage names are now POSSIBLE - the database no longer rejects them. Dormant until a code preset uses one.</span></div>
+  </div>
+
+  <div class="phase">
+    <div class="ph-badge p0">Phase 2<small>done ✓ 2026-07-10</small></div>
+    <div class="ph-body"><b class="k">Preset registry in code + apply_preset. SHIPPED.</b> <code>api/agent/presets.js</code> = the versioned code registry: <code>AGENT_TEMPLATES</code> (reusable workers) + <code>PRESETS</code>. <b>free_trial</b> is today's exact model (verified: a dry-run reproduces the live 5 stages + 20 edges byte-for-byte); <b>discovery_trial</b> (preset #2) is defined too (6 stages, 26 edges, reusing trial_confirm + closing). <code>applyPreset(client, offer, preset)</code> stamps <code>pipeline_stages</code> + <code>stage_transitions</code> for an offer, idempotently, via <code>scripts/apply-preset.mjs</code>. Migration <code>20260710180000</code>: <code>offer_id</code> on stage_transitions (already on pipeline_stages / opportunities) + a per-offer <code>NULLS NOT DISTINCT</code> edge-unique (also fixes a latent re-stamp dup bug). Proven in prod + rolled back; BAM GTA untouched.
+      <span class="unlock">A new playbook is now a code file, and stamping an academy's offer with it is one call.</span>
+      <span class="risk">Scope: works for NEW academies (one offer / pipeline). ONE academy running TWO offer pipelines at once needs offer-aware readers - that's Phase 3. applyPreset refuses it for now.</span></div>
+  </div>
+
+  <div class="phase">
+    <div class="ph-badge p0">Phase 3a<small>done ✓ 2026-07-10</small></div>
+    <div class="ph-body"><b class="k">Offer data + read seam. SHIPPED.</b> Both live pipelines are now fully offer-tagged (Zoran: both map to their Training offer) - <code>pipeline_stages</code> + <code>opportunities</code> were already backfilled by the offer-spine wave; this backfilled the 20 <code>stage_transitions</code> edges too, derived from each academy's own pipeline offer (no hardcoded ids). <code>resolveStage</code> / <code>resolveEdge</code> / <code>routeTransition</code> gained an optional <code>offerId</code> filter - DORMANT (no caller passes it yet, so prod is byte-identical), the seam the engine flips on.
+      <span class="unlock">Every stage, edge, and lead is now attributed to its offer; the readers can filter by offer the moment the engine asks.</span></div>
+  </div>
+
+  <div class="phase">
+    <div class="ph-badge p3">Phase 3b<small>PARKED until needed</small></div>
+    <div class="ph-body"><b class="k">One engine, many agents.</b> Collapse the 3 copy-pasted agent APIs (<code>agent-approvals</code> / <code>agent-confirm</code> / <code>agent-closing</code>) into one detector/drafter parameterized by (academy, offer, stage, agent_template); thread each opportunity's <code>offer_id</code> through the queues + self-seed (<code>shadowUpsertStageRegistry</code>); flip the <code>pipeline_stages</code> unique to <code>(client, offer, role)</code>; Hawkeye tabs render from the offer's stages.
+      <span class="unlock">This is what lets ONE academy run TWO offer pipelines that route correctly.</span>
+      <span class="risk">⏸ PARKED (Zoran, 2026-07-10): not worth the live-SMS risk until a gym actually needs a second preset. TRIGGER to build: the first gym that sells with a non-free-trial motion signs up. Full spec is ready in the core handoff - pick it up then, canary on BAM GTA first.</span></div>
+  </div>
+
+  <div class="phase">
+    <div class="ph-badge p0">Phase 4<small>done ✓ 2026-07-10</small></div>
+    <div class="ph-body"><b class="k">Template-scoped training. SHIPPED.</b> Turns out lessons were ALREADY template-scoped by the Phase 2 design: <code>agent_lessons.agent</code> holds the template's lessonKey, and free_trial's templates reuse the runtime names (booking = trial_booking, etc.) - so NO backfill, and the readers already isolate correctly (a general <code>call_booking</code> lesson never loads into the trial-booking runtime). This wired it to the registry: <code>lessons-io.mjs</code> now validates every lesson's template against <code>presets.js</code> (accepts new templates, catches typos), and <code>/consolidate-lessons</code> reasons in templates + states each general lesson's blast radius (which presets reuse it).
+      <span class="unlock">Craft taught to a shared template (trial_confirm, closing) upgrades EVERY preset that uses it; different missions never cross-bleed. Verified in prod: today's lessons key on booking/closing = valid template keys, zero backfill.</span></div>
+  </div>
+
+  <p class="note">Order matters: 1 before 2 (open roles first), 2 before 3 (the engine reads the registry), 4 can start any time after 2.</p>
+</section>
+
+<div class="between"><span class="lab">Zoran decided (2026-07-10) ↓</span><span class="big">↓</span></div>
+
+<!-- E: DECISIONS (DECIDED) -->
+<section class="stage sE">
+  <div class="stage-tab"><span class="n">E</span> DECISIONS &mdash; locked by Zoran, 2026-07-10</div>
+  <div class="stage-sub">these shaped the map above</div>
+  <div class="decisions">
+    <div class="dec" style="background:var(--green)"><b>1 · Preset hangs on the OFFER ✓</b> One academy can run multiple offers, each with its own pipeline preset. <span class="q" style="color:#1f5f22">Schema consequence: pipeline_stages / stage_transitions / agent config gain offer_id. Leads already route by offer via entry_points.</span></div>
+    <div class="dec" style="background:var(--green)"><b>2 · Presets are authored by BAM, in CODE ✓</b> No authoring UI, no DB templates - a preset is a reviewed, versioned code file. <span class="q" style="color:#1f5f22">Kills a whole class of build work and permissions questions.</span></div>
+    <div class="dec" style="background:var(--green)"><b>3 · Per-instance tuning = automations + agent training ONLY ✓</b> Stage structure, transitions, and agent missions stay locked to the preset. <span class="q" style="color:#1f5f22">Means BAM can safely re-stamp preset upgrades onto live academies - tuning survives, structure refreshes.</span></div>
+    <div class="dec" style="background:var(--green)"><b>4 · Preset #2 outlined ✓</b> The discovery-call motion, sketched below. <span class="q" style="color:#1f5f22">Reuses nurture + ghosted automations and the trial-confirm + closing agents as-is.</span></div>
+  </div>
+
+  <div class="arrow d">↓</div>
+  <div class="row" style="gap:6px">
+    <div style="width:100%;text-align:center;font-weight:800;font-size:15px;margin-bottom:2px">Preset #2 sketch: <span class="tterm">discovery_trial</span> <span style="font-family:var(--hand);font-weight:400;font-size:14px">(the discovery-call motion)</span></div>
+    <div class="card b" style="width:172px"><div class="h">1 · Responded</div><div class="t">Booking agent - mission: book a <b>discovery call</b> (new template: <code>call_booking</code>).</div><span class="say">New mission, same muscle.</span></div>
+    <div class="arrow">→</div>
+    <div class="card b" style="width:172px"><div class="h">2 · Call Booked</div><div class="t">NEW stage <code>discovery_call_booked</code> - confirm-style agent gets them to show up to the call (<code>call_confirm</code>).</div><span class="say">New stage, new confirm twin.</span></div>
+    <div class="arrow">→</div>
+    <div class="card g" style="width:172px"><div class="h">3 · Trial Booked</div><div class="t">Same as today's scheduled_trial - reuses <code>trial_confirm</code> template AS-IS.</div><span class="say">Borrowed from free-trial.</span></div>
+    <div class="arrow">→</div>
+    <div class="card g" style="width:172px"><div class="h">4 · Done Trial</div><div class="t">Reuses the <code>closing</code> template AS-IS.</div><span class="say">Borrowed as-is.</span></div>
+    <div class="arrow">＋</div>
+    <div class="card g" style="width:180px"><div class="h">Ghosted + Nurture</div><div class="t">Same automations as the free-trial preset, unchanged.</div><span class="say">Shared plumbing.</span></div>
+  </div>
+  <p class="note">Only 2 genuinely new pieces: the call_booking mission and the call_confirm stage/agent. Everything else is reuse - which is exactly what validates the template model.</p>
+</section>
+
+<div class="between"><span class="lab">and one blocker to clear ↓</span><span class="big">↓</span></div>
+
+<!-- F: BLOCKER -->
+<section class="stage sF">
+  <div class="stage-tab"><span class="n">F</span> ALIGNMENT BLOCKER</div>
+  <div class="stage-sub">before Phase 1 ships</div>
+  <div class="row">
+    <div class="card k tilt1" style="width:520px">
+      <div class="h">🔑 fc-core-srvc is unreachable from this machine</div>
+      <div class="t">The repo rules require checking new backend architecture against the core service (<code>Full-Control/fc-core-srvc</code>), but the <code>zoran-star</code> GitHub account can't see that repo - same blocker hit on the sales-flow handoff. The design above is recorded in <code>docs/core-handoff/pipeline-presets.md</code> as <b>ready-for-review / core-unverified</b>.</div>
+      <span class="say">Someone with Full-Control org access needs to sanity-check this against core before we cut schema.</span>
+    </div>
+  </div>
+</section>
+
+<footer>Pipeline preset architecture proposal · 2026-07-10 · pairs engineering terms with plain English · companion to agent-training-architecture.html</footer>
+</div>
+</body>
+</html>

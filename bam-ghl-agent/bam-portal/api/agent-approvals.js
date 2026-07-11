@@ -1060,7 +1060,7 @@ async function handler(req, res) {
           try {
             const [lrow] = await sb(`agent_lessons`, {
               method: "POST", headers: { Prefer: "return=representation" },
-              body: JSON.stringify([{ client_id: clientId, kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: b.contact_id, suggested: b.suggested_reply || null, sent: b.reply } }]),
+              body: JSON.stringify([{ client_id: clientId, agent: "booking", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: b.contact_id, suggested: b.suggested_reply || null, sent: b.reply } }]),
             });
             heldLessonId = lrow?.id || null;
           } catch (_) {}
@@ -1094,7 +1094,7 @@ async function handler(req, res) {
         try {
           const [row] = await sb(`agent_lessons`, {
             method: "POST", headers: { Prefer: "return=representation" },
-            body: JSON.stringify([{ client_id: clientId, kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: b.contact_id, suggested: b.suggested_reply || null, sent: b.reply } }]),
+            body: JSON.stringify([{ client_id: clientId, agent: "booking", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: b.contact_id, suggested: b.suggested_reply || null, sent: b.reply } }]),
           });
           lessonId = row?.id || null;
         } catch (_) {}

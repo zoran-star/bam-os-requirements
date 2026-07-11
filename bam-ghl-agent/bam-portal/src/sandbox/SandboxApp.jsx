@@ -73,7 +73,7 @@ export default function SandboxApp({ embedded = false } = {}) {
     try { const d = await api("examples"); setExamples(d.examples || []); } catch (_) {}
   }
   async function saveExample(parent_text, agent_text) {
-    try { await api("save-example", { parent_text, agent_text }); await loadExamples(); } catch (e) { setError(e.message); }
+    try { await api("save-example", { parent_text, agent_text, agent }); await loadExamples(); } catch (e) { setError(e.message); }
   }
   async function forgetExample(id) {
     try { await api("forget-example", { id }); await loadExamples(); } catch (e) { setError(e.message); }
@@ -108,7 +108,7 @@ export default function SandboxApp({ embedded = false } = {}) {
     if (!lesson) return;
     const ctx = { conversation: messages.slice(0, idx + 1), corrected_reply: messages[idx]?.text || "" };
     try {
-      await api("teach", { lesson, kind: "fix", context: ctx });
+      await api("teach", { lesson, kind: "fix", context: ctx, agent });
       setTeachFor(null); setTeachText("");
       await loadLessons();
     } catch (e) { setError(e.message); }
@@ -233,7 +233,7 @@ export default function SandboxApp({ embedded = false } = {}) {
                 ? <>Chat to it like a parent who <b style={{ color: tk.text }}>already booked a trial</b> - try "we'll be there", "can we move it?", "where is it?".</>
                 : <>Chat to it like a parent whose kid <b style={{ color: tk.text }}>just did the trial</b> - try "how much is it?", "we'll think about it", "how do we sign up?".</>}
               <br /><br />
-              Train it in the <b style={{ color: tk.accent }}>📝 Brain</b> tab (lessons & saved examples are booking-only for now).
+              Train it in the <b style={{ color: tk.accent }}>📝 Brain</b> tab (lessons and saved examples are per-agent).
             </div>
           </div>
           ) : (

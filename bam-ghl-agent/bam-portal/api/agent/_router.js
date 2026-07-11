@@ -33,15 +33,21 @@ import { ghl as ghlDefault } from "../ghl/_core.js";
 // from "academy has no such row" (null) — the pause must win over the fallback.
 // An enabled duplicate wins over a disabled one (order enabled.desc). `fromRole`
 // may be null for the external new_lead entry (from_stage_role IS NULL).
-export async function resolveEdge(clientId, fromRole, trigger) {
+export async function resolveEdge(clientId, fromRole, trigger, offerId) {
   if (!clientId || !trigger) return null;
   const fromClause = fromRole ? `from_stage_role=eq.${encodeURIComponent(fromRole)}` : `from_stage_role=is.null`;
+  // Phase 3 offer seam (DORMANT): filter to one offer's flow ONLY when the caller
+  // threads an offerId. No caller does today, so this is byte-identical to the
+  // single-flow lookup. stage_transitions.offer_id is fully backfilled, so a
+  // filtered lookup returns the same edge an unfiltered one does today. The engine
+  // turns it on when an academy runs more than one offer pipeline.
+  const offerClause = offerId ? `&offer_id=eq.${encodeURIComponent(offerId)}` : "";
   try {
     const rows = await sbRest(
       `stage_transitions?client_id=eq.${encodeURIComponent(clientId)}` +
       `&${fromClause}` +
       `&trigger=eq.${encodeURIComponent(trigger)}` +
-      `&pipeline_id=is.null` +
+      `&pipeline_id=is.null` + offerClause +
       `&select=trigger,to_kind,to_stage_role,to_terminal,enabled&order=enabled.desc,sort_order.asc&limit=1`
     );
     return (Array.isArray(rows) && rows[0]) || null;
@@ -61,10 +67,10 @@ export async function resolveEdge(clientId, fromRole, trigger) {
 // for "human" moved is false + escalate is true (the router performs no status
 // change — escalation is caller-specific). Requires opts.allowTerminal:true.
 export async function routeTransition(opts = {}) {
-  const { clientId, sb, ghl, token, locationId, fromRole, trigger, contactId, allowTerminal } = opts;
+  const { clientId, sb, ghl, token, locationId, fromRole, trigger, contactId, allowTerminal, offerId } = opts;
   let { oppRef } = opts;
 
-  const edge = await resolveEdge(clientId, fromRole, trigger);
+  const edge = await resolveEdge(clientId, fromRole, trigger, offerId);
   if (!edge) return { matched: false, reason: "no-edge" };
 
   // Pause wins over the fallback: the academy explicitly turned this route OFF in
@@ -99,7 +105,7 @@ export async function routeTransition(opts = {}) {
   }
 
   const role = edge.to_stage_role;
-  const stage = await resolveStage(sb, ghlFn, { clientId, token, locationId, role });
+  const stage = await resolveStage(sb, ghlFn, { clientId, token, locationId, role, offerId });
   if (!stage) return { matched: false, reason: "no-stage" };
   if (oppRef) {
     await moveStage({ clientId, sb, ghl: ghlFn, token, oppRef, stage, role, contactId, reason });

@@ -260,8 +260,12 @@ bam-ghl-agent/
     ├── setup-menu-item.md          ← skill for building a menu item
     ├── add-question.md             ← skill for adding a question to Supabase DB
     └── consolidate-lessons.md      ← skill: cluster/dedup the agents' teach-why
-                                      lessons into academy + shared-general sets
-                                      (uses bam-portal/scripts/lessons-io.mjs)
+                                      lessons, route them (brain fact / academy /
+                                      preset-tagged general / drop), and mine
+                                      academy lessons for onboarding intake gaps
+                                      (ledger: docs/onboarding-intake-candidates.md;
+                                      uses bam-portal/scripts/lessons-io.mjs).
+                                      Rollout: docs/agent-academy-rollout.md
 ```
 
 ---
