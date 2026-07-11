@@ -122,6 +122,44 @@ async function handler(req, res) {
     } catch (e) { console.error("[agent-config set-entry-routing]", e); return res.status(500).json({ error: e.message || "internal error" }); }
   }
 
+  // Closing follow-up strategy (clients.ghl_kpi_config.closing_followups) - the
+  // cadence for quiet Done-Trial leads: gaps[i] = days between follow-up i and
+  // the previous message (default [1, 2] = next day, then +2 days), lost_after =
+  // quiet days after the final follow-up before the Lost suggestion (default 2).
+  // The WORDING lives in the trainable closing_followup brain section; this is
+  // the schedule. Read + write scoped like the other config actions.
+  if (b.action === "get-closing-followups") {
+    const actor = await resolveAgentActor(req);
+    if (!actor) return res.status(401).json({ error: "sign in required" });
+    if (!b.client_id) return res.status(400).json({ error: "client_id required" });
+    if (!actor.canActOn(b.client_id)) return res.status(403).json({ error: "not your academy" });
+    try {
+      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
+      const raw = ((row && row.ghl_kpi_config) || {}).closing_followups || {};
+      const gaps = (Array.isArray(raw.gaps) && raw.gaps.length ? raw.gaps : [1, 2]).map(n => Math.max(1, Math.min(14, Math.round(Number(n) || 1)))).slice(0, 5);
+      const lostAfter = Math.max(1, Math.min(14, Math.round(Number(raw.lost_after) || 2)));
+      return res.status(200).json({ gaps, lost_after: lostAfter, is_default: !((row && row.ghl_kpi_config) || {}).closing_followups });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+  if (b.action === "set-closing-followups") {
+    const actor = await resolveAgentActor(req);
+    if (!actor) return res.status(401).json({ error: "sign in required" });
+    if (!b.client_id) return res.status(400).json({ error: "client_id required" });
+    if (!actor.canActOn(b.client_id)) return res.status(403).json({ error: "not your academy" });
+    let gaps = Array.isArray(b.gaps) ? b.gaps.map(n => Math.round(Number(n))).filter(n => Number.isFinite(n) && n >= 1 && n <= 14).slice(0, 5) : null;
+    if (!gaps || !gaps.length) return res.status(400).json({ error: "gaps must be 1-5 day counts (1-14 days each)" });
+    const lostAfter = Math.round(Number(b.lost_after));
+    if (!Number.isFinite(lostAfter) || lostAfter < 1 || lostAfter > 14) return res.status(400).json({ error: "lost_after must be 1-14 days" });
+    try {
+      const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
+      if (!row) return res.status(404).json({ error: "academy not found" });
+      const cfg = { ...(row.ghl_kpi_config || {}) };
+      cfg.closing_followups = { gaps, lost_after: lostAfter };
+      await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: cfg }) });
+      return res.status(200).json({ ok: true, gaps, lost_after: lostAfter });
+    } catch (e) { console.error("[agent-config set-closing-followups]", e); return res.status(500).json({ error: e.message || "internal error" }); }
+  }
+
   // Quiet-hours timezone (clients.time_zone). The agents only text a parent inside
   // 8:00am-9:30pm of THIS zone (agent/_quiet.js). Read + write, scoped to the
   // academy's own owner / can_train_agent member or BAM staff. Default America/
