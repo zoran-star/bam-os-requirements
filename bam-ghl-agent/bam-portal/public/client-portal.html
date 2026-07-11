@@ -14351,7 +14351,7 @@ async function _ibEnsureMembers() {
       : '?scope=client';
     const r = await fetch('/api/members' + qs, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
-    if (r.ok && Array.isArray(j.members)) { _MEMBERS_ALL = j.members; _IB_MEMBER_IDX = null; }
+    if (r.ok && Array.isArray(j.members)) { _MEMBERS_ALL = j.members; _IB_MEMBER_IDX = null; _PL_MEMBERS_LOADED = true; }
   } catch (_) { /* members optional - inbox still works without the pill */ }
 }
 // Small gold "Member" pill. `small` trims it for the dense conversation list.
@@ -29225,6 +29225,10 @@ async function _safeJson(res) {
 // Members tab - list view state (module-scope so search/filter survive
 // re-renders without re-fetching).
 let _MEMBERS_ALL = [];
+// True once the member roster has actually loaded (either loader below). The
+// not-flowing safety net needs this to tell a converted paying member apart
+// from an empty roster - `_MEMBERS_ALL = []` alone can't (init vs. zero members).
+let _PL_MEMBERS_LOADED = false;
 let _MEMBERS_SORTER = null; // import-strip done-flags from /api/members `sorter`
 let _MEMBERS_SUBS_TO_CANCEL = 0; // open "cancel old Stripe sub" action items (banner)
 let _MEMBERS_CIQ = { enabled: false, signup_url: null }; // CoachIQ config for "Set up CoachIQ"
@@ -29755,6 +29759,7 @@ async function fetchAndRenderMembers() {
     renderStripeConnectButton(json.stripe || { status: 'not_connected' });
     renderGhlConnectButton(json.ghl || { status: 'not_connected' });
     _MEMBERS_ALL = Array.isArray(json.members) ? json.members : [];
+    _PL_MEMBERS_LOADED = true;
     _IB_MEMBER_IDX = null; // roster changed - rebuild the inbox member-match index lazily
     _MEMBERS_SORTER = json.sorter || null;
     _MEMBERS_SUBS_TO_CANCEL = json.subs_to_cancel || 0;
@@ -33786,6 +33791,12 @@ function _ccStuckCards() {
   // home load (and permanently for viewers whose agent reads 403).
   if (typeof _PL_NEEDS === 'undefined' || !_PL_NEEDS) return [];
   if (typeof _PL_ENR === 'undefined' || !_PL_ENR) return [];
+  // Same rule for the member roster: a contact who already converted (active
+  // subscription) but whose GHL opp was never moved to a Member/Won stage would
+  // otherwise show up as "not flowing". Until the roster loads we can't tell
+  // them apart from a real stuck lead, so surface nothing rather than a false
+  // positive (this is what flagged paid member Bashir Popal - Zoran 2026-07-11).
+  if (typeof _PL_MEMBERS_LOADED === 'undefined' || !_PL_MEMBERS_LOADED) return [];
   const now = Date.now(), IDLE = _CC_STUCK_IDLE_DAYS * 86400000, out = [];
   for (const s of stages) {
     const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
@@ -33797,6 +33808,12 @@ function _ccStuckCards() {
       if (typeof _PL_HELD !== 'undefined' && _PL_HELD && _PL_HELD.has(cid)) continue;      // parked send awaits the 8am flush
       if (typeof _PL_REIGN !== 'undefined' && _PL_REIGN && _PL_REIGN.get(cid)) continue;   // parked for reignition - silence is the plan
       if (typeof _PL_ENR !== 'undefined' && _PL_ENR && _PL_ENR.get(cid)) continue;         // in a running automation
+      // Already converted: an active paying member (any live/paused/dunning/
+      // cancelling status = still subscribed) isn't a stuck lead - their opp
+      // just wasn't moved to a Member/Won stage. Skip anything but a fully
+      // cancelled member so paid members don't trip the alert (Zoran 2026-07-11).
+      const _mem = (typeof _ibMemberOf === 'function') ? _ibMemberOf({ contactId: cid, phone: o.contact && o.contact.phone, email: o.contact && o.contact.email }) : null;
+      if (_mem && !/^(cancel(l?ed)?|churned|former|lost|inactive)$/i.test(String(_mem.status || ''))) continue;
       // Booked trial still ahead = FLOWING: the confirm sequence's same-day
       // check-in is queued for 9am on trial day, so quiet days in between are
       // by design, not a stall (Zoran 2026-07-10). Use _plTrialInfo so a DATE-ONLY
@@ -50177,6 +50194,7 @@ async function _ccSalesLoad() {
           if (!_PL_NEEDS) { try { _plLoadNeedsAction().then(() => _cc2Render()); } catch (_) {} }
           if (!_PL_ENR) { try { _plLoadActiveAutomations().then(() => _cc2Render()); } catch (_) {} }
           if (!_PL_LASTMSG) { try { _plLoadLastMessages().then(() => _cc2Render()); } catch (_) {} }   // idle age for the not-flowing check
+          if (!_PL_MEMBERS_LOADED) { try { _ibEnsureMembers().then(() => _cc2Render()); } catch (_) {} }  // so converted paying members are skipped by the not-flowing check
         } else {
           strip.innerHTML = `<div class="plo-strip" style="width:100%">${_ploStripCells(cardStages, _CC_PIPE_NAV)}</div>`;
         }
