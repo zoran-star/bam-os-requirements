@@ -434,6 +434,34 @@ async function handler(req, res) {
     const locationId = client.ghl_location_id;
     const action = (req.query && req.query.action) || (req.body && req.body.action) || "";
 
+    // Per-contact trial date + coach for the contact drawer. Supabase-only and
+    // provider-agnostic (runs before the portal split, no GHL token needed) so the
+    // drawer can show the trial + coach without loading the whole pipeline first.
+    // Sources, best-effort in order: portal trial_bookings → website_leads.booked_slot
+    // for the date; latest post_trial_reviews for the coach. Missing data → null.
+    if (action === "contact-trial") {
+      const cid = (req.query && req.query.id) || (req.body && req.body.id) || "";
+      if (!cid) return res.status(400).json({ error: "id required" });
+      const enc = encodeURIComponent(String(cid));
+      let trial_date = null, trial_status = null, coach = null;
+      try {
+        const pr = await sb(`post_trial_reviews?client_id=eq.${clientId}&ghl_contact_id=eq.${enc}&select=trainer&order=created_at.desc&limit=1`);
+        coach = (Array.isArray(pr) && pr[0] && pr[0].trainer) || null;
+      } catch (_) {}
+      try {
+        const tb = await sb(`trial_bookings?tenant_id=eq.${clientId}&ghl_contact_id=eq.${enc}&select=status,created_at,schedule_slots(start_time)&order=created_at.desc&limit=1`);
+        const row = Array.isArray(tb) && tb[0];
+        if (row) { trial_date = (row.schedule_slots && row.schedule_slots.start_time) || null; trial_status = row.status || null; }
+      } catch (_) {}
+      if (!trial_date) {
+        try {
+          const wl = await sb(`website_leads?client_id=eq.${clientId}&ghl_contact_id=eq.${enc}&select=fields,created_at&order=created_at.desc&limit=50`);
+          for (const r of (Array.isArray(wl) ? wl : [])) { const bs = r && r.fields && r.fields.booked_slot; if (bs) { trial_date = bs; break; } }
+        } catch (_) {}
+      }
+      return res.status(200).json({ trial_date, trial_status, coach });
+    }
+
     // booking_provider='portal': the entire surface runs on the portal spine -
     // no GHL token needed at all. Every other academy continues below unchanged.
     if (client.booking_provider === "portal") {

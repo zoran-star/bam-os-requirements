@@ -8663,14 +8663,14 @@ Then the call to action."]</div>
       #ib-drawer .ib-d-sub { font-size:12px; color:var(--text-mute); margin-top:3px; }
       #ib-drawer .ib-d-close { background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:22px; padding:4px 10px; }
       #ib-drawer .ib-d-thread { flex:1; overflow-y:auto; padding:18px 20px; display:flex; flex-direction:column; gap:10px; }
-      #ib-drawer .ib-msg, #pl-drawer .ib-msg, #member-inbox-section .ib-msg {
+      #ib-drawer .ib-msg, #pl-drawer .ib-msg, #member-inbox-section .ib-msg, #contacts-drawer-body .ib-msg {
         max-width:80%; padding:8px 12px; border-radius:14px; font-size:13px; line-height:1.45;
         word-wrap:break-word; white-space:pre-wrap;
       }
-      #ib-drawer .ib-msg-in,  #pl-drawer .ib-msg-in,  #member-inbox-section .ib-msg-in  { background:rgba(255,255,255,0.04); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px; }
-      #ib-drawer .ib-msg-out, #pl-drawer .ib-msg-out, #member-inbox-section .ib-msg-out { background:var(--accent); color:#0B0B0D; align-self:flex-end; border-bottom-right-radius:4px; }
-      #ib-drawer .ib-msg-meta, #pl-drawer .ib-msg-meta, #member-inbox-section .ib-msg-meta { font-size:10px; color:var(--text-mute); margin-top:3px; }
-      #pl-drawer .ib-msg-out .ib-msg-meta, #member-inbox-section .ib-msg-out .ib-msg-meta { color:rgba(11,11,13,0.55); }
+      #ib-drawer .ib-msg-in,  #pl-drawer .ib-msg-in,  #member-inbox-section .ib-msg-in,  #contacts-drawer-body .ib-msg-in  { background:rgba(255,255,255,0.04); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px; }
+      #ib-drawer .ib-msg-out, #pl-drawer .ib-msg-out, #member-inbox-section .ib-msg-out, #contacts-drawer-body .ib-msg-out { background:var(--accent); color:#0B0B0D; align-self:flex-end; border-bottom-right-radius:4px; }
+      #ib-drawer .ib-msg-meta, #pl-drawer .ib-msg-meta, #member-inbox-section .ib-msg-meta, #contacts-drawer-body .ib-msg-meta { font-size:10px; color:var(--text-mute); margin-top:3px; }
+      #pl-drawer .ib-msg-out .ib-msg-meta, #member-inbox-section .ib-msg-out .ib-msg-meta, #contacts-drawer-body .ib-msg-out .ib-msg-meta { color:rgba(11,11,13,0.55); }
       #ib-drawer .ib-d-reply { border-top:1px solid var(--border); padding:14px 20px; flex-shrink:0; }
       #ib-drawer .ib-d-reply textarea { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px; font:inherit; font-size:13px; color:var(--text); resize:vertical; min-height:60px; outline:none; }
       #ib-drawer .ib-d-reply-actions { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; }
@@ -8822,12 +8822,12 @@ Then the call to action."]</div>
       }
 
       /* Drawer journey timeline */
-      #pl-drawer .pl-tl-step { display:flex; align-items:center; gap:9px; font-size:13px; padding:4px 0; }
-      #pl-drawer .pl-tl-dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
-      #pl-drawer .pl-tl-dot.ok { background:var(--green); }
-      #pl-drawer .pl-tl-dot.bad { background:var(--red); }
-      #pl-drawer .pl-tl-label { font-weight:600; }
-      #pl-drawer .pl-tl-sub { color:var(--text-mute); font-size:12px; margin-left:auto; }
+      #pl-drawer .pl-tl-step, #contacts-drawer-body .pl-tl-step { display:flex; align-items:center; gap:9px; font-size:13px; padding:4px 0; }
+      #pl-drawer .pl-tl-dot, #contacts-drawer-body .pl-tl-dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+      #pl-drawer .pl-tl-dot.ok, #contacts-drawer-body .pl-tl-dot.ok { background:var(--green); }
+      #pl-drawer .pl-tl-dot.bad, #contacts-drawer-body .pl-tl-dot.bad { background:var(--red); }
+      #pl-drawer .pl-tl-label, #contacts-drawer-body .pl-tl-label { font-weight:600; }
+      #pl-drawer .pl-tl-sub, #contacts-drawer-body .pl-tl-sub { color:var(--text-mute); font-size:12px; margin-left:auto; }
       #view-pipelines .pl-card-trial.is-past { color:var(--amber); }
       #view-pipelines .pl-card-notrial { border-color:rgba(240,184,74,0.75); background:rgba(240,184,74,0.09); }
       #view-pipelines .pl-card-flag { font-size:11px; color:var(--amber); font-weight:700; margin-top:5px; }
@@ -15665,24 +15665,71 @@ async function _contactsOpenDrawer(idx) {
   } catch (e) {
     _CDRAWER.ghl = { name: c.name, email: c.email, phone: c.phone, tags: c.tags || [], _error: e.message || String(e) };
   }
-  // Backfill phone/email onto the stub contact from the hydrated GHL record. When
-  // the drawer is opened from the Hawkeye deck (or any non-Contacts-tab entry) the
-  // contact is a bare stub with no phone/email, so the composer wrongly showed "No
-  // phone or email on file - can't message" even though we just loaded both
-  // (Zoran 2026-07-10). _cdComposer/_contactsMsgType/_contactsSendMsg all read
-  // _CDRAWER.contact, so fill it in place.
+  // Entry points like Hawkeye / automations / voicemail seed a stub row with null
+  // email/phone (only ghl_contact_id + name). The fetch above has the real values
+  // on _CDRAWER.ghl - backfill the seed row so the composer, Stripe lookup, tag
+  // editor, and SMS/Email default all use them instead of showing "no phone or
+  // email on file - can't message". Only fills blanks, so full Contacts-list rows
+  // are untouched. (_cdComposer/_contactsMsgType/_contactsSendMsg + Stripe all
+  // read _CDRAWER.contact.)
   if (_CDRAWER.ghl && !_CDRAWER.ghl._error) {
-    if (!c.phone && _CDRAWER.ghl.phone) c.phone = _CDRAWER.ghl.phone;
-    if (!c.email && _CDRAWER.ghl.email) c.email = _CDRAWER.ghl.email;
-    if ((!c.tags || !c.tags.length) && Array.isArray(_CDRAWER.ghl.tags)) c.tags = _CDRAWER.ghl.tags;
+    const _g = _CDRAWER.ghl;
+    if (_g.name && !c.name) c.name = _g.name;
+    if (_g.phone && !c.phone) c.phone = _g.phone;
+    if (_g.email && !c.email) c.email = _g.email;
+    if ((!c.tags || !c.tags.length) && Array.isArray(_g.tags)) c.tags = _g.tags;
     if (!_CDRAWER.msgType || (_CDRAWER.msgType === 'Email' && c.phone)) _CDRAWER.msgType = c.phone ? 'SMS' : 'Email';
   }
   const body = document.getElementById('contacts-drawer-body');
   if (body) body.innerHTML = _cdBody();
   _renderTagEditor('cd-tags', c.ghl_contact_id, (_CDRAWER.ghl && _CDRAWER.ghl.tags) || c.tags || []);
+  // Shared context the Lead + Journey sections render from. Seeded synchronously
+  // from the pipeline opp (if loaded this session); the async loaders below fill
+  // the gaps and re-render, so whichever resolves first still paints correctly.
+  const _opp = _cdFindOpp(c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id));
+  _CDRAWER.ctx = {
+    opp: _opp,
+    postTrial: null,
+    athlete: (_opp && _opp.athlete) || null,
+    age: null,
+    trialDate: (_opp && _opp.trialDate) || null,
+    trialStatus: null,
+    coach: (_opp && _opp.trainer) || null,
+    leadFields: [],
+  };
   _contactsLoadStripe(c);
   _cdLoadMemory(c);
+  _cdLoadLeadDetail(c);
+  _cdLoadTrialCoach(c);
+  _cdLoadThread(c);
   try { _cdReigniteChip(c.ghl_contact_id); } catch (_) {}
+}
+// Find this contact's pipeline opportunity (if the pipeline has been loaded this
+// session) - gives trial date, coach, journey status without an extra fetch.
+function _cdFindOpp(contactId) {
+  if (!contactId || typeof _PL_DATA === 'undefined' || !_PL_DATA) return null;
+  for (const pl of (_PL_DATA.pipelines || [])) {
+    const f = (pl.opportunities || []).find(o => String(o.contactId || '') === String(contactId));
+    if (f) return f;
+  }
+  return null;
+}
+// Per-contact trial date + coach - always available (not just when the pipeline
+// tab was opened). Supabase-only endpoint; fills any gaps the opp didn't, then
+// re-renders Lead + Journey.
+async function _cdLoadTrialCoach(c) {
+  const contactId = c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id);
+  if (!contactId || !_CDRAWER.ctx) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/calendars-v15?action=contact-trial&client_id=${encodeURIComponent(CLIENT_ID)}&id=${encodeURIComponent(contactId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) return;
+    if (!_CDRAWER.ctx.trialDate && j.trial_date) _CDRAWER.ctx.trialDate = j.trial_date;
+    if (j.trial_status) _CDRAWER.ctx.trialStatus = j.trial_status;
+    if (!_CDRAWER.ctx.coach && j.coach) _CDRAWER.ctx.coach = j.coach;
+    _cdRenderLead(); _cdRenderJourney();
+  } catch (_) { /* best-effort */ }
 }
 // 🔥 Reignition chip on the contact drawer: "Reignite <date>" + cancel. Reads
 // the parked map (fetches it once if home hasn't loaded it yet). Best-effort.
@@ -15816,11 +15863,17 @@ function _cdBody() {
     : '';
   return `${ghlHtml}
     ${callBtn}
+    <div id="cd-lead"></div>
+    <div id="cd-journey"></div>
     ${sect('Agent memory')}
     <div id="cd-memory"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Loading…</div></div>
+    ${sect('Conversation')}
+    <div id="cd-thread" style="max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:2px 0 4px">
+      <div id="cd-thread-msgs" style="display:flex;flex-direction:column;gap:8px"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Loading…</div></div>
+    </div>
+    ${_cdComposer()}
     ${sect('Billing (Stripe)')}
-    <div id="cd-stripe"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Checking Stripe…</div></div>
-    ${_cdComposer()}`;
+    <div id="cd-stripe"><div class="req-empty" style="padding:8px 0"><span class="req-spin"></span> Checking Stripe…</div></div>`;
 }
 
 // Agent memory: what the bot knows about this contact - post-trial facts +
@@ -15836,9 +15889,117 @@ async function _cdLoadMemory(c) {
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     const el = host(); if (el) el.innerHTML = _cdMemoryHtml(j);
+    // Feed the post-trial review into the shared context (coach + showed/fit) and
+    // repaint Lead + Journey with it.
+    if (_CDRAWER.ctx) {
+      _CDRAWER.ctx.postTrial = j.post_trial || null;
+      if (!_CDRAWER.ctx.coach && j.post_trial && j.post_trial.trainer) _CDRAWER.ctx.coach = j.post_trial.trainer;
+      _cdRenderLead(); _cdRenderJourney();
+    }
   } catch (e) {
     const el = host(); if (el) el.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Memory unavailable - ${escapeHTML(e.message || String(e))}</div>`;
   }
+}
+// Journey timeline from the shared context: lead created → trial booked →
+// showed/no-show → good fit/not a fit (+ coach) → won/lost. Re-run by any loader
+// as context fills in; renders only the steps we actually know.
+function _cdRenderJourney() {
+  const jr = document.getElementById('cd-journey'); if (!jr || !_CDRAWER.ctx) return;
+  const ctx = _CDRAWER.ctx, opp = ctx.opp, pt = ctx.postTrial, ghl = _CDRAWER.ghl || {};
+  const fmt = (iso) => { if (!iso) return null; const d = new Date(iso); if (isNaN(d.getTime())) return null; return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+  const steps = [];
+  const created = (opp && opp.formFilledAt) || ghl.dateAdded || null;
+  if (created) steps.push(['Lead created', fmt(created), true]);
+  if (ctx.trialDate) { let s = ''; try { s = _plTrialInfo(ctx.trialDate).str || ''; } catch (_) {} steps.push(['Trial booked', s || fmt(ctx.trialDate), true]); }
+  const rv = (opp && opp.review) || pt || null;
+  if (rv) {
+    if (rv.showed_up === true) steps.push(['Showed up', null, true]);
+    else if (rv.showed_up === false) steps.push(['No show', null, false]);
+    const coach = rv.trainer || ctx.coach;
+    if (rv.good_fit === true) steps.push(['Good fit', coach ? 'Coach ' + coach : null, true]);
+    else if (rv.good_fit === false) steps.push(['Not a fit', null, false]);
+  }
+  if (opp && opp.status === 'won') steps.push(['Won', null, true]);
+  else if (opp && opp.status === 'lost') steps.push(['Lost', null, false]);
+  jr.innerHTML = steps.length
+    ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Journey</div>` +
+      steps.map(([t, sub, ok]) => `<div class="pl-tl-step"><span class="pl-tl-dot ${ok ? 'ok' : 'bad'}"></span><span class="pl-tl-label">${escapeHTML(t)}</span>${sub ? `<span class="pl-tl-sub">${escapeHTML(sub)}</span>` : ''}</div>`).join('')
+    : '';
+}
+// Lead section rendered from the shared context: athlete + age + last trial +
+// coach, then every other captured field. Any loader can call this as data lands.
+function _cdRenderLead() {
+  const host = document.getElementById('cd-lead'); if (!host || !_CDRAWER.ctx) return;
+  const ctx = _CDRAWER.ctx;
+  const row = (k, v) => v ? `<div style="display:flex;gap:8px;padding:3px 0;font-size:13px"><span style="color:var(--text-mute);min-width:80px">${escapeHTML(k)}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
+  let trialStr = '';
+  if (ctx.trialDate) { try { trialStr = _plTrialInfo(ctx.trialDate).str || ''; } catch (_) {} if (!trialStr) { const d = new Date(ctx.trialDate); trialStr = isNaN(d.getTime()) ? String(ctx.trialDate) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } }
+  const inner = [
+    row('Athlete', ctx.athlete), row('Athlete age', ctx.age),
+    row('Last trial', trialStr), row('Coach', ctx.coach),
+    ...(ctx.leadFields || []).map(f => row(f.label, f.value)),
+  ].join('');
+  host.innerHTML = inner.replace(/\s+/g, '') ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Lead</div>${inner}` : '';
+}
+// Fetch the captured custom fields (athlete name/age, start-when, referral…) +
+// a "free trial date" field if the academy stores one, into the shared context.
+// Best-effort: non-GHL academies or a failed fetch just keep the opp-seeded view.
+async function _cdLoadLeadDetail(c) {
+  if (!_CDRAWER.ctx) return;
+  const contactId = c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id);
+  if (!contactId) { _cdRenderLead(); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/contact-detail?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(contactId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const d = await _safeJson(r);
+    if (!r.ok) throw new Error(d.error || 'detail failed');
+    const fields = d.fields || [];
+    const findF = (re) => { const f = fields.find(x => re.test((x.label || '').trim())); return (f && f.value) ? f.value : ''; };
+    const athlete = findF(/athlete'?s?\s*(full\s*)?name/i);
+    const age = findF(/athlete'?s?\s*age|^age$/i);
+    const trialField = findF(/free\s*trial\s*date|trial\s*date/i);
+    if (athlete && !_CDRAWER.ctx.athlete) _CDRAWER.ctx.athlete = athlete;
+    if (age) _CDRAWER.ctx.age = age;
+    if (trialField && !_CDRAWER.ctx.trialDate) _CDRAWER.ctx.trialDate = trialField;
+    const shown = new Set(['parent', 'athlete', 'phone', 'email', "athlete's full name", "athlete's name", "athlete's age", 'athlete age', 'age', 'name', 'free trial date', 'trial date']);
+    _CDRAWER.ctx.leadFields = fields.filter(f => f.label && f.value && !shown.has(f.label.toLowerCase().trim()));
+  } catch (_) { /* keep the opp-seeded context */ }
+  _cdRenderLead(); _cdRenderJourney();
+}
+// Conversation thread for the drawer - reuses the GHL inbox endpoint + the same
+// bubble markup as the pipeline/inbox drawers. Read-only history; the composer
+// below sends replies.
+async function _cdLoadThread(c) {
+  const host = document.getElementById('cd-thread-msgs');
+  if (!host) return;
+  const contactId = c.ghl_contact_id || (_CDRAWER.ghl && _CDRAWER.ghl.id);
+  if (!contactId) { host.innerHTML = `<div style="color:var(--text-mute);font-size:12px">No linked contact - no message history.</div>`; return; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(contactId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _cdRenderThread(j.messages || []);
+  } catch (e) {
+    host.innerHTML = `<div style="color:var(--text-mute);font-size:12px">Couldn't load messages - ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+function _cdRenderThread(messages) {
+  const host = document.getElementById('cd-thread-msgs'); if (!host) return;
+  const first = (((_CDRAWER.ghl && _CDRAWER.ghl.name) || (_CDRAWER.contact && _CDRAWER.contact.name) || '').trim().split(/\s+/)[0]) || 'Them';
+  const sorted = [...messages].filter(m => !_ibIsActivity(m)).sort((a, b) => (a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0));
+  host.innerHTML = sorted.length
+    ? sorted.map(m => {
+        const out = (m.direction || '').toLowerCase() === 'outbound';
+        const atts = _ibRenderAttachments(m.attachments);
+        const hasBody = (m.body || '').trim().length > 0;
+        const sender = out ? 'You' : escapeHTML(first);
+        const channel = escapeHTML(_ghlChannelLabel(m.type));
+        const when = escapeHTML(_ibFormatDate(m.date));
+        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(m.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
+      }).join('')
+    : `<div style="color:var(--text-mute);font-size:12px">No messages yet.</div>`;
+  try { _scrollToBottom(document.getElementById('cd-thread') || host); } catch (_) {}
 }
 function _cdMemoryHtml(j) {
   const pt = j.post_trial;
