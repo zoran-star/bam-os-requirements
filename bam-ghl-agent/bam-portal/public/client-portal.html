@@ -16522,6 +16522,14 @@ function _hv2Style() {
     '#home-v2 .hm-ib-row:hover .hm-ib-time{display:none}' +
     '#home-v2 .hm-ib-act{border:none;background:var(--surface-el,rgba(255,255,255,.08));color:var(--text-mute);font-size:11px;font-weight:600;font-family:inherit;padding:4px 10px;border-radius:6px;cursor:pointer;transition:color .12s,background .12s;white-space:nowrap}' +
     '#home-v2 .hm-ib-act:hover{color:var(--gold);background:rgba(212,182,92,.1)}' +
+    /* Hawkeye chip: shown on rows whose contact has a pending deck card.
+       Always visible (mobile has no hover); on desktop hover the quick-action
+       bar takes over the right edge, so the chip yields to its labeled twin. */
+    '#home-v2 .hm-ib-hawk{flex:none;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(212,182,92,.35);background:rgba(212,182,92,.12);color:var(--gold,#D4B65C);border-radius:999px;width:26px;height:22px;padding:0;cursor:pointer;transition:background .12s,border-color .12s}' +
+    '#home-v2 .hm-ib-hawk svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '#home-v2 .hm-ib-hawk:hover{background:rgba(212,182,92,.24);border-color:rgba(212,182,92,.55)}' +
+    '#home-v2 .hm-ib-row:hover .hm-ib-hawk{display:none}' +
+    '#home-v2 .hm-ib-act-hawk{color:var(--gold,#D4B65C);background:rgba(212,182,92,.12);font-weight:700}' +
     /* #4: System notification grouping accordion */
     '#home-v2 .hm-ib-group{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}' +
     '#home-v2 .hm-ib-group:hover{background:rgba(212,182,92,.04)}' +
@@ -17494,7 +17502,7 @@ function _hmInboxTimeStr(msgDate) {
   return Math.round(mins / 1440) + 'd';
 }
 
-function _hmInboxRow(c, opts) {
+function _hmInboxRow(c, hawkAgent) {
   (window._hmIbById = window._hmIbById || {})[c.id] = c;
   const unread = c.unreadCount > 0;
   const name = _ccCapName((c.contactName || c.fullName || 'Unknown').split(' ').slice(0, 2).join(' '));
@@ -17508,13 +17516,52 @@ function _hmInboxRow(c, opts) {
   let urgStyle = '';
   if (unread && ageHrs > 24) urgStyle = 'border-left:3px solid #B08E30;';       // overdue (unread > 24h) - deep amber, on-system
   else if (unread && ageHrs <= 4) urgStyle = 'border-left:3px solid var(--gold);';   // fresh unread
+  // Pending Hawkeye card for this contact: a lil eye button that jumps
+  // straight to that card in the deck (chip when idle, labeled on hover).
+  const hawkCid = (hawkAgent && c.contactId) ? String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '') : '';
+  const hawkGo = hawkAgent ? `_hk2Open('${hawkAgent}'${hawkCid ? `,'${hawkCid}'` : ''})` : '';
+  const hawkChip = hawkAgent ? `<button type="button" class="hm-ib-hawk" title="Hawkeye has an action waiting" onclick="event.stopPropagation();${hawkGo}">${_HV2_ICONS.eye}</button>` : '';
+  const hawkAct = hawkAgent ? `<button class="hm-ib-act hm-ib-act-hawk" onclick="event.stopPropagation();${hawkGo}">Hawkeye</button>` : '';
   return `<div class="hm-ib-row${unread ? ' hm-ib-unread' : ''}" data-cid="${escapeHTML(String(c.id))}" onclick="_hmMsgPeek('${escapeHTML(String(c.id))}')" style="${urgStyle}">
     ${unread ? '<span class="hm-ib-dot"></span>' : '<span style="width:7px;flex:none"></span>'}
     <span class="hm-ib-av">${escapeHTML(initials)}</span>
     <div style="flex:1;min-width:0"><div class="hm-ib-name">${escapeHTML(name)}</div><div class="hm-ib-prev">${escapeHTML(preview)}</div></div>
+    ${hawkChip}
     <span class="hm-ib-time">${timeStr}</span>
-    <span class="hm-ib-actions"><button class="hm-ib-act" onclick="event.stopPropagation();_hmMsgPeek('${escapeHTML(String(c.id))}', true)">Reply</button><button class="hm-ib-act" onclick="event.stopPropagation();switchView('v15inbox')">Open inbox</button></span>
+    <span class="hm-ib-actions">${hawkAct}<button class="hm-ib-act" onclick="event.stopPropagation();_hmMsgPeek('${escapeHTML(String(c.id))}', true)">Reply</button><button class="hm-ib-act" onclick="event.stopPropagation();switchView('v15inbox')">Open inbox</button></span>
   </div>`;
+}
+
+// ── Home ↔ Hawkeye alignment ─────────────────────────────────────────────
+// One shared fetch of the SAME three pending queues the Hawkeye deck reads
+// (_hk2Load: booking + confirm + closing), so everything on Home agrees with
+// what the deck actually shows. Coalesced for 5s - the inbox preview and the
+// activity feed load together and shouldn't double-hit the API.
+function _hmHawkFetch() {
+  if (window._hmHawkP) return window._hmHawkP;
+  const p = Promise.all([
+    _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})),
+    _apxPost('/api/agent-confirm', 'list-ready', {}).catch(() => ({})),
+    _apxPost('/api/agent-closing', 'list-ready', {}).catch(() => ({})),
+  ]);
+  window._hmHawkP = p;
+  setTimeout(() => { if (window._hmHawkP === p) window._hmHawkP = null; }, 5000);
+  return p;
+}
+// Index the queues by contact + conversation -> which agent's deck owns the card.
+function _hmHawkIndex(res) {
+  if (!res) return null;
+  const idx = { byContact: {}, byConv: {} };
+  const put = (r, agent) => {
+    for (const row of ((r && r.ready) || [])) {
+      if (row.status !== 'pending') continue;
+      const cid = String(row.ghl_contact_id || ''), vid = String(row.ghl_conversation_id || '');
+      if (cid && !idx.byContact[cid]) idx.byContact[cid] = agent;
+      if (vid && !idx.byConv[vid]) idx.byConv[vid] = agent;
+    }
+  };
+  put(res[0], 'booking'); put(res[1], 'confirm'); put(res[2], 'closing');
+  return idx;
 }
 
 async function _hmLoadInboxPreview() {
@@ -17524,10 +17571,28 @@ async function _hmLoadInboxPreview() {
   body._loaded = true;
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const [r, hawkRes] = await Promise.all([
+      fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }),
+      _hmHawkFetch().catch(() => null),
+    ]);
     const j = await _safeJson(r);
     if (!r.ok || !j.conversations) throw new Error('no data');
-    const convos = (j.conversations || []).slice(0, 8);
+    const hawk = _hmHawkIndex(hawkRes);
+    const hawkAgentFor = c => hawk ? (hawk.byConv[String(c.id || '')] || (c.contactId && hawk.byContact[String(c.contactId)]) || null) : null;
+    const all = j.conversations || [];
+    const convos = all.slice(0, 8);
+    // Line up with Hawkeye: a conversation with a pending deck card must make
+    // the preview even when newer chatter would push it out - swap the oldest
+    // non-flagged row for it.
+    for (const f of all.slice(8).filter(c => hawkAgentFor(c))) {
+      if (convos.length >= 8) {
+        let drop = -1;
+        for (let i = convos.length - 1; i >= 0; i--) if (!hawkAgentFor(convos[i])) { drop = i; break; }
+        if (drop < 0) break;
+        convos.splice(drop, 1);
+      }
+      convos.push(f);
+    }
     const unreadCount = convos.filter(c => c.unreadCount > 0).length;
     if (pill) { pill._count = unreadCount; pill.textContent = unreadCount; pill.style.display = (unreadCount > 0 && window._hmActiveTab === 'inbox') ? '' : 'none'; }
     if (!convos.length) {
@@ -17541,7 +17606,7 @@ async function _hmLoadInboxPreview() {
       if (_HM_SYSTEM_SENDERS.test(name)) system.push(c);
       else people.push(c);
     });
-    let html = people.map(c => _hmInboxRow(c)).join('');
+    let html = people.map(c => _hmInboxRow(c, hawkAgentFor(c))).join('');
     // Render system group as collapsible accordion if any exist
     if (system.length) {
       const gid = 'hm-ib-sysgroup';
@@ -17552,7 +17617,7 @@ async function _hmLoadInboxPreview() {
         <span class="hm-ib-group-chevron">\u203A</span>
       </div>
       <div class="hm-ib-group-items" id="${gid}">
-        ${system.map(c => _hmInboxRow(c)).join('')}
+        ${system.map(c => _hmInboxRow(c, hawkAgentFor(c))).join('')}
       </div>`;
     }
     body.innerHTML = html;
@@ -17951,12 +18016,30 @@ async function _hmLoadRailBottom() {
   // Try Hawkeye first
   let hawkData = null, hawkTotal = 0;
   try {
-    const [fu, rd] = await Promise.all([
+    const [fu, hk] = await Promise.all([
       _apxPost('/api/agent-followups', 'list', {}).catch(() => ({})),
-      _apxPost('/api/agent-approvals', 'list-ready', {}).catch(() => ({})),
+      _hmHawkFetch(),
     ]);
+    const [rd, cf, cl] = hk;
     hawkData = _apxSplit(fu, rd);
-    hawkTotal = (hawkData.followups || []).length + (hawkData.ready || []).length + (hawkData.lost || []).length + (hawkData.book || []).length + (hawkData.ghost || []).length;
+    // Confirm + closing queues too, so Home shows the same workload as the
+    // Hawkeye deck (_hk2Load) - it was booking-only and the counts drifted.
+    const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
+    hawkData.confirm = pend(cf);
+    hawkData.closing = [];
+    const clSeen = new Set();
+    for (const r of pend(cl)) {
+      if ((r.step_key || '').startsWith('followup_')) {   // one plan card per contact, like the deck
+        const k = String(r.ghl_contact_id);
+        if (clSeen.has(k)) continue;
+        clSeen.add(k);
+        hawkData.closing.push({ ...r, _plan: true });
+      } else hawkData.closing.push(r);
+    }
+    // Total = what the deck would show: pending booking rows + confirm rows +
+    // closing cards. Scheduled (not-yet-due) followups render in the feed but
+    // don't count - they aren't deck cards waiting on the owner.
+    hawkTotal = pend(rd).length + hawkData.confirm.length + hawkData.closing.length;
     // Check if Hawkeye is actually configured: if both APIs returned valid
     // structures (even if empty), Hawkeye is on. If they errored, fall back.
     const hawkOn = (fu && (fu.followups || fu.error === undefined)) || (rd && (rd.ready || rd.error === undefined));
@@ -17973,22 +18056,35 @@ function _hmRenderHawkFeed(host, d, total) {
                     mark_lost: { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x, verb: 'Mark as lost' } };
   for (const r of (d.ready || [])) {
     const k = kindMap[r.kind] || { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, verb: 'Reply drafted' };
-    items.push({ name: r.contact_name || 'Lead', desc: k.verb, icon: k.icon, svg: k.svg });
+    items.push({ name: r.contact_name || 'Lead', desc: k.verb, icon: k.icon, svg: k.svg, agent: 'booking', cid: r.ghl_contact_id });
+  }
+  for (const r of (d.confirm || [])) {
+    const verb = r.kind === 'confirm_handoff' ? 'Handoff to booking' : r.kind === 'confirm_lost' ? 'Confirm as lost' : r.kind === 'post_trial' ? 'Post-trial form to send' : 'Trial confirmation drafted';
+    items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, agent: 'confirm', cid: r.ghl_contact_id });
+  }
+  for (const r of (d.closing || [])) {
+    const verb = r._plan ? 'Follow-up plan to approve' : r.kind === 'closing_enroll' ? 'Enroll in closing plan' : r.kind === 'closing_lost' ? 'Confirm as lost' : 'Closing reply drafted';
+    items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, agent: 'closing', cid: r.ghl_contact_id });
   }
   for (const f of (d.followups || [])) {
     const when = f.scheduled_at ? new Date(f.scheduled_at) : null;
     const desc = when ? 'Follow-up ' + when.toLocaleDateString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'Follow-up queued';
     items.push({ name: f.contact_name || 'Lead', desc, icon: 'hm-feed-ic-fu', svg: _HV2_ICONS.refresh });
   }
-  for (const b of (d.book || [])) items.push({ name: b.contact_name || 'Lead', desc: 'Trial booking to confirm', icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check });
-  for (const g of (d.ghost || [])) items.push({ name: g.contact_name || 'Lead', desc: 'Move to ghosted', icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost });
-  for (const l of (d.lost || [])) items.push({ name: l.contact_name || 'Lead', desc: 'Confirm as lost', icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x });
+  for (const b of (d.book || [])) items.push({ name: b.contact_name || 'Lead', desc: 'Trial booking to confirm', icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, agent: 'booking', cid: b.ghl_contact_id });
+  for (const g of (d.ghost || [])) items.push({ name: g.contact_name || 'Lead', desc: 'Move to ghosted', icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost, agent: 'booking', cid: g.ghl_contact_id });
+  for (const l of (d.lost || [])) items.push({ name: l.contact_name || 'Lead', desc: 'Confirm as lost', icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x, agent: 'booking', cid: l.ghl_contact_id });
 
-  const rows = items.slice(0, 8).map(i => `
-    <div class="hm-feed-item" onclick="_hv2OpenHawkeye()">
+  // Each row deep-links to its own card in the deck (agent tab + contact on top).
+  const rows = items.slice(0, 8).map(i => {
+    const cid = i.cid ? String(i.cid).replace(/[^A-Za-z0-9_-]/g, '') : '';
+    const go = i.agent ? `_hk2Open('${i.agent}'${cid ? `,'${cid}'` : ''})` : '_hv2OpenHawkeye()';
+    return `
+    <div class="hm-feed-item" onclick="${go}">
       <div class="hm-feed-ic ${i.icon}">${i.svg}</div>
       <div class="hm-feed-text"><div class="hm-feed-name">${escapeHTML(_hmStripEm(i.name))}</div><div class="hm-feed-desc">${escapeHTML(_hmStripEm(i.desc))}</div></div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   host.innerHTML = `<div class="hm-feed">
     <div class="hm-feed-head">
