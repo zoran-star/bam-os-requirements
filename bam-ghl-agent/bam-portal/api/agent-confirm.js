@@ -519,8 +519,12 @@ async function detectForClient(client) {
   // post-trial form owns them now). Scoped to THIS agent's table only.
   let pruned = 0;
   try {
-    const pend = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id`);
+    const pend = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id,kind`);
     for (const row of (Array.isArray(pend) ? pend : [])) {
+      // A fired reignite_due card is a deliberate scheduled re-engagement - the
+      // passed-trial handoff must not cancel it (#10). It has its own cancel
+      // triggers (real reply, terminal actions, left-stage below).
+      if (row.kind === "reignite_due") continue;
       if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
         await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
         pruned++;
@@ -933,14 +937,20 @@ async function handler(req, res) {
             // post-trial form card while a reignition is scheduled (their dropped
             // slot was voided at park time; this guards the stragglers).
             const reignSet = await reigniteContactIdSet(clientId);
-            const unreviewed = due.filter(t => !reviewedBookings.has(String(t.id)) && !reignSet.has(String(t.ghl_contact_id || "")));
+            // A lead with a fired reignite_due card (kind flips scheduled->carded, so
+            // reignSet no longer covers them) must ALSO be left alone: no form card
+            // synthesized over their re-engagement card (#10).
+            const reignDueSet = new Set((list || []).filter(r => r.kind === "reignite_due" && r.ghl_contact_id).map(r => String(r.ghl_contact_id)));
+            const unreviewed = due.filter(t => !reviewedBookings.has(String(t.id)) && !reignSet.has(String(t.ghl_contact_id || "")) && !reignDueSet.has(String(t.ghl_contact_id || "")));
             // Read-time gate (Zoran 2026-07-09, mirrors Booking's): once the
             // trial has run, this agent's own reply/handoff/reminder cards for
             // that lead are stale - a pre-trial "see you Tuesday!" draft must
             // not sit in the deck on Thursday. Hide them so the form card
             // pushed below is THE card; the detector cron cancels them for real.
             const passed = new Set(unreviewed.map(t => String(t.ghl_contact_id || "")).filter(Boolean));
-            if (passed.size) list = list.filter(r => !r.ghl_contact_id || !passed.has(String(r.ghl_contact_id)));
+            // Keep reignite/reignite_due cards even for a passed-trial lead - they
+            // are the deliberate scheduled re-engagement, not a stale pre-trial card (#10).
+            if (passed.size) list = list.filter(r => !r.ghl_contact_id || !passed.has(String(r.ghl_contact_id)) || ["reignite", "reignite_due"].includes(r.kind));
             for (const t of unreviewed) {
               const cid = String(t.ghl_contact_id || "");
               if (!cid) continue;
@@ -1029,11 +1039,18 @@ async function handler(req, res) {
       if (!sts || !(await contactInRespondedStage(token, locationId, b.contact_id, sts, { clientId, sb, role: "scheduled_trial" }))) {
         return res.status(409).json({ error: "This lead is no longer in the Scheduled-Trial stage - not sending." });
       }
+      // A reignite_due card is a DELIBERATE scheduled re-engagement - it must fire
+      // on its date even though the old booked trial (the reason they were parked)
+      // ran. Exempt it from the passed-trial -> form-card handoff guard (#10).
+      let isReigniteDue = false;
+      if (b.ready_id) {
+        try { const rk = await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=kind`); isReigniteDue = Array.isArray(rk) && rk[0] && rk[0].kind === "reignite_due"; } catch (_) {}
+      }
       // Post-trial gate (mirrors the detector skip, prune, flush, and list-ready):
       // once the booked trial has RUN, the form card owns this lead - a stale
       // pre-trial card in an old browser tab must not text "see you Tuesday!"
       // after it. Empty set for non-portal academies; fails open by design.
-      if ((await passedTrialContactIds(clientId)).has(String(b.contact_id))) {
+      if (!isReigniteDue && (await passedTrialContactIds(clientId)).has(String(b.contact_id))) {
         return res.status(409).json({ error: "This lead's trial already ran - use their post-trial form card instead." });
       }
       // Never text an internal note at a parent (legacy escalation/overdue rows

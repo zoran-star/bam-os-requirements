@@ -345,13 +345,23 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
     (read-thread.js scheduledStoreMessages + 3 renderers), a quiet-hours bar on the
     deck (list-ready returns `quiet`), and a pagehide/visibilitychange flush of the
     6s undo so backgrounding the app never drops an approved send.
-  * NOT yet fixed (deferred, need product calls / bigger changes): #3 Book card
-    promises confirmation on GHL-calendar academies (zero exposure today - GTA is
-    portal), #10 fired confirm reignite_due pruned by a lingering passed slot, #11
-    Book-it dedup drops the confirmation EMAIL (delayed not lost), #12/#20 proposal
-    slot not re-verified against open slots at send, #19 self-serve booking doesn't
-    cancel a park, #23 parent greeted by athlete name on ADAPT-minted contacts, #27
-    scheduleStepJob reports success on insert failure.
+  * SECOND PASS (2026-07-11, the deferred 8 - all fixed): #3 Book-it card copy is
+    now provider-aware (list-ready returns booking_provider; GHL academies see "GHL
+    sends the confirmation" instead of an editable box that got dropped). #10 fired
+    confirm reignite_due cards are exempt from the passed-trial prune/list-ready
+    gate/send guard (kind reignite_due survives a lingering passed slot). #11
+    Book-it now also sends the "Your free trial is booked!" EMAIL on portal
+    academies (resolveContactInfo + sendOn), not just the SMS. #12 normalizeProposal
+    is async + verifies the proposed slot against a live freeSlots read (drops the
+    structured proposal if it isn't genuinely open - no more "verified open slot"
+    label on a hallucinated time). #20 the send action + 8am flush refuse/cancel a
+    proposal whose stamped book_slot_at already passed. #19 website/leads.js +
+    website/trial-booking.ts cancel a scheduled reignition on a self-serve booking
+    (parent-app path books with null contact, can't link). #23 contact-memory no
+    longer greets the parent by the athlete's name when contacts.name == athlete_name
+    (ADAPT-minted) - falls to a nameless warm greeting. #27 scheduleStepJob returns
+    an ok flag; enrollContact/advance exit the enrollment with a visible reason
+    instead of leaving a phantom-active enrollment with zero pending jobs.
 
 ## Open item (ask Zoran before building)
 Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-commit.

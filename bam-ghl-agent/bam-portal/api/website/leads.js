@@ -21,6 +21,7 @@ import { enrollContact, exitEnrollment } from "../automations.js";
 import { createOpp, moveStage, findOpenOpp, pipelineFlags, ROLE_MATCHERS } from "../agent/_store.js";
 import { upsertPortalContact, writePortalFieldValues, contactProvider, resolveOrMintPortalContact } from "../_contacts.js";
 import { recordKpiEvent } from "../_kpi.js";
+import { cancelReignitions } from "../agent/_reignite.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -574,6 +575,11 @@ async function handler(req, res) {
           fields.booked_slot = booking.start;
           receipt.fields = fields;
         }
+
+        // A parked "come back later" lead who self-books through the website is
+        // back NOW - cancel any scheduled reignition so the re-engagement card
+        // doesn't later fire at a family that already rebooked (#19). Best-effort.
+        if (receipt.ghl_contact_id) { try { await cancelReignitions(client.id, receipt.ghl_contact_id, "self-booked a trial"); } catch (_) {} }
 
         const routeCfg = client.ghl_kpi_config?.portal_entry_routing;
         if (routeCfg?.enabled) {

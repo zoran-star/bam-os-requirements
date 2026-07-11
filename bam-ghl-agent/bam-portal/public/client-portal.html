@@ -32447,6 +32447,9 @@ async function _hk2Load() {
   // Quiet-hours state (from list-ready): outside 8:00am-9:30pm the deck warns
   // upfront that approvals park until morning - the deferred toast alone was
   // missed (approved 9:38pm, "message never sent" report, 2026-07-10).
+  // booking_provider drives the Book-it card copy (portal sends the confirmation
+  // text from the deck; GHL lets its own automation send it - #3).
+  _HK2.bookingProvider = (b && b.booking_provider) || 'ghl';
   return { booking, confirm, closing, quiet: (b && b.quiet) || null };
 }
 function _hk2Pick(a) { _HK2.agent = a; _hk2Render(); }
@@ -32588,15 +32591,23 @@ function _hk2CardHtml(r, pos, total, isTop) {
   let body = '';
   if (r._kind === 'book') {
     const guessSlot = r.book_slot_at || '';
+    // Only portal-booking academies send the confirmation text from the deck. On
+    // GHL-calendar academies GHL's own booked-trial automation sends it, so we
+    // must NOT show an editable "sends the moment you book it" box that then gets
+    // dropped on the floor (#3). Copy is provider-aware.
+    const isPortalBooking = (_HK2 && _HK2.bookingProvider) === 'portal';
+    const confBlock = isPortalBooking
+      ? `<div class="hk2-lbl">Confirmation text - sends the moment you book it</div>
+      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+      <div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed, your confirmation text sends, and the Confirm agent takes over (reminders send from config).</div>`
+      : `<div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed in your calendar and its booked-trial automation sends the confirmation + location. The Confirm agent then takes over.</div>`;
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-lbl">Booking details - the agent's pick, change if needed</div>
       <div class="hk2-fields">
         <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
         <label><span>Slot</span><select${id.slot} onchange="_hk2Edited(true)"><option value="${escapeHTML(guessSlot)}" selected>${escapeHTML(guessSlot ? _hk2SlotLabel(guessSlot) : 'Loading open slots…')}</option></select></label>
       </div>
-      <div class="hk2-lbl">Confirmation text - sends the moment you book it</div>
-      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
-      <div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed, your confirmation text sends, and the Confirm agent takes over (reminders send from config).</div>`;
+      ${confBlock}`;
   } else if (r._kind === 'ghost') {
     body = `${_hk2ThreadHtml(r)}
       <div class="hk2-note">Nothing sends now - the Ghosted automation takes over with its nudges. A reply bounces them straight back to Booking.</div>

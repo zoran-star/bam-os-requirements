@@ -27,7 +27,8 @@ import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial, passedTrialContactIds } from "./agent/booking.js";
 import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
-import { enrollContact, isAutomationLive } from "./automations.js";
+import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
+import { sendOn } from "./_send.js";
 import { moveStage, setStatus, findOpenOpp } from "./agent/_store.js";
 import { routeTransition } from "./agent/_router.js";
 import { DEFAULT_BOOKING_AUTOMATIONS, getBookingAutomations, automationsLive as bookingAutosLive, nextDueStep as bookingNextStep } from "./agent/booking-automations.js";
@@ -293,8 +294,8 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   const book = !!(out.book && out.book_slot_at && bookCal);
   // A time PROPOSAL: the reply names a specific slot without booking yet. Zoran
   // approves every proposed time as a structured Hawkeye field (2026-07-10), so
-  // the slot rides the card instead of living only in prose. Future slots only.
-  const prop = normalizeProposal(out, book, calendars);
+  // the slot rides the card instead of living only in prose. Future + verified-open only.
+  const prop = await normalizeProposal(out, book, calendars, { token, clientId });
   return {
     conversation_id: conversationId,
     reply: out.reply || "",
@@ -325,15 +326,28 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
 // A time PROPOSAL in a non-booking reply: validate + map it onto the card's
 // book_* fields (same columns the Book-it card uses; kind stays 'reply', so
 // nothing books until the lead says yes and a real Book-it card is approved).
-// Guards: never on a booking card, must parse, must be in the future, and the
-// group must resolve to a real calendar - otherwise silently no proposal.
-function normalizeProposal(out, book, calendars) {
+// Guards: never on a booking card, must parse, must be in the future, the group
+// must resolve to a real calendar, AND the time must be a genuinely open slot -
+// the deck labels it "a verified open slot", but nothing enforced that the model
+// actually pulled it from check_availability, so a hallucinated time got stamped
+// + shown as verified (#12). Confirm against a live freeSlots read; any miss or
+// read error drops the STRUCTURED proposal (the reply text still sends, but the
+// card won't claim verification or stamp a bogus Book-it slot). async now.
+async function normalizeProposal(out, book, calendars, verifyCtx) {
   const none = { group: null, slotAt: null, calendarId: null };
   if (book || !out || !out.propose_slot_at || !out.propose_group) return none;
   const cal = calendarForGroup(calendars || [], out.propose_group);
   if (!cal) return none;
   const t = new Date(out.propose_slot_at).getTime();
   if (!Number.isFinite(t) || t <= Date.now()) return none;
+  if (verifyCtx && verifyCtx.token) {
+    try {
+      const { days } = await freeSlots(verifyCtx.token, cal.key, { days: 21, clientId: verifyCtx.clientId, calLabel: cal.label });
+      const open = [];
+      for (const arr of Object.values(days || {})) for (const iso of (arr || [])) { const ms = new Date(iso).getTime(); if (Number.isFinite(ms)) open.push(ms); }
+      if (!open.includes(t)) return none;
+    } catch (_) { return none; }
+  }
   return { group: out.propose_group, slotAt: new Date(t).toISOString(), calendarId: cal.key };
 }
 
@@ -344,7 +358,7 @@ async function draftOpener(token, locationId, clientId, contactId, cfg, calendar
   const out = await runOpener(system, { calendars: calendars || [], token, timezone: "America/Toronto", clientId });
   const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForGroup(calendars || [], out.book_group) : null;
   const book = !!(out.book && out.book_slot_at && bookCal);
-  const prop = normalizeProposal(out, book, calendars);
+  const prop = await normalizeProposal(out, book, calendars, { token, clientId });
   return {
     reply: out.reply || "",
     reasoning: out.reasoning || "",
@@ -522,8 +536,14 @@ async function detectForClient(client) {
   // and their trial hasn't run in the meantime (post-trial form owns them then).
   if (withinQuietHours(new Date(), quietTz(client))) {
     try {
-      const held = await sb(`agent_ready_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message,approved_by&order=send_after.asc&limit=40`);
+      const held = await sb(`agent_ready_replies?client_id=eq.${client.id}&status=eq.approved&send_after=lte.${new Date().toISOString()}&select=id,ghl_contact_id,draft_message,approved_by,book_slot_at&order=send_after.asc&limit=40`);
       for (const row of (Array.isArray(held) ? held : [])) {
+        // #20: a held reply proposing a specific slot can go stale overnight (the
+        // 8am flush would text a time that already passed). Cancel instead of send.
+        if (row.book_slot_at && new Date(row.book_slot_at).getTime() <= Date.now()) {
+          await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "proposed time passed before it could send", updated_at: new Date().toISOString() }) });
+          continue;
+        }
         if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
           await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
           continue;
@@ -935,7 +955,12 @@ async function handler(req, res) {
         const passed = await passedTrialContactIds(clientId);
         if (passed.size) list = list.filter(r => !r.ghl_contact_id || !passed.has(String(r.ghl_contact_id)));
       } catch (_) { /* fail open */ }
-      return res.status(200).json({ ready: list, count: list.length, quiet });
+      // Booking provider drives the Book-it card copy: only portal academies send
+      // the confirmation text from the deck; GHL academies let GHL's booked-trial
+      // automation send it (#3). Fail to 'ghl' (the no-double-text branch).
+      let booking_provider = "ghl";
+      try { booking_provider = await bookingProviderOf(clientId); } catch (_) {}
+      return res.status(200).json({ ready: list, count: list.length, quiet, booking_provider });
     }
     // Deck header names (Zoran 2026-07-09): the Hawkeye card shows the ATHLETE on
     // top + the PARENT underneath. trial_bookings carries both for any lead with a
@@ -1061,6 +1086,12 @@ async function handler(req, res) {
       const propPatch = {};
       if (typeof b.proposed_slot_at === "string" && b.proposed_slot_at) { const _pt = new Date(b.proposed_slot_at).getTime(); if (Number.isFinite(_pt)) propPatch.book_slot_at = new Date(_pt).toISOString(); }
       if (typeof b.proposed_calendar_id === "string" && b.proposed_calendar_id) propPatch.book_calendar_id = b.proposed_calendar_id;
+      // #20: a proposal card's stamped time can go stale while the card sits pending
+      // a day+. If the picked slot has already passed, refuse - don't text "does
+      // Tuesday at 5 work?" on Wednesday. Reopen + repick is one tap.
+      if (propPatch.book_slot_at && new Date(propPatch.book_slot_at).getTime() <= Date.now()) {
+        return res.status(409).json({ error: "That proposed time has already passed - reopen the card and pick a new slot." });
+      }
       // QUIET HOURS: a human approved this after 9:30pm / before 8am. Don't text the
       // parent now — hold the approved reply and let the detect cron flush it at 8am.
       if (!withinQuietHours(new Date(), quietTz(client))) {
@@ -1392,6 +1423,18 @@ async function handler(req, res) {
             confirmMsg += `\n\nAdd it to your calendar:\n\nApple: ${buildIcalUrl(cal)}\n\nGoogle: ${buildGoogleCalUrl(cal)}`;
           } catch (_) {}
           try { await sendReplyViaGhl(token, contactId, confirmMsg, clientId); confirmationSent = true; } catch (_) {}
+        }
+        // Also send the booking-confirmation EMAIL. The scripted "Booking
+        // confirmation" step sent SMS + email, but the dedup marker below
+        // suppresses that whole step - so without this the parent got the SMS but
+        // never the "Your free trial is booked!" email (#11). Best-effort, email
+        // only, only when we actually texted a confirmation. (The scripted
+        // template's Location line still arrives via the same-day 9am check-in.)
+        if (confirmationSent) {
+          try {
+            const info = await resolveContactInfo(token, contactId);
+            if (info && info.email) await sendOn({ channel: "email", clientId, toEmail: info.email, subject: "Your free trial is booked!", body: confirmMsg, vars: {} });
+          } catch (_) {}
         }
         // Mark the confirm agent's scripted "Booking confirmation" (when:
         // immediate) as handled for THIS trial - without this marker the next
