@@ -35263,7 +35263,7 @@ function _aclxRender() {
   if (!body) return;
   if (!_ACLX_DATA.length) { body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no closings waiting.') + '</div>'; return; }
   // Follow-up PLAN grouping: a contact with 2+ pending followup_N rows renders
-  // as ONE plan card (all messages editable, approved together, sent 1 day apart).
+  // as ONE plan card (all messages editable, approved together, sent on the cadence).
   const _isPlanRow = r => (r.step_key || '').startsWith('followup_') && r.status === 'pending';
   const _planCount = new Map();
   for (const r of _ACLX_DATA) if (_isPlanRow(r)) _planCount.set(r.ghl_contact_id, (_planCount.get(r.ghl_contact_id) || 0) + 1);
