@@ -340,6 +340,36 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   deck-card count (pending booking rows + confirm rows + closing cards, plans
   collapsed; scheduled followups render but don't count) and each feed row
   deep-links to its card.
+- HOME <-> HAWKEYE SYNC PASS 2 (2026-07-11, Zoran: home didn't match Hawkeye -
+  leads listed twice, convos went stale, feed != deck, deck didn't live-update).
+  All in client-portal.html. FIXED:
+  * Inbox listed a lead TWICE: `/api/ghl/inbox` merges SMS+email+social+DM stores
+    (own-store academies like GTA) + GHL can return >1 thread/contact, no dedupe.
+    New `_hmDedupeConvos`/`_hmContactKey` in `_hmLoadInboxPreview` collapse to ONE
+    row per contact (contactId -> last-10 phone -> lc name), keep newest message
+    in the server-sorted slot, OR-in unread; hawk flag is contact-keyed so no
+    flagged lead drops. Dedupe runs BEFORE the slice(0,8) + flagged-swap.
+  * Stale convos (Tara): inbox preview + Hawkeye feed loaded once on mount.
+    `_hmStartScoreRefresh` now also runs `_hmRefreshLive` on the 60s tick +
+    `_hmBindLiveRefresh` refreshes both on focus/visibilitychange. Inbox refresh
+    gated to `window._hmActiveTab==='inbox'` + home visible.
+  * Feed != deck: `_hmLoadRailBottom`/`_hmRenderHawkFeed` rendered agent-followups
+    (RETIRED, never deck cards) -> extra rows past the count/deck. Now render
+    EXACTLY the 3 deck queues (booking+confirm+closing, followup_N collapsed);
+    total==rows==deck; reignite/reignite_due labeled. agent-followups DROPPED from
+    the feed (`_apxSplit` no longer used here). Supersedes the "scheduled
+    followups render but don't count" line above.
+  * Deck didn't live-update (had to exit+reopen): NEW `_hk2Poll` (30s +
+    focus/visibility) re-reads the 3 queues while open and MERGES only new cards
+    onto queue backs + refreshes tab counts (`_hk2TabsHtml` extracted). Non-
+    destructive: never re-renders the open card / in-progress DOM edit unless the
+    active tab was empty. Resurrection guard = per-open `_HK2.seen` set (seeded in
+    `_hk2Refresh`) + the `_HAWK_PENDING` skip, so a just-resolved card that
+    list-ready still echoes during its 6s commit is never re-added. Started in
+    `_hk2Refresh`, stopped in `_hk2Back`+`closeSalesFocus`; `_hk2IsOpen` = overlay
+    `_SF_OPEN==='hawkeye'` or inline `_PL_SV==='hawkeye'`. Known low edge: a plan
+    re-created for the same contact within one open session shares key
+    `plan:<cid>` and waits for reopen (self-heals). NOT prod-verified on GTA yet.
 - 🐞 BUG SWEEP (2026-07-11, 41-agent adversarial review of the 2026-07-10 batch;
   27 confirmed). FIXED this pass:
   * CRIT: silent parks self-canceled every detector cron - a park with an empty
