@@ -17618,7 +17618,12 @@ function _hmContactKey(c) {
   const p = String(c.phone || '').replace(/\D+/g, '').slice(-10);
   if (p.length === 10) return 'p:' + p;
   const nm = String(c.contactName || c.fullName || '').trim().toLowerCase();
-  return nm ? 'n:' + nm : 'id:' + c.id;
+  // Only merge on a REAL name. Unnamed threads share a sentinel ("Lead" from the
+  // DM/social stores, "Unknown" from GHL) or are a bare number/email - two
+  // DISTINCT nameless leads must NOT collapse into one row, so fall back to the
+  // per-conversation id, which is unique.
+  const nameless = !nm || nm === 'lead' || nm === 'unknown' || /^[\s()+.\-\d]+$/.test(nm) || (nm.includes('@') && !nm.includes(' '));
+  return nameless ? 'id:' + c.id : 'n:' + nm;
 }
 function _hmDedupeConvos(list) {
   const seen = new Map(), order = [];
@@ -18222,7 +18227,15 @@ function _hmStartScoreRefresh() {
 // cadence and the moment the app regains focus.
 function _hmRefreshLive() {
   const hv = document.getElementById('home-v2');
-  if (!hv || hv.style.display === 'none' || document.hidden) return;
+  // offsetParent is null when the element OR any ancestor is display:none. The
+  // classic view hides #view-home via a CLASS (home-v2's own inline display
+  // stays ''), so checking home-v2.style.display missed it and refreshed
+  // off-screen; offsetParent catches both. document.hidden = tab backgrounded.
+  if (!hv || hv.offsetParent === null || document.hidden) return;
+  // focus + visibilitychange both fire when the app foregrounds - fetch once.
+  const now = Date.now();
+  if (window._hmLiveLast && now - window._hmLiveLast < 3000) return;
+  window._hmLiveLast = now;
   if (window._hmActiveTab === 'inbox') { try { _hmLoadInboxPreview(); } catch (_) {} }
   try { _hmLoadRailBottom(); } catch (_) {}
 }

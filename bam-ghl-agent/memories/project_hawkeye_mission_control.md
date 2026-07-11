@@ -370,6 +370,15 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
     `_SF_OPEN==='hawkeye'` or inline `_PL_SV==='hawkeye'`. Known low edge: a plan
     re-created for the same contact within one open session shares key
     `plan:<cid>` and waits for reopen (self-heals). NOT prod-verified on GTA yet.
+  * 2 REVIEW FIXES (adversarial pass on this diff, both were real): (a) dedupe
+    key must NOT merge on a non-identifying sentinel - `_hmContactKey` only
+    merges on a REAL name now; unnamed rows ("Lead" from DM/social stores,
+    "Unknown" from GHL, bare number/email) fall to `id:<convId>` so two distinct
+    nameless leads don't collapse into one. (b) `_hmRefreshLive` visibility gate
+    was `home-v2.style.display==='none'` which never trips (classic view hides
+    the ANCESTOR `#view-home` via a class) - now `hv.offsetParent === null` +
+    a 3s debounce so focus+visibilitychange don't double-fetch. Deck-poll pass
+    (resurrection/edit-wipe/lifecycle/null-derefs) reviewed clean.
 - 🐞 BUG SWEEP (2026-07-11, 41-agent adversarial review of the 2026-07-10 batch;
   27 confirmed). FIXED this pass:
   * CRIT: silent parks self-canceled every detector cron - a park with an empty
