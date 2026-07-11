@@ -1266,6 +1266,12 @@
   .modal-card {
     width: 100%;
     max-width: 440px;
+    /* Never taller than the viewport (backdrop pads 24px top+bottom), and
+       scroll inside the card so a tall modal - e.g. Add Creative once a
+       thumbnail is added - can always reach its Submit button. Mobile already
+       had this via the bottom-sheet override; desktop was missing it. */
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius-2xl);  /* 28px - premium feel */
