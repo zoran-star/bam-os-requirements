@@ -5,7 +5,10 @@ an agent's draft in Hawkeye they must leave a "why", which appends a raw
 `agent_lessons` row. Left alone the pile grows forever and every raw lesson rides
 every future prompt (context rot: more prompt = worse instruction following). This
 skill clusters the raw pile into a compact set, ROUTES each item to where it
-belongs, and mines the pile for onboarding gaps.
+belongs, and mines the pile for onboarding gaps. It triages the WHOLE fleet
+first (`scan`) so you consolidate where the rot actually is, and every apply run
+is logged to a `consolidation_runs` KPI table (timestamped) so the loop is
+measurable over time.
 
 ## The preset model (read before classifying)
 
@@ -73,11 +76,31 @@ the script exits with a clear message - ask Zoran where the keys are before retr
 
 Run everything from `bam-ghl-agent/bam-portal/`.
 
-## Step 1 - Pick the scope
+## Step 1 - Triage the fleet, then pick an academy
 
-Ask Zoran which academy to consolidate. Default: **BAM GTA**
-(`39875f07-0a4b-4429-a201-2249bc1f24df`). One academy at a time - the dump
-requires a clientId on purpose.
+Start with a fleet scan so you consolidate WHERE the rot actually is, not blind:
+
+```bash
+node scripts/lessons-io.mjs scan
+```
+
+This writes `lessons-scan.json` and prints every academy's raw-lesson count per
+agent, flagging any that are **DUE** (15+ raw on a single agent = the run
+trigger), plus the size of the shared general set (which rides every academy).
+"Raw" = lessons not yet created by `consolidate-skill`.
+
+Show Zoran the DUE list and let him pick. Then consolidate **one academy at a
+time** - the dump still requires a clientId on purpose (a no-arg dump would mix
+academies and misattribute facts). Work the DUE academies in turn; the scan is
+how you know the queue. Default when nothing is obviously due: **BAM GTA**
+(`39875f07-0a4b-4429-a201-2249bc1f24df`).
+
+**Cross-academy general review.** The shared general set is the same for every
+academy. When you have several DUE academies, eyeball the pooled general list
+from the scan ONCE up front: a craft pattern showing up in three academies'
+piles is a strong general-lesson candidate, and you avoid writing the same
+general lesson three times. Route it general on the first academy, then just
+reference it (don't re-add) on the rest.
 
 ## Step 2 - Dump the raw pile
 
@@ -92,6 +115,13 @@ Notes on the dump:
 - Each row carries `context` (often `ai_drafted` vs `you_sent` - what the bot
   wrote vs what staff actually sent) and `promotion_reason` (the live classifier's
   local-vs-general hint). Use both as evidence; neither is a verdict.
+- Each row also carries `thread_snapshot` (the conversation tail when the lesson
+  was taught), `stage_from` (the pipeline stage the lead was in), and `stage_to`
+  (where a move sent them, if the teach rode a move - usually null today). These
+  are the training-signal columns added 2026-07-12. Use them as evidence: the
+  thread shows what actually happened in the chat, and the stage tells you which
+  motion the correction belongs to (helps route academy-vs-general and mine the
+  intake gap). Older rows may have them null - that's fine, fall back to context.
 - `good` arrays are `kind='good'` positive examples. They feed a different
   mechanism - NEVER merge them into fix lessons, and leave them active unless
   Zoran explicitly retires one.
@@ -207,9 +237,20 @@ Build `plan.json`:
   "academy":  [ { "agent": "booking", "lesson": "...", "source_ids": ["<id>"], "intake_gap": "IC-007" } ],
   "general":  [ { "agent": "confirm", "lesson": "...", "preset": "free_trial", "source_ids": ["<id>"] } ],
   "archive_ids": [ "<this academy's raw + replaced consolidate-skill rows>" ],
-  "archive_general_ids": [ "<shared rows being replaced - Zoran-approved only>" ]
+  "archive_general_ids": [ "<shared rows being replaced - Zoran-approved only>" ],
+
+  "ran_by": "zoran", "raw_count": 34, "brain_facts": 3, "candidates_new": 2,
+  "by_agent": { "booking": { "academy": 4, "general": 2 } }, "notes": "biweekly GTA pass"
 }
 ```
+
+The last line is **optional KPI metadata**: the apply script auto-writes one
+`consolidation_runs` row per run (timestamped) for lessons/week + accept-rate
+tracking. Fill these so the row is rich - `raw_count` (raw lessons that went
+in), `brain_facts` (count you routed to fact sections, since those aren't in the
+academy/general arrays), `candidates_new` (intake candidates minted this run),
+`by_agent`, `ran_by`, `notes`. Omit them and the row still lands with counts
+derived from the arrays; the KPI is just coarser.
 
 Bucket rule for archives: `archive_ids` takes ONLY rows belonging to this
 academy (its raw lessons + its prior `created_by='consolidate-skill'` rows you
@@ -268,13 +309,19 @@ Confirm, all mandatory:
 - Intake candidates: N proposed / M accepted / K rejected or deferred.
 - V2 UI questions built: `<field + surface, or "none">`.
 - Ledger committed: yes/no. Notion rows created: `<links or "none">`.
+- KPI: the apply script auto-wrote a timestamped `consolidation_runs` row with
+  this run's counts - confirm it landed (the apply log prints "Recorded
+  consolidation_runs KPI row"). That table is the durable ledger for tracking
+  lessons/week and the academy-vs-general split over time.
 
 ## When to run
 
 Run per academy when **any agent has 15+ active raw lessons** (rows not created
 by `consolidate-skill`), or every 2 weeks for each academy live on Hawkeye,
 whichever comes first. The pile compounds silently - the readers load every
-active lesson with no cap.
+active lesson with no cap. **Run `node scripts/lessons-io.mjs scan` any time to
+see which academies are due at a glance** - it's the cheap read that tells you
+whether a full pass is worth it.
 
 ## Notes
 
