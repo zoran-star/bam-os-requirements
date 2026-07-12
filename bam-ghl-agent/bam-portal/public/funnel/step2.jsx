@@ -82,12 +82,12 @@ function StartDate(props) {
         <button className={'startpick__opt' + (!picked ? ' is-active' : '')}
           aria-pressed={!picked} onClick={function () { props.onStartDate(''); }}>
           <span className="startpick__t">Start today</span>
-          <span className="startpick__s">Billed now</span>
+          <span className="startpick__s">Bill + start today</span>
         </button>
         <button className={'startpick__opt' + (picked ? ' is-active' : '')}
           aria-pressed={picked} onClick={function () { if (!props.startDate) props.onStartDate(min); }}>
           <span className="startpick__t">Pick a start date</span>
-          <span className="startpick__s">No charge until then</span>
+          <span className="startpick__s">Pay today · start later</span>
         </button>
       </div>
       {picked && (
@@ -100,7 +100,7 @@ function StartDate(props) {
       )}
       <p className="termhint" style={{ marginTop: 12, marginBottom: 0 }}>
         {picked
-          ? <>Your card is saved now, but the <b>first charge happens on the start date</b>. Nothing is charged today.</>
+          ? <>You're <b>billed today</b> for the first period. Training starts {BAM.fmtDate(BAM.fromISO(props.startDate))}, and billing renews {BAM.fmtDate(BAM.renewalFrom(props.startDate, props.term))}.</>
           : <>Training and billing begin today.</>}
       </p>
     </div>
@@ -128,7 +128,7 @@ function Step2(props) {
         })}
       </div>
 
-      <StartDate startDate={props.startDate} onStartDate={props.onStartDate} />
+      <StartDate startDate={props.startDate} onStartDate={props.onStartDate} term={props.term} />
 
       <div className="reassure" style={{ marginTop: 20, justifyContent: 'center' }}>
         <IcPause size={15} />

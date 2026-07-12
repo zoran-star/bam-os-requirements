@@ -108,6 +108,14 @@
   }
   // parse a 'YYYY-MM-DD' as a LOCAL date (not UTC midnight)
   function fromISO(s) { return new Date(s + 'T00:00:00'); }
+  // first recurring charge = one billing interval after the chosen start date
+  // (the payment made today covers the first period). Mirrors the backend.
+  function renewalFrom(startStr, termId) {
+    var d = fromISO(startStr);
+    if (termId === '3mo') return addMonths(d, 3);
+    if (termId === '6mo') return addMonths(d, 6);
+    return addWeeks(d, 4); // monthly = every 4 weeks
+  }
   function addWeeks(d, w) { var x = new Date(d); x.setDate(x.getDate() + w * 7); return x; }
   function addMonths(d, m) { var x = new Date(d); x.setMonth(x.getMonth() + m); return x; }
 
@@ -139,7 +147,7 @@
     money: money, dollars: dollars, priceHST: priceHST,
     perSession: perSession, charge: charge,
     fmtDate: fmtDate, fmtShort: fmtShort, localISO: localISO, fromISO: fromISO,
-    addWeeks: addWeeks, addMonths: addMonths,
+    renewalFrom: renewalFrom, addWeeks: addWeeks, addMonths: addMonths,
     ageFrom: ageFrom, ageGroup: ageGroup,
     TODAY: new Date(2026, 5, 6)
   };

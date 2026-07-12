@@ -20,7 +20,7 @@ function OrderSummary(props) {
   var deferred = !!props.startDate;
   var when;
   if (deferred) {
-    when = <span>No charge today. Your card is saved now, and the first payment of <b>{BAM.dollars(c.total)}</b> is made on <b>{BAM.fmtDate(BAM.fromISO(props.startDate))}</b>, then it renews on that cycle.</span>;
+    when = <span>Billed today. Training starts <b>{BAM.fmtDate(BAM.fromISO(props.startDate))}</b> and billing renews <b>{BAM.fmtDate(BAM.renewalFrom(props.startDate, termId))}</b>, then each cycle after.</span>;
   } else if (termId === 'monthly') {
     when = <span>Billed today, then <b>{BAM.priceHST(plan.monthly)}</b> every 4 weeks starting {BAM.fmtDate(BAM.addWeeks(today, 4))}.</span>;
   } else {
@@ -42,7 +42,7 @@ function OrderSummary(props) {
           <span>{BAM.dollars(c.hst)}</span>
         </div>
         <div className="sumline is-total">
-          <span>{deferred ? 'Due on start date' : 'Total today'}</span>
+          <span>Total today</span>
           <span>{BAM.dollars(c.total)}</span>
         </div>
       </div>
@@ -196,7 +196,7 @@ function Step3(props) {
       <FaqRow q="When am I charged?" open={ui.faq === 2}
         onToggle={function () { setUi(Object.assign({}, ui, { faq: ui.faq === 2 ? null : 2 })); }}
         a={props.startDate
-          ? <>You picked a start date, so <b>nothing is charged today</b>. We securely save your card now and make the first payment on your start date, then it renews on that cycle. A receipt is emailed every time.</>
+          ? <>Your first payment is <b>today</b> and covers your first period. Training starts on your chosen date, and billing renews one cycle after that, then on that schedule. A receipt is emailed every time.</>
           : <>Your first payment is today. Monthly renews every 4 weeks; prepaid terms are a single charge today and renew at the end of the term. A receipt is emailed every time.</>} />
 
       <div className="trust">

@@ -102,16 +102,22 @@ function piSecretFromSub(sub) {
   return pi && typeof pi === "object" ? pi.client_secret : null;
 }
 
-// A future start date defers the first charge via a Stripe trial, so the first
-// invoice is $0 and there is NO PaymentIntent to confirm. Instead Stripe attaches
-// a SetupIntent (pending_setup_intent) to collect + save the card now; that card
-// is charged automatically when the trial ends (the start date).
-function setupSecretFromSub(sub) {
-  const si = sub && sub.pending_setup_intent;
-  return si && typeof si === "object" ? si.client_secret : null;
-}
 // 1-day buffer under Stripe's 730-day trial cap (mirrors api/members/enroll.js).
 const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
+
+// Add ONE billing interval to a Date. Used for a future start date: the parent pays
+// for the first period TODAY, and recurring billing begins one interval after the
+// start date. (Stripe caps billing_cycle_anchor to within the first period, so we set
+// trial_end to this recurring-start timestamp and charge the first period via a
+// one-time add_invoice_items line — see the subscription build below.)
+function addInterval(date, iv) {
+  const d = new Date(date.getTime());
+  const n = iv.interval_count || 1;
+  if (iv.interval === "week") d.setUTCDate(d.getUTCDate() + 7 * n);
+  else if (iv.interval === "year") d.setUTCFullYear(d.getUTCFullYear() + n);
+  else d.setUTCMonth(d.getUTCMonth() + n); // month
+  return d;
+}
 
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
@@ -137,8 +143,9 @@ async function handler(req, res) {
     const athleteName  = (athlete.name || `${athleteFirst} ${athleteLast}`).trim() || null;
     const athleteDob   = athlete.dob || athlete.date_of_birth || body.athlete_dob || null;
 
-    // Optional future start date: defer the first charge to that day (Stripe trial_end).
-    // charge_mode "on_date" + start_date (YYYY-MM-DD); default "now" = charge immediately.
+    // Optional future start date. The parent is charged the full first period TODAY;
+    // their membership "starts" on start_date and recurring billing begins ONE interval
+    // AFTER start_date. charge_mode "on_date" + start_date (YYYY-MM-DD); default "now".
     const chargeMode = body.charge_mode === "on_date" ? "on_date" : "now";
     let startDate = null;
 
@@ -155,17 +162,17 @@ async function handler(req, res) {
       startDate = body.start_date;
     }
 
-    // Future start date → Stripe trial_end (first charge deferred to that day, noon UTC).
-    // Floored at now+60s (never in the past) and capped under Stripe's trial ceiling.
-    let trialEnd = null;
+    // Recurring billing starts one interval after the chosen start date (the charge made
+    // today covers the first period). trial_end holds that recurring-start timestamp -
+    // floored at now+60s and capped under Stripe's trial ceiling.
+    let recurringStart = null;
     if (chargeMode === "on_date") {
-      const tsec = Math.floor(new Date(`${startDate}T12:00:00Z`).getTime() / 1000);
+      const anchorMs = addInterval(new Date(`${startDate}T12:00:00Z`), intervalFor(term)).getTime();
       const floor = Math.floor(Date.now() / 1000) + 60;
-      trialEnd = Math.min(Math.max(tsec, floor), Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
+      recurringStart = Math.min(Math.max(Math.floor(anchorMs / 1000), floor), Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
     }
-    const firstChargeIso = trialEnd
-      ? new Date(trialEnd * 1000).toISOString().slice(0, 10)
-      : new Date().toISOString().slice(0, 10);
+    const chargedTodayIso = new Date().toISOString().slice(0, 10);
+    const renewsIso = recurringStart ? new Date(recurringStart * 1000).toISOString().slice(0, 10) : null;
 
     const testMode = isTestMode();
 
@@ -205,28 +212,26 @@ async function handler(req, res) {
       let sub = null;
       try {
         sub = await stripeFetch(
-          `/subscriptions/${member.stripe_subscription_id}?expand[]=latest_invoice.payment_intent&expand[]=pending_setup_intent`,
+          `/subscriptions/${member.stripe_subscription_id}?expand[]=latest_invoice.payment_intent`,
           { stripeAccount }
         );
       } catch (_) { sub = null; }
       if (sub) {
-        const reuseBase = {
-          ok: true, reused: true, member_id: member.id,
-          subscription_id: sub.id, customer_id: sub.customer,
-          stripe_account: stripeAccount,
-          publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
-          amount_cents: price.amount_cents, currency: price.currency || "cad",
-        };
+        // The first invoice (immediate charge) always carries a PaymentIntent - whether
+        // the parent starts today or picks a future date (the first period is billed now).
         if (sub.status === "incomplete") {
-          // Charge-now sub awaiting the card → confirm a PaymentIntent.
           const secret = piSecretFromSub(sub);
-          if (secret) return res.status(200).json({ ...reuseBase, mode: "payment", client_secret: secret });
-        } else if (sub.status === "trialing" && setupSecretFromSub(sub)) {
-          // Future-start sub whose card hasn't been saved yet → confirm a SetupIntent.
-          const firstIso = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString().slice(0, 10) : firstChargeIso;
-          return res.status(200).json({ ...reuseBase, mode: "setup", client_secret: setupSecretFromSub(sub), first_charge_iso: firstIso });
+          if (secret) {
+            return res.status(200).json({
+              ok: true, reused: true, member_id: member.id,
+              subscription_id: sub.id, customer_id: sub.customer,
+              client_secret: secret, mode: "payment", stripe_account: stripeAccount,
+              publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
+              amount_cents: price.amount_cents, currency: price.currency || "cad",
+            });
+          }
         } else if (sub.status === "active" || sub.status === "trialing") {
-          // active, or trialing with the card already saved → nothing more to collect.
+          // Paid already (active now, or trialing until the recurring start) → done.
           return res.status(200).json({ ok: true, already_active: true, member_id: member.id, subscription_id: sub.id });
         }
         // canceled / incomplete_expired → fall through and make a fresh sub
@@ -275,18 +280,33 @@ async function handler(req, res) {
       priceIdToUse = testPrice.id;
     }
 
+    // For a future start we bill the first period NOW as a one-time invoice item, which
+    // needs the price's product + amount (add_invoice_items price_data requires an
+    // existing product). Read the resolved price so this works for live and test alike.
+    let firstPeriod = null;
+    if (recurringStart) {
+      const priceObj = await stripeFetch(`/prices/${priceIdToUse}`, { stripeAccount });
+      const amt = priceObj.unit_amount != null ? priceObj.unit_amount : price.amount_cents;
+      if (priceObj.product == null || amt == null) {
+        return res.status(409).json({ error: "can't bill the first period upfront for that plan (missing price product/amount)" });
+      }
+      firstPeriod = { product: priceObj.product, amount: amt, currency: priceObj.currency || price.currency || "cad" };
+    }
+
     // ── Create the PORTAL-OWNED subscription (default_incomplete → client_secret) ──
-    // Charge-now → the first invoice carries a PaymentIntent to confirm.
-    // Future start (trial_end) → the first invoice is $0, so Stripe hands back a
-    // pending_setup_intent instead; we save the card now and it is charged on the
-    // start date. Both are expanded so we can hand the right client_secret to the UI.
+    // The parent is charged the first period TODAY, so the first invoice always carries a
+    // PaymentIntent the funnel confirms with the card.
+    //   • Start today  → normal subscription; first invoice = first period, billed now.
+    //   • Future start → trial_end at the recurring start (one interval after start_date)
+    //     so no recurring charge lands until then, PLUS a one-time add_invoice_items line
+    //     that bills the first period NOW. (billing_cycle_anchor can't reach past the first
+    //     period, so trial_end + a one-time charge is Stripe's pattern for this.)
     const subBody = {
       customer: customerId,
       "items[0][price]": priceIdToUse,
       payment_behavior: "default_incomplete",
       "payment_settings[save_default_payment_method]": "on_subscription",
       "expand[0]": "latest_invoice.payment_intent",
-      "expand[1]": "pending_setup_intent",
       "metadata[origin]": "fullcontrol-portal",
       "metadata[plan]": plan,
       "metadata[term]": term,
@@ -294,18 +314,22 @@ async function handler(req, res) {
       "metadata[parent_email]": parentEmail,
       "metadata[athlete_name]": athleteName,
     };
-    if (trialEnd) {
-      subBody.trial_end = trialEnd;
-      subBody["metadata[start_date]"] = startDate;
+    if (recurringStart) {
+      subBody.trial_end = recurringStart;
+      subBody["metadata[start_date]"] = startDate;                 // membership start (operational)
+      subBody["metadata[first_recurring_date]"] = renewsIso;
+      subBody["add_invoice_items[0][price_data][currency]"] = firstPeriod.currency;
+      subBody["add_invoice_items[0][price_data][product]"] = firstPeriod.product;
+      subBody["add_invoice_items[0][price_data][unit_amount]"] = firstPeriod.amount;
     }
     const sub = await stripeFetch(`/subscriptions`, {
       method: "POST", stripeAccount,
-      idempotencyKey: `onb-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${plan}-${term}-${trialEnd || "now"}`.slice(0, 200),
+      idempotencyKey: `onb-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${plan}-${term}-${recurringStart || "now"}`.slice(0, 200),
       body: subBody,
     });
-    // Future start → confirm a SetupIntent (no charge today); else a PaymentIntent.
-    const paymentMode = trialEnd ? "setup" : "payment";
-    const clientSecret = trialEnd ? setupSecretFromSub(sub) : piSecretFromSub(sub);
+    // Always a real charge today → confirm a PaymentIntent client-side.
+    const paymentMode = "payment";
+    const clientSecret = piSecretFromSub(sub);
 
     // ── Upsert the member row (status stays payment_method_required until paid) ──
     const memberFields = {
@@ -348,7 +372,7 @@ async function handler(req, res) {
         body: JSON.stringify([{
           client_id: clientId, member_id: member && member.id,
           action_type: "onboarding-checkout-created",
-          args: { plan, term, price_id: price.stripe_price_id, sub_id: sub.id, customer_id: customerId, charge_mode: chargeMode, start_date: startDate, first_charge_iso: firstChargeIso },
+          args: { plan, term, price_id: price.stripe_price_id, sub_id: sub.id, customer_id: customerId, charge_mode: chargeMode, charged_today: chargedTodayIso, start_date: startDate, first_recurring_date: renewsIso },
           performed_by_name: "Parent funnel (public)",
         }]),
       });
@@ -361,7 +385,9 @@ async function handler(req, res) {
       customer_id: customerId,
       client_secret: clientSecret,
       mode: paymentMode,
-      first_charge_iso: firstChargeIso,
+      charged_today_iso: chargedTodayIso,
+      start_date: startDate,
+      renews_iso: renewsIso,
       stripe_account: stripeAccount,
       publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
       amount_cents: price.amount_cents,
