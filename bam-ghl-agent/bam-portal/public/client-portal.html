@@ -9088,6 +9088,7 @@ Then the call to action."]</div>
           .hk2-booked-check{color:var(--gold,#D4B65C);font-weight:800}
           .hk2-esc{font-size:11.5px;color:#e0a020}
           .hk2-thread{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:2px}
+          .hk2-thread-load{flex-direction:row;align-items:center;justify-content:center;gap:8px;min-height:44px;color:var(--text-sub);font-size:12.5px;cursor:default}
           .hk2-bub{font-size:13px;line-height:1.5;padding:8px 12px;border-radius:13px;max-width:82%;white-space:pre-wrap;word-break:break-word}
           .hk2-bub.in{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px;align-self:flex-start}
           .hk2-bub.bot{background:var(--accent-glow,rgba(212,182,92,.10));border:1px solid var(--accent-border,rgba(212,182,92,.3));color:var(--text);border-bottom-right-radius:4px;align-self:flex-end}
@@ -9111,6 +9112,8 @@ Then the call to action."]</div>
           .hk2-x{border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-sub);font:inherit;font-size:12.5px;font-weight:600;padding:8px 11px;cursor:pointer;text-align:left}
           .hk2-x:hover{color:var(--text);border-color:var(--border-str,rgba(255,255,255,.2))}
           .hk2-bar{display:flex;gap:8px;align-items:stretch}
+          .hk2-skip{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:44px;background:var(--bg);border:1px solid var(--border);color:var(--text-sub);border-radius:999px;padding:0;cursor:pointer}
+          .hk2-skip:hover{color:var(--text);border-color:var(--border-str,rgba(255,255,255,.2))}
           .hk2-otherbtn{flex:0 0 auto;background:var(--bg);border:1px solid var(--border);color:var(--text-sub);border-radius:999px;padding:10px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
           .hk2-otherbtn.on,.hk2-otherbtn:hover{color:var(--text);border-color:var(--border-str,rgba(255,255,255,.2))}
           .hk2-go{flex:1;background:var(--accent);color:#0B0B0D;border:none;border-radius:999px;padding:10px 16px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer}
@@ -32919,21 +32922,70 @@ function _hk2Initials(name) {
   const parts = String(name || '?').trim().split(/\s+/);
   return ((parts[0] || '?')[0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
 }
-function _hk2ThreadHtml(r) {
-  const tail = Array.isArray(r.thread_tail) ? r.thread_tail : [];
-  if (!tail.length && !r.last_message) return '';
-  let bubs = tail.map(m => {
+// Recent-messages preview inside a card. Cards drafted off an inbound reply carry
+// a `thread_tail`; proactive openers (no-show rebook, reignition day) carry none,
+// so the TOP card lazy-loads its last few messages (_hk2HydrateThread) - the
+// reviewer should always see the bit of conversation they're replying to
+// (Zoran 2026-07-11). Tap = the full thread.
+function _hk2Bubbles(tail, lastMessage) {
+  let bubs = (Array.isArray(tail) ? tail : []).map(m => {
     const out = m.role === 'agent';
-    return `<div class="hk2-bub ${out ? 'bot' : 'in'}">${escapeHTML(String(m.text || '').trim())}</div>`;
+    const t = String(m.text || '').trim();
+    return t ? `<div class="hk2-bub ${out ? 'bot' : 'in'}">${escapeHTML(t)}</div>` : '';
   }).join('');
-  if (!bubs && r.last_message) bubs = `<div class="hk2-bub in">${escapeHTML(r.last_message)}</div>`;
-  return `<div class="hk2-thread" onclick="_hk2OpenThread()" title="Tap for the full conversation">${bubs}</div>`;
+  if (!bubs && lastMessage) bubs = `<div class="hk2-bub in">${escapeHTML(String(lastMessage).trim())}</div>`;
+  return bubs;
+}
+function _hk2ThreadHtml(r, isTop) {
+  const bubs = _hk2Bubbles(r.thread_tail, r.last_message);
+  if (bubs) return `<div class="hk2-thread" onclick="_hk2OpenThread()" title="Tap for the full conversation">${bubs}</div>`;
+  // No embedded messages: the top card fetches them once, in place. `_threadFetched`
+  // means we already tried (even if the lead has no messages yet) - no re-spinner.
+  if (isTop && r.ghl_contact_id && !r._threadFetched) return `<div class="hk2-thread hk2-thread-load" id="hk2-thread-slot"><span class="req-spin"></span> Loading conversation…</div>`;
+  return '';
+}
+// Fill the top card's conversation slot when it was drafted without a thread_tail.
+async function _hk2HydrateThread() {
+  const slot = document.getElementById('hk2-thread-slot');
+  if (!slot) return;
+  const r = _hk2Top();
+  if (!r || !r.ghl_contact_id) { slot.remove(); return; }
+  if (r._threadFetched) return;
+  r._threadFetched = true;
+  try {
+    const token = await _mreqAuthToken();
+    const resp = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(r.ghl_contact_id)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(resp);
+    if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+    const msgs = (j.messages || []).filter(m => (m.body || '').trim()).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    r.thread_tail = msgs.slice(-4).map(m => ({ role: (m.direction || '').toLowerCase() === 'outbound' ? 'agent' : 'parent', text: m.body }));
+  } catch (_) { r.thread_tail = r.thread_tail || []; }
+  // The owner may have skipped / resolved this card while the fetch was in flight.
+  const el = document.getElementById('hk2-thread-slot');
+  if (!el || _hk2Top() !== r) return;
+  const bubs = _hk2Bubbles(r.thread_tail, null);
+  if (!bubs) { el.remove(); return; }   // genuinely no conversation yet - no empty box
+  el.className = 'hk2-thread';
+  el.removeAttribute('id');
+  el.setAttribute('title', 'Tap for the full conversation');
+  el.setAttribute('onclick', '_hk2OpenThread()');
+  el.innerHTML = bubs;
 }
 function _hk2OpenThread() {
   const r = _hk2Top(); if (!r || !r.ghl_contact_id) return;
   try { _apxOpenThread(r.ghl_contact_id, r.contact_name || 'Conversation'); } catch (_) {}
 }
 function _hk2Top() { return (_HK2.q && _HK2.q[_HK2.agent] || [])[0] || null; }
+// Skip = defer without deciding. Rotate this card to the back of ITS stage queue
+// (session-only; a deck reload restores the natural order). Nothing sends, the
+// lead isn't moved - it just steps aside so you can get to the rest of the queue
+// (Zoran 2026-07-11). Needs 2+ cards to have somewhere to send it.
+function _hk2Skip() {
+  const q = _HK2.q && _HK2.q[_HK2.agent];
+  if (!q || q.length < 2) return;
+  q.push(q.shift());
+  _hk2Render();
+}
 // Per-agent move destinations, minus whatever IS the card's primary action.
 // Every agent can mark Unqualified (Zoran 2026-07-08). Nurture + Unqualified
 // SEND the message box when it has text (Zoran 2026-07-10: "write a message
@@ -33021,7 +33073,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       <div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed, your confirmation text sends, and the Confirm agent takes over (reminders send from config).</div>`
       : `<div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed in your calendar and its booked-trial automation sends the confirmation + location. The Confirm agent then takes over.</div>`;
-    body = `${_hk2ThreadHtml(r)}
+    body = `${_hk2ThreadHtml(r, isTop)}
       <div class="hk2-lbl">Booking details - the agent's pick, change if needed</div>
       <div class="hk2-fields">
         <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
@@ -33029,7 +33081,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
       </div>
       ${confBlock}`;
   } else if (r._kind === 'ghost') {
-    body = `${_hk2ThreadHtml(r)}
+    body = `${_hk2ThreadHtml(r, isTop)}
       <div class="hk2-note">Nothing sends now - the Ghosted automation takes over with its nudges. A reply bounces them straight back to Booking.</div>
       <div class="hk2-write"${isTop ? ' id="hk2-write"' : ''} style="display:none">
         <div class="hk2-lbl">Your message - sends now and keeps them in Booking</div>
@@ -33039,19 +33091,19 @@ function _hk2CardHtml(r, pos, total, isTop) {
     // Each row carries its planned send time (stamped at draft on the academy's
     // cadence) - show the real day so approving reads as locking a schedule.
     const _fuDay = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
-    body = `${_hk2ThreadHtml(r)}
+    body = `${_hk2ThreadHtml(r, isTop)}
       <div class="hk2-lbl">The plan - every message editable · clear a box to drop that step</div>
       ${(r.rows || []).map((row, i) => { const when = _fuDay(row.send_after); const last = i === r.rows.length - 1; return `<div class="hk2-lbl" style="margin-top:2px">${when ? `Sends ${when}` : `Message ${i + 1}`} · only if still no reply${last ? ' · final, no-pressure' : ''}</div><textarea class="hk2-draft sm"${isTop ? ` id="hk2-plan-${i}"` : ''} oninput="_hk2Edited()">${escapeHTML(row.draft_message || '')}</textarea>`; }).join('')}
       <div class="hk2-note">Approve = the schedule locks in and each message sends itself on its day, only while the lead stays quiet. A reply cancels the rest instantly. Change the cadence in the stage config (gear) under Follow-ups.</div>`;
   } else if (r._kind === 'handoff') {
     const note = r.handoff_note ? `<div class="hk2-note"><b style="color:var(--text)">Reason:</b> ${escapeHTML(r.handoff_note)}</div>` : '';
-    body = `${_hk2ThreadHtml(r)}${note}
+    body = `${_hk2ThreadHtml(r, isTop)}${note}
       <div class="hk2-lbl">Acknowledgement to send (optional)</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       <div class="hk2-note">One approve does BOTH: sends your note + hands the lead to Booking, and the Booking agent drafts the rebook text as its next action.</div>`;
   } else if (r._kind === 'lost') {
     const reason = r.lost_reason ? ` <span style="color:var(--red,#F07060);font-weight:700">${escapeHTML(r.lost_reason)}</span>` : '';
-    body = `${_hk2ThreadHtml(r)}
+    body = `${_hk2ThreadHtml(r, isTop)}
       <div class="hk2-lbl">Optional goodbye - sends with the move${reason}</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       <div class="hk2-note">Approving routes them to Nurture (the long game). You confirm - nothing moves on its own.</div>`;
@@ -33061,7 +33113,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
     // the teach note, the date is logistics (no note, like a slot change).
     const dt = r.reignite_at ? String(r.reignite_at).slice(0, 10) : '';
     const minDt = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-    body = `${_hk2ThreadHtml(r)}
+    body = `${_hk2ThreadHtml(r, isTop)}
       <div class="hk2-lbl">Acknowledgement - sends now (clear it for a silent park)</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       <div class="hk2-lbl">Reignition date - when we circle back</div>
@@ -33074,7 +33126,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
     // as the board form; submitting routes the lead via /api/ghl/post-trial.
     const p = _HK2.ptf || {};
     const seg = (grp, val, lab, on) => `<button type="button" class="hk2-segbtn${on ? ' on' : ''}"${isTop ? ` onclick="_hk2PtfPick('${grp}',${val})"` : ''}>${lab}</button>`;
-    body = `${_hk2ThreadHtml(r)}
+    body = `${_hk2ThreadHtml(r, isTop)}
       <div class="hk2-lbl">Did ${escapeHTML(r.athlete_name || 'the athlete')} show up?</div>
       <div class="hk2-seg">${seg('showed', true, 'Showed up', p.showed === true)}${seg('showed', false, 'No show', p.showed === false)}</div>
       <div id="hk2-ptf-rest" style="display:${p.showed === true ? '' : 'none'}">
@@ -33104,7 +33156,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
     // its final ✓ on the day the lead asked for.
     const reigBanner = (r._kind === 'reignite_due' && r.reignite_at)
       ? `<div class="hk2-booked"><span class="hk2-booked-check">✓</span> Reignition day - they asked us to circle back ${escapeHTML((() => { try { return new Date(r.reignite_at).toLocaleDateString([], { month: 'short', day: 'numeric' }); } catch (_) { return 'today'; } })())}</div>` : '';
-    body = `${_hk2ThreadHtml(r)}${reigBanner}${proposal}
+    body = `${_hk2ThreadHtml(r, isTop)}${reigBanner}${proposal}
       <div class="hk2-lbl">${r._kind === 'enroll' ? 'The reply, sign-up link included · edit it right here' : r._kind === 'reignite_due' ? 'The re-engagement message you locked in · edit before it sends' : 'Proposed message · edit it right here'}</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       ${r._kind === 'enroll' ? '<div class="hk2-note">The opportunity is marked won automatically when they pay on the link.</div>' : ''}`;
@@ -33161,6 +33213,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
     <input class="hk2-teach"${id.teach} style="display:none" placeholder="Required: why did you change it? If the bot was missing a fact (price, schedule, capacity), include the fact.">
     ${isForm ? '' : `<div class="hk2-other"${id.other}><div class="hk2-other-in"><span class="hk2-lbl">Move the lead</span>${moves}</div></div>`}
     <div class="hk2-bar">
+      ${(isTop && total > 1) ? `<button class="hk2-skip" onclick="_hk2Skip()" title="Skip for now - moves this card to the back of the queue" aria-label="Skip for now"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z"/><line x1="19" y1="5" x2="19" y2="19"/></svg></button>` : ''}
       ${isForm ? '' : `<button class="hk2-otherbtn" onclick="_hk2ToggleOther(this)">Other</button>`}
       ${ptfNotFit
         ? `<button class="hk2-go alt" onclick="_hk2PtfClose('unqualified')">Mark unqualified</button><button class="hk2-go ${km.cls}" onclick="_hk2PtfClose('lost')">Mark lost</button>`
@@ -33281,10 +33334,11 @@ function _hk2Render(opts) {
     </div>
     ${quietBar}
     <div class="hk2-deck">${deck}</div>
-    <div class="hk2-hint">every card resolves here - approve it or move the lead (no skip)<br>edits flip the button to "Confirm edits" and the teach-why note becomes required</div>`;
+    <div class="hk2-hint">approve it, move the lead, or skip to send it to the back of the queue<br>edits flip the button to "Confirm edits" and the teach-why note becomes required</div>`;
   const top = _hk2Top();
   // Only Book-it cards have live pickers. Proposal cards show the slot read-only.
   if (top && top._kind === 'book') _hk2EnsureBookOpts();
+  _hk2HydrateThread();   // fill the conversation preview if this card carried none
 }
 // ── Book-it pickers: the academy's trial calendars + open slots ──
 async function _hk2EnsureBookOpts() {
