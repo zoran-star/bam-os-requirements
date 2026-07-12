@@ -43,6 +43,7 @@ import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition } from "./agent/_reignite.js";
+import { liveMemberContactIds } from "./agent/_live-members.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -939,6 +940,14 @@ async function handler(req, res) {
           if (creds) ids = await doneTrialContactIdSetCached(creds.token, loc, 60000, { clientId, sb });
         }
         if (ids) list = list.filter(r => !r.ghl_contact_id || ids.has(r.ghl_contact_id));
+      } catch (_) { /* fail open */ }
+      // Read-time paying-member gate: a signed-up lead (live member) must never sit
+      // in the Closing deck - not even with the won-mark skipped (the returning-enroll
+      // silent path). Hide instantly at read time; the signup sweep + detector clear
+      // the rows. Match on ghl_contact_id. Fail open.
+      try {
+        const liveIds = await liveMemberContactIds(clientId);
+        if (liveIds.size) list = list.filter(r => !r.ghl_contact_id || !liveIds.has(String(r.ghl_contact_id)));
       } catch (_) { /* fail open */ }
       return res.status(200).json({ ready: list, count: list.length });
     }

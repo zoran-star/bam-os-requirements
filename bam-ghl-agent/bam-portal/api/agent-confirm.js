@@ -51,6 +51,7 @@ import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition } from "./agent/_reignite.js";
+import { liveMemberContactIds } from "./agent/_live-members.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -988,6 +989,14 @@ async function handler(req, res) {
           }
         }
       } catch (_) { /* form cards are additive - never block the queue */ }
+      // Read-time paying-member gate: a signed-up lead (live member) never belongs
+      // in the Confirm deck - including the synthesized post-trial form cards above
+      // (they carry ghl_contact_id). Hide instantly at read time; the signup sweep +
+      // detector clear the rows. Fail open.
+      try {
+        const liveIds = await liveMemberContactIds(clientId);
+        if (liveIds.size) list = list.filter(r => !r.ghl_contact_id || !liveIds.has(String(r.ghl_contact_id)));
+      } catch (_) { /* fail open */ }
       return res.status(200).json({ ready: list, count: list.length });
     }
     if (b.action === "skip-ready") {

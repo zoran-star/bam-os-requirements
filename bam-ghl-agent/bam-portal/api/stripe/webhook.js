@@ -40,6 +40,7 @@ import crypto from "node:crypto";
 import { fireOnboardingActivations } from "../onboarding/activations.js";
 import { sendSms, ghl } from "../ghl/_core.js";
 import { findOpenOpp, setStatus } from "../agent/_store.js";
+import { cancelAllSalesOutbound } from "../agent/_cancel-outbound.js";
 import { recordKpiEvent } from "../_kpi.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { enrollContact, exitEnrollment, isAutomationLive } from "../automations.js";
@@ -593,11 +594,18 @@ async function handleSubCreated(event, connectedAccount, res) {
   // exit ALL active sales enrollments for this contact. Idempotent (no-op if not
   // enrolled) and best-effort: never blocks the link. Only touches the portal's own
   // automation_enrollments table — it never reads or writes GHL, so V1 is untouched.
+  const conversionContactId = target.ghl_contact_id || (sub.metadata && sub.metadata.ghl_contact_id) || null;
   try {
-    const exitContactId = target.ghl_contact_id || (sub.metadata && sub.metadata.ghl_contact_id) || null;
-    if (exitContactId) {
-      await exitEnrollment({ clientId: target.client_id, contactId: exitContactId, reason: "converted" });
-    }
+    if (conversionContactId) await exitEnrollment({ clientId: target.client_id, contactId: conversionContactId, reason: "converted" });
+  } catch { /* non-fatal */ }
+
+  // Signup sweep: cancel EVERY pending/approved agent-scheduled message (booking,
+  // confirm, closing follow-up plan) + any parked reignition for this contact. The
+  // member just went live - they must never get another sales text. Mirrors the
+  // reply-cancel sweep (shared helper); portal-native tables only, so V1 is
+  // untouched. Its own try block so a drip-exit error can't skip it. Best-effort.
+  try {
+    if (conversionContactId) await cancelAllSalesOutbound({ clientId: target.client_id, contactId: conversionContactId, sendError: "lead signed up" });
   } catch { /* non-fatal */ }
 
   // Funnel KPI: record the conversion (lead went live on Stripe), tied to the
@@ -882,20 +890,33 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
     }
   }
 
+  const conversionContactId =
+    (activations && activations.ghl && activations.ghl.contact_id) ||
+    member.ghl_contact_id ||
+    (onbSub.metadata && onbSub.metadata.ghl_contact_id) ||
+    null;
   let salesExit = null;
   try {
-    const exitContactId =
-      (activations && activations.ghl && activations.ghl.contact_id) ||
-      member.ghl_contact_id ||
-      (onbSub.metadata && onbSub.metadata.ghl_contact_id) ||
-      null;
-    if (exitContactId) {
-      salesExit = await exitEnrollment({ clientId: member.client_id, contactId: exitContactId, reason: "converted" });
-    } else {
-      salesExit = { skipped: "no ghl contact id" };
-    }
+    salesExit = conversionContactId
+      ? await exitEnrollment({ clientId: member.client_id, contactId: conversionContactId, reason: "converted" })
+      : { skipped: "no ghl contact id" };
   } catch (e) {
     salesExit = { ok: false, error: String((e && e.message) || e) };
+  }
+
+  // Signup sweep: cancel every pending/approved agent-scheduled message (booking,
+  // confirm, closing follow-up plan) + any parked reignition for this contact. THIS
+  // is the fix for the returning-enroll "silent" path too: it skips the won-mark
+  // (markOpportunityWon is guarded by !silent), so the detector's left-stage prune
+  // never fires and the closing cards previously lingered until a cron or a reply
+  // cleared them. Its own try block, independent of the drip-exit. Portal-native; V1 safe.
+  let salesSweep = null;
+  try {
+    salesSweep = conversionContactId
+      ? await cancelAllSalesOutbound({ clientId: member.client_id, contactId: conversionContactId, sendError: "lead signed up" })
+      : { skipped: "no ghl contact id" };
+  } catch (e) {
+    salesSweep = { ok: false, error: String((e && e.message) || e) };
   }
 
   let commitmentSchedule = null;
@@ -940,11 +961,11 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
   await writeAudit({
     client_id: member.client_id, member_id: member.id,
     action_type: silent ? "import-activated-silent" : "onboarding-activated",
-    args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon },
+    args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, sales_sweep: salesSweep, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon },
     db_changes: { members: { status: { from: "payment_method_required", to: "live" } } },
   });
 
-  return { ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon };
+  return { ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, sales_sweep: salesSweep, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon };
 }
 
 async function handleInvoiceSucceeded(event, connectedAccount, res) {

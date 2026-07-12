@@ -37,6 +37,7 @@ import { buildGoogleCalUrl, buildIcalUrl } from "./agent/confirm-automations.js"
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition, listReignitions } from "./agent/_reignite.js";
+import { liveMemberContactIds } from "./agent/_live-members.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -969,6 +970,15 @@ async function handler(req, res) {
       try {
         const booked = await upcomingBookedContactIds(clientId);
         if (booked.size) list = list.filter(r => !r.ghl_contact_id || !booked.has(String(r.ghl_contact_id)));
+      } catch (_) { /* fail open */ }
+      // Read-time paying-member gate: a lead who already signed up (live member)
+      // must NEVER sit in the Booking deck or the ghost tab. The signup sweep +
+      // detector cancel their cards, but hide instantly at read time too so a
+      // just-converted lead can't linger for a cron cycle. Match on ghl_contact_id
+      // (same semantics as the isLiveMember guard). Fail open.
+      try {
+        const liveIds = await liveMemberContactIds(clientId);
+        if (liveIds.size) list = list.filter(r => !r.ghl_contact_id || !liveIds.has(String(r.ghl_contact_id)));
       } catch (_) { /* fail open */ }
       // Booking provider drives the Book-it card copy: only portal academies send
       // the confirmation text from the deck; GHL academies let GHL's booked-trial
