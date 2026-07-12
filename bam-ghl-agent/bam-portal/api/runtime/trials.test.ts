@@ -205,6 +205,7 @@ const createdProfileIds: string[] = [];
 const createdStudentIds: string[] = [];
 const createdMembershipIds: string[] = [];
 const createdEntitlementIds: string[] = [];
+const createdMemberIds: string[] = [];
 
 describe("trial booking runtime APIs", () => {
   beforeAll(async () => {
@@ -688,6 +689,28 @@ describe("trial booking runtime APIs", () => {
       } satisfies Partial<ParentSlotChildAction>);
   });
 
+  it("does not restore free-trial eligibility while a paid membership is paused", async () => {
+    const slotId = await createSlot(futureDateAtUtcHour(25, 21), "Paused Paid Member");
+    const studentId = await createPausedPaidStudent(trialEligibleActor.profileId);
+
+    expect(childAction(await parentSlot(slotId, trialParentToken), studentId)).toMatchObject({
+      action: "unavailable",
+      booking_kind: null,
+      enabled: false,
+      reason: "membership_paused",
+      student_id: studentId,
+    } satisfies Partial<ParentSlotChildAction>);
+
+    const bookingRes = await invoke(parentTrialBookingHandler, {
+      method: "POST",
+      headers: { authorization: `Bearer ${trialParentToken}` },
+      body: parentTrialBookingBody(slotId, studentId),
+    });
+
+    expect(bookingRes.statusCode).toBe(409);
+    expect(bookingRes.body).toEqual({ error: "Student already has a paid membership." });
+  });
+
   it("authorizes public cancellation by matching parent email and frees capacity", async () => {
     const trialId = requireTrialBookingId();
     const wrongEmailRes = await invoke(trialBookingHandler, {
@@ -1096,6 +1119,41 @@ async function createStudentForParent(profileId: string, label: string): Promise
   return studentId;
 }
 
+async function createPausedPaidStudent(profileId: string): Promise<string> {
+  const studentId = await createStudentForParent(profileId, "paused-paid");
+  const membershipId = randomUUID();
+  const memberId = randomUUID();
+  createdMembershipIds.push(membershipId);
+  createdMemberIds.push(memberId);
+
+  await insertRow("academy_memberships", {
+    id: membershipId,
+    academy_id: TENANT_ID,
+    student_id: studentId,
+    status: "SUSPENDED",
+    joined_at: new Date().toISOString(),
+    stripe_customer_id: `cus_paused_${memberId.replaceAll("-", "").slice(0, 18)}`,
+  });
+  await insertRow("members", {
+    id: memberId,
+    client_id: TENANT_ID,
+    athlete_name: "Runtime Paused Paid Athlete",
+    parent_name: "Runtime Trial Parent",
+    plan: "1/wk",
+    status: "paused",
+    stripe_customer_id: `cus_paused_${memberId.replaceAll("-", "").slice(0, 18)}`,
+    stripe_subscription_id: `sub_paused_${memberId.replaceAll("-", "").slice(0, 18)}`,
+  });
+  await insertRow("member_links", {
+    student_id: studentId,
+    member_id: memberId,
+    matched_by: "manual",
+    confirmed_at: new Date().toISOString(),
+  });
+
+  return studentId;
+}
+
 async function createActiveMembershipForStudent(studentId: string, label: string): Promise<string> {
   const membershipId = randomUUID();
   createdMembershipIds.push(membershipId);
@@ -1289,6 +1347,9 @@ async function cleanupCreatedRows(): Promise<void> {
   }
   if (createdEntitlementIds.length > 0) {
     await serviceSupabase.from("customer_entitlements").delete().in("id", uniqueValues(createdEntitlementIds));
+  }
+  if (createdMemberIds.length > 0) {
+    await serviceSupabase.from("members").delete().in("id", uniqueValues(createdMemberIds));
   }
   if (createdMembershipIds.length > 0) {
     await serviceSupabase.from("academy_memberships").delete().in("id", uniqueValues(createdMembershipIds));
