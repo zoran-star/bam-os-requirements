@@ -43,6 +43,7 @@ import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition } from "./agent/_reignite.js";
+import { liveMemberContactIds } from "./agent/_live-members.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -940,6 +941,14 @@ async function handler(req, res) {
         }
         if (ids) list = list.filter(r => !r.ghl_contact_id || ids.has(r.ghl_contact_id));
       } catch (_) { /* fail open */ }
+      // Read-time paying-member gate: a signed-up lead (live member) must never sit
+      // in the Closing deck - not even with the won-mark skipped (the returning-enroll
+      // silent path). Hide instantly at read time; the signup sweep + detector clear
+      // the rows. Match on ghl_contact_id. Fail open.
+      try {
+        const liveIds = await liveMemberContactIds(clientId);
+        if (liveIds.size) list = list.filter(r => !r.ghl_contact_id || !liveIds.has(String(r.ghl_contact_id)));
+      } catch (_) { /* fail open */ }
       return res.status(200).json({ ready: list, count: list.length });
     }
     if (b.action === "skip-ready") {
@@ -1001,6 +1010,13 @@ async function handler(req, res) {
       planRows = (Array.isArray(planRows) ? planRows : []).filter(r => (r.step_key || "").startsWith("followup_"));
       if (!planRows.length) return res.status(404).json({ error: "no pending follow-up plan for this lead" });
       const editById = new Map(b.edits.map(e => [String(e.id), String(e.reply || "").trim()]));
+      // Staff can move any single step's send day right in the deck (YYYY-MM-DD).
+      // Stamped at 14:00 UTC to match the cadence/decision-date convention; the
+      // quiet-hours guard below still slides it to the next sendable morning if
+      // needed. A row with no override keeps its cadence spacing + late slide.
+      const whenById = new Map(b.edits
+        .filter(e => e && typeof e.send_at === "string" && /^\d{4}-\d{2}-\d{2}$/.test(e.send_at))
+        .map(e => [String(e.id), `${e.send_at}T14:00:00Z`]));
       // The lead's decision date (if the agent extracted one) pushes the whole plan.
       const holdMs = planRows.reduce((m, r) => Math.max(m, r.followup_not_before ? new Date(r.followup_not_before).getTime() : 0), 0);
       const kept = planRows.filter(r => editById.get(String(r.id)));
@@ -1017,9 +1033,12 @@ async function handler(req, res) {
           dropped++;
           continue;
         }
-        const plannedMs = row.send_after
-          ? new Date(row.send_after).getTime() + slide
-          : Math.max(Date.now(), holdMs || 0) + dayIdx * 86400000;
+        const override = whenById.get(String(row.id));
+        const plannedMs = override
+          ? new Date(override).getTime()   // staff picked this day - use it as-is (no slide)
+          : row.send_after
+            ? new Date(row.send_after).getTime() + slide
+            : Math.max(Date.now(), holdMs || 0) + dayIdx * 86400000;
         const sendAfter = nextSendableTime(new Date(plannedMs), quietTz(client)).toISOString();
         await sb(`agent_closing_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({
           status: "approved", draft_message: text, send_after: sendAfter,

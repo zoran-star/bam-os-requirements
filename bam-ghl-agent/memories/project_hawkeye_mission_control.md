@@ -327,6 +327,18 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   + the wording editor (gated on section.editable). All "1 day apart" copy killed.
   Nothing auto-sends (GTA closing_mode=hawkeye, self-drive globally off) - safe. Applied
   to GTA (default cadence). NOT prod-verified end-to-end yet.
+- 🔥 PER-STEP SEND DAY EDITABLE IN THE PLAN CARD (2026-07-12, Zoran: "edit the actual
+  schedule of the follow ups too"). Each plan row now shows an inline `type=date` picker
+  (pre-filled from `send_after.slice(0,10)`, min = tomorrow) NEXT to its message box, in
+  BOTH the V2 hk2 deck (`.hk2-when` / `#hk2-plan-when-${i}`) and the V1.5 `_aclxPlanCard`
+  (`#aclx-when-${id}`). Changing a date flips the confirm button to "Confirm edits and
+  schedule" via `_hk2Edited(true)` but does NOT demand a teach-why note (schedule = logistics,
+  like a slot change, not agent-error). approve-plan `edits[]` now carries an optional
+  `send_at` (YYYY-MM-DD) - sent ONLY for rows the staff actually moved (compared to the
+  prefill), so untouched rows keep the cadence spacing + late-approval slide. Backend stamps
+  the override at `${send_at}T14:00:00Z` (matches followup_on/decision-date convention) and
+  uses it as-is (no slide); quiet-hours `nextSendableTime` still applies. The stage-config
+  gear stays the DEFAULT cadence; the card is the per-lead override. NOT prod-verified yet.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch
   incl. reignition + always-scheduled closing follow-ups end-to-end.
 - HOME <-> HAWKEYE ALIGNMENT (2026-07-10, Zoran: "make sure the home inbox lines up
@@ -437,6 +449,35 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
     (ADAPT-minted) - falls to a nameless warm greeting. #27 scheduleStepJob returns
     an ok flag; enrollContact/advance exit the enrollment with a visible reason
     instead of leaving a phantom-active enrollment with zero pending jobs.
+
+- 🐞 TWO GTA LIVE BUGS (2026-07-11, Yaz/Tara + Kartik):
+  * BOOKED LEAD COULD GET A SECOND BOOK-IT (double-booking risk): the Booking
+    detector guarded PASSED trials (`passedTrialContactIds`) but had NO guard for a
+    lead with an UPCOMING BOOKED trial - a stage-move hiccup leaving them in Responded
+    re-queued another Book-it. NEW `upcomingBookedContactIds(clientId)` in
+    agent/booking.js (portal-only, mirrors passedTrial; BOOKED trials whose slot is
+    still future). agent-approvals uses it in 3 places: detector per-contact skip,
+    prune loop ("already booked - has an upcoming trial"), list-ready read gate. The
+    Confirm agent deliberately does NOT use it (a booked lead belongs in confirm land).
+    NOTE on Tara/Yaz specifically: NO double-book existed - she corrected "Jul 13 not
+    14", the webhook canceled the Jul-14 card, the detector drafted a valid Jul-13 8pm
+    card (that's the "card came back"); the guard prevents the SECOND card once she's
+    actually booked. No stale slot to clean.
+  * POST-TRIAL FORM CARD RESURRECTS AFTER A GOOD SUBMIT: list-ready keys reviewed
+    trials on trial_booking_id; a review saved with NULL trial_booking_id is dropped
+    from reviewedBookings -> the trial stays "unreviewed" -> the form card comes back.
+    Null happened when post-trial.js's BOOKED-only resolve query returned nothing (a
+    2nd submit: the 1st stamped the trial SHOWED) or threw. FIX (a, primary):
+    post-trial.js now resolves trials with status IN (BOOKED,SHOWED,NO_SHOW) and stamps
+    `reviewTrialId` = most recent passed trial of ANY status (trialBookingTarget stays
+    BOOKED-only for the SHOWED/NO_SHOW outcome stamp) -> trial_booking_id is never null
+    when a passed trial exists + stays stable across resubmits. FIX (b, net):
+    agent-confirm list-ready also suppresses a synthesized card when a NULL-trial review
+    exists for that opp filed at/after the trial ran (`reviewedNullOppAt`; rebook-safe -
+    a newer trial post-dates the old review). Kartik's own row was NON-null (his submit
+    fully succeeded: moved to done_trial, signup text sent) - his reported "error" was
+    NOT this bug; get the exact error text. His trial is now SHOWED so a plain review
+    delete will NOT regenerate the card (synthesis needs BOOKED).
 
 ## Open item (ask Zoran before building)
 Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-commit.

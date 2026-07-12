@@ -218,6 +218,18 @@
       "destination": "/api/parent/messages?action=unread-count"
     },
     {
+      "source": "/api/parent/member-management/change-plan",
+      "destination": "/api/parent/member-management?action=change-plan"
+    },
+    {
+      "source": "/api/parent/member-management/pause",
+      "destination": "/api/parent/member-management?action=pause"
+    },
+    {
+      "source": "/api/parent/member-management/resume",
+      "destination": "/api/parent/member-management?action=resume"
+    },
+    {
       "source": "/api/parent/billing/payment-method/default",
       "destination": "/api/parent/billing?action=payment-method-default"
     },

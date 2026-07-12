@@ -24,7 +24,7 @@ import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
-import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial, passedTrialContactIds } from "./agent/booking.js";
+import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial, passedTrialContactIds, upcomingBookedContactIds } from "./agent/booking.js";
 import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
@@ -37,6 +37,7 @@ import { buildGoogleCalUrl, buildIcalUrl } from "./agent/confirm-automations.js"
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition, listReignitions } from "./agent/_reignite.js";
+import { liveMemberContactIds } from "./agent/_live-members.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -483,6 +484,10 @@ async function detectForClient(client) {
   // Leads whose booked trial has already run: Booking hands them to the post-trial
   // form (Confirm tab) instead of drafting another reply.
   const passedTrial = await passedTrialContactIds(client.id);
+  // Leads with an UPCOMING booked trial: already locked into a slot, so never
+  // draft a second Book-it/reply. Guards the double-booking a stage-move hiccup
+  // would otherwise cause (Yaz/Tara, GTA 2026-07-11).
+  const upcomingBooked = await upcomingBookedContactIds(client.id);
 
   // Prune stale cards: cancel pending drafts whose lead has LEFT the Responded
   // stage (booked, moved, lost…) so Hawkeye only ever shows current Responded leads.
@@ -492,6 +497,9 @@ async function detectForClient(client) {
     for (const row of (Array.isArray(pend) ? pend : [])) {
       if (row.ghl_contact_id && passedTrial.has(String(row.ghl_contact_id))) {
         await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "trial ran - handed to post-trial form", updated_at: new Date().toISOString() }) });
+        pruned++;
+      } else if (row.ghl_contact_id && upcomingBooked.has(String(row.ghl_contact_id))) {
+        await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "already booked - has an upcoming trial", updated_at: new Date().toISOString() }) });
         pruned++;
       } else if (row.ghl_contact_id && !respondedIds.has(row.ghl_contact_id)) {
         await sb(`agent_ready_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Responded stage", updated_at: new Date().toISOString() }) });
@@ -578,6 +586,7 @@ async function detectForClient(client) {
     if (!contactId) { skipped++; reasons.push(`${item.name || "?"}: no contactId in queue item`); continue; }
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
     if (passedTrial.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: trial already ran → post-trial form`); continue; }
+    if (upcomingBooked.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: already booked → has an upcoming trial`); continue; }
     // A parked lead who texted back re-engaged early: clear the park (belt +
     // suspenders with the inbound webhook's cancel) and reply normally. But only
     // when a NEW inbound landed AFTER the park - a silently-parked lead (no ack)
@@ -954,6 +963,22 @@ async function handler(req, res) {
       try {
         const passed = await passedTrialContactIds(clientId);
         if (passed.size) list = list.filter(r => !r.ghl_contact_id || !passed.has(String(r.ghl_contact_id)));
+      } catch (_) { /* fail open */ }
+      // Read-time already-booked gate: a lead with an upcoming booked trial is
+      // locked in - hide any lingering Book-it/reply card until the detector cron
+      // cancels it, so a booked lead can't get a second Book-it. Fail open.
+      try {
+        const booked = await upcomingBookedContactIds(clientId);
+        if (booked.size) list = list.filter(r => !r.ghl_contact_id || !booked.has(String(r.ghl_contact_id)));
+      } catch (_) { /* fail open */ }
+      // Read-time paying-member gate: a lead who already signed up (live member)
+      // must NEVER sit in the Booking deck or the ghost tab. The signup sweep +
+      // detector cancel their cards, but hide instantly at read time too so a
+      // just-converted lead can't linger for a cron cycle. Match on ghl_contact_id
+      // (same semantics as the isLiveMember guard). Fail open.
+      try {
+        const liveIds = await liveMemberContactIds(clientId);
+        if (liveIds.size) list = list.filter(r => !r.ghl_contact_id || !liveIds.has(String(r.ghl_contact_id)));
       } catch (_) { /* fail open */ }
       // Booking provider drives the Book-it card copy: only portal academies send
       // the confirmation text from the deck; GHL academies let GHL's booked-trial
