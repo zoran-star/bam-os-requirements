@@ -438,6 +438,35 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
     an ok flag; enrollContact/advance exit the enrollment with a visible reason
     instead of leaving a phantom-active enrollment with zero pending jobs.
 
+- 🐞 TWO GTA LIVE BUGS (2026-07-11, Yaz/Tara + Kartik):
+  * BOOKED LEAD COULD GET A SECOND BOOK-IT (double-booking risk): the Booking
+    detector guarded PASSED trials (`passedTrialContactIds`) but had NO guard for a
+    lead with an UPCOMING BOOKED trial - a stage-move hiccup leaving them in Responded
+    re-queued another Book-it. NEW `upcomingBookedContactIds(clientId)` in
+    agent/booking.js (portal-only, mirrors passedTrial; BOOKED trials whose slot is
+    still future). agent-approvals uses it in 3 places: detector per-contact skip,
+    prune loop ("already booked - has an upcoming trial"), list-ready read gate. The
+    Confirm agent deliberately does NOT use it (a booked lead belongs in confirm land).
+    NOTE on Tara/Yaz specifically: NO double-book existed - she corrected "Jul 13 not
+    14", the webhook canceled the Jul-14 card, the detector drafted a valid Jul-13 8pm
+    card (that's the "card came back"); the guard prevents the SECOND card once she's
+    actually booked. No stale slot to clean.
+  * POST-TRIAL FORM CARD RESURRECTS AFTER A GOOD SUBMIT: list-ready keys reviewed
+    trials on trial_booking_id; a review saved with NULL trial_booking_id is dropped
+    from reviewedBookings -> the trial stays "unreviewed" -> the form card comes back.
+    Null happened when post-trial.js's BOOKED-only resolve query returned nothing (a
+    2nd submit: the 1st stamped the trial SHOWED) or threw. FIX (a, primary):
+    post-trial.js now resolves trials with status IN (BOOKED,SHOWED,NO_SHOW) and stamps
+    `reviewTrialId` = most recent passed trial of ANY status (trialBookingTarget stays
+    BOOKED-only for the SHOWED/NO_SHOW outcome stamp) -> trial_booking_id is never null
+    when a passed trial exists + stays stable across resubmits. FIX (b, net):
+    agent-confirm list-ready also suppresses a synthesized card when a NULL-trial review
+    exists for that opp filed at/after the trial ran (`reviewedNullOppAt`; rebook-safe -
+    a newer trial post-dates the old review). Kartik's own row was NON-null (his submit
+    fully succeeded: moved to done_trial, signup text sent) - his reported "error" was
+    NOT this bug; get the exact error text. His trial is now SHOWED so a plain review
+    delete will NOT regenerate the card (synthesis needs BOOKED).
+
 ## Open item (ask Zoran before building)
 Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-commit.
 Swipe LEFT destinations differ per agent: Booking Ghosted/Nurture/Unqualified ·

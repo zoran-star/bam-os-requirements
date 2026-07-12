@@ -86,6 +86,9 @@ function isoToUnix(iso) {
 function unixToDateStr(unix) {
   return new Date(unix * 1000).toISOString().slice(0, 10);
 }
+function newRowOperationId() {
+  return crypto.randomUUID();
+}
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -799,6 +802,7 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
   }
 
   const pauseLengthSeconds = endUnix - startUnix;
+  const operationId = body.operation_id || newRowOperationId();
   let trialEndUnix = null;
   let cappedToStripeMax = false;
   let resumeDate = null;
@@ -878,7 +882,7 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
           proration_behavior: "none",
           "pause_collection": "",
         },
-        idempotencyKey: `pause-immediate-${newRowId}`,
+        idempotencyKey: `pause-immediate-${member.id}-${operationId}`.slice(0, 255),
       });
     } catch (e) {
       // Mark the row failed and bail out — member status stays 'live'.
@@ -946,22 +950,29 @@ async function actionUnpause(res, member, stripeAccount, ctx, body) {
     return res.status(400).json({ error: "member has no Stripe subscription" });
   }
 
+  const cancellingScheduledPause = member.status !== "paused" && Boolean(member.pause_scheduled_for);
   let resumeNow = !body.new_until;
   let newTrialEnd = null;
-  let stripeBody;
+  let stripeBody = null;
   if (resumeNow) {
-    // Clear trial_end → sub resumes now, next charge happens immediately per Stripe behavior.
-    stripeBody = { "trial_end": "now", proration_behavior: "none" };
+    // A queued pause has not touched Stripe yet, so cancelling it must only
+    // clear the pending DB state. Active pauses resume billing immediately.
+    if (!cancellingScheduledPause) {
+      stripeBody = { "trial_end": "now", proration_behavior: "none" };
+    }
   } else {
     newTrialEnd = isoToUnix(body.new_until);
     stripeBody = { trial_end: String(newTrialEnd), proration_behavior: "none" };
   }
 
-  const sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
-    method: "POST",
-    stripeAccount,
-    body: stripeBody,
-  });
+  const sub = stripeBody
+    ? await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
+        method: "POST",
+        stripeAccount,
+        body: stripeBody,
+        idempotencyKey: `unpause-${member.id}-${body.operation_id || newRowOperationId()}`.slice(0, 255),
+      })
+    : { id: member.stripe_subscription_id, status: "active", trial_end: null };
 
   const dbChanges = {};
   if (resumeNow) {
@@ -1001,7 +1012,7 @@ async function actionUnpause(res, member, stripeAccount, ctx, body) {
   await writeAudit({
     client_id: member.client_id,
     member_id: member.id,
-    action_type: "unpause",
+    action_type: cancellingScheduledPause ? "pause-cancelled" : "unpause",
     args: body,
     performed_by: ctx.user.id,
     performed_by_name: ctx.staff?.name || null,
@@ -1224,14 +1235,15 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
 
   let newPriceId, newPlan, targetRow;
   if (body.new_price_id) {
-    targetRow = byPrice.get(body.new_price_id);
+    const catalogPriceId = body.catalog_price_id || body.new_price_id;
+    targetRow = byPrice.get(catalogPriceId);
     if (!targetRow) {
       return res.status(400).json({ error: "that price isn't in this academy's catalog" });
     }
     if (targetRow.is_routable !== true) {
       return res.status(400).json({ error: "that price isn't a live (sellable) price" });
     }
-    newPriceId = body.new_price_id;
+    newPriceId = body.stripe_target_price_id || body.new_price_id;
     newPlan = targetRow.canonical_plan || cleanLabel(targetRow.display_name);
   } else {
     newPlan = body.new_plan;
@@ -1243,7 +1255,8 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
   }
 
   // Already on this exact price?
-  if (member.stripe_price_id && member.stripe_price_id === newPriceId) {
+  const persistedPriceId = body.catalog_price_id || newPriceId;
+  if (member.stripe_price_id && member.stripe_price_id === persistedPriceId) {
     return res.status(400).json({ error: `already on ${newPlan}` });
   }
 
@@ -1292,6 +1305,7 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
   const intervalMismatch = !!(currentRow && targetRow && currentRow.interval && targetRow.interval
     && currentRow.interval !== targetRow.interval);
 
+  const operationId = body.operation_id || newRowOperationId();
   let sub, mode, prorated = false, nextUnix = null;
 
   if (intervalMismatch) {
@@ -1302,7 +1316,10 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     // New sub starts charging at next_payment_date, or the existing period end so
     // the member keeps time they already paid for (no double charge). Card +
     // portal origin carry over so the new sub stays portal-managed.
-    const startUnix = trialEndUnix || subCurrentPeriodEnd(currentSub) || (nowUnix() + 86400);
+    // Preserve an active pause when recreating across billing intervals. A
+    // pause's trial_end can be later than current_period_end; dropping it here
+    // would silently shorten the parent's approved pause.
+    const startUnix = trialEndUnix || currentSub.trial_end || subCurrentPeriodEnd(currentSub) || (nowUnix() + 86400);
     const createBody = {
       customer: member.stripe_customer_id,
       "items[0][price]": newPriceId,
@@ -1312,12 +1329,27 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     if (startUnix > nowUnix()) createBody.trial_end = String(startUnix);
     const pm = currentSub.default_payment_method;
     if (pm) createBody.default_payment_method = (typeof pm === "string" ? pm : pm.id);
-    sub = await stripeFetch(`/subscriptions`, { method: "POST", stripeAccount, body: createBody });
+    sub = await stripeFetch(`/subscriptions`, {
+      method: "POST",
+      stripeAccount,
+      body: createBody,
+      idempotencyKey: `member-change-create-${member.id}-${operationId}`.slice(0, 255),
+    });
     // Cancel the old sub now. If that fails, roll back the new one so we never double-bill.
     try {
-      await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, { method: "DELETE", stripeAccount });
+      await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
+        method: "DELETE",
+        stripeAccount,
+        idempotencyKey: `member-change-delete-old-${member.id}-${operationId}`.slice(0, 255),
+      });
     } catch (e) {
-      try { await stripeFetch(`/subscriptions/${sub.id}`, { method: "DELETE", stripeAccount }); } catch (_) {}
+      try {
+        await stripeFetch(`/subscriptions/${sub.id}`, {
+          method: "DELETE",
+          stripeAccount,
+          idempotencyKey: `member-change-rollback-${member.id}-${operationId}`.slice(0, 255),
+        });
+      } catch (_) {}
       return res.status(502).json({ error: "Couldn't cancel the old subscription - no change made. " + (e.message || "") });
     }
     nextUnix = startUnix > nowUnix() ? startUnix : subCurrentPeriodEnd(sub);
@@ -1326,7 +1358,7 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({
         stripe_subscription_id: sub.id,
-        stripe_price_id: newPriceId,
+        stripe_price_id: persistedPriceId,
         plan: newPlan,
         updated_at: nowIso(),
       }),
@@ -1335,7 +1367,7 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     // (the invoice.paid webhook converges on the same source_ref later).
     await syncMemberAccessNonFatal({
       clientId: member.client_id, memberId: member.id,
-      reason: "subscription-updated", subscriptionId: sub.id, stripePriceId: newPriceId,
+      reason: "subscription-updated", subscriptionId: sub.id, stripePriceId: persistedPriceId,
     });
   } else {
     mode = "swap";
@@ -1355,6 +1387,7 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
       method: "POST",
       stripeAccount,
       body: updateBody,
+      idempotencyKey: `member-change-swap-${member.id}-${operationId}`.slice(0, 255),
     });
     nextUnix = trialEndUnix != null ? trialEndUnix : subCurrentPeriodEnd(sub);
     await sb(`members?id=eq.${member.id}`, {
@@ -1362,12 +1395,12 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
       headers: { Prefer: "return=minimal" },
       // Persist the new price too - without this the row keeps the old
       // stripe_price_id, so the roster shows the stale amount/Archived tag.
-      body: JSON.stringify({ stripe_price_id: newPriceId, plan: newPlan, updated_at: nowIso() }),
+      body: JSON.stringify({ stripe_price_id: persistedPriceId, plan: newPlan, updated_at: nowIso() }),
     });
     // Offer tie-in F: move the entitlement to the new plan's template now.
     await syncMemberAccessNonFatal({
       clientId: member.client_id, memberId: member.id,
-      reason: "subscription-updated", subscriptionId: member.stripe_subscription_id, stripePriceId: newPriceId,
+      reason: "subscription-updated", subscriptionId: member.stripe_subscription_id, stripePriceId: persistedPriceId,
     });
   }
 
@@ -1430,6 +1463,10 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
     next_payment: nextUnix,
   });
 }
+
+// Parent member-management routes reuse the same billing operations after
+// performing their own student ownership checks and input sanitization.
+export { actionChange, actionPause, actionUnpause };
 
 // ─────────────────────────────────────────────────────────
 // Action: APPLY-COUPON

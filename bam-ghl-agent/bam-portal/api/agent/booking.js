@@ -76,6 +76,26 @@ export async function passedTrialContactIds(clientId) {
   } catch (_) { return new Set(); }
 }
 
+// Contacts with an UPCOMING booked trial (slot start still in the future): they
+// are already locked into a slot, so the Booking detector must NOT draft another
+// Book-it / reply card for them. Without this, a stage-move hiccup that leaves a
+// just-booked lead in Responded lets the detector re-queue a SECOND Book-it ->
+// double booking (Yaz/Tara, GTA 2026-07-11). Read-time gates hide any lingering
+// Booking card the same way. Portal-booking academies only (their trial spine
+// lives in trial_bookings). The Confirm agent deliberately does NOT use this set -
+// a booked lead belongs in confirm land (that is where confirmations happen).
+// Fails to an empty set so a lookup hiccup never wrongly hides live cards.
+export async function upcomingBookedContactIds(clientId) {
+  try {
+    if (!clientId) return new Set();
+    if ((await bookingProviderOf(clientId)) !== "portal") return new Set();
+    const nowIso = new Date().toISOString();
+    const bks = await sbFetch(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=ghl_contact_id,schedule_slots(start_time)`) || [];
+    const rows = (Array.isArray(bks) ? bks : []).filter(t => t.ghl_contact_id && t.schedule_slots && t.schedule_slots.start_time);
+    return new Set(rows.filter(t => t.schedule_slots.start_time > nowIso).map(t => String(t.ghl_contact_id)));
+  } catch (_) { return new Set(); }
+}
+
 // Normalize a calendar label to a group key the agent uses.
 function groupOf(label) {
   const s = String(label || "").toLowerCase();

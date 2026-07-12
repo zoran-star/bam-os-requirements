@@ -931,8 +931,22 @@ async function handler(req, res) {
             // and rebooked isn't suppressed by the old review - the new booking
             // is a different id. The per-opp review upsert makes trial_booking_id
             // follow the latest reviewed trial, so filling the form still hides it.
-            const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=trial_booking_id`) || [];
+            const revs = await sb(`post_trial_reviews?client_id=eq.${clientId}&select=trial_booking_id,opportunity_id,created_at`) || [];
             const reviewedBookings = new Set((Array.isArray(revs) ? revs : []).map(r => String(r.trial_booking_id || "")).filter(Boolean));
+            // Safety net for reviews that saved with a NULL trial_booking_id (the
+            // resolve query threw on submit): they are dropped from reviewedBookings
+            // above, so their trial would resurrect. Key such reviews on the OPP +
+            // when they were filed - a card is suppressed only when a null-trial
+            // review for that opp was filed at/after the trial ran (so a genuine
+            // rebook on the same opp, whose newer trial post-dates the old review,
+            // still gets its own card). Belt-and-suspenders behind the non-null
+            // trial_booking_id guarantee in api/ghl/post-trial.js.
+            const reviewedNullOppAt = new Map();
+            for (const r of (Array.isArray(revs) ? revs : [])) {
+              if (r.trial_booking_id || !r.opportunity_id) continue;
+              const oid = String(r.opportunity_id), ms = new Date(r.created_at || 0).getTime() || 0;
+              if (ms > (reviewedNullOppAt.get(oid) || 0)) reviewedNullOppAt.set(oid, ms);
+            }
             // 🔥 Parked for reignition: leaving them alone IS the plan - no
             // post-trial form card while a reignition is scheduled (their dropped
             // slot was voided at park time; this guards the stragglers).
@@ -957,6 +971,9 @@ async function handler(req, res) {
               let oppId = null;
               try { const o = await findOpenOpp(clientId, null, client.ghl_location_id, cid); oppId = o && (o.ghlOpportunityId || o.id) || null; } catch (_) {}
               if (!oppId) continue;
+              // Null-trial review already covers this trial (see reviewedNullOppAt).
+              const nullRevAt = reviewedNullOppAt.get(String(oppId)) || 0;
+              if (nullRevAt && nullRevAt >= new Date(t.schedule_slots.start_time).getTime()) continue;
               let when = "";
               try { when = new Date(t.schedule_slots.start_time).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: client.time_zone || "America/Toronto" }); } catch (_) {}
               list.push({

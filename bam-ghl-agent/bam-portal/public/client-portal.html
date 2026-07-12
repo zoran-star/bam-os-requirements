@@ -9110,8 +9110,9 @@ Then the call to action."]</div>
           .hk2-draftwrap:focus-within .hk2-draftcap .edit{display:inline-flex}
           .hk2-draftcap svg{flex:none}
           .hk2-note{font-size:11px;color:var(--text-mute);line-height:1.45}
-          .hk2-teach{width:100%;box-sizing:border-box;background:var(--bg);border:1px dashed var(--border);border-radius:9px;color:var(--text-sub);font:inherit;font-size:12.5px;padding:9px 11px;outline:none}
+          .hk2-teach{width:100%;box-sizing:border-box;background:var(--bg);border:1px dashed var(--border);border-radius:9px;color:var(--text-sub);font:inherit;font-size:12.5px;padding:9px 11px;outline:none;transition:box-shadow .18s ease,border-color .18s ease,background .18s ease}
           .hk2-teach:focus{border-color:var(--accent);border-style:solid}
+          .hk2-teach.hk2-arm{border-style:solid;border-color:var(--accent,#D4B65C);background:color-mix(in srgb,var(--accent,#D4B65C) 10%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,#D4B65C) 22%,transparent)}
           .hk2-teach.hk2-miss{border-color:var(--red,#F07060);border-style:solid}
           .hk2-fields{display:flex;flex-direction:column;gap:6px}
           .hk2-fields label{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
@@ -33624,7 +33625,10 @@ function _hk2Move(op, btn) {
     r._moveArm = op;
     if (btn) btn.textContent = 'Confirm: ' + (btn.dataset.orig || btn.textContent);
     const t = document.getElementById('hk2-teach');
-    if (t) { t.placeholder = 'Optional: teach the agent why (saved as a lesson)'; t.classList.remove('hk2-miss'); t.style.display = ''; t.focus(); }
+    // Light the note box up while the move is armed ("Confirm: ...") so the eye
+    // lands on the box that's now live before the second, committing tap
+    // (Zoran 2026-07-12). Cleared automatically on the next render.
+    if (t) { t.placeholder = 'Optional: teach the agent why (saved as a lesson)'; t.classList.remove('hk2-miss'); t.classList.add('hk2-arm'); t.style.display = ''; t.focus(); }
     return;
   }
   // Re-entry guard (shared with _hk2Confirm): a double-tap on the same card

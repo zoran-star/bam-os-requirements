@@ -22,6 +22,7 @@ type Membership = {
   customer_id: string | null;
   student_id: string | null;
   status: "ACTIVE" | "SUSPENDED" | "CANCELLED";
+  stripe_customer_id: string | null;
 };
 
 type AcademyTimeZoneRow = {
@@ -138,6 +139,7 @@ export type CustomerSlotChildActionOut = {
     | "slot_full"
     | "slot_cancelled"
     | "slot_started"
+    | "membership_paused"
     | "no_active_membership";
   membership_id?: string | null;
   reservation_id?: string | null;
@@ -559,14 +561,14 @@ async function getStudents(parentId: string): Promise<Student[]> {
 async function getMemberships(profileId: string, studentIds: string[]): Promise<Membership[]> {
   const profileMemberships = await sb<Membership[]>(
     `academy_memberships?customer_id=eq.${eq(profileId)}` +
-      "&select=id,academy_id,customer_id,student_id,status",
+      "&select=id,academy_id,customer_id,student_id,status,stripe_customer_id",
   );
 
   let studentMemberships: Membership[] = [];
   if (studentIds.length > 0) {
     studentMemberships = await sb<Membership[]>(
       `academy_memberships?student_id=in.(${inList(studentIds)})` +
-        "&select=id,academy_id,customer_id,student_id,status",
+        "&select=id,academy_id,customer_id,student_id,status,stripe_customer_id",
     );
   }
 
@@ -1202,8 +1204,16 @@ function getSlotChildActions(opts: {
     const activeMembership = activeMemberships.find(
       (membership) => !membership.student_id || membership.student_id === studentId,
     );
-    const reservation = activeMembership
-      ? getReservationForStudent(slot, state, activeMembership, studentId)
+    const pausedMembership = memberships.find(
+      (membership) =>
+        membership.academy_id === slot.tenant_id &&
+        membership.student_id === studentId &&
+        membership.status === "SUSPENDED" &&
+        Boolean(membership.stripe_customer_id),
+    );
+    const actionMembership = activeMembership ?? pausedMembership;
+    const reservation = actionMembership
+      ? getReservationForStudent(slot, state, actionMembership, studentId)
       : undefined;
     if (reservation) {
       return {
@@ -1212,7 +1222,7 @@ function getSlotChildActions(opts: {
         booking_kind: "reservation",
         enabled: false,
         reason: "already_booked",
-        membership_id: activeMembership?.id ?? reservation.membership_id,
+        membership_id: actionMembership?.id ?? reservation.membership_id,
         reservation_id: reservation.id,
       };
     }
@@ -1255,6 +1265,10 @@ function getSlotChildActions(opts: {
     }
     if (!startsInFuture) {
       return unavailableSlotAction(studentId, "slot_started");
+    }
+
+    if (pausedMembership) {
+      return unavailableSlotAction(studentId, "membership_paused", pausedMembership.id);
     }
 
     if (activeMembership) {
@@ -1339,7 +1353,8 @@ function getReservationForStudent(
 
 function unavailableSlotAction(
   studentId: string,
-  reason: "slot_cancelled" | "slot_started" | "slot_full",
+  reason: "slot_cancelled" | "slot_started" | "slot_full" | "membership_paused",
+  membershipId?: string,
 ): CustomerSlotChildActionOut {
   return {
     student_id: studentId,
@@ -1347,6 +1362,7 @@ function unavailableSlotAction(
     booking_kind: null,
     enabled: false,
     reason,
+    membership_id: membershipId ?? null,
   };
 }
 

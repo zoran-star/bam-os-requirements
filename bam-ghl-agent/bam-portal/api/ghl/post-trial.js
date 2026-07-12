@@ -143,22 +143,33 @@ async function handler(req, res) {
   // Resolve the specific trial this review is for (portal academies) so the
   // post-trial form card keys on the TRIAL, not the contact - a rebooked lead's
   // prior-trial review must never suppress the new trial's card (Zoran 2026-07-10).
-  // Rule: the contact's most recent BOOKED trial whose session has started (1h
-  // grace for early submits). Reused for the SHOWED/NO_SHOW outcome stamp below.
-  let trialBookingTarget = null;
+  // Rule: the contact's most recent trial whose session has started (1h grace for
+  // early submits).
+  //   - trialBookingTarget = most recent *BOOKED* started trial -> drives the
+  //     SHOWED/NO_SHOW outcome stamp (only a still-BOOKED trial gets stamped).
+  //   - reviewTrialId = most recent started trial of ANY status (BOOKED/SHOWED/
+  //     NO_SHOW) -> the id the review ties to. This must NEVER be null when a
+  //     passed trial exists: a null trial_booking_id is dropped from the
+  //     list-ready reviewedBookings set, so the form card RESURRECTS even after a
+  //     good submit (Kartik-class bug, GTA 2026-07-11). On a second submit the
+  //     first stamped the trial SHOWED, so a BOOKED-only lookup returns nothing -
+  //     the any-status fallback keeps trial_booking_id stable + non-null.
+  let trialBookingTarget = null, reviewTrialId = null;
   if (contactId && client.booking_provider === "portal") {
     try {
       const tbs = await sb(
-        `trial_bookings?tenant_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.BOOKED&select=id,slot_id&limit=25`
+        `trial_bookings?tenant_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(BOOKED,SHOWED,NO_SHOW)&select=id,slot_id,status&limit=50`
       );
       if (Array.isArray(tbs) && tbs.length) {
         const slotIds = tbs.map(t => t.slot_id).filter(Boolean);
         const slots = slotIds.length ? await sb(`schedule_slots?id=in.(${slotIds.map(encodeURIComponent).join(",")})&select=id,start_time`) : [];
         const startById = new Map((slots || []).map(s => [s.id, new Date(s.start_time).getTime()]));
-        trialBookingTarget = tbs
+        const started = tbs
           .map(t => ({ ...t, startMs: startById.get(t.slot_id) || 0 }))
           .filter(t => t.startMs && t.startMs <= Date.now() + 60 * 60_000)   // session started (1h grace)
-          .sort((a, b) => b.startMs - a.startMs)[0] || null;
+          .sort((a, b) => b.startMs - a.startMs);
+        reviewTrialId = started[0]?.id || null;                        // most recent passed trial, any status
+        trialBookingTarget = started.find(t => t.status === "BOOKED") || null;   // most recent still-BOOKED -> outcome stamp
       }
     } catch (e) { console.error("resolve trial_booking for review failed (non-fatal):", e.message); }
   }
@@ -171,7 +182,7 @@ async function handler(req, res) {
       headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify({
         client_id: clientId, opportunity_id: oppId, ghl_contact_id: contactId,
-        offer_id: oppOfferId, trial_booking_id: trialBookingTarget?.id || null,
+        offer_id: oppOfferId, trial_booking_id: reviewTrialId || trialBookingTarget?.id || null,
         good_fit: goodFit, showed_up: showedUp, trainer, notes,
         signup_text_status: sendLink ? "queued" : "skipped",
         created_by: ctx.staff?.name || ctx.user?.email || null,
