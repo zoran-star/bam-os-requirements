@@ -47,8 +47,10 @@ Contains: Build Guides, User Guides, Template Sections, Template Pages, Funnels,
 
 ## Design standards
 
-All frontend work follows the Full Control design system (`docs/fullcontrol-brand.md`):
-- Dark-first (ink surfaces)
-- Space Grotesk / Inter / JetBrains Mono
-- Gold (`#E8C547`) as the only accent
-- No shadows, no gradients, no rounded corners > 6px
+Portal front-end work follows the **V2 living design system**: read [`bam-portal/design-system/DESIGN.md`](bam-portal/design-system/DESIGN.md) and use [`bam-portal/design-system/tokens.css`](bam-portal/design-system/tokens.css).
+- Gold `#D4B65C` (the old `#E8C547` is DEAD, never reintroduce it)
+- Plus Jakarta Sans + Nunito (big numbers) + DM Mono (technical values)
+- Locked radius scale 6 / 8 / 12 / 16 / 24 / 999, soft lift shadows, right-side drawers, **NO emojis** in product UI
+- Marketing/editorial (non-portal) pages only: [`../front-end/fullcontrol-brand.md`](../front-end/fullcontrol-brand.md)
+
+Full repo-wide map: repo-root CLAUDE.md "Design systems".

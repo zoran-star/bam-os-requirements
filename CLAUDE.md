@@ -134,6 +134,23 @@ When committing, include a summary of what changed in the commit message body â€
 ## What this repo is
 This repository holds the FullControl product prototype, survey, onboarding flows, and supporting docs. Business requirements are documented in Notion (see Sources of truth below).
 
+## Design systems: which file governs what
+
+There are exactly **two** canonical design systems in this repo. Everything else is a copy of one of them or a standalone tool's styles. **Never point an agent at anything outside this table as "the design system."**
+
+| Design system | Canonical file | Governs |
+|---|---|---|
+| **V2 (LIVE PRODUCT)** | [`bam-ghl-agent/bam-portal/design-system/tokens.css`](bam-ghl-agent/bam-portal/design-system/tokens.css) (+ [`DESIGN.md`](bam-ghl-agent/bam-portal/design-system/DESIGN.md)) | The live staff + client portals. **BAM GTA runs on V2.** Gold `#D4B65C`, Plus Jakarta Sans + Nunito + DM Mono, dark-first. Read `DESIGN.md` before any portal UI work. |
+| **Prototype (REFERENCE)** | [`prototype/src/styles/theme.css`](prototype/src/styles/theme.css) | The FullControl reference prototype (spec/mockups, not shipped to academies). Gold `#C8A84E`, Plus Jakarta Sans + DM Mono. |
+
+**NOT design systems, do not treat any of these as canonical:**
+- `prototype/bam-gta-phase1/bam-gta-staff/src/styles/theme.css`, `prototype/bam-gta-phase1/bam-gta-parent/src/styles/theme.css`, `bam-ghl-agent/bam-gta-staff/src/styles/theme.css`: prototype-lineage **copies** (reference apps, not the live product).
+- `whiteboard/src/styles/theme.css`, `market-research/src/index.css`: standalone tool styles.
+
+We deliberately do **not** maintain a design system for V1 or V1.5. Only Prototype and V2.
+
+Every design-system CSS file carries a header comment saying which row above it is. If you add, move, or retire a design system, update this table and the file headers in the same commit.
+
 ## Repo structure
 
 ```
