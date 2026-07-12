@@ -38,7 +38,7 @@ import { notifyClientPush } from "../push/_send.js";
 
 import crypto from "node:crypto";
 import { fireOnboardingActivations } from "../onboarding/activations.js";
-import { sendSms, ghl } from "../ghl/_core.js";
+import { ghl } from "../ghl/_core.js";
 import { findOpenOpp, setStatus } from "../agent/_store.js";
 import { recordKpiEvent } from "../_kpi.js";
 import { notifyOwners } from "../_notify-owners.js";
@@ -843,10 +843,37 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
   const silent = onbSub.metadata.import_silent === "1";
   inv = inv || {};
 
-  await sb(`members?id=eq.${member.id}`, {
-    method: "PATCH", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ status: "live", updated_at: nowIso() }),
-  });
+  // ── Atomic activation claim (idempotency guard) ──────────────────────────
+  // Stripe fires BOTH invoice.payment_succeeded AND invoice.paid for a single
+  // payment, ~ms apart, and the reconcile cron can fire for the same member
+  // too. Every caller guards on status === 'payment_method_required' BEFORE
+  // reaching here, so without a lock two of them both read
+  // 'payment_method_required' and both run the full activation → duplicate
+  // staff SMS + duplicate GHL/pipeline side effects. (This is exactly what
+  // double-texted Kartik Natarajan's signup on 2026-07-12: two
+  // 'onboarding-activated' audit rows 75ms apart, each sending an SMS.)
+  //
+  // Make the flip a compare-and-swap: PATCH only the row that is STILL
+  // 'payment_method_required' and ask for the updated row back
+  // (return=representation). Exactly one concurrent caller matches and wins;
+  // any other gets an empty array and bails before a single side effect fires.
+  // Safe for the reconcile cron too — if the webhook already won, the cron's
+  // claim matches nothing and no-ops.
+  const claimed = await sb(
+    `members?id=eq.${member.id}&status=eq.payment_method_required`,
+    {
+      method: "PATCH", headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ status: "live", updated_at: nowIso() }),
+    }
+  );
+  if (!Array.isArray(claimed) || claimed.length === 0) {
+    // Another Stripe event (or the cron) already claimed this activation.
+    // Do NOT re-fire notifications/activations — report the no-op and stop.
+    return {
+      ok: true, action: "already-activated", member_id: member.id,
+      skipped: "activation already claimed by a concurrent event",
+    };
+  }
 
   let pipelineWon = silent ? { skipped: "import_silent" } : null;
   if (!silent) {
@@ -908,9 +935,8 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
   let staffNotify = silent ? { skipped: "import_silent" } : null;
   if (!silent) {
     try {
-      const cRows = await sb(`clients?id=eq.${member.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,staff_notify_phone&limit=1`);
+      const cRows = await sb(`clients?id=eq.${member.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
       const client = Array.isArray(cRows) && cRows[0];
-      const toPhone = (client && client.staff_notify_phone) || process.env.STAFF_NOTIFY_PHONE || null;
       const amt = inv.amount_paid != null ? `$${(inv.amount_paid / 100).toFixed(2)}` : "-";
       if (client) {
         const signupMsg = `🎉 New signup - ${client.business_name || "academy"}\n`
@@ -918,19 +944,22 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
           + `Parent: ${member.parent_name || "-"}${member.parent_email ? " · " + member.parent_email : ""}${member.parent_phone ? " · " + member.parent_phone : ""}\n`
           + `Plan: ${onbSub.metadata.plan || "-"} · ${onbSub.metadata.term || "-"}\n`
           + `Paid: ${amt} · status LIVE`;
-        if (toPhone) {
-          staffNotify = await sendSms({ client, toPhone, message: signupMsg, contactName: "BAM Staff" });
-        } else {
-          staffNotify = { ok: false, error: "no staff_notify_phone configured" };
-        }
-        // New owner-notification system (per notification_prefs), separate from
-        // the legacy staff_notify_phone SMS above. new_signup = V2; the same
-        // first-payment moment also fires "new payment" (V1.5/V2).
-        notifyOwners(member.client_id, "new_signup", signupMsg).catch(() => {});
+        // Owner/staff SMS is the V2 notification_prefs system ONLY. Each academy
+        // picks who receives each event (new_signup, stripe_payment) and the text
+        // is sent FROM their own GHL number, via notifyOwners().
+        //
+        // The legacy single-number path was REMOVED 2026-07-12. It sent to a
+        // per-client staff_notify_phone, else fell back to a central
+        // STAFF_NOTIFY_PHONE env catch-all — which (a) double-fired alongside V2
+        // for any academy set up on both (this double-texted BAM GTA), and
+        // (b) blasted EVERY academy's enrollments to one central BAM number that
+        // nobody wanted. notifyOwners() is non-throwing, so awaiting new_signup
+        // gives us a real audit record; stripe_payment stays fire-and-forget.
+        staffNotify = await notifyOwners(member.client_id, "new_signup", signupMsg);
         notifyOwners(member.client_id, "stripe_payment",
           `💳 New payment: ${member.athlete_name || member.parent_name || "a member"} - ${amt}`).catch(() => {});
       } else {
-        staffNotify = { ok: false, error: "no staff_notify_phone configured" };
+        staffNotify = { ok: false, error: "client row not found" };
       }
     } catch (e) {
       staffNotify = { ok: false, error: String((e && e.message) || e) };
