@@ -1424,7 +1424,7 @@ async function handler(req, res) {
       let appt = null, trialBookingId = null, confirmationSent = false;
       if ((await bookingProviderOf(clientId)) === "portal") {
         try {
-          trialBookingId = await bookPortalTrial(clientId, { slotAtIso: startIso, group: row.book_group, contactId, contactName: row.contact_name });
+          trialBookingId = await bookPortalTrial(clientId, { slotAtIso: startIso, group: row.book_group, contactId, contactName: row.contact_name, athleteName: (b.athlete_name || "").toString().trim() || null });
         } catch (e) { return res.status(502).json({ error: `book: ${e.message}` }); }
         // Tell the parent it's locked in. GHL academies get GHL's own calendar
         // notification (toNotify below); portal academies got NOTHING - the card's

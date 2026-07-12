@@ -33078,7 +33078,7 @@ function _hk2ReigniteBack() {
 }
 function _hk2CardHtml(r, pos, total, isTop) {
   const km = _HK2_KIND[r._kind];
-  const id = isTop ? { draft: ' id="hk2-draft"', teach: ' id="hk2-teach"', other: ' id="hk2-other"', go: ' id="hk2-go"', cal: ' id="hk2-cal"', slot: ' id="hk2-slot"' } : { draft: '', teach: '', other: '', go: '', cal: '', slot: '' };
+  const id = isTop ? { draft: ' id="hk2-draft"', teach: ' id="hk2-teach"', other: ' id="hk2-other"', go: ' id="hk2-go"', cal: ' id="hk2-cal"', slot: ' id="hk2-slot"', athlete: ' id="hk2-athlete-in"' } : { draft: '', teach: '', other: '', go: '', cal: '', slot: '', athlete: '' };
   const esc = r.escalate ? `<div class="hk2-esc">agent escalated${r.escalate_reason ? ': ' + escapeHTML(r.escalate_reason) : ''}</div>` : '';
   const ctx = r.reasoning || r.summary || '';
   let body = '';
@@ -33099,7 +33099,9 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <div class="hk2-fields">
         <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
         <label><span>Slot</span><select${id.slot} onchange="_hk2Edited(true)"><option value="${escapeHTML(guessSlot)}" selected>${escapeHTML(guessSlot ? _hk2SlotLabel(guessSlot) : 'Loading open slots…')}</option></select></label>
+        <label><span>Athlete</span><input type="text"${id.athlete} value="${escapeHTML(r.athlete_name || '')}" placeholder="Player's name (required to book)" oninput="_hk2Edited(true)" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:13px;padding:8px 10px;outline:none;min-width:0"></label>
       </div>
+      ${r.athlete_name ? '' : '<div class="hk2-note">No player name came through on this lead. Add it above so the booking goes through.</div>'}
       ${confBlock}`;
   } else if (r._kind === 'ghost') {
     body = `${_hk2ThreadHtml(r, isTop)}
@@ -33508,6 +33510,12 @@ function _hk2Confirm() {
   // which tears down this card's DOM before the deferred API call runs.
   const calEl = document.getElementById('hk2-cal'), slotEl = document.getElementById('hk2-slot');
   const calV = (calEl && calEl.value) || r.book_calendar_id, slotV = (slotEl && slotEl.value) || r.book_slot_at;
+  // Athlete name is required by the booking RPC. Capture the (editable) field now
+  // and stop here with a clear message if it's blank, rather than round-tripping to
+  // a raw 400 (the "Athlete name is required." bug this card was built to prevent).
+  const athEl = document.getElementById('hk2-athlete-in');
+  const athV = ((athEl && athEl.value) || r.athlete_name || '').trim();
+  if (k === 'book' && !athV) { _apxToast("Add the athlete's name to book", false); r._hk2Busy = false; return; }
   // 🔥 Reignite card: the date + the future message are both required. The ack
   // (main box) is optional - empty = silent park.
   const reigDateEl = document.getElementById('hk2-reig-date'), reigMsgEl = document.getElementById('hk2-reig-msg');
@@ -33554,7 +33562,7 @@ function _hk2Confirm() {
   let undone = false;
   _hawkDefer({ cardId: 'hk2-topcard', label: writeMode ? 'Send message' : _HK2_KIND[k].go, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
     if (k === 'book') {
-      const resp = chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: calV, slot_at: slotV, reply }));
+      const resp = chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: calV, slot_at: slotV, reply, athlete_name: athV }));
       _apxToast(resp && resp.confirmation_sent ? 'Booked + confirmation sent - Confirm takes over' : 'Booked - handed to Confirm', true);
     } else if (k === 'ghost') {
       if (writeMode) {

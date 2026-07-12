@@ -163,10 +163,23 @@ async function portalNativeContact({ clientId, ghlLocationId, name, email, phone
   if (messageFieldId && message && !cfMap[String(messageFieldId)]) cfMap[String(messageFieldId)] = message;
   const formTag = `${(formType || "contact").replace(/-/g, " ")} form filled`;
   const tags = [...new Set(["website-inquiry", formTag, ...(extraTags || [])])];
+  // Persist the athlete name the form already collected straight onto the contact
+  // row. The Hawkeye Book-it card + agent booking read contacts.athlete_name, and
+  // without this it stayed null even though the form sent it - so booking a lead
+  // like Tara 400'd with the raw RPC "Athlete name is required." Accept whatever
+  // the form used: athlete_name, athlete, or first+last. clean() drops empties, so
+  // this never nulls an existing name on a repeat submission.
+  const athleteName = (
+    fields?.athlete_name ||
+    fields?.athlete ||
+    `${fields?.athlete_first || ""} ${fields?.athlete_last || ""}`.trim() ||
+    ""
+  ).trim() || null;
   const contactId = await resolveOrMintPortalContact(clientId, {
     first_name: firstName || null,
     last_name:  rest.join(" ") || null,
     name:       (name || "").trim() || null,
+    athlete_name: athleteName,
     email, phone, tags,
     custom_fields: Object.keys(cfMap).length ? cfMap : null,
     source: "website-form",
