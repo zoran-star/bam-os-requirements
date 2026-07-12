@@ -9096,6 +9096,19 @@ Then the call to action."]</div>
           .hk2-draft{width:100%;box-sizing:border-box;background:var(--accent-glow,rgba(212,182,92,.08));border:1px solid var(--accent-border,rgba(212,182,92,.3));border-radius:11px;color:var(--text);font:inherit;font-size:13.5px;line-height:1.5;padding:10px 12px;resize:vertical;min-height:64px;outline:none}
           .hk2-draft.sm{min-height:44px;font-size:12.5px}
           .hk2-draft:focus{border-color:var(--accent)}
+          /* Proposed reply as an in-thread draft bubble (Option A): right-aligned,
+             dashed gold at rest so it reads "yours, not sent yet"; tap = solid glow
+             field with a real caret (Option D). Pure :focus swap, no JS. */
+          .hk2-draftwrap{display:flex;flex-direction:column;align-items:flex-end;gap:5px;margin-top:2px}
+          .hk2-draft-bubble{width:auto;max-width:86%;align-self:flex-end;background:var(--accent-glow,rgba(212,182,92,.10));border:1.5px dashed var(--accent-border-strong,rgba(212,182,92,.55));border-radius:13px;border-bottom-right-radius:4px;transition:border-color .15s,background .15s,box-shadow .15s}
+          .hk2-draft-bubble:focus{border-style:solid;border-color:var(--accent);background:var(--accent-glow,rgba(212,182,92,.14));box-shadow:0 0 0 3px var(--accent-border,rgba(212,182,92,.20))}
+          .hk2-draftcap{font-size:10.5px;font-weight:700;color:var(--accent);padding-right:2px}
+          .hk2-draftcap .rest,.hk2-draftcap .edit{align-items:center;gap:4px}
+          .hk2-draftcap .rest{display:inline-flex}
+          .hk2-draftcap .edit{display:none}
+          .hk2-draftwrap:focus-within .hk2-draftcap .rest{display:none}
+          .hk2-draftwrap:focus-within .hk2-draftcap .edit{display:inline-flex}
+          .hk2-draftcap svg{flex:none}
           .hk2-note{font-size:11px;color:var(--text-mute);line-height:1.45}
           .hk2-teach{width:100%;box-sizing:border-box;background:var(--bg);border:1px dashed var(--border);border-radius:9px;color:var(--text-sub);font:inherit;font-size:12.5px;padding:9px 11px;outline:none;transition:box-shadow .18s ease,border-color .18s ease,background .18s ease}
           .hk2-teach:focus{border-color:var(--accent);border-style:solid}
@@ -32720,6 +32733,10 @@ function _plEngineHawk(key) {
 // overlays; this view is V2-gated (see _hk2Open).
 let _HK2 = { agent: 'booking', q: null, edited: false, otherOpen: false, focusContact: null, bookOpts: null, bookOptsLoading: false };
 const _HK2_AGENTS = ['booking', 'confirm', 'closing'];
+// Draft-bubble caption icons: pencil at rest ("tap to edit"), text-cursor while
+// editing. currentColor so they take the caption's gold.
+const _HK2_PENCIL = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+const _HK2_CARET = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 22h-1a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4h1"/><path d="M7 22h1a4 4 0 0 0 4-4V6a4 4 0 0 0-4-4H7"/></svg>';
 const _HK2_META = {
   booking: { label: 'Booking', ep: '/api/agent-approvals', role: 'responded' },
   confirm: { label: 'Confirm', ep: '/api/agent-confirm', role: 'scheduled_trial' },
@@ -33157,9 +33174,18 @@ function _hk2CardHtml(r, pos, total, isTop) {
     // its final ✓ on the day the lead asked for.
     const reigBanner = (r._kind === 'reignite_due' && r.reignite_at)
       ? `<div class="hk2-booked"><span class="hk2-booked-check">✓</span> Reignition day - they asked us to circle back ${escapeHTML((() => { try { return new Date(r.reignite_at).toLocaleDateString([], { month: 'short', day: 'numeric' }); } catch (_) { return 'today'; } })())}</div>` : '';
+    // The proposed reply renders as a draft bubble that continues the thread
+    // above (right-aligned, dashed gold = "yours, not sent yet"); tapping it
+    // turns it into a live field. Rest caption carries the per-kind nuance the
+    // old form label used to (sign-up link embedded, locked-in message).
+    const draftCap = r._kind === 'enroll' ? 'Draft · sign-up link included · tap to edit'
+      : r._kind === 'reignite_due' ? 'Locked-in message · tap to edit before it sends'
+      : 'Draft · tap to edit';
     body = `${_hk2ThreadHtml(r, isTop)}${reigBanner}${proposal}
-      <div class="hk2-lbl">${r._kind === 'enroll' ? 'The reply, sign-up link included · edit it right here' : r._kind === 'reignite_due' ? 'The re-engagement message you locked in · edit before it sends' : 'Proposed message · edit it right here'}</div>
-      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+      <div class="hk2-draftwrap">
+        <textarea class="hk2-draft hk2-draft-bubble"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+        <div class="hk2-draftcap"><span class="rest">${_HK2_PENCIL}${draftCap}</span><span class="edit">${_HK2_CARET}Editing · changes save automatically</span></div>
+      </div>
       ${r._kind === 'enroll' ? '<div class="hk2-note">The opportunity is marked won automatically when they pay on the link.</div>' : ''}`;
   }
   const isForm = r._kind === 'form';
