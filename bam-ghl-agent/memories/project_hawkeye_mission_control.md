@@ -327,6 +327,18 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   + the wording editor (gated on section.editable). All "1 day apart" copy killed.
   Nothing auto-sends (GTA closing_mode=hawkeye, self-drive globally off) - safe. Applied
   to GTA (default cadence). NOT prod-verified end-to-end yet.
+- 🔥 PER-STEP SEND DAY EDITABLE IN THE PLAN CARD (2026-07-12, Zoran: "edit the actual
+  schedule of the follow ups too"). Each plan row now shows an inline `type=date` picker
+  (pre-filled from `send_after.slice(0,10)`, min = tomorrow) NEXT to its message box, in
+  BOTH the V2 hk2 deck (`.hk2-when` / `#hk2-plan-when-${i}`) and the V1.5 `_aclxPlanCard`
+  (`#aclx-when-${id}`). Changing a date flips the confirm button to "Confirm edits and
+  schedule" via `_hk2Edited(true)` but does NOT demand a teach-why note (schedule = logistics,
+  like a slot change, not agent-error). approve-plan `edits[]` now carries an optional
+  `send_at` (YYYY-MM-DD) - sent ONLY for rows the staff actually moved (compared to the
+  prefill), so untouched rows keep the cadence spacing + late-approval slide. Backend stamps
+  the override at `${send_at}T14:00:00Z` (matches followup_on/decision-date convention) and
+  uses it as-is (no slide); quiet-hours `nextSendableTime` still applies. The stage-config
+  gear stays the DEFAULT cadence; the card is the per-lead override. NOT prod-verified yet.
 - STILL TO DO: swipe gestures (open decision), GTA prod verification of the whole batch
   incl. reignition + always-scheduled closing follow-ups end-to-end.
 - HOME <-> HAWKEYE ALIGNMENT (2026-07-10, Zoran: "make sure the home inbox lines up
