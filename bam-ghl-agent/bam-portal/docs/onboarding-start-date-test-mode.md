@@ -27,6 +27,18 @@ Checks 1-4 need a **Test Clock**. Check 5 is a one-shot API call.
 Prereqs: Stripe CLI logged into the BAM **test** account (`stripe login`), `jq`.
 Everything below stays in test mode; no real money, no connected account.
 
+### One command (recommended)
+
+Runs checks 1-5 end to end, prints a PASS/FAIL line per check, and deletes every
+test object on exit:
+
+```bash
+bash bam-portal/scripts/verify-start-date-test-mode.sh
+```
+
+Exit code `0` = all passed. Anything else = do not go live. The manual steps below
+are the same flow spelled out, for when you want to inspect objects by hand.
+
 ```bash
 # 1. Clock frozen at "now"
 NOW=$(date +%s)
