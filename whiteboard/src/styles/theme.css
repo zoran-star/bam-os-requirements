@@ -1,3 +1,7 @@
+/* ===== Whiteboard TOOL styling - standalone, NOT a product design system =====
+   Product design systems: prototype/src/styles/theme.css (prototype reference)
+   and bam-ghl-agent/bam-portal/design-system/tokens.css (live V2 product).
+   Full map: repo-root CLAUDE.md "Design systems". */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Nunito:wght@700;800;900&display=swap');
 
 :root {

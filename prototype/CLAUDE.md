@@ -34,7 +34,8 @@ Run `/memory-audit` periodically. Memory drift wastes context.
 - Prototype and Notion must stay in sync. If you change the prototype, update Notion. If Notion changes, check if the prototype needs updating.
 - Don't add features beyond what's been agreed in whiteboard sessions or confirmed by a human.
 - Use CSS modules — no inline styles, no Tailwind.
-- Brand guide: [`front-end/fullcontrol-brand.md`](../front-end/fullcontrol-brand.md) — colors, typography, spacing, component patterns. All new UI must follow it.
+- **Design system (this prototype):** [`src/styles/theme.css`](src/styles/theme.css): canonical tokens for the FullControl reference prototype (gold `#C8A84E`, Plus Jakarta Sans + DM Mono). This prototype is the REFERENCE implementation, **not** the live product. The live V2 product that BAM GTA runs on uses a separate system at [`bam-ghl-agent/bam-portal/design-system/tokens.css`](../bam-ghl-agent/bam-portal/design-system/tokens.css) (gold `#D4B65C`). Never mix the two. Full map: repo-root CLAUDE.md "Design systems".
+- Editorial/brand reference (marketing surfaces only): [`front-end/fullcontrol-brand.md`](../front-end/fullcontrol-brand.md).
 - All new pages go in src/pages/, all shared UI in src/components/.
 
 ## Connects to
