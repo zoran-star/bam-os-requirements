@@ -160,6 +160,7 @@ function rpcErrorStatus(status: number, message: string): number {
   if (normalized.includes("no active entitlement")) return 403;
   if (normalized.includes("full")) return 409;
   if (normalized.includes("active membership")) return 409;
+  if (normalized.includes("paid membership")) return 409;
   if (normalized.includes("already has a booked trial")) return 409;
   if (normalized.includes("already booked")) return 409;
   if (normalized.includes("already used")) return 409;
@@ -200,6 +201,7 @@ const SAFE_RPC_ERROR_MESSAGES = new Set([
   "Slot not found.",
   "Student already has a booked trial.",
   "Student already has an active membership.",
+  "Student already has a paid membership.",
   "Student has already used a free trial.",
   "Student does not belong to membership.",
   "Student does not belong to this parent.",
