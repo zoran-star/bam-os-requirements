@@ -102,6 +102,17 @@ function piSecretFromSub(sub) {
   return pi && typeof pi === "object" ? pi.client_secret : null;
 }
 
+// A future start date defers the first charge via a Stripe trial, so the first
+// invoice is $0 and there is NO PaymentIntent to confirm. Instead Stripe attaches
+// a SetupIntent (pending_setup_intent) to collect + save the card now; that card
+// is charged automatically when the trial ends (the start date).
+function setupSecretFromSub(sub) {
+  const si = sub && sub.pending_setup_intent;
+  return si && typeof si === "object" ? si.client_secret : null;
+}
+// 1-day buffer under Stripe's 730-day trial cap (mirrors api/members/enroll.js).
+const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
+
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
 
@@ -126,12 +137,35 @@ async function handler(req, res) {
     const athleteName  = (athlete.name || `${athleteFirst} ${athleteLast}`).trim() || null;
     const athleteDob   = athlete.dob || athlete.date_of_birth || body.athlete_dob || null;
 
+    // Optional future start date: defer the first charge to that day (Stripe trial_end).
+    // charge_mode "on_date" + start_date (YYYY-MM-DD); default "now" = charge immediately.
+    const chargeMode = body.charge_mode === "on_date" ? "on_date" : "now";
+    let startDate = null;
+
     // ── Validate ──
     if (!clientId)     return res.status(400).json({ error: "client_id required" });
     if (!plan)         return res.status(400).json({ error: "plan invalid", allowed: ["Steady/1x", "Accelerated/2x", "Elevate/3x", "Dominate/unlimited"] });
     if (!term)         return res.status(400).json({ error: "term invalid", allowed: ["monthly", "3_months", "6_months"] });
     if (!parentEmail)  return res.status(400).json({ error: "parent email required" });
     if (!athleteName)  return res.status(400).json({ error: "athlete name required" });
+    if (chargeMode === "on_date") {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.start_date || ""))) {
+        return res.status(400).json({ error: "start_date (YYYY-MM-DD) required when charge_mode is on_date" });
+      }
+      startDate = body.start_date;
+    }
+
+    // Future start date → Stripe trial_end (first charge deferred to that day, noon UTC).
+    // Floored at now+60s (never in the past) and capped under Stripe's trial ceiling.
+    let trialEnd = null;
+    if (chargeMode === "on_date") {
+      const tsec = Math.floor(new Date(`${startDate}T12:00:00Z`).getTime() / 1000);
+      const floor = Math.floor(Date.now() / 1000) + 60;
+      trialEnd = Math.min(Math.max(tsec, floor), Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
+    }
+    const firstChargeIso = trialEnd
+      ? new Date(trialEnd * 1000).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
 
     const testMode = isTestMode();
 
@@ -171,23 +205,28 @@ async function handler(req, res) {
       let sub = null;
       try {
         sub = await stripeFetch(
-          `/subscriptions/${member.stripe_subscription_id}?expand[]=latest_invoice.payment_intent`,
+          `/subscriptions/${member.stripe_subscription_id}?expand[]=latest_invoice.payment_intent&expand[]=pending_setup_intent`,
           { stripeAccount }
         );
       } catch (_) { sub = null; }
       if (sub) {
+        const reuseBase = {
+          ok: true, reused: true, member_id: member.id,
+          subscription_id: sub.id, customer_id: sub.customer,
+          stripe_account: stripeAccount,
+          publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
+          amount_cents: price.amount_cents, currency: price.currency || "cad",
+        };
         if (sub.status === "incomplete") {
+          // Charge-now sub awaiting the card → confirm a PaymentIntent.
           const secret = piSecretFromSub(sub);
-          if (secret) {
-            return res.status(200).json({
-              ok: true, reused: true, member_id: member.id,
-              subscription_id: sub.id, customer_id: sub.customer,
-              client_secret: secret, stripe_account: stripeAccount,
-              publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
-              amount_cents: price.amount_cents, currency: price.currency || "cad",
-            });
-          }
+          if (secret) return res.status(200).json({ ...reuseBase, mode: "payment", client_secret: secret });
+        } else if (sub.status === "trialing" && setupSecretFromSub(sub)) {
+          // Future-start sub whose card hasn't been saved yet → confirm a SetupIntent.
+          const firstIso = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString().slice(0, 10) : firstChargeIso;
+          return res.status(200).json({ ...reuseBase, mode: "setup", client_secret: setupSecretFromSub(sub), first_charge_iso: firstIso });
         } else if (sub.status === "active" || sub.status === "trialing") {
+          // active, or trialing with the card already saved → nothing more to collect.
           return res.status(200).json({ ok: true, already_active: true, member_id: member.id, subscription_id: sub.id });
         }
         // canceled / incomplete_expired → fall through and make a fresh sub
@@ -237,12 +276,17 @@ async function handler(req, res) {
     }
 
     // ── Create the PORTAL-OWNED subscription (default_incomplete → client_secret) ──
+    // Charge-now → the first invoice carries a PaymentIntent to confirm.
+    // Future start (trial_end) → the first invoice is $0, so Stripe hands back a
+    // pending_setup_intent instead; we save the card now and it is charged on the
+    // start date. Both are expanded so we can hand the right client_secret to the UI.
     const subBody = {
       customer: customerId,
       "items[0][price]": priceIdToUse,
       payment_behavior: "default_incomplete",
       "payment_settings[save_default_payment_method]": "on_subscription",
       "expand[0]": "latest_invoice.payment_intent",
+      "expand[1]": "pending_setup_intent",
       "metadata[origin]": "fullcontrol-portal",
       "metadata[plan]": plan,
       "metadata[term]": term,
@@ -250,12 +294,18 @@ async function handler(req, res) {
       "metadata[parent_email]": parentEmail,
       "metadata[athlete_name]": athleteName,
     };
+    if (trialEnd) {
+      subBody.trial_end = trialEnd;
+      subBody["metadata[start_date]"] = startDate;
+    }
     const sub = await stripeFetch(`/subscriptions`, {
       method: "POST", stripeAccount,
-      idempotencyKey: `onb-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${plan}-${term}`.slice(0, 200),
+      idempotencyKey: `onb-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${plan}-${term}-${trialEnd || "now"}`.slice(0, 200),
       body: subBody,
     });
-    const clientSecret = piSecretFromSub(sub);
+    // Future start → confirm a SetupIntent (no charge today); else a PaymentIntent.
+    const paymentMode = trialEnd ? "setup" : "payment";
+    const clientSecret = trialEnd ? setupSecretFromSub(sub) : piSecretFromSub(sub);
 
     // ── Upsert the member row (status stays payment_method_required until paid) ──
     const memberFields = {
@@ -298,7 +348,7 @@ async function handler(req, res) {
         body: JSON.stringify([{
           client_id: clientId, member_id: member && member.id,
           action_type: "onboarding-checkout-created",
-          args: { plan, term, price_id: price.stripe_price_id, sub_id: sub.id, customer_id: customerId },
+          args: { plan, term, price_id: price.stripe_price_id, sub_id: sub.id, customer_id: customerId, charge_mode: chargeMode, start_date: startDate, first_charge_iso: firstChargeIso },
           performed_by_name: "Parent funnel (public)",
         }]),
       });
@@ -310,6 +360,8 @@ async function handler(req, res) {
       subscription_id: sub.id,
       customer_id: customerId,
       client_secret: clientSecret,
+      mode: paymentMode,
+      first_charge_iso: firstChargeIso,
       stripe_account: stripeAccount,
       publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
       amount_cents: price.amount_cents,

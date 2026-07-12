@@ -24,6 +24,7 @@ function App() {
   var s = React.useState(1); var step = s[0], setStep = s[1];
   var ff = React.useState(Object.assign({}, EMPTY)); var form = ff[0], setForm = ff[1];
   var tm = React.useState('3mo'); var term = tm[0], setTerm = tm[1];        // default 3-Month (anchors mid-commitment)
+  var sd = React.useState(''); var startDate = sd[0], setStartDate = sd[1]; // '' = start today; 'YYYY-MM-DD' = deferred start
   var sp = React.useState('accelerated'); var selectedPlan = sp[0], setSelectedPlan = sp[1];
   var py = React.useState({ method: null, name: '', cardFilled: false }); var pay = py[0], setPay = py[1];
   var ag = React.useState(false); var agreed = ag[0], setAgreed = ag[1];
@@ -41,6 +42,7 @@ function App() {
   var stripeRef = React.useRef(null);
   var elementsRef = React.useRef(null);
   var attemptedRef = React.useRef(false);
+  var modeRef = React.useRef('payment'); // 'payment' (charge now) | 'setup' (deferred start)
 
   React.useEffect(function () {
     var el = document.querySelector('.fbody, .success');
@@ -74,6 +76,8 @@ function App() {
       term: term,                         // monthly|3mo|6mo (backend aliases map these)
       parent:  { first: form.pFirst, last: form.pLast, email: form.pEmail, phone: form.pMobile },
       athlete: { first: form.aFirst, last: '', dob: form.aDob },
+      charge_mode: startDate ? 'on_date' : 'now',  // deferred start → first charge on start_date
+      start_date: startDate || undefined,          // 'YYYY-MM-DD' when deferred
     };
   }
 
@@ -92,6 +96,7 @@ function App() {
         if (!res.ok) throw new Error((res.j && res.j.error) || 'checkout failed');
         var data = res.j;
         if (!data.client_secret || !data.publishable_key || !window.Stripe) { setDemoFallback(true); return; }
+        modeRef.current = data.mode || 'payment'; // 'setup' = deferred start (save card, charge on start date)
         var stripe = window.Stripe(data.publishable_key, data.stripe_account ? { stripeAccount: data.stripe_account } : undefined);
         var elements = stripe.elements({ clientSecret: data.client_secret });
         var paymentEl = elements.create('payment');
@@ -117,17 +122,25 @@ function App() {
       return;
     }
 
-    // Real charge via the mounted Payment Element.
-    setLoadLabel('Processing payment…'); setLoading(true);
-    stripeRef.current.confirmPayment({
+    // Real card collection via the mounted Payment Element.
+    //  • 'payment' (start today): confirm the first charge now.
+    //  • 'setup'   (future start): save the card now; Stripe charges it on the
+    //    start date when the trial ends. No money moves today.
+    var deferred = modeRef.current === 'setup';
+    setLoadLabel(deferred ? 'Saving your card…' : 'Processing payment…'); setLoading(true);
+    var confirmArgs = {
       elements: elementsRef.current,
       confirmParams: { return_url: location.href },
       redirect: 'if_required',
-    }).then(function (result) {
+    };
+    var confirming = deferred
+      ? stripeRef.current.confirmSetup(confirmArgs)
+      : stripeRef.current.confirmPayment(confirmArgs);
+    confirming.then(function (result) {
       setLoading(false);
-      if (result && result.error) { setPayErr(result.error.message || 'Payment failed'); return; }
+      if (result && result.error) { setPayErr(result.error.message || (deferred ? 'Could not save card' : 'Payment failed')); return; }
       setStep('success');
-    }).catch(function (e) { setLoading(false); setPayErr(e.message || 'Payment failed'); });
+    }).catch(function (e) { setLoading(false); setPayErr(e.message || (deferred ? 'Could not save card' : 'Payment failed')); });
   }
 
   // ---- per-step footer / CTA ----
@@ -147,9 +160,12 @@ function App() {
       onClick={function () { advance(3, 500, 'Saving…'); }}
       onBack={function () { setStep(1); }} />;
   } else if (step === 3) {
+    var payLabel = startDate
+      ? 'Confirm & Reserve · Starts ' + BAM.fmtShort(BAM.fromISO(startDate))
+      : 'Sign & Pay ' + BAM.dollars(charge.total) + ' - Start Training';
     footer = <StickyCTA
-      label={'Sign & Pay ' + BAM.dollars(charge.total) + ' — Start Training'}
-      disabled={!s3valid} loading={loading} loadingLabel="Processing payment…"
+      label={payLabel}
+      disabled={!s3valid} loading={loading} loadingLabel={startDate ? 'Saving your card…' : 'Processing payment…'}
       onClick={signAndPay}
       onBack={function () { setStep(2); }} />;
   }
@@ -162,8 +178,9 @@ function App() {
   } else {
     var inner;
     if (step === 1) inner = <Step1 form={form} setForm={setForm} showErrors={showErr1} />;
-    else if (step === 2) inner = <Step2 term={term} onTerm={setTerm} selectedPlan={selectedPlan} onSelectPlan={setSelectedPlan} />;
-    else inner = <Step3 form={form} term={term} selectedPlan={selectedPlan}
+    else if (step === 2) inner = <Step2 term={term} onTerm={setTerm} selectedPlan={selectedPlan} onSelectPlan={setSelectedPlan}
+      startDate={startDate} onStartDate={setStartDate} />;
+    else inner = <Step3 form={form} term={term} selectedPlan={selectedPlan} startDate={startDate}
       pay={pay} setPay={setPay} agreed={agreed} onAgree={function (e) { setAgreed(e.target.checked); }}
       sig={sig} onSig={setSig} ui={ui} setUi={setUi} payErr={payErr}
       live={liveMode} stripeReady={stripeReady}
