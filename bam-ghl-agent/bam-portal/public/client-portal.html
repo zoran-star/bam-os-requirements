@@ -9093,6 +9093,9 @@ Then the call to action."]</div>
           .hk2-bub.in{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px;align-self:flex-start}
           .hk2-bub.bot{background:var(--accent-glow,rgba(212,182,92,.10));border:1px solid var(--accent-border,rgba(212,182,92,.3));color:var(--text);border-bottom-right-radius:4px;align-self:flex-end}
           .hk2-lbl{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}
+          .hk2-planwhen{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}
+          .hk2-when{background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font:inherit;font-size:11px;font-weight:700;padding:3px 7px;outline:none;text-transform:none;letter-spacing:normal;cursor:pointer}
+          .hk2-when:focus{border-color:var(--accent)}
           .hk2-draft{width:100%;box-sizing:border-box;background:var(--accent-glow,rgba(212,182,92,.08));border:1px solid var(--accent-border,rgba(212,182,92,.3));border-radius:11px;color:var(--text);font:inherit;font-size:13.5px;line-height:1.5;padding:10px 12px;resize:vertical;min-height:64px;outline:none}
           .hk2-draft.sm{min-height:44px;font-size:12.5px}
           .hk2-draft:focus{border-color:var(--accent)}
@@ -33107,12 +33110,15 @@ function _hk2CardHtml(r, pos, total, isTop) {
       </div>`;
   } else if (r._kind === 'plan') {
     // Each row carries its planned send time (stamped at draft on the academy's
-    // cadence) - show the real day so approving reads as locking a schedule.
-    const _fuDay = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
+    // cadence). Show it as an editable date so approving reads as locking a
+    // schedule, and staff can slide any single step without opening the stage
+    // config (Zoran 2026-07-12). Date-only picker, pre-filled from send_after.
+    const _fuDate = iso => { if (!iso) return ''; const s = String(iso).slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; };
+    const _minSend = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     body = `${_hk2ThreadHtml(r, isTop)}
-      <div class="hk2-lbl">The plan - every message editable · clear a box to drop that step</div>
-      ${(r.rows || []).map((row, i) => { const when = _fuDay(row.send_after); const last = i === r.rows.length - 1; return `<div class="hk2-lbl" style="margin-top:2px">${when ? `Sends ${when}` : `Message ${i + 1}`} · only if still no reply${last ? ' · final, no-pressure' : ''}</div><textarea class="hk2-draft sm"${isTop ? ` id="hk2-plan-${i}"` : ''} oninput="_hk2Edited()">${escapeHTML(row.draft_message || '')}</textarea>`; }).join('')}
-      <div class="hk2-note">Approve = the schedule locks in and each message sends itself on its day, only while the lead stays quiet. A reply cancels the rest instantly. Change the cadence in the stage config (gear) under Follow-ups.</div>`;
+      <div class="hk2-lbl">The plan - every message + send day editable · clear a box to drop that step</div>
+      ${(r.rows || []).map((row, i) => { const when = _fuDate(row.send_after); const last = i === r.rows.length - 1; return `<div class="hk2-planwhen"><span>Sends</span><input type="date" class="hk2-when"${isTop ? ` id="hk2-plan-when-${i}"` : ''} value="${escapeHTML(when)}" min="${_minSend}" onchange="_hk2Edited(true)"><span>· only if still no reply${last ? ' · final, no-pressure' : ''}</span></div><textarea class="hk2-draft sm"${isTop ? ` id="hk2-plan-${i}"` : ''} oninput="_hk2Edited()">${escapeHTML(row.draft_message || '')}</textarea>`; }).join('')}
+      <div class="hk2-note">Approve = the schedule locks in and each message sends itself on its day, only while the lead stays quiet. A reply cancels the rest instantly. Edit a date above to move that step, or set the default cadence in the stage config (gear) under Follow-ups.</div>`;
   } else if (r._kind === 'handoff') {
     const note = r.handoff_note ? `<div class="hk2-note"><b style="color:var(--text)">Reason:</b> ${escapeHTML(r.handoff_note)}</div>` : '';
     body = `${_hk2ThreadHtml(r, isTop)}${note}
@@ -33512,7 +33518,16 @@ function _hk2Confirm() {
   // A ready row exists for every card except the synthesized ones; a plan card
   // flipped into reignite mode rides its first row's id.
   const reigReadyId = k === 'reignite' ? (r._origKind === 'plan' ? (r.rows && r.rows[0] && r.rows[0].id) : (String(r.id || '').startsWith('ptf:') ? null : r.id)) : null;
-  const planEdits = k === 'plan' ? (r.rows || []).map((row, i) => { const el = document.getElementById('hk2-plan-' + i); return { id: row.id, reply: (el ? el.value : row.draft_message || '').trim() }; }) : null;
+  const planEdits = k === 'plan' ? (r.rows || []).map((row, i) => {
+    const el = document.getElementById('hk2-plan-' + i);
+    const edit = { id: row.id, reply: (el ? el.value : row.draft_message || '').trim() };
+    // Only send an explicit send day when the staff actually moved it - untouched
+    // rows keep the cadence spacing + late-approval slide the backend applies.
+    const whenEl = document.getElementById('hk2-plan-when-' + i);
+    const orig = row.send_after ? String(row.send_after).slice(0, 10) : '';
+    if (whenEl && whenEl.value && whenEl.value !== orig) edit.send_at = whenEl.value;
+    return edit;
+  }) : null;
   let ptf = null;
   if (k === 'form') {
     const p = _HK2.ptf || {};
@@ -35770,9 +35785,10 @@ function _aclxRender() {
 // the moment the lead replies).
 function _aclxPlanCard(rows) {
   const first = rows[0];
-  const _fuDay = iso => { if (!iso) return null; const d = new Date(iso); return isNaN(d) ? null : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
+  const _whenVal = iso => { const s = iso ? String(iso).slice(0, 10) : ''; return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; };
+  const _minSend = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const boxes = rows.map((r, i) => `
-    <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:${i ? '10px' : '2px'} 0 4px">${_fuDay(r.send_after) ? 'sends ' + _fuDay(r.send_after) : 'message ' + (i + 1)}${i === rows.length - 1 ? ' · final, no-pressure' : ''} · clear the box to drop this step</div>
+    <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:${i ? '10px' : '2px'} 0 4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>sends</span><input type="date" id="aclx-when-${escapeHTML(String(r.id))}" value="${_whenVal(r.send_after)}" min="${_minSend}" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font:inherit;font-size:11px;font-weight:700;padding:2px 6px;outline:none;text-transform:none;letter-spacing:normal;cursor:pointer"><span>${i === rows.length - 1 ? '· final, no-pressure ' : ''}· clear the box to drop this step</span></div>
     ${_aclxBox(r)}`).join('');
   return `<div id="aclx-plan-${escapeHTML(first.ghl_contact_id)}" style="background:var(--surface);border:1px solid var(--accent-border,rgba(212,182,92,.3));border-radius:11px;padding:12px 14px;margin-bottom:9px">
     ${_aclxHeader(first, `follow-up plan · ${rows.length} messages`, 'var(--accent)')}
@@ -35790,7 +35806,14 @@ function _aclxPlanCard(rows) {
 async function _aclxApprovePlan(contactId) {
   const rows = _ACLX_DATA.filter(x => (x.step_key || '').startsWith('followup_') && x.status === 'pending' && x.ghl_contact_id === contactId);
   if (!rows.length) return;
-  const edits = rows.map(r => ({ id: r.id, reply: (document.getElementById('aclx-edit-' + r.id)?.value || '').trim() }));
+  const edits = rows.map(r => {
+    const edit = { id: r.id, reply: (document.getElementById('aclx-edit-' + r.id)?.value || '').trim() };
+    // Send an explicit day only when staff moved it - otherwise keep the cadence.
+    const whenEl = document.getElementById('aclx-when-' + r.id);
+    const orig = r.send_after ? String(r.send_after).slice(0, 10) : '';
+    if (whenEl && whenEl.value && whenEl.value !== orig) edit.send_at = whenEl.value;
+    return edit;
+  });
   try {
     const token = await _mreqAuthToken();
     const res = await fetch('/api/agent-closing', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve-plan', client_id: CLIENT_ID, contact_id: contactId, edits }) });
