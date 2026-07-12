@@ -193,7 +193,7 @@ export async function nextAppointment(token, contactId, { nowMs = Date.now(), cl
 // scoped to the group, enriches parent details from the contacts store, and
 // returns the trial_booking id. Throws with a human message on failure
 // (no slot at that time / slot full) so callers surface it to staff.
-export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, contactId, contactName }) {
+export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, contactId, contactName, athleteName }) {
   const t = new Date(slotAtIso);
   if (isNaN(t.getTime())) throw new Error("invalid slot time");
   const rows = (await sbFetch(
@@ -207,6 +207,12 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, co
     const cr = await sbFetch(`contacts?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name,email,phone,athlete_name&limit=1`);
     c = (Array.isArray(cr) && cr[0]) || {};
   } catch (_) {}
+  // Athlete name resolution: the name staff typed on the Book-it card wins, then
+  // whatever's already stored on the contact. The book_trial_slot RPC HARD-requires
+  // it, so if both are empty we throw a clean, human message here instead of letting
+  // the raw Postgres "P0001: Athlete name is required." surface to the deck.
+  const resolvedAthlete = (athleteName || c.athlete_name || "").trim() || null;
+  if (!resolvedAthlete) throw new Error("Enter the athlete's name to book this trial");
   // Offer lineage: the lead's open pipeline card knows which offer's funnel
   // this trial belongs to (Wave 1 stamping). Best-effort - never blocks a book.
   let oppOfferId = null;
@@ -221,7 +227,7 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, co
       p_slot_id: slot.id,
       p_parent_name: contactName || c.name || null,
       p_parent_email: c.email || null,
-      p_athlete_name: c.athlete_name || null,
+      p_athlete_name: resolvedAthlete,
       p_parent_phone: c.phone || null,
       p_athlete_dob: null,
       p_entry_point_id: null,
@@ -233,6 +239,18 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, co
   });
   const id = typeof r === "string" ? r : (r && r.trial_booking_id) || null;
   if (!id) throw new Error("trial booking failed");
+  // Backfill the resolved athlete name onto the contact so it's saved for next
+  // time (agent personalization + future books). Best-effort - never fail a
+  // successful booking over this. Only writes when the contact had none.
+  if (resolvedAthlete && !c.athlete_name) {
+    try {
+      await sbFetch(`contacts?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ athlete_name: resolvedAthlete }),
+      });
+    } catch (_) {}
+  }
   return id;
 }
 

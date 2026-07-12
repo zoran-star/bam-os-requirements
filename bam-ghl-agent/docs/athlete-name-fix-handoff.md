@@ -4,6 +4,28 @@
 > connections (GitHub for both repos, Notion MCP, GHL MCP, Supabase).
 > Branch: `claude/athlete-name-confirmation-nr0m2g`.
 
+## ✅ RESOLVED 2026-07-12 - what actually shipped (read this first)
+Investigation found the cause is **narrower** than the plan below assumed: the GTA
+free-trial form (`bam-client-sites` `clients/bam-gta/gta/freetrial.jsx`) ALREADY collects
+the player name and sends `fields.athlete`; `leads.js:544` already reads it for the direct
+booking RPC. The one real gap: `portalNativeContact` in `leads.js` never wrote `athlete_name`
+onto the **contacts** row, which is exactly what the agent Book-it path (`bookPortalTrial`)
+reads. So NO bam-client-sites change was needed.
+
+Zoran chose the **tight fix + card field** (not the full plan below - no new DB column, no
+agent-captures-in-chat schema change). Shipped:
+1. `bam-portal/api/website/leads.js` `portalNativeContact` -> persist `athlete_name` on the
+   contact (`fields.athlete_name || fields.athlete || first+last`).
+2. `bam-portal/api/agent/booking.js` `bookPortalTrial({..., athleteName})` -> resolve
+   passed -> contact; clean human 400 if empty; backfill `contacts.athlete_name` on success.
+3. `bam-portal/api/agent-approvals.js` confirm-book -> pass the card's `athlete_name` through.
+4. `bam-portal/public/client-portal.html` Book-it card -> editable **Athlete** field
+   (pre-filled from the deck's resolved name), client-side empty guard, sent in confirm-book.
+
+See `memories/project_athlete_name_booking_fix.md`. The plan below is kept for reference only.
+
+---
+
 ## The bug
 Booking a lead (e.g. "Tara") from the Hawkeye **Book it** card throws:
 `book: Supabase 400: {"code":"P0001",...,"message":"Athlete name is required."}`
