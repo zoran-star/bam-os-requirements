@@ -18,7 +18,7 @@ import { respondedStage, contactInRespondedStage, interestedStage, nurtureStage,
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
-import { cancelReignitions } from "../agent/_reignite.js";
+import { cancelAllSalesOutbound } from "../agent/_cancel-outbound.js";
 import { decryptSecret } from "../messaging/_crypto.js";
 
 const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -124,17 +124,15 @@ async function handler(req, res) {
   } catch (_) {}
 
   if (ghlContactId) {
-    const cid = encodeURIComponent(String(ghlContactId));
-    // Lead replied → cancel pending/approved drafts (the detector re-drafts).
+    // Lead replied → cancel pending/approved drafts across every agent queue +
+    // any parked reignition (shared helper, same sweep as the GHL reply webhook
+    // and the signup path). The detector re-drafts against what they just said.
     try {
-      const patch = { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: occurred }) };
-      await sb(`agent_followups?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
-      await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
-      await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
-      await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
-      // 🔥 A parked "yes, but later" lead who texts back re-engaged early: clear
-      // their scheduled reignition - the owning agent works them normally now.
-      await cancelReignitions(client.id, String(ghlContactId), "lead replied before the reignition date");
+      await cancelAllSalesOutbound({
+        clientId: client.id, contactId: ghlContactId,
+        sendError: "lead replied",
+        reigniteReason: "lead replied before the reignition date",
+      });
     } catch (e) { console.error("twilio inbound draft-cancel:", e.message); }
 
     // Replied while in a portal automation → exit (keyless exit spares 🎉 onboarding) +

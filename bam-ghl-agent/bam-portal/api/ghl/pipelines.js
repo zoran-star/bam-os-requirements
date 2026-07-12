@@ -626,6 +626,22 @@ async function handler(req, res) {
     }
   }
 
+  // Hide paying members from the sales board (Zoran 2026-07-12): a lead who signed
+  // up must NEVER appear in Hawkeye, even when their sales opp is still OPEN because
+  // the won-mark missed or the returning-enroll "silent" path skipped it. Drop any
+  // opp whose contact is a LIVE member - matched on ghl_contact_id only (same
+  // semantics as the agents' isLiveMember guard), so a sibling on a different contact
+  // stays put. won/lost/abandoned opps are already dropped at render. No-op for pure
+  // V1 academies (no members rows), so their board is untouched.
+  const liveContactIds = new Set(
+    memberList.filter(m => m.status === "live" && m.ghl_contact_id).map(m => String(m.ghl_contact_id))
+  );
+  if (liveContactIds.size) {
+    for (const p of enriched) {
+      p.opportunities = p.opportunities.filter(o => !(o.contactId && liveContactIds.has(String(o.contactId))));
+    }
+  }
+
   // 4. Enrich with athlete name + booked trial date from our own website_leads
   //    (we own this data — avoids a per-contact GHL call per card). Rows come
   //    newest-first, so the first row seen per contact is the latest.
