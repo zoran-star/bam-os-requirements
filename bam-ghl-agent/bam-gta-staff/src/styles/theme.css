@@ -1,3 +1,9 @@
+/* ===== COPY of the PROTOTYPE design system (prototype lineage) - NOT canonical =====
+   This reference app intentionally keeps its own branding (see bam-ghl-agent/CLAUDE.md
+   scope exceptions) — do NOT apply the V2 portal design system here.
+   Canonical prototype system: prototype/src/styles/theme.css
+   Live V2 product system:      bam-ghl-agent/bam-portal/design-system/tokens.css
+   Full map: repo-root CLAUDE.md "Design systems". */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
 
 :root {

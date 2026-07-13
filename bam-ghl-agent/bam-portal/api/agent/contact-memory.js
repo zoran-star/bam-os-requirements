@@ -45,11 +45,21 @@ export async function loadContactMemory(sb, clientId, contactId, opts = {}) {
   // The athlete is their child, referenced in the third person - never greeted
   // directly (Zoran 2026-07-10). Parent name is authoritative from the booking,
   // then the contact record.
-  const parentName = String((booking && booking.parent_name) || contact?.name || "").trim();
+  const bookingParent = String((booking && booking.parent_name) || "").trim();
+  const contactName = String(contact?.name || "").trim();
   const athleteName = String(contact?.athlete_name || (booking && booking.athlete_name) || "").trim();
+  // contacts.name is the PARENT for most flows, but some (the ADAPT waiver
+  // onboarding, api/website/onboarding.js) write the ATHLETE's name into
+  // contacts.name. Trust the contact-name fallback as the parent ONLY when it
+  // isn't the athlete's name - otherwise we'd greet the parent by their kid's
+  // name (Zoran 2026-07-10). booking.parent_name is always authoritative.
+  const contactNameIsAthlete = contactName && athleteName && contactName.toLowerCase() === athleteName.toLowerCase();
+  const parentName = bookingParent || (contactNameIsAthlete ? "" : contactName);
   if (parentName) {
     const pf = parentName.split(/\s+/)[0];
     lines.push(`You are texting ${parentName} - the PARENT/guardian, and the person every message goes to. Greet and address them by their first name, ${pf}. Do not open a message to the athlete.`);
+  } else {
+    lines.push(`You are texting the PARENT/guardian${athleteName ? ` of ${athleteName}` : ""}, and the person every message goes to. You do NOT have the parent's own name on file - greet warmly WITHOUT a name (e.g. "Hi!"), and never open a message to the athlete by name as if they are the recipient.`);
   }
   if (athleteName) {
     const af = athleteName.split(/\s+/)[0];

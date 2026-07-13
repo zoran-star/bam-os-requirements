@@ -76,6 +76,26 @@ export async function passedTrialContactIds(clientId) {
   } catch (_) { return new Set(); }
 }
 
+// Contacts with an UPCOMING booked trial (slot start still in the future): they
+// are already locked into a slot, so the Booking detector must NOT draft another
+// Book-it / reply card for them. Without this, a stage-move hiccup that leaves a
+// just-booked lead in Responded lets the detector re-queue a SECOND Book-it ->
+// double booking (Yaz/Tara, GTA 2026-07-11). Read-time gates hide any lingering
+// Booking card the same way. Portal-booking academies only (their trial spine
+// lives in trial_bookings). The Confirm agent deliberately does NOT use this set -
+// a booked lead belongs in confirm land (that is where confirmations happen).
+// Fails to an empty set so a lookup hiccup never wrongly hides live cards.
+export async function upcomingBookedContactIds(clientId) {
+  try {
+    if (!clientId) return new Set();
+    if ((await bookingProviderOf(clientId)) !== "portal") return new Set();
+    const nowIso = new Date().toISOString();
+    const bks = await sbFetch(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=ghl_contact_id,schedule_slots(start_time)`) || [];
+    const rows = (Array.isArray(bks) ? bks : []).filter(t => t.ghl_contact_id && t.schedule_slots && t.schedule_slots.start_time);
+    return new Set(rows.filter(t => t.schedule_slots.start_time > nowIso).map(t => String(t.ghl_contact_id)));
+  } catch (_) { return new Set(); }
+}
+
 // Normalize a calendar label to a group key the agent uses.
 function groupOf(label) {
   const s = String(label || "").toLowerCase();
@@ -193,7 +213,7 @@ export async function nextAppointment(token, contactId, { nowMs = Date.now(), cl
 // scoped to the group, enriches parent details from the contacts store, and
 // returns the trial_booking id. Throws with a human message on failure
 // (no slot at that time / slot full) so callers surface it to staff.
-export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, contactId, contactName }) {
+export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, contactId, contactName, athleteName }) {
   const t = new Date(slotAtIso);
   if (isNaN(t.getTime())) throw new Error("invalid slot time");
   const rows = (await sbFetch(
@@ -207,6 +227,12 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, co
     const cr = await sbFetch(`contacts?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name,email,phone,athlete_name&limit=1`);
     c = (Array.isArray(cr) && cr[0]) || {};
   } catch (_) {}
+  // Athlete name resolution: the name staff typed on the Book-it card wins, then
+  // whatever's already stored on the contact. The book_trial_slot RPC HARD-requires
+  // it, so if both are empty we throw a clean, human message here instead of letting
+  // the raw Postgres "P0001: Athlete name is required." surface to the deck.
+  const resolvedAthlete = (athleteName || c.athlete_name || "").trim() || null;
+  if (!resolvedAthlete) throw new Error("Enter the athlete's name to book this trial");
   // Offer lineage: the lead's open pipeline card knows which offer's funnel
   // this trial belongs to (Wave 1 stamping). Best-effort - never blocks a book.
   let oppOfferId = null;
@@ -221,7 +247,7 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, co
       p_slot_id: slot.id,
       p_parent_name: contactName || c.name || null,
       p_parent_email: c.email || null,
-      p_athlete_name: c.athlete_name || null,
+      p_athlete_name: resolvedAthlete,
       p_parent_phone: c.phone || null,
       p_athlete_dob: null,
       p_entry_point_id: null,
@@ -233,6 +259,18 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, co
   });
   const id = typeof r === "string" ? r : (r && r.trial_booking_id) || null;
   if (!id) throw new Error("trial booking failed");
+  // Backfill the resolved athlete name onto the contact so it's saved for next
+  // time (agent personalization + future books). Best-effort - never fail a
+  // successful booking over this. Only writes when the contact had none.
+  if (resolvedAthlete && !c.athlete_name) {
+    try {
+      await sbFetch(`contacts?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ athlete_name: resolvedAthlete }),
+      });
+    } catch (_) {}
+  }
   return id;
 }
 

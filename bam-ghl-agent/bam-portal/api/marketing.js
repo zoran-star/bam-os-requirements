@@ -1637,8 +1637,13 @@ async function handleContentTickets(req, res) {
           client_id: ticket.client_id,
           type: "change",
           status: "open",
-          priority: "normal",
-          source: "funnel-content",
+          // ⚠️ tickets has CHECK constraints: priority in (urgent|standard|low),
+          // source in (portal|asana_import), category in (systems|website|ads|
+          // other|null). The first live send-to-systems 400'd on 'normal' +
+          // 'funnel-content' (2026-07-12) - keep these in the allowed sets.
+          priority: "standard",
+          source: "portal",
+          category: "website",
           fields: {
             // `title` doubles as the headline in the tickets-insert Slack
             // trigger (fields->>'title'), so the client channel confirm reads

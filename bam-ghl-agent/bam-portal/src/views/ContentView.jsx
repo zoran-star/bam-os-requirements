@@ -1357,6 +1357,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
   const [finalsFolder, setFinalsFolder] = useState("");     // optional folder for the next upload batch
   const [finalsDragOver, setFinalsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadDone, setUploadDone] = useState(0);   // completed files this batch
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
   const [sendModalOpen, setSendModalOpen] = useState(false);
@@ -1380,26 +1381,40 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
   const funnelMode = ticket.channel === "funnel";
 
   // ── Upload selected finals to Supabase Storage and persist on ticket ──
+  // Files upload in PARALLEL (3 at a time - single connections rarely
+  // saturate the pipe to storage, so this is a 2-3x win on video batches)
+  // with a done-count on the button so big uploads never look hung.
   async function commitFinals() {
     if (!finalsToUpload.length) return;
     setUploading(true);
+    setUploadDone(0);
     try {
-      const uploaded = [];
-      for (const file of finalsToUpload) {
-        const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
-        const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `${TICKET_STORAGE_FOLDER}/${ticket.id}/${uid}-${safe}`;
-        const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
-          contentType: file.type || "application/octet-stream",
-          cacheControl: "3600",
-        });
-        if (upErr) throw new Error(`Storage upload failed (${file.name}): ${upErr.message}`);
-        const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-        const entry = { name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || "" };
-        const folder = finalsFolder.trim();
-        if (folder) entry.folder = folder;
-        uploaded.push(entry);
+      const files = finalsToUpload;
+      const results = new Array(files.length);
+      let nextIdx = 0;
+      async function worker() {
+        for (;;) {
+          const i = nextIdx++;
+          if (i >= files.length) return;
+          const file = files[i];
+          const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+          const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const path = `${TICKET_STORAGE_FOLDER}/${ticket.id}/${uid}-${safe}`;
+          const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+            contentType: file.type || "application/octet-stream",
+            cacheControl: "3600",
+          });
+          if (upErr) throw new Error(`Storage upload failed (${file.name}): ${upErr.message}`);
+          const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+          const entry = { name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || "" };
+          const folder = finalsFolder.trim();
+          if (folder) entry.folder = folder;
+          results[i] = entry;
+          setUploadDone(d => d + 1);
+        }
       }
+      await Promise.all(Array.from({ length: Math.min(3, files.length) }, worker));
+      const uploaded = results.filter(Boolean);
       await patchTicket(ticket.id, { action: "upload-final", final_files: uploaded });
       setFinalsToUpload([]);
       setFinalsFolder("");
@@ -1781,7 +1796,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
               padding: "10px 18px", background: tk.accent, color: "#0A0A0B",
               border: 0, borderRadius: 8, fontWeight: 700, cursor: uploading ? "wait" : "pointer", fontSize: 13,
               opacity: uploading ? 0.6 : 1,
-            }}>{uploading ? "Uploading…" : `Upload ${finalsToUpload.length} file${finalsToUpload.length === 1 ? "" : "s"}`}</button>
+            }}>{uploading ? `Uploading… ${uploadDone}/${finalsToUpload.length}` : `Upload ${finalsToUpload.length} file${finalsToUpload.length === 1 ? "" : "s"}`}</button>
           )}
         </div>
       </Card>

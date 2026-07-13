@@ -21,6 +21,7 @@ import { enrollContact, exitEnrollment } from "../automations.js";
 import { createOpp, moveStage, findOpenOpp, pipelineFlags, ROLE_MATCHERS } from "../agent/_store.js";
 import { upsertPortalContact, writePortalFieldValues, contactProvider, resolveOrMintPortalContact } from "../_contacts.js";
 import { recordKpiEvent } from "../_kpi.js";
+import { cancelReignitions } from "../agent/_reignite.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -162,10 +163,23 @@ async function portalNativeContact({ clientId, ghlLocationId, name, email, phone
   if (messageFieldId && message && !cfMap[String(messageFieldId)]) cfMap[String(messageFieldId)] = message;
   const formTag = `${(formType || "contact").replace(/-/g, " ")} form filled`;
   const tags = [...new Set(["website-inquiry", formTag, ...(extraTags || [])])];
+  // Persist the athlete name the form already collected straight onto the contact
+  // row. The Hawkeye Book-it card + agent booking read contacts.athlete_name, and
+  // without this it stayed null even though the form sent it - so booking a lead
+  // like Tara 400'd with the raw RPC "Athlete name is required." Accept whatever
+  // the form used: athlete_name, athlete, or first+last. clean() drops empties, so
+  // this never nulls an existing name on a repeat submission.
+  const athleteName = (
+    fields?.athlete_name ||
+    fields?.athlete ||
+    `${fields?.athlete_first || ""} ${fields?.athlete_last || ""}`.trim() ||
+    ""
+  ).trim() || null;
   const contactId = await resolveOrMintPortalContact(clientId, {
     first_name: firstName || null,
     last_name:  rest.join(" ") || null,
     name:       (name || "").trim() || null,
+    athlete_name: athleteName,
     email, phone, tags,
     custom_fields: Object.keys(cfMap).length ? cfMap : null,
     source: "website-form",
@@ -574,6 +588,11 @@ async function handler(req, res) {
           fields.booked_slot = booking.start;
           receipt.fields = fields;
         }
+
+        // A parked "come back later" lead who self-books through the website is
+        // back NOW - cancel any scheduled reignition so the re-engagement card
+        // doesn't later fire at a family that already rebooked (#19). Best-effort.
+        if (receipt.ghl_contact_id) { try { await cancelReignitions(client.id, receipt.ghl_contact_id, "self-booked a trial"); } catch (_) {} }
 
         const routeCfg = client.ghl_kpi_config?.portal_entry_routing;
         if (routeCfg?.enabled) {

@@ -5,7 +5,7 @@ import { respondedStage, contactInRespondedStage, scheduledTrialStage, intereste
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
-import { cancelReignitions } from "../agent/_reignite.js";
+import { cancelAllSalesOutbound } from "../agent/_cancel-outbound.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
 //
 //   POST /api/ghl/inbound-webhook
@@ -255,23 +255,17 @@ async function handler(req, res) {
   } catch (_) { /* non-fatal */ }
 
   // Lead just replied → cancel any pending/approved drafts for them (don't text
-  // someone who's already talking to us): scheduled follow-ups AND ready replies
-  // (the old ready draft was for their previous message; the detector re-drafts).
+  // someone who's already talking to us): every agent queue (followups, ready,
+  // confirm, closing) PLUS any parked "yes, but later" reignition, in one sweep.
+  // Shared helper (api/agent/_cancel-outbound.js) so the reply path, the Twilio
+  // reply path, and the signup path can never drift on which queues get cleared.
   try {
     if (contactId) {
-      const cid = encodeURIComponent(String(contactId));
-      const patch = { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied", updated_at: new Date().toISOString() }) };
-      await sb(`agent_followups?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
-      await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
-      // Same for the confirm agent: a stale opener/confirm card is for their prior
-      // state; the confirm detector re-drafts against what they just said.
-      await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
-      // And the closing agent: a stale closing card can't be sent at a now-talking
-      // lead; the closing detector re-drafts so the AI can answer what they just said.
-      await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
-      // 🔥 A parked "yes, but later" lead who texts back re-engaged early: clear
-      // their scheduled reignition - the owning agent works them normally now.
-      await cancelReignitions(client.id, String(contactId), "lead replied before the reignition date");
+      await cancelAllSalesOutbound({
+        clientId: client.id, contactId,
+        sendError: "lead replied",
+        reigniteReason: "lead replied before the reignition date",
+      });
     }
   } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }
 

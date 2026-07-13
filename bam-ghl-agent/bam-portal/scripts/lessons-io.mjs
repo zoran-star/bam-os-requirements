@@ -9,8 +9,9 @@
 // the raw sources.
 //
 // Usage:
+//   node scripts/lessons-io.mjs scan                                       -> writes lessons-scan.json (fleet triage: which academies are DUE)
 //   node scripts/lessons-io.mjs dump <clientId>                            -> writes lessons-dump.json
-//   node scripts/lessons-io.mjs apply <plan.json> [--archive-only] [--force] -> applies a consolidation plan
+//   node scripts/lessons-io.mjs apply <plan.json> [--archive-only] [--force] -> applies a consolidation plan (+ a consolidation_runs KPI row)
 //
 // Env (required): SUPABASE_URL (or VITE_SUPABASE_URL) + SUPABASE_SERVICE_ROLE_KEY
 // (or SUPABASE_SERVICE_KEY). Pull them from the Vercel project or a local .env.
@@ -78,7 +79,11 @@ async function sb(path, init = {}) {
 // runtime names (booking/confirm/closing), so today's lessons need no backfill.
 const TEMPLATE_KEYS = [...new Set(Object.values(AGENT_TEMPLATES).map((t) => t.lessonKey))];
 const PRESET_TAGS = ["free_trial", "universal"]; // motion scope on a GENERAL lesson (context.preset)
-const SEL = "id,client_id,agent,scope,kind,lesson,context,promotion_reason,promotion_status,created_by,created_at";
+// thread_snapshot / stage_from / stage_to (added 2026-07-12) ride along so the
+// consolidator sees the conversation + pipeline movement behind each raw lesson,
+// not just the proposed/edited pair - richer routing + intake-mining signal.
+const SEL = "id,client_id,agent,scope,kind,lesson,context,thread_snapshot,stage_from,stage_to,promotion_reason,promotion_status,created_by,created_at";
+const RAW_THRESHOLD = 15; // an academy is DUE when any single agent hits this many raw lessons
 
 // Repo hard rules: lessons ride prompts and can echo into parent-facing SMS.
 const EM_DASH = /—/;
@@ -122,6 +127,48 @@ async function dump(clientId) {
   writeFileSync("lessons-dump.json", JSON.stringify(out, null, 2));
   console.log(`Wrote lessons-dump.json - ${own.length} academy + ${general.length} general lessons across ${Object.keys(byAgent).length} agents.`);
   for (const w of warnings) console.log(`WARNING: ${w}`);
+}
+
+// Fleet triage: scan EVERY academy's active pile at once so you know WHERE to run
+// the skill, without dumping each blind. "raw" = un-consolidated lessons still
+// riding prompts (created_by not 'consolidate-skill', excluding kind=good
+// positive examples). An academy is DUE when any single agent is at/over the
+// RAW_THRESHOLD - that's where context rot bites first. Also summarises the
+// shared general set once: a general lesson rides EVERY academy, so it's reviewed
+// cross-academy, not per-academy.
+async function scan() {
+  // limit is generous on purpose: this reads the WHOLE fleet's active pile, so a
+  // silent PostgREST default-cap truncation would under-count and hide a DUE
+  // academy. If the fleet ever exceeds this, switch to Range-header pagination.
+  const acad = (await sb(`agent_lessons?active=eq.true&client_id=not.is.null&select=id,client_id,agent,kind,created_by&limit=100000`)) || [];
+  const general = (await sb(`agent_lessons?active=eq.true&client_id=is.null&scope=eq.general&select=id,agent,kind,created_by&limit=100000`)) || [];
+  const names = {};
+  try { for (const c of (await sb(`clients?select=id,business_name`)) || []) names[c.id] = c.business_name || c.id; } catch (_) {}
+  const isRaw = (l) => l.kind !== "good" && l.created_by !== "consolidate-skill";
+  const per = {};
+  for (const l of acad) {
+    const p = per[l.client_id] || (per[l.client_id] = { name: names[l.client_id] || l.client_id, agents: {}, raw_total: 0 });
+    const a = p.agents[l.agent] || (p.agents[l.agent] = { raw: 0, total: 0 });
+    a.total++;
+    if (isRaw(l)) { a.raw++; p.raw_total++; }
+  }
+  const academies = Object.entries(per).map(([id, p]) => ({
+    client_id: id, name: p.name, raw_total: p.raw_total, by_agent: p.agents,
+    due: Object.values(p.agents).some((a) => a.raw >= RAW_THRESHOLD),
+  })).sort((x, y) => Number(y.due) - Number(x.due) || y.raw_total - x.raw_total);
+  const generalByAgent = {};
+  for (const l of general) generalByAgent[l.agent] = (generalByAgent[l.agent] || 0) + 1;
+  const out = { threshold: RAW_THRESHOLD, scanned: academies.length, due: academies.filter((a) => a.due).length, academies, general_total: general.length, general_by_agent: generalByAgent };
+  writeFileSync("lessons-scan.json", JSON.stringify(out, null, 2));
+  console.log(`\nAcademies - raw = un-consolidated lessons still riding prompts (DUE at ${RAW_THRESHOLD}+ on any one agent):`);
+  for (const a of academies) {
+    const breakdown = Object.entries(a.by_agent).map(([ag, c]) => `${ag} ${c.raw}`).join(", ") || "none";
+    console.log(`  ${a.due ? "DUE " : "    "}${a.name}: ${a.raw_total} raw (${breakdown})`);
+  }
+  const gb = Object.entries(generalByAgent).map(([a, c]) => `${a} ${c}`).join(", ") || "none";
+  console.log(`\nShared general set (rides every academy): ${general.length} lessons (${gb}).`);
+  console.log(`\n${out.due} of ${out.scanned} academies DUE. Dump each: node scripts/lessons-io.mjs dump <clientId>`);
+  console.log(`Wrote lessons-scan.json.`);
 }
 
 function validatePlan(plan) {
@@ -260,6 +307,31 @@ async function apply(planPath, force, archiveOnly) {
     process.exit(1);
   }
 
+  // KPI ledger: one row per apply run so the consolidation loop is trackable over
+  // time (lessons/week, academy vs general split, archive + intake-candidate
+  // yield). Written on a full apply only; an --archive-only recovery re-run skips
+  // it (the original run already represents the work). Best-effort: a KPI write
+  // must never fail the apply itself.
+  if (!skipInserts) {
+    const byAgent = plan.by_agent || (() => {
+      const m = {};
+      for (const l of academy) (m[l.agent] || (m[l.agent] = { academy: 0, general: 0 })).academy++;
+      for (const l of general) (m[l.agent] || (m[l.agent] = { academy: 0, general: 0 })).general++;
+      return m;
+    })();
+    try {
+      await sb(`consolidation_runs`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+        client_id: clientId, ran_by: plan.ran_by || "consolidate-skill",
+        raw_count: Number.isFinite(plan.raw_count) ? plan.raw_count : (archiveIds.length + archiveGeneralIds.length),
+        academy_out: academy.length, general_out: general.length,
+        brain_facts: Number.isFinite(plan.brain_facts) ? plan.brain_facts : 0,
+        archived, candidates_new: Number.isFinite(plan.candidates_new) ? plan.candidates_new : 0,
+        by_agent: byAgent, notes: plan.notes || null,
+      }]) });
+      console.log("Recorded consolidation_runs KPI row.");
+    } catch (e) { console.warn(`(KPI) couldn't write consolidation_runs row: ${e.message}`); }
+  }
+
   console.log("Done. The agents load the consolidated set on their next run.");
 }
 
@@ -267,6 +339,7 @@ const args = process.argv.slice(2);
 const force = args.includes("--force");
 const archiveOnly = args.includes("--archive-only");
 const [cmd, arg] = args.filter(a => !a.startsWith("--"));
-if (cmd === "dump") await dump(arg || null);
+if (cmd === "scan") await scan();
+else if (cmd === "dump") await dump(arg || null);
 else if (cmd === "apply") { if (!arg) { console.error("usage: apply <plan.json> [--archive-only] [--force]"); process.exit(1); } await apply(arg, force, archiveOnly); }
-else { console.error("usage: node scripts/lessons-io.mjs dump <clientId> | apply <plan.json> [--archive-only] [--force]"); process.exit(1); }
+else { console.error("usage: node scripts/lessons-io.mjs scan | dump <clientId> | apply <plan.json> [--archive-only] [--force]"); process.exit(1); }

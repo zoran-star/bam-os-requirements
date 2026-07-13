@@ -34,31 +34,67 @@ export async function readStoreThreadAgent(clientId, ghlContactId) {
   } catch (e) { console.error("readStoreThreadAgent:", e.message); return []; }
 }
 
+// Parked Hawkeye sends: an approved reply whose send is held on send_after
+// (quiet hours). Surfaced in the inbox thread as status:'scheduled' bubbles so
+// an approved message never looks like it silently vanished - the exact
+// confusion behind "I thought I sent a message and it never sent".
+const REPLY_TABLES = ["agent_ready_replies", "agent_confirm_replies", "agent_closing_replies"];
+export async function scheduledStoreMessages(clientId, ghlContactId) {
+  if (!clientId || !ghlContactId) return [];
+  try {
+    const parts = await Promise.all(REPLY_TABLES.map((t) =>
+      sb(`${t}?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&status=eq.approved&sent_at=is.null&send_after=not.is.null&select=id,draft_message,send_after,approved_at,created_at`).catch(() => [])
+    ));
+    return parts.flat()
+      .filter((r) => r && r.draft_message && String(r.draft_message).trim())
+      .map((r) => ({
+        id: `sched:${r.id}`, body: r.draft_message, type: "SMS",
+        direction: "outbound", status: "scheduled",
+        date: r.approved_at || r.created_at || r.send_after,
+        send_after: r.send_after, attachments: [],
+      }));
+  } catch (e) { console.error("scheduledStoreMessages:", e.message); return []; }
+}
+
 // Inbox thread view — mapped to the inbox API's message shape.
 export async function readStoreThreadInbox(clientId, ghlContactId) {
   const thread = await threadByContact(clientId, ghlContactId);
   if (!thread) return { conversation_id: null, messages: [] };
-  const msgs = await sb(`sms_messages?thread_id=eq.${thread.id}&select=id,direction,body,occurred_at,status&order=occurred_at.asc&limit=300`);
+  const [msgs, sched] = await Promise.all([
+    sb(`sms_messages?thread_id=eq.${thread.id}&select=id,direction,body,occurred_at,status&order=occurred_at.asc&limit=300`),
+    scheduledStoreMessages(clientId, ghlContactId),
+  ]);
   return {
     conversation_id: thread.id,
-    messages: (msgs || []).map((m) => ({
-      id: m.id, body: m.body || "", type: "SMS",
-      direction: m.direction || "", status: m.status || "",
-      date: m.occurred_at, attachments: [],
-    })),
+    messages: [
+      ...(msgs || []).map((m) => ({
+        id: m.id, body: m.body || "", type: "SMS",
+        direction: m.direction || "", status: m.status || "",
+        date: m.occurred_at, attachments: [],
+      })),
+      ...sched,
+    ],
   };
 }
 
 // Inbox thread view by thread id (the id listStoreThreads returns as conversation id).
 export async function readStoreThreadById(threadId) {
-  const msgs = await sb(`sms_messages?thread_id=eq.${encodeURIComponent(threadId)}&select=id,direction,body,occurred_at,status&order=occurred_at.asc&limit=300`);
+  const [msgs, trows] = await Promise.all([
+    sb(`sms_messages?thread_id=eq.${encodeURIComponent(threadId)}&select=id,direction,body,occurred_at,status&order=occurred_at.asc&limit=300`),
+    sb(`sms_threads?id=eq.${encodeURIComponent(threadId)}&select=client_id,ghl_contact_id&limit=1`).catch(() => null),
+  ]);
+  const t = (trows && trows[0]) || null;
+  const sched = t ? await scheduledStoreMessages(t.client_id, t.ghl_contact_id) : [];
   return {
     conversation_id: threadId,
-    messages: (msgs || []).map((m) => ({
-      id: m.id, body: m.body || "", type: "SMS",
-      direction: m.direction || "", status: m.status || "",
-      date: m.occurred_at, attachments: [],
-    })),
+    messages: [
+      ...(msgs || []).map((m) => ({
+        id: m.id, body: m.body || "", type: "SMS",
+        direction: m.direction || "", status: m.status || "",
+        date: m.occurred_at, attachments: [],
+      })),
+      ...sched,
+    ],
   };
 }
 

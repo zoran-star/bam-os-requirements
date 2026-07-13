@@ -582,6 +582,32 @@
 .termhint { font-size: 12px; color: var(--fg-subtle); text-align: center; margin: 12px 0 20px; }
 .termhint b { color: var(--white-80); font-weight: 600; }
 
+/* ---------- START DATE ---------- */
+.startdate { margin-top: 24px; }
+.startpick { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1.5px solid var(--gold-line); background: var(--black-lift); }
+.startpick__opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 12px 14px; text-align: left; cursor: pointer;
+  background: transparent; color: var(--fg-muted);
+  border: none; border-left: 1.5px solid var(--gold-line);
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.startpick__opt:first-child { border-left: none; }
+.startpick__opt.is-active { background: var(--gold); color: var(--black); }
+.startpick__t { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.startpick__s { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.72; }
+.startdate__field {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px;
+  padding: 12px 14px; background: var(--black-lift); border: 1.5px solid var(--gold-line);
+  color: var(--gold); cursor: pointer;
+}
+.startdate__field:focus-within { border-color: var(--gold); background: #181818; box-shadow: 0 0 0 3px rgba(226,221,159,0.12); }
+.startdate__input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--white); font-family: var(--font-body); font-size: 15px;
+}
+.startdate__input::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.65; cursor: pointer; }
+
 /* ---------- PLAN CARDS ---------- */
 .plans { display: flex; flex-direction: column; gap: 12px; }
 .plan {

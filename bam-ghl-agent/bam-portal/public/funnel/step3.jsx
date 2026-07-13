@@ -17,11 +17,14 @@ function OrderSummary(props) {
   var t = BAM.getTerm(termId);
   var c = BAM.charge(plan, termId);
   var today = BAM.TODAY;
+  var deferred = !!props.startDate;
   var when;
-  if (termId === 'monthly') {
+  if (deferred) {
+    when = <span>Billed today. Training starts <b>{BAM.fmtDate(BAM.fromISO(props.startDate))}</b> and billing renews <b>{BAM.fmtDate(BAM.renewalFrom(props.startDate, termId))}</b>, then each cycle after.</span>;
+  } else if (termId === 'monthly') {
     when = <span>Billed today, then <b>{BAM.priceHST(plan.monthly)}</b> every 4 weeks starting {BAM.fmtDate(BAM.addWeeks(today, 4))}.</span>;
   } else {
-    when = <span>One payment today. Continues month-to-month from <b>{BAM.fmtDate(BAM.addMonths(today, t.months))}</b> — cancel anytime after.</span>;
+    when = <span>One payment today. Continues month-to-month from <b>{BAM.fmtDate(BAM.addMonths(today, t.months))}</b>, cancel anytime after.</span>;
   }
   return (
     <div className="summary">
@@ -172,7 +175,7 @@ function Step3(props) {
       <h1 className="fstep-title">Confirm &amp; <em>pay.</em></h1>
       <p className="fstep-sub">Review the plan, sign the agreement, and pay securely. You can change your plan any time before paying.</p>
 
-      <OrderSummary plan={plan} term={props.term} onChange={props.onChangePlan} />
+      <OrderSummary plan={plan} term={props.term} startDate={props.startDate} onChange={props.onChangePlan} />
 
       <Payment pay={props.pay} setPay={props.setPay} live={props.live} stripeReady={props.stripeReady} payErr={props.payErr} />
 
@@ -192,7 +195,9 @@ function Step3(props) {
         a={<>Yes. Pause for travel, injury, or exams — up to 30 days at a time, about twice a year. Paused weeks are added onto your next billing date, so you{'\u2019'}re never charged for time you{'\u2019'}re paused.</>} />
       <FaqRow q="When am I charged?" open={ui.faq === 2}
         onToggle={function () { setUi(Object.assign({}, ui, { faq: ui.faq === 2 ? null : 2 })); }}
-        a={<>Your first payment is today. Monthly renews every 4 weeks; prepaid terms are a single charge today and renew at the end of the term. A receipt is emailed every time.</>} />
+        a={props.startDate
+          ? <>Your first payment is <b>today</b> and covers your first period. Training starts on your chosen date, and billing renews one cycle after that, then on that schedule. A receipt is emailed every time.</>
+          : <>Your first payment is today. Monthly renews every 4 weeks; prepaid terms are a single charge today and renew at the end of the term. A receipt is emailed every time.</>} />
 
       <div className="trust">
         <span className="trust__item"><IcLock size={13} /> Secure payment</span>

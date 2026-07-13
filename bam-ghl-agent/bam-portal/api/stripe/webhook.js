@@ -38,8 +38,9 @@ import { notifyClientPush } from "../push/_send.js";
 
 import crypto from "node:crypto";
 import { fireOnboardingActivations } from "../onboarding/activations.js";
-import { sendSms, ghl } from "../ghl/_core.js";
+import { ghl } from "../ghl/_core.js";
 import { findOpenOpp, setStatus } from "../agent/_store.js";
+import { cancelAllSalesOutbound } from "../agent/_cancel-outbound.js";
 import { recordKpiEvent } from "../_kpi.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { enrollContact, exitEnrollment, isAutomationLive } from "../automations.js";
@@ -593,11 +594,18 @@ async function handleSubCreated(event, connectedAccount, res) {
   // exit ALL active sales enrollments for this contact. Idempotent (no-op if not
   // enrolled) and best-effort: never blocks the link. Only touches the portal's own
   // automation_enrollments table — it never reads or writes GHL, so V1 is untouched.
+  const conversionContactId = target.ghl_contact_id || (sub.metadata && sub.metadata.ghl_contact_id) || null;
   try {
-    const exitContactId = target.ghl_contact_id || (sub.metadata && sub.metadata.ghl_contact_id) || null;
-    if (exitContactId) {
-      await exitEnrollment({ clientId: target.client_id, contactId: exitContactId, reason: "converted" });
-    }
+    if (conversionContactId) await exitEnrollment({ clientId: target.client_id, contactId: conversionContactId, reason: "converted" });
+  } catch { /* non-fatal */ }
+
+  // Signup sweep: cancel EVERY pending/approved agent-scheduled message (booking,
+  // confirm, closing follow-up plan) + any parked reignition for this contact. The
+  // member just went live - they must never get another sales text. Mirrors the
+  // reply-cancel sweep (shared helper); portal-native tables only, so V1 is
+  // untouched. Its own try block so a drip-exit error can't skip it. Best-effort.
+  try {
+    if (conversionContactId) await cancelAllSalesOutbound({ clientId: target.client_id, contactId: conversionContactId, sendError: "lead signed up" });
   } catch { /* non-fatal */ }
 
   // Funnel KPI: record the conversion (lead went live on Stripe), tied to the
@@ -843,10 +851,37 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
   const silent = onbSub.metadata.import_silent === "1";
   inv = inv || {};
 
-  await sb(`members?id=eq.${member.id}`, {
-    method: "PATCH", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ status: "live", updated_at: nowIso() }),
-  });
+  // ── Atomic activation claim (idempotency guard) ──────────────────────────
+  // Stripe fires BOTH invoice.payment_succeeded AND invoice.paid for a single
+  // payment, ~ms apart, and the reconcile cron can fire for the same member
+  // too. Every caller guards on status === 'payment_method_required' BEFORE
+  // reaching here, so without a lock two of them both read
+  // 'payment_method_required' and both run the full activation → duplicate
+  // staff SMS + duplicate GHL/pipeline side effects. (This is exactly what
+  // double-texted Kartik Natarajan's signup on 2026-07-12: two
+  // 'onboarding-activated' audit rows 75ms apart, each sending an SMS.)
+  //
+  // Make the flip a compare-and-swap: PATCH only the row that is STILL
+  // 'payment_method_required' and ask for the updated row back
+  // (return=representation). Exactly one concurrent caller matches and wins;
+  // any other gets an empty array and bails before a single side effect fires.
+  // Safe for the reconcile cron too — if the webhook already won, the cron's
+  // claim matches nothing and no-ops.
+  const claimed = await sb(
+    `members?id=eq.${member.id}&status=eq.payment_method_required`,
+    {
+      method: "PATCH", headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ status: "live", updated_at: nowIso() }),
+    }
+  );
+  if (!Array.isArray(claimed) || claimed.length === 0) {
+    // Another Stripe event (or the cron) already claimed this activation.
+    // Do NOT re-fire notifications/activations — report the no-op and stop.
+    return {
+      ok: true, action: "already-activated", member_id: member.id,
+      skipped: "activation already claimed by a concurrent event",
+    };
+  }
 
   let pipelineWon = silent ? { skipped: "import_silent" } : null;
   if (!silent) {
@@ -882,20 +917,33 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
     }
   }
 
+  const conversionContactId =
+    (activations && activations.ghl && activations.ghl.contact_id) ||
+    member.ghl_contact_id ||
+    (onbSub.metadata && onbSub.metadata.ghl_contact_id) ||
+    null;
   let salesExit = null;
   try {
-    const exitContactId =
-      (activations && activations.ghl && activations.ghl.contact_id) ||
-      member.ghl_contact_id ||
-      (onbSub.metadata && onbSub.metadata.ghl_contact_id) ||
-      null;
-    if (exitContactId) {
-      salesExit = await exitEnrollment({ clientId: member.client_id, contactId: exitContactId, reason: "converted" });
-    } else {
-      salesExit = { skipped: "no ghl contact id" };
-    }
+    salesExit = conversionContactId
+      ? await exitEnrollment({ clientId: member.client_id, contactId: conversionContactId, reason: "converted" })
+      : { skipped: "no ghl contact id" };
   } catch (e) {
     salesExit = { ok: false, error: String((e && e.message) || e) };
+  }
+
+  // Signup sweep: cancel every pending/approved agent-scheduled message (booking,
+  // confirm, closing follow-up plan) + any parked reignition for this contact. THIS
+  // is the fix for the returning-enroll "silent" path too: it skips the won-mark
+  // (markOpportunityWon is guarded by !silent), so the detector's left-stage prune
+  // never fires and the closing cards previously lingered until a cron or a reply
+  // cleared them. Its own try block, independent of the drip-exit. Portal-native; V1 safe.
+  let salesSweep = null;
+  try {
+    salesSweep = conversionContactId
+      ? await cancelAllSalesOutbound({ clientId: member.client_id, contactId: conversionContactId, sendError: "lead signed up" })
+      : { skipped: "no ghl contact id" };
+  } catch (e) {
+    salesSweep = { ok: false, error: String((e && e.message) || e) };
   }
 
   let commitmentSchedule = null;
@@ -908,9 +956,8 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
   let staffNotify = silent ? { skipped: "import_silent" } : null;
   if (!silent) {
     try {
-      const cRows = await sb(`clients?id=eq.${member.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,staff_notify_phone&limit=1`);
+      const cRows = await sb(`clients?id=eq.${member.client_id}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
       const client = Array.isArray(cRows) && cRows[0];
-      const toPhone = (client && client.staff_notify_phone) || process.env.STAFF_NOTIFY_PHONE || null;
       const amt = inv.amount_paid != null ? `$${(inv.amount_paid / 100).toFixed(2)}` : "-";
       if (client) {
         const signupMsg = `🎉 New signup - ${client.business_name || "academy"}\n`
@@ -918,19 +965,22 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
           + `Parent: ${member.parent_name || "-"}${member.parent_email ? " · " + member.parent_email : ""}${member.parent_phone ? " · " + member.parent_phone : ""}\n`
           + `Plan: ${onbSub.metadata.plan || "-"} · ${onbSub.metadata.term || "-"}\n`
           + `Paid: ${amt} · status LIVE`;
-        if (toPhone) {
-          staffNotify = await sendSms({ client, toPhone, message: signupMsg, contactName: "BAM Staff" });
-        } else {
-          staffNotify = { ok: false, error: "no staff_notify_phone configured" };
-        }
-        // New owner-notification system (per notification_prefs), separate from
-        // the legacy staff_notify_phone SMS above. new_signup = V2; the same
-        // first-payment moment also fires "new payment" (V1.5/V2).
-        notifyOwners(member.client_id, "new_signup", signupMsg).catch(() => {});
+        // Owner/staff SMS is the V2 notification_prefs system ONLY. Each academy
+        // picks who receives each event (new_signup, stripe_payment) and the text
+        // is sent FROM their own GHL number, via notifyOwners().
+        //
+        // The legacy single-number path was REMOVED 2026-07-12. It sent to a
+        // per-client staff_notify_phone, else fell back to a central
+        // STAFF_NOTIFY_PHONE env catch-all — which (a) double-fired alongside V2
+        // for any academy set up on both (this double-texted BAM GTA), and
+        // (b) blasted EVERY academy's enrollments to one central BAM number that
+        // nobody wanted. notifyOwners() is non-throwing, so awaiting new_signup
+        // gives us a real audit record; stripe_payment stays fire-and-forget.
+        staffNotify = await notifyOwners(member.client_id, "new_signup", signupMsg);
         notifyOwners(member.client_id, "stripe_payment",
           `💳 New payment: ${member.athlete_name || member.parent_name || "a member"} - ${amt}`).catch(() => {});
       } else {
-        staffNotify = { ok: false, error: "no staff_notify_phone configured" };
+        staffNotify = { ok: false, error: "client row not found" };
       }
     } catch (e) {
       staffNotify = { ok: false, error: String((e && e.message) || e) };
@@ -940,11 +990,11 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
   await writeAudit({
     client_id: member.client_id, member_id: member.id,
     action_type: silent ? "import-activated-silent" : "onboarding-activated",
-    args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon },
+    args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, silent, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, sales_sweep: salesSweep, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon },
     db_changes: { members: { status: { from: "payment_method_required", to: "live" } } },
   });
 
-  return { ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon };
+  return { ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, sales_sweep: salesSweep, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon };
 }
 
 async function handleInvoiceSucceeded(event, connectedAccount, res) {
