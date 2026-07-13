@@ -21892,22 +21892,35 @@ function _bbBaseOrigin() {
   if (u) { try { return new URL(u).origin; } catch (_) {} }
   return null;
 }
-function _bbCollectPages() {
+let _BB_PAGES = [];   // last collected page list, for _bbEditPage lookups
+function _bbCollectPages(sitePages) {
   const origin = _bbBaseOrigin();
   const out = [];
   ((typeof _FN !== 'undefined' && _FN) ? _FN : []).forEach(f => {
     if (!f || !f.url_resolved) return;
     out.push({ key: f.key, label: f.label || f.key, url_resolved: f.url_resolved, offer_id: f.offer_id || null });
   });
-  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
-  const extra = (c.brand_data && Array.isArray(c.brand_data.site_pages)) ? c.brand_data.site_pages : [];
-  extra.forEach(p => {
+  (Array.isArray(sitePages) ? sitePages : []).forEach(p => {
     if (!p || !p.slug) return;
     if (out.some(x => x.key === p.slug)) return;
     const url = p.url || (origin ? origin + '/' + String(p.slug).replace(/^\/+/, '') : null);
     out.push({ key: p.slug, label: p.label || p.slug, url_resolved: url, offer_id: p.offer_id || null });
   });
+  _BB_PAGES = out;
   return out;
+}
+// brand_data is NOT in CLIENT_ROWS (CLIENT_SELECT_COLS omits it), so read the
+// site page inventory straight from the clients row.
+async function _bbLoadSitePages() {
+  try {
+    if (_sb && CLIENT_ID) {
+      const { data } = await _sb.from('clients').select('brand_data').eq('id', CLIENT_ID).maybeSingle();
+      const sp = data && data.brand_data && data.brand_data.site_pages;
+      if (Array.isArray(sp)) return sp;
+    }
+  } catch (_) {}
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  return (c.brand_data && Array.isArray(c.brand_data.site_pages)) ? c.brand_data.site_pages : [];
 }
 async function _bbRenderWebsitePages(host) {
   if (!host) return;
@@ -21920,7 +21933,8 @@ async function _bbRenderWebsitePages(host) {
       (data || []).forEach(o => { offerMap[o.id] = o.title; });
     }
   } catch (_) {}
-  const pages = _bbCollectPages();
+  const sitePages = await _bbLoadSitePages();
+  const pages = _bbCollectPages(sitePages);
   if (!pages.length) {
     host.innerHTML = '<div class="bb-field-hint" style="padding:6px 0">No pages yet - they show up here once your funnels are set up.</div>';
     return;
@@ -21955,7 +21969,7 @@ async function _bbRenderWebsitePages(host) {
   host.innerHTML = html;
 }
 function _bbEditPage(key) {
-  const page = _bbCollectPages().find(p => p.key === key);
+  const page = (_BB_PAGES || []).find(p => p.key === key);
   if (!page) return;
   if (!page.url_resolved) { try { _mmToast('No link for this page yet'); } catch (_) { alert('No link for this page yet'); } return; }
   openPageAnnotator(page);
