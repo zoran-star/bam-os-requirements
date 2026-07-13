@@ -9884,6 +9884,10 @@ Then the call to action."]</div>
     ══════════════════════════════ -->
     <style>
       /* ── BB landing ── */
+      /* Business Blueprint focus-mode shell (BB is a focus overlay now) */
+      #view-blueprint .bb-focus-head { display:flex; align-items:center; gap:13px; margin-bottom:8px; }
+      #view-blueprint .bb-focus-head .mm-back-btn { margin-bottom:0; }
+      #view-blueprint .bb-focus-head .topbar-kicker { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color: var(--gold, #D4B65C); }
       #view-blueprint .bb-back {
         display:inline-flex; align-items:center; gap:6px;
         background:transparent; border:none; color:var(--text-sub);
@@ -10859,17 +10863,9 @@ Then the call to action."]</div>
       </div>
     </div>
 
-    <div class="view" id="view-blueprint">
-      <div class="topbar">
-        <div>
-          <span class="topbar-kicker">§ Business Blueprint</span>
-          <div class="topbar-title" id="bb-topbar-title">Business Blueprint</div>
-        </div>
-      </div>
-      <div class="content">
-        <div id="bb-panel"><!-- rendered by openBlueprintView() based on hash --></div>
-      </div>
-    </div>
+    <!-- Business Blueprint moved OUT of .main to a focus-mode overlay (below,
+         just after .main). It keeps id="view-blueprint" so every
+         #view-blueprint .bb-* style + JS render target still applies. -->
 
 
     <!-- ── COMMAND CENTER (beta) - sidebar-less one-page flow ──
@@ -10891,6 +10887,21 @@ Then the call to action."]</div>
          Business Blueprint > Staff. The invite + revoke modals (still
          used by BB Staff) sit below in the modals block. -->
 
+  </div>
+
+  <!-- ── Business Blueprint: focus-mode overlay ──
+       Sibling of .main so the focus camera-pan blurs the app chrome behind it
+       (mm-focus-open dims .main + .sidebar). Opened by openBlueprint() via the
+       shared _ccOpenFocusPage camera pan; Back / backdrop click closes it. -->
+  <div class="modal-backdrop mm-focus-page" id="view-blueprint" style="display:none" onclick="if(event.target===this)closeBlueprint()">
+    <div class="modal-card mm-modal-card bb-focus-card" onclick="event.stopPropagation()">
+      <div class="bb-focus-head">
+        <button type="button" class="mm-back-btn" onclick="closeBlueprint()">&lsaquo; Back</button>
+        <span class="topbar-kicker">§ Business Blueprint</span>
+        <div class="topbar-title" id="bb-topbar-title" style="display:none">Business Blueprint</div>
+      </div>
+      <div id="bb-panel"><!-- rendered by openBlueprintView() based on hash --></div>
+    </div>
   </div>
 
   <!-- ── Mobile bottom nav (phones only - replaces the hidden sidebar) ── -->
@@ -16228,6 +16239,22 @@ function switchView(name, el) {
     if (_curName && _curName !== 'messages') _MSG_RETURN_VIEW = _curName;
   }
 
+  // ── Business Blueprint focus overlay ──
+  // BB is a focus-mode overlay, not an in-.main view. If it's open and we're
+  // heading elsewhere, step out of it first. If we're heading TO it, open the
+  // camera-pan modal and skip the normal view swap. Every caller funnels through
+  // switchView, so this covers nav, mobile, command-center + deep links.
+  const _bpEl = document.getElementById('view-blueprint');
+  if (name !== 'blueprint' && _bpEl && _bpEl.classList.contains('mm-open') && typeof closeBlueprint === 'function') closeBlueprint();
+  if (name === 'blueprint') {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    if (!el) el = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'blueprint'"));
+    if (el) el.classList.add('active');
+    openBlueprint();
+    try { syncMobileNav('blueprint'); } catch (_) {}
+    return;
+  }
+
   // Update nav
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   // el is the clicked nav-item when called from sidebar onclick, but
@@ -21257,6 +21284,42 @@ function _bbNavigate(card, id, query) {
   _bbRenderFromHash();
 }
 
+// Is the Business Blueprint focus overlay currently open?
+function _bbIsOpen() { return !!document.getElementById('view-blueprint')?.classList.contains('mm-open'); }
+
+// Open the Business Blueprint as a focus-mode overlay (camera-pan zoom, app
+// chrome blurs behind), not an in-.main view. Remembers the view underneath so
+// Back steps cleanly back out to it.
+let _BP_RETURN = null;
+function openBlueprint() {
+  const modal = document.getElementById('view-blueprint');
+  if (!modal) return;
+  if (!_bbIsOpen()) {
+    const cur = document.querySelector('.view.active');
+    _BP_RETURN = cur ? cur.id.replace('view-', '') : null;
+  }
+  _bbRenderFromHash();   // render panel from the current hash before the pan
+  if (typeof _ccOpenFocusPage === 'function') {
+    _ccOpenFocusPage('view-blueprint', '.nav-item[data-feature="blueprint"]');
+  } else {
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => { document.documentElement.classList.add('mm-focus-open'); modal.classList.add('mm-open'); });
+  }
+}
+function closeBlueprint() {
+  if (typeof _mmCloseFocus === 'function') _mmCloseFocus('view-blueprint');
+  else {
+    const m = document.getElementById('view-blueprint');
+    if (m) { m.classList.remove('mm-open'); m.style.display = 'none'; }
+    document.documentElement.classList.remove('mm-focus-open');
+  }
+  // restore the sidebar highlight to whatever view we came back out to
+  const back = _BP_RETURN || (typeof _landingView === 'function' ? _landingView() : 'home');
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
+  if (item) item.classList.add('active');
+  try { syncMobileNav(back); } catch (_) {}
+}
 async function openBlueprintView() { _bbRenderFromHash(); }
 
 function _bbRenderFromHash() {
@@ -27540,8 +27603,7 @@ function _bbUpdateSaveStateLabel() {
 
 // popstate listener for BB hash routing
 window.addEventListener('popstate', () => {
-  const activeView = document.querySelector('.view.active');
-  if (activeView && activeView.id === 'view-blueprint') _bbRenderFromHash();
+  if (_bbIsOpen()) _bbRenderFromHash();
 });
 
 // Kept as a callback target for the invite + revoke modals. The
@@ -31698,7 +31760,7 @@ async function _epEnsureLoaded() {
     }
   } catch (_) {} finally { _EP_LOADING = false; }
   if (document.getElementById('pl-entry-list')) _renderEntryRail();
-  if (document.querySelector('.view.active')?.id === 'view-blueprint' && _bbState.offer) _bbRenderWizardBody();
+  if (_bbIsOpen() && _bbState.offer) _bbRenderWizardBody();
 }
 
 // The academy's (single) Training offer id - entry-point setup lives on it.
@@ -31855,7 +31917,7 @@ async function _epWizSave(disconnect) {
     if (enabled !== undefined) ep.enabled = enabled;
     _renderEntryRail();
     // If we edited from inside the offer editor, refresh its entry-points section too.
-    if (document.querySelector('.view.active')?.id === 'view-blueprint' && _bbState.offer) _bbRenderWizardBody();
+    if (_bbIsOpen() && _bbState.offer) _bbRenderWizardBody();
     closePipelineDrawer();
   } catch (e) {
     if (err) { err.textContent = e.message; err.style.display = 'block'; }
@@ -50166,6 +50228,7 @@ function _ccFocusHud(modalId) {
   const label = modalId === 'gmMachineModal' ? 'GM OFFICE'
     : modalId === 'membersMachineModal' ? 'MEMBERS'
     : modalId === 'landingMachineModal' ? 'LANDING PAGE'
+    : modalId === 'view-blueprint' ? 'BLUEPRINT'
     : 'MARKETING';
   _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE');
   _ccFocusWallpaper(modalId);
