@@ -13,11 +13,13 @@ var CLIENT_ID = "39875f07-0a4b-4429-a201-2249bc1f24df";
 var CHECKOUT_URL = "/api/onboarding/checkout";
 
 // SAFETY FLAG — when false, "Sign & Pay" is a demo advance (no backend call, no
-// Stripe sub created). LIVE as of 2026-07-12: the billing model was verified end to
-// end with Stripe Test Clocks (charge today + trial_end anchor + recurring). Requires
-// STRIPE_PUBLISHABLE_KEY (live pk) + a live ONBOARDING_STRIPE_SECRET_KEY in Vercel;
-// if either is missing the funnel safely demo-falls-back (never junk-charges).
-var LIVE_CHECKOUT = true;
+// Stripe sub created). Flip to true (or set window.FUNNEL_LIVE = true) only when
+// testing the real charge with STRIPE_PUBLISHABLE_KEY set, ideally in Stripe TEST
+// mode, so we never create junk subs on the live connected account.
+// NOTE: this is the PORTAL-hosted funnel (portal.byanymeansbusiness.com/funnel/),
+// NOT the live public enroll funnel at byanymeanstoronto.ca/enroll (that one is a
+// separate GTA site → api/website/checkout.js). Kept in demo until its role is settled.
+var LIVE_CHECKOUT = false;
 
 var EMPTY = { pFirst: '', pLast: '', pEmail: '', pMobile: '', aFirst: '', aDob: '' };
 
