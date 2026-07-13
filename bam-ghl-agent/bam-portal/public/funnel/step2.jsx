@@ -68,6 +68,45 @@ function PlanCard(props) {
   );
 }
 
+/* --- Start date: charge today, or reserve a future start (deferred first charge) --- */
+function StartDate(props) {
+  var BAM = window.BAM;
+  var today = new Date();
+  var min = BAM.localISO(new Date(today.getTime() + 86400000));       // tomorrow
+  var max = BAM.localISO(new Date(today.getTime() + 90 * 86400000));  // +90 days
+  var picked = !!props.startDate;
+  return (
+    <div className="startdate">
+      <div className="fgroup-label">When do they start?</div>
+      <div className="startpick">
+        <button className={'startpick__opt' + (!picked ? ' is-active' : '')}
+          aria-pressed={!picked} onClick={function () { props.onStartDate(''); }}>
+          <span className="startpick__t">Start today</span>
+          <span className="startpick__s">Bill + start today</span>
+        </button>
+        <button className={'startpick__opt' + (picked ? ' is-active' : '')}
+          aria-pressed={picked} onClick={function () { if (!props.startDate) props.onStartDate(min); }}>
+          <span className="startpick__t">Pick a start date</span>
+          <span className="startpick__s">Pay today · start later</span>
+        </button>
+      </div>
+      {picked && (
+        <label className="startdate__field">
+          <IcCal size={15} />
+          <input type="date" className="startdate__input"
+            value={props.startDate} min={min} max={max}
+            onChange={function (e) { props.onStartDate(e.target.value); }} />
+        </label>
+      )}
+      <p className="termhint" style={{ marginTop: 12, marginBottom: 0 }}>
+        {picked
+          ? <>You're <b>billed today</b> for the first period. Training starts {BAM.fmtDate(BAM.fromISO(props.startDate))}, and billing renews {BAM.fmtDate(BAM.renewalFrom(props.startDate, props.term))}.</>
+          : <>Training and billing begin today.</>}
+      </p>
+    </div>
+  );
+}
+
 function Step2(props) {
   var BAM = window.BAM;
   return (
@@ -78,7 +117,7 @@ function Step2(props) {
       <TermToggle term={props.term} onTerm={props.onTerm} />
       <p className="termhint">
         {props.term === 'monthly'
-          ? <><b>Rolling membership</b> — billed every 4 weeks, cancel anytime.</>
+          ? <><b>Rolling membership</b>, billed every 4 weeks, cancel anytime.</>
           : <>Prepaid for the term, then continues month-to-month. <b>Cancel anytime after.</b></>}
       </p>
 
@@ -89,12 +128,14 @@ function Step2(props) {
         })}
       </div>
 
+      <StartDate startDate={props.startDate} onStartDate={props.onStartDate} term={props.term} />
+
       <div className="reassure" style={{ marginTop: 20, justifyContent: 'center' }}>
         <IcPause size={15} />
-        <span><b>Monthly = cancel anytime.</b> Pause when you travel, get injured, or hit exams — paused time is added onto your next billing date.</span>
+        <span><b>Monthly = cancel anytime.</b> Pause when you travel, get injured, or hit exams, and paused time is added onto your next billing date.</span>
       </div>
     </div>
   );
 }
 
-Object.assign(window, { Step2: Step2, TermToggle: TermToggle, PlanCard: PlanCard });
+Object.assign(window, { Step2: Step2, TermToggle: TermToggle, PlanCard: PlanCard, StartDate: StartDate });
