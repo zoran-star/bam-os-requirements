@@ -54478,11 +54478,16 @@ function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
   if (!_V2_PINS.length && !desc) { _mmToast('Add a note or a line of context first'); return; }
   const onOther = typeof _FN_ACTIVE !== 'undefined' && !!_FN_ACTIVE;   // annotating an "other" funnel page
+  // Tie the request to the offer that owns this page. Every funnel row carries
+  // offer_id; for the main free-trial page use the primary funnel's offer.
+  const _srcFunnel = onOther ? _FN_ACTIVE : (Array.isArray(_FN) ? _FN.find(f => f.is_primary) : null);
   const payload = {
     module: 'landing-page', request_type: _V2_TYPE, source: 'v2_portal_oneclick',
     description: desc,
     context: {
       funnel: onOther ? _FN_ACTIVE.key : 'free-trial',
+      funnel_id: _srcFunnel?.id || null,
+      offer_id: _srcFunnel?.offer_id || null,
       page_url: onOther ? (_FN_ACTIVE.url_resolved || null) : ((typeof _MM !== 'undefined' && _MM?.page?.url) || null),
       metric_snapshot: (!onOther && typeof _MM !== 'undefined' && _MM?.page) ? {
         visitors: _MM.page.visitors, form_started: _MM.page.form_started,
