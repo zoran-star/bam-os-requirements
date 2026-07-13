@@ -54,6 +54,38 @@ members table are empty for pure-GHL academies).
 `api/agent-approvals.js`, `api/agent-confirm.js`, `api/agent-closing.js`,
 `api/ghl/pipelines.js`.
 
+## Fix 3 - reconcile safety net (2026-07-13, Zoran: Bashir + Amir + Kartik still in pipeline)
+Fixes 1+2 key on `ghl_contact_id` (Fix1 cancels on the signup EVENT; Fix2 hides at
+read time) so they miss two real cases, all three found live on GTA:
+- **DUP CONTACT**: member on one contact/email, open opp + closing cards on ANOTHER
+  (different id AND email) - nothing connects "open opp" to "paid member". Bashir
+  Popal (member bashpopal@gmail.com / opp superarmaan2012@gmail.com, same phone +
+  athlete Armaan). Agent texted "still interested?" a family enrolled since Jul 1.
+- **ALREADY-STUCK opp**: enrolled BEFORE the won-mark covered portal-native opps
+  (Amir Jul 7, Kartik Jul 12). The signup event never re-runs; the closing detector's
+  per-lead O6 auto-won only evaluates leads it is actively carding, so a quiet
+  enrolled lead's opp sits open forever.
+- Root cause of the miss: all 3 went through `activatePortalOnboardingMember`
+  (markOpportunityWon allowContactSearch:true) but recorded NO won outcome - the
+  won-mark couldn't resolve/close their portal-native opp (GHL-era won-mark, no
+  linked opp id; Kartik's opp has null ghl_opportunity_id). handleSubCreated path
+  is worse: `allowContactSearch:false` = only closes an already-linked opp.
+- **NEW `api/agent/_reconcile-members.js` → `reconcileLiveMembers(clientId)`**: scans
+  OPEN agent-stage opps (responded/scheduled_trial/done_trial) and closes any whose
+  person is a LIVE member → won + pipeline_outcome (idempotent) + `cancelAllSalesOutbound`.
+  Match = ghl_contact_id / portal contact_id / email (all 1:1) OR **phone+athlete-name
+  together** (catches dup-contact same-athlete WITHOUT closing a sibling's separate
+  opp on the same parent phone). Portal-provider gated + fail-soft; V1 untouched.
+- Wired at the TOP of `agent-closing.js` detectForClient (BEFORE the mode gate) so
+  every `v2_access` academy is swept each ~15-min closing cron even with closing off.
+- Match logic validated vs prod: catches all 3, 0 false-positives. The 3 stuck GTA
+  opps were also hand-closed (won + outcome + cards canceled) 2026-07-13.
+- ⚠️ Still up to ~15 min to auto-close (safety net, not instant). Possible follow-up:
+  make the signup event path itself dup-contact-aware (match member↔opp by
+  phone+athlete/email, not just contact id) for INSTANT close. Not built - the
+  reconcile net + human-approved Hawkeye sends make 15 min acceptable. NOT prod-verified
+  (ships on merge to main; branch pushes don't build bam-portal).
+
 ## Related
 [[project_v2_sales_audit_2026_07]] (backlog: "handoff doesn't cancel the dropped
 booking"), [[project_confirm_agent]] (closing follow-up PLAN + isLiveMember guards),
