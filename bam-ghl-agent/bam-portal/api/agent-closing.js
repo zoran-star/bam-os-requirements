@@ -367,6 +367,17 @@ async function sendReplyViaGhl(token, contactId, reply, clientId) {
 }
 
 // Append to the shared audit log (agent_approvals). Non-fatal.
+// Training-signal enrichment (2026-07-12): a teach-why lesson snapshots the
+// conversation + pipeline stage that produced it (see agent-approvals.js for the
+// rationale). stage_from is this agent's home stage; stage_to stays the column
+// default null on the reignite path (no stage move) - reserved for move+teach.
+const LESSON_STAGE_FROM = "Done Trial"; // closing agent works post-trial leads
+function threadSnapshot(row) {
+  const t = row && (row.thread_tail ?? row.summary);
+  if (!t) return null;
+  return typeof t === "string" ? t : JSON.stringify(t);
+}
+
 async function logApproval(row) {
   try { await sb(`agent_approvals`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) }); } catch (_) {}
 }
@@ -1220,7 +1231,7 @@ async function handler(req, res) {
       if (b.lesson && String(b.lesson).trim()) {
         try {
           const [lrow] = await sb(`agent_lessons`, { method: "POST", headers: { Prefer: "return=representation" },
-            body: JSON.stringify([{ client_id: clientId, agent: "closing", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: contactId, reignite_at: reigniteAt, sent: ack || null } }]) });
+            body: JSON.stringify([{ client_id: clientId, agent: "closing", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, stage_from: LESSON_STAGE_FROM, thread_snapshot: threadSnapshot(row), context: { contact_id: contactId, reignite_at: reigniteAt, sent: ack || null } }]) });
           lessonId = lrow?.id || null;
         } catch (_) {}
       }
