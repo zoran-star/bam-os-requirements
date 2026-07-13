@@ -33168,16 +33168,15 @@ function _hk2CardHtml(r, pos, total, isTop) {
       </div>
       <div class="hk2-note">One submit routes them: good fit moves to Done Trial, no-show hands Booking the rebook, not a fit closes as unqualified or lost.</div>`;
   } else {
-    // A reply that PROPOSES a time carries the slot as structured data (Zoran
-    // 2026-07-10: approve every proposed time as a Hawkeye field, not prose).
-    // Read-only here: this is just an offer ("does X work?"), nothing books on
-    // send. No slot picker - that only belongs on the Book-it card, where send
-    // actually books (Zoran 2026-07-11). To offer a different time, edit the
-    // message; the verified slot stays stamped for the structured field.
-    const proposal = (r._kind === 'reply' && r.book_slot_at) ? `
-      <div class="hk2-lbl">Proposed time - a verified open slot</div>
-      <div class="hk2-static">${escapeHTML(_hk2SlotLabel(r.book_slot_at))}${r.book_group ? ' · ' + escapeHTML(r.book_group) : ''}</div>
-      <div class="hk2-note">The message offers this time. Nothing books yet - it books only after the lead says yes and a Book-it card fires.</div>` : '';
+    // A reply that PROPOSES a time still carries the slot as structured data, but
+    // we do NOT surface a "verified open slot" box on the reply card (Zoran
+    // 2026-07-13). The box let the structured slot and the message text disagree
+    // (message named Tuesday, box showed Wednesday) and claimed "verified" for a
+    // time the human hadn't been shown against the prose. The MESSAGE is the
+    // source of truth on a proposal; the slot only becomes visible on the formal
+    // Book-it confirmation card (where send actually books). The stored
+    // book_slot_at still rides the card silently to pre-fill that later Book-it.
+    const proposal = '';
     // 🔥 The fired reignition: the message pre-written at park time, back for
     // its final ✓ on the day the lead asked for.
     const reigBanner = (r._kind === 'reignite_due' && r.reignite_at)
