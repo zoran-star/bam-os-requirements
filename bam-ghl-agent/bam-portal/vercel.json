@@ -222,6 +222,10 @@
       "destination": "/api/parent/member-management?action=change-plan"
     },
     {
+      "source": "/api/parent/member-management/cancel",
+      "destination": "/api/parent/member-management?action=cancel"
+    },
+    {
       "source": "/api/parent/member-management/pause",
       "destination": "/api/parent/member-management?action=pause"
     },
