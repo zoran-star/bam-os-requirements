@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { actionChange, actionPause, actionUnpause } from "../members.js";
+import { actionCancel, actionChange, actionPause, actionUnpause } from "../members.js";
 import handler from "./member-management.js";
 import type { ParentApiRequest, ParentApiResponse } from "./_types.js";
 
 vi.mock("../members.js", () => ({
+  actionCancel: vi.fn(async (res: ParentApiResponse, _member, _account, _context, body) =>
+    res.status(200).json({ ok: true, received: body }),
+  ),
   actionChange: vi.fn(async (res: ParentApiResponse, _member, _account, _context, body) =>
     res.status(200).json({ ok: true, received: body }),
   ),
@@ -122,7 +125,7 @@ describe("/api/parent/member-management", () => {
       current_offer_price_id: offerPriceId,
       member_status: "live",
       pause: { end_date: "2026-08-14", start_date: "2026-08-01", status: "SCHEDULED" },
-      actions: { can_change_plan: true, can_pause: true, can_resume: true },
+      actions: { can_cancel: true, can_change_plan: true, can_pause: true, can_resume: true },
     });
   });
 
@@ -175,6 +178,46 @@ describe("/api/parent/member-management", () => {
       source: "parent_app",
       stripe_target_price_id: "price_elevate",
     });
+  });
+
+  it("always schedules parent cancellation for period end and strips staff-only fields", async () => {
+    mockFetch(resolvedMemberResponses());
+
+    const res = await invoke({
+      body: {
+        immediate: true,
+        member_id: memberId,
+        operation_id: operationId,
+        reason: "Moving away",
+        student_id: studentId,
+      },
+      method: "POST",
+      query: { action: "cancel" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+    expect(actionCancel).toHaveBeenCalledOnce();
+    expect(vi.mocked(actionCancel).mock.calls[0]?.[4]).toEqual({
+      immediate: false,
+      operation_id: operationId,
+      reason: "Moving away",
+      source: "parent_app",
+    });
+  });
+
+  it("treats a repeated cancellation of an already-cancelling membership as successful", async () => {
+    mockFetch(resolvedMemberResponses({ status: "cancelling" }));
+
+    const res = await invoke({
+      body: { operation_id: operationId, student_id: studentId },
+      method: "POST",
+      query: { action: "cancel" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+    expect(actionCancel).not.toHaveBeenCalled();
   });
 
   it("passes only parent-safe pause fields to the shared pause action", async () => {
@@ -294,11 +337,11 @@ function parentContextResponses() {
   ];
 }
 
-function resolvedMemberResponses() {
+function resolvedMemberResponses(memberOverrides: Partial<typeof member> = {}) {
   return [
     ...parentContextResponses(),
     { body: [{ member_id: memberId }], match: "/rest/v1/member_links" },
-    { body: [member], match: "/rest/v1/members" },
+    { body: [{ ...member, ...memberOverrides }], match: "/rest/v1/members" },
     { body: [client], match: "/rest/v1/clients" },
   ];
 }

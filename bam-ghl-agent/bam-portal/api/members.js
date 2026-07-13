@@ -1031,10 +1031,11 @@ async function actionUnpause(res, member, stripeAccount, ctx, body) {
 // Action: CANCEL
 // ─────────────────────────────────────────────────────────
 // body: { reason?, immediate? (default false → at period end) }
-// Cancels the Stripe sub, inserts a cancellations row (type='cancel'),
-// DELETES the row from members. The cancellations row preserves the
-// athlete/parent info (denormalized).
+// Cancels the Stripe sub and inserts a cancellations row (type='cancel').
+// Immediate cancellation deletes the member; period-end cancellation keeps it
+// in `cancelling` until Stripe's deletion webhook removes it.
 async function actionCancel(res, member, stripeAccount, ctx, body) {
+  const operationId = body.operation_id || newRowOperationId();
   let sub = null;
   let stripeManaged = false;
   if (member.stripe_subscription_id) {
@@ -1043,12 +1044,14 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
         sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
           method: "DELETE",
           stripeAccount,
+          idempotencyKey: `cancel-immediate-${member.id}-${operationId}`.slice(0, 255),
         });
       } else {
         sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
           method: "POST",
           stripeAccount,
           body: { "cancel_at_period_end": "true" },
+          idempotencyKey: `cancel-period-end-${member.id}-${operationId}`.slice(0, 255),
         });
       }
       stripeManaged = true;
@@ -1059,6 +1062,11 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
       // Re-throw anything that isn't one of those expected "can't manage" cases.
       const em = (e && e.message) || "";
       if (!/not created by your application|No such subscription|resource_missing|can only update its cancellation_details|already canceled|already cancelled/i.test(em)) throw e;
+      if (body.source === "parent_app") {
+        return res.status(409).json({
+          error: "This membership cannot be cancelled in the app. Please contact your academy.",
+        });
+      }
       console.error("cancel: Stripe sub not manageable, portal-side cancel only:", em);
     }
   }
@@ -1466,7 +1474,7 @@ async function actionChange(res, member, stripeAccount, ctx, body) {
 
 // Parent member-management routes reuse the same billing operations after
 // performing their own student ownership checks and input sanitization.
-export { actionChange, actionPause, actionUnpause };
+export { actionCancel, actionChange, actionPause, actionUnpause };
 
 // ─────────────────────────────────────────────────────────
 // Action: APPLY-COUPON

@@ -1,5 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
-import { actionChange, actionPause, actionUnpause } from "../members.js";
+import { actionCancel, actionChange, actionPause, actionUnpause } from "../members.js";
 import { HttpError, sendError } from "./_errors.js";
 import {
   getOwnedStudent,
@@ -72,6 +72,7 @@ async function handler(req: ParentApiRequest, res: ParentApiResponse) {
     }
 
     if (req.method !== "POST") return methodNotAllowed(res, "POST");
+    if (action === "cancel") return await cancelPlan(req, res);
     if (action === "change-plan") return await changePlan(req, res);
     if (action === "pause") return await pausePlan(req, res);
     if (action === "resume") return await resumePlan(req, res);
@@ -85,7 +86,8 @@ async function handler(req: ParentApiRequest, res: ParentApiResponse) {
 async function getManagementState(req: ParentApiRequest, res: ParentApiResponse) {
   const studentId = requiredString(queryValue(req.query?.student_id), "student_id");
   const resolved = await resolveOwnedMember(req, studentId);
-  const pause = await getOpenPause(resolved.member.id);
+  const pause =
+    resolved.member.status === "cancelling" ? null : await getOpenPause(resolved.member.id);
 
   return res.status(200).json({
     academy_id: resolved.member.client_id,
@@ -103,10 +105,39 @@ async function getManagementState(req: ParentApiRequest, res: ParentApiResponse)
     student_id: studentId,
     actions: {
       can_change_plan: canChangePlan(resolved.member),
+      can_cancel: canCancel(resolved.member),
       can_pause: canPause(resolved.member),
       can_resume: Boolean(pause),
     },
   });
+}
+
+async function cancelPlan(req: ParentApiRequest, res: ParentApiResponse) {
+  const body = readJsonObject(req.body);
+  const studentId = requiredString(body.student_id, "student_id");
+  const resolved = await resolveOwnedMember(req, studentId);
+
+  // A lost response followed by a retry should converge on success rather than
+  // showing an error after Stripe and the member row were already updated.
+  if (resolved.member.status === "cancelling") {
+    return res.status(200).json({ ok: true });
+  }
+  if (!canCancel(resolved.member)) {
+    throw new HttpError(409, "This membership cannot be cancelled right now.");
+  }
+
+  return await actionCancel(
+    parentMutationResponse(res),
+    resolved.member,
+    stripeAccountFor(resolved.client),
+    actionContext(resolved.context),
+    {
+      immediate: false,
+      operation_id: optionalUuid(body.operation_id, "operation_id"),
+      reason: optionalString(body.reason),
+      source: "parent_app",
+    },
+  );
 }
 
 async function changePlan(req: ParentApiRequest, res: ParentApiResponse) {
@@ -292,6 +323,10 @@ function stripeAccountFor(client: ClientRow): string | null {
 
 function canChangePlan(member: MemberRow): boolean {
   return Boolean(member.stripe_subscription_id) && !["cancelling", "payment_failed"].includes(member.status);
+}
+
+function canCancel(member: MemberRow): boolean {
+  return Boolean(member.stripe_subscription_id) && member.status !== "cancelling";
 }
 
 function canPause(member: MemberRow): boolean {
