@@ -8389,6 +8389,37 @@ Then the call to action."]</div>
       .ctx-spam-toggle:hover { border-color:var(--text-mute); color:var(--text-sub); }
       .ctx-spam-list { opacity:.5; }
       .ctx-row.ctx-spam { padding:6px 14px; }
+      /* ── Contacts focus-mode modal ── */
+      .ctx-modal-backdrop {
+        position:fixed; inset:0; background:rgba(10,10,11,0.78); backdrop-filter:blur(8px);
+        z-index:9400; display:flex; align-items:center; justify-content:center; padding:24px;
+        animation:ctxFadeIn .16s ease;
+      }
+      @keyframes ctxFadeIn { from { opacity:0 } to { opacity:1 } }
+      .ctx-modal-card {
+        width:100%; max-width:600px; max-height:88vh; background:var(--surface);
+        border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-lg);
+        display:flex; flex-direction:column; overflow:hidden; animation:modalIn .28s var(--es);
+      }
+      .ctx-modal-head {
+        display:flex; align-items:center; gap:10px; padding:14px 18px;
+        border-bottom:1px solid var(--border); flex-shrink:0;
+      }
+      .ctx-modal-title { font-size:16px; font-weight:700; color:var(--text); }
+      .ctx-modal-back {
+        background:none; border:none; color:var(--gold); font:inherit; font-size:13px; font-weight:600;
+        cursor:pointer; display:inline-flex; align-items:center; gap:5px; padding:4px 8px 4px 0;
+      }
+      .ctx-modal-x {
+        background:none; border:none; color:var(--text-sub); cursor:pointer; width:30px; height:30px;
+        border-radius:8px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+      }
+      .ctx-modal-x:hover { background:var(--bg); color:var(--text); }
+      .ctx-modal-body { padding:16px 18px 20px; overflow-y:auto; flex:1; background:var(--bg); }
+      @media (max-width:640px) {
+        .ctx-modal-backdrop { padding:0; }
+        .ctx-modal-card { max-width:none; max-height:none; width:100%; height:100%; border:none; border-radius:0; }
+      }
       /* ── Assets page ── */
       #view-assets .content { font-family:var(--font-ui); }
       .ast-toolbar {
@@ -10741,17 +10772,10 @@ Then the call to action."]</div>
       </div>
     </div>
 
-    <div class="view" id="view-contacts">
-      <div class="topbar">
-        <div>
-          <span class="topbar-kicker">§ Contacts</span>
-          <div class="topbar-title">Contacts</div>
-        </div>
-      </div>
-      <div class="content">
-        <div id="contacts-content"></div>
-      </div>
-    </div>
+    <!-- Contacts is a focus-mode modal (built at runtime in openContactsModal),
+         not a full view. This shell stays as a harmless no-op so any stray
+         switchView('contacts') can't crash; #contacts-content lives in the modal. -->
+    <div class="view" id="view-contacts"></div>
 
     <div class="view" id="view-v15inbox">
       <div class="topbar">
@@ -15424,9 +15448,56 @@ async function _contactsAuthHeaders() {
   return tok ? { Authorization: 'Bearer ' + tok } : {};
 }
 
+// ── Contacts focus-mode modal ──────────────────────────────────────────────
+// Contacts overlays the current page instead of swapping to a full view, so
+// closing it returns you exactly where you were. Every entry point funnels
+// through switchView('contacts') → openContactsModal(), so one seam covers all.
+// The list, contact detail, and Setup all render into the single #contacts-content
+// host inside the modal; detail reuses the same #contacts-drawer-body id so its
+// async loaders (Stripe, memory, messaging, tags) work unchanged.
+function _contactsHeadList() {
+  return `<div class="ctx-modal-title">Contacts</div><span style="flex:1"></span>`
+    + `<button class="ctx-modal-x" onclick="_contactsCloseModal()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
+}
+function _contactsModalEsc(e) {
+  if (e.key !== 'Escape') return;
+  // If a contact detail or Setup is open, Esc steps back to the list first.
+  if (document.getElementById('contacts-drawer-body') || document.getElementById('contacts-setup-save')) { openContactsView(); return; }
+  _contactsCloseModal();
+}
+function _contactsCloseModal() {
+  const o = document.getElementById('contacts-modal-ov');
+  if (o) o.remove();
+  document.removeEventListener('keydown', _contactsModalEsc);
+  document.body.classList.remove('ctx-modal-open');
+}
+function openContactsModal(opts) {
+  opts = opts || {};
+  if (typeof CLIENT_ID === 'undefined') return;
+  if (!document.getElementById('contacts-modal-ov')) {
+    const ov = document.createElement('div');
+    ov.id = 'contacts-modal-ov';
+    ov.className = 'ctx-modal-backdrop';
+    ov.onclick = (e) => { if (e.target === ov) _contactsCloseModal(); };
+    ov.innerHTML = `<div class="ctx-modal-card" role="dialog" aria-modal="true" aria-label="Contacts">
+      <div class="ctx-modal-head" id="contacts-modal-head">${_contactsHeadList()}</div>
+      <div class="ctx-modal-body"><div id="contacts-content"></div></div>
+    </div>`;
+    document.body.appendChild(ov);
+    document.body.classList.add('ctx-modal-open');
+    document.addEventListener('keydown', _contactsModalEsc);
+  }
+  if (opts.setup) _contactsOpenSetup();
+  else if (typeof opts.contactIdx === 'number') _contactsOpenDrawer(opts.contactIdx);
+  else openContactsView();
+}
+
 async function openContactsView() {
   const host = document.getElementById('contacts-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
+  // Restore the modal header to list mode (detail view swaps it for a back arrow).
+  const _mh = document.getElementById('contacts-modal-head');
+  if (_mh) _mh.innerHTML = _contactsHeadList();
   // Ensure member roster is loaded for lead/member badges
   _ibEnsureMembers();
   host.innerHTML = `
@@ -15613,19 +15684,19 @@ function _contactsSetTag(v) { _contactsTag = v; _contactsLoad(); }
 let _CDRAWER = { contact: null, ghl: null, msgType: 'SMS' };
 function _cdMoney(cents, cur) { if (cents == null) return '-'; const v = cents / 100; try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: (cur || 'usd').toUpperCase() }).format(v); } catch (_) { return '$' + v.toFixed(2); } }
 function _cdDate(unix) { if (!unix) return ''; try { return new Date(unix * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); } catch (_) { return ''; } }
-function _contactsCloseDrawer() { const o = document.getElementById('contacts-drawer-ov'); if (o) o.remove(); }
+function _contactsCloseDrawer() {
+  // Detail now lives inside the Contacts modal, so "close the drawer" = back to
+  // the list. (Legacy right-sheet cleanup kept for any old callers.)
+  const legacy = document.getElementById('contacts-drawer-ov'); if (legacy) legacy.remove();
+  if (document.getElementById('contacts-modal-ov')) openContactsView();
+}
 function _contactsShowDrawer(title, bodyHtml) {
-  _contactsCloseDrawer();
-  const ov = document.createElement('div'); ov.id = 'contacts-drawer-ov';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;justify-content:flex-end';
-  ov.onclick = (e) => { if (e.target === ov) _contactsCloseDrawer(); };
-  ov.innerHTML = `<div style="width:min(460px,100%);height:100%;background:var(--bg);border-left:1px solid var(--border);overflow:auto;padding:20px 22px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <div style="font-size:17px;font-weight:700;color:var(--text)">${title}</div>
-      <button onclick="_contactsCloseDrawer()" style="background:none;border:none;color:var(--text-sub);font-size:22px;line-height:1;cursor:pointer">×</button>
-    </div>
-    <div id="contacts-drawer-body">${bodyHtml}</div></div>`;
-  document.body.appendChild(ov);
+  const host = document.getElementById('contacts-content');
+  if (!host) return;
+  // Swap the modal header into detail mode: back arrow + the contact's name.
+  const head = document.getElementById('contacts-modal-head');
+  if (head) head.innerHTML = `<button class="ctx-modal-back" onclick="openContactsView()" aria-label="Back to contacts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Contacts</button><span style="flex:1"></span><div class="ctx-modal-title" style="font-size:14px;max-width:52%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${title}</div><span style="flex:1"></span><button class="ctx-modal-x" onclick="_contactsCloseModal()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
+  host.innerHTML = `<div id="contacts-drawer-body">${bodyHtml}</div>`;
 }
 // Deep link into the academy's GHL → opens the contact (web, or the
 // LeadConnector app on mobile) where staff can place the call on the academy's
@@ -15978,6 +16049,15 @@ async function _contactsSaveSetup() {
 
 let _MSG_RETURN_VIEW = null;
 function switchView(name, el) {
+  // Contacts is a focus-mode modal, not a full view: overlay it on the current
+  // page and return, so closing it lands you back where you were. Every entry
+  // point (sidebar, inbox button, command center, mobile More, deep links)
+  // funnels through here, so this one seam covers them all. Permission still gated.
+  if (name === 'contacts') {
+    if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed('contacts')) return;
+    openContactsModal();
+    return;
+  }
   // Command center (beta): while the one-page flow is active, section-mapped
   // views scroll to their section instead of swapping views; anything else
   // opens classically with a "back to command center" pill. _CC_BYPASS lets
@@ -23140,7 +23220,7 @@ function _autoOpenContact(contactId, name) {
   try {
     let idx = _CONTACTS.findIndex(x => x && x.ghl_contact_id === contactId);
     if (idx < 0) { _CONTACTS.push({ ghl_contact_id: contactId, name: name || 'Contact', email: null, phone: null, tags: [] }); idx = _CONTACTS.length - 1; }
-    _contactsOpenDrawer(idx);
+    openContactsModal({ contactIdx: idx });
   } catch (_) { if (typeof _plToast === 'function') _plToast('Could not open contact'); }
 }
 
@@ -29117,8 +29197,7 @@ function _aiOpenBB(card) {
 // V1.5 onboarding deep-links: open Contacts → Setup (athlete-name mapping) and
 // KPIs → Setup (tie Stripe/pipelines/calendars to offers).
 function _aiOpenContactsSetup() {
-  switchView('contacts');
-  setTimeout(() => { if (typeof _contactsOpenSetup === 'function') _contactsOpenSetup(); }, 350);
+  openContactsModal({ setup: true });
 }
 function _aiOpenKpiSetup() {
   switchView('v15kpis');
@@ -32401,12 +32480,12 @@ async function _hk2Load() {
   return { booking, confirm, closing };
 }
 function _hk2Pick(a) { _HK2.agent = a; _hk2Render(); }
-// Name tap on a deck card -> the contact drawer. The drawer overlay sits at
-// z-index 9000; on mobile the deck modal is 10050, so raise the overlay above
-// it or the drawer would open BEHIND the deck.
+// Name tap on a deck card -> the contact detail (in the Contacts focus modal).
+// The modal sits at z-index 9400; on mobile the deck modal is 10050, so raise
+// the contacts modal above it or the contact would open BEHIND the deck.
 function _hk2OpenContact(cid, nm) {
   try { _autoOpenContact(cid, nm); } catch (_) { return; }
-  const ov = document.getElementById('contacts-drawer-ov');
+  const ov = document.getElementById('contacts-modal-ov');
   if (ov) ov.style.zIndex = '10060';
 }
 // Back from the deck = the HOME page's Sales section (Zoran 2026-07-09), with
