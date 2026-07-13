@@ -258,16 +258,13 @@ bam-ghl-agent/
 │
 └── .claude/commands/
     ├── setup-menu-item.md          ← skill for building a menu item
-    ├── add-question.md             ← skill for adding a question to Supabase DB
-    └── consolidate-lessons.md      ← skill: `scan` triages ALL academies (who's
-                                      DUE), then per academy cluster/dedup the
-                                      teach-why lessons, route them (brain fact /
-                                      academy / preset-tagged general / drop), and
-                                      mine academy lessons for onboarding intake
-                                      gaps (ledger: docs/onboarding-intake-candidates.md;
-                                      uses bam-portal/scripts/lessons-io.mjs). Each
-                                      apply writes a timestamped consolidation_runs
-                                      KPI row. Rollout: docs/agent-academy-rollout.md
+    └── add-question.md             ← skill for adding a question to Supabase DB
+                                      (/consolidate-lessons MOVED to the repo-root
+                                      .claude/commands/ on 2026-07-13 so it runs from
+                                      anywhere in the monorepo, like /start; it still
+                                      drives bam-portal/scripts/lessons-io.mjs. Ledger:
+                                      docs/onboarding-intake-candidates.md, rollout:
+                                      docs/agent-academy-rollout.md)
 ```
 
 ---
