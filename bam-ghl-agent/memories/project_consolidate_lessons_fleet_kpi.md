@@ -41,6 +41,11 @@ mined onboarding-intake gaps. Three additions:
    counts derive from the arrays. This closes the "ledger needs a timestamp for KPI
    tracking" gap - lessons/week + academy-vs-general split are now queryable.
 
-**Not yet applied to prod DB** as of 2026-07-12 - migration file written, needs the
-normal linked-project push (see `bam-portal/supabase/README.md`). Aggregation logic
-unit-checked with a mock harness (scan grouping + apply by_agent) before commit.
+**Applied to prod DB 2026-07-12** (linked project `jnojmfmpnsfmtqmwhopz`, via Supabase
+MCP): 3 columns + `consolidation_runs` + RLS live, and `schema_migrations` has a row
+recorded under the exact file version `20260712190000` so a future `supabase db push`
+sees no drift (see `bam-portal/supabase/README.md`). Ships to code via PR #1388
+(`claude/epic-fermat-73e3d9` -> main). Migration was applied BEFORE merge on purpose:
+the backend capture code references the new columns, so they had to exist first or
+teach-why inserts would silently fail. Aggregation logic unit-checked with a mock
+harness (scan grouping + apply by_agent) before commit.
