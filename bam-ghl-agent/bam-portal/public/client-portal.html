@@ -15065,6 +15065,14 @@ const _OBF_STEPS = [
   { key: 'ein',     group: 'general',  title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
   { key: 'email',   group: 'general',  title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
   { key: 'website', group: 'general',  title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
+  // Training-offer setup - each auto-detects from live data via /api/offers/setup-status
+  // and deep-links to the matching tab of the offer wizard.
+  { key: 'policy',      group: 'training', title: 'Set your membership policy', sub: 'Cancellation, pausing and refunds - flows into the enrollment agreement and member management', cta: 'Set policy', go: "_obfGoOffer('policy')" },
+  { key: 'pipeline',    group: 'training', title: 'Set up your sales pipeline', sub: 'The lead stages your board, agent and automations all run on', cta: 'Set up', go: "_obfGoOffer('sales')" },
+  { key: 'automations', group: 'training', title: 'Turn on your follow-ups', sub: 'First-touch texts and the ghosted drip - seeded off for you to review and approve', cta: 'Set up', go: "_obfGoOffer('sales')" },
+  { key: 'agent',       group: 'training', title: 'Brief your booking agent', sub: 'Fill the agent facts from this offer so it speaks your real pricing, schedule and policies', cta: 'Sync agent', go: "_obfGoOffer('sales')" },
+  { key: 'entrypoints', group: 'training', title: 'Create your lead forms', sub: 'The free-trial and contact form entry points your leads come through', cta: 'Create', go: "_obfGoOffer('sales')" },
+  { key: 'booking',     group: 'training', title: 'Go live with free trial booking', sub: 'Turn your schedule into bookable free-trial slots leads can grab', cta: 'Set up', go: "_obfGoOffer('schedule')" },
   { key: 'members', group: 'training', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
 ];
 
@@ -15072,15 +15080,27 @@ function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
 
 async function _obfFetchState() {
   const token = await _mreqAuthToken();
-  const next = { members: false, email: false, website: false, ein: false };
-  const [mem, em, web] = await Promise.allSettled([
+  const next = { members: false, email: false, website: false, ein: false, offer_id: null,
+    policy: false, pipeline: false, automations: false, agent: false, entrypoints: false, booking: false };
+  const [mem, em, web, ss] = await Promise.allSettled([
     fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
     _edwApi('status'),
     _wdwApi('status'),
+    fetch('/api/offers/setup-status?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
   ]);
   if (mem.status === 'fulfilled') next.members = Array.isArray(mem.value.members) && mem.value.members.length > 0;
   if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set || _obfSkipped('ein'); }
   if (web.status === 'fulfilled') next.website = web.value.status === 'live';
+  if (ss.status === 'fulfilled' && ss.value && ss.value.ok) {
+    const v = ss.value;
+    next.offer_id = v.offer_id || null;
+    next.policy = !!v.has_policy;
+    next.pipeline = (v.pipeline_stages || 0) > 0;
+    next.automations = Array.isArray(v.automations) && v.automations.length > 0;
+    next.agent = (v.agent_sections || 0) > 0;
+    next.entrypoints = (v.entry_points || 0) > 0;
+    next.booking = !!v.booking_live;
+  }
   _OBF_STATE = next; _OBF_AT = Date.now();
   _obfFanSync();
   return next;
@@ -15147,6 +15167,27 @@ function _obfGoMembers() { _obfNav('blueprint'); setTimeout(() => { try { _bbNav
 function _obfGoGeneral() { _obfNav('blueprint'); setTimeout(() => { try { _bbNavigate('general'); } catch (_) { /* blueprint not rendered yet */ } }, 150); }
 function _obfGoDomains() { _obfClose(); _edwOpenModal(); }
 function _obfGoMessages() { _obfNav('messages'); }
+
+// Deep-link into the training offer's wizard at a section (mirrors
+// _bbWizardSections' policy-after-pricing insert to get the right step index).
+// Opens the Offers list when no offer exists yet - they create it there and the
+// training-offer steps light up as each is built.
+function _obfStepForSection(sectionId) {
+  const ids = (typeof _bbSections !== 'undefined') ? _bbSections.slice() : [];
+  if (ids.indexOf('policy') === -1) { const at = ids.indexOf('pricing'); if (at >= 0) ids.splice(at + 1, 0, 'policy'); }
+  const i = ids.indexOf(sectionId);
+  return i >= 0 ? i + 1 : 1;
+}
+function _obfGoOffer(sectionId) {
+  const oid = _OBF_STATE && _OBF_STATE.offer_id;
+  _obfNav('blueprint');
+  setTimeout(() => {
+    try {
+      if (oid) _bbNavigate('offers', oid, { step: String(_obfStepForSection(sectionId)) });
+      else _bbNavigate('offers');
+    } catch (_) { /* blueprint not rendered yet */ }
+  }, 150);
+}
 
 function _obfClose() { document.getElementById('obf-overlay')?.remove(); }
 
