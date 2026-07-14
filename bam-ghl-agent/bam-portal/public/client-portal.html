@@ -27411,8 +27411,12 @@ function _bbCqCardHtml(offerId, sectionId, f) {
     ? `<div style="font-size:11.5px;color:var(--text-mute);margin-top:3px">Options: ${f.options.map(o => escapeHTML(o)).join(', ')}</div>` : '';
   const note = f.help_text ? `<div style="font-size:11.5px;color:var(--text-sub);margin-top:4px;font-style:italic">${escapeHTML(f.help_text)}</div>` : '';
   const reqPill = f.required ? `<span style="font-size:9.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:1px 7px">Required</span>` : '';
-  return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface-alt)">
+  return `<div draggable="true" data-cqid="${f.id}"
+      ondragstart="_bbCqDragStart(event,'${offerId}','${sectionId}','${f.id}')"
+      ondragover="_bbCqDragOver(event)" ondrop="_bbCqDrop(event,'${offerId}','${sectionId}','${f.id}')" ondragend="_bbCqDragEnd(event)"
+      style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface-alt)">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="cursor:grab;color:var(--text-mute);font-size:15px;line-height:1;user-select:none" title="Drag to reorder">⋮⋮</span>
         <span style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(f.label)}</span>
         <span style="font-size:10.5px;color:var(--text-mute);background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:1px 8px">${escapeHTML(typeLabel)}</span>
         ${reqPill}
@@ -27423,6 +27427,42 @@ function _bbCqCardHtml(offerId, sectionId, f) {
       </div>
       ${opts}${note}
     </div>`;
+}
+
+// Drag-drop reorder for the question cards. Mutates the section cache order,
+// re-renders, then persists the new order (POST ?action=reorder → position=index).
+let _bbCqDragId = null;
+function _bbCqDragStart(ev, offerId, sectionId, fieldId) {
+  _bbCqDragId = fieldId;
+  try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', fieldId); } catch (e) {}
+}
+function _bbCqDragOver(ev) { ev.preventDefault(); try { ev.dataTransfer.dropEffect = 'move'; } catch (e) {} }
+function _bbCqDragEnd(ev) { _bbCqDragId = null; }
+function _bbCqDrop(ev, offerId, sectionId, targetId) {
+  ev.preventDefault();
+  const dragId = _bbCqDragId; _bbCqDragId = null;
+  if (!dragId || String(dragId) === String(targetId)) return;
+  const key = offerId + ':' + sectionId;
+  const arr = _bbCqCache[key];
+  if (!Array.isArray(arr)) return;
+  const from = arr.findIndex(f => String(f.id) === String(dragId));
+  if (from < 0) return;
+  const [moved] = arr.splice(from, 1);
+  let to = arr.findIndex(f => String(f.id) === String(targetId));
+  if (to < 0) to = arr.length; // dropped past the list end
+  arr.splice(to, 0, moved);    // land the card just before the drop target
+  _bbRenderWizardBody();
+  _bbCqPersistOrder(arr.map(f => f.id));
+}
+async function _bbCqPersistOrder(orderedIds) {
+  try {
+    const token = await _mreqAuthToken();
+    await fetch('/api/custom-fields', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reorder', ordered_ids: orderedIds }),
+    });
+  } catch (e) { /* the re-render already shows the new order; a reload re-reads server order */ }
 }
 
 async function _bbLoadCoreFields(clientId) {
