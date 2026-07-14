@@ -20454,7 +20454,6 @@ function bkFmtWhen(iso) {
 
 async function bkFetchAndRender() {
   const host = document.getElementById('bk-cal-list');
-  if (!host) return;
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/website/calendars?client_id=' + encodeURIComponent(CLIENT_ID), {
@@ -20462,12 +20461,23 @@ async function bkFetchAndRender() {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    if (json.provider === 'portal') {
+      // Off-GHL academy: the real schedule straight from the portal spine.
+      _CAL_PORTAL = true;
+      _CAL_SLOTS = json.slots || [];
+      _BK_DATA = [];
+      calBuildPortalEvents();
+      _calPortalHideSetup();
+      renderCalendar();
+      return;
+    }
+    _CAL_PORTAL = false;
     _BK_DATA = json.calendars || [];
-    bkRenderList();
+    if (host) bkRenderList();
     bkBuildEvents();
     renderCalendar();
   } catch (e) {
-    host.innerHTML = `<div class="req-empty" style="padding:14px 0">Couldn't load booking calendars - ${escapeHTML(e.message)}</div>`;
+    if (host) host.innerHTML = `<div class="req-empty" style="padding:14px 0">Couldn't load the calendar - ${escapeHTML(e.message)}</div>`;
   }
 }
 
@@ -20590,6 +20600,54 @@ function bkBuildEvents() {
   });
 }
 
+// ── Portal-spine calendar (off-GHL academies) ──────────────────────────────
+// The API returns real schedule_slots as a flat slots[]. We reuse the BK_EVENTS
+// render path (one block per slot). Colour is derived client-side (the data has
+// no colour field) so the same class keeps a stable colour, and each slot carries
+// its booked attendees + contact ids for the who's-booked → contact-card link.
+let _CAL_PORTAL = false;
+let _CAL_SLOTS = [];
+function _calSlotColor(key) {
+  let h = 0; const s = String(key || 'x');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return BK_COLORS[h % BK_COLORS.length];
+}
+function calBuildPortalEvents() {
+  BK_EVENTS = [];
+  for (const sl of (_CAL_SLOTS || [])) {
+    const d = new Date(sl.start); if (isNaN(d.getTime())) continue;
+    const end = sl.end ? new Date(sl.end) : null;
+    const startHour = d.getHours() + d.getMinutes() / 60;
+    let endHour = (end && !isNaN(end.getTime())) ? end.getHours() + end.getMinutes() / 60 : startHour + 1;
+    if (!(endHour > startHour)) endHour = startHour + 1;
+    BK_EVENTS.push({
+      id: BK_EVENTS.length,
+      date: calDateKey(d),
+      start: d.toISOString(),
+      startHour, endHour,
+      label: sl.name || 'Session',
+      names: (sl.attendees || []).map(a => a.name).filter(Boolean),
+      color: _calSlotColor(sl.program || sl.name),
+      portal: true,
+      attendees: sl.attendees || [],
+      capacity: sl.capacity,
+      taken: sl.spots_taken != null ? sl.spots_taken : (sl.attendees || []).length,
+      venue: sl.venue || null,
+      program: sl.program || null,
+    });
+  }
+}
+// Portal academies set sessions in the schedule builder, not the GHL hours editor
+// - hide the GHL-only Setup affordance for them.
+function _calPortalHideSetup() {
+  const body = document.getElementById('bk-setup-body');
+  const bar = document.querySelector('#view-calendar .bk-bar');
+  const btn = document.querySelector('#view-calendar [onclick*="bkToggleSetup"]');
+  if (body) body.style.display = 'none';
+  if (bar) bar.style.display = 'none';
+  if (btn) btn.style.display = 'none';
+}
+
 async function bkPatch(calId, body, okMsg) {
   const err = document.getElementById(`bk-${calId}-err`);
   const ok = document.getElementById(`bk-${calId}-ok`);
@@ -20676,18 +20734,26 @@ function renderCalendar() {
   for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(d.getDate() + i); _weekKeys.add(calDateKey(d)); _weekDates.push(d); }
 
   // Legend
-  const venuesInUse = Array.from(new Set(CAL_SESSIONS.filter(s => _weekKeys.has(s.date)).map(s => s.venue).filter(Boolean)));
-  const bkLegend = (typeof _BK_DATA !== 'undefined' && _BK_DATA ? _BK_DATA : []).map((c, idx) => {
-    const col = bkColor(idx);
-    return `<div class="cal-legend-item"><span class="cal-legend-dot" style="background:${col.text}"></span><span style="color:var(--text-mute);font-weight:500">${escapeHTML(c.ghl?.name || c.label)}</span></div>`;
-  }).join('');
+  const venuesInUse = _CAL_PORTAL ? [] : Array.from(new Set(CAL_SESSIONS.filter(s => _weekKeys.has(s.date)).map(s => s.venue).filter(Boolean)));
+  let bkLegend = '';
+  if (_CAL_PORTAL) {
+    const seen = new Map();
+    for (const e of (typeof BK_EVENTS !== 'undefined' ? BK_EVENTS : [])) { const k = e.program || e.label; if (k && !seen.has(k)) seen.set(k, e.color); }
+    bkLegend = Array.from(seen.entries()).slice(0, 8).map(([k, col]) =>
+      `<div class="cal-legend-item"><span class="cal-legend-dot" style="background:${col.text}"></span><span style="color:var(--text-mute);font-weight:500">${escapeHTML(k)}</span></div>`).join('');
+  } else {
+    bkLegend = (typeof _BK_DATA !== 'undefined' && _BK_DATA ? _BK_DATA : []).map((c, idx) => {
+      const col = bkColor(idx);
+      return `<div class="cal-legend-item"><span class="cal-legend-dot" style="background:${col.text}"></span><span style="color:var(--text-mute);font-weight:500">${escapeHTML(c.ghl?.name || c.label)}</span></div>`;
+    }).join('');
+  }
   document.getElementById('cal-legend').innerHTML = venuesInUse.map(v => {
     const c = calVenueColor(v);
     return `<div class="cal-legend-item"><span class="cal-legend-dot" style="background:${c.text}"></span><span style="color:var(--text-mute);font-weight:500">${v}</span></div>`;
   }).join('') + bkLegend;
 
   // Session count
-  const weekSessions = CAL_SESSIONS.filter(s => _weekKeys.has(s.date));
+  const weekSessions = _CAL_PORTAL ? [] : CAL_SESSIONS.filter(s => _weekKeys.has(s.date));
   const bkEvts = (typeof BK_EVENTS !== 'undefined' ? BK_EVENTS : []).filter(e => _weekKeys.has(e.date));
   const totalCount = weekSessions.length + bkEvts.length;
   const countEl = document.getElementById('cal-week-count');
@@ -20731,8 +20797,9 @@ function renderCalendar() {
       nowLine = `<div class="cal-now-line" style="top:${nowTop}px"><div class="cal-now-dot"></div></div>`;
     }
 
-    // Session blocks
-    const sessions = CAL_SESSIONS.filter(s => s.date === key).map(s => {
+    // Session blocks (mock class-sessions only for GHL academies; portal academies
+    // render their real slots through BK_EVENTS below)
+    const sessions = (_CAL_PORTAL ? [] : CAL_SESSIONS.filter(s => s.date === key)).map(s => {
       const c = calVenueColor(s.venue);
       const top = (s.startHour - CAL_HOUR_START) * CAL_HOUR_HEIGHT;
       const duration = s.endHour - s.startHour;
@@ -20756,10 +20823,12 @@ function renderCalendar() {
       const height = Math.max(26, duration * CAL_HOUR_HEIGHT - 2);
       const isShort = duration < 1;
       const who = e.names.slice(0, 4).join(', ') + (e.names.length > 4 ? ` +${e.names.length - 4}` : '');
+      const sub = who || (e.portal ? calFormatTime(e.startHour) : '');
+      const badge = (e.portal && e.capacity != null) ? `${e.taken}/${e.capacity}` : `${e.names.length} booked`;
       return `<div class="cal-session${isShort ? ' cal-short' : ''}" style="top:${top}px;height:${height}px;background:${e.color.bg};border-color:${e.color.border};border-left-color:${e.color.text};cursor:pointer" onclick="bkOpenEvent(${e.id})" title="${escapeHTML(e.label)}: ${escapeHTML(who)}">
         <div class="cal-session-name" style="color:${e.color.text}">${escapeHTML(e.label)}</div>
-        <div class="cal-session-time" style="color:${e.color.text}">${escapeHTML(who)}</div>
-        <span class="cal-capacity-badge" style="background:${e.color.border}">${e.names.length} booked</span>
+        <div class="cal-session-time" style="color:${e.color.text}">${escapeHTML(sub)}</div>
+        <span class="cal-capacity-badge" style="background:${e.color.border}">${badge}</span>
       </div>`;
     }).join('');
 
@@ -20845,11 +20914,36 @@ function bkOpenEvent(id) {
   let when = '';
   try { const d = new Date(e.start); if (!isNaN(d.getTime())) when = d.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (_) {}
   if (!when) when = calFormatTime(e.startHour);
-  const names = e.names || [];
+  const att = e.attendees || null;
+  const bookedStr = (e.portal && e.capacity != null) ? `${e.taken} / ${e.capacity}` : String((e.names || []).length);
+
+  // Each attendee links to their contact card (portal bookings carry the contact
+  // id straight from trial_bookings). Close the drawer first so the contact modal
+  // isn't hidden behind it.
+  let whoHtml;
+  if (att && att.length) {
+    whoHtml = att.map(a => {
+      const nm = a.name || 'Guest';
+      const initial = escapeHTML((nm || '?').trim().charAt(0).toUpperCase());
+      const linkable = !!a.ghl_contact_id;
+      const onclk = linkable ? ` onclick="closeCalDrawer();_autoOpenContact('${escapeHTML(String(a.ghl_contact_id))}','${escapeHTML(String(nm).replace(/'/g, ''))}')" style="cursor:pointer"` : '';
+      const sub = (a.parent_name && a.athlete_name && a.parent_name !== a.athlete_name) ? ` <span style="color:var(--text-mute);font-size:11px">${escapeHTML(a.parent_name)}</span>` : '';
+      const chev = linkable ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-mute)" stroke-width="2" style="flex:0 0 auto"><path d="M9 18l6-6-6-6"/></svg>` : '';
+      return `<div${onclk} style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:10px">
+        <span style="width:26px;height:26px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text-mute);flex:0 0 auto">${initial}</span>
+        <span style="flex:1;min-width:0">${escapeHTML(nm)}${sub}</span>${chev}
+      </div>`;
+    }).join('');
+  } else if ((e.names || []).length) {
+    whoHtml = e.names.map(n => `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text-mute);flex:0 0 auto">${escapeHTML((n || '?').trim().charAt(0).toUpperCase())}</span>${escapeHTML(n)}</div>`).join('');
+  } else {
+    whoHtml = '<div style="color:var(--text-mute);font-size:13px;padding:10px 0">Nobody booked yet.</div>';
+  }
+
   document.getElementById('cal-drawer').innerHTML = `
     <div class="cal-drawer-header">
       <div>
-        <span style="display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:3px 9px;border-radius:999px;background:${e.color.bg};color:${e.color.text};margin-bottom:8px">Booking</span>
+        <span style="display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:3px 9px;border-radius:999px;background:${e.color.bg};color:${e.color.text};margin-bottom:8px">${e.portal ? 'Session' : 'Booking'}</span>
         <div class="cal-drawer-title">${escapeHTML(e.label)}</div>
       </div>
       <button class="cal-drawer-close" onclick="closeCalDrawer()" aria-label="Close">
@@ -20858,15 +20952,12 @@ function bkOpenEvent(id) {
     </div>
     <div class="cal-drawer-grid">
       <div><span class="cal-drawer-label">When</span><div class="cal-drawer-value">${escapeHTML(when)}</div></div>
-      <div><span class="cal-drawer-label">Booked</span><div class="cal-drawer-value">${names.length}</div></div>
+      <div><span class="cal-drawer-label">Booked</span><div class="cal-drawer-value">${escapeHTML(bookedStr)}</div></div>
+      ${e.venue ? `<div><span class="cal-drawer-label">Venue</span><div class="cal-drawer-value">${escapeHTML(e.venue)}</div></div>` : ''}
     </div>
     <div>
       <span class="cal-drawer-label">Who's booked</span>
-      <div style="margin-top:6px">
-        ${names.length
-          ? names.map(n => `<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text-mute);flex:0 0 auto">${escapeHTML((n || '?').trim().charAt(0).toUpperCase())}</span>${escapeHTML(n)}</div>`).join('')
-          : '<div style="color:var(--text-mute);font-size:13px;padding:10px 0">No names on this booking.</div>'}
-      </div>
+      <div style="margin-top:6px">${whoHtml}</div>
     </div>`;
   document.getElementById('cal-drawer-overlay').classList.add('open');
 }
