@@ -23,10 +23,14 @@ engine firing `went_quiet` for Responded leads until now). Next inbound reply bo
 lead back to Responded and the agent re-engages.
 
 ## Gotchas / guardrails
-- **Idle clock = the LIVE GHL last-message date** (any direction, via
-  `/conversations/search`), NOT `opportunities.updated_at` - the pipeline sync rewrites
-  `updated_at` in bulk so it is only a coarse candidate floor. Fails SAFE (skip, never
-  arm) if creds/inbox can't be read.
+- **Idle clock = newest message across portal STORE threads
+  (`sms_threads`/`email_threads`/`dm_threads`, keyed by `ghl_contact_id`) + GHL
+  `/conversations/search`, take the max** (helper `lastContactMessageMs`). Store is
+  PRIMARY for GTA/Twilio and is the ONLY source that resolves **portal-native
+  contacts** (UUID `ghl_contact_id`, not in `ghl_contacts` - GHL search can't read
+  them; this is what skipped Maciu on the first run). NOT `opportunities.updated_at`
+  (the pipeline sync bulk-rewrites it - coarse floor only). Fails SAFE (skip, never
+  arm) only when NEITHER source is readable.
 - Skips: active enrollment · pending/approved agent card · pending reignition.
 - Anti-loop: `REARM_COOLDOWN_HRS` (48) since last Ghosted enrollment + cap
   `REARM_MAX_GHOSTED` (3 total per lead) then left for staff. `REARM_IDLE_DAYS` default 3.

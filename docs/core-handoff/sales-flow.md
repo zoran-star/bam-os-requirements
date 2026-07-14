@@ -112,11 +112,14 @@ engine** and sat silently open. The client-portal "not flowing" panel only
   `agent_reignitions`, `automations`.
 - **Population:** open opps with `stage_role='responded'` idle ≥ `REARM_IDLE_DAYS`
   (default 3, env-tunable) with NO active enrollment, NO pending/approved agent
-  reply, NO pending reignition. **Idle clock = the live GHL last-message date**
-  (any direction, via `/conversations/search`) - the same signal the panel trusts.
-  `opportunities.updated_at` is only a coarse candidate FLOOR because the pipeline
-  sync rewrites it in bulk; the per-lead GHL check is authoritative and fails SAFE
-  (skip, never arm) when creds/inbox can't be read.
+  reply, NO pending reignition. **Idle clock = newest message across the portal
+  store threads (`sms_threads`/`email_threads`/`dm_threads`, keyed by
+  `ghl_contact_id`) + GHL `/conversations/search`, take the max** - the same signal
+  the panel/inbox trusts. Store is PRIMARY for portal/Twilio academies (GTA) and
+  also covers portal-native (UUID) contacts that never existed in GHL; GHL is the
+  fallback for GHL-messaging academies. `opportunities.updated_at` is only a coarse
+  candidate FLOOR (the pipeline sync rewrites it in bulk). Fails SAFE (skip, never
+  arm) only when NEITHER source can be read.
 - **Action:** `enrollContact(ghosted)` + `moveStage(role='interested')` - the exact
   handoff the worker's form-intro roll-forward already does (`runWork` completion
   branch), so the lead leaves Responded (where the agent + ghost detector scan) and
