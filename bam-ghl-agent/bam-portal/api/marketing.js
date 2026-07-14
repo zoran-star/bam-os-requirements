@@ -1309,10 +1309,24 @@ async function handleContentTickets(req, res) {
     });
   }
 
-  // ─── POST (client creates) ─────────────────────────────────
+  // ─── POST (client creates; staff create on a client's behalf) ──────
   if (req.method === "POST") {
-    if (!isClient) return res.status(403).json({ error: "only clients can submit content tickets" });
     const body = (req.body && typeof req.body === "object") ? req.body : {};
+    // Staff-create = the Systems -> Content round trip (Zoran approved
+    // 2026-07-14): any staff member names the client explicitly and may link
+    // an origin systems ticket. Detected by an explicit body.client_id from a
+    // staff caller, so staff who are ALSO client members don't accidentally
+    // file against their own academy.
+    const staffCreate = isStaff && typeof body.client_id === "string" && !!body.client_id;
+    if (!isClient && !staffCreate) {
+      return res.status(403).json({ error: "only clients can submit content tickets" });
+    }
+    let targetClient = staffCreate ? null : ctx.client;
+    if (staffCreate) {
+      const crows = await sb(`clients?id=eq.${body.client_id}&select=id,business_name`);
+      targetClient = crows?.[0] || null;
+      if (!targetClient) return res.status(404).json({ error: "client not found" });
+    }
     const { type, notes, raw_files, context } = body;
     // Optional client-supplied creative name ("August camp promo"). Falls back
     // to null - lists render the type/notes preview when untitled.
@@ -1327,8 +1341,9 @@ async function handleContentTickets(req, res) {
     const channel = ["organic", "funnel"].includes(body.channel) ? body.channel : "ads";
 
     // Funnel content is part of the scaling service (the client has a BAM-run
-    // website). Content-only clients have no site to put it on.
-    if (channel === "funnel") {
+    // website). Content-only clients have no site to put it on. Staff-created
+    // requests skip the gate - staff know what they're asking for.
+    if (channel === "funnel" && !staffCreate) {
       const crows = await sb(`clients?id=eq.${ctx.client.id}&select=marketing_included`);
       if (crows?.[0]?.marketing_included === false) {
         return res.status(403).json({ error: "Funnel content isn't part of your current BAM plan." });
@@ -1336,8 +1351,9 @@ async function handleContentTickets(req, res) {
     }
 
     // Per-type monthly organic credit cap (V1 hard limit, no overage). NULL allowance
-    // = unlimited; 0 = none. Counts at request; cancelling a request frees the credit.
-    if (channel === "organic") {
+    // = unlimited; 0 = none. Counts at request; cancelling a request frees the
+    // credit. Staff-created requests don't burn client credits.
+    if (channel === "organic" && !staffCreate) {
       // Organic requests are single-type so each counts toward the right limit —
       // a graphic+video upload (mixed) would otherwise bypass the caps entirely.
       if (type === "mixed") {
@@ -1384,12 +1400,24 @@ async function handleContentTickets(req, res) {
 
     // Channel-aware routing: organic -> content team (Eli), ads -> marketing (Cam),
     // unless the admin roster assigns this client's channel to someone specific.
-    const assignedTo = await resolveContentAssignee(ctx.client.id, channel);
+    const assignedTo = await resolveContentAssignee(targetClient.id, channel);
+    const baseContext = (context && typeof context === "object") ? context : {};
+    const fullContext = staffCreate
+      ? {
+          ...baseContext,
+          source: "staff-request",
+          requested_by_staff_id: ctx.staff.id,
+          requested_by_name: ctx.staff.name || "staff",
+          ...(typeof body.origin_systems_ticket_id === "string" && body.origin_systems_ticket_id
+            ? { origin_systems_ticket_id: body.origin_systems_ticket_id }
+            : {}),
+        }
+      : baseContext;
     const inserted = await sb("content_tickets", {
       method: "POST",
       headers: { Prefer: "return=representation" },
       body: JSON.stringify([{
-        client_id: ctx.client.id,
+        client_id: targetClient.id,
         type,
         channel,
         title: title || null,
@@ -1397,7 +1425,7 @@ async function handleContentTickets(req, res) {
         client_action_status: "none",
         notes: notes || "",
         raw_files: Array.isArray(raw_files) ? raw_files : [],
-        context: (context && typeof context === "object") ? context : {},
+        context: fullContext,
         messages: [],
         // Internal owner; never surfaced to the client. The client's SM is shown
         // separately as the contact (sm_name on enrich).
@@ -1406,15 +1434,16 @@ async function handleContentTickets(req, res) {
     });
     const newCt = inserted?.[0] || null;
     if (newCt) {
-      mirrorFilesToAssets(ctx.client.id, newCt.id, newCt.raw_files);
+      mirrorFilesToAssets(targetClient.id, newCt.id, newCt.raw_files);
       // DM the resolved owner that a new content request landed (carries the urgent flag).
       const code = String(newCt.id || "").slice(0, 3).toUpperCase();
-      const pr = (context?.priority === "high") ? "⚡ HIGH priority " : "";
+      const pr = (fullContext?.priority === "high") ? "⚡ HIGH priority " : "";
       const label = channel === "organic" ? "organic content" : channel === "funnel" ? "funnel content" : "content";
+      const from = staffCreate ? ` (from ${ctx.staff.name || "staff"})` : "";
       staffSlackIdById(assignedTo).then(sid => {
-        if (sid) postStaffSlackDM(sid, `🆕 New ${label} request ${pr}- ${ctx.client.business_name || "client"} [${code}]`, req);
+        if (sid) postStaffSlackDM(sid, `🆕 New ${label} request ${pr}- ${targetClient.business_name || "client"} [${code}]${from}`, req);
         const who = slackMention(sid);
-        postContentMarketingSlack(`🆕 *New ${label} request* ${pr}- ${ctx.client.business_name || "client"} [${code}]${who ? " " + who : ""}`);
+        postContentMarketingSlack(`🆕 *New ${label} request* ${pr}- ${targetClient.business_name || "client"} [${code}]${from}${who ? " " + who : ""}`);
       });
     }
     return res.status(201).json({ ticket: newCt });
@@ -1433,7 +1462,7 @@ async function handleContentTickets(req, res) {
 
     const staffActions = new Set([
       "upload-final", "set-final", "send-to-marketing", "send-for-review",
-      "send-to-systems",
+      "send-to-systems", "return-to-systems",
       "request-client-action", "mark-completed",
       "assign", "edit-context",
     ]);
@@ -1621,6 +1650,51 @@ async function handleContentTickets(req, res) {
         body: `Edited the client brief${changed.length ? ` (${changed.join(", ")})` : ""}.`,
         is_action_request: false,
         internal: true,
+      });
+
+    } else if (action === "return-to-systems") {
+      // Close the Systems -> Content round trip: attach the finished finals
+      // BACK to the origin systems ticket (no new ticket spawned) and DM the
+      // requester. Only exists for tickets created via the staff-request path
+      // with an origin link.
+      const originId = ticket.context?.origin_systems_ticket_id;
+      if (!originId) return res.status(409).json({ error: "no origin systems ticket linked" });
+      if (ticket.status !== "active") return res.status(409).json({ error: "ticket is not active" });
+      const finals = Array.isArray(ticket.final_files) ? ticket.final_files : [];
+      if (!finals.length) {
+        return res.status(400).json({ error: "upload at least one final file before returning to systems" });
+      }
+      const orows = await sb(`tickets?id=eq.${originId}&select=id,status,files,messages,submitted_by_staff,assigned_to`);
+      const origin = orows?.[0];
+      if (!origin) return res.status(404).json({ error: "origin systems ticket not found" });
+      const code = String(ticket.id).slice(0, 3).toUpperCase();
+      // Reopen finished/cancelled origins so the finals actually get worked.
+      const reopen = ["cancelled", "done", "approved"].includes(origin.status);
+      await sb(`tickets?id=eq.${originId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          files: [...(Array.isArray(origin.files) ? origin.files : []), ...finals],
+          ...(reopen ? { status: "open", resolved_at: null } : {}),
+          updated_at: nowIso(),
+          messages: appendMessage(origin.messages, {
+            author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+            body: `Content finals ready - ${finals.length} file${finals.length === 1 ? "" : "s"} attached from content ticket ${code}.`,
+            internal: true,
+          }),
+        }),
+      });
+      patch.status = "completed";
+      patch.resolved_at = nowIso();
+      patch.context = { ...(ticket.context || {}), returned_to_systems_at: nowIso() };
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+        body: "Finals returned to the systems team on the original ticket.",
+        is_action_request: false,
+      });
+      const requesterId = ticket.context?.requested_by_staff_id || origin.submitted_by_staff || origin.assigned_to;
+      const originCode = String(originId).slice(0, 3).toUpperCase();
+      staffSlackIdById(requesterId).then(sid => {
+        if (sid) postStaffSlackDM(sid, `✅ Content finals ready - ${finals.length} file${finals.length === 1 ? "" : "s"} attached to your systems ticket [${originCode}].`, req);
       });
 
     } else if (action === "send-to-systems") {

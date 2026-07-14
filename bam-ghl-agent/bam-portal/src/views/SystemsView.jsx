@@ -717,6 +717,11 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
   const [assignee, setAssignee] = useState(initial.assigned_to || "");
   const [showDeny, setShowDeny] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
+  // Systems -> Content round trip: request content work from the content team;
+  // finals return to THIS ticket automatically (Zoran approved 2026-07-14).
+  const [showReqContent, setShowReqContent] = useState(false);
+  const [rcType, setRcType] = useState("video");
+  const [rcNotes, setRcNotes] = useState("");
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [fieldEdits, setFieldEdits] = useState({});
@@ -1160,6 +1165,65 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
               </div>
             </Section>
           )}
+
+          {/* Request content from the content team (round trip: their finals
+              attach back to THIS ticket + you get a Slack DM) */}
+          {showReqContent && (
+            <Section title="Request content work" tokens={t}>
+              <div style={{ fontSize: 12, color: t.textSub, marginBottom: 10, lineHeight: 1.5 }}>
+                Creates a ticket in the content team's queue. When their finals are ready they attach back to this ticket and you get a Slack DM - no second ticket to track.
+              </div>
+              <select value={rcType} onChange={e => setRcType(e.target.value)} style={{ padding: "8px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, marginBottom: 8 }}>
+                <option value="video">Video</option>
+                <option value="graphic">Graphic</option>
+              </select>
+              <textarea
+                value={rcNotes}
+                onChange={e => setRcNotes(e.target.value)}
+                placeholder="What do you need made? Include where the raw material lives (Drive link etc.)"
+                style={{
+                  width: "100%", minHeight: 80, padding: 12,
+                  background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8,
+                  color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical",
+                }}
+              />
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button onClick={() => setShowReqContent(false)} style={btn(t, "ghost")}>Cancel</button>
+                <button
+                  disabled={!rcNotes.trim() || busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      const { data: { session: s } } = await supabase.auth.getSession();
+                      const res = await fetch("/api/marketing?resource=content-tickets", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${s?.access_token || ""}` },
+                        body: JSON.stringify({
+                          client_id: ticket.client_id,
+                          type: rcType,
+                          channel: "funnel",
+                          title: (ticket.fields?.title || "Content for systems ticket").slice(0, 120),
+                          notes: rcNotes.trim(),
+                          origin_systems_ticket_id: ticket.id,
+                        }),
+                      });
+                      const json = await res.json();
+                      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+                      setShowReqContent(false);
+                      setRcNotes("");
+                      setToast(`Content requested - ticket ${String(json.ticket?.id || "").slice(0, 3).toUpperCase()} is in the content queue.`);
+                      setTimeout(() => setToast(""), 4000);
+                    } catch (e) {
+                      alert("Request failed: " + (e?.message || "error"));
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  style={btn(t, "primary")}
+                >Send to content team</button>
+              </div>
+            </Section>
+          )}
         </div>
 
         {/* Action bar */}
@@ -1196,6 +1260,14 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             <button disabled={busy} onClick={() => setShowRequest(true)} style={btn(t, "ghost")}>
               {ticket.status === "awaiting_client" ? "Add another request" : "Request client action"}
             </button>
+          )}
+
+          {/* Systems -> Content round trip entry point */}
+          {canClientComm && !["done","approved"].includes(ticket.status) && !showReqContent && (
+            <button disabled={busy} onClick={() => {
+              setRcNotes(ticket.fields?.what ? `From systems ticket: ${String(ticket.fields.what).slice(0, 400)}` : "");
+              setShowReqContent(true);
+            }} style={btn(t, "ghost")}>Request content</button>
           )}
 
           {/* Executor: submit for review (assignee/manager only).
