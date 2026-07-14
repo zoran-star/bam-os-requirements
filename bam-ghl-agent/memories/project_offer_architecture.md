@@ -72,7 +72,11 @@ The pipeline preset engine `api/agent/presets.js` (`applyPreset`, `PRESETS.free_
 
 **2C shipped (seed automations):** new `POST /api/automations ?action=seed-preset-automations` seeds the baseline automations idempotently + dormant (approved:false) - the 3 form-intro first-touches (`FORM_INTRO_DEFAULTS`) plus the new multi-step `GHOSTED_DEFAULT` (👻 Ghosted, 3-SMS drip, merge-fields only) in `form-intro-automations.js`. Same create-if-missing / add-steps-only-if-zero rule as `seed-form-intro`. Sales-section "Set up automations" button → `_bbAutomationsSeed`. Nurture is NOT seeded (its GTA copy is brand-story email templates - needs the academy's own content).
 
-**Still to build (2D):** seed entry_points/funnels/custom_field_defs (GHL-id dependent); a Nurture default; and the agent-facts sections the offer doesn't cover (coach ratio, group sizes, pricing transparency mode, geo-qualification, social proof) still need a dedicated agent-facts interview.
+**2D shipped:** `POST /api/offers/seed-entry-points` seeds funnels (free-trial primary + contact) and website-form entry_points (free-trial + contact) idempotently, offer-tied, GHL columns null; "Create standard entry points" button in the EP manager's empty state.
+
+**Gap #1 shipped (booking go-live):** the hardcoded `ACTIVATIONS[]` in `api/schedule/cron-activate-booking.js` is GONE - the cron now reads activation requests from `bookable_programs.config` (`activation_requested_at`, `activation_offer_id`, `expect_templates`, `activation_approved_by`). New `api/schedule/activate-booking.js` (JWT auth: staff or owner): GET returns booking_provider + planned templates + warnings (pure `offerToTemplatePayloads`) + last `activation_report`; POST stamps the request (refuses on warnings / 0 templates / no program). Schedule section's "Set up free trial booking" button (`_bbBookingGolive`) previews class-time cards then queues go-live; the cron completes sync + entry-point link + `booking_provider='portal'` flip within ~10 min. The cron's fail-safe drift guard is unchanged.
+
+**Still to build:** a Nurture automation default; and the agent-facts sections the offer doesn't cover (coach ratio, group sizes, pricing transparency mode, geo-qualification, social proof) still need a dedicated agent-facts interview.
 
 ## Team is special
 

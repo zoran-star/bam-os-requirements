@@ -25613,6 +25613,7 @@ const _bbOfferConfigs = {
         hint:'When the season runs (e.g. "Sept 5 - May 30")' },
       { key:'closed_dates', type:'textarea', label:'Closed dates / breaks',
         hint:'Holidays, summer break, etc.' },
+      { key:'__booking_golive__', type:'booking_golive', label:'Free trial booking' },
       _bbCommonExtraNotes
     ]},
     { id:'value', label:'Value', fields:[
@@ -26396,6 +26397,18 @@ function _bbRenderField(field, sectionId) {
       } else {
         body = `<button type="button" class="btn-secondary-bb" onclick="_bbPresetPreview()">Set up the sales pipeline</button>
           <div class="bb-field-hint" style="margin-top:8px">Stamps the proven Free Trial pipeline - stages plus routing - onto this offer, so the board, router, and agents work out of the box. You review before it applies.</div>`;
+      }
+      break;
+    }
+    case 'booking_golive': {
+      // Free-trial booking go-live: preview the slot templates the Schedule
+      // section generates, approve, and the activation cron completes the flip.
+      const _bgOid = _bbState.offer && _bbState.offer.id;
+      if (!_bgOid) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then set up free trial booking.</div>`;
+      } else {
+        body = `<button type="button" class="btn-secondary-bb" onclick="_bbBookingGolive()">Set up free trial booking</button>
+          <div class="bb-field-hint" style="margin-top:8px">Turns this schedule into bookable free-trial slots. You review the generated class times before anything goes live.</div>`;
       }
       break;
     }
@@ -27686,6 +27699,64 @@ function _bbSalesStatusHtml(st) {
       ${row('Booking agent facts', st.agent_sections > 0, st.agent_sections > 0 ? `${st.agent_sections} synced` : 'using defaults')}
       ${row('Form fields', fields > 0, `${st.sales_fields || 0} lead · ${st.onboarding_fields || 0} intake`)}
     </div>`;
+}
+
+// Free-trial booking go-live (Gap #1). Preview the slot templates the offer's
+// Schedule section generates (server truth via activate-booking GET), then
+// approve - the activation cron completes sync + flip within ~10 minutes.
+async function _bbBookingGolive() {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  _bbShowDocModal('Free trial booking', `<div style="padding:16px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Reading your schedule…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/schedule/activate-booking?client_id=${encodeURIComponent(CLIENT_ID)}&offer_id=${encodeURIComponent(offer.id)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    const planned = Array.isArray(j.planned) ? j.planned : [];
+    const warnings = Array.isArray(j.warnings) ? j.warnings : [];
+    const cards = planned.map(p => `<div style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(p.name || 'Class')}</div>
+        <div style="font-size:11.5px;color:var(--text-mute);margin-top:2px">${escapeHTML((p.recurrence || '').replace('WEEKLY:', ''))} · ${escapeHTML(p.start || '')}-${escapeHTML(p.end || '')} · up to ${escapeHTML(String(p.capacity || '-'))} athletes · trials free</div>
+      </div>`).join('');
+    const warnHtml = warnings.length ? `<div style="border:1px solid #b3542f;border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#e0654f">${warnings.map(w => escapeHTML(w)).join('<br>')}</div>` : '';
+    if (j.booking_provider === 'portal') {
+      _bbShowDocModal('Free trial booking', `<div style="font-size:13px;color:var(--text)">Free trial booking is <b>live</b> on this schedule.</div>${cards ? `<div style="margin-top:12px">${cards}</div>` : ''}`);
+      return;
+    }
+    if (j.requested_at) {
+      _bbShowDocModal('Free trial booking', `<div style="font-size:13px;color:var(--text)">Go-live is <b>queued</b> - it completes automatically within about 10 minutes.</div>${j.report && j.report.error ? `<div style="margin-top:8px;font-size:12px;color:#e0654f">Last run: ${escapeHTML(j.report.error)}</div>` : ''}`);
+      return;
+    }
+    if (!planned.length) {
+      _bbShowDocModal('Free trial booking', `${warnHtml}<div style="font-size:13px;color:var(--text-mute)">The Schedule section has no weekly class times yet - add classes with fixed weekly times first.</div>`);
+      return;
+    }
+    _bbShowDocModal('Free trial booking', `<div style="font-size:12px;color:var(--text-mute);margin-bottom:12px">These class times become bookable free-trial slots (a year ahead, kept topped up). Review, then go live.</div>${warnHtml}${cards}
+      ${warnings.length ? `<div style="font-size:12px;color:var(--text-mute)">Fix the warnings above in the Schedule section, then come back.</div>` : `<button onclick="_bbBookingGoliveConfirm()" style="width:100%;padding:11px;background:var(--gold);border:0;border-radius:8px;color:#1a1a1a;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:4px">Go live with free trial booking</button>`}`);
+  } catch (e) {
+    _bbShowDocModal('Free trial booking', `<div style="padding:14px;color:#c0392b;font-size:13px">Could not read the schedule: ${escapeHTML(e.message || String(e))}</div>`);
+  }
+}
+
+async function _bbBookingGoliveConfirm() {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  _bbShowDocModal('Free trial booking', `<div style="padding:16px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Queuing go-live…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/schedule/activate-booking', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: CLIENT_ID, offer_id: offer.id }) });
+    const j = await r.json();
+    if (!r.ok || !j.ok) {
+      const warns = Array.isArray(j.warnings) && j.warnings.length ? `<div style="margin-top:8px;font-size:12px;color:#e0654f">${j.warnings.map(w => escapeHTML(w)).join('<br>')}</div>` : '';
+      throw Object.assign(new Error(j.error || 'Failed'), { extraHtml: warns });
+    }
+    _bbShowDocModal('Free trial booking', j.already
+      ? `<div style="font-size:13px;color:var(--text)">Free trial booking is already live.</div>`
+      : `<div style="font-size:13px;color:var(--text)">Go-live <b>queued</b>. Your slots generate and booking flips automatically within about 10 minutes.</div><div style="font-size:11.5px;color:var(--text-mute);margin-top:6px">Reopen this panel anytime to check status.</div>`);
+  } catch (e) {
+    _bbShowDocModal('Free trial booking', `<div style="padding:14px;color:#c0392b;font-size:13px">Could not queue go-live: ${escapeHTML(e.message || String(e))}${e.extraHtml || ''}</div>`);
+  }
 }
 
 // Seed the standard website entry points + funnels for this offer (Gap 2D).
