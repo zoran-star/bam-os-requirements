@@ -235,3 +235,21 @@ Update in the same commit that ships the change. Triggers:
 - Change to the auto-resend invite cron cadence or auth
 - New V2 feature added (Members is the only one today)
 - Tracker visibility logic changes
+
+## Academy onboarding flow (`_obf`) — expanded 2026-07-13
+The V2 "Finish your onboarding" flow (client-portal.html `_obf*`, opened from the
+nav orb's progress ring; NOT the retired `_obt` 8-circle pill) is a grouped,
+auto-detecting, resumable modal. Steps are config objects in `_OBF_STEPS`
+(`key/group/title/sub/cta/go`, optional `skippable`); groups in `_OBF_GROUPS`
+(general = shared, training = per-offer). Completion is auto-detected in
+`_obfFetchState` from LIVE data - nothing hand-checked.
+
+Now 10 steps (was 4): general = ein/email/website; training = policy, pipeline,
+automations, agent, entrypoints, booking, members. The 6 new training steps are
+all detected from `GET /api/offers/setup-status` (offer_id now OPTIONAL there -
+resolves the published/newest training offer; returns pipeline_stages,
+automations[], agent_sections, entry_points, has_policy, booking_live). Each new
+step deep-links via `_obfGoOffer(sectionId)` → `_bbNavigate('offers', offerId,
+{step})` (step index mirrors `_bbWizardSections`' policy-after-pricing insert).
+Consequence: fully-live academies (GTA/DETAIL) may see the orb reappear until
+they set the newer capabilities (e.g. structured policy) - intended + accurate.
