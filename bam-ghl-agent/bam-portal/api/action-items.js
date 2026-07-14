@@ -284,8 +284,38 @@ function onboardingStepsForTier(isV15) {
 }
 
 async function loadClientSignals(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS},v15_access`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS},v15_access,stripe_connect_account_id`);
   return (Array.isArray(rows) && rows[0]) || {};
+}
+
+// An academy can finish the Stripe OAuth handshake while their account still
+// cannot take money (outstanding Stripe requirements -> charges disabled). In
+// that case connect.js stores the account but leaves stripe_connect_connected_at
+// null, so the "Connect your Stripe account" step stays open. Once they finish in
+// Stripe the account flips to charges_enabled, and this backfills the timestamp so
+// the step ticks on its own - no reconnect needed.
+// Only runs for the narrow case "account stored, not yet chargeable", so it costs
+// one Stripe call for a client who is mid-setup and none for everyone else.
+async function backfillStripeWhenChargeable(clientId, signals) {
+  const acct = signals.stripe_connect_account_id;
+  if (!acct || signals.stripe_connect_connected_at) return signals;
+  const key = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+  if (!key) return signals;
+  try {
+    const r = await fetch(`https://api.stripe.com/v1/accounts/${encodeURIComponent(acct)}`, {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    const a = await r.json();
+    if (!r.ok || a.charges_enabled !== true) return signals; // still cannot charge - leave the step open
+    const nowIso = new Date().toISOString();
+    await sb(`clients?id=eq.${clientId}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ stripe_connect_status: "connected", stripe_connect_connected_at: nowIso }),
+    });
+    return { ...signals, stripe_connect_connected_at: nowIso };
+  } catch (_) {
+    return signals; // never block the checklist on a Stripe hiccup
+  }
 }
 
 // Derive the 3 systems-build-tracker steps from the client's systems onboarding
@@ -327,7 +357,9 @@ async function loadSystemsTrackerState(clientId) {
 // Idempotently ensure all onboarding steps exist for this client, then
 // reconcile each against its clients-row column. Safe to call on every GET.
 async function syncOnboardingItems(clientId, tracker) {
-  const signals = await loadClientSignals(clientId);
+  let signals = await loadClientSignals(clientId);
+  // Tick Stripe the moment the connected account can really charge (and not before).
+  signals = await backfillStripeWhenChargeable(clientId, signals);
   const isV15 = signals.v15_access === true;
   const steps = onboardingStepsForTier(isV15);
   // Ticket-derived steps mirror the systems onboarding ticket (load once).
