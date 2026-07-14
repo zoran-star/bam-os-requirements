@@ -64,7 +64,9 @@ The pipeline preset engine `api/agent/presets.js` (`applyPreset`, `PRESETS.free_
 
 **2A shipped (offer → agent facts):** new `api/offers/sync-agent.js` (Supabase-JWT auth) generates the booking agent's FACT prompt sections (`business_info`, `program`, `schedule`, `pricing`, `selling_points`, `policies`) from `offer.data` + client, `?action=preview` returns them and `POST` upserts `agent_prompt_sections` overrides (offer_id tagged; only sections the offer can fill). Sales-section "Sync booking agent from this offer" button → `_bbAgentSyncPreview` (preview + per-section checkboxes) → `_bbAgentSyncApply`. Reversible in Agent learnings; user-triggered so the live agent never changes silently. Supersedes the narrower policy-only push.
 
-**Still to build (2B-2D):** a preset-apply UI (stamp `applyPreset` from the portal, CLI-only today); seed automations (ghosted/nurture/form-intro) from the preset; seed entry_points/funnels/custom_field_defs (GHL-id dependent). Fact sections the offer does NOT cover (coach ratio, group sizes, pricing transparency mode, geo-qualification, social proof) still need a dedicated agent-facts interview.
+**2B shipped (preset-apply UI):** new `api/offers/apply-preset.js` (Supabase-JWT auth) wraps `applyPreset()` behind the portal - `?action=preview` dry-runs (returns stages + routing + workers), `POST` applies (409 `needs_force` on edge conflict). Sales-section "Set up the sales pipeline" button → `_bbPresetPreview` (shows the Free Trial stages + 20 routes) → `_bbPresetApply` (with a Replace-on-conflict path). Stamps `PRESETS.free_trial` onto the offer's `pipeline_stages` + `stage_transitions`.
+
+**Still to build (2C-2D):** seed automations (ghosted/nurture/form-intro) from the preset; seed entry_points/funnels/custom_field_defs (GHL-id dependent). Fact sections the offer does NOT cover (coach ratio, group sizes, pricing transparency mode, geo-qualification, social proof) still need a dedicated agent-facts interview.
 
 ## Team is special
 
