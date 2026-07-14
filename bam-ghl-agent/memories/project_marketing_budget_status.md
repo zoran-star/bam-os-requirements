@@ -41,3 +41,21 @@ Client still decides; the aftermath changed:
 - **Changes -> ticket stays in-progress** for marketing to apply + the client's assigned SM gets a Slack DM with the itemized changes ("Apply in Meta, then mark the ticket completed").
 - Budget-status column semantics unaffected: auto-completed no-change reviews read green (correct - budgets ARE confirmed).
 
+## Auto-apply budget changes via Meta API (APPROVED, not yet built)
+**Zoran approved on a call 2026-07-14** (Cam relayed). Would be the portal's FIRST
+Meta WRITE (everything today is read-only - see [[project_meta_api_integration]]).
+Agreed guardrail design (research-backed, July 2026 Meta rules):
+- **20% delta tier**: delta <= 20% of current budget auto-applies instantly (safe,
+  no learning-phase reset). Larger increases go to a staged cron ladder (<= 20%
+  steps every ~3 days) with a 24h SM hold window before step 1. Decreases > 20%
+  apply in full immediately (never overspend client money to protect the algo).
+- **Fat-finger net**: client-side re-type confirmation when input deviates > 50%
+  from current; server ceiling ~3x highest-ever monthly spend routes to SM, no
+  automation. The 20% tier itself means a 10x typo can never auto-apply.
+- **Accuracy**: read-after-write verify (GET campaign back, compare), before/after
+  audit trail on the ticket, idempotency key per change, feature-flag kill switch.
+- **Rollout**: shadow mode first month (log would-do, Ximena applies manually,
+  compare) before real writes.
+- Still needed from Ximena: monthly -> daily conversion rule + per-client CPA
+  floor (daily budget < target CPA x 7 can't exit learning - flag, don't apply).
+
