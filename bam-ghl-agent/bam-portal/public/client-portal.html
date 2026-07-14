@@ -15847,6 +15847,7 @@ async function _cdLoadTrialCoach(c) {
     if (!_CDRAWER.ctx.trialDate && j.trial_date) _CDRAWER.ctx.trialDate = j.trial_date;
     if (j.trial_status) _CDRAWER.ctx.trialStatus = j.trial_status;
     if (!_CDRAWER.ctx.coach && j.coach) _CDRAWER.ctx.coach = j.coach;
+    if (Array.isArray(j.trials) && j.trials.length) _CDRAWER.ctx.trials = j.trials;
     _cdRenderLead(); _cdRenderJourney();
   } catch (_) { /* best-effort */ }
 }
@@ -15964,23 +15965,70 @@ function _tagRemove(hostId, i) { const st = _TAGW[hostId]; const t = st && st.ta
 
 function _cdBody() {
   const g = _CDRAWER.ghl || {};
-  const row = (k, v) => v ? `<div style="display:flex;gap:8px;padding:3px 0;font-size:13px"><span style="color:var(--text-mute);min-width:64px">${k}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
-  const tags = (g.tags || []).map(t => `<span style="display:inline-block;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:2px 9px;font-size:11px;color:var(--text-sub);margin:0 5px 5px 0">${escapeHTML(t)}</span>`).join('');
+  const c = _CDRAWER.contact || {};
+  const cid = g.id || c.ghl_contact_id || null;
+  const row = (k, v) => v ? `<div style="display:flex;gap:8px;padding:3px 0;font-size:13px"><span style="color:var(--text-mute);min-width:72px">${escapeHTML(String(k))}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
+  const sect = (t) => `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">${escapeHTML(t)}</div>`;
+
+  // Lead vs Member: a contact is a Member iff it matches the members roster.
+  const member = (typeof _ibMemberOf === 'function') ? _ibMemberOf({ contactId: cid, phone: g.phone || c.phone, email: g.email || c.email }) : null;
+  const isMember = !!member;
+  const pipe = (typeof _V15IB !== 'undefined' && _V15IB.contactPipe && cid) ? _V15IB.contactPipe[cid] : null;
+
+  // Identity header + Lead/Member badge + status line.
+  const dispName = g.name || c.name || g.email || g.phone || 'Contact';
+  const hue = (typeof _ibAvatarHue === 'function') ? _ibAvatarHue(dispName) : 210;
+  const initials = escapeHTML((typeof _ibInitials === 'function') ? _ibInitials(dispName) : (dispName[0] || '?'));
+  const badge = isMember
+    ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;letter-spacing:.02em;text-transform:uppercase;background:rgba(76,199,106,.15);color:#66bb6a;margin-left:8px">Member</span>`
+    : (pipe ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;letter-spacing:.02em;text-transform:uppercase;background:rgba(212,182,92,.14);color:var(--gold);margin-left:8px">Lead</span>` : '');
+  let subLine = '';
+  if (isMember) {
+    const since = member.joined_date || member.start_date || member.stripe_joined_at || null;
+    let sinceStr = ''; if (since) { try { sinceStr = new Date(since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); } catch (_) {} }
+    subLine = 'Active' + (sinceStr ? ' · since ' + sinceStr : '');
+  } else if (pipe) {
+    subLine = pipe.pipelineName + (pipe.stageName ? ' · ' + pipe.stageName : '');
+  }
+  const header = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+    <div style="width:46px;height:46px;border-radius:50%;background:hsl(${hue},40%,25%);color:hsl(${hue},50%,75%);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0">${initials}</div>
+    <div style="min-width:0"><div style="font-size:16px;font-weight:700;color:var(--text)">${escapeHTML(dispName)}${badge}</div>${subLine ? `<div style="font-size:12px;color:var(--text-sub);margin-top:2px">${escapeHTML(subLine)}</div>` : ''}</div>
+  </div>`;
+
+  // Membership block (members): plan / price / status / next charge from the roster.
+  let memberBlock = '';
+  if (isMember) {
+    const plan = member.plan || (member.offer && member.offer.title) || null;
+    let price = member.price_label || null;
+    if (!price && member.amount_cents != null) price = _cdMoney(member.amount_cents, member.currency) + (member.interval ? ' / ' + member.interval : '');
+    const nextp = (member.next_payment && member.next_payment.label) || member.next_charge || null;
+    const mrows = row('Plan', plan) + row('Price', price) + row('Status', member.status) + row('Next charge', nextp);
+    if (mrows.replace(/\s+/g, '')) memberBlock = sect('Membership') + mrows;
+  }
+
+  // Custom fields grouped the way the offer defines them (backend-tagged).
   const cf = (g.customFields || []).filter(f => f.value != null && f.value !== '');
-  const sect = (t) => `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">${t}</div>`;
-  const ghlHtml = `${sect('Contact')}
-    ${row('Name', g.name)}${row('Email', g.email)}${row('Phone', g.phone)}
-    ${g.dnd ? `<div style="margin-top:6px;font-size:12px;color:#c9742f">Do-not-contact is ON</div>` : ''}
-    ${row('Source', g.source)}${row('Added', g.dateAdded ? _cdDate(Math.floor(new Date(g.dateAdded).getTime() / 1000)) : '')}
-    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:12px 0 6px">Tags</div>
-    <div id="cd-tags"></div>
-    ${cf.length ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">${cf.map(f => row(escapeHTML(f.name || 'Field'), f.value)).join('')}</div>` : ''}
-    ${g._error ? `<div style="margin-top:6px;font-size:11px;color:var(--text-mute)">Full GHL detail unavailable (${escapeHTML(g._error)})</div>` : ''}`;
+  const core = cf.filter(f => f.group === 'core');
+  const extra = cf.filter(f => f.group === 'extra');
+  const other = cf.filter(f => f.group !== 'core' && f.group !== 'extra');
+  const fieldBlock = (title, arr) => arr.length ? sect(title) + arr.map(f => row(f.name || 'Field', f.value)).join('') : '';
+
+  const contactSect = sect('Contact')
+    + row('Email', g.email) + row('Phone', g.phone)
+    + (g.dnd ? `<div style="margin-top:6px;font-size:12px;color:#c9742f">Do-not-contact is ON</div>` : '')
+    + row('Source', g.source)
+    + row('Added', g.dateAdded ? _cdDate(Math.floor(new Date(g.dateAdded).getTime() / 1000)) : '')
+    + `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:12px 0 6px">Tags</div><div id="cd-tags"></div>`
+    + (g._error ? `<div style="margin-top:6px;font-size:11px;color:var(--text-mute)">Full GHL detail unavailable (${escapeHTML(g._error)})</div>` : '');
+
   const ghlUrl = _ghlContactUrl(_CDRAWER.ghlLoc, (_CDRAWER.contact && _CDRAWER.contact.ghl_contact_id) || g.id);
   const callBtn = ghlUrl
     ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:10px;color:var(--gold);padding:11px;font:inherit;font-size:13px;font-weight:700;text-decoration:none">Call in GHL</a>`
     : '';
-  return `${ghlHtml}
+  return `${header}${memberBlock}${contactSect}
+    ${fieldBlock('Athlete + core fields', core)}
+    ${fieldBlock('Extra fields', extra)}
+    ${fieldBlock('Other fields', other)}
     ${callBtn}
     <div id="cd-lead"></div>
     <div id="cd-journey"></div>
@@ -16026,23 +16074,48 @@ function _cdRenderJourney() {
   const jr = document.getElementById('cd-journey'); if (!jr || !_CDRAWER.ctx) return;
   const ctx = _CDRAWER.ctx, opp = ctx.opp, pt = ctx.postTrial, ghl = _CDRAWER.ghl || {};
   const fmt = (iso) => { if (!iso) return null; const d = new Date(iso); if (isNaN(d.getTime())) return null; return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
-  const steps = [];
+  const steps = []; // [label, sub, state]  state: 'ok' | 'bad' | 'pending'
   const created = (opp && opp.formFilledAt) || ghl.dateAdded || null;
-  if (created) steps.push(['Lead created', fmt(created), true]);
-  if (ctx.trialDate) { let s = ''; try { s = _plTrialInfo(ctx.trialDate).str || ''; } catch (_) {} steps.push(['Trial booked', s || fmt(ctx.trialDate), true]); }
-  const rv = (opp && opp.review) || pt || null;
-  if (rv) {
-    if (rv.showed_up === true) steps.push(['Showed up', null, true]);
-    else if (rv.showed_up === false) steps.push(['No show', null, false]);
-    const coach = rv.trainer || ctx.coach;
-    if (rv.good_fit === true) steps.push(['Good fit', coach ? 'Coach ' + coach : null, true]);
-    else if (rv.good_fit === false) steps.push(['Not a fit', null, false]);
+  if (created) steps.push(['Form filled', fmt(created), 'ok']);
+
+  // Full booking history (each trial = its own node + outcome). A no-show →
+  // rebook is two trials here. Falls back to the coarse single-trial view when
+  // the academy has no portal booking history.
+  const trials = Array.isArray(ctx.trials) ? ctx.trials : [];
+  if (trials.length) {
+    trials.forEach((t, i) => {
+      const n = trials.length > 1 ? ` #${i + 1}` : '';
+      const dstr = fmt(t.date) || '';
+      const st = String(t.status || '').toUpperCase();
+      const label = (i > 0 ? 'Trial rebooked' : 'Trial booked') + n;
+      steps.push([label, dstr, 'ok']);
+      if (st === 'NO_SHOW') steps.push(['No-show', null, 'bad']);
+      else if (st === 'CANCELLED') steps.push(['Cancelled', null, 'bad']);
+      else if (st === 'SHOWED') {
+        steps.push(['Attended', t.coach ? 'Coach ' + t.coach : null, 'ok']);
+        if (t.good_fit === true) steps.push(['Good fit', null, 'ok']);
+        else if (t.good_fit === false) steps.push(['Not a fit', null, 'bad']);
+      }
+      else if (st === 'CONVERTED') steps.push(['Converted', null, 'ok']);
+      else steps.push([(t.date && new Date(t.date).getTime() > Date.now()) ? 'Upcoming' : 'Awaiting outcome', null, 'pending']);
+    });
+  } else {
+    if (ctx.trialDate) { let s = ''; try { s = _plTrialInfo(ctx.trialDate).str || ''; } catch (_) {} steps.push(['Trial booked', s || fmt(ctx.trialDate), 'ok']); }
+    const rv = (opp && opp.review) || pt || null;
+    if (rv) {
+      if (rv.showed_up === true) steps.push(['Showed up', null, 'ok']);
+      else if (rv.showed_up === false) steps.push(['No show', null, 'bad']);
+      const coach = rv.trainer || ctx.coach;
+      if (rv.good_fit === true) steps.push(['Good fit', coach ? 'Coach ' + coach : null, 'ok']);
+      else if (rv.good_fit === false) steps.push(['Not a fit', null, 'bad']);
+    }
   }
-  if (opp && opp.status === 'won') steps.push(['Won', null, true]);
-  else if (opp && opp.status === 'lost') steps.push(['Lost', null, false]);
+  if (opp && opp.status === 'won') steps.push(['Won', null, 'ok']);
+  else if (opp && opp.status === 'lost') steps.push(['Lost', null, 'bad']);
+
   jr.innerHTML = steps.length
-    ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Journey</div>` +
-      steps.map(([t, sub, ok]) => `<div class="pl-tl-step"><span class="pl-tl-dot ${ok ? 'ok' : 'bad'}"></span><span class="pl-tl-label">${escapeHTML(t)}</span>${sub ? `<span class="pl-tl-sub">${escapeHTML(sub)}</span>` : ''}</div>`).join('')
+    ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Timeline</div>` +
+      steps.map(([t, sub, st]) => `<div class="pl-tl-step"><span class="pl-tl-dot ${st === 'bad' ? 'bad' : st === 'pending' ? '' : 'ok'}"${st === 'pending' ? ' style="background:transparent;border:2px dashed var(--text-mute)"' : ''}></span><span class="pl-tl-label">${escapeHTML(t)}</span>${sub ? `<span class="pl-tl-sub">${escapeHTML(sub)}</span>` : ''}</div>`).join('')
     : '';
 }
 // Lead section rendered from the shared context: athlete + age + last trial +
@@ -16051,14 +16124,13 @@ function _cdRenderLead() {
   const host = document.getElementById('cd-lead'); if (!host || !_CDRAWER.ctx) return;
   const ctx = _CDRAWER.ctx;
   const row = (k, v) => v ? `<div style="display:flex;gap:8px;padding:3px 0;font-size:13px"><span style="color:var(--text-mute);min-width:80px">${escapeHTML(k)}</span><span style="color:var(--text);word-break:break-word">${escapeHTML(String(v))}</span></div>` : '';
-  let trialStr = '';
-  if (ctx.trialDate) { try { trialStr = _plTrialInfo(ctx.trialDate).str || ''; } catch (_) {} if (!trialStr) { const d = new Date(ctx.trialDate); trialStr = isNaN(d.getTime()) ? String(ctx.trialDate) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } }
-  const inner = [
-    row('Athlete', ctx.athlete), row('Athlete age', ctx.age),
-    row('Last trial', trialStr), row('Coach', ctx.coach),
-    ...(ctx.leadFields || []).map(f => row(f.label, f.value)),
-  ].join('');
-  host.innerHTML = inner.replace(/\s+/g, '') ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Lead</div>${inner}` : '';
+  // Athlete + core/extra fields now render grouped in the card body, and the
+  // trial history renders in the Timeline. Here we only surface any *extra*
+  // captured fields (e.g. from website_leads) not already shown as a custom field.
+  const shownNames = new Set(((_CDRAWER.ghl && _CDRAWER.ghl.customFields) || []).map(f => (f.name || '').toLowerCase().trim()).filter(Boolean));
+  const extras = (ctx.leadFields || []).filter(f => f.label && f.value && !shownNames.has(String(f.label).toLowerCase().trim()));
+  const inner = extras.map(f => row(f.label, f.value)).join('');
+  host.innerHTML = inner ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;margin:16px 0 8px">Also captured</div>${inner}` : '';
 }
 // Fetch the captured custom fields (athlete name/age, start-when, referral…) +
 // a "free trial date" field if the academy stores one, into the shared context.
