@@ -25730,6 +25730,7 @@ const _bbOfferConfigs = {
         hint:'Plays on the website confirmation page right after a trial is booked. MP4, under 50 MB.' },
       { key:'__entry_points__', type:'entry_points', label:'Entry points',
         hint:'Where leads come from - your website forms, GHL forms, calendars and funnels. Click one to connect it to a pipeline + stage.' },
+      { key:'__pipeline_preset__', type:'pipeline_preset', label:'Sales pipeline' },
       { key:'__agent_sync__', type:'agent_sync', label:'Booking agent' },
       _bbCommonExtraNotes
     ]},
@@ -26379,6 +26380,18 @@ function _bbRenderField(field, sectionId) {
         body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No entry points yet. They appear here as your website forms, GHL forms, calendars and funnels are detected.</div>`;
       } else {
         body = `<div class="ep-grid">${_EP_DATA.map(ep => _epCardHtml(ep, `_epOpenWizard('${_bbEscapeAttr(ep.id)}')`)).join('')}</div>`;
+      }
+      break;
+    }
+    case 'pipeline_preset': {
+      // Stamp the proven Free Trial sales pipeline (stages + routing) onto this
+      // offer via applyPreset() (preview-first).
+      const _ppOid = _bbState.offer && _bbState.offer.id;
+      if (!_ppOid) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then set up the sales pipeline.</div>`;
+      } else {
+        body = `<button type="button" class="btn-secondary-bb" onclick="_bbPresetPreview()">Set up the sales pipeline</button>
+          <div class="bb-field-hint" style="margin-top:8px">Stamps the proven Free Trial pipeline - stages plus routing - onto this offer, so the board, router, and agents work out of the box. You review before it applies.</div>`;
       }
       break;
     }
@@ -27595,6 +27608,61 @@ async function _bbCqPreviewForm(offerId, sectionId) {
     _bbShowDocModal(title, `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:14px">Exactly what a ${sectionId === 'sales' ? 'lead' : 'new member'} sees. Preview only.</div>${form}`);
   } catch (e) {
     _bbShowDocModal(title, `<div style="padding:14px;color:#c0392b;font-size:13px">Could not build the preview: ${escapeHTML(e.message || String(e))}</div>`);
+  }
+}
+
+// Stamp the Free Trial pipeline preset onto this offer (Gap #2, phase 2B).
+// Preview the stages + routing, then apply via /api/offers/apply-preset.
+async function _bbPresetPreview() {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  _bbShowDocModal('Sales pipeline', `<div style="padding:16px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading the Free Trial pipeline…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/offers/apply-preset?action=preview&client_id=${encodeURIComponent(CLIENT_ID)}&offer_id=${encodeURIComponent(offer.id)}&preset=free_trial`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    const workers = j.workers || {};
+    const stages = (j.stageRows || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+    const stageList = stages.map(s => `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:11px;color:var(--text-mute);min-width:16px">${s.position}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(s.label)}</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-sub)">${escapeHTML(workers[s.role] || '')}</span>
+      </div>`).join('');
+    const trans = (j.transitionRows || []).map(t => {
+      const from = t.from_stage_role || '(new lead)';
+      const to = t.to_kind === 'stage' ? t.to_stage_role : '@' + t.to_terminal;
+      return `<div style="font-size:11.5px;color:var(--text-sub);padding:2px 0">${escapeHTML(from)} <span style="color:var(--text-mute)">--${escapeHTML(t.trigger)}--&gt;</span> ${escapeHTML(to)}</div>`;
+    }).join('');
+    _bbShowDocModal('Sales pipeline', `<div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">Preset: <b>${escapeHTML(j.label || 'Free Trial')}</b> · ${j.stages} stages · ${j.transitions} routes</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute);margin-bottom:2px">Stages</div>${stageList}
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute);margin:14px 0 4px">Routing</div>
+      <div style="max-height:180px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px 10px">${trans}</div>
+      <button onclick="_bbPresetApply(false)" style="width:100%;padding:11px;background:var(--gold);border:0;border-radius:8px;color:#1a1a1a;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:14px">Apply pipeline to this offer</button>`);
+  } catch (e) {
+    _bbShowDocModal('Sales pipeline', `<div style="padding:14px;color:#c0392b;font-size:13px">Could not load the pipeline: ${escapeHTML(e.message || String(e))}</div>`);
+  }
+}
+
+async function _bbPresetApply(force) {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  _bbShowDocModal('Sales pipeline', `<div style="padding:16px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> ${force ? 'Replacing' : 'Setting up'} the pipeline…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/apply-preset', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: CLIENT_ID, offer_id: offer.id, preset: 'free_trial', force: !!force }) });
+    const j = await r.json();
+    if (r.status === 409) {
+      if (j.needs_force) {
+        _bbShowDocModal('Sales pipeline', `<div style="font-size:13px;color:var(--text);margin-bottom:12px">This offer already has pipeline routes that differ from the preset. Replace them with the preset's?</div><pre style="white-space:pre-wrap;font-size:11.5px;color:var(--text-mute);margin:0 0 12px">${escapeHTML(j.error || '')}</pre><button onclick="_bbPresetApply(true)" style="width:100%;padding:11px;background:var(--gold);border:0;border-radius:8px;color:#1a1a1a;font-size:13.5px;font-weight:700;cursor:pointer">Replace with preset</button>`);
+        return;
+      }
+      throw new Error(j.error || 'Conflict');
+    }
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    _bbShowDocModal('Sales pipeline', `<div style="font-size:13px;color:var(--text)">Pipeline set up: <b>${j.stages}</b> stages, <b>${j.transitions}</b> routes.</div><div style="font-size:11.5px;color:var(--text-mute);margin-top:6px">Your board, router, and agents now use this flow.</div>`);
+  } catch (e) {
+    _bbShowDocModal('Sales pipeline', `<div style="padding:14px;color:#c0392b;font-size:13px">Could not set up the pipeline: ${escapeHTML(e.message || String(e))}</div>`);
   }
 }
 
