@@ -111,6 +111,13 @@ async function handler(req, res) {
   // Not-a-fit terminal outcome: "unqualified" (quiet dead-end, default) or "lost"
   // (Lead Nurture takes over). Only consulted when showed up + not a good fit.
   const notFitOutcome = b.outcome === "lost" ? "lost" : "unqualified";
+  // No-show extras (Zoran 2026-07-14): the coach's read on WHY they no-showed and
+  // an optional first-text they want the rebook to work from. Both become
+  // <contact_memory> the booking agent uses to draft the rebook (which still lands
+  // in the Hawkeye deck for the coach's final ✓ - nothing is sent from here on a
+  // no-show). The reason also rides the review row so it shows on the record.
+  const rebookReason = (b.rebook_reason || "").toString().trim();
+  const rebookSeed = (b.rebook_seed || "").toString().trim();
 
   const rows = await sb(`clients?id=eq.${clientId}&select=id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,booking_provider&limit=1`);
   const client = rows?.[0];
@@ -183,7 +190,7 @@ async function handler(req, res) {
       body: JSON.stringify({
         client_id: clientId, opportunity_id: oppId, ghl_contact_id: contactId,
         offer_id: oppOfferId, trial_booking_id: reviewTrialId || trialBookingTarget?.id || null,
-        good_fit: goodFit, showed_up: showedUp, trainer, notes,
+        good_fit: goodFit, showed_up: showedUp, trainer, notes: notes || (showedUp === false ? (rebookReason || null) : null),
         signup_text_status: sendLink ? "queued" : "skipped",
         created_by: ctx.staff?.name || ctx.user?.email || null,
         updated_at: new Date().toISOString(),
@@ -277,10 +284,16 @@ async function handler(req, res) {
     // opens, so the lead is texted exactly once.
     if (contactId) {
       try {
-        await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([
+        // The persistent context note + optional coach steer come FIRST (loadContactMemory
+        // reads active notes as the team's guidance the draft must honor), and the
+        // "Entry: Rebook" trigger note comes LAST so the rebook pass fires exactly once.
+        const noteRows = [
           { client_id: clientId, ghl_contact_id: String(contactId), active: true, note: "Rebook needed (no-show): they didn't show for their booked trial.", created_by: "post-trial-noshow" },
-          { client_id: clientId, ghl_contact_id: String(contactId), active: true, note: "Entry: Rebook needed - no-show", created_by: "post-trial-noshow" },
-        ]) });
+        ];
+        if (rebookReason) noteRows.push({ client_id: clientId, ghl_contact_id: String(contactId), active: true, note: `Coach's read on the no-show (use it when you write the rebook): ${rebookReason}`, created_by: "post-trial-noshow" });
+        if (rebookSeed) noteRows.push({ client_id: clientId, ghl_contact_id: String(contactId), active: true, note: `The coach drafted a rebook opener to work from - send it or adapt it to fit the conversation: "${rebookSeed}"`, created_by: "post-trial-noshow" });
+        noteRows.push({ client_id: clientId, ghl_contact_id: String(contactId), active: true, note: "Entry: Rebook needed - no-show", created_by: "post-trial-noshow" });
+        await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(noteRows) });
       } catch (e) { console.error("no-show rebook notes failed (non-fatal):", e.message); }
     }
     result.missed_trial = "retired";

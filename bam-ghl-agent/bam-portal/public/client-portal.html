@@ -32360,30 +32360,39 @@ function _plPostTrialForm(oppId) {
           <button type="button" id="ptf-show-no" class="ptf-segbtn" onclick="_ptfSetShow(false)">No show</button>
         </div>
       </div>
-      <div class="ptf-field" id="ptf-fit-field">
+      <div class="ptf-field" id="ptf-noshow-reason-field" style="display:none">
+        <label>Why the no-show? <span style="text-transform:none;letter-spacing:0;color:var(--accent);font-weight:600">trains Hawkeye</span></label>
+        <textarea id="ptf-noshow-reason" class="ptf-input" rows="2" placeholder="e.g. Dad said work ran late - keen but busy weeknights. Hawkeye uses this to write the rebook."></textarea>
+      </div>
+      <div class="ptf-field" id="ptf-noshow-seed-field" style="display:none">
+        <label>First rebook text <span style="text-transform:none;letter-spacing:0;color:var(--text-mute);font-weight:500">optional</span></label>
+        <textarea id="ptf-noshow-seed" class="ptf-input" rows="2" placeholder="Leave blank and Hawkeye drafts it from the chat. Or write the opener and it'll work from your text."></textarea>
+      </div>
+      <div class="ptf-field" id="ptf-fit-field" style="display:none">
         <label>Was the trial a good fit?</label>
         <div class="ptf-seg">
           <button type="button" id="ptf-fit-yes" class="ptf-segbtn" onclick="_ptfSetFit(true)">Good fit</button>
           <button type="button" id="ptf-fit-no" class="ptf-segbtn" onclick="_ptfSetFit(false)">Not a fit</button>
         </div>
       </div>
-      <div class="ptf-field" id="ptf-first-msg-field">
+      <div class="ptf-field" id="ptf-first-msg-field" style="display:none">
         <label>First message to the parent</label>
         <textarea id="ptf-first-msg" class="ptf-input" rows="3" placeholder="e.g. Hey Sarah! Loved having Leah today - awesome energy. Ready to lock in her spot?"></textarea>
       </div>
-      <div class="ptf-field" id="ptf-link-field">
+      <div class="ptf-field" id="ptf-link-field" style="display:none">
         <label>Add the sign-up link at the bottom?</label>
         <div class="ptf-seg">
           <button type="button" id="ptf-link-yes" class="ptf-segbtn on" onclick="_ptfSetSendLink(true)">Yes</button>
           <button type="button" id="ptf-link-no" class="ptf-segbtn" onclick="_ptfSetSendLink(false)">No</button>
         </div>
       </div>
-      <div class="ptf-field">
+      <div class="ptf-field" id="ptf-notes-field" style="display:none">
         <label>Special notes</label>
         <textarea id="ptf-notes" class="ptf-input" rows="3" placeholder="Anything worth noting about this trial…"></textarea>
       </div>
       <div class="ptf-err" id="ptf-err"></div>
-      <div class="ptf-note">On a good fit the card moves to Done Trial and the Closing agent takes over. A no-show goes back to Booking for a rebook. Not a fit closes as unqualified. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
+      <div class="ptf-note" id="ptf-note-showed" style="display:none">On a good fit the card moves to Done Trial and the Closing agent takes over. Not a fit closes as unqualified. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
+      <div class="ptf-note" id="ptf-note-noshow" style="display:none">The lead goes back to Booking. Hawkeye drafts the rebook text using your reason above (and your first-text, if you wrote one) and drops it in your Hawkeye deck for a final ✓ before it sends.</div>
       <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit post trial form</button>
     </div>`;
   ov.classList.add('open');
@@ -32423,22 +32432,29 @@ function _ptfSetShow(v) {
   _PTF_SHOW = v;
   document.getElementById('ptf-show-yes')?.classList.toggle('on', v === true);
   document.getElementById('ptf-show-no')?.classList.toggle('on', v === false);
-  // No-show → "good fit" and "send onboarding link" are irrelevant. Hide them,
-  // clear the fit (so it isn't required or sent), and force the link off (a
-  // no-show should never get the signup text). The backend moves them to Interested.
+  // No-show → the "good fit", first-message-to-parent, sign-up link and generic
+  // notes are all irrelevant. Hide them and swap in the two no-show fields (why +
+  // an optional first rebook text). Clear the fit + force the link off so nothing
+  // stale is sent. The backend bounces the lead back to Booking for the rebook.
   const noShow = (v === false);
-  const fitField = document.getElementById('ptf-fit-field');
-  const linkField = document.getElementById('ptf-link-field');
-  const firstMsgField = document.getElementById('ptf-first-msg-field');
-  if (fitField) fitField.style.display = noShow ? 'none' : '';
-  if (linkField) linkField.style.display = noShow ? 'none' : '';
-  if (firstMsgField) firstMsgField.style.display = noShow ? 'none' : '';
+  const showed = (v === true);
+  const setDisp = (id, show) => { const el = document.getElementById(id); if (el) el.style.display = show ? '' : 'none'; };
+  // Showed-up fields
+  setDisp('ptf-fit-field', showed);
+  setDisp('ptf-link-field', showed && _PTF_FIT === true);
+  setDisp('ptf-first-msg-field', showed && _PTF_FIT === true);
+  setDisp('ptf-notes-field', showed);
+  setDisp('ptf-note-showed', showed);
+  // No-show fields
+  setDisp('ptf-noshow-reason-field', noShow);
+  setDisp('ptf-noshow-seed-field', noShow);
+  setDisp('ptf-note-noshow', noShow);
   if (noShow) {
     _PTF_FIT = null;
     document.getElementById('ptf-fit-yes')?.classList.remove('on');
     document.getElementById('ptf-fit-no')?.classList.remove('on');
     _ptfSetSendLink(false);
-  } else if (v === true) {
+  } else if (showed) {
     _ptfSetSendLink(true);   // restore the default when they switch back to Showed up
   }
   const btn = document.getElementById('ptf-submit'); if (btn) btn.textContent = noShow ? 'Mark no-show' : 'Submit post trial form';
@@ -32447,6 +32463,14 @@ function _ptfSetFit(v) {
   _PTF_FIT = v;
   document.getElementById('ptf-fit-yes')?.classList.toggle('on', v === true);
   document.getElementById('ptf-fit-no')?.classList.toggle('on', v === false);
+  // Good fit → the first message + sign-up link ARE the follow-up you send.
+  // Not a fit → a quiet close (unqualified); nothing is texted, so hide them
+  // (parity with the Hawkeye deck form, which also drops the message on not-a-fit).
+  const goodFit = (v === true);
+  const setDisp = (id, show) => { const el = document.getElementById(id); if (el) el.style.display = show ? '' : 'none'; };
+  setDisp('ptf-first-msg-field', goodFit);
+  setDisp('ptf-link-field', goodFit);
+  const btn = document.getElementById('ptf-submit'); if (btn && _PTF_SHOW === true) btn.textContent = (v === false) ? 'Close as not a fit' : 'Submit post trial form';
 }
 function _ptfSetSendLink(v) {
   _PTF_SENDLINK = v;
@@ -32500,6 +32524,10 @@ async function _ptfSubmit() {
   const trainer = '';   // trainer picker removed from the form (2026-07-01)
   const notes = document.getElementById('ptf-notes')?.value || '';
   const firstMessage = document.getElementById('ptf-first-msg')?.value || '';
+  // No-show extras: the coach's read on the no-show (trains Hawkeye's rebook) and
+  // an optional first rebook text to work from. Only meaningful on a no-show.
+  const rebookReason = (document.getElementById('ptf-noshow-reason')?.value || '').trim();
+  const rebookSeed = (document.getElementById('ptf-noshow-seed')?.value || '').trim();
   const btn = document.getElementById('ptf-submit');
   err.style.display = 'none'; btn.disabled = true; btn.textContent = 'Saving…';
   // Measure the card NOW (pre-move) so the stage move can be animated from its
@@ -32516,10 +32544,16 @@ async function _ptfSubmit() {
     const r = await fetch(`/api/ghl/post-trial?client_id=${encodeURIComponent(CLIENT_ID)}`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, showed_up: _PTF_SHOW, trainer, notes, send_onboarding_link: _PTF_SENDLINK, first_message: firstMessage }),
+      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, showed_up: _PTF_SHOW, trainer, notes, send_onboarding_link: _PTF_SENDLINK, first_message: firstMessage, rebook_reason: rebookReason, rebook_seed: rebookSeed }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    // Teach Hawkeye from the no-show reason (best-effort, booking agent). The
+    // rebook draft already gets it as per-lead context via the backend; this saves
+    // it as a lesson so future rebooks learn too. Never blocks the submit.
+    if (_PTF_SHOW === false && rebookReason) {
+      _apxPost('/api/agent-train', 'teach', { agent: 'booking', lesson: rebookReason, kind: 'lesson', context: { source: 'post-trial-noshow' } }).catch(() => {});
+    }
     // Good fit but the stage move failed server-side: don't pretend it worked.
     if (_PTF_FIT === true && json.move_ok === false) throw new Error('Saved, but the move to Done Trial did not land - retry from the card.');
     if (_PTF_SENDLINK && json.signup_text === 'no_link') { alert('Saved - but no sign-up link is set yet, so nothing was texted. Add it in KPIs → Setup → Offers (or the Blueprint training Sales section).'); }
@@ -33550,13 +33584,19 @@ function _hk2CardHtml(r, pos, total, isTop) {
         <div class="hk2-seg">${seg('fit', true, 'Good fit', p.fit === true)}${seg('fit', false, 'Not a fit', p.fit === false)}</div>
         <div id="hk2-ptf-fitfields" style="display:${p.fit === false ? 'none' : ''}">
           <div class="hk2-lbl">First message to the parent</div>
-          <textarea class="hk2-draft"${isTop ? ' id="hk2-ptf-msg"' : ''} placeholder="Great seeing you tonight - here's how to lock in a spot..."></textarea>
-          <label class="hk2-check"><input type="checkbox"${isTop ? ' id="hk2-ptf-link"' : ''} checked> Add the sign-up link at the bottom</label>
+          <textarea class="hk2-draft"${isTop ? ' id="hk2-ptf-msg"' : ''} placeholder="Great seeing you tonight - here's how to lock in a spot...">${escapeHTML(p.msg || '')}</textarea>
+          <label class="hk2-check"><input type="checkbox"${isTop ? ' id="hk2-ptf-link"' : ''}${p.link !== false ? ' checked' : ''}> Add the sign-up link at the bottom</label>
           <div class="hk2-lbl">Special notes - the Closing agent reads these</div>
-          <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-notes"' : ''} placeholder="Loved the small-group drills, dad asked about Tuesdays..."></textarea>
+          <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-notes"' : ''} placeholder="Loved the small-group drills, dad asked about Tuesdays...">${escapeHTML(p.notes || '')}</textarea>
         </div>
       </div>
-      <div class="hk2-note">One submit routes them: good fit moves to Done Trial, no-show hands Booking the rebook, not a fit closes as unqualified or lost.</div>`;
+      <div id="hk2-ptf-noshow" style="display:${p.showed === false ? '' : 'none'}">
+        <div class="hk2-lbl">Why the no-show? <span style="text-transform:none;letter-spacing:0;color:var(--accent);font-weight:700">trains Hawkeye</span></div>
+        <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-nsreason"' : ''} placeholder="e.g. Dad said work ran late - keen but busy weeknights. Hawkeye writes the rebook from this.">${escapeHTML(p.nsReason || '')}</textarea>
+        <div class="hk2-lbl">First rebook text <span style="text-transform:none;letter-spacing:0;color:var(--text-mute);font-weight:600">optional</span></div>
+        <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-nsseed"' : ''} placeholder="Leave blank and Hawkeye drafts it from the chat. Or write the opener and it'll work from your text.">${escapeHTML(p.nsSeed || '')}</textarea>
+      </div>
+      <div class="hk2-note">One submit routes them: good fit moves to Done Trial, a no-show hands Booking the rebook (it drafts the text here for your final ✓), not a fit closes as unqualified or lost.</div>`;
   } else {
     // A reply that PROPOSES a time still carries the slot as structured data, but
     // we do NOT surface a "verified open slot" box on the reply card (Zoran
@@ -33647,17 +33687,18 @@ function _hk2CardHtml(r, pos, total, isTop) {
 // Post-trial form segmented pickers: state on _HK2.ptf, re-render keeps it.
 function _hk2PtfPick(grp, val) {
   if (!_HK2.ptf) _HK2.ptf = {};
-  // Preserve typed text across the re-render (the textareas are inside the card).
+  // Capture every typed field into state BEFORE the re-render tears the textareas
+  // down (the card HTML re-renders their values from _HK2.ptf), so nothing the
+  // coach wrote is lost when they flip a segmented choice.
   const msg = document.getElementById('hk2-ptf-msg'), notes = document.getElementById('hk2-ptf-notes'), link = document.getElementById('hk2-ptf-link');
+  const nsReason = document.getElementById('hk2-ptf-nsreason'), nsSeed = document.getElementById('hk2-ptf-nsseed');
+  if (msg) _HK2.ptf.msg = msg.value;
+  if (notes) _HK2.ptf.notes = notes.value;
+  if (link) _HK2.ptf.link = link.checked;
+  if (nsReason) _HK2.ptf.nsReason = nsReason.value;
+  if (nsSeed) _HK2.ptf.nsSeed = nsSeed.value;
   _HK2.ptf[grp === 'showed' ? 'showed' : 'fit'] = val;
-  _HK2.ptf.msg = msg ? msg.value : (_HK2.ptf.msg || '');
-  _HK2.ptf.notes = notes ? notes.value : (_HK2.ptf.notes || '');
-  _HK2.ptf.link = link ? link.checked : (_HK2.ptf.link !== false);
   _hk2Render({ keepPtf: true });
-  const m2 = document.getElementById('hk2-ptf-msg'), n2 = document.getElementById('hk2-ptf-notes'), l2 = document.getElementById('hk2-ptf-link');
-  if (m2) m2.value = _HK2.ptf.msg || '';
-  if (n2) n2.value = _HK2.ptf.notes || '';
-  if (l2) l2.checked = _HK2.ptf.link !== false;
 }
 // Not-a-fit terminal closes: stamp the chosen outcome and run the same submit
 // path. 'unqualified' = quiet dead-end; 'lost' = Lead Nurture takes over.
@@ -33738,7 +33779,7 @@ function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
   const _t0 = (_HK2.q[_HK2.agent] || [])[0]; if (_t0) { _t0._writeMode = false; _t0._moveArm = null; }
-  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', outcome: null };
+  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', nsReason: '', nsSeed: '', outcome: null };
   const tabs = _hk2TabsHtml();
   const q = _HK2.q[_HK2.agent];
   const deck = !q.length
@@ -33933,7 +33974,9 @@ function _hk2Confirm() {
     if (p.showed !== true && p.showed !== false) { _apxToast('Pick Showed up or No show first', false); r._hk2Busy = false; return; }
     if (p.showed === true && p.fit !== true && p.fit !== false) { _apxToast('Pick Good fit or Not a fit', false); r._hk2Busy = false; return; }
     const msgEl = document.getElementById('hk2-ptf-msg'), notesEl = document.getElementById('hk2-ptf-notes'), linkEl = document.getElementById('hk2-ptf-link');
+    const nsReasonEl = document.getElementById('hk2-ptf-nsreason'), nsSeedEl = document.getElementById('hk2-ptf-nsseed');
     const notFit = p.showed === true && p.fit === false;
+    const noShow = p.showed === false;
     ptf = {
       opportunity_id: r.opportunity_id,
       showed_up: p.showed,
@@ -33942,6 +33985,11 @@ function _hk2Confirm() {
       notes: notFit ? '' : (notesEl ? notesEl.value : '').trim(),
       first_message: (p.showed === true && !notFit) ? (msgEl ? msgEl.value : '').trim() : '',
       send_onboarding_link: (p.showed === true && !notFit) ? !!(linkEl && linkEl.checked) : false,
+      // No-show: the coach's read on WHY (trains Hawkeye's rebook) + an optional
+      // first rebook text. Both feed the booking agent's draft, which lands back
+      // in this deck for a final ✓ - nothing sends from the form on a no-show.
+      rebook_reason: noShow ? ((nsReasonEl ? nsReasonEl.value : (p.nsReason || '')).trim()) : '',
+      rebook_seed: noShow ? ((nsSeedEl ? nsSeedEl.value : (p.nsSeed || '')).trim()) : '',
       // Not a fit splits into two terminal closes: unqualified (quiet dead-end)
       // or lost (Lead Nurture takes over). Backend ignores it unless not-a-fit.
       outcome: notFit ? (p.outcome === 'lost' ? 'lost' : 'unqualified') : undefined,
@@ -34000,6 +34048,12 @@ function _hk2Confirm() {
       if (notFit && ptf.outcome === 'lost' && j && j.lost_ok === false) throw new Error('Saved, but the Lost close did not land - reopen the card and retry.');
       if (notFit && ptf.outcome !== 'lost' && j && j.unqualified_ok === false) throw new Error("Saved, but the Unqualified close did not land (no post-trial not-a-fit route set up) - use Mark lost, or set up the route.");
       _apxToast(ptf.showed_up === false ? 'No-show logged - Booking drafts the rebook' : ptf.good_fit ? 'Routed to Done Trial - Closing takes over' : ptf.outcome === 'lost' ? 'Marked lost - Nurture takes over' : 'Closed as unqualified', true);
+      // Teach Hawkeye from the no-show reason (best-effort, booking agent). The
+      // rebook draft already gets it as per-lead context from the backend; this
+      // also saves it as a lesson so future rebooks learn. Never blocks the flow.
+      if (ptf.showed_up === false && ptf.rebook_reason) {
+        _apxPost('/api/agent-train', 'teach', { agent: 'booking', lesson: ptf.rebook_reason, kind: 'lesson', context: { source: 'post-trial-noshow' } }).catch(() => {});
+      }
     } else if (k === 'plan') {
       const edits = planEdits;
       const token = await _mreqAuthToken();
