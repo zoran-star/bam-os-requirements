@@ -34,3 +34,10 @@ The timestamp column is **`submitted_at`** (plus `updated_at`, `resolved_at`).
 The first cut ordered/selected by `created_at`, the query threw, the `try/catch`
 swallowed it, and every client silently fell back to grey "Not sent" (fixed in
 #972). Always use `submitted_at` for recency on `marketing_tickets`.
+
+## Budget-review lifecycle rework (2026-07-14, Cam + Ximena)
+Client still decides; the aftermath changed:
+- **No changes -> AUTO-COMPLETES on the spot** (respond handler sets status completed + resolved_at). The old "always leave a ticket to verify" rule buried the Slack digest in zombie tasks - most overdue Marketing lines were zero-change confirms. Two existing zero-change tickets retro-completed same day (D.A. Hoops, Major Hoops).
+- **Changes -> ticket stays in-progress** for marketing to apply + the client's assigned SM gets a Slack DM with the itemized changes ("Apply in Meta, then mark the ticket completed").
+- Budget-status column semantics unaffected: auto-completed no-change reviews read green (correct - budgets ARE confirmed).
+
