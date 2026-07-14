@@ -31,6 +31,19 @@ const WORK_CAP             = 50;       // max jobs processed per worker run
 const MAX_ATTEMPTS         = 3;
 const RETRY_BACKOFF_MS     = 5 * 60 * 1000;
 
+// ── re-arm sweep config (GET ?action=rearm) ──
+// A lead that REPLIED (exited 👻 Ghosted on reply → bounced to Responded), got an
+// agent answer, then went SILENT again has NO active engine watching it: the agent
+// only acts on inbound replies, and Ghosted exited permanently on that one reply.
+// After a few days it's the classic "silently stuck" case the client-portal panel
+// only DISPLAYS. This sweep ACTS on it: re-enroll into Ghosted (+ move the opp back
+// to the Interested/ghosted stage, mirroring the worker's form-intro roll-forward)
+// so the long game picks the lead back up. Env-tunable; sane defaults for v1.
+const REARM_IDLE_DAYS    = Number(process.env.REARM_IDLE_DAYS || 3);      // silent this long → re-arm (matches the panel's 3d)
+const REARM_COOLDOWN_HRS = Number(process.env.REARM_COOLDOWN_HRS || 48);  // don't re-arm within this of the last Ghosted enrollment (anti-loop)
+const REARM_MAX_GHOSTED  = Number(process.env.REARM_MAX_GHOSTED || 3);    // cap total Ghosted enrollments per lead (1 original + 2 re-arms) then leave for staff
+const REARM_CAP          = 200;                                           // max opps scanned per run
+
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...init,
@@ -486,12 +499,135 @@ async function runWork(res) {
   return res.status(200).json({ ok: true, picked: jobs.length, sent, deferred, advanced, completed, failed, canceled, nurture_lost: nurtureLost, ghosted_lost: ghostedLost, form_to_ghosted: formToGhosted, lost_race: lost });
 }
 
+// Newest GHL message timestamp (ms, ANY direction) for a contact — the SAME signal
+// the client-portal panel trusts for "idle". Returns null when it can't be
+// determined (no creds / API error) so the caller fails SAFE and never re-arms a
+// lead it couldn't verify. Any-direction is deliberate: the agent's own outbound
+// sends land here too, so we never re-arm right after we just messaged the lead.
+async function lastGhlMessageMs(token, locationId, contactId) {
+  try {
+    const search = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, contactId: String(contactId) })}`, { token });
+    const convos = (search && (search.conversations || search.data)) || [];
+    let ms = 0;
+    for (const c of convos) { const t = c.lastMessageDate ? new Date(c.lastMessageDate).getTime() : 0; if (t > ms) ms = t; }
+    return ms;
+  } catch (_) { return null; }
+}
+
+// ── the re-arm sweep: put silently-stuck Responded leads back into 👻 Ghosted ──
+// Population = the SAME leads the client-portal "not flowing" panel surfaces
+// (open + Responded + no active engine + idle), computed server-side so we ACT,
+// not just display. Scopes itself safely to portal-native academies: the
+// `opportunities` store only holds portal-provider opps, and the ghosted live-gate
+// (isAutomationLive) is false for V1/GHL-workflow academies, so this never touches
+// V1. Best-effort per lead; a single failure never aborts the sweep.
+async function runRearm(res) {
+  const IDLE_MS     = REARM_IDLE_DAYS * 86400000;
+  const COOLDOWN_MS = REARM_COOLDOWN_HRS * 3600000;
+  const cutoffIso   = new Date(Date.now() - IDLE_MS).toISOString();
+
+  let opps = [];
+  try {
+    // Coarse net: open opps in Responded whose store row last moved before the idle
+    // cutoff. updated_at is only a FLOOR (the pipeline sync rewrites it in bulk, so
+    // it is NOT a reliable "last activity" clock) — the authoritative idle gate is
+    // the live GHL last-message check per candidate below, matching the panel.
+    opps = await sb(`opportunities?status=eq.open&stage_role=eq.responded&updated_at=lte.${cutoffIso}&select=id,client_id,ghl_contact_id,contact_name,updated_at&order=updated_at.asc&limit=${REARM_CAP}`);
+  } catch (e) { return res.status(500).json({ error: `load opps: ${e.message}` }); }
+  opps = Array.isArray(opps) ? opps : [];
+
+  const liveCache   = new Map();   // clientId -> ghosted live?
+  const ghAutoCache = new Map();   // clientId -> ghosted automation id[]
+  const clientCache = new Map();
+  const tokenCache  = new Map();
+  let armed = 0, noLive = 0, hasActive = 0, agentBusy = 0, recentTouch = 0, cooldown = 0, capped = 0, noCreds = 0, errors = 0;
+
+  const creds = async (clientId) => {
+    if (!clientCache.has(clientId)) clientCache.set(clientId, await loadClient(clientId));
+    const client = clientCache.get(clientId);
+    if (!tokenCache.has(clientId)) tokenCache.set(clientId, client ? await pickGhlToken(client) : null);
+    return tokenCache.get(clientId);
+  };
+
+  for (const o of opps) {
+    const cid = o.ghl_contact_id;
+    const clientId = o.client_id;
+    if (!cid || !clientId) continue;
+    const enc = encodeURIComponent(String(cid));
+    try {
+      // 1) Ghosted must be LIVE for this academy (also the V1 firewall).
+      if (!liveCache.has(clientId)) liveCache.set(clientId, await isAutomationLive(clientId, "ghosted"));
+      if (!liveCache.get(clientId)) { noLive++; continue; }
+
+      // 2) Already inside an active automation → it's flowing, leave it.
+      const active = await sb(`automation_enrollments?client_id=eq.${clientId}&contact_id=eq.${enc}&status=eq.active&select=id&limit=1`);
+      if (Array.isArray(active) && active[0]) { hasActive++; continue; }
+
+      // 3) The agent is already on it (a queued/approved reply, or a parked
+      //    reignition) → don't double up on the lead.
+      const rr = await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${enc}&status=in.(pending,approved)&select=id&limit=1`);
+      if (Array.isArray(rr) && rr[0]) { agentBusy++; continue; }
+      const reign = await sb(`agent_reignitions?client_id=eq.${clientId}&ghl_contact_id=eq.${enc}&status=eq.pending&select=id&limit=1`);
+      if (Array.isArray(reign) && reign[0]) { agentBusy++; continue; }
+
+      // 4) AUTHORITATIVE idle gate: newest GHL message (any direction), the same
+      //    source the panel trusts. Fail-safe: if creds/inbox can't be read we skip
+      //    (never re-arm a lead we couldn't verify). Also honor the updated_at floor
+      //    so a lead just MOVED into Responded (no new message yet) isn't re-armed.
+      const c = await creds(clientId);
+      if (!c || !c.token || !c.locationId) { noCreds++; continue; }
+      const msgMs = await lastGhlMessageMs(c.token, c.locationId, cid);
+      if (msgMs === null) { noCreds++; continue; }
+      const lastTouch = Math.max(new Date(o.updated_at).getTime(), msgMs);
+      if (Date.now() - lastTouch < IDLE_MS) { recentTouch++; continue; }
+
+      // 5) Cooldown + cap: don't loop on a lead that keeps re-ghosting. Count this
+      //    lead's prior Ghosted enrollments (any status) — cap total, and honor a
+      //    cooldown since the most recent one.
+      if (!ghAutoCache.has(clientId)) {
+        const ga = await sb(`automations?client_id=eq.${clientId}&automation_key=eq.ghosted&select=id`);
+        ghAutoCache.set(clientId, (Array.isArray(ga) ? ga : []).map(a => a.id));
+      }
+      const ghIds = ghAutoCache.get(clientId);
+      if (ghIds.length) {
+        const prior = await sb(`automation_enrollments?client_id=eq.${clientId}&contact_id=eq.${enc}&automation_id=in.(${ghIds.join(",")})&select=entered_at,exited_at&order=entered_at.desc`);
+        const priorArr = Array.isArray(prior) ? prior : [];
+        if (priorArr.length >= REARM_MAX_GHOSTED) { capped++; continue; }
+        const last = priorArr[0];
+        const ref = last && (last.exited_at || last.entered_at);
+        if (ref && (Date.now() - new Date(ref).getTime()) < COOLDOWN_MS) { cooldown++; continue; }
+      }
+
+      // 6) ARM. Re-enroll into Ghosted and move the opp back to the Interested/ghosted
+      //    stage — the SAME handoff the worker's form-intro roll-forward does, so the
+      //    lead leaves Responded (where the agent + ghost detector scan) and the long
+      //    game owns it. On the next inbound reply the bounce guard returns them to
+      //    Responded and the agent re-engages.
+      const enr = await enrollContact({ clientId, automationKey: "ghosted", contactId: cid });
+      if (!enr || (!enr.ok && !enr.enrollment_id)) { errors++; continue; }
+      try {
+        const is = await interestedStage(c.token, c.locationId, { clientId, sb });
+        const oppRef = await findOpenOppRef(clientId, c.token, c.locationId, cid);
+        if (is && oppRef) await moveStage({ clientId, ghl, token: c.token, oppRef, stage: is, role: "interested", contactId: cid, reason: "re-arm: Responded lead went silent, rolled back into ghosted" });
+      } catch (_) { /* enrollment stands even if the stage move blips */ }
+      await logEvent({ clientId, contactId: cid, automationId: null, type: "rearm_ghosted", payload: { from: "responded", idle_days: REARM_IDLE_DAYS } });
+      armed++;
+    } catch (_) { errors++; }
+  }
+  return res.status(200).json({ ok: true, scanned: opps.length, armed, skipped: { no_live: noLive, has_active: hasActive, agent_busy: agentBusy, recent_touch: recentTouch, cooldown, capped, no_creds: noCreds }, errors });
+}
+
 // ── staff CRUD (backs the P4b step-builder) ──
 async function handler(req, res) {
   if (req.method === "GET" && req.query.action === "work") {
     const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!process.env.CRON_SECRET || got !== process.env.CRON_SECRET) return res.status(401).json({ error: "unauthorized" });
     return await runWork(res);
+  }
+  if (req.method === "GET" && req.query.action === "rearm") {
+    const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    if (!process.env.CRON_SECRET || got !== process.env.CRON_SECRET) return res.status(401).json({ error: "unauthorized" });
+    return await runRearm(res);
   }
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 

@@ -77,6 +77,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/automations?action=rearm",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/runtime/credits/cron-sweep",
       "schedule": "0 9 * * *"
     },
