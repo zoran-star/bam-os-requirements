@@ -15802,6 +15802,12 @@ async function _contactsOpenDrawer(idx) {
   const body = document.getElementById('contacts-drawer-body');
   if (body) body.innerHTML = _cdBody();
   _renderTagEditor('cd-tags', c.ghl_contact_id, (_CDRAWER.ghl && _CDRAWER.ghl.tags) || c.tags || []);
+  // Upgrade the Call bar to native Twilio when voice is on (same self-gating
+  // slot pattern as the inbox / pipeline / member drawers).
+  {
+    const _cdg = _CDRAWER.ghl || {};
+    _callSlotUpgrade('cd-call-slot', 'bar', _cdg.phone || c.phone || '', _cdg.name || c.name || '', _cdg.id || c.ghl_contact_id || '');
+  }
   // Shared context the Lead + Journey sections render from. Seeded synchronously
   // from the pipeline opp (if loaded this session); the async loaders below fill
   // the gaps and re-render, so whichever resolves first still paints correctly.
@@ -16022,9 +16028,12 @@ function _cdBody() {
     + (g._error ? `<div style="margin-top:6px;font-size:11px;color:var(--text-mute)">Full GHL detail unavailable (${escapeHTML(g._error)})</div>` : '');
 
   const ghlUrl = _ghlContactUrl(_CDRAWER.ghlLoc, (_CDRAWER.contact && _CDRAWER.contact.ghl_contact_id) || g.id);
+  // Slot + upgrade: renders the GHL fallback synchronously, then the caller
+  // swaps in a native Twilio Call bar when voice is on (same pattern as the
+  // inbox / pipeline / member drawers - this card was the one holdout).
   const callBtn = ghlUrl
-    ? `<a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:10px;color:var(--gold);padding:11px;font:inherit;font-size:13px;font-weight:700;text-decoration:none">Call in GHL</a>`
-    : '';
+    ? `<span id="cd-call-slot"><a href="${escapeHTML(ghlUrl)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:10px;color:var(--gold);padding:11px;font:inherit;font-size:13px;font-weight:700;text-decoration:none">Call in GHL</a></span>`
+    : `<span id="cd-call-slot"></span>`;
   return `${header}${memberBlock}${contactSect}
     ${fieldBlock('Athlete + core fields', core)}
     ${fieldBlock('Extra fields', extra)}
@@ -37248,6 +37257,8 @@ async function _callSlotUpgrade(slotId, variant, phone, name, ghlContactId) {
   const title = `Rings your phone first, then connects you to ${escapeHTML(name || 'this contact')}`;
   slot.innerHTML = variant === 'icon'
     ? `<button onclick="_ctcCall(${args})" title="${title}" aria-label="Call" style="background:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--green,#4CC76A);border-radius:8px;color:var(--green,#4CC76A);font-size:17px;cursor:pointer"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></button>`
+    : variant === 'bar'
+    ? `<button onclick="_ctcCall(${args})" title="${title}" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:14px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:10px;color:var(--gold);padding:11px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Call</button>`
     : `<button onclick="_ctcCall(${args})" title="${title}" style="display:inline-flex;align-items:center;gap:6px;background:rgba(212,182,92,0.12);border:1px solid var(--gold);border-radius:8px;color:var(--gold);padding:6px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">Call</button>`;
 }
 

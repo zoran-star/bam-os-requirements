@@ -246,3 +246,15 @@ San Jose/NY, Miami LAST white-glove auto_cutover=false), 7 no-phone clients
 = new numbers, 2 AU + 1 UK parked, BTG/BAMeans DC/Performance Space inactive.
 Rules: A2P starts the minute a port is requested; never cancel GHL mid-port.
 Full running state: Zoran's personal note `bam-twilio-voice`.
+
+## Manual Texting & calling switch (2026-07-13)
+`api/twilio/provider-switch.js` (staff-only JWT) + a "Texting & calling" card at
+the top of PhoneTab (all phases): ONE switch flips both channels. To Twilio =
+manual cutover (requires from_number + port landed + A2P verified when required;
+sets messaging_provider='twilio', config.status='active', voice_enabled=true).
+To GHL = escape hatch (messaging_provider='ghl', voice_enabled=false; config row
+otherwise kept so flipping forward is instant). Every SMS send site already
+routes via maybeSendSmsViaProvider so the flip reroutes texting instantly; call
+buttons self-gate on voice_enabled via _voicePrime/_callSlotUpgrade. The contact
+drawer's Call bar (the one holdout hardcoded to "Call in GHL") now uses the same
+slot-upgrade pattern (cd-call-slot, new 'bar' variant).
