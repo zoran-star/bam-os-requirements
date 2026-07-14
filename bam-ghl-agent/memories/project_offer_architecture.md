@@ -50,7 +50,11 @@ The Sales and Onboarding sections each render a `custom_field_defs`-backed panel
 
 **5A-1 shipped:** the optional questions render as **editable cards** (`_bbCqCardHtml`) instead of read-only chips. `_bbCqOpenEditor(offerId, sectionId, clientId, fieldId)` handles both add (fieldId '') and **edit** (real id → PATCH); `_bbCqSaveEditor` POSTs/PATCHes. New per-field **note** (`custom_field_defs.help_text` column, added additively via `execute_sql` + migration `20260714120000_custom_field_defs_help_text.sql`) + a **Required** toggle, both wired through `api/custom-fields.js` create + PATCH. Field types unchanged (`_BB_CQ_TYPES`: text/number/date/select/multiselect/boolean/phone/email/url).
 
-**Still to build (5A-2/5A-3, 5C):** drag-drop reorder (position column exists, no UI/bulk-reorder API yet), live form preview, live-renderer support for multiselect/number/url in `api/website/offer.js` (they collapse to text today), and the member-import AI-suggested-fields checklist modal.
+**5A-2 shipped:** drag-drop reorder of the cards (grip handle, `_bbCqDragStart/Over/Drop/End` mutate the section cache + `_bbCqPersistOrder`) backed by `POST /api/custom-fields ?action=reorder` (stamps `position=index`).
+
+**5A-3 shipped:** a **live form preview** ("Preview form" button per section) via new `api/offers/form-preview.js` (Supabase-JWT auth) which reuses the live funnel's `buildFields()` (now `export`ed from `api/website/offer.js`) so the preview never drifts from what a lead/member sees. `offer.js`'s `cfDefToField` + defs select now pass `help_text` through. Client: `_bbCqPreviewForm` + `_bbCqRenderPreviewField`, rendered in the shared `_bbShowDocModal`.
+
+**Still to build (5B, 5C):** the actual live website form (bam-client-sites funnel) still renders `multiselect`/`number`/`url` as plain text (`cfDefType` collapses them) and doesn't yet show `help_text` - the portal preview does; forms↔offer enforcement + contact-form-academy-wide rule (5B); and the member-import AI-suggested-fields checklist modal (5C).
 
 ## Team is special
 
