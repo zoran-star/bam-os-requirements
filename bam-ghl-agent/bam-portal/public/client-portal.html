@@ -30047,8 +30047,12 @@ function _aiOnbHTML(it) {
       </div>`;
     }
   }
-  // Every step is check/uncheck-able by hand. Auto steps also self-complete
-  // from the connection signal until someone overrides them by hand.
+  // auto_only steps (Connect Stripe / Connect GHL) can NOT be ticked by hand. They
+  // tick themselves only when the account is genuinely connected. Ticking them by
+  // hand used to be allowed, which let a client mark "Connect Stripe" done without
+  // ever connecting - the portal then showed them as payment-ready when they could
+  // not charge a card. The circle is read-only for these; use the Connect CTA.
+  const autoOnly = !!it.auto_only;
   const status = isDone
     ? `<span class="ai-chip" style="color:var(--green)">✓ Done</span>`
     : (cfg.auto ? `<span class="ai-chip">Auto · not yet</span>` : `<span class="ai-chip">To do</span>`);
@@ -30058,7 +30062,9 @@ function _aiOnbHTML(it) {
   if (it.onboarding_key === 'book_call_cam' && !isDone) cta = _aiCamCallCta();
   if (it.onboarding_key === 'book_review_call' && !isDone) cta = _aiBookCallCta();
   // Subway "stop": a circle node on a vertical line + the step body to the right.
-  const circle = `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}" title="${cfg.auto ? 'Auto-completes when connected - or tick by hand' : ''}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
+  const circle = autoOnly
+    ? `<span class="ai-stop-circle${isDone ? ' on' : ''}" style="cursor:default" aria-disabled="true" title="${isDone ? 'Connected' : 'Ticks itself once your account is actually connected'}">${isDone ? _AI_CHECK_ICON : ''}</span>`
+    : `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
   return `<div class="ai-stop${isDone ? ' done' : ''}">
     <div class="ai-stop-rail">${circle}<div class="ai-stop-line"></div></div>
     <div class="ai-stop-body">
