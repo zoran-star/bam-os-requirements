@@ -85,6 +85,25 @@ function verifyState(state) {
   return payload;
 }
 
+// Can this connected account actually take a live payment right now?
+// charges_enabled is Stripe's own answer to "will a charge on this account
+// succeed". details_submitted alone is not enough (an account can submit and
+// still be blocked), so we gate the onboarding tick on charges_enabled.
+// On any error we return false: better to leave the step open than to tick it
+// for an academy that cannot get paid.
+async function canCharge(acctId, platformSecret) {
+  try {
+    const r = await fetch(`https://api.stripe.com/v1/accounts/${encodeURIComponent(acctId)}`, {
+      headers: { Authorization: `Bearer ${platformSecret}` },
+    });
+    const a = await r.json();
+    if (!r.ok) return false;
+    return a.charges_enabled === true;
+  } catch (_) {
+    return false;
+  }
+}
+
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...init,
@@ -238,6 +257,8 @@ async function handleCallback(req, res) {
   if (!stripeSecret) return redirectBack(res, "error", "STRIPE_CONNECT_SECRET_KEY (or STRIPE_SECRET_KEY) not configured");
 
   // Exchange code for the connected-account id (`stripe_user_id` = acct_...).
+  // (canCharge is defined below - it asks Stripe whether this account can really
+  // take a live payment before we call the connection "done".)
   // For Standard accounts we don't store the returned `access_token` — we use
   // the platform key + `Stripe-Account: acct_...` header for all later writes.
   let tok;
@@ -261,15 +282,23 @@ async function handleCallback(req, res) {
 
   const acctId = tok.stripe_user_id;
 
-  // Persist the connection on the academy's clients row.
+  // Finishing the OAuth handshake is NOT the same as being able to take money.
+  // An academy can authorise us while their Stripe account still has outstanding
+  // requirements, in which case charges are disabled and a live checkout would
+  // fail. `stripe_connect_connected_at` is what ticks the "Connect your Stripe
+  // account" onboarding step, so we only stamp it once Stripe says the account
+  // can actually charge. Otherwise we store the account and leave them on
+  // "onboarding" - the step stays open until they finish in Stripe.
+  const chargeable = await canCharge(acctId, stripeSecret);
+
   try {
     await sb(`clients?id=eq.${encodeURIComponent(payload.client_id)}`, {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({
         stripe_connect_account_id: acctId,
-        stripe_connect_status: "connected",
-        stripe_connect_connected_at: nowIso(),
+        stripe_connect_status: chargeable ? "connected" : "onboarding",
+        stripe_connect_connected_at: chargeable ? nowIso() : null,
         updated_at: nowIso(),
       }),
     });
@@ -277,6 +306,9 @@ async function handleCallback(req, res) {
     return redirectBack(res, "error", `db write: ${e.message}`);
   }
 
+  if (!chargeable) {
+    return redirectBack(res, "error", "Stripe connected, but it cannot accept payments yet. Finish the remaining steps in Stripe, then reconnect.");
+  }
   return redirectBack(res, "connected");
 }
 
