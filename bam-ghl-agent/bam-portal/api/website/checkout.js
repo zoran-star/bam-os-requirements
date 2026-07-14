@@ -42,12 +42,12 @@ const ORIGINS_TTL_MS = 60_000;
 function nowIso() { return new Date().toISOString(); }
 function norm(s) { return (s || "").toString().trim().toLowerCase(); }
 
-// Membership start date the parent optionally chose at enrollment. When eligible (no
-// coupon) it ANCHORS billing: the first period is charged today and recurring begins
-// after this date - monthly plans at +1 interval; commitment plans charge the committed
-// amount today then revert to monthly at start+commitment. With a coupon it stays a
-// display/access label only (they pay + go live now). Accept a YYYY-MM-DD within
-// [tomorrow, ~6 months]; today / past / invalid / out-of-range all return null.
+// Membership start date the parent optionally chose at enrollment. When present it
+// ANCHORS billing: the first period is charged today and recurring begins after this
+// date - monthly plans at +1 interval; commitment plans charge the committed amount
+// today then revert to monthly at start+commitment. Coupons compose (the discount
+// carries to both today's charge and the recurring invoices). Accept a YYYY-MM-DD
+// within [tomorrow, ~6 months]; today / past / invalid / out-of-range return null.
 function clampStartDate(raw) {
   const s = String(raw || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -383,10 +383,12 @@ async function handler(req, res) {
     //     commitment length. Same access tier (the revert price is routable), and it
     //     sidesteps the webhook's from_subscription schedule (we do NOT stamp
     //     commitment_reverts when anchored) - so no trial-vs-schedule conflict.
-    //   • !promo - a coupon + future start falls back to charge-now (label only): a
-    //     sub-level discount vs a one-time invoice item is unverified. Never mischarge.
+    //   • Coupon: a sub-level discount applies to BOTH the one-time line today and the
+    //     recurring invoices (verified with Test Clocks - percent + amount off), so a
+    //     coupon + future start anchors normally; the discount just carries through. It
+    //     can only reduce the charge, never mischarge.
     let recurringStart = null, renewsIso = null, firstPeriod = null, baseItemPrice = priceIdToUse;
-    if (startDate && !promo) {
+    if (startDate) {
       const iv = intervalFor(term); // commitment term → {month, 3|6}; else 4 weeks
       const anchorSec = Math.floor(addInterval(new Date(`${startDate}T12:00:00Z`), iv).getTime() / 1000);
       const floor = Math.floor(Date.now() / 1000) + 60;
