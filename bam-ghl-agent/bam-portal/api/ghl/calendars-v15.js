@@ -177,10 +177,13 @@ async function portalContactShape(clientId, ghlContactId) {
     const rows = await sb(`contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(ghlContactId)}&select=ghl_contact_id,first_name,last_name,name,email,phone,tags,dnd,source,date_added,custom_fields&limit=1`);
     const c = rows?.[0];
     if (!c) return { id: ghlContactId };
-    let cfNames = {};
+    let cfNames = {}, cfGroup = {};
     try {
-      const defs = await sb(`custom_field_defs?client_id=eq.${clientId}&select=ghl_field_id,label`);
-      for (const d of (defs || [])) if (d.ghl_field_id) cfNames[d.ghl_field_id] = d.label || null;
+      // offer_id NULL = academy-level def (core: collected on every offer);
+      // offer_id set = per-offer authored question (extra). Tagged so the
+      // contact card can group fields core vs extra.
+      const defs = await sb(`custom_field_defs?client_id=eq.${clientId}&select=ghl_field_id,label,offer_id`);
+      for (const d of (defs || [])) if (d.ghl_field_id) { cfNames[d.ghl_field_id] = d.label || null; cfGroup[d.ghl_field_id] = d.offer_id ? "extra" : "core"; }
     } catch (_) {}
     const cf = c.custom_fields && typeof c.custom_fields === "object" ? c.custom_fields : {};
     return {
@@ -191,7 +194,7 @@ async function portalContactShape(clientId, ghlContactId) {
       tags: c.tags || [], dnd: !!c.dnd,
       source: c.source || null, type: null,
       dateAdded: c.date_added || null,
-      customFields: Object.entries(cf).map(([id, value]) => ({ id, name: cfNames[id] || null, value })),
+      customFields: Object.entries(cf).map(([id, value]) => ({ id, name: cfNames[id] || null, value, group: cfGroup[id] || null })),
     };
   } catch (_) { return { id: ghlContactId }; }
 }
@@ -634,6 +637,13 @@ async function handler(req, res) {
           const fr = await ghl(token, "GET", `/locations/${encodeURIComponent(locationId)}/customFields`);
           for (const d of (fr.customFields || [])) cfNames[d.id] = d.name || d.fieldKey || null;
         } catch (_) {}
+        // core = academy-level def (offer_id null); extra = offer-scoped def.
+        // Keyed by GHL field id so the contact card can group core vs extra.
+        let cfGroup = {};
+        try {
+          const defs = await sb(`custom_field_defs?client_id=eq.${clientId}&select=ghl_field_id,offer_id`);
+          for (const d of (Array.isArray(defs) ? defs : [])) if (d.ghl_field_id) cfGroup[d.ghl_field_id] = d.offer_id ? "extra" : "core";
+        } catch (_) {}
         const cr = await ghl(token, "GET", `/contacts/${encodeURIComponent(cid)}`);
         const c = cr.contact || cr;
         return res.status(200).json({
@@ -644,7 +654,7 @@ async function handler(req, res) {
             tags: c.tags || [], dnd: !!c.dnd,
             source: c.source || null, type: c.type || null,
             dateAdded: c.dateAdded || null,
-            customFields: (c.customFields || c.customField || []).map(f => ({ id: f.id, name: cfNames[f.id] || null, value: f.value != null ? f.value : f.field_value })),
+            customFields: (c.customFields || c.customField || []).map(f => ({ id: f.id, name: cfNames[f.id] || null, value: f.value != null ? f.value : f.field_value, group: cfGroup[f.id] || null })),
           },
           location_id: locationId,   // for the "Open in GHL" deep link
         });
