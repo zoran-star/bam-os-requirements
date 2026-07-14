@@ -27504,7 +27504,10 @@ function _bbRenderCustomQuestions(offer, sectionId) {
   return `<div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">
       <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase">${heading}</div>
-      <button type="button" onclick="_bbCqPreviewForm('${offer.id}','${sectionId}')" style="flex-shrink:0;font-size:11.5px;padding:5px 12px;background:transparent;border:1px solid var(--gold);border-radius:6px;color:var(--gold);cursor:pointer;font-weight:600">Preview form</button>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button type="button" onclick="_bbCqSeedStandard('${offer.id}','${sectionId}')" style="font-size:11.5px;padding:5px 12px;background:transparent;border:1px solid var(--border-med);border-radius:6px;color:var(--text-sub);cursor:pointer;font-weight:600" title="Add the common athlete fields (idempotent)">Standard fields</button>
+        <button type="button" onclick="_bbCqPreviewForm('${offer.id}','${sectionId}')" style="font-size:11.5px;padding:5px 12px;background:transparent;border:1px solid var(--gold);border-radius:6px;color:var(--gold);cursor:pointer;font-weight:600">Preview form</button>
+      </div>
     </div>
     <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px">${sub}</div>
     <div class="bb-defaults-info"><b style="color:var(--accent)">Always asked:</b></div>
@@ -27599,6 +27602,24 @@ function _bbCqRenderPreviewField(f) {
       <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:5px">${escapeHTML(f.label)}${req}</label>
       ${ctl}${note}
     </div>`;
+}
+
+// One-click canonical athlete fields (idempotent). Seeds both sales + onboarding
+// scopes, so a new academy's forms aren't empty. Drops both caches to re-render.
+async function _bbCqSeedStandard(offerId, sectionId) {
+  if (typeof CLIENT_ID === 'undefined') return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/custom-fields', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'seed-standard', client_id: CLIENT_ID, offer_id: offerId }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    delete _bbCqCache[offerId + ':sales'];
+    delete _bbCqCache[offerId + ':onboarding'];
+    _bbRenderWizardBody();
+    if (!j.created) alert('Your standard athlete fields are already in place.');
+  } catch (e) {
+    alert('Could not add standard fields: ' + (e.message || String(e)));
+  }
 }
 
 async function _bbCqPreviewForm(offerId, sectionId) {
