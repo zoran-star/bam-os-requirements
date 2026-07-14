@@ -54,8 +54,8 @@ Agreed guardrail design (research-backed, July 2026 Meta rules):
   automation. The 20% tier itself means a 10x typo can never auto-apply.
 - **Accuracy**: read-after-write verify (GET campaign back, compare), before/after
   audit trail on the ticket, idempotency key per change, feature-flag kill switch.
-- **Rollout**: shadow mode first month (log would-do, Ximena applies manually,
-  compare) before real writes.
+- **Rollout**: Cam chose IMMEDIATE live rollout (no shadow mode, 2026-07-14).
+  Read-after-write verify + per-change SM DM stand in as the safety net.
 - Still needed from Ximena: monthly -> daily conversion rule + per-client CPA
   floor (daily budget < target CPA x 7 can't exit learning - flag, don't apply).
 
