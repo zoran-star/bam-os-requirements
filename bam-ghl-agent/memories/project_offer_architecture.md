@@ -30,6 +30,20 @@ Five of the six types share the same 6 sections, walked through as a multi-step 
 
 Each section is a list of fields in `_bbOfferConfigs[<type>]` keyed by section id.
 
+### Policy section (training only, added 2026-07-13)
+
+Training has a **7th section, Policy**, inserted after Pricing. It captures hard, typed rules (all optional, none required): `cancellation` + `cancel_notice_amount`/`cancel_notice_unit`, `pause_allowed` + `pause_min_days`/`pause_max_days`/`pause_per_year`, `refund_policy` + `refund_window_days`, `makeup_policy`. Saves to `offer.data.policy`. Same-section deps only (pause/refund/cancel sub-fields hang off their own toggle).
+
+The Policy tab is added **additively** in `_bbWizardSections`: it appears only for offer types whose `_bbOfferConfigs[type]` array contains a `policy` section (training does; others don't), so other types are untouched. `_bbSectionLabels` has `policy:'Policy'`.
+
+**Consumers:** the enrollment agreement (`api/_lib/agreement-pdf.js` `buildClauses()`) generates clause 6 (billing/cancellation) from `offer.data.policy`; `api/website/checkout.js` passes those clauses to `renderAgreementPdf` when policy is set, else falls back to legacy `sampleClauses`.
+
+**Policy actions endpoint `api/offers/policy.js`** (added 2026-07-13), called from the Policy tab's `policy_actions` custom field (`_bbPreviewAgreement` / `_bbPushPolicyToAgent` in client-portal.html):
+- `GET ?action=preview` → returns the generated `buildClauses()` array so the owner can preview the exact agreement (unbranded modal) without a test enrollment.
+- `POST ?action=push-agent` → `policyToAgentText(policy)` → upserts the academy's `agent_prompt_sections` override for `section_key='policies'` (offer_id tagged). User-triggered, so the live booking agent never changes silently. Auth = Supabase JWT (staff or `client_users` member); writes run service-role.
+
+Still-open: `pause_allowed` is not yet read by the member-drawer Pause action (member-management enforcement is unbuilt).
+
 ## Team is special
 
 The Team type has only **2 top-level sections** (General + Per team), because Team is an umbrella for *multiple* specific teams under one program brand.
