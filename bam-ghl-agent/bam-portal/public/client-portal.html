@@ -41719,8 +41719,17 @@ function openStripeConnectModal() {
       ` : ''}`;
     primaryBtn = `<button onclick="connectStripe()" style="background:transparent;color:var(--text);border:1px solid var(--border);padding:8px 16px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Reconnect / switch account</button>`;
   } else if (status === 'onboarding') {
-    bodyHtml = `<div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Stripe connection didn't finish - start the OAuth flow again to complete it.</div>`;
-    primaryBtn = `<button onclick="connectStripe()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Continue setup</button>`;
+    // Two ways to land here: the OAuth never finished (no account_id), or it DID
+    // finish but Stripe still has outstanding requirements so the account cannot
+    // charge yet. Those need different instructions - sending someone back through
+    // OAuth when the real blocker is inside Stripe just loops them.
+    bodyHtml = stripe.account_id
+      ? `<div style="font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5">Your Stripe account is linked, but Stripe says it <b>cannot accept payments yet</b> - there are still steps to finish inside Stripe (business details, bank account, or ID verification).</div>
+         <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px;line-height:1.5">Finish those in your Stripe dashboard. This step ticks itself as soon as Stripe says you can take payments - you do not need to reconnect.</div>`
+      : `<div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Stripe connection didn't finish - start the connect flow again to complete it.</div>`;
+    primaryBtn = stripe.account_id
+      ? `<a href="https://dashboard.stripe.com/" target="_blank" rel="noopener" style="display:inline-block;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;text-decoration:none">Finish in Stripe</a>`
+      : `<button onclick="connectStripe()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Continue setup</button>`;
   } else if (status === 'disabled') {
     bodyHtml = `<div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Stripe access was revoked. Reconnect to resume billing actions.</div>`;
     primaryBtn = `<button onclick="connectStripe()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Reconnect Stripe</button>`;
