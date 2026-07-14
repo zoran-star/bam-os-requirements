@@ -27393,7 +27393,10 @@ function _bbRenderCustomQuestions(offer, sectionId) {
   const sub = sectionId === 'sales' ? "What this offer's lead form asks." : 'What a member fills in when they join this offer.';
 
   return `<div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
-    <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:4px">${heading}</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase">${heading}</div>
+      <button type="button" onclick="_bbCqPreviewForm('${offer.id}','${sectionId}')" style="flex-shrink:0;font-size:11.5px;padding:5px 12px;background:transparent;border:1px solid var(--gold);border-radius:6px;color:var(--gold);cursor:pointer;font-weight:600">Preview form</button>
+    </div>
     <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px">${sub}</div>
     <div class="bb-defaults-info"><b style="color:var(--accent)">Always asked:</b></div>
     <div class="bb-choice-row" style="margin-bottom:14px">${alwaysChips}</div>
@@ -27463,6 +27466,52 @@ async function _bbCqPersistOrder(orderedIds) {
       body: JSON.stringify({ action: 'reorder', ordered_ids: orderedIds }),
     });
   } catch (e) { /* the re-render already shows the new order; a reload re-reads server order */ }
+}
+
+// Live form preview: render one field exactly as the lead / member sees it
+// (read-only), including its note. Types come from /api/offers/form-preview,
+// which reuses the live funnel's buildFields().
+function _bbCqRenderPreviewField(f) {
+  const req = f.required ? ' <span style="color:var(--gold)">*</span>' : '';
+  const note = f.help_text ? `<div style="font-size:11px;color:var(--text-mute);margin-top:3px">${escapeHTML(f.help_text)}</div>` : '';
+  const ph = f.placeholder ? escapeHTML(f.placeholder) : '';
+  const inpStyle = 'width:100%;padding:9px 11px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text-mute);font-size:13px;box-sizing:border-box;pointer-events:none';
+  let ctl;
+  if (f.type === 'textarea') {
+    ctl = `<textarea disabled rows="2" placeholder="${ph}" style="${inpStyle};resize:none"></textarea>`;
+  } else if (f.type === 'select') {
+    const opts = (Array.isArray(f.options) ? f.options : []).map(o => `<option>${escapeHTML(o)}</option>`).join('');
+    ctl = `<select disabled style="${inpStyle}"><option>Select…</option>${opts}</select>`;
+  } else {
+    const t = (f.type === 'email' || f.type === 'tel' || f.type === 'date') ? f.type : 'text';
+    ctl = `<input disabled type="${t}" placeholder="${ph}" style="${inpStyle}">`;
+  }
+  return `<div style="margin-bottom:14px">
+      <label style="display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:5px">${escapeHTML(f.label)}${req}</label>
+      ${ctl}${note}
+    </div>`;
+}
+
+async function _bbCqPreviewForm(offerId, sectionId) {
+  if (typeof CLIENT_ID === 'undefined') return;
+  const title = sectionId === 'sales' ? 'Free trial form preview' : 'Onboarding form preview';
+  _bbShowDocModal(title, `<div style="padding:16px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Building the form…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/offers/form-preview?client_id=${encodeURIComponent(CLIENT_ID)}&offer_id=${encodeURIComponent(offerId)}&section=${encodeURIComponent(sectionId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed to build the preview');
+    const fields = Array.isArray(j.fields) ? j.fields : [];
+    const cta = sectionId === 'sales' ? 'Book my free trial' : 'Complete signup';
+    const form = fields.length
+      ? `<div style="max-width:420px;margin:0 auto">${fields.map(_bbCqRenderPreviewField).join('')}
+          <button disabled style="width:100%;padding:11px;background:var(--gold);border:0;border-radius:8px;color:#1a1a1a;font-size:14px;font-weight:700;opacity:0.9;cursor:default;margin-top:4px">${cta}</button>
+        </div>`
+      : `<div style="color:var(--text-mute);font-size:13px">No fields on this form yet.</div>`;
+    _bbShowDocModal(title, `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:14px">Exactly what a ${sectionId === 'sales' ? 'lead' : 'new member'} sees. Preview only.</div>${form}`);
+  } catch (e) {
+    _bbShowDocModal(title, `<div style="padding:14px;color:#c0392b;font-size:13px">Could not build the preview: ${escapeHTML(e.message || String(e))}</div>`);
+  }
 }
 
 async function _bbLoadCoreFields(clientId) {

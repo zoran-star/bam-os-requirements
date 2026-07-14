@@ -107,6 +107,7 @@ function cfDefToField(def) {
     key: def.key || fieldKey(label),
     label,
     required: def.required === true,
+    ...(def && def.help_text ? { help_text: String(def.help_text) } : {}),
     ...cfDefType(def),
   };
 }
@@ -117,7 +118,7 @@ function cfDefToField(def) {
 //   2. the legacy offer.data JSON add-ons (kept for backward compat)
 //   3. the academy-core + offer custom_field_defs the wizard now writes
 // De-duped by label; contact basics stay required.
-function buildFields(offer, customDefs, section) {
+export function buildFields(offer, customDefs, section) {
   const onb = (offer.data && offer.data.onboarding) || {};
   const legacySelected = section === "onboarding" && Array.isArray(onb.intake_form_fields) ? onb.intake_form_fields : [];
   const legacyCustom = section === "onboarding" && Array.isArray(onb.intake_form_fields_custom) ? onb.intake_form_fields_custom : [];
@@ -279,7 +280,7 @@ async function handler(req, res) {
       } catch { /* join table not migrated yet - offer_id match still works */ }
       const defs = (await sbReq(
         `custom_field_defs?client_id=eq.${encodeURIComponent(client_id)}&archived=eq.false` +
-        `&select=id,key,label,type,options,required,section,offer_id&order=position.asc`
+        `&select=id,key,label,type,options,required,section,offer_id,help_text&order=position.asc`
       )) || [];
       for (const d of defs) {
         const appliesToOffer = d.offer_id === offer.id || linkedIds.has(d.id);
