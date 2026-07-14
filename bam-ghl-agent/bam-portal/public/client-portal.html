@@ -25730,6 +25730,7 @@ const _bbOfferConfigs = {
         hint:'Plays on the website confirmation page right after a trial is booked. MP4, under 50 MB.' },
       { key:'__entry_points__', type:'entry_points', label:'Entry points',
         hint:'Where leads come from - your website forms, GHL forms, calendars and funnels. Click one to connect it to a pipeline + stage.' },
+      { key:'__agent_sync__', type:'agent_sync', label:'Booking agent' },
       _bbCommonExtraNotes
     ]},
     { id:'onboarding', label:'Onboarding', fields:[
@@ -26378,6 +26379,17 @@ function _bbRenderField(field, sectionId) {
         body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No entry points yet. They appear here as your website forms, GHL forms, calendars and funnels are detected.</div>`;
       } else {
         body = `<div class="ep-grid">${_EP_DATA.map(ep => _epCardHtml(ep, `_epOpenWizard('${_bbEscapeAttr(ep.id)}')`)).join('')}</div>`;
+      }
+      break;
+    }
+    case 'agent_sync': {
+      // Fill the booking agent's FACT sections from this offer (preview-first).
+      const _asOid = _bbState.offer && _bbState.offer.id;
+      if (!_asOid) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then sync the booking agent.</div>`;
+      } else {
+        body = `<button type="button" class="btn-secondary-bb" onclick="_bbAgentSyncPreview()">Sync booking agent from this offer</button>
+          <div class="bb-field-hint" style="margin-top:8px">Fills the booking agent's facts (business info, program, schedule, pricing, selling points, policies) from this offer so it speaks your real details. You review before it applies.</div>`;
       }
       break;
     }
@@ -27583,6 +27595,46 @@ async function _bbCqPreviewForm(offerId, sectionId) {
     _bbShowDocModal(title, `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:14px">Exactly what a ${sectionId === 'sales' ? 'lead' : 'new member'} sees. Preview only.</div>${form}`);
   } catch (e) {
     _bbShowDocModal(title, `<div style="padding:14px;color:#c0392b;font-size:13px">Could not build the preview: ${escapeHTML(e.message || String(e))}</div>`);
+  }
+}
+
+// Sync the booking agent's FACT sections from this offer (Gap #2, phase 2A).
+// Preview-first: generate → owner ticks which sections → apply as per-academy
+// agent_prompt_sections overrides (reversible in Agent learnings).
+async function _bbAgentSyncPreview() {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  _bbShowDocModal('Sync booking agent', `<div style="padding:16px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Building the agent facts from this offer…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/offers/sync-agent?action=preview&client_id=${encodeURIComponent(CLIENT_ID)}&offer_id=${encodeURIComponent(offer.id)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    const sections = Array.isArray(j.sections) ? j.sections : [];
+    if (!sections.length) { _bbShowDocModal('Sync booking agent', `<div style="font-size:13px;color:var(--text-mute)">This offer doesn't have enough filled in yet to update the agent. Add program, schedule, pricing or policy details first.</div>`); return; }
+    const list = sections.map(s => `<label style="display:block;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;cursor:pointer">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><input type="checkbox" class="as-pick" data-key="${escapeHTML(s.key)}" checked><span style="font-size:13px;font-weight:700;color:var(--text)">${escapeHTML(s.label)}</span></div>
+        <pre style="white-space:pre-wrap;font-size:12px;line-height:1.5;margin:0;font-family:inherit;color:var(--text-sub)">${escapeHTML(s.body)}</pre>
+      </label>`).join('');
+    _bbShowDocModal('Sync booking agent', `<div style="font-size:12px;color:var(--text-mute);margin-bottom:12px">These replace the booking agent's facts for the ticked sections. You can re-edit any of them later in Agent learnings.</div>${list}<button onclick="_bbAgentSyncApply('${offer.id}')" style="width:100%;padding:11px;background:var(--gold);border:0;border-radius:8px;color:#1a1a1a;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:2px">Apply to booking agent</button>`);
+  } catch (e) {
+    _bbShowDocModal('Sync booking agent', `<div style="padding:14px;color:#c0392b;font-size:13px">Could not build the preview: ${escapeHTML(e.message || String(e))}</div>`);
+  }
+}
+
+async function _bbAgentSyncApply(offerId) {
+  const keys = Array.from(document.querySelectorAll('#bb-doc-modal .as-pick')).filter(cb => cb.checked).map(cb => cb.getAttribute('data-key'));
+  if (!keys.length) { _bbCloseDocModal(); return; }
+  _bbShowDocModal('Sync booking agent', `<div style="padding:16px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Updating the booking agent…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/sync-agent', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: CLIENT_ID, offer_id: offerId, keys }) });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    const n = (j.written || []).length;
+    _bbShowDocModal('Sync booking agent', `<div style="font-size:13px;color:var(--text)">Updated <b>${n}</b> agent section${n === 1 ? '' : 's'}.</div><div style="font-size:11.5px;color:var(--text-mute);margin-top:6px">See or tweak them in Agent learnings.</div>`);
+  } catch (e) {
+    _bbShowDocModal('Sync booking agent', `<div style="padding:14px;color:#c0392b;font-size:13px">Could not apply: ${escapeHTML(e.message || String(e))}</div>`);
   }
 }
 
