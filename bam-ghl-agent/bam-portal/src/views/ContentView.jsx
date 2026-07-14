@@ -1118,6 +1118,13 @@ function ContentTicketsTab({ tk, session, me }) {
                 <span>{academyName}</span>
                 <CtkChannelBadge channel={t.channel} />
                 <CtkPriorityChip priority={pri} tk={tk} />
+                {t.context?.origin_systems_ticket_id && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+                    padding: "2px 7px", borderRadius: 999, whiteSpace: "nowrap",
+                    color: tk.textSub, border: `1px solid ${tk.borderMed}`,
+                  }}>from Systems</span>
+                )}
               </div>
               <div style={{ overflow: "hidden" }}>
                 {titleLine ? (
@@ -1379,6 +1386,9 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
   // Funnel content ends with the SYSTEMS team (website placement) - not
   // marketing, not client review.
   const funnelMode = ticket.channel === "funnel";
+  // Round-trip mode: this request ORIGINATED from a systems ticket, so the
+  // finals return to that ticket instead of spawning a new one.
+  const originSystemsId = ticket.context?.origin_systems_ticket_id || null;
 
   // ── Upload selected finals to Supabase Storage and persist on ticket ──
   // Files upload in PARALLEL (3 at a time - single connections rarely
@@ -1470,7 +1480,9 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
     }
   }
 
-  // Funnel tickets hand off to the systems team as a Change ticket (website work).
+  // Funnel tickets hand off to the systems team as a Change ticket (website
+  // work). Origin-linked tickets RETURN finals to the requesting systems
+  // ticket instead - no duplicate ticket.
   async function sendToSystems() {
     if (busy) return;
     if (!finalsExisting.length) {
@@ -1479,8 +1491,10 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
     }
     setBusy(true);
     try {
-      await patchTicket(ticket.id, { action: "send-to-systems" });
-      showBanner(`Sent ${academyName}'s funnel content to the systems team.`);
+      await patchTicket(ticket.id, { action: originSystemsId ? "return-to-systems" : "send-to-systems" });
+      showBanner(originSystemsId
+        ? `Finals returned to the systems ticket for ${academyName}.`
+        : `Sent ${academyName}'s funnel content to the systems team.`);
       onBack();
       await onRefetch();
     } catch (e) {
@@ -1590,6 +1604,15 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, alignItems: "center" }}>
             <CtkChannelBadge channel={ticket.channel} />
             <CtkPriorityChip priority={ctkPriorityOf(ticket)} tk={tk} />
+            {originSystemsId && (
+              <span
+                title={`Requested by ${ticket.context?.requested_by_name || "systems"} - finals return to systems ticket ${String(originSystemsId).slice(0, 3).toUpperCase()}`}
+                style={{
+                  fontSize: 11, fontWeight: 600, letterSpacing: "0.04em",
+                  padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap",
+                  color: tk.textSub, border: `1px solid ${tk.borderMed}`,
+                }}>from Systems · {String(originSystemsId).slice(0, 3).toUpperCase()}</span>
+            )}
             {(() => {
               const inProg = ticket.status === "active" || ticket.status === "client-dependent";
               const dl = inProg ? ctkDeadlineInfo(ticket.submitted_at, ctkPriorityOf(ticket)) : null;
@@ -1834,7 +1857,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
             fontFamily: "inherit", fontSize: 13, fontWeight: 500,
           }}>Request Client Action</button>
           <button
-            onClick={() => funnelMode ? sendToSystems() : reviewMode ? sendForReview() : setSendModalOpen(true)}
+            onClick={() => (funnelMode || originSystemsId) ? sendToSystems() : reviewMode ? sendForReview() : setSendModalOpen(true)}
             disabled={busy || !finalsExisting.length}
             title={funnelMode ? "Creates a Change ticket for the systems team with the final files attached." : adsApprovalGate ? "This academy reviews ads content before it goes to marketing. On approval it auto-sends." : ""}
             style={{
@@ -1843,7 +1866,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
               cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
               fontFamily: "inherit", fontSize: 13, fontWeight: 700,
               opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
-            }}>{funnelMode ? "📤  Send to Systems" : reviewMode ? "📤  Send for client review" : "📤  Send to Marketing"}</button>
+            }}>{originSystemsId ? "📤  Return to Systems" : funnelMode ? "📤  Send to Systems" : reviewMode ? "📤  Send for client review" : "📤  Send to Marketing"}</button>
         </div>
       )}
 
