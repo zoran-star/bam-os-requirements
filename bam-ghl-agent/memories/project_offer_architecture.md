@@ -66,7 +66,9 @@ The pipeline preset engine `api/agent/presets.js` (`applyPreset`, `PRESETS.free_
 
 **2B shipped (preset-apply UI):** new `api/offers/apply-preset.js` (Supabase-JWT auth) wraps `applyPreset()` behind the portal - `?action=preview` dry-runs (returns stages + routing + workers), `POST` applies (409 `needs_force` on edge conflict). Sales-section "Set up the sales pipeline" button → `_bbPresetPreview` (shows the Free Trial stages + 20 routes) → `_bbPresetApply` (with a Replace-on-conflict path). Stamps `PRESETS.free_trial` onto the offer's `pipeline_stages` + `stage_transitions`.
 
-**Still to build (2C-2D):** seed automations (ghosted/nurture/form-intro) from the preset; seed entry_points/funnels/custom_field_defs (GHL-id dependent). Fact sections the offer does NOT cover (coach ratio, group sizes, pricing transparency mode, geo-qualification, social proof) still need a dedicated agent-facts interview.
+**2C shipped (seed automations):** new `POST /api/automations ?action=seed-preset-automations` seeds the baseline automations idempotently + dormant (approved:false) - the 3 form-intro first-touches (`FORM_INTRO_DEFAULTS`) plus the new multi-step `GHOSTED_DEFAULT` (👻 Ghosted, 3-SMS drip, merge-fields only) in `form-intro-automations.js`. Same create-if-missing / add-steps-only-if-zero rule as `seed-form-intro`. Sales-section "Set up automations" button → `_bbAutomationsSeed`. Nurture is NOT seeded (its GTA copy is brand-story email templates - needs the academy's own content).
+
+**Still to build (2D):** seed entry_points/funnels/custom_field_defs (GHL-id dependent); a Nurture default; and the agent-facts sections the offer doesn't cover (coach ratio, group sizes, pricing transparency mode, geo-qualification, social proof) still need a dedicated agent-facts interview.
 
 ## Team is special
 
