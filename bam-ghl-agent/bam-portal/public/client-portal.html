@@ -25662,6 +25662,7 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'sales', label:'Sales', fields:[
+      { key:'__sales_status__', type:'sales_setup_status', label:'Setup status' },
       { key:'lead_tags', type:'ghl_tags_multi', label:'Lead tags',
         hint:'GHL tags that mark a contact as a lead. Pick as many as apply - a contact is a lead if they carry ANY of them. ★ = AI suggestion. (Members always win over lead tags.)' },
       { key:'signup_url', type:'text', label:'Sign-up link',
@@ -26394,6 +26395,15 @@ function _bbRenderField(field, sectionId) {
         body = `<button type="button" class="btn-secondary-bb" onclick="_bbPresetPreview()">Set up the sales pipeline</button>
           <div class="bb-field-hint" style="margin-top:8px">Stamps the proven Free Trial pipeline - stages plus routing - onto this offer, so the board, router, and agents work out of the box. You review before it applies.</div>`;
       }
+      break;
+    }
+    case 'sales_setup_status': {
+      // Read-only readiness checklist for this offer's sales machine.
+      const _ssOid = _bbState.offer && _bbState.offer.id;
+      if (!_ssOid) { body = ''; break; }
+      const st = _bbSalesStatusCache[_ssOid];
+      if (st === undefined) { _bbLoadSalesStatus(_ssOid); body = `<div style="font-size:12px;color:var(--text-mute)">Checking setup…</div>`; }
+      else body = _bbSalesStatusHtml(st);
       break;
     }
     case 'automations_seed': {
@@ -27615,6 +27625,7 @@ async function _bbCqSeedStandard(offerId, sectionId) {
     if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
     delete _bbCqCache[offerId + ':sales'];
     delete _bbCqCache[offerId + ':onboarding'];
+    _bbSalesStatusCache = {};
     _bbRenderWizardBody();
     if (!j.created) alert('Your standard athlete fields are already in place.');
   } catch (e) {
@@ -27644,6 +27655,37 @@ async function _bbCqPreviewForm(offerId, sectionId) {
   }
 }
 
+// Read-only "sales machine" readiness for this offer - pipeline, automations,
+// agent facts, form fields. Cached per offer; cleared by the setup actions below.
+let _bbSalesStatusCache = {};
+async function _bbLoadSalesStatus(offerId) {
+  if (typeof CLIENT_ID === 'undefined') { _bbSalesStatusCache[offerId] = {}; return; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/offers/setup-status?client_id=${encodeURIComponent(CLIENT_ID)}&offer_id=${encodeURIComponent(offerId)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json().catch(() => ({}));
+    _bbSalesStatusCache[offerId] = (r.ok && j.ok) ? j : {};
+  } catch (e) { _bbSalesStatusCache[offerId] = {}; }
+  _bbRenderWizardBody();
+}
+function _bbSalesStatusHtml(st) {
+  const row = (label, ok, detail) => `<div style="display:flex;align-items:center;gap:9px;padding:6px 0">
+      <span style="width:9px;height:9px;border-radius:50%;background:${ok ? '#1D9E75' : 'var(--border-med,#888)'};flex-shrink:0"></span>
+      <span style="font-size:12.5px;color:var(--text)">${label}</span>
+      <span style="margin-left:auto;font-size:11px;color:var(--text-mute)">${detail}</span>
+    </div>`;
+  const autos = st.automations || [];
+  const approved = autos.filter(a => a.approved).length;
+  const fields = (st.sales_fields || 0) + (st.onboarding_fields || 0);
+  return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 14px;background:var(--surface-alt);margin-bottom:6px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Sales machine setup</div>
+      ${row('Sales pipeline', st.pipeline_stages > 0, st.pipeline_stages > 0 ? `${st.pipeline_stages} stages` : 'not set up')}
+      ${row('Automations', autos.length > 0, autos.length ? `${approved}/${autos.length} approved` : 'none')}
+      ${row('Booking agent facts', st.agent_sections > 0, st.agent_sections > 0 ? `${st.agent_sections} synced` : 'using defaults')}
+      ${row('Form fields', fields > 0, `${st.sales_fields || 0} lead · ${st.onboarding_fields || 0} intake`)}
+    </div>`;
+}
+
 // Seed the preset's baseline automations onto this offer (Gap #2, phase 2C).
 // Dormant (approved:false) - the owner reviews + approves before anything sends.
 async function _bbAutomationsSeed() {
@@ -27660,6 +27702,7 @@ async function _bbAutomationsSeed() {
         <span style="font-size:13px;color:var(--text)">${escapeHTML(x.name || x.key)}</span>
         <span style="margin-left:auto;font-size:11px;color:var(--text-mute)">${x.created ? 'created' : 'existed'} · ${x.steps} step${x.steps === 1 ? '' : 's'}</span>
       </div>`).join('');
+    _bbSalesStatusCache = {};
     _bbShowDocModal('Automations', `<div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">Seeded <b>off</b>. Review, edit, and approve each in Agent learnings before anything sends.</div>${rows}`);
   } catch (e) {
     _bbShowDocModal('Automations', `<div style="padding:14px;color:#c0392b;font-size:13px">Could not set up automations: ${escapeHTML(e.message || String(e))}</div>`);
@@ -27715,6 +27758,7 @@ async function _bbPresetApply(force) {
       throw new Error(j.error || 'Conflict');
     }
     if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    _bbSalesStatusCache = {};
     _bbShowDocModal('Sales pipeline', `<div style="font-size:13px;color:var(--text)">Pipeline set up: <b>${j.stages}</b> stages, <b>${j.transitions}</b> routes.</div><div style="font-size:11.5px;color:var(--text-mute);margin-top:6px">Your board, router, and agents now use this flow.</div>`);
   } catch (e) {
     _bbShowDocModal('Sales pipeline', `<div style="padding:14px;color:#c0392b;font-size:13px">Could not set up the pipeline: ${escapeHTML(e.message || String(e))}</div>`);
@@ -27755,6 +27799,7 @@ async function _bbAgentSyncApply(offerId) {
     const j = await r.json();
     if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
     const n = (j.written || []).length;
+    _bbSalesStatusCache = {};
     _bbShowDocModal('Sync booking agent', `<div style="font-size:13px;color:var(--text)">Updated <b>${n}</b> agent section${n === 1 ? '' : 's'}.</div><div style="font-size:11.5px;color:var(--text-mute);margin-top:6px">See or tweak them in Agent learnings.</div>`);
   } catch (e) {
     _bbShowDocModal('Sync booking agent', `<div style="padding:14px;color:#c0392b;font-size:13px">Could not apply: ${escapeHTML(e.message || String(e))}</div>`);
