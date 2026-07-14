@@ -42,11 +42,12 @@ const ORIGINS_TTL_MS = 60_000;
 function nowIso() { return new Date().toISOString(); }
 function norm(s) { return (s || "").toString().trim().toLowerCase(); }
 
-// Membership start date the parent optionally chose at enrollment. When eligible (no
-// commitment-revert, no coupon) it ANCHORS billing: the first period is charged today
-// and recurring begins one interval after this date. Otherwise it's a display/access
-// label only (they pay + go live now). Accept a YYYY-MM-DD within [tomorrow, ~6 months];
-// today / past / invalid / out-of-range all return null → "starts immediately".
+// Membership start date the parent optionally chose at enrollment. When present it
+// ANCHORS billing: the first period is charged today and recurring begins after this
+// date - monthly plans at +1 interval; commitment plans charge the committed amount
+// today then revert to monthly at start+commitment. Coupons compose (the discount
+// carries to both today's charge and the recurring invoices). Accept a YYYY-MM-DD
+// within [tomorrow, ~6 months]; today / past / invalid / out-of-range return null.
 function clampStartDate(raw) {
   const s = String(raw || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -372,27 +373,34 @@ async function handler(req, res) {
 
     // ── Future start date → charge the first period TODAY + anchor recurring to it ──
     // billing_cycle_anchor can't reach past the first period, so (Stripe's documented
-    // pattern) we set trial_end to ONE interval after the start date and bill the first
-    // period now via a one-time add_invoice_items line. Result: paid today, first
-    // recurring charge on start+interval, then every cycle after.
-    // SCOPED to the clean case only — otherwise keep today's behavior (charge now,
-    // start_date = access label):
-    //   • !revert  — commitment plans adopt the sub via from_subscription (webhook),
-    //                which fights a trial. Those keep charging today.
-    //   • !promo   — sub-level discount vs a one-time invoice item is unverified; a
-    //                coupon + future start falls back so we never mischarge.
-    let recurringStart = null, renewsIso = null, firstPeriod = null;
-    if (startDate && !revert && !promo) {
-      const iv = intervalFor(term);
+    // pattern) we set trial_end to the recurring-start timestamp and bill the first
+    // period now via a one-time add_invoice_items line. Result: paid today, recurring
+    // begins on the anchor, then every cycle after. Two shapes:
+    //   • Plain (monthly / non-reverting): recurring base = the selected price; charge
+    //     one period today; anchor = start + one interval.
+    //   • Commitment → monthly (e.g. Steady 3mo → monthly): charge the COMMITTED amount
+    //     today, set the recurring base to the MONTHLY revert price, anchor at start +
+    //     commitment length. Same access tier (the revert price is routable), and it
+    //     sidesteps the webhook's from_subscription schedule (we do NOT stamp
+    //     commitment_reverts when anchored) - so no trial-vs-schedule conflict.
+    //   • Coupon: a sub-level discount applies to BOTH the one-time line today and the
+    //     recurring invoices (verified with Test Clocks - percent + amount off), so a
+    //     coupon + future start anchors normally; the discount just carries through. It
+    //     can only reduce the charge, never mischarge.
+    let recurringStart = null, renewsIso = null, firstPeriod = null, baseItemPrice = priceIdToUse;
+    if (startDate) {
+      const iv = intervalFor(term); // commitment term → {month, 3|6}; else 4 weeks
       const anchorSec = Math.floor(addInterval(new Date(`${startDate}T12:00:00Z`), iv).getTime() / 1000);
       const floor = Math.floor(Date.now() / 1000) + 60;
       recurringStart = Math.min(Math.max(anchorSec, floor), Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
       renewsIso = new Date(recurringStart * 1000).toISOString().slice(0, 10);
-      // add_invoice_items price_data needs the resolved price's product + amount.
+      // Charge the SELECTED price today (committed amount for a commitment, else the
+      // plan amount). add_invoice_items price_data needs its product + amount.
       const priceObj = await stripeFetch(`/prices/${priceIdToUse}`, { stripeAccount });
       const amt = priceObj && priceObj.unit_amount != null ? priceObj.unit_amount : price.amount_cents;
       if (priceObj && priceObj.product != null && amt != null) {
         firstPeriod = { product: priceObj.product, amount: amt, currency: (priceObj.currency || price.currency || "cad") };
+        if (revert) baseItemPrice = revert.revertToPriceId; // recurring base = monthly revert price
       } else {
         recurringStart = null; renewsIso = null; // can't bill upfront safely → charge now, label only
       }
@@ -403,7 +411,7 @@ async function handler(req, res) {
       method: "POST", stripeAccount,
       idempotencyKey: `web-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${resolvedPriceKey}${recurringStart ? `-s${recurringStart}` : ""}`.slice(0, 200),
       body: {
-        customer: customerId, "items[0][price]": priceIdToUse,
+        customer: customerId, "items[0][price]": baseItemPrice,
         payment_behavior: "default_incomplete",
         "payment_settings[save_default_payment_method]": "on_subscription",
         "expand[0]": "latest_invoice.payment_intent",
@@ -413,7 +421,10 @@ async function handler(req, res) {
         "metadata[plan]": planText, "metadata[term]": term,
         "metadata[client_id]": clientId, "metadata[parent_email]": parentEmail, "metadata[athlete_name]": athleteName,
         ...(oppId ? { "metadata[ghl_opportunity_id]": oppId } : {}),
-        ...(revert ? { "metadata[commitment_reverts]": "monthly", "metadata[revert_to_price]": revert.revertToPriceId } : {}),
+        // Non-anchored commitment → let the webhook attach the from_subscription
+        // schedule after payment. Anchored commitment (recurringStart set) already
+        // has the monthly price as its base, so DON'T stamp this (no schedule).
+        ...(revert && !recurringStart ? { "metadata[commitment_reverts]": "monthly", "metadata[revert_to_price]": revert.revertToPriceId } : {}),
         ...(promo ? { "discounts[0][promotion_code]": promo.id, "metadata[coupon_code]": couponCode } : {}),
         ...(startDate ? { "metadata[start_date]": startDate } : {}),
         // Future start: bill the first period now (add_invoice_items) + defer recurring
@@ -422,6 +433,9 @@ async function handler(req, res) {
         ...(recurringStart ? {
           trial_end: recurringStart,
           "metadata[first_recurring_date]": renewsIso,
+          // Anchored commitment: committed amount paid today, base price is monthly.
+          // Record the term they bought so the mismatch is self-explanatory.
+          ...(revert ? { "metadata[commitment_prepaid_term]": term } : {}),
           "add_invoice_items[0][price_data][currency]": firstPeriod.currency,
           "add_invoice_items[0][price_data][product]": firstPeriod.product,
           "add_invoice_items[0][price_data][unit_amount]": firstPeriod.amount,
