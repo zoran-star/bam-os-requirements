@@ -27378,17 +27378,16 @@ function _bbRenderCustomQuestions(offer, sectionId) {
     .map(l => `<span class="bb-choice selected" style="cursor:default" title="Always collected - can't remove">${escapeHTML(l)}</span>`)
     .join('');
 
-  // Optional = this offer's own custom questions (removable) + Add custom.
-  let optChips;
+  // Optional = this offer's own custom questions, as editable cards + Add custom.
+  let optList;
   if (list === undefined) {
-    optChips = `<span style="font-size:12px;color:var(--text-mute)">Loading…</span>`;
+    optList = `<div style="font-size:12px;color:var(--text-mute)">Loading…</div>`;
+  } else if (!list.length) {
+    optList = `<div style="font-size:12.5px;color:var(--text-mute);padding:2px 0 8px">No custom questions yet.</div>`;
   } else {
-    optChips = list.map(f => {
-      const nOpts = (f.type === 'select' || f.type === 'multiselect') && Array.isArray(f.options) && f.options.length ? ` (${f.options.length})` : '';
-      return `<span class="bb-choice selected" style="cursor:default" title="${escapeHTML(_BB_CQ_TYPE_LABEL[f.type] || f.type)}">${escapeHTML(f.label)}${nOpts}<span onclick="_bbCqDelete('${offer.id}','${sectionId}','${f.id}')" style="cursor:pointer;margin-left:7px;opacity:0.65;font-weight:700" title="Remove">×</span></span>`;
-    }).join('');
+    optList = list.map(f => _bbCqCardHtml(offer.id, sectionId, f)).join('');
   }
-  optChips += `<button type="button" class="bb-choice" onclick="_bbCqOpenAdd('${offer.id}','${sectionId}','${offer.client_id}')">+ Add custom</button>`;
+  optList += `<button type="button" class="bb-choice" style="margin-top:4px" onclick="_bbCqOpenEditor('${offer.id}','${sectionId}','${offer.client_id}','')">+ Add custom</button>`;
 
   const heading = sectionId === 'sales' ? 'Info to collect from leads' : 'Info to collect at onboarding';
   const sub = sectionId === 'sales' ? "What this offer's lead form asks." : 'What a member fills in when they join this offer.';
@@ -27399,8 +27398,31 @@ function _bbRenderCustomQuestions(offer, sectionId) {
     <div class="bb-defaults-info"><b style="color:var(--accent)">Always asked:</b></div>
     <div class="bb-choice-row" style="margin-bottom:14px">${alwaysChips}</div>
     <div class="bb-defaults-info" style="margin-top:0">Optional (your custom questions):</div>
-    <div class="bb-choice-row">${optChips}</div>
+    <div>${optList}</div>
   </div>`;
+}
+
+// One editable question card in the offer wizard's form builder (Sales /
+// Onboarding). Shows the label, type, a Required pill, its options, and the
+// per-field note, with Edit + remove. Reorder + live preview land in later slices.
+function _bbCqCardHtml(offerId, sectionId, f) {
+  const typeLabel = _BB_CQ_TYPE_LABEL[f.type] || f.type;
+  const opts = (f.type === 'select' || f.type === 'multiselect') && Array.isArray(f.options) && f.options.length
+    ? `<div style="font-size:11.5px;color:var(--text-mute);margin-top:3px">Options: ${f.options.map(o => escapeHTML(o)).join(', ')}</div>` : '';
+  const note = f.help_text ? `<div style="font-size:11.5px;color:var(--text-sub);margin-top:4px;font-style:italic">${escapeHTML(f.help_text)}</div>` : '';
+  const reqPill = f.required ? `<span style="font-size:9.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:1px 7px">Required</span>` : '';
+  return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface-alt)">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(f.label)}</span>
+        <span style="font-size:10.5px;color:var(--text-mute);background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:1px 8px">${escapeHTML(typeLabel)}</span>
+        ${reqPill}
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button type="button" onclick="_bbCqOpenEditor('${offerId}','${sectionId}','','${f.id}')" style="font-size:11.5px;padding:4px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);cursor:pointer">Edit</button>
+          <button type="button" onclick="_bbCqDelete('${offerId}','${sectionId}','${f.id}')" style="font-size:13px;padding:3px 9px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-mute);cursor:pointer" title="Remove">×</button>
+        </div>
+      </div>
+      ${opts}${note}
+    </div>`;
 }
 
 async function _bbLoadCoreFields(clientId) {
@@ -27433,75 +27455,98 @@ async function _bbCqDelete(offerId, sectionId, fieldId) {
   _bbRenderWizardBody();
 }
 
-function _bbCqOpenAdd(offerId, sectionId, clientId) {
+// Add or edit a custom question. fieldId '' = add (needs clientId); a real id =
+// edit (prefilled from the section cache, PATCHed by id).
+function _bbCqOpenEditor(offerId, sectionId, clientId, fieldId) {
   document.getElementById('bb-cq-modal')?.remove();
+  const editing = !!fieldId;
+  const cur = editing ? ((_bbCqCache[offerId + ':' + sectionId] || []).find(f => String(f.id) === String(fieldId)) || {}) : {};
+  const curType = cur.type || 'text';
+  const curOpts = Array.isArray(cur.options) ? cur.options.join('\n') : '';
+  const optsShown = (curType === 'select' || curType === 'multiselect');
   const wrap = document.createElement('div');
   wrap.id = 'bb-cq-modal';
   wrap.style = 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px';
   const inp = 'width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;margin:6px 0 14px;box-sizing:border-box';
   const lbl = 'font-size:12px;color:var(--text-mute)';
-  const typeOpts = _BB_CQ_TYPES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
-  wrap.innerHTML = `<div style="width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px">
-    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px">New custom question</div>
+  const typeOpts = _BB_CQ_TYPES.map(([v, l]) => `<option value="${v}" ${v === curType ? 'selected' : ''}>${l}</option>`).join('');
+  wrap.innerHTML = `<div style="width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;max-height:86vh;overflow:auto">
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px">${editing ? 'Edit question' : 'New custom question'}</div>
     <label style="${lbl}">Question / label</label>
-    <input id="bb-cq-label" placeholder="e.g. Jersey size" style="${inp}">
+    <input id="bb-cq-label" placeholder="e.g. Jersey size" value="${escapeHTML(cur.label || '')}" style="${inp}">
     <label style="${lbl}">Answer type</label>
     <select id="bb-cq-type" onchange="document.getElementById('bb-cq-opts-wrap').style.display=(this.value==='select'||this.value==='multiselect')?'block':'none'" style="${inp};cursor:pointer">${typeOpts}</select>
-    <div id="bb-cq-opts-wrap" style="display:none">
+    <div id="bb-cq-opts-wrap" style="display:${optsShown ? 'block' : 'none'}">
       <label style="${lbl}">Options (one per line)</label>
-      <textarea id="bb-cq-opts" rows="3" placeholder="Small&#10;Medium&#10;Large" style="${inp};resize:vertical"></textarea>
+      <textarea id="bb-cq-opts" rows="3" placeholder="Small&#10;Medium&#10;Large" style="${inp};resize:vertical">${escapeHTML(curOpts)}</textarea>
     </div>
+    <label style="${lbl}">Note / instruction (shown under the question)</label>
+    <input id="bb-cq-help" placeholder="e.g. Age as of Sept 1" value="${escapeHTML(cur.help_text || '')}" style="${inp}">
+    <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text);cursor:pointer;margin:0 0 14px">
+      <input type="checkbox" id="bb-cq-required" ${cur.required ? 'checked' : ''}> Required
+    </label>
     <div id="bb-cq-also-wrap" style="margin-bottom:14px"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="document.getElementById('bb-cq-modal').remove()" style="padding:9px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-      <button id="bb-cq-save" onclick="_bbCqSave('${offerId}','${sectionId}','${clientId}')" style="padding:9px 18px;background:var(--gold);border:1px solid var(--gold);border-radius:6px;color:#1a1a1a;font-size:13px;font-weight:700;cursor:pointer">Add</button>
+      <button id="bb-cq-save" onclick="_bbCqSaveEditor('${offerId}','${sectionId}','${clientId}','${fieldId || ''}')" style="padding:9px 18px;background:var(--gold);border:1px solid var(--gold);border-radius:6px;color:#1a1a1a;font-size:13px;font-weight:700;cursor:pointer">${editing ? 'Save' : 'Add'}</button>
     </div>
   </div>`;
   wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
   document.body.appendChild(wrap);
   setTimeout(() => { document.getElementById('bb-cq-label')?.focus(); }, 0);
-  // "Also applies to" - attach this field to other offers too (multi-offer).
-  // The current offer is always included; here the owner ticks any extras.
-  _bbLoadOffersList().then(offers => {
-    const host = document.getElementById('bb-cq-also-wrap');
-    if (!host) return;
-    const others = (offers || []).filter(o => o.id !== offerId);
-    if (!others.length) return; // nothing else to attach to
-    host.innerHTML = `<label style="${lbl}">Also collect this on other offers (optional)</label>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:132px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 10px">
-        ${others.map(o => `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);cursor:pointer">
-          <input type="checkbox" class="bb-cq-also" value="${escapeHTML(o.id)}"> ${escapeHTML(o.title || o.type || 'Offer')}
-        </label>`).join('')}
-      </div>`;
-  }).catch(() => {});
+  // "Also applies to" (multi-offer attach) only on ADD. The current offer is
+  // always included; here the owner ticks any extras.
+  if (!editing && clientId) {
+    _bbLoadOffersList().then(offers => {
+      const host = document.getElementById('bb-cq-also-wrap');
+      if (!host) return;
+      const others = (offers || []).filter(o => o.id !== offerId);
+      if (!others.length) return; // nothing else to attach to
+      host.innerHTML = `<label style="${lbl}">Also collect this on other offers (optional)</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:132px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+          ${others.map(o => `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);cursor:pointer">
+            <input type="checkbox" class="bb-cq-also" value="${escapeHTML(o.id)}"> ${escapeHTML(o.title || o.type || 'Offer')}
+          </label>`).join('')}
+        </div>`;
+    }).catch(() => {});
+  }
 }
 
-async function _bbCqSave(offerId, sectionId, clientId) {
+async function _bbCqSaveEditor(offerId, sectionId, clientId, fieldId) {
+  const editing = !!fieldId;
   const label = (document.getElementById('bb-cq-label')?.value || '').trim();
   const type = document.getElementById('bb-cq-type')?.value || 'text';
   if (!label) { document.getElementById('bb-cq-label')?.focus(); return; }
   const optsRaw = document.getElementById('bb-cq-opts')?.value || '';
   const options = (type === 'select' || type === 'multiselect') ? optsRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
-  const alsoOfferIds = Array.from(document.querySelectorAll('.bb-cq-also:checked')).map(el => el.value).filter(Boolean);
+  const helpText = (document.getElementById('bb-cq-help')?.value || '').trim();
+  const required = !!document.getElementById('bb-cq-required')?.checked;
+  const alsoOfferIds = editing ? [] : Array.from(document.querySelectorAll('.bb-cq-also:checked')).map(el => el.value).filter(Boolean);
   const btn = document.getElementById('bb-cq-save');
-  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Adding…'; }
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; btn.textContent = editing ? 'Saving…' : 'Adding…'; }
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/custom-fields', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, offer_id: offerId, section: sectionId, label, type, options, also_offer_ids: alsoOfferIds }),
-    });
+    const r = editing
+      ? await fetch('/api/custom-fields', {
+          method: 'PATCH',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: fieldId, label, type, options, required, help_text: helpText }),
+        })
+      : await fetch('/api/custom-fields', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: clientId, offer_id: offerId, section: sectionId, label, type, options, required, help_text: helpText, also_offer_ids: alsoOfferIds }),
+        });
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Save failed'); }
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; btn.textContent = 'Add'; }
-    alert(e.message || 'Could not add the question.');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; btn.textContent = editing ? 'Save' : 'Add'; }
+    alert(e.message || 'Could not save the question.');
     return;
   }
   document.getElementById('bb-cq-modal')?.remove();
   delete _bbCqCache[offerId + ':' + sectionId];
-  // The field now also lives on the picked offers (same section) - drop their
-  // caches so it shows when the owner opens them.
+  // On add, the field may also live on other picked offers (same section) - drop
+  // their caches so it shows when the owner opens them.
   alsoOfferIds.forEach(oid => { delete _bbCqCache[oid + ':' + sectionId]; });
   _bbRenderWizardBody();
 }

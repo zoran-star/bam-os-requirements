@@ -369,6 +369,7 @@ async function handler(req, res) {
           client_id: clientId, key, label, type,
           options: cleanOptions(type, b.options),
           required: b.required === true,
+          help_text: (typeof b.help_text === "string" && b.help_text.trim()) ? b.help_text.trim() : null,
           position: nextPos,
           offer_id: offerId, section,
         }),
@@ -411,6 +412,7 @@ async function handler(req, res) {
       if ("type" in b) patch.type = nextType;
       if ("options" in b || "type" in b) patch.options = cleanOptions(nextType, "options" in b ? b.options : existing.options);
       if ("required" in b) patch.required = b.required === true;
+      if ("help_text" in b) patch.help_text = (typeof b.help_text === "string" && b.help_text.trim()) ? b.help_text.trim() : null;
       if ("archived" in b) patch.archived = b.archived === true;
       if ("position" in b && Number.isFinite(b.position)) patch.position = b.position;
 
