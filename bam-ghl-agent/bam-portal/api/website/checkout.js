@@ -42,10 +42,11 @@ const ORIGINS_TTL_MS = 60_000;
 function nowIso() { return new Date().toISOString(); }
 function norm(s) { return (s || "").toString().trim().toLowerCase(); }
 
-// Membership start date the parent optionally chose at enrollment. Display/access
-// label ONLY - it never changes Stripe billing (they pay + go live now). Accept a
-// YYYY-MM-DD within [tomorrow, ~6 months]; today / past / invalid / out-of-range all
-// return null, meaning "starts immediately" (the member card falls back to joined_date).
+// Membership start date the parent optionally chose at enrollment. When eligible (no
+// commitment-revert, no coupon) it ANCHORS billing: the first period is charged today
+// and recurring begins one interval after this date. Otherwise it's a display/access
+// label only (they pay + go live now). Accept a YYYY-MM-DD within [tomorrow, ~6 months];
+// today / past / invalid / out-of-range all return null → "starts immediately".
 function clampStartDate(raw) {
   const s = String(raw || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -92,6 +93,19 @@ function intervalFor(term) {
   if (term === "6_months") return { interval: "month", interval_count: 6 };
   return { interval: "week", interval_count: 4 };
 }
+// Add one billing interval to a date (UTC). Used to place the recurring anchor one
+// full period AFTER a chosen future start date (they pay the first period today).
+function addInterval(date, iv) {
+  const d = new Date(date.getTime());
+  const n = iv.interval_count || 1;
+  if (iv.interval === "week") d.setUTCDate(d.getUTCDate() + 7 * n);
+  else if (iv.interval === "month") d.setUTCMonth(d.getUTCMonth() + n);
+  else if (iv.interval === "year") d.setUTCFullYear(d.getUTCFullYear() + n);
+  else d.setUTCDate(d.getUTCDate() + n); // day
+  return d;
+}
+// Stripe rejects trial_end more than 730 days out — clamp so a far-future anchor can't 400.
+const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
   const headers = { Authorization: `Bearer ${stripeKey()}` };
   if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
@@ -203,7 +217,8 @@ async function handler(req, res) {
     // the EXACT opportunity WON on payment, and persist it on the member row. Optional
     // — when absent the webhook falls back to the member's open opp by contact.
     const oppId = (body.opp_id || body.opportunity_id || "").toString().trim() || null;
-    // Optional future membership start date (display/access label only, never billing).
+    // Optional future membership start date. Anchors billing when eligible (see the
+    // recurringStart block below); otherwise a display/access label.
     const startDate = clampStartDate(body.start_date);
 
     // Typed-runtime cutover (offer tie-in step E): the stable offer_price_id
@@ -355,10 +370,38 @@ async function handler(req, res) {
     //    Live only (test mode charges an inline price unrelated to the catalog). ──
     const revert = !testMode ? await resolveCommitmentRevert({ clientId, offerId, planText, term }) : null;
 
+    // ── Future start date → charge the first period TODAY + anchor recurring to it ──
+    // billing_cycle_anchor can't reach past the first period, so (Stripe's documented
+    // pattern) we set trial_end to ONE interval after the start date and bill the first
+    // period now via a one-time add_invoice_items line. Result: paid today, first
+    // recurring charge on start+interval, then every cycle after.
+    // SCOPED to the clean case only — otherwise keep today's behavior (charge now,
+    // start_date = access label):
+    //   • !revert  — commitment plans adopt the sub via from_subscription (webhook),
+    //                which fights a trial. Those keep charging today.
+    //   • !promo   — sub-level discount vs a one-time invoice item is unverified; a
+    //                coupon + future start falls back so we never mischarge.
+    let recurringStart = null, renewsIso = null, firstPeriod = null;
+    if (startDate && !revert && !promo) {
+      const iv = intervalFor(term);
+      const anchorSec = Math.floor(addInterval(new Date(`${startDate}T12:00:00Z`), iv).getTime() / 1000);
+      const floor = Math.floor(Date.now() / 1000) + 60;
+      recurringStart = Math.min(Math.max(anchorSec, floor), Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
+      renewsIso = new Date(recurringStart * 1000).toISOString().slice(0, 10);
+      // add_invoice_items price_data needs the resolved price's product + amount.
+      const priceObj = await stripeFetch(`/prices/${priceIdToUse}`, { stripeAccount });
+      const amt = priceObj && priceObj.unit_amount != null ? priceObj.unit_amount : price.amount_cents;
+      if (priceObj && priceObj.product != null && amt != null) {
+        firstPeriod = { product: priceObj.product, amount: amt, currency: (priceObj.currency || price.currency || "cad") };
+      } else {
+        recurringStart = null; renewsIso = null; // can't bill upfront safely → charge now, label only
+      }
+    }
+
     // ── Portal-owned subscription (default_incomplete → client_secret) ──
     const sub = await stripeFetch(`/subscriptions`, {
       method: "POST", stripeAccount,
-      idempotencyKey: `web-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${resolvedPriceKey}`.slice(0, 200),
+      idempotencyKey: `web-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${resolvedPriceKey}${recurringStart ? `-s${recurringStart}` : ""}`.slice(0, 200),
       body: {
         customer: customerId, "items[0][price]": priceIdToUse,
         payment_behavior: "default_incomplete",
@@ -373,6 +416,16 @@ async function handler(req, res) {
         ...(revert ? { "metadata[commitment_reverts]": "monthly", "metadata[revert_to_price]": revert.revertToPriceId } : {}),
         ...(promo ? { "discounts[0][promotion_code]": promo.id, "metadata[coupon_code]": couponCode } : {}),
         ...(startDate ? { "metadata[start_date]": startDate } : {}),
+        // Future start: bill the first period now (add_invoice_items) + defer recurring
+        // to the anchor (trial_end). The first invoice still carries a PaymentIntent the
+        // card element confirms today. See the recurringStart block above.
+        ...(recurringStart ? {
+          trial_end: recurringStart,
+          "metadata[first_recurring_date]": renewsIso,
+          "add_invoice_items[0][price_data][currency]": firstPeriod.currency,
+          "add_invoice_items[0][price_data][product]": firstPeriod.product,
+          "add_invoice_items[0][price_data][unit_amount]": firstPeriod.amount,
+        } : {}),
       },
     });
     const clientSecret = piSecretFromSub(sub);
@@ -386,8 +439,9 @@ async function handler(req, res) {
     };
     // Only stamp the opp link when we have one — never null out an existing link on a retry.
     if (oppId) memberFields.ghl_opportunity_id = oppId;
-    // Chosen future start date (display/access label). Only set when present so a retry
-    // without it doesn't wipe a previously-chosen date.
+    // Chosen future start date. Drives billing when eligible (recurringStart set →
+    // charged today, recurring anchored to start+interval); else a display/access label.
+    // Only set when present so a retry without it doesn't wipe a previously-chosen date.
     if (startDate) memberFields.start_date = startDate;
     if (member) {
       await sb(`members?id=eq.${member.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(memberFields) });
@@ -408,7 +462,7 @@ async function handler(req, res) {
         body: JSON.stringify([{
           client_id: clientId, member_id: member && member.id,
           action_type: "website-enrollment-checkout-created",
-          args: { offer_id: offerId, offer_price_key: resolvedPriceKey, offer_price_id: price.id, plan: planText, term, sub_id: sub.id, customer_id: customerId, intake, agreement_saved: agreementSaved, coupon: discountInfo || (couponError ? { error: couponError } : null), start_date: startDate },
+          args: { offer_id: offerId, offer_price_key: resolvedPriceKey, offer_price_id: price.id, plan: planText, term, sub_id: sub.id, customer_id: customerId, intake, agreement_saved: agreementSaved, coupon: discountInfo || (couponError ? { error: couponError } : null), start_date: startDate, first_recurring_date: renewsIso },
           performed_by_name: "Website enrollment funnel (public)",
         }]),
       });
@@ -430,7 +484,7 @@ async function handler(req, res) {
       ok: true, member_id: member && member.id, subscription_id: sub.id, customer_id: customerId,
       client_secret: clientSecret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
       amount_cents: price.amount_cents, currency: price.currency || "cad", agreement_saved: agreementSaved,
-      discount: discountInfo, coupon_error: couponError, start_date: startDate,
+      discount: discountInfo, coupon_error: couponError, start_date: startDate, first_recurring_date: renewsIso,
     });
   } catch (e) {
     return res.status(e.stripeStatus || e.status || 500).json({ error: e.message || String(e) });
