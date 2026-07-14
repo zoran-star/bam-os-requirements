@@ -340,6 +340,32 @@ async function handler(req, res) {
       return res.status(200).json({ imported: created.length, folded, fields: created });
     }
 
+    // ── POST ?action=reorder: set position from an ordered id list ─────────
+    // The form builder's drag-drop sends the full ordered list for one
+    // scope (offer + section); we stamp position=index. All ids must belong to
+    // one academy the caller can access.
+    if (req.method === "POST" && (req.body || {}).action === "reorder") {
+      const ids = Array.isArray((req.body || {}).ordered_ids) ? req.body.ordered_ids.filter(Boolean) : [];
+      if (!ids.length) return res.status(400).json({ error: "ordered_ids required" });
+      const rows = await sb(`custom_field_defs?id=in.(${ids.map(encodeURIComponent).join(",")})&select=id,client_id`);
+      if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: "no fields" });
+      const clientId = rows[0].client_id;
+      if (rows.some(r => r.client_id !== clientId)) return res.status(400).json({ error: "fields span academies" });
+      if (!canAccess(ctx, clientId)) return res.status(403).json({ error: "not your academy" });
+      const known = new Set(rows.map(r => String(r.id)));
+      const now = new Date().toISOString();
+      let pos = 0;
+      for (const id of ids) {
+        if (!known.has(String(id))) continue;
+        await sb(`custom_field_defs?id=eq.${encodeURIComponent(id)}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ position: pos, updated_at: now }),
+        });
+        pos++;
+      }
+      return res.status(200).json({ ok: true, count: pos });
+    }
+
     // ── POST: create a field def ───────────────────────────────────────────
     if (req.method === "POST") {
       const b = req.body || {};
@@ -369,6 +395,7 @@ async function handler(req, res) {
           client_id: clientId, key, label, type,
           options: cleanOptions(type, b.options),
           required: b.required === true,
+          help_text: (typeof b.help_text === "string" && b.help_text.trim()) ? b.help_text.trim() : null,
           position: nextPos,
           offer_id: offerId, section,
         }),
@@ -411,6 +438,7 @@ async function handler(req, res) {
       if ("type" in b) patch.type = nextType;
       if ("options" in b || "type" in b) patch.options = cleanOptions(nextType, "options" in b ? b.options : existing.options);
       if ("required" in b) patch.required = b.required === true;
+      if ("help_text" in b) patch.help_text = (typeof b.help_text === "string" && b.help_text.trim()) ? b.help_text.trim() : null;
       if ("archived" in b) patch.archived = b.archived === true;
       if ("position" in b && Number.isFinite(b.position)) patch.position = b.position;
 

@@ -111,10 +111,17 @@ client-portal.html (V2 landing focus view):
   (console.log payload + optimistic row) - TODO real `POST /api/v2-support-tickets`.
 - `_v2ActionItemsHtml()` renders "Your requests" (V1-style status list) from the
   `_V2_REQUESTS` MOCK array - swap for a fetch once the table lands.
-- postMessage listener (`type:'fc-annotate'`) is wired + dormant; lights up when
-  the bam-client-sites bridge posts section hover/click events.
+- postMessage listener (`type:'fc-annotate'`) is LIVE. The bam-client-sites
+  bridge (`clients/bam-gta/gta/annotate.js`, merged PR #54) outlines sections on
+  hover + posts `section-click` (label from `data-fc-section` or heading, coords,
+  html2canvas thumbnail). GOTCHA fixed 2026-07-13 (sites PR #67): the bridge was
+  only `<script>`-tagged on `free-trial.html`, so the contact page (and all
+  others) were un-clickable. Now `gta/shared.jsx` auto-injects `annotate.js` on
+  EVERY GTA page in annotate mode, so no page can be missed. Portal now stamps
+  `offer_id`+`funnel_id` on the submit payload (bam-os PR #1391) to tie a request
+  to its offer.
 STILL TODO (needs core access): v2_support_tickets table + submit API + wire the
-mocks to it; the bam-client-sites annotation bridge; staff V2 Systems page.
+mocks to it; staff V2 Systems page.
 
 ## When building
 - New persistent table => run the `align-core-data-model` skill first (fc-core-srvc).

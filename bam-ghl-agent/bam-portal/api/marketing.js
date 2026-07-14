@@ -280,8 +280,8 @@ async function contentDeadlinesDigestCron(req, res) {
   }
   try {
     const mktExecSid = await marketingExecutorSlackId();
-    const contentTickets = await sb(`content_tickets?status=in.(active,client-dependent)&select=id,channel,context,submitted_at,assigned_to,client_id`) || [];
-    const mktTickets = await sb(`marketing_tickets?status=eq.in-progress&select=id,fields,submitted_at,assigned_to,client_id`) || [];
+    const contentTickets = await sb(`content_tickets?status=in.(active,client-dependent)&select=id,channel,context,status,submitted_at,assigned_to,client_id`) || [];
+    const mktTickets = await sb(`marketing_tickets?status=eq.in-progress&select=id,fields,client_action_status,submitted_at,assigned_to,client_id`) || [];
     const buckets = { overdue: [], today: [], tomorrow: [] };
     for (const t of contentTickets) {
       const pri = (t.context && t.context.priority === "high") ? "high" : "normal";
@@ -303,16 +303,26 @@ async function contentDeadlinesDigestCron(req, res) {
     const cName = {}; clients.forEach(c => { cName[c.id] = c.business_name; });
     const sSlack = {}; staff.forEach(s => { sSlack[s.id] = s.slack_user_id; });
 
+    // Overdue-because-of-the-client is not team lateness - tag those lines so
+    // the digest reads honestly (Cam 2026-07-13). Content = client-dependent
+    // status (open question OR review sitting with the client); marketing =
+    // an open client action request.
+    const waitTag = (t) => {
+      const waiting = t._kind === "marketing"
+        ? t.client_action_status === "requested"
+        : t.status === "client-dependent";
+      return waiting ? " · ⏳ waiting on client" : "";
+    };
     const line = (t) => {
       const code = String(t.id || "").slice(0, 3).toUpperCase();
       // Marketing lines ping Ximena (the doer); content lines ping the assignee.
       if (t._kind === "marketing") {
         const who = slackMention(mktExecSid);
-        return `• Marketing · ${cName[t.client_id] || "client"} [${code}]${who ? " " + who : ""}`;
+        return `• Marketing · ${cName[t.client_id] || "client"} [${code}]${who ? " " + who : ""}${waitTag(t)}`;
       }
-      const chan = t.channel === "organic" ? "Organic" : "Paid ads";
+      const chan = t.channel === "organic" ? "Organic" : t.channel === "funnel" ? "Funnel" : "Paid ads";
       const who = slackMention(sSlack[t.assigned_to]);
-      return `• ${chan} · ${cName[t.client_id] || "client"} [${code}]${who ? " " + who : ""}`;
+      return `• ${chan} · ${cName[t.client_id] || "client"} [${code}]${who ? " " + who : ""}${waitTag(t)}`;
     };
     const section = (emoji, label, arr) => arr.length ? `\n\n${emoji} *${label} (${arr.length})*\n` + arr.map(line).join("\n") : "";
     const msg = "📋 *Content / Marketing deadlines*"
@@ -2022,9 +2032,15 @@ async function handleMetaAdAccounts(req, res) {
   });
 }
 
-// Picks any valid staff token to query Meta on behalf of clients. Falls back
-// to most-recently-updated token. Returns null if no staff has connected yet.
+// The shared token used to read Meta ad data on behalf of every client.
+// Prefers a business-owned System User token (non-expiring, set once in env) so
+// KPIs never blank out when a staff member's short-lived token expires or when
+// someone reconnects and their token becomes "newest". Falls back to the most-
+// recently-updated staff_meta_tokens row so nothing breaks before the env var
+// is set. Returns null if neither exists.
 async function getAnyStaffMetaToken() {
+  const sys = (process.env.META_SYSTEM_USER_TOKEN || "").trim();
+  if (sys) return sys;
   const rows = await sb(`staff_meta_tokens?select=access_token&order=updated_at.desc&limit=1`);
   return rows?.[0]?.access_token || null;
 }

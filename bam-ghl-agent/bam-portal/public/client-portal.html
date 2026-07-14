@@ -21384,7 +21384,7 @@ const _bbTypeColors = {
 const _bbSections = ['general_info','schedule','value','pricing','sales','onboarding'];
 const _bbSectionLabels = {
   general_info:'General Info', schedule:'Schedule', value:'Value',
-  pricing:'Pricing', sales:'Sales', onboarding:'Onboarding'
+  pricing:'Pricing', policy:'Policy', sales:'Sales', onboarding:'Onboarding'
 };
 const _bbTeamSections = ['general','per_team'];
 const _bbTeamSectionLabels = { general:'General', per_team:'Per team' };
@@ -25005,7 +25005,15 @@ async function _bbDeleteOfferFile(fileId) {
 
 function _bbWizardSections(offer) {
   if (offer.type === 'team') return _bbTeamSections.map(s => ({ id: s, label: _bbTeamSectionLabels[s] }));
-  return _bbSections.map(s => ({ id: s, label: _bbSectionLabels[s] }));
+  const ids = _bbSections.slice();
+  // Insert the Policy tab (after Pricing) only for offer types whose config
+  // actually defines a `policy` section - additive, so other types are untouched.
+  const cfg = _bbOfferConfigs[offer.type] || [];
+  if (cfg.some(s => s.id === 'policy') && ids.indexOf('policy') === -1) {
+    const at = ids.indexOf('pricing');
+    ids.splice(at === -1 ? ids.length : at + 1, 0, 'policy');
+  }
+  return ids.map(s => ({ id: s, label: _bbSectionLabels[s] }));
 }
 
 function _bbRenderWizardBody() {
@@ -25615,6 +25623,44 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'pricing', label:'Pricing', fields:_bbStdPricing },
+    { id:'policy', label:'Policy', fields:[
+      // Hard, typed rules. The system enforces them and the enrollment
+      // agreement's billing/cancellation clause is generated from them.
+      // Same-section deps only (see _bbIsDepVisible), so pause/refund/cancel
+      // sub-fields hang off their own toggle. Nothing here is required, so
+      // existing offers keep working with sensible agreement defaults.
+      { key:'cancellation', type:'check_one', label:'Cancellation', default:'Cancel anytime',
+        options:['Cancel anytime','Notice required'],
+        hint:'How much warning a member must give to cancel. Feeds the agreement and member management.' },
+      { key:'cancel_notice_amount', type:'number', label:'Notice length',
+        dep:{ key:'cancellation', equals:'Notice required' },
+        hint:'How far ahead the member must give notice (e.g. 30).' },
+      { key:'cancel_notice_unit', type:'check_one', label:'Notice unit', default:'days',
+        dep:{ key:'cancellation', equals:'Notice required' },
+        options:['days','hours'] },
+      { key:'pause_allowed', type:'check_one', label:'Allow pausing', default:'Yes',
+        options:['Yes','No'],
+        hint:'Turns the Pause action on or off in member management. No = neither staff nor members can pause a membership.' },
+      { key:'pause_min_days', type:'number', label:'Minimum pause length (days)',
+        dep:{ key:'pause_allowed', equals:'Yes' },
+        hint:'Shortest pause a member can take.' },
+      { key:'pause_max_days', type:'number', label:'Maximum pause length (days)',
+        dep:{ key:'pause_allowed', equals:'Yes' },
+        hint:'Longest pause per instance.' },
+      { key:'pause_per_year', type:'number', label:'Pauses allowed per year',
+        dep:{ key:'pause_allowed', equals:'Yes' },
+        hint:'How many times a member can pause in a year.' },
+      { key:'refund_policy', type:'check_one', label:'Refunds', default:'Non-refundable',
+        options:['Non-refundable','Refundable within a window'],
+        hint:'Fees already charged. Shown in the agreement.' },
+      { key:'refund_window_days', type:'number', label:'Refund window (days)',
+        dep:{ key:'refund_policy', equals:'Refundable within a window' },
+        hint:'Days after purchase a refund is allowed.' },
+      { key:'makeup_policy', type:'textarea', label:'Makeup / reschedule policy',
+        hint:'Shown to members and in the agreement, e.g. "Reschedule through the app."' },
+      { key:'__policy_actions__', type:'policy_actions', label:'Agreement & agent' },
+      _bbCommonExtraNotes
+    ]},
     { id:'sales', label:'Sales', fields:[
       { key:'lead_tags', type:'ghl_tags_multi', label:'Lead tags',
         hint:'GHL tags that mark a contact as a lead. Pick as many as apply - a contact is a lead if they carry ANY of them. ★ = AI suggestion. (Members always win over lead tags.)' },
@@ -26332,6 +26378,22 @@ function _bbRenderField(field, sectionId) {
         body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No entry points yet. They appear here as your website forms, GHL forms, calendars and funnels are detected.</div>`;
       } else {
         body = `<div class="ep-grid">${_EP_DATA.map(ep => _epCardHtml(ep, `_epOpenWizard('${_bbEscapeAttr(ep.id)}')`)).join('')}</div>`;
+      }
+      break;
+    }
+    case 'policy_actions': {
+      // Two actions the Policy section unlocks: preview the exact enrollment
+      // agreement generated from these rules, and push the same rules into the
+      // booking agent's policy facts. Both need a saved offer id.
+      const _paOid = _bbState.offer && _bbState.offer.id;
+      if (!_paOid) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then preview the agreement or push it to the agent.</div>`;
+      } else {
+        body = `<div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button type="button" class="btn-secondary-bb" onclick="_bbPreviewAgreement()">Preview agreement</button>
+            <button type="button" class="btn-secondary-bb" onclick="_bbPushPolicyToAgent()">Push to booking agent</button>
+          </div>
+          <div class="bb-field-hint" style="margin-top:8px">Preview shows the exact enrollment agreement built from these rules. Push updates what the booking agent tells leads about cancellation, pausing and refunds.</div>`;
       }
       break;
     }
@@ -27388,17 +27450,16 @@ function _bbRenderCustomQuestions(offer, sectionId) {
     .map(l => `<span class="bb-choice selected" style="cursor:default" title="Always collected - can't remove">${escapeHTML(l)}</span>`)
     .join('');
 
-  // Optional = this offer's own custom questions (removable) + Add custom.
-  let optChips;
+  // Optional = this offer's own custom questions, as editable cards + Add custom.
+  let optList;
   if (list === undefined) {
-    optChips = `<span style="font-size:12px;color:var(--text-mute)">Loading…</span>`;
+    optList = `<div style="font-size:12px;color:var(--text-mute)">Loading…</div>`;
+  } else if (!list.length) {
+    optList = `<div style="font-size:12.5px;color:var(--text-mute);padding:2px 0 8px">No custom questions yet.</div>`;
   } else {
-    optChips = list.map(f => {
-      const nOpts = (f.type === 'select' || f.type === 'multiselect') && Array.isArray(f.options) && f.options.length ? ` (${f.options.length})` : '';
-      return `<span class="bb-choice selected" style="cursor:default" title="${escapeHTML(_BB_CQ_TYPE_LABEL[f.type] || f.type)}">${escapeHTML(f.label)}${nOpts}<span onclick="_bbCqDelete('${offer.id}','${sectionId}','${f.id}')" style="cursor:pointer;margin-left:7px;opacity:0.65;font-weight:700" title="Remove">×</span></span>`;
-    }).join('');
+    optList = list.map(f => _bbCqCardHtml(offer.id, sectionId, f)).join('');
   }
-  optChips += `<button type="button" class="bb-choice" onclick="_bbCqOpenAdd('${offer.id}','${sectionId}','${offer.client_id}')">+ Add custom</button>`;
+  optList += `<button type="button" class="bb-choice" style="margin-top:4px" onclick="_bbCqOpenEditor('${offer.id}','${sectionId}','${offer.client_id}','')">+ Add custom</button>`;
 
   const heading = sectionId === 'sales' ? 'Info to collect from leads' : 'Info to collect at onboarding';
   const sub = sectionId === 'sales' ? "What this offer's lead form asks." : 'What a member fills in when they join this offer.';
@@ -27409,8 +27470,71 @@ function _bbRenderCustomQuestions(offer, sectionId) {
     <div class="bb-defaults-info"><b style="color:var(--accent)">Always asked:</b></div>
     <div class="bb-choice-row" style="margin-bottom:14px">${alwaysChips}</div>
     <div class="bb-defaults-info" style="margin-top:0">Optional (your custom questions):</div>
-    <div class="bb-choice-row">${optChips}</div>
+    <div>${optList}</div>
   </div>`;
+}
+
+// One editable question card in the offer wizard's form builder (Sales /
+// Onboarding). Shows the label, type, a Required pill, its options, and the
+// per-field note, with Edit + remove. Reorder + live preview land in later slices.
+function _bbCqCardHtml(offerId, sectionId, f) {
+  const typeLabel = _BB_CQ_TYPE_LABEL[f.type] || f.type;
+  const opts = (f.type === 'select' || f.type === 'multiselect') && Array.isArray(f.options) && f.options.length
+    ? `<div style="font-size:11.5px;color:var(--text-mute);margin-top:3px">Options: ${f.options.map(o => escapeHTML(o)).join(', ')}</div>` : '';
+  const note = f.help_text ? `<div style="font-size:11.5px;color:var(--text-sub);margin-top:4px;font-style:italic">${escapeHTML(f.help_text)}</div>` : '';
+  const reqPill = f.required ? `<span style="font-size:9.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:1px 7px">Required</span>` : '';
+  return `<div draggable="true" data-cqid="${f.id}"
+      ondragstart="_bbCqDragStart(event,'${offerId}','${sectionId}','${f.id}')"
+      ondragover="_bbCqDragOver(event)" ondrop="_bbCqDrop(event,'${offerId}','${sectionId}','${f.id}')" ondragend="_bbCqDragEnd(event)"
+      style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface-alt)">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="cursor:grab;color:var(--text-mute);font-size:15px;line-height:1;user-select:none" title="Drag to reorder">⋮⋮</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(f.label)}</span>
+        <span style="font-size:10.5px;color:var(--text-mute);background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:1px 8px">${escapeHTML(typeLabel)}</span>
+        ${reqPill}
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button type="button" onclick="_bbCqOpenEditor('${offerId}','${sectionId}','','${f.id}')" style="font-size:11.5px;padding:4px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);cursor:pointer">Edit</button>
+          <button type="button" onclick="_bbCqDelete('${offerId}','${sectionId}','${f.id}')" style="font-size:13px;padding:3px 9px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-mute);cursor:pointer" title="Remove">×</button>
+        </div>
+      </div>
+      ${opts}${note}
+    </div>`;
+}
+
+// Drag-drop reorder for the question cards. Mutates the section cache order,
+// re-renders, then persists the new order (POST ?action=reorder → position=index).
+let _bbCqDragId = null;
+function _bbCqDragStart(ev, offerId, sectionId, fieldId) {
+  _bbCqDragId = fieldId;
+  try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', fieldId); } catch (e) {}
+}
+function _bbCqDragOver(ev) { ev.preventDefault(); try { ev.dataTransfer.dropEffect = 'move'; } catch (e) {} }
+function _bbCqDragEnd(ev) { _bbCqDragId = null; }
+function _bbCqDrop(ev, offerId, sectionId, targetId) {
+  ev.preventDefault();
+  const dragId = _bbCqDragId; _bbCqDragId = null;
+  if (!dragId || String(dragId) === String(targetId)) return;
+  const key = offerId + ':' + sectionId;
+  const arr = _bbCqCache[key];
+  if (!Array.isArray(arr)) return;
+  const from = arr.findIndex(f => String(f.id) === String(dragId));
+  if (from < 0) return;
+  const [moved] = arr.splice(from, 1);
+  let to = arr.findIndex(f => String(f.id) === String(targetId));
+  if (to < 0) to = arr.length; // dropped past the list end
+  arr.splice(to, 0, moved);    // land the card just before the drop target
+  _bbRenderWizardBody();
+  _bbCqPersistOrder(arr.map(f => f.id));
+}
+async function _bbCqPersistOrder(orderedIds) {
+  try {
+    const token = await _mreqAuthToken();
+    await fetch('/api/custom-fields', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reorder', ordered_ids: orderedIds }),
+    });
+  } catch (e) { /* the re-render already shows the new order; a reload re-reads server order */ }
 }
 
 async function _bbLoadCoreFields(clientId) {
@@ -27443,75 +27567,98 @@ async function _bbCqDelete(offerId, sectionId, fieldId) {
   _bbRenderWizardBody();
 }
 
-function _bbCqOpenAdd(offerId, sectionId, clientId) {
+// Add or edit a custom question. fieldId '' = add (needs clientId); a real id =
+// edit (prefilled from the section cache, PATCHed by id).
+function _bbCqOpenEditor(offerId, sectionId, clientId, fieldId) {
   document.getElementById('bb-cq-modal')?.remove();
+  const editing = !!fieldId;
+  const cur = editing ? ((_bbCqCache[offerId + ':' + sectionId] || []).find(f => String(f.id) === String(fieldId)) || {}) : {};
+  const curType = cur.type || 'text';
+  const curOpts = Array.isArray(cur.options) ? cur.options.join('\n') : '';
+  const optsShown = (curType === 'select' || curType === 'multiselect');
   const wrap = document.createElement('div');
   wrap.id = 'bb-cq-modal';
   wrap.style = 'position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px';
   const inp = 'width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;margin:6px 0 14px;box-sizing:border-box';
   const lbl = 'font-size:12px;color:var(--text-mute)';
-  const typeOpts = _BB_CQ_TYPES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
-  wrap.innerHTML = `<div style="width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px">
-    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px">New custom question</div>
+  const typeOpts = _BB_CQ_TYPES.map(([v, l]) => `<option value="${v}" ${v === curType ? 'selected' : ''}>${l}</option>`).join('');
+  wrap.innerHTML = `<div style="width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;max-height:86vh;overflow:auto">
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px">${editing ? 'Edit question' : 'New custom question'}</div>
     <label style="${lbl}">Question / label</label>
-    <input id="bb-cq-label" placeholder="e.g. Jersey size" style="${inp}">
+    <input id="bb-cq-label" placeholder="e.g. Jersey size" value="${escapeHTML(cur.label || '')}" style="${inp}">
     <label style="${lbl}">Answer type</label>
     <select id="bb-cq-type" onchange="document.getElementById('bb-cq-opts-wrap').style.display=(this.value==='select'||this.value==='multiselect')?'block':'none'" style="${inp};cursor:pointer">${typeOpts}</select>
-    <div id="bb-cq-opts-wrap" style="display:none">
+    <div id="bb-cq-opts-wrap" style="display:${optsShown ? 'block' : 'none'}">
       <label style="${lbl}">Options (one per line)</label>
-      <textarea id="bb-cq-opts" rows="3" placeholder="Small&#10;Medium&#10;Large" style="${inp};resize:vertical"></textarea>
+      <textarea id="bb-cq-opts" rows="3" placeholder="Small&#10;Medium&#10;Large" style="${inp};resize:vertical">${escapeHTML(curOpts)}</textarea>
     </div>
+    <label style="${lbl}">Note / instruction (shown under the question)</label>
+    <input id="bb-cq-help" placeholder="e.g. Age as of Sept 1" value="${escapeHTML(cur.help_text || '')}" style="${inp}">
+    <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text);cursor:pointer;margin:0 0 14px">
+      <input type="checkbox" id="bb-cq-required" ${cur.required ? 'checked' : ''}> Required
+    </label>
     <div id="bb-cq-also-wrap" style="margin-bottom:14px"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="document.getElementById('bb-cq-modal').remove()" style="padding:9px 16px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-      <button id="bb-cq-save" onclick="_bbCqSave('${offerId}','${sectionId}','${clientId}')" style="padding:9px 18px;background:var(--gold);border:1px solid var(--gold);border-radius:6px;color:#1a1a1a;font-size:13px;font-weight:700;cursor:pointer">Add</button>
+      <button id="bb-cq-save" onclick="_bbCqSaveEditor('${offerId}','${sectionId}','${clientId}','${fieldId || ''}')" style="padding:9px 18px;background:var(--gold);border:1px solid var(--gold);border-radius:6px;color:#1a1a1a;font-size:13px;font-weight:700;cursor:pointer">${editing ? 'Save' : 'Add'}</button>
     </div>
   </div>`;
   wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
   document.body.appendChild(wrap);
   setTimeout(() => { document.getElementById('bb-cq-label')?.focus(); }, 0);
-  // "Also applies to" - attach this field to other offers too (multi-offer).
-  // The current offer is always included; here the owner ticks any extras.
-  _bbLoadOffersList().then(offers => {
-    const host = document.getElementById('bb-cq-also-wrap');
-    if (!host) return;
-    const others = (offers || []).filter(o => o.id !== offerId);
-    if (!others.length) return; // nothing else to attach to
-    host.innerHTML = `<label style="${lbl}">Also collect this on other offers (optional)</label>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:132px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 10px">
-        ${others.map(o => `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);cursor:pointer">
-          <input type="checkbox" class="bb-cq-also" value="${escapeHTML(o.id)}"> ${escapeHTML(o.title || o.type || 'Offer')}
-        </label>`).join('')}
-      </div>`;
-  }).catch(() => {});
+  // "Also applies to" (multi-offer attach) only on ADD. The current offer is
+  // always included; here the owner ticks any extras.
+  if (!editing && clientId) {
+    _bbLoadOffersList().then(offers => {
+      const host = document.getElementById('bb-cq-also-wrap');
+      if (!host) return;
+      const others = (offers || []).filter(o => o.id !== offerId);
+      if (!others.length) return; // nothing else to attach to
+      host.innerHTML = `<label style="${lbl}">Also collect this on other offers (optional)</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:132px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+          ${others.map(o => `<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);cursor:pointer">
+            <input type="checkbox" class="bb-cq-also" value="${escapeHTML(o.id)}"> ${escapeHTML(o.title || o.type || 'Offer')}
+          </label>`).join('')}
+        </div>`;
+    }).catch(() => {});
+  }
 }
 
-async function _bbCqSave(offerId, sectionId, clientId) {
+async function _bbCqSaveEditor(offerId, sectionId, clientId, fieldId) {
+  const editing = !!fieldId;
   const label = (document.getElementById('bb-cq-label')?.value || '').trim();
   const type = document.getElementById('bb-cq-type')?.value || 'text';
   if (!label) { document.getElementById('bb-cq-label')?.focus(); return; }
   const optsRaw = document.getElementById('bb-cq-opts')?.value || '';
   const options = (type === 'select' || type === 'multiselect') ? optsRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
-  const alsoOfferIds = Array.from(document.querySelectorAll('.bb-cq-also:checked')).map(el => el.value).filter(Boolean);
+  const helpText = (document.getElementById('bb-cq-help')?.value || '').trim();
+  const required = !!document.getElementById('bb-cq-required')?.checked;
+  const alsoOfferIds = editing ? [] : Array.from(document.querySelectorAll('.bb-cq-also:checked')).map(el => el.value).filter(Boolean);
   const btn = document.getElementById('bb-cq-save');
-  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; btn.textContent = 'Adding…'; }
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; btn.textContent = editing ? 'Saving…' : 'Adding…'; }
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/custom-fields', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, offer_id: offerId, section: sectionId, label, type, options, also_offer_ids: alsoOfferIds }),
-    });
+    const r = editing
+      ? await fetch('/api/custom-fields', {
+          method: 'PATCH',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: fieldId, label, type, options, required, help_text: helpText }),
+        })
+      : await fetch('/api/custom-fields', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: clientId, offer_id: offerId, section: sectionId, label, type, options, required, help_text: helpText, also_offer_ids: alsoOfferIds }),
+        });
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Save failed'); }
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; btn.textContent = 'Add'; }
-    alert(e.message || 'Could not add the question.');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; btn.textContent = editing ? 'Save' : 'Add'; }
+    alert(e.message || 'Could not save the question.');
     return;
   }
   document.getElementById('bb-cq-modal')?.remove();
   delete _bbCqCache[offerId + ':' + sectionId];
-  // The field now also lives on the picked offers (same section) - drop their
-  // caches so it shows when the owner opens them.
+  // On add, the field may also live on other picked offers (same section) - drop
+  // their caches so it shows when the owner opens them.
   alsoOfferIds.forEach(oid => { delete _bbCqCache[oid + ':' + sectionId]; });
   _bbRenderWizardBody();
 }
@@ -27837,6 +27984,67 @@ function _bbUpdateField(section, key, val) {
 function _bbScheduleSave() {
   clearTimeout(_bbState._saveTimer);
   _bbState._saveTimer = setTimeout(_bbAutoSave, 600);
+}
+
+// ── Policy section actions: preview the generated agreement + push the rules
+//    into the booking agent. Both call /api/offers/policy (server generates from
+//    the same offer.data.policy the signed PDF uses). ──
+function _bbShowDocModal(title, innerHtml) {
+  let back = document.getElementById('bb-doc-modal');
+  if (!back) {
+    back = document.createElement('div');
+    back.id = 'bb-doc-modal';
+    back.className = 'modal-backdrop';
+    back.onclick = (e) => { if (e.target === back) _bbCloseDocModal(); };
+    document.body.appendChild(back);
+  }
+  back.style.display = 'flex';
+  back.innerHTML = `<div class="modal-card" style="max-width:640px;width:92%;max-height:82vh;overflow:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
+        <div class="modal-title" style="margin:0">${_bbEscapeHtml(title)}</div>
+        <button type="button" class="btn-secondary-bb" onclick="_bbCloseDocModal()">Close</button>
+      </div>
+      <div>${innerHtml}</div>
+    </div>`;
+}
+function _bbCloseDocModal() { const b = document.getElementById('bb-doc-modal'); if (b) b.style.display = 'none'; }
+
+async function _bbPreviewAgreement() {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  _bbShowDocModal('Agreement preview', `<div style="padding:18px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Generating the agreement from your policy…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/offers/policy?action=preview&client_id=${encodeURIComponent(CLIENT_ID)}&offer_id=${encodeURIComponent(offer.id)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed to generate');
+    const head = `<div style="text-align:center"><div style="font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:15px">Participation &amp; waiver agreement</div><div style="color:var(--text-mute);font-size:12.5px;margin-top:2px">${_bbEscapeHtml(j.academyName || '')}</div></div><hr style="border:none;border-top:2px solid var(--gold);margin:10px 0 6px">`;
+    const doc = (j.clauses || []).map(([h, b]) =>
+      `<p style="font-weight:600;margin:14px 0 3px;font-size:13.5px">${_bbEscapeHtml(h)}</p><p style="margin:0;font-size:13px;line-height:1.62">${_bbEscapeHtml(b)}</p>`
+    ).join('');
+    _bbShowDocModal('Agreement preview', head + doc + `<div class="bb-field-hint" style="margin-top:14px">This is the exact document generated for a signed enrollment. Clause 6 comes from your Policy rules.</div>`);
+  } catch (e) {
+    _bbShowDocModal('Agreement preview', `<div style="padding:16px;color:#c0392b;font-size:13px">Could not generate the preview: ${_bbEscapeHtml(e.message || String(e))}</div>`);
+  }
+}
+
+async function _bbPushPolicyToAgent() {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  if (!confirm("Update the booking agent's cancellation, pause and refund facts from this offer's policy?")) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/offers/policy?action=push-agent`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, offer_id: offer.id, agent: 'booking' }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    _bbShowDocModal('Pushed to booking agent', `<div style="font-size:12.5px;color:var(--text-mute);margin-bottom:8px">The booking agent's policy facts now read:</div><pre style="white-space:pre-wrap;font-size:13px;line-height:1.55;margin:0;font-family:inherit">${_bbEscapeHtml(j.body || '')}</pre>`);
+  } catch (e) {
+    alert('Could not push to the agent: ' + (e.message || String(e)));
+  }
 }
 
 async function _bbAutoSave() {
@@ -30074,8 +30282,12 @@ function _aiOnbHTML(it) {
       </div>`;
     }
   }
-  // Every step is check/uncheck-able by hand. Auto steps also self-complete
-  // from the connection signal until someone overrides them by hand.
+  // auto_only steps (Connect Stripe / Connect GHL) can NOT be ticked by hand. They
+  // tick themselves only when the account is genuinely connected. Ticking them by
+  // hand used to be allowed, which let a client mark "Connect Stripe" done without
+  // ever connecting - the portal then showed them as payment-ready when they could
+  // not charge a card. The circle is read-only for these; use the Connect CTA.
+  const autoOnly = !!it.auto_only;
   const status = isDone
     ? `<span class="ai-chip" style="color:var(--green)">✓ Done</span>`
     : (cfg.auto ? `<span class="ai-chip">Auto · not yet</span>` : `<span class="ai-chip">To do</span>`);
@@ -30085,7 +30297,9 @@ function _aiOnbHTML(it) {
   if (it.onboarding_key === 'book_call_cam' && !isDone) cta = _aiCamCallCta();
   if (it.onboarding_key === 'book_review_call' && !isDone) cta = _aiBookCallCta();
   // Subway "stop": a circle node on a vertical line + the step body to the right.
-  const circle = `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}" title="${cfg.auto ? 'Auto-completes when connected - or tick by hand' : ''}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
+  const circle = autoOnly
+    ? `<span class="ai-stop-circle${isDone ? ' on' : ''}" style="cursor:default" aria-disabled="true" title="${isDone ? 'Connected' : 'Ticks itself once your account is actually connected'}">${isDone ? _AI_CHECK_ICON : ''}</span>`
+    : `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
   return `<div class="ai-stop${isDone ? ' done' : ''}">
     <div class="ai-stop-rail">${circle}<div class="ai-stop-line"></div></div>
     <div class="ai-stop-body">
@@ -32303,30 +32517,39 @@ function _plPostTrialForm(oppId) {
           <button type="button" id="ptf-show-no" class="ptf-segbtn" onclick="_ptfSetShow(false)">No show</button>
         </div>
       </div>
-      <div class="ptf-field" id="ptf-fit-field">
+      <div class="ptf-field" id="ptf-noshow-reason-field" style="display:none">
+        <label>Why the no-show? <span style="text-transform:none;letter-spacing:0;color:var(--accent);font-weight:600">trains Hawkeye</span></label>
+        <textarea id="ptf-noshow-reason" class="ptf-input" rows="2" placeholder="e.g. Dad said work ran late - keen but busy weeknights. Hawkeye uses this to write the rebook."></textarea>
+      </div>
+      <div class="ptf-field" id="ptf-noshow-seed-field" style="display:none">
+        <label>First rebook text <span style="text-transform:none;letter-spacing:0;color:var(--text-mute);font-weight:500">optional</span></label>
+        <textarea id="ptf-noshow-seed" class="ptf-input" rows="2" placeholder="Leave blank and Hawkeye drafts it from the chat. Or write the opener and it'll work from your text."></textarea>
+      </div>
+      <div class="ptf-field" id="ptf-fit-field" style="display:none">
         <label>Was the trial a good fit?</label>
         <div class="ptf-seg">
           <button type="button" id="ptf-fit-yes" class="ptf-segbtn" onclick="_ptfSetFit(true)">Good fit</button>
           <button type="button" id="ptf-fit-no" class="ptf-segbtn" onclick="_ptfSetFit(false)">Not a fit</button>
         </div>
       </div>
-      <div class="ptf-field" id="ptf-first-msg-field">
+      <div class="ptf-field" id="ptf-first-msg-field" style="display:none">
         <label>First message to the parent</label>
         <textarea id="ptf-first-msg" class="ptf-input" rows="3" placeholder="e.g. Hey Sarah! Loved having Leah today - awesome energy. Ready to lock in her spot?"></textarea>
       </div>
-      <div class="ptf-field" id="ptf-link-field">
+      <div class="ptf-field" id="ptf-link-field" style="display:none">
         <label>Add the sign-up link at the bottom?</label>
         <div class="ptf-seg">
           <button type="button" id="ptf-link-yes" class="ptf-segbtn on" onclick="_ptfSetSendLink(true)">Yes</button>
           <button type="button" id="ptf-link-no" class="ptf-segbtn" onclick="_ptfSetSendLink(false)">No</button>
         </div>
       </div>
-      <div class="ptf-field">
+      <div class="ptf-field" id="ptf-notes-field" style="display:none">
         <label>Special notes</label>
         <textarea id="ptf-notes" class="ptf-input" rows="3" placeholder="Anything worth noting about this trial…"></textarea>
       </div>
       <div class="ptf-err" id="ptf-err"></div>
-      <div class="ptf-note">On a good fit the card moves to Done Trial and the Closing agent takes over. A no-show goes back to Booking for a rebook. Not a fit closes as unqualified. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
+      <div class="ptf-note" id="ptf-note-showed" style="display:none">On a good fit the card moves to Done Trial and the Closing agent takes over. Not a fit closes as unqualified. Your "first message" is texted to the parent; with the sign-up link on, the link is added at the bottom - set the link in KPIs → Setup → Offers (or the Blueprint training Sales section).</div>
+      <div class="ptf-note" id="ptf-note-noshow" style="display:none">The lead goes back to Booking. Hawkeye drafts the rebook text using your reason above (and your first-text, if you wrote one) and drops it in your Hawkeye deck for a final ✓ before it sends.</div>
       <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit post trial form</button>
     </div>`;
   ov.classList.add('open');
@@ -32366,22 +32589,29 @@ function _ptfSetShow(v) {
   _PTF_SHOW = v;
   document.getElementById('ptf-show-yes')?.classList.toggle('on', v === true);
   document.getElementById('ptf-show-no')?.classList.toggle('on', v === false);
-  // No-show → "good fit" and "send onboarding link" are irrelevant. Hide them,
-  // clear the fit (so it isn't required or sent), and force the link off (a
-  // no-show should never get the signup text). The backend moves them to Interested.
+  // No-show → the "good fit", first-message-to-parent, sign-up link and generic
+  // notes are all irrelevant. Hide them and swap in the two no-show fields (why +
+  // an optional first rebook text). Clear the fit + force the link off so nothing
+  // stale is sent. The backend bounces the lead back to Booking for the rebook.
   const noShow = (v === false);
-  const fitField = document.getElementById('ptf-fit-field');
-  const linkField = document.getElementById('ptf-link-field');
-  const firstMsgField = document.getElementById('ptf-first-msg-field');
-  if (fitField) fitField.style.display = noShow ? 'none' : '';
-  if (linkField) linkField.style.display = noShow ? 'none' : '';
-  if (firstMsgField) firstMsgField.style.display = noShow ? 'none' : '';
+  const showed = (v === true);
+  const setDisp = (id, show) => { const el = document.getElementById(id); if (el) el.style.display = show ? '' : 'none'; };
+  // Showed-up fields
+  setDisp('ptf-fit-field', showed);
+  setDisp('ptf-link-field', showed && _PTF_FIT === true);
+  setDisp('ptf-first-msg-field', showed && _PTF_FIT === true);
+  setDisp('ptf-notes-field', showed);
+  setDisp('ptf-note-showed', showed);
+  // No-show fields
+  setDisp('ptf-noshow-reason-field', noShow);
+  setDisp('ptf-noshow-seed-field', noShow);
+  setDisp('ptf-note-noshow', noShow);
   if (noShow) {
     _PTF_FIT = null;
     document.getElementById('ptf-fit-yes')?.classList.remove('on');
     document.getElementById('ptf-fit-no')?.classList.remove('on');
     _ptfSetSendLink(false);
-  } else if (v === true) {
+  } else if (showed) {
     _ptfSetSendLink(true);   // restore the default when they switch back to Showed up
   }
   const btn = document.getElementById('ptf-submit'); if (btn) btn.textContent = noShow ? 'Mark no-show' : 'Submit post trial form';
@@ -32390,6 +32620,14 @@ function _ptfSetFit(v) {
   _PTF_FIT = v;
   document.getElementById('ptf-fit-yes')?.classList.toggle('on', v === true);
   document.getElementById('ptf-fit-no')?.classList.toggle('on', v === false);
+  // Good fit → the first message + sign-up link ARE the follow-up you send.
+  // Not a fit → a quiet close (unqualified); nothing is texted, so hide them
+  // (parity with the Hawkeye deck form, which also drops the message on not-a-fit).
+  const goodFit = (v === true);
+  const setDisp = (id, show) => { const el = document.getElementById(id); if (el) el.style.display = show ? '' : 'none'; };
+  setDisp('ptf-first-msg-field', goodFit);
+  setDisp('ptf-link-field', goodFit);
+  const btn = document.getElementById('ptf-submit'); if (btn && _PTF_SHOW === true) btn.textContent = (v === false) ? 'Close as not a fit' : 'Submit post trial form';
 }
 function _ptfSetSendLink(v) {
   _PTF_SENDLINK = v;
@@ -32443,6 +32681,10 @@ async function _ptfSubmit() {
   const trainer = '';   // trainer picker removed from the form (2026-07-01)
   const notes = document.getElementById('ptf-notes')?.value || '';
   const firstMessage = document.getElementById('ptf-first-msg')?.value || '';
+  // No-show extras: the coach's read on the no-show (trains Hawkeye's rebook) and
+  // an optional first rebook text to work from. Only meaningful on a no-show.
+  const rebookReason = (document.getElementById('ptf-noshow-reason')?.value || '').trim();
+  const rebookSeed = (document.getElementById('ptf-noshow-seed')?.value || '').trim();
   const btn = document.getElementById('ptf-submit');
   err.style.display = 'none'; btn.disabled = true; btn.textContent = 'Saving…';
   // Measure the card NOW (pre-move) so the stage move can be animated from its
@@ -32459,10 +32701,16 @@ async function _ptfSubmit() {
     const r = await fetch(`/api/ghl/post-trial?client_id=${encodeURIComponent(CLIENT_ID)}`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, showed_up: _PTF_SHOW, trainer, notes, send_onboarding_link: _PTF_SENDLINK, first_message: firstMessage }),
+      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, showed_up: _PTF_SHOW, trainer, notes, send_onboarding_link: _PTF_SENDLINK, first_message: firstMessage, rebook_reason: rebookReason, rebook_seed: rebookSeed }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    // Teach Hawkeye from the no-show reason (best-effort, booking agent). The
+    // rebook draft already gets it as per-lead context via the backend; this saves
+    // it as a lesson so future rebooks learn too. Never blocks the submit.
+    if (_PTF_SHOW === false && rebookReason) {
+      _apxPost('/api/agent-train', 'teach', { agent: 'booking', lesson: rebookReason, kind: 'lesson', context: { source: 'post-trial-noshow' } }).catch(() => {});
+    }
     // Good fit but the stage move failed server-side: don't pretend it worked.
     if (_PTF_FIT === true && json.move_ok === false) throw new Error('Saved, but the move to Done Trial did not land - retry from the card.');
     if (_PTF_SENDLINK && json.signup_text === 'no_link') { alert('Saved - but no sign-up link is set yet, so nothing was texted. Add it in KPIs → Setup → Offers (or the Blueprint training Sales section).'); }
@@ -33493,13 +33741,19 @@ function _hk2CardHtml(r, pos, total, isTop) {
         <div class="hk2-seg">${seg('fit', true, 'Good fit', p.fit === true)}${seg('fit', false, 'Not a fit', p.fit === false)}</div>
         <div id="hk2-ptf-fitfields" style="display:${p.fit === false ? 'none' : ''}">
           <div class="hk2-lbl">First message to the parent</div>
-          <textarea class="hk2-draft"${isTop ? ' id="hk2-ptf-msg"' : ''} placeholder="Great seeing you tonight - here's how to lock in a spot..."></textarea>
-          <label class="hk2-check"><input type="checkbox"${isTop ? ' id="hk2-ptf-link"' : ''} checked> Add the sign-up link at the bottom</label>
+          <textarea class="hk2-draft"${isTop ? ' id="hk2-ptf-msg"' : ''} placeholder="Great seeing you tonight - here's how to lock in a spot...">${escapeHTML(p.msg || '')}</textarea>
+          <label class="hk2-check"><input type="checkbox"${isTop ? ' id="hk2-ptf-link"' : ''}${p.link !== false ? ' checked' : ''}> Add the sign-up link at the bottom</label>
           <div class="hk2-lbl">Special notes - the Closing agent reads these</div>
-          <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-notes"' : ''} placeholder="Loved the small-group drills, dad asked about Tuesdays..."></textarea>
+          <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-notes"' : ''} placeholder="Loved the small-group drills, dad asked about Tuesdays...">${escapeHTML(p.notes || '')}</textarea>
         </div>
       </div>
-      <div class="hk2-note">One submit routes them: good fit moves to Done Trial, no-show hands Booking the rebook, not a fit closes as unqualified or lost.</div>`;
+      <div id="hk2-ptf-noshow" style="display:${p.showed === false ? '' : 'none'}">
+        <div class="hk2-lbl">Why the no-show? <span style="text-transform:none;letter-spacing:0;color:var(--accent);font-weight:700">trains Hawkeye</span></div>
+        <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-nsreason"' : ''} placeholder="e.g. Dad said work ran late - keen but busy weeknights. Hawkeye writes the rebook from this.">${escapeHTML(p.nsReason || '')}</textarea>
+        <div class="hk2-lbl">First rebook text <span style="text-transform:none;letter-spacing:0;color:var(--text-mute);font-weight:600">optional</span></div>
+        <textarea class="hk2-draft sm"${isTop ? ' id="hk2-ptf-nsseed"' : ''} placeholder="Leave blank and Hawkeye drafts it from the chat. Or write the opener and it'll work from your text.">${escapeHTML(p.nsSeed || '')}</textarea>
+      </div>
+      <div class="hk2-note">One submit routes them: good fit moves to Done Trial, a no-show hands Booking the rebook (it drafts the text here for your final ✓), not a fit closes as unqualified or lost.</div>`;
   } else {
     // A reply that PROPOSES a time still carries the slot as structured data, but
     // we do NOT surface a "verified open slot" box on the reply card (Zoran
@@ -33590,17 +33844,18 @@ function _hk2CardHtml(r, pos, total, isTop) {
 // Post-trial form segmented pickers: state on _HK2.ptf, re-render keeps it.
 function _hk2PtfPick(grp, val) {
   if (!_HK2.ptf) _HK2.ptf = {};
-  // Preserve typed text across the re-render (the textareas are inside the card).
+  // Capture every typed field into state BEFORE the re-render tears the textareas
+  // down (the card HTML re-renders their values from _HK2.ptf), so nothing the
+  // coach wrote is lost when they flip a segmented choice.
   const msg = document.getElementById('hk2-ptf-msg'), notes = document.getElementById('hk2-ptf-notes'), link = document.getElementById('hk2-ptf-link');
+  const nsReason = document.getElementById('hk2-ptf-nsreason'), nsSeed = document.getElementById('hk2-ptf-nsseed');
+  if (msg) _HK2.ptf.msg = msg.value;
+  if (notes) _HK2.ptf.notes = notes.value;
+  if (link) _HK2.ptf.link = link.checked;
+  if (nsReason) _HK2.ptf.nsReason = nsReason.value;
+  if (nsSeed) _HK2.ptf.nsSeed = nsSeed.value;
   _HK2.ptf[grp === 'showed' ? 'showed' : 'fit'] = val;
-  _HK2.ptf.msg = msg ? msg.value : (_HK2.ptf.msg || '');
-  _HK2.ptf.notes = notes ? notes.value : (_HK2.ptf.notes || '');
-  _HK2.ptf.link = link ? link.checked : (_HK2.ptf.link !== false);
   _hk2Render({ keepPtf: true });
-  const m2 = document.getElementById('hk2-ptf-msg'), n2 = document.getElementById('hk2-ptf-notes'), l2 = document.getElementById('hk2-ptf-link');
-  if (m2) m2.value = _HK2.ptf.msg || '';
-  if (n2) n2.value = _HK2.ptf.notes || '';
-  if (l2) l2.checked = _HK2.ptf.link !== false;
 }
 // Not-a-fit terminal closes: stamp the chosen outcome and run the same submit
 // path. 'unqualified' = quiet dead-end; 'lost' = Lead Nurture takes over.
@@ -33681,7 +33936,7 @@ function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
   const _t0 = (_HK2.q[_HK2.agent] || [])[0]; if (_t0) { _t0._writeMode = false; _t0._moveArm = null; }
-  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', outcome: null };
+  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', nsReason: '', nsSeed: '', outcome: null };
   const tabs = _hk2TabsHtml();
   const q = _HK2.q[_HK2.agent];
   const deck = !q.length
@@ -33876,7 +34131,9 @@ function _hk2Confirm() {
     if (p.showed !== true && p.showed !== false) { _apxToast('Pick Showed up or No show first', false); r._hk2Busy = false; return; }
     if (p.showed === true && p.fit !== true && p.fit !== false) { _apxToast('Pick Good fit or Not a fit', false); r._hk2Busy = false; return; }
     const msgEl = document.getElementById('hk2-ptf-msg'), notesEl = document.getElementById('hk2-ptf-notes'), linkEl = document.getElementById('hk2-ptf-link');
+    const nsReasonEl = document.getElementById('hk2-ptf-nsreason'), nsSeedEl = document.getElementById('hk2-ptf-nsseed');
     const notFit = p.showed === true && p.fit === false;
+    const noShow = p.showed === false;
     ptf = {
       opportunity_id: r.opportunity_id,
       showed_up: p.showed,
@@ -33885,6 +34142,11 @@ function _hk2Confirm() {
       notes: notFit ? '' : (notesEl ? notesEl.value : '').trim(),
       first_message: (p.showed === true && !notFit) ? (msgEl ? msgEl.value : '').trim() : '',
       send_onboarding_link: (p.showed === true && !notFit) ? !!(linkEl && linkEl.checked) : false,
+      // No-show: the coach's read on WHY (trains Hawkeye's rebook) + an optional
+      // first rebook text. Both feed the booking agent's draft, which lands back
+      // in this deck for a final ✓ - nothing sends from the form on a no-show.
+      rebook_reason: noShow ? ((nsReasonEl ? nsReasonEl.value : (p.nsReason || '')).trim()) : '',
+      rebook_seed: noShow ? ((nsSeedEl ? nsSeedEl.value : (p.nsSeed || '')).trim()) : '',
       // Not a fit splits into two terminal closes: unqualified (quiet dead-end)
       // or lost (Lead Nurture takes over). Backend ignores it unless not-a-fit.
       outcome: notFit ? (p.outcome === 'lost' ? 'lost' : 'unqualified') : undefined,
@@ -33943,6 +34205,12 @@ function _hk2Confirm() {
       if (notFit && ptf.outcome === 'lost' && j && j.lost_ok === false) throw new Error('Saved, but the Lost close did not land - reopen the card and retry.');
       if (notFit && ptf.outcome !== 'lost' && j && j.unqualified_ok === false) throw new Error("Saved, but the Unqualified close did not land (no post-trial not-a-fit route set up) - use Mark lost, or set up the route.");
       _apxToast(ptf.showed_up === false ? 'No-show logged - Booking drafts the rebook' : ptf.good_fit ? 'Routed to Done Trial - Closing takes over' : ptf.outcome === 'lost' ? 'Marked lost - Nurture takes over' : 'Closed as unqualified', true);
+      // Teach Hawkeye from the no-show reason (best-effort, booking agent). The
+      // rebook draft already gets it as per-lead context from the backend; this
+      // also saves it as a lesson so future rebooks learn. Never blocks the flow.
+      if (ptf.showed_up === false && ptf.rebook_reason) {
+        _apxPost('/api/agent-train', 'teach', { agent: 'booking', lesson: ptf.rebook_reason, kind: 'lesson', context: { source: 'post-trial-noshow' } }).catch(() => {});
+      }
     } else if (k === 'plan') {
       const edits = planEdits;
       const token = await _mreqAuthToken();
@@ -41662,8 +41930,17 @@ function openStripeConnectModal() {
       ` : ''}`;
     primaryBtn = `<button onclick="connectStripe()" style="background:transparent;color:var(--text);border:1px solid var(--border);padding:8px 16px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Reconnect / switch account</button>`;
   } else if (status === 'onboarding') {
-    bodyHtml = `<div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Stripe connection didn't finish - start the OAuth flow again to complete it.</div>`;
-    primaryBtn = `<button onclick="connectStripe()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Continue setup</button>`;
+    // Two ways to land here: the OAuth never finished (no account_id), or it DID
+    // finish but Stripe still has outstanding requirements so the account cannot
+    // charge yet. Those need different instructions - sending someone back through
+    // OAuth when the real blocker is inside Stripe just loops them.
+    bodyHtml = stripe.account_id
+      ? `<div style="font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5">Your Stripe account is linked, but Stripe says it <b>cannot accept payments yet</b> - there are still steps to finish inside Stripe (business details, bank account, or ID verification).</div>
+         <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px;line-height:1.5">Finish those in your Stripe dashboard. This step ticks itself as soon as Stripe says you can take payments - you do not need to reconnect.</div>`
+      : `<div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Stripe connection didn't finish - start the connect flow again to complete it.</div>`;
+    primaryBtn = stripe.account_id
+      ? `<a href="https://dashboard.stripe.com/" target="_blank" rel="noopener" style="display:inline-block;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;text-decoration:none">Finish in Stripe</a>`
+      : `<button onclick="connectStripe()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Continue setup</button>`;
   } else if (status === 'disabled') {
     bodyHtml = `<div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Stripe access was revoked. Reconnect to resume billing actions.</div>`;
     primaryBtn = `<button onclick="connectStripe()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Reconnect Stripe</button>`;
@@ -50190,11 +50467,12 @@ function _ccExitBeta() {
 // portal, a V2 academy boots its command center - so this is the way back
 // into all the other academies from inside V2.
 let _ccAcctFilter = '';
-// Locked to Zoran + Mike only (both email domains they may sign in with).
+// Locked to Zoran + Mike + Rosano only (all email domains they may sign in with).
 const _CC_ACCT_EMAILS = [
   'zoran@byanymeansbball.com', 'zoran@byanymeansbusiness.com',
   'mike@byanymeansbball.com', 'mike@byanymeansbusiness.com',
   'info@byanymeanstoronto.ca',
+  'admin@byanymeansbusiness.com',
 ];
 let _ccAcctEmailOk = false;
 
@@ -54838,11 +55116,16 @@ function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
   if (!_V2_PINS.length && !desc) { _mmToast('Add a note or a line of context first'); return; }
   const onOther = typeof _FN_ACTIVE !== 'undefined' && !!_FN_ACTIVE;   // annotating an "other" funnel page
+  // Tie the request to the offer that owns this page. Every funnel row carries
+  // offer_id; for the main free-trial page use the primary funnel's offer.
+  const _srcFunnel = onOther ? _FN_ACTIVE : (Array.isArray(_FN) ? _FN.find(f => f.is_primary) : null);
   const payload = {
     module: 'landing-page', request_type: _V2_TYPE, source: 'v2_portal_oneclick',
     description: desc,
     context: {
       funnel: onOther ? _FN_ACTIVE.key : 'free-trial',
+      funnel_id: _srcFunnel?.id || null,
+      offer_id: _srcFunnel?.offer_id || null,
       page_url: onOther ? (_FN_ACTIVE.url_resolved || null) : ((typeof _MM !== 'undefined' && _MM?.page?.url) || null),
       metric_snapshot: (!onOther && typeof _MM !== 'undefined' && _MM?.page) ? {
         visitors: _MM.page.visitors, form_started: _MM.page.form_started,
