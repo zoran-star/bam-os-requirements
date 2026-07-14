@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 //   live    → the number, voice config, cutover date + this month's spend
 export default function PhoneTab({ client, tokens: t, session }) {
   const [data, setData] = useState(null);
+  const [sw, setSw] = useState(null); // texting & calling provider switch state
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
 
@@ -17,15 +18,32 @@ export default function PhoneTab({ client, tokens: t, session }) {
       headers: { Authorization: `Bearer ${session?.access_token}`, "Content-Type": "application/json", ...(opts.headers || {}) },
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    if (!r.ok) { const e = new Error(j.error || `HTTP ${r.status}`); e.blockers = j.blockers; throw e; }
     return j;
   };
 
   const load = async () => {
     try { setErr(""); setData(await api(`/api/twilio/migration-status?client_id=${client.id}`)); }
     catch (e) { setErr(e.message); }
+    try { setSw(await api(`/api/twilio/provider-switch?client_id=${client.id}`)); } catch (e) { /* switch card hides */ }
   };
-  useEffect(() => { setData(null); load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [client.id]);
+  useEffect(() => { setData(null); setSw(null); load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [client.id]);
+
+  const flipProvider = async (provider) => {
+    const label = provider === "twilio" ? "BAM Twilio" : "GHL";
+    const detail = provider === "twilio"
+      ? "Outbound texting reroutes through the BAM number and call buttons go native, effective immediately."
+      : "Outbound texting reroutes through GHL and call buttons fall back to \"Call in GHL\", effective immediately.";
+    if (!window.confirm(`Switch ${client.business_name}'s texting & calling to ${label}?\n\n${detail}`)) return;
+    setBusy("Switching…");
+    try {
+      await api("/api/twilio/provider-switch", { method: "POST", body: JSON.stringify({ client_id: client.id, provider }) });
+      await load();
+    } catch (e) {
+      window.alert("Couldn't switch: " + e.message + (Array.isArray(e.blockers) && e.blockers.length ? "\n\n- " + e.blockers.join("\n- ") : ""));
+    }
+    setBusy("");
+  };
 
   const startPort = async () => {
     const number = window.prompt("The number being ported (E.164, e.g. +17862443336) - from the phone audit:");
@@ -88,8 +106,42 @@ export default function PhoneTab({ client, tokens: t, session }) {
   const cfg = data.config || {};
   const spend = `$${(data.month_spend_usd || 0).toFixed(2)} this month`;
 
+  // Texting & calling transport switch - the V2 staff flip between BAM Twilio
+  // and GHL. Shown in every phase; going Twilio is gated on the number being
+  // actually usable (port landed + A2P verified when required).
+  const onTwilio = sw && sw.messaging_provider === "twilio";
+  const switchCard = sw ? (
+    <div style={{ ...S.card, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <div style={S.label}>Texting &amp; calling</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>
+            {onTwilio ? pill("ON BAM TWILIO", "#7BC47F") : pill("ON GHL", "#c79a4a")}
+            {onTwilio && sw.from_number ? <span style={{ color: t.textMute, marginLeft: 10 }}>{sw.from_number}</span> : null}
+          </div>
+        </div>
+        {onTwilio ? (
+          <button style={S.btn(false)} onClick={() => flipProvider("ghl")} disabled={!!busy}>{busy || "Switch to GHL"}</button>
+        ) : (
+          <button style={S.btn(true)} onClick={() => flipProvider("twilio")} disabled={!!busy || !sw.can_go_twilio}
+            title={sw.can_go_twilio ? "" : (sw.blockers || []).join(" ")}>{busy || "Switch to Twilio"}</button>
+        )}
+      </div>
+      {!onTwilio && !sw.can_go_twilio ? (
+        <div style={{ fontSize: 12, color: t.textMute, marginTop: 10, lineHeight: 1.5 }}>
+          {(sw.blockers || []).map((x, i) => <div key={i}>- {x}</div>)}
+        </div>
+      ) : null}
+      <div style={{ fontSize: 11.5, color: t.textMute, marginTop: 10, lineHeight: 1.5 }}>
+        One switch for both channels: outbound texts reroute instantly, and call buttons go native on Twilio or fall back to "Call in GHL".
+      </div>
+    </div>
+  ) : null;
+
   if (data.phase === "live") {
     return (
+      <div>
+      {switchCard}
       <div style={S.card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={S.label}>Phone system</div>
@@ -100,6 +152,7 @@ export default function PhoneTab({ client, tokens: t, session }) {
         <div style={S.row}><span style={{ color: t.textMute }}>Voicemail / missed-call text</span><span>{cfg.voicemail_enabled ? "on" : "off"} / {cfg.missed_call_text_enabled ? "on" : "off"}</span></div>
         {cfg.cutover_at ? <div style={S.row}><span style={{ color: t.textMute }}>Cut over</span><span>{String(cfg.cutover_at).slice(0, 10)}</span></div> : null}
         <div style={{ ...S.row, borderBottom: "none" }}><span style={{ color: t.textMute }}>Twilio spend</span><b>{spend}</b></div>
+      </div>
       </div>
     );
   }
@@ -112,6 +165,8 @@ export default function PhoneTab({ client, tokens: t, session }) {
       : cfg.a2p_campaign_sid ? ["A2P VETTING", "#c79a4a"]
       : ["A2P AWAITING REGISTRATION", "#c79a4a"];
     return (
+      <div>
+      {switchCard}
       <div style={S.card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={S.label}>Migration in progress</div>
@@ -131,10 +186,13 @@ export default function PhoneTab({ client, tokens: t, session }) {
           Their texting keeps flowing via GHL until cutover. The watcher checks every 30 minutes.
         </div>
       </div>
+      </div>
     );
   }
 
   return (
+    <div>
+    {switchCard}
     <div style={S.card}>
       <div style={{ ...S.label, marginBottom: 10 }}>Phone system</div>
       <div style={{ fontSize: 13, color: t.textSub, marginBottom: 16, lineHeight: 1.5 }}>
@@ -144,6 +202,7 @@ export default function PhoneTab({ client, tokens: t, session }) {
         <button style={S.btn(true)} onClick={startPort} disabled={!!busy}>{busy || "Port their GHL number"}</button>
         <button style={S.btn(false)} onClick={buyNumber} disabled={!!busy}>Get a new number</button>
       </div>
+    </div>
     </div>
   );
 }
