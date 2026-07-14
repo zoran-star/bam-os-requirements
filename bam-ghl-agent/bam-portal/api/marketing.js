@@ -969,11 +969,15 @@ async function handleMarketingTickets(req, res) {
         return res.status(409).json({ error: "no action was requested" });
       }
       patch.client_action_status = "responded";
-      // Budget-review: the client's confirmation BECOMES one marketing support
-      // ticket. We keep THIS ticket open (no auto-complete) and fold in the
-      // confirmed per-campaign budgets so marketing can apply them and then mark
-      // it completed. Always fires - even a "no changes" confirm leaves a ticket
-      // the team can verify. budgets = [{ name, current, confirmed, changed }].
+      // Budget-review (reworked 2026-07-14, Cam + Ximena): the client still
+      // decides, but the aftermath differs by outcome.
+      //   NO CHANGES -> auto-complete on the spot. The old "always leave a
+      //     ticket to verify" rule buried the digest in zombie tasks - most
+      //     overdue Marketing lines were zero-change confirms nobody had
+      //     anything to do about.
+      //   CHANGES -> ticket stays in-progress for marketing to apply, and the
+      //     client's assigned SM gets a Slack DM with the itemized changes.
+      // budgets = [{ name, current, confirmed, changed }].
       let respBody = message;
       if (ticket.type === "budget-review" && Array.isArray(body.budgets)) {
         const budgets = body.budgets.map(b => ({
@@ -984,8 +988,6 @@ async function handleMarketingTickets(req, res) {
         }));
         const changedCount = budgets.filter(b => b.changed).length;
         patch.fields = { ...(ticket.fields || {}), confirmed_budgets: budgets, changes_count: changedCount };
-        // Stays in-progress as a marketing work ticket; make sure it has an owner.
-        if (!ticket.assigned_to) patch.assigned_to = await clientScalingManager(ticket.client_id);
         // Build an itemized summary so the staff board reads at a glance.
         const lines = budgets.map(b => {
           const cur = b.current != null ? `$${b.current}` : "n/a";
@@ -994,6 +996,20 @@ async function handleMarketingTickets(req, res) {
             : `• ${b.name}: ${cur}  (no change)`;
         });
         respBody = `${changedCount ? `Confirmed monthly budgets - ${changedCount} change${changedCount === 1 ? "" : "s"}` : "Confirmed monthly budgets - no changes"}:\n${lines.join("\n")}`;
+        if (changedCount === 0) {
+          patch.status = "completed";
+          patch.resolved_at = nowIso();
+        } else {
+          // Stays in-progress as a marketing work ticket; make sure it has an owner.
+          const smId = ticket.assigned_to || await clientScalingManager(ticket.client_id);
+          if (!ticket.assigned_to) patch.assigned_to = smId;
+          const changedLines = budgets.filter(b => b.changed)
+            .map(b => `• ${b.name}: ${b.current != null ? `$${b.current}` : "n/a"} → $${b.confirmed}`);
+          const bizName = ctx.client?.business_name || "client";
+          staffSlackIdById(smId).then(sid => {
+            if (sid) postStaffSlackDM(sid, `💰 Budget changes confirmed - ${bizName}:\n${changedLines.join("\n")}\nApply in Meta, then mark the ticket completed.`, req);
+          });
+        }
       }
       patch.messages = appendMessage(ticket.messages, {
         author_type: "client", author_name: authorName,
