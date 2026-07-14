@@ -26379,7 +26379,9 @@ function _bbRenderField(field, sectionId) {
         _epEnsureLoaded();
         body = `<div style="padding:14px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading entry points…</div>`;
       } else if (!_EP_DATA.length) {
-        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No entry points yet. They appear here as your website forms, GHL forms, calendars and funnels are detected.</div>`;
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No entry points yet. They appear here as your website forms, GHL forms, calendars and funnels are detected.
+          <div style="margin-top:10px"><button type="button" class="btn-secondary-bb" onclick="_bbSeedEntryPoints()">Create standard entry points</button></div>
+          <div style="font-size:11px;margin-top:6px">Sets up the free-trial and contact form entry points (plus their funnel pages) for this offer. You connect routing after.</div></div>`;
       } else {
         body = `<div class="ep-grid">${_EP_DATA.map(ep => _epCardHtml(ep, `_epOpenWizard('${_bbEscapeAttr(ep.id)}')`)).join('')}</div>`;
       }
@@ -27684,6 +27686,29 @@ function _bbSalesStatusHtml(st) {
       ${row('Booking agent facts', st.agent_sections > 0, st.agent_sections > 0 ? `${st.agent_sections} synced` : 'using defaults')}
       ${row('Form fields', fields > 0, `${st.sales_fields || 0} lead · ${st.onboarding_fields || 0} intake`)}
     </div>`;
+}
+
+// Seed the standard website entry points + funnels for this offer (Gap 2D).
+// Idempotent server-side; refreshes the EP manager in place.
+async function _bbSeedEntryPoints() {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/seed-entry-points', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: CLIENT_ID, offer_id: offer.id }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    // Refresh the entry-points cache directly, then re-render.
+    try {
+      const er = await fetch('/api/website/entry-points?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+      const ej = await er.json().catch(() => ({}));
+      if (er.ok) _EP_DATA = ej.entry_points || [];
+    } catch (e) { /* next open reloads */ }
+    _bbSalesStatusCache = {};
+    _bbRenderWizardBody();
+  } catch (e) {
+    alert('Could not create entry points: ' + (e.message || String(e)));
+  }
 }
 
 // Seed the preset's baseline automations onto this offer (Gap #2, phase 2C).
