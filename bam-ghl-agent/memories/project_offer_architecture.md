@@ -44,6 +44,14 @@ The Policy tab is added **additively** in `_bbWizardSections`: it appears only f
 
 Still-open: `pause_allowed` is not yet read by the member-drawer Pause action (member-management enforcement is unbuilt).
 
+## Form builder — Sales / Onboarding "info to collect" (Gap #5, phase 5A-1, 2026-07-13)
+
+The Sales and Onboarding sections each render a `custom_field_defs`-backed panel via `_bbRenderCustomQuestions` (`section='sales'` = the free-trial/lead form, `section='onboarding'` = the intake form; scoped by `offer_id`). This is being turned into a real form builder.
+
+**5A-1 shipped:** the optional questions render as **editable cards** (`_bbCqCardHtml`) instead of read-only chips. `_bbCqOpenEditor(offerId, sectionId, clientId, fieldId)` handles both add (fieldId '') and **edit** (real id → PATCH); `_bbCqSaveEditor` POSTs/PATCHes. New per-field **note** (`custom_field_defs.help_text` column, added additively via `execute_sql` + migration `20260714120000_custom_field_defs_help_text.sql`) + a **Required** toggle, both wired through `api/custom-fields.js` create + PATCH. Field types unchanged (`_BB_CQ_TYPES`: text/number/date/select/multiselect/boolean/phone/email/url).
+
+**Still to build (5A-2/5A-3, 5C):** drag-drop reorder (position column exists, no UI/bulk-reorder API yet), live form preview, live-renderer support for multiselect/number/url in `api/website/offer.js` (they collapse to text today), and the member-import AI-suggested-fields checklist modal.
+
 ## Team is special
 
 The Team type has only **2 top-level sections** (General + Per team), because Team is an umbrella for *multiple* specific teams under one program brand.
