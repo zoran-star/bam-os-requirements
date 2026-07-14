@@ -99,9 +99,78 @@ function summarizeCalendar(c) {
 
 async function loadClient(clientId) {
   const rows = await sb(
-    `clients?id=eq.${clientId}&select=id,time_zone,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
+    `clients?id=eq.${clientId}&select=id,time_zone,booking_provider,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
   );
   return rows?.[0] || null;
+}
+
+// Portal-spine calendar (booking_provider='portal'): the academy's real weekly
+// schedule straight from Supabase - schedule_slots + trial_bookings + reservations
+// - so an academy that has moved OFF GoHighLevel sees its live sessions and who's
+// booked, with each attendee's contact id, without any GHL call. Returns a flat
+// slots[] (each slot = one grid block); the client renders + colours it.
+async function portalCalendarGet(req, res, clientId, client) {
+  try {
+    const q = req.query || {};
+    const now = Date.now();
+    const fromISO = new Date(q.from ? Date.parse(q.from) : now - 14 * 864e5).toISOString();
+    const toISO = new Date(q.to ? Date.parse(q.to) : now + 42 * 864e5).toISOString();
+    const encF = encodeURIComponent(fromISO), encT = encodeURIComponent(toISO);
+
+    const slots = (await sb(
+      `schedule_slots?tenant_id=eq.${clientId}&is_cancelled=eq.false&start_time=gte.${encF}&start_time=lt.${encT}` +
+      `&select=id,name,start_time,end_time,capacity,location_label,location_id,bookable_program_id,slot_template_id&order=start_time.asc&limit=1000`
+    )) || [];
+    const tz = client.time_zone || "America/Toronto";
+    if (!slots.length) return res.status(200).json({ provider: "portal", timezone: tz, slots: [] });
+
+    const slotIds = slots.map(s => s.id);
+    const idIn = `(${slotIds.join(",")})`;
+    const [programs, locations, tbs, resv] = await Promise.all([
+      sb(`bookable_programs?tenant_id=eq.${clientId}&select=id,title`).catch(() => []),
+      sb(`locations?client_id=eq.${clientId}&select=id,title`).catch(() => []),
+      sb(`trial_bookings?tenant_id=eq.${clientId}&slot_id=in.${idIn}&status=in.(BOOKED,SHOWED,NO_SHOW,CONVERTED)&select=slot_id,ghl_contact_id,athlete_name,parent_name,status&limit=3000`).catch(() => []),
+      sb(`reservations?tenant_id=eq.${clientId}&slot_id=in.${idIn}&status=eq.CONFIRMED&select=slot_id&limit=3000`).catch(() => []),
+    ]);
+    const progById = {}; for (const p of (programs || [])) progById[p.id] = p.title || null;
+    const locById = {}; for (const l of (locations || [])) locById[l.id] = l.title || null;
+
+    const bySlot = {}, bookedCount = {};
+    for (const t of (tbs || [])) {
+      (bySlot[t.slot_id] = bySlot[t.slot_id] || []).push({
+        ghl_contact_id: t.ghl_contact_id || null,
+        name: t.athlete_name || t.parent_name || "Guest",
+        athlete_name: t.athlete_name || null,
+        parent_name: t.parent_name || null,
+        status: t.status || null,
+      });
+      if (t.status === "BOOKED") bookedCount[t.slot_id] = (bookedCount[t.slot_id] || 0) + 1;
+    }
+    const resvCount = {};
+    for (const r of (resv || [])) resvCount[r.slot_id] = (resvCount[r.slot_id] || 0) + 1;
+
+    const out = slots.map(s => {
+      const cap = s.capacity != null ? s.capacity : null;
+      const taken = (bookedCount[s.id] || 0) + (resvCount[s.id] || 0);
+      return {
+        id: s.id,
+        name: s.name || "Session",
+        start: s.start_time,
+        end: s.end_time,
+        capacity: cap,
+        spots_taken: taken,
+        spots_left: cap != null ? Math.max(0, cap - taken) : null,
+        program_id: s.bookable_program_id || null,
+        program: progById[s.bookable_program_id] || null,
+        venue: (s.location_id && locById[s.location_id]) || s.location_label || null,
+        template_id: s.slot_template_id || null,
+        attendees: bySlot[s.id] || [],
+      };
+    });
+    return res.status(200).json({ provider: "portal", timezone: tz, slots: out });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
 }
 
 async function handler(req, res) {
@@ -123,6 +192,12 @@ async function handler(req, res) {
   try { client = await loadClient(clientId); }
   catch (e) { return res.status(500).json({ error: e.message }); }
   if (!client) return res.status(404).json({ error: "academy not found" });
+
+  // Academies that have moved off GHL read the calendar straight from the portal
+  // spine - no GHL token needed. (PATCH/POST calendar config stays GHL-only for now.)
+  if (req.method === "GET" && client.booking_provider === "portal") {
+    return await portalCalendarGet(req, res, clientId, client);
+  }
 
   let token;
   try { token = await getClientGhlToken(client); }
