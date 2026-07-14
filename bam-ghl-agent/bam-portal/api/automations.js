@@ -23,7 +23,8 @@ import { renderEmail } from "./email-shells.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { isMuted } from "./agent/_mutes.js";
 import { resolveAgentActor } from "./agent/_auth.js";
-import { FORM_INTRO_DEFAULTS, GHOSTED_DEFAULT } from "./form-intro-automations.js";
+import { FORM_INTRO_DEFAULTS, GHOSTED_DEFAULT, NURTURE_DEFAULT } from "./form-intro-automations.js";
+import { presetAutomationKeys } from "./agent/presets.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -55,7 +56,7 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,time_zone,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,time_zone,website_setup,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
@@ -478,10 +479,16 @@ async function runWork(res) {
         } catch (_) { /* leave blank */ }
       }
 
+      // {{location.name}} / {{location.website}} resolve from the REAL client row,
+      // not the hardcoded LOCATIONS map (which falls back to GTA for unknown
+      // academies - a new academy must never send GTA's name or site).
+      const location_name = (client && client.business_name) || "";
+      const wsDomain = client && client.website_setup && client.website_setup.domain;
+      const location_website = wsDomain ? `https://${wsDomain}` : "";
       const result = await sendOn({
         channel: step.channel, clientId: job.client_id, contactId: job.contact_id,
         toEmail: info.email, toPhone: info.phone, subject: step.subject, body: step.body, ghlToken: token,
-        vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session },
+        vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session, location_name, location_website },
       });
 
       if (result && result.sent) { await finish({ status: "sent", sent_at: new Date().toISOString() }); sent++; await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "step_sent", payload: { step_id: job.step_id, channel: step.channel } }); }
@@ -729,8 +736,14 @@ async function handler(req, res) {
     // idempotent + edit-safe rule as seed-form-intro (create only if missing; add
     // steps only when the automation has zero). All dormant (approved:false).
     if (b.action === "seed-preset-automations") {
-      const DEFS = { ...FORM_INTRO_DEFAULTS, ghosted: GHOSTED_DEFAULT };
-      const keys = (Array.isArray(b.keys) && b.keys.length) ? b.keys.filter(k => DEFS[k]) : Object.keys(DEFS);
+      const DEFS = { ...FORM_INTRO_DEFAULTS, ghosted: GHOSTED_DEFAULT, nurture: NURTURE_DEFAULT };
+      // Preset-driven (station model): pass b.preset (e.g. 'free_trial') and the
+      // seed list comes from the preset manifest itself - stage engines + form
+      // intros + exit actions. Explicit b.keys still wins; no preset = all DEFS.
+      const manifestKeys = b.preset ? presetAutomationKeys(String(b.preset)) : null;
+      const keys = (Array.isArray(b.keys) && b.keys.length) ? b.keys.filter(k => DEFS[k])
+        : (Array.isArray(manifestKeys) && manifestKeys.length) ? manifestKeys.filter(k => DEFS[k])
+        : Object.keys(DEFS);
       const results = [];
       for (const key of keys) {
         const def = DEFS[key];

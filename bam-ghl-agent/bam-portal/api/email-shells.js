@@ -112,9 +112,12 @@ export function resolveMergeVars(html, L, vars = {}) {
     "contact.athlete_full_name": vars.athlete || "your athlete",
     "contact.athlete_first_name": _athFirst || "your athlete",
     "contact.athletes_first_name": _athFirst || "your athlete",
-    "location.city": L.city || "",
-    "location.name": L.full || "",
-    "location.website": L.siteUrl || "",
+    // vars overrides first: locFor() falls back to GTA's config for academies not
+    // in the LOCATIONS map, so callers (the automations worker) pass the REAL
+    // academy name/site via vars to keep GTA's identity out of other academies' sends.
+    "location.city": vars.location_city || L.city || "",
+    "location.name": vars.location_name || L.full || "",
+    "location.website": vars.location_website || L.siteUrl || "",
     "location_owner.first_name": L.ownerFirst || "",
     // Filled at send time by the worker (e.g. "Our next session is Tue 6pm. ").
     // Empty string when no slot is known so the sentence just drops out.

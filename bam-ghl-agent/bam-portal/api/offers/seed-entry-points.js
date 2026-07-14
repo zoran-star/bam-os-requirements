@@ -1,16 +1,24 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { presetEntrySources } from "../agent/presets.js";
 
-// Seed the standard website entry points + funnels for an offer (Gap 2D).
+// Seed the website entry points + funnels a preset's stations declare (Gap 2D,
+// preset-driven since the station model).
 //
-//   POST /api/offers/seed-entry-points   body { client_id, offer_id }
+//   POST /api/offers/seed-entry-points   body { client_id, offer_id, preset? }
 //     → { ok, entry_points: n, funnels: n }
 //
+// The form list comes from the preset manifest (api/agent/presets.js): each
+// stage's entry.sources of kind website-form, plus the funnel it belongs to.
+// Default preset is free_trial, which declares exactly the pair this endpoint
+// used to hardcode (free-trial primary + contact). Calendar sources are NOT
+// seeded here - booking go-live creates those.
+//
 // Creates, idempotently (upsert on the tables' unique keys, ignore-duplicates):
-//   funnels:      free-trial (primary) + contact, offer-tied
-//   entry_points: website-form "free-trial" + "contact", offer-tied, enabled,
-//                 linked to their funnel. GHL-specific columns stay null - the
-//                 lead endpoint tolerates null pipeline/stage/field_map/workflow
-//                 for portal-native academies (contact minting, tags, and offer
+//   funnels:      from the sources' funnel declarations, offer-tied
+//   entry_points: website-form rows, offer-tied, enabled, linked to their
+//                 funnel. GHL-specific columns stay null - the lead endpoint
+//                 tolerates null pipeline/stage/field_map/workflow for
+//                 portal-native academies (contact minting, tags, and offer
 //                 lineage all still work; routing is configured afterwards in
 //                 the Entry Points wizard).
 //
@@ -57,29 +65,37 @@ async function handler(req, res) {
     const offerRows = await sb(`offers?id=eq.${enc(offerId)}&client_id=eq.${enc(clientId)}&select=id&limit=1`);
     if (!(Array.isArray(offerRows) && offerRows[0])) return res.status(404).json({ error: "offer not found for this academy" });
 
+    // The station manifest declares which forms (+ funnels) this preset needs.
+    const presetKey = String(b.preset || "free_trial");
+    const sources = presetEntrySources(presetKey).filter(s => s.kind === "website-form");
+    if (!sources.length) return res.status(400).json({ error: `preset '${presetKey}' declares no website-form sources` });
+
     // Funnels first (unique: client_id, key) so entry points can link to them.
+    const funnelDecls = [];
+    for (const s of sources) {
+      if (s.funnel && !funnelDecls.find(f => f.key === s.funnel.key)) funnelDecls.push(s.funnel);
+    }
     await sb(`funnels?on_conflict=client_id,key`, {
       method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
-      body: JSON.stringify([
-        { client_id: clientId, offer_id: offerId, key: "free-trial", label: "Free trial landing page", is_primary: true },
-        { client_id: clientId, offer_id: offerId, key: "contact", label: "Contact page", is_primary: false },
-      ]),
+      body: JSON.stringify(funnelDecls.map(f => (
+        { client_id: clientId, offer_id: offerId, key: f.key, label: f.label, is_primary: !!f.primary }
+      ))),
     });
-    const funnels = await sb(`funnels?client_id=eq.${enc(clientId)}&key=in.(free-trial,contact)&select=id,key`) || [];
+    const funnelKeys = funnelDecls.map(f => f.key).join(",");
+    const funnels = await sb(`funnels?client_id=eq.${enc(clientId)}&key=in.(${funnelKeys})&select=id,key`) || [];
     const funnelId = (key) => (funnels.find(f => f.key === key) || {}).id || null;
 
     // Entry points (unique: client_id, type, key). GHL columns stay null.
     await sb(`entry_points?on_conflict=client_id,type,key`, {
       method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
-      body: JSON.stringify([
-        { client_id: clientId, type: "website-form", key: "free-trial", label: "Website Free Trial",
-          tags: ["website-inquiry", "free trial form filled"], offer_id: offerId, funnel_id: funnelId("free-trial"), enabled: true },
-        { client_id: clientId, type: "website-form", key: "contact", label: "Website Contact Form",
-          tags: ["website-inquiry", "contact form filled"], offer_id: offerId, funnel_id: funnelId("contact"), enabled: true },
-      ]),
+      body: JSON.stringify(sources.map(s => (
+        { client_id: clientId, type: "website-form", key: s.key, label: s.label,
+          tags: s.tags || [], offer_id: offerId, funnel_id: s.funnel ? funnelId(s.funnel.key) : null, enabled: true }
+      ))),
     });
 
-    const eps = await sb(`entry_points?client_id=eq.${enc(clientId)}&type=eq.website-form&key=in.(free-trial,contact)&select=id`) || [];
+    const epKeys = sources.map(s => s.key).join(",");
+    const eps = await sb(`entry_points?client_id=eq.${enc(clientId)}&type=eq.website-form&key=in.(${epKeys})&select=id`) || [];
     return res.status(200).json({ ok: true, entry_points: eps.length, funnels: funnels.length });
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || String(e) });

@@ -1,25 +1,41 @@
-// ── Pipeline Preset Registry (Phase 2) ───────────────────────────────────────
+// ── Pipeline Preset Registry (Phase 2 → station model 2026-07-14) ─────────────
 // Presets are authored HERE, in code (Zoran, 2026-07-10): BAM-only, versioned in
-// git, no template tables and no authoring UI. A preset is a named sales playbook
-// = its stage list + the transition graph between those stages + which worker
-// runs each stage. `applyPreset()` STAMPS a preset onto an academy's OFFER,
-// writing the `pipeline_stages` + `stage_transitions` rows the board, router, and
-// agents already read.
+// git, no template tables and no authoring UI.
+//
+// THE STATION MODEL (agreed 2026-07-14): a preset is an assembly line of STAGES,
+// and each stage is a self-contained station declaring three things:
+//
+//   entry   how contacts ARRIVE here - the pipeline entry trigger (new_lead) if
+//           this is the front door, plus the SOURCES that create arrivals
+//           (website forms, calendars). A form source can name the intro
+//           automation that fires when someone comes in through it.
+//   engine  WHO works the station - an agent template, an automation, or a human.
+//   exits   where contacts GO next - triggers to other stages or to a terminal
+//           (member / unqualified / human). An exit can carry an automation
+//           action that fires when it's taken (e.g. missed_trial on no_show).
+//
+// Because every stage carries its own entries/engine/exits, stages are PORTABLE:
+// preset #2 lifts Confirm + Closing unchanged and adds one new call station in
+// front. Forms and calendars stop being separately-configured artifacts - they
+// are just sources on a stage's entry, so the seeders (entry points, automations)
+// read THIS file instead of hardcoding their own lists.
+//
+// Storage is unchanged: buildPresetRows() compiles the tree into the exact
+// pipeline_stages + stage_transitions rows the board, router, and agents already
+// read. free_trial still compiles to today's 5 stages + 20 edges byte-for-byte.
 //
 // Two things share this file:
-//   • AGENT_TEMPLATES — reusable agent definitions. A template = an underlying
+//   • AGENT_TEMPLATES - reusable agent definitions. A template = an underlying
 //     runtime (booking | confirm | closing behaviour, defined in
 //     prompt-structure.js) + a mission + the lesson bucket it trains into. The
 //     SAME template can appear in many presets: craft taught to `trial_confirm`
 //     helps every preset that reuses it (Phase 4 scopes lessons by template).
-//   • PRESETS — the playbooks. `free_trial` is today's exact live model
-//     (5 stages + 20 edges, byte-for-byte the seed_default_stage_transitions
-//     flow). `discovery_trial` is preset #2 (Zoran's outline): a discovery call
-//     before the trial, reusing trial_confirm + closing untouched.
+//   • PRESETS - the playbooks. `free_trial` is today's exact live model.
+//     `discovery_trial` is preset #2 (Zoran's outline): a discovery call before
+//     the trial, reusing trial_confirm + closing untouched.
 //
-// This is the "presets in CODE" decision made real. Adding a preset = editing
-// this file + (if it introduces a new agent mission) authoring that template's
-// prompt sections. No migration, no DB template rows.
+// Adding a preset = editing this file + (if it introduces a new agent mission)
+// authoring that template's prompt sections. No migration, no DB template rows.
 //
 // Design: bam-ghl-agent/docs/agent-preset-architecture.html ·
 //         docs/core-handoff/pipeline-presets.md
@@ -37,59 +53,105 @@ export const AGENT_TEMPLATES = {
   trial_booking: { runtime: "booking", lessonKey: "booking", mission: "Book the lead into a free trial session." },
   trial_confirm: { runtime: "confirm", lessonKey: "confirm", mission: "Confirm a booked trial and make sure they show up." },
   closing:       { runtime: "closing", lessonKey: "closing", mission: "Convert a good-fit trial attendee into an enrolled member." },
-  // Preset #2 additions — new missions, existing runtimes. Prompt sections to be
+  // Preset #2 additions - new missions, existing runtimes. Prompt sections to be
   // authored when discovery_trial ships (Phase 2 only DECLARES them).
   call_booking:  { runtime: "booking", lessonKey: "call_booking", mission: "Book the lead into a discovery call (not a trial yet)." },
   call_confirm:  { runtime: "confirm", lessonKey: "call_confirm", mission: "Confirm a booked discovery call and make sure they attend it." },
 };
 
-// Worker shorthands for a stage.
+// ── Station-model shorthands ─────────────────────────────────────────────────
+// Engines (who works a stage).
 const agent = (template) => ({ kind: "agent", template });
 const automation = (key) => ({ kind: "automation", key });
 const HUMAN = { kind: "human" };
 
-// Edge tuple helpers → the exact stage_transitions row shape.
-// stage edge: to another role. terminal edge: to member | unqualified | human.
-const to = (fromRole, trigger, toRole) => ({ fromRole, trigger, toKind: "stage", toRole });
-const end = (fromRole, trigger, terminal) => ({ fromRole, trigger, toKind: "terminal", terminal });
-const ENTRY = null; // from_stage_role IS NULL — the external new_lead entry.
+// Exits. go = to another stage. out = to a terminal (member | unqualified | human).
+// Either can carry { action: automation(key) } - fired when the exit is taken.
+const go  = (trigger, toRole, extra) => ({ trigger, toKind: "stage", toRole, ...(extra || {}) });
+const out = (trigger, terminal, extra) => ({ trigger, toKind: "terminal", terminal, ...(extra || {}) });
+
+// Entry sources. A form source seeds a funnels + entry_points pair and can name
+// the intro automation that first-touches leads who arrive through it. A calendar
+// source is NOT seeded here - booking go-live creates it - but declaring it tells
+// the UI (and future validation) what bookable artifact the stage expects.
+const form = ({ key, label, tags, funnel, intro }) => ({ kind: "website-form", key, label, tags, funnel, intro: intro || null });
+const calendar = ({ ref, label }) => ({ kind: "calendar", ref, label });
 
 // ── PRESETS ──────────────────────────────────────────────────────────────────
+// Stages are authored in FLOW order (main path first, side stations after) with
+// explicit `position` carrying the board order. The compiler emits stage rows in
+// position order and edges in authored order, which keeps free_trial's compiled
+// output identical to the pre-station-model file.
 export const PRESETS = {
   // free_trial = the current live BAM model, reproduced exactly. Stamping it onto
   // an academy's Training offer must yield today's 5 stages + 20 edges verbatim.
   free_trial: {
     key: "free_trial",
     label: "Free Trial",
+    version: 1,
     description: "Lead → book a free trial → confirm the trial → close after a good-fit trial.",
     stages: [
-      { role: "responded",       label: "Booking", position: 0, worker: agent("trial_booking") },
-      { role: "interested",      label: "Ghosted", position: 1, worker: automation("ghosted") },
-      { role: "scheduled_trial", label: "Confirm", position: 2, worker: agent("trial_confirm") },
-      { role: "done_trial",      label: "Closing", position: 3, worker: agent("closing") },
-      { role: "nurture",         label: "Nurture", position: 4, worker: automation("lead_nurture") },
-    ],
-    transitions: [
-      to(ENTRY,             "new_lead",            "responded"),
-      to("responded",       "booked",              "scheduled_trial"),
-      to("responded",       "not_interested",      "nurture"),
-      end("responded",      "marked_unqualified",  "unqualified"),
-      to("responded",       "went_quiet",          "interested"),
-      end("responded",      "complaint_offtopic",  "human"),
-      to("scheduled_trial", "post_trial_good_fit", "done_trial"),
-      end("scheduled_trial","post_trial_not_fit",  "unqualified"),
-      to("scheduled_trial", "no_show",             "responded"),
-      to("scheduled_trial", "cant_make_it",        "responded"),
-      to("scheduled_trial", "no_longer_wants",     "nurture"),
-      end("scheduled_trial","marked_unqualified",  "unqualified"),
-      end("scheduled_trial","complaint_offtopic",  "human"),
-      end("done_trial",     "enrolls",             "member"),
-      to("done_trial",      "says_no",             "nurture"),
-      end("done_trial",     "marked_unqualified",  "unqualified"),
-      end("done_trial",     "complaint_offtopic",  "human"),
-      to("interested",      "replied",             "responded"),
-      to("interested",      "ghosted_ran_out",     "nurture"),
-      to("nurture",         "replied",             "responded"),
+      { role: "responded", label: "Booking", position: 0,
+        entry: {
+          trigger: "new_lead", // the pipeline's front door (from_stage_role NULL edge)
+          sources: [
+            form({ key: "free-trial", label: "Website Free Trial", tags: ["website-inquiry", "free trial form filled"],
+                   funnel: { key: "free-trial", label: "Free trial landing page", primary: true }, intro: "trial_form" }),
+            form({ key: "contact", label: "Website Contact Form", tags: ["website-inquiry", "contact form filled"],
+                   funnel: { key: "contact", label: "Contact page", primary: false }, intro: "contact_form" }),
+          ],
+        },
+        engine: agent("trial_booking"),
+        exits: [
+          go("booked", "scheduled_trial"),
+          go("not_interested", "nurture"),
+          out("marked_unqualified", "unqualified"),
+          go("went_quiet", "interested"),
+          out("complaint_offtopic", "human"),
+        ],
+      },
+      { role: "scheduled_trial", label: "Confirm", position: 2,
+        entry: { sources: [calendar({ ref: "free-trial", label: "Free trial calendar" })] },
+        engine: agent("trial_confirm"),
+        exits: [
+          go("post_trial_good_fit", "done_trial"),
+          out("post_trial_not_fit", "unqualified"),
+          go("no_show", "responded", { action: automation("missed_trial") }),
+          go("cant_make_it", "responded"),
+          go("no_longer_wants", "nurture"),
+          out("marked_unqualified", "unqualified"),
+          out("complaint_offtopic", "human"),
+        ],
+      },
+      { role: "done_trial", label: "Closing", position: 3,
+        entry: {},
+        engine: agent("closing"),
+        exits: [
+          out("enrolls", "member"),
+          go("says_no", "nurture"),
+          out("marked_unqualified", "unqualified"),
+          out("complaint_offtopic", "human"),
+        ],
+      },
+      { role: "interested", label: "Ghosted", position: 1,
+        entry: {},
+        engine: automation("ghosted"),
+        exits: [
+          go("replied", "responded"),
+          go("ghosted_ran_out", "nurture"),
+        ],
+      },
+      { role: "nurture", label: "Nurture", position: 4,
+        entry: {},
+        // KEY FIX (2026-07-14): the worker enrolls + advances automation_key
+        // 'nurture' (api/automations.js), NOT 'lead_nurture'. The old value was a
+        // display-only mismatch here, but now this key DRIVES the seeder - so it
+        // must match the engine.
+        engine: automation("nurture"),
+        exits: [
+          go("replied", "responded"),
+        ],
+      },
     ],
   },
 
@@ -100,60 +162,163 @@ export const PRESETS = {
   discovery_trial: {
     key: "discovery_trial",
     label: "Discovery Call → Trial",
+    version: 1,
     description: "Lead → book a discovery call → confirm the call → book a trial → confirm the trial → close.",
     stages: [
-      { role: "responded",            label: "Booking",      position: 0, worker: agent("call_booking") },
-      { role: "interested",           label: "Ghosted",      position: 1, worker: automation("ghosted") },
-      { role: "discovery_call_booked",label: "Call Confirm", position: 2, worker: agent("call_confirm") },
-      { role: "scheduled_trial",      label: "Trial Confirm",position: 3, worker: agent("trial_confirm") },
-      { role: "done_trial",           label: "Closing",      position: 4, worker: agent("closing") },
-      { role: "nurture",              label: "Nurture",      position: 5, worker: automation("lead_nurture") },
-    ],
-    transitions: [
-      to(ENTRY,                    "new_lead",            "responded"),
-      to("responded",              "booked",              "discovery_call_booked"),
-      to("responded",              "not_interested",      "nurture"),
-      end("responded",             "marked_unqualified",  "unqualified"),
-      to("responded",              "went_quiet",          "interested"),
-      end("responded",             "complaint_offtopic",  "human"),
-      to("discovery_call_booked",  "booked",              "scheduled_trial"),
-      to("discovery_call_booked",  "no_show",             "responded"),
-      to("discovery_call_booked",  "cant_make_it",        "responded"),
-      to("discovery_call_booked",  "no_longer_wants",     "nurture"),
-      end("discovery_call_booked", "marked_unqualified",  "unqualified"),
-      end("discovery_call_booked", "complaint_offtopic",  "human"),
-      to("scheduled_trial",        "post_trial_good_fit", "done_trial"),
-      end("scheduled_trial",       "post_trial_not_fit",  "unqualified"),
-      to("scheduled_trial",        "no_show",             "responded"),
-      to("scheduled_trial",        "cant_make_it",        "responded"),
-      to("scheduled_trial",        "no_longer_wants",     "nurture"),
-      end("scheduled_trial",       "marked_unqualified",  "unqualified"),
-      end("scheduled_trial",       "complaint_offtopic",  "human"),
-      end("done_trial",            "enrolls",             "member"),
-      to("done_trial",             "says_no",             "nurture"),
-      end("done_trial",            "marked_unqualified",  "unqualified"),
-      end("done_trial",            "complaint_offtopic",  "human"),
-      to("interested",             "replied",             "responded"),
-      to("interested",             "ghosted_ran_out",     "nurture"),
-      to("nurture",                "replied",             "responded"),
+      { role: "responded", label: "Booking", position: 0,
+        entry: {
+          trigger: "new_lead",
+          sources: [
+            form({ key: "free-trial", label: "Website Free Trial", tags: ["website-inquiry", "free trial form filled"],
+                   funnel: { key: "free-trial", label: "Free trial landing page", primary: true }, intro: "trial_form" }),
+            form({ key: "contact", label: "Website Contact Form", tags: ["website-inquiry", "contact form filled"],
+                   funnel: { key: "contact", label: "Contact page", primary: false }, intro: "contact_form" }),
+          ],
+        },
+        engine: agent("call_booking"),
+        exits: [
+          go("booked", "discovery_call_booked"),
+          go("not_interested", "nurture"),
+          out("marked_unqualified", "unqualified"),
+          go("went_quiet", "interested"),
+          out("complaint_offtopic", "human"),
+        ],
+      },
+      { role: "discovery_call_booked", label: "Call Confirm", position: 2,
+        entry: { sources: [calendar({ ref: "discovery-call", label: "Discovery call calendar" })] },
+        engine: agent("call_confirm"),
+        exits: [
+          go("booked", "scheduled_trial"),
+          go("no_show", "responded"),
+          go("cant_make_it", "responded"),
+          go("no_longer_wants", "nurture"),
+          out("marked_unqualified", "unqualified"),
+          out("complaint_offtopic", "human"),
+        ],
+      },
+      { role: "scheduled_trial", label: "Trial Confirm", position: 3,
+        entry: { sources: [calendar({ ref: "free-trial", label: "Free trial calendar" })] },
+        engine: agent("trial_confirm"),
+        exits: [
+          go("post_trial_good_fit", "done_trial"),
+          out("post_trial_not_fit", "unqualified"),
+          go("no_show", "responded", { action: automation("missed_trial") }),
+          go("cant_make_it", "responded"),
+          go("no_longer_wants", "nurture"),
+          out("marked_unqualified", "unqualified"),
+          out("complaint_offtopic", "human"),
+        ],
+      },
+      { role: "done_trial", label: "Closing", position: 4,
+        entry: {},
+        engine: agent("closing"),
+        exits: [
+          out("enrolls", "member"),
+          go("says_no", "nurture"),
+          out("marked_unqualified", "unqualified"),
+          out("complaint_offtopic", "human"),
+        ],
+      },
+      { role: "interested", label: "Ghosted", position: 1,
+        entry: {},
+        engine: automation("ghosted"),
+        exits: [
+          go("replied", "responded"),
+          go("ghosted_ran_out", "nurture"),
+        ],
+      },
+      { role: "nurture", label: "Nurture", position: 5,
+        entry: {},
+        engine: automation("nurture"),
+        exits: [
+          go("replied", "responded"),
+        ],
+      },
     ],
   },
 };
 
-// Every role a preset uses (for validation / display).
+// ── Derived views over the station tree ──────────────────────────────────────
+
+// Every role a preset uses (for validation / display), in board (position) order.
 export function presetRoles(presetKey) {
   const p = PRESETS[presetKey];
-  return p ? p.stages.map((s) => s.role) : [];
+  return p ? [...p.stages].sort((a, b) => a.position - b.position).map((s) => s.role) : [];
 }
 
-// Turn a preset into the concrete DB rows for one (client, offer). Pure — no I/O.
+// Flatten the tree back into the flat transition list the compiler writes.
+// Entry edges (from_stage_role NULL) first, then each stage's exits in authored
+// (flow) order - the same ordering the pre-station-model flat lists carried.
+function presetTransitions(p) {
+  const list = [];
+  for (const s of p.stages) {
+    if (s.entry && s.entry.trigger) list.push({ fromRole: null, trigger: s.entry.trigger, toKind: "stage", toRole: s.role });
+  }
+  for (const s of p.stages) {
+    for (const e of s.exits || []) list.push({ fromRole: s.role, trigger: e.trigger, toKind: e.toKind, toRole: e.toRole, terminal: e.terminal });
+  }
+  return list;
+}
+
+// Every automation key the preset relies on: stage engines + form-source intros +
+// exit actions. This IS the seed list for seed-preset-automations - a new preset
+// brings its own automations by declaring them on its stations.
+export function presetAutomationKeys(presetKey) {
+  const p = PRESETS[presetKey];
+  if (!p) return [];
+  const keys = [];
+  const add = (k) => { if (k && !keys.includes(k)) keys.push(k); };
+  for (const s of p.stages) {
+    for (const src of (s.entry && s.entry.sources) || []) add(src.intro);
+    if (s.engine && s.engine.kind === "automation") add(s.engine.key);
+    for (const e of s.exits || []) if (e.action && e.action.kind === "automation") add(e.action.key);
+  }
+  return keys;
+}
+
+// Every entry source the preset declares. seed-entry-points seeds the
+// website-form ones (+ their funnels); calendar sources are created by booking
+// go-live and are listed for display/validation only.
+export function presetEntrySources(presetKey) {
+  const p = PRESETS[presetKey];
+  if (!p) return [];
+  const list = [];
+  for (const s of p.stages) {
+    for (const src of (s.entry && s.entry.sources) || []) list.push({ ...src, stageRole: s.role });
+  }
+  return list;
+}
+
+// UI-facing summary of everything the preset stamps - the "Choose the preset"
+// step renders its chips from this, so the UI never hardcodes preset contents.
+export function presetContents(presetKey) {
+  const p = PRESETS[presetKey];
+  if (!p) return null;
+  const stages = [...p.stages].sort((a, b) => a.position - b.position);
+  return {
+    key: p.key,
+    label: p.label,
+    version: p.version || 1,
+    description: p.description,
+    stages: stages.map((s) => ({ role: s.role, label: s.label, engine: s.engine ? s.engine.kind : "human",
+      engine_ref: s.engine ? (s.engine.template || s.engine.key || null) : null })),
+    agents: stages.filter((s) => s.engine && s.engine.kind === "agent")
+      .map((s) => ({ template: s.engine.template, mission: (AGENT_TEMPLATES[s.engine.template] || {}).mission || "" })),
+    automations: presetAutomationKeys(presetKey),
+    forms: presetEntrySources(presetKey).filter((x) => x.kind === "website-form").map((x) => ({ key: x.key, label: x.label })),
+    calendars: presetEntrySources(presetKey).filter((x) => x.kind === "calendar").map((x) => ({ ref: x.ref, label: x.label })),
+  };
+}
+
+// ── Compiler ─────────────────────────────────────────────────────────────────
+// Turn a preset into the concrete DB rows for one (client, offer). Pure - no I/O.
 // Returns { stageRows, transitionRows } exactly matching the table columns.
 export function buildPresetRows(presetKey, clientId, offerId) {
   const p = PRESETS[presetKey];
   if (!p) throw new Error(`unknown preset '${presetKey}' (known: ${Object.keys(PRESETS).join(", ")})`);
   if (!clientId) throw new Error("clientId required");
 
-  const stageRows = p.stages.map((s) => ({
+  const stageRows = [...p.stages].sort((a, b) => a.position - b.position).map((s) => ({
     client_id: clientId,
     offer_id: offerId || null,
     role: s.role,
@@ -162,10 +327,10 @@ export function buildPresetRows(presetKey, clientId, offerId) {
     is_terminal: false, // preset stages are working stages; won/unqualified are terminal DESTINATIONS, not stages
   }));
 
-  const transitionRows = p.transitions.map((e, i) => ({
+  const transitionRows = presetTransitions(p).map((e, i) => ({
     client_id: clientId,
     offer_id: offerId || null,
-    pipeline_id: null, // client-wide default flow — resolveEdge filters pipeline_id IS NULL
+    pipeline_id: null, // client-wide default flow - resolveEdge filters pipeline_id IS NULL
     from_stage_role: e.fromRole, // null for the new_lead entry
     trigger: e.trigger,
     to_kind: e.toKind,
@@ -183,7 +348,7 @@ export function buildPresetRows(presetKey, clientId, offerId) {
 // reader). Pass { dryRun:true } to get the rows WITHOUT writing.
 //
 // SCOPE GUARD (Phase 2): the live board/router/agents key the pipeline by
-// (client_id, role), NOT by offer — so a single academy can hold only ONE
+// (client_id, role), NOT by offer - so a single academy can hold only ONE
 // pipeline today. applyPreset therefore targets a fresh academy (no rows) or a
 // re-stamp of the SAME offer. If the academy already has stages tagged to a
 // DIFFERENT offer, it refuses: running two offer pipelines in one academy needs

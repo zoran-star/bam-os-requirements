@@ -236,20 +236,39 @@ Update in the same commit that ships the change. Triggers:
 - New V2 feature added (Members is the only one today)
 - Tracker visibility logic changes
 
-## Academy onboarding flow (`_obf`) — expanded 2026-07-13
+## Academy onboarding flow (`_obf`) — station-model restructure 2026-07-14
 The V2 "Finish your onboarding" flow (client-portal.html `_obf*`, opened from the
 nav orb's progress ring; NOT the retired `_obt` 8-circle pill) is a grouped,
 auto-detecting, resumable modal. Steps are config objects in `_OBF_STEPS`
-(`key/group/title/sub/cta/go`, optional `skippable`); groups in `_OBF_GROUPS`
-(general = shared, training = per-offer). Completion is auto-detected in
-`_obfFetchState` from LIVE data - nothing hand-checked.
+(`key/group/title/sub/cta/go`, optional `skippable`, optional `subgroup`,
+optional `note` = name of a global sub-state fn); groups in `_OBF_GROUPS`
+(general = "Your academy", training = "Training offer"). Completion is
+auto-detected in `_obfFetchState` from LIVE data - nothing hand-checked.
 
-Now 10 steps (was 4): general = ein/email/website; training = policy, pipeline,
-automations, agent, entrypoints, booking, members. The 6 new training steps are
-all detected from `GET /api/offers/setup-status` (offer_id now OPTIONAL there -
-resolves the published/newest training offer; returns pipeline_stages,
-automations[], agent_sections, entry_points, has_policy, booking_live). Each new
-step deep-links via `_obfGoOffer(sectionId)` → `_bbNavigate('offers', offerId,
-{step})` (step index mirrors `_bbWizardSections`' policy-after-pricing insert).
-Consequence: fully-live academies (GTA/DETAIL) may see the orb reappear until
-they set the newer capabilities (e.g. structured policy) - intended + accurate.
+**Structure (2026-07-14, "the offer is the container"):** 10 steps.
+- general: ein / email / website (unchanged).
+- training, define-it → sell-it → fill-it arc:
+  `define` (general_info basics) → `schedule` (weekly classes; **booking is a
+  sub-state note here, not a step** - `_obfScheduleNote` renders waiting-on-
+  pricing amber / go-live amber CTA / live green from st.booking+st.pricing) →
+  `pricing` (Stripe-matched prices) → `policy`, then subgroup **Sales**:
+  `preset` (ONE step - `_obfApplyPreset(btn)` chains apply-preset →
+  seed-preset-automations → sync-agent → seed-entry-points, all preset-keyed,
+  idempotent, re-runnable; 409 needs_force asks before replacing a customized
+  pipeline), then subgroup **Onboarding**: `onboardingform` (onboarding
+  custom_field_defs > 0) + `members`.
+- Preset step detection: offer.data.sales.preset stamp OR legacy all-four
+  (pipeline+automations+agent+entrypoints) so pre-stamp academies (GTA/DETAIL)
+  read done.
+- `_obfFetchState` no longer calls /api/members - setup-status returns a
+  members count.
+
+`GET /api/offers/setup-status` (offer_id optional - resolves published/newest
+training offer) returns: pipeline_stages, transitions, automations[],
+agent_sections, sales_fields, onboarding_fields, entry_points, has_policy,
+booking_live + (2026-07-14) define_done, schedule_set, pricing_filled,
+prices_matched, members, preset{key,version,applied_at}. Deep-links via
+`_obfGoOffer(sectionId)` → `_bbNavigate('offers', offerId, {step})` (step index
+mirrors `_bbWizardSections`' policy-after-pricing insert). Consequence:
+fully-live academies (GTA/DETAIL) may see the orb reappear until they set the
+newer capabilities (e.g. structured policy) - intended + accurate.
