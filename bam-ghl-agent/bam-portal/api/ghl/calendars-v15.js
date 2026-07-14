@@ -459,7 +459,33 @@ async function handler(req, res) {
           for (const r of (Array.isArray(wl) ? wl : [])) { const bs = r && r.fields && r.fields.booked_slot; if (bs) { trial_date = bs; break; } }
         } catch (_) {}
       }
-      return res.status(200).json({ trial_date, trial_status, coach });
+      // Full booking history (portal academies) for the contact-card timeline:
+      // every trial the contact booked, oldest-first, each with its outcome
+      // status (BOOKED/SHOWED/NO_SHOW/CANCELLED/CONVERTED) and the linked
+      // post-trial review (coach/fit/notes) via trial_booking_id. A no-show →
+      // rebook is two rows here. GHL-only academies have no portal bookings → [].
+      let trials = [];
+      try {
+        const tbAll = await sb(`trial_bookings?tenant_id=eq.${clientId}&ghl_contact_id=eq.${enc}&select=id,status,created_at,schedule_slots(start_time)&order=created_at.asc&limit=50`);
+        let revByBooking = {};
+        try {
+          const prAll = await sb(`post_trial_reviews?client_id=eq.${clientId}&ghl_contact_id=eq.${enc}&select=trial_booking_id,trainer,good_fit,notes,created_at&order=created_at.asc&limit=50`);
+          for (const r of (Array.isArray(prAll) ? prAll : [])) { if (r && r.trial_booking_id) revByBooking[r.trial_booking_id] = r; }
+        } catch (_) {}
+        trials = (Array.isArray(tbAll) ? tbAll : []).map((b) => {
+          const rev = revByBooking[b.id] || null;
+          return {
+            id: b.id,
+            date: (b.schedule_slots && b.schedule_slots.start_time) || null,
+            status: b.status || null,
+            booked_at: b.created_at || null,
+            coach: (rev && rev.trainer) || null,
+            good_fit: rev ? (rev.good_fit ?? null) : null,
+            notes: (rev && rev.notes) || null,
+          };
+        });
+      } catch (_) {}
+      return res.status(200).json({ trial_date, trial_status, coach, trials });
     }
 
     // booking_provider='portal': the entire surface runs on the portal spine -
