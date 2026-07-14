@@ -25323,6 +25323,7 @@ const _bbOfferConfigs = {
         hint:'Days after purchase a refund is allowed.' },
       { key:'makeup_policy', type:'textarea', label:'Makeup / reschedule policy',
         hint:'Shown to members and in the agreement, e.g. "Reschedule through the app."' },
+      { key:'__policy_actions__', type:'policy_actions', label:'Agreement & agent' },
       _bbCommonExtraNotes
     ]},
     { id:'sales', label:'Sales', fields:[
@@ -26042,6 +26043,22 @@ function _bbRenderField(field, sectionId) {
         body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No entry points yet. They appear here as your website forms, GHL forms, calendars and funnels are detected.</div>`;
       } else {
         body = `<div class="ep-grid">${_EP_DATA.map(ep => _epCardHtml(ep, `_epOpenWizard('${_bbEscapeAttr(ep.id)}')`)).join('')}</div>`;
+      }
+      break;
+    }
+    case 'policy_actions': {
+      // Two actions the Policy section unlocks: preview the exact enrollment
+      // agreement generated from these rules, and push the same rules into the
+      // booking agent's policy facts. Both need a saved offer id.
+      const _paOid = _bbState.offer && _bbState.offer.id;
+      if (!_paOid) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then preview the agreement or push it to the agent.</div>`;
+      } else {
+        body = `<div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button type="button" class="btn-secondary-bb" onclick="_bbPreviewAgreement()">Preview agreement</button>
+            <button type="button" class="btn-secondary-bb" onclick="_bbPushPolicyToAgent()">Push to booking agent</button>
+          </div>
+          <div class="bb-field-hint" style="margin-top:8px">Preview shows the exact enrollment agreement built from these rules. Push updates what the booking agent tells leads about cancellation, pausing and refunds.</div>`;
       }
       break;
     }
@@ -27547,6 +27564,67 @@ function _bbUpdateField(section, key, val) {
 function _bbScheduleSave() {
   clearTimeout(_bbState._saveTimer);
   _bbState._saveTimer = setTimeout(_bbAutoSave, 600);
+}
+
+// ── Policy section actions: preview the generated agreement + push the rules
+//    into the booking agent. Both call /api/offers/policy (server generates from
+//    the same offer.data.policy the signed PDF uses). ──
+function _bbShowDocModal(title, innerHtml) {
+  let back = document.getElementById('bb-doc-modal');
+  if (!back) {
+    back = document.createElement('div');
+    back.id = 'bb-doc-modal';
+    back.className = 'modal-backdrop';
+    back.onclick = (e) => { if (e.target === back) _bbCloseDocModal(); };
+    document.body.appendChild(back);
+  }
+  back.style.display = 'flex';
+  back.innerHTML = `<div class="modal-card" style="max-width:640px;width:92%;max-height:82vh;overflow:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
+        <div class="modal-title" style="margin:0">${_bbEscapeHtml(title)}</div>
+        <button type="button" class="btn-secondary-bb" onclick="_bbCloseDocModal()">Close</button>
+      </div>
+      <div>${innerHtml}</div>
+    </div>`;
+}
+function _bbCloseDocModal() { const b = document.getElementById('bb-doc-modal'); if (b) b.style.display = 'none'; }
+
+async function _bbPreviewAgreement() {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  _bbShowDocModal('Agreement preview', `<div style="padding:18px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Generating the agreement from your policy…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/offers/policy?action=preview&client_id=${encodeURIComponent(CLIENT_ID)}&offer_id=${encodeURIComponent(offer.id)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed to generate');
+    const head = `<div style="text-align:center"><div style="font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:15px">Participation &amp; waiver agreement</div><div style="color:var(--text-mute);font-size:12.5px;margin-top:2px">${_bbEscapeHtml(j.academyName || '')}</div></div><hr style="border:none;border-top:2px solid var(--gold);margin:10px 0 6px">`;
+    const doc = (j.clauses || []).map(([h, b]) =>
+      `<p style="font-weight:600;margin:14px 0 3px;font-size:13.5px">${_bbEscapeHtml(h)}</p><p style="margin:0;font-size:13px;line-height:1.62">${_bbEscapeHtml(b)}</p>`
+    ).join('');
+    _bbShowDocModal('Agreement preview', head + doc + `<div class="bb-field-hint" style="margin-top:14px">This is the exact document generated for a signed enrollment. Clause 6 comes from your Policy rules.</div>`);
+  } catch (e) {
+    _bbShowDocModal('Agreement preview', `<div style="padding:16px;color:#c0392b;font-size:13px">Could not generate the preview: ${_bbEscapeHtml(e.message || String(e))}</div>`);
+  }
+}
+
+async function _bbPushPolicyToAgent() {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  if (!confirm("Update the booking agent's cancellation, pause and refund facts from this offer's policy?")) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/offers/policy?action=push-agent`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, offer_id: offer.id, agent: 'booking' }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    _bbShowDocModal('Pushed to booking agent', `<div style="font-size:12.5px;color:var(--text-mute);margin-bottom:8px">The booking agent's policy facts now read:</div><pre style="white-space:pre-wrap;font-size:13px;line-height:1.55;margin:0;font-family:inherit">${_bbEscapeHtml(j.body || '')}</pre>`);
+  } catch (e) {
+    alert('Could not push to the agent: ' + (e.message || String(e)));
+  }
 }
 
 async function _bbAutoSave() {
