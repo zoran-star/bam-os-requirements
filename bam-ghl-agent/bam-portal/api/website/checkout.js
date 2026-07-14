@@ -27,7 +27,7 @@
 // api/stripe/webhook.js on invoice.paid; this endpoint only sets things up.
 
 import { withSentryApiRoute } from "../_sentry.js";
-import { renderAgreementPdf, uploadAgreementPdf } from "../_lib/agreement-pdf.js";
+import { renderAgreementPdf, uploadAgreementPdf, buildClauses } from "../_lib/agreement-pdf.js";
 import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
 import { resolveOrMintPortalContact, writePortalFieldValues } from "../_contacts.js";
 
@@ -222,7 +222,7 @@ async function handler(req, res) {
     const testMode = isTestMode();
 
     // ── Academy must exist + be Stripe-connected ──
-    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id&limit=1`);
+    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,email,stripe_connect_account_id&limit=1`);
     const client = Array.isArray(clientRows) && clientRows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
     const stripeAccount = testMode ? null : client.stripe_connect_account_id;
@@ -307,7 +307,7 @@ async function handler(req, res) {
           }
           const secret = piSecretFromSub(sub);
           if (secret) {
-            await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId });
+            await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId, offerId });
             return res.status(200).json({
               ok: true, reused: true, member_id: member.id, subscription_id: sub.id, customer_id: sub.customer,
               client_secret: secret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
@@ -399,7 +399,7 @@ async function handler(req, res) {
     }
 
     // ── Signed agreement PDF (best-effort: never block the payment setup) ──
-    const agreementSaved = await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId });
+    const agreementSaved = await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId, offerId });
 
     // Audit (non-fatal) — also stashes the step-1 intake answers.
     try {
@@ -439,16 +439,34 @@ async function handler(req, res) {
 
 // Render + store the signed PDF and link it on the member. Returns true on
 // success; never throws (the payment flow must not depend on it).
-async function maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId }) {
+async function maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId, offerId }) {
   if (!member || !member.id) return false;
   if (member.agreement_pdf_path) return true; // already signed/stored
   try {
+    // If the offer has a Policy section filled in, generate the clauses from
+    // its hard rules (pause / cancellation / refund). No policy set -> pass no
+    // clauses, so renderAgreementPdf keeps the legacy wording unchanged.
+    let clauses = null;
+    if (offerId) {
+      try {
+        const offerRows = await sb(`offers?id=eq.${encodeURIComponent(offerId)}&select=data&limit=1`);
+        const policy = Array.isArray(offerRows) && offerRows[0] && offerRows[0].data && offerRows[0].data.policy;
+        if (policy && typeof policy === "object" && Object.keys(policy).length) {
+          clauses = buildClauses({
+            academyName: client.business_name || "By Any Means",
+            cancelContact: client.email || "",
+            policy,
+          });
+        }
+      } catch { /* non-fatal - fall back to legacy clauses */ }
+    }
     const bytes = await renderAgreementPdf({
       academyName: client.business_name || "By Any Means",
       parentName, athleteName, planLabel: planText,
       priceText: `${money(price.amount_cents, price.currency)} ${TERM_NOUN[term] || ""}`.trim(),
       signaturePngDataUrl: agreement.signature,
       signedAtIso: agreement.signed_at || nowIso(),
+      clauses,
     });
     const { path, size } = await uploadAgreementPdf({ sbUrl: SB_URL, sbKey: SB_KEY, clientId, memberId: member.id, bytes });
     // Record it as a member document (kind 'waiver') so it lists in the staff

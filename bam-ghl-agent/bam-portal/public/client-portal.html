@@ -21312,7 +21312,7 @@ const _bbTypeColors = {
 const _bbSections = ['general_info','schedule','value','pricing','sales','onboarding'];
 const _bbSectionLabels = {
   general_info:'General Info', schedule:'Schedule', value:'Value',
-  pricing:'Pricing', sales:'Sales', onboarding:'Onboarding'
+  pricing:'Pricing', policy:'Policy', sales:'Sales', onboarding:'Onboarding'
 };
 const _bbTeamSections = ['general','per_team'];
 const _bbTeamSectionLabels = { general:'General', per_team:'Per team' };
@@ -24933,7 +24933,15 @@ async function _bbDeleteOfferFile(fileId) {
 
 function _bbWizardSections(offer) {
   if (offer.type === 'team') return _bbTeamSections.map(s => ({ id: s, label: _bbTeamSectionLabels[s] }));
-  return _bbSections.map(s => ({ id: s, label: _bbSectionLabels[s] }));
+  const ids = _bbSections.slice();
+  // Insert the Policy tab (after Pricing) only for offer types whose config
+  // actually defines a `policy` section - additive, so other types are untouched.
+  const cfg = _bbOfferConfigs[offer.type] || [];
+  if (cfg.some(s => s.id === 'policy') && ids.indexOf('policy') === -1) {
+    const at = ids.indexOf('pricing');
+    ids.splice(at === -1 ? ids.length : at + 1, 0, 'policy');
+  }
+  return ids.map(s => ({ id: s, label: _bbSectionLabels[s] }));
 }
 
 function _bbRenderWizardBody() {
@@ -25543,6 +25551,43 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'pricing', label:'Pricing', fields:_bbStdPricing },
+    { id:'policy', label:'Policy', fields:[
+      // Hard, typed rules. The system enforces them and the enrollment
+      // agreement's billing/cancellation clause is generated from them.
+      // Same-section deps only (see _bbIsDepVisible), so pause/refund/cancel
+      // sub-fields hang off their own toggle. Nothing here is required, so
+      // existing offers keep working with sensible agreement defaults.
+      { key:'cancellation', type:'check_one', label:'Cancellation', default:'Cancel anytime',
+        options:['Cancel anytime','Notice required'],
+        hint:'How much warning a member must give to cancel. Feeds the agreement and member management.' },
+      { key:'cancel_notice_amount', type:'number', label:'Notice length',
+        dep:{ key:'cancellation', equals:'Notice required' },
+        hint:'How far ahead the member must give notice (e.g. 30).' },
+      { key:'cancel_notice_unit', type:'check_one', label:'Notice unit', default:'days',
+        dep:{ key:'cancellation', equals:'Notice required' },
+        options:['days','hours'] },
+      { key:'pause_allowed', type:'check_one', label:'Allow pausing', default:'Yes',
+        options:['Yes','No'],
+        hint:'Turns the Pause action on or off in member management. No = neither staff nor members can pause a membership.' },
+      { key:'pause_min_days', type:'number', label:'Minimum pause length (days)',
+        dep:{ key:'pause_allowed', equals:'Yes' },
+        hint:'Shortest pause a member can take.' },
+      { key:'pause_max_days', type:'number', label:'Maximum pause length (days)',
+        dep:{ key:'pause_allowed', equals:'Yes' },
+        hint:'Longest pause per instance.' },
+      { key:'pause_per_year', type:'number', label:'Pauses allowed per year',
+        dep:{ key:'pause_allowed', equals:'Yes' },
+        hint:'How many times a member can pause in a year.' },
+      { key:'refund_policy', type:'check_one', label:'Refunds', default:'Non-refundable',
+        options:['Non-refundable','Refundable within a window'],
+        hint:'Fees already charged. Shown in the agreement.' },
+      { key:'refund_window_days', type:'number', label:'Refund window (days)',
+        dep:{ key:'refund_policy', equals:'Refundable within a window' },
+        hint:'Days after purchase a refund is allowed.' },
+      { key:'makeup_policy', type:'textarea', label:'Makeup / reschedule policy',
+        hint:'Shown to members and in the agreement, e.g. "Reschedule through the app."' },
+      _bbCommonExtraNotes
+    ]},
     { id:'sales', label:'Sales', fields:[
       { key:'lead_tags', type:'ghl_tags_multi', label:'Lead tags',
         hint:'GHL tags that mark a contact as a lead. Pick as many as apply - a contact is a lead if they carry ANY of them. ★ = AI suggestion. (Members always win over lead tags.)' },

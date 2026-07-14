@@ -32,6 +32,67 @@ function sampleClauses(academyName) {
   ];
 }
 
+// Build the 7-clause agreement from an offer's Policy section (offer.data.policy).
+// Clauses 1-5 and 7 are universal; clause 1 is generalized off any one academy's
+// name; clause 6 (billing/cancellation) is generated from the hard policy rules
+// (pause, cancellation notice, refund). Every rule has a safe fallback so a
+// partially-filled policy still yields a complete, correct clause.
+//
+// Callers pass the result as renderAgreementPdf({ clauses }). When an offer has
+// NO policy set, callers should skip this and let sampleClauses() run (unchanged
+// legacy wording), so existing offers are never altered.
+export function buildClauses({ academyName = "By Any Means", cancelContact = "", policy = null } = {}) {
+  const acad = academyName || "the academy";
+  const p = policy || {};
+
+  const clause1 =
+    `By signing, the participant and/or the parent or legal guardian of the minor participant (“Participant”) ` +
+    `affirms their intention to participate in athletic training, games, practices, skills training, strength ` +
+    `and conditioning, and other related activities organized by ${acad} and its partners, affiliates, and ` +
+    `associated organizations (the “Program Providers”). If signing for a minor, the undersigned confirms they ` +
+    `are the lawful parent or legal guardian with full authority to consent on the minor’s behalf.`;
+
+  // Cancellation
+  const notifyTo = cancelContact ? `to ${cancelContact}` : "to the academy";
+  const amt = Number(p.cancel_notice_amount);
+  let cancelClause;
+  if (p.cancellation === "Notice required" && amt > 0) {
+    const unit = p.cancel_notice_unit === "hours" ? "hours" : "days";
+    const u = amt === 1 ? unit.replace(/s$/, "") : unit;
+    cancelClause = `To cancel, provide ${amt} ${u} written notice ${notifyTo} before your next billing date, which stops future charges.`;
+  } else {
+    cancelClause = `To cancel, provide written notice ${notifyTo} at any time before your next billing date, which stops future charges.`;
+  }
+
+  // Pause
+  let pauseClause = "";
+  if (p.pause_allowed === "Yes") {
+    const mn = Number(p.pause_min_days), mx = Number(p.pause_max_days);
+    let len;
+    if (mn > 0 && mx > 0 && mn < mx) len = `for ${mn} to ${mx} days at a time`;
+    else if (mx > 0) len = `for up to ${mx} days at a time`;
+    else len = "at a time";
+    const per = Number(p.pause_per_year);
+    const freq = per === 1 ? ", once per year" : per === 2 ? ", twice per year" : per > 0 ? `, ${per} times per year` : "";
+    pauseClause = ` Memberships may be paused ${len}${freq}.`;
+  }
+
+  // Refund
+  const refundWindow = Number(p.refund_window_days);
+  const refundClause = (p.refund_policy === "Refundable within a window" && refundWindow > 0)
+    ? ` Fees already charged are refundable within ${refundWindow} days of purchase, and otherwise non-refundable except where required by law.`
+    : ` Fees already charged are non-refundable except where required by law.`;
+
+  const clause6 =
+    `This enrolls the athlete in a recurring membership with ${acad}. The card on file is charged automatically ` +
+    `each billing cycle at the price shown (taxes included) until cancelled.${pauseClause} ${cancelClause}${refundClause}`;
+
+  const clauses = sampleClauses(acad);
+  clauses[0] = ["1. Participation acknowledgment", clause1];
+  clauses[5] = ["6. Membership, billing and cancellation", clause6];
+  return clauses;
+}
+
 function dataUrlToBytes(dataUrl) {
   const m = /^data:(image\/(png|jpeg|jpg));base64,(.+)$/i.exec(String(dataUrl || "").trim());
   if (!m) return null;
