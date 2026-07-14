@@ -2022,9 +2022,15 @@ async function handleMetaAdAccounts(req, res) {
   });
 }
 
-// Picks any valid staff token to query Meta on behalf of clients. Falls back
-// to most-recently-updated token. Returns null if no staff has connected yet.
+// The shared token used to read Meta ad data on behalf of every client.
+// Prefers a business-owned System User token (non-expiring, set once in env) so
+// KPIs never blank out when a staff member's short-lived token expires or when
+// someone reconnects and their token becomes "newest". Falls back to the most-
+// recently-updated staff_meta_tokens row so nothing breaks before the env var
+// is set. Returns null if neither exists.
 async function getAnyStaffMetaToken() {
+  const sys = (process.env.META_SYSTEM_USER_TOKEN || "").trim();
+  if (sys) return sys;
   const rows = await sb(`staff_meta_tokens?select=access_token&order=updated_at.desc&limit=1`);
   return rows?.[0]?.access_token || null;
 }
