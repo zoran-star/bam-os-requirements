@@ -58,6 +58,14 @@ The Sales and Onboarding sections each render a `custom_field_defs`-backed panel
 
 **Still to build (5B):** the actual live website form (bam-client-sites funnel) still renders `multiselect`/`number`/`url` as plain text (`cfDefType` collapses them) and doesn't yet show `help_text` - the portal preview does; plus forms↔offer enforcement + the contact-form-academy-wide rule. Optional follow-through: backfill `member_field_values` from `members_staging.raw` at promote so imported members carry values for the newly-added fields (today `raw` is dropped at promote).
 
+## Sales preset (Gap #2)
+
+The pipeline preset engine `api/agent/presets.js` (`applyPreset`, `PRESETS.free_trial` = GTA's exact 5-stage/20-edge model) stamps `pipeline_stages` + `stage_transitions` only; CLI-trigger (`scripts/apply-preset.mjs`), no UI. Design: `docs/agent-preset-architecture.html`.
+
+**2A shipped (offer → agent facts):** new `api/offers/sync-agent.js` (Supabase-JWT auth) generates the booking agent's FACT prompt sections (`business_info`, `program`, `schedule`, `pricing`, `selling_points`, `policies`) from `offer.data` + client, `?action=preview` returns them and `POST` upserts `agent_prompt_sections` overrides (offer_id tagged; only sections the offer can fill). Sales-section "Sync booking agent from this offer" button → `_bbAgentSyncPreview` (preview + per-section checkboxes) → `_bbAgentSyncApply`. Reversible in Agent learnings; user-triggered so the live agent never changes silently. Supersedes the narrower policy-only push.
+
+**Still to build (2B-2D):** a preset-apply UI (stamp `applyPreset` from the portal, CLI-only today); seed automations (ghosted/nurture/form-intro) from the preset; seed entry_points/funnels/custom_field_defs (GHL-id dependent). Fact sections the offer does NOT cover (coach ratio, group sizes, pricing transparency mode, geo-qualification, social proof) still need a dedicated agent-facts interview.
+
 ## Team is special
 
 The Team type has only **2 top-level sections** (General + Per team), because Team is an umbrella for *multiple* specific teams under one program brand.
