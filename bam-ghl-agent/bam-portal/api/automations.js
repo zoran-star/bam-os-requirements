@@ -23,7 +23,7 @@ import { renderEmail } from "./email-shells.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { isMuted } from "./agent/_mutes.js";
 import { resolveAgentActor } from "./agent/_auth.js";
-import { FORM_INTRO_DEFAULTS } from "./form-intro-automations.js";
+import { FORM_INTRO_DEFAULTS, GHOSTED_DEFAULT } from "./form-intro-automations.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -700,6 +700,39 @@ async function handler(req, res) {
           body: JSON.stringify([{ automation_id: auto.id, position: def.step.position || 0, wait_amount: def.step.wait_amount, wait_unit: def.step.wait_unit, channel: def.step.channel, subject: def.step.subject ?? null, body: def.step.body, enabled: true, updated_at: new Date().toISOString() }]) });
       }
       return res.status(200).json({ ok: true, automation: { ...auto, steps: await loadSteps(auto.id) } });
+    }
+
+    // Seed the preset's BASELINE automations in one call (Gap #2, phase 2C): the
+    // three form-intro first-touches + the multi-step 👻 Ghosted drip. Same
+    // idempotent + edit-safe rule as seed-form-intro (create only if missing; add
+    // steps only when the automation has zero). All dormant (approved:false).
+    if (b.action === "seed-preset-automations") {
+      const DEFS = { ...FORM_INTRO_DEFAULTS, ghosted: GHOSTED_DEFAULT };
+      const keys = (Array.isArray(b.keys) && b.keys.length) ? b.keys.filter(k => DEFS[k]) : Object.keys(DEFS);
+      const results = [];
+      for (const key of keys) {
+        const def = DEFS[key];
+        let autos = await sb(`automations?client_id=eq.${clientId}&automation_key=eq.${encodeURIComponent(key)}&select=*&limit=1`);
+        let auto = Array.isArray(autos) && autos[0];
+        let created = false;
+        if (!auto) {
+          const ins = await sb(`automations?on_conflict=client_id,automation_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+            body: JSON.stringify([{ client_id: clientId, automation_key: key, name: def.name, enabled: !!def.enabled, approved: !!def.approved, offer_id: b.offer_id || null, updated_at: new Date().toISOString() }]) });
+          auto = Array.isArray(ins) && ins[0];
+          created = true;
+        }
+        if (!auto) { results.push({ key, ok: false }); continue; }
+        const existing = await loadSteps(auto.id);
+        if (!existing.length) {
+          const steps = def.steps || (def.step ? [def.step] : []);
+          if (steps.length) {
+            await sb(`automation_steps`, { method: "POST", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify(steps.map((s, i) => ({ automation_id: auto.id, position: s.position != null ? s.position : i, wait_amount: s.wait_amount, wait_unit: s.wait_unit, channel: s.channel, subject: s.subject ?? null, body: s.body, enabled: true, updated_at: new Date().toISOString() }))) });
+          }
+        }
+        results.push({ key, name: def.name, created, steps: (await loadSteps(auto.id)).length });
+      }
+      return res.status(200).json({ ok: true, results });
     }
 
     // Verify an automation_id belongs to this academy before mutating its steps.

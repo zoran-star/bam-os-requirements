@@ -25731,6 +25731,7 @@ const _bbOfferConfigs = {
       { key:'__entry_points__', type:'entry_points', label:'Entry points',
         hint:'Where leads come from - your website forms, GHL forms, calendars and funnels. Click one to connect it to a pipeline + stage.' },
       { key:'__pipeline_preset__', type:'pipeline_preset', label:'Sales pipeline' },
+      { key:'__automations_seed__', type:'automations_seed', label:'Automations' },
       { key:'__agent_sync__', type:'agent_sync', label:'Booking agent' },
       _bbCommonExtraNotes
     ]},
@@ -26392,6 +26393,17 @@ function _bbRenderField(field, sectionId) {
       } else {
         body = `<button type="button" class="btn-secondary-bb" onclick="_bbPresetPreview()">Set up the sales pipeline</button>
           <div class="bb-field-hint" style="margin-top:8px">Stamps the proven Free Trial pipeline - stages plus routing - onto this offer, so the board, router, and agents work out of the box. You review before it applies.</div>`;
+      }
+      break;
+    }
+    case 'automations_seed': {
+      // Seed the preset's baseline automations (dormant, for review).
+      const _auOid = _bbState.offer && _bbState.offer.id;
+      if (!_auOid) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then set up automations.</div>`;
+      } else {
+        body = `<button type="button" class="btn-secondary-bb" onclick="_bbAutomationsSeed()">Set up automations</button>
+          <div class="bb-field-hint" style="margin-top:8px">Seeds the baseline follow-ups - contact and trial intros, missed-trial, and the ghosted drip - OFF by default, so you review and approve each before anything sends.</div>`;
       }
       break;
     }
@@ -27608,6 +27620,28 @@ async function _bbCqPreviewForm(offerId, sectionId) {
     _bbShowDocModal(title, `<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:14px">Exactly what a ${sectionId === 'sales' ? 'lead' : 'new member'} sees. Preview only.</div>${form}`);
   } catch (e) {
     _bbShowDocModal(title, `<div style="padding:14px;color:#c0392b;font-size:13px">Could not build the preview: ${escapeHTML(e.message || String(e))}</div>`);
+  }
+}
+
+// Seed the preset's baseline automations onto this offer (Gap #2, phase 2C).
+// Dormant (approved:false) - the owner reviews + approves before anything sends.
+async function _bbAutomationsSeed() {
+  const offer = _bbState.offer;
+  if (!offer || !offer.id || typeof CLIENT_ID === 'undefined') return;
+  if (!confirm("Set up the baseline automations (contact + trial intros, missed-trial, and the ghosted drip)? They're seeded OFF for you to review and approve before anything sends.")) return;
+  _bbShowDocModal('Automations', `<div style="padding:16px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Setting up automations…</div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/automations', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: CLIENT_ID, action: 'seed-preset-automations', offer_id: offer.id }) });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    const rows = (j.results || []).map(x => `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;color:var(--text)">${escapeHTML(x.name || x.key)}</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-mute)">${x.created ? 'created' : 'existed'} · ${x.steps} step${x.steps === 1 ? '' : 's'}</span>
+      </div>`).join('');
+    _bbShowDocModal('Automations', `<div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">Seeded <b>off</b>. Review, edit, and approve each in Agent learnings before anything sends.</div>${rows}`);
+  } catch (e) {
+    _bbShowDocModal('Automations', `<div style="padding:14px;color:#c0392b;font-size:13px">Could not set up automations: ${escapeHTML(e.message || String(e))}</div>`);
   }
 }
 
