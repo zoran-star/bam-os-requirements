@@ -271,6 +271,12 @@ const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s
 const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.filter(s => s.col).map(s => s.col))].join(",");
 const ONBOARDING_STAFF_ONLY = new Set(ONBOARDING_STEPS.filter(s => s.staff_only).map(s => s.key));
 const ONBOARDING_TICKET_DERIVED = new Set(ONBOARDING_STEPS.filter(s => s.ticket_derived).map(s => s.key));
+// Steps NOBODY can tick by hand: they complete only from a real external signal
+// (the Stripe / GHL connect callback writing their column) or from the systems
+// ticket. Sent to the UIs as `auto_only` so the checkbox renders read-only.
+const ONBOARDING_AUTO_ONLY = new Set(
+  ONBOARDING_STEPS.filter(s => s.ticket_derived || !s.writable).map(s => s.key)
+);
 const ONBOARDING_TIER_KEYS = new Set(ONBOARDING_STEPS.filter(s => s.tier).map(s => s.key));
 // Which steps apply to a client of a given tier (no `tier` = all tiers).
 function onboardingStepsForTier(isV15) {
@@ -278,8 +284,38 @@ function onboardingStepsForTier(isV15) {
 }
 
 async function loadClientSignals(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS},v15_access`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS},v15_access,stripe_connect_account_id`);
   return (Array.isArray(rows) && rows[0]) || {};
+}
+
+// An academy can finish the Stripe OAuth handshake while their account still
+// cannot take money (outstanding Stripe requirements -> charges disabled). In
+// that case connect.js stores the account but leaves stripe_connect_connected_at
+// null, so the "Connect your Stripe account" step stays open. Once they finish in
+// Stripe the account flips to charges_enabled, and this backfills the timestamp so
+// the step ticks on its own - no reconnect needed.
+// Only runs for the narrow case "account stored, not yet chargeable", so it costs
+// one Stripe call for a client who is mid-setup and none for everyone else.
+async function backfillStripeWhenChargeable(clientId, signals) {
+  const acct = signals.stripe_connect_account_id;
+  if (!acct || signals.stripe_connect_connected_at) return signals;
+  const key = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+  if (!key) return signals;
+  try {
+    const r = await fetch(`https://api.stripe.com/v1/accounts/${encodeURIComponent(acct)}`, {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    const a = await r.json();
+    if (!r.ok || a.charges_enabled !== true) return signals; // still cannot charge - leave the step open
+    const nowIso = new Date().toISOString();
+    await sb(`clients?id=eq.${clientId}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ stripe_connect_status: "connected", stripe_connect_connected_at: nowIso }),
+    });
+    return { ...signals, stripe_connect_connected_at: nowIso };
+  } catch (_) {
+    return signals; // never block the checklist on a Stripe hiccup
+  }
 }
 
 // Derive the 3 systems-build-tracker steps from the client's systems onboarding
@@ -321,7 +357,9 @@ async function loadSystemsTrackerState(clientId) {
 // Idempotently ensure all onboarding steps exist for this client, then
 // reconcile each against its clients-row column. Safe to call on every GET.
 async function syncOnboardingItems(clientId, tracker) {
-  const signals = await loadClientSignals(clientId);
+  let signals = await loadClientSignals(clientId);
+  // Tick Stripe the moment the connected account can really charge (and not before).
+  signals = await backfillStripeWhenChargeable(clientId, signals);
   const isV15 = signals.v15_access === true;
   const steps = onboardingStepsForTier(isV15);
   // Ticket-derived steps mirror the systems onboarding ticket (load once).
@@ -371,18 +409,28 @@ async function syncOnboardingItems(clientId, tracker) {
         body: JSON.stringify({ sort_order: step.sort }),
       });
     }
-    // Writable steps always mirror col (toggling writes col, so they're already
-    // consistent; this picks up changes made via the BB "mark done" buttons).
-    // Signal steps mirror col UNLESS a human overrode the step by hand.
-    const respectOverride = !step.ticket_derived && !step.writable && row.onboarding_overridden;
-    if (!respectOverride) {
-      const shouldBeDone = !!colVal;
-      if (!!row.completed_at !== shouldBeDone) {
-        await sb(`action_items?id=eq.${row.id}`, {
-          method: "PATCH", headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ completed_at: shouldBeDone ? colVal : null }),
-        });
-      }
+    // EVERY step now mirrors its source of truth, with no exceptions:
+    //   writable steps      -> their clients column (toggling writes it)
+    //   ticket-derived      -> the systems ticket
+    //   signal steps        -> the real connect callback's column
+    // Signal steps used to be skipped here when onboarding_overridden was set, so a
+    // hand-tick froze the step "done" forever even with no account connected. That
+    // is exactly the bug: the tick must track reality, so the override is ignored
+    // and cleared. See the PATCH handler - signal steps can no longer be hand-ticked.
+    const shouldBeDone = !!colVal;
+    const patch = {};
+    if (!!row.completed_at !== shouldBeDone) {
+      patch.completed_at = shouldBeDone ? colVal : null;
+      // Drop the stale "completed by" name when a step reverts to not-done.
+      if (!shouldBeDone) patch.completed_by_name = null;
+    }
+    // Clear any override left behind by the old hand-tick behaviour.
+    if (row.onboarding_overridden) patch.onboarding_overridden = false;
+    if (Object.keys(patch).length) {
+      await sb(`action_items?id=eq.${row.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify(patch),
+      });
     }
   }
 }
@@ -457,6 +505,12 @@ async function handler(req, res) {
           it.ticket_id = tracker.ticketId;
           it.ticket_status = tracker.status;
           it.lit = it.onboarding_key === "sys_client_review" ? tracker.lit : false;
+        }
+        // auto_only = nobody can tick this by hand; it completes from a real signal
+        // (Stripe/GHL connect callback) or the systems ticket. The UIs render these
+        // read-only so a client can't mark "Connect Stripe" done without connecting.
+        if (it.onboarding_key && ONBOARDING_AUTO_ONLY.has(it.onboarding_key)) {
+          it.auto_only = true;
         }
       }
       // Staff-only onboarding steps (e.g. trigger_buildout) are hidden from clients.
@@ -542,12 +596,18 @@ async function handler(req, res) {
       if (obStep && obStep.ticket_derived && "completed" in b) {
         return res.status(400).json({ error: "this step updates automatically from the systems ticket" });
       }
+      // SIGNAL steps (Stripe / GHL connect) can NOT be hand-toggled. The tick has to
+      // mean the account is really connected, so the only thing that can complete
+      // them is the real connect callback writing their column. Letting a human tick
+      // them (which used to set onboarding_overridden and freeze the reconcile) made
+      // the portal show clients as payment-ready when they could not charge a card.
+      if (obStep && !obStep.writable && !obStep.ticket_derived && "completed" in b) {
+        return res.status(400).json({
+          error: "this step completes on its own once the account is actually connected",
+        });
+      }
 
       const patch = {};
-      // Hand-toggling a SIGNAL step (Stripe/GHL connect) marks it overridden so
-      // the reconcile stops forcing it back to the signal. Writable steps don't
-      // need this — toggling writes their col, so they stay consistent.
-      if (obStep && !obStep.writable && "completed" in b) patch.onboarding_overridden = true;
       if (typeof b.title === "string") {
         if (!b.title.trim()) return res.status(400).json({ error: "title cannot be empty" });
         patch.title = b.title.trim();

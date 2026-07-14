@@ -43,6 +43,7 @@ import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition } from "./agent/_reignite.js";
+import { reconcileLiveMembers } from "./agent/_reconcile-members.js";
 import { liveMemberContactIds } from "./agent/_live-members.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
@@ -367,6 +368,17 @@ async function sendReplyViaGhl(token, contactId, reply, clientId) {
 }
 
 // Append to the shared audit log (agent_approvals). Non-fatal.
+// Training-signal enrichment (2026-07-12): a teach-why lesson snapshots the
+// conversation + pipeline stage that produced it (see agent-approvals.js for the
+// rationale). stage_from is this agent's home stage; stage_to stays the column
+// default null on the reignite path (no stage move) - reserved for move+teach.
+const LESSON_STAGE_FROM = "Done Trial"; // closing agent works post-trial leads
+function threadSnapshot(row) {
+  const t = row && (row.thread_tail ?? row.summary);
+  if (!t) return null;
+  return typeof t === "string" ? t : JSON.stringify(t);
+}
+
 async function logApproval(row) {
   try { await sb(`agent_approvals`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) }); } catch (_) {}
 }
@@ -543,6 +555,20 @@ async function clearClosingCards(clientId, contactId, reason) {
 
 // ── Detector: draft post-trial conversions for Done-Trial leads ──
 async function detectForClient(client) {
+  // SAFETY NET (once per academy per cron, BEFORE the mode gate so it runs for every
+  // V2 academy even with closing mode off): close any open agent-stage opp that
+  // already belongs to a LIVE member + cancel its outbound. Catches the dup-contact
+  // split and any opp whose signup won-mark missed the portal-native store - cases
+  // the one-shot signup event can't reach. Portal-only + fail-soft; V1 untouched
+  // (the cron only visits v2_access academies, and reconcile itself is portal-gated).
+  // See api/agent/_reconcile-members.js.
+  try {
+    const rec = await reconcileLiveMembers(client.id);
+    if (rec && Array.isArray(rec.closed) && rec.closed.length) {
+      console.log(`[closing] reconcile closed ${rec.closed.length} paid-member opp(s) for ${client.id}:`, rec.closed.map(c => `${c.opp_id}(${c.via})`).join(", "));
+    }
+  } catch (_) { /* never block the detector on the safety net */ }
+
   const mode = closingAgentMode(client);
   if (!modeIsOn(mode)) return { client_id: client.id, skipped: "closing mode off" };
   const creds = await pickGhlToken(client);
@@ -1220,7 +1246,7 @@ async function handler(req, res) {
       if (b.lesson && String(b.lesson).trim()) {
         try {
           const [lrow] = await sb(`agent_lessons`, { method: "POST", headers: { Prefer: "return=representation" },
-            body: JSON.stringify([{ client_id: clientId, agent: "closing", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: contactId, reignite_at: reigniteAt, sent: ack || null } }]) });
+            body: JSON.stringify([{ client_id: clientId, agent: "closing", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, stage_from: LESSON_STAGE_FROM, thread_snapshot: threadSnapshot(row), context: { contact_id: contactId, reignite_at: reigniteAt, sent: ack || null } }]) });
           lessonId = lrow?.id || null;
         } catch (_) {}
       }

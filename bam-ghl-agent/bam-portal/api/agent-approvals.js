@@ -129,7 +129,7 @@ const REPLY_TOOL = {
       book_group:      { type: "string", description: "If book: the group by athlete age — 'Group 1' (elementary, 9-13) or 'Group 2' (high school, 14+)." },
       book_slot_at:    { type: "string", description: "If book: the EXACT ISO datetime of the open slot the lead confirmed (must be one of the open_slots from check_availability)." },
       propose_group:   { type: "string", description: "If your reply OFFERS or SUGGESTS a specific session day/time to the lead WITHOUT booking yet: 'Group 1' (elementary, 9-13) or 'Group 2' (high school, 14+)." },
-      propose_slot_at: { type: "string", description: "If your reply names a specific day/time to the lead (book=false): the EXACT ISO datetime of that open slot - it MUST come from check_availability. NEVER name a time in a reply that you have not verified as an open slot. Empty when your reply names no specific time." },
+      propose_slot_at: { type: "string", description: "If your reply names a specific day/time to the lead (book=false): the EXACT ISO datetime of that open slot - it MUST come from check_availability. NEVER name a time in a reply that you have not verified as an open slot. This MUST be the SAME slot your 'reply' text names to the lead - never name one day/time in the message and put a different one here. When you offer a time, offer the NEAREST open slot from check_availability (the soonest upcoming one) unless the lead asked for a specific day. Empty when your reply names no specific time." },
       reignite_at:      { type: "string", description: "YYYY-MM-DD. ONLY when the lead wants to proceed but at a LATER date: the concrete day to re-engage (resolve vague timeframes; bare 'later' = ~30 days out). A human confirms before anything is scheduled." },
       reignite_message: { type: "string", description: "If reignite_at: the exact re-engagement text to open with on that date - warm, references what they told us, moves toward booking." },
     },
@@ -453,6 +453,28 @@ async function enrollGhosted(client, token, contactId) {
 }
 
 // Append to the audit log (agent_approvals). Non-fatal.
+// Training-signal enrichment (2026-07-12): a teach-why lesson snapshots the
+// conversation + pipeline stage that produced it, not just the proposed/edited
+// message pair, so /consolidate-lessons (and future agent retraining) get the
+// full context. stage_from is this agent's home stage; stage_to is set only when
+// a stage move rides with the teach (the send/reignite paths don't move a lead,
+// so it stays the column default null - reserved for a future move+teach flow).
+const LESSON_STAGE_FROM = "Responded"; // booking agent works the Responded stage
+function threadSnapshot(row) {
+  const t = row && (row.thread_tail ?? row.summary);
+  if (!t) return null;
+  return typeof t === "string" ? t : JSON.stringify(t);
+}
+// Pull the deck card's stored thread tail for a lesson (best-effort, low-freq -
+// only runs when staff attach a teach-why). Null when there's no card/thread.
+async function readyThread(readyId, clientId) {
+  if (!readyId) return null;
+  try {
+    const [r] = await sb(`agent_ready_replies?id=eq.${encodeURIComponent(readyId)}&client_id=eq.${clientId}&select=thread_tail,summary`);
+    return threadSnapshot(r);
+  } catch (_) { return null; }
+}
+
 async function logApproval(row) {
   try {
     await sb(`agent_approvals`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([row]) });
@@ -1139,9 +1161,10 @@ async function handler(req, res) {
         let heldLessonId = null;
         if (b.lesson && String(b.lesson).trim()) {
           try {
+            const snap = await readyThread(b.ready_id, clientId);
             const [lrow] = await sb(`agent_lessons`, {
               method: "POST", headers: { Prefer: "return=representation" },
-              body: JSON.stringify([{ client_id: clientId, agent: "booking", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: b.contact_id, suggested: b.suggested_reply || null, sent: b.reply } }]),
+              body: JSON.stringify([{ client_id: clientId, agent: "booking", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, stage_from: LESSON_STAGE_FROM, thread_snapshot: snap, context: { contact_id: b.contact_id, suggested: b.suggested_reply || null, sent: b.reply } }]),
             });
             heldLessonId = lrow?.id || null;
           } catch (_) {}
@@ -1173,9 +1196,10 @@ async function handler(req, res) {
       let lessonId = null;
       if (b.lesson && String(b.lesson).trim()) {
         try {
+          const snap = await readyThread(b.ready_id, clientId);
           const [row] = await sb(`agent_lessons`, {
             method: "POST", headers: { Prefer: "return=representation" },
-            body: JSON.stringify([{ client_id: clientId, agent: "booking", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: b.contact_id, suggested: b.suggested_reply || null, sent: b.reply } }]),
+            body: JSON.stringify([{ client_id: clientId, agent: "booking", kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, stage_from: LESSON_STAGE_FROM, thread_snapshot: snap, context: { contact_id: b.contact_id, suggested: b.suggested_reply || null, sent: b.reply } }]),
           });
           lessonId = row?.id || null;
         } catch (_) {}
@@ -1238,7 +1262,7 @@ async function handler(req, res) {
       if (b.lesson && String(b.lesson).trim()) {
         try {
           const [lrow] = await sb(`agent_lessons`, { method: "POST", headers: { Prefer: "return=representation" },
-            body: JSON.stringify([{ client_id: clientId, kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, context: { contact_id: contactId, reignite_at: reigniteAt, sent: ack || null } }]) });
+            body: JSON.stringify([{ client_id: clientId, kind: "fix", scope: "academy", lesson: String(b.lesson).trim(), created_by: staffEmail, stage_from: LESSON_STAGE_FROM, thread_snapshot: threadSnapshot(row), context: { contact_id: contactId, reignite_at: reigniteAt, sent: ack || null } }]) });
           lessonId = lrow?.id || null;
         } catch (_) {}
       }

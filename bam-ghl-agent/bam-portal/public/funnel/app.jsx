@@ -16,6 +16,9 @@ var CHECKOUT_URL = "/api/onboarding/checkout";
 // Stripe sub created). Flip to true (or set window.FUNNEL_LIVE = true) only when
 // testing the real charge with STRIPE_PUBLISHABLE_KEY set, ideally in Stripe TEST
 // mode, so we never create junk subs on the live connected account.
+// NOTE: this is the PORTAL-hosted funnel (portal.byanymeansbusiness.com/funnel/),
+// NOT the live public enroll funnel at byanymeanstoronto.ca/enroll (that one is a
+// separate GTA site → api/website/checkout.js). Kept in demo until its role is settled.
 var LIVE_CHECKOUT = false;
 
 var EMPTY = { pFirst: '', pLast: '', pEmail: '', pMobile: '', aFirst: '', aDob: '' };
@@ -24,6 +27,7 @@ function App() {
   var s = React.useState(1); var step = s[0], setStep = s[1];
   var ff = React.useState(Object.assign({}, EMPTY)); var form = ff[0], setForm = ff[1];
   var tm = React.useState('3mo'); var term = tm[0], setTerm = tm[1];        // default 3-Month (anchors mid-commitment)
+  var sd = React.useState(''); var startDate = sd[0], setStartDate = sd[1]; // '' = start today; 'YYYY-MM-DD' = future start (billed today, membership starts then)
   var sp = React.useState('accelerated'); var selectedPlan = sp[0], setSelectedPlan = sp[1];
   var py = React.useState({ method: null, name: '', cardFilled: false }); var pay = py[0], setPay = py[1];
   var ag = React.useState(false); var agreed = ag[0], setAgreed = ag[1];
@@ -74,6 +78,8 @@ function App() {
       term: term,                         // monthly|3mo|6mo (backend aliases map these)
       parent:  { first: form.pFirst, last: form.pLast, email: form.pEmail, phone: form.pMobile },
       athlete: { first: form.aFirst, last: '', dob: form.aDob },
+      charge_mode: startDate ? 'on_date' : 'now',  // future start → billed today, recurring anchors to start_date
+      start_date: startDate || undefined,          // 'YYYY-MM-DD' when a future start is picked
     };
   }
 
@@ -117,7 +123,8 @@ function App() {
       return;
     }
 
-    // Real charge via the mounted Payment Element.
+    // Real charge via the mounted Payment Element. The first period is billed today
+    // whether they start now or pick a future date, so this is always a PaymentIntent.
     setLoadLabel('Processing payment…'); setLoading(true);
     stripeRef.current.confirmPayment({
       elements: elementsRef.current,
@@ -147,8 +154,11 @@ function App() {
       onClick={function () { advance(3, 500, 'Saving…'); }}
       onBack={function () { setStep(1); }} />;
   } else if (step === 3) {
+    var payLabel = startDate
+      ? 'Sign & Pay ' + BAM.dollars(charge.total) + ' · Starts ' + BAM.fmtShort(BAM.fromISO(startDate))
+      : 'Sign & Pay ' + BAM.dollars(charge.total) + ' - Start Training';
     footer = <StickyCTA
-      label={'Sign & Pay ' + BAM.dollars(charge.total) + ' — Start Training'}
+      label={payLabel}
       disabled={!s3valid} loading={loading} loadingLabel="Processing payment…"
       onClick={signAndPay}
       onBack={function () { setStep(2); }} />;
@@ -162,8 +172,9 @@ function App() {
   } else {
     var inner;
     if (step === 1) inner = <Step1 form={form} setForm={setForm} showErrors={showErr1} />;
-    else if (step === 2) inner = <Step2 term={term} onTerm={setTerm} selectedPlan={selectedPlan} onSelectPlan={setSelectedPlan} />;
-    else inner = <Step3 form={form} term={term} selectedPlan={selectedPlan}
+    else if (step === 2) inner = <Step2 term={term} onTerm={setTerm} selectedPlan={selectedPlan} onSelectPlan={setSelectedPlan}
+      startDate={startDate} onStartDate={setStartDate} />;
+    else inner = <Step3 form={form} term={term} selectedPlan={selectedPlan} startDate={startDate}
       pay={pay} setPay={setPay} agreed={agreed} onAgree={function (e) { setAgreed(e.target.checked); }}
       sig={sig} onSig={setSig} ui={ui} setUi={setUi} payErr={payErr}
       live={liveMode} stripeReady={stripeReady}

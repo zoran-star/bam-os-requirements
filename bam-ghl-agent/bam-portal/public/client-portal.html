@@ -8389,6 +8389,37 @@ Then the call to action."]</div>
       .ctx-spam-toggle:hover { border-color:var(--text-mute); color:var(--text-sub); }
       .ctx-spam-list { opacity:.5; }
       .ctx-row.ctx-spam { padding:6px 14px; }
+      /* ── Contacts focus-mode modal ── */
+      .ctx-modal-backdrop {
+        position:fixed; inset:0; background:rgba(10,10,11,0.78); backdrop-filter:blur(8px);
+        z-index:9400; display:flex; align-items:center; justify-content:center; padding:24px;
+        animation:ctxFadeIn .16s ease;
+      }
+      @keyframes ctxFadeIn { from { opacity:0 } to { opacity:1 } }
+      .ctx-modal-card {
+        width:100%; max-width:600px; max-height:88vh; background:var(--surface);
+        border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-lg);
+        display:flex; flex-direction:column; overflow:hidden; animation:modalIn .28s var(--es);
+      }
+      .ctx-modal-head {
+        display:flex; align-items:center; gap:10px; padding:14px 18px;
+        border-bottom:1px solid var(--border); flex-shrink:0;
+      }
+      .ctx-modal-title { font-size:16px; font-weight:700; color:var(--text); }
+      .ctx-modal-back {
+        background:none; border:none; color:var(--gold); font:inherit; font-size:13px; font-weight:600;
+        cursor:pointer; display:inline-flex; align-items:center; gap:5px; padding:4px 8px 4px 0;
+      }
+      .ctx-modal-x {
+        background:none; border:none; color:var(--text-sub); cursor:pointer; width:30px; height:30px;
+        border-radius:8px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+      }
+      .ctx-modal-x:hover { background:var(--bg); color:var(--text); }
+      .ctx-modal-body { padding:16px 18px 20px; overflow-y:auto; flex:1; background:var(--bg); }
+      @media (max-width:640px) {
+        .ctx-modal-backdrop { padding:0; }
+        .ctx-modal-card { max-width:none; max-height:none; width:100%; height:100%; border:none; border-radius:0; }
+      }
       /* ── Assets page ── */
       #view-assets .content { font-family:var(--font-ui); }
       .ast-toolbar {
@@ -9103,7 +9134,7 @@ Then the call to action."]</div>
              dashed gold at rest so it reads "yours, not sent yet"; tap = solid glow
              field with a real caret (Option D). Pure :focus swap, no JS. */
           .hk2-draftwrap{display:flex;flex-direction:column;align-items:flex-end;gap:5px;margin-top:2px}
-          .hk2-draft-bubble{width:auto;max-width:86%;align-self:flex-end;background:var(--accent-glow,rgba(212,182,92,.10));border:1.5px dashed var(--accent-border-strong,rgba(212,182,92,.55));border-radius:13px;border-bottom-right-radius:4px;transition:border-color .15s,background .15s,box-shadow .15s}
+          .hk2-draft-bubble{width:92%;max-width:92%;align-self:flex-end;background:var(--accent-glow,rgba(212,182,92,.10));border:1.5px dashed var(--accent-border-strong,rgba(212,182,92,.55));border-radius:13px;border-bottom-right-radius:4px;transition:border-color .15s,background .15s,box-shadow .15s}
           .hk2-draft-bubble:focus{border-style:solid;border-color:var(--accent);background:var(--accent-glow,rgba(212,182,92,.14));box-shadow:0 0 0 3px var(--accent-border,rgba(212,182,92,.20))}
           .hk2-draftcap{font-size:10.5px;font-weight:700;color:var(--accent);padding-right:2px}
           .hk2-draftcap .rest,.hk2-draftcap .edit{align-items:center;gap:4px}
@@ -9884,6 +9915,27 @@ Then the call to action."]</div>
     ══════════════════════════════ -->
     <style>
       /* ── BB landing ── */
+      /* Business Blueprint focus-mode shell (BB is a focus overlay now) */
+      #view-blueprint .bb-focus-head { display:flex; align-items:center; gap:13px; margin-bottom:8px; }
+      #view-blueprint .bb-focus-head .mm-back-btn { margin-bottom:0; }
+      #view-blueprint .bb-focus-head .topbar-kicker { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color: var(--gold, #D4B65C); }
+      /* Website pages editor (Brand > Website) */
+      #view-blueprint .wp-group { border:1px solid var(--line); border-radius:10px; margin-top:10px; overflow:hidden; }
+      #view-blueprint .wp-group-head { width:100%; display:flex; align-items:center; gap:10px; background:var(--surface-el); border:none; cursor:pointer; padding:12px 14px; font-family:inherit; color:var(--text); }
+      #view-blueprint .wp-group-title { font-size:13px; font-weight:700; letter-spacing:.02em; }
+      #view-blueprint .wp-group-count { margin-left:auto; font-size:12px; color:var(--text-mute); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:1px 9px; }
+      #view-blueprint .wp-caret { transition:transform .18s ease; color:var(--text-mute); font-size:12px; }
+      #view-blueprint .wp-group-head.open .wp-caret { transform:rotate(180deg); }
+      #view-blueprint .wp-group-body { padding:2px 10px 8px; }
+      #view-blueprint .wp-row { display:flex; align-items:center; gap:12px; padding:11px 6px; border-bottom:1px solid var(--line); }
+      #view-blueprint .wp-row:last-child { border-bottom:none; }
+      #view-blueprint .wp-row-main { flex:1; min-width:0; }
+      #view-blueprint .wp-row-label { font-size:13.5px; font-weight:600; color:var(--text); }
+      #view-blueprint .wp-row-url { font-size:12px; color:var(--text-mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+      #view-blueprint .wp-tag { font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; background:var(--surface-el); color:var(--text-sub); border:1px solid var(--line); white-space:nowrap; }
+      #view-blueprint .wp-tag--offer { background:color-mix(in srgb, var(--gold,#D4B65C) 15%, transparent); color:var(--gold,#D4B65C); border-color:color-mix(in srgb, var(--gold,#D4B65C) 30%, transparent); }
+      #view-blueprint .wp-edit { flex:none; background:var(--gold,#D4B65C); color:#0B0B0D; border:none; border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+      #view-blueprint .wp-edit:disabled { opacity:.4; cursor:default; }
       #view-blueprint .bb-back {
         display:inline-flex; align-items:center; gap:6px;
         background:transparent; border:none; color:var(--text-sub);
@@ -10764,17 +10816,10 @@ Then the call to action."]</div>
       </div>
     </div>
 
-    <div class="view" id="view-contacts">
-      <div class="topbar">
-        <div>
-          <span class="topbar-kicker">§ Contacts</span>
-          <div class="topbar-title">Contacts</div>
-        </div>
-      </div>
-      <div class="content">
-        <div id="contacts-content"></div>
-      </div>
-    </div>
+    <!-- Contacts is a focus-mode modal (built at runtime in openContactsModal),
+         not a full view. This shell stays as a harmless no-op so any stray
+         switchView('contacts') can't crash; #contacts-content lives in the modal. -->
+    <div class="view" id="view-contacts"></div>
 
     <div class="view" id="view-v15inbox">
       <div class="topbar">
@@ -10859,17 +10904,9 @@ Then the call to action."]</div>
       </div>
     </div>
 
-    <div class="view" id="view-blueprint">
-      <div class="topbar">
-        <div>
-          <span class="topbar-kicker">§ Business Blueprint</span>
-          <div class="topbar-title" id="bb-topbar-title">Business Blueprint</div>
-        </div>
-      </div>
-      <div class="content">
-        <div id="bb-panel"><!-- rendered by openBlueprintView() based on hash --></div>
-      </div>
-    </div>
+    <!-- Business Blueprint moved OUT of .main to a focus-mode overlay (below,
+         just after .main). It keeps id="view-blueprint" so every
+         #view-blueprint .bb-* style + JS render target still applies. -->
 
 
     <!-- ── COMMAND CENTER (beta) - sidebar-less one-page flow ──
@@ -10891,6 +10928,21 @@ Then the call to action."]</div>
          Business Blueprint > Staff. The invite + revoke modals (still
          used by BB Staff) sit below in the modals block. -->
 
+  </div>
+
+  <!-- ── Business Blueprint: focus-mode overlay ──
+       Sibling of .main so the focus camera-pan blurs the app chrome behind it
+       (mm-focus-open dims .main + .sidebar). Opened by openBlueprint() via the
+       shared _ccOpenFocusPage camera pan; Back / backdrop click closes it. -->
+  <div class="modal-backdrop mm-focus-page" id="view-blueprint" style="display:none" onclick="if(event.target===this)closeBlueprint()">
+    <div class="modal-card mm-modal-card bb-focus-card" onclick="event.stopPropagation()">
+      <div class="bb-focus-head">
+        <button type="button" class="mm-back-btn" onclick="closeBlueprint()">&lsaquo; Back</button>
+        <span class="topbar-kicker">§ Business Blueprint</span>
+        <div class="topbar-title" id="bb-topbar-title" style="display:none">Business Blueprint</div>
+      </div>
+      <div id="bb-panel"><!-- rendered by openBlueprintView() based on hash --></div>
+    </div>
   </div>
 
   <!-- ── Mobile bottom nav (phones only - replaces the hidden sidebar) ── -->
@@ -15461,9 +15513,56 @@ async function _contactsAuthHeaders() {
   return tok ? { Authorization: 'Bearer ' + tok } : {};
 }
 
+// ── Contacts focus-mode modal ──────────────────────────────────────────────
+// Contacts overlays the current page instead of swapping to a full view, so
+// closing it returns you exactly where you were. Every entry point funnels
+// through switchView('contacts') → openContactsModal(), so one seam covers all.
+// The list, contact detail, and Setup all render into the single #contacts-content
+// host inside the modal; detail reuses the same #contacts-drawer-body id so its
+// async loaders (Stripe, memory, messaging, tags) work unchanged.
+function _contactsHeadList() {
+  return `<div class="ctx-modal-title">Contacts</div><span style="flex:1"></span>`
+    + `<button class="ctx-modal-x" onclick="_contactsCloseModal()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
+}
+function _contactsModalEsc(e) {
+  if (e.key !== 'Escape') return;
+  // If a contact detail or Setup is open, Esc steps back to the list first.
+  if (document.getElementById('contacts-drawer-body') || document.getElementById('contacts-setup-save')) { openContactsView(); return; }
+  _contactsCloseModal();
+}
+function _contactsCloseModal() {
+  const o = document.getElementById('contacts-modal-ov');
+  if (o) o.remove();
+  document.removeEventListener('keydown', _contactsModalEsc);
+  document.body.classList.remove('ctx-modal-open');
+}
+function openContactsModal(opts) {
+  opts = opts || {};
+  if (typeof CLIENT_ID === 'undefined') return;
+  if (!document.getElementById('contacts-modal-ov')) {
+    const ov = document.createElement('div');
+    ov.id = 'contacts-modal-ov';
+    ov.className = 'ctx-modal-backdrop';
+    ov.onclick = (e) => { if (e.target === ov) _contactsCloseModal(); };
+    ov.innerHTML = `<div class="ctx-modal-card" role="dialog" aria-modal="true" aria-label="Contacts">
+      <div class="ctx-modal-head" id="contacts-modal-head">${_contactsHeadList()}</div>
+      <div class="ctx-modal-body"><div id="contacts-content"></div></div>
+    </div>`;
+    document.body.appendChild(ov);
+    document.body.classList.add('ctx-modal-open');
+    document.addEventListener('keydown', _contactsModalEsc);
+  }
+  if (opts.setup) _contactsOpenSetup();
+  else if (typeof opts.contactIdx === 'number') _contactsOpenDrawer(opts.contactIdx);
+  else openContactsView();
+}
+
 async function openContactsView() {
   const host = document.getElementById('contacts-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
+  // Restore the modal header to list mode (detail view swaps it for a back arrow).
+  const _mh = document.getElementById('contacts-modal-head');
+  if (_mh) _mh.innerHTML = _contactsHeadList();
   // Ensure member roster is loaded for lead/member badges
   _ibEnsureMembers();
   host.innerHTML = `
@@ -15650,19 +15749,19 @@ function _contactsSetTag(v) { _contactsTag = v; _contactsLoad(); }
 let _CDRAWER = { contact: null, ghl: null, msgType: 'SMS' };
 function _cdMoney(cents, cur) { if (cents == null) return '-'; const v = cents / 100; try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: (cur || 'usd').toUpperCase() }).format(v); } catch (_) { return '$' + v.toFixed(2); } }
 function _cdDate(unix) { if (!unix) return ''; try { return new Date(unix * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); } catch (_) { return ''; } }
-function _contactsCloseDrawer() { const o = document.getElementById('contacts-drawer-ov'); if (o) o.remove(); }
+function _contactsCloseDrawer() {
+  // Detail now lives inside the Contacts modal, so "close the drawer" = back to
+  // the list. (Legacy right-sheet cleanup kept for any old callers.)
+  const legacy = document.getElementById('contacts-drawer-ov'); if (legacy) legacy.remove();
+  if (document.getElementById('contacts-modal-ov')) openContactsView();
+}
 function _contactsShowDrawer(title, bodyHtml) {
-  _contactsCloseDrawer();
-  const ov = document.createElement('div'); ov.id = 'contacts-drawer-ov';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;justify-content:flex-end';
-  ov.onclick = (e) => { if (e.target === ov) _contactsCloseDrawer(); };
-  ov.innerHTML = `<div style="width:min(460px,100%);height:100%;background:var(--bg);border-left:1px solid var(--border);overflow:auto;padding:20px 22px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <div style="font-size:17px;font-weight:700;color:var(--text)">${title}</div>
-      <button onclick="_contactsCloseDrawer()" style="background:none;border:none;color:var(--text-sub);font-size:22px;line-height:1;cursor:pointer">×</button>
-    </div>
-    <div id="contacts-drawer-body">${bodyHtml}</div></div>`;
-  document.body.appendChild(ov);
+  const host = document.getElementById('contacts-content');
+  if (!host) return;
+  // Swap the modal header into detail mode: back arrow + the contact's name.
+  const head = document.getElementById('contacts-modal-head');
+  if (head) head.innerHTML = `<button class="ctx-modal-back" onclick="openContactsView()" aria-label="Back to contacts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Contacts</button><span style="flex:1"></span><div class="ctx-modal-title" style="font-size:14px;max-width:52%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${title}</div><span style="flex:1"></span><button class="ctx-modal-x" onclick="_contactsCloseModal()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
+  host.innerHTML = `<div id="contacts-drawer-body">${bodyHtml}</div>`;
 }
 // Deep link into the academy's GHL → opens the contact (web, or the
 // LeadConnector app on mobile) where staff can place the call on the academy's
@@ -16199,6 +16298,15 @@ async function _contactsSaveSetup() {
 
 let _MSG_RETURN_VIEW = null;
 function switchView(name, el) {
+  // Contacts is a focus-mode modal, not a full view: overlay it on the current
+  // page and return, so closing it lands you back where you were. Every entry
+  // point (sidebar, inbox button, command center, mobile More, deep links)
+  // funnels through here, so this one seam covers them all. Permission still gated.
+  if (name === 'contacts') {
+    if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed('contacts')) return;
+    openContactsModal();
+    return;
+  }
   // Command center (beta): while the one-page flow is active, section-mapped
   // views scroll to their section instead of swapping views; anything else
   // opens classically with a "back to command center" pill. _CC_BYPASS lets
@@ -16226,6 +16334,22 @@ function switchView(name, el) {
     const _cur = document.querySelector('.view.active');
     const _curName = _cur ? _cur.id.replace('view-', '') : null;
     if (_curName && _curName !== 'messages') _MSG_RETURN_VIEW = _curName;
+  }
+
+  // ── Business Blueprint focus overlay ──
+  // BB is a focus-mode overlay, not an in-.main view. If it's open and we're
+  // heading elsewhere, step out of it first. If we're heading TO it, open the
+  // camera-pan modal and skip the normal view swap. Every caller funnels through
+  // switchView, so this covers nav, mobile, command-center + deep links.
+  const _bpEl = document.getElementById('view-blueprint');
+  if (name !== 'blueprint' && _bpEl && _bpEl.classList.contains('mm-open') && typeof closeBlueprint === 'function') closeBlueprint();
+  if (name === 'blueprint') {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    if (!el) el = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'blueprint'"));
+    if (el) el.classList.add('active');
+    openBlueprint();
+    try { syncMobileNav('blueprint'); } catch (_) {}
+    return;
   }
 
   // Update nav
@@ -21257,6 +21381,42 @@ function _bbNavigate(card, id, query) {
   _bbRenderFromHash();
 }
 
+// Is the Business Blueprint focus overlay currently open?
+function _bbIsOpen() { return !!document.getElementById('view-blueprint')?.classList.contains('mm-open'); }
+
+// Open the Business Blueprint as a focus-mode overlay (camera-pan zoom, app
+// chrome blurs behind), not an in-.main view. Remembers the view underneath so
+// Back steps cleanly back out to it.
+let _BP_RETURN = null;
+function openBlueprint() {
+  const modal = document.getElementById('view-blueprint');
+  if (!modal) return;
+  if (!_bbIsOpen()) {
+    const cur = document.querySelector('.view.active');
+    _BP_RETURN = cur ? cur.id.replace('view-', '') : null;
+  }
+  _bbRenderFromHash();   // render panel from the current hash before the pan
+  if (typeof _ccOpenFocusPage === 'function') {
+    _ccOpenFocusPage('view-blueprint', '.nav-item[data-feature="blueprint"]');
+  } else {
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => { document.documentElement.classList.add('mm-focus-open'); modal.classList.add('mm-open'); });
+  }
+}
+function closeBlueprint() {
+  if (typeof _mmCloseFocus === 'function') _mmCloseFocus('view-blueprint');
+  else {
+    const m = document.getElementById('view-blueprint');
+    if (m) { m.classList.remove('mm-open'); m.style.display = 'none'; }
+    document.documentElement.classList.remove('mm-focus-open');
+  }
+  // restore the sidebar highlight to whatever view we came back out to
+  const back = _BP_RETURN || (typeof _landingView === 'function' ? _landingView() : 'home');
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
+  if (item) item.classList.add('active');
+  try { syncMobileNav(back); } catch (_) {}
+}
 async function openBlueprintView() { _bbRenderFromHash(); }
 
 function _bbRenderFromHash() {
@@ -21737,6 +21897,12 @@ function _bbRenderBrandCard(panel, meta) {
     <h3 style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin:24px 0 10px;letter-spacing:0.02em">Website</h3>
 
     <div class="bb-field">
+      <div class="bb-field-label">Your pages</div>
+      <div class="bb-field-hint" style="margin-bottom:8px">Every page of your site, grouped by the offer it belongs to. Click <b>Edit page</b> to open it and leave notes on any section - the same way you edit your free trial and contact pages.</div>
+      <div id="bb-website-pages"></div>
+    </div>
+
+    <div class="bb-field">
       <div class="bb-field-label">Current website status</div>
       <div class="bb-choice-row">${statusOpts.map(opt => `
         <button type="button" class="bb-choice ${websiteStatus === opt ? 'selected' : ''}" onclick="_bbBrandSetWebsiteStatus('${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
@@ -21790,6 +21956,103 @@ function _bbRenderBrandCard(panel, meta) {
 
     ${_bbMarkDoneCta('brand', 'Brand')}
   `;
+  const _wp = document.getElementById('bb-website-pages');
+  if (_wp) _bbRenderWebsitePages(_wp);
+}
+
+// ── Website pages editor (Business Blueprint > Brand > Website) ──
+// Lists every page of the academy site grouped by the offer that owns it. Each
+// row opens the Request-a-change annotator for that page (same click-to-note
+// flow as free trial / contact). Pages = offer funnels (_FN) + any extra site
+// pages saved on brand_data.site_pages ({ slug, label, offer_id }).
+function _bbBaseOrigin() {
+  const list = (typeof _FN !== 'undefined' && _FN) ? _FN : [];
+  const prim = list.find(f => f.is_primary) || list[0];
+  const u = prim && prim.url_resolved;
+  if (u) { try { return new URL(u).origin; } catch (_) {} }
+  return null;
+}
+let _BB_PAGES = [];   // last collected page list, for _bbEditPage lookups
+function _bbCollectPages(sitePages) {
+  const origin = _bbBaseOrigin();
+  const out = [];
+  ((typeof _FN !== 'undefined' && _FN) ? _FN : []).forEach(f => {
+    if (!f || !f.url_resolved) return;
+    out.push({ key: f.key, label: f.label || f.key, url_resolved: f.url_resolved, offer_id: f.offer_id || null });
+  });
+  (Array.isArray(sitePages) ? sitePages : []).forEach(p => {
+    if (!p || !p.slug) return;
+    if (out.some(x => x.key === p.slug)) return;
+    const url = p.url || (origin ? origin + '/' + String(p.slug).replace(/^\/+/, '') : null);
+    out.push({ key: p.slug, label: p.label || p.slug, url_resolved: url, offer_id: p.offer_id || null });
+  });
+  _BB_PAGES = out;
+  return out;
+}
+// brand_data is NOT in CLIENT_ROWS (CLIENT_SELECT_COLS omits it), so read the
+// site page inventory straight from the clients row.
+async function _bbLoadSitePages() {
+  try {
+    if (_sb && CLIENT_ID) {
+      const { data } = await _sb.from('clients').select('brand_data').eq('id', CLIENT_ID).maybeSingle();
+      const sp = data && data.brand_data && data.brand_data.site_pages;
+      if (Array.isArray(sp)) return sp;
+    }
+  } catch (_) {}
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  return (c.brand_data && Array.isArray(c.brand_data.site_pages)) ? c.brand_data.site_pages : [];
+}
+async function _bbRenderWebsitePages(host) {
+  if (!host) return;
+  host.innerHTML = '<div class="bb-field-hint" style="padding:6px 0">Loading your pages…</div>';
+  try { if (typeof _fnLoad === 'function' && !_FN_LOADED) await _fnLoad(true); } catch (_) {}
+  const offerMap = {};
+  try {
+    if (_sb && CLIENT_ID) {
+      const { data } = await _sb.from('offers').select('id,title').eq('client_id', CLIENT_ID).neq('status', 'archived');
+      (data || []).forEach(o => { offerMap[o.id] = o.title; });
+    }
+  } catch (_) {}
+  const sitePages = await _bbLoadSitePages();
+  const pages = _bbCollectPages(sitePages);
+  if (!pages.length) {
+    host.innerHTML = '<div class="bb-field-hint" style="padding:6px 0">No pages yet - they show up here once your funnels are set up.</div>';
+    return;
+  }
+  const groups = new Map();
+  pages.forEach(p => { const k = p.offer_id || '__general__'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); });
+  const keys = [...groups.keys()].filter(k => k !== '__general__').sort((a, b) => (offerMap[a] || '').localeCompare(offerMap[b] || ''));
+  if (groups.has('__general__')) keys.push('__general__');
+  let html = '';
+  keys.forEach((k, gi) => {
+    const isGen = k === '__general__';
+    const title = isGen ? 'General / whole site' : (offerMap[k] || 'Offer');
+    const rows = groups.get(k).map(p => `
+      <div class="wp-row">
+        <div class="wp-row-main">
+          <div class="wp-row-label">${_bbEscapeHtml(p.label)}</div>
+          <div class="wp-row-url">${_bbEscapeHtml((p.url_resolved || '').replace(/^https?:\/\//, '')) || 'no link yet'}</div>
+        </div>
+        ${isGen ? '' : `<span class="wp-tag wp-tag--offer">${_bbEscapeHtml(title)}</span>`}
+        <button type="button" class="wp-edit"${p.url_resolved ? '' : ' disabled'} onclick="_bbEditPage('${_bbEscapeAttr(p.key)}')">Edit page</button>
+      </div>`).join('');
+    html += `
+      <div class="wp-group">
+        <button type="button" class="wp-group-head${gi === 0 ? ' open' : ''}" onclick="this.classList.toggle('open');this.nextElementSibling.style.display=this.classList.contains('open')?'block':'none'">
+          <span class="wp-caret">&#9662;</span>
+          <span class="wp-group-title">${_bbEscapeHtml(title)}</span>
+          <span class="wp-group-count">${groups.get(k).length}</span>
+        </button>
+        <div class="wp-group-body" style="display:${gi === 0 ? 'block' : 'none'}">${rows}</div>
+      </div>`;
+  });
+  host.innerHTML = html;
+}
+function _bbEditPage(key) {
+  const page = (_BB_PAGES || []).find(p => p.key === key);
+  if (!page) return;
+  if (!page.url_resolved) { try { _mmToast('No link for this page yet'); } catch (_) { alert('No link for this page yet'); } return; }
+  openPageAnnotator(page);
 }
 
 async function _bbToggleAdsApproval() {
@@ -23611,7 +23874,7 @@ function _autoOpenContact(contactId, name) {
   try {
     let idx = _CONTACTS.findIndex(x => x && x.ghl_contact_id === contactId);
     if (idx < 0) { _CONTACTS.push({ ghl_contact_id: contactId, name: name || 'Contact', email: null, phone: null, tags: [] }); idx = _CONTACTS.length - 1; }
-    _contactsOpenDrawer(idx);
+    openContactsModal({ contactIdx: idx });
   } catch (_) { if (typeof _plToast === 'function') _plToast('Could not open contact'); }
 }
 
@@ -27663,8 +27926,7 @@ function _bbUpdateSaveStateLabel() {
 
 // popstate listener for BB hash routing
 window.addEventListener('popstate', () => {
-  const activeView = document.querySelector('.view.active');
-  if (activeView && activeView.id === 'view-blueprint') _bbRenderFromHash();
+  if (_bbIsOpen()) _bbRenderFromHash();
 });
 
 // Kept as a callback target for the invite + revoke modals. The
@@ -29715,8 +29977,7 @@ function _aiOpenBB(card) {
 // V1.5 onboarding deep-links: open Contacts → Setup (athlete-name mapping) and
 // KPIs → Setup (tie Stripe/pipelines/calendars to offers).
 function _aiOpenContactsSetup() {
-  switchView('contacts');
-  setTimeout(() => { if (typeof _contactsOpenSetup === 'function') _contactsOpenSetup(); }, 350);
+  openContactsModal({ setup: true });
 }
 function _aiOpenKpiSetup() {
   switchView('v15kpis');
@@ -29864,8 +30125,12 @@ function _aiOnbHTML(it) {
       </div>`;
     }
   }
-  // Every step is check/uncheck-able by hand. Auto steps also self-complete
-  // from the connection signal until someone overrides them by hand.
+  // auto_only steps (Connect Stripe / Connect GHL) can NOT be ticked by hand. They
+  // tick themselves only when the account is genuinely connected. Ticking them by
+  // hand used to be allowed, which let a client mark "Connect Stripe" done without
+  // ever connecting - the portal then showed them as payment-ready when they could
+  // not charge a card. The circle is read-only for these; use the Connect CTA.
+  const autoOnly = !!it.auto_only;
   const status = isDone
     ? `<span class="ai-chip" style="color:var(--green)">✓ Done</span>`
     : (cfg.auto ? `<span class="ai-chip">Auto · not yet</span>` : `<span class="ai-chip">To do</span>`);
@@ -29875,7 +30140,9 @@ function _aiOnbHTML(it) {
   if (it.onboarding_key === 'book_call_cam' && !isDone) cta = _aiCamCallCta();
   if (it.onboarding_key === 'book_review_call' && !isDone) cta = _aiBookCallCta();
   // Subway "stop": a circle node on a vertical line + the step body to the right.
-  const circle = `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}" title="${cfg.auto ? 'Auto-completes when connected - or tick by hand' : ''}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
+  const circle = autoOnly
+    ? `<span class="ai-stop-circle${isDone ? ' on' : ''}" style="cursor:default" aria-disabled="true" title="${isDone ? 'Connected' : 'Ticks itself once your account is actually connected'}">${isDone ? _AI_CHECK_ICON : ''}</span>`
+    : `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
   return `<div class="ai-stop${isDone ? ' done' : ''}">
     <div class="ai-stop-rail">${circle}<div class="ai-stop-line"></div></div>
     <div class="ai-stop-body">
@@ -31821,7 +32088,7 @@ async function _epEnsureLoaded() {
     }
   } catch (_) {} finally { _EP_LOADING = false; }
   if (document.getElementById('pl-entry-list')) _renderEntryRail();
-  if (document.querySelector('.view.active')?.id === 'view-blueprint' && _bbState.offer) _bbRenderWizardBody();
+  if (_bbIsOpen() && _bbState.offer) _bbRenderWizardBody();
 }
 
 // The academy's (single) Training offer id - entry-point setup lives on it.
@@ -31978,7 +32245,7 @@ async function _epWizSave(disconnect) {
     if (enabled !== undefined) ep.enabled = enabled;
     _renderEntryRail();
     // If we edited from inside the offer editor, refresh its entry-points section too.
-    if (document.querySelector('.view.active')?.id === 'view-blueprint' && _bbState.offer) _bbRenderWizardBody();
+    if (_bbIsOpen() && _bbState.offer) _bbRenderWizardBody();
     closePipelineDrawer();
   } catch (e) {
     if (err) { err.textContent = e.message; err.style.display = 'block'; }
@@ -33029,12 +33296,12 @@ function _hk2QuietWhen(iso) {
     return day + ' at ' + t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   } catch (_) { return 'in the morning'; }
 }
-// Name tap on a deck card -> the contact drawer. The drawer overlay sits at
-// z-index 9000; on mobile the deck modal is 10050, so raise the overlay above
-// it or the drawer would open BEHIND the deck.
+// Name tap on a deck card -> the contact detail (in the Contacts focus modal).
+// The modal sits at z-index 9400; on mobile the deck modal is 10050, so raise
+// the contacts modal above it or the contact would open BEHIND the deck.
 function _hk2OpenContact(cid, nm) {
   try { _autoOpenContact(cid, nm); } catch (_) { return; }
-  const ov = document.getElementById('contacts-drawer-ov');
+  const ov = document.getElementById('contacts-modal-ov');
   if (ov) ov.style.zIndex = '10060';
 }
 // Back from the deck = the HOME page's Sales section (Zoran 2026-07-09), with
@@ -33291,16 +33558,15 @@ function _hk2CardHtml(r, pos, total, isTop) {
       </div>
       <div class="hk2-note">One submit routes them: good fit moves to Done Trial, no-show hands Booking the rebook, not a fit closes as unqualified or lost.</div>`;
   } else {
-    // A reply that PROPOSES a time carries the slot as structured data (Zoran
-    // 2026-07-10: approve every proposed time as a Hawkeye field, not prose).
-    // Read-only here: this is just an offer ("does X work?"), nothing books on
-    // send. No slot picker - that only belongs on the Book-it card, where send
-    // actually books (Zoran 2026-07-11). To offer a different time, edit the
-    // message; the verified slot stays stamped for the structured field.
-    const proposal = (r._kind === 'reply' && r.book_slot_at) ? `
-      <div class="hk2-lbl">Proposed time - a verified open slot</div>
-      <div class="hk2-static">${escapeHTML(_hk2SlotLabel(r.book_slot_at))}${r.book_group ? ' · ' + escapeHTML(r.book_group) : ''}</div>
-      <div class="hk2-note">The message offers this time. Nothing books yet - it books only after the lead says yes and a Book-it card fires.</div>` : '';
+    // A reply that PROPOSES a time still carries the slot as structured data, but
+    // we do NOT surface a "verified open slot" box on the reply card (Zoran
+    // 2026-07-13). The box let the structured slot and the message text disagree
+    // (message named Tuesday, box showed Wednesday) and claimed "verified" for a
+    // time the human hadn't been shown against the prose. The MESSAGE is the
+    // source of truth on a proposal; the slot only becomes visible on the formal
+    // Book-it confirmation card (where send actually books). The stored
+    // book_slot_at still rides the card silently to pre-fill that later Book-it.
+    const proposal = '';
     // 🔥 The fired reignition: the message pre-written at park time, back for
     // its final ✓ on the day the lead asked for.
     const reigBanner = (r._kind === 'reignite_due' && r.reignite_at)
@@ -50290,6 +50556,7 @@ function _ccFocusHud(modalId) {
   const label = modalId === 'gmMachineModal' ? 'GM OFFICE'
     : modalId === 'membersMachineModal' ? 'MEMBERS'
     : modalId === 'landingMachineModal' ? 'LANDING PAGE'
+    : modalId === 'view-blueprint' ? 'BLUEPRINT'
     : 'MARKETING';
   _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE');
   _ccFocusWallpaper(modalId);
@@ -53687,14 +53954,41 @@ function openChangeRequest() {
 // the pan (the config's own Back button is what exits to the main surface).
 function closeChangeRequest() {
   _V2_OPEN = false; _v2NoteCancel(); _v2CloseReview();
-  const cfg = document.getElementById('landingMachineModal');
   const cr = document.getElementById('changeRequestModal');
   if (cr) { cr.classList.remove('mm-open'); setTimeout(() => { cr.style.display = 'none'; }, 500); }
+  // Launched from the Business Blueprint website editor: the blueprint overlay
+  // is still open underneath, so just clear the annotator and refresh it.
+  if (window._CR_FROM_BLUEPRINT) {
+    window._CR_FROM_BLUEPRINT = false;
+    _FN_ACTIVE = null;
+    try { if (_bbIsOpen()) _bbRenderFromHash(); } catch (_) {}
+    return;
+  }
+  const cfg = document.getElementById('landingMachineModal');
   if (_FN_ACTIVE) _fnRenderFunnelFocus(_FN_ACTIVE); else _mmRenderLandingFocus(_MM);
   if (cfg && document.documentElement.classList.contains('mm-focus-open')) {
     cfg.style.display = 'flex';
     requestAnimationFrame(() => cfg.classList.add('mm-open'));
   }
+}
+// Open the Request-a-change annotator for ANY site page (not just a funnel),
+// launched from the Business Blueprint website editor. No _MM dependency: the
+// blueprint overlay already holds mm-focus-open, so we just raise the annotator
+// modal on top and mount the page. `page` = { key, label, url_resolved, offer_id }.
+function openPageAnnotator(page) {
+  if (!page) return;
+  _FN_ACTIVE = page;                       // annotator reads url_resolved / label / offer_id off this
+  window._CR_FROM_BLUEPRINT = true;
+  _V2_OPEN = true; _V2_PINS = []; _V2_PENDING = null; _V2_STEPS = []; _V2_STAGE = null;
+  const t = document.getElementById('cr-modal-title');
+  if (t) t.textContent = 'Request a change · ' + (page.label || 'Page');
+  const b = document.getElementById('cr-modal-body');
+  if (b) b.innerHTML = _crBodyHtml();
+  const cr = document.getElementById('changeRequestModal');
+  if (!cr) return;
+  cr.style.display = 'flex';
+  requestAnimationFrame(() => requestAnimationFrame(() => cr.classList.add('mm-open')));
+  setTimeout(() => { try { _v2MountStage(); } catch (e) {} }, 120);
 }
 
 /* ── Mini date picker for the Marketing Machine range ──
@@ -54601,11 +54895,16 @@ function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
   if (!_V2_PINS.length && !desc) { _mmToast('Add a note or a line of context first'); return; }
   const onOther = typeof _FN_ACTIVE !== 'undefined' && !!_FN_ACTIVE;   // annotating an "other" funnel page
+  // Tie the request to the offer that owns this page. Every funnel row carries
+  // offer_id; for the main free-trial page use the primary funnel's offer.
+  const _srcFunnel = onOther ? _FN_ACTIVE : (Array.isArray(_FN) ? _FN.find(f => f.is_primary) : null);
   const payload = {
     module: 'landing-page', request_type: _V2_TYPE, source: 'v2_portal_oneclick',
     description: desc,
     context: {
       funnel: onOther ? _FN_ACTIVE.key : 'free-trial',
+      funnel_id: _srcFunnel?.id || null,
+      offer_id: _srcFunnel?.offer_id || null,
       page_url: onOther ? (_FN_ACTIVE.url_resolved || null) : ((typeof _MM !== 'undefined' && _MM?.page?.url) || null),
       metric_snapshot: (!onOther && typeof _MM !== 'undefined' && _MM?.page) ? {
         visitors: _MM.page.visitors, form_started: _MM.page.form_started,
