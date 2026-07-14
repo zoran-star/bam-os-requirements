@@ -39473,7 +39473,11 @@ function _sorterRenderStep2(host) {
 
   host.innerHTML = `
     <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Found <b>${m.rows.length}</b> rows. Confirm each column's field (or untick "use" to send it to leftover data).</div>
-    ${rowsHtml}`;
+    ${rowsHtml}
+    <div style="margin-top:8px;padding-top:12px;border-top:1px solid var(--border,#2a2a31)">
+      <button onclick="_sorterSuggestFields()" style="font-size:12px;font-weight:600;padding:7px 13px;border:1px solid var(--accent,#D4B65C);border-radius:7px;background:transparent;color:var(--accent,#D4B65C);cursor:pointer;">Add leftover columns to your onboarding form</button>
+      <div style="font-size:11px;color:var(--text-mute,#888);margin-top:6px;">The AI suggests intake fields for columns you're not mapping, so future signups collect them too.</div>
+    </div>`;
   _sorterSetNext(`<button onclick="_sorterCommitImport()" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#D4B65C);color:#1a1a1a;cursor:pointer;">Confirm &amp; import →</button>`);
 }
 
@@ -39557,6 +39561,97 @@ async function _sorterCommitImport() {
   } catch (e) {
     alert('Import failed: ' + e.message);
   }
+}
+
+// ── 5C: AI-suggested onboarding fields from the leftover (unmapped) columns ──
+function _sorterFieldsModal(innerHtml, closable) {
+  let back = document.getElementById('sf-modal');
+  if (!back) {
+    back = document.createElement('div');
+    back.id = 'sf-modal';
+    back.style.cssText = 'position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px';
+    document.body.appendChild(back);
+  }
+  back.onclick = closable ? (e) => { if (e.target === back) back.remove(); } : null;
+  back.innerHTML = `<div style="width:100%;max-width:520px;max-height:84vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px">
+        <div style="font-size:15px;font-weight:700;color:var(--text)">Add fields from leftover columns</div>
+        <button onclick="document.getElementById('sf-modal')?.remove()" style="background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);font-size:12px;padding:5px 10px;cursor:pointer">Close</button>
+      </div>
+      ${innerHtml}
+    </div>`;
+}
+
+async function _sorterSuggestFields() {
+  // Columns the owner is NOT mapping (unticked / no field) = the leftover set.
+  const mapped = new Set();
+  document.querySelectorAll('.pc-sorter-maprow').forEach(row => {
+    const use = row.querySelector('.pc-sorter-mapuse');
+    const sel = row.querySelector('.pc-sorter-mapsel');
+    if (use && use.checked && sel && sel.value) mapped.add(row.getAttribute('data-header'));
+  });
+  const headers = (_SORTER.map && _SORTER.map.headers) || [];
+  const rows = (_SORTER.map && _SORTER.map.rows) || [];
+  const unmapped = headers.filter(h => !mapped.has(h));
+  if (!unmapped.length) { alert('Every column is mapped - nothing leftover to add.'); return; }
+  const columns = unmapped.map(h => ({ column: h, samples: rows.map(r => r[h]).filter(v => v != null && String(v).trim()).slice(0, 5) }));
+  _sorterFieldsModal('<div style="padding:16px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Asking AI which leftover columns are worth collecting…</div>', false);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/suggest-fields', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), columns }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed');
+    _SORTER._suggestOfferId = j.offer_id || null;
+    _SORTER._suggest = Array.isArray(j.suggestions) ? j.suggestions : [];
+    if (!j.offer_id) { _sorterFieldsModal('<div style="font-size:13px;color:var(--text-mute)">No training offer found to attach fields to - create an offer first.</div>', true); return; }
+    if (!_SORTER._suggest.length) { _sorterFieldsModal('<div style="font-size:13px;color:var(--text-mute)">Nothing worth adding - your leftover columns look like system data or things you already collect.</div>', true); return; }
+    const typeOpts = t => _BB_CQ_TYPES.map(([v, l]) => `<option value="${v}" ${v === t ? 'selected' : ''}>${l}</option>`).join('');
+    const list = _SORTER._suggest.map((s, i) => `<label style="display:grid;grid-template-columns:auto 1fr 130px;gap:9px;align-items:center;padding:9px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer">
+        <input type="checkbox" class="sf-pick" data-i="${i}" checked>
+        <div style="min-width:0">
+          <input class="sf-label" data-i="${i}" value="${escapeHTML(s.label)}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;font-weight:600;box-sizing:border-box">
+          <div style="font-size:10.5px;color:var(--text-mute);margin-top:3px">from "${escapeHTML(s.source_column || '')}"</div>
+        </div>
+        <select class="sf-type" data-i="${i}" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px">${typeOpts(s.type)}</select>
+      </label>`).join('');
+    _sorterFieldsModal(`<div style="font-size:12px;color:var(--text-mute);margin-bottom:12px">Tick the ones to add to your onboarding form. New signups will be asked these.</div>${list}<button onclick="_sorterApplySuggestedFields()" style="width:100%;margin-top:6px;padding:10px;background:var(--gold);border:0;border-radius:8px;color:#1a1a1a;font-size:13.5px;font-weight:700;cursor:pointer">Add selected to onboarding form</button>`, true);
+  } catch (e) {
+    _sorterFieldsModal(`<div style="padding:14px;color:#c0392b;font-size:13px">Could not get suggestions: ${escapeHTML(e.message || String(e))}</div>`, true);
+  }
+}
+
+async function _sorterApplySuggestedFields() {
+  const offerId = _SORTER._suggestOfferId;
+  const sugg = _SORTER._suggest || [];
+  if (!offerId) return;
+  const picks = [];
+  document.querySelectorAll('#sf-modal .sf-pick').forEach(cb => {
+    if (!cb.checked) return;
+    const i = +cb.getAttribute('data-i');
+    const labelEl = document.querySelector('#sf-modal .sf-label[data-i="' + i + '"]');
+    const typeEl = document.querySelector('#sf-modal .sf-type[data-i="' + i + '"]');
+    const label = (labelEl && labelEl.value.trim()) || (sugg[i] && sugg[i].label) || '';
+    const type = (typeEl && typeEl.value) || (sugg[i] && sugg[i].type) || 'text';
+    if (label) picks.push({ label, type });
+  });
+  if (!picks.length) { document.getElementById('sf-modal')?.remove(); return; }
+  _sorterFieldsModal('<div style="padding:16px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Adding ' + picks.length + ' field' + (picks.length > 1 ? 's' : '') + '…</div>', false);
+  let ok = 0;
+  try {
+    const token = await _mreqAuthToken();
+    for (const p of picks) {
+      const r = await fetch('/api/custom-fields', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ client_id: _aiClientId(), offer_id: offerId, section: 'onboarding', label: p.label, type: p.type }),
+      });
+      if (r.ok) ok++;
+    }
+  } catch (e) { /* partial adds still count */ }
+  try { delete _bbCqCache[offerId + ':onboarding']; } catch (e) {}
+  _sorterFieldsModal(`<div style="font-size:13px;color:var(--text)">Added <b>${ok}</b> field${ok === 1 ? '' : 's'} to your onboarding form.</div><div style="font-size:11.5px;color:var(--text-mute);margin-top:6px">See them in Blueprint → Offers → your training offer → Onboarding.</div>`, true);
 }
 
 // ───────────────────────────── STEP 3 - cleanup → promote ─────────────────────────────

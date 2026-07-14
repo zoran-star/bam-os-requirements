@@ -54,7 +54,9 @@ The Sales and Onboarding sections each render a `custom_field_defs`-backed panel
 
 **5A-3 shipped:** a **live form preview** ("Preview form" button per section) via new `api/offers/form-preview.js` (Supabase-JWT auth) which reuses the live funnel's `buildFields()` (now `export`ed from `api/website/offer.js`) so the preview never drifts from what a lead/member sees. `offer.js`'s `cfDefToField` + defs select now pass `help_text` through. Client: `_bbCqPreviewForm` + `_bbCqRenderPreviewField`, rendered in the shared `_bbShowDocModal`.
 
-**Still to build (5B, 5C):** the actual live website form (bam-client-sites funnel) still renders `multiselect`/`number`/`url` as plain text (`cfDefType` collapses them) and doesn't yet show `help_text` - the portal preview does; forms↔offer enforcement + contact-form-academy-wide rule (5B); and the member-import AI-suggested-fields checklist modal (5C).
+**5C shipped:** member-import AI-suggested onboarding fields. The Pricing Sorter's mapping step (`_sorterRenderStep2`) has an "Add leftover columns to your onboarding form" button → `_sorterSuggestFields` posts the unmapped columns + samples to new `api/sorter/suggest-fields.js` (Claude proposes onboarding fields, skips dupes, resolves the training offer) → checklist modal (`_sorterFieldsModal`) → `_sorterApplySuggestedFields` creates the picked ones via `POST /api/custom-fields` (section=onboarding, offer_id). Non-blocking (doesn't touch the commit flow); drops the onboarding `_bbCqCache` so the builder shows them.
+
+**Still to build (5B):** the actual live website form (bam-client-sites funnel) still renders `multiselect`/`number`/`url` as plain text (`cfDefType` collapses them) and doesn't yet show `help_text` - the portal preview does; plus forms↔offer enforcement + the contact-form-academy-wide rule. Optional follow-through: backfill `member_field_values` from `members_staging.raw` at promote so imported members carry values for the newly-added fields (today `raw` is dropped at promote).
 
 ## Team is special
 
