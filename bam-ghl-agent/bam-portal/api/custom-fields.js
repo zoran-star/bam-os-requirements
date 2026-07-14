@@ -340,6 +340,40 @@ async function handler(req, res) {
       return res.status(200).json({ imported: created.length, folded, fields: created });
     }
 
+    // ── POST ?action=seed-standard: add the canonical athlete fields ───────
+    // A one-click baseline so a new academy's forms aren't empty. Idempotent:
+    // skips any field whose label already exists for this academy. Sales-scoped
+    // fields land on the lead form, onboarding-scoped on the intake form.
+    if (req.method === "POST" && (req.body || {}).action === "seed-standard") {
+      const b = req.body || {};
+      const clientId = b.client_id;
+      if (!clientId) return res.status(400).json({ error: "client_id required" });
+      if (!canAccess(ctx, clientId)) return res.status(403).json({ error: "not your academy" });
+      const offerId = b.offer_id || null;
+      const CANON = [
+        { section: "sales",      label: "Athlete first name", type: "text" },
+        { section: "sales",      label: "Athlete last name",  type: "text" },
+        { section: "sales",      label: "Athlete age",        type: "number" },
+        { section: "onboarding", label: "Medical / allergies", type: "text" },
+        { section: "onboarding", label: "Grade",              type: "text" },
+        { section: "onboarding", label: "Jersey size",        type: "select", options: ["YS", "YM", "YL", "AS", "AM", "AL", "AXL"] },
+        { section: "onboarding", label: "Goals",              type: "text" },
+        { section: "onboarding", label: "Experience level",   type: "select", options: ["Beginner", "Intermediate", "Advanced"] },
+      ];
+      const existingRows = await sb(`custom_field_defs?client_id=eq.${encodeURIComponent(clientId)}&archived=eq.false&select=label`) || [];
+      const existing = new Set(existingRows.map(r => String(r.label || "").trim().toLowerCase()));
+      const rows = [];
+      let i = 0;
+      for (const c of CANON) {
+        if (existing.has(c.label.toLowerCase())) continue;
+        const key = await uniqueKey(clientId, c.label);
+        rows.push({ client_id: clientId, key, label: c.label, type: c.type, options: cleanOptions(c.type, c.options || []), required: false, position: 100 + i, offer_id: offerId, section: c.section });
+        i++;
+      }
+      if (rows.length) await sb(`custom_field_defs`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(rows) });
+      return res.status(200).json({ ok: true, created: rows.length });
+    }
+
     // ── POST ?action=reorder: set position from an ordered id list ─────────
     // The form builder's drag-drop sends the full ordered list for one
     // scope (offer + section); we stamp position=index. All ids must belong to
