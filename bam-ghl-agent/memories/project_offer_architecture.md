@@ -50,7 +50,33 @@ The Sales and Onboarding sections each render a `custom_field_defs`-backed panel
 
 **5A-1 shipped:** the optional questions render as **editable cards** (`_bbCqCardHtml`) instead of read-only chips. `_bbCqOpenEditor(offerId, sectionId, clientId, fieldId)` handles both add (fieldId '') and **edit** (real id → PATCH); `_bbCqSaveEditor` POSTs/PATCHes. New per-field **note** (`custom_field_defs.help_text` column, added additively via `execute_sql` + migration `20260714120000_custom_field_defs_help_text.sql`) + a **Required** toggle, both wired through `api/custom-fields.js` create + PATCH. Field types unchanged (`_BB_CQ_TYPES`: text/number/date/select/multiselect/boolean/phone/email/url).
 
-**Still to build (5A-2/5A-3, 5C):** drag-drop reorder (position column exists, no UI/bulk-reorder API yet), live form preview, live-renderer support for multiselect/number/url in `api/website/offer.js` (they collapse to text today), and the member-import AI-suggested-fields checklist modal.
+**5A-2 shipped:** drag-drop reorder of the cards (grip handle, `_bbCqDragStart/Over/Drop/End` mutate the section cache + `_bbCqPersistOrder`) backed by `POST /api/custom-fields ?action=reorder` (stamps `position=index`).
+
+**5A-3 shipped:** a **live form preview** ("Preview form" button per section) via new `api/offers/form-preview.js` (Supabase-JWT auth) which reuses the live funnel's `buildFields()` (now `export`ed from `api/website/offer.js`) so the preview never drifts from what a lead/member sees. `offer.js`'s `cfDefToField` + defs select now pass `help_text` through. Client: `_bbCqPreviewForm` + `_bbCqRenderPreviewField`, rendered in the shared `_bbShowDocModal`.
+
+**Canonical seed shipped:** `POST /api/custom-fields ?action=seed-standard` adds the common athlete fields (sales: athlete first/last name, age; onboarding: medical, grade, jersey size, goals, experience) - idempotent (skips labels that already exist). "Standard fields" button next to "Preview form" (`_bbCqSeedStandard`, seeds both scopes).
+
+**5C shipped:** member-import AI-suggested onboarding fields. The Pricing Sorter's mapping step (`_sorterRenderStep2`) has an "Add leftover columns to your onboarding form" button → `_sorterSuggestFields` posts the unmapped columns + samples to new `api/sorter/suggest-fields.js` (Claude proposes onboarding fields, skips dupes, resolves the training offer) → checklist modal (`_sorterFieldsModal`) → `_sorterApplySuggestedFields` creates the picked ones via `POST /api/custom-fields` (section=onboarding, offer_id). Non-blocking (doesn't touch the commit flow); drops the onboarding `_bbCqCache` so the builder shows them.
+
+**Still to build (5B):** the actual live website form (bam-client-sites funnel) still renders `multiselect`/`number`/`url` as plain text (`cfDefType` collapses them) and doesn't yet show `help_text` - the portal preview does; plus forms↔offer enforcement + the contact-form-academy-wide rule. Optional follow-through: backfill `member_field_values` from `members_staging.raw` at promote so imported members carry values for the newly-added fields (today `raw` is dropped at promote).
+
+## Sales preset (Gap #2)
+
+The pipeline preset engine `api/agent/presets.js` (`applyPreset`, `PRESETS.free_trial` = GTA's exact 5-stage/20-edge model) stamps `pipeline_stages` + `stage_transitions` only; CLI-trigger (`scripts/apply-preset.mjs`), no UI. Design: `docs/agent-preset-architecture.html`.
+
+**2A shipped (offer → agent facts):** new `api/offers/sync-agent.js` (Supabase-JWT auth) generates the booking agent's FACT prompt sections (`business_info`, `program`, `schedule`, `pricing`, `selling_points`, `policies`) from `offer.data` + client, `?action=preview` returns them and `POST` upserts `agent_prompt_sections` overrides (offer_id tagged; only sections the offer can fill). Sales-section "Sync booking agent from this offer" button → `_bbAgentSyncPreview` (preview + per-section checkboxes) → `_bbAgentSyncApply`. Reversible in Agent learnings; user-triggered so the live agent never changes silently. Supersedes the narrower policy-only push.
+
+**2B shipped (preset-apply UI):** new `api/offers/apply-preset.js` (Supabase-JWT auth) wraps `applyPreset()` behind the portal - `?action=preview` dry-runs (returns stages + routing + workers), `POST` applies (409 `needs_force` on edge conflict). Sales-section "Set up the sales pipeline" button → `_bbPresetPreview` (shows the Free Trial stages + 20 routes) → `_bbPresetApply` (with a Replace-on-conflict path). Stamps `PRESETS.free_trial` onto the offer's `pipeline_stages` + `stage_transitions`.
+
+**Setup status readout:** `GET /api/offers/setup-status` returns the offer's sales-machine readiness (pipeline_stages, transitions, automations + approved, agent_sections, sales/onboarding field counts). Read-only checklist at the top of the Sales section (`sales_setup_status` field → `_bbLoadSalesStatus`/`_bbSalesStatusHtml`, cached in `_bbSalesStatusCache`, cleared by the pipeline/automations/agent/field actions).
+
+**2C shipped (seed automations):** new `POST /api/automations ?action=seed-preset-automations` seeds the baseline automations idempotently + dormant (approved:false) - the 3 form-intro first-touches (`FORM_INTRO_DEFAULTS`) plus the new multi-step `GHOSTED_DEFAULT` (👻 Ghosted, 3-SMS drip, merge-fields only) in `form-intro-automations.js`. Same create-if-missing / add-steps-only-if-zero rule as `seed-form-intro`. Sales-section "Set up automations" button → `_bbAutomationsSeed`. Nurture is NOT seeded (its GTA copy is brand-story email templates - needs the academy's own content).
+
+**2D shipped:** `POST /api/offers/seed-entry-points` seeds funnels (free-trial primary + contact) and website-form entry_points (free-trial + contact) idempotently, offer-tied, GHL columns null; "Create standard entry points" button in the EP manager's empty state.
+
+**Gap #1 shipped (booking go-live):** the hardcoded `ACTIVATIONS[]` in `api/schedule/cron-activate-booking.js` is GONE - the cron now reads activation requests from `bookable_programs.config` (`activation_requested_at`, `activation_offer_id`, `expect_templates`, `activation_approved_by`). New `api/schedule/activate-booking.js` (JWT auth: staff or owner): GET returns booking_provider + planned templates + warnings (pure `offerToTemplatePayloads`) + last `activation_report`; POST stamps the request (refuses on warnings / 0 templates / no program). Schedule section's "Set up free trial booking" button (`_bbBookingGolive`) previews class-time cards then queues go-live; the cron completes sync + entry-point link + `booking_provider='portal'` flip within ~10 min. The cron's fail-safe drift guard is unchanged.
+
+**Still to build:** a Nurture automation default; and the agent-facts sections the offer doesn't cover (coach ratio, group sizes, pricing transparency mode, geo-qualification, social proof) still need a dedicated agent-facts interview.
 
 ## Team is special
 

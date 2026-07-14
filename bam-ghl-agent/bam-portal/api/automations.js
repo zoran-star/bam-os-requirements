@@ -23,13 +23,26 @@ import { renderEmail } from "./email-shells.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { isMuted } from "./agent/_mutes.js";
 import { resolveAgentActor } from "./agent/_auth.js";
-import { FORM_INTRO_DEFAULTS } from "./form-intro-automations.js";
+import { FORM_INTRO_DEFAULTS, GHOSTED_DEFAULT } from "./form-intro-automations.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const WORK_CAP             = 50;       // max jobs processed per worker run
 const MAX_ATTEMPTS         = 3;
 const RETRY_BACKOFF_MS     = 5 * 60 * 1000;
+
+// ── re-arm sweep config (GET ?action=rearm) ──
+// A lead that REPLIED (exited 👻 Ghosted on reply → bounced to Responded), got an
+// agent answer, then went SILENT again has NO active engine watching it: the agent
+// only acts on inbound replies, and Ghosted exited permanently on that one reply.
+// After a few days it's the classic "silently stuck" case the client-portal panel
+// only DISPLAYS. This sweep ACTS on it: re-enroll into Ghosted (+ move the opp back
+// to the Interested/ghosted stage, mirroring the worker's form-intro roll-forward)
+// so the long game picks the lead back up. Env-tunable; sane defaults for v1.
+const REARM_IDLE_DAYS    = Number(process.env.REARM_IDLE_DAYS || 3);      // silent this long → re-arm (matches the panel's 3d)
+const REARM_COOLDOWN_HRS = Number(process.env.REARM_COOLDOWN_HRS || 48);  // don't re-arm within this of the last Ghosted enrollment (anti-loop)
+const REARM_MAX_GHOSTED  = Number(process.env.REARM_MAX_GHOSTED || 3);    // cap total Ghosted enrollments per lead (1 original + 2 re-arms) then leave for staff
+const REARM_CAP          = 200;                                           // max opps scanned per run
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -486,12 +499,157 @@ async function runWork(res) {
   return res.status(200).json({ ok: true, picked: jobs.length, sent, deferred, advanced, completed, failed, canceled, nurture_lost: nurtureLost, ghosted_lost: ghostedLost, form_to_ghosted: formToGhosted, lost_race: lost });
 }
 
+// Newest message timestamp (ms, ANY direction) for a contact — the SAME idle signal
+// the client-portal panel/inbox trusts. Two sources, take the max:
+//   1. Portal STORE threads (Twilio SMS / Resend email / Meta DM) — the PRIMARY
+//      messaging source for portal-native academies (GTA). Keyed by ghl_contact_id
+//      even for portal-native (UUID) contacts that never existed in GHL, so this
+//      also covers leads the GHL lookup below can't resolve.
+//   2. GHL conversations — for academies still messaging through GHL directly.
+// Any-direction is deliberate: our own outbound sends land here too, so we never
+// re-arm right after messaging a lead. Returns null ONLY when NEITHER source could
+// be read (fail SAFE — never re-arm a lead we couldn't verify).
+async function lastContactMessageMs(clientId, token, locationId, contactId) {
+  const enc = encodeURIComponent(String(contactId));
+  let ms = 0, known = false;
+  for (const tbl of ["sms_threads", "email_threads", "dm_threads"]) {
+    try {
+      const rows = await sb(`${tbl}?client_id=eq.${clientId}&ghl_contact_id=eq.${enc}&select=last_message_at&order=last_message_at.desc.nullslast&limit=1`);
+      if (Array.isArray(rows) && rows[0]) {
+        known = true;
+        const t = rows[0].last_message_at ? new Date(rows[0].last_message_at).getTime() : 0;
+        if (t > ms) ms = t;
+      }
+    } catch (_) { /* one store table down must not blind the others */ }
+  }
+  if (token && locationId) {
+    try {
+      const search = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, contactId: String(contactId) })}`, { token });
+      known = true; // a successful GHL response is a valid (possibly empty) signal
+      const convos = (search && (search.conversations || search.data)) || [];
+      for (const c of convos) { const t = c.lastMessageDate ? new Date(c.lastMessageDate).getTime() : 0; if (t > ms) ms = t; }
+    } catch (_) { /* GHL blip — rely on the store signal if we got one */ }
+  }
+  return known ? ms : null;
+}
+
+// ── the re-arm sweep: put silently-stuck Responded leads back into 👻 Ghosted ──
+// Population = the SAME leads the client-portal "not flowing" panel surfaces
+// (open + Responded + no active engine + idle), computed server-side so we ACT,
+// not just display. Scopes itself safely to portal-native academies: the
+// `opportunities` store only holds portal-provider opps, and the ghosted live-gate
+// (isAutomationLive) is false for V1/GHL-workflow academies, so this never touches
+// V1. Best-effort per lead; a single failure never aborts the sweep.
+async function runRearm(res) {
+  const IDLE_MS     = REARM_IDLE_DAYS * 86400000;
+  const COOLDOWN_MS = REARM_COOLDOWN_HRS * 3600000;
+  const cutoffIso   = new Date(Date.now() - IDLE_MS).toISOString();
+
+  let opps = [];
+  try {
+    // Coarse net: open opps in Responded whose store row last moved before the idle
+    // cutoff. updated_at is only a FLOOR (the pipeline sync rewrites it in bulk, so
+    // it is NOT a reliable "last activity" clock) — the authoritative idle gate is
+    // the live GHL last-message check per candidate below, matching the panel.
+    opps = await sb(`opportunities?status=eq.open&stage_role=eq.responded&updated_at=lte.${cutoffIso}&select=id,client_id,ghl_contact_id,contact_name,updated_at&order=updated_at.asc&limit=${REARM_CAP}`);
+  } catch (e) { return res.status(500).json({ error: `load opps: ${e.message}` }); }
+  opps = Array.isArray(opps) ? opps : [];
+
+  const liveCache   = new Map();   // clientId -> ghosted live?
+  const ghAutoCache = new Map();   // clientId -> ghosted automation id[]
+  const clientCache = new Map();
+  const tokenCache  = new Map();
+  let armed = 0, noLive = 0, hasActive = 0, agentBusy = 0, recentTouch = 0, cooldown = 0, capped = 0, noCreds = 0, errors = 0;
+
+  const creds = async (clientId) => {
+    if (!clientCache.has(clientId)) clientCache.set(clientId, await loadClient(clientId));
+    const client = clientCache.get(clientId);
+    if (!tokenCache.has(clientId)) tokenCache.set(clientId, client ? await pickGhlToken(client) : null);
+    return tokenCache.get(clientId);
+  };
+
+  for (const o of opps) {
+    const cid = o.ghl_contact_id;
+    const clientId = o.client_id;
+    if (!cid || !clientId) continue;
+    const enc = encodeURIComponent(String(cid));
+    try {
+      // 1) Ghosted must be LIVE for this academy (also the V1 firewall).
+      if (!liveCache.has(clientId)) liveCache.set(clientId, await isAutomationLive(clientId, "ghosted"));
+      if (!liveCache.get(clientId)) { noLive++; continue; }
+
+      // 2) Already inside an active automation → it's flowing, leave it.
+      const active = await sb(`automation_enrollments?client_id=eq.${clientId}&contact_id=eq.${enc}&status=eq.active&select=id&limit=1`);
+      if (Array.isArray(active) && active[0]) { hasActive++; continue; }
+
+      // 3) The agent is already on it (a queued/approved reply, or a parked
+      //    reignition) → don't double up on the lead.
+      const rr = await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${enc}&status=in.(pending,approved)&select=id&limit=1`);
+      if (Array.isArray(rr) && rr[0]) { agentBusy++; continue; }
+      const reign = await sb(`agent_reignitions?client_id=eq.${clientId}&ghl_contact_id=eq.${enc}&status=eq.pending&select=id&limit=1`);
+      if (Array.isArray(reign) && reign[0]) { agentBusy++; continue; }
+
+      // 4) AUTHORITATIVE idle gate: newest message across the portal store threads
+      //    (primary for GTA) + GHL conversations, the same source the panel trusts.
+      //    Fail-safe: if NEITHER source can be read we skip (never re-arm a lead we
+      //    couldn't verify). Also honor the updated_at floor so a lead just MOVED
+      //    into Responded (no new message yet) isn't re-armed. Creds are best-effort
+      //    here (the store signal works without GHL) but required to move the stage.
+      const c = await creds(clientId);
+      const msgMs = await lastContactMessageMs(clientId, c && c.token, c && c.locationId, cid);
+      if (msgMs === null) { noCreds++; continue; }
+      const lastTouch = Math.max(new Date(o.updated_at).getTime(), msgMs);
+      if (Date.now() - lastTouch < IDLE_MS) { recentTouch++; continue; }
+
+      // 5) Cooldown + cap: don't loop on a lead that keeps re-ghosting. Count this
+      //    lead's prior Ghosted enrollments (any status) — cap total, and honor a
+      //    cooldown since the most recent one.
+      if (!ghAutoCache.has(clientId)) {
+        const ga = await sb(`automations?client_id=eq.${clientId}&automation_key=eq.ghosted&select=id`);
+        ghAutoCache.set(clientId, (Array.isArray(ga) ? ga : []).map(a => a.id));
+      }
+      const ghIds = ghAutoCache.get(clientId);
+      if (ghIds.length) {
+        const prior = await sb(`automation_enrollments?client_id=eq.${clientId}&contact_id=eq.${enc}&automation_id=in.(${ghIds.join(",")})&select=entered_at,exited_at&order=entered_at.desc`);
+        const priorArr = Array.isArray(prior) ? prior : [];
+        if (priorArr.length >= REARM_MAX_GHOSTED) { capped++; continue; }
+        const last = priorArr[0];
+        const ref = last && (last.exited_at || last.entered_at);
+        if (ref && (Date.now() - new Date(ref).getTime()) < COOLDOWN_MS) { cooldown++; continue; }
+      }
+
+      // 6) ARM. Re-enroll into Ghosted and move the opp back to the Interested/ghosted
+      //    stage — the SAME handoff the worker's form-intro roll-forward does, so the
+      //    lead leaves Responded (where the agent + ghost detector scan) and the long
+      //    game owns it. On the next inbound reply the bounce guard returns them to
+      //    Responded and the agent re-engages.
+      const enr = await enrollContact({ clientId, automationKey: "ghosted", contactId: cid });
+      if (!enr || (!enr.ok && !enr.enrollment_id)) { errors++; continue; }
+      try {
+        if (c && c.token && c.locationId) {
+          const is = await interestedStage(c.token, c.locationId, { clientId, sb });
+          const oppRef = await findOpenOppRef(clientId, c.token, c.locationId, cid);
+          if (is && oppRef) await moveStage({ clientId, ghl, token: c.token, oppRef, stage: is, role: "interested", contactId: cid, reason: "re-arm: Responded lead went silent, rolled back into ghosted" });
+        }
+      } catch (_) { /* enrollment stands even if the stage move blips */ }
+      await logEvent({ clientId, contactId: cid, automationId: null, type: "rearm_ghosted", payload: { from: "responded", idle_days: REARM_IDLE_DAYS } });
+      armed++;
+    } catch (_) { errors++; }
+  }
+  return res.status(200).json({ ok: true, scanned: opps.length, armed, skipped: { no_live: noLive, has_active: hasActive, agent_busy: agentBusy, recent_touch: recentTouch, cooldown, capped, no_creds: noCreds }, errors });
+}
+
 // ── staff CRUD (backs the P4b step-builder) ──
 async function handler(req, res) {
   if (req.method === "GET" && req.query.action === "work") {
     const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!process.env.CRON_SECRET || got !== process.env.CRON_SECRET) return res.status(401).json({ error: "unauthorized" });
     return await runWork(res);
+  }
+  if (req.method === "GET" && req.query.action === "rearm") {
+    const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    if (!process.env.CRON_SECRET || got !== process.env.CRON_SECRET) return res.status(401).json({ error: "unauthorized" });
+    return await runRearm(res);
   }
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
@@ -564,6 +722,39 @@ async function handler(req, res) {
           body: JSON.stringify([{ automation_id: auto.id, position: def.step.position || 0, wait_amount: def.step.wait_amount, wait_unit: def.step.wait_unit, channel: def.step.channel, subject: def.step.subject ?? null, body: def.step.body, enabled: true, updated_at: new Date().toISOString() }]) });
       }
       return res.status(200).json({ ok: true, automation: { ...auto, steps: await loadSteps(auto.id) } });
+    }
+
+    // Seed the preset's BASELINE automations in one call (Gap #2, phase 2C): the
+    // three form-intro first-touches + the multi-step 👻 Ghosted drip. Same
+    // idempotent + edit-safe rule as seed-form-intro (create only if missing; add
+    // steps only when the automation has zero). All dormant (approved:false).
+    if (b.action === "seed-preset-automations") {
+      const DEFS = { ...FORM_INTRO_DEFAULTS, ghosted: GHOSTED_DEFAULT };
+      const keys = (Array.isArray(b.keys) && b.keys.length) ? b.keys.filter(k => DEFS[k]) : Object.keys(DEFS);
+      const results = [];
+      for (const key of keys) {
+        const def = DEFS[key];
+        let autos = await sb(`automations?client_id=eq.${clientId}&automation_key=eq.${encodeURIComponent(key)}&select=*&limit=1`);
+        let auto = Array.isArray(autos) && autos[0];
+        let created = false;
+        if (!auto) {
+          const ins = await sb(`automations?on_conflict=client_id,automation_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+            body: JSON.stringify([{ client_id: clientId, automation_key: key, name: def.name, enabled: !!def.enabled, approved: !!def.approved, offer_id: b.offer_id || null, updated_at: new Date().toISOString() }]) });
+          auto = Array.isArray(ins) && ins[0];
+          created = true;
+        }
+        if (!auto) { results.push({ key, ok: false }); continue; }
+        const existing = await loadSteps(auto.id);
+        if (!existing.length) {
+          const steps = def.steps || (def.step ? [def.step] : []);
+          if (steps.length) {
+            await sb(`automation_steps`, { method: "POST", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify(steps.map((s, i) => ({ automation_id: auto.id, position: s.position != null ? s.position : i, wait_amount: s.wait_amount, wait_unit: s.wait_unit, channel: s.channel, subject: s.subject ?? null, body: s.body, enabled: true, updated_at: new Date().toISOString() }))) });
+          }
+        }
+        results.push({ key, name: def.name, created, steps: (await loadSteps(auto.id)).length });
+      }
+      return res.status(200).json({ ok: true, results });
     }
 
     // Verify an automation_id belongs to this academy before mutating its steps.

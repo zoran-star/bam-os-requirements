@@ -73,3 +73,22 @@ export const FORM_INTRO_DEFAULTS = {
     },
   },
 };
+
+// 👻 Ghosted - the multi-step drip a lead rolls into when a form-intro first-touch
+// gets no reply (the engine advances form_intro -> ghosted -> nurture). Academy-
+// agnostic copy (merge fields only) so it clones cleanly; the academy edits it in
+// the portal after seeding. Same dormant rule: enabled:true + approved:false, so
+// nothing sends until approved. HARD RULE: no em dash (U+2014) - hyphens only.
+export const GHOSTED_DEFAULT = {
+  name: "👻 Ghosted",
+  enabled: true,
+  approved: false,
+  steps: [
+    { position: 0, wait_amount: 1, wait_unit: "days", channel: "sms", subject: null,
+      body: "Hi {{contact.first_name}}, still keen to get your athlete training with us? Happy to help you grab a free trial spot: {{location.website}}/free-trial" },
+    { position: 1, wait_amount: 1, wait_unit: "days", channel: "sms", subject: null,
+      body: "Hey {{contact.first_name}}, just checking in - want me to hold a trial spot for you? Here's the calendar: {{location.website}}/free-trial" },
+    { position: 2, wait_amount: 1, wait_unit: "days", channel: "sms", subject: null,
+      body: "Last nudge {{contact.first_name}} - the free trial is a no-pressure way to see if it's a fit. Here whenever you're ready: {{location.website}}/free-trial" },
+  ],
+};

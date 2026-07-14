@@ -3,7 +3,7 @@ domain: sales-flow
 review_state: ready-for-review
 prototype_status: partial
 core_parity: not-reviewed
-last_reviewed: "2026-07-10"
+last_reviewed: "2026-07-14"
 prototype_commit: working-tree
 core_commit_reviewed: unavailable
 ---
@@ -96,10 +96,55 @@ audit trail. Status transitions are recoverable (never deleted, always canceled+
 Deviation: contact linkage is `ghl_contact_id` (consistent with every agent table today), not
 a core contact FK - migrate via the existing contact mapping.
 
+## 🔁 Re-arm sweep (added 2026-07-14, LIVE in prod)
+
+Operationalizes the seed edge **`responded --went_quiet--> interested`** (line 68).
+That edge exists in every academy's seed, but until now **no engine emitted
+`went_quiet` for a Responded lead**: the agent only acts on inbound replies, and
+👻 Ghosted exits permanently on the reply that first bounced the lead to Responded.
+So a lead that replied once, got an agent answer, then re-ghosted had **no active
+engine** and sat silently open. The client-portal "not flowing" panel only
+*displayed* this; the sweep *acts* on it.
+
+- **Where:** `bam-portal/api/automations.js` → `runRearm()`, `GET ?action=rearm`
+  (Bearer `CRON_SECRET`), cron `*/15 * * * *` in `vercel.json`. No schema change -
+  reuses `opportunities`, `automation_enrollments`, `agent_ready_replies`,
+  `agent_reignitions`, `automations`.
+- **Population:** open opps with `stage_role='responded'` idle ≥ `REARM_IDLE_DAYS`
+  (default 3, env-tunable) with NO active enrollment, NO pending/approved agent
+  reply, NO pending reignition. **Idle clock = newest message across the portal
+  store threads (`sms_threads`/`email_threads`/`dm_threads`, keyed by
+  `ghl_contact_id`) + GHL `/conversations/search`, take the max** - the same signal
+  the panel/inbox trusts. Store is PRIMARY for portal/Twilio academies (GTA) and
+  also covers portal-native (UUID) contacts that never existed in GHL; GHL is the
+  fallback for GHL-messaging academies. `opportunities.updated_at` is only a coarse
+  candidate FLOOR (the pipeline sync rewrites it in bulk). Fails SAFE (skip, never
+  arm) only when NEITHER source can be read.
+- **Action:** `enrollContact(ghosted)` + `moveStage(role='interested')` - the exact
+  handoff the worker's form-intro roll-forward already does (`runWork` completion
+  branch), so the lead leaves Responded (where the agent + ghost detector scan) and
+  the long game owns it. On the next inbound reply the bounce guard returns it to
+  Responded and the agent re-engages, closing the loop.
+- **Guardrails:** V1 firewall via `isAutomationLive(client,'ghosted')` (false for
+  GHL-workflow academies) + the `opportunities` store being portal-provider only;
+  anti-loop cooldown `REARM_COOLDOWN_HRS` (48) and cap `REARM_MAX_GHOSTED` (3 total
+  Ghosted enrollments per lead, then left for staff). Emits an `automation_events`
+  `rearm_ghosted` audit row per arm.
+
+**Core mapping (proposed):** a **backstop reconciler** in the sales-automation
+domain - a periodic job that detects leads sitting in an agent-owned stage with no
+live engine and re-drives the authored `went_quiet` transition. In core this is the
+router firing a time-based `went_quiet` trigger, not a separate concept; the sweep
+is the prototype stand-in until the transition router (above) reads the edge table
+directly. Thresholds (`REARM_IDLE_DAYS`/`COOLDOWN_HRS`/`MAX_GHOSTED`) are per-deploy
+env today; core would make them per-academy config (also flagged for the Onboarding
+Data Points DB).
+
 ## Parity
 
 | Prototype concept | Core mapping | Status | Next action |
 |---|---|---|---|
+| `runRearm` re-arm sweep (`went_quiet` backstop) | core sales-automation backstop reconciler / time-based trigger | `missing` | Fold into the transition router once it reads the edge table; move thresholds to per-academy config |
 | `agent_reignitions` park/schedule | core lead re-engagement / snooze model | `missing` | Review once core is accessible; likely a new sales-automation concept |
 | `stage_role` / `stage_engine` enums | core pipeline/stage model | `decision-needed` | Review core pipeline domain once accessible |
 | `stage_transition` edges | core workflow / pipeline-rule | `decision-needed` | Confirm core has (or wants) a transition-rule table vs hardcoded |

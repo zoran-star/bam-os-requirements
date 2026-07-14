@@ -6,31 +6,23 @@ export const maxDuration = 90; // waits on one sync-offer invocation (itself up 
 // run api/schedule/sync-offer for real, link the offer's calendar entry
 // points to the bookable program, then flip clients.booking_provider='portal'.
 //
-// The human "eyeball the dry-run" step is NOT skipped - it moves into code
-// review: an academy only activates when someone adds it to ACTIVATIONS below
-// with the expected template count, after eyeballing the planned payloads
-// (offline dry-run or sync-offer dry_run:true). The runner re-checks that
-// expectation at execution time and refuses to flip on any drift or warning,
-// so a schedule edited between review and run fails safe.
+// The human "eyeball the dry-run" step is NOT skipped - it moved from a
+// hardcoded ACTIVATIONS[] array in this file (edit + deploy per academy) to a
+// DB-driven request: api/schedule/activate-booking.js shows the owner the
+// planned templates + warnings, and on approval stamps
+// bookable_programs.config.{activation_requested_at, activation_offer_id,
+// expect_templates, activation_approved_by}. This cron picks those up. The
+// runner still re-checks the expectation at execution time and refuses to flip
+// on any drift or warning, so a schedule edited between review and run fails
+// safe. (DETAIL Miami, the one ACTIVATIONS[] entry, flipped 2026-07-08 - its
+// booking_provider is already 'portal', so nothing regresses.)
 //
 //   GET /api/schedule/cron-activate-booking               (Vercel cron, x-vercel-cron)
 //   GET /api/schedule/cron-activate-booking?client_id=…   (manual, Bearer CRON_SECRET)
 //
 // Idempotent: once booking_provider='portal' the entry costs one clients read
 // plus an entry-point link check (which also heals a partial earlier run).
-// V2-only by construction: activations are explicit rows in this file.
-
-// ── Approved activations (adding a row here = the eyeball record) ──────────
-const ACTIVATIONS = [
-  {
-    // DETAIL Miami - Training offer. Approved by Zoran 2026-07-08 after
-    // eyeballing the planned template: "Training - DETAIL Academy
-    // (Mon, Wed, Fri)" 18:00-20:00, capacity 25, trial credit cost 0.
-    client_id: "4708a68d-5365-48bf-a404-72a69fadd34d",
-    offer_id: "7d82f15e-db2e-45e5-9f22-9de86ff88254",
-    expect_templates: 1,
-  },
-];
+// V2-only by construction: requests only come from the activate-booking flow.
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -172,8 +164,18 @@ async function handler(req, res) {
   }
   try {
     const one = String(req.query.client_id || "").trim();
+    // DB-driven work list: programs whose config carries an activation request
+    // (stamped by api/schedule/activate-booking.js on owner approval).
+    const rows = await sb(
+      `bookable_programs?status=eq.ACTIVE&config->>activation_requested_at=not.is.null&select=id,tenant_id,config`
+    ) || [];
+    const activations = rows.map(r => ({
+      client_id: r.tenant_id,
+      offer_id: (r.config || {}).activation_offer_id || (r.config || {}).source_offer_id || null,
+      expect_templates: Number((r.config || {}).expect_templates) || 0,
+    })).filter(a => a.client_id && a.offer_id && a.expect_templates > 0);
     const results = [];
-    for (const a of ACTIVATIONS) {
+    for (const a of activations) {
       if (one && a.client_id !== one) continue;
       let report;
       try {
