@@ -1,15 +1,21 @@
 import { withSentryApiRoute } from "../_sentry.js";
-import { applyPreset, PRESETS } from "../agent/presets.js";
+import { applyPreset, buildPresetRows, PRESETS, presetContents } from "../agent/presets.js";
 
-// Stamp a sales-pipeline preset onto an offer from the portal (Gap #2, phase 2B).
-// Wraps api/agent/presets.js applyPreset() (CLI-only until now) behind JWT auth.
+// Stamp a sales-pipeline preset onto an offer from the portal (Gap #2, phase 2B;
+// station-model manifest since 2026-07-14).
 //
 //   GET  /api/offers/apply-preset?action=list
-//     → { ok, presets:[{ key, label, description, stages, transitions }] }
+//     → { ok, presets:[{ key, label, description, stages, transitions, contents }] }
 //   GET  /api/offers/apply-preset?action=preview&client_id=&offer_id=&preset=free_trial
-//     → { ok, preset, label, stages, transitions, stageRows, transitionRows }  (dry-run, no writes)
+//     → { ok, preset, label, stages, transitions, stageRows, transitionRows,
+//         workers, contents }  (dry-run, no writes; `contents` is the manifest
+//         summary the UI renders its chips from - agents, automations, forms,
+//         calendars - so the front end never hardcodes what a preset brings)
 //   POST /api/offers/apply-preset   body { client_id, offer_id, preset, force? }
-//     → { ok, preset, stages, transitions }   (writes pipeline_stages + stage_transitions)
+//     → { ok, preset, stages, transitions, stamp }
+//        (writes pipeline_stages + stage_transitions, then stamps
+//         offer.data.sales.{preset_key,preset_version,preset_applied_at} so
+//         setup-status and re-stamps are traceable)
 //        409 { error, needs_force } when the offer already has conflicting edges.
 //
 // Auth: Supabase JWT — BAM staff (any academy) or a client_users member of client_id.
@@ -47,15 +53,20 @@ async function resolveUser(req) {
   return { isStaff, clientIds };
 }
 
-// The preset's stage workers (agent template / automation), for a readable preview.
+// The preset's stage engines (agent template / automation), for a readable preview.
 function stageWorkers(presetKey) {
   const p = PRESETS[presetKey];
   const map = {};
   for (const s of (p ? p.stages : [])) {
-    const w = s.worker || {};
+    const w = s.engine || {};
     map[s.role] = w.kind === "agent" ? `agent: ${w.template}` : w.kind === "automation" ? `automation: ${w.key}` : "human";
   }
   return map;
+}
+
+// Transitions count without a real client (list view) - compile with a dummy id.
+function transitionCount(presetKey) {
+  try { return buildPresetRows(presetKey, "count", null).transitionRows.length; } catch (_) { return 0; }
 }
 
 async function handler(req, res) {
@@ -67,7 +78,11 @@ async function handler(req, res) {
     if (action === "list") {
       return res.status(200).json({
         ok: true,
-        presets: Object.values(PRESETS).map(p => ({ key: p.key, label: p.label, description: p.description, stages: p.stages.length, transitions: p.transitions.length })),
+        presets: Object.values(PRESETS).map(p => ({
+          key: p.key, label: p.label, description: p.description,
+          stages: p.stages.length, transitions: transitionCount(p.key),
+          contents: presetContents(p.key),
+        })),
       });
     }
 
@@ -89,13 +104,34 @@ async function handler(req, res) {
         ok: true, preset: presetKey, label: PRESETS[presetKey].label,
         stages: r.stages, transitions: r.transitions,
         stageRows: r.stageRows, transitionRows: r.transitionRows, workers: stageWorkers(presetKey),
+        contents: presetContents(presetKey),
       });
     }
 
     if (action === "apply") {
       try {
         const r = await applyPreset({ clientId, offerId, presetKey, force: b.force === true, log: () => {} });
-        return res.status(200).json({ ok: true, preset: presetKey, stages: r.stages, transitions: r.transitions });
+
+        // Stamp the offer so setup-status + future re-stamps know which preset
+        // (and which version of it) this offer runs on. Merge into data.sales -
+        // never clobber the owner's wizard answers in the rest of the blob.
+        let stamp = null;
+        try {
+          const rows = await sb(`offers?id=eq.${enc(offerId)}&select=data&limit=1`);
+          const data = (Array.isArray(rows) && rows[0] && rows[0].data) || {};
+          stamp = {
+            preset_key: presetKey,
+            preset_version: (PRESETS[presetKey] && PRESETS[presetKey].version) || 1,
+            preset_applied_at: new Date().toISOString(),
+          };
+          data.sales = { ...(data.sales || {}), ...stamp };
+          await sb(`offers?id=eq.${enc(offerId)}`, {
+            method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
+          });
+        } catch (_) { /* stamp is best-effort - the pipeline rows are already in */ }
+
+        return res.status(200).json({ ok: true, preset: presetKey, stages: r.stages, transitions: r.transitions, stamp });
       } catch (e) {
         const msg = e.message || String(e);
         const needsForce = /force:\s*true|Re-run with force|nondeterministic/.test(msg);

@@ -64,12 +64,13 @@ async function handler(req, res) {
     if (!offerId) {
       // No offer yet - nothing to score. The onboarding flow shows every step as
       // not-done, which is correct (they need to build the offer first).
-      return res.status(200).json({ ok: true, offer_id: null, pipeline_stages: 0, transitions: 0, automations: [], agent_sections: 0, sales_fields: 0, onboarding_fields: 0, entry_points: 0, has_policy: false, booking_live: false });
+      return res.status(200).json({ ok: true, offer_id: null, pipeline_stages: 0, transitions: 0, automations: [], agent_sections: 0, sales_fields: 0, onboarding_fields: 0, entry_points: 0, has_policy: false, booking_live: false,
+        define_done: false, schedule_set: false, pricing_filled: false, prices_matched: 0, members: 0, preset: null });
     }
 
     // Pipeline stages/edges scoped to this offer (or the academy-wide default).
     const offerFilter = `or=(offer_id.eq.${enc(offerId)},offer_id.is.null)`;
-    const [stages, edges, autos, agentSecs, salesDefs, onbDefs, eps, clientRows] = await Promise.all([
+    const [stages, edges, autos, agentSecs, salesDefs, onbDefs, eps, clientRows, prices, memberRows] = await Promise.all([
       sb(`pipeline_stages?client_id=eq.${enc(clientId)}&${offerFilter}&select=role`),
       sb(`stage_transitions?client_id=eq.${enc(clientId)}&${offerFilter}&select=id`),
       sb(`automations?client_id=eq.${enc(clientId)}&select=automation_key,approved`),
@@ -78,8 +79,15 @@ async function handler(req, res) {
       sb(`custom_field_defs?client_id=eq.${enc(clientId)}&archived=eq.false&section=eq.onboarding&or=(offer_id.eq.${enc(offerId)},offer_id.is.null)&select=id`),
       sb(`entry_points?client_id=eq.${enc(clientId)}&offer_id=eq.${enc(offerId)}&type=eq.website-form&select=id`),
       sb(`clients?id=eq.${enc(clientId)}&select=booking_provider&limit=1`),
+      sb(`offer_prices?tenant_id=eq.${enc(clientId)}&source_offer_id=eq.${enc(offerId)}&select=id&limit=100`),
+      sb(`members?client_id=eq.${enc(clientId)}&select=id&limit=500`),
     ]);
-    const policy = (offer && offer.data && offer.data.policy) || {};
+    const data = (offer && offer.data) || {};
+    const policy = data.policy || {};
+    const gi = data.general_info || {};
+    const sched = data.schedule || {};
+    const pricing = data.pricing || {};
+    const sales = data.sales || {};
 
     return res.status(200).json({
       ok: true,
@@ -93,6 +101,17 @@ async function handler(req, res) {
       entry_points: count(eps),
       has_policy: policy && typeof policy === "object" && Object.keys(policy).length > 0,
       booking_live: (Array.isArray(clientRows) && clientRows[0] && clientRows[0].booking_provider) === "portal",
+      // Offer-definition sub-states (station-model onboarding flow):
+      // define = the wizard's required basics; schedule = weekly classes built;
+      // pricing_filled = wizard pricing typed; prices_matched = Stripe-matched
+      // sellable prices (the launch-blocking one); preset = the sales-preset
+      // stamp apply-preset writes.
+      define_done: !!(gi.age_range && gi.capacity),
+      schedule_set: Array.isArray(sched.classes) && sched.classes.length > 0,
+      pricing_filled: Object.keys(pricing).length > 0,
+      prices_matched: count(prices),
+      members: count(memberRows),
+      preset: sales.preset_key ? { key: sales.preset_key, version: sales.preset_version || 1, applied_at: sales.preset_applied_at || null } : null,
     });
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || String(e) });

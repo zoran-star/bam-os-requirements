@@ -41,7 +41,7 @@ export const FORM_INTRO_DEFAULTS = {
       channel: "sms",
       subject: null,
       body:
-"Hi {{contact.first_name}},\n\nIt's coach from By Any Means Basketball. Just saw you filled in the form for extra info, is there anything I can help with?",
+"Hi {{contact.first_name}},\n\nIt's the coach from {{location.name}}. Just saw you filled in the form for extra info, is there anything I can help with?",
     },
   },
   trial_form: {
@@ -55,7 +55,7 @@ export const FORM_INTRO_DEFAULTS = {
       channel: "sms",
       subject: null,
       body:
-"Hi {{contact.first_name}}, it's coach from By Any Means GTA.\n\nI saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?\n\nHere's the link to the calendar again: {{location.website}}/free-trial",
+"Hi {{contact.first_name}}, it's the coach from {{location.name}}.\n\nI saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?\n\nHere's the link to the calendar again: {{location.website}}/free-trial",
     },
   },
   missed_trial: {
@@ -90,5 +90,26 @@ export const GHOSTED_DEFAULT = {
       body: "Hey {{contact.first_name}}, just checking in - want me to hold a trial spot for you? Here's the calendar: {{location.website}}/free-trial" },
     { position: 2, wait_amount: 1, wait_unit: "days", channel: "sms", subject: null,
       body: "Last nudge {{contact.first_name}} - the free trial is a no-pressure way to see if it's a fit. Here whenever you're ready: {{location.website}}/free-trial" },
+  ],
+};
+
+// 💔 Lead Nurture - the LONG game. When Ghosted runs out, the worker enrolls the
+// lead into automation_key 'nurture' (api/automations.js) and if the nurture
+// sequence ALSO runs dry the lead goes terminal LOST. Until now this automation
+// was never in the seed set, so on a fresh academy ghosted-exhausted leads were
+// marked lost with zero long-game touches - THE missing station engine. Same
+// dormant rule: enabled:true + approved:false so nothing sends until approved.
+// Academy-agnostic copy (merge fields only). HARD RULE: no em dash - hyphens only.
+export const NURTURE_DEFAULT = {
+  name: "💔 Lead Nurture",
+  enabled: true,
+  approved: false,
+  steps: [
+    { position: 0, wait_amount: 7, wait_unit: "days", channel: "sms", subject: null,
+      body: "Hi {{contact.first_name}}, checking in from {{location.name}} - no pressure at all. If the timing works down the road, a free trial spot is always open: {{location.website}}/free-trial" },
+    { position: 1, wait_amount: 14, wait_unit: "days", channel: "sms", subject: null,
+      body: "Hey {{contact.first_name}}, hope training is going well. If you ever want to see how we run things, come grab a free session: {{location.website}}/free-trial" },
+    { position: 2, wait_amount: 21, wait_unit: "days", channel: "sms", subject: null,
+      body: "Hi {{contact.first_name}}, last check-in from me - the door is always open whenever you're ready: {{location.website}}/free-trial" },
   ],
 };

@@ -15053,52 +15053,73 @@ let _OBF_AT = 0;
 
 // Steps carry a `group` so the flow separates GENERAL academy setup from the
 // per-offer setup (Zoran 2026-07-09: "training is one offer type, separate the
-// general stuff from the training offer"). Member import lives UNDER the
-// training offer (it maps the roster onto that offer's plans), reusing the
-// Member Onboarding card's UI. As more offer types come online each gets its
-// own group; general steps stay shared.
+// general stuff from the training offer"). Station-model restructure 2026-07-14:
+// the offer is the CONTAINER - define it (define → schedule → pricing → policy),
+// sell it (the Sales preset, one click), fill it (onboarding form → members).
+// Booking is no longer its own step: it's a sub-state on Schedule that resolves
+// itself once pricing lands (see _obfScheduleNote). The old pipeline/automations/
+// agent/entrypoints quartet collapsed into ONE preset step whose chips + apply
+// chain come from the preset manifest (api/agent/presets.js).
 const _OBF_GROUPS = [
-  { key: 'general',  label: 'Academy setup', sub: 'Shared across every offer you run' },
-  { key: 'training', label: 'Training offer', sub: 'Your first offer - members, schedule and enrollment' },
+  { key: 'general',  label: 'Your academy', sub: 'Shared across every offer you run' },
+  { key: 'training', label: 'Training offer', sub: 'Define it, sell it, fill it - all in one place' },
 ];
+const _OBF_SUBGROUPS = { sales: 'Sales', onboarding: 'Onboarding' };
 const _OBF_STEPS = [
   { key: 'ein',     group: 'general',  title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
   { key: 'email',   group: 'general',  title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
   { key: 'website', group: 'general',  title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
-  // Training-offer setup - each auto-detects from live data via /api/offers/setup-status
-  // and deep-links to the matching tab of the offer wizard.
-  { key: 'policy',      group: 'training', title: 'Set your membership policy', sub: 'Cancellation, pausing and refunds - flows into the enrollment agreement and member management', cta: 'Set policy', go: "_obfGoOffer('policy')" },
-  { key: 'pipeline',    group: 'training', title: 'Set up your sales pipeline', sub: 'The lead stages your board, agent and automations all run on', cta: 'Set up', go: "_obfGoOffer('sales')" },
-  { key: 'automations', group: 'training', title: 'Turn on your follow-ups', sub: 'First-touch texts and the ghosted drip - seeded off for you to review and approve', cta: 'Set up', go: "_obfGoOffer('sales')" },
-  { key: 'agent',       group: 'training', title: 'Brief your booking agent', sub: 'Fill the agent facts from this offer so it speaks your real pricing, schedule and policies', cta: 'Sync agent', go: "_obfGoOffer('sales')" },
-  { key: 'entrypoints', group: 'training', title: 'Create your lead forms', sub: 'The free-trial and contact form entry points your leads come through', cta: 'Create', go: "_obfGoOffer('sales')" },
-  { key: 'booking',     group: 'training', title: 'Go live with free trial booking', sub: 'Turn your schedule into bookable free-trial slots leads can grab', cta: 'Set up', go: "_obfGoOffer('schedule')" },
-  { key: 'members', group: 'training', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
+  // Training offer: define the offer...
+  { key: 'define',   group: 'training', title: 'Define your offer', sub: 'Ages, skill level, capacity and what is included', cta: 'Define it', go: "_obfGoOffer('general_info')" },
+  { key: 'schedule', group: 'training', title: 'Build your schedule', sub: 'Weekly class times - they become bookable free-trial slots on the portal', cta: 'Build schedule', go: "_obfGoOffer('schedule')", note: '_obfScheduleNote' },
+  { key: 'pricing',  group: 'training', title: 'Confirm your pricing', sub: 'Tiers matched to Stripe - unlocks checkout and free-trial booking', cta: 'Set pricing', go: "_obfGoOffer('pricing')" },
+  { key: 'policy',   group: 'training', title: 'Set your membership policy', sub: 'Cancellation, pausing and refunds - flows into the enrollment agreement and member management', cta: 'Set policy', go: "_obfGoOffer('policy')" },
+  // ...sell it (the whole sales machine is ONE preset)...
+  { key: 'preset',   group: 'training', subgroup: 'sales', title: 'Apply the Free Trial preset', sub: 'Pipeline, follow-ups, booking agent and lead forms - wired to this offer in one click. Nothing texts anyone until you approve it.', cta: 'Apply preset', go: '_obfApplyPreset(this)' },
+  // ...fill it.
+  { key: 'onboardingform', group: 'training', subgroup: 'onboarding', title: 'Set up your onboarding form', sub: 'What you collect at signup, plus the welcome message new members get', cta: 'Set up', go: "_obfGoOffer('onboarding')" },
+  { key: 'members', group: 'training', subgroup: 'onboarding', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
 ];
+
+// Schedule's booking sub-state: booking is not a separate step - it rides the
+// Schedule card and resolves itself. No prices yet → waiting on pricing; prices
+// matched but not live → one action left in the Schedule tab; live → done.
+function _obfScheduleNote(st) {
+  if (!st || !st.schedule) return null;
+  if (st.booking) return { tone: 'good', text: 'Free trial booking is live' };
+  if (!st.pricing) return { tone: 'wait', text: 'Free-trial booking goes live once pricing is confirmed' };
+  return { tone: 'act', text: 'Pricing confirmed - go live with free-trial booking in the Schedule tab', cta: 'Go live', go: "_obfGoOffer('schedule')" };
+}
 
 function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
 
 async function _obfFetchState() {
   const token = await _mreqAuthToken();
-  const next = { members: false, email: false, website: false, ein: false, offer_id: null,
-    policy: false, pipeline: false, automations: false, agent: false, entrypoints: false, booking: false };
-  const [mem, em, web, ss] = await Promise.allSettled([
-    fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+  const next = { ein: false, email: false, website: false,
+    define: false, schedule: false, pricing: false, policy: false,
+    preset: false, onboardingform: false, members: false,
+    offer_id: null, booking: false };
+  const [em, web, ss] = await Promise.allSettled([
     _edwApi('status'),
     _wdwApi('status'),
     fetch('/api/offers/setup-status?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
   ]);
-  if (mem.status === 'fulfilled') next.members = Array.isArray(mem.value.members) && mem.value.members.length > 0;
   if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set || _obfSkipped('ein'); }
   if (web.status === 'fulfilled') next.website = web.value.status === 'live';
   if (ss.status === 'fulfilled' && ss.value && ss.value.ok) {
     const v = ss.value;
     next.offer_id = v.offer_id || null;
+    next.define = !!v.define_done;
+    next.schedule = !!v.schedule_set;
+    next.pricing = (v.prices_matched || 0) > 0;
     next.policy = !!v.has_policy;
-    next.pipeline = (v.pipeline_stages || 0) > 0;
-    next.automations = Array.isArray(v.automations) && v.automations.length > 0;
-    next.agent = (v.agent_sections || 0) > 0;
-    next.entrypoints = (v.entry_points || 0) > 0;
+    // Preset done = the apply-preset stamp, or (academies wired before the stamp
+    // existed, like GTA/DETAIL) all four of its pieces detected live.
+    const legacyPreset = (v.pipeline_stages || 0) > 0 && Array.isArray(v.automations) && v.automations.length > 0
+      && (v.agent_sections || 0) > 0 && (v.entry_points || 0) > 0;
+    next.preset = !!v.preset || legacyPreset;
+    next.onboardingform = (v.onboarding_fields || 0) > 0;
+    next.members = (v.members || 0) > 0;
     next.booking = !!v.booking_live;
   }
   _OBF_STATE = next; _OBF_AT = Date.now();
@@ -15221,6 +15242,19 @@ function _obfRender(st) {
   if (prog) prog.innerHTML = `${_obfRing(done, total, 30)}<div style="font-size:13px;font-weight:700;color:var(--text)">${done} of ${total} done</div>` + (done === total ? `<div style="font-size:12px;color:var(--green,#7BC47F);font-weight:700">All set - your academy is fully onboarded</div>` : '');
   const stepRow = (s) => {
     const ok = !!st[s.key];
+    // Optional sub-state note (Schedule's booking rider): waiting amber, one-
+    // action amber with its own small CTA, or a green "live" once resolved.
+    let note = '';
+    const noteFn = s.note && (typeof window !== 'undefined' ? window[s.note] : null);
+    const n = (typeof noteFn === 'function') ? noteFn(st) : null;
+    if (n) {
+      const color = n.tone === 'good' ? 'var(--green,#7BC47F)' : '#c79a4a';
+      note = `<div style="display:flex;align-items:center;gap:7px;margin-top:5px;font-size:11.5px;font-weight:600;color:${color}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${n.tone === 'good' ? '<path d="M20 6 9 17l-5-5"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>'}</svg>
+        <span>${n.text}</span>
+        ${n.cta ? `<button onclick="${n.go}" style="background:none;border:1px solid #c79a4a;border-radius:6px;color:#c79a4a;padding:2px 9px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">${n.cta}</button>` : ''}
+      </div>`;
+    }
     return `<div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px solid ${ok ? 'var(--accent-border,rgba(212,182,92,.25))' : 'var(--border)'};background:${ok ? 'var(--gold-sheen,rgba(212,182,92,.06))' : 'transparent'};border-radius:12px;margin-top:9px">
       <span style="flex:none;width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
@@ -15228,26 +15262,84 @@ function _obfRender(st) {
       <div style="flex:1;min-width:0">
         <div style="font-size:13.5px;font-weight:700;color:var(--text)">${s.title}</div>
         <div style="font-size:12px;color:var(--text-sub,var(--text-mute));margin-top:1px">${s.sub}</div>
+        ${note}
         ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" style="margin-top:6px;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Not applicable - skip for now</button>` : ''}
       </div>
       ${ok ? '' : `<button onclick="${s.go}" style="flex:none;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:8px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${s.cta}</button>`}
     </div>`;
   };
   // Render group by group; a group with no steps is skipped. Each header shows
-  // the group's own n/N so the offer vs general split reads at a glance.
+  // the group's own n/N so the offer vs general split reads at a glance. Within
+  // a group, `subgroup` steps get a small section header (Sales / Onboarding) -
+  // the define-it → sell-it → fill-it arc inside the offer.
   host.innerHTML = _OBF_GROUPS.map(g => {
     const steps = _OBF_STEPS.filter(s => s.group === g.key);
     if (!steps.length) return '';
     const gDone = steps.filter(s => !!st[s.key]).length;
+    let lastSub = null;
+    const rows = steps.map(s => {
+      let head = '';
+      if (s.subgroup && s.subgroup !== lastSub) {
+        head = `<div style="display:flex;align-items:center;gap:7px;margin:16px 2px 0">
+          <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold)">${_OBF_SUBGROUPS[s.subgroup] || s.subgroup}</div>
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>`;
+      }
+      lastSub = s.subgroup || null;
+      return head + stepRow(s);
+    }).join('');
     return `<div style="margin-top:20px">
       <div style="display:flex;align-items:baseline;gap:8px">
         <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">${g.label}</div>
         <div style="font-size:11px;font-weight:700;color:${gDone === steps.length ? 'var(--green,#7BC47F)' : 'var(--text-mute)'}">${gDone}/${steps.length}</div>
       </div>
       <div style="font-size:11.5px;color:var(--text-mute);margin-top:1px">${g.sub}</div>
-      ${steps.map(stepRow).join('')}
+      ${rows}
     </div>`;
   }).join('');
+}
+
+// ── One-click sales preset (the Phase 3 orchestrator) ──
+// Chains the four existing setup endpoints in dependency order, every artifact
+// tied to THIS academy + THIS offer via the preset manifest: pipeline (stamped +
+// versioned on the offer) → automations (dormant, approved:false) → agent facts
+// (from the offer's own data) → lead forms + funnels. Safe to re-run: every leg
+// is idempotent; a customized pipeline asks before being replaced.
+async function _obfApplyPreset(btn) {
+  const oid = _OBF_STATE && _OBF_STATE.offer_id;
+  if (!oid) { _obfGoOffer('sales'); return; } // no offer yet - create it first
+  if (!confirm('Apply the Free Trial preset to your training offer?\n\nSets up the sales pipeline, follow-up texts (OFF until you approve them), booking agent facts and your lead forms - all wired to this offer.')) return;
+  const token = await _mreqAuthToken();
+  const post = async (url, body) => {
+    const r = await fetch(url, { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    return { status: r.status, ok: r.ok, j };
+  };
+  const label = (t) => { if (btn) { btn.textContent = t; btn.disabled = true; } };
+  try {
+    label('Pipeline…');
+    let r1 = await post('/api/offers/apply-preset', { client_id: CLIENT_ID, offer_id: oid, preset: 'free_trial' });
+    if (r1.status === 409 && r1.j.needs_force) {
+      if (!confirm('This offer already has customized pipeline routes. Replace them with the preset?')) { label('Apply preset'); btn.disabled = false; return; }
+      r1 = await post('/api/offers/apply-preset', { client_id: CLIENT_ID, offer_id: oid, preset: 'free_trial', force: true });
+    }
+    if (!r1.ok || !r1.j.ok) throw new Error(r1.j.error || 'pipeline failed');
+    label('Follow-ups…');
+    const r2 = await post('/api/automations', { client_id: CLIENT_ID, action: 'seed-preset-automations', offer_id: oid, preset: 'free_trial' });
+    if (!r2.ok || !r2.j.ok) throw new Error(r2.j.error || 'automations failed');
+    label('Agent…');
+    const r3 = await post('/api/offers/sync-agent', { client_id: CLIENT_ID, offer_id: oid });
+    if (!r3.ok || !r3.j.ok) throw new Error(r3.j.error || 'agent sync failed');
+    label('Lead forms…');
+    const r4 = await post('/api/offers/seed-entry-points', { client_id: CLIENT_ID, offer_id: oid, preset: 'free_trial' });
+    if (!r4.ok || !r4.j.ok) throw new Error(r4.j.error || 'entry points failed');
+    try { _bbSalesStatusCache = {}; } catch (_) {}
+    await _obfFetchState().catch(() => {});
+    _obfRender(_OBF_STATE);
+  } catch (e) {
+    if (btn) { btn.textContent = 'Apply preset'; btn.disabled = false; }
+    alert("Couldn't apply the preset - " + (e && e.message || e) + "\n\nNothing is half-broken: every piece that did land is saved, and re-running picks up where it left off.");
+  }
 }
 
 // The navigation pop's entry: "Finish your onboarding" + live progress ring.
