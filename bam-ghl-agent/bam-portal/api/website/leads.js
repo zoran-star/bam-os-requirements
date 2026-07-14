@@ -114,9 +114,12 @@ async function resolvePipelineStage(headers, ghlLocationId, pipelineName, stageN
       if (role) {
         const prow = await sbReq(`clients?id=eq.${clientId}&select=pipeline_provider&limit=1`);
         if (prow?.[0]?.pipeline_provider === "portal") {
-          const rows = await sbReq(`pipeline_stages?client_id=eq.${clientId}&role=eq.${encodeURIComponent(role)}&select=ghl_pipeline_id,ghl_stage_id&limit=1`);
+          const rows = await sbReq(`pipeline_stages?client_id=eq.${clientId}&role=eq.${encodeURIComponent(role)}&select=id,ghl_pipeline_id,ghl_stage_id&limit=1`);
           const row = rows?.[0];
-          if (row?.ghl_pipeline_id && row?.ghl_stage_id) return { pipelineId: row.ghl_pipeline_id, stageId: row.ghl_stage_id };
+          // Unseeded GHL ids (never-on-GHL academy) key by the registry row id -
+          // the same fallback buildPortalBoard uses - so the portal store card
+          // lands on the stage the board renders, with no GHL read.
+          if (row) return { pipelineId: row.ghl_pipeline_id || "portal", stageId: row.ghl_stage_id || row.id };
         }
       }
     } catch (_) { /* fall through to GHL */ }
@@ -492,7 +495,12 @@ async function handler(req, res) {
 
   let ghlStatus = "not-configured";
   let kpiContactId = null;
-  if (ghlLocName && client.ghl_location_id) {
+  // Portal-native intake needs NO GHL location config - pushToGhl short-circuits
+  // to portalNativeContact for contact_provider='portal' academies, so a net-new
+  // academy that never touched GHL still mints contacts + cards. The GHL-config
+  // gate only applies to the GHL delivery path.
+  const portalIntake = contactProv === "portal" && !requireGhl;
+  if (portalIntake || (ghlLocName && client.ghl_location_id)) {
     let receipt;
     try {
       const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { clientId: client.id, contactProv, requireGhl, name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig, extraTags, fields, fieldMap });

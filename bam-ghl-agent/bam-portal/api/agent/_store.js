@@ -109,11 +109,17 @@ async function resolveFromRegistry(sb, clientId, role, offerId) {
   const offerClause = offerId ? `&offer_id=eq.${encodeURIComponent(offerId)}` : "";
   const rows = await sbGet(
     `pipeline_stages?client_id=eq.${encodeURIComponent(clientId)}&role=eq.${encodeURIComponent(role)}${offerClause}` +
-    `&select=ghl_pipeline_id,ghl_stage_id,ghl_stage_name&limit=1`
+    `&select=id,label,ghl_pipeline_id,ghl_stage_id,ghl_stage_name&limit=1`
   );
   const row = rows && rows[0];
-  if (!row || !row.ghl_stage_id) return null;
-  return { pipelineId: row.ghl_pipeline_id || null, stageId: row.ghl_stage_id, stageName: row.ghl_stage_name || null };
+  if (!row) return null;
+  if (row.ghl_stage_id) return { pipelineId: row.ghl_pipeline_id || null, stageId: row.ghl_stage_id, stageName: row.ghl_stage_name || null };
+  // Unseeded GHL ids (a never-on-GHL academy whose stages came from applyPreset):
+  // key by the registry row id - the SAME fallback key buildPortalBoard uses
+  // (ghl_stage_id || row.id) - so store writes and board rendering stay
+  // consistent, and a portal academy never falls back to a live GHL read it has
+  // no token for. Seeded academies (GTA/DETAIL) hit the branch above unchanged.
+  return { pipelineId: row.ghl_pipeline_id || null, stageId: row.id, stageName: row.ghl_stage_name || row.label || null };
 }
 
 // The seam. Same return contract as the _stage.js finders: { pipelineId,
