@@ -96,6 +96,11 @@ function policyToAgentText(policy) {
     lines.push(`Makeup/reschedule: ${String(p.makeup_policy).trim()}`);
   }
 
+  // Session-day facts parents ask about constantly (policy extras, 2026-07-14).
+  if (p.parent_watching) lines.push(`Parents watching: ${p.parent_watching}.`);
+  if (p.under_18) lines.push(`Under-18s: ${p.under_18}.`);
+  if (p.holiday_schedule) lines.push(`Holidays: ${p.holiday_schedule}.`);
+
   return lines.join("\n");
 }
 

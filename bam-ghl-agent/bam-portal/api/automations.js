@@ -23,7 +23,7 @@ import { renderEmail } from "./email-shells.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { isMuted } from "./agent/_mutes.js";
 import { resolveAgentActor } from "./agent/_auth.js";
-import { FORM_INTRO_DEFAULTS, GHOSTED_DEFAULT, NURTURE_DEFAULT } from "./form-intro-automations.js";
+import { FORM_INTRO_DEFAULTS, GHOSTED_DEFAULT, NURTURE_DEFAULT, ONBOARDING_DEFAULT } from "./form-intro-automations.js";
 import { presetAutomationKeys } from "./agent/presets.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -736,7 +736,7 @@ async function handler(req, res) {
     // idempotent + edit-safe rule as seed-form-intro (create only if missing; add
     // steps only when the automation has zero). All dormant (approved:false).
     if (b.action === "seed-preset-automations") {
-      const DEFS = { ...FORM_INTRO_DEFAULTS, ghosted: GHOSTED_DEFAULT, nurture: NURTURE_DEFAULT };
+      const DEFS = { ...FORM_INTRO_DEFAULTS, ghosted: GHOSTED_DEFAULT, nurture: NURTURE_DEFAULT, onboarding: ONBOARDING_DEFAULT };
       // Preset-driven (station model): pass b.preset (e.g. 'free_trial') and the
       // seed list comes from the preset manifest itself - stage engines + form
       // intros + exit actions. Explicit b.keys still wins; no preset = all DEFS.

@@ -90,6 +90,10 @@ export const PRESETS = {
     label: "Free Trial",
     version: 1,
     description: "Lead → book a free trial → confirm the trial → close after a good-fit trial.",
+    // Post-conversion: fires on the @member terminal (a won lead going live) -
+    // not a station, but part of what the preset stamps. The worker enrolls
+    // automation_key 'onboarding' when a member activates (api/automations.js).
+    postConversion: [automation("onboarding")],
     stages: [
       { role: "responded", label: "Booking", position: 0,
         entry: {
@@ -164,6 +168,7 @@ export const PRESETS = {
     label: "Discovery Call → Trial",
     version: 1,
     description: "Lead → book a discovery call → confirm the call → book a trial → confirm the trial → close.",
+    postConversion: [automation("onboarding")],
     stages: [
       { role: "responded", label: "Booking", position: 0,
         entry: {
@@ -273,6 +278,7 @@ export function presetAutomationKeys(presetKey) {
     if (s.engine && s.engine.kind === "automation") add(s.engine.key);
     for (const e of s.exits || []) if (e.action && e.action.kind === "automation") add(e.action.key);
   }
+  for (const x of p.postConversion || []) if (x && x.kind === "automation") add(x.key);
   return keys;
 }
 

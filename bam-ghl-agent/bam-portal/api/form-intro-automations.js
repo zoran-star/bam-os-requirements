@@ -113,3 +113,24 @@ export const NURTURE_DEFAULT = {
       body: "Hi {{contact.first_name}}, last check-in from me - the door is always open whenever you're ready: {{location.website}}/free-trial" },
   ],
 };
+
+// 🎉 Onboarding - the WELCOME drip for a brand-new paid member. The worker
+// enrolls automation_key 'onboarding' the moment a member goes live (see
+// api/automations.js), but until now it was never in the seed set - new
+// academies' first members got silence. Post-conversion piece of the preset
+// (declared as postConversion in api/agent/presets.js). Same dormant rule:
+// enabled:true + approved:false so nothing sends until the owner approves and
+// edits the copy. Academy-agnostic merge fields only. HARD RULE: no em dash.
+export const ONBOARDING_DEFAULT = {
+  name: "🎉 Onboarding",
+  enabled: true,
+  approved: false,
+  steps: [
+    { position: 0, wait_amount: 2, wait_unit: "minutes", channel: "sms", subject: null,
+      body: "Welcome to {{location.name}}, {{contact.first_name}}! We're pumped to have you. If anything comes up before the first session, text back here - this line reaches us directly." },
+    { position: 1, wait_amount: 2, wait_unit: "days", channel: "sms", subject: null,
+      body: "Hi {{contact.first_name}}, how are the first sessions feeling? Anything we can do better, tell us right here - we read every message." },
+    { position: 2, wait_amount: 5, wait_unit: "days", channel: "sms", subject: null,
+      body: "Hey {{contact.first_name}}, one week in with {{location.name}} - great to have you in the group. Consistency is where the growth is; see you at the next session!" },
+  ],
+};
