@@ -245,7 +245,28 @@ optional `note` = name of a global sub-state fn); groups in `_OBF_GROUPS`
 (general = "Your academy", training = "Training offer"). Completion is
 auto-detected in `_obfFetchState` from LIVE data - nothing hand-checked.
 
-**Structure (2026-07-14, "the offer is the container"):** 10 steps.
+**Structure (2026-07-14 evening, accepted mockup - 18 steps + cancelled coming):**
+- general "Your academy" (10): basics/ein/brand/locations/coaches (detect via
+  `get_onboarding_progress` RPC flags the BB cards stamp - flow = checklist,
+  Blueprint = workbench), stripe (Connect, launch tag), email, website,
+  contacts (team+ghlOnly visibility step, count note), instagram (optional,
+  skippable, deep-links to the Inbox setup ig-connect card).
+- training (8): define, schedule (booking sub-state), pricing (launch;
+  `_obfPricingNote` nudges the Stripe match panel ON the pricing page when
+  stripe connected + nothing matched; wizard Pricing section now renders a
+  "Match existing Stripe prices" door → openPricingSorter(1)), policy,
+  [Sales] preset (launch) + leads (team+ghlOnly - done when
+  pipeline_provider='portal'), [Onboarding] onboardingform + members.
+- Step flags: launch (banner up top lists remaining must-haves), team (Our
+  team badge, no CTA, note line), ghlOnly (hidden via `_obfVisibleSteps` when
+  setup-status says has_ghl=false), optional/skippable.
+- GHL-optional sweep: global `HAS_GHL` (clients.ghl_location_id via
+  CLIENT_SELECT_COLS); when false → member-onboarding card drops Connect-GHL +
+  Link-GHL steps (renumbers), sorter step 4 shows a skip card, wizard hides
+  ghl_tag/ghl_tags_multi/ghl_workflow fields (portal-provider academies also
+  hide ghl_workflow now).
+
+Previous structure (2026-07-14 morning): 10 steps.
 - general: ein / email / website (unchanged).
 - training, define-it → sell-it → fill-it arc:
   `define` (general_info basics) → `schedule` (weekly classes; **booking is a
