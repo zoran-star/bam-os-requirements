@@ -101,18 +101,30 @@ export default function ActivationTab({ client, tokens: t, session }) {
           </div>
           {row(it.website_build.build_status === "verified", `Build: ${it.website_build.build_status}`, it.website_build.staging_url ? `Staging: ${it.website_build.staging_url}` : "Set the staging URL via Set state", ["building", "staging_ready"].includes(it.website_build.build_status))}
           {row(it.website_build.auto_ok, "Automated readiness", it.website_build.auto_ok ? "Last run passed (pages + offer endpoint)" : "Run it - checks staging pages + the offer endpoint")}
-          {["brand_ok", "copy_ok", "agent_ok"].map((k) => (
-            <div style={S.row} key={k}>
-              {dot(it.website_build.manual[k] === true)}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>{k === "brand_ok" ? "Brand looks right" : k === "copy_ok" ? "Copy proofed" : "Agent replied correctly to a test"}</div>
+          {[
+            { key: "brand_ok", title: "Brand approved", sub: "Owner approves the brand board in Blueprint - Record only if they approved it with you directly" },
+            { key: "site_accepted", title: "Owner accepted the site", sub: "Owner opens the staging link in their onboarding flow and clicks Accept - Record only as their proxy" },
+            { key: "copy_ok", title: "Copy proofed", sub: "Staff read every staging page's copy" },
+          ].map(({ key: k, title, sub }) => {
+            const m = it.website_build.manual || {};
+            const on = m[k] === true;
+            const stamp = on
+              ? `${m[`${k}_by`] === "owner" ? "Accepted by the owner" : "Recorded by staff"}${m[`${k}_at`] ? ` - ${new Date(m[`${k}_at`]).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}`
+              : sub;
+            return (
+              <div style={S.row} key={k}>
+                {dot(on)}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{title}</div>
+                  <div style={{ fontSize: 11.5, color: t.textMute, marginTop: 1 }}>{stamp}</div>
+                </div>
+                <button onClick={() => buildApi("POST", { action: "sign", key: k, ok: !on })} disabled={!!busy}
+                  style={{ background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11 }}>
+                  {on ? "Unsign" : k === "copy_ok" ? "Sign off" : "Record"}
+                </button>
               </div>
-              <button onClick={() => buildApi("POST", { action: "sign", key: k, ok: it.website_build.manual[k] !== true })} disabled={!!busy}
-                style={{ background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11 }}>
-                {it.website_build.manual[k] === true ? "Unsign" : "Sign off"}
-              </button>
-            </div>
-          ))}
+            );
+          })}
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             <button onClick={() => buildApi("GET", { action: "readiness" })} disabled={!!busy}
               style={{ background: "rgba(212,182,92,.12)", border: "1px solid rgba(212,182,92,.4)", borderRadius: 6, color: t.text, padding: "7px 13px", cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 700 }}>

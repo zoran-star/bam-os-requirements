@@ -282,9 +282,16 @@ bam-client-sites system/pages (+ enroll-flow component: ONE funnel, intake
 final step). /site-build skill drafts the whole site (script + --data offline
 mode). Website BUILD state machine: clients.website_setup.build_status
 (queued→building→staging_ready→verified) via api/website/build-state.js
-(readiness = auto checks vs staging_url + 3 manual sign-offs brand_ok/copy_ok/
-agent_ok; verified requires all green) - domain-setup action=create REFUSES
-until verified (412; pre-machine academies without build_status unaffected).
+(readiness = auto checks vs staging_url + 3 manual sign-offs; verified requires
+all green) - domain-setup action=create REFUSES until verified (412;
+pre-machine academies without build_status unaffected).
+**Sign-off redesign 2026-07-15 (#3 of the three): agent_ok DROPPED** (agent
+go-live = Hawkeye operating toggle, not a website concern). Manual set is now
+`brand_ok` (owner approves the brand board, redesign #1) + `site_accepted`
+(owner clicks Accept on the staging link in the flow's Website step, redesign
+#2) + `copy_ok` (staff copy-proof). Staff 'sign' stamps `<key>_by:'staff'` +
+`<key>_at` beside the flag (owner path writes by:'owner'); Activation card
+shows the attribution and labels owner keys "Record" (proxy) vs "Sign off".
 Activation tab "Website build" card drives it; _obf website step shows the
 build sub-state (_obfWebsiteNote). Generic POST /api/website/intake (enroll's
 final intake step: contact custom_fields.intake + intake-complete tag +

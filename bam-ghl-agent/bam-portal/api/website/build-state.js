@@ -6,14 +6,23 @@ import { withSentryApiRoute } from "../_sentry.js";
 //
 //   build_status   queued → building → staging_ready → verified
 //   staging_url    the Vercel URL the build deploys to
-//   readiness      { auto: {...last run}, manual: { brand_ok, copy_ok, agent_ok } }
+//   readiness      { auto: {...last run}, manual: { brand_ok, site_accepted, copy_ok } }
+//
+// Manual sign-offs (redesigned 2026-07-15 - agent_ok DROPPED, the agent is not
+// a website concern; its go-live is the Hawkeye operating toggle):
+//   brand_ok       the owner approved the brand board (Blueprint > Branding)
+//   site_accepted  the owner opened the staging site and clicked Accept in
+//                  their onboarding flow's Website step
+//   copy_ok        staff proofread the site copy
+// Owner keys are meant to be set by the OWNER (client-portal flow); staff
+// signing records by:'staff' next to the flag so we know it was on-their-behalf.
 //
 //   GET  /api/website/build-state?client_id=            → the whole block
 //   GET  /api/website/build-state?client_id=&action=readiness
 //        runs the AUTOMATED checks against staging_url: every site_pages page
 //        answers 200, /api/website/offer returns plans. Stores the run.
 //   POST /api/website/build-state  { client_id, action:'set', build_status, staging_url? }
-//   POST /api/website/build-state  { client_id, action:'sign', key:'brand_ok'|'copy_ok'|'agent_ok', ok:true|false }
+//   POST /api/website/build-state  { client_id, action:'sign', key:'brand_ok'|'site_accepted'|'copy_ok', ok:true|false }
 //
 // 'verified' can only be SET when the last auto run passed and all three manual
 // sign-offs are true - the gate api/website/domain-setup.js enforces on flip.
@@ -24,7 +33,7 @@ const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABA
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const enc = encodeURIComponent;
 const STATES = ["queued", "building", "staging_ready", "verified"];
-const MANUAL = ["brand_ok", "copy_ok", "agent_ok"];
+const MANUAL = ["brand_ok", "site_accepted", "copy_ok"];
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -123,7 +132,7 @@ async function handler(req, res) {
       if (!STATES.includes(next)) return res.status(400).json({ error: `build_status must be one of ${STATES.join(" | ")}` });
       if (next === "verified") {
         const s = summary(setup);
-        if (!s.can_verify) return res.status(412).json({ error: "verified needs a passing auto run + all three manual sign-offs (brand_ok, copy_ok, agent_ok)", ...s });
+        if (!s.can_verify) return res.status(412).json({ error: "verified needs a passing auto run + all three manual sign-offs (brand_ok, site_accepted, copy_ok)", ...s });
       }
       setup.build_status = next;
       if (b.staging_url !== undefined) setup.staging_url = String(b.staging_url || "");
@@ -136,7 +145,12 @@ async function handler(req, res) {
       const key = String(b.key || "");
       if (!MANUAL.includes(key)) return res.status(400).json({ error: `key must be one of ${MANUAL.join(" | ")}` });
       setup.readiness = setup.readiness || { auto: null, manual: {} };
-      setup.readiness.manual = { ...(setup.readiness.manual || {}), [key]: b.ok === true };
+      const manual = { ...(setup.readiness.manual || {}), [key]: b.ok === true };
+      // Stamp who recorded it: this route is staff-auth'd, so 'staff'. The
+      // owner path (client-portal flow) writes by:'owner' via action=owner-sign.
+      if (b.ok === true) { manual[`${key}_by`] = "staff"; manual[`${key}_at`] = new Date().toISOString(); }
+      else { delete manual[`${key}_by`]; delete manual[`${key}_at`]; }
+      setup.readiness.manual = manual;
       await saveSetup(clientId, setup);
       return res.status(200).json(summary(setup));
     }
