@@ -15240,6 +15240,7 @@ const _OBF_STEPS = [
   { key: 'basics',    group: 'general', title: 'Set up your business basics', sub: 'Name, address, entity type and time zone', cta: 'Open Blueprint', go: '_obfGoGeneral()' },
   { key: 'ein',       group: 'general', title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
   { key: 'brand',     group: 'general', title: 'Set your brand', sub: 'Logo, colors and fonts - your website, emails and agreement wear these', cta: 'Set brand', go: "_obfGoCard('brand')" },
+  { key: 'sitecopy',  group: 'general', title: 'Tell your story', sub: 'Your story, mission and vibe words - your website gets written from these, in your words', cta: 'Write it', go: "_obfGoCard('brand')" },
   { key: 'locations', group: 'general', title: 'Add your locations', sub: 'Address, how to find the door, photos - your agent quotes these to parents', cta: 'Add locations', go: "_obfGoCard('locations')" },
   { key: 'coaches',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
   { key: 'stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account - every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
@@ -15306,7 +15307,7 @@ function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
 
 async function _obfFetchState() {
   const token = await _mreqAuthToken();
-  const next = { basics: false, ein: false, brand: false, locations: false, coaches: false,
+  const next = { basics: false, ein: false, brand: false, locations: false, coaches: false, sitecopy: false,
     stripe: false, email: false, website: false, contacts: false, instagram: false,
     define: false, schedule: false, pricing: false, policy: false,
     preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
@@ -15352,6 +15353,7 @@ async function _obfFetchState() {
     next.contacts = (v.contacts || 0) > 0;
     next.leads = !next.has_ghl ? true : (v.pipeline_provider === 'portal');
     next.instagram = !!v.ig_live || _obfSkipped('instagram');
+    next.sitecopy = !!v.site_copy;
     next.cancelled = (v.cancelled_contacts || 0) > 0 || _obfSkipped('cancelled');
   }
   _OBF_STATE = next; _OBF_AT = Date.now();
@@ -22609,6 +22611,21 @@ function _bbRenderBrandCard(panel, meta) {
       <textarea id="bb-brand-notes" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="Voice, tone, what NOT to do, etc.">${v('notes')}</textarea>
     </div>
 
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin:24px 0 10px;letter-spacing:0.02em">Your story</h3>
+    <div style="font-size:12px;color:var(--text-mute);margin:-4px 0 12px">Your website's About page and headlines get written from these - in your words, not ours.</div>
+    <div class="bb-field">
+      <div class="bb-field-label">Your story</div>
+      <textarea id="bb-brand-story" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="How the academy started, why you coach, what you believe about development. A few sentences is plenty.">${v('story')}</textarea>
+    </div>
+    <div class="bb-field">
+      <div class="bb-field-label">Mission in one line</div>
+      <input id="bb-brand-mission" type="text" class="bb-input" oninput="_bbBrandChanged()" placeholder="e.g. 'Develop the complete player, on and off the court'" value="${v('mission')}" />
+    </div>
+    <div class="bb-field">
+      <div class="bb-field-label">Vibe words</div>
+      <input id="bb-brand-vibe_words" type="text" class="bb-input" oninput="_bbBrandChanged()" placeholder="3 to 5 words, e.g. 'serious, welcoming, no-nonsense, family'" value="${v('vibe_words')}" />
+    </div>
+
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
 
     <h3 style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin:24px 0 10px;letter-spacing:0.02em">Content approvals</h3>
@@ -22757,6 +22774,9 @@ function _bbBrandChanged() {
       references:      document.getElementById('bb-brand-references')?.value || '',
       stats:           document.getElementById('bb-brand-stats')?.value || '',
       notes:           document.getElementById('bb-brand-notes')?.value || '',
+      story:           document.getElementById('bb-brand-story')?.value || '',
+      mission:         document.getElementById('bb-brand-mission')?.value || '',
+      vibe_words:      document.getElementById('bb-brand-vibe_words')?.value || '',
     };
     return { brand_data: next };
   });
@@ -26281,6 +26301,12 @@ const _bbOfferConfigs = {
     ]},
     { id:'sales', label:'Sales', fields:[
       { key:'__sales_status__', type:'sales_setup_status', label:'Setup status' },
+      { key:'site_headline', type:'text', label:'Website headline for this offer',
+        hint:'The big line on your website\'s page for this offer, e.g. "Develop the complete player." Short and punchy - your site gets built from this.' },
+      { key:'site_subline', type:'text', label:'Website subline',
+        hint:'The sentence under the headline, e.g. "Small groups. Real coaches. Time on task."' },
+      { key:'site_selling_points', type:'textarea', label:'Selling points for the website',
+        hint:'One per line - the reasons a parent picks you. These become the bullets and sections on the offer\'s page.' },
       { key:'lead_tags', type:'ghl_tags_multi', label:'Lead tags',
         hint:'GHL tags that mark a contact as a lead. Pick as many as apply - a contact is a lead if they carry ANY of them. ★ = AI suggestion. (Members always win over lead tags.)' },
       { key:'signup_url', type:'text', label:'Sign-up link',
