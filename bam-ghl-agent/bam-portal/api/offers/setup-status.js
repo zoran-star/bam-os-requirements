@@ -79,6 +79,10 @@ async function handler(req, res) {
       website_staging_url: (cRow.website_setup && cRow.website_setup.staging_url) || null,
       website_site_accepted: !!(cRow.website_setup && cRow.website_setup.readiness
         && cRow.website_setup.readiness.manual && cRow.website_setup.readiness.manual.site_accepted === true),
+      // Brand board approval (the brand_ok sign-off) - drives the flow's
+      // "Approve your brand board" step + the Blueprint Brand card block.
+      website_brand_ok: !!(cRow.website_setup && cRow.website_setup.readiness
+        && cRow.website_setup.readiness.manual && cRow.website_setup.readiness.manual.brand_ok === true),
       pipeline_provider: cRow.pipeline_provider || "ghl",
       contacts: count(contactRows),
       cancelled_contacts: count(cancelledRows),
