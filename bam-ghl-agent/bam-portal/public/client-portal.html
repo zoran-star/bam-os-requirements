@@ -9446,10 +9446,12 @@ Then the call to action."]</div>
         background:var(--surface); border:1px solid var(--border);
         border-radius:12px; overflow:hidden;
         transition:opacity .15s;
+        /* fill the focus card + let the inner scroll take the slack */
+        display:flex; flex-direction:column; flex:1; min-height:0;
       }
       #view-calendar .cal-grid-wrap.cal-fading { opacity:0; }
       #view-calendar .cal-scroll {
-        max-height:calc(100vh - 160px); overflow-y:auto; position:relative;
+        max-height:none; flex:1; min-height:0; overflow-y:auto; position:relative;
       }
       #view-calendar .cal-scroll::-webkit-scrollbar { width:4px; }
       #view-calendar .cal-scroll::-webkit-scrollbar-track { background:transparent; }
@@ -9535,9 +9537,35 @@ Then the call to action."]</div>
       #view-calendar .cal-session.cal-short .cal-session-venue { display:none; }
       #view-calendar .cal-session.cal-short .cal-capacity-badge { top:3px; right:4px; }
       /* Drawer */
+      /* ── Calendar focus overlay (mirrors Blueprint's bb-focus-card) ──
+         A fixed-height panel floating on the dimmed lit-room backdrop; the grid
+         scrolls INSIDE the card instead of the page. Scoped under #view-calendar
+         so it beats .mm-focus-page .mm-modal-card (transparent, 1120px) below. */
+      #view-calendar .cal-focus-card {
+        max-width:none; width:min(1280px, 96vw); height:92vh; margin:4vh auto;
+        display:flex; flex-direction:column; padding:0;
+        background:var(--surface); border:1px solid var(--border);
+        border-radius:16px; box-shadow:var(--shadow-lg); overflow:hidden;
+      }
+      #view-calendar .cal-focus-head {
+        display:flex; align-items:center; gap:13px;
+        padding:16px 20px 12px; flex:0 0 auto;
+      }
+      #view-calendar .cal-focus-head .mm-back-btn { margin-bottom:0; }
+      #view-calendar .cal-focus-head .topbar-kicker {
+        font-size:12px; font-weight:700; letter-spacing:.06em;
+        text-transform:uppercase; color:var(--gold, #D4B65C);
+      }
+      /* the card owns the padding now, and the content column drives the flex */
+      #view-calendar .cal-focus-card .content {
+        flex:1; min-height:0; display:flex; flex-direction:column;
+        padding:0 20px 20px; overflow:hidden;
+      }
       #cal-drawer-overlay {
         position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(6px);
-        z-index:200; display:none; justify-content:flex-end;
+        /* above the calendar focus overlay (z 1000 desktop / 10050 mobile) so the
+           session drawer sits ON TOP of the card, not behind it */
+        z-index:10055; display:none; justify-content:flex-end;
       }
       #cal-drawer-overlay.open { display:flex; }
       #cal-drawer {
@@ -9568,56 +9596,25 @@ Then the call to action."]</div>
       }
       #cal-drawer .cal-capacity-fill { height:100%; background:var(--accent); }
       @media (max-width:768px) {
+        /* full-screen the focus card on phones (parity with desktop overlay) */
+        #view-calendar .cal-focus-card {
+          width:100%; height:100dvh; margin:0; border:none; border-radius:0;
+        }
+        #view-calendar .cal-focus-head {
+          padding:calc(10px + env(safe-area-inset-top)) 16px 8px;
+        }
+        #view-calendar .cal-focus-card .content { padding:0 14px 16px; }
         #view-calendar .cal-grid-wrap { overflow-x:auto; }
         #view-calendar .cal-day-headers,
         #view-calendar .cal-body { min-width:720px; }
         #cal-drawer { max-width:100%; border-left:none; }
       }
     </style>
-    <div class="view" id="view-calendar">
-      <div class="topbar" style="display:none"></div>
-      <div class="content">
-        <div class="cal-toolbar">
-          <div class="cal-nav">
-            <button class="cal-arrow" onclick="calShiftWeek(-1)" aria-label="Previous week">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-            <button class="cal-today" onclick="calShiftWeek(0)">Today</button>
-            <button class="cal-arrow" onclick="calShiftWeek(1)" aria-label="Next week">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
-            <span class="cal-range" id="cal-range-label">-</span>
-            <span class="cal-week-count" id="cal-week-count"></span>
-          </div>
-          <div class="cal-legend" id="cal-legend"></div>
-          <button onclick="bkToggleSetup()" class="cal-setup-btn" id="cal-setup-btn">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Setup <span class="bk-bar-hint" id="bk-bar-hint" style="font-size:10px;opacity:.6"></span>
-          </button>
-        </div>
-        <!-- Calendar Setup: collapsible, now below toolbar -->
-        <div class="bk-section" style="margin-bottom:14px">
-          <div id="bk-setup-body" style="display:none">
-            <div class="bk-head">
-              <div class="bk-sub">Booking availability per calendar. Changes go live on the website instantly.</div>
-              <button class="bk-new" onclick="bkOpenCreate()">+ New calendar</button>
-            </div>
-            <div id="bk-cal-list"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span>Loading booking calendars…</div></div>
-          </div>
-        </div>
-        <div class="cal-grid-wrap">
-          <div class="cal-scroll" id="cal-scroll">
-            <div class="cal-day-headers" id="cal-day-headers"></div>
-            <div class="cal-body" id="cal-body"></div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- #view-calendar + #cal-drawer-overlay were moved OUT of .main to a
+         focus-mode overlay (sibling of .main, just before #view-blueprint) so
+         the mm-focus-open camera-pan that blanks .main cannot blank them.
+         See openCalendar()/closeCalendar(). Moved 2026-07-15. -->
 
-    <!-- Calendar session detail drawer (read-only) -->
-    <div id="cal-drawer-overlay" onclick="if(event.target===this)closeCalDrawer()">
-      <div id="cal-drawer"></div>
-    </div>
 
     <style>
       .team-intro { font-size:13px; color:var(--text-mute); margin:6px 0 16px; line-height:1.5; max-width:560px; }
@@ -10952,6 +10949,61 @@ Then the call to action."]</div>
          used by BB Staff) sit below in the modals block. -->
 
   </div>
+
+  <!-- ── Calendar: focus-mode overlay ──
+       Sibling of .main so the focus camera-pan blurs the app chrome behind it
+       (mm-focus-open dims .main + .sidebar). Opened by openCalendar() via the
+       shared _ccOpenFocusPage camera pan; Back / backdrop click closes it.
+       Lives OUTSIDE .main on purpose (see project_calendar_off_ghl). -->
+    <div class="modal-backdrop mm-focus-page cal-focus-page" id="view-calendar" style="display:none" onclick="if(event.target===this)closeCalendar()">
+      <div class="modal-card mm-modal-card cal-focus-card" onclick="event.stopPropagation()">
+        <div class="cal-focus-head">
+          <button type="button" class="mm-back-btn" onclick="closeCalendar()">‹ Back</button>
+          <span class="topbar-kicker">§ Calendar</span>
+        </div>
+        <div class="content">
+        <div class="cal-toolbar">
+          <div class="cal-nav">
+            <button class="cal-arrow" onclick="calShiftWeek(-1)" aria-label="Previous week">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="cal-today" onclick="calShiftWeek(0)">Today</button>
+            <button class="cal-arrow" onclick="calShiftWeek(1)" aria-label="Next week">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <span class="cal-range" id="cal-range-label">-</span>
+            <span class="cal-week-count" id="cal-week-count"></span>
+          </div>
+          <div class="cal-legend" id="cal-legend"></div>
+          <button onclick="bkToggleSetup()" class="cal-setup-btn" id="cal-setup-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Setup <span class="bk-bar-hint" id="bk-bar-hint" style="font-size:10px;opacity:.6"></span>
+          </button>
+        </div>
+        <!-- Calendar Setup: collapsible, now below toolbar -->
+        <div class="bk-section" style="margin-bottom:14px">
+          <div id="bk-setup-body" style="display:none">
+            <div class="bk-head">
+              <div class="bk-sub">Booking availability per calendar. Changes go live on the website instantly.</div>
+              <button class="bk-new" onclick="bkOpenCreate()">+ New calendar</button>
+            </div>
+            <div id="bk-cal-list"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span>Loading booking calendars…</div></div>
+          </div>
+        </div>
+        <div class="cal-grid-wrap">
+          <div class="cal-scroll" id="cal-scroll">
+            <div class="cal-day-headers" id="cal-day-headers"></div>
+            <div class="cal-body" id="cal-body"></div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- Calendar session detail drawer (read-only) -->
+    <div id="cal-drawer-overlay" onclick="if(event.target===this)closeCalDrawer()">
+      <div id="cal-drawer"></div>
+    </div>
 
   <!-- ── Business Blueprint: focus-mode overlay ──
        Sibling of .main so the focus camera-pan blurs the app chrome behind it
@@ -16955,6 +17007,14 @@ function switchView(name, el) {
     openContactsModal();
     return;
   }
+  // Calendar is a focus-mode overlay (like Blueprint), not an in-.main view:
+  // pop it over the current page and return so closing lands you back where you
+  // were. Same seam as contacts; permission still gated (bounce to landing).
+  if (name === 'calendar') {
+    if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed('calendar')) { switchView(_landingView ? _landingView() : 'home'); return; }
+    openCalendar();
+    return;
+  }
   // Command center (beta): while the one-page flow is active, section-mapped
   // views scroll to their section instead of swapping views; anything else
   // opens classically with a "back to command center" pill. _CC_BYPASS lets
@@ -16991,6 +17051,9 @@ function switchView(name, el) {
   // switchView, so this covers nav, mobile, command-center + deep links.
   const _bpEl = document.getElementById('view-blueprint');
   if (name !== 'blueprint' && _bpEl && _bpEl.classList.contains('mm-open') && typeof closeBlueprint === 'function') closeBlueprint();
+  // Same for the Calendar focus overlay: if it's open and we're heading to any
+  // other view, step out of it first (the target view then swaps in normally).
+  if (name !== 'calendar' && typeof _calIsOpen === 'function' && _calIsOpen()) _mmCloseFocus('view-calendar');
   if (name === 'blueprint') {
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
     if (!el) el = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'blueprint'"));
@@ -17039,8 +17102,9 @@ function switchView(name, el) {
   if (name === 'inbox')   fetchAndRenderInbox();
   if (name === 'pipelines') { try { _PL_SV = 'overview'; _PL_STAGE_ONLY = null; } catch (_) {} fetchAndRenderPipelines(); _pcoInit(); }
 
-  // When entering Calendar, render the weekly grid (mock data for now)
-  if (name === 'calendar') { window._calScrolled = false; renderCalendar(); bkFetchAndRender(); }
+  // Calendar entry is handled by the focus-overlay intercept above (openCalendar
+  // renders the grid + booking data before the camera pan), so there's no
+  // in-.main on-enter render here anymore.
 
   // Team view removed 2026-05-26 - its surface now lives at
   // Business Blueprint > Staff. Old #view-team gone, no on-enter loader.
@@ -20973,7 +21037,8 @@ function calShiftWeek(delta) {
 // #12: Keyboard nav for calendar
 document.addEventListener('keydown', function(e) {
   const view = document.getElementById('view-calendar');
-  if (!view || !view.classList.contains('active')) return;
+  // calendar is now a focus overlay (mm-open), not an in-.main .active view
+  if (!view || !view.classList.contains('mm-open')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
   if (e.key === 'ArrowLeft') { e.preventDefault(); calShiftWeek(-1); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); calShiftWeek(1); }
@@ -21474,6 +21539,16 @@ function openCalDrawer(id) {
 function closeCalDrawer() {
   document.getElementById('cal-drawer-overlay').classList.remove('open');
 }
+// Attendee tap in the session drawer -> their contact card. The calendar is a
+// focus overlay (z 1000/10050) so the contacts modal (default z 9400) must be
+// raised above it, same trick as _hk2OpenContact. Close the drawer first so the
+// contact isn't hidden behind it.
+function _calOpenContact(cid, name) {
+  closeCalDrawer();
+  _autoOpenContact(cid, name);
+  const ov = document.getElementById('contacts-modal-ov');
+  if (ov) ov.style.zIndex = '10060';
+}
 
 // Tap a booking slot → the session detail drawer (same right-side drawer as
 // class sessions - one detail idiom per the design system). Full-width on mobile.
@@ -21495,7 +21570,7 @@ function bkOpenEvent(id) {
       const nm = a.name || 'Guest';
       const initial = escapeHTML((nm || '?').trim().charAt(0).toUpperCase());
       const linkable = !!a.ghl_contact_id;
-      const onclk = linkable ? ` onclick="closeCalDrawer();_autoOpenContact('${escapeHTML(String(a.ghl_contact_id))}','${escapeHTML(String(nm).replace(/'/g, ''))}')" style="cursor:pointer"` : '';
+      const onclk = linkable ? ` onclick="_calOpenContact('${escapeHTML(String(a.ghl_contact_id))}','${escapeHTML(String(nm).replace(/'/g, ''))}')" style="cursor:pointer"` : '';
       const sub = (a.parent_name && a.athlete_name && a.parent_name !== a.athlete_name) ? ` <span style="color:var(--text-mute);font-size:11px">${escapeHTML(a.parent_name)}</span>` : '';
       const chev = linkable ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-mute)" stroke-width="2" style="flex:0 0 auto"><path d="M9 18l6-6-6-6"/></svg>` : '';
       return `<div${onclk} style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:10px">
@@ -22159,6 +22234,46 @@ function closeBlueprint() {
   try { syncMobileNav(back); } catch (_) {}
 }
 async function openBlueprintView() { _bbRenderFromHash(); }
+
+// ── Calendar focus overlay (mirrors openBlueprint/closeBlueprint) ──
+// Calendar lives OUTSIDE .main (sibling of it) so the mm-focus-open camera-pan
+// that blanks .main doesn't blank the overlay. Open pops it over the current
+// page; Back / backdrop click closes it and returns to where you were.
+function _calIsOpen() { return !!document.getElementById('view-calendar')?.classList.contains('mm-open'); }
+let _CAL_RETURN = null;
+function openCalendar() {
+  const modal = document.getElementById('view-calendar');
+  if (!modal) return;
+  if (!_calIsOpen()) {
+    const cur = document.querySelector('.view.active');
+    _CAL_RETURN = cur ? cur.id.replace('view-', '') : null;
+  }
+  // render the weekly grid + booking data before the pan (same as the old
+  // in-.main on-enter render at switchView)
+  window._calScrolled = false;
+  try { renderCalendar(); } catch (_) {}
+  try { bkFetchAndRender(); } catch (_) {}
+  if (typeof _ccOpenFocusPage === 'function') {
+    _ccOpenFocusPage('view-calendar', '.nav-item[data-feature="calendar"]');
+  } else {
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => { document.documentElement.classList.add('mm-focus-open'); modal.classList.add('mm-open'); });
+  }
+}
+function closeCalendar() {
+  if (typeof _mmCloseFocus === 'function') _mmCloseFocus('view-calendar');
+  else {
+    const m = document.getElementById('view-calendar');
+    if (m) { m.classList.remove('mm-open'); m.style.display = 'none'; }
+    document.documentElement.classList.remove('mm-focus-open');
+  }
+  // restore the sidebar highlight to whatever view we came back out to
+  const back = _CAL_RETURN || (typeof _landingView === 'function' ? _landingView() : 'home');
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
+  if (item) item.classList.add('active');
+  try { syncMobileNav(back); } catch (_) {}
+}
 
 function _bbRenderFromHash() {
   const { card, id, query } = _bbParseHash();
@@ -51997,6 +52112,7 @@ function _ccFocusHud(modalId) {
     : modalId === 'membersMachineModal' ? 'MEMBERS'
     : modalId === 'landingMachineModal' ? 'LANDING PAGE'
     : modalId === 'view-blueprint' ? 'BLUEPRINT'
+    : modalId === 'view-calendar' ? 'CALENDAR'
     : 'MARKETING';
   _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE');
   _ccFocusWallpaper(modalId);
