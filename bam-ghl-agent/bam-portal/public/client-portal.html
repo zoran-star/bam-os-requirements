@@ -15241,6 +15241,7 @@ const _OBF_STEPS = [
   { key: 'ein',       group: 'general', title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
   { key: 'brand',     group: 'general', title: 'Set your brand', sub: 'Logo, colors and fonts - your website, emails and agreement wear these', cta: 'Set brand', go: "_obfGoCard('brand')" },
   { key: 'sitecopy',  group: 'general', title: 'Tell your story', sub: 'Your story, mission and vibe words - your website gets written from these, in your words', cta: 'Write it', go: "_obfGoCard('brand')" },
+  { key: 'brandboard', group: 'general', title: 'Approve your brand board', sub: 'One page with your colors, type and components - the system every asset ships from', cta: 'Review board', go: '_obfBrandBoardOpen()', needsStaging: true },
   { key: 'locations', group: 'general', title: 'Add your locations', sub: 'Address, how to find the door, photos - your agent quotes these to parents', cta: 'Add locations', go: "_obfGoCard('locations')" },
   { key: 'coaches',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
   { key: 'stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account - every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
@@ -15265,7 +15266,10 @@ const _OBF_STEPS = [
 // Steps visible for THIS academy: ghlOnly steps drop when we know there is no
 // GHL to migrate from (born-on-V2). Default (state unknown) shows everything.
 function _obfVisibleSteps(st) {
-  return _OBF_STEPS.filter(s => !s.ghlOnly || !st || st.has_ghl !== false);
+  return _OBF_STEPS.filter(s => (!s.ghlOnly || !st || st.has_ghl !== false)
+    // Steps that ride the site-build silo (the brand board lives there) only
+    // appear once the build machine has a staging home for this academy.
+    && (!s.needsStaging || (st && st.staging_url)));
 }
 
 // Schedule's booking sub-state: booking is not a separate step - it rides the
@@ -15362,6 +15366,58 @@ async function _obfSiteAccept(btn) {
   }
 }
 
+// ── Brand board review (sign-off redesign #1, 2026-07-15) ──
+// Every client silo in bam-client-sites carries an owner-facing
+// brand-board.html (colors, type, components - rendered live off their
+// cascade). The owner reviews it here or in Blueprint > Brand; approving
+// records the brand_ok readiness sign-off (by:'owner').
+function _obfBrandBoardUrl(st) {
+  return st && st.staging_url ? String(st.staging_url).replace(/\/$/, '') + '/brand-board.html' : null;
+}
+function _obfBrandBoardClose() { document.getElementById('obb-overlay')?.remove(); }
+function _obfBrandBoardOpen() {
+  _obfBrandBoardClose();
+  const st = _OBF_STATE || {};
+  const url = _obfBrandBoardUrl(st);
+  document.body.insertAdjacentHTML('beforeend', `<div id="obb-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_obfBrandBoardClose()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:760px;max-height:92vh;overflow-y:auto;padding:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
+        <div>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Your brand</div>
+          <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text)">Review your brand board</div>
+        </div>
+        <button onclick="_obfBrandBoardClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Close</button>
+      </div>
+      <div style="font-size:13px;line-height:1.55;color:var(--text-sub,var(--text-mute));margin:8px 0 14px">Your colors, type and components on one page - the system your website, emails, booking and agreement all ship from. Approve it and everything we build stays on it.</div>
+      ${url ? `<iframe src="${escapeHTML(url)}" title="Brand board" loading="lazy" style="width:100%;height:52vh;min-height:320px;border:1px solid var(--border);border-radius:12px;background:#0a0a0a"></iframe>
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+        <a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border-med);border-radius:10px;padding:10px 14px;font-size:12.5px;font-weight:700;color:var(--text);text-decoration:none">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
+          Open full size</a>
+        <button onclick="_obfBrandApprove(this)" style="flex:1;min-width:200px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:11px 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">Approve this board</button>
+      </div>
+      <div style="font-size:11.5px;line-height:1.5;color:var(--text-mute);margin-top:10px">Want something changed? Adjust your Brand section in the Blueprint or message us - approve once it reads like you.</div>`
+      : `<div style="border:1px solid var(--border);border-radius:10px;padding:11px;font-size:12.5px;color:var(--text-mute);text-align:center">Your board is being set up - check back shortly</div>`}
+    </div></div>`);
+}
+async function _obfBrandApprove(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Recording your approval…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/website/build-state', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, action: 'owner-sign', key: 'brand_ok' }) });
+    const j = await _safeJson(r);
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _obfBrandBoardClose();
+    await _obfFetchState().catch(() => {});
+    _obfRender(_OBF_STATE);
+    if (typeof _bbRenderBrandBoard === 'function') _bbRenderBrandBoard();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Approve this board'; }
+    alert("Couldn't record your approval - " + (e && e.message || e));
+  }
+}
+
 function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
 
 async function _obfFetchState() {
@@ -15371,7 +15427,7 @@ async function _obfFetchState() {
     define: false, schedule: false, pricing: false, policy: false,
     preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
     offer_id: null, booking: false, has_ghl: true, contacts_n: 0,
-    website_build: null, staging_url: null, site_accepted: false };
+    website_build: null, staging_url: null, site_accepted: false, brandboard: false };
   const [em, web, ss, prog] = await Promise.allSettled([
     _edwApi('status'),
     _wdwApi('status'),
@@ -15418,6 +15474,7 @@ async function _obfFetchState() {
     next.website_build = v.website_build || null;
     next.staging_url = v.website_staging_url || null;
     next.site_accepted = !!v.website_site_accepted;
+    next.brandboard = !!v.website_brand_ok;
   }
   _OBF_STATE = next; _OBF_AT = Date.now();
   _obfFanSync();
@@ -22581,6 +22638,8 @@ function _bbRenderBrandCard(panel, meta) {
       </div>
     </div>
 
+    <div id="bb-brand-board"></div>
+
     <h3 style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin:24px 0 10px;letter-spacing:0.02em">Colors</h3>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
@@ -22714,6 +22773,36 @@ function _bbRenderBrandCard(panel, meta) {
   `;
   const _wp = document.getElementById('bb-website-pages');
   if (_wp) _bbRenderWebsitePages(_wp);
+  _bbRenderBrandBoard();
+}
+
+// ── Brand board block (Blueprint > Brand, sign-off redesign #1) ──
+// The persistent home of the owner-facing board: live preview + approve.
+// State rides the flow's setup-status cache; approval = brand_ok sign-off.
+async function _bbRenderBrandBoard() {
+  const host = document.getElementById('bb-brand-board');
+  if (!host) return;
+  const fresh = typeof _OBF_STATE !== 'undefined' && _OBF_STATE && (Date.now() - (_OBF_AT || 0) < 60000);
+  const st = fresh ? _OBF_STATE : await _obfFetchState().catch(() => null);
+  const url = _obfBrandBoardUrl(st);
+  if (!url || !document.getElementById('bb-brand-board')) { host.innerHTML = ''; return; }
+  const ok = !!(st && st.brandboard);
+  host.innerHTML = `
+    <div style="border:1px solid ${ok ? 'rgba(52,211,153,.35)' : 'var(--line)'};border-radius:12px;padding:16px;margin-top:20px;background:var(--surface-el)">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:13.5px;font-weight:700;color:var(--text)">Your brand board</div>
+          <div style="font-size:12px;color:var(--text-mute);margin-top:2px;line-height:1.5">${ok
+            ? 'Approved - every asset we ship stays on this system. Edits below flow into it live.'
+            : 'Your colors, type and components on one page - review it and approve. It becomes the standard every asset is checked against.'}</div>
+        </div>
+        <a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-str,var(--line));border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;color:var(--text);text-decoration:none">Open full size</a>
+        ${ok
+          ? `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--green,#34D399)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Approved</span>`
+          : `<button onclick="_obfBrandApprove(this)" style="background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:9px 14px;font:inherit;font-size:12px;font-weight:800;cursor:pointer">Approve this board</button>`}
+      </div>
+      <iframe src="${escapeHTML(url)}" title="Brand board" loading="lazy" style="width:100%;height:380px;border:1px solid var(--line);border-radius:10px;background:#0a0a0a;margin-top:12px"></iframe>
+    </div>`;
 }
 
 // ── Website pages editor (Business Blueprint > Brand > Website) ──

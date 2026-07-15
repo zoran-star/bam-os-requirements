@@ -300,6 +300,18 @@ staging_ready|verified; always stamps by:'owner'). setup-status now returns
 (`_obfWebsiteNote`) at staging_ready shows "Review & accept" →
 `_obfSiteAcceptOpen()` modal (open staging preview + "Looks good - accept the
 site" → owner-sign → re-render; accepted state shows green "You accepted...").
+**Redesign #1 shipped same day: per-client brand boards.** bam-client-sites
+`scripts/brand-board.mjs` fills `system/preview/brand-board-template.html` →
+`clients/<slug>/brand-board.html` (new-client.mjs auto-runs it; all 8 clients
+backfilled; cascade loads LIVE so theme edits never stale a board). Portal:
+setup-status returns `website_brand_ok`; NEW flow step `brandboard` ("Approve
+your brand board", general group after sitecopy, `needsStaging: true` - hidden
+via `_obfVisibleSteps` until website_setup.staging_url exists, so the flow is
+21 steps max / 20 without a silo) opens `_obfBrandBoardOpen()` (iframe preview
++ "Approve this board" → owner-sign brand_ok). Blueprint > Brand card top
+block `_bbRenderBrandBoard()` (`#bb-brand-board`) = persistent home: live
+iframe + Open full size + Approve/Approved. Board URL derives as
+`staging_url + '/brand-board.html'` (`_obfBrandBoardUrl`) - no new column.
 Activation tab "Website build" card drives it; _obf website step shows the
 build sub-state (_obfWebsiteNote). Generic POST /api/website/intake (enroll's
 final intake step: contact custom_fields.intake + intake-complete tag +
