@@ -59,9 +59,20 @@ const arr = (x) => Array.isArray(x) ? x : (x ? [x] : []);
 // ── FACT section generators (offer.data + client → agent prompt text) ──
 // Each returns a string, or null when the offer has nothing to say for it (so we
 // never blank out a section the offer doesn't cover).
-function genBusinessInfo(client, data) {
+function genBusinessInfo(client, data, locations) {
   const lines = [client.business_name || "The academy"];
-  if (client.address) lines.push(`Location: ${client.address}`);
+  // Locations with directions ("doors on the front, to the left") - what the
+  // agent quotes to parents asking where to go. Falls back to the client address.
+  const locs = Array.isArray(locations) ? locations : [];
+  if (locs.length) {
+    for (const l of locs) {
+      const bits = [l.title, l.address].filter(Boolean).join(" - ");
+      if (bits) lines.push(`Location: ${bits}${l.notes ? ` (${String(l.notes).trim()})` : ""}`);
+    }
+  } else if (client.address) lines.push(`Location: ${client.address}`);
+  // Trial booking link from the live website domain (the fact leads get texted).
+  const domain = client.website_setup && client.website_setup.domain;
+  if (domain) lines.push(`Free trial booking link: https://${domain}/free-trial`);
   const link = (data.sales && data.sales.signup_url) || "";
   if (link) lines.push(`Sign-up link: ${link}`);
   return lines.length ? lines.join("\n") : null;
@@ -132,11 +143,14 @@ function genPolicies(data) {
     ? `Refunds: refundable within ${rw} days of purchase, otherwise non-refundable.`
     : "Refunds: fees already charged are non-refundable except where required by law.");
   if (p.makeup_policy && String(p.makeup_policy).trim()) lines.push(`Makeup/reschedule: ${String(p.makeup_policy).trim()}`);
+  if (p.parent_watching) lines.push(`Parents watching: ${p.parent_watching}.`);
+  if (p.under_18) lines.push(`Under-18s: ${p.under_18}.`);
+  if (p.holiday_schedule) lines.push(`Holidays: ${p.holiday_schedule}.`);
   return lines.join("\n");
 }
 
 const SECTIONS = [
-  { key: "business_info",  label: "Business info",  gen: (c, d) => genBusinessInfo(c, d) },
+  { key: "business_info",  label: "Business info",  gen: (c, d, l) => genBusinessInfo(c, d, l) },
   { key: "program",        label: "Program",        gen: (c, d) => genProgram(d) },
   { key: "schedule",       label: "Schedule",       gen: (c, d) => genSchedule(d) },
   { key: "pricing",        label: "Pricing",        gen: (c, d) => genPricing(d) },
@@ -144,8 +158,8 @@ const SECTIONS = [
   { key: "policies",       label: "Policies",       gen: (c, d) => genPolicies(d) },
 ];
 
-function generateSections(client, data) {
-  return SECTIONS.map(s => ({ key: s.key, label: s.label, body: s.gen(client, data) }))
+function generateSections(client, data, locations) {
+  return SECTIONS.map(s => ({ key: s.key, label: s.label, body: s.gen(client, data, locations) }))
     .filter(s => s.body && s.body.trim());
 }
 
@@ -164,10 +178,13 @@ async function handler(req, res) {
     const offerRows = await sb(`offers?id=eq.${encodeURIComponent(offerId)}&client_id=eq.${encodeURIComponent(clientId)}&select=id,data&limit=1`);
     const offer = Array.isArray(offerRows) && offerRows[0];
     if (!offer) return res.status(404).json({ error: "offer not found for this academy" });
-    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_name,address&limit=1`);
+    const [clientRows, locationRows] = await Promise.all([
+      sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_name,address,website_setup&limit=1`),
+      sb(`locations?client_id=eq.${encodeURIComponent(clientId)}&select=title,address,notes&order=sort_order.asc&limit=10`),
+    ]);
     const client = (Array.isArray(clientRows) && clientRows[0]) || {};
 
-    const sections = generateSections(client, offer.data || {});
+    const sections = generateSections(client, offer.data || {}, locationRows || []);
 
     if (action === "preview") return res.status(200).json({ ok: true, sections });
 

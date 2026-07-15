@@ -64,6 +64,18 @@ The Sales and Onboarding sections each render a `custom_field_defs`-backed panel
 
 `api/agent/presets.js` is now a **station-model manifest**: a preset = stages, each stage a self-contained station declaring `entry` (pipeline trigger + sources: website-forms with funnel + intro-automation, calendars for display/validation), `engine` (agent template | automation | human) and `exits` (with optional automation `action`, e.g. missed_trial on no_show). `buildPresetRows` compiles the tree to the SAME `pipeline_stages` + `stage_transitions` rows (free_trial verified byte-for-byte vs the flat file). New derived exports: `presetAutomationKeys` (drives seed-preset-automations), `presetEntrySources` (drives seed-entry-points), `presetContents` (UI chips). `applyPreset` unchanged. Fixes baked in: nurture engine key corrected `lead_nurture`→`nurture` (matches the worker); `NURTURE_DEFAULT` (Lead Nurture, 3-SMS long-game drip, dormant) added to `form-intro-automations.js` + the seed set - SUPERSEDES the earlier "nurture NOT seeded" decision because the worker enrolls `nurture` on ghosted-exhaust and marks leads LOST when it's missing; form-intro copy de-hardcoded ("By Any Means GTA/Basketball" → `{{location.name}}`), with `resolveMergeVars` vars overrides (`location_name`/`location_website` from clients.business_name + website_setup.domain) so locFor()'s GTA fallback never leaks GTA identity into other academies' sends. `POST /api/offers/apply-preset` stamps `offer.data.sales.{preset_key,preset_version,preset_applied_at}`; preview/list return `contents`. One-click orchestrator: `_obfApplyPreset` in the onboarding flow chains all four legs (see project_v2_onboarding_model.md). Design: `docs/agent-preset-architecture.html`.
 
+**Preset completions (2026-07-14 PR 3):** presets gained `postConversion:
+[automation('onboarding')]` (fires on the @member terminal; included in
+presetAutomationKeys → seeded by seed-preset-automations). `ONBOARDING_DEFAULT`
+(🎉 Onboarding welcome drip: 2min/2d/5d SMS, dormant) added to
+form-intro-automations.js - the worker already enrolled automation_key
+'onboarding' on member activation but it was never seeded. Policy section
+gained parent_watching / under_18 / holiday_schedule check_one fields → both
+policyToAgentText (api/offers/policy.js) and sync-agent genPolicies emit them.
+sync-agent now also reads `locations` rows (title+address+notes directions →
+business_info) and `clients.website_setup.domain` (free-trial booking link
+fact). free_trial compile re-verified byte-for-byte after all of it.
+
 **2A shipped (offer → agent facts):** new `api/offers/sync-agent.js` (Supabase-JWT auth) generates the booking agent's FACT prompt sections (`business_info`, `program`, `schedule`, `pricing`, `selling_points`, `policies`) from `offer.data` + client, `?action=preview` returns them and `POST` upserts `agent_prompt_sections` overrides (offer_id tagged; only sections the offer can fill). Sales-section "Sync booking agent from this offer" button → `_bbAgentSyncPreview` (preview + per-section checkboxes) → `_bbAgentSyncApply`. Reversible in Agent learnings; user-triggered so the live agent never changes silently. Supersedes the narrower policy-only push.
 
 **2B shipped (preset-apply UI):** new `api/offers/apply-preset.js` (Supabase-JWT auth) wraps `applyPreset()` behind the portal - `?action=preview` dry-runs (returns stages + routing + workers), `POST` applies (409 `needs_force` on edge conflict). Sales-section "Set up the sales pipeline" button → `_bbPresetPreview` (shows the Free Trial stages + 20 routes) → `_bbPresetApply` (with a Replace-on-conflict path). Stamps `PRESETS.free_trial` onto the offer's `pipeline_stages` + `stage_transitions`.
