@@ -3354,10 +3354,17 @@ async function handleMetaOverview(req, res) {
   try {
     const bt = await sb(`marketing_tickets?type=eq.budget-review&select=client_id,client_action_status,status,submitted_at,fields&order=submitted_at.desc`);
     for (const t of (bt || [])) {
-      if (budgetStatusById[t.client_id]) continue; // first = newest
-      budgetStatusById[t.client_id] = t.status === "completed" ? "complete"
-        : t.client_action_status === "responded" ? "confirmed"
-        : "requested";
+      // Status = newest ticket wins.
+      if (!budgetStatusById[t.client_id]) {
+        budgetStatusById[t.client_id] = t.status === "completed" ? "complete"
+          : t.client_action_status === "responded" ? "confirmed"
+          : "requested";
+      }
+      // Amount = newest ticket that ACTUALLY carries a budget breakdown wins.
+      // Decoupled from status: a newer "completed" ticket may not carry
+      // fields.confirmed_budgets, which would otherwise blank the amount even
+      // though the client confirmed a budget on an earlier ticket.
+      if (confirmedBudgetById[t.client_id]) continue;
       // Client's picked budgets live in fields.confirmed_budgets (written on respond).
       // Surface them so staff see WHAT the client chose, not just that they answered.
       const cb = Array.isArray(t.fields?.confirmed_budgets) ? t.fields.confirmed_budgets : null;
