@@ -76,7 +76,10 @@ async function runAutoChecks(clientId, setup) {
     checks.push({ name: `page ${p.page_key}`, ok, note });
   }
   try {
-    const r = await fetch(`https://portal.byanymeansbusiness.com/api/website/offer?client_id=${enc(clientId)}`);
+    // The offer endpoint is origin-gated (clients.allowed_domains) - send the
+    // staging origin, exactly like the browser will.
+    const origin = new URL(base).origin;
+    const r = await fetch(`https://portal.byanymeansbusiness.com/api/website/offer?client_id=${enc(clientId)}`, { headers: { Origin: origin } });
     const j = await r.json().catch(() => ({}));
     const plans = (j.plans || j.offer?.plans || []).length || (Array.isArray(j.questions) ? 1 : 0);
     checks.push({ name: "offer endpoint answers", ok: r.ok && plans > 0, note: r.ok ? `${plans} plan group(s)` : String(r.status) });
