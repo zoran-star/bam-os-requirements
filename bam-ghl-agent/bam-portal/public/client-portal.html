@@ -15092,6 +15092,7 @@ const _OBF_STEPS = [
   // ...fill it.
   { key: 'onboardingform', group: 'training', subgroup: 'onboarding', title: 'Set up your onboarding form', sub: 'What you collect at signup, plus the welcome message new members get', cta: 'Set up', go: "_obfGoOffer('onboarding')" },
   { key: 'members', group: 'training', subgroup: 'onboarding', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
+  { key: 'cancelled', group: 'training', subgroup: 'onboarding', title: 'Import cancelled members', sub: 'Pull your churned Stripe subscriptions and tie them to your contacts - win-back and nurture get real history. The AI matches what it can; you clean up the rest.', cta: 'Import cancelled', go: '_cxOpen()', skippable: true },
 ];
 
 // Steps visible for THIS academy: ghlOnly steps drop when we know there is no
@@ -15142,7 +15143,7 @@ async function _obfFetchState() {
   const next = { basics: false, ein: false, brand: false, locations: false, coaches: false,
     stripe: false, email: false, website: false, contacts: false, instagram: false,
     define: false, schedule: false, pricing: false, policy: false,
-    preset: false, leads: false, onboardingform: false, members: false,
+    preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
     offer_id: null, booking: false, has_ghl: true, contacts_n: 0 };
   const [em, web, ss, prog] = await Promise.allSettled([
     _edwApi('status'),
@@ -15185,6 +15186,7 @@ async function _obfFetchState() {
     next.contacts = (v.contacts || 0) > 0;
     next.leads = !next.has_ghl ? true : (v.pipeline_provider === 'portal');
     next.instagram = !!v.ig_live || _obfSkipped('instagram');
+    next.cancelled = (v.cancelled_contacts || 0) > 0 || _obfSkipped('cancelled');
   }
   _OBF_STATE = next; _OBF_AT = Date.now();
   _obfFanSync();
@@ -15429,6 +15431,117 @@ async function _obfApplyPreset(btn) {
   } catch (e) {
     if (btn) { btn.textContent = 'Apply preset'; btn.disabled = false; }
     alert("Couldn't apply the preset - " + (e && e.message || e) + "\n\nNothing is half-broken: every piece that did land is saved, and re-running picks up where it left off.");
+  }
+}
+
+// ── Cancelled-members import (the accepted mini-flow, 2026-07-14) ──
+// Owner clicks → AI pulls churned Stripe subs and matches them to contacts →
+// three buckets: matched (bulk-approve), review (confirm the fuzzy ones),
+// none (create from Stripe, or skip). Human effort scales with data mess, not
+// headcount. NO custom fields - cancel meta stores on the contact record.
+let _CX = null; // { buckets } from the GET
+function _cxClose() { document.getElementById('cx-overlay')?.remove(); }
+async function _cxOpen() {
+  _cxClose();
+  document.body.insertAdjacentHTML('beforeend', `<div id="cx-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_cxClose()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;padding:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
+        <div>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Onboarding</div>
+          <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text)">Import cancelled members</div>
+        </div>
+        <button onclick="_cxClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Close</button>
+      </div>
+      <div id="cx-body"><div class="req-empty" style="padding:16px 0"><span class="req-spin"></span> Reading your Stripe cancellations and matching contacts…</div></div>
+    </div></div>`);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/members/import-cancelled?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _CX = j;
+    _cxRender();
+  } catch (e) {
+    const body = document.getElementById('cx-body');
+    if (body) body.innerHTML = `<div style="font-size:12.5px;color:var(--red,#c96856);padding:8px 0">${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+
+function _cxRender() {
+  const body = document.getElementById('cx-body');
+  if (!body || !_CX) return;
+  const bk = _CX.buckets || {};
+  const meta = (r) => [r.cancelled_at, r.last_plan, r.cancel_reason].filter(Boolean).map(escapeHTML).join(' · ');
+  const who = (r) => escapeHTML(r.name || r.email || r.phone || r.customer_id);
+  if (!(bk.matched || []).length && !(bk.review || []).length && !(bk.none || []).length) {
+    body.innerHTML = `<div style="border:1px solid var(--border);border-radius:12px;padding:16px;font-size:13px;color:var(--text-sub,var(--text-mute))">No cancelled subscriptions found in your Stripe${(bk.already_member || []).length ? ` (${bk.already_member.length} cancelled-then-resubscribed people are already live members - nothing to do)` : ''}. You're clean - skip this step.</div>
+      <button onclick="_obfSkip('cancelled');_cxClose()" style="margin-top:12px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Done - nothing to import</button>`;
+    return;
+  }
+  const sect = (label, hint, rowsHtml, color) => rowsHtml ? `<div style="margin-top:16px">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:${color}">${label}</div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin:2px 0 6px">${hint}</div>${rowsHtml}</div>` : '';
+  const matchedRows = (bk.matched || []).map((r, i) => `<label style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px;cursor:pointer">
+      <input type="checkbox" class="cx-m" data-i="${i}" ${r.already_tagged ? '' : 'checked'} ${r.already_tagged ? 'disabled' : ''}>
+      <div style="flex:1;min-width:0;font-size:12px"><b>${who(r)}</b> <span style="color:var(--text-mute)">→ ${escapeHTML(r.contact_name)}</span><div style="font-size:11px;color:var(--text-mute)">${meta(r)}${r.already_tagged ? ' · already imported' : ''}</div></div>
+      <span style="flex:none;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:6px;border:1px solid var(--border);color:var(--text-mute)">${r.why.toUpperCase()}</span>
+    </label>`).join('');
+  const reviewRows = (bk.review || []).map((r, i) => `<div style="border:1px solid #c79a4a55;border-radius:8px;padding:8px 10px;margin-top:6px">
+      <div style="font-size:12px"><b>${who(r)}</b><div style="font-size:11px;color:var(--text-mute)">${meta(r)}</div></div>
+      <select class="cx-r" data-i="${i}" style="margin-top:6px;width:100%;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 8px;font:inherit;font-size:12px">
+        <option value="link">Link to ${escapeHTML(r.candidate_name)} (${escapeHTML(r.why)} match)</option>
+        <option value="create">Not them - create a new contact</option>
+        <option value="skip">Skip this one</option>
+      </select>
+    </div>`).join('');
+  const noneRows = (bk.none || []).map((r, i) => `<div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px">
+      <div style="flex:1;min-width:0;font-size:12px"><b>${who(r)}</b><div style="font-size:11px;color:var(--text-mute)">${meta(r)}</div></div>
+      <select class="cx-n" data-i="${i}" style="flex:none;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:5px 8px;font:inherit;font-size:11.5px">
+        <option value="create">Create contact</option>
+        <option value="skip">Skip (test/dupe)</option>
+      </select>
+    </div>`).join('');
+  body.innerHTML = `
+    <div style="font-size:12px;color:var(--text-sub,var(--text-mute))">${_CX.total} cancelled ${_CX.total === 1 ? 'person' : 'people'} found${(bk.already_member || []).length ? ` · ${bk.already_member.length} came back as live members (left alone)` : ''}. Each import lands as a contact tagged "cancelled" with its cancel date, plan and reason on the record.</div>
+    ${sect('Matched', 'Exact email hits - untick any you do not want.', matchedRows, 'var(--green,#7BC47F)')}
+    ${sect('Needs a look', 'Fuzzy matches - confirm each one.', reviewRows, '#c79a4a')}
+    ${sect('No contact found', 'Nobody in your CRM matches - create them from the Stripe data, or skip.', noneRows, 'var(--text-mute)')}
+    <button id="cx-apply" onclick="_cxApply(this)" style="margin-top:16px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Import cancelled members</button>`;
+}
+
+async function _cxApply(btn) {
+  if (!_CX) return;
+  const bk = _CX.buckets || {};
+  const decisions = [];
+  document.querySelectorAll('#cx-overlay .cx-m').forEach(cb => {
+    const r = bk.matched[Number(cb.dataset.i)];
+    if (r && cb.checked && !cb.disabled) decisions.push({ ...r, action: 'link', contact_id: r.contact_id });
+  });
+  document.querySelectorAll('#cx-overlay .cx-r').forEach(sel => {
+    const r = bk.review[Number(sel.dataset.i)];
+    if (!r) return;
+    if (sel.value === 'link') decisions.push({ ...r, action: 'link', contact_id: r.candidate_id });
+    else if (sel.value === 'create') decisions.push({ ...r, action: 'create' });
+  });
+  document.querySelectorAll('#cx-overlay .cx-n').forEach(sel => {
+    const r = bk.none[Number(sel.dataset.i)];
+    if (r && sel.value === 'create') decisions.push({ ...r, action: 'create' });
+  });
+  if (!decisions.length) { _cxClose(); return; }
+  btn.disabled = true; btn.textContent = 'Importing…';
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/members/import-cancelled', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: CLIENT_ID, decisions }) });
+    const j = await _safeJson(r);
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const body = document.getElementById('cx-body');
+    if (body) body.innerHTML = `<div style="border:1px solid var(--accent-border,rgba(212,182,92,.3));background:var(--gold-sheen,rgba(212,182,92,.06));border-radius:12px;padding:16px;font-size:13px;color:var(--text)"><b>Done.</b> ${j.linked} linked · ${j.created} created · ${j.skipped} skipped. They're tagged "cancelled" with their history - win-back can start whenever you're ready.</div>
+      <button onclick="_cxClose()" style="margin-top:12px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Back to onboarding</button>`;
+    await _obfFetchState().catch(() => {});
+    _obfRender(_OBF_STATE);
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Import cancelled members';
+    alert("Couldn't import - " + (e.message || String(e)));
   }
 }
 

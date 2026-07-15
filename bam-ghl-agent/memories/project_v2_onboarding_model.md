@@ -267,6 +267,25 @@ auto-detected in `_obfFetchState` from LIVE data - nothing hand-checked.
   hide ghl_workflow now).
 
 Previous structure (2026-07-14 morning): 10 steps.
+
+**PR 2 additions (2026-07-14):** 19th step `cancelled` (skippable, Onboarding
+subgroup) - owner clicks Import cancelled → `_cxOpen()` modal →
+`GET/POST /api/members/import-cancelled` (pulls canceled Stripe subs off the
+connect account, collapses per customer, buckets: matched-by-email /
+review-phone-or-name / none / already_member; apply tags contacts 'cancelled'
++ stores cancel meta in contacts.custom_fields jsonb - deliberately NO
+custom_field_defs). Detection: setup-status.cancelled_contacts > 0 or skipped.
+**Staff Activation tab** (`src/views/ActivationTab.jsx` +
+`GET /api/admin/activation-status`, staff-only): tier/Slack/invite/Stripe/
+website/Meta/phone/booking rows + the "Bring their GHL over" ladder (connect →
+contacts count → preset applied → cards in store → flipped).
+**/ghl-pipeline-import runbook** (repo-root .claude/commands) drives
+`scripts/ghl-import.mjs` (dump | import --map | shadow-on | reconcile | flip |
+rollback) which reuses the pipeline-cutover action functions (now exported;
+new actions: GET dump = full board w/ stage names for Claude's per-card
+classification, POST import-cards = shadowUpsertOpportunity writes,
+idempotent). Model: same Free Trial preset for everyone; Claude sorts their
+cards into it - no stage-mapping engine.
 - general: ein / email / website (unchanged).
 - training, define-it → sell-it → fill-it arc:
   `define` (general_info basics) → `schedule` (weekly classes; **booking is a
