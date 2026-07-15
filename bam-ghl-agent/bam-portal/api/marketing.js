@@ -2086,9 +2086,10 @@ async function handleMetaAdAccounts(req, res) {
   //
   // Client callers don't reach this anymore (client-side OAuth removed);
   // the UI on client-portal.html no longer surfaces an ad-account picker.
-  // Staff callers use their own staff_meta_tokens first, then fall back
-  // to any team token, so any admin/marketing role can do Client Setup
-  // without personally connecting Meta.
+  // Prefer the shared System User token (business-owned, non-expiring, already
+  // sees every assigned client ad account) so Client Setup needs no per-staff
+  // OAuth. Falls back to the caller's own staff_meta_tokens, then any team
+  // token, so setup still works if the System User token isn't set yet.
   let tok = null;
   let usingOwnToken = false;
   if (ctx.client) {
@@ -2096,13 +2097,18 @@ async function handleMetaAdAccounts(req, res) {
     // client side via a stale path. UI never calls this for clients now.
     return res.status(404).json({ error: "Meta is managed by BAM staff for your account. Ask your BAM contact if you need a change." });
   }
-  const ownTokRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=access_token,expires_at,fb_user_name`);
-  if (ownTokRows?.[0]) {
-    tok = ownTokRows[0];
-    usingOwnToken = true;
+  const sysUserTok = (process.env.META_SYSTEM_USER_TOKEN || "").trim();
+  if (sysUserTok) {
+    tok = { access_token: sysUserTok, fb_user_name: "System User" };
   } else {
-    const teamRows = await sb(`staff_meta_tokens?select=access_token,expires_at,fb_user_name&order=updated_at.desc&limit=1`);
-    if (teamRows?.[0]) tok = teamRows[0];
+    const ownTokRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=access_token,expires_at,fb_user_name`);
+    if (ownTokRows?.[0]) {
+      tok = ownTokRows[0];
+      usingOwnToken = true;
+    } else {
+      const teamRows = await sb(`staff_meta_tokens?select=access_token,expires_at,fb_user_name&order=updated_at.desc&limit=1`);
+      if (teamRows?.[0]) tok = teamRows[0];
+    }
   }
   if (!tok) return res.status(404).json({ error: "Meta not connected. Connect your Meta account on the staff side first." });
 
