@@ -111,7 +111,7 @@ const custEmail = c => (c && typeof c === "object") ? (c.email || null) : null;
 const custId = c => (c && typeof c === "object") ? c.id : (typeof c === "string" ? c : null);
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,time_zone,stripe_connect_account_id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,time_zone,stripe_connect_account_id,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   return rows?.[0] || null;
 }
 async function loadLinks(clientId) {
