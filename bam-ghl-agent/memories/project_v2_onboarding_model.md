@@ -1,5 +1,11 @@
 # V2 Onboarding Model
 
+> **RESUME POINT (2026-07-15): [`docs/onboarding-flow-handoff.md`](../docs/onboarding-flow-handoff.md)**
+> - run `/onboarding-continue`. Next session: the three sign-off redesigns
+> (per-client brand board in Blueprint Branding + flow check · owner Accept on
+> the staging link in the Website step · drop agent_ok from website readiness).
+> DETAIL Miami is mid-gate at staging_ready with a passing auto run.
+
 The canonical doc for how onboarding, V2 access, the Business Blueprint, the tracker pill, and the Slack welcome all fit together. Read this before changing anything in those four surfaces.
 
 > ⚠ **KEEP THIS UPDATED.** Any change to the staff toggle, the V2/V1 split, the BB cards, the tracker visibility logic, the mark-done flow, or the welcome Slack flow MUST update this note in the same commit. If something here is stale, the next session will burn an hour re-deriving the model and probably get it wrong.
