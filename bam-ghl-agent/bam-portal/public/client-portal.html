@@ -15245,7 +15245,7 @@ const _OBF_STEPS = [
   { key: 'coaches',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
   { key: 'stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account - every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
   { key: 'email',     group: 'general', title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
-  { key: 'website',   group: 'general', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
+  { key: 'website',   group: 'general', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()', note: '_obfWebsiteNote' },
   { key: 'contacts',  group: 'general', title: 'Import your contacts', sub: 'Your whole contact list comes over from GoHighLevel - the base every lead and member record ties back to', team: true, ghlOnly: true, note: '_obfContactsNote' },
   { key: 'instagram', group: 'general', title: 'Connect Instagram DMs', sub: 'Your IG messages land in the portal inbox - skip it and add later', cta: 'Connect', go: '_obfGoInstagram()', skippable: true, optional: true },
   // Training offer: define the offer...
@@ -15288,6 +15288,16 @@ function _obfPricingNote(st) {
 
 // Contacts (team step): the GHL bulk sync runs automatically - the owner just
 // watches the count land.
+// Website's build sub-state: the team builds on staging behind the scenes -
+// the owner watches it move: building → staging → verified → flip.
+function _obfWebsiteNote(st) {
+  if (!st || st.website || !st.website_build) return null;
+  const b = st.website_build;
+  if (b === 'verified') return { tone: 'act', text: 'Site verified on staging - the domain flip is the last step', cta: 'Flip it', go: '_obfGoDomains()' };
+  if (b === 'staging_ready') return { tone: 'wait', text: 'Your new site is on staging - our team is running the final checks' };
+  return { tone: 'wait', text: 'Our team is building your new site - it goes live only after every check passes' };
+}
+
 function _obfContactsNote(st) {
   if (!st) return null;
   const n = st.contacts_n || 0;
@@ -15355,6 +15365,7 @@ async function _obfFetchState() {
     next.instagram = !!v.ig_live || _obfSkipped('instagram');
     next.sitecopy = !!v.site_copy;
     next.cancelled = (v.cancelled_contacts || 0) > 0 || _obfSkipped('cancelled');
+    next.website_build = v.website_build || null;
   }
   _OBF_STATE = next; _OBF_AT = Date.now();
   _obfFanSync();

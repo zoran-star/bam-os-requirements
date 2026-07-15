@@ -67,6 +67,12 @@ async function handler(req, res) {
         slack_wired: !!c.slack_channel_id,
         invites_active: count(users),
         website_live: !!(c.website_setup && c.website_setup.status === "live"),
+        website_build: c.website_setup ? {
+          build_status: c.website_setup.build_status || null,
+          staging_url: c.website_setup.staging_url || null,
+          auto_ok: !!(c.website_setup.readiness && c.website_setup.readiness.auto && c.website_setup.readiness.auto.ok),
+          manual: (c.website_setup.readiness && c.website_setup.readiness.manual) || {},
+        } : null,
         meta_connected: !!(c.meta_ad_account_id || c.ads_connected_at),
         stripe_connected: c.stripe_connect_status === "connected",
         booking_provider: c.booking_provider || "ghl",

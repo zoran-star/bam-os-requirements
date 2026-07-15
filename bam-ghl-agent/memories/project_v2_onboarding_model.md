@@ -268,6 +268,22 @@ auto-detected in `_obfFetchState` from LIVE data - nothing hand-checked.
 
 Previous structure (2026-07-14 morning): 10 steps.
 
+**Site-build machine (2026-07-15, PRs #1440 + bam-client-sites #82/#83 + readiness PR):**
+copy is COLLECTED (Brand card "Your story": story/mission/vibe_words flat
+brand_data keys + _obf step `sitecopy`; offer Sales section: site_headline/
+site_subline/site_selling_points). Templates extracted from GTA →
+bam-client-sites system/pages (+ enroll-flow component: ONE funnel, intake
+final step). /site-build skill drafts the whole site (script + --data offline
+mode). Website BUILD state machine: clients.website_setup.build_status
+(queued→building→staging_ready→verified) via api/website/build-state.js
+(readiness = auto checks vs staging_url + 3 manual sign-offs brand_ok/copy_ok/
+agent_ok; verified requires all green) - domain-setup action=create REFUSES
+until verified (412; pre-machine academies without build_status unaffected).
+Activation tab "Website build" card drives it; _obf website step shows the
+build sub-state (_obfWebsiteNote). Generic POST /api/website/intake (enroll's
+final intake step: contact custom_fields.intake + intake-complete tag +
+onboarding welcome enrollment, fails closed).
+
 **PR 2 additions (2026-07-14):** 19th step `cancelled` (skippable, Onboarding
 subgroup) - owner clicks Import cancelled → `_cxOpen()` modal →
 `GET/POST /api/members/import-cancelled` (pulls canceled Stripe subs off the

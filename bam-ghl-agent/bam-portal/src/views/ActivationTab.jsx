@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 export default function ActivationTab({ client, tokens: t, session }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState("");
 
   const load = async () => {
     try {
@@ -21,6 +22,29 @@ export default function ActivationTab({ client, tokens: t, session }) {
     } catch (e) { setErr(e.message); }
   };
   useEffect(() => { setData(null); load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [client.id]);
+
+  // Website build state machine controls (build-state.js).
+  const buildApi = async (method, params) => {
+    setBusy("build");
+    try {
+      const qs = method === "GET" ? `?client_id=${client.id}&action=${params.action}` : "";
+      const r = await fetch(`/api/website/build-state${qs}`, {
+        method,
+        headers: { Authorization: `Bearer ${session?.access_token}`, "Content-Type": "application/json" },
+        ...(method === "POST" ? { body: JSON.stringify({ client_id: client.id, ...params }) } : {}),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) window.alert(j.error || `HTTP ${r.status}`);
+      await load();
+    } catch (e) { window.alert(e.message); }
+    setBusy("");
+  };
+  const setBuildState = () => {
+    const next = window.prompt("build_status (queued | building | staging_ready | verified):", (data?.items?.website_build?.build_status) || "building");
+    if (!next) return;
+    const staging = window.prompt("staging_url (blank = keep):", data?.items?.website_build?.staging_url || "");
+    buildApi("POST", { action: "set", build_status: next.trim(), ...(staging ? { staging_url: staging.trim() } : {}) });
+  };
 
   const S = {
     card: { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: 18, maxWidth: 680, marginBottom: 14 },
@@ -67,6 +91,37 @@ export default function ActivationTab({ client, tokens: t, session }) {
         {row(phoneOk, "Phone: texting and calling", phoneSub, phoneWarn)}
         {row(it.booking_provider === "portal", "Free-trial booking on the portal", it.booking_provider === "portal" ? "Leads book portal slots" : "Flips via the offer's Schedule go-live once pricing lands")}
       </div>
+
+      {it.website_build && it.website_build.build_status ? (
+        <div style={{ ...S.card, borderColor: "rgba(212,182,92,.4)" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
+            <div style={S.label}>Website build</div>
+            <span style={{ fontSize: 10.5, color: t.textMute }}>build → staging → readiness → flip</span>
+            <button onClick={setBuildState} disabled={!!busy} style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, padding: "4px 10px", cursor: "pointer", font: "inherit", fontSize: 11 }}>Set state</button>
+          </div>
+          {row(it.website_build.build_status === "verified", `Build: ${it.website_build.build_status}`, it.website_build.staging_url ? `Staging: ${it.website_build.staging_url}` : "Set the staging URL via Set state", ["building", "staging_ready"].includes(it.website_build.build_status))}
+          {row(it.website_build.auto_ok, "Automated readiness", it.website_build.auto_ok ? "Last run passed (pages + offer endpoint)" : "Run it - checks staging pages + the offer endpoint")}
+          {["brand_ok", "copy_ok", "agent_ok"].map((k) => (
+            <div style={S.row} key={k}>
+              {dot(it.website_build.manual[k] === true)}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{k === "brand_ok" ? "Brand looks right" : k === "copy_ok" ? "Copy proofed" : "Agent replied correctly to a test"}</div>
+              </div>
+              <button onClick={() => buildApi("POST", { action: "sign", key: k, ok: it.website_build.manual[k] !== true })} disabled={!!busy}
+                style={{ background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11 }}>
+                {it.website_build.manual[k] === true ? "Unsign" : "Sign off"}
+              </button>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <button onClick={() => buildApi("GET", { action: "readiness" })} disabled={!!busy}
+              style={{ background: "rgba(212,182,92,.12)", border: "1px solid rgba(212,182,92,.4)", borderRadius: 6, color: t.text, padding: "7px 13px", cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 700 }}>
+              {busy === "build" ? "Working…" : "Run readiness checks"}
+            </button>
+            <div style={{ fontSize: 11, color: t.textMute, alignSelf: "center" }}>The domain wizard refuses to flip until build_status = verified.</div>
+          </div>
+        </div>
+      ) : null}
 
       {mg.has_ghl ? (
         <div style={{ ...S.card, borderColor: "rgba(212,182,92,.4)" }}>
