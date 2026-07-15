@@ -6461,6 +6461,17 @@
         KPIs
       </div>
 
+      <div class="nav-item" id="nav-store" style="display:none" onclick="switchView('store', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+            <path d="M3 6h18"/>
+            <path d="M16 10a4 4 0 0 1-8 0"/>
+          </svg>
+        </span>
+        Store
+      </div>
+
       <div id="nav-v15cal" class="nav-item" data-feature="v15" style="display:none" onclick="switchView('v15cal', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -10853,6 +10864,18 @@ Then the call to action."]</div>
       </div>
     </div>
 
+    <div class="view" id="view-store">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Store</span>
+          <div class="topbar-title">Store</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="store-content"></div>
+      </div>
+    </div>
+
     <div class="view" id="view-v15cal">
       <div class="topbar">
         <div>
@@ -12391,6 +12414,58 @@ function _v15kStoreHtml(s) {
     </div>
     <div id="${id}" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${_v15kStoreList(s.items)}</div>
   </div>`;
+}
+// ── Store tab (merch order management) ──
+// Revealed only for clients with a store configured (section=store -> enabled).
+// Lists recent orders with fulfillment detail; orders also feed New Order in GHL.
+async function _revealStoreTab() {
+  try {
+    if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) return;
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/kpis-v15?section=store&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) return;
+    const j = await r.json();
+    const nav = document.getElementById('nav-store');
+    if (nav && j && j.enabled) nav.style.display = '';
+  } catch (_) {}
+}
+async function openStoreView() {
+  const host = document.getElementById('store-content');
+  if (!host || typeof CLIENT_ID === 'undefined') return;
+  host.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span> Loading orders…</div>';
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/kpis-v15?section=store&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    host.innerHTML = _storeViewHtml(j);
+  } catch (e) {
+    host.innerHTML = `<div class="req-empty" style="padding:20px 0;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+function _storeViewHtml(d) {
+  if (!d.stripe_ok) return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">Stripe is not connected.</div>`;
+  const orders = (d && d.orders) || [];
+  const revenue = orders.filter(o => o.status === 'Paid').reduce((a, o) => a + (o.amount || 0), 0);
+  const head = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px">
+    ${_v15kStat('Orders', String(orders.length))}
+    ${_v15kStat('Paid revenue', _v15kMoney(revenue))}
+  </div>`;
+  if (!orders.length) return head + `<div class="req-empty" style="padding:24px 0;color:var(--text-mute)">No orders yet. When a customer checks out, the order shows here (and enrolls in your New Order workflow).</div>`;
+  const rows = orders.map(o => `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div style="font-weight:700;font-size:13.5px;color:var(--text)">#${escapeHTML(o.order_no)} <span style="font-weight:600;color:var(--text-mute);font-size:12px;margin-left:6px">${escapeHTML(o.name || o.email || 'Customer')}</span></div>
+          <div style="font-size:12px;color:var(--text-mute);margin-top:2px">${o.created ? _v15kDate(o.created) : ''}${o.email ? ' · ' + escapeHTML(o.email) : ''}${o.phone ? ' · ' + escapeHTML(o.phone) : ''}</div>
+          ${o.shipping ? `<div style="font-size:12px;color:var(--text-mute);margin-top:2px">Ship to: ${escapeHTML(o.shipping)}</div>` : ''}
+        </div>
+        <div style="text-align:right;white-space:nowrap">
+          <div style="font-weight:700;font-size:14px;color:var(--text)">${_v15kMoney(o.amount)}</div>
+          <div style="font-size:11px;color:${o.status === 'Paid' ? 'var(--gold)' : 'var(--text-mute)'};text-transform:uppercase;letter-spacing:.05em;margin-top:2px">${escapeHTML(o.status || '')}</div>
+        </div>
+      </div>
+    </div>`).join('');
+  return head + `<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:8px">Recent orders</div>` + rows;
 }
 function _v15kSalesHtml(d) {
   const store = _v15kStoreHtml(d.store);
@@ -16869,6 +16944,7 @@ function switchView(name, el) {
   if (name === 'v15inbox') openV15Inbox();
 
   if (name === 'v15kpis') openV15Kpis();
+  if (name === 'store') openStoreView();
   if (name === 'v15cal') openV15Cal();
 
   // When entering Action Items, load the list
@@ -20531,6 +20607,7 @@ function applyV15NavState(v15) {
   applyV15ContactsPlacement();   // V1.5: Contacts moves to a button in the Inbox
   applyTabPermissions(); // re-subtract per-staff tab perms after the tier re-gate
   applyTalkToBamNav();
+  try { _revealStoreTab(); } catch (_) {}  // show Store tab only for clients with a store
 }
 
 // V1.5 groups Systems + Marketing under an expandable "Support" accordion.

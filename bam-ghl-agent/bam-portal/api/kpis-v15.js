@@ -543,6 +543,39 @@ async function handler(req, res) {
       });
     }
 
+    // ─────────── STORE (merch order management) ───────────
+    // Recent merch orders (paid + comp Checkout Sessions tagged metadata.client)
+    // on the connected account, newest first, with fulfillment detail. `enabled`
+    // drives whether the client portal reveals the Store tab.
+    if (section === "store") {
+      const enabled = !!(client.ghl_kpi_config && client.ghl_kpi_config.store_order_workflow_id);
+      if (!acct) return res.status(200).json({ ok: true, enabled, stripe_ok: false, orders: [] });
+      let orders = [];
+      try {
+        const sessions = await stripeGetAll(`/checkout/sessions`, acct, 3); // up to ~300 recent
+        orders = sessions
+          .filter(s => s.status === "complete" && s.payment_status && s.metadata && s.metadata.client)
+          .map(s => {
+            const cd = s.customer_details || {};
+            const ad = (s.shipping_details && s.shipping_details.address) || cd.address || {};
+            const ship = [ad.line1, ad.line2, [ad.city, ad.state].filter(Boolean).join(", "), ad.postal_code, ad.country].filter(Boolean).join(", ");
+            return {
+              id: s.id,
+              order_no: `ORD-${String(s.id).replace(/^cs_(test_|live_)?/, "").slice(0, 8).toUpperCase()}`,
+              created: s.created,
+              name: cd.name || null,
+              email: cd.email || null,
+              phone: cd.phone || null,
+              amount: money(s.amount_total),
+              status: s.payment_status === "paid" ? "Paid" : (s.payment_status === "no_payment_required" ? "Comp" : s.payment_status),
+              shipping: ship || null,
+            };
+          })
+          .sort((a, b) => (b.created || 0) - (a.created || 0));
+      } catch (_) {}
+      return res.status(200).json({ ok: true, enabled, stripe_ok: true, orders });
+    }
+
     return res.status(400).json({ error: "unknown section" });
   } catch (e) {
     let msg = e && e.message; if (!msg) { try { msg = JSON.stringify(e); } catch (_) { msg = String(e); } }
