@@ -17,7 +17,11 @@
 //                   post-trial cards marked SHOWED UP + GOOD FIT. Of those:
 //                     won  = the lead became a paying member (ground truth), or an
 //                            opportunity/outcome marks it won
-//                     lost = the lead's opportunity/outcome is marked lost
+//                     lost = the lead's outcome is 'lost' OR 'nurture' - when
+//                            portal Lead-Nurture is live, hand-marking "Lost"
+//                            re-routes to nurture and writes status 'nurture'
+//                            (api/ghl/pipelines.js), so nurture = marked lost
+//                            (Zoran, 2026-07-15). Won beats lost if they buy later.
 //                     pending = neither yet (excluded from the rate)
 //                     rate = won / (won + lost)   [null if 0]
 //                   won/lost/pending are the actual trials behind the number, for

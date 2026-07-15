@@ -6,9 +6,19 @@
 **Definition:** population = post-trial cards marked **showed up + good fit**
 (`post_trial_reviews.showed_up=true AND good_fit=true`). Of those:
 - **won** = the lead became a paying member (ground truth) OR an opportunity/outcome marks it won
-- **lost** = the lead's opportunity/outcome is marked lost (`pipeline_outcomes.status='lost'`)
+- **lost** = `pipeline_outcomes.status IN ('lost','nurture')` - see 2026-07-15 update below
 - **pending** = neither yet (EXCLUDED from the rate)
 - **rate = won / (won + lost)**, null if 0.
+
+**2026-07-15 update - nurture counts as lost.** When portal Lead-Nurture is live,
+hand-marking a card "Lost" is re-routed to the nurture stage and the outcome row is
+written as `status='nurture'`, NOT `'lost'` (`api/ghl/pipelines.js`). The nurture
+stage is where lost-marked leads go (Zoran's call), so the KPI was blind to every
+hand-marked loss - GTA showed 100% (3 won / 0 lost) with 6 qualified trials sitting
+in nurture. Both SQL functions now treat `('lost','nurture')` as lost. Won still
+beats lost (a nurtured lead who buys flips to won); nurture-exhausted writes a final
+'lost' row but EXISTS dedupes it. `abandoned`/`ghosted`/`rebook`/`enroll_link_sent`
+stay pending. Migration: `20260715191718_cc_close_rate_nurture_counts_as_lost.sql`.
 
 **Why it was wrong before:** old calc was `new members in 45d / (new members + not-a-fit reviews)`
 - mixed opposite populations (counted NOT-a-fit as the loss), ignored `showed_up`, counted every
