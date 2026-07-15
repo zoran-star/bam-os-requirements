@@ -111,6 +111,14 @@ async function handler(req, res) {
     if (action === "create") {
       const root = normalizeDomain(body.domain);
       if (!root) return res.status(400).json({ error: "Enter a plain domain, e.g. detail-mia.com" });
+      // THE FLIP GATE (accepted design 2026-07-15): the domain only points at
+      // the new site once the build passed readiness. build_status is stamped
+      // by api/website/build-state.js; pre-gate academies (no build_status,
+      // e.g. GTA whose site predates the machine) are not blocked.
+      const bs = client.website_setup && client.website_setup.build_status;
+      if (bs && bs !== "verified" && body.force !== true) {
+        return res.status(412).json({ error: `The site build is '${bs}' - readiness has to pass (build_status 'verified') before the domain flips. Run the checks in the Activation tab, or pass force:true (staff only).`, build_status: bs });
+      }
       // Attach apex + www to the sites project (idempotent-ish: already-attached is OK).
       await vercel("POST", `/v10/projects/${encodeURIComponent(SITES_PROJECT)}/domains${vercelQs()}`, { name: root });
       await vercel("POST", `/v10/projects/${encodeURIComponent(SITES_PROJECT)}/domains${vercelQs()}`, { name: `www.${root}`, redirect: root }).catch(() => {});
