@@ -81,8 +81,10 @@ async function runAutoChecks(clientId, setup) {
     const origin = new URL(base).origin;
     const r = await fetch(`https://portal.byanymeansbusiness.com/api/website/offer?client_id=${enc(clientId)}`, { headers: { Origin: origin } });
     const j = await r.json().catch(() => ({}));
-    const plans = (j.plans || j.offer?.plans || []).length || (Array.isArray(j.questions) ? 1 : 0);
-    checks.push({ name: "offer endpoint answers", ok: r.ok && plans > 0, note: r.ok ? `${plans} plan group(s)` : String(r.status) });
+    // The real response shape: purchasable/pricing arrays (verified live on
+    // DETAIL: pricing=9, purchasable=9, no 'plans' key).
+    const plans = (j.purchasable || j.pricing || j.plans || []).length;
+    checks.push({ name: "offer endpoint answers", ok: r.ok && plans > 0, note: r.ok ? `${plans} purchasable price(s)` : String(r.status) });
   } catch (e) { checks.push({ name: "offer endpoint answers", ok: false, note: e.message.slice(0, 60) }); }
 
   return { ok: checks.length > 0 && checks.every(c => c.ok), at: new Date().toISOString(), checks };
