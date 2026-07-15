@@ -23,17 +23,22 @@ import { withSentryApiRoute } from "../_sentry.js";
 //        answers 200, /api/website/offer returns plans. Stores the run.
 //   POST /api/website/build-state  { client_id, action:'set', build_status, staging_url? }
 //   POST /api/website/build-state  { client_id, action:'sign', key:'brand_ok'|'site_accepted'|'copy_ok', ok:true|false }
+//   POST /api/website/build-state  { client_id, action:'owner-sign', key:'brand_ok'|'site_accepted' }
+//        the OWNER path (client-portal onboarding flow) - stamps by:'owner'.
+//        site_accepted additionally requires the build to be on staging.
 //
 // 'verified' can only be SET when the last auto run passed and all three manual
 // sign-offs are true - the gate api/website/domain-setup.js enforces on flip.
 //
-// Auth: BAM staff only (this drives the Activation tab).
+// Auth: BAM staff (drives the Activation tab), EXCEPT action=owner-sign which
+// authenticates an active client_users member of client_id instead.
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const enc = encodeURIComponent;
 const STATES = ["queued", "building", "staging_ready", "verified"];
 const MANUAL = ["brand_ok", "site_accepted", "copy_ok"];
+const OWNER_KEYS = ["brand_ok", "site_accepted"]; // what the owner can sign via owner-sign
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -45,15 +50,25 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
-async function requireStaff(req) {
+async function authUser(req) {
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!token) throw Object.assign(new Error("no token"), { status: 401 });
   const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` } });
   if (!userRes.ok) throw Object.assign(new Error("invalid token"), { status: 401 });
-  const user = await userRes.json();
+  return userRes.json();
+}
+async function requireStaff(req) {
+  const user = await authUser(req);
   let staff = await sb(`staff?user_id=eq.${user.id}&select=id&limit=1`);
   if ((!staff || !staff[0]) && user.email) staff = await sb(`staff?email=eq.${enc(user.email)}&select=id&limit=1`);
   if (!(Array.isArray(staff) && staff[0])) throw Object.assign(new Error("staff only"), { status: 403 });
+}
+// The owner path: an active client_users member of THIS academy (same rule as
+// domain-setup.js, which the owner also drives).
+async function requireMember(req, clientId) {
+  const user = await authUser(req);
+  const rows = await sb(`client_users?user_id=eq.${user.id}&client_id=eq.${enc(clientId)}&status=eq.active&select=id&limit=1`);
+  if (!(Array.isArray(rows) && rows[0])) throw Object.assign(new Error("not a member of this academy"), { status: 403 });
 }
 
 async function loadSetup(clientId) {
@@ -115,7 +130,8 @@ async function handler(req, res) {
     const clientId = q.client_id || b.client_id;
     const action = q.action || b.action || "status";
     if (!clientId) return res.status(400).json({ error: "client_id required" });
-    await requireStaff(req);
+    if (action === "owner-sign") await requireMember(req, clientId);
+    else await requireStaff(req);
     const setup = await loadSetup(clientId);
 
     if (req.method === "GET" && action === "status") return res.status(200).json(summary(setup));
@@ -155,7 +171,22 @@ async function handler(req, res) {
       return res.status(200).json(summary(setup));
     }
 
-    return res.status(400).json({ error: "unknown action (status | readiness | set | sign)" });
+    if (req.method === "POST" && action === "owner-sign") {
+      const key = String(b.key || "");
+      if (!OWNER_KEYS.includes(key)) return res.status(400).json({ error: `key must be one of ${OWNER_KEYS.join(" | ")}` });
+      if (key === "site_accepted" && !["staging_ready", "verified"].includes(setup.build_status)) {
+        return res.status(412).json({ error: "the site is not on staging yet" });
+      }
+      setup.readiness = setup.readiness || { auto: null, manual: {} };
+      setup.readiness.manual = {
+        ...(setup.readiness.manual || {}),
+        [key]: true, [`${key}_by`]: "owner", [`${key}_at`]: new Date().toISOString(),
+      };
+      await saveSetup(clientId, setup);
+      return res.status(200).json(summary(setup));
+    }
+
+    return res.status(400).json({ error: "unknown action (status | readiness | set | sign | owner-sign)" });
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || String(e) });
   }
