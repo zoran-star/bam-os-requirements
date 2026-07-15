@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { ANY_STAFF_ROLES, hasRole } from "../_roles.js";
+import { shadowUpsertOpportunity } from "../agent/_store.js";
 
 // Vercel Serverless Function - Pipeline cutover control (off-GHL, Effort E).
 //
@@ -26,6 +27,17 @@ import { ANY_STAFF_ROLES, hasRole } from "../_roles.js";
 //     -> set clients.pipeline_provider. GUARD: refuses provider='portal' unless
 //        shadow has been ON and a fresh reconcile is clean (or force=true). Rolling
 //        back to 'ghl' is always allowed and instant.
+//
+//   GET  /api/admin/pipeline-cutover?action=dump&client_id=<uuid>
+//     -> every open GHL card with pipeline + stage NAMES - the raw material the
+//        /ghl-pipeline-import runbook hands Claude to classify per-card into a
+//        preset stage role (we import their PEOPLE, not their pipeline shape).
+//
+//   POST /api/admin/pipeline-cutover?action=import-cards&client_id=<uuid>
+//     body: { cards: [{ id, role, contact_id?, name?, phone?, monetary_value?,
+//             last_stage_change_at?, pipeline_id? }], dry_run?: true }
+//     -> upserts each card into the opportunities store at the given preset
+//        stage role (source 'ghl-import'). Idempotent (per ghl_opportunity_id).
 //
 // Auth: Supabase JWT; the caller MUST be BAM staff (a row in `staff`). Academy
 // owners / client teammates can NOT reach this - it is staff-operations only.
@@ -246,6 +258,98 @@ async function fetchAllOpenGhlOpps({ token, locationId }) {
   return out;
 }
 
+// Rich board dump for the /ghl-pipeline-import runbook: pipelines with stage
+// names + every open opp with enough context (name, contact, stage name, last
+// stage change) for a per-card classification into preset roles.
+async function fetchBoardDump({ token, locationId }) {
+  const pipelinesResp = await ghl("GET", `/opportunities/pipelines?locationId=${encodeURIComponent(locationId)}`, { token });
+  const pipelines = pipelinesResp.pipelines || pipelinesResp.data || [];
+  const stageName = new Map();
+  for (const p of pipelines) for (const s of (p.stages || [])) stageName.set(s.id, { stage: s.name, pipeline: p.name, pipeline_id: p.id });
+  const cards = [];
+  for (const p of pipelines) {
+    let startAfter, startAfterId;
+    for (let page = 0; page < 8; page++) {
+      const params = new URLSearchParams({ location_id: locationId, pipeline_id: p.id, status: "open", limit: "100" });
+      if (startAfter)   params.set("startAfter", String(startAfter));
+      if (startAfterId) params.set("startAfterId", String(startAfterId));
+      let r;
+      try { r = await ghl("GET", `/opportunities/search?${params}`, { token }); }
+      catch (_) { break; }
+      const batch = r.opportunities || r.data || [];
+      for (const o of batch) {
+        const sid = o.pipelineStageId || o.stageId || null;
+        const loc = (sid && stageName.get(sid)) || {};
+        cards.push({
+          id: o.id,
+          name: o.name || (o.contact && o.contact.name) || "",
+          contact_id: o.contactId || (o.contact && o.contact.id) || null,
+          contact_name: (o.contact && o.contact.name) || null,
+          phone: (o.contact && o.contact.phone) || null,
+          email: (o.contact && o.contact.email) || null,
+          stage_id: sid,
+          stage_name: loc.stage || null,
+          pipeline_name: loc.pipeline || null,
+          pipeline_id: loc.pipeline_id || p.id,
+          monetary_value: o.monetaryValue || 0,
+          last_stage_change_at: o.lastStageChangeAt || o.updatedAt || null,
+          created_at: o.createdAt || o.dateAdded || null,
+        });
+      }
+      const meta = r.meta || {};
+      startAfter = meta.startAfter; startAfterId = meta.startAfterId;
+      if (batch.length < 100 || (!startAfter && !startAfterId)) break;
+    }
+  }
+  return {
+    pipelines: pipelines.map(p => ({ id: p.id, name: p.name, stages: (p.stages || []).map(s => ({ id: s.id, name: s.name, position: s.position })) })),
+    cards,
+  };
+}
+
+async function actionDump(clientId) {
+  const acc = await loadGhlCreds(clientId);
+  if (acc.error) return { error: acc.error };
+  const board = await fetchBoardDump(acc);
+  return { ok: true, roles: ROLES, ...board, total_cards: board.cards.length };
+}
+
+// import-cards - the runbook's write leg. Each card lands in the opportunities
+// store at the CLASSIFIED preset role. Idempotent per ghl_opportunity_id.
+async function actionImportCards(clientId, body) {
+  const cards = Array.isArray(body.cards) ? body.cards : [];
+  if (!cards.length) return { error: { status: 400, message: "cards required: [{ id, role, ... }]" } };
+  const bad = cards.filter(c => !c || !c.id || !ROLES.includes(c.role));
+  if (bad.length) return { error: { status: 400, message: `${bad.length} card(s) missing id or with an unknown role (allowed: ${ROLES.join(", ")})` } };
+  if (body.dry_run) {
+    const byRole = {};
+    for (const c of cards) byRole[c.role] = (byRole[c.role] || 0) + 1;
+    return { ok: true, dry_run: true, cards: cards.length, by_role: byRole };
+  }
+  let written = 0, failed = 0;
+  for (const c of cards) {
+    const ok = await shadowUpsertOpportunity(clientId, {
+      ghlOpportunityId: c.id,
+      ghlContactId: c.contact_id || null,
+      contactName: c.contact_name || c.name || null,
+      contactPhone: c.phone || null,
+      stageRole: c.role,
+      status: "open",
+      ghlPipelineId: c.pipeline_id || null,
+      monetaryValue: c.monetary_value || 0,
+      source: "ghl-import",
+      entryPoint: "ghl-import",
+      lastStageChangeAt: c.last_stage_change_at || null,
+    });
+    if (ok) written++; else failed++;
+  }
+  return { ok: true, written, failed };
+}
+
+// Exported for scripts/ghl-import.mjs (the /ghl-pipeline-import runbook runs
+// these locally with service-role env instead of a staff JWT).
+export { actionDump, actionImportCards, actionReconcile, actionSetShadow, actionFlip, loadClientFlags };
+
 // ─────────────────────────────────────────────────────────
 // Actions
 // ─────────────────────────────────────────────────────────
@@ -464,12 +568,17 @@ async function handler(req, res) {
   try {
     if (req.method === "GET") {
       if (action === "status")    return res.status(200).json(await actionStatus(clientId, flags));
+      if (action === "dump") {
+        const out = await actionDump(clientId);
+        if (out.error) return res.status(out.error.status || 502).json({ error: out.error.message });
+        return res.status(200).json(out);
+      }
       if (action === "reconcile") {
         const out = await actionReconcile(clientId, flags);
         if (out.error) return res.status(out.error.status || 502).json({ error: out.error.message });
         return res.status(200).json(out);
       }
-      return res.status(400).json({ error: "unknown GET action (use status | reconcile)" });
+      return res.status(400).json({ error: "unknown GET action (use status | dump | reconcile)" });
     }
 
     if (req.method === "POST") {
@@ -479,12 +588,17 @@ async function handler(req, res) {
         if (out.error) return res.status(out.error.status || 500).json({ error: out.error.message });
         return res.status(200).json(out);
       }
+      if (action === "import-cards") {
+        const out = await actionImportCards(clientId, body);
+        if (out.error) return res.status(out.error.status || 400).json({ error: out.error.message });
+        return res.status(200).json(out);
+      }
       if (action === "flip") {
         const out = await actionFlip(clientId, flags, (body.provider || "").toString(), !!body.force);
         if (out.error) return res.status(out.error.status || 412).json(out.error);
         return res.status(200).json(out);
       }
-      return res.status(400).json({ error: "unknown POST action (use set-shadow | flip)" });
+      return res.status(400).json({ error: "unknown POST action (use set-shadow | import-cards | flip)" });
     }
 
     return res.status(405).json({ error: "method not allowed" });
