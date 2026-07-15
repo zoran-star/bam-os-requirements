@@ -53,6 +53,8 @@ import { resolveOrMintPortalContact } from "../_contacts.js";
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const STRIPE_API = "https://api.stripe.com/v1";
+const GHL_V2 = "https://services.leadconnectorhq.com";
+const V2_VERSION = "2021-07-28";
 
 // Stripe signature verification needs the RAW body — disable Vercel's
 // default JSON body parser for this route.
@@ -476,6 +478,7 @@ async function handler(req, res) {
       case "customer.created":              return await handleCustomerCreated(event, connectedAccount, res);
       case "price.created":                 return await handlePriceUpserted(event, connectedAccount, res);
       case "price.updated":                 return await handlePriceUpserted(event, connectedAccount, res);
+      case "checkout.session.completed":    return await handleStoreOrder(event, connectedAccount, res);
       default:                              return res.status(200).json({ skipped: event.type });
     }
   } catch (e) {
@@ -1399,6 +1402,104 @@ async function handlePriceUpserted(event, connectedAccount, res) {
   });
 
   return res.status(200).json({ ok: true, action: event.type, price_id: price.id, tier });
+}
+
+// ─── Merch store order → GHL order workflow ───────────────────────────────────
+// Academy merch stores (bam-client-sites) charge through the connected account via
+// one-off Checkout Sessions stamped `metadata.client`. On completion we upsert the
+// buyer as a GHL contact (order-detail custom fields + phone) and enroll them into
+// the academy's configured order workflow (its steps run in GHL). No store-side
+// webhook needed - this rides the existing Connect endpoint.
+//
+// Gated HARD so it can never touch subscription/member flows: only fires when the
+// session carries `metadata.client` AND the matched client has
+// `ghl_kpi_config.store_order_workflow_id`. Everything else returns skip. Always
+// 200 + best-effort (a GHL hiccup never makes Stripe retry-storm).
+async function handleStoreOrder(event, connectedAccount, res) {
+  const session = event.data && event.data.object;
+  if (!session || !session.metadata || !session.metadata.client) return res.status(200).json({ skipped: "not a store order" });
+  if (session.status && session.status !== "complete") return res.status(200).json({ skipped: `session ${session.status}` });
+  if (!connectedAccount) return res.status(200).json({ skipped: "no connected account" });
+
+  const cRows = await sb(`clients?stripe_connect_account_id=eq.${encodeURIComponent(connectedAccount)}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const client = Array.isArray(cRows) && cRows[0];
+  if (!client) return res.status(200).json({ skipped: "no client for account" });
+  const workflowId = client.ghl_kpi_config && client.ghl_kpi_config.store_order_workflow_id;
+  if (!workflowId) return res.status(200).json({ skipped: "store order workflow not configured" });
+  if (!client.ghl_location_id) return res.status(200).json({ skipped: "client not GHL-connected" });
+
+  // The event payload omits line items + shipping rate name; re-fetch expanded.
+  let full = session;
+  try { full = await stripeFetch(`/checkout/sessions/${encodeURIComponent(session.id)}?expand[]=line_items&expand[]=shipping_cost.shipping_rate`, connectedAccount); } catch (_) {}
+  const cd = full.customer_details || {};
+  const email = cd.email ? String(cd.email).toLowerCase() : null;
+  if (!email) return res.status(200).json({ skipped: "no buyer email" });
+  const fullName = cd.name || "";
+  const nameParts = fullName.split(" ").filter(Boolean);
+  const firstName = nameParts[0] || fullName || "Customer";
+  const lastName = nameParts.slice(1).join(" ");
+  const phone = cd.phone || null;
+  const addr = (full.shipping_details && full.shipping_details.address) || cd.address || {};
+  const shipAddr = [addr.line1, addr.line2, [addr.city, addr.state].filter(Boolean).join(", "), addr.postal_code, addr.country].filter(Boolean).join(", ");
+  const items = ((full.line_items && full.line_items.data) || []).map(li => `${li.quantity}x ${li.description}`).join("; ");
+  const orderNo = `ELV-${String(session.id).replace(/^cs_(test_|live_)?/, "").slice(0, 8).toUpperCase()}`;
+  const total = `$${((full.amount_total || 0) / 100).toFixed(2)}`;
+  const orderDate = new Date((full.created || 0) * 1000).toISOString().slice(0, 10);
+  const shipMethod = (full.shipping_cost && full.shipping_cost.shipping_rate && full.shipping_cost.shipping_rate.display_name)
+    || (full.shipping_cost && full.shipping_cost.amount_total === 0 ? "Free shipping" : "Standard");
+  const orderStatus = full.payment_status === "paid" ? "Paid" : (full.payment_status === "no_payment_required" ? "Comp" : (full.payment_status || "Unknown"));
+
+  let token;
+  try { token = await getClientGhlToken(client); }
+  catch (e) { return res.status(200).json({ error: `no GHL token: ${(e && e.message) || e}` }); }
+  const ghlHeaders = { Authorization: `Bearer ${token}`, Version: V2_VERSION, "Content-Type": "application/json", Accept: "application/json" };
+
+  // GHL upsert takes custom fields by id → map fieldKey→id for this location.
+  const cfIdByKey = {};
+  try {
+    const r = await fetch(`${GHL_V2}/locations/${client.ghl_location_id}/customFields`, { headers: ghlHeaders });
+    if (r.ok) { const d = await r.json(); for (const f of (d.customFields || [])) cfIdByKey[f.fieldKey] = f.id; }
+  } catch (_) {}
+  const valueByKey = {
+    "contact.order_number": orderNo,
+    "contact.order_items": items,
+    "contact.order_total": total,
+    "contact.order_date": orderDate,
+    "contact.order_shipping_method": shipMethod,
+    "contact.order_shipping_address": shipAddr,
+    "contact.order_status": orderStatus,
+  };
+  const customFields = Object.entries(valueByKey)
+    .filter(([k, v]) => cfIdByKey[k] && v)
+    .map(([k, v]) => ({ id: cfIdByKey[k], field_value: String(v) }));
+
+  const payload = {
+    locationId: client.ghl_location_id,
+    firstName,
+    ...(lastName ? { lastName } : {}),
+    email,
+    ...(phone ? { phone } : {}),
+    source: "merch-store",
+    tags: ["merch-order"],
+    ...(customFields.length ? { customFields } : {}),
+  };
+  const up = await fetch(`${GHL_V2}/contacts/upsert`, { method: "POST", headers: ghlHeaders, body: JSON.stringify(payload) });
+  if (!up.ok) return res.status(200).json({ error: `ghl upsert ${up.status}: ${(await up.text()).slice(0, 150)}` });
+  const contactId = ((await up.json()).contact || {}).id || null;
+  if (!contactId) return res.status(200).json({ error: "no contactId from upsert" });
+
+  // Enroll into the order workflow (idempotent enough - GHL de-dupes active runs).
+  let enrolled = false;
+  try {
+    const wr = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
+      method: "POST", headers: ghlHeaders,
+      body: JSON.stringify({ eventStartTime: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00") }),
+    });
+    enrolled = wr.ok;
+    if (!wr.ok) console.error("store-order workflow enroll failed:", wr.status, (await wr.text()).slice(0, 150));
+  } catch (e) { console.error("store-order workflow enroll error:", e.message); }
+
+  return res.status(200).json({ ok: true, order: orderNo, contact_id: contactId, enrolled, workflow_id: workflowId });
 }
 
 export default withSentryApiRoute(handler);
