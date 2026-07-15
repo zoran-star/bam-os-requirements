@@ -194,13 +194,13 @@ export default function MarketingOverview({ tokens, session }) {
                   <td style={{ ...td, textAlign: "right" }}>{showNums ? fmtMoney(r.spend) : "—"}</td>
                   <td style={{ ...td, textAlign: "right" }}>{showNums ? fmtNum(r.leads) : "—"}</td>
                   <td style={{ ...td, textAlign: "right", color: r.cpl == null ? t.textMute : (r.cpl <= target ? t.green : t.amber) }}>{r.cpl != null ? fmtMoney(r.cpl) : "—"}</td>
+                  <td style={td}>{r.trend?.leads_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.trend.leads_pct >= 0 ? t.green : t.amber }}>{r.trend.leads_pct > 0 ? "▲" : r.trend.leads_pct < 0 ? "▼" : "■"} {Math.abs(r.trend.leads_pct)}% leads</span>}</td>
                   <td style={{ ...td, textAlign: "right" }}>{r.confirmed_budget != null ? (
                     <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                       <span>{fmtMoney(r.confirmed_budget)}</span>
                       <span style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.green }}>client confirmed</span>
                     </span>
                   ) : r.monthly_budget != null ? fmtMoney(r.monthly_budget) : <span style={{ color: t.textMute }}>—</span>}</td>
-                  <td style={td}>{r.trend?.leads_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.trend.leads_pct >= 0 ? t.green : t.amber }}>{r.trend.leads_pct > 0 ? "▲" : r.trend.leads_pct < 0 ? "▼" : "■"} {Math.abs(r.trend.leads_pct)}% leads</span>}</td>
                   <td style={td}>{r.pacing?.spent_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.pacing.spent_pct > r.pacing.month_pct + 15 ? t.amber : t.textSub }}>{r.pacing.spent_pct}% of budget</span>}</td>
                   <td style={td}>{budgetStatusCell(r.budget_status)}</td>
                 </tr>
