@@ -15294,7 +15294,12 @@ function _obfWebsiteNote(st) {
   if (!st || st.website || !st.website_build) return null;
   const b = st.website_build;
   if (b === 'verified') return { tone: 'act', text: 'Site verified on staging - the domain flip is the last step', cta: 'Flip it', go: '_obfGoDomains()' };
-  if (b === 'staging_ready') return { tone: 'wait', text: 'Your new site is on staging - our team is running the final checks' };
+  if (b === 'staging_ready') {
+    // The owner's acceptance IS the site_accepted readiness sign-off - the
+    // gate to 'verified' waits on it (sign-off redesign #2, 2026-07-15).
+    if (st.site_accepted) return { tone: 'good', text: 'You accepted the new site - our team runs the final checks, then the domain flips' };
+    return { tone: 'act', text: 'Your new site is ready for you to review', cta: 'Review & accept', go: '_obfSiteAcceptOpen()' };
+  }
   return { tone: 'wait', text: 'Our team is building your new site - it goes live only after every check passes' };
 }
 
@@ -15313,6 +15318,50 @@ function _obfLeadsNote(st) {
   return { tone: 'wait', text: 'Runs after the preset - our team sorts your cards into your new pipeline' };
 }
 
+// ── Owner site acceptance (sign-off redesign #2, 2026-07-15) ──
+// Website step, build on staging: the owner opens the preview, clicks through
+// it like a parent would, and accepts it right in the flow. The acceptance is
+// recorded as the site_accepted readiness sign-off (by:'owner') - one of the
+// three gates the build must clear before 'verified' unlocks the domain flip.
+function _obfSiteAcceptClose() { document.getElementById('osa-overlay')?.remove(); }
+function _obfSiteAcceptOpen() {
+  _obfSiteAcceptClose();
+  const st = _OBF_STATE || {};
+  const url = st.staging_url || '';
+  document.body.insertAdjacentHTML('beforeend', `<div id="osa-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_obfSiteAcceptClose()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
+        <div>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Your website</div>
+          <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text)">Review your new website</div>
+        </div>
+        <button onclick="_obfSiteAcceptClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Close</button>
+      </div>
+      <div style="font-size:13px;line-height:1.55;color:var(--text-sub,var(--text-mute));margin:8px 0 14px">Your new site is built and running on a private preview address. Open it and click around like a parent would - every page, the schedule, the enroll flow. Your current site stays live until you flip the domain.</div>
+      ${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border-med);border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:var(--text);text-decoration:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
+        Open the preview</a>` : `<div style="border:1px solid var(--border);border-radius:10px;padding:11px;font-size:12.5px;color:var(--text-mute);text-align:center">The preview link is being set up - check back shortly</div>`}
+      <button onclick="_obfSiteAccept(this)" ${url ? '' : 'disabled'} style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;${url ? '' : 'opacity:.5;cursor:default'}">Looks good - accept the site</button>
+      <div style="font-size:11.5px;line-height:1.5;color:var(--text-mute);margin-top:10px">Something needs a fix? Send it to us in Messages and accept once it looks right. Accepting green-lights the final checks before launch.</div>
+    </div></div>`);
+}
+async function _obfSiteAccept(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Recording your acceptance…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/website/build-state', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, action: 'owner-sign', key: 'site_accepted' }) });
+    const j = await _safeJson(r);
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _obfSiteAcceptClose();
+    await _obfFetchState().catch(() => {});
+    _obfRender(_OBF_STATE);
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Looks good - accept the site'; }
+    alert("Couldn't record your acceptance - " + (e && e.message || e));
+  }
+}
+
 function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
 
 async function _obfFetchState() {
@@ -15321,7 +15370,8 @@ async function _obfFetchState() {
     stripe: false, email: false, website: false, contacts: false, instagram: false,
     define: false, schedule: false, pricing: false, policy: false,
     preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
-    offer_id: null, booking: false, has_ghl: true, contacts_n: 0 };
+    offer_id: null, booking: false, has_ghl: true, contacts_n: 0,
+    website_build: null, staging_url: null, site_accepted: false };
   const [em, web, ss, prog] = await Promise.allSettled([
     _edwApi('status'),
     _wdwApi('status'),
@@ -15366,6 +15416,8 @@ async function _obfFetchState() {
     next.sitecopy = !!v.site_copy;
     next.cancelled = (v.cancelled_contacts || 0) > 0 || _obfSkipped('cancelled');
     next.website_build = v.website_build || null;
+    next.staging_url = v.website_staging_url || null;
+    next.site_accepted = !!v.website_site_accepted;
   }
   _OBF_STATE = next; _OBF_AT = Date.now();
   _obfFanSync();

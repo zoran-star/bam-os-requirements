@@ -292,6 +292,14 @@ go-live = Hawkeye operating toggle, not a website concern). Manual set is now
 #2) + `copy_ok` (staff copy-proof). Staff 'sign' stamps `<key>_by:'staff'` +
 `<key>_at` beside the flag (owner path writes by:'owner'); Activation card
 shows the attribution and labels owner keys "Record" (proxy) vs "Sign off".
+**Redesign #2 shipped same day: owner Accept in the flow.** build-state.js
+gained `action=owner-sign` (auth = active client_users member of client_id,
+NOT staff; keys brand_ok|site_accepted; site_accepted requires build_status
+staging_ready|verified; always stamps by:'owner'). setup-status now returns
+`website_staging_url` + `website_site_accepted`; the flow's Website step note
+(`_obfWebsiteNote`) at staging_ready shows "Review & accept" →
+`_obfSiteAcceptOpen()` modal (open staging preview + "Looks good - accept the
+site" → owner-sign → re-render; accepted state shows green "You accepted...").
 Activation tab "Website build" card drives it; _obf website step shows the
 build sub-state (_obfWebsiteNote). Generic POST /api/website/intake (enroll's
 final intake step: contact custom_fields.intake + intake-complete tag +

@@ -74,6 +74,11 @@ async function handler(req, res) {
       site_copy: !!(cRow.brand_data && cRow.brand_data.story && String(cRow.brand_data.story).trim()),
       has_ghl: !!cRow.ghl_location_id,
       website_build: (cRow.website_setup && cRow.website_setup.build_status) || null,
+      // The flow's Website step (owner acceptance, sign-off redesign #2):
+      // staging link to review + whether the owner already accepted it.
+      website_staging_url: (cRow.website_setup && cRow.website_setup.staging_url) || null,
+      website_site_accepted: !!(cRow.website_setup && cRow.website_setup.readiness
+        && cRow.website_setup.readiness.manual && cRow.website_setup.readiness.manual.site_accepted === true),
       pipeline_provider: cRow.pipeline_provider || "ghl",
       contacts: count(contactRows),
       cancelled_contacts: count(cancelledRows),
