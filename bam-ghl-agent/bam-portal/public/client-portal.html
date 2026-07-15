@@ -34226,6 +34226,11 @@ function _hk2Moves(r) {
     // write a message instead of handing them to the automation (Zoran 2026-07-10).
     if (k === 'ghost') m.push(['Write a message', 'write']);
     if (k !== 'ghost') m.push(['Send to Ghosted', 'ghost']);
+    // The lead already okayed the slot but the agent drafted another re-ask
+    // instead of a Book-it card. Let staff flip this reply straight into the
+    // Book-it flow - the agent's proposed slot + athlete prefill the pickers
+    // (Zoran 2026-07-14).
+    if (k === 'reply') m.push(['Confirm the booking', 'book']);
     if (k !== 'lost') m.push([_hk2MoveLabel('lost', hasMsg), 'lost']);
   } else if (_HK2.agent === 'confirm') {
     if (k !== 'handoff') m.push(['Rebook: back to Booking', 'handoff']);
@@ -34235,7 +34240,7 @@ function _hk2Moves(r) {
   }
   // 🔥 Any card can park the lead for a later date instead ("yes, but later").
   if (k !== 'reignite') m.push(['Reignite later', 'reignite']);
-  if (k === 'reignite' && r._origKind) m.unshift(['Back to the card', 'unreignite']);
+  if ((k === 'reignite' || k === 'book') && r._origKind) m.unshift(['Back to the card', 'unreignite']);
   m.push([_hk2MoveLabel('unq', hasMsg), 'unq']);
   return m;
 }
@@ -34253,6 +34258,22 @@ function _hk2ReigniteBack() {
   const r = _hk2Top(); if (!r || !r._origKind) return;
   r._kind = r._origKind;
   r._origKind = null;
+  _hk2Render();
+}
+// "Confirm the booking" from the Other menu (booking agent): the lead already
+// okayed the slot, but the agent drafted another re-ask instead of a Book-it
+// card. Flip this reply card into the Book-it flow so staff can book directly.
+// The proposed slot/calendar/group already ride on the row (book_slot_at etc,
+// even on a proposal card), so the pickers prefill; "Back to the card" restores
+// the original reply (Zoran 2026-07-14).
+function _hk2BookMode() {
+  const r = _hk2Top(); if (!r || r._kind === 'book') return;
+  r._origKind = r._kind;
+  r._kind = 'book';
+  // The reply text was a re-ask ("want me to book it?"), NOT a booking
+  // confirmation - clear it so the portal confirmation box doesn't send the
+  // wrong thing the moment the slot is claimed.
+  r.draft_message = '';
   _hk2Render();
 }
 function _hk2CardHtml(r, pos, total, isTop) {
@@ -34387,6 +34408,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
   const ptfNotFit = isForm && _pp.showed === true && _pp.fit === false;
   const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) =>
     op === 'write' ? `<button class="hk2-x" onclick="_hk2Write()">${lab}</button>`
+    : op === 'book' ? `<button class="hk2-x" onclick="_hk2BookMode()">${lab}</button>`
     : op === 'reignite' ? `<button class="hk2-x" onclick="_hk2ReigniteMode()">${lab}</button>`
     : op === 'unreignite' ? `<button class="hk2-x" onclick="_hk2ReigniteBack()">${lab}</button>`
     : `<button class="hk2-x" data-op="${op}" data-orig="${escapeHTML(lab)}" onclick="_hk2Move('${op}', this)">${lab}</button>`).join('');
