@@ -12432,14 +12432,62 @@ async function _revealStoreTab() {
 async function openStoreView() {
   const host = document.getElementById('store-content');
   if (!host || typeof CLIENT_ID === 'undefined') return;
-  host.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span> Loading orders…</div>';
+  host.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span> Loading store…</div>';
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch(`/api/kpis-v15?section=store&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
-    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    host.innerHTML = _storeViewHtml(j);
+    const [ordRes, invRes] = await Promise.all([
+      fetch(`/api/kpis-v15?section=store&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } }),
+      fetch(`/api/store/inventory?client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } }),
+    ]);
+    const ord = await _safeJson(ordRes); if (!ordRes.ok) throw new Error(ord.error || ('HTTP ' + ordRes.status));
+    const inv = invRes.ok ? await _safeJson(invRes) : { products: [] };
+    host.innerHTML = _storeInvHtml(inv) + _storeViewHtml(ord);
   } catch (e) {
     host.innerHTML = `<div class="req-empty" style="padding:20px 0;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+function _storeInvHtml(inv) {
+  const products = (inv && inv.products) || [];
+  if (!products.length) return '';
+  const oosCount = products.reduce((n, p) => n + p.colorways.filter(c => !c.in_stock).length, 0);
+  const rows = products.map(p => {
+    const cws = p.colorways.map(c => {
+      const vk = `${p.slug}__${c.key}`;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;font-size:12.5px">
+        <span style="color:var(--text)">${escapeHTML(c.label)}</span>
+        <button id="inv-${escapeHTML(vk)}" onclick="_storeToggleStock('${vk}', ${c.in_stock ? 'false' : 'true'}, this)"
+          style="border:1px solid var(--border-med);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:${c.in_stock ? 'transparent' : 'rgba(201,135,31,0.14)'};color:${c.in_stock ? 'var(--text-mute)' : '#c9871f'}">${c.in_stock ? 'In stock' : 'Sold out'}</button>
+      </div>`;
+    }).join('');
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="font-weight:700;font-size:13.5px;color:var(--text);margin-bottom:4px">${escapeHTML(p.name)}</div>
+      ${cws}
+    </div>`;
+  }).join('');
+  return `<div style="margin-bottom:26px">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Inventory${oosCount ? ` · ${oosCount} sold out` : ''}</div>
+    <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">Tap a colorway to toggle stock. Sold-out colorways can't be purchased on the store.</div>
+    ${rows}
+  </div>`;
+}
+async function _storeToggleStock(variantKey, nextInStock, btn) {
+  const target = (nextInStock === true || nextInStock === 'true');
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/store/inventory?client_id=${encodeURIComponent(CLIENT_ID)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ client_id: CLIENT_ID, variant_key: variantKey, in_stock: target }) });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = target ? 'In stock' : 'Sold out';
+      btn.style.background = target ? 'transparent' : 'rgba(201,135,31,0.14)';
+      btn.style.color = target ? 'var(--text-mute)' : '#c9871f';
+      btn.setAttribute('onclick', `_storeToggleStock('${variantKey}', ${target ? 'false' : 'true'}, this)`);
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = prev || 'Error'; }
+    alert("Couldn't update stock: " + (e.message || e));
   }
 }
 function _storeViewHtml(d) {
