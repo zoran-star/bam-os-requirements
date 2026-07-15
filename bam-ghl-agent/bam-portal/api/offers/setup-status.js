@@ -60,7 +60,7 @@ async function handler(req, res) {
     // Academy-level state (station-model onboarding flow) - fetched regardless
     // of whether an offer exists yet, so the flow's academy group (Stripe,
     // contacts migration, Instagram) lights up before the first offer is built.
-    const clientRows = await sb(`clients?id=eq.${enc(clientId)}&select=booking_provider,pipeline_provider,stripe_connect_status,ghl_location_id&limit=1`);
+    const clientRows = await sb(`clients?id=eq.${enc(clientId)}&select=booking_provider,pipeline_provider,stripe_connect_status,ghl_location_id,brand_data&limit=1`);
     const cRow = (Array.isArray(clientRows) && clientRows[0]) || {};
     const [contactRows, cancelledRows, igRows] = await Promise.all([
       sb(`contacts?client_id=eq.${enc(clientId)}&select=id&limit=1000`),
@@ -69,6 +69,9 @@ async function handler(req, res) {
     ]);
     const academy = {
       stripe_connected: cRow.stripe_connect_status === "connected",
+      // Site copy collected (the "Tell your story" step): the Brand card's
+      // story field is the anchor - mission/vibe ride along with it.
+      site_copy: !!(cRow.brand_data && cRow.brand_data.story && String(cRow.brand_data.story).trim()),
       has_ghl: !!cRow.ghl_location_id,
       pipeline_provider: cRow.pipeline_provider || "ghl",
       contacts: count(contactRows),
