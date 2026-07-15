@@ -316,7 +316,37 @@ async function handler(req, res) {
     // ─────────── SALES ───────────
     if (section === "sales") {
       const offers = await loadLinks(clientId);
-      if (!offers.length) return res.status(200).json({ ok: true, offers: [], note: "Tie Stripe products and GHL pipelines to offers in Setup first." });
+
+      // ── Merch store sales ──
+      // Academy merch stores (e.g. Elevate) charge through the SAME connected
+      // Stripe account, via one-off Checkout Sessions stamped metadata.client.
+      // They never create a Stripe product or invoice (inline price_data), so
+      // the per-offer "new payments" logic below can't see them. Scan the paid
+      // Checkout Sessions directly and surface them as their own line. Cleaning
+      // uses metric "sales_store" (offer_id null), same exclusion plumbing.
+      let store = null;
+      if (acct) {
+        try {
+          const sessions = await stripeGetAll(`/checkout/sessions?created[gte]=${start}&created[lt]=${end}`, acct);
+          const paid = sessions.filter(s => s.status === "complete" && s.payment_status === "paid" && s.metadata && s.metadata.client);
+          if (paid.length) {
+            const items = paid
+              .sort((a, b) => (b.created || 0) - (a.created || 0))
+              .map(s => ({
+                ref_id: s.id,
+                label: (s.customer_details && (s.customer_details.name || s.customer_details.email)) || "Order",
+                email: (s.customer_details && s.customer_details.email) || null,
+                amount: money(s.amount_total),
+                created: s.created,
+                excluded: isExcluded(excl, "sales_store", null, s.id),
+              }));
+            const kept = items.filter(i => !i.excluded);
+            store = { count: kept.length, revenue: kept.reduce((a, i) => a + i.amount, 0), items };
+          }
+        } catch (_) {}
+      }
+
+      if (!offers.length && !store) return res.status(200).json({ ok: true, offers: [], store: null, note: "Tie Stripe products and GHL pipelines to offers in Setup first." });
       // New payments this month, grouped by product:
       //  • subscriptions created in the month, AND
       //  • one-time (non-subscription) PAID invoices in the month → covers
@@ -453,7 +483,7 @@ async function handler(req, res) {
           has_pipelines: o.pipelines.length > 0, has_products: o.products.length > 0, has_calendars: (o.calendars || []).length > 0,
         });
       }
-      return res.status(200).json({ ok: true, offers: out, ghl_ok: pipelineProv === "portal" ? true : !!ghlToken, ghl_error: pipelineProv === "portal" ? false : (ghlError || !ghlToken), stripe_ok: !!acct });
+      return res.status(200).json({ ok: true, offers: out, store, ghl_ok: pipelineProv === "portal" ? true : !!ghlToken, ghl_error: pipelineProv === "portal" ? false : (ghlError || !ghlToken), stripe_ok: !!acct });
     }
 
     // ─────────── REVENUE ───────────

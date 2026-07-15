@@ -12171,6 +12171,7 @@ function _v15kCleanList(items, metric, offerId) {
 function _v15kGroupFor(metric, oid) {
   const m = _V15K.monthKey;
   if (metric === 'members_cancelled') { const d = (_V15K.sec.members || {})[m]; return d && d.cancelled; }
+  if (metric === 'sales_store') { const d = (_V15K.sec.sales || {})[m]; return d && d.store; }
   const d = (_V15K.sec.sales || {})[m]; if (!d || !d.offers) return null;
   const o = d.offers.find(x => String(x.offer_id) === String(oid)); if (!o) return null;
   return metric === 'sales_pipeline' ? o.pipeline : metric === 'sales_bookings' ? o.bookings : o.payments;
@@ -12184,6 +12185,11 @@ function _v15kApplyExclude(metric, oid, refId, excluded) {
     grp.count = (grp.items || []).filter(x => !x.excluded).length;
     const cnt = document.getElementById(`v15kc-${metric}-${oid}`);
     if (cnt) cnt.textContent = grp.count;
+    if (metric === 'sales_store') {
+      grp.revenue = (grp.items || []).filter(x => !x.excluded).reduce((a, x) => a + (x.amount || 0), 0);
+      const rev = document.getElementById('v15krev-store');
+      if (rev) rev.textContent = _v15kMoney(grp.revenue);
+    }
   }
   const row = document.getElementById(`v15kr-${metric}-${oid}-${refId}`);
   if (row) {
@@ -12353,8 +12359,45 @@ function _v15kConvOf(d) {
   return pipe > 0 ? (pay / pipe) * 100 : null;
 }
 
+// Merch store orders (paid Checkout Sessions on the connected account, tagged
+// metadata.client) render as their own Sales line - revenue + order count with
+// a cleanable per-order list. Shows even when no offers are tied.
+function _v15kStoreList(items) {
+  return (items || []).map(it => {
+    const p = JSON.stringify({ c: null, e: it.email || null, n: it.label || '' }).replace(/'/g, '&#39;');
+    return `<div id="v15kr-sales_store-null-${escapeHTML(it.ref_id)}" style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px">
+      <button class="v15k-nm" onclick='_v15kPersonDrawer(${p})' title="View GHL info" style="flex:1;min-width:0;text-align:left;background:none;border:none;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0;opacity:${it.excluded ? '.5' : '1'};text-decoration:${it.excluded ? 'line-through' : 'none'}">${_v15kMoney(it.amount)} · ${escapeHTML(it.label || it.ref_id)}</button>
+      <span class="v15k-act">${_v15kActBtn('sales_store', 'null', it.ref_id, it.excluded)}</span>
+    </div>`;
+  }).join('') || '<div style="font-size:12px;color:var(--text-mute)">None.</div>';
+}
+function _v15kStoreHtml(s) {
+  if (!s) return '';
+  const id = 'v15ks-sales_store-null';
+  return `<div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:12px">
+    <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:10px">Merch Store</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px">
+      <div>
+        <span id="v15krev-store" style="font-size:24px;font-weight:700;color:var(--text)">${_v15kMoney(s.revenue)}</span>
+        <span style="font-size:12px;color:var(--text-mute);margin-left:6px">store revenue</span>
+      </div>
+      <div>
+        <button onclick="_v15kToggle('${id}')" style="background:none;border:none;cursor:pointer;text-align:left;width:100%;padding:0">
+          <span id="v15kc-sales_store-null" style="font-size:24px;font-weight:700;color:var(--text)">${s.count}</span>
+          <span style="font-size:12px;color:var(--text-mute);margin-left:6px">orders</span>
+          <span id="${id}-chev" title="Click to review &amp; clean" style="display:inline-block;margin-left:5px;color:var(--text-mute);font-size:11px;transition:transform .15s">▾</span>
+        </button>
+      </div>
+    </div>
+    <div id="${id}" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${_v15kStoreList(s.items)}</div>
+  </div>`;
+}
 function _v15kSalesHtml(d) {
-  if (!d.offers || !d.offers.length) return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">${escapeHTML(d.note || 'No offers tied yet.')}</div>`;
+  const store = _v15kStoreHtml(d.store);
+  if (!d.offers || !d.offers.length) {
+    if (store) return store;
+    return `<div class="req-empty" style="padding:12px 0;color:var(--text-mute)">${escapeHTML(d.note || 'No offers tied yet.')}</div>`;
+  }
   const ghlWarn = d.ghl_error ? `<div style="font-size:12px;color:#c9871f;background:rgba(201,135,31,0.08);border:1px solid rgba(201,135,31,0.3);border-radius:8px;padding:8px 12px;margin-top:10px">Couldn't fully reach GoHighLevel just now - entered-pipeline and bookings counts may be understated. Refresh in a moment to retry.</div>` : '';
   // Conversion rate + momentum (CC-3): entered pipeline → paid, vs prev window.
   const conv = _v15kConvOf(d);
@@ -12364,7 +12407,7 @@ function _v15kSalesHtml(d) {
     <span style="font-size:12px;color:var(--text-mute)">conversion · pipeline → paid</span>
     ${_v15kMomentum(conv, convPrev, false)}
   </div>` : '';
-  return convChip + ghlWarn + d.offers.map(o => {
+  return store + convChip + ghlWarn + d.offers.map(o => {
     const block = (group, metric, tiedLabel, untiedLabel, tied) => {
       const id = `v15ks-${metric}-${o.offer_id}`;
       return `<div>
