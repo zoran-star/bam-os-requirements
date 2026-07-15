@@ -15065,21 +15065,40 @@ const _OBF_GROUPS = [
   { key: 'training', label: 'Training offer', sub: 'Define it, sell it, fill it - all in one place' },
 ];
 const _OBF_SUBGROUPS = { sales: 'Sales', onboarding: 'Onboarding' };
+// Step flags (accepted mockup 2026-07-14):
+//   launch:true   - blocks the first booking; named in the banner up top
+//   team:true     - BAM runs it; owner sees a live status line, no CTA
+//   ghlOnly:true  - hidden for academies with no GHL to migrate from
+//   skippable     - "not applicable" link (per-client, localStorage)
 const _OBF_STEPS = [
-  { key: 'ein',     group: 'general',  title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
-  { key: 'email',   group: 'general',  title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
-  { key: 'website', group: 'general',  title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
+  { key: 'basics',    group: 'general', title: 'Set up your business basics', sub: 'Name, address, entity type and time zone', cta: 'Open Blueprint', go: '_obfGoGeneral()' },
+  { key: 'ein',       group: 'general', title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
+  { key: 'brand',     group: 'general', title: 'Set your brand', sub: 'Logo, colors and fonts - your website, emails and agreement wear these', cta: 'Set brand', go: "_obfGoCard('brand')" },
+  { key: 'locations', group: 'general', title: 'Add your locations', sub: 'Address, how to find the door, photos - your agent quotes these to parents', cta: 'Add locations', go: "_obfGoCard('locations')" },
+  { key: 'coaches',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
+  { key: 'stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account - every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
+  { key: 'email',     group: 'general', title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'website',   group: 'general', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()' },
+  { key: 'contacts',  group: 'general', title: 'Import your contacts', sub: 'Your whole contact list comes over from GoHighLevel - the base every lead and member record ties back to', team: true, ghlOnly: true, note: '_obfContactsNote' },
+  { key: 'instagram', group: 'general', title: 'Connect Instagram DMs', sub: 'Your IG messages land in the portal inbox - skip it and add later', cta: 'Connect', go: '_obfGoInstagram()', skippable: true, optional: true },
   // Training offer: define the offer...
   { key: 'define',   group: 'training', title: 'Define your offer', sub: 'Ages, skill level, capacity and what is included', cta: 'Define it', go: "_obfGoOffer('general_info')" },
   { key: 'schedule', group: 'training', title: 'Build your schedule', sub: 'Weekly class times - they become bookable free-trial slots on the portal', cta: 'Build schedule', go: "_obfGoOffer('schedule')", note: '_obfScheduleNote' },
-  { key: 'pricing',  group: 'training', title: 'Confirm your pricing', sub: 'Tiers matched to Stripe - unlocks checkout and free-trial booking', cta: 'Set pricing', go: "_obfGoOffer('pricing')" },
+  { key: 'pricing',  group: 'training', title: 'Confirm your pricing', sub: 'Set your tiers - matched to Stripe, unlocks checkout and booking', cta: 'Set pricing', go: "_obfGoOffer('pricing')", note: '_obfPricingNote', launch: true },
   { key: 'policy',   group: 'training', title: 'Set your membership policy', sub: 'Cancellation, pausing and refunds - flows into the enrollment agreement and member management', cta: 'Set policy', go: "_obfGoOffer('policy')" },
   // ...sell it (the whole sales machine is ONE preset)...
-  { key: 'preset',   group: 'training', subgroup: 'sales', title: 'Apply the Free Trial preset', sub: 'Pipeline, follow-ups, booking agent and lead forms - wired to this offer in one click. Nothing texts anyone until you approve it.', cta: 'Apply preset', go: '_obfApplyPreset(this)' },
+  { key: 'preset',   group: 'training', subgroup: 'sales', title: 'Apply the Free Trial preset', sub: 'Pipeline, follow-ups, booking agent and lead forms - wired to this offer in one click. Nothing texts anyone until you approve it.', cta: 'Apply preset', go: '_obfApplyPreset(this)', launch: true },
+  { key: 'leads',    group: 'training', subgroup: 'sales', title: 'Import your active leads', sub: 'Once the preset is applied, our team sorts each open card from your old pipeline into the right stage', team: true, ghlOnly: true, note: '_obfLeadsNote' },
   // ...fill it.
   { key: 'onboardingform', group: 'training', subgroup: 'onboarding', title: 'Set up your onboarding form', sub: 'What you collect at signup, plus the welcome message new members get', cta: 'Set up', go: "_obfGoOffer('onboarding')" },
   { key: 'members', group: 'training', subgroup: 'onboarding', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
 ];
+
+// Steps visible for THIS academy: ghlOnly steps drop when we know there is no
+// GHL to migrate from (born-on-V2). Default (state unknown) shows everything.
+function _obfVisibleSteps(st) {
+  return _OBF_STEPS.filter(s => !s.ghlOnly || !st || st.has_ghl !== false);
+}
 
 // Schedule's booking sub-state: booking is not a separate step - it rides the
 // Schedule card and resolves itself. No prices yet → waiting on pricing; prices
@@ -15091,21 +15110,58 @@ function _obfScheduleNote(st) {
   return { tone: 'act', text: 'Pricing confirmed - go live with free-trial booking in the Schedule tab', cta: 'Go live', go: "_obfGoOffer('schedule')" };
 }
 
+// Pricing's migration sub-state: Stripe connected but nothing matched yet →
+// nudge the match panel (it lives ON the pricing page - one page, one step).
+// A fresh Stripe with no history just sets tiers and never sees this.
+function _obfPricingNote(st) {
+  if (!st || st.pricing || !st.stripe) return null;
+  return { tone: 'wait', text: 'Bringing an existing Stripe? The match panel is on this page - old members keep their legacy rate' };
+}
+
+// Contacts (team step): the GHL bulk sync runs automatically - the owner just
+// watches the count land.
+function _obfContactsNote(st) {
+  if (!st) return null;
+  const n = st.contacts_n || 0;
+  if (st.contacts) return { tone: 'good', text: n + ' contact' + (n === 1 ? '' : 's') + ' in' };
+  return { tone: 'wait', text: 'Our team is bringing your contacts over - they land here automatically' };
+}
+
+// Leads (team step): done = the pipeline flip landed (their cards live on the
+// portal board and the agents work them).
+function _obfLeadsNote(st) {
+  if (!st) return null;
+  if (st.leads) return { tone: 'good', text: 'Your leads are on the portal board' };
+  return { tone: 'wait', text: 'Runs after the preset - our team sorts your cards into your new pipeline' };
+}
+
 function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
 
 async function _obfFetchState() {
   const token = await _mreqAuthToken();
-  const next = { ein: false, email: false, website: false,
+  const next = { basics: false, ein: false, brand: false, locations: false, coaches: false,
+    stripe: false, email: false, website: false, contacts: false, instagram: false,
     define: false, schedule: false, pricing: false, policy: false,
-    preset: false, onboardingform: false, members: false,
-    offer_id: null, booking: false };
-  const [em, web, ss] = await Promise.allSettled([
+    preset: false, leads: false, onboardingform: false, members: false,
+    offer_id: null, booking: false, has_ghl: true, contacts_n: 0 };
+  const [em, web, ss, prog] = await Promise.allSettled([
     _edwApi('status'),
     _wdwApi('status'),
     fetch('/api/offers/setup-status?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
+    // The Business Blueprint cards stamp <section>_done flags via the
+    // mark_onboarding_section RPC; the flow reads those SAME flags. The flow
+    // is the checklist, the Blueprint is the workbench - one source of truth.
+    _sb ? _sb.rpc('get_onboarding_progress', { p_client_id: CLIENT_ID }) : Promise.reject(new Error('no sb')),
   ]);
   if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set || _obfSkipped('ein'); }
   if (web.status === 'fulfilled') next.website = web.value.status === 'live';
+  if (prog.status === 'fulfilled' && prog.value && prog.value.data) {
+    const p = prog.value.data;
+    next.basics = !!p.general_done;
+    next.brand = !!p.brand_done;
+    next.locations = !!p.locations_done;
+    next.coaches = !!p.staff_done;
+  }
   if (ss.status === 'fulfilled' && ss.value && ss.value.ok) {
     const v = ss.value;
     next.offer_id = v.offer_id || null;
@@ -15121,6 +15177,14 @@ async function _obfFetchState() {
     next.onboardingform = (v.onboarding_fields || 0) > 0;
     next.members = (v.members || 0) > 0;
     next.booking = !!v.booking_live;
+    // Academy-level (station-model additions): Stripe Connect, the GHL
+    // migration signals (contacts landed / pipeline flipped), Instagram inbox.
+    next.stripe = !!v.stripe_connected;
+    next.has_ghl = v.has_ghl !== false;
+    next.contacts_n = v.contacts || 0;
+    next.contacts = (v.contacts || 0) > 0;
+    next.leads = !next.has_ghl ? true : (v.pipeline_provider === 'portal');
+    next.instagram = !!v.ig_live || _obfSkipped('instagram');
   }
   _OBF_STATE = next; _OBF_AT = Date.now();
   _obfFanSync();
@@ -15135,7 +15199,7 @@ function _obfFanSync() {
   const btn = document.getElementById('cc-fan-obf');
   if (!btn) return;
   if (!_obfIsV2()) { btn.style.display = 'none'; return; }
-  const total = _OBF_STEPS.length;
+  const total = _obfVisibleSteps(_OBF_STATE).length;
   const done = _OBF_STATE ? _obfDone(_OBF_STATE) : 0;
   if (_OBF_STATE && done === total) { btn.style.display = 'none'; return; }
   btn.style.display = '';
@@ -15148,7 +15212,7 @@ function _obfFanSync() {
   }
 }
 
-function _obfDone(st) { return _OBF_STEPS.filter(s => st && st[s.key]).length; }
+function _obfDone(st) { return _obfVisibleSteps(st).filter(s => st && st[s.key]).length; }
 
 // Gold progress ring (SVG, r=8 -> circumference ~50.27).
 function _obfRing(done, total, px) {
@@ -15188,6 +15252,19 @@ function _obfGoMembers() { _obfNav('blueprint'); setTimeout(() => { try { _bbNav
 function _obfGoGeneral() { _obfNav('blueprint'); setTimeout(() => { try { _bbNavigate('general'); } catch (_) { /* blueprint not rendered yet */ } }, 150); }
 function _obfGoDomains() { _obfClose(); _edwOpenModal(); }
 function _obfGoMessages() { _obfNav('messages'); }
+// Generic Blueprint card deep-link (brand / locations / staff - the workbench
+// cards whose own "I'm done" buttons stamp the flags this flow reads).
+function _obfGoCard(card) { _obfNav('blueprint'); setTimeout(() => { try { _bbNavigate(card); } catch (_) { /* blueprint not rendered yet */ } }, 150); }
+// Stripe Connect: the existing OAuth modal, openable from anywhere.
+function _obfGoStripe() {
+  _obfClose();
+  try { openStripeConnectModal(); } catch (_) { _obfGoCard('offers'); }
+}
+// Instagram: the ig-connect card lives on the Inbox setup panel.
+function _obfGoInstagram() {
+  _obfNav('messages');
+  setTimeout(() => { try { document.getElementById('ig-connect-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }, 500);
+}
 
 // Deep-link into the training offer's wizard at a section (mirrors
 // _bbWizardSections' policy-after-pricing insert to get the right step index).
@@ -15238,8 +15315,15 @@ function _obfRender(st) {
   const prog = document.getElementById('obf-progress');
   if (!host) return;
   if (!st) { host.innerHTML = `<div style="font-size:12.5px;color:var(--red,#c96856)">Couldn't check your setup - try again in a minute.</div>`; return; }
-  const done = _obfDone(st), total = _OBF_STEPS.length;
+  const visible = _obfVisibleSteps(st);
+  const done = _obfDone(st), total = visible.length;
   if (prog) prog.innerHTML = `${_obfRing(done, total, 30)}<div style="font-size:13px;font-weight:700;color:var(--text)">${done} of ${total} done</div>` + (done === total ? `<div style="font-size:12px;color:var(--green,#7BC47F);font-weight:700">All set - your academy is fully onboarded</div>` : '');
+  // Launch banner: only the must-haves that block the first booking.
+  const launchLeft = visible.filter(s => s.launch && !st[s.key]);
+  const banner = launchLeft.length ? `<div style="display:flex;gap:9px;align-items:flex-start;background:var(--gold-sheen,rgba(212,182,92,.07));border:1px solid var(--accent-border,rgba(212,182,92,.3));border-radius:12px;padding:11px 13px;margin-top:14px">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M4 15V4h12l-2 4 2 4H6"/><path d="M4 22v-7"/></svg>
+      <div style="font-size:12.5px;line-height:1.5;color:var(--text)"><b>${launchLeft.length} must-have${launchLeft.length === 1 ? '' : 's'} left before your first booking:</b> <span style="color:var(--text-sub,var(--text-mute))">${launchLeft.map(s => s.title).join(' · ')}. Everything else can come after launch.</span></div>
+    </div>` : '';
   const stepRow = (s) => {
     const ok = !!st[s.key];
     // Optional sub-state note (Schedule's booking rider): waiting amber, one-
@@ -15255,25 +15339,31 @@ function _obfRender(st) {
         ${n.cta ? `<button onclick="${n.go}" style="background:none;border:1px solid #c79a4a;border-radius:6px;color:#c79a4a;padding:2px 9px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">${n.cta}</button>` : ''}
       </div>`;
     }
+    // Row tags: Launch (blocks first booking) / Optional / Our team (BAM runs it).
+    const tags = []
+      .concat(s.launch && !ok ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);border:1px solid var(--accent-border,rgba(212,182,92,.35));border-radius:5px;padding:1px 6px;margin-left:7px;vertical-align:2px">Launch</span>`] : [])
+      .concat(s.optional && !ok ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);border:1px solid var(--border-med);border-radius:5px;padding:1px 6px;margin-left:7px;vertical-align:2px">Optional</span>`] : [])
+      .concat(s.team ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--text-sub,var(--text-mute));border:1px solid var(--border-med);border-radius:5px;padding:1px 6px;margin-left:7px;vertical-align:2px">Our team</span>`] : [])
+      .join('');
     return `<div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px solid ${ok ? 'var(--accent-border,rgba(212,182,92,.25))' : 'var(--border)'};background:${ok ? 'var(--gold-sheen,rgba(212,182,92,.06))' : 'transparent'};border-radius:12px;margin-top:9px">
       <span style="flex:none;width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       </span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13.5px;font-weight:700;color:var(--text)">${s.title}</div>
+        <div style="font-size:13.5px;font-weight:700;color:var(--text)">${s.title}${tags}</div>
         <div style="font-size:12px;color:var(--text-sub,var(--text-mute));margin-top:1px">${s.sub}</div>
         ${note}
         ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" style="margin-top:6px;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Not applicable - skip for now</button>` : ''}
       </div>
-      ${ok ? '' : `<button onclick="${s.go}" style="flex:none;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:8px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${s.cta}</button>`}
+      ${(ok || s.team) ? '' : `<button onclick="${s.go}" style="flex:none;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:8px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${s.cta}</button>`}
     </div>`;
   };
   // Render group by group; a group with no steps is skipped. Each header shows
   // the group's own n/N so the offer vs general split reads at a glance. Within
   // a group, `subgroup` steps get a small section header (Sales / Onboarding) -
   // the define-it → sell-it → fill-it arc inside the offer.
-  host.innerHTML = _OBF_GROUPS.map(g => {
-    const steps = _OBF_STEPS.filter(s => s.group === g.key);
+  host.innerHTML = banner + _OBF_GROUPS.map(g => {
+    const steps = visible.filter(s => s.group === g.key);
     if (!steps.length) return '';
     const gDone = steps.filter(s => !!st[s.key]).length;
     let lastSub = null;
@@ -24934,17 +25024,21 @@ async function _bbRenderMemberOnboarding(panel) {
     : `<button disabled title="${lockHint || ''}" style="font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:not-allowed;">${label}</button>`;
 
   const ghlBadge = ghlOk ? `<span style="font-size:10.5px;color:#7BC47F;font-weight:700;">✓ connected</span>` : '';
+  // GHL-optional sweep: a never-GHL academy (born on V2) has no CRM to connect
+  // or link against - steps 1 + 4 drop and the list renumbers itself.
+  const noGhl = (typeof HAS_GHL !== 'undefined' && HAS_GHL === false);
+  let n = 0;
   const steps =
-    stepRow(1, 'Connect GoHighLevel', 'Your CRM connection - powers texts, emails and contact sync.',
+    (noGhl ? '' : stepRow(++n, 'Connect GoHighLevel', 'Your CRM connection - powers texts, emails and contact sync.',
       ghlOk ? `<span style="font-size:11px;font-weight:700;color:#2e9e54;border:1px solid #1f7a3d;border-radius:999px;padding:4px 10px;">● Connected</span>`
             : `<button onclick="openGhlConnectModal()" style="font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:9px;border:none;background:var(--gold,#D4B65C);color:#0B0B0D;cursor:pointer;">Connect GHL →</button>`,
-      ghlBadge)
-    + stepRow(2, 'Import your members', 'Upload your member spreadsheet (any layout) - we map the columns, you confirm.',
+      ghlBadge))
+    + stepRow(++n, 'Import your members', 'Upload your member spreadsheet (any layout) - we map the columns, you confirm.',
       cta('Import members →', 'openPricingSorter(2)', true))
-    + stepRow(3, 'Clean up &amp; go live', 'Cross-check imported members against Stripe, fix duplicates, then promote to your live roster.' + (memberCount != null ? ` <b>${memberCount}</b> live now.` : ''),
+    + stepRow(++n, 'Clean up &amp; go live', 'Cross-check imported members against Stripe, fix duplicates, then promote to your live roster.' + (memberCount != null ? ` <b>${memberCount}</b> live now.` : ''),
       cta('Run cleanup →', 'openPricingSorter(3)', true))
-    + stepRow(4, 'Link GHL contacts', 'Match each member to their GHL contact (by email/phone) so texts, emails and the 10-minute sync work.',
-      cta('Link contacts →', '_moRunGhlLink()', ghlOk, 'Connect GHL first'));
+    + (noGhl ? '' : stepRow(++n, 'Link GHL contacts', 'Match each member to their GHL contact (by email/phone) so texts, emails and the 10-minute sync work.',
+      cta('Link contacts →', '_moRunGhlLink()', ghlOk, 'Connect GHL first')));
 
   document.getElementById('bb-mo-steps').innerHTML = steps
     + `<div id="bb-mo-ghl-link-host"></div>`;
@@ -27703,7 +27797,12 @@ function _bbRenderStepFields(offer, sectionId) {
 
   let fields = config.fields;
   if (_bbIsV1()) fields = fields.filter(f => !_V1_HIDE_TYPES.has(f.type) && !_V1_HIDE_KEYS.has(f.key));
-  else if (_bbHideTagFields()) fields = fields.filter(f => !_TAG_TYPES.has(f.type));
+  else if (_bbHideTagFields()) fields = fields.filter(f => !_TAG_TYPES.has(f.type) && f.type !== 'ghl_workflow');
+  // GHL-optional sweep: an academy with NO GHL sub-account at all (born on V2)
+  // never sees GHL-shaped fields - there is nothing for them to point at.
+  if (typeof HAS_GHL !== 'undefined' && HAS_GHL === false) {
+    fields = fields.filter(f => f.type !== 'ghl_tag' && f.type !== 'ghl_tags_multi' && f.type !== 'ghl_workflow');
+  }
   let html = fields.map(f => _bbRenderField(f, sectionId)).join('');
   // Owner-authored "info to collect" (always-asked + custom questions) - the
   // consolidated single surface (backed by custom_field_defs) for the Sales and
@@ -27711,6 +27810,17 @@ function _bbRenderStepFields(offer, sectionId) {
   // sales/onboarding through a different renderer, so it isn't affected here.
   if ((sectionId === 'sales' || sectionId === 'onboarding') && !_bbIsV1()) {
     html += _bbRenderCustomQuestions(offer, sectionId);
+  }
+  // Pricing is ONE page, one step (accepted onboarding design 2026-07-14): set
+  // your tiers here, and if you're migrating an existing Stripe the match panel
+  // opens from the SAME page - old members keep their legacy price, new signups
+  // get the live one. The matcher loads its own data, so this is just the door.
+  if (sectionId === 'pricing' && !_bbIsV1()) {
+    html += `<div style="border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-top:18px">
+      <div style="font-size:12.5px;font-weight:700;color:var(--text)">Bringing an existing Stripe account?</div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin-top:3px;line-height:1.5">Match the prices already in your Stripe to these tiers - members on old prices stay on them (Legacy), new signups get the prices above (Live).</div>
+      <button type="button" onclick="openPricingSorter(1)" style="margin-top:10px;font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:8px;border:1px solid var(--accent,#D4B65C);background:rgba(212,182,92,0.1);color:var(--accent,#D4B65C);cursor:pointer">Match existing Stripe prices</button>
+    </div>`;
   }
   return html;
 }
@@ -28878,6 +28988,7 @@ async function switchClient(newId) {
   }
   CLIENT_ID = row.id;
   CONTACT_PROVIDER = row.contact_provider || 'ghl';
+  if ('ghl_location_id' in row) HAS_GHL = !!row.ghl_location_id;
   if (typeof stopParentMessagesPoll === 'function') stopParentMessagesPoll();
   try { localStorage.setItem('bam_active_client', row.id); } catch (_) {} // remember the choice
   MARKETING_INCLUDED = row.marketing_included !== false;
@@ -42140,6 +42251,13 @@ async function _sorterFinishCoachiqSync() {
 // Same engine as the Member Onboarding card's link step (api/sorter/link-ghl),
 // rendered inside the modal: propose by email/phone → review checkboxes → apply.
 function _sorterRenderStep4(host) {
+  // GHL-optional sweep: never-GHL academies have nothing to link - say so and
+  // move straight on instead of showing a dead matcher.
+  if (typeof HAS_GHL !== 'undefined' && HAS_GHL === false) {
+    host.innerHTML = `<div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:14px 16px;font-size:12.5px;color:var(--text-mute,#888);">This academy isn't on GoHighLevel - there are no GHL contacts to link. Head straight to Billing.</div>`;
+    _sorterSetNext(`<button onclick="_sorterGoto(6)" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#D4B65C);color:#1a1a1a;cursor:pointer;">Next: Billing &rarr;</button>`);
+    return;
+  }
   host.innerHTML = `
     <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">Match each member to their GoHighLevel contact (by email/phone) so texts, emails and the contact sync work.</div>
     <div id="pc-sorter-ghl-host">
@@ -47169,6 +47287,11 @@ let CLIENT_ID = null;
 // portal `members` table, NOT GHL tags, so the offer builder hides its GHL
 // tag dropdowns for them (see _bbRenderStepFields). Set on login + on switch.
 let CONTACT_PROVIDER = 'ghl';
+// Whether this academy has a GHL sub-account AT ALL (vs born-on-V2, never-GHL).
+// Drives the GHL-optional sweep: no GHL location = no GHL UI (connect steps,
+// link-contacts steps, GHL wizard fields). Defaults true so nothing hides
+// before the client row loads - only a KNOWN absence hides GHL surfaces.
+let HAS_GHL = true;
 // All clients this auth user can access - populated on login. When
 // length > 1, the bottom-left sidebar shows a switcher so the user
 // can flip between them. Each entry is { id, business_name,
@@ -53380,7 +53503,7 @@ async function boot() {
   // client_users table (owner OR invited teammate); RLS scopes this query
   // to exactly the caller's clients via my_client_ids(). One auth user can
   // belong to multiple clients - the bottom-left switcher lets them flip.
-  const CLIENT_SELECT_COLS = 'id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access, v15_access, v4_access, organic_content, ads_content_approval_required, onboarding_feedback_requested_at, onboarding_feedback_submitted_at, contact_provider';
+  const CLIENT_SELECT_COLS = 'id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access, v15_access, v4_access, organic_content, ads_content_approval_required, onboarding_feedback_requested_at, onboarding_feedback_submitted_at, contact_provider, ghl_location_id';
   const { data: clientRows } = await _sb.from('clients')
     .select(CLIENT_SELECT_COLS)
     .is('archived_at', null)
@@ -53466,6 +53589,7 @@ async function boot() {
   }
   CLIENT_ID = clientRow.id;
   CONTACT_PROVIDER = clientRow.contact_provider || 'ghl';
+  HAS_GHL = !!clientRow.ghl_location_id;
   MARKETING_INCLUDED = clientRow.marketing_included !== false;
   ORGANIC_CONTENT = clientRow.organic_content === true;
   applyMarketingNavState();

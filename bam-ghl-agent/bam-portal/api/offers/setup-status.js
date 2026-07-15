@@ -3,8 +3,15 @@ import { withSentryApiRoute } from "../_sentry.js";
 // Sales-machine readiness for one offer (Gap #2 / DETAIL "what's left" view).
 //
 //   GET /api/offers/setup-status?client_id=&offer_id=
-//     → { ok, pipeline_stages, transitions, automations:[{key,approved,steps}],
-//         agent_sections, sales_fields, onboarding_fields }
+//     → { ok, pipeline_stages, transitions, automations:[{key,approved}],
+//         agent_sections, sales_fields, onboarding_fields, entry_points,
+//         has_policy, booking_live, define_done, schedule_set, pricing_filled,
+//         prices_matched, members, preset:{key,version,applied_at}|null,
+//         + academy-level: stripe_connected, has_ghl, pipeline_provider,
+//           contacts, cancelled_contacts, ig_live }
+//
+// The academy-level block reports even with no offer yet - the onboarding
+// flow's "Your academy" group works from day zero.
 //
 // Read-only: powers the Sales section's setup checklist so an owner sees which
 // parts of the machine (pipeline, automations, agent facts, form fields) are in
@@ -50,6 +57,25 @@ async function handler(req, res) {
     const { isStaff, clientIds } = await resolveUser(req);
     if (!isStaff && !clientIds.includes(clientId)) return res.status(403).json({ error: "not authorized for this academy" });
 
+    // Academy-level state (station-model onboarding flow) - fetched regardless
+    // of whether an offer exists yet, so the flow's academy group (Stripe,
+    // contacts migration, Instagram) lights up before the first offer is built.
+    const clientRows = await sb(`clients?id=eq.${enc(clientId)}&select=booking_provider,pipeline_provider,stripe_connect_status,ghl_location_id&limit=1`);
+    const cRow = (Array.isArray(clientRows) && clientRows[0]) || {};
+    const [contactRows, cancelledRows, igRows] = await Promise.all([
+      sb(`contacts?client_id=eq.${enc(clientId)}&select=id&limit=1000`),
+      sb(`contacts?client_id=eq.${enc(clientId)}&tags=cs.{cancelled}&select=id&limit=500`),
+      sb(`client_meta_messaging_config?client_id=eq.${enc(clientId)}&select=inbox_live&limit=1`),
+    ]);
+    const academy = {
+      stripe_connected: cRow.stripe_connect_status === "connected",
+      has_ghl: !!cRow.ghl_location_id,
+      pipeline_provider: cRow.pipeline_provider || "ghl",
+      contacts: count(contactRows),
+      cancelled_contacts: count(cancelledRows),
+      ig_live: !!(Array.isArray(igRows) && igRows[0] && igRows[0].inbox_live),
+    };
+
     // Resolve the offer when the caller omits it (the onboarding flow passes only
     // client_id): the published training offer, else the newest training offer.
     let offer = null;
@@ -62,15 +88,15 @@ async function handler(req, res) {
       offerId = offer ? offer.id : null;
     }
     if (!offerId) {
-      // No offer yet - nothing to score. The onboarding flow shows every step as
-      // not-done, which is correct (they need to build the offer first).
+      // No offer yet - nothing offer-scoped to score. The academy-level block
+      // still reports, so the flow's academy group works from day zero.
       return res.status(200).json({ ok: true, offer_id: null, pipeline_stages: 0, transitions: 0, automations: [], agent_sections: 0, sales_fields: 0, onboarding_fields: 0, entry_points: 0, has_policy: false, booking_live: false,
-        define_done: false, schedule_set: false, pricing_filled: false, prices_matched: 0, members: 0, preset: null });
+        define_done: false, schedule_set: false, pricing_filled: false, prices_matched: 0, members: 0, preset: null, ...academy });
     }
 
     // Pipeline stages/edges scoped to this offer (or the academy-wide default).
     const offerFilter = `or=(offer_id.eq.${enc(offerId)},offer_id.is.null)`;
-    const [stages, edges, autos, agentSecs, salesDefs, onbDefs, eps, clientRows, prices, memberRows] = await Promise.all([
+    const [stages, edges, autos, agentSecs, salesDefs, onbDefs, eps, prices, memberRows] = await Promise.all([
       sb(`pipeline_stages?client_id=eq.${enc(clientId)}&${offerFilter}&select=role`),
       sb(`stage_transitions?client_id=eq.${enc(clientId)}&${offerFilter}&select=id`),
       sb(`automations?client_id=eq.${enc(clientId)}&select=automation_key,approved`),
@@ -78,7 +104,6 @@ async function handler(req, res) {
       sb(`custom_field_defs?client_id=eq.${enc(clientId)}&archived=eq.false&section=eq.sales&or=(offer_id.eq.${enc(offerId)},offer_id.is.null)&select=id`),
       sb(`custom_field_defs?client_id=eq.${enc(clientId)}&archived=eq.false&section=eq.onboarding&or=(offer_id.eq.${enc(offerId)},offer_id.is.null)&select=id`),
       sb(`entry_points?client_id=eq.${enc(clientId)}&offer_id=eq.${enc(offerId)}&type=eq.website-form&select=id`),
-      sb(`clients?id=eq.${enc(clientId)}&select=booking_provider&limit=1`),
       sb(`offer_prices?tenant_id=eq.${enc(clientId)}&source_offer_id=eq.${enc(offerId)}&select=id&limit=100`),
       sb(`members?client_id=eq.${enc(clientId)}&select=id&limit=500`),
     ]);
@@ -100,7 +125,7 @@ async function handler(req, res) {
       onboarding_fields: count(onbDefs),
       entry_points: count(eps),
       has_policy: policy && typeof policy === "object" && Object.keys(policy).length > 0,
-      booking_live: (Array.isArray(clientRows) && clientRows[0] && clientRows[0].booking_provider) === "portal",
+      booking_live: cRow.booking_provider === "portal",
       // Offer-definition sub-states (station-model onboarding flow):
       // define = the wizard's required basics; schedule = weekly classes built;
       // pricing_filled = wizard pricing typed; prices_matched = Stripe-matched
@@ -112,6 +137,7 @@ async function handler(req, res) {
       prices_matched: count(prices),
       members: count(memberRows),
       preset: sales.preset_key ? { key: sales.preset_key, version: sales.preset_version || 1, applied_at: sales.preset_applied_at || null } : null,
+      ...academy,
     });
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || String(e) });
