@@ -178,10 +178,11 @@ if (window.__MOCK__) (() => {
     lastMessageType: 'TYPE_SMS', unreadCount: c[3], classification: c[4], matched_member_name: c[5],
   }));
   const THREAD = (name) => ([
-    { id: 'm-1', direction: 'inbound', body: 'Hi! ' + (name || 'A parent') + ' here, quick question about the schedule.', dateAdded: iso(0, 4), type: 'TYPE_SMS', status: 'delivered' },
-    { id: 'm-2', direction: 'outbound', body: 'Of course! Happy to help, what do you need?', dateAdded: iso(0, 3), type: 'TYPE_SMS', status: 'delivered' },
-    { id: 'm-3', direction: 'inbound', body: 'What time do U12 sessions run on Saturdays?', dateAdded: iso(0, 2), type: 'TYPE_SMS', status: 'delivered' },
-    { id: 'm-4', direction: 'outbound', body: 'Saturdays are 9am to 10:30am at Northside Main Gym. Doors open 15 min early.', dateAdded: iso(0, 1), type: 'TYPE_SMS', status: 'delivered' },
+    { id: 'm-1', direction: 'inbound', body: 'Hi! ' + (name || 'A parent') + ' here, quick question about the schedule.', dateAdded: iso(0, 5), type: 'TYPE_SMS', status: 'delivered' },
+    { id: 'm-2', direction: 'outbound', body: 'Of course! Happy to help, what do you need?', dateAdded: iso(0, 4), type: 'TYPE_SMS', status: 'delivered' },
+    { id: 'm-3', direction: 'inbound', body: 'What time do U12 sessions run on Saturdays?', dateAdded: iso(0, 3), type: 'TYPE_SMS', status: 'delivered' },
+    { id: 'm-4', direction: 'outbound', body: 'Saturdays are 9am to 10:30am at Northside Main Gym. Doors open 15 min early.', dateAdded: iso(0, 2), type: 'TYPE_SMS', status: 'delivered' },
+    { id: 'm-5', direction: 'inbound', body: 'Perfect. Is this Saturday open for U12 girls?', dateAdded: iso(0, 1), type: 'TYPE_SMS', status: 'delivered' },
   ]);
   // Hawkeye: agent-drafted actions waiting on the owner. `ghl_contact_id`s
   // match OPPS contactIds so the sales board stages glow for the same leads.
@@ -35226,7 +35227,14 @@ async function _hk2HydrateThread() {
     const j = await _safeJson(resp);
     if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
     const msgs = (j.messages || []).filter(m => (m.body || '').trim()).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    r.thread_tail = msgs.slice(-4).map(m => ({ role: (m.direction || '').toLowerCase() === 'outbound' ? 'agent' : 'parent', text: m.body }));
+    // Start the preview at OUR last message: what we said last + everything
+    // the lead sent since is the beat the draft answers - older history is
+    // noise on the card (Zoran 2026-07-16). No outbound yet (brand-new lead)
+    // falls back to their last 2. Capped at 4 bubbles either way.
+    let _lastOut = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) { if ((msgs[i].direction || '').toLowerCase() === 'outbound') { _lastOut = i; break; } }
+    const _win = (_lastOut >= 0 ? msgs.slice(_lastOut) : msgs.slice(-2)).slice(-4);
+    r.thread_tail = _win.map(m => ({ role: (m.direction || '').toLowerCase() === 'outbound' ? 'agent' : 'parent', text: m.body }));
   } catch (_) { r.thread_tail = r.thread_tail || []; }
   // The owner may have skipped / resolved this card while the fetch was in flight.
   const el = document.getElementById('hk2-thread-slot');
@@ -35674,8 +35682,34 @@ function _hk2Render(opts) {
   const _topKey = _HK2.agent + ':' + _hk2CardKey(top);
   if (_HK2._seenTopKey !== _topKey) {
     _HK2._seenTopKey = _topKey;
-    try { host.scrollIntoView({ block: 'start', behavior: 'auto' }); } catch (_) {}
+    _hk2ScrollDeckTop();
   }
+}
+// Land the deck at its header. Uses offsetTop math instead of
+// scrollIntoView: the focus overlay opens with a pan TRANSFORM, and
+// rect-based scrolling mid-animation lands past the card (Zoran's phone
+// opened the deck scrolled to the middle). Layout offsets ignore transforms.
+// Re-asserts twice because the focus page's sections ABOVE the deck render
+// async and grow after the first scroll - but never fights the user: a
+// scrollTop that moved from what we set means they scrolled, so we stop.
+function _hk2ScrollDeckTop() {
+  const run = () => {
+    const host = document.getElementById('pl-hawkeye'); if (!host) return;
+    const page = host.closest('.mm-focus-page.modal-backdrop');
+    if (page) {
+      const y = page.scrollTop + host.getBoundingClientRect().top - page.getBoundingClientRect().top;
+      page.scrollTop = Math.max(0, y - 10);
+      _HK2._deckScrollSet = page.scrollTop;
+    } else {
+      try { host.scrollIntoView({ block: 'start', behavior: 'auto' }); } catch (_) {}
+    }
+  };
+  run();
+  [400, 1000].forEach(ms => setTimeout(() => {
+    const host = document.getElementById('pl-hawkeye'); if (!host) return;
+    const page = host.closest('.mm-focus-page.modal-backdrop'); if (!page) return;
+    if (Math.abs(page.scrollTop - (_HK2._deckScrollSet != null ? _HK2._deckScrollSet : -1)) <= 2) run();
+  }, ms));
 }
 // ── Book-it pickers: the academy's trial calendars + open slots ──
 async function _hk2EnsureBookOpts() {
