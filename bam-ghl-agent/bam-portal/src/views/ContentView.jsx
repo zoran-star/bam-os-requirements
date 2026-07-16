@@ -1315,7 +1315,7 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
     const picked = (files || []).filter(f => selected.has(f.url));
     if (!picked.length || zipping) return;
     setZipping(true);
-    try { await ctkDownloadPicked(picked, "client-media", setDlNote); }
+    try { await ctkDownloadPicked(picked, "client-media", setDlNote, clientId); }
     catch (e) { alert("Download failed: " + (e.message || e)); }
     finally { setZipping(false); setDlNote(""); }
   };
@@ -2396,10 +2396,16 @@ async function ctkDownloadDirect(files, onProgress) {
 // Access API, Chrome/Edge). No per-file Save As dialogs even when Chrome's
 // "ask where to save each file" setting is on. Returns false if the user
 // cancelled the picker (caller falls back or aborts), true when done.
-async function ctkDownloadToFolder(files, onProgress) {
+async function ctkDownloadToFolder(files, onProgress, pickerId) {
   let dir;
   try {
-    dir = await window.showDirectoryPicker({ mode: "readwrite" });
+    // `id` makes Chrome remember the last-used folder PER id - keyed by client
+    // so Pro Precision downloads reopen in Pro Precision's folder, not the
+    // last client you happened to touch. Must be <= 32 chars, [a-zA-Z0-9_-].
+    const opts = { mode: "readwrite" };
+    const cleanId = typeof pickerId === "string" ? pickerId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) : "";
+    if (cleanId) opts.id = cleanId;
+    dir = await window.showDirectoryPicker(opts);
   } catch {
     return false;   // user cancelled the folder picker
   }
@@ -2434,7 +2440,7 @@ function ctkShouldZip(files) {
 // Shared "download picked files the right way" wrapper for the grids below.
 // Big batches: folder streaming where supported (one picker, zero dialogs),
 // else per-file direct downloads.
-async function ctkDownloadPicked(picked, zipName, setNote) {
+async function ctkDownloadPicked(picked, zipName, setNote, pickerId) {
   if (ctkShouldZip(picked)) {
     setNote("Zipping…");
     await ctkDownloadZip(picked, zipName);
@@ -2443,7 +2449,7 @@ async function ctkDownloadPicked(picked, zipName, setNote) {
   const note = (i, n) => setNote(`Downloading ${i}/${n}…`);
   if (typeof window.showDirectoryPicker === "function") {
     setNote("Pick a folder…");
-    await ctkDownloadToFolder(picked, note);   // false = user cancelled; that's a deliberate abort
+    await ctkDownloadToFolder(picked, note, pickerId);   // false = user cancelled; that's a deliberate abort
     return;
   }
   await ctkDownloadDirect(picked, note);
