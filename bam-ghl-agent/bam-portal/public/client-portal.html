@@ -34930,6 +34930,16 @@ function _hk2SyncMoveLabels() {
 }
 function _hk2Moves(r) {
   const k = r._kind, m = [];
+  // Post-trial form escape hatch (Zoran 2026-07-16): the trial didn't happen the
+  // normal way (parent pulled out / cancelled before it ran). Close it honestly
+  // WITHOUT faking a "showed up". Rebook is already the "No show" button, so these
+  // are the terminal + park dispositions the form otherwise buried behind
+  // "Showed up -> Not a fit". ptflost/ptfunq route through the post-trial endpoint
+  // (writes the review row so the card stays gone + no attendance KPI); reignite
+  // reuses the normal park flow.
+  if (k === 'form') {
+    return [['Mark lost', 'ptflost'], ['Reignite later', 'reignite'], ['Mark unqualified', 'ptfunq']];
+  }
   // The card's textarea isn't in the DOM yet at render time - label from the
   // prefill on the kinds that show a message box.
   const hasMsg = !!(['reply', 'enroll', 'lost', 'handoff'].includes(k) && String(r.draft_message || '').trim());
@@ -34960,7 +34970,9 @@ function _hk2Moves(r) {
 // (date + future message + optional ack) - the normal confirm flow schedules it.
 function _hk2ReigniteMode() {
   const r = _hk2Top(); if (!r) return;
-  if (r._kind === 'form') return;   // the form card has no moves anyway
+  // Form cards CAN park now (Zoran 2026-07-16): the reignite confirm keys on
+  // contact_id for a synthesized "ptf:" card (see reigReadyId below), so a
+  // post-trial form lead can be circled back on a date instead of closed.
   r._origKind = r._kind;
   r._kind = 'reignite';
   if (!r.reignite_message) r.reignite_message = '';
@@ -35118,11 +35130,13 @@ function _hk2CardHtml(r, pos, total, isTop) {
   // primary button into the two terminal closes (Zoran 2026-07-10).
   const _pp = _HK2.ptf || {};
   const ptfNotFit = isForm && _pp.showed === true && _pp.fit === false;
-  const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) =>
+  const moves = _hk2Moves(r).map(([lab, op]) =>
     op === 'write' ? `<button class="hk2-x" onclick="_hk2Write()">${lab}</button>`
     : op === 'book' ? `<button class="hk2-x" onclick="_hk2BookMode()">${lab}</button>`
     : op === 'reignite' ? `<button class="hk2-x" onclick="_hk2ReigniteMode()">${lab}</button>`
     : op === 'unreignite' ? `<button class="hk2-x" onclick="_hk2ReigniteBack()">${lab}</button>`
+    : op === 'ptflost' ? `<button class="hk2-x" onclick="_hk2PtfOther('lost')">${lab}</button>`
+    : op === 'ptfunq' ? `<button class="hk2-x" onclick="_hk2PtfOther('unqualified')">${lab}</button>`
     : `<button class="hk2-x" data-op="${op}" data-orig="${escapeHTML(lab)}" onclick="_hk2Move('${op}', this)">${lab}</button>`).join('');
   // Two-line header: athlete on top, parent underneath. No athlete name = fall
   // back to the single contact name + confidence, exactly as before.
@@ -35164,10 +35178,10 @@ function _hk2CardHtml(r, pos, total, isTop) {
     ${ctx ? `<div class="hk2-ctx">${escapeHTML(ctx)}</div>` : ''}
     ${body}
     <input class="hk2-teach"${id.teach} style="display:none" placeholder="Required: why did you change it? If the bot was missing a fact (price, schedule, capacity), include the fact.">
-    ${isForm ? '' : `<div class="hk2-other"${id.other}><div class="hk2-other-in"><span class="hk2-lbl">Move the lead</span>${moves}</div></div>`}
+    <div class="hk2-other"${id.other}><div class="hk2-other-in"><span class="hk2-lbl">${isForm ? 'Other outcomes' : 'Move the lead'}</span>${moves}</div></div>
     <div class="hk2-bar">
       ${(isTop && total > 1) ? `<button class="hk2-skip" onclick="_hk2Skip()" title="Skip for now - moves this card to the back of the queue" aria-label="Skip for now"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z"/><line x1="19" y1="5" x2="19" y2="19"/></svg></button>` : ''}
-      ${isForm ? '' : `<button class="hk2-otherbtn" onclick="_hk2ToggleOther(this)">Other</button>`}
+      <button class="hk2-otherbtn" onclick="_hk2ToggleOther(this)">Other</button>
       ${ptfNotFit
         ? `<button class="hk2-go alt" onclick="_hk2PtfClose('unqualified')">Mark unqualified</button><button class="hk2-go ${km.cls}" onclick="_hk2PtfClose('lost')">Mark lost</button>`
         : `<button class="hk2-go ${km.cls}"${id.go} onclick="_hk2Confirm()">${km.go}</button>`}
@@ -35193,6 +35207,18 @@ function _hk2PtfPick(grp, val) {
 // path. 'unqualified' = quiet dead-end; 'lost' = Lead Nurture takes over.
 function _hk2PtfClose(outcome) {
   if (!_HK2.ptf) _HK2.ptf = {};
+  _HK2.ptf.outcome = outcome === 'lost' ? 'lost' : 'unqualified';
+  _hk2Confirm();
+}
+// Post-trial form "Other outcomes" menu (Zoran 2026-07-16): close a lead whose
+// trial never happened the normal way (parent pulled out / cancelled) WITHOUT
+// recording attendance. showed_up stays null so no trial_attended / no_show KPI is
+// stamped; the backend still writes the review row (retires this form card) and
+// routes lost -> Lead Nurture / unqualified -> quiet dead end. Undo rides the
+// normal defer. Rebook stays on the "No show" button; parking is "Reignite later".
+function _hk2PtfOther(outcome) {
+  if (!_HK2.ptf) _HK2.ptf = {};
+  _HK2.ptf.optedOut = true;
   _HK2.ptf.outcome = outcome === 'lost' ? 'lost' : 'unqualified';
   _hk2Confirm();
 }
@@ -35268,7 +35294,7 @@ function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
   const _t0 = (_HK2.q[_HK2.agent] || [])[0]; if (_t0) { _t0._writeMode = false; _t0._moveArm = null; }
-  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', nsReason: '', nsSeed: '', outcome: null };
+  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', nsReason: '', nsSeed: '', outcome: null, optedOut: false };
   const tabs = _hk2TabsHtml();
   const q = _HK2.q[_HK2.agent];
   const deck = !q.length
@@ -35458,6 +35484,18 @@ function _hk2Confirm() {
   let ptf = null;
   if (k === 'form') {
     const p = _HK2.ptf || {};
+    // Opted-out close from the "Other outcomes" menu: the trial never happened the
+    // normal way, so NO attendance is recorded (showed_up null). Backend skips the
+    // trial_attended / no_show KPI + SHOWED/NO_SHOW stamp and just runs the close.
+    if (p.optedOut) {
+      ptf = {
+        opportunity_id: r.opportunity_id,
+        showed_up: null, good_fit: false, trainer: '', notes: '',
+        first_message: '', send_onboarding_link: false,
+        rebook_reason: '', rebook_seed: '',
+        outcome: p.outcome === 'lost' ? 'lost' : 'unqualified',
+      };
+    } else {
     // Reset the re-entry latch on every early-return or the card wedges: all later
     // taps hit `if (r._hk2Busy) return` and do nothing (Zoran 2026-07-10).
     if (p.showed !== true && p.showed !== false) { _apxToast('Pick Showed up or No show first', false); r._hk2Busy = false; return; }
@@ -35483,6 +35521,7 @@ function _hk2Confirm() {
       // or lost (Lead Nurture takes over). Backend ignores it unless not-a-fit.
       outcome: notFit ? (p.outcome === 'lost' ? 'lost' : 'unqualified') : undefined,
     };
+    }
   }
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   let undone = false;
@@ -35532,10 +35571,12 @@ function _hk2Confirm() {
       // A terminal write that failed server-side (move_ok / lost_ok / unqualified_ok
       // === false): warn, don't claim success - the review saved (form card gone)
       // but the lead never actually moved/closed, so it must be retried.
-      const notFit = ptf.showed_up === true && ptf.good_fit === false;
+      // A terminal close = "showed up + not a fit" OR an opted-out close (no
+      // attendance). Both read lost_ok / unqualified_ok to warn on a silent fail.
+      const isClose = (ptf.showed_up === true && ptf.good_fit === false) || (ptf.showed_up === null && !!ptf.outcome);
       if (ptf.good_fit && j && j.move_ok === false) throw new Error('Saved, but the move to Done Trial did not land - reopen the card and retry.');
-      if (notFit && ptf.outcome === 'lost' && j && j.lost_ok === false) throw new Error('Saved, but the Lost close did not land - reopen the card and retry.');
-      if (notFit && ptf.outcome !== 'lost' && j && j.unqualified_ok === false) throw new Error("Saved, but the Unqualified close did not land (no post-trial not-a-fit route set up) - use Mark lost, or set up the route.");
+      if (isClose && ptf.outcome === 'lost' && j && j.lost_ok === false) throw new Error('Saved, but the Lost close did not land - reopen the card and retry.');
+      if (isClose && ptf.outcome !== 'lost' && j && j.unqualified_ok === false) throw new Error("Saved, but the Unqualified close did not land (no not-a-fit route set up) - use Mark lost, or set up the route.");
       _apxToast(ptf.showed_up === false ? 'No-show logged - Booking drafts the rebook' : ptf.good_fit ? 'Routed to Done Trial - Closing takes over' : ptf.outcome === 'lost' ? 'Marked lost - Nurture takes over' : 'Closed as unqualified', true);
       // Teach Hawkeye from the no-show reason (best-effort, booking agent). The
       // rebook draft already gets it as per-lead context from the backend; this

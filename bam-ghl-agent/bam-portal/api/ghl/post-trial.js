@@ -109,8 +109,16 @@ async function handler(req, res) {
   const notes = (b.notes || "").trim() || null;
   const sendLink = !!b.send_onboarding_link;
   // Not-a-fit terminal outcome: "unqualified" (quiet dead-end, default) or "lost"
-  // (Lead Nurture takes over). Only consulted when showed up + not a good fit.
+  // (Lead Nurture takes over). Consulted on a showed-up not-a-fit OR an opted-out close.
   const notFitOutcome = b.outcome === "lost" ? "lost" : "unqualified";
+  // Opted-out close (Zoran 2026-07-16): the trial never happened the normal way
+  // (parent pulled out / cancelled before it ran), so the Hawkeye form's "Other
+  // outcomes" menu closes the lead WITHOUT recording attendance. showed_up stays
+  // null, so the trial_attended / trial_no_show KPI and the SHOWED/NO_SHOW trial
+  // stamp are both skipped (guarded by `showedUp !== null` below); the review row
+  // still saves (killing the form card) and outcome routes lost -> Lead Nurture or
+  // unqualified -> quiet dead end, reusing the exact showed-up-not-a-fit close paths.
+  const optedOut = showedUp === null && (b.outcome === "lost" || b.outcome === "unqualified");
   // No-show extras (Zoran 2026-07-14): the coach's read on WHY they no-showed and
   // an optional first-text they want the rebook to work from. Both become
   // <contact_memory> the booking agent uses to draft the rebook (which still lands
@@ -353,12 +361,12 @@ async function handler(req, res) {
 
   // Showed up but NOT a fit -> a terminal close. The coach picks which one on the
   // form: "lost" (Lead Nurture takes over) or "unqualified" (quiet dead-end).
-  if (showedUp === true && !goodFit && notFitOutcome === "lost") {
-    // Showed up but LOST (qualified, not proceeding): same terminal as the Confirm
-    // agent's Mark Lost - route into 💔 Lead Nurture if that sequence is live + a
-    // Lead Nurture stage exists (opp stays OPEN), else GHL-native status=lost.
-    // Quiet close, no message. (Zoran 2026-07-10)
-    const lostReason = (b.lost_reason || "").toString().trim() || "post-trial: lost";
+  if (((showedUp === true && !goodFit) || optedOut) && notFitOutcome === "lost") {
+    // Showed up but LOST (qualified, not proceeding) OR opted out before the trial:
+    // same terminal as the Confirm agent's Mark Lost - route into 💔 Lead Nurture if
+    // that sequence is live + a Lead Nurture stage exists (opp stays OPEN), else
+    // GHL-native status=lost. Quiet close, no message. (Zoran 2026-07-10, 2026-07-16)
+    const lostReason = (b.lost_reason || "").toString().trim() || (optedOut ? "post-trial: opted out (lost)" : "post-trial: lost");
     let routedToNurture = false;
     try {
       if (await isAutomationLive(clientId, "nurture")) {
@@ -382,25 +390,26 @@ async function handler(req, res) {
     result.lost_ok = lostLanded;
     result.routed_to_nurture = routedToNurture;
     try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason: lostReason }]) }); } catch (_) {}
-  } else if (showedUp === true && !goodFit) {
-    // Showed up but NOT a fit -> the dead end. Route the post_trial_not_fit edge
-    // through the router's terminal path (GTA seed = scheduled_trial -> Unqualified):
-    // close the opp (setStatus abandoned + role:unqualified) and stamp the GHL
-    // unqualified tag + an outcome row, mirroring the confirm-abandoned action.
-    // Only fires when the coach explicitly marked showed-up + not-a-fit; a paused or
-    // missing edge leaves the lead put (no legacy behavior to preserve here). No
-    // message is sent - it's a quiet close.
+  } else if ((showedUp === true && !goodFit) || optedOut) {
+    // Showed up but NOT a fit (or opted out before the trial) -> the dead end. Route
+    // the post_trial_not_fit edge through the router's terminal path (GTA seed =
+    // scheduled_trial -> Unqualified): close the opp (setStatus abandoned +
+    // role:unqualified) and stamp the GHL unqualified tag + an outcome row, mirroring
+    // the confirm-abandoned action. Fires when the coach marked showed-up + not-a-fit
+    // OR chose the opted-out "Mark unqualified"; a paused or missing edge leaves the
+    // lead put (no legacy behavior to preserve here). No message is sent - quiet close.
     // unqualified_ok = did the close actually land? A paused/unseeded edge (or a
     // lookup blip -> resolveEdge returns null) leaves the lead PUT with nothing
     // closed; the deck reads this to warn instead of falsely toasting "Closed as
     // unqualified" (Zoran 2026-07-10).
+    const uqReason = optedOut ? "post-trial: opted out (unqualified)" : "post-trial: showed up, not a fit";
     let uqLanded = false;
     try {
-      const routed = await routeTransition({ clientId, sb, ghl, token, locationId: client.ghl_location_id, fromRole: "scheduled_trial", trigger: "post_trial_not_fit", contactId, oppRef, allowTerminal: true, reason: "post-trial: showed up, not a fit" });
+      const routed = await routeTransition({ clientId, sb, ghl, token, locationId: client.ghl_location_id, fromRole: "scheduled_trial", trigger: "post_trial_not_fit", contactId, oppRef, allowTerminal: true, reason: uqReason });
       if (routed.matched && routed.terminal === "unqualified" && routed.moved) {
         result.unqualified = true; uqLanded = true;
         if (contactId) { try { await markUnqualified(token, contactId, clientId); } catch (_) {} }
-        try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason: "post-trial: not a fit" }]) }); } catch (_) {}
+        try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "abandoned", reason: optedOut ? "post-trial: opted out" : "post-trial: not a fit" }]) }); } catch (_) {}
       }
     } catch (e) { console.error("not-a-fit unqualified close failed (non-fatal):", e.message); }
     result.unqualified_ok = uqLanded;
