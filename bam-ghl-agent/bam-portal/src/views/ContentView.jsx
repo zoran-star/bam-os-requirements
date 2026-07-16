@@ -2392,6 +2392,39 @@ async function ctkDownloadDirect(files, onProgress) {
     await new Promise(r => setTimeout(r, 350));
   }
 }
+// Pick a destination folder ONCE, then stream every file into it (File System
+// Access API, Chrome/Edge). No per-file Save As dialogs even when Chrome's
+// "ask where to save each file" setting is on. Returns false if the user
+// cancelled the picker (caller falls back or aborts), true when done.
+async function ctkDownloadToFolder(files, onProgress) {
+  let dir;
+  try {
+    dir = await window.showDirectoryPicker({ mode: "readwrite" });
+  } catch {
+    return false;   // user cancelled the folder picker
+  }
+  const used = new Set();
+  for (let i = 0; i < files.length; i++) {
+    try {
+      const f = files[i];
+      const res = await fetch(f.url);
+      if (!res.ok) continue;
+      const safe = (f.name || "file").replace(/[\\/:*?"<>|]/g, "_");
+      let name = safe, n = 1;
+      while (used.has(name)) {
+        const dot = safe.lastIndexOf(".");
+        name = dot > 0 ? `${safe.slice(0, dot)}-${n}${safe.slice(dot)}` : `${safe}-${n}`;
+        n++;
+      }
+      used.add(name);
+      const handle = await dir.getFileHandle(name, { create: true });
+      const writable = await handle.createWritable();
+      await res.body.pipeTo(writable);   // streams network -> disk, no RAM buildup
+    } catch { /* skip files that fail; keep going */ }
+    if (onProgress) onProgress(i + 1, files.length);
+  }
+  return true;
+}
 // Zip only small non-video batches. In-browser zipping buffers every file in
 // RAM before packaging (Google Drive zips server-side; we can't), so video
 // batches took minutes and could die at Chrome's ~2GB blob ceiling.
@@ -2399,13 +2432,21 @@ function ctkShouldZip(files) {
   return files.length <= 12 && !files.some(f => _cmIsVideo(f));
 }
 // Shared "download picked files the right way" wrapper for the grids below.
+// Big batches: folder streaming where supported (one picker, zero dialogs),
+// else per-file direct downloads.
 async function ctkDownloadPicked(picked, zipName, setNote) {
   if (ctkShouldZip(picked)) {
     setNote("Zipping…");
     await ctkDownloadZip(picked, zipName);
-  } else {
-    await ctkDownloadDirect(picked, (i, n) => setNote(`Downloading ${i}/${n}…`));
+    return;
   }
+  const note = (i, n) => setNote(`Downloading ${i}/${n}…`);
+  if (typeof window.showDirectoryPicker === "function") {
+    setNote("Pick a folder…");
+    await ctkDownloadToFolder(picked, note);   // false = user cancelled; that's a deliberate abort
+    return;
+  }
+  await ctkDownloadDirect(picked, note);
 }
 
 function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives", onRemove }) {
