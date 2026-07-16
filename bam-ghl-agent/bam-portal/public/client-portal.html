@@ -9533,6 +9533,9 @@ Then the call to action."]</div>
             .hk2-draft-bubble{width:100%;max-width:100%;align-self:stretch}
             .hk2-draftcap{align-self:flex-end}
             .hk2-ctx{text-align:left}
+            /* No stacked-card peek on phones - the faded next-card sliver read
+               as a glitch (Zoran 2026-07-16); "1 of 7" already shows the queue. */
+            .hk2-behind{display:none}
           }
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
           .hk2-quietbar{display:flex;align-items:center;gap:7px;margin:0 0 12px;padding:8px 12px;border:1px solid color-mix(in srgb, var(--gold) 45%, transparent);background:color-mix(in srgb, var(--gold) 10%, transparent);color:var(--gold);border-radius:var(--r-8,8px);font-size:12px;font-weight:600}
