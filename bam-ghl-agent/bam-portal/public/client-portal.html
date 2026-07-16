@@ -4048,6 +4048,12 @@ if (window.__MOCK__) (() => {
     max-width: 1120px; width: min(1120px, 96vw); max-height: none;
     margin: 28px auto 48px; background: transparent; border: none; box-shadow: none;
   }
+  /* Focus pages are full pages, not centered dialogs or mobile bottom sheets.
+     Anchor to the TOP and let the page scroll: flex-centering (desktop) and
+     the mobile bottom-sheet align-items:flex-end pushed tall cards' tops above
+     the viewport with no way to scroll up - flex overflow above the container
+     start is unreachable (Hawkeye deck, Zoran 2026-07-16). */
+  .mm-focus-page.modal-backdrop { align-items: flex-start; overflow-y: auto; }
   /* focus pages run on the design system: Jakarta UI + Nunito display,
      DM Mono for the telemetry labels (redefines --mono for children) */
   .mm-focus-page { font-family: var(--font-ui); --mono: var(--font-mono); }
@@ -9435,7 +9441,10 @@ Then the call to action."]</div>
         <div id="pl-focus" style="display:none"></div>
         <!-- Hawkeye deck (V2): the single Hawkeye surface - one card at a time. -->
         <style>
-          #pl-hawkeye{max-width:680px;margin:0 auto;padding:4px 0 44px}
+          /* overflow-anchor off: the on-card thread hydrates ~300ms after render
+             and grows the card - scroll anchoring then kept the draft pinned and
+             shoved the card header above the fold (Zoran 2026-07-16). */
+          #pl-hawkeye{max-width:680px;margin:0 auto;padding:4px 0 44px;overflow-anchor:none}
           .hk2-topbar{display:flex;align-items:center;gap:16px;margin:2px 0 14px;flex-wrap:wrap}
           .hk2-back{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;border:1.5px solid var(--border);background:var(--surface);color:var(--text-sub);border-radius:999px;padding:7px 13px 7px 10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
           .hk2-back:hover{color:var(--text);border-color:var(--border-med)}
@@ -9541,6 +9550,9 @@ Then the call to action."]</div>
             /* No stacked-card peek on phones - the faded next-card sliver read
                as a glitch (Zoran 2026-07-16); "1 of 7" already shows the queue. */
             .hk2-behind{display:none}
+            /* Shorter thread preview so the card head + draft + actions fit a
+               phone screen; the full conversation is one tap away. */
+            .hk2-thread{max-height:230px}
           }
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
           .hk2-quietbar{display:flex;align-items:center;gap:7px;margin:0 0 12px;padding:8px 12px;border:1px solid color-mix(in srgb, var(--gold) 45%, transparent);background:color-mix(in srgb, var(--gold) 10%, transparent);color:var(--gold);border-radius:var(--r-8,8px);font-size:12px;font-weight:600}
@@ -35654,6 +35666,16 @@ function _hk2Render(opts) {
   if (top && top._kind === 'book') _hk2EnsureBookOpts();
   _hk2HydrateThread();   // fill the conversation preview if this card carried none
   _hkAutosizeDrafts('#pl-hawkeye');
+  // A NEW card on top (deck open, approve/skip advance, tab switch) starts in
+  // view from its header - hydrated threads make cards taller than a phone
+  // screen, and staying scrolled mid-card read as "the card is out of view"
+  // (Zoran 2026-07-16). Keyed so same-card re-renders (post-trial form taps,
+  // undo restores of the same card) never yank the scroll.
+  const _topKey = _HK2.agent + ':' + _hk2CardKey(top);
+  if (_HK2._seenTopKey !== _topKey) {
+    _HK2._seenTopKey = _topKey;
+    try { host.scrollIntoView({ block: 'start', behavior: 'auto' }); } catch (_) {}
+  }
 }
 // ── Book-it pickers: the academy's trial calendars + open slots ──
 async function _hk2EnsureBookOpts() {
