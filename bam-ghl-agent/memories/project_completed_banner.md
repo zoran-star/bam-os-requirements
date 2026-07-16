@@ -17,3 +17,13 @@
 - V2 command-center clients: banner lives in the classic `.main` flow - verify visibility in CC mode; may need a CC mount later.
 - Marketing items deep-link to the marketing view, not the specific request detail.
 - All tiers see it (deliberate - biggest value for V1 systems tickets); flagged on the PR per V1 rule.
+
+## Sibling: "We need something from you" action banner (2026-07-16, Cam)
+Same placement/pattern, sits ABOVE the completed banner. `_checkActionBanner()`
++ `_abOpen`/`_abSnooze` in client-portal.html. Shows while anything is waiting
+on the client: systems `status=awaiting_client`, content/marketing
+`client_action_status=requested` (cancelled excluded). Key difference from the
+completed banner: snooze is **sessionStorage only** - it returns every login
+until the client actually responds. Born from Pro Precision replying to a
+b-roll request by creating a NEW $1 campaign ticket with 78 files instead of
+using Respond on the ticket.
