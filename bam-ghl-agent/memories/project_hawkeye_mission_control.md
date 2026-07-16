@@ -484,6 +484,22 @@ Swipe RIGHT commits the card's main action (can SEND) - confirm it's instant-com
 Swipe LEFT destinations differ per agent: Booking Ghosted/Nurture/Unqualified ·
 Confirm Rebook/Nurture · Closing Nurture. Pop options vs default+undo vs buttons-only.
 
+## Post-trial form "Other outcomes" menu (Zoran 2026-07-16)
+The post-trial form deck card (`_kind==='form'`, synthesized `id:"ptf:"+trialId`,
+kind `post_trial`) only had "Showed up" / "No show" - a lead who opted out before
+the trial ("focusing on soccer this summer") had to be closed via a FALSE "Showed
+up -> Not a fit" (which stamped a fake `trial_attended` KPI + SHOWED trial outcome).
+Fix: the form card now shows the standard **Other** button -> **Mark lost** (Nurture) /
+**Reignite later** (park) / **Mark unqualified** (dead end). New op codes `ptflost`/
+`ptfunq` -> `_hk2PtfOther(outcome)` sets `_HK2.ptf.optedOut=true`+outcome and runs the
+normal `_hk2Confirm` (undo included); reignite reuses `_hk2ReigniteMode` (the reignite
+confirm already keys a `ptf:` card on `contact_id`, not ready_id). Closes with
+`showed_up:null` so NO attendance KPI/stamp (guarded by `showedUp!==null`); the review
+row still saves (retires the card). Backend `api/ghl/post-trial.js`: `optedOut =
+showed_up null + outcome` makes the lost + unqualified branches fire without attendance,
+reusing the showed-up-not-a-fit close paths (lost->nurture, unqualified via
+`post_trial_not_fit` edge). V2/V1.5 only. Not yet prod-verified with a live GTA card.
+
 ## See also
 [[project_sales_focus_mode]] (focus mode + engines model + router, what's already live) ·
 [[project_sales_crew_model]] (the crew) · [[project_sales_crew_guardrails]] (solid vs dashed
