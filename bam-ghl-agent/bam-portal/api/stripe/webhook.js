@@ -46,6 +46,7 @@ import { notifyOwners } from "../_notify-owners.js";
 import { enrollContact, exitEnrollment, isAutomationLive } from "../automations.js";
 import { getClientGhlToken } from "../website/availability.js";
 import { getAccessSyncMode, syncAccessForMember } from "../_runtime/access-sync.js";
+import { buildCancellationSnapshot } from "../_runtime/cancellation-snapshot.js";
 import { applyInvoiceCreditGrants } from "../_runtime/credit-engine.js";
 import { createRuntimeSupabaseClient } from "../_runtime/supabase.js";
 import { resolveOrMintPortalContact } from "../_contacts.js";
@@ -659,6 +660,14 @@ async function handleSubDeleted(event, connectedAccount, res) {
   );
   const cancellationAlreadyLogged = Array.isArray(existingCancel) && existingCancel.length > 0;
   if (!cancellationAlreadyLogged) {
+    // Snapshot economics before the members row is deleted below. Stripe's
+    // cancellation_details.reason distinguishes dunning auto-cancels
+    // ("payment_failed") from requested ones - that's involuntary churn.
+    const snapshot = await buildCancellationSnapshot({
+      member, sb,
+      stripeFetch: (path, opts) => stripeFetch(path, opts && opts.stripeAccount),
+      stripeAccount: connectedAccount,
+    });
     await sb(`cancellations`, {
       method: "POST",
       headers: { Prefer: "return=minimal" },
@@ -673,6 +682,9 @@ async function handleSubDeleted(event, connectedAccount, res) {
         reason:                 "cancelled in Stripe (outside portal)",
         stripe_subscription_id: member.stripe_subscription_id,
         stripe_customer_id:     member.stripe_customer_id,
+        ...snapshot,
+        source:                 "stripe",
+        involuntary:            sub?.cancellation_details?.reason === "payment_failed",
       }]),
     });
   }

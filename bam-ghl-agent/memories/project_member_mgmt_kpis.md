@@ -36,6 +36,12 @@ Grouped by urgency; every row = member + issue + $/mo value + one-tap action; ta
 **Hygiene (neutral):** member on archived/legacy price (migrate to live pricing) · uncatalogued Stripe price (fix mapping) · missing agreement/waiver (chase signature) · missing phone/email on contact.
 **Win-back (future):** recently cancelled 30-60d ago from `cancellations` (re-engage offer).
 
+## Cancellation snapshots (shipped 2026-07-16)
+
+Cancelled members are DELETED from `members`, so `cancellations` rows now FREEZE the member's economics at cancel time: `joined_date, plan_name, stripe_price_id, offer_id, monthly_amount_cents, total_spent_cents, payments_count, source (staff_portal|parent_app|stripe), involuntary` (Stripe `cancellation_details.reason='payment_failed'` = dunning auto-cancel). Written by BOTH insert sites: `actionCancel` (api/members.js) and `handleSubDeleted` (api/stripe/webhook.js) via shared `api/_runtime/cancellation-snapshot.js`. `members` also carries `total_spent_cents, payments_count, spend_synced_at` refreshed by `GET /api/members?action=spend-sync` (one paginated invoice sweep per account). Historical rows backfilled 2026-07-16 by `scripts/backfill-cancellations.mjs` (21/21 full; join dates taken from EARLIEST PAID INVOICE, not sub start - June-2026 migration subs carry fake start dates).
+
+**Known data-truth gap:** live members' `members.joined_date` still holds the June migration date for most of GTA → active tenure understated + "new members" inflated. Fix = same earliest-invoice correction, but it changes roster/milestones behavior; needs Zoran's go-ahead.
+
 ## Gotchas (learned the hard way)
 
 1. **`pricing_catalog.interval` speaks TERM vocabulary**, not raw Stripe intervals: `4_weeks`, `3_months`, `6_months`, `week`, `month`, `year`, `one_time` (see `api/offers/create-price.js` `termToInterval`). Stripe's `interval_count` is baked into the term string and is NOT in the roster payload.

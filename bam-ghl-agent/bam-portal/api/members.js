@@ -25,6 +25,7 @@ import crypto from "node:crypto";
 import { timingSafeEqual } from "node:crypto";
 import { applyDiscountToCents, normCode, couponFromPromo } from "./_coupon-guardrails.js";
 import { syncMemberAccessNonFatal } from "./_runtime/access-sync-portal.js";
+import { buildCancellationSnapshot, stripeLifetimeSpend } from "./_runtime/cancellation-snapshot.js";
 import { smsProvider } from "./messaging/provider.js";
 import { emailProvider } from "./messaging/email-provider.js";
 
@@ -292,10 +293,63 @@ async function handler(req, res) {
         }
         const rows = await sb(
           `cancellations?client_id=eq.${cid}` +
-          `&select=id,member_id,type,cancel_date,pause_start,pause_end,reason,athlete_name,parent_name,stripe_subscription_id,activated_at,completed_at,created_at` +
+          `&select=id,member_id,type,cancel_date,pause_start,pause_end,reason,athlete_name,parent_name,stripe_subscription_id,activated_at,completed_at,created_at,joined_date,plan_name,stripe_price_id,offer_id,monthly_amount_cents,total_spent_cents,payments_count,source,involuntary` +
           `&order=created_at.desc&limit=1000`
         );
         return res.status(200).json({ ok: true, cancellations: Array.isArray(rows) ? rows : [] });
+      }
+
+      // ─── Spend sync: refresh members.total_spent_cents from Stripe ───
+      // Powers the "active" side of the churned-vs-active comparison
+      // (avg total spend). One paginated sweep of the connected account's
+      // paid invoices, aggregated per customer. Idempotent; call when
+      // spend_synced_at is stale.
+      if (req.query.action === "spend-sync") {
+        const cid = (req.query.client_id || "").toString();
+        if (!cid) return res.status(400).json({ error: "client_id required" });
+        if (!isStaff && !clients.some((c) => c.id === cid)) {
+          return res.status(403).json({ error: "not your client" });
+        }
+        const client = await loadClientRow(cid);
+        if (!client?.stripe_connect_account_id) {
+          return res.status(200).json({ ok: false, reason: "no stripe account connected" });
+        }
+        const acct = client.stripe_connect_account_id;
+        const byCustomer = new Map(); // customerId -> { cents, count }
+        let startingAfter = null, scanned = 0;
+        for (let page = 0; page < 10; page++) {
+          const qs = `status=paid&limit=100` + (startingAfter ? `&starting_after=${encodeURIComponent(startingAfter)}` : "");
+          const inv = await stripeFetch(`/invoices?${qs}`, { stripeAccount: acct });
+          const data = (inv && Array.isArray(inv.data)) ? inv.data : [];
+          for (const i of data) {
+            scanned++;
+            const cust = typeof i.customer === "string" ? i.customer : i.customer?.id;
+            const paid = Number(i.amount_paid);
+            if (!cust || !Number.isFinite(paid) || paid <= 0) continue;
+            const e = byCustomer.get(cust) || { cents: 0, count: 0 };
+            e.cents += paid; e.count++;
+            byCustomer.set(cust, e);
+          }
+          if (!inv || !inv.has_more || !data.length) break;
+          startingAfter = data[data.length - 1].id;
+        }
+        const membersRows = await sb(`members?client_id=eq.${cid}&select=id,stripe_customer_id`);
+        const now = nowIso();
+        let updated = 0;
+        for (const m of (Array.isArray(membersRows) ? membersRows : [])) {
+          const agg = m.stripe_customer_id ? byCustomer.get(m.stripe_customer_id) : null;
+          await sb(`members?id=eq.${m.id}`, {
+            method: "PATCH",
+            headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({
+              total_spent_cents: agg ? agg.cents : 0,
+              payments_count: agg ? agg.count : 0,
+              spend_synced_at: now,
+            }),
+          }).catch(() => {});
+          updated++;
+        }
+        return res.status(200).json({ ok: true, invoices_scanned: scanned, members_updated: updated });
       }
 
       // ─── Single member: returns DB row + Stripe detail (for popup) ─
@@ -1089,7 +1143,10 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
     }
   }
 
-  // Insert cancellations row (always — captures intent + audit trail)
+  // Insert cancellations row (always — captures intent + audit trail).
+  // Snapshot the member's economics NOW: the members row gets deleted (here or
+  // at period end), and the KPI churned-vs-active comparisons read these.
+  const snapshot = await buildCancellationSnapshot({ member, sb, stripeFetch, stripeAccount });
   await sb(`cancellations`, {
     method: "POST",
     headers: { Prefer: "return=minimal" },
@@ -1104,6 +1161,9 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
       reason: body.reason || null,
       stripe_subscription_id: member.stripe_subscription_id,
       stripe_customer_id: member.stripe_customer_id,
+      ...snapshot,
+      source: body.source === "parent_app" ? "parent_app" : "staff_portal",
+      involuntary: false,
     }]),
   });
 
