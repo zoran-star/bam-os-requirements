@@ -1226,6 +1226,15 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
   const [typeF, setTypeF] = useState("all");  // all | video | image
   const [selected, setSelected] = useState(() => new Set());   // file urls
   const [zipping, setZipping] = useState(false);
+  const [preview, setPreview] = useState(null);   // file being viewed in the lightbox
+
+  // Esc closes the lightbox
+  useEffect(() => {
+    if (!preview) return;
+    const onKey = (e) => { if (e.key === "Escape") setPreview(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [preview]);
 
   async function toggle() {
     const next = !open;
@@ -1363,11 +1372,15 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
                       <input type="checkbox" checked={selected.has(f.url)} onChange={() => toggleSel(f)}
                         style={{ width: 15, height: 15, accentColor: tk.accent, cursor: "pointer", margin: 0 }} />
                     </label>
-                    <a href={f.url} target="_blank" rel="noreferrer" title={`${f.name} - open in a new tab`} style={{
-                      display: "block", textDecoration: "none",
-                      border: `1px solid ${selected.has(f.url) ? tk.accent : f.ticket_id === currentTicketId ? tk.accent : tk.border}`,
-                      borderRadius: 8, overflow: "hidden", background: tk.surfaceEl,
-                    }}>
+                    <a
+                      href={f.url} target="_blank" rel="noreferrer"
+                      title={_cmIsImage(f) || _cmIsVideo(f) ? `${f.name} - click to preview` : `${f.name} - open in a new tab`}
+                      onClick={_cmIsImage(f) || _cmIsVideo(f) ? (e) => { e.preventDefault(); setPreview(f); } : undefined}
+                      style={{
+                        display: "block", textDecoration: "none",
+                        border: `1px solid ${selected.has(f.url) ? tk.accent : f.ticket_id === currentTicketId ? tk.accent : tk.border}`,
+                        borderRadius: 8, overflow: "hidden", background: tk.surfaceEl,
+                      }}>
                       {_cmIsImage(f) ? (
                         <img
                           src={ctkThumbUrl(f.url, 300)} alt={f.name} loading="lazy" decoding="async"
@@ -1396,6 +1409,31 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {preview && (
+        <div onClick={() => setPreview(null)} style={{
+          position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.82)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            maxWidth: "min(920px, 94vw)", background: tk.surface,
+            border: `1px solid ${tk.border}`, borderRadius: 12, overflow: "hidden",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px" }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: tk.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview.name}</span>
+              <span style={{ flex: 1 }} />
+              <a href={preview.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: tk.accent, textDecoration: "none", whiteSpace: "nowrap" }}>Download ↓</a>
+              <button onClick={() => setPreview(null)} aria-label="Close preview" style={{
+                border: "none", background: "transparent", color: tk.textSub, fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1,
+              }}>✕</button>
+            </div>
+            {_cmIsVideo(preview) ? (
+              <video src={preview.url} controls autoPlay playsInline style={{ display: "block", width: "min(880px, 90vw)", maxHeight: "76vh", background: "#000" }} />
+            ) : (
+              <img src={preview.url} alt={preview.name} style={{ display: "block", maxWidth: "min(880px, 90vw)", maxHeight: "76vh", objectFit: "contain", background: "#000" }} />
+            )}
+          </div>
         </div>
       )}
     </Card>
