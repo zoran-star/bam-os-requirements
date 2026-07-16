@@ -9523,10 +9523,16 @@ Then the call to action."]</div>
           .hk2-clear .big{width:56px;height:56px;border-radius:50%;background:rgba(76,199,106,.14);color:var(--green,#4CC76A);display:flex;align-items:center;justify-content:center;font-size:26px}
           /* Phones: the deck's desktop min-height left the absolutely-positioned
              "behind" card poking out as an empty shell under short cards
-             (Zoran 2026-07-16). Let the deck hug the top card instead. */
+             (Zoran 2026-07-16). Let the deck hug the top card instead, and
+             center the card content - the right-hanging 92% chat bubble read
+             as "outside" at phone width, so the draft goes full-width. */
           @media(max-width:640px){
             .hk2-deck{min-height:0}
             .hk2-bub{max-width:92%}
+            .hk2-draftwrap{align-items:stretch}
+            .hk2-draft-bubble{width:100%;max-width:100%;align-self:stretch}
+            .hk2-draftcap{align-self:flex-end}
+            .hk2-ctx{text-align:left}
           }
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
           .hk2-quietbar{display:flex;align-items:center;gap:7px;margin:0 0 12px;padding:8px 12px;border:1px solid color-mix(in srgb, var(--gold) 45%, transparent);background:color-mix(in srgb, var(--gold) 10%, transparent);color:var(--gold);border-radius:var(--r-8,8px);font-size:12px;font-weight:600}
