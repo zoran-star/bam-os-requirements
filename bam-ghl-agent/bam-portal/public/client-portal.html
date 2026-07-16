@@ -20079,7 +20079,10 @@ function _hmInitParallax() {
       const heroH = hero.offsetHeight;
       const progress = Math.min(st / (heroH * 1.5), 1);
       hero.style.opacity = String(1 - progress * 0.7);
-      hero.style.filter = progress > 0.1 ? `blur(${progress * 4}px)` : '';
+      // Scroll blur OFF for now (Zoran 2026-07-16): it only hit the hero, so the
+      // page blurred inconsistently. Revisit with the section recede blur in the
+      // dedicated UI pass. Was: blur(progress*4 px) past progress 0.1.
+      hero.style.filter = '';
       hero.style.transform = `translateY(${progress * -20}px) scale(${1 - progress * 0.03})`;
       ticking = false;
     });
@@ -52896,7 +52899,10 @@ function _ccInitRecede(root, secs) {
         if (p > 0.01) {
           s.classList.add('cc-recede');
           s.style.opacity = String(1 - 0.55 * p);
-          s.style.filter = 'blur(' + (4 * p).toFixed(1) + 'px)';
+          // Scroll blur OFF for now (Zoran 2026-07-16): with the hero parallax
+          // blur it read as "only the first thing blurs". Recede keeps the fade +
+          // slide; re-decide blur in the dedicated UI pass. Was: blur(4p px).
+          s.style.filter = '';
           s.style.transform = 'translateY(' + (-14 * p).toFixed(1) + 'px) scale(' + (1 - 0.035 * p).toFixed(3) + ')';
         } else if (s.classList.contains('cc-recede')) {
           s.style.opacity = ''; s.style.filter = ''; s.style.transform = '';
