@@ -4049,12 +4049,15 @@ if (window.__MOCK__) (() => {
     max-width: 1120px; width: min(1120px, 96vw); max-height: none;
     margin: 28px auto 48px; background: transparent; border: none; box-shadow: none;
   }
-  /* Focus pages are full pages, not centered dialogs or mobile bottom sheets.
-     Anchor to the TOP and let the page scroll: flex-centering (desktop) and
-     the mobile bottom-sheet align-items:flex-end pushed tall cards' tops above
-     the viewport with no way to scroll up - flex overflow above the container
-     start is unreachable (Hawkeye deck, Zoran 2026-07-16). */
-  .mm-focus-page.modal-backdrop { align-items: flex-start; overflow-y: auto; }
+  /* The Hawkeye/sales focus page is a full page, not a centered dialog or a
+     mobile bottom sheet. Anchor to the TOP and let the page scroll: both
+     flex-centering (desktop) and the mobile bottom-sheet align-items:flex-end
+     pushed a tall deck card's top above the viewport with no way to scroll up
+     (flex overflow above the container start is unreachable). Zoran 2026-07-16.
+     SCOPED to #salesMachineModal on purpose: the other .mm-focus-page overlays
+     (marketing / members / blueprint machines) share this latent mobile bug but
+     weren't in scope here - fix them in a dedicated pass, not silently. */
+  #salesMachineModal.mm-focus-page.modal-backdrop { align-items: flex-start; overflow-y: auto; }
   /* focus pages run on the design system: Jakarta UI + Nunito display,
      DM Mono for the telemetry labels (redefines --mono for children) */
   .mm-focus-page { font-family: var(--font-ui); --mono: var(--font-mono); }
