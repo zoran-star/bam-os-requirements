@@ -6639,6 +6639,23 @@
       </div>
     </div>
 
+    <!-- "We need something from you" banner (Cam, 2026-07-16). Hidden by
+         default; _checkActionBanner() flips it visible while any ticket is
+         waiting on the client (systems awaiting_client, content/marketing
+         client_action_status = requested). Snooze lasts the session only -
+         it returns next login until they actually respond, which is the
+         point: clients were creating new tickets instead of replying. -->
+    <div id="action-banner" style="display:none; background:rgba(212,182,92,0.16); border-bottom:1px solid rgba(212,182,92,0.55); padding:12px 22px; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap; font-size:13px;">
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0;">
+        <span style="font-size:16px; color:var(--gold,#D4B65C);"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
+        <span id="action-banner-msg" style="min-width:0;"></span>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button onclick="_abOpen()" style="background:var(--gold,#D4B65C); color:#0B0B0D; border:none; padding:8px 16px; font-size:13px; font-weight:700; border-radius:4px; cursor:pointer; font-family:inherit;">Respond</button>
+        <button onclick="_abSnooze()" title="Hide for this session" style="background:transparent; color:var(--text-mute); border:1px solid var(--border); padding:8px 12px; font-size:12px; border-radius:4px; cursor:pointer; font-family:inherit;">Later</button>
+      </div>
+    </div>
+
     <!-- "Completed while you were away" banner (Mike's suggestion 2026-07-06).
          Hidden by default; _checkCompletedBanner() flips it visible when a
          ticket/creative finished since the client's last dismiss. Lives above
@@ -29603,6 +29620,7 @@ async function switchClient(newId) {
   subscribeTicketsRealtime();   // re-scope tickets subscription to new CLIENT_ID
   _obtLoadProgress();           // refresh tracker for the new client's progress state
   _checkCompletedBanner();      // re-check "while you were away" for the new academy
+  _checkActionBanner();         // re-check "waiting on you" for the new academy
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -48059,6 +48077,82 @@ function closeDetail() {
   document.getElementById('systems-list').style.display = 'block';
 }
 
+// ── "We need something from you" banner ──────────────────────────────
+// Shows while ANY ticket is waiting on the client: systems tickets in
+// awaiting_client, content/marketing tickets with client_action_status
+// "requested". Snooze is per-session only (sessionStorage) - the banner
+// returns every login until they respond, because the failure mode it
+// fixes is clients replying by creating brand-new tickets instead.
+// Best-effort: any fetch failing just means no banner.
+let _abTarget = null;
+async function _checkActionBanner() {
+  try {
+    if (!CLIENT_ID) return;
+    const host = document.getElementById('action-banner');
+    if (!host) return;
+    host.style.display = 'none';
+    try { if (sessionStorage.getItem('bam_action_snooze_' + CLIENT_ID)) return; } catch (_) {}
+
+    const waiting = [];
+    try {
+      const { data } = await _sb.from('tickets')
+        .select('id,type,menu_item,fields,status,updated_at')
+        .eq('client_id', CLIENT_ID).eq('status', 'awaiting_client')
+        .order('updated_at', { ascending: false }).limit(10);
+      (data || []).forEach(t => waiting.push({
+        label: t.menu_item || (t.fields && (t.fields.title || t.fields.what)) || ((t.type || 'support') + ' ticket'),
+        kind: 'systems', id: t.id,
+      }));
+    } catch (_) {}
+    try {
+      const list = await _ctkFetchForClient();
+      (list || []).forEach(t => {
+        if (t.client_action_status !== 'requested' || t.status === 'cancelled') return;
+        waiting.push({
+          label: (t.title || '').trim() || ((t.type === 'video' ? 'Video' : 'Graphic') + ' creative'),
+          kind: 'marketing', id: t.id,
+        });
+      });
+    } catch (_) {}
+    try {
+      const list = await _mreqFetchAll();
+      (list || []).forEach(t => {
+        if (t.client_action_status !== 'requested' || t.status === 'cancelled') return;
+        waiting.push({ label: 'Campaign request', kind: 'marketing', id: t.id });
+      });
+    } catch (_) {}
+
+    if (!waiting.length) return;
+    _abTarget = waiting[0];
+    const msgEl = document.getElementById('action-banner-msg');
+    if (msgEl) {
+      msgEl.innerHTML = waiting.length === 1
+        ? `We need something from you: <strong>${escapeHTML(_abTarget.label)}</strong> is waiting on your reply.`
+        : `We need something from you: <strong>${waiting.length} requests</strong> are waiting on your reply.`;
+    }
+    host.style.display = 'flex';
+  } catch (_) { /* banner is best-effort, never block boot */ }
+}
+function _abSnooze() {
+  try { if (CLIENT_ID) sessionStorage.setItem('bam_action_snooze_' + CLIENT_ID, '1'); } catch (_) {}
+  const host = document.getElementById('action-banner');
+  if (host) host.style.display = 'none';
+}
+function _abOpen() {
+  const t = _abTarget;
+  const host = document.getElementById('action-banner');
+  if (host) host.style.display = 'none';
+  if (!t) return;
+  if (t.kind === 'systems') {
+    const nav = document.getElementById('nav-systems-flat');
+    switchView('systems', nav || undefined);
+    try { if (typeof getTicket === 'function' && getTicket(t.id)) openTicket(t.id); } catch (_) { /* list is fine */ }
+  } else {
+    const mk = document.querySelector(`.nav-item[onclick*="switchView('marketing'"]`);
+    switchView('marketing', mk || undefined);
+  }
+}
+
 // ── "Completed while you were away" banner ───────────────────────────
 // Shows once per completion wave: anything finished since the client's
 // last dismiss (localStorage baseline per client, 14-day floor so first
@@ -54187,6 +54281,7 @@ async function boot() {
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
   _checkCompletedBanner();     // "completed while you were away" (fire-and-forget)
+  _checkActionBanner();        // "we need something from you" (fire-and-forget)
   document.getElementById('login-overlay').style.display = 'none';
 
   // Staff-triggered onboarding feedback form — hard-blocks the portal until
