@@ -1460,6 +1460,9 @@ async function handleStoreOrder(event, connectedAccount, res) {
     const r = await fetch(`${GHL_V2}/locations/${client.ghl_location_id}/customFields`, { headers: ghlHeaders });
     if (r.ok) { const d = await r.json(); for (const f of (d.customFields || [])) cfIdByKey[f.fieldKey] = f.id; }
   } catch (_) {}
+  // Same values under two naming schemes; only fields that EXIST on the location
+  // are written (order_* for merch stores like Elevate, payment_* for
+  // program/payment funnels like Pro Precision).
   const valueByKey = {
     "contact.order_number": orderNo,
     "contact.order_items": items,
@@ -1468,6 +1471,11 @@ async function handleStoreOrder(event, connectedAccount, res) {
     "contact.order_shipping_method": shipMethod,
     "contact.order_shipping_address": shipAddr,
     "contact.order_status": orderStatus,
+    "contact.payment_reference": orderNo,
+    "contact.payment_program": items,
+    "contact.payment_amount": total,
+    "contact.payment_date": orderDate,
+    "contact.payment_status": orderStatus,
   };
   const customFields = Object.entries(valueByKey)
     .filter(([k, v]) => cfIdByKey[k] && v)
