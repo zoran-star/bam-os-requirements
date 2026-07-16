@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useUrlState } from "../hooks/useUrlState";
 import MarketingOverview from "./MarketingOverview";
 import RefreshCalendarSection from "./RefreshCalendarSection";
+import MediaLightbox from "../components/MediaLightbox";
+import { mlIsMedia } from "../lib/media";
 
 const TYPE_META = {
   replace:           { icon: "🔄", label: "Replace creative" },
@@ -1039,6 +1041,44 @@ function renderClientInfo(t, tk, onAskSm) {
   ));
 }
 
+// One attached-file tile in a submitted-info grid. Media tiles open the shared
+// lightbox player (raw .MOV URLs download instead of playing when navigated to);
+// the Download caption keeps the one-click download.
+function SubmittedFileTile({ f, tk }) {
+  const isImage = (f.mime || "").startsWith("image/");
+  const isVideo = (f.mime || "").startsWith("video/");
+  const isMedia = mlIsMedia(f);
+  const [preview, setPreview] = useState(false);
+  return (<>
+    <a
+      href={f.url} target="_blank" rel="noreferrer" download={f.name}
+      onClick={isMedia ? (e) => { e.preventDefault(); setPreview(true); } : undefined}
+      style={{
+        display: "flex", flexDirection: "column", gap: 4, alignItems: "center",
+        padding: 8, borderRadius: 8,
+        background: tk.surfaceHov || "rgba(255,255,255,0.04)",
+        border: `1px solid ${tk.border}`,
+        textDecoration: "none", color: tk.text, fontSize: 11, maxWidth: 120,
+      }}>
+      {isImage
+        ? <img src={f.url} alt={f.name} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 4 }} />
+        : isVideo
+        ? <div style={{ position: "relative", width: 56, height: 56 }}>
+            <video src={`${f.url}#t=0.5`} muted playsInline preload="metadata" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 4, background: tk.surface, display: "block" }} />
+            <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, textShadow: "0 1px 3px rgba(0,0,0,0.7)", pointerEvents: "none" }}>▶</span>
+          </div>
+        : <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, background: tk.surface, fontSize: 22, color: tk.textMute }}>📄</div>
+      }
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{f.name}</span>
+      <span
+        onClick={isMedia ? (e) => { e.stopPropagation(); } : undefined}
+        style={{ color: tk.accent, fontSize: 10, letterSpacing: "0.05em" }}
+      >Download ↓</span>
+    </a>
+    {preview && <MediaLightbox file={f} tk={tk} onClose={() => setPreview(false)} />}
+  </>);
+}
+
 function renderSubmittedInfo(t, tk) {
   const rows = [];
   rows.push(["Academy", t.academyName]);
@@ -1047,31 +1087,7 @@ function renderSubmittedInfo(t, tk) {
   // Helper to render a download grid for the attached final creatives
   const filesGrid = (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-      {(t.files || []).map((f, i) => {
-        const isImage = (f.mime || "").startsWith("image/");
-        const isVideo = (f.mime || "").startsWith("video/");
-        return (
-          <a key={i} href={f.url} target="_blank" rel="noreferrer" download={f.name} style={{
-            display: "flex", flexDirection: "column", gap: 4, alignItems: "center",
-            padding: 8, borderRadius: 8,
-            background: tk.surfaceHov || "rgba(255,255,255,0.04)",
-            border: `1px solid ${tk.border}`,
-            textDecoration: "none", color: tk.text, fontSize: 11, maxWidth: 120,
-          }}>
-            {isImage
-              ? <img src={f.url} alt={f.name} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 4 }} />
-              : isVideo
-              ? <div style={{ position: "relative", width: 56, height: 56 }}>
-                  <video src={`${f.url}#t=0.5`} muted playsInline preload="metadata" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 4, background: tk.surface, display: "block" }} />
-                  <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, textShadow: "0 1px 3px rgba(0,0,0,0.7)", pointerEvents: "none" }}>▶</span>
-                </div>
-              : <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, background: tk.surface, fontSize: 22, color: tk.textMute }}>📄</div>
-            }
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{f.name}</span>
-            <span style={{ color: tk.accent, fontSize: 10, letterSpacing: "0.05em" }}>Download ↓</span>
-          </a>
-        );
-      })}
+      {(t.files || []).map((f, i) => <SubmittedFileTile key={i} f={f} tk={tk} />)}
     </div>
   );
 
