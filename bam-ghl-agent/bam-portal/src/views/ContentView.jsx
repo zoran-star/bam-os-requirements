@@ -1588,6 +1588,25 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
     }
   }
 
+  // ── Promote client raw files to finals without download/re-upload ──
+  // The file is already in storage; a final is just a reference, so promotion
+  // copies the entry (raw uses `type`, finals use `mime`). Dedupes by url.
+  async function promoteToFinals(picked) {
+    if (!picked?.length) return;
+    const have = new Set(finalsExisting.map(f => f.url));
+    const entries = picked
+      .filter(f => f.url && !have.has(f.url))
+      .map(f => {
+        const e = { name: f.name || "file", url: f.url, size: f.size || 0, mime: f.mime || f.type || "" };
+        if (f.folder) e.folder = f.folder;
+        return e;
+      });
+    if (!entries.length) { showBanner("Already in finals."); return; }
+    await patchTicket(ticket.id, { action: "upload-final", final_files: entries });
+    await onRefetch();
+    showBanner(`Added ${entries.length} client file${entries.length === 1 ? "" : "s"} to finals.`);
+  }
+
   // ── Remove finals uploaded by mistake (multi-select from FilesByFolder) ──
   async function removeFinals(toRemove) {
     if (!toRemove?.length) return;
@@ -1871,6 +1890,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
           ticket={ticket}
           tk={tk}
           edit={editingCtx ? { draft: ctxDraft, setDraft: setCtxDraft, notesDraft, setNotesDraft } : null}
+          onPromote={promoteToFinals}
         />
       </Card>
 
@@ -2133,7 +2153,7 @@ function StatusBadge({ ticket, tk }) {
   );
 }
 
-function ClientInputs({ ticket, tk, edit = null }) {
+function ClientInputs({ ticket, tk, edit = null, onPromote = null }) {
   const ctx = ticket.context || {};
   const raw = Array.isArray(ticket.raw_files) ? ticket.raw_files : [];
   const subCreatives = Array.isArray(ctx.creatives) ? ctx.creatives : null;
@@ -2255,7 +2275,7 @@ function ClientInputs({ ticket, tk, edit = null }) {
                     {cd.notes || <span style={{ color: tk.textMute, fontStyle: "italic" }}>(no notes)</span>}
                   </div>
                 )}
-                <FilesByFolder files={c.raw_files} tk={tk} compact minmax={160} />
+                <FilesByFolder files={c.raw_files} tk={tk} compact minmax={160} onPromote={onPromote} />
               </div>
               );
             })}
@@ -2275,7 +2295,7 @@ function ClientInputs({ ticket, tk, edit = null }) {
               Raw files ({raw.length})
             </div>
             {raw.length ? (
-              <FilesByFolder files={raw} tk={tk} />
+              <FilesByFolder files={raw} tk={tk} onPromote={onPromote} />
             ) : (
               <div style={{ color: tk.textMute, fontSize: 13, fontStyle: "italic" }}>None</div>
             )}
@@ -2451,7 +2471,7 @@ async function ctkDownloadPicked(picked, zipName, setNote, pickerId) {
   await ctkDownloadDirect(picked, note);
 }
 
-function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives", onRemove }) {
+function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives", onRemove, onPromote }) {
   const list = Array.isArray(files) ? files : [];
   const keyOf = (f) => f.url || f.name || "";
   const isDl = (f) => !!f.url && (f.mime || "") !== "text/uri-list";   // skip drive-link entries
@@ -2460,6 +2480,7 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
   const [zipping, setZipping] = useState(false);
   const [dlNote, setDlNote] = useState("");
   const [removing, setRemoving] = useState(false);
+  const [promoting, setPromoting] = useState(false);
   if (!list.length) return null;
 
   const toggle = (f) => setSelected(s => {
@@ -2475,6 +2496,14 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
     try { await ctkDownloadPicked(picked, zipName, setDlNote); }
     catch (e) { alert("Download failed: " + (e.message || e)); }
     finally { setZipping(false); setDlNote(""); }
+  };
+  const promoteSelected = async () => {
+    const picked = dlList.filter(f => selected.has(keyOf(f)));
+    if (!picked.length || !onPromote) return;
+    setPromoting(true);
+    try { await onPromote(picked); setSelected(new Set()); }
+    catch (e) { alert("Could not add to finals: " + (e.message || e)); }
+    finally { setPromoting(false); }
   };
   const removeSelected = async () => {
     const picked = list.filter(f => selected.has(keyOf(f)));
@@ -2523,7 +2552,7 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
     cursor: removing ? "wait" : "pointer",
     border: `1px solid ${tk.danger || "#E0524A"}`, background: "transparent", color: tk.danger || "#E0524A",
   };
-  const showToolbar = dlList.length > 1 || (onRemove && dlList.length >= 1);
+  const showToolbar = dlList.length > 1 || ((onRemove || onPromote) && dlList.length >= 1);
   const toolbar = showToolbar ? (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
       <button type="button" onClick={selectAll} style={btn(false)}>{allSelected ? "Clear" : "Select all"}</button>
@@ -2535,6 +2564,15 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
       {dlList.length > 1 && (
         <button type="button" onClick={() => download("all")} disabled={zipping} style={btn(false)}>
           {zipping ? (dlNote || "Preparing…") : `↓ Download all (${dlList.length})`}
+        </button>
+      )}
+      {onPromote && selCount > 0 && (
+        <button type="button" onClick={promoteSelected} disabled={promoting} style={{
+          padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, fontFamily: "inherit",
+          cursor: promoting ? "wait" : "pointer",
+          border: `1px solid ${tk.accent}`, background: "transparent", color: tk.accent,
+        }} title="The file is already in storage - this adds it to Finals without re-uploading">
+          {promoting ? "Adding…" : `→ Use ${selCount} as final${selCount === 1 ? "" : "s"}`}
         </button>
       )}
       {onRemove && selCount > 0 && (
