@@ -1189,12 +1189,43 @@ function _cmIsVideo(f) {
 function _cmIsImage(f) {
   return (f.type || "").startsWith("image/") || /\.(jpe?g|png|gif|webp|heic)(\?|#|$)/i.test(f.url || f.name || "");
 }
+// Video poster frame, mounted only when scrolled near the viewport - <video> has no
+// native lazy loading, and this grid can hold 100+ clips.
+function CmVideoThumb({ url, tk }) {
+  const ref = useRef(null);
+  const [show, setShow] = useState(() => typeof IntersectionObserver === "undefined");
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) { setShow(true); obs.disconnect(); }
+    }, { rootMargin: "300px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div ref={ref} style={{ position: "relative", height: 84, background: tk.surfaceHov }}>
+      {show && (
+        <video
+          src={`${url}#t=0.5`}
+          muted playsInline preload="metadata"
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      )}
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+        <span style={{ width: 26, height: 26, borderRadius: "50%", background: "rgba(0,0,0,0.55)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, paddingLeft: 2 }}>▶</span>
+      </div>
+    </div>
+  );
+}
 function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState(null);   // null = not fetched yet
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
   const [typeF, setTypeF] = useState("all");  // all | video | image
+  const [selected, setSelected] = useState(() => new Set());   // file urls
+  const [zipping, setZipping] = useState(false);
 
   async function toggle() {
     const next = !open;
@@ -1235,6 +1266,34 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
 
   const dateStr = (iso) => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 
+  // ── Multi-select + zip download (same pattern as FilesByFolder) ──
+  const toggleSel = (f) => setSelected(s => {
+    const n = new Set(s); n.has(f.url) ? n.delete(f.url) : n.add(f.url); return n;
+  });
+  const selCount = visible.filter(f => selected.has(f.url)).length;
+  const allVisibleSelected = visible.length > 0 && selCount === visible.length;
+  const selectAllVisible = () => setSelected(s => {
+    const n = new Set(s);
+    visible.forEach(f => allVisibleSelected ? n.delete(f.url) : n.add(f.url));
+    return n;
+  });
+  const downloadSelected = async () => {
+    // Pull from the full file list so picks survive filter changes.
+    const picked = (files || []).filter(f => selected.has(f.url));
+    if (!picked.length || zipping) return;
+    setZipping(true);
+    try { await ctkDownloadZip(picked, "client-media"); }
+    catch (e) { alert("Download failed: " + (e.message || e)); }
+    finally { setZipping(false); }
+  };
+  const selBtn = (accent) => ({
+    padding: "4px 12px", fontSize: 11, fontWeight: 600, borderRadius: 999, fontFamily: "inherit",
+    cursor: zipping ? "wait" : "pointer",
+    border: `1px solid ${accent ? tk.accent : tk.border}`,
+    background: accent ? tk.accent : "transparent",
+    color: accent ? "#0A0A0B" : tk.textSub,
+  });
+
   return (
     <Card tk={tk} style={{ marginBottom: 22, padding: 0 }}>
       <div onClick={toggle} role="button" aria-expanded={open} style={{
@@ -1266,6 +1325,21 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
               }}
             />
           </div>
+          {visible.length > 0 && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+              <button type="button" onClick={selectAllVisible} style={selBtn(false)}>
+                {allVisibleSelected ? "Clear selection" : "Select all"}
+              </button>
+              {selected.size > 0 && (
+                <>
+                  <button type="button" onClick={downloadSelected} disabled={zipping} style={selBtn(true)}>
+                    {zipping ? "Zipping…" : `↓ Download ${selected.size} selected`}
+                  </button>
+                  <button type="button" onClick={() => setSelected(new Set())} style={selBtn(false)}>Clear</button>
+                </>
+              )}
+            </div>
+          )}
           {loading && <div style={{ color: tk.textSub, fontSize: 13, padding: "8px 0" }}>Loading media…</div>}
           {files && !files.length && !loading && (
             <div style={{ color: tk.textSub, fontSize: 13, padding: "8px 0", fontStyle: "italic" }}>No media from this client yet.</div>
@@ -1280,25 +1354,44 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
                 {byFolder.get(g).map((f, i) => (
-                  <a key={f.url + i} href={f.url} target="_blank" rel="noreferrer" title={`${f.name} - open in a new tab`} style={{
-                    display: "block", textDecoration: "none",
-                    border: `1px solid ${f.ticket_id === currentTicketId ? tk.accent : tk.border}`,
-                    borderRadius: 8, overflow: "hidden", background: tk.surfaceEl,
-                  }}>
-                    {_cmIsImage(f) ? (
-                      <img src={f.url} alt={f.name} loading="lazy" style={{ width: "100%", height: 84, objectFit: "cover", display: "block" }} />
-                    ) : (
-                      <div style={{ height: 84, display: "flex", alignItems: "center", justifyContent: "center", color: tk.textSub, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em" }}>
-                        {_cmIsVideo(f) ? "▶ VIDEO" : "FILE"}
+                  <div key={f.url + i} style={{ position: "relative" }}>
+                    <label onClick={e => e.stopPropagation()} style={{
+                      position: "absolute", top: 6, left: 6, zIndex: 3,
+                      width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+                      background: "rgba(0,0,0,0.55)", borderRadius: 5, cursor: "pointer",
+                    }}>
+                      <input type="checkbox" checked={selected.has(f.url)} onChange={() => toggleSel(f)}
+                        style={{ width: 15, height: 15, accentColor: tk.accent, cursor: "pointer", margin: 0 }} />
+                    </label>
+                    <a href={f.url} target="_blank" rel="noreferrer" title={`${f.name} - open in a new tab`} style={{
+                      display: "block", textDecoration: "none",
+                      border: `1px solid ${selected.has(f.url) ? tk.accent : f.ticket_id === currentTicketId ? tk.accent : tk.border}`,
+                      borderRadius: 8, overflow: "hidden", background: tk.surfaceEl,
+                    }}>
+                      {_cmIsImage(f) ? (
+                        <img
+                          src={ctkThumbUrl(f.url, 300)} alt={f.name} loading="lazy" decoding="async"
+                          onError={e => {
+                            const img = e.currentTarget;
+                            if (!img.dataset.fellBack && f.url) { img.dataset.fellBack = "1"; img.src = f.url; }
+                          }}
+                          style={{ width: "100%", height: 84, objectFit: "cover", display: "block", background: tk.surfaceHov }}
+                        />
+                      ) : _cmIsVideo(f) ? (
+                        <CmVideoThumb url={f.url} tk={tk} />
+                      ) : (
+                        <div style={{ height: 84, display: "flex", alignItems: "center", justifyContent: "center", color: tk.textSub, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em" }}>
+                          FILE
+                        </div>
+                      )}
+                      <div style={{ padding: "6px 8px" }}>
+                        <div style={{ fontSize: 11, color: tk.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>
+                        <div style={{ fontSize: 10, color: tk.textMute, marginTop: 2 }}>
+                          {f.code}{f.ticket_id === currentTicketId ? " · this ticket" : ""} · {dateStr(f.sent_at)}{f.source === "response" ? " · from a response" : ""}
+                        </div>
                       </div>
-                    )}
-                    <div style={{ padding: "6px 8px" }}>
-                      <div style={{ fontSize: 11, color: tk.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>
-                      <div style={{ fontSize: 10, color: tk.textMute, marginTop: 2 }}>
-                        {f.code}{f.ticket_id === currentTicketId ? " · this ticket" : ""} · {dateStr(f.sent_at)}{f.source === "response" ? " · from a response" : ""}
-                      </div>
-                    </div>
-                  </a>
+                    </a>
+                  </div>
                 ))}
               </div>
             </div>
