@@ -1,10 +1,10 @@
-# Member-management KPI page (planned) + MRR calculation gotchas
+# Member-management KPI + Actions pages (planned) + MRR calculation gotchas
 
-**Status 2026-07-16:** KPI list agreed with Zoran; MRR math fixed (#1466); page not built yet.
+**Status 2026-07-16:** KPI list + mockup approved by Zoran ("those are all the numbers i need"); THIRD left page added to the plan: **Actions** (client action items). Pages not built yet.
 
 ## The plan
 
-A second "left page" in the Shield members focus (the roster ↔ contact column shipped in #1464): a **Roster ↔ KPIs toggle** in the same left column. All KPIs scoped to the **training offer** (via `members.offer_id`), adjustable time window, default **MTD**. These academies have no parent app, so everything comes from the billing/roster spine - no attendance/engagement data.
+Left pages in the Shield members focus (the roster ↔ contact column shipped in #1464): a **Roster | KPIs | Actions toggle** in the same left column (Actions tab carries an open-count badge). All scoped to the **training offer** (via `members.offer_id`), adjustable time window, default **MTD**. These academies have no parent app, so everything comes from the billing/roster spine - no attendance/engagement data.
 
 Agreed KPI list:
 
@@ -23,6 +23,16 @@ Agreed KPI list:
 | $ at risk | payment_failed / payment_method_required count + monthly value |
 | Paused MRR | parked revenue |
 | Avg tenure (months) | best retention proxy without app data |
+
+## Actions page - the action-item catalog (agreed 2026-07-16)
+
+Grouped by urgency; every row = member + issue + $/mo value + one-tap action; tapping the member opens their contact card in the same column; tapping the action has Shield draft it in chat. Sales-side cards (post-trial, booking) stay in Hawkeye - this page is member-side only.
+
+**Money (red, act today):** payment failed (retry / payment link) · no card on file / card expiring before next bill (card-update link) · past-due invoice.
+**Leaving (amber, savable):** pending cancel with period-end date + reason (save offer / exit call) · pause ending soon (confirm return) · pause scheduled (prep) · paused past pause_end but not resumed (unpause or cancel).
+**Milestones (gold, loyalty):** member anniversaries 1/3/6/12 mo (congrats) · commitment term (3mo/6mo) ending soon (renewal conversation) · new member first week (check-in).
+**Hygiene (neutral):** member on archived/legacy price (migrate to live pricing) · uncatalogued Stripe price (fix mapping) · missing agreement/waiver (chase signature) · missing phone/email on contact.
+**Win-back (future):** recently cancelled 30-60d ago from `cancellations` (re-engage offer).
 
 ## Gotchas (learned the hard way)
 
