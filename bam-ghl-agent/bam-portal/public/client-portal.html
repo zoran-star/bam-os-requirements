@@ -33,6 +33,332 @@
      to load, uploads fall back to the standard supabase-js upload (see _storageUpload). -->
 <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4/dist/tus.min.js"></script>
 <script>
+/* ══ MOCK MODE (?mock=1) - local dev styling loop only ══════════════════
+   Renders the full portal with fake data: no login, no Supabase, no /api.
+   Activates ONLY on localhost / private-LAN hosts (never in production).
+   Wiring: (1) this block, (2) `const _sb = window.__MOCK__ ? ...` at the
+   Supabase client init, (3) the __MOCK__ guard on sw.js registration. */
+window.__MOCK__ = (() => {
+  try {
+    if (new URLSearchParams(location.search).get('mock') !== '1') return false;
+    const h = location.hostname;
+    return h === 'localhost' || h === '127.0.0.1' || h.endsWith('.local')
+      || /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(h);
+  } catch (_) { return false; }
+})();
+if (window.__MOCK__) (() => {
+  const NOW = Date.now();
+  const iso = (daysAgo, hoursAgo) => new Date(NOW - (daysAgo || 0) * 86400e3 - (hoursAgo || 0) * 3600e3).toISOString();
+  const AV = (name, bg) => {
+    const init = String(name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
+      + '<rect width="120" height="120" fill="' + (bg || '#23283a') + '"/>'
+      + '<text x="60" y="76" font-family="Arial,sans-serif" font-size="44" font-weight="700" fill="#D4B65C" text-anchor="middle">' + init + '</text></svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  };
+
+  // ── Identity ──
+  const USER = { id: 'mock-user-1', email: 'demo@northsidehoops.com', user_metadata: { full_name: 'Alex Carter', needs_password: false } };
+  const SESSION = { access_token: 'mock-token', token_type: 'bearer', expires_at: Math.floor(NOW / 1000) + 86400, user: USER };
+  const CID = 'mock-client-1';
+
+  // ── Supabase table fixtures ──
+  const T = {
+    clients: [{
+      id: CID, business_name: 'Northside Hoops Academy', owner_name: 'Alex Carter',
+      email: 'demo@northsidehoops.com', onboarding_completed_at: iso(45),
+      marketing_included: true, v2_access: true, v15_access: false, v4_access: false,
+      organic_content: true, ads_content_approval_required: false,
+      onboarding_feedback_requested_at: null, onboarding_feedback_submitted_at: null,
+      contact_provider: 'ghl', ghl_location_id: 'mock-loc-1', archived_at: null, created_at: iso(60),
+    }],
+    client_users: [
+      { id: 'cu-1', client_id: CID, user_id: 'mock-user-1', name: 'Alex Carter', email: 'demo@northsidehoops.com', role: 'owner', status: 'active', hide_from_team: false, last_seen_at: iso(0), created_at: iso(60) },
+      { id: 'cu-2', client_id: CID, user_id: 'mock-user-2', name: 'Simone Wright', email: 'simone@northsidehoops.com', role: 'member', status: 'active', hide_from_team: false, last_seen_at: iso(0, 3), created_at: iso(50) },
+      { id: 'cu-3', client_id: CID, user_id: 'mock-user-3', name: 'Dre Holmes', email: 'dre@northsidehoops.com', role: 'member', status: 'active', hide_from_team: false, last_seen_at: iso(1), created_at: iso(50) },
+    ],
+    tickets: [
+      { id: 'tk-1', client_id: CID, type: 'change', menu_item: null, status: 'awaiting_client', priority: 'high',
+        fields: { title: 'Update summer camp pricing', what: 'Camp page pricing section', how: 'Change $199 to $229 for the July session' },
+        files: [], client_action_request: 'Confirm the new July price so we can publish the page.', user_guide: null,
+        messages: [], submitted_at: iso(2), updated_at: iso(0, 2) },
+      { id: 'tk-2', client_id: CID, type: 'build', menu_item: 'Camps/Clinics', status: 'final_review', priority: 'normal',
+        fields: { title: 'August shooting clinic funnel', describe: 'Landing page + signup for the Aug 12 shooting clinic, 24 spots' },
+        files: [], client_action_request: null, user_guide: null, messages: [], submitted_at: iso(6), updated_at: iso(1) },
+      { id: 'tk-3', client_id: CID, type: 'error', menu_item: null, status: 'in_progress', priority: 'high',
+        fields: { title: 'Trial calendar not loading', where: 'Free trial booking page', should: 'Calendar should show open slots for next week' },
+        files: [], client_action_request: null, user_guide: null, messages: [], submitted_at: iso(1), updated_at: iso(0, 5) },
+      { id: 'tk-4', client_id: CID, type: 'build', menu_item: 'Build something else', status: 'open', priority: 'normal',
+        fields: { title: 'Alumni newsletter signup', describe: 'Simple email capture for academy alumni' },
+        files: [], client_action_request: null, user_guide: null, messages: [], submitted_at: iso(0, 6), updated_at: iso(0, 6) },
+      { id: 'tk-5', client_id: CID, type: 'change', menu_item: null, status: 'done', priority: 'normal',
+        fields: { title: 'Homepage hero refresh', what: 'Homepage top section', how: 'Swap in the new team photo and update the headline' },
+        files: [], client_action_request: null, user_guide: null, messages: [], submitted_at: iso(12), updated_at: iso(9) },
+    ],
+    offers: [
+      { id: 'of-1', client_id: CID, title: 'Youth Academy U12', sort_order: 1, status: 'live', created_at: iso(50) },
+      { id: 'of-2', client_id: CID, title: 'Elite Training U16', sort_order: 2, status: 'live', created_at: iso(50) },
+      { id: 'of-3', client_id: CID, title: 'Summer Camps', sort_order: 3, status: 'live', created_at: iso(30) },
+    ],
+    locations: [
+      { id: 'loc-1', client_id: CID, title: 'Northside Main Gym', sort_order: 1, created_at: iso(50) },
+      { id: 'loc-2', client_id: CID, title: 'Eastview Court 2', sort_order: 2, created_at: iso(50) },
+    ],
+    resource_categories: [
+      { id: 'rc-1', name: 'Getting Started', title: 'Getting Started', sort_order: 1 },
+      { id: 'rc-2', name: 'Playbooks', title: 'Playbooks', sort_order: 2 },
+    ],
+    resources: [
+      { id: 'rs-1', title: 'Welcome to your portal', description: 'A 5 minute walkthrough of every tab.', category_id: 'rc-1', created_at: iso(20), resource_files: [] },
+      { id: 'rs-2', title: 'Running a great free trial', description: 'The follow-up playbook our top academies use.', category_id: 'rc-2', created_at: iso(10), resource_files: [] },
+    ],
+    client_assets: [
+      { id: 'as-1', client_id: CID, source: 'upload', kind: 'image', name: 'team-photo-2026.jpg', title: 'Team photo 2026', url: AV('Team Photo', '#31405a'), mime: 'image/jpeg', size: 482000, created_at: iso(8) },
+      { id: 'as-2', client_id: CID, source: 'upload', kind: 'image', name: 'summer-camp-flyer.png', title: 'Summer camp flyer', url: AV('Camp Flyer', '#523a2e'), mime: 'image/png', size: 861000, created_at: iso(5) },
+    ],
+    staff: [], offer_teams: [], offer_files: [], member_files: [], stage_transitions: [],
+    action_items: [], device_tokens: [], 'Questions Database': [],
+  };
+
+  // ── /api fixtures ──
+  const MEMBERS = [
+    ['Jayden Cole', 'Marcus Cole', 'live', 'consistent'], ['Maya Thompson', 'Denise Thompson', 'live', 'consistent'],
+    ['Zion Walker', 'Andre Walker', 'live', 'at_risk'], ['Aaliyah Brooks', 'Tanya Brooks', 'live', 'consistent'],
+    ['Elijah Reed', 'Sam Reed', 'live', 'at_risk'], ['Nova Bennett', 'Chris Bennett', 'live', 'consistent'],
+    ['Isaiah Grant', 'Paula Grant', 'paused', 'at_risk'], ['Skye Morgan', 'Jordan Morgan', 'payment_failed', 'at_risk'],
+    ['Carter Hayes', 'Nicole Hayes', 'cancelling', 'at_risk'], ['Amara Diallo', 'Fatou Diallo', 'pending', 'consistent'],
+  ].map((m, i) => ({
+    id: 'mb-' + (i + 1), athlete_name: m[0], parent_name: m[1], status: m[2], engagement: m[3],
+    offer: i % 3 === 0 ? 'Elite Training U16' : 'Youth Academy U12', plan: 'Monthly',
+    pricing: i % 3 === 0 ? '$329/mo' : '$249/mo', stripe_price_id: 'price_mock_' + (i % 3),
+    trainer: i % 2 === 0 ? 'Coach Dre' : 'Coach Simone', avatar_url: AV(m[0]),
+    ghl_contact_id: 'ct-' + (i + 1), billing_portal_owned: true,
+    email: m[1].toLowerCase().replace(/\s+/g, '.') + '@example.com', phone: '+1416555' + String(1000 + i),
+    created_at: iso(40 - i * 3), start_date: iso(40 - i * 3),
+  }));
+  // Canonical V2 training-pipeline stage names: _plStageBot() maps them to the
+  // agent lanes (Responded=Booking, Scheduled Trial=Confirm, Done Trial=Closing,
+  // Interested=Ghosted, Won=Member) so the sales board renders like BAM GTA.
+  const STAGES = [
+    { id: 'st-1', name: 'New Lead' }, { id: 'st-2', name: 'Responded' }, { id: 'st-3', name: 'Scheduled Trial' },
+    { id: 'st-4', name: 'Done Trial' }, { id: 'st-5', name: 'Interested' }, { id: 'st-6', name: 'Won' },
+  ];
+  const OPPS = [
+    ['Jordan Price', 'st-1', 'Micah Price'], ['Riley Chen', 'st-1', 'Lucas Chen'],
+    ['Sasha Adams', 'st-2', 'Deja Adams'], ['Malik Turner', 'st-2', 'Malik Turner Jr'], ['Devon Ellis', 'st-2', 'Trey Ellis'],
+    ['Kira Patel', 'st-3', 'Arjun Patel'], ['Leo Sanders', 'st-3', 'Eli Sanders'], ['Tia Roberts', 'st-3', 'Jade Roberts'],
+    ['Andre Boyd', 'st-4', 'AJ Boyd'], ['Nina Flores', 'st-4', 'Mateo Flores'],
+    ['Owen Marsh', 'st-5', 'Cole Marsh'], ['Zara Quinn', 'st-6', 'Noor Quinn'],
+  ].map((o, i) => ({
+    id: 'op-' + (i + 1), name: o[0], contactName: o[0], contactId: 'lead-' + (i + 1), stageId: o[1],
+    contact: { id: 'lead-' + (i + 1), name: o[0], phone: '+1416555' + String(2000 + i), email: o[0].toLowerCase().replace(/\s+/g, '.') + '@example.com' },
+    athlete: o[2], trialDate: (o[1] === 'st-3' || o[1] === 'st-4') ? iso(-(i % 4)) : null,
+    status: 'open', monetaryValue: 249, dateAdded: iso(i), source: i % 2 ? 'Instagram' : 'Website',
+  }));
+  const BAM_THREAD = [
+    { id: 'bm-1', body: 'Hey Alex! The new camp landing page is live. Can you give it a quick look?', author_staff_id: 'staff-1', author_auth_user_id: null, files: [], created_at: iso(1, 4), edited_at: null, deleted_at: null },
+    { id: 'bm-2', body: 'Looks great. Can we make the header photo the team huddle shot?', author_staff_id: null, author_auth_user_id: 'mock-user-1', files: [], created_at: iso(1, 2), edited_at: null, deleted_at: null },
+    { id: 'bm-3', body: 'Done! Swapped it in and republished. Anything else before we push the ads?', author_staff_id: 'staff-1', author_auth_user_id: null, files: [], created_at: iso(0, 5), edited_at: null, deleted_at: null },
+    { id: 'bm-4', body: 'That is everything, thanks team!', author_staff_id: null, author_auth_user_id: 'mock-user-1', files: [], created_at: iso(0, 4), edited_at: null, deleted_at: null },
+  ];
+  const CONVOS = [
+    ['Denise Thompson', 'Sounds good, Maya will be at practice Thursday!', 'inbound', 2, 'member', 'Maya Thompson'],
+    ['Jordan Price', 'What time do U12 trials run on Saturdays?', 'inbound', 1, 'lead', null],
+    ['Sam Reed', 'Can we switch Elijah to the 6pm group next month?', 'inbound', 1, null, 'Elijah Reed'],
+    ['Riley Chen', 'Thanks! Just booked the free trial for this weekend.', 'inbound', 0, 'lead', null],
+    ['Marcus Cole', 'Payment went through, thanks for the quick help.', 'inbound', 0, 'member', 'Jayden Cole'],
+    ['Kira Patel', 'Is there parking at the Northside gym?', 'inbound', 0, 'lead', null],
+    ['Nicole Hayes', 'We will finish out the month then pause for summer.', 'inbound', 0, null, 'Carter Hayes'],
+    ['Tanya Brooks', 'Aaliyah loved the shooting clinic last week!', 'inbound', 0, 'member', 'Aaliyah Brooks'],
+    ['Sasha Adams', 'Do you have anything on Saturday mornings for Deja?', 'inbound', 1, 'lead', null, 'lead-3'],
+    ['Andre Boyd', 'AJ had a blast at the trial yesterday!', 'inbound', 0, 'lead', null, 'lead-9'],
+  ].map((c, i) => ({
+    id: 'cv-' + (i + 1), contactId: c[6] || 'ct-cv-' + (i + 1), contactName: c[0], fullName: c[0],
+    lastMessageBody: c[1], lastMessageDate: iso(0, i * 5 + 1), lastMessageDirection: c[2],
+    lastMessageType: 'TYPE_SMS', unreadCount: c[3], classification: c[4], matched_member_name: c[5],
+  }));
+  const THREAD = (name) => ([
+    { id: 'm-1', direction: 'inbound', body: 'Hi! ' + (name || 'A parent') + ' here, quick question about the schedule.', dateAdded: iso(0, 5), type: 'TYPE_SMS', status: 'delivered' },
+    { id: 'm-2', direction: 'outbound', body: 'Of course! Happy to help, what do you need?', dateAdded: iso(0, 4), type: 'TYPE_SMS', status: 'delivered' },
+    { id: 'm-3', direction: 'inbound', body: 'What time do U12 sessions run on Saturdays?', dateAdded: iso(0, 3), type: 'TYPE_SMS', status: 'delivered' },
+    { id: 'm-4', direction: 'outbound', body: 'Saturdays are 9am to 10:30am at Northside Main Gym. Doors open 15 min early.', dateAdded: iso(0, 2), type: 'TYPE_SMS', status: 'delivered' },
+    { id: 'm-5', direction: 'inbound', body: 'Perfect. Is this Saturday open for U12 girls?', dateAdded: iso(0, 1), type: 'TYPE_SMS', status: 'delivered' },
+  ]);
+  // Hawkeye: agent-drafted actions waiting on the owner. `ghl_contact_id`s
+  // match OPPS contactIds so the sales board stages glow for the same leads.
+  const HAWK_READY = [
+    { id: 'apx-1', kind: 'reply', status: 'pending', contact_name: 'Sasha Adams', ghl_contact_id: 'lead-3', ghl_conversation_id: 'cv-apx-1', reply_count: 3, confidence: 0.92, goal: 'Book the free trial',
+      draft_message: 'Hey Sasha! Coach Dre has two U12 spots left this Saturday at 9am. Want me to lock one in for Deja?',
+      reasoning: 'Lead asked about weekend times in her last message. Saturday 9am has open capacity and matches Deja\'s age group.' },
+    { id: 'apx-2', kind: 'reply', status: 'pending', contact_name: 'Andre Boyd', ghl_contact_id: 'lead-9', ghl_conversation_id: 'cv-apx-2', reply_count: 5, confidence: 0.84, goal: 'Close post-trial',
+      draft_message: 'AJ looked great out there yesterday! Coach Dre thinks the U16 Elite group is the right fit. Want me to send over the enrollment link so he keeps the momentum?',
+      reasoning: 'Trial completed yesterday, parent replied positively. Best window to close is within 24 hours of the trial.' },
+    { id: 'apx-3', kind: 'reply', status: 'pending', contact_name: 'Nina Flores', ghl_contact_id: 'lead-10', ghl_conversation_id: 'cv-apx-3', reply_count: 4, confidence: 0.48, goal: 'Close post-trial',
+      escalate: true, escalate_reason: 'Asked for a sibling discount - no discount policy is configured for this academy.',
+      draft_message: 'Great question! Let me check with the team on sibling pricing and get right back to you today.',
+      reasoning: 'Parent asked about enrolling both kids with a discount. I do not have pricing authority, so this needs a human call.' },
+    { id: 'apx-4', kind: 'book', status: 'pending', contact_name: 'Malik Turner', ghl_contact_id: 'lead-4', ghl_conversation_id: 'cv-apx-4', confidence: 0.9, goal: 'Confirm the trial booking',
+      book_slot_at: iso(-1, -2), book_group: 'U16 Elite - Tuesday 6:00 PM', booking_asks: 'Confirmed Tuesday works, asked what Malik Jr should bring',
+      draft_message: 'You are all set for Tuesday 6pm at Northside Main Gym! Bring water and indoor shoes - doors open 15 minutes early.',
+      reasoning: 'Lead confirmed the Tuesday slot in their last message, so I prepared the booking.' },
+    { id: 'apx-5', kind: 'ghost', status: 'pending', contact_name: 'Owen Marsh', ghl_contact_id: 'lead-11',
+      reasoning: 'Said they were interested, then went quiet 6 days ago. Two nudges sent, no reply. Recommend one last touch or mark lost.' },
+    { id: 'apx-6', kind: 'ghost', status: 'pending', contact_name: 'Devon Ellis', ghl_contact_id: 'lead-5',
+      reasoning: 'Opened the trial booking link twice but never picked a time. Last reply 5 days ago.' },
+    { id: 'apx-7', kind: 'mark_lost', status: 'pending', contact_name: 'Marcus Webb', ghl_contact_id: 'lead-13',
+      lost_reason: 'Unreachable for 3 weeks: 6 texts undelivered, 2 calls no answer.',
+      reasoning: 'No working contact channel. Keeping him on the board skews your pipeline numbers.' },
+  ];
+  const HAWK_FU = [
+    { id: 'fu-1', status: 'pending', contact_name: 'Kira Patel', ghl_contact_id: 'lead-6', scheduled_at: iso(-1),
+      draft_message: 'Hey Kira! Quick reminder about Arjun\'s trial this Saturday at 9am. Doors open 8:45 - see you there!' },
+    { id: 'fu-2', status: 'pending', contact_name: 'Tia Roberts', ghl_contact_id: 'lead-8', scheduled_at: iso(-2),
+      draft_message: 'Hi Tia! Just checking in before Jade\'s trial Thursday. Want me to send the parking info?' },
+    { id: 'fu-3', status: 'pending', contact_name: 'Leo Sanders', ghl_contact_id: 'lead-7', scheduled_at: iso(0, 3),
+      draft_message: 'Following up on Eli\'s trial from Sunday - how did he like the session? Coach Simone saved him a spot in the Tuesday group.' },
+  ];
+  const PERIODS = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(NOW); d.setMonth(d.getMonth() - (11 - i));
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const leads = 24 + ((i * 7) % 18); const spend = 620 + ((i * 53) % 240);
+    return { key, month: key, spend, leads, cpl: +(spend / leads).toFixed(2), impressions: 41000 + i * 900, clicks: 820 + i * 40, trials: Math.round(leads * 0.55), members: Math.round(leads * 0.2) };
+  });
+
+  // ── /api router ──
+  const DEFAULT_API = {
+    ok: true, items: [], data: [], rows: [], members: [], conversations: [], messages: [],
+    campaigns: [], tickets: [], requests: [], pipelines: [], periods: [], events: [],
+    calendars: [], entry_points: [], milestones: [], contacts: [], fields: [], notes: [],
+    ready: [], followups: [], reignitions: [], mutes: [], lessons: [],
+    count: 0, unread: 0, total: 0,
+  };
+  function mockApi(u, init) {
+    const p = u.pathname, q = u.searchParams;
+    let act = '';
+    try { act = JSON.parse((init && init.body) || '{}').action || ''; } catch (_) {}
+    // ── Hawkeye (agent approval queues; action rides in the POST body) ──
+    if (p === '/api/agent-config') return act === 'get-mode' ? { mode: 'approve' } : { ok: true };
+    if (p === '/api/agent-followups') return act === 'list' ? { followups: HAWK_FU } : { ok: true };
+    if (p === '/api/agent-approvals') {
+      if (act === 'list-ready') return { ready: HAWK_READY };
+      if (act === 'list-reignitions') return { reignitions: [] };
+      return { ok: true, ready: [], followups: [], reignitions: [] };
+    }
+    if (p === '/api/agent-confirm') return act === 'list-ready' ? { ready: HAWK_READY.filter(r => r.kind === 'book') } : { ok: true };
+    if (p === '/api/agent-closing') return act === 'list-ready' ? { ready: HAWK_READY.filter(r => r.id === 'apx-2' || r.id === 'apx-3') } : { ok: true };
+    if (p === '/api/members') return { members: MEMBERS, ghl: { status: 'connected' }, stripe: { status: 'connected' }, sorter: null, subs_to_cancel: 0, coachiq: { enabled: false, signup_url: null } };
+    if (p === '/api/ghl/pipelines') return {
+      pipelines: [
+        { id: 'pl-1', name: 'Training Pipeline', stages: STAGES, opportunities: OPPS },
+      ],
+      totals: {}, entry_points: [],
+    };
+    if (p === '/api/messages') {
+      if (q.get('action') === 'list-conversations') return {
+        conversations: [{ id: 'bam-conv-1', client_id: CID, business_name: 'Northside Hoops Academy', last_message_preview: 'That is everything, thanks team!', last_message_at: iso(0, 4), has_unread: false }],
+      };
+      if (q.get('conversation_id')) return { messages: BAM_THREAD, directory: null };
+      return { ok: true, conversations: [], messages: [], count: 0, unread: 0 };
+    }
+    if (p === '/api/ghl/inbox') {
+      if (q.get('conversation_id')) return { messages: THREAD(), conversation: CONVOS.find(c => c.id === q.get('conversation_id')) || null };
+      // Hawkeye deck hydrates the on-card conversation preview by contact_id.
+      if (q.get('contact_id')) {
+        const card = HAWK_READY.find(r => r.ghl_contact_id === q.get('contact_id'));
+        return { messages: THREAD(card ? card.contact_name : null).map(m => ({ ...m, date: m.dateAdded })) };
+      }
+      if (q.get('action') === 'sender-info') return { ok: true, name: 'Northside Hoops Academy', phone: '+14165550100', email: 'team@northsidehoops.com' };
+      if (q.get('action')) return { ok: true };
+      return { conversations: CONVOS };
+    }
+    if (p.startsWith('/api/marketing')) {
+      if (q.get('resource') === 'meta-report') return { periods: PERIODS };
+      return { ...DEFAULT_API };
+    }
+    if (p === '/api/action-items') return { items: [], team: [], sm: null, mktg: null, ads: null, review_ready: false };
+    if (p === '/api/kpis-v15') return { ...DEFAULT_API };
+    return null;
+  }
+  const _realFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    try {
+      const raw = typeof input === 'string' ? input : (input && input.url) || '';
+      const u = new URL(raw, location.origin);
+      if (u.origin === location.origin && u.pathname.startsWith('/api/')) {
+        const body = mockApi(u, init) || { ...DEFAULT_API };
+        return Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+    } catch (_) { /* fall through to real fetch */ }
+    return _realFetch(input, init);
+  };
+
+  // ── Fake Supabase client (chainable query builder over T) ──
+  let _seq = 0;
+  function builder(table) {
+    const st = { rows: (T[table] || []).map(r => ({ ...r })), single: false };
+    const b = {};
+    const pass = () => b;
+    ['gt', 'lt', 'gte', 'lte', 'like', 'ilike', 'or', 'not', 'filter', 'match', 'overlaps', 'textSearch', 'csv', 'abortSignal', 'select', 'throwOnError'].forEach(k => { b[k] = pass; });
+    b.eq = (c, v) => { st.rows = st.rows.filter(r => r[c] === undefined ? true : r[c] === v); return b; };
+    b.neq = (c, v) => { st.rows = st.rows.filter(r => r[c] === undefined ? true : r[c] !== v); return b; };
+    b.is = (c, v) => { st.rows = st.rows.filter(r => (r[c] === undefined ? null : r[c]) === v); return b; };
+    b.in = (c, vs) => { st.rows = st.rows.filter(r => r[c] === undefined ? true : (vs || []).includes(r[c])); return b; };
+    b.contains = (c, vs) => { st.rows = st.rows.filter(r => Array.isArray(r[c]) ? (Array.isArray(vs) ? vs : [vs]).every(v => r[c].includes(v)) : true); return b; };
+    b.order = (c, o) => { const asc = !o || o.ascending !== false; st.rows.sort((x, y) => ((x[c] > y[c]) ? 1 : (x[c] < y[c]) ? -1 : 0) * (asc ? 1 : -1)); return b; };
+    b.limit = (n) => { st.rows = st.rows.slice(0, n); return b; };
+    b.range = (a, z) => { st.rows = st.rows.slice(a, z + 1); return b; };
+    b.single = () => { st.single = true; return b; };
+    b.maybeSingle = () => { st.single = true; return b; };
+    b.insert = (p) => { const arr = (Array.isArray(p) ? p : [p]).map(r => ({ id: table + '-new-' + (++_seq), created_at: new Date().toISOString(), ...r })); (T[table] = T[table] || []).push(...arr); st.rows = arr.map(r => ({ ...r })); return b; };
+    b.upsert = (p) => b.insert(p);
+    b.update = (p) => { st.rows = st.rows.map(r => ({ ...r, ...p })); return b; };
+    b.delete = () => { st.rows = []; return b; };
+    b.then = (res, rej) => Promise.resolve({
+      data: st.single ? (st.rows[0] !== undefined ? st.rows[0] : null) : st.rows,
+      error: null, count: st.rows.length,
+    }).then(res, rej);
+    return b;
+  }
+  const storageBucket = {
+    getPublicUrl: (p) => ({ data: { publicUrl: AV(String(p).split('/').pop() || 'File', '#2c3242') } }),
+    createSignedUrl: async (p) => ({ data: { signedUrl: AV(String(p).split('/').pop() || 'File', '#2c3242') }, error: null }),
+    createSignedUrls: async (ps) => ({ data: (ps || []).map(p => ({ path: p, signedUrl: AV(String(p).split('/').pop() || 'File', '#2c3242') })), error: null }),
+    upload: async (p) => ({ data: { path: p }, error: null }),
+    list: async () => ({ data: [], error: null }),
+    download: async () => ({ data: new Blob(['mock'], { type: 'text/plain' }), error: null }),
+    remove: async () => ({ data: [], error: null }),
+  };
+  const channelStub = () => ({
+    on() { return this; },
+    subscribe(cb) { try { cb && cb('SUBSCRIBED'); } catch (_) {} return this; },
+    unsubscribe() { return Promise.resolve('ok'); },
+    send() { return Promise.resolve('ok'); }, track() { return Promise.resolve('ok'); }, untrack() { return Promise.resolve('ok'); },
+  });
+  window.__MockSb = () => ({
+    auth: {
+      getSession: async () => ({ data: { session: SESSION }, error: null }),
+      getUser: async () => ({ data: { user: USER }, error: null }),
+      onAuthStateChange: (cb) => { setTimeout(() => { try { cb('INITIAL_SESSION', SESSION); } catch (_) {} }, 0); return { data: { subscription: { unsubscribe() {} } } }; },
+      signInWithPassword: async () => ({ data: { session: SESSION, user: USER }, error: null }),
+      signOut: async () => ({ error: null }),
+      updateUser: async () => ({ data: { user: USER }, error: null }),
+      resetPasswordForEmail: async () => ({ data: {}, error: null }),
+      refreshSession: async () => ({ data: { session: SESSION }, error: null }),
+      setSession: async () => ({ data: { session: SESSION }, error: null }),
+    },
+    from: (t) => builder(t),
+    storage: { from: () => storageBucket },
+    channel: channelStub,
+    removeChannel: () => Promise.resolve('ok'),
+    removeAllChannels: () => Promise.resolve('ok'),
+    getChannels: () => [],
+    rpc: async () => ({ data: null, error: null }),
+    functions: { invoke: async () => ({ data: {}, error: null }) },
+  });
+  console.info('[mock] Client portal mock mode active - fake data, no auth, no network writes.');
+})();
+</script>
+<script>
   window.sentryOnLoad = function () {
     var prodHosts = ["portal.byanymeansbusiness.com", "fullcontrol.vercel.app"];
     var isProductionHost = prodHosts.indexOf(window.location.hostname) !== -1;
@@ -3723,6 +4049,15 @@
     max-width: 1120px; width: min(1120px, 96vw); max-height: none;
     margin: 28px auto 48px; background: transparent; border: none; box-shadow: none;
   }
+  /* The Hawkeye/sales focus page is a full page, not a centered dialog or a
+     mobile bottom sheet. Anchor to the TOP and let the page scroll: both
+     flex-centering (desktop) and the mobile bottom-sheet align-items:flex-end
+     pushed a tall deck card's top above the viewport with no way to scroll up
+     (flex overflow above the container start is unreachable). Zoran 2026-07-16.
+     SCOPED to #salesMachineModal on purpose: the other .mm-focus-page overlays
+     (marketing / members / blueprint machines) share this latent mobile bug but
+     weren't in scope here - fix them in a dedicated pass, not silently. */
+  #salesMachineModal.mm-focus-page.modal-backdrop { align-items: flex-start; overflow-y: auto; }
   /* focus pages run on the design system: Jakarta UI + Nunito display,
      DM Mono for the telemetry labels (redefines --mono for children) */
   .mm-focus-page { font-family: var(--font-ui); --mono: var(--font-mono); }
@@ -9110,7 +9445,10 @@ Then the call to action."]</div>
         <div id="pl-focus" style="display:none"></div>
         <!-- Hawkeye deck (V2): the single Hawkeye surface - one card at a time. -->
         <style>
-          #pl-hawkeye{max-width:680px;margin:0 auto;padding:4px 0 44px}
+          /* overflow-anchor off: the on-card thread hydrates ~300ms after render
+             and grows the card - scroll anchoring then kept the draft pinned and
+             shoved the card header above the fold (Zoran 2026-07-16). */
+          #pl-hawkeye{max-width:680px;margin:0 auto;padding:4px 0 44px;overflow-anchor:none}
           .hk2-topbar{display:flex;align-items:center;gap:16px;margin:2px 0 14px;flex-wrap:wrap}
           .hk2-back{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;border:1.5px solid var(--border);background:var(--surface);color:var(--text-sub);border-radius:999px;padding:7px 13px 7px 10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
           .hk2-back:hover{color:var(--text);border-color:var(--border-med)}
@@ -9201,6 +9539,25 @@ Then the call to action."]</div>
           .hk2-clear{min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1px dashed var(--border);border-radius:16px;color:var(--text-sub);font-size:13px}
           .hk2-clear b{color:var(--text);font-size:16px}
           .hk2-clear .big{width:56px;height:56px;border-radius:50%;background:rgba(76,199,106,.14);color:var(--green,#4CC76A);display:flex;align-items:center;justify-content:center;font-size:26px}
+          /* Phones: the deck's desktop min-height left the absolutely-positioned
+             "behind" card poking out as an empty shell under short cards
+             (Zoran 2026-07-16). Let the deck hug the top card instead, and
+             center the card content - the right-hanging 92% chat bubble read
+             as "outside" at phone width, so the draft goes full-width. */
+          @media(max-width:640px){
+            .hk2-deck{min-height:0}
+            .hk2-bub{max-width:92%}
+            .hk2-draftwrap{align-items:stretch}
+            .hk2-draft-bubble{width:100%;max-width:100%;align-self:stretch}
+            .hk2-draftcap{align-self:flex-end}
+            .hk2-ctx{text-align:left}
+            /* No stacked-card peek on phones - the faded next-card sliver read
+               as a glitch (Zoran 2026-07-16); "1 of 7" already shows the queue. */
+            .hk2-behind{display:none}
+            /* Shorter thread preview so the card head + draft + actions fit a
+               phone screen; the full conversation is one tap away. */
+            .hk2-thread{max-height:230px}
+          }
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
           .hk2-quietbar{display:flex;align-items:center;gap:7px;margin:0 0 12px;padding:8px 12px;border:1px solid color-mix(in srgb, var(--gold) 45%, transparent);background:color-mix(in srgb, var(--gold) 10%, transparent);color:var(--gold);border-radius:var(--r-8,8px);font-size:12px;font-weight:600}
           .hk2-load{min-height:300px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-sub);font-size:13px}
@@ -19807,7 +20164,10 @@ function _hmInitParallax() {
       const heroH = hero.offsetHeight;
       const progress = Math.min(st / (heroH * 1.5), 1);
       hero.style.opacity = String(1 - progress * 0.7);
-      hero.style.filter = progress > 0.1 ? `blur(${progress * 4}px)` : '';
+      // Scroll blur OFF for now (Zoran 2026-07-16): it only hit the hero, so the
+      // page blurred inconsistently. Revisit with the section recede blur in the
+      // dedicated UI pass. Was: blur(progress*4 px) past progress 0.1.
+      hero.style.filter = '';
       hero.style.transform = `translateY(${progress * -20}px) scale(${1 - progress * 0.03})`;
       ticking = false;
     });
@@ -34675,6 +35035,10 @@ function _sfOpen(which) {
   if (focus && focus.parentElement !== body) body.appendChild(focus);
   if (hawk) hawk.style.display = which === 'hawkeye' ? '' : 'none';
   if (focus) focus.style.display = which === 'focus' ? '' : 'none';
+  // The deck brings its own Back inline with the Hawkeye title - the modal's
+  // floating Back would double up on its own row above it (Zoran 2026-07-16).
+  const mmBack = document.querySelector('#salesMachineModal .mm-back-btn');
+  if (mmBack) mmBack.style.display = which === 'hawkeye' ? 'none' : '';
   const already = !!_SF_OPEN;
   _SF_OPEN = which;
   if (!already) {
@@ -34870,7 +35234,14 @@ async function _hk2HydrateThread() {
     const j = await _safeJson(resp);
     if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
     const msgs = (j.messages || []).filter(m => (m.body || '').trim()).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    r.thread_tail = msgs.slice(-4).map(m => ({ role: (m.direction || '').toLowerCase() === 'outbound' ? 'agent' : 'parent', text: m.body }));
+    // Start the preview at OUR last message: what we said last + everything
+    // the lead sent since is the beat the draft answers - older history is
+    // noise on the card (Zoran 2026-07-16). No outbound yet (brand-new lead)
+    // falls back to their last 2. Capped at 4 bubbles either way.
+    let _lastOut = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) { if ((msgs[i].direction || '').toLowerCase() === 'outbound') { _lastOut = i; break; } }
+    const _win = (_lastOut >= 0 ? msgs.slice(_lastOut) : msgs.slice(-2)).slice(-4);
+    r.thread_tail = _win.map(m => ({ role: (m.direction || '').toLowerCase() === 'outbound' ? 'agent' : 'parent', text: m.body }));
   } catch (_) { r.thread_tail = r.thread_tail || []; }
   // The owner may have skipped / resolved this card while the fetch was in flight.
   const el = document.getElementById('hk2-thread-slot');
@@ -35290,6 +35661,22 @@ async function _hk2Poll() {
     if (bar) bar.innerHTML = _hk2TabsHtml();
   }
 }
+// Grow draft/teach textareas to fit their content. Phone widths wrap the text
+// to more lines than the desktop min-height shows, which clipped drafts
+// mid-sentence on mobile (Zoran 2026-07-16). Shared by the Hawkeye deck and
+// the approvals popup; re-fits live while typing.
+function _hkAutosizeDrafts(rootSel) {
+  const fitAll = () => document.querySelectorAll(rootSel + ' textarea').forEach(t => {
+    if (!t.offsetParent) return;   // not laid out (hidden card/panel) - scrollHeight would be 0
+    const fit = () => { if (!t.offsetParent) return; t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; };
+    if (!t._fitWired) { t._fitWired = true; t.addEventListener('input', fit); }
+    fit();
+  });
+  fitAll();
+  // Re-fit next frame: the deck can render mid-transition (focus overlay pan,
+  // card advance) where this frame's layout isn't final yet.
+  requestAnimationFrame(fitAll);
+}
 function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
@@ -35302,10 +35689,13 @@ function _hk2Render(opts) {
     : `${q[1] ? `<div class="hk2-card hk2-behind">${_hk2CardHtml(q[1], 2, q.length, false)}</div>` : ''}
        <div class="hk2-card hk2-top" id="hk2-topcard">${_hk2CardHtml(q[0], 1, q.length, true)}</div>`;
   const quietBar = _HK2.q.quiet ? `<div class="hk2-quietbar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>After hours - approved messages will send ${escapeHTML(_hk2QuietWhen(_HK2.q.quiet.until))}</div>` : '';
-  // In the overlay path (command center on) the outer modal has its own Back. In
-  // the inline path (cc opted out) the deck fills the pipelines view with NO way
-  // back - add an in-deck Back so the user isn't trapped (Zoran 2026-07-10).
-  const inlineBack = (typeof _sfUseOverlay === 'function' && _sfUseOverlay()) ? '' : `<button class="hk2-back" onclick="_hk2Back()" title="Back to Sales"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg> Sales</button>`;
+  // The deck always carries its own Back, sitting in the SAME row as the
+  // Hawkeye title (Zoran 2026-07-16 - the overlay's floating Back sat on its
+  // own row above the title; _sfOpen hides that one while the deck is up).
+  // Label: overlay path returns to wherever the deck was opened from, inline
+  // path returns to the Sales board.
+  const _bkLabel = (typeof _sfUseOverlay === 'function' && _sfUseOverlay()) ? 'Back' : 'Sales';
+  const inlineBack = `<button class="hk2-back" onclick="_hk2Back()" title="Back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg> ${_bkLabel}</button>`;
   host.innerHTML = `
     <div class="hk2-topbar">
       ${inlineBack}
@@ -35319,6 +35709,43 @@ function _hk2Render(opts) {
   // Only Book-it cards have live pickers. Proposal cards show the slot read-only.
   if (top && top._kind === 'book') _hk2EnsureBookOpts();
   _hk2HydrateThread();   // fill the conversation preview if this card carried none
+  _hkAutosizeDrafts('#pl-hawkeye');
+  // A NEW card on top (deck open, approve/skip advance, tab switch) starts in
+  // view from its header - hydrated threads make cards taller than a phone
+  // screen, and staying scrolled mid-card read as "the card is out of view"
+  // (Zoran 2026-07-16). Keyed so same-card re-renders (post-trial form taps,
+  // undo restores of the same card) never yank the scroll.
+  const _topKey = _HK2.agent + ':' + _hk2CardKey(top);
+  if (_HK2._seenTopKey !== _topKey) {
+    _HK2._seenTopKey = _topKey;
+    _hk2ScrollDeckTop();
+  }
+}
+// Land the deck at its header. Uses offsetTop math instead of
+// scrollIntoView: the focus overlay opens with a pan TRANSFORM, and
+// rect-based scrolling mid-animation lands past the card (Zoran's phone
+// opened the deck scrolled to the middle). Layout offsets ignore transforms.
+// Re-asserts twice because the focus page's sections ABOVE the deck render
+// async and grow after the first scroll - but never fights the user: a
+// scrollTop that moved from what we set means they scrolled, so we stop.
+function _hk2ScrollDeckTop() {
+  const run = () => {
+    const host = document.getElementById('pl-hawkeye'); if (!host) return;
+    const page = host.closest('.mm-focus-page.modal-backdrop');
+    if (page) {
+      const y = page.scrollTop + host.getBoundingClientRect().top - page.getBoundingClientRect().top;
+      page.scrollTop = Math.max(0, y - 10);
+      _HK2._deckScrollSet = page.scrollTop;
+    } else {
+      try { host.scrollIntoView({ block: 'start', behavior: 'auto' }); } catch (_) {}
+    }
+  };
+  run();
+  [400, 1000].forEach(ms => setTimeout(() => {
+    const host = document.getElementById('pl-hawkeye'); if (!host) return;
+    const page = host.closest('.mm-focus-page.modal-backdrop'); if (!page) return;
+    if (Math.abs(page.scrollTop - (_HK2._deckScrollSet != null ? _HK2._deckScrollSet : -1)) <= 2) run();
+  }, ms));
 }
 // ── Book-it pickers: the academy's trial calendars + open slots ──
 async function _hk2EnsureBookOpts() {
@@ -38684,6 +39111,7 @@ function _apxRender() {
     }
   }
   body.innerHTML = `<div style="max-width:860px;margin:0 auto">${focusBanner}${inner}</div>`;
+  _hkAutosizeDrafts('#apx-body');
 }
 
 // ── Hawkeye deferred-action engine ──────────────────────────────────────────
@@ -48640,7 +49068,9 @@ function selectMenuItem(el) {
 }
 
 // ── Supabase client ──────────────────────────────────────────────
-const _sb = supabase.createClient(
+// ?mock=1 on localhost/LAN swaps in the fake client from the MOCK MODE
+// block in <head> - full UI, fake data, no auth (dev styling loop).
+const _sb = (window.__MOCK__ && window.__MockSb) ? window.__MockSb() : supabase.createClient(
   'https://jnojmfmpnsfmtqmwhopz.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impub2ptZm1wbnNmbXRxbXdob3B6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjI1ODQsImV4cCI6MjA5MDE5ODU4NH0.8vUj-MHg73yUtQR5i3VAbgrTyjvmTCMM6-U3mGxbGGo'
 );
@@ -52718,7 +53148,10 @@ function _ccInitRecede(root, secs) {
         if (p > 0.01) {
           s.classList.add('cc-recede');
           s.style.opacity = String(1 - 0.55 * p);
-          s.style.filter = 'blur(' + (4 * p).toFixed(1) + 'px)';
+          // Scroll blur OFF for now (Zoran 2026-07-16): with the hero parallax
+          // blur it read as "only the first thing blurs". Recede keeps the fade +
+          // slide; re-decide blur in the dedicated UI pass. Was: blur(4p px).
+          s.style.filter = '';
           s.style.transform = 'translateY(' + (-14 * p).toFixed(1) + 'px) scale(' + (1 - 0.035 * p).toFixed(3) + ')';
         } else if (s.classList.contains('cc-recede')) {
           s.style.opacity = ''; s.style.filter = ''; s.style.transform = '';
@@ -57561,7 +57994,8 @@ window.addEventListener('message', (e) => {
 
 <!-- ── PWA service worker registration ── -->
 <script>
-  if ('serviceWorker' in navigator) {
+  // Skipped in mock mode (?mock=1 dev loop) so stale caches never mask edits.
+  if ('serviceWorker' in navigator && !window.__MOCK__) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('/sw.js?v=2', { scope: '/client-portal.html' })
         .catch(function () { /* PWA install is a progressive enhancement - ignore failures */ });
