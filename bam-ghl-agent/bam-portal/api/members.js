@@ -280,6 +280,24 @@ async function handler(req, res) {
         return res.status(200).json({ ok: true, log: Array.isArray(rows) ? rows : [] });
       }
 
+      // ─── Cancellations feed: powers the members-focus KPI + Actions pages.
+      // Cancelled members are DELETED from `members`, so churn/cancellation
+      // counts must read this append-only table. Returns cancel + pause rows
+      // for the client; the front end windows them by date.
+      if (req.query.action === "cancellations") {
+        const cid = (req.query.client_id || "").toString();
+        if (!cid) return res.status(400).json({ error: "client_id required" });
+        if (!isStaff && !clients.some((c) => c.id === cid)) {
+          return res.status(403).json({ error: "not your client" });
+        }
+        const rows = await sb(
+          `cancellations?client_id=eq.${cid}` +
+          `&select=id,member_id,type,cancel_date,pause_start,pause_end,reason,athlete_name,parent_name,stripe_subscription_id,activated_at,completed_at,created_at` +
+          `&order=created_at.desc&limit=1000`
+        );
+        return res.status(200).json({ ok: true, cancellations: Array.isArray(rows) ? rows : [] });
+      }
+
       // ─── Single member: returns DB row + Stripe detail (for popup) ─
       if (id) {
         const rows = await sb(`members?id=eq.${id}&select=*`);

@@ -35298,6 +35298,16 @@ function _hk2SyncMoveLabels() {
 }
 function _hk2Moves(r) {
   const k = r._kind, m = [];
+  // Post-trial form escape hatch (Zoran 2026-07-16): the trial didn't happen the
+  // normal way (parent pulled out / cancelled before it ran). Close it honestly
+  // WITHOUT faking a "showed up". Rebook is already the "No show" button, so these
+  // are the terminal + park dispositions the form otherwise buried behind
+  // "Showed up -> Not a fit". ptflost/ptfunq route through the post-trial endpoint
+  // (writes the review row so the card stays gone + no attendance KPI); reignite
+  // reuses the normal park flow.
+  if (k === 'form') {
+    return [['Mark lost', 'ptflost'], ['Reignite later', 'reignite'], ['Mark unqualified', 'ptfunq']];
+  }
   // The card's textarea isn't in the DOM yet at render time - label from the
   // prefill on the kinds that show a message box.
   const hasMsg = !!(['reply', 'enroll', 'lost', 'handoff'].includes(k) && String(r.draft_message || '').trim());
@@ -35328,7 +35338,9 @@ function _hk2Moves(r) {
 // (date + future message + optional ack) - the normal confirm flow schedules it.
 function _hk2ReigniteMode() {
   const r = _hk2Top(); if (!r) return;
-  if (r._kind === 'form') return;   // the form card has no moves anyway
+  // Form cards CAN park now (Zoran 2026-07-16): the reignite confirm keys on
+  // contact_id for a synthesized "ptf:" card (see reigReadyId below), so a
+  // post-trial form lead can be circled back on a date instead of closed.
   r._origKind = r._kind;
   r._kind = 'reignite';
   if (!r.reignite_message) r.reignite_message = '';
@@ -35486,11 +35498,13 @@ function _hk2CardHtml(r, pos, total, isTop) {
   // primary button into the two terminal closes (Zoran 2026-07-10).
   const _pp = _HK2.ptf || {};
   const ptfNotFit = isForm && _pp.showed === true && _pp.fit === false;
-  const moves = isForm ? '' : _hk2Moves(r).map(([lab, op]) =>
+  const moves = _hk2Moves(r).map(([lab, op]) =>
     op === 'write' ? `<button class="hk2-x" onclick="_hk2Write()">${lab}</button>`
     : op === 'book' ? `<button class="hk2-x" onclick="_hk2BookMode()">${lab}</button>`
     : op === 'reignite' ? `<button class="hk2-x" onclick="_hk2ReigniteMode()">${lab}</button>`
     : op === 'unreignite' ? `<button class="hk2-x" onclick="_hk2ReigniteBack()">${lab}</button>`
+    : op === 'ptflost' ? `<button class="hk2-x" onclick="_hk2PtfOther('lost')">${lab}</button>`
+    : op === 'ptfunq' ? `<button class="hk2-x" onclick="_hk2PtfOther('unqualified')">${lab}</button>`
     : `<button class="hk2-x" data-op="${op}" data-orig="${escapeHTML(lab)}" onclick="_hk2Move('${op}', this)">${lab}</button>`).join('');
   // Two-line header: athlete on top, parent underneath. No athlete name = fall
   // back to the single contact name + confidence, exactly as before.
@@ -35532,10 +35546,10 @@ function _hk2CardHtml(r, pos, total, isTop) {
     ${ctx ? `<div class="hk2-ctx">${escapeHTML(ctx)}</div>` : ''}
     ${body}
     <input class="hk2-teach"${id.teach} style="display:none" placeholder="Required: why did you change it? If the bot was missing a fact (price, schedule, capacity), include the fact.">
-    ${isForm ? '' : `<div class="hk2-other"${id.other}><div class="hk2-other-in"><span class="hk2-lbl">Move the lead</span>${moves}</div></div>`}
+    <div class="hk2-other"${id.other}><div class="hk2-other-in"><span class="hk2-lbl">${isForm ? 'Other outcomes' : 'Move the lead'}</span>${moves}</div></div>
     <div class="hk2-bar">
       ${(isTop && total > 1) ? `<button class="hk2-skip" onclick="_hk2Skip()" title="Skip for now - moves this card to the back of the queue" aria-label="Skip for now"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8V4z"/><line x1="19" y1="5" x2="19" y2="19"/></svg></button>` : ''}
-      ${isForm ? '' : `<button class="hk2-otherbtn" onclick="_hk2ToggleOther(this)">Other</button>`}
+      <button class="hk2-otherbtn" onclick="_hk2ToggleOther(this)">Other</button>
       ${ptfNotFit
         ? `<button class="hk2-go alt" onclick="_hk2PtfClose('unqualified')">Mark unqualified</button><button class="hk2-go ${km.cls}" onclick="_hk2PtfClose('lost')">Mark lost</button>`
         : `<button class="hk2-go ${km.cls}"${id.go} onclick="_hk2Confirm()">${km.go}</button>`}
@@ -35561,6 +35575,18 @@ function _hk2PtfPick(grp, val) {
 // path. 'unqualified' = quiet dead-end; 'lost' = Lead Nurture takes over.
 function _hk2PtfClose(outcome) {
   if (!_HK2.ptf) _HK2.ptf = {};
+  _HK2.ptf.outcome = outcome === 'lost' ? 'lost' : 'unqualified';
+  _hk2Confirm();
+}
+// Post-trial form "Other outcomes" menu (Zoran 2026-07-16): close a lead whose
+// trial never happened the normal way (parent pulled out / cancelled) WITHOUT
+// recording attendance. showed_up stays null so no trial_attended / no_show KPI is
+// stamped; the backend still writes the review row (retires this form card) and
+// routes lost -> Lead Nurture / unqualified -> quiet dead end. Undo rides the
+// normal defer. Rebook stays on the "No show" button; parking is "Reignite later".
+function _hk2PtfOther(outcome) {
+  if (!_HK2.ptf) _HK2.ptf = {};
+  _HK2.ptf.optedOut = true;
   _HK2.ptf.outcome = outcome === 'lost' ? 'lost' : 'unqualified';
   _hk2Confirm();
 }
@@ -35652,7 +35678,7 @@ function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
   const _t0 = (_HK2.q[_HK2.agent] || [])[0]; if (_t0) { _t0._writeMode = false; _t0._moveArm = null; }
-  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', nsReason: '', nsSeed: '', outcome: null };
+  if (!(opts && opts.keepPtf)) _HK2.ptf = { showed: null, fit: null, link: true, msg: '', notes: '', nsReason: '', nsSeed: '', outcome: null, optedOut: false };
   const tabs = _hk2TabsHtml();
   const q = _HK2.q[_HK2.agent];
   const deck = !q.length
@@ -35882,6 +35908,18 @@ function _hk2Confirm() {
   let ptf = null;
   if (k === 'form') {
     const p = _HK2.ptf || {};
+    // Opted-out close from the "Other outcomes" menu: the trial never happened the
+    // normal way, so NO attendance is recorded (showed_up null). Backend skips the
+    // trial_attended / no_show KPI + SHOWED/NO_SHOW stamp and just runs the close.
+    if (p.optedOut) {
+      ptf = {
+        opportunity_id: r.opportunity_id,
+        showed_up: null, good_fit: false, trainer: '', notes: '',
+        first_message: '', send_onboarding_link: false,
+        rebook_reason: '', rebook_seed: '',
+        outcome: p.outcome === 'lost' ? 'lost' : 'unqualified',
+      };
+    } else {
     // Reset the re-entry latch on every early-return or the card wedges: all later
     // taps hit `if (r._hk2Busy) return` and do nothing (Zoran 2026-07-10).
     if (p.showed !== true && p.showed !== false) { _apxToast('Pick Showed up or No show first', false); r._hk2Busy = false; return; }
@@ -35907,6 +35945,7 @@ function _hk2Confirm() {
       // or lost (Lead Nurture takes over). Backend ignores it unless not-a-fit.
       outcome: notFit ? (p.outcome === 'lost' ? 'lost' : 'unqualified') : undefined,
     };
+    }
   }
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   let undone = false;
@@ -35956,10 +35995,12 @@ function _hk2Confirm() {
       // A terminal write that failed server-side (move_ok / lost_ok / unqualified_ok
       // === false): warn, don't claim success - the review saved (form card gone)
       // but the lead never actually moved/closed, so it must be retried.
-      const notFit = ptf.showed_up === true && ptf.good_fit === false;
+      // A terminal close = "showed up + not a fit" OR an opted-out close (no
+      // attendance). Both read lost_ok / unqualified_ok to warn on a silent fail.
+      const isClose = (ptf.showed_up === true && ptf.good_fit === false) || (ptf.showed_up === null && !!ptf.outcome);
       if (ptf.good_fit && j && j.move_ok === false) throw new Error('Saved, but the move to Done Trial did not land - reopen the card and retry.');
-      if (notFit && ptf.outcome === 'lost' && j && j.lost_ok === false) throw new Error('Saved, but the Lost close did not land - reopen the card and retry.');
-      if (notFit && ptf.outcome !== 'lost' && j && j.unqualified_ok === false) throw new Error("Saved, but the Unqualified close did not land (no post-trial not-a-fit route set up) - use Mark lost, or set up the route.");
+      if (isClose && ptf.outcome === 'lost' && j && j.lost_ok === false) throw new Error('Saved, but the Lost close did not land - reopen the card and retry.');
+      if (isClose && ptf.outcome !== 'lost' && j && j.unqualified_ok === false) throw new Error("Saved, but the Unqualified close did not land (no not-a-fit route set up) - use Mark lost, or set up the route.");
       _apxToast(ptf.showed_up === false ? 'No-show logged - Booking drafts the rebook' : ptf.good_fit ? 'Routed to Done Trial - Closing takes over' : ptf.outcome === 'lost' ? 'Marked lost - Nurture takes over' : 'Closed as unqualified', true);
       // Teach Hawkeye from the no-show reason (best-effort, booking agent). The
       // rebook draft already gets it as per-lead context from the backend; this
@@ -52128,6 +52169,61 @@ function _ccStyle() {
     '.mma-ctx.on{opacity:1}' +
     '.mma-roster-btn{display:none;margin-left:auto;align-items:center;gap:5px;background:transparent;border:1px solid var(--border-med);border-radius:999px;padding:6px 12px;font:inherit;font-size:11px;font-weight:700;color:var(--text-sub);cursor:pointer}' +
     '.mma-roster-btn svg{width:14px;height:14px}' +
+    /* Subject column: Roster | KPIs | Actions pages share the pane area */
+    '.mma-subject{display:flex;flex-direction:column}' +
+    '.mma-seg-bar{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px 9px;border-bottom:1px solid var(--border)}' +
+    '.mma-seg{flex:1;display:flex;background:var(--surface-el);border:1px solid var(--border);border-radius:999px;padding:3px}' +
+    '.mma-seg button{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;background:none;border:none;border-radius:999px;padding:6px 6px;font:inherit;font-size:11.5px;font-weight:700;color:var(--text-sub);cursor:pointer;transition:background .15s,color .15s}' +
+    '.mma-seg button.on{background:var(--gold);color:var(--on-gold)}' +
+    '.mma-seg-n{background:var(--red);color:#fff;border-radius:999px;font-family:var(--mono);font-size:8.5px;padding:1px 6px;line-height:1.4}' +
+    '.mma-seg button.on .mma-seg-n{background:rgba(0,0,0,.25)}' +
+    '.mma-panes{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}' +
+    '.mma-roster{position:relative;flex:1;min-height:0}' +
+    '.mma-kpage,.mma-apage{position:absolute;inset:0;display:none;overflow-y:auto;padding:12px 14px 18px;background:var(--surface)}' +
+    '.mma-subject[data-pane="kpis"] .mma-roster,.mma-subject[data-pane="actions"] .mma-roster{display:none}' +
+    '.mma-subject[data-pane="kpis"] .mma-kpage{display:block}' +
+    '.mma-subject[data-pane="actions"] .mma-apage{display:block}' +
+    '.mma-subject.showing-contact .mma-kpage,.mma-subject.showing-contact .mma-apage{opacity:0;pointer-events:none}' +
+    /* KPI page */
+    '.mma-kp-ranges{display:flex;gap:4px;margin-bottom:10px}' +
+    '.mma-kp-r{flex:1;background:transparent;border:1px solid var(--border-med);border-radius:8px;padding:5px 0;font-family:var(--mono);font-size:10px;color:var(--text-mute);cursor:pointer}' +
+    '.mma-kp-r.on{border-color:var(--gold);color:var(--gold);background:var(--gold-sheen)}' +
+    '.mma-kp-lab{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute)}' +
+    '.mma-kp-hero{background:var(--surface-el);border:1px solid var(--accent-border);border-radius:12px;padding:11px 13px;margin-bottom:8px}' +
+    '.mma-kp-hero-v{font-family:var(--font-num);font-weight:800;font-size:25px;color:var(--text);line-height:1.2}' +
+    '.mma-kp-move{font-size:11.5px;font-weight:700}' +
+    '.mma-kp-det{display:flex;gap:10px;margin-top:4px;font-size:10.5px;color:var(--text-sub)}' +
+    '.mma-kp-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}' +
+    '.mma-kp{background:var(--surface-el);border:1px solid var(--border);border-radius:12px;padding:8px 11px}' +
+    '.mma-kp-v{font-family:var(--font-num);font-weight:800;font-size:17px;color:var(--text);margin-top:1px}' +
+    '.mma-kp-s{font-size:9px;color:var(--text-mute)}' +
+    '.mma-kp-band{display:flex;gap:7px;margin-top:7px}' +
+    '.mma-kp-risk{flex:1;background:var(--red-soft);border:1px solid rgba(240,112,96,.3);border-radius:12px;padding:8px 11px;cursor:pointer;font:inherit;text-align:left}' +
+    '.mma-kp-paused{flex:1;background:var(--surface-el);border:1px solid var(--border);border-radius:12px;padding:8px 11px}' +
+    '.mma-kp-mix{margin-top:12px}' +
+    '.mma-kp-mrow{display:flex;align-items:center;gap:7px;width:100%;font:inherit;font-size:11px;color:var(--text);background:none;border:none;border-radius:8px;padding:3px 3px;margin-bottom:4px;cursor:pointer;text-align:left}' +
+    '.mma-kp-mrow:hover{background:var(--surface-el)}' +
+    '.mma-kp-mnm{flex:none;width:126px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.mma-kp-bdg{flex:none;font-family:var(--mono);font-size:8px;border-radius:999px;padding:1px 6px;letter-spacing:.05em}' +
+    '.mma-kp-bdg.live{color:var(--green);border:1px solid rgba(76,199,106,.4)}' +
+    '.mma-kp-bdg.arch{color:var(--text-mute);border:1px solid var(--border-med)}' +
+    '.mma-kp-bar{flex:1;height:7px;background:var(--surface-hov);border-radius:999px;overflow:hidden}' +
+    '.mma-kp-bar i{display:block;height:100%;background:var(--gold);border-radius:999px}' +
+    '.mma-kp-c{flex:none;font-family:var(--font-num);font-weight:800;font-size:12px;width:22px;text-align:right}' +
+    '.mma-kp-note{font-size:9.5px;color:var(--text-mute);margin-top:7px}' +
+    /* Actions page */
+    '.mma-ai-hd{display:flex;align-items:baseline;gap:7px;margin-bottom:6px}' +
+    '.mma-ai-hd b{font-family:var(--font-num);font-weight:800;font-size:19px;color:var(--text)}' +
+    '.mma-ai-hd span{font-size:10.5px;color:var(--text-sub)}' +
+    '.mma-ai-grp{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;margin:11px 0 6px;color:var(--text-mute)}' +
+    '.mma-ai{display:flex;align-items:center;gap:8px;width:100%;background:var(--surface-el);border:1px solid var(--border);border-radius:12px;padding:8px 10px;margin-bottom:6px;cursor:pointer;text-align:left;font:inherit;color:var(--text)}' +
+    '.mma-ai:hover{background:var(--surface-hov)}' +
+    '.mma-ai-dot{flex:none;width:7px;height:7px;border-radius:50%}' +
+    '.mma-ai-nm{display:block;font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.mma-ai-sub{display:block;font-size:10.5px;color:var(--text-mute);margin-top:1px}' +
+    '.mma-ai-btn{flex:none;border:1px solid var(--accent-border);background:transparent;color:var(--gold);border-radius:8px;padding:5px 9px;font:inherit;font-size:10px;font-weight:700;cursor:pointer}' +
+    '.mma-ai-btn:hover{background:var(--gold-sheen)}' +
+    '.mma-ai-empty{color:var(--text-mute);font-size:11.5px;text-align:center;padding:22px 8px}' +
     '@media(max-width:980px){' +
       '.mma-subject{position:absolute;inset:0;width:auto;z-index:6;transform:translateX(-100%);visibility:hidden;transition:transform .3s ease,visibility 0s linear .3s;min-height:0}' +
       '.mma-subject.mobile-open{transform:none;visibility:visible;transition:transform .3s ease}' +
@@ -53841,21 +53937,34 @@ async function _ccEnsureMembers() {
   try { await fetchAndRenderMembers(); } catch (_) {}
   return _ccRoster();
 }
-// Monthly-equivalent price for a member (catalog rows are tax-inclusive, so
-// MRR/ARPU here are approximations - labeled as such in the UI).
+// Monthly-equivalent price for a member. pricing.interval comes from
+// pricing_catalog and speaks the TERM vocabulary ("4_weeks", "3_months",
+// "6_months", "one_time" - see api/offers/create-price.js termToInterval),
+// not just raw Stripe week/month/year. Decode "N_unit" generically - any
+// term an academy invents later (2_weeks, 9_months, day-based) resolves
+// with no code change - so a $540/3mo commitment reads as $180/mo, not
+// $540/mo, and one_time charges contribute $0 to MRR. (Catalog rows are
+// tax-inclusive, so MRR/ARPU stay approximations - labeled as such.)
 function _ccMonthly(m) {
   const p = m.pricing || {};
   const amt = (p.amount_cents || 0) / 100;
   const iv = String(p.interval || 'month').toLowerCase();
-  if (iv.startsWith('week')) return amt * 4.33;
-  if (iv.startsWith('year')) return amt / 12;
-  return amt;
+  if (iv === 'one_time' || iv === 'onetime' || iv === 'once') return 0;
+  const t = iv.match(/^(\d+)[_ ]?(day|week|month|year)/) || iv.match(/(day|week|month|year)/);
+  const unit = t ? t[t.length - 1] : 'month';
+  const count = (t && t.length === 3 && Number(t[1])) || 1;
+  const perMonth = unit === 'day' ? 30.44 : (unit === 'week' ? 4.33 : (unit === 'year' ? 1 / 12 : 1));
+  return (amt / count) * perMonth;
 }
+// MRR/ARPU count status==='live' ONLY. Cancelling members still bill until
+// period end, but they are leaving - counting them overstates run-rate, so
+// they surface separately as pendingCancel (Zoran's call, 2026-07-16).
 function _ccMemberKpis(roster) {
-  const live = roster.filter(m => m.status === 'live' || m.status === 'cancelling');
+  const live = roster.filter(m => m.status === 'live');
+  const pendingCancel = roster.filter(m => m.status === 'cancelling');
   const paused = roster.filter(m => m.status === 'paused');
   const mrr = live.reduce((s, m) => s + _ccMonthly(m), 0);
-  return { live: live.length, paused: paused.length, mrr, arpu: live.length ? mrr / live.length : 0 };
+  return { live: live.length, pendingCancel: pendingCancel.length, paused: paused.length, mrr, arpu: live.length ? mrr / live.length : 0 };
 }
 async function _ccLoadMemberKpis() {
   const roster = await _ccEnsureMembers();
@@ -53963,22 +54072,30 @@ function _mmaEnsureModal() {
       <div class="modal-card mm-modal-card mma-shell" onclick="event.stopPropagation()">
         <button type="button" class="mm-back-btn" onclick="closeMembersFocus()">&lsaquo; Back</button>
         <div class="mma-split">
-          <aside class="mma-subject" id="mma-subject">
-            <div class="mma-roster" id="mma-roster">
-              <div class="mma-roster-hd">
-                <button type="button" class="mma-roster-close" onclick="_mmaCloseMobileRoster()" aria-label="Back to chat"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Chat</button>
-                <span class="mma-roster-ttl">Roster</span>
-                <span class="mma-roster-cnt" id="mma-roster-cnt"></span>
+          <aside class="mma-subject" id="mma-subject" data-pane="roster">
+            <div class="mma-seg-bar">
+              <button type="button" class="mma-roster-close" onclick="_mmaCloseMobileRoster()" aria-label="Back to chat"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Chat</button>
+              <div class="mma-seg" id="mma-seg">
+                <button type="button" class="on" data-pane="roster" onclick="_mmaSetPane('roster')">Roster</button>
+                <button type="button" data-pane="kpis" onclick="_mmaSetPane('kpis')">KPIs</button>
+                <button type="button" data-pane="actions" onclick="_mmaSetPane('actions')">Actions<span class="mma-seg-n" id="mma-act-n" style="display:none"></span></button>
               </div>
-              <div class="mma-roster-tools">
-                <input class="mma-rsearch" id="mma-rsearch" placeholder="Filter members" oninput="_mmaRenderRoster()" autocomplete="off">
-                <button type="button" class="mma-rfilter" id="mma-rfilter" onclick="_mmaToggleRiskFilter()">At risk</button>
-              </div>
-              <div class="mma-rlist" id="mma-rlist"></div>
+              <span class="mma-roster-cnt" id="mma-roster-cnt"></span>
             </div>
-            <div class="mma-contact" id="mma-contact">
-              <button type="button" class="mma-back" onclick="closeMemberPopup()"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Roster</button>
-              <div class="mma-contact-body"><div id="member-modal-body"></div></div>
+            <div class="mma-panes">
+              <div class="mma-roster" id="mma-roster">
+                <div class="mma-roster-tools">
+                  <input class="mma-rsearch" id="mma-rsearch" placeholder="Filter members" oninput="_mmaRenderRoster()" autocomplete="off">
+                  <button type="button" class="mma-rfilter" id="mma-rfilter" onclick="_mmaToggleRiskFilter()">At risk</button>
+                </div>
+                <div class="mma-rlist" id="mma-rlist"></div>
+              </div>
+              <div class="mma-kpage" id="mma-kpage"><div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading...</div></div>
+              <div class="mma-apage" id="mma-apage"><div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading...</div></div>
+              <div class="mma-contact" id="mma-contact">
+                <button type="button" class="mma-back" onclick="closeMemberPopup()"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Back</button>
+                <div class="mma-contact-body"><div id="member-modal-body"></div></div>
+              </div>
             </div>
           </aside>
           <div class="mma-main">
@@ -54124,7 +54241,12 @@ function openMembersFocus() {
   const orb = document.getElementById('mma-orb');
   if (orb) { orb.classList.remove('wake'); void orb.offsetWidth; orb.classList.add('wake'); }
   _mmaShowRoster();
-  _ccEnsureMembers().then(() => _mmaRenderRoster()).catch(() => {});
+  _ccEnsureMembers().then(() => {
+    _mmaRenderRoster();
+    _mmaUpdateActBadge();
+    if (_MMA_PANE === 'kpis') _mmaRenderKpiPage();
+    if (_MMA_PANE === 'actions') _mmaRenderActionsPage();
+  }).catch(() => {});
   if (!window._MMA_GREETED) {
     window._MMA_GREETED = true;
     _mmaStandup();
@@ -54291,6 +54413,234 @@ function _mmaOpenMobileRoster() {
 function _mmaCloseMobileRoster() {
   document.getElementById('mma-subject')?.classList.remove('mobile-open');
 }
+// ── Subject-column pages: Roster | KPIs | Actions ───────────────────────────
+// The KPI + Actions pages share the roster's left column (Zoran, 2026-07-16).
+// KPIs: training-offer scoped, MTD default window, churn pinned to the last
+// full month. Actions v1 is member-scoped; a future session ties it into the
+// portal-wide action-items system (clients + leads).
+let _MMA_PANE = 'roster';
+let _MMA_KRANGE = 'mtd';
+function _mmaSetPane(p) {
+  const subj = document.getElementById('mma-subject');
+  if (!subj) return;
+  _MMA_PANE = p;
+  if (subj.classList.contains('showing-contact')) { try { closeMemberPopup(); } catch (_) {} }
+  subj.dataset.pane = p;
+  document.querySelectorAll('#mma-seg button').forEach(b => b.classList.toggle('on', b.dataset.pane === p));
+  if (p === 'kpis') _mmaRenderKpiPage();
+  if (p === 'actions') _mmaRenderActionsPage();
+}
+function _mmaSetKpiRange(r) { _MMA_KRANGE = r; _mmaRenderKpiPage(); }
+// Cancellations feed. Cancelled members are DELETED from `members`, so churn
+// and windowed cancellation counts must read the append-only table.
+let _MMA_CANCELS = null, _MMA_CANCELS_AT = 0;
+async function _mmaCancels() {
+  if (_MMA_CANCELS && Date.now() - _MMA_CANCELS_AT < 120000) return _MMA_CANCELS;
+  try {
+    const cid = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? CLIENT_ID : null;
+    if (!cid) { _MMA_CANCELS = []; return _MMA_CANCELS; }
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/members?action=cancellations&client_id=' + encodeURIComponent(cid), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    _MMA_CANCELS = (r.ok && j && Array.isArray(j.cancellations)) ? j.cancellations : [];
+  } catch (_) { _MMA_CANCELS = _MMA_CANCELS || []; }
+  _MMA_CANCELS_AT = Date.now();
+  return _MMA_CANCELS;
+}
+function _mmaJoinT(m) { return new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime(); }
+function _mmaCancelT(c) { return new Date(c.cancel_date || c.created_at || 0).getTime(); }
+function _mmaWindowStart(r) {
+  const now = new Date();
+  if (r === 'mtd') return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const days = r === '7d' ? 7 : (r === '90d' ? 90 : 30);
+  return Date.now() - days * 86400000;
+}
+async function _mmaRenderKpiPage() {
+  const host = document.getElementById('mma-kpage');
+  if (!host) return;
+  const roster = await _ccEnsureMembers();
+  const cancels = await _mmaCancels();
+  if (!Object.keys(_MEMBERS_PRICE_STATUS || {}).length) { try { await _loadMemberPriceStatusMap(); } catch (_) {} }
+  if (_MMA_PANE !== 'kpis') return;
+  if (!roster.length) { host.innerHTML = '<div class="mma-ai-empty">Roster not loaded yet.</div>'; return; }
+  const k = _ccMemberKpis(roster);
+  const start = _mmaWindowStart(_MMA_KRANGE);
+  const rangeLbl = { '7d': 'last 7 days', mtd: 'this month', '30d': 'last 30 days', '90d': 'last 90 days' }[_MMA_KRANGE];
+  const joins = roster.filter(m => _mmaJoinT(m) >= start);
+  const newMrr = joins.reduce((s, m) => s + _ccMonthly(m), 0);
+  const cancelRows = cancels.filter(c => c.type === 'cancel');
+  const cxIn = cancelRows.filter(c => _mmaCancelT(c) >= start);
+  // The cancellations table stores no price, so churned MRR is approximated
+  // at the current avg revenue per member.
+  const churnedMrr = cxIn.length * (k.arpu || 0);
+  const moveNet = newMrr - churnedMrr;
+  const net = joins.length - cxIn.length;
+  // Churn: pinned to the LAST FULL MONTH (Zoran's call). Denominator is the
+  // live count reconstructed at that month's start.
+  const now = new Date();
+  const m0 = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const mPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+  const cxPrevMonth = cancelRows.filter(c => { const t = _mmaCancelT(c); return t >= mPrev && t < m0; }).length;
+  const cxSincePrev = cancelRows.filter(c => _mmaCancelT(c) >= mPrev).length;
+  const joinsSincePrev = roster.filter(m => _mmaJoinT(m) >= mPrev).length;
+  const liveAtPrev = Math.max(1, k.live + k.pendingCancel + cxSincePrev - joinsSincePrev);
+  const churn = cxPrevMonth / liveAtPrev * 100;
+  const churnMonth = new Date(mPrev).toLocaleString('en-US', { month: 'short' });
+  const liveTs = roster.filter(m => m.status === 'live').map(_mmaJoinT).filter(t => t > 0);
+  const tenure = liveTs.length ? liveTs.reduce((s, t) => s + (Date.now() - t), 0) / liveTs.length / (30.44 * 86400000) : 0;
+  const risky = roster.filter(m => m.status === 'payment_failed' || m.status === 'payment_method_required');
+  const riskMrr = risky.reduce((s, m) => s + _ccMonthly(m), 0);
+  const pausedMrr = roster.filter(m => m.status === 'paused').reduce((s, m) => s + _ccMonthly(m), 0);
+  const pcMrr = roster.filter(m => m.status === 'cancelling').reduce((s, m) => s + _ccMonthly(m), 0);
+  const mix = {};
+  roster.forEach(m => {
+    const name = (m.pricing && (m.pricing.display_name || m.pricing.canonical_plan)) || m.plan || 'Unknown plan';
+    const st = (m.stripe_price_id && _MEMBERS_PRICE_STATUS[m.stripe_price_id]) || null;
+    const e = mix[name] || (mix[name] = { n: 0, live: 0, arch: 0 });
+    e.n++; if (st === 'live') e.live++; else if (st === 'legacy') e.arch++;
+  });
+  const mixRows = Object.entries(mix).sort((a, b) => b[1].n - a[1].n).slice(0, 7);
+  const maxN = mixRows.length ? mixRows[0][1].n : 1;
+  const onLive = roster.filter(m => m.stripe_price_id && _MEMBERS_PRICE_STATUS[m.stripe_price_id] === 'live').length;
+  const onArch = roster.filter(m => m.stripe_price_id && _MEMBERS_PRICE_STATUS[m.stripe_price_id] === 'legacy').length;
+  const fmt$ = v => '$' + Math.round(v).toLocaleString();
+  const tile = (lab, val, sub) => '<div class="mma-kp"><div class="mma-kp-lab">' + lab + '</div><div class="mma-kp-v">' + val + '</div>' + (sub ? '<div class="mma-kp-s">' + sub + '</div>' : '') + '</div>';
+  host.innerHTML =
+    '<div class="mma-kp-ranges">' + [['7d', '7D'], ['mtd', 'MTD'], ['30d', '30D'], ['90d', '90D']].map(r =>
+      '<button type="button" class="mma-kp-r' + (_MMA_KRANGE === r[0] ? ' on' : '') + '" onclick="_mmaSetKpiRange(\'' + r[0] + '\')">' + r[1] + '</button>').join('') + '</div>' +
+    '<div class="mma-kp-hero">' +
+      '<div class="mma-kp-lab">MRR &middot; approx, live members only</div>' +
+      '<div style="display:flex;align-items:baseline;gap:9px"><span class="mma-kp-hero-v">' + fmt$(k.mrr) + '</span>' +
+      '<span class="mma-kp-move" style="color:var(--' + (moveNet >= 0 ? 'green' : 'red') + ')">' + (moveNet >= 0 ? '&#8593; +' : '&#8595; -') + fmt$(Math.abs(moveNet)).slice(1) + '</span></div>' +
+      '<div class="mma-kp-det"><span style="color:var(--green)">+' + fmt$(newMrr) + '</span> new <span style="color:var(--red)">-' + fmt$(churnedMrr) + '</span> churned<span style="margin-left:auto;color:var(--text-mute)">' + rangeLbl + '</span></div>' +
+    '</div>' +
+    '<div class="mma-kp-grid">' +
+      tile('Live members', String(k.live)) +
+      tile('Net growth', '<span style="color:var(--' + (net >= 0 ? 'green' : 'red') + ')">' + (net >= 0 ? '+' : '') + net + '</span>') +
+      tile('New members', String(joins.length)) +
+      tile('Cancellations', String(cxIn.length)) +
+      tile('Churn &middot; ' + churnMonth, churn.toFixed(1) + '%', 'always last full month') +
+      tile('Avg revenue / member', fmt$(k.arpu)) +
+      tile('Avg tenure', tenure.toFixed(1) + ' <span style="font-size:11px;color:var(--text-sub)">mo</span>') +
+      tile('Pending cancels', '<span style="color:var(--amber)">' + k.pendingCancel + '</span>' + (pcMrr ? ' <span style="font-size:10px;color:var(--text-sub)">&middot; ' + fmt$(pcMrr) + '/mo</span>' : '')) +
+    '</div>' +
+    '<div class="mma-kp-band">' +
+      '<button type="button" class="mma-kp-risk" onclick="_mmaKpiRiskClick()"><div class="mma-kp-lab" style="color:var(--red)">At risk</div><div class="mma-kp-v" style="color:var(--red);font-size:14px">' + risky.length + ' &middot; ' + fmt$(riskMrr) + '/mo</div><div class="mma-kp-s">tap to see who</div></button>' +
+      '<div class="mma-kp-paused"><div class="mma-kp-lab">Paused</div><div class="mma-kp-v" style="font-size:14px">' + k.paused + ' <span style="font-size:10px;color:var(--text-sub)">&middot; ' + fmt$(pausedMrr) + '/mo parked</span></div></div>' +
+    '</div>' +
+    '<div class="mma-kp-mix"><div class="mma-kp-lab" style="margin-bottom:7px">Plan mix &middot; who\'s on what</div>' +
+      mixRows.map(([name, e]) => {
+        const bdg = e.live >= e.arch && e.live > 0 ? '<span class="mma-kp-bdg live">LIVE</span>' : (e.arch > 0 ? '<span class="mma-kp-bdg arch">ARCHIVED</span>' : '');
+        return '<button type="button" class="mma-kp-mrow" onclick="_mmaKpiMixClick(this)" data-plan="' + escapeHTML(name) + '">' +
+          '<span class="mma-kp-mnm">' + escapeHTML(name) + '</span>' + bdg +
+          '<span class="mma-kp-bar"><i style="width:' + Math.max(4, Math.round(e.n / maxN * 100)) + '%"></i></span>' +
+          '<span class="mma-kp-c">' + e.n + '</span></button>';
+      }).join('') +
+      '<div class="mma-kp-note">' + onLive + ' on live prices &middot; ' + onArch + ' on archived &middot; tap a plan to filter the roster</div>' +
+    '</div>';
+}
+function _mmaKpiRiskClick() {
+  _MMA_RISK_ONLY = true;
+  document.getElementById('mma-rfilter')?.classList.add('on');
+  _mmaSetPane('roster');
+  _mmaRenderRoster();
+}
+function _mmaKpiMixClick(btn) {
+  const inp = document.getElementById('mma-rsearch');
+  _MMA_RISK_ONLY = false;
+  document.getElementById('mma-rfilter')?.classList.remove('on');
+  _mmaSetPane('roster');
+  if (inp) { inp.value = btn?.dataset?.plan || ''; }
+  _mmaRenderRoster();
+}
+// Action items v1 (member-scoped). Money -> Leaving -> Milestones -> Hygiene.
+function _mmaActionItems(roster, cancels) {
+  const items = { money: [], leaving: [], mile: [], hyg: [] };
+  const now = Date.now();
+  roster.forEach(m => {
+    const nm = _ccCapName(m.athlete_name || m.parent_name || 'Member');
+    const amt = Math.round(_ccMonthly(m));
+    const dollars = amt > 0 ? ' &middot; $' + amt.toLocaleString() + '/mo' : '';
+    if (m.status === 'payment_failed') items.money.push({ m, nm, dot: 'var(--red)', sub: 'Payment failed' + dollars + ' at risk', btn: 'Payment link', fn: "mPaymentLink('" + m.id + "')" });
+    if (m.status === 'payment_method_required') items.money.push({ m, nm, dot: 'var(--red)', sub: 'No card on file' + dollars, btn: 'Card link', fn: "mGetCardLink('" + m.id + "')" });
+    if (m.status === 'cancelling') items.leaving.push({ m, nm, dot: 'var(--amber)', sub: 'Cancelling at period end' + dollars + ' - still savable', btn: 'Open card', fn: "openMemberPopup('" + m.id + "')" });
+    if (m.pause_scheduled_for && m.status !== 'paused') items.leaving.push({ m, nm, dot: 'var(--amber)', sub: 'Pause scheduled for ' + m.pause_scheduled_for, btn: 'Open card', fn: "openMemberPopup('" + m.id + "')" });
+  });
+  const byId = new Map(roster.map(m => [m.id, m]));
+  (cancels || []).forEach(c => {
+    if (c.type !== 'pause' || !c.pause_end || c.completed_at) return;
+    const days = Math.ceil((new Date(c.pause_end).getTime() - now) / 86400000);
+    const m = c.member_id ? byId.get(c.member_id) : null;
+    if (m && m.status === 'paused' && days >= 0 && days <= 10) {
+      items.leaving.push({ m, nm: _ccCapName(m.athlete_name || 'Member'), dot: 'var(--amber)', sub: 'Pause ends ' + (days === 0 ? 'today' : 'in ' + days + 'd') + ' - confirm the return', btn: 'Message', fn: "_ccOpenClassic('v15inbox')" });
+    }
+  });
+  roster.forEach(m => {
+    if (m.status !== 'live') return;
+    const nm = _ccCapName(m.athlete_name || m.parent_name || 'Member');
+    const t = _mmaJoinT(m);
+    if (!(t > 0)) return;
+    const daysIn = (now - t) / 86400000;
+    if (daysIn >= 0 && daysIn <= 7) { items.mile.push({ m, nm, dot: 'var(--gold)', sub: 'First week - send a check-in', btn: 'Message', fn: "_ccOpenClassic('v15inbox')" }); return; }
+    for (const mo of [1, 3, 6, 12, 18, 24]) {
+      const anniv = new Date(t); anniv.setMonth(anniv.getMonth() + mo);
+      const d = Math.ceil((anniv.getTime() - now) / 86400000);
+      if (d >= 0 && d <= 14) { items.mile.push({ m, nm, dot: 'var(--gold)', sub: mo + ' months ' + (d === 0 ? 'today' : 'in ' + d + 'd') + ' - good moment for a shoutout', btn: 'Message', fn: "_ccOpenClassic('v15inbox')" }); break; }
+    }
+  });
+  roster.forEach(m => {
+    if (m.status === 'cancelling') return;
+    const issues = [];
+    const st = m.stripe_price_id ? _MEMBERS_PRICE_STATUS[m.stripe_price_id] : null;
+    if (st === 'legacy') issues.push('on archived pricing');
+    if (m.pricing && m.pricing.tier === 'uncatalogued') issues.push('price not in catalog');
+    if (!m.agreement_pdf_path) issues.push('no signed agreement');
+    if (!m.parent_phone && !m.parent_email) issues.push('no contact info');
+    if (issues.length) items.hyg.push({ m, nm: _ccCapName(m.athlete_name || 'Member'), dot: 'var(--text-mute)', sub: issues.join(' &middot; '), btn: 'Open card', fn: "openMemberPopup('" + m.id + "')" });
+  });
+  return items;
+}
+async function _mmaRenderActionsPage() {
+  const host = document.getElementById('mma-apage');
+  if (!host) return;
+  const roster = await _ccEnsureMembers();
+  const cancels = await _mmaCancels();
+  if (!Object.keys(_MEMBERS_PRICE_STATUS || {}).length) { try { await _loadMemberPriceStatusMap(); } catch (_) {} }
+  if (_MMA_PANE !== 'actions') return;
+  if (!roster.length) { host.innerHTML = '<div class="mma-ai-empty">Roster not loaded yet.</div>'; return; }
+  const it = _mmaActionItems(roster, cancels);
+  _mmaUpdateActBadge(it);
+  const tied = it.money.concat(it.leaving).reduce((s, x) => s + _ccMonthly(x.m), 0);
+  const total = it.money.length + it.leaving.length + it.mile.length + it.hyg.length;
+  if (!total) { host.innerHTML = '<div class="mma-ai-empty">Nothing needs you right now. Quiet shift.</div>'; return; }
+  const row = x => '<div class="mma-ai" onclick="openMemberPopup(\'' + x.m.id + '\')">' +
+    '<span class="mma-ai-dot" style="background:' + x.dot + '"></span>' +
+    '<span style="flex:1;min-width:0"><span class="mma-ai-nm">' + escapeHTML(x.nm) + '</span><span class="mma-ai-sub">' + x.sub + '</span></span>' +
+    (x.fn ? '<button type="button" class="mma-ai-btn" onclick="event.stopPropagation();' + x.fn + '">' + x.btn + '</button>' : '') + '</div>';
+  const grp = (label, color, arr) => arr.length ? '<div class="mma-ai-grp" style="color:' + color + '">' + label + '</div>' + arr.map(row).join('') : '';
+  const hygShown = it.hyg.slice(0, 6);
+  const hygMore = it.hyg.length - hygShown.length;
+  host.innerHTML =
+    '<div class="mma-ai-hd"><b>' + total + ' open</b>' + (tied > 0 ? '<span>&middot; $' + Math.round(tied).toLocaleString() + '/mo tied up</span>' : '') + '</div>' +
+    grp('Money &middot; act today', 'var(--red)', it.money) +
+    grp('Leaving &middot; still savable', 'var(--amber)', it.leaving) +
+    grp('Milestones &middot; lock in loyalty', 'var(--gold)', it.mile) +
+    (it.hyg.length ? '<div class="mma-ai-grp">Hygiene &middot; when you have a minute</div>' + hygShown.map(row).join('') +
+      (hygMore > 0 ? '<div class="mma-ai-empty" style="padding:4px 0 0">+ ' + hygMore + ' more in the roster</div>' : '') : '');
+}
+function _mmaUpdateActBadge(precomputed) {
+  const el = document.getElementById('mma-act-n');
+  if (!el) return;
+  const paint = it => {
+    const n = it.money.length + it.leaving.length + it.mile.length;
+    el.textContent = String(n);
+    el.style.display = n ? '' : 'none';
+  };
+  if (precomputed) { paint(precomputed); return; }
+  Promise.all([_ccEnsureMembers(), _mmaCancels()]).then(([roster, cancels]) => {
+    if (roster.length) paint(_mmaActionItems(roster, cancels));
+  }).catch(() => {});
+}
 // ── Tower (GM agent): the boardroom. Rule-based router like Shield's -
 // answers whole-business questions itself, hands specialist asks to the
 // right staff member. Opens from the mobile tab-bar orb (tap = type,
@@ -54434,7 +54784,7 @@ function _gmaSend() {
 }
 async function _gmaHandle(q) {
   const roster = (typeof _ccRoster === 'function') ? _ccRoster() : [];
-  const live = roster.filter(m => m.status === 'live' || m.status === 'cancelling');
+  const live = roster.filter(m => m.status === 'live');
   const mrr = live.reduce((s, m) => s + (typeof _ccMonthly === 'function' ? _ccMonthly(m) : 0), 0);
   const hawk = window._hmHawkTotal || 0;
   if (/business|snapshot|overview|numbers|how.?s (it|things|everything)|today look/.test(q)) {
