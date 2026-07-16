@@ -3,7 +3,7 @@ import { useUrlState } from "../hooks/useUrlState";
 import MarketingOverview from "./MarketingOverview";
 import RefreshCalendarSection from "./RefreshCalendarSection";
 import MediaLightbox from "../components/MediaLightbox";
-import { mlIsMedia } from "../lib/media";
+import { mlIsMedia, mlDownloadUrl } from "../lib/media";
 
 const TYPE_META = {
   replace:           { icon: "🔄", label: "Replace creative" },
@@ -1071,7 +1071,12 @@ function SubmittedFileTile({ f, tk }) {
       }
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{f.name}</span>
       <span
-        onClick={isMedia ? (e) => { e.stopPropagation(); } : undefined}
+        onClick={isMedia ? (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const a = document.createElement("a");
+          a.href = mlDownloadUrl(f); a.download = f.name || "file";
+          document.body.appendChild(a); a.click(); a.remove();
+        } : undefined}
         style={{ color: tk.accent, fontSize: 10, letterSpacing: "0.05em" }}
       >Download ↓</span>
     </a>
