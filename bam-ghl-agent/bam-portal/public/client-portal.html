@@ -43604,29 +43604,39 @@ function _ghlConnectReturnCheck() {
 // Right-side drawer (not centered modal): slides in from the edge,
 // stacks above a dimmed backdrop. Backdrop click closes.
 async function openMemberPopup(memberId, opts = {}) {
-  const host = document.getElementById('member-modal-host');
-  if (!host) return;
-  // Elevated mode: open ABOVE the members focus-chat modal (z 9999) with no
-  // dimming backdrop, so the payment cards in the chat stay visible + clickable
-  // on the left while the contact drawer sits on the right. Close via its own ×.
-  const elevated = !!opts.elevated;
-  const bdZ = elevated ? 10055 : 8900;
-  const drZ = elevated ? 10060 : 8950;
-  const bdStyle = elevated
-    ? `position:fixed;inset:0;background:transparent;z-index:${bdZ};pointer-events:none`
-    : `position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:${bdZ};opacity:0;transition:opacity 0.2s ease`;
-  host.innerHTML = `
-    <div id="member-drawer-backdrop" style="${bdStyle}" onclick="closeMemberPopup()"></div>
-    <div id="member-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:${drZ};overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
-      <div id="member-modal-body" style="padding:28px 28px 36px"><div class="req-empty" style="padding:24px 0"><span class="req-spin"></span>Loading…</div></div>
-    </div>`;
-  // Slide in on next frame so the transition fires.
-  requestAnimationFrame(() => {
-    const bd = document.getElementById('member-drawer-backdrop');
-    const dr = document.getElementById('member-drawer');
-    if (bd) bd.style.opacity = '1';
-    if (dr) dr.style.transform = 'translateX(0)';
-  });
+  // Inside the Shield members focus, the contact opens IN PLACE in the left
+  // subject column (roster swaps to the pinned card) instead of the right-edge
+  // drawer - so the chat stays put on the right. Everywhere else keeps the drawer.
+  const inFocus = !opts.forceDrawer && _mmaFocusOpen();
+  if (inFocus) {
+    if (!_mmaShowContactPane()) return openMemberPopup(memberId, { ...opts, forceDrawer: true });
+    const bodyHost = document.getElementById('member-modal-body');
+    if (bodyHost) bodyHost.innerHTML = `<div class="req-empty"><span class="req-spin"></span>Loading…</div>`;
+  } else {
+    const host = document.getElementById('member-modal-host');
+    if (!host) return;
+    // Elevated mode: open ABOVE the members focus-chat modal (z 9999) with no
+    // dimming backdrop, so the payment cards in the chat stay visible + clickable
+    // on the left while the contact drawer sits on the right. Close via its own ×.
+    const elevated = !!opts.elevated;
+    const bdZ = elevated ? 10055 : 8900;
+    const drZ = elevated ? 10060 : 8950;
+    const bdStyle = elevated
+      ? `position:fixed;inset:0;background:transparent;z-index:${bdZ};pointer-events:none`
+      : `position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:${bdZ};opacity:0;transition:opacity 0.2s ease`;
+    host.innerHTML = `
+      <div id="member-drawer-backdrop" style="${bdStyle}" onclick="closeMemberPopup()"></div>
+      <div id="member-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:${drZ};overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
+        <div id="member-modal-body" style="padding:28px 28px 36px"><div class="req-empty" style="padding:24px 0"><span class="req-spin"></span>Loading…</div></div>
+      </div>`;
+    // Slide in on next frame so the transition fires.
+    requestAnimationFrame(() => {
+      const bd = document.getElementById('member-drawer-backdrop');
+      const dr = document.getElementById('member-drawer');
+      if (bd) bd.style.opacity = '1';
+      if (dr) dr.style.transform = 'translateX(0)';
+    });
+  }
   try {
     const token = await _mreqAuthToken();
     const res = await fetch('/api/members?id=' + encodeURIComponent(memberId), {
@@ -43635,13 +43645,17 @@ async function openMemberPopup(memberId, opts = {}) {
     const json = await _safeJson(res);
     if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
     _renderMemberModalBody(json.member, json.stripe, json.history, json.calls);
+    if (inFocus) _mmaSetContext(json.member && json.member.athlete_name);
   } catch (e) {
     const body = document.getElementById('member-modal-body');
-    if (body) body.innerHTML = `<div style="padding:24px 0;color:#9a3b2f">Couldn't load - ${escapeHTML(e.message)}</div>`;
+    if (body) body.innerHTML = `<div style="padding:24px 18px;color:#9a3b2f">Couldn't load - ${escapeHTML(e.message)}</div>`;
   }
 }
 
 function closeMemberPopup() {
+  // In the Shield focus (no drawer present) the "contact" is the left pane -
+  // closing it means sliding back to the roster list, not tearing down a drawer.
+  if (_mmaFocusOpen() && !document.getElementById('member-drawer')) { _mmaShowRoster(); return; }
   const bd = document.getElementById('member-drawer-backdrop');
   const dr = document.getElementById('member-drawer');
   if (!bd && !dr) {
@@ -51621,7 +51635,7 @@ function _ccStyle() {
     '.gma-floor-ic svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
     '.gma-floor-nm{font-size:12.5px;font-weight:700}' +
     '.gma-floor-st{font-size:11.5px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '.mma-split{display:flex;gap:20px;align-items:stretch}' +
+    '.mma-split{display:flex;gap:20px;align-items:stretch;position:relative}' +
     '.mma-main{flex:1;min-width:0;display:flex;flex-direction:column}' +
     '.mma-rail{width:250px;flex:none;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);align-self:flex-start;position:sticky;top:14px;display:flex;flex-direction:column;gap:8px}' +
     '.mma-bench{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:2px 0 14px;border-bottom:1px solid var(--border);margin-bottom:8px}' +
@@ -51651,6 +51665,49 @@ function _ccStyle() {
     '.mma-pin:hover{border-color:var(--accent-border);transform:translateY(-1px)}' +
     '.mma-pin-t{display:block;font-size:12.5px;font-weight:700;color:var(--text)}' +
     '.mma-pin-s{display:block;font-size:11px;color:var(--text-mute);margin-top:2px}' +
+    /* Shield subject column: roster list <-> pinned contact (separate from Tower rail) */
+    '.mma-subject{width:360px;flex:none;align-self:stretch;position:relative;min-height:440px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);overflow:hidden}' +
+    '.mma-roster{position:absolute;inset:0;display:flex;flex-direction:column;transition:opacity .3s ease,transform .34s cubic-bezier(.34,1.56,.64,1)}' +
+    '.mma-subject.showing-contact .mma-roster{opacity:0;transform:translateX(-14px);pointer-events:none}' +
+    '.mma-roster-hd{display:flex;align-items:center;gap:8px;padding:13px 15px 11px;border-bottom:1px solid var(--border)}' +
+    '.mma-roster-ttl{font-family:var(--font-num);font-weight:800;font-size:15px;color:var(--text)}' +
+    '.mma-roster-cnt{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--text-mute)}' +
+    '.mma-roster-close{display:none;align-items:center;gap:3px;flex:none;background:none;border:none;color:var(--gold);cursor:pointer;font:inherit;font-size:11.5px;font-weight:700;padding:0}' +
+    '.mma-roster-close svg,.mma-back svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}' +
+    '.mma-roster-tools{display:flex;gap:6px;padding:9px 12px 7px}' +
+    '.mma-rsearch{flex:1;min-width:0;background:var(--surface-el);border:1px solid var(--border-med);border-radius:9px;padding:7px 11px;font:inherit;font-size:12px;color:var(--text);outline:none}' +
+    '.mma-rsearch:focus{border-color:var(--gold)}' +
+    '.mma-rfilter{flex:none;background:transparent;border:1px solid var(--border-med);border-radius:9px;padding:6px 11px;font:inherit;font-size:11px;font-weight:700;color:var(--text-sub);cursor:pointer;white-space:nowrap}' +
+    '.mma-rfilter.on{background:var(--red-soft);border-color:transparent;color:var(--red)}' +
+    '.mma-rlist{flex:1;overflow-y:auto;padding:4px 8px 10px}' +
+    '.mma-rrow{display:flex;align-items:center;gap:10px;width:100%;padding:8px;border-radius:10px;cursor:pointer;transition:background .12s;text-align:left;background:none;border:none;font:inherit;color:var(--text)}' +
+    '.mma-rrow:hover{background:var(--surface-el)}' +
+    '.mma-rrow-nm{display:block;font-size:12.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.mma-rrow-sub{display:block;font-size:10.5px;color:var(--text-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}' +
+    '.mma-rrow-dot{flex:none;width:7px;height:7px;border-radius:50%}' +
+    '.mma-rempty{padding:18px 16px;font-size:12px;color:var(--text-mute);text-align:center}' +
+    '.mma-contact{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--surface);opacity:0;transform:translateX(14px);pointer-events:none;transition:opacity .3s ease,transform .34s cubic-bezier(.34,1.56,.64,1)}' +
+    '.mma-subject.showing-contact .mma-contact{opacity:1;transform:none;pointer-events:auto}' +
+    '.mma-back{display:flex;align-items:center;gap:5px;flex:none;background:none;border:none;border-bottom:1px solid var(--border);padding:10px 14px;font:inherit;font-size:11.5px;font-weight:700;color:var(--gold);cursor:pointer;text-align:left}' +
+    '.mma-contact-body{flex:1;overflow-y:auto}' +
+    '.mma-contact .req-empty{padding:24px 18px}' +
+    '.mma-contact #member-modal-body{padding:16px 18px 28px}' +
+    /* Shield chat header (identity moved here from the rail) */
+    '.mma-hd{display:flex;align-items:center;gap:11px;padding:0 0 13px;margin-bottom:8px;border-bottom:1px solid var(--border)}' +
+    '.mma-hd-tx{min-width:0}' +
+    '.mma-hd-nm{font-family:var(--font-num);font-weight:800;font-size:15px;color:var(--text);line-height:1}' +
+    '.mma-hd-role{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-top:3px}' +
+    '.mma-ctx{margin-left:auto;flex:none;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--text-mute);opacity:0;transition:opacity .3s;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.mma-ctx.on{opacity:1}' +
+    '.mma-roster-btn{display:none;margin-left:auto;align-items:center;gap:5px;background:transparent;border:1px solid var(--border-med);border-radius:999px;padding:6px 12px;font:inherit;font-size:11px;font-weight:700;color:var(--text-sub);cursor:pointer}' +
+    '.mma-roster-btn svg{width:14px;height:14px}' +
+    '@media(max-width:980px){' +
+      '.mma-subject{position:absolute;inset:0;width:auto;z-index:6;transform:translateX(-100%);visibility:hidden;transition:transform .3s ease,visibility 0s linear .3s;min-height:0}' +
+      '.mma-subject.mobile-open{transform:none;visibility:visible;transition:transform .3s ease}' +
+      '.mma-roster-close{display:inline-flex}' +
+      '.mma-roster-btn{display:inline-flex}' +
+      '.mma-ctx{display:none}' +
+    '}' +
     '.mma-thread{flex:1;overflow-y:auto;display:flex;flex-direction:column;padding:8px 2px;min-height:300px;max-height:calc(100vh - 320px);-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%);mask-image:linear-gradient(180deg,transparent 0,#000 14%)}' +
     '.mma-bub{transition:opacity .5s ease}' +
     '.mma-bub.past{opacity:.55}' +
@@ -53476,19 +53533,34 @@ function _mmaEnsureModal() {
       <div class="modal-card mm-modal-card mma-shell" onclick="event.stopPropagation()">
         <button type="button" class="mm-back-btn" onclick="closeMembersFocus()">&lsaquo; Back</button>
         <div class="mma-split">
-          <aside class="mma-rail" id="mma-rail">
-            <div class="mma-bench">
-              <span class="mma-orb mma-orb-lg" id="mma-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
-              <div class="mma-bench-name">Shield</div>
-              <div class="mma-bench-role">Member manager</div>
-              <div class="mma-bench-status" id="mma-status">Watching the roster. Ask about a member or a number.</div>
+          <aside class="mma-subject" id="mma-subject">
+            <div class="mma-roster" id="mma-roster">
+              <div class="mma-roster-hd">
+                <button type="button" class="mma-roster-close" onclick="_mmaCloseMobileRoster()" aria-label="Back to chat"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Chat</button>
+                <span class="mma-roster-ttl">Roster</span>
+                <span class="mma-roster-cnt" id="mma-roster-cnt"></span>
+              </div>
+              <div class="mma-roster-tools">
+                <input class="mma-rsearch" id="mma-rsearch" placeholder="Filter members" oninput="_mmaRenderRoster()" autocomplete="off">
+                <button type="button" class="mma-rfilter" id="mma-rfilter" onclick="_mmaToggleRiskFilter()">At risk</button>
+              </div>
+              <div class="mma-rlist" id="mma-rlist"></div>
             </div>
-            <div class="mma-rail-h">Since you left</div>
-            <div class="mma-shift" id="mma-shift"></div>
-            <div class="mma-rail-h">Pulled this session</div>
-            <div class="mma-rail-empty" id="mma-rail-empty">Nothing pulled yet.</div>
+            <div class="mma-contact" id="mma-contact">
+              <button type="button" class="mma-back" onclick="closeMemberPopup()"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Roster</button>
+              <div class="mma-contact-body"><div id="member-modal-body"></div></div>
+            </div>
           </aside>
           <div class="mma-main">
+            <div class="mma-hd">
+              <span class="mma-orb mma-orb-lg" id="mma-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+              <div class="mma-hd-tx">
+                <div class="mma-hd-nm">Shield</div>
+                <div class="mma-hd-role">Member manager</div>
+              </div>
+              <button type="button" class="mma-roster-btn" onclick="_mmaOpenMobileRoster()" aria-label="Open roster"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Roster</button>
+              <span class="mma-ctx" id="mma-ctx"></span>
+            </div>
             <div class="mma-log" id="mma-log"></div>
             <div class="mma-voice" id="mma-voice"></div>
             <div class="mma-desk" id="mma-desk"></div>
@@ -53621,7 +53693,8 @@ function openMembersFocus() {
   _ccOpenFocusPage('membersMachineModal', '#cc-agent-bar');
   const orb = document.getElementById('mma-orb');
   if (orb) { orb.classList.remove('wake'); void orb.offsetWidth; orb.classList.add('wake'); }
-  _mmaShiftLoad();
+  _mmaShowRoster();
+  _ccEnsureMembers().then(() => _mmaRenderRoster()).catch(() => {});
   if (!window._MMA_GREETED) {
     window._MMA_GREETED = true;
     _mmaStandup();
@@ -53707,6 +53780,86 @@ function closeMembersFocus() {
   try { if (typeof closeMemberPopup === 'function') closeMemberPopup(); } catch (_) {}
   try { _mmCloseFocus('membersMachineModal'); }
   catch (_) { const m = document.getElementById('membersMachineModal'); m.classList.remove('mm-open'); m.style.display = 'none'; }
+}
+// ── Shield subject column: roster list <-> pinned contact ──────────────────
+// True when the Shield members focus is open AND its subject column exists.
+function _mmaFocusOpen() {
+  const el = document.getElementById('membersMachineModal');
+  return !!(el && el.classList.contains('mm-open') && document.getElementById('mma-subject'));
+}
+function _mmaRiskyStatus(m) {
+  return m.status === 'payment_failed' || m.status === 'payment_method_required' || m.status === 'cancelling' || !!m.pause_scheduled_for;
+}
+// Roster row status dot: red = needs attention, amber = paused, green = healthy.
+function _mmaRosterDot(m) {
+  if (_mmaRiskyStatus(m)) return 'var(--red)';
+  if (m.status === 'paused') return 'var(--amber)';
+  return 'var(--green)';
+}
+let _MMA_RISK_ONLY = false;
+function _mmaToggleRiskFilter() {
+  _MMA_RISK_ONLY = !_MMA_RISK_ONLY;
+  document.getElementById('mma-rfilter')?.classList.toggle('on', _MMA_RISK_ONLY);
+  _mmaRenderRoster();
+}
+// Render the left-column roster from the loaded members. Risky first, then
+// live, then paused; alpha within. Honors the search box + "At risk" filter.
+function _mmaRenderRoster() {
+  const host = document.getElementById('mma-rlist');
+  if (!host) return;
+  const all = _ccRoster();
+  const cnt = document.getElementById('mma-roster-cnt');
+  if (cnt) cnt.textContent = all.filter(m => m.status === 'live' || m.status === 'cancelling').length + ' live';
+  const q = (document.getElementById('mma-rsearch')?.value || '').trim().toLowerCase();
+  let roster = all.slice();
+  if (_MMA_RISK_ONLY) roster = roster.filter(_mmaRiskyStatus);
+  if (q) roster = roster.filter(m => ((m.athlete_name || '') + ' ' + (m.parent_name || '')).toLowerCase().includes(q));
+  const rank = m => _mmaRiskyStatus(m) ? 0 : (m.status === 'paused' ? 2 : 1);
+  roster.sort((a, b) => rank(a) - rank(b) || String(a.athlete_name || '').localeCompare(String(b.athlete_name || '')));
+  if (!roster.length) {
+    host.innerHTML = '<div class="mma-rempty">' + (all.length ? 'No members match.' : 'Roster not loaded yet.') + '</div>';
+    return;
+  }
+  host.innerHTML = roster.map(m => {
+    const av = (typeof _memberAvatar === 'function') ? _memberAvatar(m, 28) : '';
+    let plan = '';
+    try { plan = m.pricing ? _memberPriceLabel(m.pricing) : (m.plan || ''); } catch (_) { plan = m.plan || ''; }
+    const sub = [_ccCapName(m.parent_name || ''), plan ? String(plan).replace(/<[^>]+>/g, '') : ''].filter(Boolean).join(' · ');
+    return '<button type="button" class="mma-rrow" onclick="openMemberPopup(\'' + m.id + '\')">' + av +
+      '<span style="flex:1;min-width:0"><span class="mma-rrow-nm">' + escapeHTML(_ccCapName(m.athlete_name || 'Member')) + '</span>' +
+      '<span class="mma-rrow-sub">' + escapeHTML(sub) + '</span></span>' +
+      '<span class="mma-rrow-dot" style="background:' + _mmaRosterDot(m) + '"></span></button>';
+  }).join('');
+}
+// Swap the left column to the pinned contact. Returns false if the subject
+// column isn't present (caller falls back to the drawer).
+function _mmaShowContactPane() {
+  const subj = document.getElementById('mma-subject');
+  if (!subj) return false;
+  subj.classList.add('showing-contact', 'mobile-open');
+  return true;
+}
+// Slide back to the roster list (keeps the mobile overlay open on phones).
+function _mmaShowRoster() {
+  document.getElementById('mma-subject')?.classList.remove('showing-contact');
+  _mmaSetContext(null);
+}
+// The pinned-member tag in the chat header, so Shield reads as "focused" on them.
+function _mmaSetContext(name) {
+  const el = document.getElementById('mma-ctx');
+  if (!el) return;
+  if (name) { el.textContent = '◆ ' + String(name).toUpperCase(); el.classList.add('on'); }
+  else { el.classList.remove('on'); el.textContent = ''; }
+}
+// Mobile only: the subject column is an off-canvas overlay over the chat.
+function _mmaOpenMobileRoster() {
+  const subj = document.getElementById('mma-subject');
+  if (!subj) return;
+  subj.classList.remove('showing-contact');
+  subj.classList.add('mobile-open');
+}
+function _mmaCloseMobileRoster() {
+  document.getElementById('mma-subject')?.classList.remove('mobile-open');
 }
 // ── Tower (GM agent): the boardroom. Rule-based router like Shield's -
 // answers whole-business questions itself, hands specialist asks to the
