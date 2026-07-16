@@ -261,6 +261,11 @@ if (window.__MOCK__) (() => {
     }
     if (p === '/api/ghl/inbox') {
       if (q.get('conversation_id')) return { messages: THREAD(), conversation: CONVOS.find(c => c.id === q.get('conversation_id')) || null };
+      // Hawkeye deck hydrates the on-card conversation preview by contact_id.
+      if (q.get('contact_id')) {
+        const card = HAWK_READY.find(r => r.ghl_contact_id === q.get('contact_id'));
+        return { messages: THREAD(card ? card.contact_name : null).map(m => ({ ...m, date: m.dateAdded })) };
+      }
       if (q.get('action') === 'sender-info') return { ok: true, name: 'Northside Hoops Academy', phone: '+14165550100', email: 'team@northsidehoops.com' };
       if (q.get('action')) return { ok: true };
       return { conversations: CONVOS };
@@ -35608,11 +35613,16 @@ async function _hk2Poll() {
 // mid-sentence on mobile (Zoran 2026-07-16). Shared by the Hawkeye deck and
 // the approvals popup; re-fits live while typing.
 function _hkAutosizeDrafts(rootSel) {
-  document.querySelectorAll(rootSel + ' textarea').forEach(t => {
-    const fit = () => { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; };
+  const fitAll = () => document.querySelectorAll(rootSel + ' textarea').forEach(t => {
+    if (!t.offsetParent) return;   // not laid out (hidden card/panel) - scrollHeight would be 0
+    const fit = () => { if (!t.offsetParent) return; t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; };
     if (!t._fitWired) { t._fitWired = true; t.addEventListener('input', fit); }
     fit();
   });
+  fitAll();
+  // Re-fit next frame: the deck can render mid-transition (focus overlay pan,
+  // card advance) where this frame's layout isn't final yet.
+  requestAnimationFrame(fitAll);
 }
 function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
