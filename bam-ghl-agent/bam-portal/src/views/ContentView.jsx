@@ -1230,6 +1230,7 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
   const [zipping, setZipping] = useState(false);
   const [dlNote, setDlNote] = useState("");       // "Downloading 12/78…" progress
   const [preview, setPreview] = useState(null);   // file being viewed in the lightbox
+  const _cmAnchorRef = useRef(null);              // shift-select range anchor (flat index)
 
   async function toggle() {
     const next = !open;
@@ -1271,9 +1272,37 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
   const dateStr = (iso) => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 
   // ── Multi-select + zip download (same pattern as FilesByFolder) ──
-  const toggleSel = (f) => setSelected(s => {
-    const n = new Set(s); n.has(f.url) ? n.delete(f.url) : n.add(f.url); return n;
-  });
+  // Shift-click selects a range in rendered order, like Finder/Drive. The
+  // anchor is the last tile whose checkbox was clicked; the range takes the
+  // clicked tile's NEW state (shift-check selects the span, shift-uncheck
+  // clears it).
+  const flatOrder = groups.flatMap(g => byFolder.get(g));
+  const idxOf = new Map(flatOrder.map((f, i) => [f, i]));
+  const toggleSel = (f, shiftKey) => {
+    const idx = idxOf.get(f);
+    const anchor = _cmAnchorRef.current;
+    setSelected(s => {
+      const n = new Set(s);
+      const willSelect = !n.has(f.url);
+      if (shiftKey && anchor != null && idx != null) {
+        const [a, b] = anchor < idx ? [anchor, idx] : [idx, anchor];
+        for (let i = a; i <= b; i++) {
+          if (willSelect) n.add(flatOrder[i].url); else n.delete(flatOrder[i].url);
+        }
+      } else if (willSelect) n.add(f.url); else n.delete(f.url);
+      return n;
+    });
+    if (idx != null) _cmAnchorRef.current = idx;
+  };
+  const toggleGroup = (g) => {
+    const gf = byFolder.get(g) || [];
+    const allSel = gf.length > 0 && gf.every(f => selected.has(f.url));
+    setSelected(s => {
+      const n = new Set(s);
+      gf.forEach(f => allSel ? n.delete(f.url) : n.add(f.url));
+      return n;
+    });
+  };
   const selCount = visible.filter(f => selected.has(f.url)).length;
   const allVisibleSelected = visible.length > 0 && selCount === visible.length;
   const selectAllVisible = () => setSelected(s => {
@@ -1353,9 +1382,25 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
           )}
           {groups.map(g => (
             <div key={g} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: tk.textMute, margin: "8px 0 8px" }}>
+              <label style={{
+                display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none",
+                fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: tk.textMute, margin: "8px 0 8px",
+              }}>
+                <input
+                  type="checkbox"
+                  checked={byFolder.get(g).every(f => selected.has(f.url))}
+                  ref={el => {
+                    if (!el) return;
+                    const gf = byFolder.get(g);
+                    const some = gf.some(f => selected.has(f.url));
+                    el.indeterminate = some && !gf.every(f => selected.has(f.url));
+                  }}
+                  onChange={() => toggleGroup(g)}
+                  title={`Select all in ${g}`}
+                  style={{ width: 14, height: 14, accentColor: tk.accent, cursor: "pointer", margin: 0 }}
+                />
                 {g} <span style={{ fontWeight: 500 }}>({byFolder.get(g).length})</span>
-              </div>
+              </label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
                 {byFolder.get(g).map((f, i) => (
                   <div key={f.url + i} style={{ position: "relative" }}>
@@ -1364,7 +1409,8 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
                       width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
                       background: "rgba(0,0,0,0.55)", borderRadius: 5, cursor: "pointer",
                     }}>
-                      <input type="checkbox" checked={selected.has(f.url)} onChange={() => toggleSel(f)}
+                      <input type="checkbox" checked={selected.has(f.url)} onChange={() => {}}
+                        onClick={(e) => { e.stopPropagation(); toggleSel(f, e.shiftKey); }}
                         style={{ width: 15, height: 15, accentColor: tk.accent, cursor: "pointer", margin: 0 }} />
                     </label>
                     <a
