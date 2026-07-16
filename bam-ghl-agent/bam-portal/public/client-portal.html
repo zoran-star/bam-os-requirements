@@ -170,8 +170,10 @@ if (window.__MOCK__) (() => {
     ['Kira Patel', 'Is there parking at the Northside gym?', 'inbound', 0, 'lead', null],
     ['Nicole Hayes', 'We will finish out the month then pause for summer.', 'inbound', 0, null, 'Carter Hayes'],
     ['Tanya Brooks', 'Aaliyah loved the shooting clinic last week!', 'inbound', 0, 'member', 'Aaliyah Brooks'],
+    ['Sasha Adams', 'Do you have anything on Saturday mornings for Deja?', 'inbound', 1, 'lead', null, 'lead-3'],
+    ['Andre Boyd', 'AJ had a blast at the trial yesterday!', 'inbound', 0, 'lead', null, 'lead-9'],
   ].map((c, i) => ({
-    id: 'cv-' + (i + 1), contactId: 'ct-cv-' + (i + 1), contactName: c[0], fullName: c[0],
+    id: 'cv-' + (i + 1), contactId: c[6] || 'ct-cv-' + (i + 1), contactName: c[0], fullName: c[0],
     lastMessageBody: c[1], lastMessageDate: iso(0, i * 5 + 1), lastMessageDirection: c[2],
     lastMessageType: 'TYPE_SMS', unreadCount: c[3], classification: c[4], matched_member_name: c[5],
   }));
@@ -181,6 +183,39 @@ if (window.__MOCK__) (() => {
     { id: 'm-3', direction: 'inbound', body: 'What time do U12 sessions run on Saturdays?', dateAdded: iso(0, 2), type: 'TYPE_SMS', status: 'delivered' },
     { id: 'm-4', direction: 'outbound', body: 'Saturdays are 9am to 10:30am at Northside Main Gym. Doors open 15 min early.', dateAdded: iso(0, 1), type: 'TYPE_SMS', status: 'delivered' },
   ]);
+  // Hawkeye: agent-drafted actions waiting on the owner. `ghl_contact_id`s
+  // match OPPS contactIds so the sales board stages glow for the same leads.
+  const HAWK_READY = [
+    { id: 'apx-1', kind: 'reply', status: 'pending', contact_name: 'Sasha Adams', ghl_contact_id: 'lead-3', ghl_conversation_id: 'cv-apx-1', reply_count: 3, confidence: 0.92, goal: 'Book the free trial',
+      draft_message: 'Hey Sasha! Coach Dre has two U12 spots left this Saturday at 9am. Want me to lock one in for Deja?',
+      reasoning: 'Lead asked about weekend times in her last message. Saturday 9am has open capacity and matches Deja\'s age group.' },
+    { id: 'apx-2', kind: 'reply', status: 'pending', contact_name: 'Andre Boyd', ghl_contact_id: 'lead-9', ghl_conversation_id: 'cv-apx-2', reply_count: 5, confidence: 0.84, goal: 'Close post-trial',
+      draft_message: 'AJ looked great out there yesterday! Coach Dre thinks the U16 Elite group is the right fit. Want me to send over the enrollment link so he keeps the momentum?',
+      reasoning: 'Trial completed yesterday, parent replied positively. Best window to close is within 24 hours of the trial.' },
+    { id: 'apx-3', kind: 'reply', status: 'pending', contact_name: 'Nina Flores', ghl_contact_id: 'lead-10', ghl_conversation_id: 'cv-apx-3', reply_count: 4, confidence: 0.48, goal: 'Close post-trial',
+      escalate: true, escalate_reason: 'Asked for a sibling discount - no discount policy is configured for this academy.',
+      draft_message: 'Great question! Let me check with the team on sibling pricing and get right back to you today.',
+      reasoning: 'Parent asked about enrolling both kids with a discount. I do not have pricing authority, so this needs a human call.' },
+    { id: 'apx-4', kind: 'book', status: 'pending', contact_name: 'Malik Turner', ghl_contact_id: 'lead-4', ghl_conversation_id: 'cv-apx-4', confidence: 0.9, goal: 'Confirm the trial booking',
+      book_slot_at: iso(-1, -2), book_group: 'U16 Elite - Tuesday 6:00 PM', booking_asks: 'Confirmed Tuesday works, asked what Malik Jr should bring',
+      draft_message: 'You are all set for Tuesday 6pm at Northside Main Gym! Bring water and indoor shoes - doors open 15 minutes early.',
+      reasoning: 'Lead confirmed the Tuesday slot in their last message, so I prepared the booking.' },
+    { id: 'apx-5', kind: 'ghost', status: 'pending', contact_name: 'Owen Marsh', ghl_contact_id: 'lead-11',
+      reasoning: 'Said they were interested, then went quiet 6 days ago. Two nudges sent, no reply. Recommend one last touch or mark lost.' },
+    { id: 'apx-6', kind: 'ghost', status: 'pending', contact_name: 'Devon Ellis', ghl_contact_id: 'lead-5',
+      reasoning: 'Opened the trial booking link twice but never picked a time. Last reply 5 days ago.' },
+    { id: 'apx-7', kind: 'mark_lost', status: 'pending', contact_name: 'Marcus Webb', ghl_contact_id: 'lead-13',
+      lost_reason: 'Unreachable for 3 weeks: 6 texts undelivered, 2 calls no answer.',
+      reasoning: 'No working contact channel. Keeping him on the board skews your pipeline numbers.' },
+  ];
+  const HAWK_FU = [
+    { id: 'fu-1', status: 'pending', contact_name: 'Kira Patel', ghl_contact_id: 'lead-6', scheduled_at: iso(-1),
+      draft_message: 'Hey Kira! Quick reminder about Arjun\'s trial this Saturday at 9am. Doors open 8:45 - see you there!' },
+    { id: 'fu-2', status: 'pending', contact_name: 'Tia Roberts', ghl_contact_id: 'lead-8', scheduled_at: iso(-2),
+      draft_message: 'Hi Tia! Just checking in before Jade\'s trial Thursday. Want me to send the parking info?' },
+    { id: 'fu-3', status: 'pending', contact_name: 'Leo Sanders', ghl_contact_id: 'lead-7', scheduled_at: iso(0, 3),
+      draft_message: 'Following up on Eli\'s trial from Sunday - how did he like the session? Coach Simone saved him a spot in the Tuesday group.' },
+  ];
   const PERIODS = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(NOW); d.setMonth(d.getMonth() - (11 - i));
     const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
@@ -193,10 +228,23 @@ if (window.__MOCK__) (() => {
     ok: true, items: [], data: [], rows: [], members: [], conversations: [], messages: [],
     campaigns: [], tickets: [], requests: [], pipelines: [], periods: [], events: [],
     calendars: [], entry_points: [], milestones: [], contacts: [], fields: [], notes: [],
+    ready: [], followups: [], reignitions: [], mutes: [], lessons: [],
     count: 0, unread: 0, total: 0,
   };
-  function mockApi(u) {
+  function mockApi(u, init) {
     const p = u.pathname, q = u.searchParams;
+    let act = '';
+    try { act = JSON.parse((init && init.body) || '{}').action || ''; } catch (_) {}
+    // ── Hawkeye (agent approval queues; action rides in the POST body) ──
+    if (p === '/api/agent-config') return act === 'get-mode' ? { mode: 'approve' } : { ok: true };
+    if (p === '/api/agent-followups') return act === 'list' ? { followups: HAWK_FU } : { ok: true };
+    if (p === '/api/agent-approvals') {
+      if (act === 'list-ready') return { ready: HAWK_READY };
+      if (act === 'list-reignitions') return { reignitions: [] };
+      return { ok: true, ready: [], followups: [], reignitions: [] };
+    }
+    if (p === '/api/agent-confirm') return act === 'list-ready' ? { ready: HAWK_READY.filter(r => r.kind === 'book') } : { ok: true };
+    if (p === '/api/agent-closing') return act === 'list-ready' ? { ready: HAWK_READY.filter(r => r.id === 'apx-2' || r.id === 'apx-3') } : { ok: true };
     if (p === '/api/members') return { members: MEMBERS, ghl: { status: 'connected' }, stripe: { status: 'connected' }, sorter: null, subs_to_cancel: 0, coachiq: { enabled: false, signup_url: null } };
     if (p === '/api/ghl/pipelines') return {
       pipelines: [
@@ -231,7 +279,7 @@ if (window.__MOCK__) (() => {
       const raw = typeof input === 'string' ? input : (input && input.url) || '';
       const u = new URL(raw, location.origin);
       if (u.origin === location.origin && u.pathname.startsWith('/api/')) {
-        const body = mockApi(u) || { ...DEFAULT_API };
+        const body = mockApi(u, init) || { ...DEFAULT_API };
         return Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
       }
     } catch (_) { /* fall through to real fetch */ }
