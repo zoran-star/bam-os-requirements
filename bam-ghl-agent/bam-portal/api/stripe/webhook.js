@@ -1424,7 +1424,11 @@ async function handleStoreOrder(event, connectedAccount, res) {
   const cRows = await sb(`clients?stripe_connect_account_id=eq.${encodeURIComponent(connectedAccount)}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   const client = Array.isArray(cRows) && cRows[0];
   if (!client) return res.status(200).json({ skipped: "no client for account" });
-  const workflowId = client.ghl_kpi_config && client.ghl_kpi_config.store_order_workflow_id;
+  // Per-checkout workflow override (metadata.workflow_id) lets one client route
+  // different products to different GHL workflows (e.g. Pro Precision: main
+  // enrolments vs the online shooting program); else the client default.
+  const workflowId = (session.metadata && session.metadata.workflow_id)
+    || (client.ghl_kpi_config && client.ghl_kpi_config.store_order_workflow_id);
   if (!workflowId) return res.status(200).json({ skipped: "store order workflow not configured" });
   if (!client.ghl_location_id) return res.status(200).json({ skipped: "client not GHL-connected" });
 
