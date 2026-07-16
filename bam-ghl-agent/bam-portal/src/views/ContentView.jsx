@@ -1228,6 +1228,7 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
   const [typeF, setTypeF] = useState("all");  // all | video | image
   const [selected, setSelected] = useState(() => new Set());   // file urls
   const [zipping, setZipping] = useState(false);
+  const [dlNote, setDlNote] = useState("");       // "Downloading 12/78…" progress
   const [preview, setPreview] = useState(null);   // file being viewed in the lightbox
 
   async function toggle() {
@@ -1285,9 +1286,9 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
     const picked = (files || []).filter(f => selected.has(f.url));
     if (!picked.length || zipping) return;
     setZipping(true);
-    try { await ctkDownloadZip(picked, "client-media"); }
+    try { await ctkDownloadPicked(picked, "client-media", setDlNote); }
     catch (e) { alert("Download failed: " + (e.message || e)); }
-    finally { setZipping(false); }
+    finally { setZipping(false); setDlNote(""); }
   };
   const selBtn = (accent) => ({
     padding: "4px 12px", fontSize: 11, fontWeight: 600, borderRadius: 999, fontFamily: "inherit",
@@ -1336,7 +1337,7 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
               {selected.size > 0 && (
                 <>
                   <button type="button" onClick={downloadSelected} disabled={zipping} style={selBtn(true)}>
-                    {zipping ? "Zipping…" : `↓ Download ${selected.size} selected`}
+                    {zipping ? (dlNote || "Preparing…") : `↓ Download ${selected.size} selected`}
                   </button>
                   <button type="button" onClick={() => setSelected(new Set())} style={selBtn(false)}>Clear</button>
                 </>
@@ -2323,6 +2324,44 @@ async function ctkDownloadZip(files, baseName) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
+// Supabase public-storage URLs accept ?download=<name>, which flips the
+// response to Content-Disposition: attachment - the browser streams straight
+// to disk. Non-storage URLs pass through unchanged.
+function ctkDirectUrl(f) {
+  if (typeof f.url === "string" && f.url.includes("/storage/v1/object/public/")) {
+    const sep = f.url.includes("?") ? "&" : "?";
+    return `${f.url}${sep}download=${encodeURIComponent(f.name || "file")}`;
+  }
+  return f.url;
+}
+// Download files individually, streamed to the Downloads folder. Staggered so
+// Chrome registers them as one multi-download burst (single permission prompt).
+async function ctkDownloadDirect(files, onProgress) {
+  for (let i = 0; i < files.length; i++) {
+    const a = document.createElement("a");
+    a.href = ctkDirectUrl(files[i]);
+    a.download = files[i].name || "file";
+    document.body.appendChild(a); a.click(); a.remove();
+    if (onProgress) onProgress(i + 1, files.length);
+    await new Promise(r => setTimeout(r, 350));
+  }
+}
+// Zip only small non-video batches. In-browser zipping buffers every file in
+// RAM before packaging (Google Drive zips server-side; we can't), so video
+// batches took minutes and could die at Chrome's ~2GB blob ceiling.
+function ctkShouldZip(files) {
+  return files.length <= 12 && !files.some(f => _cmIsVideo(f));
+}
+// Shared "download picked files the right way" wrapper for the grids below.
+async function ctkDownloadPicked(picked, zipName, setNote) {
+  if (ctkShouldZip(picked)) {
+    setNote("Zipping…");
+    await ctkDownloadZip(picked, zipName);
+  } else {
+    await ctkDownloadDirect(picked, (i, n) => setNote(`Downloading ${i}/${n}…`));
+  }
+}
+
 function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives", onRemove }) {
   const list = Array.isArray(files) ? files : [];
   const keyOf = (f) => f.url || f.name || "";
@@ -2330,6 +2369,7 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
   const dlList = list.filter(isDl);
   const [selected, setSelected] = useState(() => new Set());
   const [zipping, setZipping] = useState(false);
+  const [dlNote, setDlNote] = useState("");
   const [removing, setRemoving] = useState(false);
   if (!list.length) return null;
 
@@ -2343,9 +2383,9 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
     const picked = which === "all" ? dlList : dlList.filter(f => selected.has(keyOf(f)));
     if (!picked.length) return;
     setZipping(true);
-    try { await ctkDownloadZip(picked, zipName); }
+    try { await ctkDownloadPicked(picked, zipName, setDlNote); }
     catch (e) { alert("Download failed: " + (e.message || e)); }
-    finally { setZipping(false); }
+    finally { setZipping(false); setDlNote(""); }
   };
   const removeSelected = async () => {
     const picked = list.filter(f => selected.has(keyOf(f)));
@@ -2400,12 +2440,12 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
       <button type="button" onClick={selectAll} style={btn(false)}>{allSelected ? "Clear" : "Select all"}</button>
       {selCount > 0 && (
         <button type="button" onClick={() => download("selected")} disabled={zipping} style={btn(true)}>
-          {zipping ? "Zipping…" : `↓ Download ${selCount} selected`}
+          {zipping ? (dlNote || "Preparing…") : `↓ Download ${selCount} selected`}
         </button>
       )}
       {dlList.length > 1 && (
         <button type="button" onClick={() => download("all")} disabled={zipping} style={btn(false)}>
-          {zipping ? "Zipping…" : `↓ Download all (${dlList.length})`}
+          {zipping ? (dlNote || "Preparing…") : `↓ Download all (${dlList.length})`}
         </button>
       )}
       {onRemove && selCount > 0 && (
