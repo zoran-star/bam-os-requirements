@@ -1,6 +1,8 @@
 # Member-management KPI + Actions pages (planned) + MRR calculation gotchas
 
-**Status 2026-07-16:** KPI list + mockup approved by Zoran ("those are all the numbers i need"); THIRD left page added to the plan: **Actions** (client action items). Pages not built yet.
+**Status 2026-07-16:** KPI list + mockup approved by Zoran ("those are all the numbers i need"); THIRD left page added: **Actions** (client action items). Build greenlit same day.
+
+**FUTURE SESSION (Zoran, 2026-07-16):** action items will be extended beyond this page - tied into the portal's GENERAL action items system, tied to specific clients AND leads (not just members), with actions you can take on them. Treat the Actions page shipped here as v1/member-scoped; design the data shape so it can join that wider system later.
 
 ## The plan
 
