@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { mlIsVideo } from "../lib/media";
+import { mlIsVideo, mlDownloadUrl } from "../lib/media";
 
 // Fullscreen preview overlay. Videos get a native player (navigating to a raw
 // .MOV URL makes Chrome download it; the <video> element plays it fine).
@@ -23,7 +23,7 @@ export default function MediaLightbox({ file, tk, onClose }) {
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px" }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: tk.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</span>
           <span style={{ flex: 1 }} />
-          <a href={file.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: tk.accent, textDecoration: "none", whiteSpace: "nowrap" }}>Download ↓</a>
+          <a href={mlDownloadUrl(file)} download={file.name} rel="noreferrer" style={{ fontSize: 11, color: tk.accent, textDecoration: "none", whiteSpace: "nowrap" }}>Download ↓</a>
           <button onClick={onClose} aria-label="Close preview" style={{
             border: "none", background: "transparent", color: tk.textSub, fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1,
           }}>✕</button>

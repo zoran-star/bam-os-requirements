@@ -3,7 +3,7 @@ import { useUrlState } from "../hooks/useUrlState";
 import JSZip from "jszip";
 import { supabase } from "../lib/supabase";
 import MediaLightbox from "../components/MediaLightbox";
-import { mlIsMedia } from "../lib/media";
+import { mlIsMedia, mlDownloadUrl } from "../lib/media";
 
 const STORAGE_BUCKET = "ticket-files";
 const STORAGE_FOLDER = "guide-cards";
@@ -2374,11 +2374,7 @@ async function ctkDownloadZip(files, baseName) {
 // response to Content-Disposition: attachment - the browser streams straight
 // to disk. Non-storage URLs pass through unchanged.
 function ctkDirectUrl(f) {
-  if (typeof f.url === "string" && f.url.includes("/storage/v1/object/public/")) {
-    const sep = f.url.includes("?") ? "&" : "?";
-    return `${f.url}${sep}download=${encodeURIComponent(f.name || "file")}`;
-  }
-  return f.url;
+  return mlDownloadUrl(f);
 }
 // Download files individually, streamed to the Downloads folder. Staggered so
 // Chrome registers them as one multi-download burst (single permission prompt).
@@ -2648,8 +2644,12 @@ function FilePreviewTile({ file, tk, compact }) {
       </div>
       <div
         onClick={isMedia ? (e) => {
-          // Bypass the preview intercept: fall through to the real link behavior.
-          e.stopPropagation();
+          // Real download, not the preview intercept and not inline navigation
+          // (images render in a tab without ?download).
+          e.preventDefault(); e.stopPropagation();
+          const a = document.createElement("a");
+          a.href = mlDownloadUrl(file); a.download = file.name || "file";
+          document.body.appendChild(a); a.click(); a.remove();
         } : undefined}
         style={{ fontSize: 10, color: tk.accent, letterSpacing: "0.05em" }}
       >Download ↓</div>
