@@ -8,6 +8,7 @@ Short developer handoffs for reviewing prototype architecture and tracking `fc-c
 | Sales flow (entry/exit transitions) | [`sales-flow.md`](sales-flow.md) | `ready-for-review` | `partial` | `not-reviewed` | 2026-07-06 |
 | Lead entry (funnels + entry points) | [`lead-entry.md`](lead-entry.md) | `ready-for-review` | `built` | `not-reviewed` | 2026-07-08 |
 | Pipeline presets (sales-system templates) | [`pipeline-presets.md`](pipeline-presets.md) | `ready-for-review` | `planned` | `not-reviewed` | 2026-07-10 |
+| Member lifecycle economics (cancellation snapshots + lifetime spend) | [`member-lifecycle-economics.md`](member-lifecycle-economics.md) | `ready-for-review` | `live` | `not-reviewed` | 2026-07-16 |
 
 Use one handoff per durable domain, not per ticket, screen, or table. Start from [`_template.md`](_template.md).
 
