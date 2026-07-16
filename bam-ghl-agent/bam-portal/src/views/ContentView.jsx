@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useUrlState } from "../hooks/useUrlState";
 import JSZip from "jszip";
 import { supabase } from "../lib/supabase";
+import MediaLightbox from "../components/MediaLightbox";
+import { mlIsMedia } from "../lib/media";
 
 const STORAGE_BUCKET = "ticket-files";
 const STORAGE_FOLDER = "guide-cards";
@@ -1228,14 +1230,6 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
   const [zipping, setZipping] = useState(false);
   const [preview, setPreview] = useState(null);   // file being viewed in the lightbox
 
-  // Esc closes the lightbox
-  useEffect(() => {
-    if (!preview) return;
-    const onKey = (e) => { if (e.key === "Escape") setPreview(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [preview]);
-
   async function toggle() {
     const next = !open;
     setOpen(next);
@@ -1411,31 +1405,7 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
           ))}
         </div>
       )}
-      {preview && (
-        <div onClick={() => setPreview(null)} style={{
-          position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.82)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            maxWidth: "min(920px, 94vw)", background: tk.surface,
-            border: `1px solid ${tk.border}`, borderRadius: 12, overflow: "hidden",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: tk.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview.name}</span>
-              <span style={{ flex: 1 }} />
-              <a href={preview.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: tk.accent, textDecoration: "none", whiteSpace: "nowrap" }}>Download ↓</a>
-              <button onClick={() => setPreview(null)} aria-label="Close preview" style={{
-                border: "none", background: "transparent", color: tk.textSub, fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1,
-              }}>✕</button>
-            </div>
-            {_cmIsVideo(preview) ? (
-              <video src={preview.url} controls autoPlay playsInline style={{ display: "block", width: "min(880px, 90vw)", maxHeight: "76vh", background: "#000" }} />
-            ) : (
-              <img src={preview.url} alt={preview.name} style={{ display: "block", maxWidth: "min(880px, 90vw)", maxHeight: "76vh", objectFit: "contain", background: "#000" }} />
-            )}
-          </div>
-        </div>
-      )}
+      {preview && <MediaLightbox file={preview} tk={tk} onClose={() => setPreview(null)} />}
     </Card>
   );
 }
@@ -2485,8 +2455,16 @@ function FilePreviewTile({ file, tk, compact }) {
   const isImage = (file.mime || "").startsWith("image/");
   const isVideo = (file.mime || "").startsWith("video/");
   const icon = isImage ? "🖼" : isVideo ? "🎬" : "📄";
-  return (
-    <a href={file.url} target="_blank" rel="noreferrer" download={file.name} style={{
+  // Media tiles preview in the lightbox; the Download caption below keeps the
+  // one-click download. The lightbox renders as a sibling of the <a>, never
+  // inside it, so modal clicks don't navigate.
+  const [preview, setPreview] = useState(false);
+  const isMedia = mlIsMedia(file);
+  return (<>
+    <a
+      href={file.url} target="_blank" rel="noreferrer" download={file.name}
+      onClick={isMedia ? (e) => { e.preventDefault(); setPreview(true); } : undefined}
+      style={{
       display: "flex", flexDirection: "column", gap: 6,
       padding: 10, borderRadius: 8,
       background: tk.surface, border: `1px solid ${tk.border}`,
@@ -2535,9 +2513,16 @@ function FilePreviewTile({ file, tk, compact }) {
       <div style={{ fontSize: compact ? 11 : 12, color: tk.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {file.name}
       </div>
-      <div style={{ fontSize: 10, color: tk.accent, letterSpacing: "0.05em" }}>Download ↓</div>
+      <div
+        onClick={isMedia ? (e) => {
+          // Bypass the preview intercept: fall through to the real link behavior.
+          e.stopPropagation();
+        } : undefined}
+        style={{ fontSize: 10, color: tk.accent, letterSpacing: "0.05em" }}
+      >Download ↓</div>
     </a>
-  );
+    {preview && <MediaLightbox file={file} tk={tk} onClose={() => setPreview(false)} />}
+  </>);
 }
 
 function SectionLabel({ children, tk, style }) {
