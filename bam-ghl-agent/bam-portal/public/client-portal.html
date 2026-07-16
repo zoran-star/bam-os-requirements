@@ -9521,6 +9521,13 @@ Then the call to action."]</div>
           .hk2-clear{min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1px dashed var(--border);border-radius:16px;color:var(--text-sub);font-size:13px}
           .hk2-clear b{color:var(--text);font-size:16px}
           .hk2-clear .big{width:56px;height:56px;border-radius:50%;background:rgba(76,199,106,.14);color:var(--green,#4CC76A);display:flex;align-items:center;justify-content:center;font-size:26px}
+          /* Phones: the deck's desktop min-height left the absolutely-positioned
+             "behind" card poking out as an empty shell under short cards
+             (Zoran 2026-07-16). Let the deck hug the top card instead. */
+          @media(max-width:640px){
+            .hk2-deck{min-height:0}
+            .hk2-bub{max-width:92%}
+          }
           .hk2-hint{font-size:11px;color:var(--text-mute);margin-top:12px;text-align:center;line-height:1.5}
           .hk2-quietbar{display:flex;align-items:center;gap:7px;margin:0 0 12px;padding:8px 12px;border:1px solid color-mix(in srgb, var(--gold) 45%, transparent);background:color-mix(in srgb, var(--gold) 10%, transparent);color:var(--gold);border-radius:var(--r-8,8px);font-size:12px;font-weight:600}
           .hk2-load{min-height:300px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-sub);font-size:13px}
@@ -35587,6 +35594,17 @@ async function _hk2Poll() {
     if (bar) bar.innerHTML = _hk2TabsHtml();
   }
 }
+// Grow draft/teach textareas to fit their content. Phone widths wrap the text
+// to more lines than the desktop min-height shows, which clipped drafts
+// mid-sentence on mobile (Zoran 2026-07-16). Shared by the Hawkeye deck and
+// the approvals popup; re-fits live while typing.
+function _hkAutosizeDrafts(rootSel) {
+  document.querySelectorAll(rootSel + ' textarea').forEach(t => {
+    const fit = () => { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; };
+    if (!t._fitWired) { t._fitWired = true; t.addEventListener('input', fit); }
+    fit();
+  });
+}
 function _hk2Render(opts) {
   const host = document.getElementById('pl-hawkeye'); if (!host || !_HK2.q) return;
   _HK2.edited = false; _HK2.touched = false; _HK2.otherOpen = false;
@@ -35616,6 +35634,7 @@ function _hk2Render(opts) {
   // Only Book-it cards have live pickers. Proposal cards show the slot read-only.
   if (top && top._kind === 'book') _hk2EnsureBookOpts();
   _hk2HydrateThread();   // fill the conversation preview if this card carried none
+  _hkAutosizeDrafts('#pl-hawkeye');
 }
 // ── Book-it pickers: the academy's trial calendars + open slots ──
 async function _hk2EnsureBookOpts() {
@@ -38966,6 +38985,7 @@ function _apxRender() {
     }
   }
   body.innerHTML = `<div style="max-width:860px;margin:0 auto">${focusBanner}${inner}</div>`;
+  _hkAutosizeDrafts('#apx-body');
 }
 
 // ── Hawkeye deferred-action engine ──────────────────────────────────────────
