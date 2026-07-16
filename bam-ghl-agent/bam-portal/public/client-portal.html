@@ -53455,26 +53455,31 @@ async function _ccEnsureMembers() {
 // Monthly-equivalent price for a member. pricing.interval comes from
 // pricing_catalog and speaks the TERM vocabulary ("4_weeks", "3_months",
 // "6_months", "one_time" - see api/offers/create-price.js termToInterval),
-// not just raw Stripe week/month/year. Decode "N_unit" generically so a
-// $540/3mo commitment reads as $180/mo, not $540/mo, and one_time charges
-// contribute $0 to MRR. (Catalog rows are tax-inclusive, so MRR/ARPU stay
-// approximations - labeled as such in the UI.)
+// not just raw Stripe week/month/year. Decode "N_unit" generically - any
+// term an academy invents later (2_weeks, 9_months, day-based) resolves
+// with no code change - so a $540/3mo commitment reads as $180/mo, not
+// $540/mo, and one_time charges contribute $0 to MRR. (Catalog rows are
+// tax-inclusive, so MRR/ARPU stay approximations - labeled as such.)
 function _ccMonthly(m) {
   const p = m.pricing || {};
   const amt = (p.amount_cents || 0) / 100;
   const iv = String(p.interval || 'month').toLowerCase();
-  if (iv === 'one_time' || iv === 'onetime') return 0;
-  const t = iv.match(/^(\d+)[_ ]?(week|month|year)/) || iv.match(/(week|month|year)/);
+  if (iv === 'one_time' || iv === 'onetime' || iv === 'once') return 0;
+  const t = iv.match(/^(\d+)[_ ]?(day|week|month|year)/) || iv.match(/(day|week|month|year)/);
   const unit = t ? t[t.length - 1] : 'month';
   const count = (t && t.length === 3 && Number(t[1])) || 1;
-  const perMonth = unit === 'week' ? 4.33 : (unit === 'year' ? 1 / 12 : 1);
+  const perMonth = unit === 'day' ? 30.44 : (unit === 'week' ? 4.33 : (unit === 'year' ? 1 / 12 : 1));
   return (amt / count) * perMonth;
 }
+// MRR/ARPU count status==='live' ONLY. Cancelling members still bill until
+// period end, but they are leaving - counting them overstates run-rate, so
+// they surface separately as pendingCancel (Zoran's call, 2026-07-16).
 function _ccMemberKpis(roster) {
-  const live = roster.filter(m => m.status === 'live' || m.status === 'cancelling');
+  const live = roster.filter(m => m.status === 'live');
+  const pendingCancel = roster.filter(m => m.status === 'cancelling');
   const paused = roster.filter(m => m.status === 'paused');
   const mrr = live.reduce((s, m) => s + _ccMonthly(m), 0);
-  return { live: live.length, paused: paused.length, mrr, arpu: live.length ? mrr / live.length : 0 };
+  return { live: live.length, pendingCancel: pendingCancel.length, paused: paused.length, mrr, arpu: live.length ? mrr / live.length : 0 };
 }
 async function _ccLoadMemberKpis() {
   const roster = await _ccEnsureMembers();
@@ -54053,7 +54058,7 @@ function _gmaSend() {
 }
 async function _gmaHandle(q) {
   const roster = (typeof _ccRoster === 'function') ? _ccRoster() : [];
-  const live = roster.filter(m => m.status === 'live' || m.status === 'cancelling');
+  const live = roster.filter(m => m.status === 'live');
   const mrr = live.reduce((s, m) => s + (typeof _ccMonthly === 'function' ? _ccMonthly(m) : 0), 0);
   const hawk = window._hmHawkTotal || 0;
   if (/business|snapshot|overview|numbers|how.?s (it|things|everything)|today look/.test(q)) {
