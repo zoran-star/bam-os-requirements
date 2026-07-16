@@ -35032,6 +35032,10 @@ function _sfOpen(which) {
   if (focus && focus.parentElement !== body) body.appendChild(focus);
   if (hawk) hawk.style.display = which === 'hawkeye' ? '' : 'none';
   if (focus) focus.style.display = which === 'focus' ? '' : 'none';
+  // The deck brings its own Back inline with the Hawkeye title - the modal's
+  // floating Back would double up on its own row above it (Zoran 2026-07-16).
+  const mmBack = document.querySelector('#salesMachineModal .mm-back-btn');
+  if (mmBack) mmBack.style.display = which === 'hawkeye' ? 'none' : '';
   const already = !!_SF_OPEN;
   _SF_OPEN = which;
   if (!already) {
@@ -35656,10 +35660,13 @@ function _hk2Render(opts) {
     : `${q[1] ? `<div class="hk2-card hk2-behind">${_hk2CardHtml(q[1], 2, q.length, false)}</div>` : ''}
        <div class="hk2-card hk2-top" id="hk2-topcard">${_hk2CardHtml(q[0], 1, q.length, true)}</div>`;
   const quietBar = _HK2.q.quiet ? `<div class="hk2-quietbar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>After hours - approved messages will send ${escapeHTML(_hk2QuietWhen(_HK2.q.quiet.until))}</div>` : '';
-  // In the overlay path (command center on) the outer modal has its own Back. In
-  // the inline path (cc opted out) the deck fills the pipelines view with NO way
-  // back - add an in-deck Back so the user isn't trapped (Zoran 2026-07-10).
-  const inlineBack = (typeof _sfUseOverlay === 'function' && _sfUseOverlay()) ? '' : `<button class="hk2-back" onclick="_hk2Back()" title="Back to Sales"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg> Sales</button>`;
+  // The deck always carries its own Back, sitting in the SAME row as the
+  // Hawkeye title (Zoran 2026-07-16 - the overlay's floating Back sat on its
+  // own row above the title; _sfOpen hides that one while the deck is up).
+  // Label: overlay path returns to wherever the deck was opened from, inline
+  // path returns to the Sales board.
+  const _bkLabel = (typeof _sfUseOverlay === 'function' && _sfUseOverlay()) ? 'Back' : 'Sales';
+  const inlineBack = `<button class="hk2-back" onclick="_hk2Back()" title="Back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg> ${_bkLabel}</button>`;
   host.innerHTML = `
     <div class="hk2-topbar">
       ${inlineBack}
