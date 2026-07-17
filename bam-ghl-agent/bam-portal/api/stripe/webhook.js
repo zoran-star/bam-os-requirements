@@ -686,6 +686,9 @@ async function handleSubDeleted(event, connectedAccount, res) {
         source:                 "stripe",
         involuntary:            sub?.cancellation_details?.reason === "payment_failed",
       }]),
+    }).catch((e) => {
+      // 409 = the partial unique index caught a race with the portal insert.
+      if (!/409|duplicate|unique/i.test(e.message || "")) throw e;
     });
   }
 
