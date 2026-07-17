@@ -39145,7 +39145,18 @@ function _hawkDefer({ btn, cardId, label, run, restore }) {
 async function _hawkFlush() {
   const e = _HAWK_PENDING; if (!e) return;
   _HAWK_PENDING = null; clearInterval(e.timer); _hawkUndoPill();
-  try { await e.run(); } catch (err) { _apxToast(_apxErr(err), false); try { e.restore(); } catch (_) {} }
+  try { await e.run(); _hawkSalesFeedRefresh(); } catch (err) { _apxToast(_apxErr(err), false); try { e.restore(); } catch (_) {} }
+}
+// After a Hawkeye action commits, the home Sales card's "Recent movement" feed
+// (and the pipeline strip) is stale - it only loaded once on mount. Re-pull the
+// pipeline so the just-actioned lead shows up. GHL takes a beat to record the
+// stage change / message, so refresh once now and again after a short delay to
+// catch the propagation. No-op when the Sales card isn't mounted.
+function _hawkSalesFeedRefresh() {
+  if (typeof _ccSalesLoad !== 'function') return;
+  if (!document.getElementById('cc-sal-feed')) return;
+  _ccSalesLoad();
+  setTimeout(() => { if (document.getElementById('cc-sal-feed')) _ccSalesLoad(); }, 2500);
 }
 function _hawkUndo() {
   const e = _HAWK_PENDING; if (!e) return;
