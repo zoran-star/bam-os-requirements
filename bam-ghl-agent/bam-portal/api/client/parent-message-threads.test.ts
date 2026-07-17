@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../parent/_notifications.js", () => ({
+  dispatchParentPushDeliveries: vi.fn().mockResolvedValue({
+    claimed: 1,
+    failed: 0,
+    retried: 0,
+    sent: 1,
+  }),
+}));
+
 import handler from "./parent-message-threads.js";
+import { dispatchParentPushDeliveries } from "../parent/_notifications.js";
 import type { ParentApiRequest, ParentApiResponse } from "../parent/_types.js";
 
 type MockResponse = ParentApiResponse & {
@@ -65,6 +75,7 @@ describe("api/client/parent-message-threads", () => {
     process.env.VITE_SUPABASE_URL = "http://127.0.0.1:54321";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
     vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it("returns 403 when the caller has no client_users row", async () => {
@@ -211,6 +222,11 @@ describe("api/client/parent-message-threads", () => {
       p_customer_profile_id: null,
       p_tenant_id: tenantId,
       p_thread_id: threadId,
+    });
+    expect(dispatchParentPushDeliveries).toHaveBeenCalledWith({
+      limit: 10,
+      subjectId: messageId,
+      timeoutMs: 3_000,
     });
   });
 

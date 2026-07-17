@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { HttpError, sendError } from "../parent/_errors.js";
+import { dispatchParentPushDeliveries } from "../parent/_notifications.js";
 import { eq, inList, rpc, sb } from "../parent/_supabase.js";
 import type { ParentApiRequest, ParentApiResponse } from "../parent/_types.js";
 import { getClientUserContext, type ClientUserContext } from "./_client-context.js";
@@ -251,6 +252,16 @@ async function sendStaffMessage(
     p_client_message_id: request.client_message_id,
     p_message_type: "TEXT",
   });
+
+  try {
+    await dispatchParentPushDeliveries({
+      limit: 10,
+      subjectId: result.message.id,
+      timeoutMs: 3_000,
+    });
+  } catch (error) {
+    console.error("[parent-notifications] Immediate staff-message dispatch failed", error);
+  }
 
   return res.status(200).json({
     thread: mapClientThread(result.thread, null, 0),

@@ -145,7 +145,11 @@ async function sendToToken(deviceToken, payload) {
   // Apple says drop these tokens — they'll never deliver again.
   if (r.reason === "Unregistered" || r.reason === "BadDeviceToken") {
     try {
-      await sb(`device_tokens?token=eq.${encodeURIComponent(deviceToken)}`, { method: "DELETE" });
+      await sb(
+        `device_tokens?token=eq.${encodeURIComponent(deviceToken)}` +
+          "&app_scope=eq.CLIENT_PORTAL&token_provider=eq.APNS",
+        { method: "DELETE" },
+      );
     } catch {}
   }
   return r;
@@ -225,7 +229,9 @@ export async function notifyClientPush(clientId, kind, detail = {}) {
       return { sent: 0, skipped: true };
     }
     const rows = await sb(
-      `device_tokens?client_id=eq.${clientId}&platform=eq.ios&select=token`
+      `device_tokens?client_id=eq.${clientId}` +
+        "&platform=eq.ios&app_scope=eq.CLIENT_PORTAL" +
+        "&token_provider=eq.APNS&disabled_at=is.null&select=token"
     );
     if (!rows || !rows.length) return { sent: 0 };
     const payload = buildPayload(kind, detail);
@@ -244,7 +250,9 @@ export async function notifyAuthUserPush(authUserId, kind, detail = {}) {
   try {
     if (!authUserId || !apnsConfigured()) return { sent: 0, skipped: !apnsConfigured() };
     const rows = await sb(
-      `device_tokens?auth_user_id=eq.${authUserId}&platform=eq.ios&select=token`
+      `device_tokens?auth_user_id=eq.${authUserId}` +
+        "&platform=eq.ios&app_scope=eq.CLIENT_PORTAL" +
+        "&token_provider=eq.APNS&disabled_at=is.null&select=token"
     );
     if (!rows || !rows.length) return { sent: 0 };
     const payload = buildPayload(kind, detail);
