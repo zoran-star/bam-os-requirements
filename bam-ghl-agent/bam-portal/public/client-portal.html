@@ -45338,12 +45338,22 @@ async function mCancel(memberId, athleteName) {
         { value: 'period_end', label: 'At period end', hint: 'Stays active until the current paid period ends.' },
         { value: 'immediate', label: 'Immediately', hint: 'Cancels the Stripe subscription right now.' },
       ] },
-      { key: 'reason', label: 'Reason (optional)', type: 'textarea', rows: 2, placeholder: 'e.g. Moving away' },
+      { key: 'reason_category', label: 'Why are they leaving?', type: 'select', value: '', options: [
+        { value: '', label: '- pick a reason -' },
+        { value: 'schedule', label: 'Schedule conflict' },
+        { value: 'price', label: 'Too expensive' },
+        { value: 'injury', label: 'Injury or health' },
+        { value: 'moved', label: 'Moved away' },
+        { value: 'service', label: 'Unhappy with the service' },
+        { value: 'seasonal', label: 'Seasonal break or other sport' },
+        { value: 'other', label: 'Other' },
+      ] },
+      { key: 'reason', label: 'Details (optional)', type: 'textarea', rows: 2, placeholder: 'e.g. Moving to Ottawa in August' },
     ],
   });
   if (!vals) return;
   try {
-    await _memberAction(memberId, 'cancel', { reason: vals.reason || null, immediate: vals.when === 'immediate' });
+    await _memberAction(memberId, 'cancel', { reason: vals.reason || null, reason_category: vals.reason_category || null, immediate: vals.when === 'immediate' });
     _plToast('Membership cancelled.');
     closeMemberPopup();
     // Slide the member's card away before the roster refetches, so the removal reads

@@ -293,7 +293,7 @@ async function handler(req, res) {
         }
         const rows = await sb(
           `cancellations?client_id=eq.${cid}` +
-          `&select=id,member_id,type,cancel_date,pause_start,pause_end,reason,athlete_name,parent_name,stripe_subscription_id,activated_at,completed_at,created_at,joined_date,plan_name,stripe_price_id,offer_id,monthly_amount_cents,total_spent_cents,payments_count,source,involuntary` +
+          `&select=id,member_id,type,cancel_date,pause_start,pause_end,reason,reason_category,athlete_name,parent_name,stripe_subscription_id,activated_at,completed_at,created_at,joined_date,plan_name,stripe_price_id,offer_id,monthly_amount_cents,total_spent_cents,payments_count,source,involuntary` +
           `&order=created_at.desc&limit=1000`
         );
         return res.status(200).json({ ok: true, cancellations: Array.isArray(rows) ? rows : [] });
@@ -1146,26 +1146,42 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
   // Insert cancellations row (always — captures intent + audit trail).
   // Snapshot the member's economics NOW: the members row gets deleted (here or
   // at period end), and the KPI churned-vs-active comparisons read these.
-  const snapshot = await buildCancellationSnapshot({ member, sb, stripeFetch, stripeAccount });
-  await sb(`cancellations`, {
-    method: "POST",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify([{
-      client_id: member.client_id,
-      member_id: member.id,
-      athlete_name: member.athlete_name,
-      archetype: member.archetype,
-      parent_name: member.parent_name,
-      type: "cancel",
-      cancel_date: unixToDateStr(nowUnix()),
-      reason: body.reason || null,
-      stripe_subscription_id: member.stripe_subscription_id,
-      stripe_customer_id: member.stripe_customer_id,
-      ...snapshot,
-      source: body.source === "parent_app" ? "parent_app" : "staff_portal",
-      involuntary: false,
-    }]),
-  });
+  // Skip if a cancel row already exists for this sub/member (double-click,
+  // retried request) - the partial unique indexes are the DB backstop.
+  const dupeQ = member.stripe_subscription_id
+    ? `cancellations?stripe_subscription_id=eq.${encodeURIComponent(member.stripe_subscription_id)}&type=eq.cancel&select=id&limit=1`
+    : `cancellations?member_id=eq.${member.id}&type=eq.cancel&select=id&limit=1`;
+  const existingCancelRows = await sb(dupeQ).catch(() => []);
+  if (!(Array.isArray(existingCancelRows) && existingCancelRows.length)) {
+    const snapshot = await buildCancellationSnapshot({ member, sb, stripeFetch, stripeAccount });
+    // Period-end cancels stamp the date the membership actually ENDS (Stripe's
+    // current_period_end), not the day the button was pressed - churn lands in
+    // the right month.
+    const periodEnd = !body.immediate && sub && Number(sub.current_period_end) > 0 ? Number(sub.current_period_end) : null;
+    await sb(`cancellations`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify([{
+        client_id: member.client_id,
+        member_id: member.id,
+        athlete_name: member.athlete_name,
+        archetype: member.archetype,
+        parent_name: member.parent_name,
+        type: "cancel",
+        cancel_date: unixToDateStr(periodEnd || nowUnix()),
+        reason: body.reason || null,
+        reason_category: body.reason_category || null,
+        stripe_subscription_id: member.stripe_subscription_id,
+        stripe_customer_id: member.stripe_customer_id,
+        ...snapshot,
+        source: body.source === "parent_app" ? "parent_app" : "staff_portal",
+        involuntary: false,
+      }]),
+    }).catch((e) => {
+      // 409 = unique-index backstop caught a race; the row exists, move on.
+      if (!/409|duplicate|unique/i.test(e.message || "")) throw e;
+    });
+  }
 
   // Close any open pause rows (pending or active) — cancellation supersedes them.
   await sb(
