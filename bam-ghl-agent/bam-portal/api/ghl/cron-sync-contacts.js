@@ -16,7 +16,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 //   - Global function timeout: 270s (Vercel Pro = 5min, we leave headroom)
 
 import { timingSafeEqual } from "node:crypto";
-import { bulkUpsertPortalContacts } from "../_contacts.js";
+import { bulkUpsertPortalContacts, resolveAthleteNameFromFields } from "../_contacts.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -169,11 +169,7 @@ async function syncContactsForAcademy(client, deadline) {
         for (const f of (Array.isArray(cfArr) ? cfArr : [])) {
           if (f && f.id != null) cfMap[String(f.id)] = (f.value ?? f.field_value ?? f.fieldValue ?? "");
         }
-        let athleteName = null;
-        for (const fid of athleteFieldIds) {
-          const v = cfMap[fid];
-          if (v != null && String(v).trim()) { athleteName = String(v).trim(); break; }
-        }
+        const athleteName = resolveAthleteNameFromFields(cfMap, athleteFieldIds);
         const tags = Array.isArray(c.tags)
           ? c.tags.map(t => (typeof t === "string" ? t : (t.name || t.tag || ""))).filter(Boolean) : [];
         const name = [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || c.contactName || c.name || null;

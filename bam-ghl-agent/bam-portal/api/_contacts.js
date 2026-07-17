@@ -48,7 +48,7 @@ async function post(path, body, prefer) {
 // field ids (v15_config.athlete_name_field_ids, first non-empty wins - the same
 // precedence as cron-sync-contacts). Best-effort: never blocks a write.
 const _athleteFieldsCache = new Map();   // clientId -> string[] (process lifetime)
-async function athleteFieldIds(clientId) {
+export async function athleteFieldIds(clientId) {
   if (_athleteFieldsCache.has(clientId)) return _athleteFieldsCache.get(clientId);
   let ids = [];
   try {
@@ -59,15 +59,31 @@ async function athleteFieldIds(clientId) {
   _athleteFieldsCache.set(clientId, ids);
   return ids;
 }
+// Resolve an athlete name from a custom-fields map + the academy's mapped field
+// ids. Mapped ids can mix FULL-name fields with FIRST/LAST pairs (BAM GTA maps
+// all three), so "first non-empty wins" showed half a name when a form only
+// filled first+last (Meg Pappas' card: "Blake" instead of "Blake Pappas",
+// 2026-07-16). Rule: prefer the first mapped value that already looks like a
+// full name (has a space); otherwise join the single-word values in mapped
+// order so first+last pairs come out whole.
+export function resolveAthleteNameFromFields(cfMap, ids) {
+  if (!cfMap || typeof cfMap !== "object" || Array.isArray(cfMap)) return null;
+  const vals = [];
+  for (const fid of (ids || [])) {
+    const raw = cfMap[String(fid)];
+    const s = raw == null ? "" : (Array.isArray(raw) ? raw.join(" ") : String(raw)).trim();
+    if (s && !vals.some(x => x.toLowerCase() === s.toLowerCase())) vals.push(s);
+  }
+  if (!vals.length) return null;
+  return vals.find(s => /\s/.test(s)) || vals.join(" ");
+}
 async function withAthleteName(clientId, fields) {
   try {
     const cf = fields && fields.custom_fields;
     if (!cf || typeof cf !== "object" || Array.isArray(cf)) return fields;
     if (fields.athlete_name && String(fields.athlete_name).trim()) return fields;
-    for (const fid of await athleteFieldIds(clientId)) {
-      const v = cf[fid];
-      if (v != null && String(v).trim()) return { ...fields, athlete_name: String(v).trim() };
-    }
+    const name = resolveAthleteNameFromFields(cf, await athleteFieldIds(clientId));
+    if (name) return { ...fields, athlete_name: name };
   } catch (_) { /* name resolution is a nicety - never block the write */ }
   return fields;
 }

@@ -36,3 +36,30 @@ form the whole time, just never persisted where booking looks.
 - BAM GTA is a portal-provider academy (`booking_provider='portal'`), so it hits `bookPortalTrial`.
 - Handoff doc: `docs/athlete-name-fix-handoff.md`. See [[project_website_leads]] +
   [[project_hawkeye_mission_control]].
+
+## Round 2 - 2026-07-16 (Meg Pappas): pre-flip GHL leads had NO form data in the portal
+
+Round 1 fixed the WRITE path for new website leads. Meg Pappas' card was still empty
+because she's a **pre-portal-flip lead**: her `contacts` row came from the Jul 4
+`lead-backfill` with just email+phone, her form answers (Athlete's First/Last Name,
+age, start timeline) live only in GHL. BAM GTA is `contact_provider='portal'` +
+`v15_access=false`, so NO sync path ever brings GHL custom fields into the portal
+store - the agent + Book-it card read a blank row. ~1,000 GTA contacts were like this.
+
+### Fixes (PR branch claude/athlete-name-duplication-audit-1c01cb)
+1. **`api/_contacts.js` `resolveAthleteNameFromFields(cfMap, ids)`** - shared, exported.
+   First+last aware: prefers the first mapped value with a space ("Blake Pappas"),
+   else joins single-word values in mapped order ("Blake"+"Pappas"). Replaces the
+   old "first non-empty field wins" (which returned half a name). Used by
+   `withAthleteName`, `cron-sync-contacts`, and contact-memory.
+2. **`api/agent/contact-memory.js`** (ONE seam feeding ALL agent presets - booking
+   drafts + cold openers, confirm, closing, rebook):
+   - live GHL contact fallback when the store row's `custom_fields` is empty and a
+     token exists (real GHL ids have no dashes; minted portal uuids skip the call)
+   - reads portal-native `contact_field_values` (wizard/checkout answers, no GHL
+     bridge) with labels from `custom_field_defs` - works even with no GHL token
+   - **self-heals** the contacts row (fill-only: custom_fields/athlete_name/name)
+     so deck-names + `bookPortalTrial` see the athlete after the next draft
+3. **`scripts/backfill-ghl-contact-fields.mjs`** - one-time enrichment: for every
+   portal contact with a real GHL id + empty custom_fields/athlete_name, pull the
+   live GHL contact and fill (never clobbers). Ran for GTA 2026-07-16.
