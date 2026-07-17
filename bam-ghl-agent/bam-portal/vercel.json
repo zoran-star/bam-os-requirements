@@ -45,6 +45,10 @@
       "schedule": "0 14 * * 1"
     },
     {
+      "path": "/api/parent/notifications-worker",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/marketing?resource=meta-health-cron",
       "schedule": "0 13 * * *"
     },
@@ -220,6 +224,10 @@
     {
       "source": "/api/parent/messages/unread-count",
       "destination": "/api/parent/messages?action=unread-count"
+    },
+    {
+      "source": "/api/parent/devices/([^/]+)",
+      "destination": "/api/parent/devices?token=$1"
     },
     {
       "source": "/api/parent/member-management/change-plan",

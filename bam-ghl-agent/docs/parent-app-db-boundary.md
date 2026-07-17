@@ -14,7 +14,7 @@ cutover work (checkout/webhook/members/sorter -> typed runtime), also read
 **For agents:** before making schema changes (new tables, columns, RLS, functions, drops/renames),
 diff your plan against the lists below. If anything overlaps → **stop and tell Zoran to message Luka.**
 
-Owner: Luka (fc-mobile parent app backend). Last updated: 2026-07-07.
+Owner: Luka (fc-mobile parent app backend). Last updated: 2026-07-14.
 Original planning context lives in `fc-mobile/docs/parent-app-architecture-plan.md`
 and `fc-mobile/docs/parent-app-decisions-log.md`, which may not be available to
 all BAM Portal agents.
@@ -38,8 +38,9 @@ all BAM Portal agents.
 | Applied 2026-07-02 (guards) | identity-spine uniqueness guards (`20260702115744`) on top of the runtime guards (`20260701161000`) |
 | Deployed 2026-07-02 (API layer) | `/api/runtime/*` (staff schedule CRUD, generate-slots, calendar, diagnostics, offers read), `/api/website/trial-slots` + `/api/website/trial-booking`, parent availability alignment - merged via PR #1020, live on Vercel |
 | Applied 2026-07-03 (parent messaging baseline) | `customer_message_threads` · `customer_thread_messages` · `customer_thread_reads` + `customer_send_thread_message` RPC (`20260703020000`) |
+| Implemented locally 2026-07-14 (parent push foundation; deployment pending) | `parent_notification_events` · `parent_notification_preferences` · `parent_notification_deliveries` + parent Expo metadata on shared `device_tokens` (`20260714043304`) |
 | Not in v1 unless explicitly revived | `subscriptions` |
-| Planned (later) | `membership_change_requests` · parent notification tables/preferences (names TBD) |
+| Planned (later) | `membership_change_requests` · additional parent notification event producers · SMS delivery worker |
 
 ⚠️ These names are **reserved even before the tables/projections exist** — creating one of
 these names is itself a conflict. `offer_purchase_options` is reserved as a possible
@@ -100,7 +101,7 @@ If timing forces a parallel implementation, keep the later migration cheap:
 | `offer_teams` | Future Team offers may link schedule/templates or parent runtime options to specific team rows via soft lineage. Phase one can leave this unlinked. | reshape team row identity/data semantics, regenerate ids |
 | `pricing_catalog` | Long-term lineage target for parent `offer_prices` through confirmed Stripe/CoachIQ mappings. Phase-one parent runtime can leave this unlinked. | change `match_status` values/semantics, remove `offer_id` / `offer_price_key`, change canonical price tier semantics |
 | `locations` | Will be **additively extended** (new nullable columns) toward core `Location` | drop/rename existing columns |
-| `device_tokens` | Reused as-is for parent push | schema change |
+| `device_tokens` | Shared by client-portal APNs and parent Expo push; `app_scope` + `token_provider` isolate the paths | schema change, policy change, or sender query that omits scope/provider |
 | **Auth (whole project)** | Parents will register as Supabase auth users; `app_metadata.role='parent'` stamped at registration | logic assuming every auth user is staff/client |
 
 ---

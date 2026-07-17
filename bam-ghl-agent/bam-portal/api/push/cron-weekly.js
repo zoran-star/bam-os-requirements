@@ -41,7 +41,11 @@ async function handler(req, res) {
   }
   try {
     // Distinct clients that have at least one iOS device token.
-    const rows = await sb(`device_tokens?platform=eq.ios&client_id=not.is.null&select=client_id`);
+    const rows = await sb(
+      "device_tokens?platform=eq.ios" +
+        "&client_id=not.is.null&app_scope=eq.CLIENT_PORTAL" +
+        "&token_provider=eq.APNS&disabled_at=is.null&select=client_id",
+    );
     const clientIds = [...new Set((rows || []).map((r) => r.client_id).filter(Boolean))];
     let sent = 0;
     for (const clientId of clientIds) {
