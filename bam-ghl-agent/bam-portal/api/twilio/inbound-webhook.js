@@ -16,9 +16,11 @@ import { pickGhlToken, sendSms, ghl } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, contactInRespondedStage, interestedStage, nurtureStage, isRealInbound } from "../agent/_stage.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
-import { agentMode, modeIsOn } from "../agent/_mode.js";
+import { agentMode, memberCareAgentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
 import { cancelAllSalesOutbound } from "../agent/_cancel-outbound.js";
+import { draftMemberCareForMember, cancelPendingMemberCards, MEMBER_CARE_SELECT } from "../agent/member-care.js";
+import { notifyClientPush } from "../push/_send.js";
 import { decryptSecret } from "../messaging/_crypto.js";
 
 const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -134,6 +136,24 @@ async function handler(req, res) {
         reigniteReason: "lead replied before the reignition date",
       });
     } catch (e) { console.error("twilio inbound draft-cancel:", e.message); }
+
+    // Member Care (V2): same fast path as the GHL webhook - cancel a stale
+    // member-care card, then best-effort redraft (own-store thread read, no GHL
+    // creds needed). Two separate blocks so the draft can degrade to cancel-only.
+    let careMember = null;
+    try {
+      if (client.v2_access) {
+        const mem = await sb(`members?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(String(ghlContactId))}&select=${MEMBER_CARE_SELECT}&limit=1`);
+        careMember = Array.isArray(mem) && mem[0] ? mem[0] : null;
+        if (careMember) await cancelPendingMemberCards(client.id, careMember.id, "parent replied again");
+      }
+    } catch (e) { console.error("twilio inbound member-care cancel:", e.message); }
+    try {
+      if (careMember && modeIsOn(memberCareAgentMode(client))) {
+        const out = await draftMemberCareForMember(client, careMember, { createdBy: "webhook-fastpath" });
+        if (out?.inserted) notifyClientPush(client.id, "member-care-ready", { count: 1, view: "members" }).catch(() => {});
+      }
+    } catch (e) { console.error("twilio inbound member-care draft:", e.message); }
 
     // Replied while in a portal automation → exit (keyless exit spares 🎉 onboarding) +
     // bounce to Responded. GUARD: only move when the open opp is currently in a NUDGE/

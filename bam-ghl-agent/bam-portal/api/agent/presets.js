@@ -57,6 +57,10 @@ export const AGENT_TEMPLATES = {
   // authored when discovery_trial ships (Phase 2 only DECLARES them).
   call_booking:  { runtime: "booking", lessonKey: "call_booking", mission: "Book the lead into a discovery call (not a trial yet)." },
   call_confirm:  { runtime: "confirm", lessonKey: "call_confirm", mission: "Confirm a booked discovery call and make sure they attend it." },
+  // Member Care is NOT a pipeline-station agent: it iterates the MEMBERS roster
+  // (api/agent-member-care.js), so it never appears as a stage engine. Declared
+  // here so its lesson bucket + mission live in the same registry as its siblings.
+  member_care:   { runtime: "member_care", lessonKey: "member_care", mission: "Watch member conversations; propose billing actions, replies, and staff to-dos for approval." },
 };
 
 // ── Station-model shorthands ─────────────────────────────────────────────────

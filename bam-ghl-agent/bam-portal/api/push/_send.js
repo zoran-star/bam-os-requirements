@@ -183,6 +183,10 @@ const EVENTS = {
     title: "Hawkeye has something for you",
     body: (d.count || 1) > 1 ? `${d.count} drafts are waiting for your approval` : "A draft is waiting for your approval",
   }),
+  "member-care-ready": (d) => ({
+    title: "Member care proposal",
+    body: (d.count || 1) > 1 ? `${d.count} member conversations have proposals waiting` : "A member conversation has a proposal waiting",
+  }),
   "new-message": (d) => ({
     title: d.sender ? `New message from ${d.sender}` : "New message",
     body: d.preview || "You have a new message from your BAM team",

@@ -3,9 +3,11 @@ import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, contactInRespondedStage, scheduledTrialStage, interestedStage, nurtureStage } from "../agent/_stage.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
-import { agentMode, modeIsOn } from "../agent/_mode.js";
+import { agentMode, memberCareAgentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
 import { cancelAllSalesOutbound } from "../agent/_cancel-outbound.js";
+import { draftMemberCareForMember, cancelPendingMemberCards, MEMBER_CARE_SELECT } from "../agent/member-care.js";
+import { notifyClientPush } from "../push/_send.js";
 // Vercel Serverless Function — GHL inbound-message webhook  ("P1 Spine")
 //
 //   POST /api/ghl/inbound-webhook
@@ -268,6 +270,28 @@ async function handler(req, res) {
       });
     }
   } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }
+
+  // Member Care (V2): if this inbound is from a MEMBER's parent, any pending
+  // member-care card no longer reflects the thread - cancel it, then best-effort
+  // draft a fresh one so staff see a current card within seconds instead of
+  // waiting for the 15-min cron. TWO separate try/catch blocks on purpose: if
+  // webhook latency ever becomes a problem, delete the draft block below and the
+  // cron picks up the redraft (cancel-only degradation).
+  let careMember = null;
+  try {
+    if (contactId && client.v2_access) {
+      const mem = await sb(`members?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}&select=${MEMBER_CARE_SELECT}&limit=1`);
+      careMember = Array.isArray(mem) && mem[0] ? mem[0] : null;
+      if (careMember) await cancelPendingMemberCards(client.id, careMember.id, "parent replied again");
+    }
+  } catch (e) { console.error("ghl inbound member-care cancel:", e.message); }
+  try {
+    if (careMember && modeIsOn(memberCareAgentMode(client))) {
+      const creds = await pickGhlToken(client);
+      const out = await draftMemberCareForMember(client, careMember, { token: creds?.token, locationId: creds?.locationId, createdBy: "webhook-fastpath" });
+      if (out?.inserted) notifyClientPush(client.id, "member-care-ready", { count: 1, view: "members" }).catch(() => {});
+    }
+  } catch (e) { console.error("ghl inbound member-care draft:", e.message); }
 
   // Lead replied while in a portal automation (any EXCEPT 🎉 onboarding: the form-intro
   // 📝 contact_form / 🏀 trial_form first touches, 👻 Ghosted, 💔 Lead Nurture) → exit the
