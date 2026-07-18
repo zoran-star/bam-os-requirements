@@ -691,16 +691,16 @@ export default function Sales() {
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToastVisible(false), 1600);
 
-    // Sound
-    try {
-      const a = new (window.AudioContext || window.webkitAudioContext)();
-      const o = a.createOscillator(), g = a.createGain();
-      o.connect(g); g.connect(a.destination);
-      o.frequency.value = 300; o.type = 'sine';
-      g.gain.setValueAtTime(0.055, a.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.11);
-      o.start(); o.stop(a.currentTime + 0.11);
-    } catch (_) {}
+    // Sound — muted for now, will revisit later
+    // try {
+    //   const a = new (window.AudioContext || window.webkitAudioContext)();
+    //   const o = a.createOscillator(), g = a.createGain();
+    //   o.connect(g); g.connect(a.destination);
+    //   o.frequency.value = 300; o.type = 'sine';
+    //   g.gain.setValueAtTime(0.055, a.currentTime);
+    //   g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.11);
+    //   o.start(); o.stop(a.currentTime + 0.11);
+    // } catch (_) {}
   }, [draggingId]);
 
   /* ─── KEYBOARD SHORTCUTS ─── */
