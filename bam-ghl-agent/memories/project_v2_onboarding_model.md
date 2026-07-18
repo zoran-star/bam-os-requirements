@@ -1,10 +1,19 @@
 # V2 Onboarding Model
 
-> **RESUME POINT (2026-07-15): [`docs/onboarding-flow-handoff.md`](../docs/onboarding-flow-handoff.md)**
-> - run `/onboarding-continue`. Next session: the three sign-off redesigns
-> (per-client brand board in Blueprint Branding + flow check · owner Accept on
-> the staging link in the Website step · drop agent_ok from website readiness).
-> DETAIL Miami is mid-gate at staging_ready with a passing auto run.
+> **RESUME POINT (2026-07-18): [`docs/onboarding-wizard-spec.md`](../docs/onboarding-wizard-spec.md)**
+> - the FULL onboarding redesign is accepted: paged wizard (5 sections, every
+> question audited), staged build pipeline (6 team-built artifacts, precondition
+> triggers, owner-visible statuses, silent team pings), staff A-list (9 jobs),
+> "Add academy" front door (4 fields + GHL dropdown → 7 auto-initializations),
+> Meta = Leadsie now → BAM Connect after App Review, phone = GHL wrap→switch /
+> new number / carrier port, client Slack DISSOLVED (portal chat + SMS).
+> Build = 7 workstreams, plan-confirm-build one at a time with Zoran.
+> Everyone moves to the wizard (it reads the same completion flags - no forks).
+> Deferred: how the academy pays BAM · launch definition final call (proposal
+> in spec) · V2 ticket system / Zoran-icon (design exploration in spec).
+> Of the 2026-07-15 sign-off redesigns: #3 shipped (#1448), #2 shipped (#1449),
+> #1 became the Branding deck pipeline. Readiness gate will drop copy_ok when
+> the pipeline ships (2 owner sign-offs: brand_ok + site_accepted).
 
 The canonical doc for how onboarding, V2 access, the Business Blueprint, the tracker pill, and the Slack welcome all fit together. Read this before changing anything in those four surfaces.
 
