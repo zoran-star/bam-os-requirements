@@ -52184,6 +52184,17 @@ function _ccStyle() {
     '.mma-contact-body{flex:1;overflow-y:auto}' +
     '.mma-contact .req-empty{padding:24px 18px}' +
     '.mma-contact #member-modal-body{padding:16px 18px 28px}' +
+    /* Fit the whole Shield focus page to one screen: the card fills the viewport,
+       and each column (left member card / roster + right chat) scrolls INSIDE
+       itself instead of growing the card and scrolling the whole page. Desktop
+       only - mobile keeps its slide-over roster + bottom-sheet behavior. */
+    '@media(min-width:981px){' +
+      '#membersMachineModal.mm-focus-page{overflow:hidden}' +
+      '#membersMachineModal .mm-modal-card{height:calc(100dvh - 56px);max-height:calc(100dvh - 56px);margin:24px auto}' +
+      '#membersMachineModal .mma-split{flex:1;min-height:0;overflow:hidden}' +
+      '#membersMachineModal .mma-main{min-height:0}' +
+      '#membersMachineModal .mma-desk{flex:1;min-height:0;overflow-y:auto}' +
+    '}' +
     /* Shield chat header (identity moved here from the rail) */
     '.mma-hd{display:flex;align-items:center;gap:11px;padding:0 0 13px;margin-bottom:8px;border-bottom:1px solid var(--border)}' +
     '.mma-hd-tx{min-width:0}' +
