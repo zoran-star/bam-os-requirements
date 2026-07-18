@@ -8,6 +8,14 @@
 > Meta = Leadsie now → BAM Connect after App Review, phone = GHL wrap→switch /
 > new number / carrier port, client Slack DISSOLVED (portal chat + SMS).
 > Build = 7 workstreams, plan-confirm-build one at a time with Zoran.
+> **WS1 PR-1 SHIPPED (2026-07-18): the wizard shell is live** - `_obfOpen`/
+> `_obfRender` in client-portal.html are now the paged wizard (`_OBF_SECTIONS`
+> bar + sub-rail pills + Back/Next via `_obfWizGo`, resume via `_obfWizResume`,
+> Launch page = build stages + accept + go-live checklist with jump-to-fix via
+> `_obfWizJumpKey`). Pure view over the same `_OBF_STEPS` flags - fetchState,
+> deep links, notes, skip, preset apply, site-accept, brand-board all untouched.
+> Old checklist renderer is gone. Next PRs: new collection pages (Texting/Ads/
+> brief), offer wrap-in-place, question audits per the spec.
 > Everyone moves to the wizard (it reads the same completion flags - no forks).
 > Deferred: how the academy pays BAM · launch definition final call (proposal
 > in spec) · V2 ticket system / Zoran-icon (design exploration in spec).
