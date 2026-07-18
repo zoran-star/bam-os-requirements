@@ -32,7 +32,7 @@ import { readStoreThreadAgent } from "./messaging/read-thread.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
-import { nextAppointment, passedTrialContactIds, bookingProviderOf } from "./agent/booking.js";
+import { nextAppointment, passedTrialContactIds, upcomingBookedContactIds, bookingProviderOf } from "./agent/booking.js";
 import {
   scheduledTrialStage, contactInRespondedStage, computeConfirmQueue,
   scheduledTrialContactIdSetCached, peekScheduledTrialIdSet, respondedStage, nurtureStage, toIso,
@@ -526,12 +526,19 @@ async function detectForClient(client) {
   // academies, so V1/V1.5 behavior is unchanged.
   const passedTrial = await passedTrialContactIds(client.id);
 
+  // Leads REBOOKED onto a future PORTAL slot: the overdue "did they show up?"
+  // pass reads GHL appointments only, so a portal rebooking is invisible to it
+  // and a stale nag quoting the OLD trial date sits in the deck (Meg Pappas,
+  // GTA 2026-07-18). This set retires those nags in the prune below and blocks
+  // new ones in the overdue pass. Empty set for non-portal academies.
+  const upcomingBooked = await upcomingBookedContactIds(client.id);
+
   // Prune: cancel pending confirm cards whose lead has LEFT the Scheduled-Trial
   // stage (showed up, handed off, lost…) or whose trial has already run (the
   // post-trial form owns them now). Scoped to THIS agent's table only.
   let pruned = 0;
   try {
-    const pend = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id,kind`);
+    const pend = await sb(`agent_confirm_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id,kind,created_by`);
     for (const row of (Array.isArray(pend) ? pend : [])) {
       // A fired reignite_due card is a deliberate scheduled re-engagement - the
       // passed-trial handoff must not cancel it (#10). It has its own cancel
@@ -542,6 +549,16 @@ async function detectForClient(client) {
         pruned++;
       } else if (row.ghl_contact_id && stageSetTrusted && !scheduledIds.has(row.ghl_contact_id)) {
         await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Scheduled-Trial stage", updated_at: new Date().toISOString() }) });
+        pruned++;
+      } else if (row.created_by === "overdue-detector" && row.ghl_contact_id && (
+        upcomingBooked.has(String(row.ghl_contact_id)) ||
+        (await trialAppts(token, row.ghl_contact_id)).some(a => a.startMs > Date.now())
+      )) {
+        // Overdue "did they show up?" nag whose lead has since REBOOKED (portal
+        // slot or new GHL appointment): the old passed trial is moot - the
+        // confirm flow owns the new one, and a card quoting the old date must
+        // not sit in the deck.
+        await sb(`agent_confirm_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "rebooked - a future trial is scheduled", updated_at: new Date().toISOString() }) });
         pruned++;
       }
     }
@@ -812,22 +829,30 @@ async function detectForClient(client) {
       // in list-ready - an overdue "did they show up?" nag would be a duplicate.
       if (passedTrial.has(String(contactId))) continue;
       // Already carded? (a) any active confirm card -> leave it (the unique index
-      // allows only one). (b) we already raised an overdue card -> never nag twice.
+      // allows only one). (b) we already raised an overdue card for THIS trial ->
+      // never nag twice (checked below once lastPast is known).
       let cards = [];
-      try { cards = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=status,created_by&order=created_at.desc&limit=10`); } catch (_) { cards = []; }
+      try { cards = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=status,created_by,trial_at&order=created_at.desc&limit=10`); } catch (_) { cards = []; }
       cards = Array.isArray(cards) ? cards : [];
       if (cards.some(c => ["pending", "approved"].includes(c.status))) continue;
-      if (cards.some(c => c.created_by === "overdue-detector")) continue;
       // Already reviewed? Then it is not stranded.
       let rev = [];
       try { rev = await sb(`post_trial_reviews?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id&limit=1`); } catch (_) { rev = []; }
       if (Array.isArray(rev) && rev.length) continue;
       // Is the booked trial actually PAST (+ grace) with nothing upcoming?
+      // Rebooked onto a future PORTAL slot: trialAppts() below reads GHL only,
+      // so the new booking is invisible to it - skip, they are not stranded.
+      if (upcomingBooked.has(String(contactId))) continue;
       const appts = await trialAppts(token, contactId);
       if (!appts.length) continue;
       if (appts.some(a => a.startMs > nowMs)) continue;            // a future trial exists -> not stranded
       const lastPast = appts.filter(a => a.startMs <= nowMs).sort((a, b) => b.startMs - a.startMs)[0];
       if (!lastPast) continue;
+      // Never nag twice FOR THE SAME TRIAL - scoped by trial_at (not "ever") so
+      // a lead whose stale nag was canceled on a rebook still gets a fresh,
+      // correctly-dated nag if the NEW trial passes unreviewed too. A dateless
+      // legacy card keeps blocking (can't tell which trial it was for).
+      if (cards.some(c => c.created_by === "overdue-detector" && (!c.trial_at || new Date(c.trial_at).getTime() >= lastPast.startMs))) continue;
       const age = nowMs - lastPast.startMs;
       if (age < OVERDUE_GRACE_MS || age > OVERDUE_MAX_MS) continue; // too soon, or too old to resurrect
       // Do not card a paid member (O6 reuse).
@@ -925,6 +950,10 @@ async function handler(req, res) {
           const bks = await sb(`trial_bookings?tenant_id=eq.${clientId}&status=eq.BOOKED&select=id,ghl_contact_id,parent_name,athlete_name,schedule_slots(start_time,name)`) || [];
           const rows = (Array.isArray(bks) ? bks : []).filter(t => t.schedule_slots && t.schedule_slots.start_time);
           const upcoming = new Set(rows.filter(t => t.schedule_slots.start_time > nowIso).map(t => String(t.ghl_contact_id || "")));
+          // Read-time gate for stale overdue "did they show up?" nags: the lead
+          // REBOOKED (upcoming slot), so a card quoting the OLD trial date is
+          // moot. Hide it now; the detector cron's prune cancels the row for real.
+          if (upcoming.size) list = list.filter(r => !(r.created_by === "overdue-detector" && r.ghl_contact_id && upcoming.has(String(r.ghl_contact_id))));
           let due = rows.filter(t => t.schedule_slots.start_time <= nowIso && !upcoming.has(String(t.ghl_contact_id || "")));
           // ONE form card per lead: a contact with several passed BOOKED rows
           // (data quirks, repeat no-shows) keeps only the LATEST slot. Epoch

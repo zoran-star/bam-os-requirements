@@ -244,3 +244,22 @@ Open loops (human/next session):
 - computeClosingQueue got the recency overlay; the closing agent still caps
   DETECT_CAP=10/run.
 - Reactivation cohort (8 texted Jul 2 ~5:18 PM): watch for replies in Hawkeye.
+
+## 2026-07-18 - overdue "did they show up?" nag was blind to portal rebookings
+Meg Pappas (GTA): her Hawkeye card said "Trial on Tue, Jul 7 4:00 PM has passed
+with no review logged" while the real session was Wed Jul 22 8pm. Cause: the
+overdue-detector + prune in `api/agent-confirm.js` check future trials via
+`trialAppts()` (GHL appointments ONLY), but Book-it on a portal-provider academy
+books via `bookPortalTrial` (trial_bookings, NO GHL appointment) - so a rebooked
+lead still looked stranded and the stale nag sat pending quoting the old date.
+Fixed (V2-only, detect loads v2_access clients):
+- detect: `upcomingBookedContactIds` (portal spine) now skips rebooked leads
+  before the GHL appts check.
+- prune: pending `created_by='overdue-detector'` cards cancel when the lead has
+  an upcoming portal slot OR a future GHL appt ("rebooked - a future trial is
+  scheduled").
+- list-ready: read-time gate hides those stale nags instantly (cron cancels for
+  real).
+- "never nag twice" is now scoped per trial via `trial_at` (>= lastPast blocks),
+  so a lead who rebooks and no-shows AGAIN gets a fresh, correctly-dated nag;
+  dateless legacy cards still block forever.

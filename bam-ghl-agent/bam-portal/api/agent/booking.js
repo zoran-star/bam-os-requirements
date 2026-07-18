@@ -82,8 +82,10 @@ export async function passedTrialContactIds(clientId) {
 // just-booked lead in Responded lets the detector re-queue a SECOND Book-it ->
 // double booking (Yaz/Tara, GTA 2026-07-11). Read-time gates hide any lingering
 // Booking card the same way. Portal-booking academies only (their trial spine
-// lives in trial_bookings). The Confirm agent deliberately does NOT use this set -
-// a booked lead belongs in confirm land (that is where confirmations happen).
+// lives in trial_bookings). The Confirm agent uses this set ONLY to skip/retire
+// the overdue "did they show up?" nag for rebooked leads (a portal rebooking is
+// invisible to GHL appointment reads) - never to hide confirm cards, since a
+// booked lead belongs in confirm land (that is where confirmations happen).
 // Fails to an empty set so a lookup hiccup never wrongly hides live cards.
 export async function upcomingBookedContactIds(clientId) {
   try {
