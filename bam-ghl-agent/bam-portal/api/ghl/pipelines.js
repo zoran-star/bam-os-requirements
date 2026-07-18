@@ -413,6 +413,7 @@ async function handler(req, res) {
         parent_phone:   parentPhone,
         ghl_contact_id: contactId,
         status:         "payment_method_required",
+        signup_origin:  "convert",   // pre-payment shell - hidden from the roster until paid
         joined_date:    new Date().toISOString().slice(0, 10),
         created_at:     nowIso(),
         updated_at:     nowIso(),
