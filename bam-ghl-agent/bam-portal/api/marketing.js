@@ -684,6 +684,9 @@ async function handler(req, res) {
     if (resource === "meta-creatives") {
       return await handleMetaCreatives(req, res);
     }
+    if (resource === "meta-previews") {
+      return await handleMetaPreviews(req, res);
+    }
     if (resource === "meta-machine") {
       return await handleMetaMachine(req, res);
     }
@@ -4243,6 +4246,82 @@ async function handleMetaCreatives(req, res) {
   }
 
   return res.status(200).json({ creatives });
+}
+
+// ─────────────────────────────────────────────────────────
+// META AD PLACEMENT PREVIEWS
+// ─────────────────────────────────────────────────────────
+// GET /api/marketing?resource=meta-previews&ad_id=...
+// Returns Meta-rendered previews of a LIVE ad across every placement
+// (FB feed / story / reels, IG feed / story / reels, etc). Read-only —
+// uses the /{ad_id}/previews Graph edge, which returns an iframe per
+// ad_format. We extract the facebook.com iframe src and hand the client
+// a clean list; the raw staff token is never shipped (the preview URL's
+// d/t params are opaque Meta-signed blobs that expire after ~24h).
+
+const META_PREVIEW_FORMATS = [
+  { format: "MOBILE_FEED_STANDARD", label: "Facebook Feed", group: "facebook" },
+  { format: "FACEBOOK_STORY_MOBILE", label: "Facebook Story", group: "facebook" },
+  { format: "FACEBOOK_REELS_MOBILE", label: "Facebook Reels", group: "facebook" },
+  { format: "DESKTOP_FEED_STANDARD", label: "Facebook Feed (Desktop)", group: "facebook" },
+  { format: "RIGHT_COLUMN_STANDARD", label: "Facebook Right Column", group: "facebook" },
+  { format: "MARKETPLACE_MOBILE", label: "Facebook Marketplace", group: "facebook" },
+  { format: "INSTAGRAM_STANDARD", label: "Instagram Feed", group: "instagram" },
+  { format: "INSTAGRAM_STORY", label: "Instagram Story", group: "instagram" },
+  { format: "INSTAGRAM_REELS", label: "Instagram Reels", group: "instagram" },
+  { format: "INSTAGRAM_EXPLORE_CONTEXTUAL", label: "Instagram Explore", group: "instagram" },
+];
+
+async function handleMetaPreviews(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.client && !ctx.staff) return res.status(403).json({ error: "client or staff required" });
+
+  const adId = (req.query.ad_id || "").trim();
+  if (!/^\d+$/.test(adId)) return res.status(400).json({ error: "valid ad_id required" });
+
+  // Same partner-share strategy as creatives: one staff token covers all clients.
+  const staffToken = await getAnyStaffMetaToken();
+  if (!staffToken) return res.status(200).json({ previews: [], reason: "no_staff_token" });
+
+  // Fetch every placement in parallel; a format that errors for this ad
+  // (e.g. a placement the ad doesn't run in) just drops out of the list.
+  const results = await Promise.all(META_PREVIEW_FORMATS.map(async (f) => {
+    try {
+      const r = await fetch(`${META_GRAPH}/${encodeURIComponent(adId)}/previews?` + new URLSearchParams({
+        ad_format: f.format,
+        access_token: staffToken,
+      }));
+      const j = await r.json();
+      const body = j?.data?.[0]?.body || "";
+      if (!r.ok || !body) return null;
+      // Pull the iframe src + dimensions out of the returned snippet.
+      const srcMatch = body.match(/src="([^"]+)"/);
+      let src = srcMatch ? srcMatch[1].replace(/&amp;/g, "&") : null;
+      if (!src) return null;
+      // Safety: never ship a URL carrying the raw staff token, and only
+      // accept facebook.com-hosted preview URLs.
+      if (src.includes(staffToken)) return null;
+      let host = "";
+      try { host = new URL(src).hostname; } catch (_) { return null; }
+      if (!/(^|\.)facebook\.com$/.test(host)) return null;
+      const wMatch = body.match(/width="(\d+)"/);
+      const hMatch = body.match(/height="(\d+)"/);
+      return {
+        format: f.format,
+        label: f.label,
+        group: f.group,
+        src,
+        width: wMatch ? Number(wMatch[1]) : null,
+        height: hMatch ? Number(hMatch[1]) : null,
+      };
+    } catch (_) {
+      return null;
+    }
+  }));
+
+  return res.status(200).json({ previews: results.filter(Boolean) });
 }
 
 // ─────────────────────────────────────────────────────────

@@ -170,6 +170,10 @@
       "destination": "/api/marketing?resource=meta-creatives"
     },
     {
+      "source": "/api/meta/previews",
+      "destination": "/api/marketing?resource=meta-previews"
+    },
+    {
       "source": "/api/auth/staff-meta/start",
       "destination": "/api/marketing?resource=meta-staff-auth&step=prepare"
     },
