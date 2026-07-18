@@ -11427,6 +11427,9 @@ Then the call to action."]</div>
        across every placement (FB feed/story/reels, IG feed/story/reels).
   ══════════════════════════════ -->
   <style>
+    /* Preview opens on TOP of the Marketing Machine focus page (also z-index:1000
+       but later in the DOM), so lift it above. */
+    #view-ad-previews.mm-focus-page { z-index: 1002; }
     #view-ad-previews .adprev-head { display:flex; align-items:center; gap:13px; margin-bottom:8px; }
     #view-ad-previews .adprev-head .mm-back-btn { margin-bottom:0; }
     #view-ad-previews .adprev-head .topbar-kicker { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color: var(--gold, #D4B65C); }
@@ -30286,6 +30289,15 @@ function openAdPreviewsFromTile(btn) {
   openAdPreviews(tile.dataset.adId, tile.dataset.adName || 'Creative');
 }
 
+// Marketing Machine focus mode: the tile passes an index into window._MMC_REP
+// (rebuilt each render), which holds { creative, ... }. Read ad_id/name from there.
+function openAdPreviewsFromMM(idx) {
+  const rec = (window._MMC_REP || [])[idx];
+  const c = rec && rec.creative;
+  if (!c || !c.ad_id) return;
+  openAdPreviews(String(c.ad_id), c.name || 'Creative');
+}
+
 async function openAdPreviews(adId, adName) {
   const nameEl = document.getElementById('adprev-adname');
   if (nameEl) nameEl.textContent = adName || '';
@@ -30355,7 +30367,14 @@ function _adprevMount() {
     </div>`;
 }
 
-function closeAdPreviews() { _mmCloseFocus('view-ad-previews'); }
+function closeAdPreviews() {
+  _mmCloseFocus('view-ad-previews');
+  // We may have opened ON TOP of another focus page (the Marketing Machine).
+  // _mmCloseFocus drops the shared `mm-focus-open` flag; re-assert it if a
+  // focus page is still open underneath so its backdrop stays in focus mode.
+  const under = document.querySelector('.mm-focus-page.mm-open');
+  if (under) document.documentElement.classList.add('mm-focus-open');
+}
 
 function closeCampaignDetail() {
   const detail = document.getElementById('marketing-detail');
@@ -57310,6 +57329,7 @@ function _mmRenderMetaFocus(d) {
         (v.note ? '<div class="mm-cr-note ' + (v.verdict === 'replace' ? 'mm-note-replace' : 'mm-note-edit') + '">' + (v.verdict === 'replace' ? '&#8635; ' : '&#9998; ') + _escapeHtml(v.note) + '</div>' : '') +
         '<div style="display:flex;gap:8px;margin-top:10px">' +
           '<button type="button" class="mm-cbtn" onclick="event.stopPropagation();_mmcOpen(\'replace\',' + repIdx + ')">&#8635; replace</button>' +
+          ((_adprevEnabled() && c.ad_id) ? '<button type="button" class="mm-cbtn" onclick="event.stopPropagation();openAdPreviewsFromMM(' + repIdx + ')">&#9673; preview</button>' : '') +
         '</div>' +
       '</div></div>';
   };
