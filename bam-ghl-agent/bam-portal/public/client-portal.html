@@ -1500,6 +1500,33 @@ if (window.__MOCK__) (() => {
     border-color: #C7253E;
   }
 
+  /* "Preview" pill over the thumbnail (V2 placement previews) */
+  .creative-preview-btn {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(10,10,11,0.78);
+    color: rgba(255,255,255,0.9);
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .creative-preview-btn:hover {
+    color: var(--gold, #D4B65C);
+    border-color: var(--gold, #D4B65C);
+  }
+
   /* Selected state: dim the image, show action buttons */
   .creative-actions {
     position: absolute;
@@ -11391,6 +11418,43 @@ Then the call to action."]</div>
         <div class="topbar-title" id="bb-topbar-title" style="display:none">Business Blueprint</div>
       </div>
       <div id="bb-panel"><!-- rendered by openBlueprintView() based on hash --></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════
+       AD PLACEMENT PREVIEWS (V2 marketing, GTA-first)
+       Focus overlay showing Meta-rendered previews of a live ad
+       across every placement (FB feed/story/reels, IG feed/story/reels).
+  ══════════════════════════════ -->
+  <style>
+    #view-ad-previews .adprev-head { display:flex; align-items:center; gap:13px; margin-bottom:8px; }
+    #view-ad-previews .adprev-head .mm-back-btn { margin-bottom:0; }
+    #view-ad-previews .adprev-head .topbar-kicker { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color: var(--gold, #D4B65C); }
+    #view-ad-previews .adprev-adname { margin-left:auto; font-size:13px; font-weight:700; color:var(--text-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:46%; }
+    #view-ad-previews .adprev-tabs { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:10px 0 16px; }
+    #view-ad-previews .adprev-group-label { width:100%; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-mute); margin-top:6px; }
+    #view-ad-previews .adprev-tab {
+      font-family:inherit; font-size:12px; font-weight:700; padding:6px 13px; border-radius:999px;
+      border:1px solid var(--line); background:var(--surface-el); color:var(--text-sub);
+      cursor:pointer; transition:all .15s ease;
+    }
+    #view-ad-previews .adprev-tab:hover { color:var(--text); border-color:var(--borderm, var(--line)); }
+    #view-ad-previews .adprev-tab.active {
+      background:color-mix(in srgb, var(--gold,#D4B65C) 15%, transparent);
+      color:var(--gold,#D4B65C);
+      border-color:color-mix(in srgb, var(--gold,#D4B65C) 35%, transparent);
+    }
+    #view-ad-previews .adprev-stage { display:flex; justify-content:center; align-items:flex-start; min-height:320px; }
+    #view-ad-previews .adprev-note { font-size:12px; color:var(--text-mute); text-align:center; margin-top:12px; }
+  </style>
+  <div class="modal-backdrop mm-focus-page" id="view-ad-previews" style="display:none" onclick="if(event.target===this)closeAdPreviews()">
+    <div class="modal-card mm-modal-card" onclick="event.stopPropagation()">
+      <div class="adprev-head">
+        <button type="button" class="mm-back-btn" onclick="closeAdPreviews()">&lsaquo; Back</button>
+        <span class="topbar-kicker">&sect; 02 &middot; Ad Preview</span>
+        <div class="adprev-adname" id="adprev-adname"></div>
+      </div>
+      <div id="adprev-panel"><!-- rendered by openAdPreviews() --></div>
     </div>
   </div>
 
@@ -30166,11 +30230,15 @@ async function _renderCampaignCreatives(campaignId) {
           : isCarousel
             ? (fbUrl ? 'Click to view carousel on Facebook' : 'Carousel ad - first slide shown')
             : (fbUrl ? 'Click to view ad on Facebook' : '');
+      // V2 (GTA-first): "Preview" pill opens the placement-previews focus mode
+      const previewBtn = _adprevEnabled() ? `
+          <button class="creative-preview-btn" onclick="event.stopPropagation();openAdPreviewsFromTile(this)" title="See this ad in every placement">Preview</button>` : '';
       return `
-        <div class="creative-tile" data-ad-id="${escapeHTML(c.ad_id)}" style="position:relative;${cursor}" ${clickHandler} title="${titleAttr}">
+        <div class="creative-tile" data-ad-id="${escapeHTML(c.ad_id)}" data-ad-name="${adNameLabel}" style="position:relative;${cursor}" ${clickHandler} title="${titleAttr}">
           ${imgInner}
           ${openOverlay}
           ${carouselBadge}
+          ${previewBtn}
           <button class="creative-delete" onclick="event.stopPropagation();openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
             <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 3L13 13M13 3L3 13"/>
@@ -30182,6 +30250,96 @@ async function _renderCampaignCreatives(campaignId) {
     gridEl.innerHTML = `<div class="req-empty" style="grid-column:1/-1;padding:18px 0">Failed: ${escapeHTML(e.message)}</div>`;
   }
 }
+
+// ── Ad placement previews (V2, GTA-first rollout) ─────────────────
+// Meta's /{ad_id}/previews edge renders the LIVE ad exactly as it appears
+// in each placement (FB feed / story / reels, IG feed / story / reels...).
+// A "Preview" pill on each creative tile opens a focus overlay with one
+// pill per placement and the Meta-rendered iframe for the selected one.
+const _ADPREV_ALLOW = ['39875f07-0a4b-4429-a201-2249bc1f24df']; // BAM GTA - add client ids to widen rollout
+function _adprevEnabled() {
+  const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  return isV2 && typeof CLIENT_ID !== 'undefined' && _ADPREV_ALLOW.includes(CLIENT_ID);
+}
+const _adprevCache = {};                              // ad_id -> previews[]
+let _ADPREV = { adId: null, previews: [], active: 0 };
+
+function openAdPreviewsFromTile(btn) {
+  const tile = btn.closest('.creative-tile');
+  if (!tile) return;
+  openAdPreviews(tile.dataset.adId, tile.dataset.adName || 'Creative');
+}
+
+async function openAdPreviews(adId, adName) {
+  const nameEl = document.getElementById('adprev-adname');
+  if (nameEl) nameEl.textContent = adName || '';
+  const panel = document.getElementById('adprev-panel');
+  _ccOpenFocusPage('view-ad-previews', '#marketing-detail');
+  if (!panel) return;
+  panel.innerHTML = '<div class="req-empty" style="padding:26px 0;text-align:center"><span class="req-spin"></span>Rendering placements…</div>';
+  try {
+    let previews = _adprevCache[adId];
+    if (!previews) {
+      const token = await _mreqAuthToken();
+      const res = await fetch('/api/meta/previews?ad_id=' + encodeURIComponent(adId), {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const json = await _safeJson(res);
+      if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+      previews = json.previews || [];
+      _adprevCache[adId] = previews;
+    }
+    if (!previews.length) {
+      panel.innerHTML = '<div class="req-empty" style="padding:26px 0;text-align:center">No placement previews available for this ad.</div>';
+      return;
+    }
+    _ADPREV = { adId, previews, active: 0 };
+    _adprevRender();
+  } catch (e) {
+    panel.innerHTML = `<div class="req-empty" style="padding:26px 0;text-align:center">Couldn't load previews: ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _adprevRender() {
+  const panel = document.getElementById('adprev-panel');
+  if (!panel) return;
+  const { previews, active } = _ADPREV;
+  const groups = [['facebook', 'Facebook'], ['instagram', 'Instagram']];
+  const tabs = groups.map(([g, glabel]) => {
+    const items = previews.map((p, i) => ({ p, i })).filter(x => x.p.group === g);
+    if (!items.length) return '';
+    return `<div class="adprev-group-label">${glabel}</div>` + items.map(({ p, i }) =>
+      `<button type="button" class="adprev-tab${i === active ? ' active' : ''}" onclick="_adprevSelect(${i})">${escapeHTML(p.label.replace(/^(Facebook|Instagram) /, ''))}</button>`
+    ).join('');
+  }).join('');
+  panel.innerHTML = `
+    <div class="adprev-tabs">${tabs}</div>
+    <div class="adprev-stage" id="adprev-stage"></div>
+    <div class="adprev-note">Live preview rendered by Meta - this is exactly how the ad appears in this placement.</div>`;
+  _adprevMount();
+}
+
+function _adprevSelect(i) {
+  _ADPREV.active = i;
+  _adprevRender();
+}
+
+function _adprevMount() {
+  const stage = document.getElementById('adprev-stage');
+  const p = _ADPREV.previews[_ADPREV.active];
+  if (!stage || !p) return;
+  // Meta's iframes are fixed-size per placement; scale down to fit the card
+  // (phones especially - V2 clients live on mobile).
+  const w = p.width || 340, h = p.height || 600;
+  const avail = Math.min(stage.clientWidth || 320, 560);
+  const scale = Math.min(1, avail / w);
+  stage.innerHTML = `
+    <div style="width:${Math.round(w * scale)}px;height:${Math.round(h * scale)}px;overflow:hidden;border-radius:12px;border:1px solid var(--line)">
+      <iframe src="${escapeHTML(p.src)}" width="${w}" height="${h}" scrolling="yes" style="border:none;transform:scale(${scale});transform-origin:top left;background:#fff" title="${escapeHTML(p.label)}"></iframe>
+    </div>`;
+}
+
+function closeAdPreviews() { _mmCloseFocus('view-ad-previews'); }
 
 function closeCampaignDetail() {
   const detail = document.getElementById('marketing-detail');
