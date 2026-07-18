@@ -339,7 +339,10 @@ async function handler(req, res) {
       parent_email:           parentEmail,
       parent_phone:           parentPhone,
       plan,
+      // Pre-payment shell: hidden from the members roster (signup_origin) until
+      // the webhook flips it live - the person stays a lead until they pay.
       status:                 "payment_method_required",
+      signup_origin:          "website_enroll",
       stripe_customer_id:     customerId,
       stripe_subscription_id: sub.id,
       stripe_price_id:        price.stripe_price_id,

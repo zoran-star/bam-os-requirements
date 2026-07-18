@@ -9,9 +9,10 @@ export const maxDuration = 60; // Stripe search + customer + sub writes
 // before) onto a live offer price without the public checkout. Two doors:
 //   - saved card  -> portal-owned subscription created directly (charge now,
 //                    or trial_end-anchored to a chosen start date)
-//   - no card     -> pending member (payment_method_required) + a mode:'setup'
-//                    Checkout link to collect a card; staff re-run the flow
-//                    once the card is saved and it completes the signup.
+//   - no card     -> NOTHING is created. Returns the academy's public enroll
+//                    link (mode:'enroll_link') for staff to send; the person
+//                    stays a lead until they finish the form and pay
+//                    (locked decision 2026-07-18 - no pre-payment member shells).
 //
 // POST /api/members/enroll   body: { action, client_id, ... }
 //   action=find-customer { q }
@@ -27,7 +28,7 @@ export const maxDuration = 60; // Stripe search + customer + sub writes
 //                   parent_email?, parent_phone?, charge_mode: 'now'|'on_date',
 //                   start_date?, coupon_code?, consent_confirmed: true }
 //     -> door A: { ok, mode: 'charged'|'scheduled', member_id, subscription_id, ... }
-//     -> door B: { ok, mode: 'card_link', member_id, url, parent, suggested }
+//     -> door B: { ok, mode: 'enroll_link', url, parent, suggested }
 //
 // Consent is a HARD gate (locked decision 2026-07-08): enroll rejects unless
 // consent_confirmed === true, and the confirmation is written to the audit row.
@@ -242,11 +243,6 @@ async function resolvePromo(codeRaw, acct, planCents) {
   const applied = applyDiscountToCents(def, planCents);
   if (!applied.ok) fail(applied.error);
   return { pc, code, label: applied.label, discount_cents: applied.discountCents, discounted_cents: applied.discountedCents };
-}
-
-function setupLinkBase(req) {
-  const origin = req.headers.origin || `https://${req.headers.host || ""}`;
-  return /localhost|127\.0\.0\.1/.test(origin) ? origin : "https://portal.byanymeansbusiness.com";
 }
 
 // ── action: find-customer ──────────────────────────────────
@@ -576,41 +572,44 @@ async function actionEnroll(res, req, { clientId, acct, ctx, body }) {
   const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_name&limit=1`).catch(() => []);
   const academyName = (clientRows && clientRows[0] && clientRows[0].business_name) || "your academy";
 
-  // ── Door B: no usable card -> pending members for all + ONE setup link ──
+  // ── Door B: no usable card -> hand staff the ENROLL LINK, create NOTHING ──
+  // Locked decision (Zoran 2026-07-18): no card on file means we do NOT create
+  // pending member rows. The person stays a LEAD in the pipeline; staff send the
+  // academy's public enroll link and the parent completes signup (and payment)
+  // themselves. The member row is born by api/website/checkout.js when they pay.
   if (!pm) {
-    const base = setupLinkBase(req);
-    const session = await stripeFetch(`/checkout/sessions`, {
-      method: "POST", stripeAccount: acct,
-      body: {
-        mode: "setup", currency: prepared[0].target.currency || "cad", customer: customerId,
-        success_url: `${base}/client-portal.html?card=saved`,
-        cancel_url: `${base}/client-portal.html?card=cancelled`,
-      },
-    });
-    const results = [];
-    for (const p of prepared) {
-      const memberId = await upsertAthleteMember({
-        clientId, athleteName: p.a.athlete_name, parentName, parentEmail, parentPhone,
-        customerId, plan: planFromKey(p.target.key), contactId: parent.contactId, contactKey: parent.contactKey, resumable: p.resumable,
+    let signupUrl = "";
+    try {
+      const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+      signupUrl = ((offers && offers[0] && offers[0].data && offers[0].data.signup_url) || "").trim();
+    } catch (_) { /* handled below */ }
+    if (!signupUrl) {
+      return res.status(409).json({
+        error: "No card on file, and no sign-up link is set for this academy. Set the link in KPIs, then Setup, then Offers - or collect the card first and re-run this signup.",
       });
-      if (memberId) await writeMemberFieldValues(memberId, p.defs, p.a.field_values);
-      await writeAudit({
-        client_id: clientId, member_id: memberId, performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null,
-        action_type: "enroll-returning",
-        args: { door: "card_link", offer_price_key: p.target.key, charge_mode: chargeMode, start_date: startDate, consent_confirmed: true, customer_id: customerId, coupon_code: p.promo ? p.promo.code : null },
-        stripe_response: { checkout_session: session.id },
-      });
-      results.push({ ok: true, athlete_name: p.a.athlete_name, member_id: memberId, mode: "card_link" });
     }
+    let enrollUrl = signupUrl;
+    try {
+      const u = new URL(enrollUrl);
+      u.searchParams.set("client_id", clientId);
+      if (parent.contactKey) u.searchParams.set("contact_id", String(parent.contactKey));
+      enrollUrl = u.toString();
+    } catch (_) { /* not a valid absolute URL - use as-is */ }
     const names = prepared.map(p => p.a.athlete_name).join(", ");
+    await writeAudit({
+      client_id: clientId, member_id: null, performed_by: ctx.user.id, performed_by_name: ctx.staff?.name || null,
+      action_type: "enroll-returning",
+      args: { door: "enroll_link", athletes: prepared.map(p => ({ athlete_name: p.a.athlete_name, offer_price_key: p.target.key })), customer_id: customerId, consent_confirmed: true },
+    });
     return res.status(200).json({
-      ok: true, mode: "card_link", url: session.url, results,
+      ok: true, mode: "enroll_link", url: enrollUrl,
+      results: prepared.map(p => ({ ok: true, athlete_name: p.a.athlete_name, mode: "enroll_link" })),
       parent: { name: parentName, email: parentEmail, phone: parentPhone },
       suggested: {
-        sms_text: `Hi, here's the secure link to add your card and finish signing up ${names} with ${academyName}: ${session.url}`,
-        email_subject: `Finish signup - ${academyName}`,
+        sms_text: `Hi${parentName ? " " + parentName.split(" ")[0] : ""}, here's the link to sign ${names} up with ${academyName}: ${enrollUrl}`,
+        email_subject: `Sign up - ${academyName}`,
       },
-      note: "No usable card on file. Send the link; once the card is saved, run this signup again and it completes.",
+      note: "No usable card on file. Nothing was created - they stay a lead until they finish the enroll form and pay.",
     });
   }
 

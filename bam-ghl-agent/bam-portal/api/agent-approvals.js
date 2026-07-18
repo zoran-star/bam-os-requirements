@@ -1002,6 +1002,26 @@ async function handler(req, res) {
         const liveIds = await liveMemberContactIds(clientId);
         if (liveIds.size) list = list.filter(r => !r.ghl_contact_id || !liveIds.has(String(r.ghl_contact_id)));
       } catch (_) { /* fail open */ }
+      // Enroll-form flag: a lead who FILLED the enroll form but hasn't paid gets
+      // enroll_form_filled_at stamped on their card - the deck shows a banner so
+      // the reviewer knows they're one payment step from converting (they stay a
+      // LEAD, never a roster member, until the payment lands). Matched on
+      // ghl_contact_id (website checkout persists it from the enroll link's
+      // ?contact_id). Fail open.
+      try {
+        const cids = [...new Set(list.map(r => r.ghl_contact_id).filter(Boolean).map(String))].slice(0, 200);
+        if (cids.length) {
+          const shells = await sb(
+            `members?client_id=eq.${clientId}&status=eq.payment_method_required&signup_origin=eq.website_enroll` +
+            `&ghl_contact_id=in.(${cids.map(encodeURIComponent).join(",")})&select=ghl_contact_id,created_at`
+          );
+          const shellBy = new Map((Array.isArray(shells) ? shells : []).map(s => [String(s.ghl_contact_id), s.created_at]));
+          for (const r of list) {
+            const at = r.ghl_contact_id && shellBy.get(String(r.ghl_contact_id));
+            if (at) r.enroll_form_filled_at = at;
+          }
+        }
+      } catch (_) { /* fail open */ }
       // Booking provider drives the Book-it card copy: only portal academies send
       // the confirmation text from the deck; GHL academies let GHL's booked-trial
       // automation send it (#3). Fail to 'ghl' (the no-double-text branch).

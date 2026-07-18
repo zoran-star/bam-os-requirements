@@ -218,6 +218,10 @@ async function handler(req, res) {
     // the EXACT opportunity WON on payment, and persist it on the member row. Optional
     // — when absent the webhook falls back to the member's open opp by contact.
     const oppId = (body.opp_id || body.opportunity_id || "").toString().trim() || null;
+    // The enroll link also carries ?contact_id=<GHL contact id>. Persisting it on
+    // the member row lets the pipeline drawer + Hawkeye show "enroll form filled"
+    // on the LEAD while they sit unpaid in Done Trial.
+    const ghlContactId = (body.contact_id || body.ghl_contact_id || "").toString().trim() || null;
     // Optional future membership start date. Anchors billing when eligible (see the
     // recurringStart block below); otherwise a display/access label.
     const startDate = clampStartDate(body.start_date);
@@ -448,11 +452,14 @@ async function handler(req, res) {
     const memberFields = {
       client_id: clientId, athlete_name: athleteName, parent_name: parentName,
       parent_email: parentEmail, parent_phone: parentPhone, plan: planText,
-      status: "payment_method_required", stripe_customer_id: customerId,
+      // signup_origin keeps this pre-payment shell OFF the members roster - the
+      // person stays a lead in the pipeline until the webhook flips them live.
+      status: "payment_method_required", signup_origin: "website_enroll", stripe_customer_id: customerId,
       stripe_subscription_id: sub.id, stripe_price_id: price.stripe_price_id, updated_at: nowIso(),
     };
-    // Only stamp the opp link when we have one — never null out an existing link on a retry.
+    // Only stamp the opp/contact links when we have them — never null out an existing link on a retry.
     if (oppId) memberFields.ghl_opportunity_id = oppId;
+    if (ghlContactId) memberFields.ghl_contact_id = ghlContactId;
     // Chosen future start date. Drives billing when eligible (recurringStart set →
     // charged today, recurring anchored to start+interval); else a display/access label.
     // Only set when present so a retry without it doesn't wipe a previously-chosen date.

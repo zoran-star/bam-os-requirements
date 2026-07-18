@@ -31,7 +31,7 @@ export async function loadContactMemory(sb, clientId, contactId, opts = {}) {
   let contact = null, ptr = null, notes = [], booking = null;
   try {
     [contact, ptr, notes, booking] = await Promise.all([
-      sb(`${await contactsReadTable(clientId)}?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&select=name,athlete_name,tags,custom_fields&limit=1`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null),
+      sb(`${await contactsReadTable(clientId)}?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&select=name,email,athlete_name,tags,custom_fields&limit=1`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null),
       sb(`post_trial_reviews?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&select=showed_up,good_fit,trainer,notes,created_at&order=created_at.desc&limit=1`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null),
       sb(`agent_contact_notes?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&active=eq.true&select=note,created_by,created_at&order=created_at.desc&limit=20`).then(r => (Array.isArray(r) ? r : [])).catch(() => []),
       // Authoritative parent + athlete names from the portal trial spine (typed at
@@ -95,6 +95,22 @@ export async function loadContactMemory(sb, clientId, contactId, opts = {}) {
     if (ptr.trainer) lines.push(`Their trainer was ${ptr.trainer}.`);
     if (ptr.notes && String(ptr.notes).trim()) lines.push(`Post-trial notes from the coach: ${String(ptr.notes).trim()}`);
   }
+
+  // Enroll-form state: a members row at payment_method_required born on the
+  // public enroll form means they FILLED the form but never paid. They are not
+  // a member (the roster hides these shells; the lead stays in Done Trial) -
+  // but the agent must know, so it nudges them to FINISH instead of re-pitching.
+  try {
+    const shellSel = `status=eq.payment_method_required&signup_origin=eq.website_enroll&select=athlete_name,created_at&order=created_at.desc&limit=1`;
+    let shell = await sb(`members?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&${shellSel}`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null);
+    if (!shell && contact?.email) {
+      shell = await sb(`members?client_id=eq.${clientId}&parent_email=eq.${encodeURIComponent(String(contact.email).toLowerCase().trim())}&${shellSel}`).then(r => (Array.isArray(r) ? r[0] : null)).catch(() => null);
+    }
+    if (shell) {
+      const when = String(shell.created_at || "").slice(0, 10);
+      lines.push(`IMPORTANT: they already STARTED signing up - they filled the enroll form${shell.athlete_name ? ` for ${shell.athlete_name}` : ""}${when ? ` on ${when}` : ""} but did NOT complete the payment step. Do not pitch from scratch or resend a fresh signup intro; warmly nudge them to finish the payment (offer to resend the same link or help if the card step gave them trouble).`);
+    }
+  } catch (_) { /* best-effort — never block a draft */ }
 
   if (Array.isArray(notes) && notes.length) {
     lines.push(`Notes the team left about this person:`);

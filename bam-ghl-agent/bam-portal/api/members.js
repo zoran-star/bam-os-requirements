@@ -514,7 +514,14 @@ async function handler(req, res) {
         query = `members?client_id=eq.${targetClientId}&select=*&order=${orderBy}`;
       }
       const members = await sb(query);
-      const memberList = Array.isArray(members) ? members : [];
+      // Pre-payment signup shells are NOT members: someone who started the enroll
+      // form (or a staff pipeline-convert) but never paid stays a LEAD in the
+      // pipeline. Hide those rows from every roster. 'collecting' (a real member
+      // whose card is being re-collected) and legacy NULL origins stay visible.
+      const HIDDEN_SIGNUP_ORIGINS = new Set(["website_enroll", "convert", "wizard"]);
+      const memberList = (Array.isArray(members) ? members : []).filter(
+        m => !(m.status === "payment_method_required" && HIDDEN_SIGNUP_ORIGINS.has(m.signup_origin))
+      );
 
       // Enrich each member with their pricing_catalog row (for tier badge
       // + display_name on the roster card). Single batched query.
@@ -1790,9 +1797,12 @@ async function actionCardSetupLink(res, member, stripeAccount, ctx, body, req) {
   });
 
   if (body.mark_collecting) {
+    // signup_origin 'collecting' keeps this REAL member visible on the roster -
+    // pre-payment enroll-form shells (origin website_enroll/convert/wizard) are
+    // hidden, but a member whose card is being collected must stay in view.
     await sb(`members?id=eq.${member.id}`, {
       method: "PATCH", headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ status: "payment_method_required", updated_at: nowIso() }),
+      body: JSON.stringify({ status: "payment_method_required", signup_origin: "collecting", updated_at: nowIso() }),
     }).catch(() => {});
     // Offer tie-in F: mirror the collecting state (suspends entitlements).
     await syncMemberAccessNonFatal({ clientId: member.client_id, memberId: member.id, reason: "portal-action" });

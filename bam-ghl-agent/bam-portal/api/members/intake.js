@@ -106,7 +106,11 @@ async function handler(req, res) {
     parent_email:     parentEmail,
     parent_phone:     parentPhone,
     plan,
+    // Enroll form filled, not paid yet: a pre-payment shell. signup_origin
+    // 'website_enroll' keeps it OFF the members roster until the Stripe
+    // webhook flips it live - the person stays a lead in the pipeline.
     status:           "payment_method_required",
+    signup_origin:    "website_enroll",
     archetype:        body.archetype        || null,
     trainer:          body.trainer          || null,
     group_num:        body.group_num        || null,

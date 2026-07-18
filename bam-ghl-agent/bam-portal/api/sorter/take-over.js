@@ -210,10 +210,12 @@ async function handler(req, res) {
       let payment_link = null;
       if (!defaultPm) {
         // No card → mark "collecting payment" + a setup Checkout link staff can send.
+        // signup_origin 'collecting' keeps this REAL member visible on the roster
+        // (pre-payment enroll shells are hidden; a member being fixed is not one).
         try {
           await sb(`members?id=eq.${encodeURIComponent(member.id)}`, {
             method: "PATCH", headers: { Prefer: "return=minimal" },
-            body: JSON.stringify({ status: "payment_method_required", updated_at: new Date().toISOString() }),
+            body: JSON.stringify({ status: "payment_method_required", signup_origin: "collecting", updated_at: new Date().toISOString() }),
           }).catch(() => {});
           const origin = (req.headers.origin || "https://portal.byanymeansbusiness.com").replace(/\/+$/, "");
           const sess = await stripeFetch(`/checkout/sessions`, {

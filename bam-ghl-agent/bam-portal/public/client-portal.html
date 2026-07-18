@@ -17175,14 +17175,20 @@ async function _cdLoadMemory(c) {
   _CDRAWER._memContact = contactId;
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch('/api/agent-contact-notes', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get', client_id: CLIENT_ID, contact_id: contactId }) });
+    // opp_id + email hints let the server find the lead's enroll-form checkout
+    // row (website checkout stamps ghl_opportunity_id + parent_email, not
+    // always the contact id) so the Journey can show "Enroll form filled".
+    const _opp = _CDRAWER.ctx && _CDRAWER.ctx.opp;
+    const _email = (c && c.email) || (_CDRAWER.ghl && _CDRAWER.ghl.email) || null;
+    const r = await fetch('/api/agent-contact-notes', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get', client_id: CLIENT_ID, contact_id: contactId, opp_id: (_opp && (_opp.id || _opp.opportunity_id)) || null, email: _email }) });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     const el = host(); if (el) el.innerHTML = _cdMemoryHtml(j);
-    // Feed the post-trial review into the shared context (coach + showed/fit) and
-    // repaint Lead + Journey with it.
+    // Feed the post-trial review + enroll journey into the shared context and
+    // repaint Lead + Journey with them.
     if (_CDRAWER.ctx) {
       _CDRAWER.ctx.postTrial = j.post_trial || null;
+      _CDRAWER.ctx.enroll = j.enroll || null;
       if (!_CDRAWER.ctx.coach && j.post_trial && j.post_trial.trainer) _CDRAWER.ctx.coach = j.post_trial.trainer;
       _cdRenderLead(); _cdRenderJourney();
     }
@@ -17232,6 +17238,16 @@ function _cdRenderJourney() {
       if (rv.good_fit === true) steps.push(['Good fit', coach ? 'Coach ' + coach : null, 'ok']);
       else if (rv.good_fit === false) steps.push(['Not a fit', null, 'bad']);
     }
+  }
+  // Enroll-form journey (post-trial closing): link sent → form filled → paid.
+  // A filled form with no payment renders a dashed "Payment pending" node so
+  // staff instantly see the lead is one step from converting.
+  const en = ctx.enroll || null;
+  if (en) {
+    if (en.link_sent_at)   steps.push(['Signup link sent', fmt(en.link_sent_at), 'ok']);
+    if (en.form_filled_at) steps.push(['Enroll form filled', fmt(en.form_filled_at), 'ok']);
+    if (en.paid_at)        steps.push(['Paid', fmt(en.paid_at), 'ok']);
+    else if (en.form_filled_at) steps.push(['Payment pending', null, 'pending']);
   }
   if (opp && opp.status === 'won') steps.push(['Won', null, 'ok']);
   else if (opp && opp.status === 'lost') steps.push(['Lost', null, 'bad']);
@@ -32375,12 +32391,15 @@ function _memberStatusPill(status, opts) {
   // a secondary "Pause queued" pill alongside the main status. Useful for
   // surfacing a future-dated pause to staff before the cron activates it.
   //
-  // "Signup in progress" = started checkout but has NOT paid (status
-  // payment_method_required). Rendered as a muted amber OUTLINE tag - visually
-  // distinct from the solid member pills below - so it never reads as a paying
-  // member. These rows are excluded from every member count (see _renderMembersView).
+  // "Collecting card" = a real member with no usable card on file yet (status
+  // payment_method_required). Pre-payment enroll-form shells never reach the
+  // roster (the API hides signup_origin website_enroll/convert/wizard rows -
+  // those people stay LEADS in the pipeline until they pay), so anything still
+  // showing this status is a member staff are collecting a card for. Rendered
+  // as a muted amber OUTLINE tag and excluded from member counts (see
+  // _renderMembersView) because they aren't billing yet.
   if (status === 'payment_method_required') {
-    return `<span title="Started checkout but has not paid yet. Not counted as a member." style="display:inline-block;vertical-align:middle;white-space:nowrap;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:rgba(199,154,74,0.12);border:1px solid #c79a4a;color:#c79a4a">Signup in progress</span>`;
+    return `<span title="No usable card on file yet - not billing. Send a card link from the member card." style="display:inline-block;vertical-align:middle;white-space:nowrap;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:rgba(199,154,74,0.12);border:1px solid #c79a4a;color:#c79a4a">Collecting card</span>`;
   }
   const map = {
     live:                    ['Live', '#1f7a3d'],
@@ -32547,24 +32566,26 @@ function _memberAvatar(m, size) {
   return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:var(--surface-el,rgba(0,0,0,.05));border:1px solid var(--border);color:var(--text-mute);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${Math.max(10, Math.floor(size * 0.4))}px;flex:0 0 ${size}px">${escapeHTML(initials)}</div>`;
 }
 
-// "Signup in progress" = started checkout, has NOT paid. Never a real member.
-function _isSignupInProgress(m) { return !!m && m.status === 'payment_method_required'; }
+// "Collecting card" = a member with no usable card on file yet (not billing).
+// The API already hides pre-payment enroll-form shells, so any
+// payment_method_required row that reaches the UI is a real collecting member.
+function _isCollectingCard(m) { return !!m && m.status === 'payment_method_required'; }
 
 function _filterMembers(all, statusOverride) {
   const f = _MEMBERS_FILTER;
   const status = statusOverride || f.status;
-  // payment_method_required is "started, not paid" - it is NOT an issue (a real
-  // lapsed-but-paid member). Issues = payment_failed only.
+  // payment_method_required is "collecting card" (no card on file, not billing) -
+  // it is NOT an issue (a real lapsed-but-paid member). Issues = payment_failed only.
   const isIssue = (s) => s === 'payment_failed';
   // 'cancelling' members are still billing through the end of their period -
   // surface them under "Live" so they don't disappear from the roster.
   const isLiveLike = (s) => s === 'live' || s === 'cancelling';
   return all.filter(m => {
-    // Default ("all") + every member bucket excludes signup-in-progress rows so
-    // they are never counted or shown as members. They surface only under their
-    // own "Signup in progress" group/filter.
-    if (status === 'all'     && _isSignupInProgress(m))  return false;
-    if (status === 'pending' && !_isSignupInProgress(m)) return false;
+    // Default ("all") + every member bucket excludes collecting-card rows (no
+    // card on file, not billing) so member counts stay honest. They surface
+    // only under their own "Collecting card" group/filter.
+    if (status === 'all'     && _isCollectingCard(m))  return false;
+    if (status === 'pending' && !_isCollectingCard(m)) return false;
     if (status === 'live'    && !isLiveLike(m.status))   return false;
     if (status === 'paused'  && m.status !== 'paused')   return false;
     if (status === 'issues'  && !isIssue(m.status))      return false;
@@ -32734,13 +32755,13 @@ function _renderMembersView() {
   const liveCount    = all.filter(m => m.status === 'live' || m.status === 'cancelling').length;
   const pausedCount  = all.filter(m => m.status === 'paused').length;
   const issuesCount  = all.filter(m => m.status === 'payment_failed').length;
-  // Signup-in-progress (started checkout, not paid) is NEVER counted as a member.
-  const pendingCount = all.filter(_isSignupInProgress).length;
-  const memberTotal  = all.length - pendingCount;   // "All" = real (paid) members only
+  // Collecting-card members (no card on file, not billing) are NOT in the totals.
+  const pendingCount = all.filter(_isCollectingCard).length;
+  const memberTotal  = all.length - pendingCount;   // "All" = billing members only
   const f = _MEMBERS_FILTER;
   // Apply the client-side column-header sort (no-op when no header is active).
   const filtered = _membersApplyColSort(_filterMembers(all));
-  // In the default view, append signup-in-progress rows as their own labeled
+  // In the default view, append collecting-card rows as their own labeled
   // group below the members (aux filters - trainer/search/offer - still apply).
   const pendingGroup = (f.status === 'all') ? _membersApplyColSort(_filterMembers(all, 'pending')) : [];
 
@@ -32782,7 +32803,7 @@ function _renderMembersView() {
         ${filterChip('status','live','Live',   liveCount)}
         ${filterChip('status','paused','Paused', pausedCount)}
         ${filterChip('status','issues','Issues', issuesCount)}
-        ${pendingCount ? filterChip('status','pending','Signup in progress', pendingCount) : ''}
+        ${pendingCount ? filterChip('status','pending','Collecting card', pendingCount) : ''}
       </div>
       <div style="${popoverLabel};margin-bottom:8px">Trainer</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
@@ -33462,11 +33483,11 @@ function _enrollRenderResult(body) {
   const r = s.result;
   const done = `<button onclick="closeEnrollDrawer()" style="width:100%;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;border-radius:8px;cursor:pointer;font-family:inherit;margin-top:4px">Done</button>`;
 
-  if (r.mode === 'card_link') {
+  if (r.mode === 'enroll_link') {
     const names = (r.results || []).map(x => x.athlete_name).join(', ') || 'The athlete(s)';
-    body.innerHTML = _enrollHeader('Pending - card link created', '') + `
+    body.innerHTML = _enrollHeader('No card on file - send the enroll link', '') + `
       <div style="padding:13px 14px;border:1px solid #c47424;border-radius:12px;background:rgba(199,154,74,0.08);font-size:13.5px;line-height:1.5;margin-bottom:14px">
-        <b>${escapeHTML(names)}</b> added as <b>Signup in progress</b>. ${escapeHTML(s.customer.name || 'The parent')} has no usable card, so nothing was charged. Send this secure link - once the card is saved, run this signup again and it completes.
+        ${escapeHTML(s.customer.name || 'The parent')} has no usable card, so nothing was created or charged. Send them the enroll link - they sign <b>${escapeHTML(names)}</b> up and pay themselves. They stay a lead in the pipeline until the payment lands, then the member appears here automatically.
       </div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <input id="enroll-link" type="text" readonly value="${escapeHTML(r.url || '')}" style="flex:1;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;outline:none">
@@ -33490,16 +33511,18 @@ function _enrollRenderResult(body) {
   body.innerHTML = _enrollHeader(failed.length ? 'Signed up (with issues)' : (scheduled ? 'Signup scheduled' : 'Signed up'), `${ok.length} of ${results.length} on the roster`) + `
     ${okRows}
     ${failRows}
-    ${failed.length ? `<div style="font-size:12.5px;color:var(--text-mute);margin-bottom:14px">The failed athletes were added as Signup in progress - reopen the wizard for them, or fix the card and retry.</div>` : ''}
+    ${failed.length ? `<div style="font-size:12.5px;color:var(--text-mute);margin-bottom:14px">The failed athletes are on the roster as Collecting card - send a card link from their member card, or fix the card and re-run the wizard.</div>` : ''}
     ${done}`;
 }
 
-// Divider that labels the signup-in-progress group and spells out that these
-// rows are NOT members (started checkout, never paid). Amber to match the pill.
+// Divider that labels the collecting-card group: real members with no usable
+// card on file yet (not billing, so kept out of the member totals). Amber to
+// match the pill. Enroll-form starters never appear here - they stay leads in
+// the pipeline until they pay.
 function _pendingGroupHeader(n) {
   return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:16px 0 8px;padding:8px 12px;border:1px solid #7a5a2f;border-left:3px solid #c79a4a;border-radius:6px;background:rgba(199,154,74,0.08)">
-    <span style="font-size:12px;font-weight:800;color:#c79a4a;text-transform:uppercase;letter-spacing:0.5px">Signup in progress · ${n}</span>
-    <span style="font-size:11px;color:var(--text-mute)">Started checkout, not paid yet. Not counted as members.</span>
+    <span style="font-size:12px;font-weight:800;color:#c79a4a;text-transform:uppercase;letter-spacing:0.5px">Collecting card · ${n}</span>
+    <span style="font-size:11px;color:var(--text-mute)">No usable card on file yet. Not billing, so not in the member totals.</span>
   </div>`;
 }
 
@@ -35694,6 +35717,10 @@ function _hk2CardHtml(r, pos, total, isTop) {
   // stale card would just confuse.
   const trialLine = (r.trial_at && new Date(r.trial_at).getTime() > Date.now())
     ? `<div class="hk2-booked"><span class="hk2-booked-check">✓</span> Trial on the books: ${escapeHTML(_hk2SlotLabel(r.trial_at))}</div>` : '';
+  // They filled the enroll form but the payment never landed - one step from
+  // converting. Gold banner so the reviewer nudges the FINISH, not a re-pitch.
+  const enrollLine = r.enroll_form_filled_at
+    ? `<div class="hk2-booked"><span class="hk2-booked-check">✓</span> Enroll form filled ${escapeHTML((() => { try { return new Date(r.enroll_form_filled_at).toLocaleDateString([], { month: 'short', day: 'numeric' }); } catch (_) { return ''; } })())} - payment not finished</div>` : '';
   return `
     <div class="hk2-head">
       <div class="hk2-av">${escapeHTML(_hk2Initials(bigName))}</div>
@@ -35704,6 +35731,7 @@ function _hk2CardHtml(r, pos, total, isTop) {
     </div>
     ${esc}
     ${trialLine}
+    ${enrollLine}
     ${ctx ? `<div class="hk2-ctx">${escapeHTML(ctx)}</div>` : ''}
     ${body}
     <input class="hk2-teach"${id.teach} style="display:none" placeholder="Required: why did you change it? If the bot was missing a fact (price, schedule, capacity), include the fact.">
@@ -37819,26 +37847,6 @@ function closePipelineDrawer() {
   document.getElementById('pl-drawer-overlay')?.classList.remove('open');
   document.getElementById('pl-drawer')?.classList.remove('open');
   _PL_DRAWER_CONTACT = null;
-}
-
-async function _plConvert(oppId) {
-  if (!confirm('Convert this lead to a member?\n\nCreates a member row in payment_method_required state with the contact info from GHL.')) return;
-  try {
-    const token = await _mreqAuthToken();
-    const r = await fetch(`/api/ghl/pipelines?action=convert&client_id=${encodeURIComponent(CLIENT_ID)}`, {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opportunity_id: oppId }),
-    });
-    const json = await _safeJson(r);
-    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    const m = json.member || {};
-    closePipelineDrawer();
-    alert(`✓ ${json.duplicate ? 'Already existed' : 'Created'}: ${m.athlete_name || 'member'}.`);
-    fetchAndRenderPipelines();   // refresh so the card now shows 'member' badge
-  } catch (e) {
-    alert('Convert failed: ' + e.message);
-  }
 }
 
 // ══════════════════════════════════════════════════════════════

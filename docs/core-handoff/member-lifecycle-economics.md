@@ -3,8 +3,8 @@ domain: member-lifecycle-economics
 review_state: ready-for-review
 prototype_status: live
 core_parity: not-reviewed
-last_reviewed: "2026-07-16"
-prototype_commit: 4af43aa
+last_reviewed: "2026-07-18"
+prototype_commit: working-tree
 core_commit_reviewed: unknown
 ---
 
@@ -45,6 +45,7 @@ core_commit_reviewed: unknown
 | Economics snapshot | `joined_date`, `plan_name` (label only), `monthly_amount_cents`, `total_spent_cents`, `payments_count` frozen at cancel | Written best-effort by both cancel paths; backfillable from Stripe |
 | Churn attribution | `source` (staff_portal, parent_app, stripe) + `involuntary` (Stripe `cancellation_details.reason = payment_failed` = dunning) | Voluntary vs involuntary churn split |
 | Member lifetime spend | `members.total_spent_cents`, `payments_count`, `spend_synced_at` | Refreshed by one paginated paid-invoice sweep per connected account |
+| Membership birth boundary (2026-07-18) | A membership exists only once the first payment lands. Pre-payment enroll-form checkouts live in `members` as shells (`status='payment_method_required'` + `signup_origin`) purely for retry idempotency + webhook activation; every roster read hides them and the person stays a LEAD in the pipeline | `members.signup_origin` text CHECK: `website_enroll` (public enroll/onboarding form or GHL intake webhook), `convert` (staff pipeline-convert), `wizard` (historical returning-client shells; no longer created), `collecting` (a REAL member whose card is being re-collected - visible on the roster), NULL = legacy/visible. Migration `20260718150000_members_signup_origin.sql` backfills from `member_audit_log` action types |
 
 ## Parity
 
@@ -55,6 +56,7 @@ core_commit_reviewed: unknown
 | `monthly_amount_cents` term decode (4_weeks, 3_months, one_time) | Core price normalization service | `missing` | Single shared monthly-equivalent function in core; prototype has twins in `cancellation-snapshot.js` + `client-portal.html _ccMonthly` |
 | Lifetime spend from Stripe paid invoices | Core payments ledger | `missing` | Core ledger makes the Stripe sweep unnecessary |
 | `involuntary` flag from Stripe cancellation_details | Core churn-reason enum | `missing` | Promote to enum (voluntary, dunning, migrated, other) |
+| Pre-payment checkout shells inside `members` (`signup_origin`) | Core should model in-flight checkout as LEAD-side state (a checkout/enrollment-intent record on the sales side), creating the membership only on first payment | `decision-needed` | When core owns checkout, drop the shells; the enroll-form-filled event maps to a lead-timeline event (provider IDs preserved: `stripe_customer_id`, `stripe_subscription_id`, `ghl_opportunity_id`, `ghl_contact_id`, `parent_email`) |
 
 ## Decisions And Shortcuts
 

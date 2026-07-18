@@ -111,7 +111,7 @@ const READ_TOOLS = [
   },
   {
     name: "list_members",
-    description: "List or count members by billing status. Use for roster questions like 'who has failed payments', 'how many are paused', or 'show members with billing issues'. Omit everything to get a count of every status. status: live | paused | payment_failed (a charge bounced) | payment_method_required (no card on file) | cancelling. Set issues_only=true to get everyone in a problem state (payment_failed + payment_method_required).",
+    description: "List or count members by billing status. Use for roster questions like 'who has failed payments', 'how many are paused', or 'show members with billing issues'. Omit everything to get a count of every status. status: live | paused | payment_failed (a charge bounced) | payment_method_required (a real member with no card on file - collecting card) | cancelling. Set issues_only=true to get everyone in a problem state (payment_failed + payment_method_required). People who merely started the enroll form but never paid are leads, not members, and never appear here.",
     input_schema: {
       type: "object",
       properties: {
@@ -411,11 +411,18 @@ async function execFindMembers(clientId, query) {
 
 const ISSUE_STATUSES = ["payment_failed", "payment_method_required"];
 
+// Pre-payment signup shells (enroll form filled / pipeline convert, never paid)
+// are LEADS, not members - the roster hides them, so the AI must not count or
+// list them as members with billing issues either.
+const HIDDEN_SIGNUP_ORIGINS = new Set(["website_enroll", "convert", "wizard"]);
+
 async function execListMembers(clientId, { status, issues_only } = {}) {
   const rows = await sb(
-    `members?client_id=eq.${clientId}&select=id,athlete_name,parent_name,plan,status&order=athlete_name.asc`
+    `members?client_id=eq.${clientId}&select=id,athlete_name,parent_name,plan,status,signup_origin&order=athlete_name.asc`
   ).catch(() => []);
-  const all = Array.isArray(rows) ? rows : [];
+  const all = (Array.isArray(rows) ? rows : []).filter(
+    m => !(m.status === "payment_method_required" && HIDDEN_SIGNUP_ORIGINS.has(m.signup_origin))
+  );
   const counts = {};
   for (const m of all) counts[m.status || "unknown"] = (counts[m.status || "unknown"] || 0) + 1;
 
