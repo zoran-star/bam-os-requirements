@@ -73,6 +73,10 @@
       "schedule": "3,18,33,48 * * * *"
     },
     {
+      "path": "/api/agent-member-care?action=detect",
+      "schedule": "11,26,41,56 * * * *"
+    },
+    {
       "path": "/api/ghl/cron-post-trial-escalate",
       "schedule": "*/15 * * * *"
     },

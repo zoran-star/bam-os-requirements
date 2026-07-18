@@ -53,6 +53,17 @@ export function closingAgentMode(client) {
   return AGENT_MODES.includes(m) ? m : "off";
 }
 
+// The MEMBER CARE agent (V2 Members tab) - watches member conversations and
+// proposes billing actions / replies / to-dos as approve-only cards. Its OWN
+// switch, opt-in (defaults "off"). Only off/hawkeye are meaningful: the agent is
+// proposal-only by construction, so nothing auto-sends in ANY mode. Stored at
+// clients.ghl_kpi_config.member_care_agent_mode.
+export function memberCareAgentMode(client) {
+  const cfg = (client && client.ghl_kpi_config) || {};
+  const m = cfg.member_care_agent_mode;
+  return AGENT_MODES.includes(m) ? m : "off";
+}
+
 export const modeIsOn      = (mode) => mode === "hawkeye" || mode === "self_drive";
 export const modeSelfDrives = (mode) => mode === "self_drive";
 

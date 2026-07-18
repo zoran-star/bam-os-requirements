@@ -15,7 +15,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 // bot + follow-up engine. The CONFIRM agent has its OWN switch at
 // clients.ghl_kpi_config.confirm_agent_mode (default off). See agent/_mode.js.
 
-import { agentMode, confirmAgentMode, closingAgentMode, AGENT_MODES, SELF_DRIVE_GLOBALLY_DISABLED } from "./agent/_mode.js";
+import { agentMode, confirmAgentMode, closingAgentMode, memberCareAgentMode, AGENT_MODES, SELF_DRIVE_GLOBALLY_DISABLED } from "./agent/_mode.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -57,7 +57,7 @@ async function handler(req, res) {
     if (!actor.canActOn(b.client_id)) return res.status(403).json({ error: "not your academy" });
     try {
       const [row] = await sb(`clients?id=eq.${encodeURIComponent(b.client_id)}&select=ghl_kpi_config&limit=1`);
-      return res.status(200).json({ mode: row ? agentMode(row) : "off", confirm_mode: row ? confirmAgentMode(row) : "off", closing_mode: row ? closingAgentMode(row) : "off", self_drive_enabled: !SELF_DRIVE_GLOBALLY_DISABLED });
+      return res.status(200).json({ mode: row ? agentMode(row) : "off", confirm_mode: row ? confirmAgentMode(row) : "off", closing_mode: row ? closingAgentMode(row) : "off", member_care_mode: row ? memberCareAgentMode(row) : "off", self_drive_enabled: !SELF_DRIVE_GLOBALLY_DISABLED });
     } catch (e) { return res.status(500).json({ error: e.message }); }
   }
 
@@ -65,7 +65,7 @@ async function handler(req, res) {
   // their OWN academy (so an academy can turn its own agents on/off from the client
   // portal). self_drive stays staff-only AND is globally blocked, so academies can
   // only pick off / hawkeye (hawkeye = drafts for approval; nothing auto-sends).
-  const SET_ACTIONS = { "set-mode": "mode", "set-confirm-mode": "confirm_mode", "set-closing-mode": "closing_mode" };
+  const SET_ACTIONS = { "set-mode": "mode", "set-confirm-mode": "confirm_mode", "set-closing-mode": "closing_mode", "set-member-care-mode": "member_care_mode" };
   if (SET_ACTIONS[b.action]) {
     const actor = await resolveAgentActor(req);
     if (!actor) return res.status(401).json({ error: "sign in required" });
@@ -84,6 +84,10 @@ async function handler(req, res) {
         cfg.followup_engine_enabled = b.mode !== "off";
       } else if (b.action === "set-confirm-mode") {
         cfg.confirm_agent_mode = b.mode;
+      } else if (b.action === "set-member-care-mode") {
+        // Member Care is proposal-only by construction: self_drive is meaningless
+        // here and already rejected above, so only off/hawkeye ever land.
+        cfg.member_care_agent_mode = b.mode;
       } else {
         cfg.closing_agent_mode = b.mode;
       }
@@ -203,6 +207,7 @@ async function handler(req, res) {
         mode: agentMode(c),
         confirm_mode: confirmAgentMode(c),
         closing_mode: closingAgentMode(c),
+        member_care_mode: memberCareAgentMode(c),
         notify_phone: (c.ghl_kpi_config || {}).agent_notify_phone || null,
       }));
       return res.status(200).json({ academies, self_drive_enabled: !SELF_DRIVE_GLOBALLY_DISABLED });

@@ -134,6 +134,7 @@ if (window.__MOCK__) (() => {
     trainer: i % 2 === 0 ? 'Coach Dre' : 'Coach Simone', avatar_url: AV(m[0]),
     ghl_contact_id: 'ct-' + (i + 1), billing_portal_owned: true,
     email: m[1].toLowerCase().replace(/\s+/g, '.') + '@example.com', phone: '+1416555' + String(1000 + i),
+    parent_email: m[1].toLowerCase().replace(/\s+/g, '.') + '@example.com', parent_phone: '+1416555' + String(1000 + i),
     created_at: iso(40 - i * 3), start_date: iso(40 - i * 3),
   }));
   // Canonical V2 training-pipeline stage names: _plStageBot() maps them to the
@@ -224,6 +225,34 @@ if (window.__MOCK__) (() => {
     return { key, month: key, spend, leads, cpl: +(spend / leads).toFixed(2), impressions: 41000 + i * 900, clicks: 820 + i * 40, trials: Math.round(leads * 0.55), members: Math.round(leads * 0.2) };
   });
 
+  // ── Member Care agent cards (inline proposals in the member drawer) ──
+  const MEMBER_CARE_CARDS = [
+    { id: 'mcc-1', member_id: 'mb-3', ghl_contact_id: 'ct-3', member_name: 'Zion Walker', parent_name: 'Andre Walker',
+      action: 'pause', action_body: { start_date: iso(0).slice(0, 10), end_date: iso(-30).slice(0, 10), reason: 'Family trip' },
+      action_summary: 'Pause Zion Walker: ' + iso(0).slice(0, 10) + ' to ' + iso(-30).slice(0, 10) + ' - family trip',
+      action_status: 'pending',
+      draft_reply: "Of course! We can pause Zion's membership for the month you're away. I'll set that up and confirm the dates with you.",
+      reply_channel: 'SMS', reply_status: 'pending',
+      action_items: [{ title: 'Book Zion a makeup session for when he is back', notes: 'Parent asked about catching up on missed sessions' }],
+      action_items_status: 'pending',
+      reasoning: 'Andre asked to pause for a 4-week trip in his last message; pause fits the 30-day policy.',
+      confidence: 0.9, escalate: false, escalate_reason: null,
+      summary: 'Andre is taking the family abroad for a month and asked to pause Zion\'s membership while they are away.',
+      last_message: 'Hey! We are travelling for 4 weeks in August, can we pause Zion\'s membership?',
+      status: 'pending', created_at: iso(0, 2) },
+    { id: 'mcc-2', member_id: 'mb-8', ghl_contact_id: 'ct-8', member_name: 'Skye Morgan', parent_name: 'Jordan Morgan',
+      action: 'payment-link', action_body: {}, action_summary: 'Generate a payment / card-update link for Skye Morgan',
+      action_status: 'pending',
+      draft_reply: 'No stress at all - card declines happen. Here is a secure link to update your card and you will be all set.',
+      reply_channel: 'SMS', reply_status: 'pending',
+      action_items: null, action_items_status: 'none',
+      reasoning: 'Jordan mentioned their card was replaced after fraud; a fresh card-update link fixes the failed payment.',
+      confidence: 0.85, escalate: false, escalate_reason: null,
+      summary: 'Jordan\'s payment failed because their card was replaced; they asked how to update it.',
+      last_message: 'Sorry, my card got replaced last week - how do I update it?',
+      status: 'pending', created_at: iso(0, 5) },
+  ];
+
   // ── /api router ──
   const DEFAULT_API = {
     ok: true, items: [], data: [], rows: [], members: [], conversations: [], messages: [],
@@ -246,7 +275,15 @@ if (window.__MOCK__) (() => {
     }
     if (p === '/api/agent-confirm') return act === 'list-ready' ? { ready: HAWK_READY.filter(r => r.kind === 'book') } : { ok: true };
     if (p === '/api/agent-closing') return act === 'list-ready' ? { ready: HAWK_READY.filter(r => r.id === 'apx-2' || r.id === 'apx-3') } : { ok: true };
-    if (p === '/api/members') return { members: MEMBERS, ghl: { status: 'connected' }, stripe: { status: 'connected' }, sorter: null, subs_to_cancel: 0, coachiq: { enabled: false, signup_url: null } };
+    if (p === '/api/members') {
+      // Member detail drawer (?id=...): single-member shape for openMemberPopup.
+      const mid = q.get('id');
+      if (mid) {
+        const member = MEMBERS.find(m => m.id === mid) || null;
+        return { member, stripe: member ? { status: 'active', amount_cents: 24900, currency: 'cad', created: Math.floor(NOW / 1000) - 40 * 86400, current_period_end: Math.floor(NOW / 1000) + 12 * 86400, cancel_at_period_end: false, trial_end: null } : null, history: [], calls: [] };
+      }
+      return { members: MEMBERS, ghl: { status: 'connected' }, stripe: { status: 'connected' }, sorter: null, subs_to_cancel: 0, coachiq: { enabled: false, signup_url: null } };
+    }
     if (p === '/api/ghl/pipelines') return {
       pipelines: [
         { id: 'pl-1', name: 'Training Pipeline', stages: STAGES, opportunities: OPPS },
@@ -274,6 +311,25 @@ if (window.__MOCK__) (() => {
     if (p.startsWith('/api/marketing')) {
       if (q.get('resource') === 'meta-report') return { periods: PERIODS };
       return { ...DEFAULT_API };
+    }
+    if (p === '/api/agent-member-care') {
+      let b = {}; try { b = JSON.parse((init && init.body) || '{}'); } catch (_) {}
+      if (act === 'list') return { cards: MEMBER_CARE_CARDS.filter(c => c.status === 'pending' && (!b.member_id || c.member_id === b.member_id)) };
+      if (act === 'counts') { const counts = {}; MEMBER_CARE_CARDS.filter(c => c.status === 'pending').forEach(c => { counts[c.member_id] = 1; }); return { counts }; }
+      const c = MEMBER_CARE_CARDS.find(x => x.id === b.id);
+      if (c) {
+        const part = b.part || 'all';
+        if (act === 'mark-action-done' && c.action_status === 'pending') c.action_status = 'done';
+        if (act === 'mark-reply-sent' && c.reply_status === 'pending') c.reply_status = 'sent';
+        if (act === 'mark-items-added' && c.action_items_status === 'pending') c.action_items_status = 'added';
+        if (act === 'dismiss') {
+          if ((part === 'action' || part === 'all') && c.action_status === 'pending') c.action_status = 'dismissed';
+          if ((part === 'reply' || part === 'all') && c.reply_status === 'pending') c.reply_status = 'dismissed';
+          if ((part === 'items' || part === 'all') && c.action_items_status === 'pending') c.action_items_status = 'dismissed';
+        }
+        if (![c.action_status, c.reply_status, c.action_items_status].includes('pending')) c.status = 'resolved';
+      }
+      return { ok: true, card: c || null };
     }
     if (p === '/api/action-items') return { items: [], team: [], sm: null, mktg: null, ads: null, review_ready: false };
     if (p === '/api/kpis-v15') return { ...DEFAULT_API };
@@ -32399,6 +32455,18 @@ async function fetchAndRenderMembers() {
     _MEMBERS_SUBS_TO_CANCEL = json.subs_to_cancel || 0;
     _MEMBERS_CIQ = json.coachiq || { enabled: false, signup_url: null };
     await _loadMemberPriceStatusMap();   // priceId → live/archived (offer-aware), one fetch for the whole roster
+    // Member Care agent: which members have a pending proposal card (gold dot
+    // on the roster card; the cards themselves live in the drawer conversation).
+    try {
+      if (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) {
+        const cr = await fetch('/api/agent-member-care', {
+          method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'counts', client_id: CLIENT_ID }),
+        });
+        const cj = await _safeJson(cr);
+        _MEMBER_CARE_PENDING = new Set(Object.keys((cr.ok && cj && cj.counts) || {}));
+      }
+    } catch (_) { /* non-fatal - dots just don't render */ }
     _renderMembersView();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members - ${escapeHTML(e.message)}</div>`;
@@ -33559,6 +33627,13 @@ function _membersCardsMarkup(members, pending, statusFilter) {
   return html;
 }
 
+// Members with a pending Member Care proposal card (gold dot on the roster card).
+let _MEMBER_CARE_PENDING = new Set();
+function _memberCareDot(m) {
+  if (!_MEMBER_CARE_PENDING.has(m.id)) return '';
+  return `<span title="Agent proposal waiting - open the conversation" style="display:inline-block;vertical-align:middle;width:8px;height:8px;border-radius:999px;background:var(--gold,#D4B65C);margin-left:6px"></span>`;
+}
+
 // One member card's markup (shared by the full render + the search-only render).
 function _memberCardHtml(m) {
   const updating = _MEMBERS_UPDATING.has(m.id);
@@ -33576,7 +33651,7 @@ function _memberCardHtml(m) {
         <span class="mc-status">${_memberStatusPill(m.status, m)}</span>
         <span class="mc-pricestatus">${_memberPriceStatusCell(m)}</span>
         <span class="mc-price">${_memberPriceLabel(m.pricing)}</span>
-        <span class="mc-extra">${_memberBillingFlag(m)}${_memberSetupBadge(m)}${_memberOfferPill(m)}</span>
+        <span class="mc-extra">${_memberBillingFlag(m)}${_memberSetupBadge(m)}${_memberOfferPill(m)}${_memberCareDot(m)}</span>
       </div>
       ${updating ? '<span class="member-card-spin" aria-label="Updating"></span>' : ''}
     </div>`;
@@ -44749,20 +44824,27 @@ const _MEMBER_DOC_KINDS = { waiver: 'Waiver', media: 'Media release', medical: '
 // Reuses /api/ghl/inbox + ib-msg styling + /api/ghl/send-message (same as the
 // Sales pipeline drawer). Newest messages on top; a composer lets staff reply
 // inline without leaving the drawer.
-let _MEMBER_INBOX = null;  // { contactId, clientId, name, phone, email }
+let _MEMBER_INBOX = null;  // { contactId, clientId, memberId, name, phone, email }
 async function _loadMemberInbox(m) {
   const sec = document.getElementById('member-inbox-section');
   if (!sec || !m || !m.ghl_contact_id) return;
   _MEMBER_INBOX = {
     contactId: m.ghl_contact_id,
     clientId: m.client_id || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null),
+    memberId: m.id || null,
     name: (m.athlete_name || '').trim(),
     phone: m.parent_phone || null,
     email: m.parent_email || null,
   };
   try {
     const token = await _mreqAuthToken();
-    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(_MEMBER_INBOX.clientId)}&contact_id=${encodeURIComponent(m.ghl_contact_id)}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    // Thread + Member Care proposal cards load in parallel; cards render inline
+    // in the conversation, right above the composer.
+    const [r, cards] = await Promise.all([
+      fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(_MEMBER_INBOX.clientId)}&contact_id=${encodeURIComponent(m.ghl_contact_id)}`, { headers: { 'Authorization': 'Bearer ' + token } }),
+      _memberCareFetch(token),
+    ]);
+    _MEMBER_CARE.cards = cards;
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     _renderMemberInbox(sec, j.messages || []);
@@ -44809,7 +44891,7 @@ function _renderMemberInbox(sec, messages) {
     const when = escapeHTML(_ibFormatDate(mm.date));
     return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(mm.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
   }).join('') : `<div style="font-size:12px;color:var(--text-mute)">No messages yet.</div>`;
-  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Latest ${recent.length} of ${asc.length} messages</div>` : ''}<div id="member-inbox-thread" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px">${thread}</div>${_memberInboxComposer()}`;
+  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Latest ${recent.length} of ${asc.length} messages</div>` : ''}<div id="member-inbox-thread" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px">${thread}</div>${_memberCareCardsHtml()}${_memberInboxComposer()}`;
   // Load scrolled to the bottom so the newest message is in view.
   const tc = document.getElementById('member-inbox-thread');
   if (tc) tc.scrollTop = tc.scrollHeight;
@@ -44842,11 +44924,195 @@ async function _memberInboxSend() {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     if (textEl) textEl.value = '';
     const sec = document.getElementById('member-inbox-section');
-    if (sec) _loadMemberInbox({ ghl_contact_id: i.contactId, client_id: i.clientId, athlete_name: i.name, parent_phone: i.phone, parent_email: i.email });
+    if (sec) _loadMemberInbox({ id: i.memberId, ghl_contact_id: i.contactId, client_id: i.clientId, athlete_name: i.name, parent_phone: i.phone, parent_email: i.email });
   } catch (e) {
     alert('Send failed: ' + e.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+  }
+}
+
+// ── Member Care agent cards (inline in the member drawer conversation) ──────
+// The Member Care agent (api/agent-member-care.js) watches this conversation
+// and proposes: a billing action, a reply to the parent, and/or staff to-dos.
+// Each part has its OWN approve button; NOTHING runs until a human clicks.
+// "Do action" fires the proven _memberAction() PATCH path; "Send reply" fires
+// /api/ghl/send-message; "Add to to-dos" copies into /api/action-items.
+let _MEMBER_CARE = { cards: [], busy: false };
+
+async function _memberCareFetch(token) {
+  const i = _MEMBER_INBOX;
+  if (!i || !i.memberId || !i.clientId) return [];
+  try {
+    const r = await fetch('/api/agent-member-care', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'list', client_id: i.clientId, member_id: i.memberId }),
+    });
+    const j = await _safeJson(r);
+    return (r.ok && Array.isArray(j.cards)) ? j.cards : [];
+  } catch (_) { return []; }
+}
+
+async function _memberCarePost(payload) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/agent-member-care', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const j = await _safeJson(r);
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+async function _memberCareReload() {
+  const i = _MEMBER_INBOX;
+  if (!i) return;
+  _loadMemberInbox({ id: i.memberId, ghl_contact_id: i.contactId, client_id: i.clientId, athlete_name: i.name, parent_phone: i.phone, parent_email: i.email });
+}
+
+function _memberCareCardsHtml() {
+  const cards = (_MEMBER_CARE.cards || []).filter(c => c && c.id);
+  if (!cards.length) return '';
+  return cards.map(c => {
+    const destructive = c.action === 'cancel';
+    const accent = destructive ? '#e0654f' : 'var(--gold,#D4B65C)';
+    const esc = escapeHTML;
+    const parts = [];
+    if (c.escalate) {
+      parts.push(`<div style="font-size:12px;color:#c79a4a;background:rgba(199,154,74,0.1);border:1px solid rgba(199,154,74,0.4);border-radius:6px;padding:6px 9px;margin-bottom:8px">Needs your judgment${c.escalate_reason ? ' - ' + esc(c.escalate_reason) : ''}</div>`);
+    }
+    if (c.summary) parts.push(`<div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:4px">${esc(c.summary)}</div>`);
+    if (c.reasoning) parts.push(`<div style="font-size:11.5px;color:var(--text-mute);line-height:1.45;margin-bottom:10px">${esc(c.reasoning)}</div>`);
+    // Part 1: the proposed member action.
+    if (c.action_status === 'pending' && c.action) {
+      parts.push(`<div style="border:1px solid var(--border,#2a2a31);border-left:3px solid ${accent};border-radius:8px;padding:9px 11px;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">${esc(c.action_summary || c.action)}</div>
+          <button onclick="_memberCareDoAction('${esc(c.id)}')" style="background:${accent};color:#0B0B0D;border:none;border-radius:8px;padding:7px 14px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Do action</button>
+        </div>`);
+    } else if (c.action_status === 'done') {
+      parts.push(`<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:8px">Action done: ${esc(c.action_summary || c.action || '')}</div>`);
+    }
+    // Part 2: the draft reply (editable before send).
+    if (c.reply_status === 'pending' && c.draft_reply) {
+      parts.push(`<div style="border:1px solid var(--border,#2a2a31);border-radius:8px;padding:9px 11px;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text-mute);margin-bottom:6px">Suggested reply · ${esc(c.reply_channel || 'SMS')}</div>
+          <textarea id="mcare-reply-${esc(c.id)}" style="width:100%;min-height:56px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font:inherit;font-size:12.5px;resize:vertical;outline:none;box-sizing:border-box">${esc(c.draft_reply)}</textarea>
+          <div style="display:flex;justify-content:flex-end;margin-top:6px">
+            <button onclick="_memberCareSendReply('${esc(c.id)}')" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:8px;padding:7px 14px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Send reply</button>
+          </div>
+        </div>`);
+    } else if (c.reply_status === 'sent') {
+      parts.push(`<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:8px">Reply sent.</div>`);
+    }
+    // Part 3: staff to-dos.
+    const items = Array.isArray(c.action_items) ? c.action_items : [];
+    if (c.action_items_status === 'pending' && items.length) {
+      parts.push(`<div style="border:1px solid var(--border,#2a2a31);border-radius:8px;padding:9px 11px;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text-mute);margin-bottom:6px">To-dos</div>
+          ${items.map(it => `<div style="font-size:12.5px;color:var(--text);margin-bottom:4px">&bull; ${esc(it.title)}${it.notes ? `<span style="color:var(--text-mute)"> - ${esc(it.notes)}</span>` : ''}</div>`).join('')}
+          <button onclick="_memberCareAddItems('${esc(c.id)}')" style="margin-top:4px;background:transparent;color:var(--gold,#D4B65C);border:1px solid var(--gold,#D4B65C);border-radius:8px;padding:6px 13px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Add to to-dos</button>
+        </div>`);
+    } else if (c.action_items_status === 'added') {
+      parts.push(`<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:8px">To-dos added.</div>`);
+    }
+    // Dismiss + optional teach-why (the lesson lands in the member_care bucket).
+    parts.push(`<div style="display:flex;gap:8px;align-items:center;margin-top:2px">
+        <input id="mcare-teach-${esc(c.id)}" placeholder="Why? (optional - teaches the agent)" style="flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 9px;font:inherit;font-size:11.5px;outline:none">
+        <button onclick="_memberCareDismiss('${esc(c.id)}')" style="background:transparent;color:var(--text-sub);border:1px solid var(--border,#2a2a31);border-radius:8px;padding:6px 13px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;flex:0 0 auto">Dismiss</button>
+      </div>`);
+    return `<div class="mcare-card" data-card-id="${esc(c.id)}" style="background:var(--surface,#16161a);border:1px solid ${accent};border-radius:12px;padding:12px 13px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:${accent};margin-bottom:7px">Agent proposal</div>
+        ${parts.join('')}
+      </div>`;
+  }).join('');
+}
+
+async function _memberCareDoAction(cardId) {
+  const c = (_MEMBER_CARE.cards || []).find(x => x.id === cardId);
+  if (!c || _MEMBER_CARE.busy) return;
+  if (c.action === 'cancel' && !confirm(`Cancel ${c.member_name || 'this member'}'s membership? This runs the real cancellation.`)) return;
+  _MEMBER_CARE.busy = true;
+  try {
+    const result = await _memberAction(c.member_id, c.action, c.action_body || {});
+    await _memberCarePost({ action: 'mark-action-done', id: c.id });
+    if ((c.action === 'payment-link' || c.action === 'card-setup-link') && result && result.url) {
+      try { await navigator.clipboard.writeText(result.url); if (typeof _plToast === 'function') _plToast('Link copied to clipboard'); }
+      catch (_) { alert('Link ready: ' + result.url); }
+    }
+    if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
+  } catch (e) {
+    alert("That didn't go through: " + (e.message || e));
+  } finally {
+    _MEMBER_CARE.busy = false;
+    _memberCareReload();
+  }
+}
+
+async function _memberCareSendReply(cardId) {
+  if (!_sendGuard('memberCareSendReply')) return;
+  const c = (_MEMBER_CARE.cards || []).find(x => x.id === cardId);
+  const i = _MEMBER_INBOX;
+  if (!c || !i || _MEMBER_CARE.busy) return;
+  const ta = document.getElementById('mcare-reply-' + cardId);
+  const message = (ta && ta.value || '').trim();
+  if (!message) return;
+  const type = c.reply_channel === 'Email' && i.email ? 'Email' : 'SMS';
+  if (type === 'SMS' && !i.phone) { alert('This contact has no phone on file.'); return; }
+  _MEMBER_CARE.busy = true;
+  try {
+    const token = await _mreqAuthToken();
+    const subject = type === 'Email' ? `Message from ${(_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.business_name) || 'us'}` : undefined;
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: i.clientId, contact_id: i.contactId, type, message, subject }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    await _memberCarePost({ action: 'mark-reply-sent', id: c.id, final_text: message });
+  } catch (e) {
+    alert('Send failed: ' + e.message);
+  } finally {
+    _MEMBER_CARE.busy = false;
+    _memberCareReload();
+  }
+}
+
+async function _memberCareAddItems(cardId) {
+  const c = (_MEMBER_CARE.cards || []).find(x => x.id === cardId);
+  const i = _MEMBER_INBOX;
+  if (!c || !i || _MEMBER_CARE.busy) return;
+  _MEMBER_CARE.busy = true;
+  try {
+    const token = await _mreqAuthToken();
+    for (const it of (Array.isArray(c.action_items) ? c.action_items : [])) {
+      if (!it || !it.title) continue;
+      await fetch('/api/action-items', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: i.clientId, title: it.title, description: it.notes || null }),
+      });
+    }
+    await _memberCarePost({ action: 'mark-items-added', id: c.id });
+    if (typeof _plToast === 'function') _plToast('Added to to-dos');
+  } catch (e) {
+    alert("Couldn't add the to-dos: " + (e.message || e));
+  } finally {
+    _MEMBER_CARE.busy = false;
+    _memberCareReload();
+  }
+}
+
+async function _memberCareDismiss(cardId) {
+  if (_MEMBER_CARE.busy) return;
+  const input = document.getElementById('mcare-teach-' + cardId);
+  const lesson = (input && input.value || '').trim();
+  _MEMBER_CARE.busy = true;
+  try {
+    await _memberCarePost({ action: 'dismiss', id: cardId, part: 'all', lesson: lesson || undefined });
+  } catch (e) {
+    alert("Couldn't dismiss: " + (e.message || e));
+  } finally {
+    _MEMBER_CARE.busy = false;
+    _memberCareReload();
   }
 }
 

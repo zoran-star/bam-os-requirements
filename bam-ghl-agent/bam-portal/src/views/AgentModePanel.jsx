@@ -38,6 +38,10 @@ const HINTS = {
     hawkeye: "Drafts every post-trial follow-up for attendees; you approve each before it sends.",
     self_drive: "Sends confident follow-ups itself. Enroll & 'lost' ALWAYS wait for you.",
   },
+  member_care: {
+    off: "Member Care agent is silent - member conversations get no proposal cards.",
+    hawkeye: "Watches member conversations; proposes billing actions, replies, and to-dos as cards in the member drawer. Proposal-only: NOTHING runs or sends without a click.",
+  },
 };
 
 export default function AgentModePanel({ tokens }) {
@@ -58,12 +62,12 @@ export default function AgentModePanel({ tokens }) {
 
   async function setMode(client_id, mode, agent = "booking") {
     setBusy(client_id);
-    const action = agent === "confirm" ? "set-confirm-mode" : agent === "closing" ? "set-closing-mode" : "set-mode";
+    const action = agent === "confirm" ? "set-confirm-mode" : agent === "closing" ? "set-closing-mode" : agent === "member_care" ? "set-member-care-mode" : "set-mode";
     try { await api(action, { client_id, mode }); await load(); }
     catch (e) { alert(e.message); } finally { setBusy(null); setWarn(null); }
   }
   function pick(row, mode, agent = "booking") {
-    const cur = agent === "confirm" ? (row.confirm_mode || "off") : agent === "closing" ? (row.closing_mode || "off") : row.mode;
+    const cur = agent === "confirm" ? (row.confirm_mode || "off") : agent === "closing" ? (row.closing_mode || "off") : agent === "member_care" ? (row.member_care_mode || "off") : row.mode;
     if (mode === cur) return;
     if (mode === "self_drive") { setWarn({ ...row, _next: mode, _agent: agent }); return; }
     setMode(row.client_id, mode, agent);
@@ -101,11 +105,13 @@ export default function AgentModePanel({ tokens }) {
       {rows.map(row => {
         const confirmMode = row.confirm_mode || "off";
         const closingMode = row.closing_mode || "off";
+        const memberCareMode = row.member_care_mode || "off";
         const anyDrive = row.mode === "self_drive" || confirmMode === "self_drive" || closingMode === "self_drive";
-        const AGENT_LABEL = { booking: "Booking agent", confirm: "Confirm agent", closing: "Closing agent" };
-        // One agent's labeled segmented control row.
+        const AGENT_LABEL = { booking: "Booking agent", confirm: "Confirm agent", closing: "Closing agent", member_care: "Member Care agent" };
+        // One agent's labeled segmented control row. Member Care is proposal-only
+        // by construction, so Self-drive is never offered for it.
         const control = (agent) => {
-          const mode = agent === "confirm" ? confirmMode : agent === "closing" ? closingMode : row.mode;
+          const mode = agent === "confirm" ? confirmMode : agent === "closing" ? closingMode : agent === "member_care" ? memberCareMode : row.mode;
           const isSub = agent !== "booking";
           return (
             <div style={{ marginTop: isSub ? 12 : 0, paddingTop: isSub ? 12 : 0, borderTop: isSub ? `1px solid ${border}` : "none" }}>
@@ -115,7 +121,7 @@ export default function AgentModePanel({ tokens }) {
                 {mode === "hawkeye" && <span style={{ fontSize: 11, fontWeight: 700, color: accent }}>👁</span>}
                 <div style={{ flex: 1 }} />
                 <div style={{ display: "flex", gap: 6 }}>
-                  {MODES.filter(m => selfDriveOn || m.key !== "self_drive").map(m => (
+                  {MODES.filter(m => m.key !== "self_drive" ? true : (selfDriveOn && agent !== "member_care")).map(m => (
                     <button key={m.key} disabled={busy === row.client_id} onClick={() => pick(row, m.key, agent)}
                       style={seg(mode === m.key, m.key === "self_drive")}>{m.label}</button>
                   ))}
@@ -131,6 +137,7 @@ export default function AgentModePanel({ tokens }) {
             {control("booking")}
             {control("confirm")}
             {control("closing")}
+            {control("member_care")}
             {!row.notify_phone && (row.mode !== "off" || confirmMode !== "off" || closingMode !== "off") && (
               <div style={{ fontSize: 11.5, color: mute, marginTop: 8 }}>⚠ No notify phone set (ghl_kpi_config.agent_notify_phone) - no SMS alerts when chats are waiting.</div>
             )}
