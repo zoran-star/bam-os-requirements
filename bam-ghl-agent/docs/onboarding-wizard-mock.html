@@ -1,0 +1,783 @@
+<title>Onboarding Wizard Mock</title>
+<style>
+/* ── FullControl V2 tokens (from bam-portal/design-system/tokens.css) ── */
+:root {
+  --bg:#131416; --surface:#1B1D1F; --surface-el:#232629; --surface-hov:#2B2E32;
+  --border:rgba(255,255,255,0.08); --border-med:rgba(255,255,255,0.12); --border-str:rgba(255,255,255,0.16);
+  --text:#F0EDE8; --text-sub:#A5A19A; --text-mute:#6E6B63;
+  --gold:#D4B65C; --gold-glow:rgba(212,182,92,0.12); --gold-sheen:rgba(212,182,92,0.06);
+  --accent-ghost:rgba(212,182,92,0.10); --accent-border:rgba(212,182,92,0.25); --on-gold:#131416;
+  --green:#4CC76A; --green-soft:rgba(76,199,106,0.12);
+  --amber:#F0B84A; --amber-soft:rgba(240,184,74,0.14);
+  --font-ui:"Plus Jakarta Sans",-apple-system,system-ui,sans-serif;
+  --font-num:"Nunito",-apple-system,system-ui,sans-serif;
+  --font-mono:"DM Mono",ui-monospace,SFMono-Regular,monospace;
+  --r-xs:6px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --r-full:999px;
+  --shadow-pop:0 12px 40px rgba(0,0,0,.3);
+  --es:cubic-bezier(0.4,0,0.2,1);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:#F8F7F5; --surface:#FFFFFF; --surface-el:#FAFAF8; --surface-hov:#F0EFEC;
+    --border:rgba(0,0,0,0.07); --border-med:rgba(0,0,0,0.12); --border-str:rgba(0,0,0,0.16);
+    --text:#1C1B18; --text-sub:#6E6B63; --text-mute:#9B978F;
+    --gold:#C8A84E; --gold-glow:rgba(200,168,78,0.14); --gold-sheen:rgba(200,168,78,0.07);
+    --accent-ghost:rgba(200,168,78,0.10); --accent-border:rgba(200,168,78,0.3);
+    --shadow-pop:0 12px 40px rgba(0,0,0,.14);
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#131416; --surface:#1B1D1F; --surface-el:#232629; --surface-hov:#2B2E32;
+  --border:rgba(255,255,255,0.08); --border-med:rgba(255,255,255,0.12); --border-str:rgba(255,255,255,0.16);
+  --text:#F0EDE8; --text-sub:#A5A19A; --text-mute:#6E6B63;
+  --gold:#D4B65C; --gold-glow:rgba(212,182,92,0.12); --gold-sheen:rgba(212,182,92,0.06);
+  --accent-ghost:rgba(212,182,92,0.10); --accent-border:rgba(212,182,92,0.25);
+  --shadow-pop:0 12px 40px rgba(0,0,0,.3);
+}
+:root[data-theme="light"] {
+  --bg:#F8F7F5; --surface:#FFFFFF; --surface-el:#FAFAF8; --surface-hov:#F0EFEC;
+  --border:rgba(0,0,0,0.07); --border-med:rgba(0,0,0,0.12); --border-str:rgba(0,0,0,0.16);
+  --text:#1C1B18; --text-sub:#6E6B63; --text-mute:#9B978F;
+  --gold:#C8A84E; --gold-glow:rgba(200,168,78,0.14); --gold-sheen:rgba(200,168,78,0.07);
+  --accent-ghost:rgba(200,168,78,0.10); --accent-border:rgba(200,168,78,0.3);
+  --shadow-pop:0 12px 40px rgba(0,0,0,.14);
+}
+
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; }
+body { background:var(--bg); color:var(--text); font-family:var(--font-ui); font-size:14px; -webkit-font-smoothing:antialiased; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+button:focus-visible, a:focus-visible { outline:2px solid var(--gold); outline-offset:2px; border-radius:var(--r-xs); }
+
+.app { max-width:760px; margin:0 auto; min-height:100dvh; display:flex; flex-direction:column; padding:0 20px; }
+
+.head { display:flex; align-items:baseline; gap:10px; padding:22px 2px 14px; }
+.head .who { font-family:var(--font-num); font-size:16px; font-weight:800; }
+.head .what { font-size:12px; color:var(--text-sub); }
+.head .reset { margin-left:auto; font-size:11px; color:var(--text-mute); text-decoration:underline; }
+.head .reset:hover { color:var(--text-sub); }
+
+/* ── the bar: battery segments ── */
+.segs { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; }
+.seg { text-align:left; padding:0; }
+.seg .lbl { display:flex; align-items:center; gap:5px; font-size:11px; font-weight:700; color:var(--text-mute); margin-bottom:6px; letter-spacing:.02em; white-space:nowrap; overflow:hidden; }
+.seg.cur .lbl { color:var(--text); }
+.seg.done .lbl { color:var(--text-sub); }
+.seg .lbl svg { flex:none; }
+.seg .track { display:block; height:6px; border-radius:var(--r-full); background:var(--surface-el); border:1px solid var(--border); overflow:hidden; position:relative; }
+.seg .fill { display:block; height:100%; border-radius:var(--r-full); background:var(--gold); width:0%; transition:width .35s var(--es); }
+.seg.done .fill { background:var(--green); }
+.seg.cur .track { border-color:var(--accent-border); box-shadow:0 0 0 3px var(--gold-glow); }
+.seg:hover .lbl { color:var(--text); }
+.seg .flag { color:var(--amber); }
+
+/* ── sub-rail ── */
+.subrail { display:flex; gap:6px; overflow-x:auto; padding:14px 2px 4px; scrollbar-width:none; }
+.subrail::-webkit-scrollbar { display:none; }
+.pill { flex:none; display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; color:var(--text-sub); background:var(--surface); border:1px solid var(--border); border-radius:var(--r-full); padding:6px 12px; transition:border-color .12s,color .12s; }
+.pill:hover { border-color:var(--border-str); color:var(--text); }
+.pill.cur { color:var(--on-gold); background:var(--gold); border-color:var(--gold); }
+.pill.done:not(.cur) { color:var(--text-sub); border-color:var(--accent-border); background:var(--gold-sheen); }
+.pill .tick { display:none; }
+.pill.done .tick { display:inline-flex; color:var(--green); }
+.pill.cur.done .tick { color:var(--on-gold); }
+.pill .flg { color:var(--amber); display:inline-flex; }
+.pill.cur .flg { color:var(--on-gold); }
+
+/* ── stage ── */
+.stage { flex:1; padding:14px 0 110px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:26px 26px 28px; animation:rise .3s var(--es) both; }
+@keyframes rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) { .card { animation:none; } .seg .fill { transition:none; } }
+.eyebrow { font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-mute); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.eyebrow .tag { font-size:9.5px; letter-spacing:.07em; color:var(--amber); border:1px solid var(--amber); border-radius:var(--r-xs); padding:1px 6px; }
+.eyebrow .team { font-size:9.5px; letter-spacing:.04em; color:var(--text-sub); border:1px solid var(--border-med); border-radius:var(--r-xs); padding:1px 6px; text-transform:none; }
+.eyebrow .qcount { font-family:var(--font-mono); font-size:9.5px; color:var(--text-mute); margin-left:auto; }
+h1 { font-family:var(--font-num); font-size:24px; font-weight:800; margin:8px 0 4px; text-wrap:balance; }
+.sub { font-size:13px; color:var(--text-sub); line-height:1.55; max-width:56ch; }
+
+.body { margin-top:18px; display:flex; flex-direction:column; gap:6px; }
+.qgroup { margin:12px 0 2px; font-size:10px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--gold); display:flex; align-items:center; gap:8px; }
+.qgroup::after { content:''; flex:1; height:1px; background:var(--border); }
+.qrow { display:flex; align-items:center; gap:10px; padding:8px 12px; border:1px solid var(--border); border-radius:var(--r-sm); }
+.qrow.mand { border-left:3px solid var(--gold); background:var(--gold-sheen); }
+.qrow .chip.rchip { color:var(--on-gold); background:var(--gold); border-color:var(--gold); font-weight:700; }
+/* standalone required pill - works in owner/logo rows too, not just .qrow */
+.rchip { font-family:var(--font-mono); font-size:9px; letter-spacing:.03em; border:1px solid var(--gold); border-radius:var(--r-full); padding:2px 8px; color:var(--on-gold); background:var(--gold); font-weight:700; white-space:nowrap; }
+.qrow .l { flex:1; min-width:0; }
+.qrow .q { font-size:12.5px; font-weight:600; }
+.qrow .q .req { color:var(--gold); }
+.qrow .opts { font-size:10.5px; color:var(--text-mute); margin-top:1px; }
+.qrow .chip { flex:none; font-family:var(--font-mono); font-size:9px; letter-spacing:.03em; color:var(--text-mute); border:1px solid var(--border-med); border-radius:var(--r-full); padding:2px 8px; white-space:nowrap; }
+.qrow.dep { margin-left:24px; border-style:dashed; }
+.qrow.dep .q { color:var(--text-sub); font-weight:500; }
+.qrow.dep2 { margin-left:48px; border-style:dashed; }
+.qrow.dep2 .q { color:var(--text-sub); font-weight:500; }
+.qrow .cond { font-size:10px; font-weight:700; color:var(--amber); margin-right:2px; white-space:nowrap; }
+.qrow.action { background:var(--gold-sheen); border-color:var(--accent-border); }
+.qrow.action .chip { color:var(--gold); border-color:var(--accent-border); }
+.qrow .chip.ghl { color:var(--amber); border-color:var(--amber); }
+/* color picker rows */
+.crow { display:flex; align-items:center; gap:10px; padding:7px 10px; border:1px solid var(--border); border-radius:var(--r-sm); }
+.crow input[type="color"] { flex:none; width:44px; height:32px; padding:0; border:1px solid var(--border-med); border-radius:var(--r-xs); background:none; cursor:pointer; }
+.crow input[type="color"]::-webkit-color-swatch-wrapper { padding:2px; }
+.crow input[type="color"]::-webkit-color-swatch { border:none; border-radius:4px; }
+.crow .cname { flex:1; min-width:0; background:transparent; border:none; color:var(--text); font:inherit; font-size:12.5px; font-weight:600; padding:4px 2px; }
+.crow .cname:focus { outline:none; border-bottom:1px solid var(--gold); }
+.crow input.chex { flex:none; width:92px; font-family:var(--font-mono); font-size:11px; color:var(--text-sub); text-transform:uppercase; background:var(--surface); border:1px solid var(--border-med); border-radius:var(--r-xs); padding:6px 8px; text-align:center; }
+.crow input.chex:focus { outline:none; border-color:var(--gold); color:var(--text); }
+.crow input.chex.bad { border-color:var(--red,#F07060); color:var(--red,#F07060); }
+.crow .crm { flex:none; color:var(--text-mute); padding:4px; border-radius:var(--r-xs); display:flex; }
+.crow .crm:hover { color:var(--red,#F07060); }
+.addcolor { display:flex; align-items:center; justify-content:center; gap:7px; padding:9px; border:1px dashed var(--border-med); border-radius:var(--r-sm); font-size:12px; font-weight:700; color:var(--text-sub); }
+.addcolor:hover { border-color:var(--gold); color:var(--gold); }
+/* logo rows */
+.lrow { display:flex; align-items:center; gap:11px; padding:8px 10px; border:1px solid var(--border); border-radius:var(--r-sm); }
+.lrow .lthumb { flex:none; width:40px; height:40px; border-radius:var(--r-xs); border:1px dashed var(--border-med); display:flex; align-items:center; justify-content:center; color:var(--text-mute); }
+.lrow .l { flex:1; min-width:0; }
+.lrow .q { display:flex; align-items:center; }
+.lrow .lname { flex:1; min-width:0; background:transparent; border:none; border-bottom:1px solid var(--border-med); color:var(--text); font:inherit; font-size:12.5px; font-weight:600; padding:5px 2px; }
+.lrow .lname::placeholder { color:var(--text-mute); font-weight:500; }
+.lrow .lname:focus { outline:none; border-bottom-color:var(--gold); }
+.upl { flex:none; display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--text-sub); border:1px solid var(--border-med); border-radius:var(--r-xs); padding:6px 11px; }
+.upl:hover { border-color:var(--gold); color:var(--gold); }
+/* file drop zone */
+.drop { border:1.5px dashed var(--border-med); border-radius:var(--r-md); padding:20px 18px; display:flex; flex-direction:column; align-items:center; gap:7px; text-align:center; cursor:pointer; transition:border-color .15s,background .15s; }
+.drop:hover { border-color:var(--gold); background:var(--gold-sheen); }
+.drop .dropicon { color:var(--text-mute); }
+.drop:hover .dropicon { color:var(--gold); }
+.drop .dlabel { font-size:13px; font-weight:700; }
+.drop .dhint { font-size:11px; color:var(--text-mute); max-width:46ch; line-height:1.45; }
+/* preset picker cards */
+.pcard { display:flex; align-items:center; gap:12px; padding:14px; border:1.5px solid var(--border-med); border-radius:var(--r-md); cursor:pointer; transition:border-color .15s,background .15s; }
+.pcard:hover:not(.soon) { border-color:var(--gold); }
+.pcard.sel { border-color:var(--gold); background:var(--gold-sheen); }
+.pcard .pdot { flex:none; width:16px; height:16px; border-radius:var(--r-full); border:2px solid var(--border-str); transition:all .15s; }
+.pcard.sel .pdot { border-color:var(--gold); background:var(--gold); box-shadow:inset 0 0 0 3px var(--surface); }
+.pcard .pt { font-size:13.5px; font-weight:800; }
+.pcard .ps { font-size:11.5px; color:var(--text-mute); margin-top:1px; line-height:1.45; }
+.pcard.soon { opacity:.55; cursor:default; border-style:dashed; }
+/* toggle switch row */
+.switchrow { display:flex; align-items:center; gap:12px; padding:11px 13px; border:1px solid var(--border); border-radius:var(--r-sm); }
+.switchrow .l { flex:1; min-width:0; }
+.switchrow .sq { font-size:12.5px; font-weight:700; }
+.switchrow .sh { font-size:11px; color:var(--text-mute); margin-top:1px; line-height:1.45; }
+.toggle { flex:none; width:42px; height:24px; border-radius:var(--r-full); background:var(--surface-el); border:1px solid var(--border-med); position:relative; cursor:pointer; transition:background .15s,border-color .15s; }
+.toggle.on { background:var(--gold); border-color:var(--gold); }
+.toggle .knob { position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:var(--r-full); background:var(--surface); transition:transform .18s var(--es); box-shadow:0 1px 2px rgba(0,0,0,.25); }
+.toggle.on .knob { transform:translateX(18px); }
+/* person rows (owner + staff) */
+.prow { display:flex; align-items:center; gap:11px; padding:9px 12px; border:1px solid var(--border); border-radius:var(--r-sm); }
+.prow .pav { flex:none; width:30px; height:30px; border-radius:var(--r-full); background:var(--gold-sheen); border:1px solid var(--accent-border); color:var(--gold); font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; letter-spacing:.02em; }
+.prow .l { flex:1; min-width:0; }
+.prow .q { font-size:13px; font-weight:700; display:flex; align-items:center; gap:7px; }
+.prow .opts { font-size:11px; color:var(--text-mute); margin-top:1px; }
+.youtag { font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--on-gold); background:var(--gold); border-radius:var(--r-xs); padding:1px 6px; }
+/* add-staff form */
+.sform { border:1px solid var(--accent-border); border-radius:var(--r-md); padding:14px; background:var(--gold-sheen); display:flex; flex-direction:column; gap:10px; }
+.sform-h { font-size:12px; font-weight:800; letter-spacing:.02em; }
+.sfld label { display:flex; align-items:center; gap:7px; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text-mute); margin-bottom:5px; }
+.sfld label .rq { font-size:8.5px; letter-spacing:.03em; color:var(--on-gold); background:var(--gold); border-radius:var(--r-xs); padding:1px 5px; }
+.sform input, .sform select { width:100%; background:var(--surface); border:1px solid var(--border-med); border-radius:var(--r-sm); color:var(--text); font:inherit; font-size:13px; padding:9px 11px; }
+.sform input:focus, .sform select:focus { outline:none; border-color:var(--gold); }
+.sform-err { display:none; font-size:11.5px; font-weight:700; color:var(--red,#F07060); }
+.sactions { display:flex; gap:8px; }
+.sbtn { flex:1; border-radius:var(--r-sm); padding:10px; font-size:12.5px; font-weight:800; }
+.sbtn.save { background:var(--gold); color:var(--on-gold); }
+.sbtn.cancel { border:1px solid var(--border-med); color:var(--text-sub); }
+.rowitem { display:flex; align-items:center; gap:11px; padding:11px 13px; border:1px solid var(--border); border-radius:var(--r-md); font-size:13px; }
+.rowitem .dot { flex:none; width:8px; height:8px; border-radius:var(--r-full); background:var(--border-str); }
+.rowitem.ok .dot { background:var(--green); }
+.rowitem.wait .dot { background:var(--amber); }
+.rowitem small { margin-left:auto; color:var(--text-mute); font-size:11px; }
+.note { font-size:11.5px; color:var(--text-mute); line-height:1.5; border-left:2px solid var(--border-med); padding-left:11px; margin-top:6px; }
+
+.moment { margin-top:22px; border-top:1px solid var(--border); padding-top:18px; display:flex; flex-direction:column; gap:9px; }
+.cta { display:flex; align-items:center; justify-content:center; gap:9px; width:100%; background:var(--gold); color:var(--on-gold); border-radius:var(--r-md); padding:13px; font-size:13.5px; font-weight:800; transition:transform .12s var(--es); }
+.cta:hover { transform:translateY(-1px); }
+.cta.donebtn { background:var(--green-soft); color:var(--green); border:1px solid var(--green); cursor:default; transform:none; }
+.ghostbtn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; border:1px solid var(--border-med); border-radius:var(--r-md); padding:11px; font-size:12.5px; font-weight:700; color:var(--text); }
+.ghostbtn:hover { border-color:var(--border-str); }
+
+.wiznote { margin-top:18px; font-family:var(--font-mono); font-size:10.5px; color:var(--text-mute); display:flex; align-items:center; gap:7px; }
+.wiznote .sq { width:7px; height:7px; background:var(--gold); border-radius:2px; flex:none; }
+
+.dock { position:fixed; bottom:0; left:0; right:0; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(10px); border-top:1px solid var(--border); }
+.dock .in { max-width:760px; margin:0 auto; padding:12px 20px calc(12px + env(safe-area-inset-bottom)); display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:12px; }
+.nav { display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:800; border-radius:var(--r-md); padding:11px 18px; }
+.nav.back { color:var(--text-sub); border:1px solid var(--border-med); justify-self:start; }
+.nav.back:hover { color:var(--text); border-color:var(--border-str); }
+.nav.back[disabled] { opacity:.35; cursor:default; }
+.nav.next { background:var(--gold); color:var(--on-gold); justify-self:end; }
+.nav.next:hover { transform:translateY(-1px); }
+.pos { text-align:center; }
+.pos .where { font-size:11.5px; font-weight:700; color:var(--text-sub); }
+.pos .count { font-family:var(--font-mono); font-size:10px; color:var(--text-mute); margin-top:2px; }
+
+.toast { position:fixed; top:14px; left:50%; transform:translateX(-50%); background:var(--surface-el); border:1px solid var(--accent-border); color:var(--text); font-size:12px; font-weight:700; border-radius:var(--r-full); padding:8px 16px; box-shadow:var(--shadow-pop); opacity:0; pointer-events:none; transition:opacity .3s; z-index:50; }
+.toast.show { opacity:1; }
+
+@media (max-width:560px) {
+  .app { padding:0 14px; }
+  .segs { gap:5px; }
+  .seg .lbl { font-size:0; gap:0; margin-bottom:5px; height:14px; }
+  .seg .lbl svg { width:11px; height:11px; }
+  .seg.cur .lbl { font-size:10px; gap:4px; }
+  .card { padding:20px 16px 22px; border-radius:var(--r-md); }
+  h1 { font-size:20px; }
+  .qrow.dep { margin-left:14px; }
+  .qrow.dep2 { margin-left:28px; }
+  .qrow .chip { display:none; }
+  .nav { padding:11px 15px; }
+  .pos .where { font-size:10.5px; }
+}
+</style>
+
+<div class="app">
+  <div class="head">
+    <span class="who">DETAIL Miami</span>
+    <span class="what">Finish your onboarding</span>
+    <button class="reset" onclick="resetDemo()">reset demo</button>
+  </div>
+  <nav class="segs" id="segs" aria-label="Onboarding sections"></nav>
+  <div class="subrail" id="subrail" aria-label="Steps in this section"></div>
+  <main class="stage"><section class="card" id="card"></section></main>
+</div>
+
+<div class="dock"><div class="in">
+  <button class="nav back" id="btnBack" onclick="go(-1)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+    Back
+  </button>
+  <div class="pos"><div class="where" id="posWhere"></div><div class="count" id="posCount"></div></div>
+  <button class="nav next" id="btnNext" onclick="go(1)">
+    Next
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+  </button>
+</div></div>
+
+<div class="toast" id="toast">Picked up where you left off</div>
+
+<script>
+const TICK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const FLAG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15V4h12l-2 4 2 4H6"/><path d="M4 22v-7"/></svg>';
+
+/* Body entry kinds:
+   ['h','Group label']                                  section header inside a page
+   ['q','Label','type',{req,dep,dep2,ghl,opts}]         a real question (from client-portal.html)
+   ['a','Label','what the system does']                 a system action row (not a question)
+   ['rows',[[state,label,meta],...]]                    status rows
+   ['note','...']                                       explainer
+   ['ghost','Label']                                    link-out stub          */
+function freshState() { return [
+  { id:'academy', label:'Academy', steps:[
+    { t:'Basics', done:true, sub:'Who you are and what you run - the essentials the whole build keys off.', body:[
+      ['q','Business name','text',{req:1}],
+      ['q','Address','text',{req:1}],
+      ['q','What does your academy offer?','choice',{req:1,opts:'Training - more program types coming soon'}],
+      ['note','Training to start - teams, camps, leagues and more are coming. Time zone is derived from your address; legal name and tax details come at the texting-setup step.'],
+    ]},
+    { t:'Locations', done:true, sub:'Where you actually run your sessions - the gyms, courts or fields your athletes show up to. Each one becomes a bookable location on your free-trial schedule.', body:[
+      ['h','Your locations - add at least one, repeats per location'],
+      ['q','Title','text',{req:1}],
+      ['q','Address','text',{req:1}],
+      ['q','Notes','long',{}],
+      ['note','You need at least one location before you can move on - it is where your schedule and free-trial booking send people.'],
+    ]},
+    { t:'Staff', done:true, sub:'Everyone who runs your academy - starting with you. Each person gets their own portal login with the access you choose.', body:[
+      ['h','Owner'],
+      ['owner'],
+      ['h','Your team - add anyone who needs a login'],
+      ['staff'],
+    ]},
+  ]},
+  { id:'brand', label:'Brand', steps:[
+    { t:'Look', done:true, sub:'Colors, fonts and logos - the raw material.', body:[
+      ['h','Colors - add as many as your brand has'],
+      ['colors'],
+      ['h','Fonts'],
+      ['q','Display / headlines','choice',{}],
+      ['q','Body / paragraph','choice',{}],
+      ['h','Logos - your main mark, plus any variations you have'],
+      ['logos'],
+    ]},
+    { t:'Your website', sub:'Tell us about your academy and hand over anything that shows your vibe. This is what your whole site and emails get written from - the more real detail, the more it sounds like you and not a template. Submitting it kicks off the build, which you track at the Launch step.', body:[
+      ['h','About your academy - the copy is written from this'],
+      ['q','Why should families choose you over other options?','long',{req:1}],
+      ['q','How would you describe your dream athletes?','long',{}],
+      ['q','Your story - why you coach and how you started','long',{}],
+      ['q','Proof - results, credentials, stats, awards','long',{}],
+      ['h','Anything that helps us capture your vibe'],
+      ['q','Already have a site? Drop the link so we can pull copy and photos from it','link',{}],
+      ['q','What did you like about it? Anything you want to keep on the new one','long',{dep:'if you have one'}],
+      ['q','Reference sites you like + what you like about them','long',{}],
+      ['filedrop','Other assets for inspiration','Brochures, a pitch deck, gear shots, team photos, an old flyer - anything that shows your look and feel. Drag files in or browse.'],
+      ['vibeswitch'],
+      ['a','Submit and start the build','pings our systems team - they start your branding deck right away'],
+    ]},
+    { t:'Socials', sub:'Optional - connect it and your content lands in one inbox.', body:[
+      ['q','Instagram','connect',{}],
+    ]},
+    { t:'Branding deck', moment:'Approve your branding deck', sub:'Your whole look on one page - fonts, colors, buttons, every component your site is built from. Our team crafts it from your Look + website brief the moment you submit them.', body:[
+      ['rows',[
+        ['ok','Brief submitted','kicks off automatically'],
+        ['wait','Our team is building your deck','crafted and tweaked by hand, then published'],
+        ['wait','Ready for your review','you approve it right here'],
+      ]],
+      ['note','Your approval is the brand sign-off your launch waits on. Once the deck is published, our team starts your core website pages (home, about, contact) in the background - offer pages follow as you confirm Sales and Onboarding.'],
+    ]},
+  ]},
+  { id:'wired', label:'Wired', steps:[
+    { t:'Stripe', done:true, sub:'Your money goes straight to you.', body:[
+      ['a','Connect Stripe','one-click connect - payments land in your account'],
+    ]},
+    { t:'Contacts', sub:'Every lead, parent and past inquiry you have - into one system, right at the start.', body:[
+      ['ghlswitch'],
+      ['note','This first import is just people - names, phones, emails. No program details or custom fields here; the specific info you collect from new leads and members is set up later in your offer (Sales and Onboarding).'],
+    ]},
+    { t:'Email', sub:'Send from your own domain.', body:[
+      ['q','Sending domain','text',{}],
+      ['a','DNS records','we check and verify them automatically'],
+    ]},
+    { t:'Texting', sub:'The number your academy texts and calls from - booking confirmations, follow-ups, the AI agent, all of it.', body:[
+      ['h','Your number'],
+      ['q','What should your academy text and call from?','choice',{req:1,opts:'Switching from GoHighLevel / Get me a new local number / Port a number from another carrier'}],
+      ['q','Your GHL number','auto',{dep:'if from GHL',opts:'detected from your connected GoHighLevel - your number keeps working through GHL, wrapped into your portal from day one, then switches onto your own line the moment carrier registration clears. Zero paperwork, zero downtime'}],
+      ['q','Area code + number','auto',{dep:'if new number',opts:'picked from your address - we grab it for you, you confirm before anything goes live'}],
+      ['q','The number to port','text',{req:1,dep:'if carrier port'}],
+      ['q','Current carrier + account number + transfer PIN','text',{req:1,dep:'if carrier port'}],
+      ['q','A recent phone bill','upload',{req:1,dep:'if carrier port'}],
+      ['note','The GoHighLevel option only shows if you connected GHL at the Contacts step. Texting families from your personal cell today? Take the new number - parent texts land in your portal inbox, and your cell stays yours.'],
+      ['h','Registration details - must match your IRS records exactly'],
+      ['q','Legal business name','text',{req:1}],
+      ['q','Tax ID (EIN)','text',{req:1}],
+      ['q','Registered business address','text',{req:1}],
+      ['a','A2P / 10DLC registration','we file it with the carriers for you'],
+      ['note','This step runs the two slowest clocks in onboarding: carrier registration (days) and porting (up to a few weeks). Both run in the background while you finish everything else - and nothing switches until the very end, so parents never miss a message. Your address may be prefilled from Basics; just confirm it matches your IRS records.'],
+    ]},
+    { t:'Ads', sub:'Optional - skip it if you are not running ads yet, and set it up anytime later in Settings. Ads are never required to launch.', body:[
+      ['q','Who runs your ads?','choice',{opts:'You run them for me / I run my own / Not running ads yet'}],
+      ['q','Grant us access','connect',{dep:'if we run them',opts:'one guided link - approve access to your ad account, page and pixel in a couple of clicks. Never run ads? We set the whole account up for you'}],
+      ['q','Connect Meta','connect',{dep:'if you run your own',opts:'your own login - your campaigns and spend controls show up right in your portal'}],
+      ['note','Either way, the ad account, pixel and billing stay YOURS - we only ever get partner access. Leave anytime, nothing to migrate.'],
+    ]},
+  ]},
+  { id:'offer', label:'Offer', wizard:true, steps:[
+    { t:'General info', sub:'What the program is. Who it serves and when it runs live in Schedule - your classes carry all of that.', body:[
+      ['q','Title','text',{req:1}],
+      ['q','Short description','long',{}],
+      ['q','Program structure - how you train, what a week looks like','long',{}],
+      ['q','Assets','upload',{}],
+      ['q','Extra notes','long',{}],
+      ['note','Ages, skill levels, gender and locations are not asked here - they live on your classes in Schedule, and the website pulls them from there. You never type them twice.'],
+    ]},
+    { t:'Schedule', sub:'When you train - each class becomes bookable slots.', body:[
+      ['a','Times shown in America/New_York','auto-detected from your address - tap to change if your slots should show in a different zone'],
+      ['h','Classes - repeats per class'],
+      ['q','Title','text',{req:1}],
+      ['q','Age','text',{req:1}],
+      ['q','Skill level','choice',{opts:'Beginner / Intermediate / Advanced / All'}],
+      ['q','Gender','multi',{opts:'Boys / Girls'}],
+      ['q','Max athletes per session','number',{req:1}],
+      ['q','Location','picker',{req:1,opts:'from your saved locations - this is where the class runs'}],
+      ['q','Other notes','long',{}],
+      ['q','Same time every week?','choice',{opts:'Yes / No'}],
+      ['q','Weekly times: days, start, end (+ location only if that slot differs)','builder',{dep:'if Yes'}],
+      ['q','How is the schedule communicated?','long',{dep:'if No'}],
+      ['h','Season'],
+      ['q','Year-round or seasonal?','choice',{opts:'Year-round / Seasonal'}],
+      ['q','Season start / end dates','text',{req:1,dep:'if Seasonal'}],
+      ['q','Closed dates / breaks','long',{}],
+      ['q','Extra notes','long',{}],
+      ['note','No booking switch here - your free-trial slots go bookable on their own once your pricing is live. Each class caps at its own max, and a full slot starts a waitlist automatically.'],
+    ]},
+    { t:'Pricing', flag:true, sub:'Your tiers, matched to Stripe - unlocks checkout and booking.', body:[
+      ['h','Pricing options - repeats per option'],
+      ['q','Title','text',{req:1}],
+      ['q','Pricing type','choice',{req:1,opts:'Membership / Package / Single Session / Other'}],
+      ['q','What do clients get?','long',{}],
+      ['q','Price (pre-tax)','$',{req:1}],
+      ['q','Billing cycle','choice',{req:1,dep:'if Membership',opts:'Weekly / Biweekly / Monthly / Every 4 weeks / Quarterly / Annually / Other'}],
+      ['q','Added fees + what they cover','text',{}],
+      ['q','Commitments: length, included, price','builder',{dep:'if Membership'}],
+      ['a','Stripe match panel','bringing an existing Stripe? old members keep their legacy rate'],
+      ['q','Extra notes','long',{}],
+    ]},
+    { t:'Policy', sub:'Hard rules - the system enforces them, and they become the clauses in your enrollment agreement.', body:[
+      ['q','Cancellation','choice',{opts:'Cancel anytime / Notice required'}],
+      ['q','Notice length + unit','number',{dep:'if Notice required'}],
+      ['q','Allow pausing','choice',{opts:'Yes / No'}],
+      ['q','Min / max pause length (days)','number',{dep:'if Yes'}],
+      ['q','Pauses allowed per year','number',{dep:'if Yes'}],
+      ['q','Refunds','choice',{opts:'Non-refundable / Refundable within a window'}],
+      ['q','Refund window (days)','number',{dep:'if Refundable'}],
+      ['q','Makeup / reschedule policy','long',{}],
+      ['q','Extra notes - anything else to put in the agreement','long',{}],
+      ['ghost','View your agreement - plain draft'],
+      ['note','A plain-text draft, assembled from your rules and notes, just so you can check it reads right. Your team turns it into the branded, signable version - adapting anything you added in notes - and you approve that at Build & review before launch.'],
+    ]},
+    { t:'Sales', flag:true, moment:'Apply the Free Trial preset', sub:'One choice - pick the preset that fills your trials. Everything else is stamped for you, nothing to configure.', body:[
+      ['h','Choose your preset'],
+      ['preset'],
+      ['q','Staff in charge (pinged on new lead)','picker',{}],
+      ['q','Info to collect from new leads','panel',{opts:'name, phone, email always asked - add your own questions'}],
+      ['h','What the preset stamps - the proven system, identical for every academy'],
+      ['rows',[
+        ['ok','Pipeline + stages','the exact setup GTA runs'],
+        ['ok','AI booking agent + follow-ups',''],
+        ['ok','Lead forms + welcome drip',''],
+      ]],
+      ['note','Applying the preset also builds your funnel pages and emails automatically - you review them at the final step. Nothing else to set up here.'],
+    ]},
+    { t:'Onboarding', sub:'How people get into your program - the form new parents fill out, and bringing the people you already have into the system.', body:[
+      ['h','Onboarding form - always asked'],
+      ['q','Parent name / Phone / Email','fixed',{}],
+      ['q','Emergency contact name + phone','fixed',{}],
+      ['h','Onboarding form - optional toggles'],
+      ['q','Medical-allergies / School / Grade / Goals / Experience / Jersey size','toggle',{}],
+      ['q','Add custom question','builder',{}],
+      ['h','Active members - drop a file, we do the rest'],
+      ['filedrop','Drop your active members list','Any layout - a spreadsheet or CSV with names, emails, phones, plans. We figure out the columns; you just confirm.'],
+      ['rows',[
+        ['ok','Columns mapped automatically','you confirm the mapping, never build it'],
+        ['ok','Each member matched to a plan + their Stripe subscription','confident matches attach on their own - billing real from day one'],
+        ['ok','Cleanup - duplicates flagged, fuzzy matches confirmed by you','anyone unmatched still imports, just badged to finish billing later'],
+        ['ok','Promoted to your live roster','they appear in Members immediately'],
+      ]],
+      ['h','Cancelled members - pulled from your Stripe, not a file'],
+      ['rows',[
+        ['ok','We find everyone whose subscription ended','on the Stripe prices tied to your offer - live and legacy'],
+        ['ok','Add any other prices or plans to count','old memberships, retired plans you also want included'],
+        ['ok','Match them to your contacts','AI matches; you confirm anything fuzzy'],
+        ['ok','Clean the numbers','when each person actually cancelled - so the history is real'],
+      ]],
+      ['note','Imports unlock once your pricing is set - every member maps to one of your plans. Cancelled members power your win-back campaigns AND your churn numbers from day one. And your signup pages never wait on imports: they build on their own once pricing, policy and this form are in.'],
+    ]},
+  ]},
+  { id:'launch', label:'Launch', steps:[
+    { t:'Build & review', moment:'Accept your site', sub:'Everything we build lands here as it finishes - each piece kicks off automatically when you complete its section. Open each preview, click around like a parent would, and accept when it all looks right.', body:[
+      ['h','General site'],
+      ['rows',[['ok','Core pages - home, about, contact','started once your branding deck published']]],
+      ['ghost','Open the site preview'],
+      ['h','Sales funnel + emails'],
+      ['rows',[
+        ['ok','Free-trial funnel pages','built when you applied your preset'],
+        ['ok','Booking + follow-up emails','written in your voice, themed to your deck'],
+      ]],
+      ['ghost','Open the funnel preview'],
+      ['h','Onboarding funnel + emails'],
+      ['rows',[['wait','Signup + onboarding flow','builds once your pricing, policy and onboarding form are all in']]],
+      ['h','Email templates'],
+      ['rows',[['wait','General templates - confirmations, receipts, reminders','themed from your branding deck']]],
+      ['h','Enrollment agreement'],
+      ['rows',[['wait','Branded agreement - the one parents sign','builds once your Policy rules AND your legal details (from Texting) are in - it is signed under your legal name']]],
+      ['ghost','Open the agreement preview'],
+      ['h','Your leads - only if you came from GoHighLevel'],
+      ['rows',[['wait','Old pipeline sorted onto your new board','our team files every open lead card into the right stage, set up so the AI picks each conversation up exactly where it left off']]],
+      ['note','Your current site stays live until you flip the domain. Accepting green-lights the final checks before launch.'],
+    ]},
+    { t:'Go live', moment:'Flip the domain', launchPage:true, sub:'Last stage - everything below is green, flip the domain and the new site takes over.', body:[] },
+  ]},
+]; }
+
+let S = freshState();
+let cur = { s:1, i:1 };  // resume on Brand > Your website (the brief)
+
+// Brand colors - a flexible list, not fixed slots. Add as many as the brand has.
+const freshColors = () => [ { name:'Navy', v:'#12263A' }, { name:'Volt', v:'#C8F03C' } ];
+let COLORS = freshColors();
+function addColor() { COLORS.push({ name:'Color ' + (COLORS.length + 1), v:'#D4B65C' }); render(); }
+function rmColor(i) { COLORS.splice(i, 1); render(); }
+function expandHex(v) { return /^#[0-9a-fA-F]{3}$/.test(v) ? '#' + v.slice(1).split('').map(c => c + c).join('') : v; }
+// From the swatch → sync the hex box (no re-render, keeps focus).
+function setColor(i, v) { COLORS[i].v = v; const hx = document.getElementById('chex-' + i); if (hx) hx.value = v.toUpperCase(); }
+// From the hex box → validate, then drive the swatch.
+function setHex(i, raw) {
+  let v = raw.trim(); if (v && v[0] !== '#') v = '#' + v;
+  const box = document.getElementById('chex-' + i);
+  const ok = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v);
+  if (box) box.classList.toggle('bad', !!raw && !ok);
+  if (!ok) return;
+  COLORS[i].v = v;
+  const sw = document.getElementById('csw-' + i); if (sw) sw.value = expandHex(v);
+}
+function setColorName(i, v) { COLORS[i].name = v; }
+// Logos - one main mark (required) + any number of labeled variations.
+const freshLogos = () => [];
+let LOGOS = freshLogos();
+function addLogo() { LOGOS.push({ label: '', file: null }); render(); }
+function rmLogo(i) { LOGOS.splice(i, 1); render(); }
+function setLogoLabel(i, v) { LOGOS[i].label = v; }
+const LOGO_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+const UPLOAD_ICON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>';
+function logosHtml() {
+  const main = `<div class="lrow">
+      <span class="lthumb">${LOGO_ICON}</span>
+      <div class="l"><div class="q">Main logo <span class="chip rchip" style="margin-left:2px">required</span></div><div class="opts">Your primary mark - used everywhere by default</div></div>
+      <button class="upl">${UPLOAD_ICON} Upload</button>
+    </div>`;
+  const extras = LOGOS.map((lg, i) => `<div class="lrow">
+      <span class="lthumb">${LOGO_ICON}</span>
+      <input class="lname" placeholder="Label this one - e.g. White version, Icon, Wordmark" value="${lg.label}" onchange="setLogoLabel(${i}, this.value)" aria-label="Logo label">
+      <button class="upl">${UPLOAD_ICON} Upload</button>
+      <button class="crm" onclick="rmLogo(${i})" aria-label="Remove logo"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>`).join('');
+  const add = `<button class="addcolor" onclick="addLogo()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Add another logo</button>`;
+  return main + extras + add;
+}
+function colorsHtml() {
+  return COLORS.map((c, i) => `<div class="crow">
+      <input type="color" id="csw-${i}" value="${expandHex(c.v)}" oninput="setColor(${i}, this.value)" aria-label="${c.name} color">
+      <input class="cname" value="${c.name}" onchange="setColorName(${i}, this.value)" aria-label="Color name">
+      <input class="chex" id="chex-${i}" value="${c.v.toUpperCase()}" oninput="setHex(${i}, this.value)" spellcheck="false" maxlength="7" aria-label="Hex code">
+      <button class="crm" onclick="rmColor(${i})" aria-label="Remove ${c.name}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>`).join('')
+    + `<button class="addcolor" onclick="addColor()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Add a color</button>`;
+}
+
+// Staff - the owner (you, prefilled) at the top, then a team list you add to.
+// Adding a person opens an inline form: name / email / phone / permissions,
+// all mandatory. Each becomes a portal login.
+const OWNER = { name:'Mike Delgado', email:'mike@detail-mia.com', phone:'(305) 555-0148' };
+const freshStaff = () => [];
+let STAFF = freshStaff();
+let staffAdding = false;
+function staffOpen() { staffAdding = true; render(); setTimeout(() => document.getElementById('sf-name')?.focus(), 30); }
+function staffCancel() { staffAdding = false; render(); }
+function staffSave() {
+  const g = (id) => (document.getElementById(id)?.value || '').trim();
+  const name = g('sf-name'), email = g('sf-email'), phone = g('sf-phone'), perm = g('sf-perm');
+  if (!name || !email || !phone || !perm) { document.getElementById('sf-err').style.display = 'block'; return; }
+  STAFF.push({ name, email, phone, perm });
+  staffAdding = false; render();
+}
+function rmStaff(i) { STAFF.splice(i, 1); render(); }
+const PERMS = ['Admin - full access','Marketing','Content','Front desk - view only'];
+function ownerHtml() {
+  return `<div class="prow">
+    <span class="pav">${OWNER.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</span>
+    <div class="l"><div class="q">${OWNER.name} <span class="youtag">You</span></div><div class="opts">${OWNER.email} &middot; ${OWNER.phone} &middot; Admin - full access</div></div>
+    <span class="chip rchip">required</span>
+  </div>`;
+}
+function staffHtml() {
+  const list = STAFF.map((s, i) => `<div class="prow">
+      <span class="pav">${(s.name.split(' ').map(w=>w[0]).slice(0,2).join('') || '?').toUpperCase()}</span>
+      <div class="l"><div class="q">${s.name}</div><div class="opts">${s.email} &middot; ${s.phone} &middot; ${s.perm}</div></div>
+      <button class="crm" onclick="rmStaff(${i})" aria-label="Remove ${s.name}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>`).join('');
+  const fld = (id, label, ph, type) => `<div class="sfld"><label>${label} <span class="rq">required</span></label>${
+    type === 'select'
+      ? `<select id="${id}"><option value="" selected disabled>Choose access level...</option>${PERMS.map(p=>`<option>${p}</option>`).join('')}</select>`
+      : `<input id="${id}" type="${type||'text'}" placeholder="${ph}">`}</div>`;
+  const add = staffAdding
+    ? `<div class="sform">
+        <div class="sform-h">New staff member</div>
+        ${fld('sf-name','Name','Jordan Rivera')}
+        ${fld('sf-email','Email','jordan@academy.com','email')}
+        ${fld('sf-phone','Phone','(305) 555-0123','tel')}
+        ${fld('sf-perm','Permissions','','select')}
+        <div id="sf-err" class="sform-err">All four fields are required.</div>
+        <div class="sactions">
+          <button class="sbtn cancel" onclick="staffCancel()">Cancel</button>
+          <button class="sbtn save" onclick="staffSave()">Add teammate</button>
+        </div>
+      </div>`
+    : `<button class="addcolor" onclick="staffOpen()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>Add a staff member</button>`;
+  return list + add;
+}
+
+// Sales preset picker - ONE choice, everything else is stamped. Picking it is
+// what pings the team to build the funnel + emails.
+let PRESETSEL = true;
+function pickPreset() { PRESETSEL = !PRESETSEL; render(); }
+function presetHtml() {
+  return `<div class="pcard ${PRESETSEL ? 'sel' : ''}" onclick="pickPreset()" role="radio" aria-checked="${PRESETSEL}">
+      <span class="pdot"></span>
+      <div><div class="pt">Free Trial</div><div class="ps">For training offers - the exact system GTA runs. Lead comes in, the agent books the trial, follow-ups chase no-shows, you close.</div></div>
+    </div>
+    <div class="pcard soon"><span class="pdot"></span><div><div class="pt">More presets coming</div><div class="ps">Paid trial, discovery call first, direct signup</div></div></div>`;
+}
+
+// Contacts import - the GHL fork: on GHL -> connect + auto-import, off -> file drop.
+let GHLSW = true;
+function setGhl(v) { GHLSW = v; render(); }
+function ghlSwitchHtml() {
+  return `<div class="switchrow">
+      <div class="l"><div class="sq">Are you using GoHighLevel?</div><div class="sh">If yes, we connect it and every contact imports automatically.</div></div>
+      <button class="toggle ${GHLSW ? 'on' : ''}" role="switch" aria-checked="${GHLSW}" onclick="setGhl(${!GHLSW})"><span class="knob"></span></button>
+    </div>` + (GHLSW
+      ? `<div class="qrow action"><div class="l"><div class="q">Connect GoHighLevel</div><div class="opts">one click - your whole contact list comes over on its own</div></div><span class="chip">connect</span></div>`
+      : dropHtml('Drop your contact list', 'A spreadsheet or CSV - names, phones, emails. We import everyone and merge duplicates automatically.'));
+}
+
+// File drops + the "did you build your own site?" switch (reveals a drop).
+let VIBE = false;
+function setVibe(v) { VIBE = v; render(); }
+const DROP_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>';
+function dropHtml(label, hint) {
+  return `<div class="drop">
+      <span class="dropicon">${DROP_ICON}</span>
+      <div class="dlabel">${label}</div>
+      <div class="dhint">${hint}</div>
+    </div>`;
+}
+function vibeHtml() {
+  return `<div class="switchrow">
+      <div class="l"><div class="sq">Did you build your own website?</div><div class="sh">If you vibe-coded or DIY'd a site, we can start from your work instead of from scratch.</div></div>
+      <button class="toggle ${VIBE ? 'on' : ''}" role="switch" aria-checked="${VIBE}" onclick="setVibe(${!VIBE})"><span class="knob"></span></button>
+    </div>` + (VIBE ? dropHtml('Drop what you built', 'A zip of the code, a link to the repo or live preview, or screenshots - whatever you have.') : '');
+}
+
+const flat = () => S.flatMap((sec,s) => sec.steps.map((st,i) => ({s,i,st,sec})));
+const doneCount = () => flat().filter(x => x.st.done).length;
+const qCount = (st) => (st.body||[]).filter(e => e[0]==='q').length;
+
+function render() {
+  const sec = S[cur.s], st = sec.steps[cur.i];
+
+  const segsEl = document.getElementById('segs');
+  segsEl.style.gridTemplateColumns = `repeat(${S.length},1fr)`;
+  segsEl.innerHTML = S.map((x,s) => {
+    const total = x.steps.length, d = x.steps.filter(t=>t.done).length;
+    const flagged = x.steps.some(t=>t.flag && !t.done);
+    return `<button class="seg ${s===cur.s?'cur':''} ${d===total?'done':''}" onclick="jumpSection(${s})" aria-label="${x.label}, ${d} of ${total} done">
+      <span class="lbl">${d===total ? `<span style="color:var(--green)">${TICK}</span>` : flagged ? `<span class="flag">${FLAG}</span>` : ''}${x.label}</span>
+      <span class="track"><span class="fill" style="width:${total?Math.round(d/total*100):0}%"></span></span>
+    </button>`;
+  }).join('');
+
+  document.getElementById('subrail').innerHTML = sec.steps.map((x,i) =>
+    `<button class="pill ${i===cur.i?'cur':''} ${x.done?'done':''}" onclick="jumpStep(${i})">
+      <span class="tick">${TICK}</span>${x.t}${x.flag && !x.done ? `<span class="flg">${FLAG}</span>` : ''}
+    </button>`).join('');
+
+  const bodyHtml = st.launchPage ? launchBody() : st.body.map(entry => {
+    const [kind, a, b, c] = entry;
+    if (kind === 'h') return `<div class="qgroup">${a}</div>`;
+    if (kind === 'colors') return colorsHtml();
+    if (kind === 'logos') return logosHtml();
+    if (kind === 'preset') return presetHtml();
+    if (kind === 'filedrop') return dropHtml(a, b);
+    if (kind === 'vibeswitch') return vibeHtml();
+    if (kind === 'ghlswitch') return ghlSwitchHtml();
+    if (kind === 'owner') return ownerHtml();
+    if (kind === 'staff') return staffHtml();
+    if (kind === 'q') {
+      const o = c || {};
+      const depCls = o.dep2 ? 'dep2' : o.dep ? 'dep' : '';
+      return `<div class="qrow ${depCls} ${o.req ? 'mand' : ''}">
+        ${o.dep ? `<span class="cond">${o.dep}</span>` : ''}
+        <div class="l"><div class="q">${a}</div>
+        ${o.opts ? `<div class="opts">${o.opts}</div>` : ''}</div>
+        ${o.req ? '<span class="chip rchip">required</span>' : ''}
+        <span class="chip ${o.ghl?'ghl':''}">${o.ghl ? 'GHL only' : b}</span>
+      </div>`;
+    }
+    if (kind === 'a') return `<div class="qrow action"><div class="l"><div class="q">${a}</div><div class="opts">${b}</div></div><span class="chip">system</span></div>`;
+    if (kind === 'rows') return a.map(([s2,t2,m]) => `<div class="rowitem ${s2}"><span class="dot"></span>${t2}${m?`<small>${m}</small>`:''}</div>`).join('');
+    if (kind === 'note') return `<div class="note">${a}</div>`;
+    if (kind === 'ghost') return `<button class="ghostbtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>${a}</button>`;
+    return '';
+  }).join('');
+
+  const momentHtml = st.moment ? `<div class="moment">
+      <button class="cta ${st.done?'donebtn':''}" onclick="hitMoment()" ${st.done?'disabled':''}>
+        ${st.done ? TICK + ' Done - ' + st.moment.toLowerCase() : st.moment}
+      </button>
+    </div>` : '';
+
+  const nq = qCount(st);
+  const nreq = (st.body||[]).filter(e => e[0]==='q' && e[3] && e[3].req).length;
+  document.getElementById('card').innerHTML = `
+    <div class="eyebrow">${fullLabel(sec)} &middot; step ${cur.i+1} of ${sec.steps.length}
+      ${st.flag ? '<span class="tag">Launch must-have</span>' : ''}
+      ${st.team ? '<span class="team">Our team runs this</span>' : ''}
+      ${nq ? `<span class="qcount">${nq} question${nq===1?'':'s'}${nreq ? ` &middot; ${nreq} required` : ' &middot; all optional'}</span>` : ''}
+    </div>
+    <h1>${st.t === 'Go live' ? 'Ready to go live' : st.t}</h1>
+    <div class="sub">${st.sub || ''}</div>
+    <div class="body">${bodyHtml}</div>
+    ${momentHtml}
+    ${sec.wizard ? `<div class="wiznote"><span class="sq"></span>this chapter IS the existing training offer wizard, wrapped in place</div>` : ''}`;
+
+  const f = flat(), pos = f.findIndex(x => x.s===cur.s && x.i===cur.i);
+  document.getElementById('posWhere').textContent = `${fullLabel(sec)} \u00B7 ${cur.i+1} of ${sec.steps.length}`;
+  document.getElementById('posCount').textContent = `${doneCount()} of ${f.length} complete`;
+  document.getElementById('btnBack').disabled = pos === 0;
+  document.getElementById('btnNext').textContent = '';
+  document.getElementById('btnNext').insertAdjacentHTML('beforeend', pos === f.length-1 ? 'Finish' : 'Next <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>');
+}
+
+function fullLabel(sec) {
+  return { academy:'Your academy', brand:'Your brand', wired:'Get wired', offer:'Your offer', website:'Your website', launch:'Launch' }[sec.id];
+}
+
+function launchBody() {
+  const find = (sid, t) => S.find(x=>x.id===sid).steps.find(x=>x.t===t);
+  const checks = [
+    ['Pricing set', find('offer','Pricing').done, 'offer', 'Pricing'],
+    ['Free Trial preset applied', find('offer','Sales').done, 'offer', 'Sales'],
+    ['Branding deck approved', find('brand','Branding deck').done, 'brand', 'Branding deck'],
+    ['Site accepted', find('launch','Build & review').done, 'launch', 'Build & review'],
+  ];
+  return checks.map(([t,ok,sid,stepT]) => ok
+    ? `<div class="rowitem ok"><span class="dot"></span>${t}<small>done</small></div>`
+    : `<button class="rowitem wait" style="width:100%;text-align:left;cursor:pointer" onclick="jumpTo('${sid}','${stepT}')"><span class="dot"></span>${t}<small style="display:inline-flex;align-items:center;gap:4px;color:var(--amber)">still open - fix it <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></small></button>`
+  ).join('')
+    + `<div class="note">The domain flip retires your old site the moment the new one takes over. Until then, nothing changes for your parents.</div>`;
+}
+
+function jumpTo(sid, stepT) {
+  const s = S.findIndex(x => x.id === sid);
+  const i = S[s].steps.findIndex(x => x.t === stepT);
+  cur = { s, i };
+  render();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function hitMoment() {
+  S[cur.s].steps[cur.i].done = true;
+  render();
+  setTimeout(() => go(1), 700);
+}
+
+function go(dir) {
+  const f = flat(), pos = f.findIndex(x => x.s===cur.s && x.i===cur.i);
+  if (dir === 1) {
+    const st = S[cur.s].steps[cur.i];
+    if (!st.moment) st.done = true;
+    if (pos === f.length-1) { render(); return }
+    const n = f[pos+1]; cur = { s:n.s, i:n.i };
+  } else {
+    if (pos === 0) return;
+    const p = f[pos-1]; cur = { s:p.s, i:p.i };
+  }
+  render();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function jumpSection(s) {
+  const firstOpen = S[s].steps.findIndex(x => !x.done);
+  cur = { s, i: firstOpen === -1 ? 0 : firstOpen };
+  render();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+function jumpStep(i) { cur.i = i; render(); }
+function resetDemo() { S = freshState(); COLORS = freshColors(); LOGOS = freshLogos(); STAFF = freshStaff(); staffAdding = false; VIBE = false; GHLSW = true; PRESETSEL = true; cur = { s:1, i:1 }; render(); toast(); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') go(1);
+  if (e.key === 'ArrowLeft') go(-1);
+});
+
+function toast() {
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+render();
+toast();
+</script>
+

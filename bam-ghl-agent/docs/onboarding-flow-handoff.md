@@ -1,4 +1,16 @@
-# Onboarding Flow - handoff (2026-07-15)
+# Onboarding Flow - handoff (2026-07-15; superseded 2026-07-18)
+
+> **2026-07-18 UPDATE - the wizard redesign is the plan now.** A full-session
+> workshop with Zoran redesigned onboarding end-to-end: paged wizard (5
+> sections), staged build pipeline (6 team-built artifacts with triggers +
+> owner-visible statuses), staff A-list settled, Meta/phone/Slack gaps closed,
+> "Add academy" front door defined. THE source of truth is
+> [`onboarding-wizard-spec.md`](onboarding-wizard-spec.md) (+ the clickable
+> mock [`onboarding-wizard-mock.html`](onboarding-wizard-mock.html)). Build =
+> 7 workstreams, plans presented to Zoran one at a time for confirm-then-build.
+> Of the three sign-off redesigns below: #3 shipped (PR #1448), #2 shipped
+> (PR #1449), #1 evolved into the Branding deck pipeline in the spec.
+> Everything below this line is historical context.
 
 THE tie-everything project: one resumable flow takes any academy to BAM GTA's
 V2 state (off GHL, text/call flip last). This doc is the resume point - read it
