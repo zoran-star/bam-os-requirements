@@ -34,5 +34,5 @@ the prompt routes those to a to-do.
 - Candidate discovery is contact-keyed: members without `ghl_contact_id` are invisible to this agent.
 - Do NOT route its teach-why through `/api/agent-train` - `pickAgent` there falls back to `booking` and misfiles the lesson bucket. The endpoint's `dismiss` action inserts directly.
 - Mock mode (`?mock=1`) has fixtures: cards `mcc-1`/`mcc-2` on members mb-3/mb-8, and the mock `/api/members?id=` single-member drawer shape was added for this (drawer previously blank in mock).
-- Migration `20260718100000_agent_member_cards.sql` needs the normal linked-push flow (see supabase/README.md) - NOT yet pushed to prod as of 2026-07-18.
+- Migration `20260718100000_agent_member_cards.sql` APPLIED to prod 2026-07-18 via Supabase MCP (DDL + history row inserted at the exact version, so `migration list --linked` stays in sync). The prod history row's statements column is a pointer note, not the full SQL - the repo file is canonical.
 - Notion Member Management page: MEM- requirement for this agent still to be added (two-sources-of-truth rule).
