@@ -15775,41 +15775,49 @@ let _OBF_AT = 0;
 // itself once pricing lands (see _obfScheduleNote). The old pipeline/automations/
 // agent/entrypoints quartet collapsed into ONE preset step whose chips + apply
 // chain come from the preset manifest (api/agent/presets.js).
-const _OBF_GROUPS = [
-  { key: 'general',  label: 'Your academy', sub: 'Shared across every offer you run' },
-  { key: 'training', label: 'Training offer', sub: 'Define it, sell it, fill it - all in one place' },
+// Wizard sections (accepted redesign 2026-07-18, docs/onboarding-wizard-spec.md):
+// one page per step, a battery bar of sections up top, Back/Next walks the flat
+// path. Pure VIEW over the same completion flags - no state machine changes.
+const _OBF_SECTIONS = [
+  { id: 'academy', label: 'Academy', full: 'Your academy', keys: ['basics', 'locations', 'coaches'] },
+  { id: 'brand',   label: 'Brand',   full: 'Your brand',   keys: ['brand', 'sitecopy', 'instagram', 'brandboard'] },
+  { id: 'wired',   label: 'Wired',   full: 'Get wired',    keys: ['stripe', 'contacts', 'email', 'ein'] },
+  { id: 'offer',   label: 'Offer',   full: 'Your offer',   keys: ['define', 'schedule', 'pricing', 'policy', 'preset', 'leads', 'onboardingform', 'members', 'cancelled'] },
+  { id: 'launch',  label: 'Launch',  full: 'Launch',       keys: ['website'] },
 ];
-const _OBF_SUBGROUPS = { sales: 'Sales', onboarding: 'Onboarding' };
+// Where the wizard is parked (section index, step index within the section's
+// visible steps). Set on open (first incomplete step) and by bar/rail/arrows.
+let _OBF_NAV = { s: 0, i: 0 };
 // Step flags (accepted mockup 2026-07-14):
 //   launch:true   - blocks the first booking; named in the banner up top
 //   team:true     - BAM runs it; owner sees a live status line, no CTA
 //   ghlOnly:true  - hidden for academies with no GHL to migrate from
 //   skippable     - "not applicable" link (per-client, localStorage)
 const _OBF_STEPS = [
-  { key: 'basics',    group: 'general', title: 'Set up your business basics', sub: 'Name, address, entity type and time zone', cta: 'Open Blueprint', go: '_obfGoGeneral()' },
-  { key: 'ein',       group: 'general', title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
-  { key: 'brand',     group: 'general', title: 'Set your brand', sub: 'Logo, colors and fonts - your website, emails and agreement wear these', cta: 'Set brand', go: "_obfGoCard('brand')" },
-  { key: 'sitecopy',  group: 'general', title: 'Tell your story', sub: 'Your story, mission and vibe words - your website gets written from these, in your words', cta: 'Write it', go: "_obfGoCard('brand')" },
-  { key: 'brandboard', group: 'general', title: 'Approve your brand board', sub: 'One page with your colors, type and components - the system every asset ships from', cta: 'Review board', go: '_obfBrandBoardOpen()', needsStaging: true },
-  { key: 'locations', group: 'general', title: 'Add your locations', sub: 'Address, how to find the door, photos - your agent quotes these to parents', cta: 'Add locations', go: "_obfGoCard('locations')" },
-  { key: 'coaches',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
-  { key: 'stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account - every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
-  { key: 'email',     group: 'general', title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
-  { key: 'website',   group: 'general', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()', note: '_obfWebsiteNote' },
-  { key: 'contacts',  group: 'general', title: 'Import your contacts', sub: 'Your whole contact list comes over from GoHighLevel - the base every lead and member record ties back to', team: true, ghlOnly: true, note: '_obfContactsNote' },
-  { key: 'instagram', group: 'general', title: 'Connect Instagram DMs', sub: 'Your IG messages land in the portal inbox - skip it and add later', cta: 'Connect', go: '_obfGoInstagram()', skippable: true, optional: true },
+  { key: 'basics', railLabel: 'Basics',    group: 'general', title: 'Set up your business basics', sub: 'Name, address, entity type and time zone', cta: 'Open Blueprint', go: '_obfGoGeneral()' },
+  { key: 'ein', railLabel: 'Tax ID',       group: 'general', title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
+  { key: 'brand', railLabel: 'Look',     group: 'general', title: 'Set your brand', sub: 'Logo, colors and fonts - your website, emails and agreement wear these', cta: 'Set brand', go: "_obfGoCard('brand')" },
+  { key: 'sitecopy', railLabel: 'Story',  group: 'general', title: 'Tell your story', sub: 'Your story, mission and vibe words - your website gets written from these, in your words', cta: 'Write it', go: "_obfGoCard('brand')" },
+  { key: 'brandboard', railLabel: 'Brand board', group: 'general', title: 'Approve your brand board', sub: 'One page with your colors, type and components - the system every asset ships from', cta: 'Review board', go: '_obfBrandBoardOpen()', needsStaging: true },
+  { key: 'locations', railLabel: 'Locations', group: 'general', title: 'Add your locations', sub: 'Address, how to find the door, photos - your agent quotes these to parents', cta: 'Add locations', go: "_obfGoCard('locations')" },
+  { key: 'coaches', railLabel: 'Team',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
+  { key: 'stripe', railLabel: 'Stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account - every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
+  { key: 'email', railLabel: 'Email',     group: 'general', title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'website', railLabel: 'Go live',   group: 'general', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()', note: '_obfWebsiteNote' },
+  { key: 'contacts', railLabel: 'Contacts',  group: 'general', title: 'Import your contacts', sub: 'Your whole contact list comes over from GoHighLevel - the base every lead and member record ties back to', team: true, ghlOnly: true, note: '_obfContactsNote' },
+  { key: 'instagram', railLabel: 'Instagram', group: 'general', title: 'Connect Instagram DMs', sub: 'Your IG messages land in the portal inbox - skip it and add later', cta: 'Connect', go: '_obfGoInstagram()', skippable: true, optional: true },
   // Training offer: define the offer...
-  { key: 'define',   group: 'training', title: 'Define your offer', sub: 'Ages, skill level, capacity and what is included', cta: 'Define it', go: "_obfGoOffer('general_info')" },
-  { key: 'schedule', group: 'training', title: 'Build your schedule', sub: 'Weekly class times - they become bookable free-trial slots on the portal', cta: 'Build schedule', go: "_obfGoOffer('schedule')", note: '_obfScheduleNote' },
-  { key: 'pricing',  group: 'training', title: 'Confirm your pricing', sub: 'Set your tiers - matched to Stripe, unlocks checkout and booking', cta: 'Set pricing', go: "_obfGoOffer('pricing')", note: '_obfPricingNote', launch: true },
-  { key: 'policy',   group: 'training', title: 'Set your membership policy', sub: 'Cancellation, pausing and refunds - flows into the enrollment agreement and member management', cta: 'Set policy', go: "_obfGoOffer('policy')" },
+  { key: 'define', railLabel: 'Define',   group: 'training', title: 'Define your offer', sub: 'Ages, skill level, capacity and what is included', cta: 'Define it', go: "_obfGoOffer('general_info')" },
+  { key: 'schedule', railLabel: 'Schedule', group: 'training', title: 'Build your schedule', sub: 'Weekly class times - they become bookable free-trial slots on the portal', cta: 'Build schedule', go: "_obfGoOffer('schedule')", note: '_obfScheduleNote' },
+  { key: 'pricing', railLabel: 'Pricing',  group: 'training', title: 'Confirm your pricing', sub: 'Set your tiers - matched to Stripe, unlocks checkout and booking', cta: 'Set pricing', go: "_obfGoOffer('pricing')", note: '_obfPricingNote', launch: true },
+  { key: 'policy', railLabel: 'Policy',   group: 'training', title: 'Set your membership policy', sub: 'Cancellation, pausing and refunds - flows into the enrollment agreement and member management', cta: 'Set policy', go: "_obfGoOffer('policy')" },
   // ...sell it (the whole sales machine is ONE preset)...
-  { key: 'preset',   group: 'training', subgroup: 'sales', title: 'Apply the Free Trial preset', sub: 'Pipeline, follow-ups, booking agent and lead forms - wired to this offer in one click. Nothing texts anyone until you approve it.', cta: 'Apply preset', go: '_obfApplyPreset(this)', launch: true },
-  { key: 'leads',    group: 'training', subgroup: 'sales', title: 'Import your active leads', sub: 'Once the preset is applied, our team sorts each open card from your old pipeline into the right stage', team: true, ghlOnly: true, note: '_obfLeadsNote' },
+  { key: 'preset', railLabel: 'Sales preset',   group: 'training', subgroup: 'sales', title: 'Apply the Free Trial preset', sub: 'Pipeline, follow-ups, booking agent and lead forms - wired to this offer in one click. Nothing texts anyone until you approve it.', cta: 'Apply preset', go: '_obfApplyPreset(this)', launch: true },
+  { key: 'leads', railLabel: 'Leads',    group: 'training', subgroup: 'sales', title: 'Import your active leads', sub: 'Once the preset is applied, our team sorts each open card from your old pipeline into the right stage', team: true, ghlOnly: true, note: '_obfLeadsNote' },
   // ...fill it.
-  { key: 'onboardingform', group: 'training', subgroup: 'onboarding', title: 'Set up your onboarding form', sub: 'What you collect at signup, plus the welcome message new members get', cta: 'Set up', go: "_obfGoOffer('onboarding')" },
-  { key: 'members', group: 'training', subgroup: 'onboarding', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
-  { key: 'cancelled', group: 'training', subgroup: 'onboarding', title: 'Import cancelled members', sub: 'Pull your churned Stripe subscriptions and tie them to your contacts - win-back and nurture get real history. The AI matches what it can; you clean up the rest.', cta: 'Import cancelled', go: '_cxOpen()', skippable: true },
+  { key: 'onboardingform', railLabel: 'Form', group: 'training', subgroup: 'onboarding', title: 'Set up your onboarding form', sub: 'What you collect at signup, plus the welcome message new members get', cta: 'Set up', go: "_obfGoOffer('onboarding')" },
+  { key: 'members', railLabel: 'Members', group: 'training', subgroup: 'onboarding', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
+  { key: 'cancelled', railLabel: 'Cancelled', group: 'training', subgroup: 'onboarding', title: 'Import cancelled members', sub: 'Pull your churned Stripe subscriptions and tie them to your contacts - win-back and nurture get real history. The AI matches what it can; you clean up the rest.', cta: 'Import cancelled', go: '_cxOpen()', skippable: true },
 ];
 
 // Steps visible for THIS academy: ghlOnly steps drop when we know there is no
@@ -16132,100 +16140,243 @@ async function _obfOpen() {
   if (!_obfIsV2()) return;
   _obfClose();
   document.body.insertAdjacentHTML('beforeend', `<div id="obf-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_obfClose()">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:620px;max-height:92vh;overflow-y:auto;padding:26px 26px 20px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-        <div>
-          <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Academy setup</div>
-          <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">Finish your onboarding</div>
+    <style>
+      #obf-overlay .obf2-card { background:var(--surface); border:1px solid var(--border); border-radius:24px; width:100%; max-width:640px; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; }
+      #obf-overlay .obf2-top { padding:22px 24px 0; }
+      #obf-overlay .obf2-segs { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:7px; margin-top:16px; }
+      #obf-overlay .obf2-seg { text-align:left; background:none; border:none; padding:0; cursor:pointer; font:inherit; }
+      #obf-overlay .obf2-seg .lb { display:flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; color:var(--text-mute); margin-bottom:5px; white-space:nowrap; overflow:hidden; }
+      #obf-overlay .obf2-seg.cur .lb { color:var(--text); }
+      #obf-overlay .obf2-seg .tk { display:block; height:6px; border-radius:999px; background:var(--surface-2,rgba(127,127,127,.12)); border:1px solid var(--border); overflow:hidden; }
+      #obf-overlay .obf2-seg.cur .tk { border-color:var(--accent-border,rgba(212,182,92,.35)); box-shadow:0 0 0 3px var(--gold-sheen,rgba(212,182,92,.09)); }
+      #obf-overlay .obf2-seg .fl { display:block; height:100%; border-radius:999px; background:var(--gold); transition:width .3s; }
+      #obf-overlay .obf2-seg.done .fl { background:var(--green,#7BC47F); }
+      #obf-overlay .obf2-rail { display:flex; gap:6px; overflow-x:auto; padding:12px 24px 10px; scrollbar-width:none; }
+      #obf-overlay .obf2-rail::-webkit-scrollbar { display:none; }
+      #obf-overlay .obf2-pill { flex:none; display:inline-flex; align-items:center; gap:5px; font:inherit; font-size:11px; font-weight:700; color:var(--text-sub,var(--text-mute)); background:transparent; border:1px solid var(--border); border-radius:999px; padding:5px 11px; cursor:pointer; }
+      #obf-overlay .obf2-pill.cur { color:var(--on-gold,#1a1608); background:var(--gold); border-color:var(--gold); }
+      #obf-overlay .obf2-pill.done:not(.cur) { border-color:var(--accent-border,rgba(212,182,92,.3)); background:var(--gold-sheen,rgba(212,182,92,.06)); }
+      #obf-overlay .obf2-page { flex:1; overflow-y:auto; padding:6px 24px 18px; }
+      #obf-overlay .obf2-foot { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; padding:12px 24px 16px; border-top:1px solid var(--border); }
+      #obf-overlay .obf2-nav { display:inline-flex; align-items:center; gap:6px; font:inherit; font-size:12.5px; font-weight:800; border-radius:10px; padding:10px 16px; cursor:pointer; }
+      #obf-overlay .obf2-back { justify-self:start; background:transparent; border:1px solid var(--border-med); color:var(--text-sub,var(--text-mute)); }
+      #obf-overlay .obf2-back:disabled { opacity:.35; cursor:default; }
+      #obf-overlay .obf2-next { justify-self:end; background:var(--gold); border:none; color:var(--on-gold,#1a1608); }
+      @media (max-width:560px) {
+        #obf-overlay { padding:10px; }
+        #obf-overlay .obf2-seg .lb { font-size:0; height:13px; }
+        #obf-overlay .obf2-seg.cur .lb { font-size:10px; }
+        #obf-overlay .obf2-top, #obf-overlay .obf2-page { padding-left:16px; padding-right:16px; }
+        #obf-overlay .obf2-rail, #obf-overlay .obf2-foot { padding-left:16px; padding-right:16px; }
+      }
+    </style>
+    <div class="obf2-card">
+      <div class="obf2-top">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div>
+            <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Academy setup</div>
+            <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">Finish your onboarding</div>
+          </div>
+          <button onclick="_obfClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Back to home</button>
         </div>
-        <button onclick="_obfClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Back to home</button>
+        <div class="obf2-segs" id="obf-segs"></div>
       </div>
-      <div id="obf-progress" style="display:flex;align-items:center;gap:10px;margin:16px 0 4px"></div>
-      <div id="obf-steps"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Checking your setup…</div></div>
-      <div style="margin-top:14px;font-size:11.5px;color:var(--text-mute)">Leave any time - progress saves itself. Steps turn gold as the system sees them done.</div>
+      <div class="obf2-rail" id="obf-rail"></div>
+      <div class="obf2-page" id="obf-steps"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Checking your setup…</div></div>
+      <div class="obf2-foot">
+        <button class="obf2-nav obf2-back" id="obf-back" onclick="_obfWizGo(-1)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          Back
+        </button>
+        <div style="text-align:center">
+          <div id="obf-pos" style="font-size:11px;font-weight:700;color:var(--text-sub,var(--text-mute))"></div>
+          <div id="obf-count" style="font-size:10px;color:var(--text-mute);margin-top:1px"></div>
+        </div>
+        <button class="obf2-nav obf2-next" id="obf-next" onclick="_obfWizGo(1)">
+          Next
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+      </div>
     </div></div>`);
   let st = null;
   try { st = await _obfFetchState(); } catch (_) { st = _OBF_STATE; }
+  _obfWizResume(st);
   _obfRender(st);
+}
+
+// ── Wizard navigation ──
+// Sections' VISIBLE steps for this academy (ghlOnly / needsStaging filtered),
+// in section order. A section with zero visible steps drops from the bar.
+function _obfWizSections(st) {
+  const vis = new Set(_obfVisibleSteps(st).map(s => s.key));
+  return _OBF_SECTIONS.map(sec => ({
+    ...sec,
+    steps: sec.keys.filter(k => vis.has(k)).map(k => _OBF_STEPS.find(s => s.key === k)).filter(Boolean),
+  })).filter(sec => sec.steps.length);
+}
+function _obfWizFlat(st) {
+  const secs = _obfWizSections(st);
+  const out = [];
+  secs.forEach((sec, s) => sec.steps.forEach((step, i) => out.push({ s, i, sec, step })));
+  return out;
+}
+// Park on the first incomplete visible step (or the last step when all done).
+function _obfWizResume(st) {
+  const flat = _obfWizFlat(st);
+  if (!flat.length) { _OBF_NAV = { s: 0, i: 0 }; return; }
+  const open = flat.find(x => st && !st[x.step.key]);
+  const at = open || flat[flat.length - 1];
+  _OBF_NAV = { s: at.s, i: at.i };
+}
+function _obfWizGo(dir) {
+  const st = _OBF_STATE;
+  const flat = _obfWizFlat(st);
+  const pos = flat.findIndex(x => x.s === _OBF_NAV.s && x.i === _OBF_NAV.i);
+  const next = pos + dir;
+  if (next < 0 || next >= flat.length) return;
+  _OBF_NAV = { s: flat[next].s, i: flat[next].i };
+  _obfRender(st);
+}
+function _obfWizJumpSection(s) {
+  const st = _OBF_STATE;
+  const secs = _obfWizSections(st);
+  if (!secs[s]) return;
+  const open = secs[s].steps.findIndex(x => st && !st[x.key]);
+  _OBF_NAV = { s, i: open === -1 ? 0 : open };
+  _obfRender(st);
+}
+function _obfWizJumpStep(s, i) { _OBF_NAV = { s, i }; _obfRender(_OBF_STATE); }
+// Jump straight to a step key (the Launch checklist uses this).
+function _obfWizJumpKey(key) {
+  const at = _obfWizFlat(_OBF_STATE).find(x => x.step.key === key);
+  if (at) { _OBF_NAV = { s: at.s, i: at.i }; _obfRender(_OBF_STATE); }
 }
 
 function _obfRender(st) {
   const host = document.getElementById('obf-steps');
-  const prog = document.getElementById('obf-progress');
   if (!host) return;
   if (!st) { host.innerHTML = `<div style="font-size:12.5px;color:var(--red,#c96856)">Couldn't check your setup - try again in a minute.</div>`; return; }
-  const visible = _obfVisibleSteps(st);
-  const done = _obfDone(st), total = visible.length;
-  if (prog) prog.innerHTML = `${_obfRing(done, total, 30)}<div style="font-size:13px;font-weight:700;color:var(--text)">${done} of ${total} done</div>` + (done === total ? `<div style="font-size:12px;color:var(--green,#7BC47F);font-weight:700">All set - your academy is fully onboarded</div>` : '');
-  // Launch banner: only the must-haves that block the first booking.
-  const launchLeft = visible.filter(s => s.launch && !st[s.key]);
-  const banner = launchLeft.length ? `<div style="display:flex;gap:9px;align-items:flex-start;background:var(--gold-sheen,rgba(212,182,92,.07));border:1px solid var(--accent-border,rgba(212,182,92,.3));border-radius:12px;padding:11px 13px;margin-top:14px">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M4 15V4h12l-2 4 2 4H6"/><path d="M4 22v-7"/></svg>
-      <div style="font-size:12.5px;line-height:1.5;color:var(--text)"><b>${launchLeft.length} must-have${launchLeft.length === 1 ? '' : 's'} left before your first booking:</b> <span style="color:var(--text-sub,var(--text-mute))">${launchLeft.map(s => s.title).join(' · ')}. Everything else can come after launch.</span></div>
-    </div>` : '';
-  const stepRow = (s) => {
-    const ok = !!st[s.key];
-    // Optional sub-state note (Schedule's booking rider): waiting amber, one-
-    // action amber with its own small CTA, or a green "live" once resolved.
-    let note = '';
-    const noteFn = s.note && (typeof window !== 'undefined' ? window[s.note] : null);
-    const n = (typeof noteFn === 'function') ? noteFn(st) : null;
-    if (n) {
-      const color = n.tone === 'good' ? 'var(--green,#7BC47F)' : '#c79a4a';
-      note = `<div style="display:flex;align-items:center;gap:7px;margin-top:5px;font-size:11.5px;font-weight:600;color:${color}">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${n.tone === 'good' ? '<path d="M20 6 9 17l-5-5"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>'}</svg>
-        <span>${n.text}</span>
-        ${n.cta ? `<button onclick="${n.go}" style="background:none;border:1px solid #c79a4a;border-radius:6px;color:#c79a4a;padding:2px 9px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">${n.cta}</button>` : ''}
-      </div>`;
-    }
-    // Row tags: Launch (blocks first booking) / Optional / Our team (BAM runs it).
-    const tags = []
-      .concat(s.launch && !ok ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);border:1px solid var(--accent-border,rgba(212,182,92,.35));border-radius:5px;padding:1px 6px;margin-left:7px;vertical-align:2px">Launch</span>`] : [])
-      .concat(s.optional && !ok ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);border:1px solid var(--border-med);border-radius:5px;padding:1px 6px;margin-left:7px;vertical-align:2px">Optional</span>`] : [])
-      .concat(s.team ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--text-sub,var(--text-mute));border:1px solid var(--border-med);border-radius:5px;padding:1px 6px;margin-left:7px;vertical-align:2px">Our team</span>`] : [])
-      .join('');
-    return `<div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px solid ${ok ? 'var(--accent-border,rgba(212,182,92,.25))' : 'var(--border)'};background:${ok ? 'var(--gold-sheen,rgba(212,182,92,.06))' : 'transparent'};border-radius:12px;margin-top:9px">
-      <span style="flex:none;width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-      </span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13.5px;font-weight:700;color:var(--text)">${s.title}${tags}</div>
-        <div style="font-size:12px;color:var(--text-sub,var(--text-mute));margin-top:1px">${s.sub}</div>
-        ${note}
-        ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" style="margin-top:6px;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Not applicable - skip for now</button>` : ''}
-      </div>
-      ${(ok || s.team) ? '' : `<button onclick="${s.go}" style="flex:none;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:8px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">${s.cta}</button>`}
-    </div>`;
-  };
-  // Render group by group; a group with no steps is skipped. Each header shows
-  // the group's own n/N so the offer vs general split reads at a glance. Within
-  // a group, `subgroup` steps get a small section header (Sales / Onboarding) -
-  // the define-it → sell-it → fill-it arc inside the offer.
-  host.innerHTML = banner + _OBF_GROUPS.map(g => {
-    const steps = visible.filter(s => s.group === g.key);
-    if (!steps.length) return '';
-    const gDone = steps.filter(s => !!st[s.key]).length;
-    let lastSub = null;
-    const rows = steps.map(s => {
-      let head = '';
-      if (s.subgroup && s.subgroup !== lastSub) {
-        head = `<div style="display:flex;align-items:center;gap:7px;margin:16px 2px 0">
-          <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold)">${_OBF_SUBGROUPS[s.subgroup] || s.subgroup}</div>
-          <div style="flex:1;height:1px;background:var(--border)"></div>
-        </div>`;
-      }
-      lastSub = s.subgroup || null;
-      return head + stepRow(s);
-    }).join('');
-    return `<div style="margin-top:20px">
-      <div style="display:flex;align-items:baseline;gap:8px">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">${g.label}</div>
-        <div style="font-size:11px;font-weight:700;color:${gDone === steps.length ? 'var(--green,#7BC47F)' : 'var(--text-mute)'}">${gDone}/${steps.length}</div>
-      </div>
-      <div style="font-size:11.5px;color:var(--text-mute);margin-top:1px">${g.sub}</div>
-      ${rows}
-    </div>`;
+  const secs = _obfWizSections(st);
+  if (!secs.length) return;
+  // Clamp the parked position (visible steps can shift after a fetch).
+  if (_OBF_NAV.s >= secs.length) _OBF_NAV.s = secs.length - 1;
+  if (_OBF_NAV.i >= secs[_OBF_NAV.s].steps.length) _OBF_NAV.i = secs[_OBF_NAV.s].steps.length - 1;
+  const sec = secs[_OBF_NAV.s];
+  const step = sec.steps[_OBF_NAV.i];
+  const flat = _obfWizFlat(st);
+  const pos = flat.findIndex(x => x.s === _OBF_NAV.s && x.i === _OBF_NAV.i);
+  const done = _obfDone(st), total = flat.length;
+
+  // Section bar: battery fill per section, launch-flag dot while its
+  // must-haves are open, green + check when the whole section is done.
+  const segs = document.getElementById('obf-segs');
+  if (segs) segs.innerHTML = secs.map((x, s) => {
+    const d = x.steps.filter(t => !!st[t.key]).length, t = x.steps.length;
+    const flagged = x.steps.some(t => t.launch && !st[t.key]);
+    return `<button class="obf2-seg ${s === _OBF_NAV.s ? 'cur' : ''} ${d === t ? 'done' : ''}" onclick="_obfWizJumpSection(${s})" aria-label="${x.full}, ${d} of ${t} done">
+      <span class="lb">${d === t ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--green,#7BC47F)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M20 6 9 17l-5-5"/></svg>` : flagged ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M4 15V4h12l-2 4 2 4H6"/><path d="M4 22v-7"/></svg>` : ''}${x.label}</span>
+      <span class="tk"><span class="fl" style="width:${t ? Math.round(d / t * 100) : 0}%"></span></span>
+    </button>`;
   }).join('');
+
+  // Sub-rail: this section's steps as pills.
+  const rail = document.getElementById('obf-rail');
+  if (rail) rail.innerHTML = sec.steps.map((x, i) => {
+    const ok = !!st[x.key];
+    return `<button class="obf2-pill ${i === _OBF_NAV.i ? 'cur' : ''} ${ok ? 'done' : ''}" onclick="_obfWizJumpStep(${_OBF_NAV.s}, ${i})">
+      ${ok ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="${i === _OBF_NAV.i ? 'currentColor' : 'var(--green,#7BC47F)'}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M20 6 9 17l-5-5"/></svg>` : ''}
+      ${x.railLabel || x.title.replace(/^(Set up your |Set your |Add your |Connect your |Build your |Confirm your |Define your |Import your |Apply the |Approve your |Tell your |Launch your new |Add |Connect |Import |Set up )/, '')}
+    </button>`;
+  }).join('');
+
+  // Footer position + arrows.
+  const posEl = document.getElementById('obf-pos'), cntEl = document.getElementById('obf-count');
+  if (posEl) posEl.textContent = `${sec.full} · ${_OBF_NAV.i + 1} of ${sec.steps.length}`;
+  if (cntEl) cntEl.textContent = `${done} of ${total} complete`;
+  const backBtn = document.getElementById('obf-back'), nextBtn = document.getElementById('obf-next');
+  if (backBtn) backBtn.disabled = pos <= 0;
+  if (nextBtn) nextBtn.style.visibility = pos >= flat.length - 1 ? 'hidden' : 'visible';
+
+  host.innerHTML = step.key === 'website' ? _obfWizLaunchPage(st) : _obfWizStepPage(st, sec, step);
+}
+
+// One step, one page: the old checklist row grown into a full card - same
+// title/sub/tags/note/CTA/skip, same deep links, nothing else to relearn.
+function _obfWizStepPage(st, sec, s) {
+  const ok = !!st[s.key];
+  let note = '';
+  const noteFn = s.note && (typeof window !== 'undefined' ? window[s.note] : null);
+  const n = (typeof noteFn === 'function') ? noteFn(st) : null;
+  if (n) {
+    const color = n.tone === 'good' ? 'var(--green,#7BC47F)' : '#c79a4a';
+    note = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:14px;font-size:12px;font-weight:600;color:${color}">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${n.tone === 'good' ? '<path d="M20 6 9 17l-5-5"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>'}</svg>
+      <span>${n.text}</span>
+      ${n.cta ? `<button onclick="${n.go}" style="background:none;border:1px solid #c79a4a;border-radius:6px;color:#c79a4a;padding:3px 10px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">${n.cta}</button>` : ''}
+    </div>`;
+  }
+  const tags = []
+    .concat(s.launch && !ok ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);border:1px solid var(--accent-border,rgba(212,182,92,.35));border-radius:5px;padding:1px 6px">Launch must-have</span>`] : [])
+    .concat(s.optional && !ok ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);border:1px solid var(--border-med);border-radius:5px;padding:1px 6px">Optional</span>`] : [])
+    .concat(s.team ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--text-sub,var(--text-mute));border:1px solid var(--border-med);border-radius:5px;padding:1px 6px">Our team runs this</span>`] : [])
+    .join(' ');
+  return `<div style="border:1px solid ${ok ? 'var(--accent-border,rgba(212,182,92,.25))' : 'var(--border)'};background:${ok ? 'var(--gold-sheen,rgba(212,182,92,.05))' : 'transparent'};border-radius:16px;padding:20px 20px 22px;margin-top:4px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="flex:none;width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+      ${tags}
+    </div>
+    <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text);margin-top:10px">${s.title}</div>
+    <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${s.sub}</div>
+    ${note}
+    ${ok ? `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:700;color:var(--green,#7BC47F)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        Done - the system sees it live${s.go && !s.team ? ` <button onclick="${s.go}" style="background:none;border:none;padding:0;margin-left:4px;font:inherit;font-size:11.5px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Open anyway</button>` : ''}
+      </div>`
+      : s.team ? `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:600;color:var(--text-sub,var(--text-mute))">
+        <span class="req-spin" style="width:12px;height:12px"></span> Our team is on it - nothing for you to do here
+      </div>`
+      : `<button onclick="${s.go}" style="width:100%;margin-top:18px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">${s.cta}</button>`}
+    ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" style="display:block;margin:10px auto 0;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Not applicable - skip for now</button>` : ''}
+  </div>`;
+}
+
+// The Launch page: build stages + review/accept + the go-live checklist +
+// the flip - everything that ends onboarding, on one page (spec: Build &
+// review + Go live; PR-1 renders them together over today's build states).
+function _obfWizLaunchPage(st) {
+  const b = st.website_build;
+  const stage = (on, label, meta) => `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:10px;margin-top:7px;font-size:12.5px">
+      <span style="flex:none;width:8px;height:8px;border-radius:999px;background:${on ? 'var(--green,#7BC47F)' : '#c79a4a'}"></span>
+      <span style="font-weight:700;color:var(--text)">${label}</span>
+      ${meta ? `<span style="margin-left:auto;color:var(--text-mute);font-size:11px;text-align:right">${meta}</span>` : ''}
+    </div>`;
+  const buildRows = st.website ? '' : `
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:16px">Your site build</div>
+    ${stage(true, 'Queued', 'brief received')}
+    ${stage(b === 'building' || b === 'staging_ready' || b === 'verified', 'Building', 'our team, from your brand and offer')}
+    ${stage(b === 'staging_ready' || b === 'verified', 'On staging', st.staging_url ? 'ready to preview' : '')}
+    ${stage(b === 'verified', 'Verified', 'all checks + your sign-offs green')}
+    ${b === 'staging_ready' && !st.site_accepted ? `<button onclick="_obfSiteAcceptOpen()" style="width:100%;margin-top:10px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">Review your new site &amp; accept</button>` : ''}
+    ${b === 'staging_ready' && st.site_accepted ? `<div style="display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;font-weight:600;color:var(--green,#7BC47F)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> You accepted the new site - our team runs the final checks</div>` : ''}`;
+  // The go-live checklist: every launch must-have + the site itself, each
+  // row clickable straight to its page when still open.
+  const visible = _obfVisibleSteps(st);
+  const checks = visible.filter(s => s.launch).map(s => ({ key: s.key, label: s.title, ok: !!st[s.key] }))
+    .concat([{ key: null, label: 'Site verified on staging', ok: b === 'verified' || !!st.website }]);
+  const allGreen = checks.every(c => c.ok);
+  const checkRows = checks.map(c => c.ok
+    ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:10px;margin-top:7px;font-size:12.5px"><span style="flex:none;width:8px;height:8px;border-radius:999px;background:var(--green,#7BC47F)"></span><span style="font-weight:700">${c.label}</span><span style="margin-left:auto;color:var(--text-mute);font-size:11px">done</span></div>`
+    : `<button ${c.key ? `onclick="_obfWizJumpKey('${c.key}')"` : 'disabled'} style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 13px;border:1px solid var(--border);border-radius:10px;margin-top:7px;font:inherit;font-size:12.5px;background:none;color:var(--text);cursor:${c.key ? 'pointer' : 'default'};text-align:left"><span style="flex:none;width:8px;height:8px;border-radius:999px;background:#c79a4a"></span><span style="font-weight:700">${c.label}</span><span style="margin-left:auto;color:#c79a4a;font-size:11px;font-weight:700">still open${c.key ? ' - fix it' : ''}</span></button>`).join('');
+  return `<div style="border:1px solid var(--border);border-radius:16px;padding:20px 20px 22px;margin-top:4px">
+    <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text)">${st.website ? 'Your site is live' : 'Launch your new website'}</div>
+    <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${st.website ? 'The domain points at the new site - onboarding is done.' : 'Our team builds it from everything you set up. You review it on a private address, accept it, and flip your domain when every light below is green. Your current site stays live until the flip.'}</div>
+    ${buildRows}
+    ${st.website ? '' : `<div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:18px">Ready to go live?</div>
+    ${checkRows}
+    <button onclick="_obfGoDomains()" ${allGreen ? '' : 'disabled'} style="width:100%;margin-top:14px;background:${allGreen ? 'var(--gold)' : 'transparent'};border:${allGreen ? 'none' : '1px solid var(--border-med)'};border-radius:10px;color:${allGreen ? 'var(--on-gold,#1a1608)' : 'var(--text-mute)'};padding:13px;font:inherit;font-size:13.5px;font-weight:800;cursor:${allGreen ? 'pointer' : 'default'}">${allGreen ? 'Flip the domain' : 'Flip the domain - unlocks when everything above is green'}</button>`}
+  </div>`;
 }
 
 // ── One-click sales preset (the Phase 3 orchestrator) ──
