@@ -82,7 +82,7 @@
     },
     {
       "path": "/api/ghl/cron-trial-summary",
-      "schedule": "0 13 * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/api/automations?action=work",
