@@ -285,7 +285,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
               border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
-            + New client
+            + Add academy
           </button>
         )}
       </div>
@@ -3253,54 +3253,99 @@ function AuthActions({ client, tokens, session, onChanged }) {
 }
 
 // ─── New client modal ───────────────────────────────────────────────────────
+// The Plan 7 "Add academy" front door (2026-07-19). One card, one Create:
+// the api create-academy action initializes account/V2/GHL/Slack/scaffold,
+// then setup-account sends the owner invite - and the result renders as a
+// per-step checklist with Retry on anything that failed. The old minimal
+// "plain client row" path stays behind a checkbox for non-academy rows.
+const ACADEMY_STEP_LABELS = {
+  account: "Account created, V2 on",
+  ghl: "GoHighLevel link",
+  slack: "Slack channel + wiring",
+  scaffold: "Website silo (robot)",
+  kickoff: "Team kickoff ping",
+  invite: "Owner invite email",
+};
 function NewClientModal({ tokens, session, staff = [], onClose, onCreated }) {
   const t = tokens;
   const [biz, setBiz] = useState("");
   const [owner, setOwner] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [sm, setSm] = useState("");
-  const [sendInvite, setSendInvite] = useState(false);
+  const [ghlName, setGhlName] = useState("");
+  const [ghlLocs, setGhlLocs] = useState([]);
+  const [plainRow, setPlainRow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [result, setResult] = useState(null); // { id, slug, steps:[{key,ok,detail}] }
+
+  useEffect(() => {
+    let alive = true;
+    import("../services/ghlService").then(m => m.fetchLocations()).then(({ data }) => {
+      if (alive) setGhlLocs(Array.isArray(data) ? data : []);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const post = async (url, body) => {
+    const tok = session?.access_token;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+      body: JSON.stringify(body),
+    });
+    const j = await res.json().catch(() => ({}));
+    return { ok: res.ok, j };
+  };
+
+  // Run (or re-run) the initialization chain. Passing clientId makes it a
+  // retry: create-academy only redoes the missing steps, and setup-account
+  // only re-fires when the invite step is the one that failed.
+  async function runInit(clientId) {
+    const { ok, j } = await post("/api/clients?action=create-academy", {
+      client_id: clientId || undefined,
+      business_name: biz.trim(),
+      owner_name: owner.trim(),
+      email: email.trim(),
+      phone: phone.trim() || undefined,
+      ghl_location_name: ghlName || undefined,
+    });
+    if (!ok) throw new Error(j.error || "create-academy failed");
+    const steps = [...(j.steps || [])];
+    if (j.id && sm) {
+      const smRes = await post(`/api/clients?action=update-fields&id=${j.id}`, { client_id: j.id, scaling_manager_id: sm });
+      if (!smRes.ok) steps.push({ key: "account", ok: false, detail: "Scaling Manager assignment failed" });
+    }
+    const inv = await post("/api/clients?action=setup-account", {
+      client_id: j.id, owner_name: owner.trim(), email: email.trim().toLowerCase(),
+    });
+    steps.push({
+      key: "invite",
+      ok: !!inv.ok,
+      detail: inv.ok ? (inv.j.email_sent ? `sent to ${email.trim()}` : "link made, email did not send") : (inv.j.error || "failed"),
+    });
+    return { id: j.id, slug: j.slug, steps };
+  }
 
   async function create() {
     setErr(null);
-    if (!biz.trim()) { setErr("Business name required"); return; }
+    if (!biz.trim()) { setErr("Academy name required"); return; }
     if (!sm) { setErr("Assign a Scaling Manager"); return; }
-    if (sendInvite && (!email.trim() || !owner.trim())) {
-      setErr("Email + point of contact required to send invite");
-      return;
-    }
     setBusy(true);
     try {
-      const tok = session?.access_token;
-      const action = sendInvite ? "" : "create-client";
-      const url = action ? `/api/clients?action=${action}` : "/api/clients";
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({
-          business_name: biz.trim(),
-          owner_name: owner.trim() || undefined,
-          email: email.trim() || undefined,
-        }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
-
-      // Assign the Scaling Manager (works for both create paths via update-fields).
-      if (j.id && sm) {
-        const smRes = await fetch(`/api/clients?action=update-fields&id=${j.id}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-          body: JSON.stringify({ client_id: j.id, scaling_manager_id: sm }),
+      if (plainRow) {
+        const { ok, j } = await post("/api/clients?action=create-client", {
+          business_name: biz.trim(), owner_name: owner.trim() || undefined, email: email.trim() || undefined,
         });
-        if (!smRes.ok) {
-          const sj = await smRes.json().catch(() => ({}));
-          throw new Error("Client created, but assigning SM failed: " + (sj.error || smRes.statusText));
-        }
+        if (!ok) throw new Error(j.error || "create failed");
+        if (j.id && sm) await post(`/api/clients?action=update-fields&id=${j.id}`, { client_id: j.id, scaling_manager_id: sm });
+        onCreated(j.id);
+        return;
       }
-      onCreated(j.id);
+      if (!owner.trim()) { setErr("Owner name required"); setBusy(false); return; }
+      if (!email.trim()) { setErr("Owner email required"); setBusy(false); return; }
+      setResult(await runInit(result?.id || null));
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -3308,13 +3353,49 @@ function NewClientModal({ tokens, session, staff = [], onClose, onCreated }) {
     }
   }
 
+  if (result) {
+    const failed = result.steps.filter(s => !s.ok);
+    return (
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, padding: 28, maxWidth: 520, width: "100%" }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 4px", color: t.text }}>{biz.trim()}</h2>
+          <div style={{ fontSize: 13, color: t.textSub, marginBottom: 16 }}>
+            {failed.length === 0 ? "Fully initialized. The wizard is live for the owner." : `${failed.length} step${failed.length === 1 ? "" : "s"} need${failed.length === 1 ? "s" : ""} a look - the academy exists either way.`}
+          </div>
+          {result.steps.map((s, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "7px 0", borderBottom: `1px solid ${t.border}`, fontSize: 13 }}>
+              <span style={{ flex: "none", fontWeight: 700, color: s.ok ? (t.green || "#4CC76A") : (t.amber || "#F0B84A") }}>{s.ok ? "OK" : "!"}</span>
+              <span style={{ color: t.text, fontWeight: 600 }}>{ACADEMY_STEP_LABELS[s.key] || s.key}</span>
+              {s.detail && <span style={{ color: t.textMute, fontSize: 12 }}>{s.detail}</span>}
+            </div>
+          ))}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+            {failed.length > 0 && (
+              <button onClick={create} disabled={busy} style={btnStyle(t, "secondary")}>{busy ? "Retrying…" : "Retry failed steps"}</button>
+            )}
+            <button onClick={() => onCreated(result.id)} style={btnStyle(t, "primary")}>Open the academy</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6, padding: 28, maxWidth: 460, width: "100%" }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 18px", color: t.text }}>New client</h2>
-        <EditField label="Business name" value={biz} onChange={setBiz} tokens={t} />
-        <EditField label="Point of contact" value={owner} onChange={setOwner} tokens={t} />
-        <EditField label="Email" value={email} onChange={setEmail} tokens={t} type="email" />
+      <div onClick={e => e.stopPropagation()} style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, padding: 28, maxWidth: 460, width: "100%" }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 4px", color: t.text }}>Add academy</h2>
+        <div style={{ fontSize: 12.5, color: t.textSub, marginBottom: 16 }}>Creates the account, Slack channel, invite, site silo and wizard in one go.</div>
+        <EditField label="Academy name" value={biz} onChange={setBiz} tokens={t} />
+        <EditField label="Owner name" value={owner} onChange={setOwner} tokens={t} />
+        <EditField label="Owner email" value={email} onChange={setEmail} tokens={t} type="email" />
+        <EditField label="Owner phone" value={phone} onChange={setPhone} tokens={t} />
+        <EditSelect
+          label="GHL sub-account (only if under our agency)"
+          value={ghlName}
+          onChange={setGhlName}
+          options={[{ value: "", label: "Not on our agency (file-drop paths)" }, ...ghlLocs.map(l => ({ value: l.name, label: l.name }))]}
+          tokens={t}
+        />
         <EditSelect
           label="Scaling Manager"
           value={sm}
@@ -3322,14 +3403,14 @@ function NewClientModal({ tokens, session, staff = [], onClose, onCreated }) {
           options={[{ value: "", label: "Select a Scaling Manager…" }, ...staff.map(s => ({ value: s.id, label: `${s.name} · ${s.role}` }))]}
           tokens={t}
         />
-        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14, cursor: "pointer", fontSize: 13, color: t.textSub }}>
-          <input type="checkbox" checked={sendInvite} onChange={e => setSendInvite(e.target.checked)} />
-          Send portal invite immediately *(requires email + point of contact)*
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14, cursor: "pointer", fontSize: 12.5, color: t.textMute }}>
+          <input type="checkbox" checked={plainRow} onChange={e => setPlainRow(e.target.checked)} />
+          Plain client row only (no V2 setup, no invite)
         </label>
         {err && <div style={{ color: t.red, fontSize: 13, marginTop: 10 }}>{err}</div>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
           <button onClick={onClose} style={btnStyle(t, "secondary")}>Cancel</button>
-          <button onClick={create} disabled={busy} style={btnStyle(t, "primary")}>{busy ? "Creating…" : "Create"}</button>
+          <button onClick={create} disabled={busy} style={btnStyle(t, "primary")}>{busy ? "Creating…" : plainRow ? "Create row" : "Create academy"}</button>
         </div>
       </div>
     </div>

@@ -78,6 +78,23 @@
 > create = custom_field_defs (+values at promote via raw.__create) · archive =
 > contact custom_fields jsonb (member archives land on the family contact) ·
 > skip = explicit drop. Nothing is silently lost.
+> **WS7 SHIPPED (2026-07-19): the Add Academy front door.** clients.js
+> action=create-academy (admin+scaling): inserts the row born v2_access:true
+> (owner phone → onboarding_setup.owner_phone), resolves the picked GHL
+> sub-account NAME → locationId (GHL_LOCATIONS_JSON blob, same JWT decode as
+> ghl.js getLocationIdSync) → clients.ghl_location_id, Slack
+> conversations.create #<slug> + staff kickoff ping (owner welcome still
+> fires on first login, untouched), dispatches the bam-client-sites
+> new-client.yml scaffold robot (#90; fallback = paste command posted in the
+> channel). IDEMPOTENT on client_id = the UI's Retry. The Add Academy modal
+> (ClientsCombinedView, replaces New client; plain-row checkbox stays) chains
+> create-academy → update-fields (SM) → setup-account (existing invite flow)
+> and renders the per-step checklist. KEY MODEL FACT: has_ghl =
+> !!clients.ghl_location_id (setup-status.js:75) and is STAFF-SET ONLY - the
+> front door's dropdown is the single source of the wizard's GHL forks
+> (contacts sync vs file drop, ghlOnly steps, Texting wrap option); no owner
+> question sets it anywhere. One-time env (Zoran): Slack channels:manage
+> scope; GITHUB_DISPATCH_TOKEN (PAT, actions:write on bam-client-sites).
 > Everyone moves to the wizard (it reads the same completion flags - no forks).
 > Deferred: how the academy pays BAM · launch definition final call (proposal
 > in spec) · V2 ticket system / Zoran-icon (design exploration in spec).
