@@ -48,6 +48,7 @@ Slash commands available in this repo (in `.claude/commands/`, shared via git):
 - `/setup` — **one-time setup for a new portal team member** (Cole, Cam, etc.): session-recording config, jq, git identity + a verify check. Run this first on a new machine.
 - `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/ for a new project folder
 - `/memory-audit` — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
+- `/academy` — onboarding cockpit: list academies currently onboarding (today GTA + DETAIL Miami), pick one, see its live progress scorecard (wizard sections, build chunks, sign-offs, imports), then jump into whatever it needs next
 - `/v2-tickets` — triage outstanding tickets from the lil Zoran icon one by one (client-side V2 + staff-side bug reports): full context, plain-English fix proposal, workshop with Zoran, record decision, repeat until the queue is empty
 - `/consolidate-lessons` — consolidate the sales agents' teach-why lessons (from Hawkeye). `scan` triages which academies are DUE, then per academy: cluster/dedup, route each lesson (brain fact / academy / general / drop), mine onboarding-intake gaps, workshop with you, apply, and stamp a timestamped `consolidation_runs` KPI row. Drives `bam-ghl-agent/bam-portal/scripts/lessons-io.mjs`.
 
