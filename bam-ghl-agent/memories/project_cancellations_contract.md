@@ -13,20 +13,31 @@ cancelled members are hard-deleted from `members`. Every KPI churned cohort
 `GET /api/members?action=cancellations`. **If a cancel is not a row here, it did
 not happen as far as the KPIs are concerned.**
 
-## Who writes it today (2026-07-16)
+## Who writes it today (2026-07-18)
 
 | Writer | File | source= | Has member_id? | Has sub_id? |
 |---|---|---|---|---|
 | Portal cancel | `api/members.js` actionCancel | `staff_portal` / `parent_app` | yes | yes |
 | Stripe/dunning | `api/stripe/webhook.js` handleSubDeleted | `stripe` | yes | yes |
 | Historical backfill | `scripts/backfill-cancellations.mjs` | (leaves source) | yes | yes |
+| Onboarding cancelled import | `api/members/import-cancelled.js` POST | `import` | null (pre-platform) | yes |
 
-## The GAP the onboarding import must close
+## The GAP — CLOSED 2026-07-18 (Plan 5 / WS5)
 
-The onboarding "Import cancelled members" step (`api/members/import-cancelled.js`)
-currently writes ONLY `contacts` (tag `cancelled` + `custom_fields` jsonb for
-win-back/nurture). It does NOT write `cancellations`, so imported churned members
-never reach the KPIs. A fuller import MUST also insert `cancellations` rows.
+`api/members/import-cancelled.js` now writes BOTH contacts (tag + custom_fields
+jsonb for win-back, unchanged) AND `cancellations` rows per the contract below.
+Extras the rebuild added on top of the contract:
+- **Chains**: a sub ending within 14 days of the same customer's next sub
+  starting = plan switch, folded (one churn row per chain-terminal end only).
+- **Came-backs**: customers with a LIVE Stripe sub are excluded (not churn),
+  even if they aren't portal members yet.
+- **Guardrail flags** (bulk-cleanup day 10+, cancel-before-join, $0 plan,
+  unreachable): flagged rows default `exclude_churn` in the UI - a human must
+  count them in (editable cancel date rides as `cancel_date_override`).
+- Enrichment happens at POST: paid invoices per chain sub → total_spent_cents /
+  payments_count / earliest-paid joined_date; monthly cents decoded from the
+  RAW Stripe price (interval/interval_count); plan_name/offer_id via
+  pricing_catalog. 409 on the sub-id unique index = already imported, skipped.
 
 ## Contract for the import (or any new writer)
 

@@ -45,7 +45,9 @@ const STRIPE_API = "https://api.stripe.com/v1";
 // subs (CoachIQ/GHL/dashboard) reject every write — the popup greys those actions.
 // One standard portal-owned marker = metadata.origin in this set (matches webhook.js).
 // setup-monthly subs now also stamp origin=fullcontrol-portal (no more divergent 'source').
-const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment"]);
+// fullcontrol-import = a pre-existing sub ADOPTED at member-import promote time
+// (sorter/cleanup.js tryAdoptSub) - the portal manages it from that point on.
+const PORTAL_OWNED_ORIGINS = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment", "fullcontrol-import"]);
 
 const PLAN_TO_PRICE = {
   "1/wk":   "plan_ToNwa96lQ5I1Bs",   // Steady       $226 / 4-wk all-in

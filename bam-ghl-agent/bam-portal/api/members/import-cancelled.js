@@ -1,41 +1,62 @@
 import { withSentryApiRoute } from "../_sentry.js";
 
-// Import CANCELLED members (the accepted onboarding mini-flow, 2026-07-14).
+// Import CANCELLED members (onboarding mini-flow, 2026-07-14; rebuilt 2026-07-18
+// to close the cancellations-contract gap - see
+// memories/project_cancellations_contract.md).
 //
 // The owner clicks "Import cancelled" in the onboarding flow. We pull their
 // churned Stripe subscriptions, match each one against the contacts already
-// imported (this is WHY contacts import first), and hand back three buckets:
+// imported (this is WHY contacts import first), and hand back buckets:
 //
 //   matched    exact email hit on a contact           → bulk-approve
 //   review     phone or name hit only (fuzzy)         → human confirms which
 //   none       nobody in the CRM matches              → create from Stripe, or skip
 //
-// Applying a decision tags the contact 'cancelled' and stores the cancel meta
-// (cancelled_at / cancel_reason / last_plan / monthly_amount) in the contact's
-// custom_fields jsonb - ON the record, deliberately NOT as custom_field_defs
-// (Zoran 2026-07-14: no custom fields in the cancelled flow). Win-back and
-// nurture read real history; nothing new appears on any form.
+// What the 2026-07-18 rebuild adds (Plan 5, confirmed by Zoran):
+//   - CHAINS: a sub that ends within days of the same customer's next sub
+//     starting is a plan switch, not churn. Only chain-terminal ends count.
+//   - CAME BACK: a customer with a live Stripe sub is not churn, even if
+//     they're not a portal member yet.
+//   - GUARDRAIL FLAGS on each row (bulk-cleanup day, cancel-before-join,
+//     $0 plan, unreachable). Flagged rows default OUT of the churn numbers;
+//     a human includes them explicitly (the cleaning pass).
+//   - POST writes `cancellations` rows (type='cancel', source='import',
+//     member_id=null, KEEP stripe_subscription_id for idempotency, amounts in
+//     CENTS, Stripe-enriched joined_date / total_spent / payments_count).
+//     Contact tagging stays - the write is ADDITIVE per the contract.
+//
+// Cancel meta still stores on the contact record's custom_fields jsonb -
+// deliberately NOT as custom_field_defs (Zoran 2026-07-14 and re-confirmed
+// 2026-07-18: the cancelled flow never grows the academy's custom values).
 //
 //   GET  /api/members/import-cancelled?client_id=
-//     → { ok, buckets: { matched:[], review:[], none:[], already_member:[] } }
+//     → { ok, total, plan_switches, buckets: { matched:[], review:[], none:[],
+//          already_member:[] }, excluded:[{ name, reason }] }
 //   POST /api/members/import-cancelled
-//     body { client_id, decisions: [{ customer_id, action: 'link'|'create'|'skip',
-//            contact_id? }] }   (cancel meta rides each GET row and is echoed back)
-//     → { ok, linked, created, skipped }
+//     body { client_id, decisions: [{ customer_id, action:'link'|'create'|'skip',
+//            contact_id?, exclude_churn?, cancel_date_override?, churn_events? }] }
+//     → { ok, linked, created, skipped, churn_written, churn_duplicates, churn_excluded }
 //
 // Auth: Supabase JWT — BAM staff (any academy) or a client_users member of client_id.
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const STRIPE_KEY           = process.env.STRIPE_SECRET_KEY;
+const STRIPE_KEY           = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
 const enc = encodeURIComponent;
+
+// A gap of up to 14 days between one sub ending and the next starting is a
+// plan switch / billing migration, not a real leave-and-come-back.
+const CHAIN_GAP_DAYS = 14;
+// This many cancellations sharing one calendar day smells like a bulk Stripe
+// cleanup, not real same-day churn.
+const BULK_DAY_MIN = 10;
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...init,
     headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", ...(init.headers || {}) },
   });
-  if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw Object.assign(new Error(`Supabase ${res.status}: ${await res.text()}`), { status: res.status });
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
 }
@@ -47,6 +68,20 @@ async function stripeGet(path, stripeAccount) {
   const j = await res.json();
   if (!res.ok) throw new Error(`Stripe ${res.status}: ${(j.error && j.error.message) || "error"}`);
   return j;
+}
+
+// params is an ARRAY of [key, value] entries so repeated keys (expand[]) survive.
+async function stripePage(pathBase, params, stripeAccount, pages = 3) {
+  let out = [], starting_after = null;
+  for (let page = 0; page < pages; page++) {
+    const qs = new URLSearchParams(params);
+    if (starting_after) qs.set("starting_after", starting_after);
+    const r = await stripeGet(`${pathBase}?${qs.toString()}`, stripeAccount);
+    out = out.concat(r.data || []);
+    if (!r.has_more || !r.data.length) break;
+    starting_after = r.data[r.data.length - 1].id;
+  }
+  return out;
 }
 
 async function resolveUser(req) {
@@ -65,35 +100,44 @@ async function resolveUser(req) {
 
 const normPhone = (p) => String(p || "").replace(/\D/g, "").slice(-10) || null;
 const normName  = (n) => String(n || "").toLowerCase().replace(/[^a-z ]/g, "").trim();
+const toDay = (unix) => unix ? new Date(unix * 1000).toISOString().slice(0, 10) : null;
 
-// One row per Stripe CUSTOMER (dedupe: cancelled → resubbed → cancelled is one
-// person). Latest cancellation wins; sub count noted.
-function collapseByCustomer(subs) {
-  const by = new Map();
-  for (const s of subs) {
-    const cu = (s.customer && typeof s.customer === "object") ? s.customer : { id: s.customer };
-    const prev = by.get(cu.id);
-    const canceledAt = s.canceled_at || s.ended_at || null;
-    const item = (s.items && s.items.data && s.items.data[0]) || {};
-    const price = item.price || {};
-    const row = {
-      customer_id: cu.id,
-      email: (cu.email || "").toLowerCase() || null,
-      phone: cu.phone || null,
-      name: cu.name || null,
-      cancelled_at: canceledAt ? new Date(canceledAt * 1000).toISOString().slice(0, 10) : null,
-      cancel_reason: (s.cancellation_details && (s.cancellation_details.feedback || s.cancellation_details.reason)) || null,
-      last_plan: price.nickname || (price.product && price.product.name) || null,
-      monthly_amount: price.unit_amount != null ? Math.round(price.unit_amount) / 100 : null,
-      subs: 1,
-    };
-    if (!prev) by.set(cu.id, row);
-    else {
-      prev.subs += 1;
-      if ((row.cancelled_at || "") > (prev.cancelled_at || "")) Object.assign(prev, { ...row, subs: prev.subs });
+// True monthly cents from a RAW Stripe price (has real interval/interval_count) -
+// same decode as scripts/backfill-cancellations.mjs monthlyCentsFromStripePrice.
+function monthlyCents(price) {
+  if (!price || price.unit_amount == null) return null;
+  const rec = price.recurring || {};
+  const per = { day: 30.44, week: 4.33, month: 1, year: 1 / 12 }[rec.interval] ?? 1;
+  const count = rec.interval_count || 1;
+  return Math.round((price.unit_amount * per) / count);
+}
+
+// Group one customer's CANCELED subs into chains: sorted by start, a sub whose
+// end is within CHAIN_GAP_DAYS of the next start is the same run of membership
+// (a plan switch / billing migration). One churn event per chain END.
+function buildChains(subs) {
+  const sorted = subs.slice().sort((a, b) => (a.start_date || 0) - (b.start_date || 0));
+  const chains = [];
+  for (const s of sorted) {
+    const end = s.canceled_at || s.ended_at || null;
+    const cur = chains[chains.length - 1];
+    if (cur && s.start_date && cur.end_unix && (s.start_date - cur.end_unix) <= CHAIN_GAP_DAYS * 86400) {
+      cur.subs.push(s);
+      if ((end || 0) > (cur.end_unix || 0)) { cur.end_unix = end; cur.last = s; }
+    } else {
+      chains.push({ subs: [s], start_unix: s.start_date || end, end_unix: end, last: s });
     }
   }
-  return [...by.values()];
+  return chains;
+}
+
+function handlerRowFlags(row, bulkDays) {
+  const flags = [];
+  if (row.churn_events.some(ev => ev.cancel_date && bulkDays.has(ev.cancel_date))) flags.push("bulk_day");
+  if (row.churn_events.some(ev => ev.joined_date && ev.cancel_date && ev.cancel_date < ev.joined_date)) flags.push("date_conflict");
+  if (row.churn_events.some(ev => !ev.monthly_amount_cents)) flags.push("zero_amount");
+  if (!row.email && !row.phone) flags.push("unreachable");
+  return flags;
 }
 
 async function handler(req, res) {
@@ -111,27 +155,32 @@ async function handler(req, res) {
     if (!acct) return res.status(400).json({ error: "Connect Stripe first - there is no account to read cancelled subscriptions from" });
 
     if (req.method === "GET") {
-      // Cancelled subs (up to ~300 - plenty for an academy), one row per customer.
-      let subs = [], starting_after = null;
-      for (let page = 0; page < 3; page++) {
-        const qs = new URLSearchParams({ status: "canceled", limit: "100" });
-        qs.append("expand[]", "data.customer");
-        qs.append("expand[]", "data.items.data.price.product");
-        if (starting_after) qs.set("starting_after", starting_after);
-        const r = await stripeGet(`/subscriptions?${qs.toString()}`, acct);
-        subs = subs.concat(r.data || []);
-        if (!r.has_more || !r.data.length) break;
-        starting_after = r.data[r.data.length - 1].id;
-      }
-      const rows = collapseByCustomer(subs);
+      // Canceled subs (up to ~300 - plenty for an academy) + the LIVE subs, so a
+      // customer who came back on their own is never offered as churn.
+      const [subsFull, live] = await Promise.all([
+        stripePage("/subscriptions", [["status", "canceled"], ["limit", "100"], ["expand[]", "data.customer"], ["expand[]", "data.items.data.price.product"]], acct),
+        stripePage("/subscriptions", [["limit", "100"]], acct), // default = every non-canceled status
+      ]);
+      const liveCustomers = new Set(live.map(s => (typeof s.customer === "string" ? s.customer : s.customer && s.customer.id)).filter(Boolean));
 
-      // Match targets: the imported contacts (why contacts import FIRST) + the
-      // live roster (a cancelled customer who resubscribed is a member - skip).
+      // Group canceled subs per customer.
+      const byCustomer = new Map();
+      for (const s of subsFull) {
+        const cu = (s.customer && typeof s.customer === "object") ? s.customer : { id: s.customer };
+        if (!byCustomer.has(cu.id)) byCustomer.set(cu.id, { customer: cu, subs: [] });
+        byCustomer.get(cu.id).subs.push(s);
+      }
+
+      // Match targets: imported contacts + the live portal roster.
       const [contacts, members] = await Promise.all([
         sb(`contacts?client_id=eq.${enc(clientId)}&select=id,name,first_name,last_name,email,phone,tags&limit=2000`),
         sb(`members?client_id=eq.${enc(clientId)}&select=id,stripe_customer_id&limit=1000`),
       ]);
       const memberCustomers = new Set((members || []).map(m => m.stripe_customer_id).filter(Boolean));
+      // Which of these customers already have an imported churn row? (re-open safe)
+      const existingCancels = await sb(`cancellations?client_id=eq.${enc(clientId)}&type=eq.cancel&select=stripe_subscription_id&limit=2000`).catch(() => []);
+      const cancelledSubIds = new Set((existingCancels || []).map(r => r.stripe_subscription_id).filter(Boolean));
+
       const byEmail = new Map(), byPhone = new Map(), byName = new Map();
       for (const c of contacts || []) {
         const nm = c.name || [c.first_name, c.last_name].filter(Boolean).join(" ");
@@ -143,9 +192,68 @@ async function handler(req, res) {
       }
       const contactLabel = (c) => c.name || [c.first_name, c.last_name].filter(Boolean).join(" ") || c.email || c.phone || c.id;
 
-      const buckets = { matched: [], review: [], none: [], already_member: [] };
+      // Build per-customer rows: chains → churn events. Hard block: an ended sub
+      // with no cancel date at all cannot enter the churn table.
+      const rows = [];
+      const excluded = [];
+      let planSwitches = 0;
+      const alreadyMember = [];
+      for (const { customer: cu, subs } of byCustomer.values()) {
+        const label = cu.name || cu.email || cu.id;
+        if (memberCustomers.has(cu.id) || liveCustomers.has(cu.id)) {
+          alreadyMember.push({ customer_id: cu.id, name: cu.name || null, email: (cu.email || "").toLowerCase() || null });
+          continue;
+        }
+        const dated = subs.filter(s => s.canceled_at || s.ended_at);
+        for (const s of subs) {
+          if (!s.canceled_at && !s.ended_at) excluded.push({ name: label, reason: "no cancel date on the Stripe subscription" });
+        }
+        if (!dated.length) continue;
+        const chains = buildChains(dated);
+        planSwitches += dated.length - chains.length;
+        const churn_events = chains.map(ch => {
+          const s = ch.last;
+          const item = (s.items && s.items.data && s.items.data[0]) || {};
+          const price = item.price || {};
+          return {
+            sub_id: s.id,
+            chain_sub_ids: ch.subs.map(x => x.id),
+            cancel_date: toDay(ch.end_unix),
+            joined_date: toDay(ch.start_unix),
+            stripe_price_id: price.id || null,
+            plan: price.nickname || (price.product && price.product.name) || null,
+            monthly_amount_cents: monthlyCents(price),
+            involuntary: !!(s.cancellation_details && s.cancellation_details.reason === "payment_failed"),
+            reason: (s.cancellation_details && (s.cancellation_details.feedback || s.cancellation_details.reason)) || null,
+            already_written: cancelledSubIds.has(s.id),
+          };
+        });
+        const latest = churn_events.reduce((a, ev) => (!a || (ev.cancel_date || "") > (a.cancel_date || "")) ? ev : a, null);
+        rows.push({
+          customer_id: cu.id,
+          email: (cu.email || "").toLowerCase() || null,
+          phone: cu.phone || null,
+          name: cu.name || null,
+          cancelled_at: latest && latest.cancel_date,
+          cancel_reason: latest && latest.reason,
+          last_plan: latest && latest.plan,
+          monthly_amount: latest && latest.monthly_amount_cents != null ? Math.round(latest.monthly_amount_cents) / 100 : null,
+          subs: dated.length,
+          plan_switches: dated.length - chains.length,
+          churn_events,
+        });
+      }
+
+      // Bulk-cleanup radar: a calendar day carrying BULK_DAY_MIN+ cancel events.
+      const dayCounts = new Map();
+      for (const r of rows) for (const ev of r.churn_events) {
+        if (ev.cancel_date) dayCounts.set(ev.cancel_date, (dayCounts.get(ev.cancel_date) || 0) + 1);
+      }
+      const bulkDays = new Set([...dayCounts.entries()].filter(([, n]) => n >= BULK_DAY_MIN).map(([d]) => d));
+      for (const r of rows) r.flags = handlerRowFlags(r, bulkDays);
+
+      const buckets = { matched: [], review: [], none: [], already_member: alreadyMember };
       for (const row of rows) {
-        if (memberCustomers.has(row.customer_id)) { buckets.already_member.push(row); continue; }
         const emailHit = row.email && byEmail.get(row.email);
         if (emailHit) {
           const already = Array.isArray(emailHit.tags) && emailHit.tags.includes("cancelled");
@@ -161,14 +269,20 @@ async function handler(req, res) {
         }
         buckets.none.push(row);
       }
-      return res.status(200).json({ ok: true, total: rows.length, buckets });
+      return res.status(200).json({ ok: true, total: rows.length, plan_switches: planSwitches, bulk_days: [...bulkDays], buckets, excluded });
     }
 
     if (req.method === "POST") {
       const decisions = Array.isArray(b.decisions) ? b.decisions : [];
       if (!decisions.length) return res.status(400).json({ error: "decisions required" });
-      let linked = 0, created = 0, skipped = 0;
+      let linked = 0, created = 0, skipped = 0, churnWritten = 0, churnDupes = 0, churnExcluded = 0;
       const nowIso = new Date().toISOString();
+
+      // plan_name / offer_id come from the academy's pricing_catalog when the
+      // Stripe price is mapped there (same lookup as backfill-cancellations.mjs).
+      const catalog = await sb(`pricing_catalog?client_id=eq.${enc(clientId)}&select=stripe_price_id,display_name,offer_id`).catch(() => []);
+      const catByPrice = new Map((catalog || []).filter(c => c.stripe_price_id).map(c => [c.stripe_price_id, c]));
+
       const metaOf = (d) => {
         const m = {};
         if (d.cancelled_at) m.cancelled_at = d.cancelled_at;
@@ -178,6 +292,63 @@ async function handler(req, res) {
         m.stripe_customer_id = d.customer_id;
         return m;
       };
+
+      // One cancellations row per chain-terminal churn event, enriched from the
+      // chain's paid invoices (true joined date + lifetime spend). Idempotent on
+      // the sub-id unique index: a 409 means already imported, skip quietly.
+      async function writeChurnRows(d) {
+        const events = Array.isArray(d.churn_events) ? d.churn_events : [];
+        if (d.exclude_churn) { churnExcluded += events.length; return; }
+        for (const ev of events) {
+          if (!ev || !ev.sub_id || !(d.cancel_date_override || ev.cancel_date)) continue;
+          if (ev.excluded) { churnExcluded++; continue; }
+          if (ev.already_written) { churnDupes++; continue; }
+          let totalSpent = 0, payments = 0, earliestPaid = null;
+          try {
+            const invLists = await Promise.all((ev.chain_sub_ids || [ev.sub_id]).slice(0, 6).map(sid =>
+              stripeGet(`/invoices?subscription=${enc(sid)}&status=paid&limit=100`, acct).then(r => r.data || []).catch(() => [])
+            ));
+            for (const inv of invLists.flat()) {
+              if (inv.amount_paid > 0) {
+                totalSpent += inv.amount_paid; payments++;
+                if (!earliestPaid || inv.created < earliestPaid) earliestPaid = inv.created;
+              }
+            }
+          } catch (_) { /* enrichment is best-effort */ }
+          const invoiceJoin = toDay(earliestPaid);
+          const joined = (invoiceJoin && (!ev.joined_date || invoiceJoin < ev.joined_date)) ? invoiceJoin : ev.joined_date || null;
+          const cat = ev.stripe_price_id ? catByPrice.get(ev.stripe_price_id) : null;
+          const row = {
+            client_id: clientId,
+            member_id: null, // pre-platform cancels have no member row (contract)
+            athlete_name: d.name || null,
+            parent_name: d.name || null,
+            type: "cancel",
+            cancel_date: d.cancel_date_override || ev.cancel_date,
+            reason: ev.reason || "imported from Stripe history",
+            stripe_subscription_id: ev.sub_id,
+            stripe_customer_id: d.customer_id,
+            joined_date: joined,
+            plan_name: (cat && cat.display_name) || ev.plan || null,
+            stripe_price_id: ev.stripe_price_id || null,
+            offer_id: (cat && cat.offer_id) || null,
+            monthly_amount_cents: ev.monthly_amount_cents != null ? ev.monthly_amount_cents : null,
+            total_spent_cents: totalSpent || null,
+            payments_count: payments || null,
+            source: "import",
+            involuntary: !!ev.involuntary,
+          };
+          const ins = await fetch(`${SUPABASE_URL}/rest/v1/cancellations`, {
+            method: "POST",
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify([row]),
+          });
+          if (ins.ok) churnWritten++;
+          else if (ins.status === 409) churnDupes++; // one-cancel-per-sub index: already imported
+          else throw new Error(`cancellations insert ${ins.status}: ${(await ins.text()).slice(0, 200)}`);
+        }
+      }
+
       for (const d of decisions) {
         if (!d || !d.customer_id) continue;
         if (d.action === "skip") { skipped++; continue; }
@@ -192,6 +363,7 @@ async function handler(req, res) {
             body: JSON.stringify({ tags, custom_fields: { ...(c.custom_fields || {}), ...metaOf(d) }, updated_at: nowIso }),
           });
           linked++;
+          await writeChurnRows(d);
           continue;
         }
         if (d.action === "create") {
@@ -208,11 +380,12 @@ async function handler(req, res) {
             }]),
           });
           created++;
+          await writeChurnRows(d);
           continue;
         }
         skipped++;
       }
-      return res.status(200).json({ ok: true, linked, created, skipped });
+      return res.status(200).json({ ok: true, linked, created, skipped, churn_written: churnWritten, churn_duplicates: churnDupes, churn_excluded: churnExcluded });
     }
 
     return res.status(405).json({ error: "GET or POST" });
