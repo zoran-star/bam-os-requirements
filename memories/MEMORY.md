@@ -12,4 +12,5 @@ Team-shared project notes. Read the relevant file when its topic comes up.
 - [FullControl Brand Assets](project_fullcontrol_brand_assets.md) — logo system + 4 size-tiered variants, SVG extraction
 - [No Em Dashes](feedback_no_em_dashes.md) — Never use em dashes anywhere, in any copy or output
 - [Main Branch Protection](project_git_main_protection.md) - main is locked (PR required + local pre-commit hook); run `sh .githooks/install.sh` once per machine
+- [BAM VA App Review](project_bam_va_app_review.md) - OPEN 2026-07-19: Apple 2.1 rejection, needs an expired-subscription demo account (+3.1.1 IAP risk); app code lives in `coleman-ayers/bam-va`, fix checklist inside
 - [Design Systems Map](project_design_systems_map.md) - exactly 2 canonical design systems: V2 live product (`bam-portal/design-system/tokens.css`, #D4B65C) + prototype reference (`prototype/src/styles/theme.css`, #C8A84E). Everything else is a copy. No DS for V1/V1.5.
