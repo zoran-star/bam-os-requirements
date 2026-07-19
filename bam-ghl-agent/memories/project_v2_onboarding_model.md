@@ -25,7 +25,19 @@
 > `contacts` step now for ALL academies (GHL fork: auto-sync status vs
 > "where does your list live" source field for born-on-V2). setup-status
 > exposes onboarding_setup + legal_name/ein_value/address for prefill.
-> Remaining WS1: offer wrap-in-place + Blueprint card question audits (PR-3).
+> **WS1 PR-3 SHIPPED (2026-07-18): offer wrap-in-place + card audits.**
+> `_bbRenderFromHash` now prefers `#obf-bb-host` over `#bb-panel` - while the
+> flow overlay hosts that div, EVERY Blueprint render (saves, pickers, step
+> nav) lands inside the flow. Offer steps define/schedule/pricing/policy/
+> onboardingform mount the REAL offer editor via `_obfWizOfferPage` +
+> `_obfWizOfferMount` (history.replaceState to #bb=offers/<id>?step=N, then
+> _bbRenderFromHash; scoped CSS hides the editor's own back/head/dots/foot-
+> nav). No offer yet = falls back to the old CTA page. Blueprint modals all
+> sit above z 9000, so pickers stack fine. Card audits: Brand story block now
+> asks why_us / dream_athletes / proof (mission + vibe_words inputs cut, old
+> data preserved via {...cur} spread); General card entity_type question cut
+> (column + RPC support remain). WS1 is DONE pending a live spot-check of the
+> embed with DETAIL's real offer.
 > Everyone moves to the wizard (it reads the same completion flags - no forks).
 > Deferred: how the academy pays BAM · launch definition final call (proposal
 > in spec) · V2 ticket system / Zoran-icon (design exploration in spec).
