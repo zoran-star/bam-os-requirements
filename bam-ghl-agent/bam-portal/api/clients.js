@@ -2151,7 +2151,7 @@ async function handler(req, res) {
       // submit-feedback moved to the public path (no auth required).
       // list-feedback + resolve-feedback flow through staff auth, then are
       // additionally narrowed to the `admin` role inside their handlers.
-      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "staff-pending", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback", "feedback-spec", "ship-queue", "ship-merge"]);
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "staff-pending", "create-client", "create-academy", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback", "feedback-spec", "ship-queue", "ship-merge"]);
       const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
@@ -2447,6 +2447,185 @@ async function handler(req, res) {
         } catch (insertErr) {
           return res.status(500).json({ error: `clients insert failed: ${insertErr.message}` });
         }
+      }
+
+      // ── action=create-academy ──
+      // The Plan 7 front door (2026-07-19): ONE call turns "new academy
+      // signed" into a fully initialized V2 account. Steps, each non-fatal,
+      // reported back as a checklist so staff SEES what worked:
+      //   account  clients row born with v2_access:true (+ owner phone into
+      //            onboarding_setup.owner_phone - texting step collects the
+      //            real numbers later)
+      //   ghl      optional: resolve the picked agency sub-account NAME to a
+      //            locationId (GHL_LOCATIONS_JSON blob, same JWT decode as
+      //            api/ghl.js getLocationIdSync) → clients.ghl_location_id.
+      //            This single column drives the whole wizard fork (has_ghl
+      //            in setup-status): contacts sync vs file drop, the GHL
+      //            wrap option on Texting, ghlOnly steps.
+      //   slack    conversations.create (#<slug>) + save slack_channel_id -
+      //            the channel every pipeline ping lands in. Needs the
+      //            channels:manage bot scope.
+      //   kickoff  staff-facing ping into the new channel (owner-facing
+      //            welcome still fires on their first login, untouched).
+      //   scaffold GitHub workflow dispatch → bam-client-sites new-client
+      //            robot commits the site silo. Fallback: the paste command
+      //            is posted in the channel instead.
+      // The INVITE is deliberately not here - the modal chains the existing
+      // ?action=setup-account (which creates the auth user, client_users
+      // owner row, email + Slack link) right after.
+      // IDEMPOTENT: re-call with client_id to re-run only the missing steps -
+      // that is exactly what the checklist's Retry button does.
+      // Env: SLACK_BOT_TOKEN, GITHUB_DISPATCH_TOKEN (fine-grained PAT with
+      // actions:write on zoran-star/bam-client-sites).
+      if (action === "create-academy") {
+        const body = req.body || {};
+        const bizName = typeof body.business_name === "string" ? body.business_name.trim() : "";
+        const ownName = typeof body.owner_name === "string" ? body.owner_name.trim() : "";
+        const ownEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        const ownPhone = typeof body.phone === "string" ? body.phone.trim() : "";
+        const ghlName = typeof body.ghl_location_name === "string" ? body.ghl_location_name.trim() : "";
+        let clientId = typeof body.client_id === "string" ? body.client_id : null;
+        if (!clientId && !bizName) return res.status(400).json({ error: "business name required" });
+        if (!clientId && (!ownEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownEmail))) {
+          return res.status(400).json({ error: "valid owner email required" });
+        }
+
+        const steps = [];
+        const step = (key, ok, detail) => steps.push({ key, ok, detail: detail || null });
+        const patchClient = async (patch) => {
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${clientId}`, {
+            method: "PATCH",
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify(patch),
+          });
+          if (!r.ok) throw new Error(`clients patch ${r.status}: ${await r.text()}`);
+        };
+
+        // 1 · account
+        let row = null;
+        try {
+          if (clientId) {
+            const rows = await supabaseSelect(`clients?id=eq.${clientId}&select=id,business_name,owner_name,email,slack_channel_id,ghl_location_id,v2_access,onboarding_setup`);
+            row = rows?.[0] || null;
+            if (!row) return res.status(404).json({ error: "client not found" });
+            if (row.v2_access !== true) { await patchClient({ v2_access: true }); row.v2_access = true; }
+            step("account", true, "already existed, V2 confirmed on");
+          } else {
+            const ob = ownPhone ? { owner_phone: ownPhone } : {};
+            const rows = await supabaseInsert("clients", {
+              business_name: bizName, owner_name: ownName || null, email: ownEmail,
+              status: "onboarding", v2_access: true, onboarding_setup: ob,
+            });
+            row = Array.isArray(rows) ? rows[0] : rows;
+            clientId = row?.id;
+            if (!clientId) throw new Error("insert returned no id");
+            step("account", true, "created, V2 on");
+          }
+        } catch (e) {
+          step("account", false, e.message);
+          return res.status(500).json({ ok: false, steps });
+        }
+        const academyName = row.business_name || bizName;
+        const slug = academyName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+        // 2 · ghl (optional - absence is a valid state, not a failure)
+        if (row.ghl_location_id) {
+          step("ghl", true, "already linked");
+        } else if (ghlName) {
+          try {
+            let locs = [];
+            try { locs = JSON.parse(process.env.GHL_LOCATIONS_JSON || "[]"); } catch { locs = []; }
+            const loc = locs.find(l => l.name === ghlName) || null;
+            let locId = loc?.locationId || null;
+            if (!locId && loc?.apiKey?.startsWith("eyJ")) {
+              try { locId = JSON.parse(Buffer.from(loc.apiKey.split(".")[1], "base64").toString()).location_id || null; } catch { /* fall through */ }
+            }
+            if (!locId) throw new Error(`no locationId resolvable for "${ghlName}" - paste it in Client Setup`);
+            await patchClient({ ghl_location_id: locId });
+            row.ghl_location_id = locId;
+            step("ghl", true, `linked ${ghlName}`);
+          } catch (e) {
+            step("ghl", false, e.message);
+          }
+        } else {
+          step("ghl", true, "no GHL - file-drop paths");
+        }
+
+        // 3 · slack channel
+        const slackToken = process.env.SLACK_BOT_TOKEN;
+        let channelId = row.slack_channel_id || null;
+        if (channelId) {
+          step("slack", true, "channel already wired");
+        } else if (!slackToken) {
+          step("slack", false, "SLACK_BOT_TOKEN not configured");
+        } else {
+          try {
+            const r = await fetch("https://slack.com/api/conversations.create", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${slackToken}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ name: slug.slice(0, 76), is_private: false }),
+            });
+            const j = await r.json();
+            if (!j.ok) throw new Error(j.error === "name_taken"
+              ? `#${slug} already exists in Slack - link its id in Client Setup`
+              : (j.error === "missing_scope" ? "Slack app needs the channels:manage scope" : `Slack: ${j.error}`));
+            channelId = j.channel?.id || null;
+            if (!channelId) throw new Error("Slack returned no channel id");
+            await patchClient({ slack_channel_id: channelId });
+            row.slack_channel_id = channelId;
+            step("slack", true, `#${slug} created`);
+          } catch (e) {
+            step("slack", false, e.message);
+          }
+        }
+
+        // 4 · scaffold robot (fires before the kickoff ping so the ping can
+        // report its outcome; the workflow exits harmlessly if the folder
+        // already exists, so retries are safe)
+        const ghToken = process.env.GITHUB_DISPATCH_TOKEN;
+        const scaffoldCmd = `node scripts/new-client.mjs --slug ${slug} --name "${academyName}" --client-id ${clientId}`;
+        let scaffoldOk = false, scaffoldDetail = null;
+        if (ghToken) {
+          try {
+            const r = await fetch("https://api.github.com/repos/zoran-star/bam-client-sites/actions/workflows/new-client.yml/dispatches", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json", "User-Agent": "bam-portal", "X-GitHub-Api-Version": "2022-11-28" },
+              body: JSON.stringify({ ref: "main", inputs: { slug, name: academyName, client_id: clientId } }),
+            });
+            if (r.status === 204) { scaffoldOk = true; scaffoldDetail = "site silo dispatching"; }
+            else scaffoldDetail = `GitHub ${r.status}: ${(await r.text()).slice(0, 140)}`;
+          } catch (e) { scaffoldDetail = e.message; }
+        } else {
+          scaffoldDetail = "GITHUB_DISPATCH_TOKEN not configured - command posted in Slack";
+        }
+        step("scaffold", scaffoldOk, scaffoldDetail);
+
+        // 5 · staff kickoff ping (owner-facing welcome fires on first login)
+        if (channelId && slackToken) {
+          try {
+            const lines = [
+              `*${academyName}* is in. V2 on, wizard ready.`,
+              `Owner: ${row.owner_name || ownName || "-"} · ${row.email || ownEmail || "-"}`,
+              row.ghl_location_id ? "GHL: linked (contacts + pipeline migrate; wrap offered on Texting)" : "GHL: none - file-drop import, new number or port on Texting",
+              scaffoldOk ? "Site silo: robot dispatched, folder lands in bam-client-sites shortly."
+                         : `Site silo: run this in bam-client-sites → \`${scaffoldCmd}\``,
+              "Build pings (deck, pages, templates, agreement) will land here as the owner fills their wizard.",
+            ];
+            const r = await fetch("https://slack.com/api/chat.postMessage", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${slackToken}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ channel: channelId, text: lines.join("\n"), unfurl_links: false }),
+            });
+            const j = await r.json();
+            step("kickoff", !!j.ok, j.ok ? "posted" : `Slack: ${j.error}`);
+          } catch (e) {
+            step("kickoff", false, e.message);
+          }
+        } else {
+          step("kickoff", false, "no channel to post into");
+        }
+
+        return res.status(200).json({ ok: true, id: clientId, slug, business_name: academyName, steps });
       }
 
       // ── action=update-fields ──

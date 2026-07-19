@@ -146,10 +146,13 @@ wrap/port/switch, chase port rejections, test text) + Meta ops (managed only:
 verify grant, wire account, pixel/CAPI; create account if never ran ads).
 Member imports + DNS = owner-driven, staff exception/concierge only.
 
-## The front door: "Add academy" (staff-initiated)
+## The front door: "Add academy" (staff-initiated) - BUILT 2026-07-19 (WS7)
 
 One staff screen, 4 fields (academy name, owner name/email/phone) + optional
-GHL sub-account dropdown. Auto-initializes 7 switches that are manual today:
+GHL sub-account dropdown. The dropdown is the ONLY place the GHL fork is ever
+decided (has_ghl = staff-set ghl_location_id; the owner is never asked - an
+academy on its own non-agency GHL rides the file-drop + new-number paths).
+Auto-initializes 7 switches that were manual before:
 v2_access on · Slack channel created + wired (today silently no-ops if
 forgotten) · welcome ping · ghl_location_id link · owner invite (resend cron
 exists) · bam-client-sites scaffold (new-client.mjs at creation, so the site
