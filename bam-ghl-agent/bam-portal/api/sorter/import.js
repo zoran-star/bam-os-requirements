@@ -138,11 +138,45 @@ async function runCommit(req, res, ctx, body, clientId) {
   if (rows.length > 5000) return res.status(413).json({ error: "too many rows (max 5000 per import)" });
 
   // column → field (drop "ignore"/null/unknown fields → those go to raw).
+  // Unmapped columns can carry a FATE (Plan 5, 2026-07-18) so nothing is
+  // silently dropped:
+  //   create  → becomes a custom_field_defs entry now; values land in
+  //             member_field_values at promote (cleanup.js reads raw.__create)
+  //   archive → stays in raw; promote merges it onto the family's contact
+  //             record custom_fields (institutional memory survives)
+  //   skip    → explicitly discarded here
+  // No fate (old callers) = archive-in-raw, exactly the old behavior.
   const colToField = {};
+  const colFate = {};
   for (const m of mapping) {
     if (!m || !m.column) continue;
     const field = m.field;
     if (field && field !== "ignore" && FIELDS.includes(field)) colToField[String(m.column)] = field;
+    else if (m.fate === "skip" || m.fate === "create" || m.fate === "archive") colFate[String(m.column)] = m.fate;
+  }
+
+  // Create the custom field defs for 'create' columns up front (once per column).
+  const createCols = Object.keys(colFate).filter(c => colFate[c] === "create");
+  const createDefs = {}; // column → def id
+  if (createCols.length) {
+    const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "field";
+    const existingDefs = await sb(`custom_field_defs?client_id=eq.${encodeURIComponent(clientId)}&select=id,key,label`) || [];
+    const taken = new Set(existingDefs.map(d => d.key));
+    const byLabel = new Map(existingDefs.map(d => [String(d.label).toLowerCase(), d]));
+    let pos = 1000; // park imported defs after the curated ones
+    for (const col of createCols) {
+      const already = byLabel.get(col.toLowerCase());
+      if (already) { createDefs[col] = already.id; continue; }
+      let key = slug(col);
+      for (let i = 2; taken.has(key); i++) key = `${slug(col)}_${i}`;
+      taken.add(key);
+      const made = await sb(`custom_field_defs`, {
+        method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ client_id: clientId, key, label: col, type: "text", options: [], required: false, position: pos++ }),
+      });
+      const def = Array.isArray(made) ? made[0] : made;
+      if (def && def.id) createDefs[col] = def.id;
+    }
   }
 
   const norm = v => (v == null ? null : String(v).trim() || null);
@@ -165,11 +199,16 @@ async function runCommit(req, res, ctx, body, clientId) {
     for (const [column, value] of Object.entries(r)) {
       if (column === "__row") continue;
       const field = colToField[column];
-      if (!field) { out.raw[column] = value; continue; }
+      if (!field) {
+        if (colFate[column] === "skip") continue; // discarded on purpose
+        out.raw[column] = value;
+        continue;
+      }
       if (field === "joined_date") out.joined_date = parseDate(value);
       else if (field === "parent_email") out.parent_email = norm(value) ? norm(value).toLowerCase() : null;
       else out[field] = norm(value);
     }
+    if (Object.keys(createDefs).length) out.raw.__create = createDefs; // promote writes these to member_field_values
     return out;
   });
 

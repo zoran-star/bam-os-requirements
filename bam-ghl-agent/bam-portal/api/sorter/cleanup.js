@@ -783,6 +783,32 @@ async function handler(req, res) {
       const promoted = [];
       const skipped = [];
       const memberIds = [];
+      let adopted = 0;
+
+      // AUTO-ATTACH (Plan 5, 2026-07-18): a confidently matched import with a
+      // LIVE sub shouldn't sit badged "imported / set up billing". Adopt the
+      // sub: stamp metadata.origin=fullcontrol-import (in members.js
+      // PORTAL_OWNED_ORIGINS so pause/cancel/change work on it) and flip
+      // billing_portal_owned. Deliberately NOT in webhook.js's origin set -
+      // that one fires new-signup activation flows, which must never hit an
+      // already-paying import (handleSubDeleted has no origin gate, so churn
+      // tracking still works). Fuzzy matches never reach here with a sub id,
+      // so only confident links adopt. Non-fatal: any Stripe hiccup just
+      // leaves the member on the manual path.
+      const PORTAL_OWNED = new Set(["fullcontrol-portal", "fullcontrol-website-enrollment", "fullcontrol-parent-app", "fullcontrol-import"]);
+      const tryAdoptSub = async (s) => {
+        if (!s.stripe_subscription_id || !client.stripe_connect_account_id) return false;
+        try {
+          const sub = await stripeGet(`/subscriptions/${encodeURIComponent(s.stripe_subscription_id)}`, client.stripe_connect_account_id);
+          if (!sub || !ACTIVEISH.has(sub.status)) return false;
+          const origin = sub.metadata && sub.metadata.origin;
+          if (!PORTAL_OWNED.has(origin)) {
+            await stripePost(`/subscriptions/${encodeURIComponent(s.stripe_subscription_id)}`,
+              { "metadata[origin]": "fullcontrol-import" }, client.stripe_connect_account_id);
+          }
+          return true;
+        } catch (_) { return false; }
+      };
 
       // Offer scoping (V2): a member belongs to the offer its Stripe price maps
       // to. Build a price_id → offer_id map once from this academy's catalog, plus
@@ -837,6 +863,13 @@ async function handler(req, res) {
         // isn't (yet) offer-mapped never clobbers an existing member's offer.
         if (offerId) memberFields.offer_id = offerId;
 
+        // Confident Stripe match with a live sub → billing attaches itself.
+        if (await tryAdoptSub(s)) {
+          memberFields.billing_portal_owned = true;
+          memberFields.billing_mode = s.billing_mode || "card";
+          adopted++;
+        }
+
         // Idempotency on (client_id, parent_email, athlete_name): PATCH if exists, else POST.
         const existingRows = await sb(
           `members?client_id=eq.${encodeURIComponent(clientId)}` +
@@ -887,6 +920,43 @@ async function handler(req, res) {
           });
         } catch (_) { /* non-fatal */ }
 
+        // Column fates (Plan 5, 2026-07-18): the mapping step promised no
+        // spreadsheet column is silently lost. raw.__create maps column →
+        // custom_field_defs id (import.js made the defs) → values become
+        // member_field_values. Every OTHER raw column is the archive fate:
+        // merged onto the family's contact record custom_fields, where
+        // win-back/nurture and the contact drawer already read. Best-effort.
+        try {
+          const raw = (s.raw && typeof s.raw === "object") ? s.raw : {};
+          const createMap = (raw.__create && typeof raw.__create === "object") ? raw.__create : {};
+          if (memberId && Object.keys(createMap).length) {
+            const valRows = Object.entries(createMap)
+              .filter(([col]) => raw[col] != null && String(raw[col]).trim())
+              .map(([col, fieldId]) => ({ member_id: memberId, field_id: fieldId, value: String(raw[col]).trim(), updated_at: nowIso() }));
+            if (valRows.length) {
+              await sb(`member_field_values?on_conflict=member_id,field_id`, {
+                method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+                body: JSON.stringify(valRows),
+              });
+            }
+          }
+          const archive = {};
+          for (const [col, v] of Object.entries(raw)) {
+            if (col === "__create" || col in createMap) continue;
+            if (v != null && String(v).trim()) archive[col] = String(v).trim();
+          }
+          if (Object.keys(archive).length && parentEmail) {
+            const cRows = await sb(`contacts?client_id=eq.${encodeURIComponent(clientId)}&email=eq.${encodeURIComponent(parentEmail)}&select=id,custom_fields&limit=1`);
+            const contact = Array.isArray(cRows) && cRows[0];
+            if (contact) {
+              await sb(`contacts?id=eq.${encodeURIComponent(contact.id)}`, {
+                method: "PATCH", headers: { Prefer: "return=minimal" },
+                body: JSON.stringify({ custom_fields: { ...archive, ...(contact.custom_fields || {}) }, updated_at: nowIso() }),
+              });
+            }
+          }
+        } catch (_) { /* fates are enrichment - never block a promote */ }
+
         promoted.push({ id: s.id, member_id: memberId, reused: !!existing });
         if (memberId) memberIds.push(memberId);
       }
@@ -901,7 +971,7 @@ async function handler(req, res) {
         ));
       }
 
-      return res.status(200).json({ ok: true, promoted, skipped, member_ids: memberIds, counts: { promoted: promoted.length, skipped: skipped.length } });
+      return res.status(200).json({ ok: true, promoted, skipped, member_ids: memberIds, counts: { promoted: promoted.length, skipped: skipped.length, billing_attached: adopted } });
     }
 
     // ═══════════════════ 1-TAP FIX ACTIONS (Phase B) ═══════════════════

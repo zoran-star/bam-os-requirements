@@ -16497,10 +16497,114 @@ function _obfWizContactsPage(st) {
   }
   return _obfWizShell('Import your contacts',
     'Every lead, parent and past inquiry you have, into one system right at the start. Names, phones and emails only; the specific info you collect from new leads and members is set up later in your offer.',
-    `${_obfInp('obf-contacts-src', 'Where does your contact list live?', ob.contacts_source, 'Paste a Google Sheet link, or tell us: "spreadsheet on my laptop", "in Mailchimp"...')}
-     <button onclick="_obfSetupSave({contacts_source:document.getElementById('obf-contacts-src').value.trim()}, null, this)" style="width:100%;margin-top:12px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save</button>
-     <div style="font-size:11px;color:var(--text-mute);line-height:1.5;margin-top:10px">Our team imports everyone and merges duplicates automatically. Direct file upload is coming; for now a link or a note is all we need.</div>
-     ${st.contacts ? _obfDoneLine('Got it. Your contacts are on the way in') : ''}`);
+    _cimpBody(st, ob));
+}
+
+// ── Contact file import (non-GHL path, Plan 5 2026-07-18) ──
+// Drop a CSV → AI maps the columns → owner confirms → everyone lands in
+// contacts, deduped. Every column gets a FATE; nothing is silently dropped:
+// map it, make it a custom field, keep it on the record, or skip it on purpose.
+let _CIMP = null; // { headers, rows, sample, mapping, batch_id, step, result, err }
+const _CIMP_FIELD_LABELS = { name: 'Full name', first_name: 'First name', last_name: 'Last name', email: 'Email', phone: 'Phone', tags: 'Tags' };
+const _CIMP_FATE_LABELS = { create: 'Make it a custom field', archive: 'Keep on the record', skip: 'Skip this column' };
+function _cimpBody(st, ob) {
+  const c = _CIMP;
+  if (c && c.step === 'done') {
+    const r = c.result || {};
+    const bits = [`${(r.imported || 0) + (r.merged_existing || 0)} contacts in`];
+    if (r.merged_existing) bits.push(`${r.merged_existing} merged with people you already had`);
+    if (r.merged_in_file) bits.push(`${r.merged_in_file} in-file duplicates folded`);
+    if ((r.fields_created || []).length) bits.push(`new fields: ${r.fields_created.join(', ')}`);
+    return `${_obfDoneLine(bits.map(escapeHTML).join(' &middot; '))}
+      <button onclick="_CIMP=null;_obfRender(_OBF_STATE)" style="margin-top:12px;background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 14px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Import another file</button>`;
+  }
+  if (c && c.step === 'map') {
+    const opts = (sel) => {
+      const f = Object.entries(_CIMP_FIELD_LABELS).map(([v, l]) => `<option value="field:${v}" ${sel === 'field:' + v ? 'selected' : ''}>${l}</option>`).join('');
+      const g = Object.entries(_CIMP_FATE_LABELS).map(([v, l]) => `<option value="fate:${v}" ${sel === 'fate:' + v ? 'selected' : ''}>${l}</option>`).join('');
+      return `<optgroup label="Map to">${f}</optgroup><optgroup label="No match? Choose its fate">${g}</optgroup>`;
+    };
+    const rows = c.mapping.map((m, i) => {
+      const sel = m.field ? 'field:' + m.field : 'fate:' + (m.fate || 'archive');
+      return `<div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px">
+        <div style="flex:1;min-width:0;font-size:12px"><b>${escapeHTML(m.column)}</b>${m.sample ? `<div style="font-size:11px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">e.g. ${escapeHTML(m.sample)}</div>` : ''}</div>
+        <select class="cimp-sel" data-i="${i}" style="flex:none;max-width:200px;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 8px;font:inherit;font-size:11.5px">${opts(sel)}</select>
+      </div>`;
+    }).join('');
+    return `<div style="font-size:12px;color:var(--text-sub,var(--text-mute));margin-top:4px">${c.rows.length.toLocaleString()} rows read. Check what each column becomes. Columns that fit nothing are never lost silently: make them a custom field, keep them on the person's record, or skip them on purpose.</div>
+      ${rows}
+      ${c.err ? `<div style="font-size:12px;color:var(--red,#c96856);margin-top:10px">${escapeHTML(c.err)}</div>` : ''}
+      <button onclick="_cimpCommit(this)" style="width:100%;margin-top:14px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Import ${c.rows.length.toLocaleString()} contacts</button>
+      <button onclick="_CIMP=null;_obfRender(_OBF_STATE)" style="width:100%;margin-top:8px;background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Start over</button>`;
+  }
+  return `<label style="display:block;border:1.5px dashed var(--border-med);border-radius:12px;padding:22px 16px;margin-top:14px;text-align:center;cursor:pointer">
+      <input type="file" accept=".csv,text/csv" style="display:none" onchange="_cimpFile(this)">
+      <div style="font-size:13px;font-weight:700;color:var(--text)">Drop your contact list here</div>
+      <div style="font-size:11.5px;color:var(--text-mute);margin-top:4px">CSV export from any tool. Any layout: we map the columns, you confirm.</div>
+    </label>
+    ${(_CIMP && _CIMP.err) ? `<div style="font-size:12px;color:var(--red,#c96856);margin-top:10px">${escapeHTML(_CIMP.err)}</div>` : ''}
+    ${(_CIMP && _CIMP.step === 'busy') ? `<div style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:12px;font-weight:600;color:var(--text-sub,var(--text-mute))"><span class="req-spin" style="width:12px;height:12px"></span> Reading your file and mapping the columns…</div>` : ''}
+    ${_obfInp('obf-contacts-src', 'No file handy? Tell us where the list lives', ob.contacts_source, 'Paste a Google Sheet link, or tell us where it lives...')}
+    <button onclick="_obfSetupSave({contacts_source:document.getElementById('obf-contacts-src').value.trim()}, null, this)" style="width:100%;margin-top:10px;background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Save the note for our team</button>
+    ${st.contacts ? _obfDoneLine('Contacts are in') : ''}`;
+}
+
+async function _cimpFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  _CIMP = { step: 'busy' };
+  _obfRender(_OBF_STATE);
+  try {
+    if (file.size > 5 * 1024 * 1024) throw new Error('That file is over 5 MB. Export a plain CSV and try again.');
+    const text = await file.text();
+    const grid = _sorterParseCSV(text);
+    if (!grid || grid.length < 2) throw new Error('Could not read rows from that file. Export it as CSV and try again.');
+    const headers = _sorterDedupeHeaders(grid[0]);
+    const dataRows = grid.slice(1).filter(r => r.some(v => String(v || '').trim()));
+    if (dataRows.length > 5000) throw new Error('Max 5000 rows per import. Split the file and run it twice.');
+    const rows = dataRows.map((r, i) => {
+      const o = { __row: i + 2 };
+      headers.forEach((h, j) => { o[h] = r[j] != null ? r[j] : ''; });
+      return o;
+    });
+    const token = await _mreqAuthToken();
+    const resp = await fetch('/api/contacts/import', {
+      method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, mode: 'map', header: headers, sample_rows: grid.slice(1, 9) }),
+    });
+    const j = await _safeJson(resp);
+    if (!resp.ok || !j.mapping) throw new Error(j.error || ('HTTP ' + resp.status));
+    _CIMP = { step: 'map', headers, rows, mapping: j.mapping, batch_id: j.batch_id };
+  } catch (e) {
+    _CIMP = { step: null, err: e.message || String(e) };
+  }
+  _obfRender(_OBF_STATE);
+}
+
+async function _cimpCommit(btn) {
+  const c = _CIMP;
+  if (!c || c.step !== 'map') return;
+  const mapping = c.mapping.map((m, i) => {
+    const sel = document.querySelector(`.cimp-sel[data-i="${i}"]`);
+    const v = sel ? sel.value : (m.field ? 'field:' + m.field : 'fate:' + (m.fate || 'archive'));
+    return v.startsWith('field:') ? { column: m.column, field: v.slice(6) } : { column: m.column, fate: v.slice(5) };
+  });
+  btn.disabled = true; btn.textContent = 'Importing…';
+  try {
+    const token = await _mreqAuthToken();
+    const resp = await fetch('/api/contacts/import', {
+      method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, mode: 'commit', batch_id: c.batch_id, mapping, rows: c.rows }),
+    });
+    const j = await _safeJson(resp);
+    if (!resp.ok || !j.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+    _CIMP = { step: 'done', result: j };
+    await _obfFetchState().catch(() => {});
+  } catch (e) {
+    c.err = e.message || String(e);
+    btn.disabled = false; btn.textContent = 'Import ' + c.rows.length.toLocaleString() + ' contacts';
+  }
+  _obfRender(_OBF_STATE);
 }
 
 // One step, one page: the old checklist row grown into a full card - same
@@ -16683,65 +16787,100 @@ async function _cxOpen() {
   }
 }
 
+const _CX_FLAG_LABELS = { bulk_day: 'Bulk cleanup day?', date_conflict: 'Ends before it starts', zero_amount: '$0 plan', unreachable: 'No email or phone' };
 function _cxRender() {
   const body = document.getElementById('cx-body');
   if (!body || !_CX) return;
   const bk = _CX.buckets || {};
-  const meta = (r) => [r.cancelled_at, r.last_plan, r.cancel_reason].filter(Boolean).map(escapeHTML).join(' · ');
+  const meta = (r) => [r.cancelled_at, r.last_plan, r.cancel_reason].filter(Boolean).map(escapeHTML).join(' &middot; ');
   const who = (r) => escapeHTML(r.name || r.email || r.phone || r.customer_id);
+  // The cleaning pass: flagged rows show WHY they look off, an editable leave
+  // date, and default OUT of the churn numbers until the owner counts them in.
+  const flagBlock = (r) => {
+    const flags = Array.isArray(r.flags) ? r.flags : [];
+    if (!flags.length) return '';
+    const chips = flags.map(f => `<span style="flex:none;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:6px;border:1px solid rgba(240,184,74,.45);color:var(--amber,#F0B84A)">${escapeHTML(_CX_FLAG_LABELS[f] || f)}</span>`).join('');
+    return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px">${chips}</div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:7px;font-size:11.5px;color:var(--text-mute)">
+        <span>Left on</span>
+        <input type="date" class="cx-date" data-cid="${escapeHTML(r.customer_id)}" value="${escapeHTML(r.cancelled_at || '')}" style="background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit;font-size:11.5px">
+        <select class="cx-churn" data-cid="${escapeHTML(r.customer_id)}" style="flex:1;min-width:150px;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit;font-size:11.5px">
+          <option value="out" selected>Keep out of churn numbers</option>
+          <option value="in">Looks right, count it</option>
+        </select>
+      </div>`;
+  };
   if (!(bk.matched || []).length && !(bk.review || []).length && !(bk.none || []).length) {
     body.innerHTML = `<div style="border:1px solid var(--border);border-radius:12px;padding:16px;font-size:13px;color:var(--text-sub,var(--text-mute))">No cancelled subscriptions found in your Stripe${(bk.already_member || []).length ? ` (${bk.already_member.length} cancelled-then-resubscribed people are already live members - nothing to do)` : ''}. You're clean - skip this step.</div>
-      <button onclick="_obfSkip('cancelled');_cxClose()" style="margin-top:12px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Done - nothing to import</button>`;
+      <button onclick="_obfSkip('cancelled');_cxClose()" style="margin-top:12px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Done, nothing to import</button>`;
     return;
   }
   const sect = (label, hint, rowsHtml, color) => rowsHtml ? `<div style="margin-top:16px">
       <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:${color}">${label}</div>
       <div style="font-size:11.5px;color:var(--text-mute);margin:2px 0 6px">${hint}</div>${rowsHtml}</div>` : '';
-  const matchedRows = (bk.matched || []).map((r, i) => `<label style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px;cursor:pointer">
-      <input type="checkbox" class="cx-m" data-i="${i}" ${r.already_tagged ? '' : 'checked'} ${r.already_tagged ? 'disabled' : ''}>
-      <div style="flex:1;min-width:0;font-size:12px"><b>${who(r)}</b> <span style="color:var(--text-mute)">→ ${escapeHTML(r.contact_name)}</span><div style="font-size:11px;color:var(--text-mute)">${meta(r)}${r.already_tagged ? ' · already imported' : ''}</div></div>
-      <span style="flex:none;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:6px;border:1px solid var(--border);color:var(--text-mute)">${r.why.toUpperCase()}</span>
-    </label>`).join('');
+  const matchedRows = (bk.matched || []).map((r, i) => `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" class="cx-m" data-i="${i}" ${r.already_tagged ? '' : 'checked'} ${r.already_tagged ? 'disabled' : ''}>
+        <div style="flex:1;min-width:0;font-size:12px"><b>${who(r)}</b> <span style="color:var(--text-mute)">→ ${escapeHTML(r.contact_name)}</span><div style="font-size:11px;color:var(--text-mute)">${meta(r)}${r.already_tagged ? ' &middot; already imported' : ''}</div></div>
+        <span style="flex:none;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:6px;border:1px solid var(--border);color:var(--text-mute)">${r.why.toUpperCase()}</span>
+      </label>${flagBlock(r)}
+    </div>`).join('');
   const reviewRows = (bk.review || []).map((r, i) => `<div style="border:1px solid rgba(240,184,74,.35);border-radius:8px;padding:8px 10px;margin-top:6px">
       <div style="font-size:12px"><b>${who(r)}</b><div style="font-size:11px;color:var(--text-mute)">${meta(r)}</div></div>
       <select class="cx-r" data-i="${i}" style="margin-top:6px;width:100%;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 8px;font:inherit;font-size:12px">
         <option value="link">Link to ${escapeHTML(r.candidate_name)} (${escapeHTML(r.why)} match)</option>
-        <option value="create">Not them - create a new contact</option>
+        <option value="create">Not them, create a new contact</option>
         <option value="skip">Skip this one</option>
-      </select>
+      </select>${flagBlock(r)}
     </div>`).join('');
-  const noneRows = (bk.none || []).map((r, i) => `<div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px">
-      <div style="flex:1;min-width:0;font-size:12px"><b>${who(r)}</b><div style="font-size:11px;color:var(--text-mute)">${meta(r)}</div></div>
-      <select class="cx-n" data-i="${i}" style="flex:none;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:5px 8px;font:inherit;font-size:11.5px">
-        <option value="create">Create contact</option>
-        <option value="skip">Skip (test/dupe)</option>
-      </select>
+  const noneRows = (bk.none || []).map((r, i) => `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0;font-size:12px"><b>${who(r)}</b><div style="font-size:11px;color:var(--text-mute)">${meta(r)}</div></div>
+        <select class="cx-n" data-i="${i}" style="flex:none;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:5px 8px;font:inherit;font-size:11.5px">
+          <option value="create">Create contact</option>
+          <option value="skip">Skip (test/dupe)</option>
+        </select>
+      </div>${flagBlock(r)}
     </div>`).join('');
+  const notes = [];
+  if ((bk.already_member || []).length) notes.push(`${bk.already_member.length} came back and are paying again (left alone)`);
+  if (_CX.plan_switches) notes.push(`${_CX.plan_switches} plan ${_CX.plan_switches === 1 ? 'switch' : 'switches'} folded in (not counted as churn)`);
+  if ((_CX.excluded || []).length) notes.push(`${_CX.excluded.length} skipped: no cancel date in Stripe`);
   body.innerHTML = `
-    <div style="font-size:12px;color:var(--text-sub,var(--text-mute))">${_CX.total} cancelled ${_CX.total === 1 ? 'person' : 'people'} found${(bk.already_member || []).length ? ` · ${bk.already_member.length} came back as live members (left alone)` : ''}. Each import lands as a contact tagged "cancelled" with its cancel date, plan and reason on the record.</div>
-    ${sect('Matched', 'Exact email hits - untick any you do not want.', matchedRows, 'var(--green,#7BC47F)')}
-    ${sect('Needs a look', 'Fuzzy matches - confirm each one.', reviewRows, 'var(--amber,#F0B84A)')}
-    ${sect('No contact found', 'Nobody in your CRM matches - create them from the Stripe data, or skip.', noneRows, 'var(--text-mute)')}
+    <div style="font-size:12px;color:var(--text-sub,var(--text-mute))">${_CX.total} cancelled ${_CX.total === 1 ? 'person' : 'people'} found${notes.length ? ' &middot; ' + notes.map(escapeHTML).join(' &middot; ') : ''}. Each import is tagged "cancelled" for win-back AND written into your churn history, so your retention numbers start true.</div>
+    ${sect('Matched', 'Exact email hits. Untick any you do not want.', matchedRows, 'var(--green,#7BC47F)')}
+    ${sect('Needs a look', 'Fuzzy matches. Confirm each one.', reviewRows, 'var(--amber,#F0B84A)')}
+    ${sect('No contact found', 'Nobody in your CRM matches. Create them from the Stripe data, or skip.', noneRows, 'var(--text-mute)')}
     <button id="cx-apply" onclick="_cxApply(this)" style="margin-top:16px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Import cancelled members</button>`;
 }
 
 async function _cxApply(btn) {
   if (!_CX) return;
   const bk = _CX.buckets || {};
+  // Flagged rows carry the human's cleaning verdict: an edited leave date
+  // and whether this person counts in the churn numbers at all.
+  const cleanOf = (r) => {
+    const out = {};
+    const churnSel = document.querySelector(`#cx-overlay .cx-churn[data-cid="${(window.CSS && CSS.escape) ? CSS.escape(r.customer_id) : r.customer_id}"]`);
+    if (churnSel) out.exclude_churn = churnSel.value !== 'in';
+    const dateInp = document.querySelector(`#cx-overlay .cx-date[data-cid="${(window.CSS && CSS.escape) ? CSS.escape(r.customer_id) : r.customer_id}"]`);
+    if (dateInp && dateInp.value && dateInp.value !== r.cancelled_at) out.cancel_date_override = dateInp.value;
+    return out;
+  };
   const decisions = [];
   document.querySelectorAll('#cx-overlay .cx-m').forEach(cb => {
     const r = bk.matched[Number(cb.dataset.i)];
-    if (r && cb.checked && !cb.disabled) decisions.push({ ...r, action: 'link', contact_id: r.contact_id });
+    if (r && cb.checked && !cb.disabled) decisions.push({ ...r, action: 'link', contact_id: r.contact_id, ...cleanOf(r) });
   });
   document.querySelectorAll('#cx-overlay .cx-r').forEach(sel => {
     const r = bk.review[Number(sel.dataset.i)];
     if (!r) return;
-    if (sel.value === 'link') decisions.push({ ...r, action: 'link', contact_id: r.candidate_id });
-    else if (sel.value === 'create') decisions.push({ ...r, action: 'create' });
+    if (sel.value === 'link') decisions.push({ ...r, action: 'link', contact_id: r.candidate_id, ...cleanOf(r) });
+    else if (sel.value === 'create') decisions.push({ ...r, action: 'create', ...cleanOf(r) });
   });
   document.querySelectorAll('#cx-overlay .cx-n').forEach(sel => {
     const r = bk.none[Number(sel.dataset.i)];
-    if (r && sel.value === 'create') decisions.push({ ...r, action: 'create' });
+    if (r && sel.value === 'create') decisions.push({ ...r, action: 'create', ...cleanOf(r) });
   });
   if (!decisions.length) { _cxClose(); return; }
   btn.disabled = true; btn.textContent = 'Importing…';
@@ -16751,7 +16890,7 @@ async function _cxApply(btn) {
     const j = await _safeJson(r);
     if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
     const body = document.getElementById('cx-body');
-    if (body) body.innerHTML = `<div style="border:1px solid var(--accent-border,rgba(212,182,92,.3));background:var(--gold-sheen,rgba(212,182,92,.06));border-radius:12px;padding:16px;font-size:13px;color:var(--text)"><b>Done.</b> ${j.linked} linked · ${j.created} created · ${j.skipped} skipped. They're tagged "cancelled" with their history - win-back can start whenever you're ready.</div>
+    if (body) body.innerHTML = `<div style="border:1px solid var(--accent-border,rgba(212,182,92,.3));background:var(--gold-sheen,rgba(212,182,92,.06));border-radius:12px;padding:16px;font-size:13px;color:var(--text)"><b>Done.</b> ${j.linked} linked &middot; ${j.created} created &middot; ${j.skipped} skipped. ${j.churn_written ? `${j.churn_written} churn ${j.churn_written === 1 ? 'record' : 'records'} written: your retention numbers now include this history.` : ''}${j.churn_excluded ? ` ${j.churn_excluded} kept out of the numbers per your review.` : ''} They're tagged "cancelled" with their history, so win-back can start whenever you're ready.</div>
       <button onclick="_cxClose()" style="margin-top:12px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Back to onboarding</button>`;
     await _obfFetchState().catch(() => {});
     _obfRender(_OBF_STATE);
@@ -41863,18 +42002,28 @@ function _sorterRenderStep2(host) {
     const sample = (m.rows[0] && m.rows[0][h] != null) ? String(m.rows[0][h]) : '';
     const opts = _SORTER_FIELD_OPTS.map(([v, l]) => `<option value="${v}" ${v === suggested ? 'selected' : ''}>${l}</option>`).join('');
     const useChecked = suggested ? 'checked' : '';
-    return `<div class="pc-sorter-maprow" data-header="${escapeHTML(h)}" style="display:grid;grid-template-columns:1fr 180px auto;gap:12px;align-items:center;padding:9px 12px;border:1px solid var(--border,#2a2a31);border-radius:9px;margin-bottom:7px;">
-      <div style="min-width:0;">
-        <div style="font-weight:700;font-size:13px;">${escapeHTML(h)}</div>
-        <div style="font-size:10.5px;color:var(--text-mute,#888);">${sample ? 'e.g. ' + escapeHTML(sample.slice(0, 40)) : ''}${conf ? ' · ' + conf : ''}</div>
+    return `<div class="pc-sorter-maprow" data-header="${escapeHTML(h)}" style="padding:9px 12px;border:1px solid var(--border,#2a2a31);border-radius:9px;margin-bottom:7px;">
+      <div style="display:grid;grid-template-columns:1fr 180px auto;gap:12px;align-items:center;">
+        <div style="min-width:0;">
+          <div style="font-weight:700;font-size:13px;">${escapeHTML(h)}</div>
+          <div style="font-size:10.5px;color:var(--text-mute,#888);">${sample ? 'e.g. ' + escapeHTML(sample.slice(0, 40)) : ''}${conf ? ' &middot; ' + conf : ''}</div>
+        </div>
+        <select class="pc-sorter-mapsel" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;">${opts}</select>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-mute,#888);cursor:pointer;"><input type="checkbox" class="pc-sorter-mapuse" ${useChecked} onchange="_sorterUseToggle(this)" /> use</label>
       </div>
-      <select class="pc-sorter-mapsel" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;">${opts}</select>
-      <label style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-mute,#888);cursor:pointer;"><input type="checkbox" class="pc-sorter-mapuse" ${useChecked} /> use</label>
+      <div class="pc-sorter-faterow" style="display:${useChecked ? 'none' : 'flex'};align-items:center;gap:8px;margin-top:7px;font-size:11.5px;color:var(--text-mute,#888);">
+        <span style="flex:none;">Not mapped, so:</span>
+        <select class="pc-sorter-fatesel" style="flex:1;padding:5px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:11.5px;">
+          <option value="archive" selected>Keep on the family's record (history survives)</option>
+          <option value="create">Make it a custom field (shows on profiles)</option>
+          <option value="skip">Skip this column (drop it on purpose)</option>
+        </select>
+      </div>
     </div>`;
   }).join('');
 
   host.innerHTML = `
-    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Found <b>${m.rows.length}</b> rows. Confirm each column's field (or untick "use" to send it to leftover data).</div>
+    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Found <b>${m.rows.length}</b> rows. Confirm each column's field. Columns you don't map are never lost silently: keep them on the record, make them a custom field, or skip them on purpose.</div>
     ${rowsHtml}
     <div style="margin-top:8px;padding-top:12px;border-top:1px solid var(--border,#2a2a31)">
       <button onclick="_sorterSuggestFields()" style="font-size:12px;font-weight:600;padding:7px 13px;border:1px solid var(--accent,#D4B65C);border-radius:7px;background:transparent;color:var(--accent,#D4B65C);cursor:pointer;">Add leftover columns to your onboarding form</button>
@@ -41937,6 +42086,14 @@ async function _sorterOnFile(input) {
   }
 }
 
+// Unticking "use" reveals the column's fate select (Plan 5): archive on the
+// family record, become a custom field, or an explicit skip.
+function _sorterUseToggle(cb) {
+  const row = cb.closest('.pc-sorter-maprow');
+  const fate = row && row.querySelector('.pc-sorter-faterow');
+  if (fate) fate.style.display = cb.checked ? 'none' : 'flex';
+}
+
 async function _sorterCommitImport() {
   // Read the confirmed mapping back out of the table.
   const mapping = [];
@@ -41945,7 +42102,9 @@ async function _sorterCommitImport() {
     const use = row.querySelector('.pc-sorter-mapuse');
     const sel = row.querySelector('.pc-sorter-mapsel');
     const field = (use && use.checked && sel && sel.value) ? sel.value : null;
-    mapping.push({ column: header, header, field });
+    const fateSel = row.querySelector('.pc-sorter-fatesel');
+    const fate = !field && fateSel ? fateSel.value : null;
+    mapping.push({ column: header, header, field, ...(fate ? { fate } : {}) });
   });
   try {
     const token = await _mreqAuthToken();

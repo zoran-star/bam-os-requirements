@@ -16,7 +16,7 @@ replacement). Update statuses here as PRs land.
 | 2 | Schema deltas (brand_data extensions, per-class location/capacity, rollups, drop storage) | rides 1b/1c |
 | 3 | Trigger + status machinery | **SHIPPED** (WS3 PR) - chunk statuses on website_setup.chunks, triggers evaluate in setup-status (owner-activity driven) + Slack pings, brief Submit moment, Launch chunk board, Activation chunk controls, gate = 2 owner sign-offs (copy_ok retired) |
 | 4 | Skills | **SHIPPED** (bam-client-sites #89 + portal PR) - /brand-scan RENAMED /branding-deck (wizard-brief gathering, closes its chunk) · site-build --phase core|sales|onboarding · NEW /email-templates + /agreement skills · scripts/mark-chunk.mjs closes every loop · ghl-pipeline-import gained the engine-prep launch-safety step · Slack ping names the new runbooks |
-| 5 | Imports (contact file-drop path · member import Stripe auto-attach · cancelled import Stripe-driven + cancellations contract) | queued |
+| 5 | Imports (contact file-drop path · member import Stripe auto-attach · cancelled import Stripe-driven + cancellations contract) | **SHIPPED** (feat/imports-plan5, 2026-07-18) - cancelled import writes `cancellations` rows (chains fold plan switches, came-backs excluded, flags default OUT of churn until a human counts them in) · member promote adopts live subs (origin=fullcontrol-import, billing_portal_owned) · NEW api/contacts/import.js + wizard file-drop · unknown-column fates everywhere (create field / archive on record / skip) |
 | 6 | Integrations (Leadsie link in Ads step · BAM Connect post-App-Review · phone wrap wiring) | queued |
 | 7 | Front door - "Add academy" (4 fields + GHL dropdown → 7 auto-initializations: v2_access, Slack channel, welcome ping, GHL link, invite, sites scaffold, wizard state) | queued, standalone - can go anytime |
 
@@ -48,5 +48,5 @@ Replaces client-facing Slack. Build chunks when we pick it up:
 | **START Meta App Review** | Zoran/staff | THE long calendar clock (weeks), zero eng to start, unlocks BAM Connect + self-serve ads. Kick off ASAP |
 | How the academy pays BAM | Zoran | The one open design hole in onboarding - no home in the flow yet |
 | Launch definition final call | Zoran | Proposal in the spec (domain flip = the moment, everything else arms silently) |
-| Member import auto-attach behavior | workshop at WS5 | confirm confident-match auto-attach vs "needs billing" badge |
-| Imported cancels in churn-rate math | decided-ish | count in calculations post-clean; rate-denominator detail per cancellations contract note |
+| Member import auto-attach behavior | DECIDED + shipped (WS5) | confident match with a live sub = billing attaches itself (sub adopted); fuzzy stays badged |
+| Imported cancels in churn-rate math | decided-ish | flagged rows default OUT until a human counts them in (WS5); rate-denominator detail still per cancellations contract note |

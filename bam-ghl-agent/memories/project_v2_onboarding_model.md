@@ -62,6 +62,22 @@
 > position, nothing texts until Hawkeye); setup-status ping names the new
 > runbooks. Skills' mark-chunk needs SUPABASE env (bam-portal/.env.local
 > service key is STALE - use fresh key or Supabase MCP).
+> **WS5 SHIPPED (2026-07-18): the imports.** Cancelled import
+> (api/members/import-cancelled.js) rebuilt - writes `cancellations` rows per
+> [[project_cancellations_contract]] (gap closed; chains fold plan switches,
+> live-sub came-backs excluded, guardrail flags default OUT of churn until the
+> owner counts them in via the _cx cleaning pass). Member promote
+> (sorter/cleanup.js) ADOPTS confidently-matched live subs: stamps
+> metadata.origin=fullcontrol-import (added to members.js PORTAL_OWNED_ORIGINS
+> only - deliberately NOT webhook.js's set, that one fires new-signup
+> activations) + billing_portal_owned=true, so imported members stop sitting
+> on "Set up billing". NEW api/contacts/import.js (map/commit, AI column
+> mapping) + wizard Contacts file-drop (_cimpBody/_cimpFile/_cimpCommit)
+> replaces the "upload coming soon" note for non-GHL academies. Unknown
+> spreadsheet columns get FATES everywhere (contact import + member sorter):
+> create = custom_field_defs (+values at promote via raw.__create) · archive =
+> contact custom_fields jsonb (member archives land on the family contact) ·
+> skip = explicit drop. Nothing is silently lost.
 > Everyone moves to the wizard (it reads the same completion flags - no forks).
 > Deferred: how the academy pays BAM · launch definition final call (proposal
 > in spec) · V2 ticket system / Zoran-icon (design exploration in spec).
