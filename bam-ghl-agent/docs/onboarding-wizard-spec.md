@@ -169,9 +169,9 @@ so agents wait on A2P. Revisit before build of the Go live page.
 
 - **How the academy pays BAM** - no home in the flow yet (the one open design hole)
 - Launch definition final sign-off (proposal above)
-- V2 support ticket system + Zoran-icon Slack replacement (design exploration
-  done in-session: 4 lanes, orchestrator, 9 ticket types, 4 trigger surfaces -
-  revisit AFTER onboarding ships)
+- V2 support ticket system + Zoran-icon Slack replacement - full design banked
+  in [`zoran-icon-ticket-design.md`](zoran-icon-ticket-design.md); build after
+  onboarding as Track 2 of [`v2-master-build-list.md`](v2-master-build-list.md)
 - Member import: confirm auto-attach behavior on confident Stripe matches
 - KPI alerting + agent escalation queue (B-bucket new builds)
 - Multi-offer types (Teams/Camps/etc.) - Basics shows Training only
