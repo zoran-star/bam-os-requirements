@@ -60,7 +60,7 @@ async function handler(req, res) {
     // Academy-level state (station-model onboarding flow) - fetched regardless
     // of whether an offer exists yet, so the flow's academy group (Stripe,
     // contacts migration, Instagram) lights up before the first offer is built.
-    const clientRows = await sb(`clients?id=eq.${enc(clientId)}&select=booking_provider,pipeline_provider,stripe_connect_status,ghl_location_id,brand_data,website_setup,onboarding_setup,legal_name,ein,address&limit=1`);
+    const clientRows = await sb(`clients?id=eq.${enc(clientId)}&select=booking_provider,pipeline_provider,stripe_connect_status,ghl_location_id,brand_data,website_setup,onboarding_setup,legal_name,ein,address,slack_channel_id,business_name&limit=1`);
     const cRow = (Array.isArray(clientRows) && clientRows[0]) || {};
     const [contactRows, cancelledRows, igRows] = await Promise.all([
       sb(`contacts?client_id=eq.${enc(clientId)}&select=id&limit=1000`),
@@ -96,6 +96,61 @@ async function handler(req, res) {
       ig_live: !!(Array.isArray(igRows) && igRows[0] && igRows[0].inbox_live),
     };
 
+    // ── Build-chunk trigger evaluation (wizard spec 2026-07-18, WS3) ──
+    // The flow calls setup-status whenever the owner is active, so evaluating
+    // here means triggers fire exactly when their inputs land - no cron, no
+    // client wiring. Transitions are one-way (waiting → ready) and idempotent;
+    // team pings go to the academy's staff Slack channel. building/published
+    // are staff-set via build-state action:'chunk'.
+    const evaluateChunks = async (sig) => {
+      const ws = cRow.website_setup || {};
+      const chunks = { ...(ws.chunks || {}) };
+      const deckPublished = (chunks.deck || {}).status === "published";
+      const CHUNK_DEFS = [
+        ["deck",       "Branding deck",              !!(sig.brief_submitted && sig.story)],
+        ["core",       "Core site pages",            deckPublished],
+        ["templates",  "Email templates",            deckPublished],
+        ["sales",      "Sales funnel + emails",      !!sig.preset],
+        ["onboarding", "Onboarding funnel + emails", !!(sig.prices > 0 && sig.policy && sig.onb_fields > 0)],
+        ["agreement",  "Branded agreement",          !!(sig.policy && sig.legal_name)],
+      ];
+      const fired = [];
+      for (const [key, label, ready] of CHUNK_DEFS) {
+        const cur = chunks[key] || { status: "waiting" };
+        if (ready && (cur.status === "waiting" || !cur.status)) {
+          chunks[key] = { ...cur, status: "ready", ready_at: new Date().toISOString() };
+          fired.push(label);
+        } else if (!chunks[key]) chunks[key] = cur;
+      }
+      if (fired.length) {
+        await sb(`clients?id=eq.${enc(clientId)}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ website_setup: { ...ws, chunks } }),
+        }).catch(() => {});
+        const tok = process.env.SLACK_BOT_TOKEN;
+        if (tok && cRow.slack_channel_id) {
+          const name = cRow.business_name || clientId;
+          await fetch("https://slack.com/api/chat.postMessage", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              channel: cRow.slack_channel_id,
+              text: `:hammer_and_wrench: ${name}: ready to build → ${fired.join(", ")}. Runbooks: /brand-scan · /site-build. Mark published in the Activation tab when live.`,
+              unfurl_links: false,
+            }),
+          }).catch(() => {});
+        }
+      }
+      return chunks;
+    };
+    const ob = cRow.onboarding_setup || {};
+    const baseSig = {
+      brief_submitted: !!ob.brief_submitted_at,
+      story: !!(cRow.brand_data && cRow.brand_data.story && String(cRow.brand_data.story).trim()),
+      legal_name: !!(cRow.legal_name && String(cRow.legal_name).trim()),
+      preset: false, prices: 0, policy: false, onb_fields: 0,
+    };
+
     // Resolve the offer when the caller omits it (the onboarding flow passes only
     // client_id): the published training offer, else the newest training offer.
     let offer = null;
@@ -110,8 +165,9 @@ async function handler(req, res) {
     if (!offerId) {
       // No offer yet - nothing offer-scoped to score. The academy-level block
       // still reports, so the flow's academy group works from day zero.
+      const chunksNoOffer = await evaluateChunks(baseSig);
       return res.status(200).json({ ok: true, offer_id: null, pipeline_stages: 0, transitions: 0, automations: [], agent_sections: 0, sales_fields: 0, onboarding_fields: 0, entry_points: 0, has_policy: false, booking_live: false,
-        define_done: false, schedule_set: false, pricing_filled: false, prices_matched: 0, members: 0, preset: null, ...academy });
+        define_done: false, schedule_set: false, pricing_filled: false, prices_matched: 0, members: 0, preset: null, chunks: chunksNoOffer, ...academy });
     }
 
     // Pipeline stages/edges scoped to this offer (or the academy-wide default).
@@ -133,6 +189,15 @@ async function handler(req, res) {
     const sched = data.schedule || {};
     const pricing = data.pricing || {};
     const sales = data.sales || {};
+
+    const hasPolicyNow = policy && typeof policy === "object" && Object.keys(policy).length > 0;
+    const chunksNow = await evaluateChunks({
+      ...baseSig,
+      preset: !!sales.preset_key,
+      prices: count(prices),
+      policy: hasPolicyNow,
+      onb_fields: count(onbDefs),
+    });
 
     return res.status(200).json({
       ok: true,
@@ -157,6 +222,7 @@ async function handler(req, res) {
       prices_matched: count(prices),
       members: count(memberRows),
       preset: sales.preset_key ? { key: sales.preset_key, version: sales.preset_version || 1, applied_at: sales.preset_applied_at || null } : null,
+      chunks: chunksNow,
       ...academy,
     });
   } catch (e) {

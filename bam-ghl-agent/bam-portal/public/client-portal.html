@@ -15988,7 +15988,7 @@ async function _obfFetchState() {
     preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
     offer_id: null, booking: false, has_ghl: true, contacts_n: 0,
     website_build: null, staging_url: null, site_accepted: false, brandboard: false,
-    texting: false, ads: false, ob: {}, legal_name: '', ein_value: '', address: '' };
+    texting: false, ads: false, ob: {}, legal_name: '', ein_value: '', address: '', chunks: {} };
   const [em, web, ss, prog] = await Promise.allSettled([
     _edwApi('status'),
     _wdwApi('status'),
@@ -16038,6 +16038,7 @@ async function _obfFetchState() {
     next.brandboard = !!v.website_brand_ok;
     // PR-2 collection pages: saved answers + the A2P trio for prefill.
     next.ob = v.onboarding_setup || {};
+    next.chunks = v.chunks || {};
     next.legal_name = v.legal_name || '';
     next.ein_value = v.ein_value || '';
     next.address = v.address || '';
@@ -16328,6 +16329,7 @@ function _obfRender(st) {
     : step.key === 'texting' ? _obfWizTextingPage(st)
     : step.key === 'ads' ? _obfWizAdsPage(st)
     : step.key === 'contacts' ? _obfWizContactsPage(st)
+    : step.key === 'sitecopy' ? _obfWizStoryPage(st, sec, step)
     : (OFFER_EMBED[step.key] && st.offer_id) ? _obfWizOfferPage(st, sec, step, OFFER_EMBED[step.key])
     : _obfWizStepPage(st, sec, step);
 }
@@ -16463,6 +16465,23 @@ function _obfWizAdsPage(st) {
     'Optional: ads are never required to launch. Either way the ad account, pixel and billing stay YOURS; we only ever get partner access.', inner);
 }
 
+// Story page: the standard step page + the SUBMIT moment (WS3). Writing the
+// story happens on the Brand card; submitting is what pings the team and
+// starts the branding deck build - the first domino of the pipeline.
+function _obfWizStoryPage(st, sec, step) {
+  const base = _obfWizStepPage(st, sec, step);
+  const submitted = !!(st.ob && st.ob.brief_submitted_at);
+  const extra = submitted
+    ? `<div style="display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;font-weight:700;color:var(--green,#4CC76A)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        Brief submitted. Your branding deck build kicked off; watch it on the Brand board step</div>`
+    : st.sitecopy
+      ? `<button onclick="_obfSetupSave({brief_submitted_at:new Date().toISOString()}, null, this)" style="width:100%;margin-top:12px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Submit your brief and start the build</button>
+         <div style="font-size:11px;color:var(--text-mute);line-height:1.5;margin-top:8px;text-align:center">Submitting kicks off your branding deck. You can keep refining your answers after.</div>`
+      : `<div style="font-size:11px;color:var(--text-mute);line-height:1.5;margin-top:10px">Write your story first, then submit the brief here to start the build.</div>`;
+  return base.replace(/<\/div>\s*$/, extra + '</div>');
+}
+
 // Contacts: the GHL fork. On GHL -> the sync runs itself (team status). Not
 // on GHL -> point us at the list (sheet link or "our team will ask") - the
 // full file-drop import lands with the imports workstream.
@@ -16553,9 +16572,34 @@ function _obfWizLaunchPage(st) {
   const checkRows = checks.map(c => c.ok
     ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:12px;margin-top:7px;font-size:12.5px"><span style="flex:none;width:8px;height:8px;border-radius:999px;background:var(--green,#4CC76A)"></span><span style="font-weight:700">${c.label}</span><span style="margin-left:auto;color:var(--text-mute);font-size:11px">done</span></div>`
     : `<button ${c.key ? `onclick="_obfWizJumpKey('${c.key}')"` : 'disabled'} style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 13px;border:1px solid var(--border);border-radius:12px;margin-top:7px;font:inherit;font-size:12.5px;background:none;color:var(--text);cursor:${c.key ? 'pointer' : 'default'};text-align:left"><span style="flex:none;width:8px;height:8px;border-radius:999px;background:var(--amber,#F0B84A)"></span><span style="font-weight:700">${c.label}</span><span style="margin-left:auto;color:var(--amber,#F0B84A);font-size:11px;font-weight:700">still open${c.key ? ' &middot; fix it' : ''}</span></button>`).join('');
+  // The six build artifacts (WS3): status straight from website_setup.chunks -
+  // each piece kicks off on its own the moment its inputs land.
+  const CHUNK_LABELS = [
+    ['deck', 'Branding deck', 'kicks off when you submit your brief'],
+    ['core', 'Core site pages', 'starts once your deck is published'],
+    ['templates', 'Email templates', 'themed from your deck'],
+    ['sales', 'Sales funnel + emails', 'starts when you apply your preset'],
+    ['onboarding', 'Onboarding funnel + emails', 'starts once pricing, policy and your form are in'],
+    ['agreement', 'Enrollment agreement', 'starts once policy and your legal details are in'],
+  ];
+  const chunkRow = ([key, label, hint]) => {
+    const c = (st.chunks || {})[key] || {};
+    const done = c.status === 'published';
+    const active = c.status === 'ready' || c.status === 'building';
+    const meta = done ? 'published' : c.status === 'building' ? 'our team is building it' : c.status === 'ready' ? 'our team is on it' : hint;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:12px;margin-top:7px;font-size:12.5px">
+      <span style="flex:none;width:8px;height:8px;border-radius:999px;background:${done ? 'var(--green,#4CC76A)' : active ? 'var(--amber,#F0B84A)' : 'var(--border-str)'}"></span>
+      <span style="font-weight:700;color:${done || active ? 'var(--text)' : 'var(--text-sub,var(--text-mute))'}">${label}</span>
+      <span style="margin-left:auto;color:var(--text-mute);font-size:11px;text-align:right">${meta}</span>
+    </div>`;
+  };
+  const chunkRows = st.website ? '' : `
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:18px">What we build for you</div>
+    ${CHUNK_LABELS.map(chunkRow).join('')}`;
   return `<div style="border:1px solid var(--border);border-radius:16px;padding:20px 20px 22px;margin-top:4px">
     <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">${st.website ? 'Your site is live' : 'Launch your new website'}</div>
     <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${st.website ? 'The domain points at the new site. Onboarding is done.' : 'Our team builds it from everything you set up. You review it on a private address, accept it, and flip your domain when every light below is green. Your current site stays live until the flip.'}</div>
+    ${chunkRows}
     ${buildRows}
     ${st.website ? '' : `<div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:18px">Ready to go live?</div>
     ${checkRows}

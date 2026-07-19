@@ -101,10 +101,40 @@ export default function ActivationTab({ client, tokens: t, session }) {
           </div>
           {row(it.website_build.build_status === "verified", `Build: ${it.website_build.build_status}`, it.website_build.staging_url ? `Staging: ${it.website_build.staging_url}` : "Set the staging URL via Set state", ["building", "staging_ready"].includes(it.website_build.build_status))}
           {row(it.website_build.auto_ok, "Automated readiness", it.website_build.auto_ok ? "Last run passed (pages + offer endpoint)" : "Run it - checks staging pages + the offer endpoint")}
+          {/* Build chunks (WS3): triggers fire server-side (setup-status evaluates
+              on every owner visit + pings the client Slack channel); staff mark
+              building/published here. Publishing the deck unlocks core+templates
+              on the next evaluation. */}
+          {Object.keys(it.website_build.chunks || {}).length > 0 || it.website_build.build_status ? (
+            <div style={{ margin: "8px 0 2px" }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: t.textMute, margin: "6px 0" }}>Build chunks</div>
+              {[["deck", "Branding deck"], ["core", "Core site pages"], ["templates", "Email templates"], ["sales", "Sales funnel + emails"], ["onboarding", "Onboarding funnel + emails"], ["agreement", "Branded agreement"]].map(([ck, label]) => {
+                const c = (it.website_build.chunks || {})[ck] || {};
+                const stt = c.status || "waiting";
+                const color = stt === "published" ? "#7BC47F" : stt === "waiting" ? t.textMute : "#c79a4a";
+                return (
+                  <div style={{ ...S.row, padding: "7px 0" }} key={ck}>
+                    <span style={{ flex: "none", width: 8, height: 8, borderRadius: 999, marginTop: 5, background: stt === "waiting" ? t.border : color }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700 }}>{label}</div>
+                      <div style={{ fontSize: 11, color }}>{stt}</div>
+                    </div>
+                    {stt === "ready" || stt === "building" ? (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {stt === "ready" ? <button onClick={() => buildApi("POST", { action: "chunk", chunk: ck, status: "building" })} disabled={!!busy}
+                          style={{ background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11 }}>Building</button> : null}
+                        <button onClick={() => buildApi("POST", { action: "chunk", chunk: ck, status: "published" })} disabled={!!busy}
+                          style={{ background: "rgba(212,182,92,.12)", border: "1px solid rgba(212,182,92,.4)", borderRadius: 6, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11, fontWeight: 700 }}>Published</button>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
           {[
             { key: "brand_ok", title: "Brand approved", sub: "Owner approves the brand board in Blueprint - Record only if they approved it with you directly" },
             { key: "site_accepted", title: "Owner accepted the site", sub: "Owner opens the staging link in their onboarding flow and clicks Accept - Record only as their proxy" },
-            { key: "copy_ok", title: "Copy proofed", sub: "Staff read every staging page's copy" },
           ].map(({ key: k, title, sub }) => {
             const m = it.website_build.manual || {};
             const on = m[k] === true;

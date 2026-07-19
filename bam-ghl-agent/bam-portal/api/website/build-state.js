@@ -6,14 +6,15 @@ import { withSentryApiRoute } from "../_sentry.js";
 //
 //   build_status   queued → building → staging_ready → verified
 //   staging_url    the Vercel URL the build deploys to
-//   readiness      { auto: {...last run}, manual: { brand_ok, site_accepted, copy_ok } }
+//   readiness      { auto: {...last run}, manual: { brand_ok, site_accepted } }
+//   chunks         { deck|core|sales|onboarding|templates|agreement:
+//                    { status: waiting|ready|building|published, ready_at, published_at } }
 //
 // Manual sign-offs (redesigned 2026-07-15 - agent_ok DROPPED, the agent is not
 // a website concern; its go-live is the Hawkeye operating toggle):
 //   brand_ok       the owner approved the brand board (Blueprint > Branding)
 //   site_accepted  the owner opened the staging site and clicked Accept in
 //                  their onboarding flow's Website step
-//   copy_ok        staff proofread the site copy
 // Owner keys are meant to be set by the OWNER (client-portal flow); staff
 // signing records by:'staff' next to the flag so we know it was on-their-behalf.
 //
@@ -22,12 +23,15 @@ import { withSentryApiRoute } from "../_sentry.js";
 //        runs the AUTOMATED checks against staging_url: every site_pages page
 //        answers 200, /api/website/offer returns plans. Stores the run.
 //   POST /api/website/build-state  { client_id, action:'set', build_status, staging_url? }
-//   POST /api/website/build-state  { client_id, action:'sign', key:'brand_ok'|'site_accepted'|'copy_ok', ok:true|false }
+//   POST /api/website/build-state  { client_id, action:'sign', key:'brand_ok'|'site_accepted', ok:true|false }
+//   POST /api/website/build-state  { client_id, action:'chunk', chunk:'deck'|..., status:'building'|'published' }
+//        staff marks a build chunk; publishing the deck unlocks core+templates
+//        (their 'ready' fires on the next setup-status evaluation + Slack ping).
 //   POST /api/website/build-state  { client_id, action:'owner-sign', key:'brand_ok'|'site_accepted' }
 //        the OWNER path (client-portal onboarding flow) - stamps by:'owner'.
 //        site_accepted additionally requires the build to be on staging.
 //
-// 'verified' can only be SET when the last auto run passed and all three manual
+// 'verified' can only be SET when the last auto run passed and BOTH owner
 // sign-offs are true - the gate api/website/domain-setup.js enforces on flip.
 //
 // Auth: BAM staff (drives the Activation tab), EXCEPT action=owner-sign which
@@ -37,7 +41,10 @@ const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABA
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const enc = encodeURIComponent;
 const STATES = ["queued", "building", "staging_ready", "verified"];
-const MANUAL = ["brand_ok", "site_accepted", "copy_ok"];
+// copy_ok RETIRED 2026-07-18 (wizard spec): the team's localhost review before
+// publish IS the proof. Old copy_ok values are ignored harmlessly.
+const MANUAL = ["brand_ok", "site_accepted"];
+const CHUNKS = ["deck", "core", "sales", "onboarding", "templates", "agreement"];
 const OWNER_KEYS = ["brand_ok", "site_accepted"]; // what the owner can sign via owner-sign
 
 async function sb(path, init = {}) {
@@ -148,7 +155,7 @@ async function handler(req, res) {
       if (!STATES.includes(next)) return res.status(400).json({ error: `build_status must be one of ${STATES.join(" | ")}` });
       if (next === "verified") {
         const s = summary(setup);
-        if (!s.can_verify) return res.status(412).json({ error: "verified needs a passing auto run + all three manual sign-offs (brand_ok, site_accepted, copy_ok)", ...s });
+        if (!s.can_verify) return res.status(412).json({ error: "verified needs a passing auto run + both owner sign-offs (brand_ok, site_accepted)", ...s });
       }
       setup.build_status = next;
       if (b.staging_url !== undefined) setup.staging_url = String(b.staging_url || "");
@@ -169,6 +176,18 @@ async function handler(req, res) {
       setup.readiness.manual = manual;
       await saveSetup(clientId, setup);
       return res.status(200).json(summary(setup));
+    }
+
+    if (req.method === "POST" && action === "chunk") {
+      const chunk = String(b.chunk || "");
+      const status = String(b.status || "");
+      if (!CHUNKS.includes(chunk)) return res.status(400).json({ error: `chunk must be one of ${CHUNKS.join(" | ")}` });
+      if (!["building", "published"].includes(status)) return res.status(400).json({ error: "status must be building | published" });
+      setup.chunks = setup.chunks || {};
+      const cur = setup.chunks[chunk] || {};
+      setup.chunks[chunk] = { ...cur, status, ...(status === "published" ? { published_at: new Date().toISOString() } : {}) };
+      await saveSetup(clientId, setup);
+      return res.status(200).json({ ok: true, chunks: setup.chunks, ...summary(setup) });
     }
 
     if (req.method === "POST" && action === "owner-sign") {

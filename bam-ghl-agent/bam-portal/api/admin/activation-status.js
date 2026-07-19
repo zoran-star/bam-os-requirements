@@ -72,6 +72,7 @@ async function handler(req, res) {
           staging_url: c.website_setup.staging_url || null,
           auto_ok: !!(c.website_setup.readiness && c.website_setup.readiness.auto && c.website_setup.readiness.auto.ok),
           manual: (c.website_setup.readiness && c.website_setup.readiness.manual) || {},
+          chunks: c.website_setup.chunks || {},
         } : null,
         meta_connected: !!(c.meta_ad_account_id || c.ads_connected_at),
         stripe_connected: c.stripe_connect_status === "connected",
