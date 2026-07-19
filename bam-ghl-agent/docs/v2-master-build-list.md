@@ -14,7 +14,7 @@ replacement). Update statuses here as PRs land.
 | 1b | Wizard UI - collection pages (Contacts GHL-fork, Texting number+A2P, Ads) | **SHIPPED** (#1491) + design-system pass |
 | 1c | Wizard UI - offer wrap-in-place + Brand/General card audits | **SHIPPED** (PR-3) - offer editor mounts inside the flow; brand story block = why-us/dream-athletes/proof; entity type cut. Offer-config class-atom rollups ride WS2 |
 | 2 | Schema deltas (brand_data extensions, per-class location/capacity, rollups, drop storage) | rides 1b/1c |
-| 3 | Trigger + status machinery (section-complete → team pings, per-chunk build statuses, Build & review reads them, gate → 2 owner sign-offs) | queued |
+| 3 | Trigger + status machinery | **SHIPPED** (WS3 PR) - chunk statuses on website_setup.chunks, triggers evaluate in setup-status (owner-activity driven) + Slack pings, brief Submit moment, Launch chunk board, Activation chunk controls, gate = 2 owner sign-offs (copy_ok retired) |
 | 4 | Skills (brand-scan trigger wiring · site-build 3-phase split · NEW email-templates skill · NEW agreement skill · GHL migration skill w/ fuzzy match + engine prep) | queued |
 | 5 | Imports (contact file-drop path · member import Stripe auto-attach · cancelled import Stripe-driven + cancellations contract) | queued |
 | 6 | Integrations (Leadsie link in Ads step · BAM Connect post-App-Review · phone wrap wiring) | queued |

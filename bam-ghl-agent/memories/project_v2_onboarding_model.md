@@ -38,6 +38,18 @@
 > data preserved via {...cur} spread); General card entity_type question cut
 > (column + RPC support remain). WS1 is DONE pending a live spot-check of the
 > embed with DETAIL's real offer.
+> **WS3 SHIPPED (2026-07-18): the build pipeline machinery.**
+> `website_setup.chunks` = {deck|core|templates|sales|onboarding|agreement:
+> {status: waiting|ready|building|published}}. Triggers EVALUATE inside
+> setup-status on every owner visit (one-way waiting→ready, idempotent) and
+> ping the academy's staff Slack channel; deck published unlocks core+
+> templates on the next evaluation. Owner moments: Story step gained "Submit
+> your brief" (writes onboarding_setup.brief_submitted_at = the deck
+> trigger); Launch page shows the six-chunk "What we build for you" board.
+> Staff: Activation tab chunk rows with Building/Published buttons
+> (build-state action:'chunk'). **Gate is now 2 owner sign-offs: brand_ok +
+> site_accepted (copy_ok RETIRED** - the team's pre-publish review is the
+> proof; old copy_ok values ignored harmlessly).
 > Everyone moves to the wizard (it reads the same completion flags - no forks).
 > Deferred: how the academy pays BAM · launch definition final call (proposal
 > in spec) · V2 ticket system / Zoran-icon (design exploration in spec).
