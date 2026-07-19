@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
-import { pickGhlToken, ghl, sendSms } from "./_core.js";
+import { pickGhlToken, ghl, sendSms, lookupContact } from "./_core.js";
+import { maybeSendEmailViaResend } from "../messaging/email-provider.js";
 // Cron - daily free-trial summary.
 //
 // Once a day, text an academy a summary of every free trial SCHEDULED for that
@@ -11,8 +12,10 @@ import { pickGhlToken, ghl, sendSms } from "./_core.js";
 //
 // Config resolution per client (DB wins, code fallback for the initial rollout):
 //   1. clients.ghl_kpi_config.trial_summary = {
-//        enabled, to_phone, timezone, calendars:[{id,label}] | calendar_ids:[...]
+//        enabled, to_phone, to_email, timezone,
+//        calendars:[{id,label}] | calendar_ids:[...]
 //      }
+//      (to_phone and/or to_email - sends to whichever are set)
 //   2. FALLBACK_CONFIG keyed by ghl_location_id (below) - lets this ship before
 //      the portal DB env is reachable; move it to ghl_kpi_config anytime and the
 //      DB value takes over automatically.
@@ -30,6 +33,7 @@ const FALLBACK_CONFIG = {
   gXHbLTQzaEYlyLSKJUTU: {
     enabled: true,
     to_phone: "+16267673748",
+    to_email: "jeremy@majorhoops.com",
     timezone: "America/Los_Angeles",
     calendars: [
       { id: "0Z7H70gSweantyTQBkIt", label: "St. Francis HS" },
@@ -85,8 +89,37 @@ function resolveConfig(client) {
   let calendars = cfg.calendars;
   if (!calendars && Array.isArray(cfg.calendar_ids)) calendars = cfg.calendar_ids.map((id) => ({ id, label: "" }));
   if (!Array.isArray(calendars) || !calendars.length) return null;
-  if (!cfg.to_phone) return null;
-  return { to_phone: cfg.to_phone, timezone: cfg.timezone || "America/Los_Angeles", calendars };
+  if (!cfg.to_phone && !cfg.to_email) return null; // need at least one destination
+  return { to_phone: cfg.to_phone || null, to_email: cfg.to_email || null, timezone: cfg.timezone || "America/Los_Angeles", calendars };
+}
+
+// Email the summary. Honors a client's own Resend domain, else sends via GHL
+// Email (upserts a contact for the address). Never throws.
+async function sendEmailSummary({ client, toEmail, subject, html, text, contactName }) {
+  try {
+    if (!toEmail) return { ok: false, error: "no destination email" };
+    const viaResend = await maybeSendEmailViaResend(client.id, { toEmail, subject, html, text, sentBy: "system", contactName });
+    if (viaResend.handled) return viaResend.ok ? { ok: true, via: "resend", id: viaResend.id } : { ok: false, error: viaResend.error };
+    const creds = await pickGhlToken(client);
+    if (!creds) return { ok: false, error: "no GHL token for academy" };
+    const { token, locationId } = creds;
+    let contactId = await lookupContact({ token, locationId, email: toEmail });
+    if (!contactId) {
+      try {
+        const resp = await ghl("POST", `/contacts/upsert`, { token, body: { locationId, email: toEmail, ...(contactName ? { name: contactName } : {}) } });
+        contactId = resp?.contact?.id || resp?.id || null;
+      } catch (_) { /* fall through */ }
+    }
+    if (!contactId) return { ok: false, error: "could not find/create a GHL contact for the email" };
+    const resp = await ghl("POST", `/conversations/messages`, { token, body: { type: "Email", contactId, subject, html } });
+    return { ok: true, via: "ghl", message_id: resp?.messageId || null };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || String(e) };
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 async function handler(req, res) {
@@ -128,18 +161,34 @@ async function handler(req, res) {
       appts.sort((a, b) => a.startMs - b.startMs);
 
       const name = client.business_name || "Your academy";
-      const header = `${name} - Free Trials Today (${fmtDay(cfg.timezone)})`;
-      let body;
+      const day = fmtDay(cfg.timezone);
+      const header = `${name} - Free Trials Today (${day})`;
+      const subject = `Free Trials Today - ${name} (${day})`;
+      const noun = appts.length === 1 ? "trial" : "trials";
+
+      let smsText, htmlBody;
       if (!appts.length) {
-        body = `${header}\n\nNo free trials scheduled for today.`;
+        smsText = `${header}\n\nNo free trials scheduled for today.`;
+        htmlBody = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111"><h2 style="margin:0 0 12px">${escapeHtml(header)}</h2><p>No free trials scheduled for today.</p></div>`;
       } else {
         const lines = appts.map((a) => `- ${a.time}  ${a.who}${a.where ? `  (${a.where})` : ""}`);
-        const noun = appts.length === 1 ? "trial" : "trials";
-        body = `${header}\n\n${appts.length} ${noun} scheduled:\n${lines.join("\n")}`;
+        smsText = `${header}\n\n${appts.length} ${noun} scheduled:\n${lines.join("\n")}`;
+        const rows = appts
+          .map((a) => `<li style="margin:0 0 6px"><strong>${escapeHtml(a.time)}</strong> &nbsp;${escapeHtml(a.who)}${a.where ? ` <span style="color:#666">(${escapeHtml(a.where)})</span>` : ""}</li>`)
+          .join("");
+        htmlBody = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111"><h2 style="margin:0 0 12px">${escapeHtml(header)}</h2><p style="margin:0 0 8px">${appts.length} ${noun} scheduled:</p><ul style="margin:0;padding-left:20px">${rows}</ul></div>`;
       }
 
-      const r = await sendSms({ client, toPhone: cfg.to_phone, message: body, contactName: name });
-      out.push({ client_id: client.id, business: name, count: appts.length, sms: r.ok ? "sent" : `failed: ${r.error}` });
+      const result = { client_id: client.id, business: name, count: appts.length };
+      if (cfg.to_phone) {
+        const r = await sendSms({ client, toPhone: cfg.to_phone, message: smsText, contactName: name });
+        result.sms = r.ok ? "sent" : `failed: ${r.error}`;
+      }
+      if (cfg.to_email) {
+        const e = await sendEmailSummary({ client, toEmail: cfg.to_email, subject, html: htmlBody, text: smsText, contactName: name });
+        result.email = e.ok ? `sent (${e.via})` : `failed: ${e.error}`;
+      }
+      out.push(result);
     } catch (e) { out.push({ client_id: client.id, error: e.message }); }
   }
   return res.status(200).json({ ok: true, processed: out.length, items: out });
