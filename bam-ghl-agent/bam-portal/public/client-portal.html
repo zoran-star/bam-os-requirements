@@ -15797,30 +15797,30 @@ const _OBF_STEPS = [
   { key: 'basics', railLabel: 'Basics',    group: 'general', title: 'Set up your business basics', sub: 'Name, address, entity type and time zone', cta: 'Open Blueprint', go: '_obfGoGeneral()' },
   // PR-2 collection pages (spec: Texting absorbs the old Tax ID step - the
   // A2P registration is the only consumer of legal name + EIN).
-  { key: 'texting', railLabel: 'Texting',  group: 'general', title: 'Set up texting and calling', sub: 'The number your academy texts and calls from - booking confirmations, follow-ups, the AI agent, all of it.', skippable: true },
-  { key: 'ads', railLabel: 'Ads',          group: 'general', title: 'Set up your ads', sub: 'Optional - skip if you are not running ads yet, and set it up anytime later. Ads are never required to launch.', optional: true, skippable: true },
-  { key: 'brand', railLabel: 'Look',     group: 'general', title: 'Set your brand', sub: 'Logo, colors and fonts - your website, emails and agreement wear these', cta: 'Set brand', go: "_obfGoCard('brand')" },
-  { key: 'sitecopy', railLabel: 'Story',  group: 'general', title: 'Tell your story', sub: 'Your story, mission and vibe words - your website gets written from these, in your words', cta: 'Write it', go: "_obfGoCard('brand')" },
-  { key: 'brandboard', railLabel: 'Brand board', group: 'general', title: 'Approve your brand board', sub: 'One page with your colors, type and components - the system every asset ships from', cta: 'Review board', go: '_obfBrandBoardOpen()', needsStaging: true },
-  { key: 'locations', railLabel: 'Locations', group: 'general', title: 'Add your locations', sub: 'Address, how to find the door, photos - your agent quotes these to parents', cta: 'Add locations', go: "_obfGoCard('locations')" },
+  { key: 'texting', railLabel: 'Texting',  group: 'general', title: 'Set up texting and calling', sub: 'The number your academy texts and calls from: booking confirmations, follow-ups, the AI agent, all of it.', skippable: true },
+  { key: 'ads', railLabel: 'Ads',          group: 'general', title: 'Set up your ads', sub: 'Optional. Skip if you are not running ads yet and set it up anytime later. Ads are never required to launch.', optional: true, skippable: true },
+  { key: 'brand', railLabel: 'Look',     group: 'general', title: 'Set your brand', sub: 'Logo, colors and fonts. Your website, emails and agreement wear these', cta: 'Set brand', go: "_obfGoCard('brand')" },
+  { key: 'sitecopy', railLabel: 'Story',  group: 'general', title: 'Tell your story', sub: 'Your story, mission and vibe words. Your website gets written from these, in your words', cta: 'Write it', go: "_obfGoCard('brand')" },
+  { key: 'brandboard', railLabel: 'Brand board', group: 'general', title: 'Approve your brand board', sub: 'One page with your colors, type and components: the system every asset ships from', cta: 'Review board', go: '_obfBrandBoardOpen()', needsStaging: true },
+  { key: 'locations', railLabel: 'Locations', group: 'general', title: 'Add your locations', sub: 'Address, how to find the door, photos. Your agent quotes these to parents', cta: 'Add locations', go: "_obfGoCard('locations')" },
   { key: 'coaches', railLabel: 'Team',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
-  { key: 'stripe', railLabel: 'Stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account - every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
-  { key: 'email', railLabel: 'Email',     group: 'general', title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
-  { key: 'website', railLabel: 'Go live',   group: 'general', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()', note: '_obfWebsiteNote' },
-  { key: 'contacts', railLabel: 'Contacts',  group: 'general', title: 'Import your contacts', sub: 'Every lead, parent and past inquiry you have - into one system, right at the start. Names and numbers only; program details come later in your offer.', note: '_obfContactsNote' },
-  { key: 'instagram', railLabel: 'Instagram', group: 'general', title: 'Connect Instagram DMs', sub: 'Your IG messages land in the portal inbox - skip it and add later', cta: 'Connect', go: '_obfGoInstagram()', skippable: true, optional: true },
+  { key: 'stripe', railLabel: 'Stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account: every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
+  { key: 'email', railLabel: 'Email',     group: 'general', title: 'Connect your email domain', sub: 'Emails send from your own domain. One DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'website', railLabel: 'Go live',   group: 'general', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site. The old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()', note: '_obfWebsiteNote' },
+  { key: 'contacts', railLabel: 'Contacts',  group: 'general', title: 'Import your contacts', sub: 'Every lead, parent and past inquiry you have, into one system right at the start. Names and numbers only; program details come later in your offer.', note: '_obfContactsNote' },
+  { key: 'instagram', railLabel: 'Instagram', group: 'general', title: 'Connect Instagram DMs', sub: 'Your IG messages land in the portal inbox. Skip it and add later', cta: 'Connect', go: '_obfGoInstagram()', skippable: true, optional: true },
   // Training offer: define the offer...
   { key: 'define', railLabel: 'Define',   group: 'training', title: 'Define your offer', sub: 'Ages, skill level, capacity and what is included', cta: 'Define it', go: "_obfGoOffer('general_info')" },
-  { key: 'schedule', railLabel: 'Schedule', group: 'training', title: 'Build your schedule', sub: 'Weekly class times - they become bookable free-trial slots on the portal', cta: 'Build schedule', go: "_obfGoOffer('schedule')", note: '_obfScheduleNote' },
-  { key: 'pricing', railLabel: 'Pricing',  group: 'training', title: 'Confirm your pricing', sub: 'Set your tiers - matched to Stripe, unlocks checkout and booking', cta: 'Set pricing', go: "_obfGoOffer('pricing')", note: '_obfPricingNote', launch: true },
-  { key: 'policy', railLabel: 'Policy',   group: 'training', title: 'Set your membership policy', sub: 'Cancellation, pausing and refunds - flows into the enrollment agreement and member management', cta: 'Set policy', go: "_obfGoOffer('policy')" },
+  { key: 'schedule', railLabel: 'Schedule', group: 'training', title: 'Build your schedule', sub: 'Weekly class times. They become bookable free-trial slots on the portal', cta: 'Build schedule', go: "_obfGoOffer('schedule')", note: '_obfScheduleNote' },
+  { key: 'pricing', railLabel: 'Pricing',  group: 'training', title: 'Confirm your pricing', sub: 'Set your tiers, matched to Stripe. Unlocks checkout and booking', cta: 'Set pricing', go: "_obfGoOffer('pricing')", note: '_obfPricingNote', launch: true },
+  { key: 'policy', railLabel: 'Policy',   group: 'training', title: 'Set your membership policy', sub: 'Cancellation, pausing and refunds. Flows into the enrollment agreement and member management', cta: 'Set policy', go: "_obfGoOffer('policy')" },
   // ...sell it (the whole sales machine is ONE preset)...
-  { key: 'preset', railLabel: 'Sales preset',   group: 'training', subgroup: 'sales', title: 'Apply the Free Trial preset', sub: 'Pipeline, follow-ups, booking agent and lead forms - wired to this offer in one click. Nothing texts anyone until you approve it.', cta: 'Apply preset', go: '_obfApplyPreset(this)', launch: true },
+  { key: 'preset', railLabel: 'Sales preset',   group: 'training', subgroup: 'sales', title: 'Apply the Free Trial preset', sub: 'Pipeline, follow-ups, booking agent and lead forms, wired to this offer in one click. Nothing texts anyone until you approve it.', cta: 'Apply preset', go: '_obfApplyPreset(this)', launch: true },
   { key: 'leads', railLabel: 'Leads',    group: 'training', subgroup: 'sales', title: 'Import your active leads', sub: 'Once the preset is applied, our team sorts each open card from your old pipeline into the right stage', team: true, ghlOnly: true, note: '_obfLeadsNote' },
   // ...fill it.
   { key: 'onboardingform', railLabel: 'Form', group: 'training', subgroup: 'onboarding', title: 'Set up your onboarding form', sub: 'What you collect at signup, plus the welcome message new members get', cta: 'Set up', go: "_obfGoOffer('onboarding')" },
-  { key: 'members', railLabel: 'Members', group: 'training', subgroup: 'onboarding', title: 'Import your members', sub: 'Bring your roster onto this offer - import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
-  { key: 'cancelled', railLabel: 'Cancelled', group: 'training', subgroup: 'onboarding', title: 'Import cancelled members', sub: 'Pull your churned Stripe subscriptions and tie them to your contacts - win-back and nurture get real history. The AI matches what it can; you clean up the rest.', cta: 'Import cancelled', go: '_cxOpen()', skippable: true },
+  { key: 'members', railLabel: 'Members', group: 'training', subgroup: 'onboarding', title: 'Import your members', sub: 'Bring your roster onto this offer: import from Stripe or CSV, clean it up, link contacts', cta: 'Import members', go: '_obfGoMembers()' },
+  { key: 'cancelled', railLabel: 'Cancelled', group: 'training', subgroup: 'onboarding', title: 'Import cancelled members', sub: 'Pull your churned Stripe subscriptions and tie them to your contacts. Win-back and nurture get real history: the AI matches what it can, you clean up the rest.', cta: 'Import cancelled', go: '_cxOpen()', skippable: true },
 ];
 
 // Steps visible for THIS academy: ghlOnly steps drop when we know there is no
@@ -15839,7 +15839,7 @@ function _obfScheduleNote(st) {
   if (!st || !st.schedule) return null;
   if (st.booking) return { tone: 'good', text: 'Free trial booking is live' };
   if (!st.pricing) return { tone: 'wait', text: 'Free-trial booking goes live once pricing is confirmed' };
-  return { tone: 'act', text: 'Pricing confirmed - go live with free-trial booking in the Schedule tab', cta: 'Go live', go: "_obfGoOffer('schedule')" };
+  return { tone: 'act', text: 'Pricing confirmed. Go live with free-trial booking in the Schedule tab', cta: 'Go live', go: "_obfGoOffer('schedule')" };
 }
 
 // Pricing's migration sub-state: Stripe connected but nothing matched yet →
@@ -15847,7 +15847,7 @@ function _obfScheduleNote(st) {
 // A fresh Stripe with no history just sets tiers and never sees this.
 function _obfPricingNote(st) {
   if (!st || st.pricing || !st.stripe) return null;
-  return { tone: 'wait', text: 'Bringing an existing Stripe? The match panel is on this page - old members keep their legacy rate' };
+  return { tone: 'wait', text: 'Bringing an existing Stripe? The match panel is on this page, and old members keep their legacy rate' };
 }
 
 // Contacts (team step): the GHL bulk sync runs automatically - the owner just
@@ -15857,21 +15857,21 @@ function _obfPricingNote(st) {
 function _obfWebsiteNote(st) {
   if (!st || st.website || !st.website_build) return null;
   const b = st.website_build;
-  if (b === 'verified') return { tone: 'act', text: 'Site verified on staging - the domain flip is the last step', cta: 'Flip it', go: '_obfGoDomains()' };
+  if (b === 'verified') return { tone: 'act', text: 'Site verified on staging. The domain flip is the last step', cta: 'Flip it', go: '_obfGoDomains()' };
   if (b === 'staging_ready') {
     // The owner's acceptance IS the site_accepted readiness sign-off - the
     // gate to 'verified' waits on it (sign-off redesign #2, 2026-07-15).
-    if (st.site_accepted) return { tone: 'good', text: 'You accepted the new site - our team runs the final checks, then the domain flips' };
+    if (st.site_accepted) return { tone: 'good', text: 'You accepted the new site. Our team runs the final checks, then the domain flips' };
     return { tone: 'act', text: 'Your new site is ready for you to review', cta: 'Review & accept', go: '_obfSiteAcceptOpen()' };
   }
-  return { tone: 'wait', text: 'Our team is building your new site - it goes live only after every check passes' };
+  return { tone: 'wait', text: 'Our team is building your new site. It goes live only after every check passes' };
 }
 
 function _obfContactsNote(st) {
   if (!st) return null;
   const n = st.contacts_n || 0;
   if (st.contacts) return { tone: 'good', text: n + ' contact' + (n === 1 ? '' : 's') + ' in' };
-  return { tone: 'wait', text: 'Our team is bringing your contacts over - they land here automatically' };
+  return { tone: 'wait', text: 'Our team is bringing your contacts over. They land here automatically' };
 }
 
 // Leads (team step): done = the pipeline flip landed (their cards live on the
@@ -15879,7 +15879,7 @@ function _obfContactsNote(st) {
 function _obfLeadsNote(st) {
   if (!st) return null;
   if (st.leads) return { tone: 'good', text: 'Your leads are on the portal board' };
-  return { tone: 'wait', text: 'Runs after the preset - our team sorts your cards into your new pipeline' };
+  return { tone: 'wait', text: 'Runs after the preset. Our team sorts your cards into your new pipeline' };
 }
 
 // ── Owner site acceptance (sign-off redesign #2, 2026-07-15) ──
@@ -15897,15 +15897,15 @@ function _obfSiteAcceptOpen() {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
         <div>
           <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Your website</div>
-          <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text)">Review your new website</div>
+          <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">Review your new website</div>
         </div>
         <button onclick="_obfSiteAcceptClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Close</button>
       </div>
       <div style="font-size:13px;line-height:1.55;color:var(--text-sub,var(--text-mute));margin:8px 0 14px">Your new site is built and running on a private preview address. Open it and click around like a parent would - every page, the schedule, the enroll flow. Your current site stays live until you flip the domain.</div>
-      ${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border-med);border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:var(--text);text-decoration:none">
+      ${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border-med);border-radius:8px;padding:11px;font-size:13px;font-weight:700;color:var(--text);text-decoration:none">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
-        Open the preview</a>` : `<div style="border:1px solid var(--border);border-radius:10px;padding:11px;font-size:12.5px;color:var(--text-mute);text-align:center">The preview link is being set up - check back shortly</div>`}
-      <button onclick="_obfSiteAccept(this)" ${url ? '' : 'disabled'} style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;${url ? '' : 'opacity:.5;cursor:default'}">Looks good - accept the site</button>
+        Open the preview</a>` : `<div style="border:1px solid var(--border);border-radius:12px;padding:11px;font-size:12.5px;color:var(--text-mute);text-align:center">The preview link is being set up. Check back shortly</div>`}
+      <button onclick="_obfSiteAccept(this)" ${url ? '' : 'disabled'} style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;${url ? '' : 'opacity:.5;cursor:default'}">Looks good - accept the site</button>
       <div style="font-size:11.5px;line-height:1.5;color:var(--text-mute);margin-top:10px">Something needs a fix? Send it to us in Messages and accept once it looks right. Accepting green-lights the final checks before launch.</div>
     </div></div>`);
 }
@@ -15944,20 +15944,20 @@ function _obfBrandBoardOpen() {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
         <div>
           <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Your brand</div>
-          <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text)">Review your brand board</div>
+          <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">Review your brand board</div>
         </div>
         <button onclick="_obfBrandBoardClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Close</button>
       </div>
       <div style="font-size:13px;line-height:1.55;color:var(--text-sub,var(--text-mute));margin:8px 0 14px">Your colors, type and components on one page - the system your website, emails, booking and agreement all ship from. Approve it and everything we build stays on it.</div>
       ${url ? `<iframe src="${escapeHTML(url)}" title="Brand board" loading="lazy" style="width:100%;height:52vh;min-height:320px;border:1px solid var(--border);border-radius:12px;background:#0a0a0a"></iframe>
       <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-        <a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border-med);border-radius:10px;padding:10px 14px;font-size:12.5px;font-weight:700;color:var(--text);text-decoration:none">
+        <a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border-med);border-radius:8px;padding:10px 14px;font-size:12.5px;font-weight:700;color:var(--text);text-decoration:none">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
           Open full size</a>
-        <button onclick="_obfBrandApprove(this)" style="flex:1;min-width:200px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:11px 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">Approve this board</button>
+        <button onclick="_obfBrandApprove(this)" style="flex:1;min-width:200px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">Approve this board</button>
       </div>
       <div style="font-size:11.5px;line-height:1.5;color:var(--text-mute);margin-top:10px">Want something changed? Adjust your Brand section in the Blueprint or message us - approve once it reads like you.</div>`
-      : `<div style="border:1px solid var(--border);border-radius:10px;padding:11px;font-size:12.5px;color:var(--text-mute);text-align:center">Your board is being set up - check back shortly</div>`}
+      : `<div style="border:1px solid var(--border);border-radius:12px;padding:11px;font-size:12.5px;color:var(--text-mute);text-align:center">Your board is being set up. Check back shortly</div>`}
     </div></div>`);
 }
 async function _obfBrandApprove(btn) {
@@ -16165,7 +16165,7 @@ async function _obfOpen() {
       #obf-overlay .obf2-seg .tk { display:block; height:6px; border-radius:999px; background:var(--surface-2,rgba(127,127,127,.12)); border:1px solid var(--border); overflow:hidden; }
       #obf-overlay .obf2-seg.cur .tk { border-color:var(--accent-border,rgba(212,182,92,.35)); box-shadow:0 0 0 3px var(--gold-sheen,rgba(212,182,92,.09)); }
       #obf-overlay .obf2-seg .fl { display:block; height:100%; border-radius:999px; background:var(--gold); transition:width .3s; }
-      #obf-overlay .obf2-seg.done .fl { background:var(--green,#7BC47F); }
+      #obf-overlay .obf2-seg.done .fl { background:var(--green,#4CC76A); }
       #obf-overlay .obf2-rail { display:flex; gap:6px; overflow-x:auto; padding:12px 24px 10px; scrollbar-width:none; }
       #obf-overlay .obf2-rail::-webkit-scrollbar { display:none; }
       #obf-overlay .obf2-pill { flex:none; display:inline-flex; align-items:center; gap:5px; font:inherit; font-size:11px; font-weight:700; color:var(--text-sub,var(--text-mute)); background:transparent; border:1px solid var(--border); border-radius:999px; padding:5px 11px; cursor:pointer; }
@@ -16173,7 +16173,7 @@ async function _obfOpen() {
       #obf-overlay .obf2-pill.done:not(.cur) { border-color:var(--accent-border,rgba(212,182,92,.3)); background:var(--gold-sheen,rgba(212,182,92,.06)); }
       #obf-overlay .obf2-page { flex:1; overflow-y:auto; padding:6px 24px 18px; }
       #obf-overlay .obf2-foot { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; padding:12px 24px 16px; border-top:1px solid var(--border); }
-      #obf-overlay .obf2-nav { display:inline-flex; align-items:center; gap:6px; font:inherit; font-size:12.5px; font-weight:800; border-radius:10px; padding:10px 16px; cursor:pointer; }
+      #obf-overlay .obf2-nav { display:inline-flex; align-items:center; gap:6px; font:inherit; font-size:12.5px; font-weight:800; border-radius:8px; padding:10px 16px; cursor:pointer; }
       #obf-overlay .obf2-back { justify-self:start; background:transparent; border:1px solid var(--border-med); color:var(--text-sub,var(--text-mute)); }
       #obf-overlay .obf2-back:disabled { opacity:.35; cursor:default; }
       #obf-overlay .obf2-next { justify-self:end; background:var(--gold); border:none; color:var(--on-gold,#1a1608); }
@@ -16289,7 +16289,7 @@ function _obfRender(st) {
     const d = x.steps.filter(t => !!st[t.key]).length, t = x.steps.length;
     const flagged = x.steps.some(t => t.launch && !st[t.key]);
     return `<button class="obf2-seg ${s === _OBF_NAV.s ? 'cur' : ''} ${d === t ? 'done' : ''}" onclick="_obfWizJumpSection(${s})" aria-label="${x.full}, ${d} of ${t} done">
-      <span class="lb">${d === t ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--green,#7BC47F)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M20 6 9 17l-5-5"/></svg>` : flagged ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M4 15V4h12l-2 4 2 4H6"/><path d="M4 22v-7"/></svg>` : ''}${x.label}</span>
+      <span class="lb">${d === t ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--green,#4CC76A)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M20 6 9 17l-5-5"/></svg>` : flagged ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M4 15V4h12l-2 4 2 4H6"/><path d="M4 22v-7"/></svg>` : ''}${x.label}</span>
       <span class="tk"><span class="fl" style="width:${t ? Math.round(d / t * 100) : 0}%"></span></span>
     </button>`;
   }).join('');
@@ -16299,7 +16299,7 @@ function _obfRender(st) {
   if (rail) rail.innerHTML = sec.steps.map((x, i) => {
     const ok = !!st[x.key];
     return `<button class="obf2-pill ${i === _OBF_NAV.i ? 'cur' : ''} ${ok ? 'done' : ''}" onclick="_obfWizJumpStep(${_OBF_NAV.s}, ${i})">
-      ${ok ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="${i === _OBF_NAV.i ? 'currentColor' : 'var(--green,#7BC47F)'}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M20 6 9 17l-5-5"/></svg>` : ''}
+      ${ok ? `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="${i === _OBF_NAV.i ? 'currentColor' : 'var(--green,#4CC76A)'}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M20 6 9 17l-5-5"/></svg>` : ''}
       ${x.railLabel || x.title.replace(/^(Set up your |Set your |Add your |Connect your |Build your |Confirm your |Define your |Import your |Apply the |Approve your |Tell your |Launch your new |Add |Connect |Import |Set up )/, '')}
     </button>`;
   }).join('');
@@ -16330,14 +16330,14 @@ async function _obfSetupSave(patch, direct, btn) {
   if (ok && _OBF_STATE) _OBF_STATE.ob = merged;
   try { await _obfFetchState(); } catch (_) {}
   _obfRender(_OBF_STATE);
-  if (!ok) _plToast('Could not save - try again in a moment.');
+  if (!ok) _plToast('Could not save. Try again in a moment.');
   return ok;
 }
 // Small shared pieces for the collection pages.
 function _obfWizShell(title, sub, inner, extraTags) {
   return `<div style="border:1px solid var(--border);border-radius:16px;padding:20px 20px 22px;margin-top:4px">
     ${extraTags ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">${extraTags}</div>` : ''}
-    <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text)">${title}</div>
+    <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">${title}</div>
     <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${sub}</div>
     ${inner}
   </div>`;
@@ -16354,7 +16354,7 @@ const _obfInp = (id, label, val, ph) => `<div style="margin-top:10px">
   <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute);margin-bottom:5px">${label}</div>
   <input id="${id}" value="${escapeHTML(val || '')}" placeholder="${ph || ''}" style="width:100%;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:8px;color:var(--text);font:inherit;font-size:13px;padding:10px 12px">
 </div>`;
-const _obfDoneLine = (txt) => `<div style="display:flex;align-items:center;gap:7px;margin-top:14px;font-size:12px;font-weight:700;color:var(--green,#7BC47F)">
+const _obfDoneLine = (txt) => `<div style="display:flex;align-items:center;gap:7px;margin-top:14px;font-size:12px;font-weight:700;color:var(--green,#4CC76A)">
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>${txt}</div>`;
 
 // Texting: the number choice (3 paths) + the A2P registration trio. The two
@@ -16364,10 +16364,10 @@ function _obfWizTextingPage(st) {
   const c = ob.texting_choice || '';
   const choices =
     (st.has_ghl !== false ? _obfWizChoice('tx', 'ghl', c, 'Switching from GoHighLevel',
-      'Your number keeps working through GHL, wrapped into your portal from day one - then switches onto your own line the moment carrier registration clears. Zero paperwork, zero downtime.',
+      'Your number keeps working through GHL, wrapped into your portal from day one. It switches onto your own line the moment carrier registration clears. Zero paperwork, zero downtime.',
       `_obfSetupSave({texting_choice:'ghl'})`) : '')
     + _obfWizChoice('tx', 'new', c, 'Get me a new local number',
-      'Picked from your area code - we grab it for you, you confirm before anything goes live. Texting from your personal cell today? Take this one - parent texts land in your portal and your cell stays yours.',
+      'Picked from your area code. We grab it for you, and you confirm before anything goes live. Texting from your personal cell today? Take this one: parent texts land in your portal and your cell stays yours.',
       `_obfSetupSave({texting_choice:'new'})`)
     + _obfWizChoice('tx', 'port', c, 'Port a number from another carrier',
       'Keep a business number that lives at a phone carrier today. The one path with paperwork.',
@@ -16375,20 +16375,20 @@ function _obfWizTextingPage(st) {
   const portForm = c === 'port' ? `
     ${_obfInp('obf-port-number', 'The number to port', ob.port_number, '(305) 555-0123')}
     ${_obfInp('obf-port-carrier', 'Current carrier + account number + transfer PIN', ob.port_carrier, 'Verizon · acct 1234 · PIN 0000')}
-    <div style="font-size:11px;color:var(--text-mute);margin-top:8px">Our team collects a recent phone bill from you when we file the port - most rejections are a wrong PIN or account number, so double-check those.</div>
-    <button onclick="_obfSetupSave({port_number:document.getElementById('obf-port-number').value.trim(), port_carrier:document.getElementById('obf-port-carrier').value.trim()}, null, this)" style="width:100%;margin-top:10px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save port details</button>` : '';
+    <div style="font-size:11px;color:var(--text-mute);margin-top:8px">Our team collects a recent phone bill from you when we file the port. Most rejections are a wrong PIN or account number, so double-check those.</div>
+    <button onclick="_obfSetupSave({port_number:document.getElementById('obf-port-number').value.trim(), port_carrier:document.getElementById('obf-port-carrier').value.trim()}, null, this)" style="width:100%;margin-top:10px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save port details</button>` : '';
   const a2p = `
-    <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:20px">Registration details - must match your IRS records exactly</div>
-    <div style="font-size:11.5px;color:var(--text-mute);line-height:1.5;margin-top:4px">US carriers require every business to register before it can text customers. We file it for you - carrier approval takes a few days and runs in the background while you finish everything else.</div>
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:20px">Registration details (must match your IRS records exactly)</div>
+    <div style="font-size:11.5px;color:var(--text-mute);line-height:1.5;margin-top:4px">US carriers require every business to register before it can text customers. We file it for you. Carrier approval takes a few days and runs in the background while you finish everything else.</div>
     ${_obfInp('obf-a2p-legal', 'Legal business name', st.legal_name, 'Exactly as registered with the IRS')}
     ${_obfInp('obf-a2p-ein', 'Tax ID (EIN)', st.ein_value, 'XX-XXXXXXX')}
     ${_obfInp('obf-a2p-address', 'Registered business address', st.address, 'Street, city, state, zip')}
-    <button onclick="_obfSetupSave({}, {legal_name:document.getElementById('obf-a2p-legal').value.trim(), ein:document.getElementById('obf-a2p-ein').value.trim(), address:document.getElementById('obf-a2p-address').value.trim()}, this)" style="width:100%;margin-top:12px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save registration details</button>
+    <button onclick="_obfSetupSave({}, {legal_name:document.getElementById('obf-a2p-legal').value.trim(), ein:document.getElementById('obf-a2p-ein').value.trim(), address:document.getElementById('obf-a2p-address').value.trim()}, this)" style="width:100%;margin-top:12px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save registration details</button>
     <button onclick="_obfSkip('texting')" style="display:block;margin:10px auto 0;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Canadian business without an EIN? Skip for now</button>`;
   return _obfWizShell('Set up texting and calling',
-    'The number your academy texts and calls from - booking confirmations, follow-ups, the AI agent, all of it. Nothing switches until the very end, so parents never miss a message.',
+    'The number your academy texts and calls from: booking confirmations, follow-ups, the AI agent, all of it. Nothing switches until the very end, so parents never miss a message.',
     `<div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:16px">Your number</div>
-     ${choices}${portForm}${a2p}${st.texting ? _obfDoneLine('Texting setup saved - our team runs the registration from here') : ''}`);
+     ${choices}${portForm}${a2p}${st.texting ? _obfDoneLine('Texting setup saved. Our team runs the registration from here') : ''}`);
 }
 
 // Ads: one question, three answers. Managed = partner access (their account,
@@ -16397,18 +16397,18 @@ function _obfWizAdsPage(st) {
   const c = (st.ob || {}).ads_choice || '';
   const inner = `
     ${_obfWizChoice('ads', 'managed', c, 'You run them for me',
-      'We manage your campaigns. You approve one access link (a couple of clicks) - your ad account, page and pixel stay yours, we get partner access.',
+      'We manage your campaigns. You approve one access link in a couple of clicks. Your ad account, page and pixel stay yours; we get partner access.',
       `_obfSetupSave({ads_choice:'managed'})`)}
     ${_obfWizChoice('ads', 'self', c, 'I run my own',
-      'You keep the wheel - your campaigns and spend controls show up right in your portal. Our team helps you connect.',
+      'You keep the wheel: your campaigns and spend controls show up right in your portal. Our team helps you connect.',
       `_obfSetupSave({ads_choice:'self'})`)}
     ${_obfWizChoice('ads', 'later', c, 'Not running ads yet',
-      'Skip it - this lives in your portal whenever you are ready.',
+      'Skip it. This lives in your portal whenever you are ready.',
       `_obfSetupSave({ads_choice:'later'})`)}
-    ${c === 'managed' ? `<div style="font-size:11.5px;color:var(--text-mute);line-height:1.5;margin-top:12px">Our team sends your access link right after this - approve it and ads are wired. Never run ads before? We set the whole account up for you, in your name.</div>` : ''}
+    ${c === 'managed' ? `<div style="font-size:11.5px;color:var(--text-mute);line-height:1.5;margin-top:12px">Our team sends your access link right after this. Approve it and ads are wired. Never run ads before? We set the whole account up for you, in your name.</div>` : ''}
     ${st.ads ? _obfDoneLine('Ads choice saved') : ''}`;
   return _obfWizShell('Set up your ads',
-    'Optional - ads are never required to launch. Either way the ad account, pixel and billing stay YOURS; we only ever get partner access.', inner);
+    'Optional: ads are never required to launch. Either way the ad account, pixel and billing stay YOURS; we only ever get partner access.', inner);
 }
 
 // Contacts: the GHL fork. On GHL -> the sync runs itself (team status). Not
@@ -16419,17 +16419,17 @@ function _obfWizContactsPage(st) {
   if (st.has_ghl !== false) {
     const n = st.contacts_n || 0;
     return _obfWizShell('Import your contacts',
-      'Your whole contact list comes over from GoHighLevel automatically - the base every lead and member record ties back to.',
+      'Your whole contact list comes over from GoHighLevel automatically. It is the base every lead and member record ties back to.',
       st.contacts
         ? _obfDoneLine(`${n.toLocaleString()} contact${n === 1 ? '' : 's'} in`)
-        : `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:600;color:var(--text-sub,var(--text-mute))"><span class="req-spin" style="width:12px;height:12px"></span> Our team is bringing your contacts over - they land here automatically</div>`);
+        : `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:600;color:var(--text-sub,var(--text-mute))"><span class="req-spin" style="width:12px;height:12px"></span> Our team is bringing your contacts over. They land here automatically</div>`);
   }
   return _obfWizShell('Import your contacts',
-    'Every lead, parent and past inquiry you have - into one system, right at the start. Names, phones and emails only; the specific info you collect from new leads and members is set up later in your offer.',
+    'Every lead, parent and past inquiry you have, into one system right at the start. Names, phones and emails only; the specific info you collect from new leads and members is set up later in your offer.',
     `${_obfInp('obf-contacts-src', 'Where does your contact list live?', ob.contacts_source, 'Paste a Google Sheet link, or tell us: "spreadsheet on my laptop", "in Mailchimp"...')}
-     <button onclick="_obfSetupSave({contacts_source:document.getElementById('obf-contacts-src').value.trim()}, null, this)" style="width:100%;margin-top:12px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save</button>
-     <div style="font-size:11px;color:var(--text-mute);line-height:1.5;margin-top:10px">Our team imports everyone and merges duplicates automatically. Direct file upload is coming - for now a link or a note is all we need.</div>
-     ${st.contacts ? _obfDoneLine('Got it - your contacts are on the way in') : ''}`);
+     <button onclick="_obfSetupSave({contacts_source:document.getElementById('obf-contacts-src').value.trim()}, null, this)" style="width:100%;margin-top:12px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save</button>
+     <div style="font-size:11px;color:var(--text-mute);line-height:1.5;margin-top:10px">Our team imports everyone and merges duplicates automatically. Direct file upload is coming; for now a link or a note is all we need.</div>
+     ${st.contacts ? _obfDoneLine('Got it. Your contacts are on the way in') : ''}`);
 }
 
 // One step, one page: the old checklist row grown into a full card - same
@@ -16440,11 +16440,11 @@ function _obfWizStepPage(st, sec, s) {
   const noteFn = s.note && (typeof window !== 'undefined' ? window[s.note] : null);
   const n = (typeof noteFn === 'function') ? noteFn(st) : null;
   if (n) {
-    const color = n.tone === 'good' ? 'var(--green,#7BC47F)' : '#c79a4a';
+    const color = n.tone === 'good' ? 'var(--green,#4CC76A)' : 'var(--amber,#F0B84A)';
     note = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:14px;font-size:12px;font-weight:600;color:${color}">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${n.tone === 'good' ? '<path d="M20 6 9 17l-5-5"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>'}</svg>
       <span>${n.text}</span>
-      ${n.cta ? `<button onclick="${n.go}" style="background:none;border:1px solid #c79a4a;border-radius:6px;color:#c79a4a;padding:3px 10px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">${n.cta}</button>` : ''}
+      ${n.cta ? `<button onclick="${n.go}" style="background:none;border:1px solid var(--amber,#F0B84A);border-radius:6px;color:var(--amber,#F0B84A);padding:3px 10px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">${n.cta}</button>` : ''}
     </div>`;
   }
   const tags = []
@@ -16459,18 +16459,18 @@ function _obfWizStepPage(st, sec, s) {
       </span>
       ${tags}
     </div>
-    <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text);margin-top:10px">${s.title}</div>
+    <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text);margin-top:10px">${s.title}</div>
     <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${s.sub}</div>
     ${note}
-    ${ok ? `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:700;color:var(--green,#7BC47F)">
+    ${ok ? `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:700;color:var(--green,#4CC76A)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-        Done - the system sees it live${s.go && !s.team ? ` <button onclick="${s.go}" style="background:none;border:none;padding:0;margin-left:4px;font:inherit;font-size:11.5px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Open anyway</button>` : ''}
+        Done. The system sees it live${s.go && !s.team ? ` <button onclick="${s.go}" style="background:none;border:none;padding:0;margin-left:4px;font:inherit;font-size:11.5px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Open anyway</button>` : ''}
       </div>`
       : s.team ? `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:600;color:var(--text-sub,var(--text-mute))">
-        <span class="req-spin" style="width:12px;height:12px"></span> Our team is on it - nothing for you to do here
+        <span class="req-spin" style="width:12px;height:12px"></span> Our team is on it. Nothing for you to do here
       </div>`
-      : `<button onclick="${s.go}" style="width:100%;margin-top:18px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">${s.cta}</button>`}
-    ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" style="display:block;margin:10px auto 0;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Not applicable - skip for now</button>` : ''}
+      : `<button onclick="${s.go}" style="width:100%;margin-top:18px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">${s.cta}</button>`}
+    ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" style="display:block;margin:10px auto 0;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Not applicable, skip for now</button>` : ''}
   </div>`;
 }
 
@@ -16479,8 +16479,8 @@ function _obfWizStepPage(st, sec, s) {
 // review + Go live; PR-1 renders them together over today's build states).
 function _obfWizLaunchPage(st) {
   const b = st.website_build;
-  const stage = (on, label, meta) => `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:10px;margin-top:7px;font-size:12.5px">
-      <span style="flex:none;width:8px;height:8px;border-radius:999px;background:${on ? 'var(--green,#7BC47F)' : '#c79a4a'}"></span>
+  const stage = (on, label, meta) => `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:12px;margin-top:7px;font-size:12.5px">
+      <span style="flex:none;width:8px;height:8px;border-radius:999px;background:${on ? 'var(--green,#4CC76A)' : 'var(--amber,#F0B84A)'}"></span>
       <span style="font-weight:700;color:var(--text)">${label}</span>
       ${meta ? `<span style="margin-left:auto;color:var(--text-mute);font-size:11px;text-align:right">${meta}</span>` : ''}
     </div>`;
@@ -16490,8 +16490,8 @@ function _obfWizLaunchPage(st) {
     ${stage(b === 'building' || b === 'staging_ready' || b === 'verified', 'Building', 'our team, from your brand and offer')}
     ${stage(b === 'staging_ready' || b === 'verified', 'On staging', st.staging_url ? 'ready to preview' : '')}
     ${stage(b === 'verified', 'Verified', 'all checks + your sign-offs green')}
-    ${b === 'staging_ready' && !st.site_accepted ? `<button onclick="_obfSiteAcceptOpen()" style="width:100%;margin-top:10px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">Review your new site &amp; accept</button>` : ''}
-    ${b === 'staging_ready' && st.site_accepted ? `<div style="display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;font-weight:600;color:var(--green,#7BC47F)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> You accepted the new site - our team runs the final checks</div>` : ''}`;
+    ${b === 'staging_ready' && !st.site_accepted ? `<button onclick="_obfSiteAcceptOpen()" style="width:100%;margin-top:10px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">Review your new site &amp; accept</button>` : ''}
+    ${b === 'staging_ready' && st.site_accepted ? `<div style="display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;font-weight:600;color:var(--green,#4CC76A)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> You accepted the new site. Our team runs the final checks</div>` : ''}`;
   // The go-live checklist: every launch must-have + the site itself, each
   // row clickable straight to its page when still open.
   const visible = _obfVisibleSteps(st);
@@ -16499,15 +16499,15 @@ function _obfWizLaunchPage(st) {
     .concat([{ key: null, label: 'Site verified on staging', ok: b === 'verified' || !!st.website }]);
   const allGreen = checks.every(c => c.ok);
   const checkRows = checks.map(c => c.ok
-    ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:10px;margin-top:7px;font-size:12.5px"><span style="flex:none;width:8px;height:8px;border-radius:999px;background:var(--green,#7BC47F)"></span><span style="font-weight:700">${c.label}</span><span style="margin-left:auto;color:var(--text-mute);font-size:11px">done</span></div>`
-    : `<button ${c.key ? `onclick="_obfWizJumpKey('${c.key}')"` : 'disabled'} style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 13px;border:1px solid var(--border);border-radius:10px;margin-top:7px;font:inherit;font-size:12.5px;background:none;color:var(--text);cursor:${c.key ? 'pointer' : 'default'};text-align:left"><span style="flex:none;width:8px;height:8px;border-radius:999px;background:#c79a4a"></span><span style="font-weight:700">${c.label}</span><span style="margin-left:auto;color:#c79a4a;font-size:11px;font-weight:700">still open${c.key ? ' - fix it' : ''}</span></button>`).join('');
+    ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:12px;margin-top:7px;font-size:12.5px"><span style="flex:none;width:8px;height:8px;border-radius:999px;background:var(--green,#4CC76A)"></span><span style="font-weight:700">${c.label}</span><span style="margin-left:auto;color:var(--text-mute);font-size:11px">done</span></div>`
+    : `<button ${c.key ? `onclick="_obfWizJumpKey('${c.key}')"` : 'disabled'} style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 13px;border:1px solid var(--border);border-radius:12px;margin-top:7px;font:inherit;font-size:12.5px;background:none;color:var(--text);cursor:${c.key ? 'pointer' : 'default'};text-align:left"><span style="flex:none;width:8px;height:8px;border-radius:999px;background:var(--amber,#F0B84A)"></span><span style="font-weight:700">${c.label}</span><span style="margin-left:auto;color:var(--amber,#F0B84A);font-size:11px;font-weight:700">still open${c.key ? ' &middot; fix it' : ''}</span></button>`).join('');
   return `<div style="border:1px solid var(--border);border-radius:16px;padding:20px 20px 22px;margin-top:4px">
-    <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text)">${st.website ? 'Your site is live' : 'Launch your new website'}</div>
-    <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${st.website ? 'The domain points at the new site - onboarding is done.' : 'Our team builds it from everything you set up. You review it on a private address, accept it, and flip your domain when every light below is green. Your current site stays live until the flip.'}</div>
+    <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">${st.website ? 'Your site is live' : 'Launch your new website'}</div>
+    <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${st.website ? 'The domain points at the new site. Onboarding is done.' : 'Our team builds it from everything you set up. You review it on a private address, accept it, and flip your domain when every light below is green. Your current site stays live until the flip.'}</div>
     ${buildRows}
     ${st.website ? '' : `<div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:18px">Ready to go live?</div>
     ${checkRows}
-    <button onclick="_obfGoDomains()" ${allGreen ? '' : 'disabled'} style="width:100%;margin-top:14px;background:${allGreen ? 'var(--gold)' : 'transparent'};border:${allGreen ? 'none' : '1px solid var(--border-med)'};border-radius:10px;color:${allGreen ? 'var(--on-gold,#1a1608)' : 'var(--text-mute)'};padding:13px;font:inherit;font-size:13.5px;font-weight:800;cursor:${allGreen ? 'pointer' : 'default'}">${allGreen ? 'Flip the domain' : 'Flip the domain - unlocks when everything above is green'}</button>`}
+    <button onclick="_obfGoDomains()" ${allGreen ? '' : 'disabled'} style="width:100%;margin-top:14px;background:${allGreen ? 'var(--gold)' : 'transparent'};border:${allGreen ? 'none' : '1px solid var(--border-med)'};border-radius:8px;color:${allGreen ? 'var(--on-gold,#1a1608)' : 'var(--text-mute)'};padding:13px;font:inherit;font-size:13.5px;font-weight:800;cursor:${allGreen ? 'pointer' : 'default'}">${allGreen ? 'Flip the domain' : 'Flip the domain (unlocks when everything above is green)'}</button>`}
   </div>`;
 }
 
@@ -16606,7 +16606,7 @@ function _cxRender() {
       <div style="flex:1;min-width:0;font-size:12px"><b>${who(r)}</b> <span style="color:var(--text-mute)">→ ${escapeHTML(r.contact_name)}</span><div style="font-size:11px;color:var(--text-mute)">${meta(r)}${r.already_tagged ? ' · already imported' : ''}</div></div>
       <span style="flex:none;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:6px;border:1px solid var(--border);color:var(--text-mute)">${r.why.toUpperCase()}</span>
     </label>`).join('');
-  const reviewRows = (bk.review || []).map((r, i) => `<div style="border:1px solid #c79a4a55;border-radius:8px;padding:8px 10px;margin-top:6px">
+  const reviewRows = (bk.review || []).map((r, i) => `<div style="border:1px solid rgba(240,184,74,.35);border-radius:8px;padding:8px 10px;margin-top:6px">
       <div style="font-size:12px"><b>${who(r)}</b><div style="font-size:11px;color:var(--text-mute)">${meta(r)}</div></div>
       <select class="cx-r" data-i="${i}" style="margin-top:6px;width:100%;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 8px;font:inherit;font-size:12px">
         <option value="link">Link to ${escapeHTML(r.candidate_name)} (${escapeHTML(r.why)} match)</option>
@@ -16624,7 +16624,7 @@ function _cxRender() {
   body.innerHTML = `
     <div style="font-size:12px;color:var(--text-sub,var(--text-mute))">${_CX.total} cancelled ${_CX.total === 1 ? 'person' : 'people'} found${(bk.already_member || []).length ? ` · ${bk.already_member.length} came back as live members (left alone)` : ''}. Each import lands as a contact tagged "cancelled" with its cancel date, plan and reason on the record.</div>
     ${sect('Matched', 'Exact email hits - untick any you do not want.', matchedRows, 'var(--green,#7BC47F)')}
-    ${sect('Needs a look', 'Fuzzy matches - confirm each one.', reviewRows, '#c79a4a')}
+    ${sect('Needs a look', 'Fuzzy matches - confirm each one.', reviewRows, 'var(--amber,#F0B84A)')}
     ${sect('No contact found', 'Nobody in your CRM matches - create them from the Stripe data, or skip.', noneRows, 'var(--text-mute)')}
     <button id="cx-apply" onclick="_cxApply(this)" style="margin-top:16px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Import cancelled members</button>`;
 }

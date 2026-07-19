@@ -11,7 +11,7 @@ replacement). Update statuses here as PRs land.
 | # | Workstream | Status |
 |---|---|---|
 | 1 | Wizard UI - paged shell | **PR-1 SHIPPED** (#1489, 2026-07-18) - shell live for all V2 academies |
-| 1b | Wizard UI - new collection pages (Contacts GHL-fork, Texting number+A2P, Ads, website brief) + question audits on Blueprint cards | next up |
+| 1b | Wizard UI - collection pages (Contacts GHL-fork, Texting number+A2P, Ads) | **SHIPPED** (#1491) + design-system pass |
 | 1c | Wizard UI - offer wizard wrap-in-place + polish | queued |
 | 2 | Schema deltas (brand_data extensions, per-class location/capacity, rollups, drop storage) | rides 1b/1c |
 | 3 | Trigger + status machinery (section-complete → team pings, per-chunk build statuses, Build & review reads them, gate → 2 owner sign-offs) | queued |
