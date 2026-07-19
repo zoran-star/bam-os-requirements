@@ -49,6 +49,7 @@ Slash commands available in this repo (in `.claude/commands/`, shared via git):
 - `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/ for a new project folder
 - `/memory-audit` — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
 - `/academy` — onboarding cockpit: list academies currently onboarding (today GTA + DETAIL Miami), pick one, see its live progress scorecard (wizard sections, build chunks, sign-offs, imports), then jump into whatever it needs next
+- `/track2` — pick up Track 2 (the Zoran icon / V2 ticket system, the client-facing Slack replacement): co-work the user requirements with Zoran FIRST, then build chunk by chunk. Loads `bam-ghl-agent/docs/track2-handoff.md`
 - `/v2-tickets` — triage outstanding tickets from the lil Zoran icon one by one (client-side V2 + staff-side bug reports): full context, plain-English fix proposal, workshop with Zoran, record decision, repeat until the queue is empty
 - `/consolidate-lessons` — consolidate the sales agents' teach-why lessons (from Hawkeye). `scan` triages which academies are DUE, then per academy: cluster/dedup, route each lesson (brain fact / academy / general / drop), mine onboarding-intake gaps, workshop with you, apply, and stamp a timestamped `consolidation_runs` KPI row. Drives `bam-ghl-agent/bam-portal/scripts/lessons-io.mjs`.
 
