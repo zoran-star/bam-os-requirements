@@ -15,7 +15,7 @@ replacement). Update statuses here as PRs land.
 | 1c | Wizard UI - offer wrap-in-place + Brand/General card audits | **SHIPPED** (PR-3) - offer editor mounts inside the flow; brand story block = why-us/dream-athletes/proof; entity type cut. Offer-config class-atom rollups ride WS2 |
 | 2 | Schema deltas (brand_data extensions, per-class location/capacity, rollups, drop storage) | rides 1b/1c |
 | 3 | Trigger + status machinery | **SHIPPED** (WS3 PR) - chunk statuses on website_setup.chunks, triggers evaluate in setup-status (owner-activity driven) + Slack pings, brief Submit moment, Launch chunk board, Activation chunk controls, gate = 2 owner sign-offs (copy_ok retired) |
-| 4 | Skills (brand-scan trigger wiring · site-build 3-phase split · NEW email-templates skill · NEW agreement skill · GHL migration skill w/ fuzzy match + engine prep) | queued |
+| 4 | Skills | **SHIPPED** (bam-client-sites #89 + portal PR) - /brand-scan RENAMED /branding-deck (wizard-brief gathering, closes its chunk) · site-build --phase core|sales|onboarding · NEW /email-templates + /agreement skills · scripts/mark-chunk.mjs closes every loop · ghl-pipeline-import gained the engine-prep launch-safety step · Slack ping names the new runbooks |
 | 5 | Imports (contact file-drop path · member import Stripe auto-attach · cancelled import Stripe-driven + cancellations contract) | queued |
 | 6 | Integrations (Leadsie link in Ads step · BAM Connect post-App-Review · phone wrap wiring) | queued |
 | 7 | Front door - "Add academy" (4 fields + GHL dropdown → 7 auto-initializations: v2_access, Slack channel, welcome ping, GHL link, invite, sites scaffold, wizard state) | queued, standalone - can go anytime |

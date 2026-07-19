@@ -1,5 +1,10 @@
 # /ghl-pipeline-import - bring an academy's GHL pipeline over to the portal
 
+(aka the GHL migration skill - WS4 of the onboarding wizard spec. Runs as a
+co-working session after the owner applies the Free Trial preset; the owner
+sees it as the "Your leads" status. Import is NOT done when cards are placed:
+it is done when every card is safe to launch on - see step 6.)
+
 Staff-side, Claude-assisted runbook (accepted onboarding design 2026-07-14).
 **We import their PEOPLE, not their pipeline shape**: every academy runs the same
 Free Trial preset; you (Claude) read each of their open GHL cards and sort it
@@ -65,7 +70,20 @@ node scripts/ghl-import.mjs reconcile --client <id>
 Show the drift report. `missing`/`mismatched` rows must be explained (usually:
 cards the user chose to skip, or terminal stages). Re-import to fix, or accept.
 
-### 6. Flip
+### 6. Engine prep - make every card safe to launch on (the WS4 step)
+Before the flip, walk the launch-safety list with the user:
+- **Recency landed:** spot-check store rows carry `last_stage_change_at` from
+  the dump - the agents' queue uses it so nobody who was texted yesterday gets
+  texted again at go-live, and nobody waiting a week gets skipped.
+- **Cadence position, not cadence restart:** imported `responded`/`interested`
+  cards must read as MID-conversation to the follow-up engine (their recency
+  stamp is the position). A card with no timestamp defaults to oldest - call
+  those out and set a sensible date with the user.
+- **Nothing texts yet:** confirm automations are still `approved:false` and
+  Hawkeye is off - the flip moves the board, agent go-live is its own gate.
+Fix anything off by re-importing that card with corrected fields.
+
+### 7. Flip
 Only after the user says go:
 ```bash
 node scripts/ghl-import.mjs flip --client <id>
@@ -76,7 +94,7 @@ imported leads. Instant rollback if anything looks wrong:
 node scripts/ghl-import.mjs rollback --client <id>
 ```
 
-### 7. Verify + close out
+### 8. Verify + close out
 - Staff portal → the academy → **Activation** tab: "Cards sorted into the
   pipeline" and "Flipped to the portal board" should both be green, with counts.
 - The owner's onboarding flow: "Import your active leads" turns gold on its own

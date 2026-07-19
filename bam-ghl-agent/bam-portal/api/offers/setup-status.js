@@ -135,7 +135,7 @@ async function handler(req, res) {
             headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
             body: JSON.stringify({
               channel: cRow.slack_channel_id,
-              text: `:hammer_and_wrench: ${name}: ready to build → ${fired.join(", ")}. Runbooks: /brand-scan · /site-build. Mark published in the Activation tab when live.`,
+              text: `:hammer_and_wrench: ${name}: ready to build → ${fired.join(", ")}. Runbooks: /branding-deck · /site-build --phase <core|sales|onboarding> · /email-templates · /agreement. Each skill ends by marking its chunk published.`,
               unfurl_links: false,
             }),
           }).catch(() => {});
