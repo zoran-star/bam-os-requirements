@@ -50,6 +50,18 @@
 > (build-state action:'chunk'). **Gate is now 2 owner sign-offs: brand_ok +
 > site_accepted (copy_ok RETIRED** - the team's pre-publish review is the
 > proof; old copy_ok values ignored harmlessly).
+> **WS4 SHIPPED (2026-07-18): the chunk-aware skills.** In bam-client-sites
+> (#89): /brand-scan RENAMED **/branding-deck** (gathers the wizard brief -
+> why_us/dream_athletes/proof/files - scan is step 2; ends with mark-chunk
+> deck which cascades core+templates) · **site-build.mjs --phase
+> core|sales|onboarding** (per-chunk builds; BUILD-DATA.copy carries the new
+> brief fields, mission/vibe legacy) · NEW **/email-templates** +
+> **/agreement** skills · **scripts/mark-chunk.mjs** = the loop-closer every
+> skill ends with (stamps website_setup.chunks via service key). This repo:
+> ghl-pipeline-import gained step 6 "engine prep" (recency stamps = cadence
+> position, nothing texts until Hawkeye); setup-status ping names the new
+> runbooks. Skills' mark-chunk needs SUPABASE env (bam-portal/.env.local
+> service key is STALE - use fresh key or Supabase MCP).
 > Everyone moves to the wizard (it reads the same completion flags - no forks).
 > Deferred: how the academy pays BAM · launch definition final call (proposal
 > in spec) · V2 ticket system / Zoran-icon (design exploration in spec).
