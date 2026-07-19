@@ -77,6 +77,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/ghl/cron-trial-summary",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/automations?action=work",
       "schedule": "* * * * *"
     },
