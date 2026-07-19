@@ -20,9 +20,12 @@ replacement). Update statuses here as PRs land.
 | 6 | Integrations (Leadsie link in Ads step · BAM Connect post-App-Review · phone wrap wiring) | queued |
 | 7 | Front door - "Add academy" (4 fields + GHL dropdown → 7 auto-initializations: v2_access, Slack channel, welcome ping, GHL link, invite, sites scaffold, wizard state) | **SHIPPED** (feat/add-academy + bam-client-sites #90, 2026-07-19) - clients.js action=create-academy (idempotent = the checklist's Retry) · Add Academy modal replaces New client (plain-row escape hatch stays) · Slack conversations.create + staff kickoff ping · GHL name→locationId from GHL_LOCATIONS_JSON (the ONE flag driving the wizard's has_ghl forks, already wired since PR-2) · scaffold robot = workflow_dispatch new-client.yml. ⚠ Needs Zoran one-time: Slack app channels:manage scope + GITHUB_DISPATCH_TOKEN in Vercel (see Clocks) |
 
-## Track 2 - The Zoran icon / V2 ticket system (DESIGNED, build after onboarding)
+## Track 2 - The Zoran icon / V2 ticket system (DESIGNED, NEXT UP)
 
 Full design in [`zoran-icon-ticket-design.md`](zoran-icon-ticket-design.md).
+**Handoff for the next chat: [`track2-handoff.md`](track2-handoff.md) - run
+`/track2`.** That chat CO-WORKS the user requirements with Zoran first (the
+design is a sketch, not a locked spec), THEN builds chunk by chunk.
 Replaces client-facing Slack. Build chunks when we pick it up:
 
 | # | Chunk |
@@ -36,10 +39,10 @@ Replaces client-facing Slack. Build chunks when we pick it up:
 
 ## Track 3 - Running-the-business builds (B-bucket, standalone, schedule anytime)
 
-| # | Build | Why |
-|---|---|---|
-| B1 | **Agent escalation queue** - agent-unsure / off-script conversations surface to staff with context + drafted reply | today someone has to notice; this makes it a queue |
-| B2 | **KPI alerting** - thresholds ping staff (churn spike, CPL jump, booking drought, failed payments) | replaces "Zoran stares at dashboards" |
+| # | Build | Why | Status |
+|---|---|---|---|
+| B1 | **Agent escalation queue** - agent-unsure / off-script conversations surface to staff with context + drafted reply | today someone has to notice; this makes it a queue | ⚠ NEEDS RETHINK (Zoran 2026-07-19: framing doesn't make sense; overlaps Track 2 ticket type 5 "agent correction" - revisit as its own conversation, do not build against it) |
+| B2 | **KPI alerting** - thresholds ping staff (churn spike, CPL jump, booking drought, failed payments) | replaces "Zoran stares at dashboards" | LATER (small standalone, schedule after Track 2) |
 
 ## Clocks and decisions (not code)
 
