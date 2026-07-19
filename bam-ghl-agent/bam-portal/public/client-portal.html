@@ -15781,7 +15781,7 @@ let _OBF_AT = 0;
 const _OBF_SECTIONS = [
   { id: 'academy', label: 'Academy', full: 'Your academy', keys: ['basics', 'locations', 'coaches'] },
   { id: 'brand',   label: 'Brand',   full: 'Your brand',   keys: ['brand', 'sitecopy', 'instagram', 'brandboard'] },
-  { id: 'wired',   label: 'Wired',   full: 'Get wired',    keys: ['stripe', 'contacts', 'email', 'ein'] },
+  { id: 'wired',   label: 'Wired',   full: 'Get wired',    keys: ['stripe', 'contacts', 'email', 'texting', 'ads'] },
   { id: 'offer',   label: 'Offer',   full: 'Your offer',   keys: ['define', 'schedule', 'pricing', 'policy', 'preset', 'leads', 'onboardingform', 'members', 'cancelled'] },
   { id: 'launch',  label: 'Launch',  full: 'Launch',       keys: ['website'] },
 ];
@@ -15795,7 +15795,10 @@ let _OBF_NAV = { s: 0, i: 0 };
 //   skippable     - "not applicable" link (per-client, localStorage)
 const _OBF_STEPS = [
   { key: 'basics', railLabel: 'Basics',    group: 'general', title: 'Set up your business basics', sub: 'Name, address, entity type and time zone', cta: 'Open Blueprint', go: '_obfGoGeneral()' },
-  { key: 'ein', railLabel: 'Tax ID',       group: 'general', title: 'Add your business tax ID', sub: 'EIN (US) or Business Number (Canada) - unlocks offer publishing and the payment paperwork. Canadian businesses without one can skip this for now.', cta: 'Add it in Blueprint', go: '_obfGoGeneral()', skippable: true },
+  // PR-2 collection pages (spec: Texting absorbs the old Tax ID step - the
+  // A2P registration is the only consumer of legal name + EIN).
+  { key: 'texting', railLabel: 'Texting',  group: 'general', title: 'Set up texting and calling', sub: 'The number your academy texts and calls from - booking confirmations, follow-ups, the AI agent, all of it.', skippable: true },
+  { key: 'ads', railLabel: 'Ads',          group: 'general', title: 'Set up your ads', sub: 'Optional - skip if you are not running ads yet, and set it up anytime later. Ads are never required to launch.', optional: true, skippable: true },
   { key: 'brand', railLabel: 'Look',     group: 'general', title: 'Set your brand', sub: 'Logo, colors and fonts - your website, emails and agreement wear these', cta: 'Set brand', go: "_obfGoCard('brand')" },
   { key: 'sitecopy', railLabel: 'Story',  group: 'general', title: 'Tell your story', sub: 'Your story, mission and vibe words - your website gets written from these, in your words', cta: 'Write it', go: "_obfGoCard('brand')" },
   { key: 'brandboard', railLabel: 'Brand board', group: 'general', title: 'Approve your brand board', sub: 'One page with your colors, type and components - the system every asset ships from', cta: 'Review board', go: '_obfBrandBoardOpen()', needsStaging: true },
@@ -15804,7 +15807,7 @@ const _OBF_STEPS = [
   { key: 'stripe', railLabel: 'Stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account - every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
   { key: 'email', railLabel: 'Email',     group: 'general', title: 'Connect your email domain', sub: 'Emails send from your own domain - one DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
   { key: 'website', railLabel: 'Go live',   group: 'general', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site - the old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()', note: '_obfWebsiteNote' },
-  { key: 'contacts', railLabel: 'Contacts',  group: 'general', title: 'Import your contacts', sub: 'Your whole contact list comes over from GoHighLevel - the base every lead and member record ties back to', team: true, ghlOnly: true, note: '_obfContactsNote' },
+  { key: 'contacts', railLabel: 'Contacts',  group: 'general', title: 'Import your contacts', sub: 'Every lead, parent and past inquiry you have - into one system, right at the start. Names and numbers only; program details come later in your offer.', note: '_obfContactsNote' },
   { key: 'instagram', railLabel: 'Instagram', group: 'general', title: 'Connect Instagram DMs', sub: 'Your IG messages land in the portal inbox - skip it and add later', cta: 'Connect', go: '_obfGoInstagram()', skippable: true, optional: true },
   // Training offer: define the offer...
   { key: 'define', railLabel: 'Define',   group: 'training', title: 'Define your offer', sub: 'Ages, skill level, capacity and what is included', cta: 'Define it', go: "_obfGoOffer('general_info')" },
@@ -15984,7 +15987,8 @@ async function _obfFetchState() {
     define: false, schedule: false, pricing: false, policy: false,
     preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
     offer_id: null, booking: false, has_ghl: true, contacts_n: 0,
-    website_build: null, staging_url: null, site_accepted: false, brandboard: false };
+    website_build: null, staging_url: null, site_accepted: false, brandboard: false,
+    texting: false, ads: false, ob: {}, legal_name: '', ein_value: '', address: '' };
   const [em, web, ss, prog] = await Promise.allSettled([
     _edwApi('status'),
     _wdwApi('status'),
@@ -16032,6 +16036,17 @@ async function _obfFetchState() {
     next.staging_url = v.website_staging_url || null;
     next.site_accepted = !!v.website_site_accepted;
     next.brandboard = !!v.website_brand_ok;
+    // PR-2 collection pages: saved answers + the A2P trio for prefill.
+    next.ob = v.onboarding_setup || {};
+    next.legal_name = v.legal_name || '';
+    next.ein_value = v.ein_value || '';
+    next.address = v.address || '';
+    // Texting done = a number choice made + the A2P paperwork in (legal name
+    // + EIN; ein flag also honors the old EIN skip for Canadian businesses).
+    next.texting = (!!next.ob.texting_choice && !!next.legal_name && next.ein) || _obfSkipped('texting') || _obfSkipped('ein');
+    next.ads = !!next.ob.ads_choice || _obfSkipped('ads');
+    // Contacts for a no-GHL academy: done once they point us at their list.
+    if (next.has_ghl === false) next.contacts = next.contacts || !!next.ob.contacts_source;
   }
   _OBF_STATE = next; _OBF_AT = Date.now();
   _obfFanSync();
@@ -16297,7 +16312,124 @@ function _obfRender(st) {
   if (backBtn) backBtn.disabled = pos <= 0;
   if (nextBtn) nextBtn.style.visibility = pos >= flat.length - 1 ? 'hidden' : 'visible';
 
-  host.innerHTML = step.key === 'website' ? _obfWizLaunchPage(st) : _obfWizStepPage(st, sec, step);
+  host.innerHTML =
+    step.key === 'website' ? _obfWizLaunchPage(st)
+    : step.key === 'texting' ? _obfWizTextingPage(st)
+    : step.key === 'ads' ? _obfWizAdsPage(st)
+    : step.key === 'contacts' ? _obfWizContactsPage(st)
+    : _obfWizStepPage(st, sec, step);
+}
+
+// ── PR-2 collection pages: save wizard answers into clients.onboarding_setup
+// (merged client-side, replaced wholesale by the update_client_basics RPC -
+// same contract as brand_data) plus direct columns for the A2P trio. ──
+async function _obfSetupSave(patch, direct, btn) {
+  if (btn) { btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = 'Saving…'; }
+  const merged = { ...((_OBF_STATE && _OBF_STATE.ob) || {}), ...(patch || {}) };
+  const ok = await _bbSaveClientBasics({ onboarding_setup: merged, ...(direct || {}) });
+  if (ok && _OBF_STATE) _OBF_STATE.ob = merged;
+  try { await _obfFetchState(); } catch (_) {}
+  _obfRender(_OBF_STATE);
+  if (!ok) _plToast('Could not save - try again in a moment.');
+  return ok;
+}
+// Small shared pieces for the collection pages.
+function _obfWizShell(title, sub, inner, extraTags) {
+  return `<div style="border:1px solid var(--border);border-radius:16px;padding:20px 20px 22px;margin-top:4px">
+    ${extraTags ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">${extraTags}</div>` : ''}
+    <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text)">${title}</div>
+    <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${sub}</div>
+    ${inner}
+  </div>`;
+}
+function _obfWizChoice(name, val, cur, title, sub, onpick) {
+  const sel = cur === val;
+  return `<button onclick="${onpick}" style="display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;padding:13px 14px;border:1.5px solid ${sel ? 'var(--gold)' : 'var(--border-med)'};background:${sel ? 'var(--gold-sheen,rgba(212,182,92,.06))' : 'transparent'};border-radius:12px;margin-top:8px;font:inherit;cursor:pointer">
+    <span style="flex:none;width:15px;height:15px;margin-top:1px;border-radius:999px;border:2px solid ${sel ? 'var(--gold)' : 'var(--border-str)'};${sel ? 'background:var(--gold);box-shadow:inset 0 0 0 3px var(--surface)' : ''}"></span>
+    <span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:800;color:var(--text)">${title}</span>
+    <span style="display:block;font-size:11.5px;color:var(--text-mute);line-height:1.45;margin-top:2px">${sub}</span></span>
+  </button>`;
+}
+const _obfInp = (id, label, val, ph) => `<div style="margin-top:10px">
+  <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute);margin-bottom:5px">${label}</div>
+  <input id="${id}" value="${escapeHTML(val || '')}" placeholder="${ph || ''}" style="width:100%;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:8px;color:var(--text);font:inherit;font-size:13px;padding:10px 12px">
+</div>`;
+const _obfDoneLine = (txt) => `<div style="display:flex;align-items:center;gap:7px;margin-top:14px;font-size:12px;font-weight:700;color:var(--green,#7BC47F)">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>${txt}</div>`;
+
+// Texting: the number choice (3 paths) + the A2P registration trio. The two
+// slowest onboarding clocks start here; nothing switches until the end.
+function _obfWizTextingPage(st) {
+  const ob = st.ob || {};
+  const c = ob.texting_choice || '';
+  const choices =
+    (st.has_ghl !== false ? _obfWizChoice('tx', 'ghl', c, 'Switching from GoHighLevel',
+      'Your number keeps working through GHL, wrapped into your portal from day one - then switches onto your own line the moment carrier registration clears. Zero paperwork, zero downtime.',
+      `_obfSetupSave({texting_choice:'ghl'})`) : '')
+    + _obfWizChoice('tx', 'new', c, 'Get me a new local number',
+      'Picked from your area code - we grab it for you, you confirm before anything goes live. Texting from your personal cell today? Take this one - parent texts land in your portal and your cell stays yours.',
+      `_obfSetupSave({texting_choice:'new'})`)
+    + _obfWizChoice('tx', 'port', c, 'Port a number from another carrier',
+      'Keep a business number that lives at a phone carrier today. The one path with paperwork.',
+      `_obfSetupSave({texting_choice:'port'})`);
+  const portForm = c === 'port' ? `
+    ${_obfInp('obf-port-number', 'The number to port', ob.port_number, '(305) 555-0123')}
+    ${_obfInp('obf-port-carrier', 'Current carrier + account number + transfer PIN', ob.port_carrier, 'Verizon · acct 1234 · PIN 0000')}
+    <div style="font-size:11px;color:var(--text-mute);margin-top:8px">Our team collects a recent phone bill from you when we file the port - most rejections are a wrong PIN or account number, so double-check those.</div>
+    <button onclick="_obfSetupSave({port_number:document.getElementById('obf-port-number').value.trim(), port_carrier:document.getElementById('obf-port-carrier').value.trim()}, null, this)" style="width:100%;margin-top:10px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save port details</button>` : '';
+  const a2p = `
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:20px">Registration details - must match your IRS records exactly</div>
+    <div style="font-size:11.5px;color:var(--text-mute);line-height:1.5;margin-top:4px">US carriers require every business to register before it can text customers. We file it for you - carrier approval takes a few days and runs in the background while you finish everything else.</div>
+    ${_obfInp('obf-a2p-legal', 'Legal business name', st.legal_name, 'Exactly as registered with the IRS')}
+    ${_obfInp('obf-a2p-ein', 'Tax ID (EIN)', st.ein_value, 'XX-XXXXXXX')}
+    ${_obfInp('obf-a2p-address', 'Registered business address', st.address, 'Street, city, state, zip')}
+    <button onclick="_obfSetupSave({}, {legal_name:document.getElementById('obf-a2p-legal').value.trim(), ein:document.getElementById('obf-a2p-ein').value.trim(), address:document.getElementById('obf-a2p-address').value.trim()}, this)" style="width:100%;margin-top:12px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save registration details</button>
+    <button onclick="_obfSkip('texting')" style="display:block;margin:10px auto 0;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Canadian business without an EIN? Skip for now</button>`;
+  return _obfWizShell('Set up texting and calling',
+    'The number your academy texts and calls from - booking confirmations, follow-ups, the AI agent, all of it. Nothing switches until the very end, so parents never miss a message.',
+    `<div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:16px">Your number</div>
+     ${choices}${portForm}${a2p}${st.texting ? _obfDoneLine('Texting setup saved - our team runs the registration from here') : ''}`);
+}
+
+// Ads: one question, three answers. Managed = partner access (their account,
+// their pixel, their billing - we only ever get access). Never blocks launch.
+function _obfWizAdsPage(st) {
+  const c = (st.ob || {}).ads_choice || '';
+  const inner = `
+    ${_obfWizChoice('ads', 'managed', c, 'You run them for me',
+      'We manage your campaigns. You approve one access link (a couple of clicks) - your ad account, page and pixel stay yours, we get partner access.',
+      `_obfSetupSave({ads_choice:'managed'})`)}
+    ${_obfWizChoice('ads', 'self', c, 'I run my own',
+      'You keep the wheel - your campaigns and spend controls show up right in your portal. Our team helps you connect.',
+      `_obfSetupSave({ads_choice:'self'})`)}
+    ${_obfWizChoice('ads', 'later', c, 'Not running ads yet',
+      'Skip it - this lives in your portal whenever you are ready.',
+      `_obfSetupSave({ads_choice:'later'})`)}
+    ${c === 'managed' ? `<div style="font-size:11.5px;color:var(--text-mute);line-height:1.5;margin-top:12px">Our team sends your access link right after this - approve it and ads are wired. Never run ads before? We set the whole account up for you, in your name.</div>` : ''}
+    ${st.ads ? _obfDoneLine('Ads choice saved') : ''}`;
+  return _obfWizShell('Set up your ads',
+    'Optional - ads are never required to launch. Either way the ad account, pixel and billing stay YOURS; we only ever get partner access.', inner);
+}
+
+// Contacts: the GHL fork. On GHL -> the sync runs itself (team status). Not
+// on GHL -> point us at the list (sheet link or "our team will ask") - the
+// full file-drop import lands with the imports workstream.
+function _obfWizContactsPage(st) {
+  const ob = st.ob || {};
+  if (st.has_ghl !== false) {
+    const n = st.contacts_n || 0;
+    return _obfWizShell('Import your contacts',
+      'Your whole contact list comes over from GoHighLevel automatically - the base every lead and member record ties back to.',
+      st.contacts
+        ? _obfDoneLine(`${n.toLocaleString()} contact${n === 1 ? '' : 's'} in`)
+        : `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:600;color:var(--text-sub,var(--text-mute))"><span class="req-spin" style="width:12px;height:12px"></span> Our team is bringing your contacts over - they land here automatically</div>`);
+  }
+  return _obfWizShell('Import your contacts',
+    'Every lead, parent and past inquiry you have - into one system, right at the start. Names, phones and emails only; the specific info you collect from new leads and members is set up later in your offer.',
+    `${_obfInp('obf-contacts-src', 'Where does your contact list live?', ob.contacts_source, 'Paste a Google Sheet link, or tell us: "spreadsheet on my laptop", "in Mailchimp"...')}
+     <button onclick="_obfSetupSave({contacts_source:document.getElementById('obf-contacts-src').value.trim()}, null, this)" style="width:100%;margin-top:12px;background:var(--gold);border:none;border-radius:10px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save</button>
+     <div style="font-size:11px;color:var(--text-mute);line-height:1.5;margin-top:10px">Our team imports everyone and merges duplicates automatically. Direct file upload is coming - for now a link or a note is all we need.</div>
+     ${st.contacts ? _obfDoneLine('Got it - your contacts are on the way in') : ''}`);
 }
 
 // One step, one page: the old checklist row grown into a full card - same

@@ -14,8 +14,18 @@
 > Launch page = build stages + accept + go-live checklist with jump-to-fix via
 > `_obfWizJumpKey`). Pure view over the same `_OBF_STEPS` flags - fetchState,
 > deep links, notes, skip, preset apply, site-accept, brand-board all untouched.
-> Old checklist renderer is gone. Next PRs: new collection pages (Texting/Ads/
-> brief), offer wrap-in-place, question audits per the spec.
+> Old checklist renderer is gone.
+> **WS1 PR-2 SHIPPED (2026-07-18): the collection pages.** New
+> `clients.onboarding_setup` jsonb (migration 20260718210000, APPLIED to prod;
+> `update_client_basics` RPC extended to patch it - replace-wholesale like
+> brand_data, client merges first via `_obfSetupSave`). New wizard steps:
+> `texting` (3-path number choice: GHL wrap / new local / carrier port + the
+> A2P trio saved to clients.legal_name/ein/address; absorbs+retires the old
+> ein step, honors old ein skips) and `ads` (managed / self / later, optional).
+> `contacts` step now for ALL academies (GHL fork: auto-sync status vs
+> "where does your list live" source field for born-on-V2). setup-status
+> exposes onboarding_setup + legal_name/ein_value/address for prefill.
+> Remaining WS1: offer wrap-in-place + Blueprint card question audits (PR-3).
 > Everyone moves to the wizard (it reads the same completion flags - no forks).
 > Deferred: how the academy pays BAM · launch definition final call (proposal
 > in spec) · V2 ticket system / Zoran-icon (design exploration in spec).

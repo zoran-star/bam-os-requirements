@@ -60,7 +60,7 @@ async function handler(req, res) {
     // Academy-level state (station-model onboarding flow) - fetched regardless
     // of whether an offer exists yet, so the flow's academy group (Stripe,
     // contacts migration, Instagram) lights up before the first offer is built.
-    const clientRows = await sb(`clients?id=eq.${enc(clientId)}&select=booking_provider,pipeline_provider,stripe_connect_status,ghl_location_id,brand_data,website_setup&limit=1`);
+    const clientRows = await sb(`clients?id=eq.${enc(clientId)}&select=booking_provider,pipeline_provider,stripe_connect_status,ghl_location_id,brand_data,website_setup,onboarding_setup,legal_name,ein,address&limit=1`);
     const cRow = (Array.isArray(clientRows) && clientRows[0]) || {};
     const [contactRows, cancelledRows, igRows] = await Promise.all([
       sb(`contacts?client_id=eq.${enc(clientId)}&select=id&limit=1000`),
@@ -74,6 +74,13 @@ async function handler(req, res) {
       site_copy: !!(cRow.brand_data && cRow.brand_data.story && String(cRow.brand_data.story).trim()),
       has_ghl: !!cRow.ghl_location_id,
       website_build: (cRow.website_setup && cRow.website_setup.build_status) || null,
+      // Wizard collection pages (PR-2): saved answers + the A2P prefill trio.
+      // ein/legal/address are the owner's own business paperwork - the
+      // Blueprint General card already shows them to the client.
+      onboarding_setup: cRow.onboarding_setup || {},
+      legal_name: cRow.legal_name || '',
+      ein_value: cRow.ein || '',
+      address: cRow.address || '',
       // The flow's Website step (owner acceptance, sign-off redesign #2):
       // staging link to review + whether the owner already accepted it.
       website_staging_url: (cRow.website_setup && cRow.website_setup.staging_url) || null,
