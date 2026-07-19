@@ -7,7 +7,7 @@ import { pickGhlToken, ghl, sendSms } from "./_core.js";
 // separate personal line for now, so the summary goes to the academy's own
 // business number.
 //
-//   GET /api/ghl/cron-trial-summary   (Bearer CRON_SECRET) - runs 13:00 UTC = 6am PT (PDT)
+//   GET /api/ghl/cron-trial-summary   (Bearer CRON_SECRET) - runs 15:00 UTC = 8am PT (PDT)
 //
 // Config resolution per client (DB wins, code fallback for the initial rollout):
 //   1. clients.ghl_kpi_config.trial_summary = {
