@@ -15794,13 +15794,13 @@ let _OBF_NAV = { s: 0, i: 0 };
 //   ghlOnly:true  - hidden for academies with no GHL to migrate from
 //   skippable     - "not applicable" link (per-client, localStorage)
 const _OBF_STEPS = [
-  { key: 'basics', railLabel: 'Basics',    group: 'general', title: 'Set up your business basics', sub: 'Name, address, entity type and time zone', cta: 'Open Blueprint', go: '_obfGoGeneral()' },
+  { key: 'basics', railLabel: 'Basics',    group: 'general', title: 'Set up your business basics', sub: 'Name, address and time zone', cta: 'Open Blueprint', go: '_obfGoGeneral()' },
   // PR-2 collection pages (spec: Texting absorbs the old Tax ID step - the
   // A2P registration is the only consumer of legal name + EIN).
   { key: 'texting', railLabel: 'Texting',  group: 'general', title: 'Set up texting and calling', sub: 'The number your academy texts and calls from: booking confirmations, follow-ups, the AI agent, all of it.', skippable: true },
   { key: 'ads', railLabel: 'Ads',          group: 'general', title: 'Set up your ads', sub: 'Optional. Skip if you are not running ads yet and set it up anytime later. Ads are never required to launch.', optional: true, skippable: true },
   { key: 'brand', railLabel: 'Look',     group: 'general', title: 'Set your brand', sub: 'Logo, colors and fonts. Your website, emails and agreement wear these', cta: 'Set brand', go: "_obfGoCard('brand')" },
-  { key: 'sitecopy', railLabel: 'Story',  group: 'general', title: 'Tell your story', sub: 'Your story, mission and vibe words. Your website gets written from these, in your words', cta: 'Write it', go: "_obfGoCard('brand')" },
+  { key: 'sitecopy', railLabel: 'Story',  group: 'general', title: 'Tell your story', sub: 'Why families should pick you, who your dream athletes are, your story and your proof. Your website and emails get written from these, in your words', cta: 'Write it', go: "_obfGoCard('brand')" },
   { key: 'brandboard', railLabel: 'Brand board', group: 'general', title: 'Approve your brand board', sub: 'One page with your colors, type and components: the system every asset ships from', cta: 'Review board', go: '_obfBrandBoardOpen()', needsStaging: true },
   { key: 'locations', railLabel: 'Locations', group: 'general', title: 'Add your locations', sub: 'Address, how to find the door, photos. Your agent quotes these to parents', cta: 'Add locations', go: "_obfGoCard('locations')" },
   { key: 'coaches', railLabel: 'Team',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
@@ -16177,6 +16177,16 @@ async function _obfOpen() {
       #obf-overlay .obf2-back { justify-self:start; background:transparent; border:1px solid var(--border-med); color:var(--text-sub,var(--text-mute)); }
       #obf-overlay .obf2-back:disabled { opacity:.35; cursor:default; }
       #obf-overlay .obf2-next { justify-self:end; background:var(--gold); border:none; color:var(--on-gold,#1a1608); }
+      /* Embedded offer editor (PR-3): the flow hosts the REAL Blueprint offer
+         wizard - hide its duplicate chrome (back link, page head, step dots,
+         its own step header + nav buttons); the flow's bar/rail/arrows drive. */
+      #obf-overlay #obf-bb-host .bb-back,
+      #obf-overlay #obf-bb-host .bb-page-head,
+      #obf-overlay #obf-bb-host .bb-wizard-steps,
+      #obf-overlay #obf-bb-host .bb-wizard-step-head { display:none; }
+      #obf-overlay #obf-bb-host .bb-wizard-foot > div:last-child { display:none; }
+      #obf-overlay #obf-bb-host .bb-wizard-body { border:none; background:transparent; padding:0; box-shadow:none; }
+      #obf-overlay #obf-bb-host .bb-wizard-foot { border:none; background:transparent; padding:8px 0 0; }
       @media (max-width:560px) {
         #obf-overlay { padding:10px; }
         #obf-overlay .obf2-seg .lb { font-size:0; height:13px; }
@@ -16312,12 +16322,54 @@ function _obfRender(st) {
   if (backBtn) backBtn.disabled = pos <= 0;
   if (nextBtn) nextBtn.style.visibility = pos >= flat.length - 1 ? 'hidden' : 'visible';
 
+  const OFFER_EMBED = { define: 'general_info', schedule: 'schedule', pricing: 'pricing', policy: 'policy', onboardingform: 'onboarding' };
   host.innerHTML =
     step.key === 'website' ? _obfWizLaunchPage(st)
     : step.key === 'texting' ? _obfWizTextingPage(st)
     : step.key === 'ads' ? _obfWizAdsPage(st)
     : step.key === 'contacts' ? _obfWizContactsPage(st)
+    : (OFFER_EMBED[step.key] && st.offer_id) ? _obfWizOfferPage(st, sec, step, OFFER_EMBED[step.key])
     : _obfWizStepPage(st, sec, step);
+}
+
+// The offer chapter IS the existing training-offer wizard, wrapped in place
+// (spec 2026-07-18). The flow page shows a slim status strip, then mounts the
+// real Blueprint editor at the mapped section - saves, pickers and sub-modals
+// all work exactly as they do in the Blueprint, without leaving the flow.
+function _obfWizOfferPage(st, sec, step, bbSection) {
+  const ok = !!st[step.key];
+  let note = '';
+  const noteFn = step.note && (typeof window !== 'undefined' ? window[step.note] : null);
+  const n = (typeof noteFn === 'function') ? noteFn(st) : null;
+  if (n) {
+    const color = n.tone === 'good' ? 'var(--green,#4CC76A)' : 'var(--amber,#F0B84A)';
+    note = `<span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:${color}">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${n.tone === 'good' ? '<path d="M20 6 9 17l-5-5"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>'}</svg>${n.text}
+      ${n.cta ? `<button onclick="${n.go}" style="background:none;border:1px solid var(--amber,#F0B84A);border-radius:6px;color:var(--amber,#F0B84A);padding:2px 9px;font:inherit;font-size:10.5px;font-weight:700;cursor:pointer">${n.cta}</button>` : ''}
+    </span>`;
+  }
+  setTimeout(() => _obfWizOfferMount(bbSection), 0);
+  return `<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:2px 2px 12px">
+      <span style="flex:none;width:20px;height:20px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+      <span style="font-size:13px;font-weight:800;color:var(--text)">${step.title}</span>
+      ${step.launch && !ok ? `<span style="font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);border:1px solid var(--accent-border,rgba(212,182,92,.35));border-radius:5px;padding:1px 6px">Launch must-have</span>` : ''}
+      ${note}
+    </div>
+    <div id="obf-bb-host"><div class="bb-empty" style="padding:20px 0">Loading your offer…</div></div>`;
+}
+let _OBF_BB_MOUNTED = null; // offerId:section currently mounted in the flow
+function _obfWizOfferMount(sectionId) {
+  const hostEl = document.getElementById('obf-bb-host');
+  const oid = _OBF_STATE && _OBF_STATE.offer_id;
+  if (!hostEl || !oid) return;
+  const stepN = _obfStepForSection(sectionId);
+  const key = oid + ':' + sectionId;
+  _OBF_BB_MOUNTED = key;
+  const newHash = _bbBuildHash('offers', oid, { step: String(stepN) });
+  try { history.replaceState(null, '', window.location.pathname + window.location.search + newHash); } catch (_) {}
+  _bbRenderFromHash();
 }
 
 // ── PR-2 collection pages: save wizard answers into clients.onboarding_setup
@@ -23144,7 +23196,10 @@ function _bbRenderFromHash() {
     else titleEl.textContent = (_bbEffectiveCards().find(c => c.id === card)||{}).label || 'Business Blueprint';
   }
 
-  const panel = document.getElementById('bb-panel');
+  // The onboarding wizard embeds the offer editor in-place (spec 2026-07-18):
+  // while the flow overlay hosts obf-bb-host, every Blueprint render targets
+  // it - so field saves and internal re-renders stay INSIDE the flow.
+  const panel = document.getElementById('obf-bb-host') || document.getElementById('bb-panel');
   if (!panel) return;
 
   if (!card) return _bbRenderLanding(panel);
@@ -23444,18 +23499,8 @@ function _bbRenderGeneralCard(panel, meta) {
       <div class="bb-field-hint">Mailing address for the business (required). Locations you operate from live under BB &gt; Locations.</div>
     </div>
 
-    <div class="bb-field">
-      <div class="bb-field-label">Entity type</div>
-      <div class="bb-choice-row">${entityOpts.map(opt => {
-        const sel = opt === 'Other' ? isOtherEntity : entityType === opt;
-        return `<button type="button" class="bb-choice ${sel ? 'selected' : ''}" onclick="_bbGenSetEntity('${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>`;
-      }).join('')}</div>
-      ${isOtherEntity ? `
-      <input id="bb-gen-entity_other" type="text" class="bb-input" style="margin-top:8px"
-        value="${entityType === 'Other' ? '' : _bbEscapeHtml(entityType)}"
-        oninput="_bbGenOtherChanged()" placeholder="Specify entity type (e.g. Co-op, S-Corp)" />` : ''}
-    </div>
-
+    <!-- Entity type question CUT (wizard spec 2026-07-18 decision log: zero
+         code consumers). The column + RPC support stay; existing values keep. -->
     <div class="bb-field">
       <div class="bb-field-label">EIN <span class="bb-field-req">*</span></div>
       <input id="bb-gen-ein" type="text" class="bb-input" value="${v('ein')}"
@@ -23654,12 +23699,16 @@ function _bbRenderBrandCard(panel, meta) {
       <textarea id="bb-brand-story" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="How the academy started, why you coach, what you believe about development. A few sentences is plenty.">${v('story')}</textarea>
     </div>
     <div class="bb-field">
-      <div class="bb-field-label">Mission in one line</div>
-      <input id="bb-brand-mission" type="text" class="bb-input" oninput="_bbBrandChanged()" placeholder="e.g. 'Develop the complete player, on and off the court'" value="${v('mission')}" />
+      <div class="bb-field-label">Why should families choose you over other options?</div>
+      <textarea id="bb-brand-why_us" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="The honest answer, in your words. This becomes the strongest copy on your site.">${v('why_us')}</textarea>
     </div>
     <div class="bb-field">
-      <div class="bb-field-label">Vibe words</div>
-      <input id="bb-brand-vibe_words" type="text" class="bb-input" oninput="_bbBrandChanged()" placeholder="3 to 5 words, e.g. 'serious, welcoming, no-nonsense, family'" value="${v('vibe_words')}" />
+      <div class="bb-field-label">How would you describe your dream athletes?</div>
+      <textarea id="bb-brand-dream_athletes" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="Who thrives with you: age, mindset, what their parents care about.">${v('dream_athletes')}</textarea>
+    </div>
+    <div class="bb-field">
+      <div class="bb-field-label">Proof: results, credentials, stats, awards</div>
+      <textarea id="bb-brand-proof" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="Years coaching, players placed, championships, certifications. One per line.">${v('proof')}</textarea>
     </div>
 
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
@@ -23841,8 +23890,9 @@ function _bbBrandChanged() {
       stats:           document.getElementById('bb-brand-stats')?.value || '',
       notes:           document.getElementById('bb-brand-notes')?.value || '',
       story:           document.getElementById('bb-brand-story')?.value || '',
-      mission:         document.getElementById('bb-brand-mission')?.value || '',
-      vibe_words:      document.getElementById('bb-brand-vibe_words')?.value || '',
+      why_us:          document.getElementById('bb-brand-why_us')?.value || '',
+      dream_athletes:  document.getElementById('bb-brand-dream_athletes')?.value || '',
+      proof:           document.getElementById('bb-brand-proof')?.value || '',
     };
     return { brand_data: next };
   });
