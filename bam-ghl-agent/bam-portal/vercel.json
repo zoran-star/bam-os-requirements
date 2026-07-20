@@ -198,6 +198,14 @@
       "destination": "/api/google-oauth?step=callback"
     },
     {
+      "source": "/api/email/connect",
+      "destination": "/api/email/mailbox-connect?step=login"
+    },
+    {
+      "source": "/api/email/callback",
+      "destination": "/api/email/mailbox-connect?step=callback"
+    },
+    {
       "source": "/api/meta/staff-status",
       "destination": "/api/marketing?resource=meta-staff-status"
     },

@@ -46,7 +46,41 @@ Resend) - sending auth is separate from MX receiving, so they coexide fine.
 - Mirrors the Twilio SMS spine pattern EXACTLY (provider resolver + gate + inbound
   webhook + read branch + provider-switch UI) - build this the same way.
 
-## Build phases
+## BUILD STATUS
+- **Phase 0 (foundation) — BUILT, dormant, NOT yet applied to prod.** Migration
+  `supabase/migrations/20260720170000_email_mailbox_sync_foundation.sql`:
+  `client_mailboxes` table (one per academy, encrypted refresh token via
+  `messaging/_crypto.js`), `email_messages.provider` check extended to
+  gmail/outlook/imap, + mailbox threading/idempotency columns. **Apply to prod via
+  MCP** (like the sibling spine foundations - local creds are stale, see the Twilio
+  note gotcha).
+- **Phase 1a (Gmail connect) — BUILT, needs env + Google setup to go live.**
+  - `api/email/_mailbox.js` — Google OAuth/token helpers + `client_mailboxes` I/O.
+  - `api/email/mailbox-connect.js` — `/api/email/connect` (login) + `/api/email/callback`.
+    Domain-validates the connected inbox against `clients.email_domain`, stores the
+    encrypted refresh token. Rewrites added to `vercel.json`.
+  - **Reuses the existing `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`** (same Google
+    Cloud project as the staff calendar OAuth) - just add the Gmail API + scopes +
+    the new redirect URI. Optional `EMAIL_OAUTH_BASE_URL` (default
+    portal.byanymeansbusiness.com).
+- **NEXT (not built): Phase 1b inbound sync + Phase 2 send routing.** Inbound =
+  poll each connected mailbox via Gmail history (cron) OR watch→Pub/Sub; Phase 2 =
+  `maybeSendEmailViaMailbox()` gate for human replies + inbox read-merge. Build +
+  test these AFTER the connect flow is proven end-to-end with GTA's real inbox.
+
+### What Zoran must do (Google-side, one-time, unblocks Phase 1a testing)
+1. Google Cloud Console → the existing OAuth project → **enable the Gmail API**.
+2. OAuth consent screen → add scopes `gmail.modify`, `gmail.send`,
+   `userinfo.email`. (These are RESTRICTED → app stays in **Testing** mode for now;
+   add GTA's `info@` as a test user. Full Google verification/CASA needed later for
+   many external academies.)
+3. Add redirect URI `https://portal.byanymeansbusiness.com/api/email/callback` to
+   the OAuth client.
+4. Confirm GTA's `clients.email_domain` = `byanymeanstoronto.ca` (connect blocks
+   with `no_domain_on_file` otherwise). `MESSAGING_ENC_KEY` already set (Twilio).
+5. Apply the Phase 0 migration to prod (MCP).
+
+## Build phases (original plan)
 **Phase 0 — schema + connection store**
 - New `client_mailboxes` (client_id, provider 'gmail'|'outlook'|'imap', email,
   oauth tokens *encrypted* (reuse `messaging/_crypto.js` AES-256-GCM), imap creds,
