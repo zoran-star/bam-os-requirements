@@ -147,8 +147,14 @@ Zoran icon), so a channel-per-client has nobody in it but us.
     kickoff → **#systems**
   - Marketing asks → **#marketing**
   - Content asks → **#content**
-  - Support / billing fixes / data fixes / feature ideas / agent corrections →
-    **#other**
+  - Support / **bug reports (Fix, "report a problem")** / billing fixes / data
+    fixes / feature ideas / agent corrections → **#other**
+- **#other = every client-reported ticket born from the icon.** The channel is
+  WHO GETS NOTIFIED, separate from WHO DOES THE WORK: a bug still gets fixed by
+  Systems, a billing fix still runs through Stripe by Systems, etc. #other is the
+  "a client reported/asked something" announcement rail; #systems stays the
+  proactive build/onboarding pipeline. (Bug routing to #other locked with Zoran
+  2026-07-20; his instinct, consistent with the rest of the icon lanes.)
 - Every ping carries the **academy name in the message text** (the channel is no
   longer per-academy).
 - Replaces `clients.slack_channel_id` (per-client) with 4 channel ids resolved by
