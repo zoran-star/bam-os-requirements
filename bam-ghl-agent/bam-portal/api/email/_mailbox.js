@@ -10,13 +10,13 @@ const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SER
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
-// Gmail scopes for 2-way sync: read inbound + send on the user's behalf, plus the
-// address so we can domain-validate the connection. gmail.modify lets us mark read
-// / apply labels later. These are RESTRICTED scopes -> the Google Cloud OAuth app
-// needs verification before non-test users can consent (see the build note).
+// Gmail scopes for 2-way sync. gmail.modify ALONE covers read + compose + send +
+// mark-read/label (Gmail's messages.send accepts gmail.modify), so we don't add a
+// separate gmail.send. userinfo.email lets us domain-validate the connection.
+// gmail.modify is a RESTRICTED scope -> the Google Cloud OAuth app needs
+// verification (CASA) before non-test users can consent; Testing mode is fine now.
 export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.modify",
-  "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/userinfo.email",
 ].join(" ");
 
