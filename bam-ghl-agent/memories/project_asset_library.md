@@ -22,7 +22,11 @@ Taxonomy (migrations `20260720120000_content_library_taxonomy.sql` +
   **client_users.id** (name-only rows OK), `display_name` snapshot
 - `client_content_skills` per-academy skill presets (6 defaults seeded per V2
   academy: ball-handling/shooting/game-iq/defense/athleticism/passing +
-  client custom) + `client_asset_skills` join
+  client custom) + `client_asset_skills` join. The 6 defaults are ALSO baked
+  into the client (`_AST_DEFAULT_SKILLS`) so chips render even pre-seed;
+  `_astEnsureSkillRow` lazily creates a missing preset row before first tag.
+- `client_asset_tags` (migration `20260720160000`): free-text "Extra tags" on
+  any asset, shown for EVERY content_type. Distinct from skills.
 - Conditional rules enforced in UI (tag modal `_astTagOpen`), not DB
 - Client writes blocked on `source='ticket'` assets (mirrors existing rule)
 - Tag UI = a **centered popup module** (`#ast-tag-modal`), NOT a side drawer.

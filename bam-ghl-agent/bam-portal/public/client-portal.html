@@ -12011,6 +12011,7 @@ let _AST_LIB_MODE = false;
 let _AST_SKILLS = [];        // client_content_skills rows (defaults + custom)
 let _AST_PEOPLE = {};        // asset_id -> client_asset_people rows
 let _AST_ASSET_SKILLS = {};  // asset_id -> [skill_slug]
+let _AST_TAGS = {};          // asset_id -> [free-text tag] (any content_type)
 const _AST_CONTENT_TYPES = [
   ['action',      'Action'],
   ['coaching',    'Coaching'],
@@ -12067,17 +12068,20 @@ async function openAssetsView() {
     // Content Library mode: pull the taxonomy alongside (skills + person tags).
     if (_AST_LIB_MODE) {
       try {
-        const [skills, people, askills] = await Promise.all([
+        const [skills, people, askills, atags] = await Promise.all([
           _sb.from('client_content_skills').select('id,slug,label,is_default,sort_order').eq('client_id', CLIENT_ID).order('sort_order'),
           _sb.from('client_asset_people').select('id,asset_id,role,contact_id,client_user_id,display_name').eq('client_id', CLIENT_ID),
           _sb.from('client_asset_skills').select('asset_id,skill_slug').eq('client_id', CLIENT_ID),
+          _sb.from('client_asset_tags').select('asset_id,tag').eq('client_id', CLIENT_ID),
         ]);
         _AST_SKILLS = _astMergeSkills(skills.data);
         _AST_PEOPLE = {};
         (people.data || []).forEach(p => { (_AST_PEOPLE[p.asset_id] = _AST_PEOPLE[p.asset_id] || []).push(p); });
         _AST_ASSET_SKILLS = {};
         (askills.data || []).forEach(s => { (_AST_ASSET_SKILLS[s.asset_id] = _AST_ASSET_SKILLS[s.asset_id] || []).push(s.skill_slug); });
-      } catch (_) { _AST_SKILLS = _astMergeSkills([]); _AST_PEOPLE = {}; _AST_ASSET_SKILLS = {}; }
+        _AST_TAGS = {};
+        (atags.data || []).forEach(t => { (_AST_TAGS[t.asset_id] = _AST_TAGS[t.asset_id] || []).push(t.tag); });
+      } catch (_) { _AST_SKILLS = _astMergeSkills([]); _AST_PEOPLE = {}; _AST_ASSET_SKILLS = {}; _AST_TAGS = {}; }
     }
     _renderAssets();
   } catch (e) {
@@ -12356,12 +12360,15 @@ function _astTaxRow(a) {
   const typeLabel = (_AST_CONTENT_TYPES.find(([v]) => v === a.content_type) || [])[1];
   const people = _AST_PEOPLE[a.id] || [];
   const skills = _AST_ASSET_SKILLS[a.id] || [];
+  const xtags = _AST_TAGS[a.id] || [];
   const bits = [];
   if (a.content_type === 'action' && typeof a.highlight === 'boolean') bits.push(a.highlight ? 'Highlight' : 'Lowlight');
   people.slice(0, 2).forEach(p => bits.push(p.display_name));
   if (people.length > 2) bits.push('+' + (people.length - 2));
   skills.slice(0, 2).forEach(s => { const sk = _AST_SKILLS.find(x => x.slug === s); if (sk) bits.push(sk.label); });
   if (skills.length > 2) bits.push('+' + (skills.length - 2));
+  xtags.slice(0, 2).forEach(t => bits.push('#' + t));
+  if (xtags.length > 2) bits.push('+' + (xtags.length - 2));
   return `<button type="button" class="ast-tax-row${typeLabel ? ' typed' : ''}" onclick="_astTagOpen('${a.id}')">
     <span class="ast-tax-type">${typeLabel || '+ What is this?'}</span>
     ${bits.length ? `<span class="ast-tax-bits">${escapeHTML(bits.join(' · '))}</span>` : (typeLabel ? '<span class="ast-tax-bits">Tag people + skills</span>' : '')}
@@ -12562,13 +12569,30 @@ function _astTagRender() {
       </div>
     </div>`;
 
-  // Conditional sections per locked taxonomy: action -> athletes+skills+hl;
-  // coaching -> staff; culture/testimonial -> athletes+staff; other -> none.
+  // Free-text "extra tags" - available for EVERY content type.
+  const tags = _AST_TAGS[a.id] || [];
+  const tagChips = tags.map(t =>
+    `<span class="ast-tag-person">${escapeHTML(t)}<button type="button" data-tag="${escapeHTML(t)}" onclick="_astRemoveTag(this.dataset.tag)" aria-label="Remove">&times;</button></span>`
+  ).join('');
+  const tagsSection = `
+    <div class="ast-tag-sec">
+      <div class="ast-tag-label">Extra tags</div>
+      <div class="ast-tag-people">${tagChips || '<span class="ast-tag-none">No extra tags yet</span>'}</div>
+      <div class="ast-tag-quickadd">
+        <input id="ast-tag-add" class="ast-tag-search" type="text" placeholder="Add a tag (e.g. championship, u13, drills)..."
+               onkeydown="if(event.key==='Enter'){event.preventDefault();_astAddTag();}">
+        <button type="button" class="ast-tag-qa-btn" onclick="_astAddTag()">Add</button>
+      </div>
+    </div>`;
+
+  // Conditional sections per locked taxonomy, PLUS extra tags on every type:
+  // action -> athletes+skills+hl; coaching -> staff; culture/testimonial ->
+  // athletes+staff; other -> just tags.
   let conditional = '';
-  if (a.content_type === 'action') conditional = athleteSection + skillsSection + hlSection;
-  else if (a.content_type === 'coaching') conditional = staffSection;
-  else if (a.content_type === 'culture' || a.content_type === 'testimonial') conditional = athleteSection + staffSection;
-  else if (a.content_type === 'other') conditional = '<div class="ast-tag-sec"><div class="ast-tag-none">Filed as general content. Add a clear label so we know what it is.</div></div>';
+  if (a.content_type === 'action') conditional = athleteSection + skillsSection + hlSection + tagsSection;
+  else if (a.content_type === 'coaching') conditional = staffSection + tagsSection;
+  else if (a.content_type === 'culture' || a.content_type === 'testimonial') conditional = athleteSection + staffSection + tagsSection;
+  else if (a.content_type === 'other') conditional = '<div class="ast-tag-sec"><div class="ast-tag-none">Filed as general content. Add a clear label and any tags so we know what it is.</div></div>' + tagsSection;
 
   const footer = frame
     ? `<div class="ast-tag-foot"><button type="button" class="ast-tag-done" onclick="_astTagClose()">Done</button></div>`
@@ -12778,6 +12802,34 @@ async function _astAddCustomSkill() {
     if (/duplicate|unique/i.test(e.message || '')) { if (inp) inp.value = ''; _astToggleSkill(slug); }
     else alert('Add failed: ' + (e.message || e));
   }
+}
+
+// Free-text extra tags - available on any content type; applies to every asset
+// in the session (single or upload batch).
+async function _astAddTag() {
+  const inp = document.getElementById('ast-tag-add');
+  const raw = (inp?.value || '').trim();
+  if (!raw) { inp?.focus(); return; }
+  const tag = raw.slice(0, 40);
+  const targets = _astTagTargets().filter(id => !((_AST_TAGS[id] || []).some(t => t.toLowerCase() === tag.toLowerCase())));
+  if (inp) inp.value = '';
+  if (!targets.length) { _astTagRender(); return; }
+  try {
+    const { error } = await _sb.from('client_asset_tags').insert(targets.map(id => ({ asset_id: id, client_id: CLIENT_ID, tag })));
+    if (error) throw error;
+    targets.forEach(id => { (_AST_TAGS[id] = _AST_TAGS[id] || []).push(tag); });
+    _astTagRender();
+    setTimeout(() => document.getElementById('ast-tag-add')?.focus(), 0);
+  } catch (e) { alert('Add tag failed: ' + (e.message || e)); }
+}
+
+async function _astRemoveTag(tag) {
+  try {
+    const { error } = await _sb.from('client_asset_tags').delete().in('asset_id', _astTagTargets()).eq('tag', tag);
+    if (error) throw error;
+    _astTagTargets().forEach(id => { _AST_TAGS[id] = (_AST_TAGS[id] || []).filter(t => t !== tag); });
+    _astTagRender();
+  } catch (e) { alert('Remove tag failed: ' + (e.message || e)); }
 }
 
 function _astStaffQuickAddToggle() {
