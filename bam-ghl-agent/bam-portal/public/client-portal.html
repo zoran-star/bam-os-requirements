@@ -11750,19 +11750,8 @@ Then the call to action."]</div>
       </button>
     </div>
 
-    <div class="view" id="view-settings">
-      <div class="topbar">
-        <div>
-          <span class="topbar-kicker">§ Settings</span>
-          <div class="topbar-title">Settings</div>
-        </div>
-      </div>
-      <div class="content">
-        <div id="settings-body">
-          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div>
-        </div>
-      </div>
-    </div>
+    <!-- #view-settings moved OUT of .main (focus overlay, just after .main) so it
+         opens in focus mode like Business Blueprint, not as an in-.main view. -->
 
     <div class="view" id="view-train-agent">
       <div class="topbar">
@@ -11871,6 +11860,18 @@ Then the call to action."]</div>
         <div class="topbar-title" id="bb-topbar-title" style="display:none">Business Blueprint</div>
       </div>
       <div id="bb-panel"><!-- rendered by openBlueprintView() based on hash --></div>
+    </div>
+  </div>
+
+  <!-- Settings focus overlay (mirrors Business Blueprint). Owner-only; opened by
+       openSettingsFocus() from the sidebar nav + the command-center gear menu. -->
+  <div class="modal-backdrop mm-focus-page" id="view-settings" style="display:none" onclick="if(event.target===this)closeSettings()">
+    <div class="modal-card mm-modal-card bb-focus-card" onclick="event.stopPropagation()">
+      <div class="bb-focus-head">
+        <button type="button" class="mm-back-btn" onclick="closeSettings()">&lsaquo; Back</button>
+        <span class="topbar-kicker">§ Settings</span>
+      </div>
+      <div id="settings-body"><div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div></div>
     </div>
   </div>
 
@@ -19142,6 +19143,14 @@ function switchView(name, el) {
     openCalendar();
     return;
   }
+  // Settings is a focus-mode overlay (like Blueprint/Calendar), not an in-.main
+  // view: pop it over the current page and return. Placed before the command-
+  // center check so it opens cleanly without the cc-classic chrome. Owner-gated.
+  if (name === 'settings') {
+    if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed('settings')) { switchView(_landingView ? _landingView() : 'home'); return; }
+    openSettingsFocus();
+    return;
+  }
   // Command center (beta): while the one-page flow is active, section-mapped
   // views scroll to their section instead of swapping views; anything else
   // opens classically with a "back to command center" pill. _CC_BYPASS lets
@@ -19181,6 +19190,8 @@ function switchView(name, el) {
   // Same for the Calendar focus overlay: if it's open and we're heading to any
   // other view, step out of it first (the target view then swaps in normally).
   if (name !== 'calendar' && typeof _calIsOpen === 'function' && _calIsOpen()) _mmCloseFocus('view-calendar');
+  // Same for the Settings focus overlay: step out if heading elsewhere.
+  if (name !== 'settings' && typeof _settingsIsOpen === 'function' && _settingsIsOpen()) closeSettings();
   if (name === 'blueprint') {
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
     if (!el) el = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'blueprint'"));
@@ -19241,7 +19252,7 @@ function switchView(name, el) {
 
   if (name === 'resources') openResourcesView();
 
-  if (name === 'settings') openSettingsView();
+  // Settings renders via its focus overlay (openSettingsFocus), not here.
 
   if (name === 'assets') { _AST_LIB_MODE = false; _ASSETS_HOST_ID = 'assets-content'; openAssetsView(); }
 
@@ -24515,6 +24526,40 @@ function closeBlueprint() {
   try { syncMobileNav(back); } catch (_) {}
 }
 async function openBlueprintView() { _bbRenderFromHash(); }
+
+// ── Settings focus overlay (mirrors openBlueprint/closeBlueprint) ──
+// #view-settings lives OUTSIDE .main so the camera-pan doesn't blank it. Opened
+// from the sidebar nav + the command-center gear menu; Back / backdrop closes it.
+let _SET_RETURN = null;
+function _settingsIsOpen() { return !!document.getElementById('view-settings')?.classList.contains('mm-open'); }
+function openSettingsFocus() {
+  const modal = document.getElementById('view-settings');
+  if (!modal) return;
+  if (!_settingsIsOpen()) {
+    const cur = document.querySelector('.view.active');
+    _SET_RETURN = cur ? cur.id.replace('view-', '') : null;
+  }
+  try { openSettingsView(); } catch (_) {}   // render integrations + time zone before the pan
+  if (typeof _ccOpenFocusPage === 'function') {
+    _ccOpenFocusPage('view-settings', '#nav-settings');
+  } else {
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => { document.documentElement.classList.add('mm-focus-open'); modal.classList.add('mm-open'); });
+  }
+}
+function closeSettings() {
+  if (typeof _mmCloseFocus === 'function') _mmCloseFocus('view-settings');
+  else {
+    const m = document.getElementById('view-settings');
+    if (m) { m.classList.remove('mm-open'); m.style.display = 'none'; }
+    document.documentElement.classList.remove('mm-focus-open');
+  }
+  const back = _SET_RETURN || (typeof _landingView === 'function' ? _landingView() : 'home');
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
+  if (item) item.classList.add('active');
+  try { syncMobileNav(back); } catch (_) {}
+}
 
 // ── Calendar focus overlay (mirrors openBlueprint/closeBlueprint) ──
 // Calendar lives OUTSIDE .main (sibling of it) so the mm-focus-open camera-pan
@@ -55561,7 +55606,7 @@ function _ccDockPop(kind) {
       // (integrations + time zone) is only reachable from here. Opens the classic
       // view over the CC. Owner / BAM staff only.
       ((_MY_TAB_ROLE === 'owner' || _IS_BAM_STAFF === true)
-        ? `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_ccOpenClassic('settings')">Settings</button>`
+        ? `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');switchView('settings')">Settings</button>`
         : '') +
       `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
       `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
