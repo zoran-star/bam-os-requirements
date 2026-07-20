@@ -32,7 +32,7 @@ Replaces client-facing Slack. Build chunks when we pick it up:
 |---|---|
 | T1 | Unified tickets table + statuses + the tickets page (left circle) |
 | T2 | The icon front door: 4 lanes + orchestrator (classify + slot-fill) + bug/feature intake agents |
-| T3 | Notification rail: staff Slack pings + client SMS on status change (rides the phone spine) |
+| T3 | Notification rail: staff Slack pings + client SMS on status change (rides the phone spine). **DECIDED 2026-07-20: staff pings go to 4 TEAM channels by function - #systems / #marketing / #content / #other - NOT per-client (clients are off Slack). Retrofits WS7 front door + WS3 build pings, removes the Slack channels:manage scope. See [`track2-handoff.md`](track2-handoff.md).** |
 | T4 | Point-of-action side doors (flag-this-reply on Inbox, editor send-to-team, import leftovers, billing panel) |
 | T5 | Staff side: command palette + pre-worked queue (agent drafts, staff approves) |
 | T6 | Pipes: feature ticket → Notion Backlog · ship → "your idea is live" SMS |

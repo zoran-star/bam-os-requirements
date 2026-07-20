@@ -64,6 +64,30 @@ becomes a ticket.
 
 ---
 
+## Decided already - do NOT re-litigate
+
+**Staff notifications = 4 TEAM channels by function, not per-client (Zoran, 2026-07-20).**
+Clients are off Slack in V2, so a channel-per-client has nobody in it but us.
+Replace `clients.slack_channel_id` (per-client) with a fixed set of team
+channels resolved by name (bot needs `channels:read`, NOT `channels:manage`).
+
+| Ping | Channel |
+|---|---|
+| Build pipeline (deck, pages, templates, agreement) + new-academy kickoff | `#systems` |
+| Marketing asks | `#marketing` |
+| Content asks | `#content` |
+| Support / billing / data fixes / feature ideas / agent corrections | `#other` |
+
+Every ping carries the academy name in the message text. This IS the staff side
+of the notification rail (T3) - design T3 around it. Building it also lets us
+retrofit the shipped Add Academy front door (WS7) + onboarding build pings (WS3):
+drop the per-client `conversations.create`, repoint to `#systems`. That removes
+the Slack `channels:manage` scope requirement entirely. One-time setup: Zoran
+creates the 4 channels + invites the BAM bot; resolve ids by name. Surface it as
+a plan first (plan-confirm-build), do not silently build.
+
+---
+
 ## The requirements agenda (co-work these WITH Zoran)
 
 These are the open questions the design left pending. This is your session
