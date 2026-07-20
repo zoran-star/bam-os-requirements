@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { maybeSendSmsViaProvider } from "../messaging/provider.js";
 import { emailProvider, maybeSendEmailViaResend } from "../messaging/email-provider.js";
+import { maybeSendEmailViaMailbox } from "../email/mailbox-send.js";
 import { maybeSendDmViaMeta } from "../meta/_dm.js";
 // Vercel Serverless Function — GHL: send SMS or Email to an academy parent.
 //
@@ -367,6 +368,22 @@ async function handler(req, res) {
         if (!g.ok) { await logSend({ status: "failed", error: g.error }); return res.status(502).json({ error: `Twilio send failed: ${g.error}` }); }
         await logSend({ status: "sent", ghl_message_id: g.sid || null });
         return res.status(200).json({ ok: true, sent_via: "twilio", message_id: g.sid || null });
+      }
+    }
+    // Provider gate (Email, HUMAN reply): academies with a connected mailbox send
+    // human replies via their OWN inbox (Gmail) so it lands in their real Sent and
+    // threads natively. Runs BEFORE Resend - bulk/automated email (agents, _send.js)
+    // never comes through here, so it stays on Resend. Falls through if no mailbox.
+    if (type === "Email") {
+      let toEmail = body.contact_email || null;
+      if (!toEmail) {
+        try { const r = await sb(`contacts?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=email&limit=1`); toEmail = r && r[0] && r[0].email; } catch (_) {}
+      }
+      const g = await maybeSendEmailViaMailbox(clientId, { toEmail, subject, html: html || `<p>${message}</p>`, text: message, ghlContactId: contactId, sentBy: (ctx.user && ctx.user.email) || "staff", contactName: body.contact_name || null });
+      if (g.handled) {
+        if (!g.ok) { await logSend({ status: "failed", error: g.error }); return res.status(502).json({ error: `Mailbox send failed: ${g.error}` }); }
+        await logSend({ status: "sent", ghl_message_id: g.id || null });
+        return res.status(200).json({ ok: true, sent_via: "gmail", message_id: g.id || null });
       }
     }
     // Provider gate (Email): Resend academies send via Resend + own-store.

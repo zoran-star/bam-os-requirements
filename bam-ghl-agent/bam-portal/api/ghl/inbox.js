@@ -3,6 +3,7 @@ import { smsProvider } from "../messaging/provider.js";
 import { readStoreThreadInbox, readStoreThreadById, listStoreThreads } from "../messaging/read-thread.js";
 import { emailProvider } from "../messaging/email-provider.js";
 import { readEmailStoreThreadInbox, readEmailStoreThreadById, listEmailStoreThreads } from "../messaging/email-read-thread.js";
+import { hasActiveMailbox } from "../email/_mailbox.js";
 import { metaDmConfig, listDmThreads, readDmThreadById, readDmThreadInbox } from "../meta/_dm.js";
 // Vercel Serverless Function — Per-academy GHL Inbox
 //
@@ -487,7 +488,12 @@ async function handler(req, res) {
   try {
     const [smsOn, emailOn, metaCfg] = await Promise.all([
       smsProvider(clientId).then((p) => p === "twilio").catch(() => false),
-      emailProvider(clientId).then((p) => p === "resend").catch(() => false),
+      // Email store is on when the academy sends bulk via Resend OR has a connected
+      // mailbox (Gmail) - both write to email_threads/email_messages, same read path.
+      Promise.all([
+        emailProvider(clientId).then((p) => p === "resend").catch(() => false),
+        hasActiveMailbox(clientId).catch(() => false),
+      ]).then(([r, mb]) => r || mb),
       metaDmConfig(clientId, { requireInboxLive: true }).catch(() => null),
     ]);
     const metaOn = !!metaCfg;
