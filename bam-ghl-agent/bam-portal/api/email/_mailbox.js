@@ -91,8 +91,12 @@ export async function hasActiveMailbox(clientId) {
 // Load a client's connected mailbox row (or null). Decrypts nothing by itself.
 export async function getMailbox(clientId) {
   if (!clientId) return null;
-  const rows = await sb(`client_mailboxes?client_id=eq.${encodeURIComponent(clientId)}&limit=1`);
-  return (rows && rows[0]) || null;
+  // Fail SAFE: return null on any error (incl. the table not existing pre-migration)
+  // so the send gate falls through to Resend/GHL instead of erroring a send.
+  try {
+    const rows = await sb(`client_mailboxes?client_id=eq.${encodeURIComponent(clientId)}&limit=1`);
+    return (rows && rows[0]) || null;
+  } catch (_) { return null; }
 }
 
 // Upsert a Google mailbox connection (one per academy).
