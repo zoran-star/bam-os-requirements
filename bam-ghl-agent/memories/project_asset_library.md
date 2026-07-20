@@ -27,6 +27,11 @@ Taxonomy (migrations `20260720120000_content_library_taxonomy.sql` +
   `_astEnsureSkillRow` lazily creates a missing preset row before first tag.
 - `client_asset_tags` (migration `20260720160000`): free-text "Extra tags" on
   any asset, shown for EVERY content_type. Distinct from skills.
+- **Audio assets (2026-07-20):** uploads accept `audio/*` everywhere content is
+  imported; `audio/*` -> category `'audio'` (added to `_ASSET_CATS`); "Audio"
+  filter tab; audio renders as `<audio controls>` in the grid card, tag-popup
+  thumb, and the Meta creative-flow picker. client-assets bucket is unrestricted
+  (works now); ticket-files MIME widened by migration `20260720210000`.
 - Conditional rules enforced in UI (tag modal `_astTagOpen`), not DB
 - Client writes blocked on `source='ticket'` assets (mirrors existing rule)
 - Tag UI = a **centered popup module** (`#ast-tag-modal`), NOT a side drawer.
