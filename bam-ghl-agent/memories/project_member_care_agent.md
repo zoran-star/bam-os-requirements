@@ -16,6 +16,15 @@ input that writes an `agent_lessons` row (`agent='member_care'` bucket, auto pic
 up by `/consolidate-lessons`). Refunds/coupons are deliberately NOT proposable -
 the prompt routes those to a to-do.
 
+**On-demand "Ask the agent" button** (added 2026-07-20): a manual per-conversation
+trigger in the member drawer (gold outline button above the composer, hidden once a
+card is showing). Endpoint action `draft-now {client_id, member_id}` runs the SAME
+draft for one member on demand and works REGARDLESS of `member_care_agent_mode` (the
+toggle only gates the background cron/webhook sweep; an explicit human click always
+runs). Driven by `opts.manual` in `draftMemberCareForMember`, which bypasses the
+automatic-run guards (mute, wait-for-parent, this-inbound dedup) but still refuses to
+stack a second card when one is already pending (returns `{skipped, existing:true}`).
+
 ## Pieces
 
 | Piece | Where |

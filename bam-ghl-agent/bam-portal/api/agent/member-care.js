@@ -220,21 +220,28 @@ export async function cancelPendingMemberCards(clientId, memberId, note) {
 // client: clients row (id, business_name, ghl_* creds fields, ghl_kpi_config)
 // member: members row with MEMBER_CARE_SELECT columns
 // opts:   { token, locationId }  - GHL creds (omit for Twilio academies)
-//         { createdBy }          - 'detector' | 'webhook-fastpath'
-// Returns { inserted: true, card } | { skipped: reason } | { error }.
+//         { createdBy }          - 'detector' | 'webhook-fastpath' | 'manual'
+//         { manual }             - true when a human clicked "Ask the agent" on a
+//                                  conversation. Bypasses the automatic-run guards
+//                                  (mute, wait-for-parent, this-inbound dedup) since
+//                                  it's an explicit request; still refuses to make a
+//                                  SECOND card when one is already pending.
+// Returns { inserted: true, card } | { skipped: reason, existing? } | { error }.
 export async function draftMemberCareForMember(client, member, opts = {}) {
   if (!ANTHROPIC_KEY) return { error: "ANTHROPIC_API_KEY not configured" };
+  const manual = !!opts.manual;
   const contactId = member.ghl_contact_id;
   if (!contactId) return { skipped: "member has no ghl_contact_id" };
-  if (await isMuted(client.id, contactId, "member_care")) return { skipped: "muted" };
+  if (!manual && await isMuted(client.id, contactId, "member_care")) return { skipped: "muted" };
 
-  // Dedup guard 1: an active card already covers this member.
+  // Dedup guard 1: an active card already covers this member. (A manual ask still
+  // won't stack a second card - the existing one is surfaced to the UI instead.)
   const existing = await sb(
     `agent_member_cards?client_id=eq.${client.id}&member_id=eq.${member.id}` +
     `&order=created_at.desc&select=id,status,last_inbound_at&limit=1`
   ).catch(() => []);
   const last = Array.isArray(existing) && existing[0];
-  if (last && last.status === "pending") return { skipped: "already has a pending card" };
+  if (last && last.status === "pending") return { skipped: "already has a pending card", existing: true };
 
   // Read the thread (GHL or the Twilio own-store).
   const provider = await smsProvider(client.id);
@@ -250,14 +257,17 @@ export async function draftMemberCareForMember(client, member, opts = {}) {
   if (!messages || !messages.length) return { skipped: "empty thread" };
 
   const lastInbound = [...messages].reverse().find(m => m.role === "parent");
-  if (!lastInbound) return { skipped: "no inbound from parent" };
-  // Only draft when the parent is the one waiting on us.
-  if (messages[messages.length - 1].role !== "parent") return { skipped: "last message is outbound" };
-  const lastInboundAt = lastInbound.date ? new Date(lastInbound.date).toISOString() : null;
+  // Automatic runs need a parent waiting on us; a manual ask can recommend off the
+  // whole thread even when we replied last (or the parent never texted first).
+  if (!manual) {
+    if (!lastInbound) return { skipped: "no inbound from parent" };
+    if (messages[messages.length - 1].role !== "parent") return { skipped: "last message is outbound" };
+  }
+  const lastInboundAt = lastInbound && lastInbound.date ? new Date(lastInbound.date).toISOString() : null;
   // Dedup guard 2: we already carded THIS inbound (timestamp match, like the
-  // booking detector's last_lead_at check). A canceled/resolved card on the same
-  // inbound means a human or a newer draft already covered it.
-  if (last && last.last_inbound_at && lastInboundAt &&
+  // booking detector's last_lead_at check). Skipped for a manual ask - the human
+  // explicitly wants a fresh look even if we drafted for this inbound before.
+  if (!manual && last && last.last_inbound_at && lastInboundAt &&
       new Date(last.last_inbound_at).getTime() === new Date(lastInboundAt).getTime()) {
     return { skipped: "already drafted for this inbound" };
   }
@@ -333,7 +343,7 @@ export async function draftMemberCareForMember(client, member, opts = {}) {
     escalate: !!out.escalate, escalate_reason: out.escalate_reason || null,
     summary: out.summary ? String(out.summary).slice(0, 600) : null,
     thread_tail: messages.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "parent", text: String(m.text).slice(0, 2000), at: m.date || null })),
-    last_message: String(lastInbound.text).slice(0, 500),
+    last_message: lastInbound ? String(lastInbound.text).slice(0, 500) : null,
     last_inbound_at: lastInboundAt,
     status: "pending",
     created_by: opts.createdBy || "detector",
