@@ -136,6 +136,35 @@ design's separate "tickets page" into the popout - one support home in reach.
 The 4 lanes stay as designed: 1 Where do I…? (Navigator) · 2 Get help from our
 team (Support) · 3 Report a problem (Bug) · 4 Suggest a feature (Feature).
 
+**T3 notification rail - staff channels LOCKED (Zoran, via onboarding chat
+2026-07-20). Carry this; do NOT build until T3.**
+Staff notifications go to a fixed set of **4 TEAM channels by FUNCTION**, NOT a
+Slack channel per client. Clients are off Slack in V2 (the whole point of the
+Zoran icon), so a channel-per-client has nobody in it but us.
+- Channels: **#systems · #marketing · #content · #other**
+- Routing:
+  - Build-pipeline pings (deck, pages, templates, agreement) + new-academy
+    kickoff → **#systems**
+  - Marketing asks → **#marketing**
+  - Content asks → **#content**
+  - Support / billing fixes / data fixes / feature ideas / agent corrections →
+    **#other**
+- Every ping carries the **academy name in the message text** (the channel is no
+  longer per-academy).
+- Replaces `clients.slack_channel_id` (per-client) with 4 channel ids resolved by
+  NAME. Bot needs `channels:read`, NOT `channels:manage`.
+- **Retrofit when built:** already-shipped onboarding code creates/uses
+  per-client channels - the Add Academy front door (WS7,
+  `api/clients.js action=create-academy`) and the build-pipeline pings (WS3,
+  `api/offers/setup-status.js evaluateChunks`). Drop the per-client
+  `conversations.create`, repoint pings to #systems. That removes the
+  `channels:manage` scope entirely (one less one-time setup).
+- One-time setup (when built): Zoran creates the 4 channels + invites the BAM
+  bot; resolve ids by name.
+- **Design T3 around these 4 function channels + client SMS**, never per-client
+  channels. Surface it as a plan (plan-confirm-build) when T3 comes up, or sooner
+  if the front door / onboarding pings get touched.
+
 **Build path agreed:**
 1. **NOW:** front-end-ONLY popout template (live tickets list with MOCK data + 4
    lane buttons + free-type box). Visual only, no backend, no agent. Replaces the
