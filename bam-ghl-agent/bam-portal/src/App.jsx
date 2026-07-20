@@ -195,6 +195,7 @@ export default function BAMPortal() {
     "coleman@byanymeansbball.com", "coleman@byanymeansbusiness.com",
     "cam@byanymeansbball.com", "cam@byanymeansbusiness.com",
     "cameron@byanymeansbball.com", "cameron@byanymeansbusiness.com",
+    "admin@byanymeansbusiness.com",
   ];
   const canSeeOurAds = !!me && OUR_ADS_ALLOWLIST.includes((session?.user?.email || "").toLowerCase());
   // Channel dashboard hidden from portal (Cole's basketball acquisition
