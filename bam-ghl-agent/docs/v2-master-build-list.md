@@ -48,8 +48,8 @@ The T1-T6 chunks are superseded by the approved P1-P6 bundle:
 | # | Chunk | Status |
 |---|---|---|
 | T2-a | Icon popout FE template + bug/feature lanes bridged to old feedback modal | ✅ built 2026-07-20 (PR #1504) |
-| P1 | Content Library: taxonomy migration + rename + V2 BB focus card + circle menu + conditional tagging UI + "keep adding" nudge | ⬅ IN PROGRESS |
-| P2 | Library search (api/content-library.js) + staff-side browser | after P1 |
+| P1 | Content Library: taxonomy migration + rename + V2 BB focus card + circle menu + conditional tagging UI + "keep adding" nudge | ✅ built 2026-07-20 (PR #1504) |
+| P2 | Library search (api/content-library.js) + staff-side browser | ⬅ NEXT |
 | P3 | Ad request flow + RAIL CORE (v2_tickets + v2_ticket_messages + api/v2-tickets.js, notify stubbed) · angle content_types authoring · offer → angle → guide → optional library attach → content_ask | after P1 |
 | P4 | Systems wiring: _v2Submit/_mmcSubmit → rail · staff V2 queue view · portal_feedback backfill · /v2-tickets repoint | after P3 |
 | P5 | Icon popout LIVE: real reads + realtime, lanes create tickets | after P3 |

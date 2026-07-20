@@ -6,6 +6,29 @@ asset). Replaces ad-hoc per-offer-only assets + hardcoded site images. Pairs
 with the unified site design system (tokens live in git `bam-client-sites`;
 images live here in Supabase, fed by the Business Blueprint).
 
+## V2 = "Content Library" + content taxonomy (Track 2 P1, 2026-07-20)
+
+On V2 the library is surfaced as the **Content Library**: a V2 Business
+Blueprint card (`content_library` in `_bbEffectiveCards`, renderer
+`_bbRenderContentLibrary`) + an orb-fan quick entry; the standalone Assets
+left-nav item is HIDDEN for V2 (V1 keeps it; V1.5 keeps its `assets` BB card).
+`_AST_LIB_MODE` gates the taxonomy UI.
+
+Taxonomy (migration `20260720120000_content_library_taxonomy.sql`, applied to
+prod):
+- `client_assets.content_type` (action|coaching|culture|testimonial) +
+  `highlight` bool (action only)
+- `client_asset_people`: athlete tags → **contacts.id**, staff tags →
+  **client_users.id** (name-only rows OK), `display_name` snapshot
+- `client_content_skills` per-academy skill presets (6 defaults seeded per V2
+  academy: ball-handling/shooting/game-iq/defense/athleticism/passing +
+  client custom) + `client_asset_skills` join
+- Conditional rules enforced in UI (tag drawer `_astTagOpen`), not DB
+- Client writes blocked on `source='ticket'` assets (mirrors existing rule)
+
+Core handoff: `docs/core-handoff/content-library-tickets.md`. Full Track 2
+context: `docs/zoran-icon-ticket-design.md` "T-SCOPE OUTCOME".
+
 ## Schema (migration `20260615120000_client_assets_library.sql`)
 - Table **`client_assets`**: `client_id` → clients; `label`, `category`
   (logo|wordmark|hero|photo|**video**|crest|icon|og|favicon|other), `alt`, `storage_path`,
