@@ -23,7 +23,7 @@ As more offer types come online each gets its own group; general steps stay shar
 ## Steps live today
 1. **Add your business tax ID** (general) -> Blueprint General. Auto-completes when `clients.ein` is set. **Skippable** (`skippable:true`): Canadian businesses without an EIN/BN click "Not applicable - skip for now" (localStorage `bam_obf_skip_<clientId>`, cleared automatically once a real EIN lands) so the flow can still reach 100%.
 2. **Connect your email domain** (general) -> Domains wizard
-3. **Launch your new website** (general) -> Domains wizard. Detector also recognizes **pre-wizard hand-wired sites** (GTA): when `website_setup` is empty it probes `clients.allowed_domains` against the sites Vercel project.
+3. **Launch your new website** (general) -> Domains wizard. Detector also recognizes **pre-wizard hand-wired sites** (GTA): when `website_setup` is empty it probes `clients.allowed_domains` against the sites Vercel project. **Staging/system hosts are excluded** (2026-07-20): `*.vercel.app` (the shared `bam-client-sites.vercel.app` staging host) and `portal.byanymeansbusiness.com` ride in `allowed_domains` too, so `api/website/domain-setup.js` status filters them out - only a REAL custom domain can read as "live on your new site" (else the staging URL showed as live). Website step correctly stays not-done until the real domain resolves.
 4. **Import your members** (training offer) -> Blueprint Member Onboarding card
 
 ## Custom values tied end to end (offer.js, 2026-07-09)

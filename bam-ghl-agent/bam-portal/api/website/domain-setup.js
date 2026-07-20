@@ -134,7 +134,12 @@ async function handler(req, res) {
         // by hand, so website_setup is empty even though the site is LIVE.
         // Detect it from allowed_domains so status (and the onboarding flow's
         // website step) reports the truth instead of "none".
-        const candidates = [...new Set((client.allowed_domains || []).map(normalizeDomain).filter(Boolean))].slice(0, 4);
+        // A real custom domain only - never the shared Vercel staging host
+        // (bam-client-sites.vercel.app) or the portal itself. Both ride in
+        // allowed_domains and are attached to the sites project, so without
+        // this filter the staging URL reads as "live on your new site".
+        const isSystemDomain = (d) => /\.vercel\.app$/i.test(d) || d === "portal.byanymeansbusiness.com";
+        const candidates = [...new Set((client.allowed_domains || []).map(normalizeDomain).filter(Boolean))].filter((d) => !isSystemDomain(d)).slice(0, 4);
         for (const dom of candidates) {
           const onProject = await vercel("GET", `/v9/projects/${encodeURIComponent(SITES_PROJECT)}/domains/${encodeURIComponent(dom)}${vercelQs()}`).catch(() => null);
           if (!onProject || !onProject.name) continue; // not attached to our sites project
