@@ -17132,8 +17132,22 @@ async function _obfInboxGo() {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { _plToast('Enter the inbox address to connect (e.g. info@yourdomain.com)'); return; }
   const token = await _mreqAuthToken();
   if (!token) { _plToast('Please sign in again, then reconnect.'); return; }
+  // Remember to reopen the wizard on this step when Google sends us back.
+  try { sessionStorage.setItem('bam_obf_return_step', 'inbox'); } catch (_) {}
+  document.getElementById('obf-inbox-modal')?.remove();
+  _obfInboxLoading();
   const url = '/api/email/connect?' + new URLSearchParams({ token, client_id: CLIENT_ID, email, ret: window.location.origin });
   window.location.href = url;
+}
+// Full-screen "opening Google" state during the OAuth hand-off. The current page
+// stays visible until Google's screen loads, so this is the last thing they see.
+function _obfInboxLoading() {
+  document.getElementById('obf-inbox-loading')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div id="obf-inbox-loading" style="position:fixed;inset:0;background:var(--surface,#0b0b0d);z-index:9300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;text-align:center;padding:24px">
+    <span class="req-spin" style="width:34px;height:34px"></span>
+    <div style="font-family:var(--font-ui);font-weight:700;font-size:16px;color:var(--text)">Opening Google…</div>
+    <div style="font-size:12.5px;color:var(--text-mute);max-width:280px;line-height:1.5">Sign in and click Allow. We'll bring you right back to this step.</div>
+  </div>`);
 }
 
 // Handle the OAuth return (?mailbox=connected|error). Toasts the result, kicks an
@@ -17165,6 +17179,16 @@ async function _mbxBoot() {
         : (reason || 'please try again');
       _plToast('Inbox connect failed - ' + human + '.');
     }
+    // Reopen the onboarding wizard on the step they left from (survives the
+    // Google round-trip via sessionStorage; same tab, same origin).
+    try {
+      const back = sessionStorage.getItem('bam_obf_return_step');
+      if (back) {
+        sessionStorage.removeItem('bam_obf_return_step');
+        await _obfOpen();
+        _obfWizJumpKey(back);
+      }
+    } catch (_) {}
   } catch (_) {}
 }
 
