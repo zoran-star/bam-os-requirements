@@ -374,6 +374,15 @@ session):**
   rail. No pointing Meta at a dead URL.
 
 **Client-side creative flows (LOCKED 2026-07-20 pt 2):**
+- **STEPPED WIZARD, not a single scroll (LOCKED).** The new-creative request is
+  one decision per screen with a progress bar: (1) pick an angle -> (2) the
+  playbook (that angle's guide - why it works, film it, the beats; gets its own
+  moment so it's actually read) -> (3) add content (library picker filtered to
+  the angle's types + tagged upload) -> (4) brief (optional) -> (5) review ->
+  (6) sent. Matches the onboarding-wizard pattern. **Convert P3a's single-scroll
+  `_mmc` modal into this wizard.** Edit / Replace reuse screens 2-5 but open on
+  the ad being changed first (Replace shows why it's tired; Edit shows the note
+  field).
 - **Three client modals, verdict-driven: New / Edit / Replace.** Which door the
   client sees follows the ad's Marketing Machine verdict chip: keep -> nothing,
   edit -> "Tweak this ad" (note + optional content, SAME ad, no angle change),
