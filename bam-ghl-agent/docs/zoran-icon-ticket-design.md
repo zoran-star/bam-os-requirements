@@ -383,6 +383,19 @@ session):**
   `_mmc` modal into this wizard.** Edit / Replace reuse screens 2-5 but open on
   the ad being changed first (Replace shows why it's tired; Edit shows the note
   field).
+- **ONE ANGLE = ONE CREATIVE (LOCKED).** An angle is bound to a creative 1:1.
+  Editing a creative NEVER changes its angle (Edit shows the ad's current angle
+  as a READ-ONLY playbook reference so the tweak stays on-angle); switching
+  angle = a Replace (which presents the angle picker + full playbook). New picks
+  an angle. Keeps Edit (tweak, keep learning) and Replace (fresh, retire)
+  distinct.
+- **Angle education surfaces (LOCKED: A + all creative flows).** Cam's guide
+  cards (the "playbook") show in: the wizard step 2; Replace's angle screen;
+  Edit as a read-only current-angle reference; AND **(A) a browsable "Playbook"
+  in the Content Library** - every angle + what content to capture for it, so
+  education is PROACTIVE (the library fills with the right raw material before an
+  ad is ever requested). Same guide-card data, more doors. Not selected (easy
+  future adds): a tag-time one-line tip (B), an ads-verdict nudge (C).
 - **Three client modals, verdict-driven: New / Edit / Replace.** Which door the
   client sees follows the ad's Marketing Machine verdict chip: keep -> nothing,
   edit -> "Tweak this ad" (note + optional content, SAME ad, no angle change),
