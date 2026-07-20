@@ -2009,6 +2009,7 @@ const INTERNAL_ADS_EDITORS = new Set([
   "coleman@byanymeansbball.com", "coleman@byanymeansbusiness.com",
   "cam@byanymeansbball.com", "cam@byanymeansbusiness.com",
   "cameron@byanymeansbball.com", "cameron@byanymeansbusiness.com",
+  "admin@byanymeansbusiness.com",
 ]);
 async function handleMetaAdAccounts(req, res) {
   const ctx = await resolveUser(req);
