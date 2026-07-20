@@ -16749,6 +16749,7 @@ const _OBF_STEPS = [
   { key: 'coaches', railLabel: 'Team',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
   { key: 'stripe', railLabel: 'Stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account: every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
   { key: 'email', railLabel: 'Email',     group: 'general', title: 'Connect your email domain', sub: 'Emails send from your own domain. One DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'inbox', railLabel: 'Inbox',     group: 'general', title: 'Connect your inbox', sub: 'Sign in to your Google inbox once. The emails you send and receive then show up in both your inbox and the portal', cta: 'Connect inbox', go: '_obfConnectInbox()', skippable: true, optional: true },
   { key: 'website', railLabel: 'Go live',   group: 'general', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site. The old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()', note: '_obfWebsiteNote' },
   { key: 'contacts', railLabel: 'Contacts',  group: 'general', title: 'Import your contacts', sub: 'Every lead, parent and past inquiry you have, into one system right at the start. Names and numbers only; program details come later in your offer.', note: '_obfContactsNote' },
   { key: 'instagram', railLabel: 'Instagram', group: 'general', title: 'Connect Instagram DMs', sub: 'Your IG messages land in the portal inbox. Skip it and add later', cta: 'Connect', go: '_obfGoInstagram()', skippable: true, optional: true },
@@ -16926,13 +16927,13 @@ function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
 async function _obfFetchState() {
   const token = await _mreqAuthToken();
   const next = { basics: false, ein: false, brand: false, locations: false, coaches: false, sitecopy: false,
-    stripe: false, email: false, website: false, contacts: false, instagram: false,
+    stripe: false, email: false, inbox: false, website: false, contacts: false, instagram: false,
     define: false, schedule: false, pricing: false, policy: false,
     preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
     offer_id: null, booking: false, has_ghl: true, contacts_n: 0,
     website_build: null, staging_url: null, site_accepted: false, brandboard: false,
     texting: false, ads: false, ob: {}, legal_name: '', ein_value: '', address: '', chunks: {} };
-  const [em, web, ss, prog] = await Promise.allSettled([
+  const [em, web, ss, prog, mbx] = await Promise.allSettled([
     _edwApi('status'),
     _wdwApi('status'),
     fetch('/api/offers/setup-status?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
@@ -16940,8 +16941,11 @@ async function _obfFetchState() {
     // mark_onboarding_section RPC; the flow reads those SAME flags. The flow
     // is the checklist, the Blueprint is the workbench - one source of truth.
     _sb ? _sb.rpc('get_onboarding_progress', { p_client_id: CLIENT_ID }) : Promise.reject(new Error('no sb')),
+    // Connected-mailbox (2-way sync) status for the "Connect your inbox" step.
+    fetch('/api/email/mailbox-status?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
   ]);
   if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set || _obfSkipped('ein'); }
+  if (mbx.status === 'fulfilled' && mbx.value) next.inbox = !!mbx.value.connected || _obfSkipped('inbox');
   if (web.status === 'fulfilled') next.website = web.value.status === 'live';
   if (prog.status === 'fulfilled' && prog.value && prog.value.data) {
     const p = prog.value.data;
@@ -17070,6 +17074,70 @@ function _obfGoStripe() {
 function _obfGoInstagram() {
   _obfNav('messages');
   setTimeout(() => { try { document.getElementById('ig-connect-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }, 500);
+}
+
+// Connect your inbox (2-way Gmail sync). One-time Google OAuth: the academy
+// signs into its own inbox once, then sent + received email mirrors between
+// Gmail and the portal. Staff/owner enters the EXACT inbox to connect (the
+// backend matches the Google-authorized address against it), so it works even
+// when the inbox domain differs from the Resend sending domain.
+function _obfConnectInbox() {
+  _obfClose();
+  document.getElementById('obf-inbox-modal')?.remove();
+  const prefill = (_OBF_STATE && _OBF_STATE.mailbox_email) || '';
+  document.body.insertAdjacentHTML('beforeend', `<div id="obf-inbox-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-24,24px);width:100%;max-width:460px;padding:24px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:var(--font-ui);font-weight:700;font-size:18px">Connect your inbox</div>
+      <div style="color:var(--text-muted);font-size:14px;line-height:1.5">Sign in to your Google inbox once. After that, the emails you send and receive sync between your inbox and the portal. Automated emails keep sending from your domain as usual.</div>
+      <label style="font-size:12px;color:var(--text-muted);margin-top:4px">Your inbox address</label>
+      <input id="obf-inbox-email" type="email" value="${prefill}" placeholder="info@yourdomain.com" autocomplete="off" style="background:var(--surface-2,var(--bg));border:1px solid var(--border);border-radius:var(--r-8,8px);padding:10px 12px;color:var(--text);font-size:14px" />
+      <div style="font-size:12px;color:var(--text-muted)">Use the exact Google address you want connected.</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+        <button class="btn" onclick="document.getElementById('obf-inbox-modal').remove()" style="background:transparent;border:1px solid var(--border);border-radius:var(--r-999,999px);padding:8px 16px;color:var(--text);cursor:pointer">Cancel</button>
+        <button class="btn" onclick="_obfInboxGo()" style="background:var(--gold);border:none;border-radius:var(--r-999,999px);padding:8px 18px;color:#1a1a1a;font-weight:600;cursor:pointer">Connect Gmail</button>
+      </div>
+    </div></div>`);
+  setTimeout(() => document.getElementById('obf-inbox-email')?.focus(), 50);
+}
+async function _obfInboxGo() {
+  const email = (document.getElementById('obf-inbox-email')?.value || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { _plToast('Enter the inbox address to connect (e.g. info@yourdomain.com)'); return; }
+  const token = await _mreqAuthToken();
+  if (!token) { _plToast('Please sign in again, then reconnect.'); return; }
+  const url = '/api/email/connect?' + new URLSearchParams({ token, client_id: CLIENT_ID, email, ret: window.location.origin });
+  window.location.href = url;
+}
+
+// Handle the OAuth return (?mailbox=connected|error). Toasts the result, kicks an
+// immediate first sync so mail shows up without waiting for the 3-min cron, and
+// refreshes the onboarding state. Mirrors _igwBoot's return handling.
+let _MBX_BOOTED = false;
+async function _mbxBoot() {
+  if (_MBX_BOOTED) return; _MBX_BOOTED = true;
+  try {
+    const u = new URL(window.location.href);
+    const p = u.searchParams.get('mailbox');
+    if (!p) return;
+    const email = u.searchParams.get('email') || '';
+    const reason = u.searchParams.get('reason') || '';
+    ['mailbox', 'email', 'reason', 'got', 'want'].forEach(k => u.searchParams.delete(k));
+    window.history.replaceState({}, document.title, u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '') + u.hash);
+    if (p === 'connected') {
+      _plToast('Inbox connected' + (email ? ' - ' + email : '') + '. Syncing your email now.');
+      try {
+        const token = await _mreqAuthToken();
+        // First pull now (staff JWT); the cron keeps it fresh after.
+        fetch('/api/email/sync-gmail?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).catch(() => {});
+      } catch (_) {}
+      _obfFetchState().catch(() => {});
+    } else if (p === 'error') {
+      const human = reason === 'inbox_mismatch' ? 'that Google account did not match the inbox you entered'
+        : reason === 'no_refresh_token' ? 'Google did not return access - try again and click Allow'
+        : reason === 'no_target_inbox' ? 'no inbox address was provided'
+        : (reason || 'please try again');
+      _plToast('Inbox connect failed - ' + human + '.');
+    }
+  } catch (_) {}
 }
 
 // Deep-link into the training offer's wizard at a section (mirrors
@@ -22782,6 +22850,7 @@ function applyCrmSupersetNav() {
   // their GHL social threads (the inbox_live dedupe trap - see
   // memories/project_meta_dm_spine.md).
   if (isV2 && typeof _igwBoot === 'function') { try { _igwBoot(); } catch (_) {} }
+  if (isV2 && typeof _mbxBoot === 'function') { try { _mbxBoot(); } catch (_) {} }
 }
 
 // ── V1.5 feature gate ──

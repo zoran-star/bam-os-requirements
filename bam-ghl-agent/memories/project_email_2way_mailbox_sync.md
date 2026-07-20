@@ -76,12 +76,29 @@ Resend) - sending auth is separate from MX receiving, so they coexide fine.
   are DUPLICATED from resend/inbound-webhook.js (Twilio-spine precedent) - keep in
   sync. NOTE: with a mailbox connected, MX points at Google so the Resend inbound
   webhook stops receiving for that domain; this cron becomes the inbound source.
-- **NEXT (not built): Phase 2 send routing + UI.** `maybeSendEmailViaMailbox()`
-  gate so human replies/compose go out via Gmail (threaded, shows in Gmail Sent),
-  bulk/agent stays on Resend; merge mailbox threads into `api/ghl/inbox.js` read;
-  "Connect your inbox" Settings card (mirror PhoneTab) with the green/reconnect
-  badge. Optional: fire an instant `?client_id=` sync right after connect instead
-  of waiting for the cron tick.
+- **Phase 2 (send routing + read + onboarding UI) — BUILT, needs live test.**
+  - `api/email/mailbox-send.js` `maybeSendEmailViaMailbox()`: builds a threaded
+    RFC822 message (In-Reply-To/References + Gmail threadId) and sends via the
+    academy's Gmail so it lands in their real Sent; stores the outbound row
+    idempotently. `{handled:false}` when no active mailbox.
+  - `api/ghl/send-message.js`: mailbox gate wired into the HUMAN email path BEFORE
+    the Resend gate. Automated/bulk (agents, `_send.js`) never routes here → stays
+    on Resend. Exact two-lane split.
+  - `api/ghl/inbox.js`: email-store read turns on when a mailbox is connected (not
+    just email_provider='resend') via `hasActiveMailbox()` - Gmail-synced threads
+    share email_threads/email_messages so the existing read helpers surface them.
+  - `api/email/mailbox-status.js`: GET status (connected/email/status/last_synced_at)
+    + POST disconnect. Powers the onboarding detector + (future) Settings badge.
+  - **Onboarding step (client-portal.html `_obf*`):** new **`inbox`** step in the
+    **general** group, right after "Connect your email domain" (skippable+optional
+    so it never blocks launch). Detector hits `mailbox-status`. `_obfConnectInbox()`
+    modal (enter exact inbox → `/api/email/connect?...&email=`) + `_mbxBoot()`
+    handles the `?mailbox=connected|error` return (toast + instant first sync +
+    state refresh). Tour verifier passes.
+- **STILL TODO before live:** (1) apply the Phase 0 migration to prod via MCP;
+  (2) connect GTA + Detail and test end-to-end; (3) optional staff-side "Connect
+  inbox" button on a client's Phone/Settings tab (mirror PhoneTab) - onboarding
+  step covers the primary flow for now.
 
 ### What Zoran must do (Google-side, one-time, unblocks Phase 1a testing)
 1. Google Cloud Console → the existing OAuth project → **enable the Gmail API**.
