@@ -20,22 +20,37 @@ replacement). Update statuses here as PRs land.
 | 6 | Integrations (Leadsie link in Ads step · BAM Connect post-App-Review · phone wrap wiring) | queued |
 | 7 | Front door - "Add academy" (4 fields + GHL dropdown → 7 auto-initializations: v2_access, Slack channel, welcome ping, GHL link, invite, sites scaffold, wizard state) | **SHIPPED** (feat/add-academy + bam-client-sites #90, 2026-07-19) - clients.js action=create-academy (idempotent = the checklist's Retry) · Add Academy modal replaces New client (plain-row escape hatch stays) · Slack conversations.create + staff kickoff ping · GHL name→locationId from GHL_LOCATIONS_JSON (the ONE flag driving the wizard's has_ghl forks, already wired since PR-2) · scaffold robot = workflow_dispatch new-client.yml. ⚠ Needs Zoran one-time: Slack app channels:manage scope + GITHUB_DISPATCH_TOKEN in Vercel (see Clocks) |
 
-## Track 2 - The Zoran icon / V2 ticket system (DESIGNED, NEXT UP)
+## Track 2 - The Zoran icon / V2 ticket system (IN PROGRESS)
 
 Full design in [`zoran-icon-ticket-design.md`](zoran-icon-ticket-design.md).
-**Handoff for the next chat: [`track2-handoff.md`](track2-handoff.md) - run
-`/track2`.** That chat CO-WORKS the user requirements with Zoran first (the
-design is a sketch, not a locked spec), THEN builds chunk by chunk.
-Replaces client-facing Slack. Build chunks when we pick it up:
+**Requirements LOCKED with Zoran 2026-07-20** (see the "Requirements LOCKED"
+section in the design doc). Handoff: [`track2-handoff.md`](track2-handoff.md).
+Replaces client-facing Slack.
 
-| # | Chunk |
-|---|---|
-| T1 | Unified tickets table + statuses + the tickets page (left circle) |
-| T2 | The icon front door: 4 lanes + orchestrator (classify + slot-fill) + bug/feature intake agents |
-| T3 | Notification rail: staff Slack pings + client SMS on status change (rides the phone spine) |
-| T4 | Point-of-action side doors (flag-this-reply on Inbox, editor send-to-team, import leftovers, billing panel) |
-| T5 | Staff side: command palette + pre-worked queue (agent drafts, staff approves) |
-| T6 | Pipes: feature ticket → Notion Backlog · ship → "your idea is live" SMS |
+**Locked decisions (headline):** ticket rail first (marketing/content later, an
+ask routes to Cam for now) · build asks straight to Systems (Rosano) · KPI alerts
+parked (Track 3) · statuses-only, no SLA clock · one shared 5-state ladder
+(Received/Working on it/Needs you/Done/Closed) for all 9 types · SMS on
+Received/Needs you/Done/Closed, Slack on new + client-reply · real conversation
+thread (Slack replacement) · 4-lane door replaces today's feedback modal,
+`portal_feedback` migrates into `tickets`.
+
+**The door reshaped:** the icon popout shows live tickets FIRST, then the 4 lanes,
+then the free-type box (folds the old "tickets page" into the popout).
+
+Build order (revised): FE template first, then a support-ticket scoping pass
+BEFORE wiring, then wire lanes on the scoped foundation.
+
+| # | Chunk | Status |
+|---|---|---|
+| T2-a | Icon popout FE template: live tickets list (mock) + 4 lanes + free-type + thread view. V2-gated, replaces feedback modal visually. No backend. | ✅ built 2026-07-20 (PR pending) |
+| T-scope | Support-ticket system scoping pass (how tickets get worked, staff queue + agent pre-work, wiring per lane) | ⬅ NEXT (requirements, before any wiring) |
+| T1 | Unified tickets table + statuses + real tickets list behind the popout | after scope |
+| T2 | Orchestrator (classify + slot-fill) + bug/feature intake agents wired to the lanes | after scope |
+| T3 | Notification rail: staff Slack pings + client SMS on status change (rides the phone spine) | later |
+| T4 | Point-of-action side doors (flag-this-reply on Inbox, editor send-to-team, import leftovers, billing panel) | later |
+| T5 | Staff side: command palette + pre-worked queue (agent drafts, staff approves) | later |
+| T6 | Pipes: feature ticket → Notion Backlog · ship → "your idea is live" SMS | later |
 
 ## Track 3 - Running-the-business builds (B-bucket, standalone, schedule anytime)
 

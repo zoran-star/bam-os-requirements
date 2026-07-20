@@ -83,3 +83,66 @@ table underneath (type, client_id, status, assignee_role, intake jsonb, thread).
 2. Build tickets: triaged by Zoran personally or straight to systems?
 3. KPI alerts day one: churn spike / CPL jump / booking drought / failed payments / agent stuck?
 4. SLAs: promise response times or statuses only?
+
+## Requirements LOCKED (co-work session 2026-07-20)
+
+All 4 pending questions + the registry core resolved with Zoran. This section
+supersedes the "pending" list above.
+
+**Zoran's 4 questions:**
+1. **Sequencing (not "both doors"):** marketing/content isn't built in V2 yet.
+   Decision: **build the ticket rail FIRST.** A marketing/content ask is just one
+   ticket type, routed to a human (Cam, marketing manager) for now; a real
+   dedicated flow plugs into the same `tickets` table later. Nothing waits on it.
+2. **Build asks** ("can we sell gift cards?") route **straight to Systems
+   (Rosano).** He scopes/builds and escalates to Zoran only if it's bigger than
+   one academy. No personal-triage bottleneck.
+3. **KPI alerts stay parked** (Track 3 / B2). Track 2 is human-initiated tickets
+   only. The table leaves room for a future health monitor to auto-open tickets;
+   we build none of that now.
+4. **Statuses only, no SLA clock.** Client sees where the ticket is + gets an SMS
+   when it changes. No promised response times.
+
+**Registry:**
+- **Status model = one shared 5-state ladder for all 9 types** (no per-type
+  ladders):
+  `new/triaging → in_progress → waiting_client → resolved → closed`
+  Client-visible labels: **Received · Working on it · Needs you · Done · Closed**
+  (Closed carries a reason note). A shipped feature idea flips to resolved and
+  fires the "your idea is live" SMS.
+- **Notification moments:**
+  - Client **SMS** on: Received, Needs you, Done, Closed. **Skip** "Working on it"
+    (noise). 3-4 useful texts max per ticket.
+  - Staff **Slack** on: new ticket created (ping the assignee role), and when a
+    client replies to a `waiting_client` ticket (ball back in staff court).
+- **`tickets` table shape:** `type, client_id, created_by, status, assignee_role
+  (systems·agent-supervision·marketing·backlog), intake jsonb, context jsonb
+  (page+click breadcrumbs, same as portal_feedback today), source
+  (icon-chat·inbox-flag·editor·import·billing·staff), close_reason, timestamps
+  (created/updated/resolved)`.
+- **Thread = a REAL conversation** (own `ticket_messages` table: client + staff +
+  agent post back and forth on the ticket), NOT a status log. This is the actual
+  client-facing-Slack replacement. Log-only was rejected because it keeps Slack
+  alive.
+- **Existing feedback widget:** the 4-lane door **replaces** today's "Got
+  feedback?" modal on the same icon. Bug lane = today's Bug, Feature lane =
+  today's Feature. Existing `portal_feedback` rows **migrate into `tickets`**;
+  `/v2-tickets` reads the new table.
+
+**The door itself (reshaped from the design sketch):** tapping the icon shows the
+client's **live tickets list FIRST** (status pills, tap opens the thread), THEN
+the 4 lanes to start something new, THEN the free-type box. This folds the
+design's separate "tickets page" into the popout - one support home in reach.
+The 4 lanes stay as designed: 1 Where do I…? (Navigator) · 2 Get help from our
+team (Support) · 3 Report a problem (Bug) · 4 Suggest a feature (Feature).
+
+**Build path agreed:**
+1. **NOW:** front-end-ONLY popout template (live tickets list with MOCK data + 4
+   lane buttons + free-type box). Visual only, no backend, no agent. Replaces the
+   feedback modal visually. Design-system compliant, V2-gated.
+2. **NEXT:** a dedicated **scoping pass on the support-ticket system** (how a
+   support ticket actually gets worked, the staff queue + agent pre-work / T5,
+   what wiring each lane needs) BEFORE wiring anything. Zoran flagged that much of
+   the door's real behavior depends on this and it isn't scoped yet.
+3. **THEN:** wire the lanes one at a time on the scoped foundation (T1 real table,
+   T2 orchestrator, T3 notifications, etc.).
