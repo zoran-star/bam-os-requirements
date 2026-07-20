@@ -15618,20 +15618,31 @@ async function _edwApi(action, extra) {
   if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
   return j;
 }
+// Copy a DNS cell's exact value (from data-copy, so the visible priority tag
+// never rides along) and flash a small "copied" pill without touching the text.
+function _edwCopyCell(el) {
+  try { navigator.clipboard.writeText(el.getAttribute('data-copy') || ''); } catch (_) {}
+  const ok = el.querySelector('.edw-ok');
+  if (ok) { ok.style.opacity = '1'; clearTimeout(el._edwT); el._edwT = setTimeout(() => { ok.style.opacity = '0'; }, 1100); }
+}
 function _edwRecordsHtml(records) {
+  const cell = (text, extra) => `<td class="edw-copy" data-copy="${escapeHTML(text)}" onclick="_edwCopyCell(this)" title="Click to copy" style="position:relative;padding:7px 26px 7px 8px;font-size:11.5px;color:var(--text);word-break:break-all;cursor:pointer">${escapeHTML(text)}${extra || ''}<span class="edw-ok" style="position:absolute;top:5px;right:6px;background:var(--gold,#D4B65C);color:#0B0B0D;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px;opacity:0;transition:opacity .15s;pointer-events:none">copied</span></td>`;
   const rows = (records || []).map(rc => `
     <tr>
       <td style="padding:7px 8px;font-size:11px;color:var(--text-mute);white-space:nowrap">${escapeHTML(rc.type || '')}</td>
-      <td style="padding:7px 8px;font-size:11.5px;color:var(--text);word-break:break-all">${escapeHTML(rc.name || '')}</td>
-      <td style="padding:7px 8px;font-size:11.5px;color:var(--text);word-break:break-all">${escapeHTML(rc.value || '')}${rc.priority != null ? ` <span style=\"color:var(--text-mute)\">(priority ${escapeHTML(String(rc.priority))})</span>` : ''}</td>
-      <td style="padding:7px 4px"><button data-edw-copy="${escapeHTML(rc.value || '')}" onclick="navigator.clipboard.writeText(this.dataset.edwCopy);this.textContent='Copied';setTimeout(()=>this.textContent='Copy',1200)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);padding:3px 8px;font-size:11px;cursor:pointer">Copy</button></td>
+      ${cell(rc.name || '')}
+      ${cell(rc.value || '', rc.priority != null ? ` <span style=\"color:var(--text-mute)\">(priority ${escapeHTML(String(rc.priority))})</span>` : '')}
     </tr>`).join('');
-  return `<div style="border:1px solid var(--border);border-radius:8px;overflow-x:auto;margin:10px 0">
+  return `<style>.edw-copy:hover{background:var(--surface-2,rgba(255,255,255,.05))}</style>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow-x:auto;margin:10px 0 6px">
     <table style="width:100%;border-collapse:collapse"><thead><tr>
       <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Type</th>
       <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Name</th>
-      <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Value</th><th></th>
-    </tr></thead><tbody>${rows}</tbody></table></div>`;
+      <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Value</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="font-size:11px;color:var(--text-mute);margin:0 0 4px;display:flex;align-items:center;gap:5px">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Tap any name or value to copy it</div>`;
 }
 async function _edwRender() {
   const card = document.getElementById('email-domain-card');
