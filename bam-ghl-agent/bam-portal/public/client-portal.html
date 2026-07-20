@@ -7151,6 +7151,19 @@ if (window.__MOCK__) (() => {
         Business Blueprint
       </div>
 
+      <!-- Settings: owner-only system config (integrations + timezone). Never
+           grantable to a teammate (not in _PERMISSIONABLE_TABS); revealed by
+           applySettingsNavState() once role/BAM-staff is known. -->
+      <div class="nav-item" id="nav-settings" style="display:none" onclick="switchView('settings', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </span>
+        Settings
+      </div>
+
       <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('members', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -11735,6 +11748,20 @@ Then the call to action."]</div>
           <path d="M12 5v14M5 12h14"/>
         </svg>
       </button>
+    </div>
+
+    <div class="view" id="view-settings">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Settings</span>
+          <div class="topbar-title">Settings</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="settings-body">
+          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div>
+        </div>
+      </div>
     </div>
 
     <div class="view" id="view-train-agent">
@@ -19214,6 +19241,8 @@ function switchView(name, el) {
 
   if (name === 'resources') openResourcesView();
 
+  if (name === 'settings') openSettingsView();
+
   if (name === 'assets') { _AST_LIB_MODE = false; _ASSETS_HOST_ID = 'assets-content'; openAssetsView(); }
 
   if (name === 'contacts') openContactsView();
@@ -19353,6 +19382,88 @@ function _mobileMorePick(view) { _mobileMoreClose(); mobileSwitchView(view); }
 // into the real tabs, plus 2 quick actions. Counts come from data the app
 // already maintains (tickets global, _msgConversations) + one light query
 // for open action items. Renders instantly; numbers fill in as they resolve.
+// ─── SETTINGS VIEW (owner-only) ─────────────────────────────────────────────
+// System config split out of the Business Blueprint: integrations/connections
+// status + the account time zone. Business identity stays in the Blueprint.
+function _settingsSaveTimezone(val) {
+  const statusEl = document.getElementById('settings-tz-status');
+  if (statusEl) statusEl.textContent = 'Saving…';
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+  if (c) c.time_zone = val;
+  Promise.resolve(_bbSaveClientBasics({ time_zone: val })).then(ok => {
+    if (statusEl) { statusEl.textContent = ok ? 'Saved' : "Couldn't save"; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
+  }).catch(() => { if (statusEl) statusEl.textContent = "Couldn't save"; });
+}
+
+function _settingsIntegRow(name, desc, connected, actionLabel, actionFn) {
+  const pill = connected
+    ? `<span style="font-size:11px;font-weight:700;color:var(--green,#2e7d5b);background:var(--green-soft,rgba(46,125,91,.12));border-radius:var(--r-full,999px);padding:3px 10px;white-space:nowrap">Connected</span>`
+    : `<span style="font-size:11px;font-weight:700;color:var(--amber,#b5851f);background:var(--amber-soft,rgba(181,133,31,.12));border-radius:var(--r-full,999px);padding:3px 10px;white-space:nowrap">Not set up</span>`;
+  const action = actionFn
+    ? `<button onclick="${actionFn}" style="background:transparent;color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">${actionLabel}</button>`
+    : `<span style="font-size:12px;color:var(--text-mute);white-space:nowrap">${actionLabel}</span>`;
+  return `<div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-top:1px solid var(--border)">
+    <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--text)">${name}</div><div style="font-size:12px;color:var(--text-mute)">${desc}</div></div>
+    ${pill}${action}
+  </div>`;
+}
+
+function _settingsRenderIntegrations(st) {
+  const el = document.getElementById('settings-integrations');
+  if (!el) return;
+  st = st || {};
+  el.innerHTML = [
+    _settingsIntegRow('Stripe', 'Take payments and subscriptions.', !!st.stripe, 'Manage', '_obfGoStripe()'),
+    _settingsIntegRow('Email domain', 'Send email from your own domain.', !!st.email, 'Manage', '_obfGoDomains()'),
+    _settingsIntegRow('Website', 'Your live website domain.', !!st.website, 'Set up during onboarding', null),
+    _settingsIntegRow('Texting', 'Send SMS from your academy number.', !!st.texting, 'Set up during onboarding', null),
+    _settingsIntegRow('Instagram / Meta', 'Connect your Instagram inbox.', !!st.instagram, 'Manage', '_obfGoInstagram()'),
+    _settingsIntegRow('CRM (GHL)', 'Your BAM-managed CRM sub-account.', st.has_ghl !== false, 'Managed by BAM', null),
+  ].join('');
+}
+
+async function openSettingsView() {
+  const host = document.getElementById('settings-body');
+  if (!host) return;
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  const tzOpts = _BB_TZ_OPTS.map(([val, label]) => `<option value="${val}" ${(c.time_zone || '') === val ? 'selected' : ''}>${_bbEscapeHtml(label)}</option>`).join('');
+  const card = 'background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg,16px);box-shadow:var(--shadow-card);padding:22px 24px';
+  host.innerHTML = `
+    <div style="max-width:720px">
+      <div style="${card};margin-bottom:18px">
+        <div style="font-family:var(--font-num,inherit);font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">Integrations</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-bottom:8px">The accounts that power your payments, messaging, and automations.</div>
+        <div id="settings-integrations"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Checking connections…</div></div>
+      </div>
+      <div style="${card}">
+        <div style="font-family:var(--font-num,inherit);font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">Time zone</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-bottom:14px">Used to time automations, reminders, and reports correctly.</div>
+        <select onchange="_settingsSaveTimezone(this.value)" style="width:100%;max-width:360px;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:10px 12px;font-size:14px;font-family:inherit;outline:none">${tzOpts}</select>
+        <span id="settings-tz-status" style="display:inline-block;margin-left:10px;font-size:12px;color:var(--text-mute)"></span>
+      </div>
+    </div>`;
+  try { _settingsRenderIntegrations(await _obfFetchState()); }
+  catch (_) { const el = document.getElementById('settings-integrations'); if (el) el.innerHTML = '<div style="font-size:13px;color:var(--text-mute);padding:12px 0">Couldn\'t load connection status right now.</div>'; }
+}
+
+// Empty-state shown on Home to a teammate with no tab grants yet ([]). It's the
+// only surface they can reach until the owner grants access in Blueprint > Staff.
+function _renderHomeNoAccess() {
+  const wrap = document.querySelector('#view-home .home-wrap');
+  if (!wrap) return;
+  let host = document.getElementById('home-no-access');
+  if (!host) { host = document.createElement('div'); host.id = 'home-no-access'; wrap.appendChild(host); }
+  host.style.display = '';
+  host.innerHTML = `
+    <div style="max-width:520px;margin:40px auto;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg,16px);box-shadow:var(--shadow-card);padding:40px 32px">
+      <div style="width:52px;height:52px;margin:0 auto 18px;border-radius:var(--r-full,999px);background:var(--gold-sheen,rgba(212,182,92,.08));display:flex;align-items:center;justify-content:center;color:var(--gold,#D4B65C)">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px">No access yet</div>
+      <div style="font-size:14px;color:var(--text-sub);line-height:1.6">Your academy owner hasn't set your permissions yet. Ask them to give you access, then refresh this page.</div>
+    </div>`;
+}
+
 async function openHomeView() {
   // #1 - greeting + first name
   const hour = new Date().getHours();
@@ -19361,6 +19472,18 @@ async function openHomeView() {
   const g = document.getElementById('home-greeting');
   if (g) g.textContent = (first && first !== '-') ? `${part}, ${first}` : part;
   loadMyAvatar();   // show / refresh my profile photo
+
+  // No-access member ([] tab grant = "nothing yet"): Home is their only screen,
+  // and it shows the access-request prompt instead of any dashboard. Everyone
+  // else (owner / BAM / granted members) falls through to the normal home.
+  if (_hasNoTabAccess()) {
+    ['home-v15', 'home-v2', 'home-tiles-sec', 'home-tiles', 'home-week-sec', 'home-week',
+     'home-activity-sec', 'home-activity', 'home-qa-sec', 'home-qa', 'home-status']
+      .forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+    _renderHomeNoAccess();
+    return;
+  }
+  { const naEl = document.getElementById('home-no-access'); if (naEl) naEl.style.display = 'none'; }
 
   // V1.5 academies get a dedicated dashboard (trials today · missed calls ·
   // action items) instead of the ticket-centric tiles.
@@ -22617,17 +22740,39 @@ function applyTabPermissions() {
       document.querySelectorAll(`.mobile-nav-item[data-view="${v}"]`).forEach(el => { el.style.setProperty('display', 'none', 'important'); });
     }
   }
+  // No grants yet ([] = nothing) → also hide Messages + Parent Inbox (both
+  // normally always-on) so the teammate is left with Home only.
+  if (_hasNoTabAccess()) {
+    for (const v of ['messages', 'parent-messages']) {
+      document.querySelectorAll(`.nav-item[onclick*="switchView('${v}'"]`).forEach(el => { el.style.display = 'none'; });
+      document.querySelectorAll(`.mobile-nav-item[data-view="${v}"]`).forEach(el => { el.style.setProperty('display', 'none', 'important'); });
+    }
+  }
 }
 
 // Is a view allowed for the current user? Owner/unrestricted = always yes.
 // Views not under a permissionable tab (home, messages…) = always yes.
 function _isViewTabAllowed(view) {
   if (_effTabRole() === 'owner') return true;
+  // Settings is owner-only, never grantable. Non-owners: only BAM staff (support).
+  if (view === 'settings') return _IS_BAM_STAFF === true;
   const tabs = _effAllowedTabs();
   if (!Array.isArray(tabs)) return true;
+  // No grants yet ([] = nothing) → only Home is reachable; it shows the
+  // "ask your owner for access" prompt. Everything else bounces to Home.
+  if (tabs.length === 0) return view === 'home';
   const tab = _PERMISSIONABLE_TABS.find(t => t.views.includes(view));
   if (!tab) return true;
   return tabs.includes(tab.key);
+}
+
+// A member whose tab grant is an explicit empty array ([] = "nothing yet") sees
+// ONLY Home, which shows the access-request prompt. Owner / BAM staff / null(=all)
+// members are never in this state.
+function _hasNoTabAccess() {
+  if (_effTabRole() === 'owner' || _IS_BAM_STAFF === true) return false;
+  const tabs = _effAllowedTabs();
+  return Array.isArray(tabs) && tabs.length === 0;
 }
 
 // ── Owner: preview a teammate's view ──
@@ -22701,6 +22846,7 @@ async function _ensureStaffFlag() {
   // Now that we know staff status, re-apply Home visibility (staff keep Home).
   try { if (typeof applyHomeNavState === 'function') applyHomeNavState(); } catch (_) {}
   try { if (typeof applyTrainAgentNavState === 'function') applyTrainAgentNavState(); } catch (_) {}
+  try { if (typeof applySettingsNavState === 'function') applySettingsNavState(); } catch (_) {}
   return _IS_BAM_STAFF;
 }
 
@@ -22769,6 +22915,15 @@ async function loadMyPermissionsAndApply() {
     _MY_CAN_ENROLL_MEMBERS = row?.can_enroll_members === true;
   } catch (_) { _MY_ALLOWED_TABS = null; _MY_ALLOWED_STAGES = null; _MY_ALLOWED_KPIS = null; }
   applyTabPermissions();
+  try { if (typeof applySettingsNavState === 'function') applySettingsNavState(); } catch (_) {} // owner-only Settings nav
+  // Perms load async: if this resolves while a no-access member is sitting in the
+  // command center (or any non-Home view), pull them back to the Home prompt.
+  if (typeof _hasNoTabAccess === 'function' && _hasNoTabAccess()) {
+    try {
+      if (typeof _ccActive === 'function' && _ccActive()) _ccOpenClassic('home');
+      else if (typeof switchView === 'function') switchView('home');
+    } catch (_) {}
+  }
   if (typeof _renderPreviewAsMenu === 'function') _renderPreviewAsMenu(); // owner role now known
   if (typeof applyTalkToBamInboxState === 'function') applyTalkToBamInboxState();
 }
@@ -22799,6 +22954,16 @@ function applyHomeNavState() {
   const el = document.getElementById('nav-home');
   if (el) el.style.display = hide ? 'none' : '';
   document.querySelectorAll('.mobile-nav-item[data-view="home"]').forEach(m => { m.style.display = hide ? 'none' : ''; });
+}
+
+// Settings is owner-only system config (integrations + timezone) - never
+// grantable to a teammate. Show it only for the academy owner or a BAM staff
+// admin. Called whenever role / BAM-staff status becomes known.
+function applySettingsNavState() {
+  const show = (_MY_TAB_ROLE === 'owner') || (_IS_BAM_STAFF === true);
+  const el = document.getElementById('nav-settings');
+  if (el) el.style.display = show ? '' : 'none';
+  document.querySelectorAll('.mobile-nav-item[data-view="settings"]').forEach(m => { m.style.setProperty('display', show ? '' : 'none', 'important'); });
 }
 
 // Where a user lands when Home isn't available to them - first visible tab.
@@ -24741,13 +24906,9 @@ function _bbRenderGeneralCard(panel, meta) {
       <div class="bb-field-hint">Federal tax ID - required so we can set up Stripe Connect under your business.</div>
     </div>
 
-    <div class="bb-field">
-      <div class="bb-field-label">Time zone</div>
-      <select id="bb-gen-time_zone" class="bb-input" onchange="_bbGenChanged()">
-        ${_BB_TZ_OPTS.map(([val, label]) => `<option value="${val}" ${(c.time_zone || '') === val ? 'selected' : ''}>${label}</option>`).join('')}
-      </select>
-      <div class="bb-field-hint">Used to time automations, reminders, and reports correctly.</div>
-    </div>
+    <!-- Time zone MOVED to Settings (owner-only system config) 2026-07-20.
+         It's a system setting, not business identity. Edited at Settings >
+         Time zone; still persisted to clients.time_zone via the same RPC. -->
 
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
   `;
@@ -24773,7 +24934,8 @@ function _bbGenChanged() {
     legal_name:    document.getElementById('bb-gen-legal_name')?.value || '',
     address:       document.getElementById('bb-gen-address')?.value || '',
     ein:           document.getElementById('bb-gen-ein')?.value || '',
-    time_zone:     document.getElementById('bb-gen-time_zone')?.value || '',
+    // time_zone moved to Settings; do NOT read it here (the field is gone, so
+    // reading it would save an empty value and wipe the saved zone).
   }));
 }
 
@@ -25367,12 +25529,12 @@ async function _bbStaffRefreshList() {
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
   let { data, error } = await _sb.from('client_users')
-    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members')
+    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members, title, bio')
     .eq('client_id', CLIENT_ID)
     .eq('status', 'active')
     .eq('hide_from_team', false);
   if (error) {
-    // Migration-safe fallback: can_enroll_members may not exist yet.
+    // Migration-safe fallback: can_enroll_members / title / bio may not exist yet.
     ({ data, error } = await _sb.from('client_users')
       .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages')
       .eq('client_id', CLIENT_ID)
@@ -25481,6 +25643,19 @@ async function _bbStaffRefreshList() {
     // Contact edit (email + phone) for any owner-managed teammate - editable at
     // any point, invited or not. Not-yet-invited rows also get the Invite button.
     const canEditContact = iAmOwner && !isOwner;
+    // Public Team-page copy: title (position) + bio (blurb). Owner-editable, feeds
+    // the academy's public "Our Team" website page. Same save path as email/phone.
+    const teamPageHtml = !canEditContact ? '' : `
+      <div style="margin-top:6px;padding:11px 13px;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--r-md,12px)">
+        <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Team page (public website)</div>
+        <input id="staff-title-${r.id}" type="text" value="${_bbEscapeAttr(r.title || '')}" placeholder="Title / role (e.g. Head Coach)"
+          onchange="_bbStaffContactSave('${r.id}', 'title', this.value)"
+          style="width:100%;box-sizing:border-box;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:8px 11px;font-size:13px;outline:none;margin-bottom:8px">
+        <textarea id="staff-bio-${r.id}" rows="3" placeholder="Short bio or notes shown on your website Team page"
+          onchange="_bbStaffContactSave('${r.id}', 'bio', this.value)"
+          style="width:100%;box-sizing:border-box;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:8px 11px;font-size:13px;outline:none;resize:vertical;font-family:inherit;line-height:1.5">${escapeHTML(r.bio || '')}</textarea>
+        <span style="display:block;font-size:11px;color:var(--text-mute);margin-top:6px">Shows on your public Team page. Leave blank to hide.</span>
+      </div>`;
     const inviteHtml = !canEditContact ? '' : `
       <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
         <input id="staff-email-${r.id}" type="email" value="${_bbEscapeAttr(r.email || '')}" placeholder="email@example.com"
@@ -25509,7 +25684,8 @@ async function _bbStaffRefreshList() {
       ${enrollHtml}
       ${stagesHtml}
       ${kpisHtml}
-      <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
+      ${teamPageHtml}
+      <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--r-md,12px)">
         <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Photo / headshot</div>
         ${_assetBankHtml('staff_id', r.id, { category: 'photo' })}
       </div>
@@ -57521,7 +57697,10 @@ async function boot() {
   applyV2NavState(clientRow.v2_access === true);
   applyV15NavState(clientRow.v15_access === true);
   applyV4NavState(clientRow.v4_access === true);
-  loadMyPermissionsAndApply(); // per-staff tab perms (subtractive, async)
+  // Await per-staff perms BEFORE the landing decision below: a no-access member
+  // ([] tabs) must not fall into the command center (the V2 default landing).
+  // Also removes the flash of full nav before subtraction. Always resolves.
+  await loadMyPermissionsAndApply(); // per-staff tab perms (subtractive)
   _loadPreviewStaff();         // populate the "Preview as" account-menu switcher
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
@@ -57598,7 +57777,8 @@ async function boot() {
     // Returning user (tour already done) → land on Home, or their first tab when
     // Home is hidden (V2 users). Skip when a deep link already targets a view.
     // Command center beta (?cc=1, V2 only) replaces the landing entirely.
-    if (typeof _ccWanted === 'function' && _ccWanted() && typeof V2_ACCESS !== 'undefined' && V2_ACCESS) {
+    if (typeof _ccWanted === 'function' && _ccWanted() && typeof V2_ACCESS !== 'undefined' && V2_ACCESS
+        && !(typeof _hasNoTabAccess === 'function' && _hasNoTabAccess())) {
       openCommandCenter();
     } else {
       switchView(typeof _landingView === 'function' ? _landingView() : 'home');

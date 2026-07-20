@@ -1849,6 +1849,10 @@ async function handler(req, res) {
             const rows = await supabaseInsert("client_users", {
               client_id, name, email: email || null, phone: phone || null,
               role: "member", status: "active", user_id: null, hide_from_team: false,
+              // New teammates start with NO tab access ([] = nothing). They land on
+              // a Home screen prompting the owner to grant permissions. (null would
+              // mean "all"; existing members keep whatever they have.)
+              allowed_tabs: [],
             });
             return res.status(200).json({ ok: true, member: Array.isArray(rows) ? rows[0] : rows });
           } catch (e) { return res.status(500).json({ error: `add teammate failed: ${e.message}` }); }
@@ -1889,6 +1893,10 @@ async function handler(req, res) {
           }
           if ("phone" in teamBody) { const ph = (teamBody.phone || "").trim(); patch.phone = ph || null; }
           if ("name" in teamBody) { const nm = (teamBody.name || "").trim(); if (nm) patch.name = nm; }
+          // Public Team-page copy: title (position) + bio (blurb). Both optional,
+          // owner-editable at any point. Empty string clears the field.
+          if ("title" in teamBody) { const t = (teamBody.title || "").trim(); patch.title = t || null; }
+          if ("bio" in teamBody) { const b = (teamBody.bio || "").trim(); patch.bio = b || null; }
           const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
             method: "PATCH",
             headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
@@ -2035,6 +2043,9 @@ async function handler(req, res) {
               const rows = await supabaseInsert("client_users", {
                 user_id: memberUserId, client_id, name, email, phone: phone || null,
                 role: "member", status: "active",
+                // New teammates start with NO tab access ([] = nothing) - owner grants
+                // access afterward. See add-teammate for the same default.
+                allowed_tabs: [],
               });
               memberRow = Array.isArray(rows) ? rows[0] : rows;
             } catch (insErr) {
