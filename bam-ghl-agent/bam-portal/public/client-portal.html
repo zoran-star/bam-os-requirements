@@ -7151,6 +7151,19 @@ if (window.__MOCK__) (() => {
         Business Blueprint
       </div>
 
+      <!-- Settings: owner-only system config (integrations + timezone). Never
+           grantable to a teammate (not in _PERMISSIONABLE_TABS); revealed by
+           applySettingsNavState() once role/BAM-staff is known. -->
+      <div class="nav-item" id="nav-settings" style="display:none" onclick="switchView('settings', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </span>
+        Settings
+      </div>
+
       <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('members', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -11735,6 +11748,20 @@ Then the call to action."]</div>
           <path d="M12 5v14M5 12h14"/>
         </svg>
       </button>
+    </div>
+
+    <div class="view" id="view-settings">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Settings</span>
+          <div class="topbar-title">Settings</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="settings-body">
+          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div>
+        </div>
+      </div>
     </div>
 
     <div class="view" id="view-train-agent">
@@ -19146,6 +19173,8 @@ function switchView(name, el) {
 
   if (name === 'resources') openResourcesView();
 
+  if (name === 'settings') openSettingsView();
+
   if (name === 'assets') { _AST_LIB_MODE = false; _ASSETS_HOST_ID = 'assets-content'; openAssetsView(); }
 
   if (name === 'contacts') openContactsView();
@@ -19285,6 +19314,70 @@ function _mobileMorePick(view) { _mobileMoreClose(); mobileSwitchView(view); }
 // into the real tabs, plus 2 quick actions. Counts come from data the app
 // already maintains (tickets global, _msgConversations) + one light query
 // for open action items. Renders instantly; numbers fill in as they resolve.
+// ─── SETTINGS VIEW (owner-only) ─────────────────────────────────────────────
+// System config split out of the Business Blueprint: integrations/connections
+// status + the account time zone. Business identity stays in the Blueprint.
+function _settingsSaveTimezone(val) {
+  const statusEl = document.getElementById('settings-tz-status');
+  if (statusEl) statusEl.textContent = 'Saving…';
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+  if (c) c.time_zone = val;
+  Promise.resolve(_bbSaveClientBasics({ time_zone: val })).then(ok => {
+    if (statusEl) { statusEl.textContent = ok ? 'Saved' : "Couldn't save"; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
+  }).catch(() => { if (statusEl) statusEl.textContent = "Couldn't save"; });
+}
+
+function _settingsIntegRow(name, desc, connected, actionLabel, actionFn) {
+  const pill = connected
+    ? `<span style="font-size:11px;font-weight:700;color:var(--green,#2e7d5b);background:var(--green-soft,rgba(46,125,91,.12));border-radius:var(--r-full,999px);padding:3px 10px;white-space:nowrap">Connected</span>`
+    : `<span style="font-size:11px;font-weight:700;color:var(--amber,#b5851f);background:var(--amber-soft,rgba(181,133,31,.12));border-radius:var(--r-full,999px);padding:3px 10px;white-space:nowrap">Not set up</span>`;
+  const action = actionFn
+    ? `<button onclick="${actionFn}" style="background:transparent;color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">${actionLabel}</button>`
+    : `<span style="font-size:12px;color:var(--text-mute);white-space:nowrap">${actionLabel}</span>`;
+  return `<div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-top:1px solid var(--border)">
+    <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--text)">${name}</div><div style="font-size:12px;color:var(--text-mute)">${desc}</div></div>
+    ${pill}${action}
+  </div>`;
+}
+
+function _settingsRenderIntegrations(st) {
+  const el = document.getElementById('settings-integrations');
+  if (!el) return;
+  st = st || {};
+  el.innerHTML = [
+    _settingsIntegRow('Stripe', 'Take payments and subscriptions.', !!st.stripe, 'Manage', '_obfGoStripe()'),
+    _settingsIntegRow('Email domain', 'Send email from your own domain.', !!st.email, 'Manage', '_obfGoDomains()'),
+    _settingsIntegRow('Website', 'Your live website domain.', !!st.website, 'Set up during onboarding', null),
+    _settingsIntegRow('Texting', 'Send SMS from your academy number.', !!st.texting, 'Set up during onboarding', null),
+    _settingsIntegRow('Instagram / Meta', 'Connect your Instagram inbox.', !!st.instagram, 'Manage', '_obfGoInstagram()'),
+    _settingsIntegRow('CRM (GHL)', 'Your BAM-managed CRM sub-account.', st.has_ghl !== false, 'Managed by BAM', null),
+  ].join('');
+}
+
+async function openSettingsView() {
+  const host = document.getElementById('settings-body');
+  if (!host) return;
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  const tzOpts = _BB_TZ_OPTS.map(([val, label]) => `<option value="${val}" ${(c.time_zone || '') === val ? 'selected' : ''}>${_bbEscapeHtml(label)}</option>`).join('');
+  const card = 'background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg,16px);box-shadow:var(--shadow-card);padding:22px 24px';
+  host.innerHTML = `
+    <div style="max-width:720px">
+      <div style="${card};margin-bottom:18px">
+        <div style="font-family:var(--font-num,inherit);font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">Integrations</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-bottom:8px">The accounts that power your payments, messaging, and automations.</div>
+        <div id="settings-integrations"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Checking connections…</div></div>
+      </div>
+      <div style="${card}">
+        <div style="font-family:var(--font-num,inherit);font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">Time zone</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-bottom:14px">Used to time automations, reminders, and reports correctly.</div>
+        <select onchange="_settingsSaveTimezone(this.value)" style="width:100%;max-width:360px;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:10px 12px;font-size:14px;font-family:inherit;outline:none">${tzOpts}</select>
+        <span id="settings-tz-status" style="display:inline-block;margin-left:10px;font-size:12px;color:var(--text-mute)"></span>
+      </div>
+    </div>`;
+  try { _settingsRenderIntegrations(await _obfFetchState()); }
+  catch (_) { const el = document.getElementById('settings-integrations'); if (el) el.innerHTML = '<div style="font-size:13px;color:var(--text-mute);padding:12px 0">Couldn\'t load connection status right now.</div>'; }
+}
+
 // Empty-state shown on Home to a teammate with no tab grants yet ([]). It's the
 // only surface they can reach until the owner grants access in Blueprint > Staff.
 function _renderHomeNoAccess() {
@@ -22593,6 +22686,8 @@ function applyTabPermissions() {
 // Views not under a permissionable tab (home, messages…) = always yes.
 function _isViewTabAllowed(view) {
   if (_effTabRole() === 'owner') return true;
+  // Settings is owner-only, never grantable. Non-owners: only BAM staff (support).
+  if (view === 'settings') return _IS_BAM_STAFF === true;
   const tabs = _effAllowedTabs();
   if (!Array.isArray(tabs)) return true;
   // No grants yet ([] = nothing) → only Home is reachable; it shows the
@@ -22683,6 +22778,7 @@ async function _ensureStaffFlag() {
   // Now that we know staff status, re-apply Home visibility (staff keep Home).
   try { if (typeof applyHomeNavState === 'function') applyHomeNavState(); } catch (_) {}
   try { if (typeof applyTrainAgentNavState === 'function') applyTrainAgentNavState(); } catch (_) {}
+  try { if (typeof applySettingsNavState === 'function') applySettingsNavState(); } catch (_) {}
   return _IS_BAM_STAFF;
 }
 
@@ -22751,6 +22847,7 @@ async function loadMyPermissionsAndApply() {
     _MY_CAN_ENROLL_MEMBERS = row?.can_enroll_members === true;
   } catch (_) { _MY_ALLOWED_TABS = null; _MY_ALLOWED_STAGES = null; _MY_ALLOWED_KPIS = null; }
   applyTabPermissions();
+  try { if (typeof applySettingsNavState === 'function') applySettingsNavState(); } catch (_) {} // owner-only Settings nav
   // Perms load async: if this resolves while a no-access member is sitting in the
   // command center (or any non-Home view), pull them back to the Home prompt.
   if (typeof _hasNoTabAccess === 'function' && _hasNoTabAccess()) {
@@ -22789,6 +22886,16 @@ function applyHomeNavState() {
   const el = document.getElementById('nav-home');
   if (el) el.style.display = hide ? 'none' : '';
   document.querySelectorAll('.mobile-nav-item[data-view="home"]').forEach(m => { m.style.display = hide ? 'none' : ''; });
+}
+
+// Settings is owner-only system config (integrations + timezone) - never
+// grantable to a teammate. Show it only for the academy owner or a BAM staff
+// admin. Called whenever role / BAM-staff status becomes known.
+function applySettingsNavState() {
+  const show = (_MY_TAB_ROLE === 'owner') || (_IS_BAM_STAFF === true);
+  const el = document.getElementById('nav-settings');
+  if (el) el.style.display = show ? '' : 'none';
+  document.querySelectorAll('.mobile-nav-item[data-view="settings"]').forEach(m => { m.style.setProperty('display', show ? '' : 'none', 'important'); });
 }
 
 // Where a user lands when Home isn't available to them - first visible tab.
@@ -24730,13 +24837,9 @@ function _bbRenderGeneralCard(panel, meta) {
       <div class="bb-field-hint">Federal tax ID - required so we can set up Stripe Connect under your business.</div>
     </div>
 
-    <div class="bb-field">
-      <div class="bb-field-label">Time zone</div>
-      <select id="bb-gen-time_zone" class="bb-input" onchange="_bbGenChanged()">
-        ${_BB_TZ_OPTS.map(([val, label]) => `<option value="${val}" ${(c.time_zone || '') === val ? 'selected' : ''}>${label}</option>`).join('')}
-      </select>
-      <div class="bb-field-hint">Used to time automations, reminders, and reports correctly.</div>
-    </div>
+    <!-- Time zone MOVED to Settings (owner-only system config) 2026-07-20.
+         It's a system setting, not business identity. Edited at Settings >
+         Time zone; still persisted to clients.time_zone via the same RPC. -->
 
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
   `;
@@ -24762,7 +24865,8 @@ function _bbGenChanged() {
     legal_name:    document.getElementById('bb-gen-legal_name')?.value || '',
     address:       document.getElementById('bb-gen-address')?.value || '',
     ein:           document.getElementById('bb-gen-ein')?.value || '',
-    time_zone:     document.getElementById('bb-gen-time_zone')?.value || '',
+    // time_zone moved to Settings; do NOT read it here (the field is gone, so
+    // reading it would save an empty value and wipe the saved zone).
   }));
 }
 
