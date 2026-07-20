@@ -4255,7 +4255,11 @@ if (window.__MOCK__) (() => {
   .mm-dp-cell.is-sel { background:var(--gold); color:var(--on-gold); }
   .mm-sect { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
   .mm-fsec { margin: 0; }
-  .mm-farrow { display: flex; justify-content: center; margin: 18px 0; }
+  /* Flow connectors sit on the same left rail as the section icons (Campaign /
+     Results) - the content is left-aligned, so a centered arrow floated off in
+     the whitespace and read as "not lined up". padding-left centers the 4px pole
+     under the ~15px section icon. */
+  .mm-farrow { display: flex; justify-content: flex-start; padding-left: 6px; margin: 18px 0; }
   .mm-farrow span { position: relative; width: 4px; height: 34px; background: var(--text-mute); opacity: 0.45; border-radius: 2px; }
   .mm-farrow span::after { content: ''; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top: 10px solid var(--text-mute); }
   .mm-adset { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; background: var(--surface-el); margin-bottom: 14px; }
