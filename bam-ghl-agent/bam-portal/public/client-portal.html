@@ -54009,7 +54009,13 @@ function _ccFocusCloseOpen() {
     else if (open.id === 'landingMachineModal') closeLandingMachine();
     else if (open.id === 'membersMachineModal') closeMembersFocus();
     else if (open.id === 'gmMachineModal') closeGmFocus();
-    else { open.classList.remove('mm-open'); document.documentElement.classList.remove('mm-focus-open'); }
+    // Route the CC-launched overlays through their real close fns so the classic
+    // breadcrumb chrome (cc-classic) gets cleared - otherwise swipe / Escape /
+    // hardware-back strands the "‹ Command center › X" bar over the home page.
+    else if (open.id === 'view-blueprint' && typeof closeBlueprint === 'function') closeBlueprint();
+    else if (open.id === 'view-calendar' && typeof closeCalendar === 'function') closeCalendar();
+    else if (open.id === 'view-ad-previews' && typeof closeAdPreviews === 'function') closeAdPreviews();
+    else { open.classList.remove('mm-open'); document.documentElement.classList.remove('mm-focus-open'); try { _ccClearStaleClassic(); } catch (_) {} }
   } catch (_) {}
   return true;
 }
