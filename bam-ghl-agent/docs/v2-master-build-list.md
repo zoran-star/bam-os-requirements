@@ -49,8 +49,9 @@ The T1-T6 chunks are superseded by the approved P1-P6 bundle:
 |---|---|---|
 | T2-a | Icon popout FE template + bug/feature lanes bridged to old feedback modal | ✅ built 2026-07-20 (PR #1504) |
 | P1 | Content Library: taxonomy migration + rename + V2 BB focus card + circle menu + conditional tagging UI + "keep adding" nudge | ✅ built 2026-07-20 (PR #1504) |
-| P2 | Library search (api/content-library.js) + staff-side browser | ⬅ NEXT |
-| P3 | Ad request flow + RAIL CORE (v2_tickets + v2_ticket_messages + api/v2-tickets.js, notify stubbed) · angle content_types authoring · offer → angle → guide → optional library attach → content_ask | after P1 |
+| P2 | Library search (api/content-library.js) + staff-side browser | later |
+| P3a | RAIL CORE (v2_tickets + v2_ticket_messages + api/v2-tickets.js, notify stubbed) + client ad request in the Meta creative modal: pick angle (offer guide card) → guide → Content Library picker (filter/multi-select) + upload → content_ask ticket. Entry = Marketing → Meta ads → campaign → +add / replace creative (`_mmc`). | ✅ built 2026-07-20 (PR #1504) |
+| P3b | Staff side of the ad flow: angle content_types authoring, staff V2 queue view (Zoran reviews separately) | ⬅ NEXT |
 | P4 | Systems wiring: _v2Submit/_mmcSubmit → rail · staff V2 queue view · portal_feedback backfill · /v2-tickets repoint | after P3 |
 | P5 | Icon popout LIVE: real reads + realtime, lanes create tickets | after P3 |
 | P6 | Notifications (T3 decision): 4 function channels (#systems/#marketing/#content/#other) + client SMS on status change · retrofit WS7/WS3 per-client channels | after P3-P5 |

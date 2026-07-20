@@ -57977,6 +57977,28 @@ function toggleTheme() {
   .mmc-input::placeholder, .mmc-textarea::placeholder { color:var(--text-mute); }
   .mmc-input:focus, .mmc-textarea:focus { outline:none; border-color:var(--gold); }
   .mmc-textarea { min-height:88px; resize:vertical; line-height:1.5; }
+  /* Track 2 / P3: angle + guide + Content Library picker inside the modal */
+  .mmc-muted { font-family:var(--font-ui); font-size:12px; color:var(--text-mute); padding:4px 0; }
+  .mmc-angles { display:flex; flex-wrap:wrap; gap:6px; }
+  .mmc-angle { font-family:var(--font-ui); font-size:12px; font-weight:600; color:var(--text-sub); background:transparent; border:1px solid var(--border-med); border-radius:999px; padding:7px 14px; cursor:pointer; transition:all var(--t-fast,.12s); }
+  .mmc-angle:hover { border-color:var(--gold); color:var(--text); }
+  .mmc-angle.on { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
+  .mmc-guide { margin-top:10px; padding:12px 14px; background:var(--surface-el); border:1px solid var(--line); border-radius:var(--radius-md); }
+  .mmc-guide-purpose { font-family:var(--font-ui); font-size:12.5px; color:var(--text); line-height:1.5; }
+  .mmc-guide-tips { font-family:var(--font-ui); font-size:12px; color:var(--text-sub); line-height:1.5; margin-top:8px; }
+  .mmc-guide-segs { margin-top:8px; display:flex; flex-direction:column; gap:5px; }
+  .mmc-guide-seg { font-family:var(--font-ui); font-size:12px; color:var(--text-sub); line-height:1.45; }
+  .mmc-guide-seg b { color:var(--text); }
+  .mmc-libfilts { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
+  .mmc-libfilt { font-family:var(--font-ui); font-size:11px; font-weight:600; color:var(--text-sub); background:transparent; border:1px solid var(--border-med); border-radius:999px; padding:5px 11px; cursor:pointer; transition:all var(--t-fast,.12s); }
+  .mmc-libfilt:hover { border-color:var(--gold); color:var(--text); }
+  .mmc-libfilt.on { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
+  .mmc-libgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(76px, 1fr)); gap:8px; max-height:220px; overflow-y:auto; padding:2px; }
+  .mmc-libitem { position:relative; aspect-ratio:1; border:2px solid var(--line); border-radius:var(--radius-sm); overflow:hidden; background:#000; cursor:pointer; padding:0; transition:border-color var(--t-fast,.12s); }
+  .mmc-libitem:hover { border-color:var(--border-str); }
+  .mmc-libitem.sel { border-color:var(--gold); }
+  .mmc-libitem img, .mmc-libitem video { width:100%; height:100%; object-fit:cover; display:block; }
+  .mmc-libcheck { position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:999px; background:var(--gold); color:var(--on-gold); font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; }
   .mmc-foot { display:flex; justify-content:flex-end; gap:10px; margin-top:22px; }
   .mmc-btn-ghost { font-family:var(--font-ui); font-size:13px; font-weight:600; color:var(--text-sub); background:transparent; border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:10px 18px; cursor:pointer; transition:border-color var(--t-fast,.12s), color var(--t-fast,.12s); }
   .mmc-btn-ghost:hover { color:var(--text); border-color:var(--border-str); }
@@ -59006,10 +59028,112 @@ function _mmCreativeAction(action, name) {
 let _MMC = null;
 function _mmcOpen(mode, idx) {
   const ctx = (mode === 'replace' ? (window._MMC_REP || []) : (window._MMC_ADD || []))[idx] || {};
-  _MMC = { mode, step: 'form', files: [], drive: '', brief: '', creative: ctx.creative || null, verdict: ctx.verdict || null, ctx };
+  _MMC = {
+    mode, step: 'form', files: [], drive: '', brief: '', creative: ctx.creative || null, verdict: ctx.verdict || null, ctx,
+    // Track 2 / P3: angle + guide + Content Library picker
+    angleIdx: null, guideLoaded: false, guideCard: null, angles: [],
+    libLoaded: false, libAssets: [], libIds: new Set(), libFilter: 'all',
+  };
   _mmcRender();
   const bd = document.getElementById('mmCreativeModal');
   if (bd) bd.style.display = 'flex';
+  _mmcLoadGuide();
+  _mmcLoadLibrary();
+}
+
+// Pull the guide card that matches this campaign's offer, and its angles.
+// Match by title (the live convention), else the default card, else first.
+async function _mmcLoadGuide() {
+  const want = _MMC;
+  try {
+    const cards = await _fetchGuideCards();
+    const offer = ((want.ctx && want.ctx.offer) || '').toLowerCase().trim();
+    let card = null;
+    if (offer) {
+      card = cards.find(c => (c.title || '').toLowerCase().trim() === offer)
+          || cards.find(c => (c.title || '').toLowerCase().includes(offer) || offer.includes((c.title || '').toLowerCase()));
+    }
+    card = card || cards.find(c => c.is_default) || cards[0] || null;
+    if (_MMC !== want) return;
+    _MMC.guideCard = card;
+    _MMC.angles = card ? _cardAngles(card) : [];
+  } catch (_) { if (_MMC === want) _MMC.angles = []; }
+  if (_MMC === want) { _MMC.guideLoaded = true; if (_MMC.step === 'form') _mmcRender(); }
+}
+
+// Load this academy's Content Library assets for the picker (own, non-ticket).
+async function _mmcLoadLibrary() {
+  const want = _MMC;
+  try {
+    const { data } = await _sb.from('client_assets')
+      .select('id,label,storage_path,link_url,mime_type,category,content_type')
+      .eq('client_id', CLIENT_ID).neq('source', 'ticket')
+      .order('created_at', { ascending: false }).limit(200);
+    if (_MMC !== want) return;
+    _MMC.libAssets = data || [];
+  } catch (_) { if (_MMC === want) _MMC.libAssets = []; }
+  if (_MMC === want) { _MMC.libLoaded = true; if (_MMC.step === 'form') _mmcRender(); }
+}
+
+function _mmcPickAngle(i) { if (!_MMC) return; _mmcCapture(); _MMC.angleIdx = (_MMC.angleIdx === i ? null : i); _mmcRender(); }
+function _mmcLibFilter(f) { if (!_MMC) return; _mmcCapture(); _MMC.libFilter = f; _mmcRender(); }
+function _mmcToggleLib(id) {
+  if (!_MMC) return; _mmcCapture();
+  _MMC.libIds = _MMC.libIds || new Set();
+  if (_MMC.libIds.has(id)) _MMC.libIds.delete(id); else _MMC.libIds.add(id);
+  _mmcRender();
+}
+// Build the angle + guide + library picker block for the form step.
+function _mmcContentBlockHtml() {
+  const m = _MMC;
+  // Angle chips (from the offer's guide card) + Other.
+  let angleBlock = '';
+  if (!m.guideLoaded) {
+    angleBlock = '<div class="mmc-field"><label class="mmc-label">Pick an angle</label><div class="mmc-muted">Loading guide…</div></div>';
+  } else if (m.angles.length) {
+    const chips = m.angles.map((a, i) =>
+      '<button type="button" class="mmc-angle' + (m.angleIdx === i ? ' on' : '') + '" onclick="_mmcPickAngle(' + i + ')">' + _escapeHtml(a.name) + '</button>'
+    ).join('') + '<button type="button" class="mmc-angle' + (m.angleIdx === 'other' ? ' on' : '') + '" onclick="_mmcPickAngle(\'other\')">Other</button>';
+    // Guide for the picked angle.
+    let guide = '';
+    if (typeof m.angleIdx === 'number' && m.angles[m.angleIdx]) {
+      const a = m.angles[m.angleIdx];
+      const exec = a.video || a.graphic;
+      const segs = (exec && exec.segments && exec.segments.length)
+        ? '<div class="mmc-guide-segs">' + exec.segments.map(s => '<div class="mmc-guide-seg"><b>' + _escapeHtml(s.label || '') + '</b>' + (s.text ? ' ' + _escapeHtml(s.text) : '') + '</div>').join('') + '</div>' : '';
+      const tips = (exec && exec.tips) ? '<div class="mmc-guide-tips">' + _escapeHtml(exec.tips) + '</div>' : '';
+      guide = '<div class="mmc-guide">' + (a.purpose ? '<div class="mmc-guide-purpose">' + _escapeHtml(a.purpose) + '</div>' : '') + tips + segs + '</div>';
+    }
+    const cardName = m.guideCard && m.guideCard.title ? ' &middot; ' + _escapeHtml(m.guideCard.title) : '';
+    angleBlock = '<div class="mmc-field"><label class="mmc-label">Pick an angle' + cardName + '</label><div class="mmc-angles">' + chips + '</div>' + guide + '</div>';
+  }
+
+  // Content Library picker.
+  let lib = '';
+  const filt = m.libFilter || 'all';
+  const filtered = (m.libAssets || []).filter(x => filt === 'all' || x.content_type === filt);
+  const filts = ['all', 'action', 'coaching', 'culture', 'testimonial', 'other'].map(f =>
+    '<button type="button" class="mmc-libfilt' + (filt === f ? ' on' : '') + '" onclick="_mmcLibFilter(\'' + f + '\')">' + (f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)) + '</button>'
+  ).join('');
+  if (!m.libLoaded) {
+    lib = '<div class="mmc-muted">Loading your library…</div>';
+  } else if (!filtered.length) {
+    lib = '<div class="mmc-muted">Nothing ' + (filt === 'all' ? 'in your library yet' : 'tagged as ' + filt) + '. Add content in the Content Library, or upload below.</div>';
+  } else {
+    lib = '<div class="mmc-libgrid">' + filtered.map(x => {
+      const sel = m.libIds && m.libIds.has(x.id);
+      const url = x.link_url || _assetUrl(x.storage_path);
+      const isVid = (x.mime_type || '').startsWith('video/') || x.category === 'video';
+      const thumb = isVid
+        ? '<video src="' + _escapeHtml(url) + '#t=0.3" muted playsinline preload="metadata"></video>'
+        : '<img src="' + _escapeHtml(url) + '" alt="" loading="lazy">';
+      return '<button type="button" class="mmc-libitem' + (sel ? ' sel' : '') + '" onclick="_mmcToggleLib(\'' + x.id + '\')">' + thumb + (sel ? '<span class="mmc-libcheck">&#10003;</span>' : '') + '</button>';
+    }).join('') + '</div>';
+  }
+  const selCount = m.libIds ? m.libIds.size : 0;
+  const libBlock = '<div class="mmc-field"><label class="mmc-label">From your Content Library' + (selCount ? ' &middot; ' + selCount + ' selected' : '') + '</label><div class="mmc-libfilts">' + filts + '</div>' + lib + '</div>';
+
+  return angleBlock + libBlock;
 }
 function _mmcClose() { const bd = document.getElementById('mmCreativeModal'); if (bd) bd.style.display = 'none'; _MMC = null; }
 function _mmcPick(input) { if (_MMC && input.files) { _mmcCapture(); for (const f of input.files) _MMC.files.push(f); input.value = ''; _mmcRender(); } }
@@ -59060,12 +59184,13 @@ function _mmcRender() {
       '<button type="button" class="mmc-x" onclick="_mmcClose()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
     '</div>' +
     repCard +
-    '<div class="mmc-field"><label class="mmc-label">Your footage &amp; photos</label>' +
+    _mmcContentBlockHtml() +
+    '<div class="mmc-field"><label class="mmc-label">Or add new footage &amp; photos</label>' +
       '<label class="mmc-drop" id="mmcDrop" ondragover="event.preventDefault();this.classList.add(\'is-over\')" ondragleave="this.classList.remove(\'is-over\')" ondrop="_mmcDrop(event)">' +
         '<input type="file" multiple accept="image/*,video/*" style="display:none" onchange="_mmcPick(this)">' +
         '<svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M8 3L5 6M8 3l3 3"/><path d="M2.5 10.5V12a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-1.5"/></svg>' +
         '<span class="mmc-drop-main">Drop files or <b>browse</b></span>' +
-        '<span class="mmc-drop-sub">Photos and clips. Big files? Paste a Google Drive link below.</span>' +
+        '<span class="mmc-drop-sub">New clips get added to your Content Library too. Big files? Paste a Google Drive link below.</span>' +
       '</label>' + files +
       '<input type="text" id="mmcDrive" class="mmc-input" placeholder="Or paste a Google Drive / Dropbox link" value="' + _escapeHtml(_MMC.drive || '') + '">' +
     '</div>' +
@@ -59096,8 +59221,12 @@ function _mmcConfirmHtml() {
         (stats ? '<div class="mmc-rep-stats">' + stats + '</div>' : '') + '</div></div>';
   }
   const fileCount = _MMC.files.length;
+  const libCount = _MMC.libIds ? _MMC.libIds.size : 0;
+  const angleName = (typeof _MMC.angleIdx === 'number' && _MMC.angles[_MMC.angleIdx])
+    ? _MMC.angles[_MMC.angleIdx].name : (_MMC.angleIdx === 'other' ? 'Other' : null);
   const assetLine = [
-    fileCount ? (fileCount + ' file' + (fileCount === 1 ? '' : 's')) : null,
+    libCount ? (libCount + ' from library') : null,
+    fileCount ? (fileCount + ' new file' + (fileCount === 1 ? '' : 's')) : null,
     (_MMC.drive || '').trim() ? 'a shared link' : null,
   ].filter(Boolean).join(' + ') || 'none';
   const fileList = fileCount
@@ -59114,7 +59243,8 @@ function _mmcConfirmHtml() {
     repCard +
     '<div class="mmc-sum">' +
       row('Request', isRep ? 'Replace this ad with a fresh creative' : 'A brand-new creative') +
-      row('Assets', assetLine) + fileList +
+      (angleName ? row('Angle', _escapeHtml(angleName)) : '') +
+      row('Content', assetLine) + fileList +
       ((_MMC.drive || '').trim() ? row('Link', '<span style="word-break:break-all">' + _escapeHtml(_MMC.drive.trim()) + '</span>') : '') +
       '<div class="mmc-sum-row"><span class="mmc-sum-k">' + (isRep ? 'What to beat' : 'Brief') + '</span></div>' +
       '<div class="mmc-sum-brief">' + _escapeHtml((_MMC.brief || '').trim()) + '</div>' +
@@ -59129,12 +59259,13 @@ function _mmcReview() {   // validate the form, then move to the confirmation st
   if (!_MMC) return;
   _mmcCapture();
   const brief = (_MMC.brief || '').trim(), drive = (_MMC.drive || '').trim();
-  const needAssets = !_MMC.files.length && !drive, needBrief = !brief;
+  const libCount = _MMC.libIds ? _MMC.libIds.size : 0;
+  const needAssets = !_MMC.files.length && !drive && !libCount, needBrief = !brief;
   if (needAssets || needBrief) {
     if (needAssets) _mmcShake('mmcDrop');
     if (needBrief) _mmcShake('mmcBrief');
-    _mmToast(needAssets && needBrief ? 'Add your footage and a quick brief'
-      : needAssets ? 'Add your footage or photos (upload or a Drive link)'
+    _mmToast(needAssets && needBrief ? 'Pick content and add a quick brief'
+      : needAssets ? 'Pick from your library or upload footage'
       : 'Add a quick brief so the team knows the vibe');
     return;
   }
@@ -59149,34 +59280,82 @@ function _mmcShake(id) {   // "no-no" shake + red flag on a missing field
   el.classList.add('mmc-shake', 'mmc-invalid');
   setTimeout(() => el.classList.remove('mmc-invalid'), 1400);
 }
-function _mmcSubmit() {   // fires from the confirmation step (already validated)
+// Upload any newly-dropped files into the Content Library (client-assets), so
+// they are reusable + taggable, and return their ids to attach to the ticket.
+async function _mmcUploadNewFiles() {
+  const ids = [];
+  for (const f of (_MMC.files || [])) {
+    try {
+      const clean = f.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+      const stamp = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      const path = CLIENT_ID + '/' + stamp + '-' + clean;
+      await _storageUpload('client-assets', path, f);
+      const { data } = await _sb.from('client_assets').insert({
+        client_id: CLIENT_ID, label: f.name.replace(/\.[^.]+$/, ''),
+        category: (f.type || '').startsWith('video/') ? 'video' : 'photo',
+        storage_path: path, mime_type: f.type || null, size_bytes: f.size,
+      }).select('id').single();
+      if (data) ids.push(data.id);
+    } catch (_) { /* skip a failed file; the brief + others still go */ }
+  }
+  return ids;
+}
+
+async function _mmcSubmit() {   // fires from the confirmation step (already validated)
   if (!_MMC) return;
   const brief = (_MMC.brief || '').trim(), drive = (_MMC.drive || '').trim();
   const isRep = _MMC.mode === 'replace', c = _MMC.creative, v = _MMC.verdict;
-  const payload = {
-    module: 'meta-ads', request_type: isRep ? 'replace' : 'add', source: 'v2_portal_creative',
-    brief,
-    assets: { files: _MMC.files.map((f) => ({ name: f.name, size: f.size })), drive_link: drive || null },
-    context: {
-      campaign: (_MMC.ctx && _MMC.ctx.campaign) || null,
-      adset: (_MMC.ctx && _MMC.ctx.adset) || null,
-      offer: (_MMC.ctx && _MMC.ctx.offer) || null,
-      replacing: (isRep && c) ? {
-        id: c.id || null, name: c.name || null, cpl: c.cpl, hook_rate: c.hook_rate,
-        frequency: c.frequency, spend: c.spend, verdict: v && v.verdict, why: v && v.note,
-      } : null,
-    },
-  };
-  console.log('[v2-creative] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
-  // Loading -> sent checkmark. The setTimeout stands in for the real POST.
+  const angleName = (typeof _MMC.angleIdx === 'number' && _MMC.angles[_MMC.angleIdx])
+    ? _MMC.angles[_MMC.angleIdx].name : (_MMC.angleIdx === 'other' ? 'Other' : null);
   _MMC.step = 'sending';
   _mmcRender();
-  setTimeout(() => {
+  try {
+    const newIds = await _mmcUploadNewFiles();
+    const libIds = _MMC.libIds ? Array.from(_MMC.libIds) : [];
+    const assetIds = libIds.concat(newIds);
+    const campaign = (_MMC.ctx && _MMC.ctx.campaign) || null;
+    const body = {
+      type: 'content_ask',
+      source: 'editor',
+      client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
+      title: (isRep ? 'Replace creative' : 'New creative') + (campaign ? ' - ' + campaign : ''),
+      intake: {
+        mode: isRep ? 'replace' : 'add',
+        angle: angleName,
+        guide_card: (_MMC.guideCard && _MMC.guideCard.title) || null,
+        brief,
+        drive_link: drive || null,
+        asset_ids: assetIds,
+        replacing: (isRep && c) ? {
+          id: c.id || null, name: c.name || null, cpl: c.cpl, hook_rate: c.hook_rate,
+          frequency: c.frequency, spend: c.spend, verdict: v && v.verdict, why: v && v.note,
+        } : null,
+      },
+      context: {
+        surface: 'meta-ads',
+        campaign,
+        adset: (_MMC.ctx && _MMC.ctx.adset) || null,
+        offer: (_MMC.ctx && _MMC.ctx.offer) || null,
+        page_url: window.location.pathname + window.location.search,
+      },
+      message: brief || null,
+    };
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/v2-tickets?action=create&client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    const j = await _safeJson(res);
+    if (!res.ok || j.error) throw new Error(j.error || ('HTTP ' + res.status));
     if (!_MMC || _MMC.step !== 'sending') return;   // user closed mid-send
     _MMC.step = 'sent';
     _mmcRender();
-    setTimeout(() => { if (_MMC && _MMC.step === 'sent') _mmcClose(); }, 2600);   // auto-dismiss
-  }, 950);
+    setTimeout(() => { if (_MMC && _MMC.step === 'sent') _mmcClose(); }, 2600);
+  } catch (e) {
+    if (_MMC) { _MMC.step = 'form'; _mmcRender(); }
+    _mmToast("Couldn't send: " + (e.message || e));
+  }
 }
 function _mmcSendingHtml() {
   return '<div class="mmc-status">' +
