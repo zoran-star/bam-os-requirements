@@ -78,15 +78,19 @@ async function handler(req, res) {
     if (!GOOGLE_CLIENT_ID) return res.status(500).send("GOOGLE_CLIENT_ID not configured");
     if (!(await canManageClient(user, clientId))) return res.status(403).send("You do not have access to this academy.");
 
-    // Require the academy to have its sending domain on file so we can validate the
-    // connected inbox against it (and so it lines up with the Resend send-from).
+    // What inbox are we connecting? An explicit address (staff picks it - handles
+    // academies whose inbox domain differs from their Resend sending domain, e.g.
+    // Detail Miami uses info@byanymeansbball.com) wins; else fall back to the
+    // sending domain on file (connected inbox must be on that domain).
+    const expected = norm(req.query.email || "");
     const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=email_domain&limit=1`);
-    const emailDomain = rows && rows[0] && rows[0].email_domain;
-    if (!emailDomain) {
-      return res.redirect(302, `${safeReturn(ret)}/?mailbox=error&reason=no_domain_on_file`);
+    const emailDomain = rows && rows[0] && rows[0].email_domain ? norm(rows[0].email_domain) : null;
+    if (!expected && !emailDomain) {
+      // Nothing to validate against - staff must pass ?email= or set email_domain.
+      return res.redirect(302, `${safeReturn(ret)}/?mailbox=error&reason=no_target_inbox`);
     }
 
-    const state = b64urlEncode({ t: token, c: clientId, r: safeReturn(ret), d: norm(emailDomain) });
+    const state = b64urlEncode({ t: token, c: clientId, r: safeReturn(ret), x: expected || null, d: emailDomain });
     const authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
       redirect_uri: redirectUri,
@@ -94,8 +98,8 @@ async function handler(req, res) {
       scope: GMAIL_SCOPES,
       access_type: "offline",
       prompt: "consent",
-      // Nudge Google to pre-fill the academy's shared inbox.
-      login_hint: `info@${norm(emailDomain)}`,
+      // Nudge Google to pre-fill the expected inbox.
+      login_hint: expected || (emailDomain ? `info@${emailDomain}` : ""),
       state,
     });
     return res.redirect(302, authUrl);
@@ -124,9 +128,15 @@ async function handler(req, res) {
       const connectedEmail = await googleProfileEmail(tokens.access_token);
       if (!connectedEmail) return res.redirect(302, `${ret}/?mailbox=error&reason=no_email`);
 
-      // THE GUARANTEE: the connected inbox's domain must match the academy on file.
-      if (domainOf(connectedEmail) !== norm(st.d)) {
-        return res.redirect(302, `${ret}/?mailbox=error&reason=domain_mismatch&got=${encodeURIComponent(connectedEmail)}&want=${encodeURIComponent(st.d)}`);
+      // THE GUARANTEE: the connected account must be the intended inbox. If staff
+      // named an exact address, match it exactly (any domain); otherwise the inbox
+      // must at least live on the academy's sending domain on file.
+      const connected = norm(connectedEmail);
+      const okExact = st.x && connected === norm(st.x);
+      const okDomain = !st.x && st.d && domainOf(connected) === norm(st.d);
+      if (!(okExact || okDomain)) {
+        const want = st.x || `@${st.d}`;
+        return res.redirect(302, `${ret}/?mailbox=error&reason=inbox_mismatch&got=${encodeURIComponent(connectedEmail)}&want=${encodeURIComponent(want)}`);
       }
 
       await saveGoogleMailbox({

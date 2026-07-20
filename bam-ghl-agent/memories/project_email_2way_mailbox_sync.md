@@ -152,12 +152,21 @@ Resend) - sending auth is separate from MX receiving, so they coexide fine.
 
 ### "Right inbox" guarantee (how we tie the correct mailbox to the portal)
 The OAuth connection IS the proof - Google returns the authorized address; we don't
-guess. Safeguards on connect:
+guess. Safeguards on connect (`mailbox-connect.js`):
 - OAuth callback returns the real authenticated address → store that, tied to
   `client_id` (one mailbox per academy, idempotent).
-- **Domain-match check** against `clients.email_domain` → block + warn if the
-  connected address's domain doesn't match (stops a personal @gmail slip).
-- Confirm-back screen ("✅ Connected: info@…") before it goes live.
+- **Inbox-match check:** connect takes an explicit expected inbox
+  `?email=<addr>` → connected account must EXACTLY equal it (any domain). If no
+  explicit address, falls back to domain-match against `clients.email_domain`.
+  Either way a wrong inbox (personal @gmail, etc.) is blocked (`inbox_mismatch`).
+- **IMPORTANT - inbox domain ≠ sending domain.** An academy's real inbox can live
+  on a different domain than its Resend *sending* domain. Real case: Detail Miami
+  sends bulk from `detail-mia.com` (email_domain) but their actual inbox is
+  `info@byanymeansbball.com`. So the connect is keyed to an EXPLICIT address, not
+  the sending domain. Heads-up: for such academies, human replies go FROM the
+  connected inbox (byanymeansbball.com) while bulk still goes FROM the Resend
+  domain (detail-mia.com) - two from-addresses; acceptable if that's their reality.
+- Confirm-back screen ("Connected: info@…") before it goes live.
 - Red "Reconnect inbox" status badge when the token expires/revokes (never fails
   silent) → renewal cron + reconnect CTA.
 
