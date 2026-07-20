@@ -181,3 +181,68 @@ Zoran icon), so a channel-per-client has nobody in it but us.
    the door's real behavior depends on this and it isn't scoped yet.
 3. **THEN:** wire the lanes one at a time on the scoped foundation (T1 real table,
    T2 orchestrator, T3 notifications, etc.).
+
+---
+
+## T-SCOPE OUTCOME (co-worked + approved 2026-07-20) - supersedes the build
+chunks above with the P1-P6 bundle
+
+The scoping pass ran same-day. Full plan approved by Zoran (plan-mode session;
+plan file mirrored below in essentials). Codebase scans grounded everything.
+
+**The V2 reframe: three ticket FAMILIES + greenfield architecture.**
+- V2 ticket architecture is NEW (Zoran: "we don't have to have the same ticket
+  architecture as V1/V1.5... even new front ends / Claude skills"). V1/V1.5
+  keep legacy `tickets`, `marketing_tickets`, `content_tickets` + ContentView/
+  MarketingView queues UNTOUCHED. No migration - tier split.
+- Families: **systems** (fix, website_change, billing_fix, data_fix),
+  **marketing** (marketing_ask), **content** (content_ask = "make-something"
+  asks - new ads now, more later), plus feature_idea → Zoran (backlog).
+- Sales/member-mgmt coverage deliberately thin: clients use the feature-idea
+  lane to "bug Zoran" while he finalizes presets; automations text is already
+  client-editable self-serve.
+
+**Content Library (P1 spine):** the live Assets feature (client_assets table)
+renamed + upgraded. Placement: V2 Business Blueprint focus card + the
+bottom-left circle menu (no left-nav item). NEW structured taxonomy (NOT free
+tags): content_type action|coaching|culture|testimonial with conditional
+fields - action → athlete(s) from CONTACTS + skill presets (6 defaults:
+ball-handling, shooting, game-iq, defense, athleticism, passing + client
+custom) + highlight/lowlight; coaching → staff (client_users; name-only
+add-staff mini modal OK); culture/testimonial → athletes + staff. Uploads are
+self-serve (no ticket); constant "keep adding content" nudge.
+
+**Presets = ANGLES.** The client-facing "ad preset" = an angle of their offer's
+guide card (guide_cards.angles jsonb; Training has 3: Free session /
+Testimonial / Transformation). Flow: in offer → pick angle (+ Other) → angle
+guide content → OPTIONAL library attach ("feel free to select anything you
+specifically want") or tagged upload → content_ask ticket. The other 9 guide
+cards park until their offer types exist. Angles declare `content_types` (jsonb
+key added, Cam authors via the staff guide-card editor) → library picker
+pre-filters.
+
+**Architecture (approved):** `v2_tickets` + `v2_ticket_messages` (real thread,
+realtime, system-author rows double as the status log), `api/v2-tickets.js`
+(create/list/thread/reply/status/reassign - ALL mutations through it so T3
+notifications get one choke point), `api/content-library.js` (search/skills/
+tag), taxonomy tables `client_asset_people` (athlete→contacts,
+staff→client_users, display_name snapshots) + `client_content_skills` +
+`client_asset_skills`. Existing mock call sites `_v2Submit` (website_change)
+and `_mmcSubmit` (content_ask) wire straight in. assignee_role gains
+**content**; source gains **offer-flow**.
+
+**The P1-P6 bundle (locked priority Library → ads → systems → icon):**
+| P | Ships |
+|---|---|
+| P1 | Content Library: taxonomy migration + rename + V2 BB card + circle menu + conditional tagging UI + nudge |
+| P2 | Library search API + staff-side browser |
+| P3 | Ad request flow (rail core rides in here: v2_tickets/messages + API, notify stubbed) |
+| P4 | Systems wiring: _v2Submit/_mmcSubmit → rail, staff queue view, portal_feedback backfill, /v2-tickets repoint |
+| P5 | Icon popout live (real reads + realtime, bug/feature lanes create tickets) |
+| P6 | Notifications T3 (4 channels + client SMS; retrofit WS7/WS3 per-client-channel code) |
+
+Parked still: orchestrator/navigator (T2-b), non-editor side doors (T4), staff
+command palette (T5), Notion pipes (T6), B1 rethink, B2 later.
+
+**Interim bridge (shipped with T2-a):** the popout's bug/feature lanes open the
+OLD feedback modal (kind preselected) until P5 - V2 academies lose nothing.

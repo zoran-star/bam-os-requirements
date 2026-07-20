@@ -51571,9 +51571,18 @@ function _zdOpenThread(id) {
 
 function _zdCloseThread() { _zdShowHome(); }
 
-// Lanes + free-type are visual this chunk. Show a gentle inline note so the
-// template feels responsive without faking a backend.
-function _zdLane(kind) { _zdShowHint('This opens the real intake in the next build.'); }
+// Lanes + free-type are visual this chunk. Bug/feature BRIDGE to the existing
+// feedback modal (kind preselected) so V2 academies lose nothing until P5
+// wires the real intake; the other lanes show a gentle inline note.
+function _zdLane(kind) {
+  if (kind === 'bug' || kind === 'feature') {
+    closeZoranDoor();
+    openAdminFeedback();
+    setFeedbackKind(kind);
+    return;
+  }
+  _zdShowHint('This opens the real intake in the next build.');
+}
 function _zdTypeSend() {
   const el = document.getElementById('zd-type-input');
   if (el && el.value.trim()) { el.value = ''; _zdShowHint('Chat routing gets wired in the next build.'); }

@@ -38,19 +38,25 @@ thread (Slack replacement) · 4-lane door replaces today's feedback modal,
 **The door reshaped:** the icon popout shows live tickets FIRST, then the 4 lanes,
 then the free-type box (folds the old "tickets page" into the popout).
 
-Build order (revised): FE template first, then a support-ticket scoping pass
-BEFORE wiring, then wire lanes on the scoped foundation.
+**T-scope ran 2026-07-20 (same day):** three ticket FAMILIES (systems /
+marketing / content), greenfield `v2_tickets` architecture (V1/V1.5 legacy
+tables untouched), Content Library (Assets reborn w/ structured taxonomy tied
+to contacts + client_users), presets = guide-card ANGLES. Full outcome in
+[`zoran-icon-ticket-design.md`](zoran-icon-ticket-design.md) "T-SCOPE OUTCOME".
+The T1-T6 chunks are superseded by the approved P1-P6 bundle:
 
 | # | Chunk | Status |
 |---|---|---|
-| T2-a | Icon popout FE template: live tickets list (mock) + 4 lanes + free-type + thread view. V2-gated, replaces feedback modal visually. No backend. | ✅ built 2026-07-20 (PR pending) |
-| T-scope | Support-ticket system scoping pass (how tickets get worked, staff queue + agent pre-work, wiring per lane) | ⬅ NEXT (requirements, before any wiring) |
-| T1 | Unified tickets table + statuses + real tickets list behind the popout | after scope |
-| T2 | Orchestrator (classify + slot-fill) + bug/feature intake agents wired to the lanes | after scope |
-| T3 | Notification rail: staff Slack pings + client SMS on status change (rides the phone spine) | later |
-| T4 | Point-of-action side doors (flag-this-reply on Inbox, editor send-to-team, import leftovers, billing panel) | later |
-| T5 | Staff side: command palette + pre-worked queue (agent drafts, staff approves) | later |
-| T6 | Pipes: feature ticket → Notion Backlog · ship → "your idea is live" SMS | later |
+| T2-a | Icon popout FE template + bug/feature lanes bridged to old feedback modal | ✅ built 2026-07-20 (PR #1504) |
+| P1 | Content Library: taxonomy migration + rename + V2 BB focus card + circle menu + conditional tagging UI + "keep adding" nudge | ⬅ IN PROGRESS |
+| P2 | Library search (api/content-library.js) + staff-side browser | after P1 |
+| P3 | Ad request flow + RAIL CORE (v2_tickets + v2_ticket_messages + api/v2-tickets.js, notify stubbed) · angle content_types authoring · offer → angle → guide → optional library attach → content_ask | after P1 |
+| P4 | Systems wiring: _v2Submit/_mmcSubmit → rail · staff V2 queue view · portal_feedback backfill · /v2-tickets repoint | after P3 |
+| P5 | Icon popout LIVE: real reads + realtime, lanes create tickets | after P3 |
+| P6 | Notifications (T3 decision): 4 function channels (#systems/#marketing/#content/#other) + client SMS on status change · retrofit WS7/WS3 per-client channels | after P3-P5 |
+
+Still parked: orchestrator/navigator lanes (T2-b), non-editor side doors (old
+T4), staff command palette (old T5), Notion pipes (old T6).
 
 ## Track 3 - Running-the-business builds (B-bucket, standalone, schedule anytime)
 
