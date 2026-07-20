@@ -12018,6 +12018,24 @@ const _AST_CONTENT_TYPES = [
   ['testimonial', 'Testimonial'],
   ['other',       'Other'],
 ];
+// The 6 core basketball skills ALWAYS show as presets, even before the DB seed
+// runs (mock mode, or a not-yet-seeded academy). Real DB rows (with ids) win;
+// client-custom skills append after these.
+const _AST_DEFAULT_SKILLS = [
+  { slug: 'ball-handling', label: 'Ball handling' },
+  { slug: 'shooting',      label: 'Shooting' },
+  { slug: 'game-iq',       label: 'Game IQ' },
+  { slug: 'defense',       label: 'Defense' },
+  { slug: 'athleticism',   label: 'Athleticism' },
+  { slug: 'passing',       label: 'Passing' },
+];
+function _astMergeSkills(dbRows) {
+  const rows = dbRows || [];
+  const bySlug = new Map(rows.map(s => [s.slug, s]));
+  const merged = _AST_DEFAULT_SKILLS.map(d => bySlug.get(d.slug) || { id: null, slug: d.slug, label: d.label, is_default: true, sort_order: 0 });
+  rows.filter(s => !_AST_DEFAULT_SKILLS.some(d => d.slug === s.slug)).forEach(s => merged.push(s));
+  return merged;
+}
 
 // Where the asset library renders. Standalone view = 'assets-content';
 // when embedded in Business Blueprint (V1.5) = 'bb-assets-content'. Set by
@@ -12054,12 +12072,12 @@ async function openAssetsView() {
           _sb.from('client_asset_people').select('id,asset_id,role,contact_id,client_user_id,display_name').eq('client_id', CLIENT_ID),
           _sb.from('client_asset_skills').select('asset_id,skill_slug').eq('client_id', CLIENT_ID),
         ]);
-        _AST_SKILLS = skills.data || [];
+        _AST_SKILLS = _astMergeSkills(skills.data);
         _AST_PEOPLE = {};
         (people.data || []).forEach(p => { (_AST_PEOPLE[p.asset_id] = _AST_PEOPLE[p.asset_id] || []).push(p); });
         _AST_ASSET_SKILLS = {};
         (askills.data || []).forEach(s => { (_AST_ASSET_SKILLS[s.asset_id] = _AST_ASSET_SKILLS[s.asset_id] || []).push(s.skill_slug); });
-      } catch (_) { _AST_SKILLS = []; _AST_PEOPLE = {}; _AST_ASSET_SKILLS = {}; }
+      } catch (_) { _AST_SKILLS = _astMergeSkills([]); _AST_PEOPLE = {}; _AST_ASSET_SKILLS = {}; }
     }
     _renderAssets();
   } catch (e) {
@@ -12698,6 +12716,26 @@ async function _astToggleStaff(clientUserId, btn) {
   } catch (e) { alert('Tag failed: ' + (e.message || e)); }
 }
 
+// A baked-in default skill has no DB row until it's first used. Create it
+// (is_default=false so client RLS allows the insert) so the asset<->skill FK
+// never fails on a not-yet-seeded academy. Seeded academies already have ids.
+async function _astEnsureSkillRow(slug) {
+  const meta = _AST_SKILLS.find(s => s.slug === slug);
+  if (!meta || meta.id) return;
+  try {
+    const { data, error } = await _sb.from('client_content_skills')
+      .insert({ client_id: CLIENT_ID, slug, label: meta.label, is_default: false, sort_order: meta.sort_order || 0 })
+      .select().single();
+    if (!error && data) { meta.id = data.id; return; }
+    throw error || new Error('no row');
+  } catch (_) {
+    try {
+      const { data } = await _sb.from('client_content_skills').select('id').eq('client_id', CLIENT_ID).eq('slug', slug).single();
+      if (data) meta.id = data.id;
+    } catch (__) {}
+  }
+}
+
 async function _astToggleSkill(slug) {
   const p = _astTagPrimary(); if (!p) return;
   const has = (_AST_ASSET_SKILLS[p.id] || []).includes(slug);
@@ -12707,6 +12745,7 @@ async function _astToggleSkill(slug) {
       if (error) throw error;
       _astTagTargets().forEach(id => { _AST_ASSET_SKILLS[id] = (_AST_ASSET_SKILLS[id] || []).filter(s => s !== slug); });
     } else {
+      await _astEnsureSkillRow(slug);
       const targets = _astTagTargets().filter(id => !((_AST_ASSET_SKILLS[id] || []).includes(slug)));
       if (targets.length) {
         const { error } = await _sb.from('client_asset_skills').insert(targets.map(id => ({ asset_id: id, client_id: CLIENT_ID, skill_slug: slug })));
