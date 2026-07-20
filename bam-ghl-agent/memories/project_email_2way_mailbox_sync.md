@@ -88,13 +88,36 @@ Resend) - sending auth is separate from MX receiving, so they coexide fine.
 - Recipient's provider is irrelevant - you can send to any address from any lane.
   Provider only matters for the ACADEMY's own connected mailbox (Gmail→Graph→IMAP).
 
-## Open decisions for Zoran
-1. Human replies: default to the connected mailbox always, or per-message choice?
-2. Do we keep the Resend inbound webhook as a fallback for academies with NO
-   mailbox connected (current GTA behavior), and only switch to Gmail-ingest once a
-   mailbox is connected? (Recommended: yes, both coexist per-academy.)
-3. Whose mailbox connects - one shared academy inbox (info@) or per-rep mailboxes?
-   (Affects the trainer-tab comms model in `project_sales_comms.md`.)
+## Decisions LOCKED (2026-07-20, Zoran)
+1. **Human replies always route through the connected mailbox** (no per-email
+   toggle - trivial with one shared inbox).
+2. **Resend inbound webhook stays as the fallback** for academies with no mailbox
+   connected; Gmail-ingest takes over only once a mailbox is connected. Both
+   coexist per-academy.
+3. **One shared academy inbox** (`info@`), NOT per-rep, for now. (Revisit against
+   the trainer-tab comms model in `project_sales_comms.md` if per-rep ever needed.)
+4. **Setup = Model A: academies connect their OWN existing mailbox.** All academies
+   already have a real mailbox (GTA = Google Workspace `info@byanymeanstoronto.ca`).
+   Nothing is provisioned/created - it's a ONE-TIME OAuth connect by whoever holds
+   the info@ login (self-serve onboarding screen or staff-assisted screen-share).
+
+### "Right inbox" guarantee (how we tie the correct mailbox to the portal)
+The OAuth connection IS the proof - Google returns the authorized address; we don't
+guess. Safeguards on connect:
+- OAuth callback returns the real authenticated address → store that, tied to
+  `client_id` (one mailbox per academy, idempotent).
+- **Domain-match check** against `clients.email_domain` → block + warn if the
+  connected address's domain doesn't match (stops a personal @gmail slip).
+- Confirm-back screen ("✅ Connected: info@…") before it goes live.
+- Red "Reconnect inbox" status badge when the token expires/revokes (never fails
+  silent) → renewal cron + reconnect CTA.
+
+### MX / DNS at connect time
+Turning on the real inbox = the domain's MX points at Google (GTA already does -
+they run Workspace). Inbound then syncs via Gmail API (Resend inbound webhook stops
+being the source once connected). Resend KEEPS sending bulk from the domain (SPF
+includes Google + Resend, DKIM stays verified in Resend) - sending auth ≠ receiving
+MX, so they coexist. For GTA, BAM controls the domain DNS already.
 
 ## When to update
 - Any phase ships → mark done, note the new endpoints/tables.
