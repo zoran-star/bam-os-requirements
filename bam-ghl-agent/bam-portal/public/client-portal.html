@@ -6671,12 +6671,151 @@ if (window.__MOCK__) (() => {
      directly above the keyboard (no crammed nav strip between them). */
   body.keyboard-open .mobile-nav { display: none !important; }
   body.keyboard-open .chat-input-area { padding-bottom: 8px; }
+
+  /* ─── Zoran door (Track 2 T2-a front-end template) ─────────────────── */
+  #zdoor-overlay {
+    position: fixed; inset: 0; z-index: 10050;
+    background: rgba(0,0,0,.5); opacity: 0; pointer-events: none;
+    transition: opacity var(--t-med, .22s) ease;
+    display: flex; align-items: flex-end; justify-content: flex-end;
+    padding: 0 20px calc(96px + env(safe-area-inset-bottom)) 20px;
+  }
+  #zdoor-overlay.open { opacity: 1; pointer-events: auto; }
+  #zdoor-panel {
+    width: 380px; max-width: 100%;
+    max-height: min(72vh, 620px);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg, 16px); box-shadow: var(--shadow-pop, 0 24px 60px rgba(0,0,0,.4));
+    display: flex; flex-direction: column; overflow: hidden;
+    transform: translateY(12px) scale(.98); opacity: .6;
+    transition: transform var(--t-med, .22s) var(--es, cubic-bezier(.4,0,.2,1)), opacity var(--t-med, .22s);
+  }
+  #zdoor-overlay.open #zdoor-panel { transform: translateY(0) scale(1); opacity: 1; }
+  #zdoor-home, #zdoor-thread { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+
+  .zd-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 18px 12px; border-bottom: 1px solid var(--border);
+    flex: 0 0 auto;
+  }
+  .zd-head-title { font-family: var(--font-num, inherit); font-weight: 800; font-size: 16px; color: var(--text); flex: 1; }
+  .zd-close, .zd-back {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: var(--r-sm, 8px);
+    background: transparent; border: 1px solid transparent; color: var(--text-mute);
+    cursor: pointer; transition: background var(--t-fast, .12s), color var(--t-fast, .12s);
+    flex: 0 0 auto;
+  }
+  .zd-close:hover, .zd-back:hover { background: var(--surface-el, rgba(0,0,0,.04)); color: var(--text); }
+
+  .zd-scroll { overflow-y: auto; padding: 12px 14px 6px; flex: 1 1 auto; min-height: 0; }
+  .zd-sec-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--text-mute); padding: 2px 4px 8px;
+  }
+  .zd-sec-label-mt { padding-top: 14px; }
+
+  /* Ticket rows */
+  .zd-ticket {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 11px 12px; margin-bottom: 6px;
+    background: var(--surface-el, rgba(0,0,0,.02)); border: 1px solid var(--border);
+    border-radius: var(--r-md, 12px); cursor: pointer; text-align: left;
+    transition: transform var(--t-fast, .12s) var(--es, ease), border-color var(--t-fast, .12s);
+  }
+  .zd-ticket:hover { transform: translateY(-1px); border-color: var(--border-med, var(--border)); }
+  .zd-ticket-body { flex: 1 1 auto; min-width: 0; }
+  .zd-ticket-title {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .zd-ticket-meta { font-size: 11px; color: var(--text-mute); margin-top: 2px; }
+  .zd-pill {
+    display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
+    font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: var(--r-full, 999px);
+    white-space: nowrap;
+  }
+  .zd-pill-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+
+  .zd-empty {
+    text-align: center; color: var(--text-mute); font-size: 12px;
+    padding: 18px 12px; border: 1px dashed var(--border-med, var(--border));
+    border-radius: var(--r-md, 12px); line-height: 1.5;
+  }
+
+  /* Lanes */
+  .zd-lanes { display: flex; flex-direction: column; gap: 6px; }
+  .zd-lane {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 11px 12px; background: transparent; border: 1px solid var(--border);
+    border-radius: var(--r-md, 12px); cursor: pointer; text-align: left;
+    transition: border-color var(--t-fast, .12s), background var(--t-fast, .12s), transform var(--t-fast, .12s) var(--es, ease);
+  }
+  .zd-lane:hover { border-color: var(--accent-border, var(--gold)); background: var(--gold-sheen, rgba(212,182,92,.06)); transform: translateY(-1px); }
+  .zd-lane-ic {
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    width: 34px; height: 34px; border-radius: var(--r-sm, 8px);
+    background: var(--gold-sheen, rgba(212,182,92,.08)); color: var(--gold, #D4B65C);
+  }
+  .zd-lane-ic svg { width: 18px; height: 18px; }
+  .zd-lane-txt { display: flex; flex-direction: column; min-width: 0; }
+  .zd-lane-t { font-size: 13px; font-weight: 600; color: var(--text); }
+  .zd-lane-s { font-size: 11px; color: var(--text-mute); margin-top: 1px; }
+
+  /* Free-type + composer row */
+  .zd-type-row {
+    display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+    padding: 12px 14px calc(14px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+  }
+  .zd-type-input {
+    flex: 1 1 auto; min-width: 0; height: 40px; padding: 0 14px;
+    background: var(--surface-el, rgba(0,0,0,.03)); border: 1px solid var(--border);
+    border-radius: var(--r-full, 999px); color: var(--text); font-size: 13px;
+    font-family: var(--font-ui, inherit); outline: none;
+    transition: border-color var(--t-fast, .12s);
+  }
+  .zd-type-input:focus { border-color: var(--accent-border, var(--gold)); }
+  .zd-type-input::placeholder { color: var(--text-mute); }
+  .zd-type-send {
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    width: 40px; height: 40px; border-radius: var(--r-full, 999px);
+    background: var(--gold, #D4B65C); color: var(--on-gold, #131416); border: none;
+    cursor: pointer; transition: filter var(--t-fast, .12s);
+  }
+  .zd-type-send:hover { filter: brightness(1.05); }
+  .zd-hint {
+    height: 0; overflow: hidden; opacity: 0;
+    font-size: 12px; color: var(--text-mute); text-align: center;
+    transition: height var(--t-fast, .12s), opacity var(--t-fast, .12s);
+  }
+  .zd-hint.show { height: auto; opacity: 1; padding: 0 14px 12px; }
+
+  /* Thread view */
+  .zd-thread-head { gap: 8px; }
+  .zd-thread-titles { flex: 1; min-width: 0; }
+  .zd-thread-msgs { overflow-y: auto; padding: 14px; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+  .zd-msg { max-width: 84%; }
+  .zd-msg-who { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-mute); margin: 0 4px 3px; }
+  .zd-msg-bubble { padding: 9px 12px; border-radius: var(--r-md, 12px); font-size: 13px; line-height: 1.45; color: var(--text); }
+  .zd-msg.them .zd-msg-bubble { background: var(--surface-el, rgba(0,0,0,.04)); border: 1px solid var(--border); border-top-left-radius: var(--r-xs, 6px); }
+  .zd-msg.me { align-self: flex-end; }
+  .zd-msg.me .zd-msg-who { text-align: right; }
+  .zd-msg.me .zd-msg-bubble { background: var(--gold, #D4B65C); color: var(--on-gold, #131416); border-top-right-radius: var(--r-xs, 6px); }
+
+  @media (max-width: 620px) {
+    #zdoor-overlay { padding: 0; align-items: stretch; justify-content: stretch; }
+    #zdoor-panel { width: 100%; max-width: 100%; max-height: 100%; height: 100%; border-radius: 0; border: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #zdoor-overlay, #zdoor-panel { transition: none; }
+  }
 </style>
 
 <div id="admin-fb-wrap">
   <div id="admin-fb-tip">help zoran out...</div>
-  <button id="admin-fb-btn" onclick="openAdminFeedback()" aria-label="Send feedback">
-    <img src="/help-zoran.png" alt="Send feedback" />
+  <button id="admin-fb-btn" onclick="onZoranIconClick()" aria-label="Support">
+    <img src="/help-zoran.png" alt="Support" />
   </button>
 </div>
 
@@ -6720,6 +6859,82 @@ if (window.__MOCK__) (() => {
                 display:inline-flex;align-items:center;gap:6px">
         Book time with Zoran →
       </a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Zoran door (V2 support front door) ────────────────────────────
+     Track 2 T2-a: FRONT-END TEMPLATE ONLY. Tapping the Zoran icon on V2
+     opens this popout instead of the old feedback modal. Live tickets list
+     (currently MOCK data) + 4 lanes + free-type box. No backend yet: intake
+     wiring, the real tickets table, agent + notifications all come in later
+     chunks. V1/V1.5 keep the old #admin-fb-overlay feedback modal untouched. -->
+<div id="zdoor-overlay" onclick="if (event.target === this) closeZoranDoor()">
+  <div id="zdoor-panel" role="dialog" aria-label="Support">
+    <!-- HOME view -->
+    <div id="zdoor-home">
+      <div class="zd-head">
+        <div class="zd-head-title">Support</div>
+        <button type="button" class="zd-close" onclick="closeZoranDoor()" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
+      <div class="zd-scroll">
+        <div class="zd-sec-label">Your tickets</div>
+        <div id="zd-ticket-list"><!-- rendered by _zdRenderTickets() --></div>
+
+        <div class="zd-sec-label zd-sec-label-mt">Start something new</div>
+        <div class="zd-lanes">
+          <button type="button" class="zd-lane" onclick="_zdLane('navigator')">
+            <span class="zd-lane-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></span>
+            <span class="zd-lane-txt"><span class="zd-lane-t">Where do I…?</span><span class="zd-lane-s">Get a quick answer</span></span>
+          </button>
+          <button type="button" class="zd-lane" onclick="_zdLane('support')">
+            <span class="zd-lane-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <span class="zd-lane-txt"><span class="zd-lane-t">Get help from our team</span><span class="zd-lane-s">Talk to a human</span></span>
+          </button>
+          <button type="button" class="zd-lane" onclick="_zdLane('bug')">
+            <span class="zd-lane-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+            <span class="zd-lane-txt"><span class="zd-lane-t">Report a problem</span><span class="zd-lane-s">Something is broken</span></span>
+          </button>
+          <button type="button" class="zd-lane" onclick="_zdLane('feature')">
+            <span class="zd-lane-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.09 6.26L20.5 9.5l-5 3.9 1.9 6.1L12 15.9 6.6 19.5l1.9-6.1-5-3.9 6.41-.24z"/></svg></span>
+            <span class="zd-lane-txt"><span class="zd-lane-t">Suggest a feature</span><span class="zd-lane-s">An idea for us</span></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="zd-type-row">
+        <input id="zd-type-input" class="zd-type-input" type="text" placeholder="…or just type what you need" onkeydown="if(event.key==='Enter')_zdTypeSend()" />
+        <button type="button" class="zd-type-send" onclick="_zdTypeSend()" aria-label="Send">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
+        </button>
+      </div>
+      <div id="zd-hint" class="zd-hint"></div>
+    </div>
+
+    <!-- THREAD view -->
+    <div id="zdoor-thread" style="display:none">
+      <div class="zd-head zd-thread-head">
+        <button type="button" class="zd-back" onclick="_zdCloseThread()" aria-label="Back">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="zd-thread-titles">
+          <div id="zd-thread-title" class="zd-head-title"></div>
+          <div id="zd-thread-status"></div>
+        </div>
+        <button type="button" class="zd-close" onclick="closeZoranDoor()" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div id="zd-thread-msgs" class="zd-thread-msgs"><!-- rendered --></div>
+      <div class="zd-type-row">
+        <input id="zd-thread-input" class="zd-type-input" type="text" placeholder="Reply…" onkeydown="if(event.key==='Enter')_zdThreadSend()" />
+        <button type="button" class="zd-type-send" onclick="_zdThreadSend()" aria-label="Send">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -9013,6 +9228,141 @@ Then the call to action."]</div>
         height:100%; background:var(--gold); border-radius:2px; width:0%; transition:width .2s;
       }
       /* Lightbox */
+      /* ── Content Library taxonomy (Track 2 / P1) ── */
+      .ast-tax-row {
+        display:flex; align-items:center; gap:6px; width:100%; margin:6px 0 2px;
+        padding:6px 8px; background:transparent; border:1px dashed var(--border-med);
+        border-radius:var(--r-sm, 8px); cursor:pointer; text-align:left; font:inherit;
+        transition:border-color .12s, background .12s;
+      }
+      .ast-tax-row:hover { border-color:var(--gold); background:var(--gold-sheen, rgba(212,182,92,.06)); }
+      .ast-tax-row.typed { border-style:solid; border-color:var(--accent-border, rgba(212,182,92,.25)); }
+      .ast-tax-type { font-size:11px; font-weight:700; color:var(--gold); white-space:nowrap; }
+      .ast-tax-bits {
+        font-size:11px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      }
+      #ast-tag-overlay {
+        /* Centered popup module. Above the Business Blueprint focus overlay
+           (z 10050) - the library opens inside it, so this must outrank it. */
+        position:fixed; inset:0; z-index:10080; background:rgba(0,0,0,.55);
+        display:flex; align-items:center; justify-content:center; padding:24px;
+        opacity:0; pointer-events:none; transition:opacity .2s ease;
+      }
+      #ast-tag-overlay.open { opacity:1; pointer-events:auto; }
+      #ast-tag-modal {
+        width:480px; max-width:100%; max-height:86vh;
+        background:var(--surface); border:1px solid var(--border);
+        border-radius:var(--r-xl, 24px); box-shadow:var(--shadow-pop, 0 24px 60px rgba(0,0,0,.4));
+        display:flex; flex-direction:column; overflow:hidden;
+        transform:translateY(12px) scale(.98); opacity:.6;
+        transition:transform .2s var(--es, cubic-bezier(.4,0,.2,1)), opacity .2s;
+      }
+      #ast-tag-overlay.open #ast-tag-modal { transform:translateY(0) scale(1); opacity:1; }
+      .ast-tag-head {
+        display:flex; align-items:center; gap:12px; padding:16px 18px;
+        border-bottom:1px solid var(--border); flex:0 0 auto;
+      }
+      .ast-tag-strip { display:flex; align-items:center; gap:5px; flex:0 0 auto; }
+      .ast-tag-strip .ast-tag-thumb { width:40px; height:40px; }
+      .ast-tag-more {
+        display:inline-flex; align-items:center; justify-content:center; height:40px; padding:0 8px;
+        border-radius:var(--r-sm, 8px); background:var(--surface-el, rgba(0,0,0,.05));
+        color:var(--text-mute); font-size:12px; font-weight:700;
+      }
+      .ast-up-zone {
+        display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+        padding:14px 16px; margin-bottom:18px;
+        border:1px dashed var(--border-med); border-radius:var(--r-md, 12px);
+        background:var(--surface-el, rgba(0,0,0,.02)); transition:border-color .12s, background .12s;
+      }
+      .ast-up-zone.drag { border-color:var(--gold); background:var(--gold-sheen, rgba(212,182,92,.08)); }
+      .ast-up-choose {
+        display:inline-flex; align-items:center; gap:7px; flex:0 0 auto;
+        padding:9px 16px; border-radius:var(--r-sm, 8px); border:none;
+        background:var(--gold); color:var(--on-gold, #131416); font:inherit;
+        font-size:13px; font-weight:700; cursor:pointer;
+      }
+      .ast-up-choose:hover { filter:brightness(1.05); }
+      .ast-up-hint { font-size:12px; color:var(--text-mute); }
+      .ast-tag-foot {
+        flex:0 0 auto; padding:12px 18px calc(16px + env(safe-area-inset-bottom));
+        border-top:1px solid var(--border); display:flex; justify-content:flex-end;
+      }
+      .ast-tag-done {
+        padding:9px 22px; border-radius:var(--r-sm, 8px); border:none;
+        background:var(--gold); color:var(--on-gold, #131416); font:inherit;
+        font-size:13px; font-weight:700; cursor:pointer;
+      }
+      .ast-tag-done:hover { filter:brightness(1.05); }
+      .ast-tag-thumb {
+        width:52px; height:52px; border-radius:var(--r-md, 12px); object-fit:cover;
+        background:#000; flex:0 0 auto;
+      }
+      .ast-tag-thumb-link { display:flex; align-items:center; justify-content:center; background:var(--surface-el, rgba(0,0,0,.05)); color:var(--text-mute); }
+      .ast-tag-title { flex:1; min-width:0; }
+      .ast-tag-name { font-size:14px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .ast-tag-sub { font-size:11px; color:var(--text-mute); margin-top:2px; }
+      .ast-tag-close {
+        display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px;
+        border-radius:var(--r-sm, 8px); background:transparent; border:none; color:var(--text-mute); cursor:pointer;
+      }
+      .ast-tag-close:hover { color:var(--text); background:var(--surface-el, rgba(0,0,0,.05)); }
+      .ast-tag-body { overflow-y:auto; padding:16px 18px calc(24px + env(safe-area-inset-bottom)); flex:1; min-height:0; }
+      .ast-tag-sec { margin-bottom:20px; }
+      .ast-tag-label {
+        font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+        color:var(--text-mute); margin-bottom:8px;
+      }
+      .ast-tag-chips { display:flex; flex-wrap:wrap; gap:6px; }
+      .ast-tag-chip {
+        padding:7px 13px; border-radius:var(--r-full, 999px); border:1px solid var(--border-med);
+        background:transparent; color:var(--text-sub); font:inherit; font-size:12px; font-weight:600;
+        cursor:pointer; transition:all .12s;
+      }
+      .ast-tag-chip:hover { border-color:var(--gold); color:var(--text); }
+      .ast-tag-chip.on { background:var(--gold); border-color:var(--gold); color:var(--on-gold, #131416); }
+      .ast-tag-add { border-style:dashed; }
+      .ast-tag-people { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+      .ast-tag-person {
+        display:inline-flex; align-items:center; gap:6px; padding:5px 6px 5px 12px;
+        border-radius:var(--r-full, 999px); background:var(--gold-sheen, rgba(212,182,92,.08));
+        border:1px solid var(--accent-border, rgba(212,182,92,.25)); color:var(--text);
+        font-size:12px; font-weight:600;
+      }
+      .ast-tag-person button {
+        display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px;
+        border-radius:999px; border:none; background:transparent; color:var(--text-mute);
+        font-size:14px; line-height:1; cursor:pointer;
+      }
+      .ast-tag-person button:hover { color:var(--red, #ED7969); }
+      .ast-tag-none { font-size:12px; color:var(--text-mute); }
+      .ast-tag-search-wrap { position:relative; }
+      .ast-tag-search {
+        width:100%; height:38px; padding:0 12px; border-radius:var(--r-sm, 8px);
+        border:1px solid var(--border-med); background:var(--surface-el, rgba(0,0,0,.02));
+        color:var(--text); font:inherit; font-size:13px; outline:none;
+      }
+      .ast-tag-search:focus { border-color:var(--gold); }
+      .ast-tag-results { display:flex; flex-direction:column; gap:2px; margin-top:4px; }
+      .ast-tag-res {
+        text-align:left; padding:8px 10px; border-radius:var(--r-sm, 8px); border:none;
+        background:transparent; color:var(--text); font:inherit; font-size:13px; cursor:pointer;
+      }
+      .ast-tag-res:hover { background:var(--gold-sheen, rgba(212,182,92,.08)); }
+      .ast-tag-res-sub { color:var(--text-mute); font-size:11px; }
+      .ast-tag-quickadd { display:flex; gap:6px; margin-top:8px; }
+      .ast-tag-qa-btn {
+        flex:0 0 auto; padding:0 16px; border-radius:var(--r-sm, 8px); border:none;
+        background:var(--gold); color:var(--on-gold, #131416); font:inherit; font-size:12px;
+        font-weight:700; cursor:pointer;
+      }
+      @media (max-width: 620px) {
+        #ast-tag-overlay { padding:14px; }
+        #ast-tag-modal { width:100%; max-width:100%; max-height:90vh; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #ast-tag-overlay, #ast-tag-modal { transition:none; }
+      }
       .ast-lightbox {
         position:fixed; inset:0; z-index:9500; background:rgba(0,0,0,.88); display:flex;
         align-items:center; justify-content:center; cursor:zoom-out;
@@ -11674,6 +12024,40 @@ let _astRendered = false;  // stagger flag
 let _astSelected = new Set(); // bulk select
 let _astFolderState = {};  // folder open/close memory
 
+// V2 Content Library taxonomy state (Track 2 / P1). _AST_LIB_MODE is true only
+// when the library renders as the V2 Content Library card; it gates the
+// taxonomy row on asset cards + the tag drawer.
+let _AST_LIB_MODE = false;
+let _AST_SKILLS = [];        // client_content_skills rows (defaults + custom)
+let _AST_PEOPLE = {};        // asset_id -> client_asset_people rows
+let _AST_ASSET_SKILLS = {};  // asset_id -> [skill_slug]
+let _AST_TAGS = {};          // asset_id -> [free-text tag] (any content_type)
+const _AST_CONTENT_TYPES = [
+  ['action',      'Action'],
+  ['coaching',    'Coaching'],
+  ['culture',     'Culture'],
+  ['testimonial', 'Testimonial'],
+  ['other',       'Other'],
+];
+// The 6 core basketball skills ALWAYS show as presets, even before the DB seed
+// runs (mock mode, or a not-yet-seeded academy). Real DB rows (with ids) win;
+// client-custom skills append after these.
+const _AST_DEFAULT_SKILLS = [
+  { slug: 'ball-handling', label: 'Ball handling' },
+  { slug: 'shooting',      label: 'Shooting' },
+  { slug: 'game-iq',       label: 'Game IQ' },
+  { slug: 'defense',       label: 'Defense' },
+  { slug: 'athleticism',   label: 'Athleticism' },
+  { slug: 'passing',       label: 'Passing' },
+];
+function _astMergeSkills(dbRows) {
+  const rows = dbRows || [];
+  const bySlug = new Map(rows.map(s => [s.slug, s]));
+  const merged = _AST_DEFAULT_SKILLS.map(d => bySlug.get(d.slug) || { id: null, slug: d.slug, label: d.label, is_default: true, sort_order: 0 });
+  rows.filter(s => !_AST_DEFAULT_SKILLS.some(d => d.slug === s.slug)).forEach(s => merged.push(s));
+  return merged;
+}
+
 // Where the asset library renders. Standalone view = 'assets-content';
 // when embedded in Business Blueprint (V1.5) = 'bb-assets-content'. Set by
 // whichever entry point opens it; all re-renders read this.
@@ -11701,6 +12085,24 @@ async function openAssetsView() {
     ]);
     _ASSETS = assets.data || [];
     _ASSET_TARGETS = { offers: offers.data || [], staff: staff.data || [], locations: locations.data || [] };
+    // Content Library mode: pull the taxonomy alongside (skills + person tags).
+    if (_AST_LIB_MODE) {
+      try {
+        const [skills, people, askills, atags] = await Promise.all([
+          _sb.from('client_content_skills').select('id,slug,label,is_default,sort_order').eq('client_id', CLIENT_ID).order('sort_order'),
+          _sb.from('client_asset_people').select('id,asset_id,role,contact_id,client_user_id,display_name').eq('client_id', CLIENT_ID),
+          _sb.from('client_asset_skills').select('asset_id,skill_slug').eq('client_id', CLIENT_ID),
+          _sb.from('client_asset_tags').select('asset_id,tag').eq('client_id', CLIENT_ID),
+        ]);
+        _AST_SKILLS = _astMergeSkills(skills.data);
+        _AST_PEOPLE = {};
+        (people.data || []).forEach(p => { (_AST_PEOPLE[p.asset_id] = _AST_PEOPLE[p.asset_id] || []).push(p); });
+        _AST_ASSET_SKILLS = {};
+        (askills.data || []).forEach(s => { (_AST_ASSET_SKILLS[s.asset_id] = _AST_ASSET_SKILLS[s.asset_id] || []).push(s.skill_slug); });
+        _AST_TAGS = {};
+        (atags.data || []).forEach(t => { (_AST_TAGS[t.asset_id] = _AST_TAGS[t.asset_id] || []).push(t.tag); });
+      } catch (_) { _AST_SKILLS = _astMergeSkills([]); _AST_PEOPLE = {}; _AST_ASSET_SKILLS = {}; _AST_TAGS = {}; }
+    }
     _renderAssets();
   } catch (e) {
     host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load assets - ${escapeHTML(e.message || String(e))}</div>`;
@@ -11770,8 +12172,14 @@ function _renderAssets() {
   const grid = (list, offset) => `<div class="ast-grid">${list.map((a, i) => _assetCard(a, doStagger ? (offset || 0) + i : -1)).join('')}</div>`;
   let cards;
   if (!shown.length) {
-    // #12: Empty state with icon
-    cards = `<div class="ast-empty">
+    // #12: Empty state with icon (Content Library mode carries the nudge)
+    cards = _AST_LIB_MODE
+      ? `<div class="ast-empty">
+         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="m10 12 4 2.5-4 2.5z"/></svg>
+         <div style="font-size:14px;color:var(--text-sub)">Your library ${_ASSET_FILTER === 'all' ? 'is empty' : 'has nothing in this filter'}</div>
+         <div style="font-size:12px;margin-top:6px">Upload game clips, practice footage, and photos any time. The more you add, the faster we can build ads for you.</div>
+       </div>`
+      : `<div class="ast-empty">
          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
          <div style="font-size:14px;color:var(--text-sub)">No assets ${_ASSET_FILTER === 'all' ? 'yet' : 'in this filter'}</div>
          <div style="font-size:12px;margin-top:6px">Drop files here, or use the upload buttons above</div>
@@ -11797,11 +12205,16 @@ function _renderAssets() {
   // #1: Glass toolbar with upload + link input inline
   host.innerHTML = `
     <div class="ast-toolbar">
+      ${_AST_LIB_MODE ? `
+      <button type="button" class="ast-upload-btn" onclick="_astUploadPopupOpen()">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload
+      </button>` : `
       <label class="ast-upload-btn">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Upload
         <input type="file" accept="image/*,video/*" multiple onchange="_uploadAssets(this)">
-      </label>
+      </label>`}
       <label class="ast-upload-btn secondary">
         Folder
         <input type="file" webkitdirectory directory multiple onchange="_uploadAssets(this, true)">
@@ -11952,12 +12365,34 @@ function _assetCard(a, staggerIdx) {
           </span>
           <span class="ast-detail-pill" style="position:relative;overflow:hidden">${escapeHTML(_assetTargetName(a).split(' · ')[0])}${tagSel}</span>
         </div>
+        ${_AST_LIB_MODE ? _astTaxRow(a) : ''}
         <div class="ast-card-actions">
           <a href="${escapeHTML(url)}" target="_blank" rel="noopener">Open ↗</a>
           <button onclick="_assetRemove('${a.id}')">Remove</button>
         </div>
       </div>
     </div>`;
+}
+
+// Content Library taxonomy row on an asset card: content-type pill + a
+// compact summary of who/what is tagged. Clicking opens the tag drawer.
+function _astTaxRow(a) {
+  const typeLabel = (_AST_CONTENT_TYPES.find(([v]) => v === a.content_type) || [])[1];
+  const people = _AST_PEOPLE[a.id] || [];
+  const skills = _AST_ASSET_SKILLS[a.id] || [];
+  const xtags = _AST_TAGS[a.id] || [];
+  const bits = [];
+  if (a.content_type === 'action' && typeof a.highlight === 'boolean') bits.push(a.highlight ? 'Highlight' : 'Lowlight');
+  people.slice(0, 2).forEach(p => bits.push(p.display_name));
+  if (people.length > 2) bits.push('+' + (people.length - 2));
+  skills.slice(0, 2).forEach(s => { const sk = _AST_SKILLS.find(x => x.slug === s); if (sk) bits.push(sk.label); });
+  if (skills.length > 2) bits.push('+' + (skills.length - 2));
+  xtags.slice(0, 2).forEach(t => bits.push('#' + t));
+  if (xtags.length > 2) bits.push('+' + (xtags.length - 2));
+  return `<button type="button" class="ast-tax-row${typeLabel ? ' typed' : ''}" onclick="_astTagOpen('${a.id}')">
+    <span class="ast-tax-type">${typeLabel || '+ What is this?'}</span>
+    ${bits.length ? `<span class="ast-tax-bits">${escapeHTML(bits.join(' · '))}</span>` : (typeLabel ? '<span class="ast-tax-bits">Tag people + skills</span>' : '')}
+  </button>`;
 }
 
 // Combined "Tagged to" - value is '' (brand) | 'offer:<id>' | 'staff:<id>' |
@@ -11981,6 +12416,472 @@ async function _assetSetTag2(id, value) {
 
 function _assetSetFilter(k) { _ASSET_FILTER = k; _renderAssets(); }
 function _setAssetType(t)   { _ASSET_TYPE   = t; _renderAssets(); }
+
+/* ── Content Library tag modal (Track 2 / P1) ──────────────────────────
+   Centered popup for the content taxonomy: pick what the asset IS
+   (action/coaching/culture/testimonial/other), then the conditional fields -
+   athletes from contacts, staff from client_users (name-only quick-add ok),
+   skills from the per-academy preset list (+ custom). Runs on ONE asset (a
+   card's "What is this?") OR a BATCH just uploaded (the upload flow opens it
+   with the files on top; every pick applies to all of them). Saves are
+   immediate; local state mirrors so the grid updates without a refetch. */
+let _astTagIds = [];            // asset ids being tagged (1 = card, N = upload)
+let _astTagUploadFrame = false; // popup is the upload frame (zone on top + tagging)
+let _astUploadTargetPopup = false; // route _uploadAssetFiles results into the open popup
+let _astAthleteTimer = null;
+
+function _astTagPrimary() { return _ASSETS.find(x => x.id === _astTagIds[0]) || null; }
+function _astTagAssetsAll() { return _astTagIds.map(id => _ASSETS.find(x => x.id === id)).filter(Boolean); }
+function _astTagTargets() { return _astTagIds.slice(); }
+
+function _astTagOpen(id) { _astTagIds = [id]; _astTagUploadFrame = false; _astTagShow(); }
+// The upload frame: opens the popup as the whole upload+tag surface. Files are
+// chosen from inside it (the OS picker fires from the "Choose files" control),
+// upload, then appear in the strip; tagging below applies to all of them.
+function _astUploadPopupOpen() { _astTagIds = []; _astTagUploadFrame = true; _astTagShow(); }
+function _astTagOpenBatch(ids) { _astTagIds = (ids || []).slice(); _astTagUploadFrame = true; _astTagShow(); }
+
+function _astTagShow() {
+  let ov = document.getElementById('ast-tag-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'ast-tag-overlay';
+    ov.onclick = (e) => { if (e.target === ov) _astTagClose(); };
+    ov.innerHTML = '<div id="ast-tag-modal" role="dialog" aria-label="Tag content"></div>';
+    document.body.appendChild(ov);
+  }
+  _astTagRender();
+  requestAnimationFrame(() => ov.classList.add('open'));
+}
+
+function _astTagClose() {
+  document.getElementById('ast-tag-overlay')?.classList.remove('open');
+  _astTagIds = []; _astTagUploadFrame = false;
+  _renderAssets();
+}
+
+function _astTagThumb(x) {
+  const isLink = !!x.link_url;
+  const url = isLink ? x.link_url : _assetUrl(x.storage_path);
+  const isVideo = (x.mime_type || '').startsWith('video/') || x.category === 'video';
+  if (isLink) return '<div class="ast-tag-thumb ast-tag-thumb-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>';
+  if (isVideo) return `<video class="ast-tag-thumb" src="${escapeHTML(url)}#t=0.5" preload="metadata" muted playsinline></video>`;
+  return `<img class="ast-tag-thumb" src="${escapeHTML(url)}" alt="">`;
+}
+
+function _astTagRender() {
+  const modal = document.getElementById('ast-tag-modal');
+  if (!modal) return;
+  const a = _astTagPrimary();
+  const frame = _astTagUploadFrame;
+  if (!a && !frame) return;
+  const assets = _astTagAssetsAll();
+  const batch = assets.length > 1;
+
+  // Header preview: strip of thumbs, one thumb, or (empty frame) an upload glyph.
+  let previewStrip, title, sub;
+  if (frame) {
+    previewStrip = assets.length
+      ? `<div class="ast-tag-strip">${assets.slice(0, 8).map(_astTagThumb).join('')}${assets.length > 8 ? `<span class="ast-tag-more">+${assets.length - 8}</span>` : ''}</div>`
+      : '<div class="ast-tag-thumb ast-tag-thumb-link"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>';
+    title = assets.length ? `${assets.length} file${assets.length > 1 ? 's' : ''} added` : 'Add content';
+    sub = assets.length
+      ? 'Tag what these show. It applies to all of them, and you can fine-tune each one later.'
+      : 'Add photos and videos, then tag what they show so we can build ads from them.';
+  } else {
+    previewStrip = _astTagThumb(a);
+    title = a.label || 'Untitled';
+    sub = 'Tag it so we can find it when we build your ads';
+  }
+
+  // Upload zone (frame only) - the OS picker fires from the "Choose files"
+  // input; drops also land here. Uploads route into this popup.
+  const uploadZone = frame ? `
+    <div class="ast-up-zone" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="_astPopupDrop(event)">
+      <label class="ast-up-choose">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Choose files
+        <input type="file" accept="image/*,video/*" multiple style="display:none" onchange="_astPopupUpload(this)">
+      </label>
+      <span class="ast-up-hint">or drop photos and videos here</span>
+    </div>` : '';
+
+  // Taxonomy needs a real asset to write to; empty frame shows a hint instead.
+  if (!a) {
+    modal.innerHTML = `
+      <div class="ast-tag-head">
+        ${previewStrip}
+        <div class="ast-tag-title">
+          <div class="ast-tag-name">${escapeHTML(title)}</div>
+          <div class="ast-tag-sub">${escapeHTML(sub)}</div>
+        </div>
+        <button type="button" class="ast-tag-close" onclick="_astTagClose()" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="ast-tag-body">
+        ${uploadZone}
+        <div class="ast-tag-sec"><div class="ast-tag-none">Add a file above to start tagging.</div></div>
+      </div>
+      <div class="ast-tag-foot"><button type="button" class="ast-tag-done" onclick="_astTagClose()">Done</button></div>`;
+    return;
+  }
+
+  const typeChips = _AST_CONTENT_TYPES.map(([v, l]) =>
+    `<button type="button" class="ast-tag-chip${a.content_type === v ? ' on' : ''}" onclick="_astSetContentType('${v}')">${l}</button>`
+  ).join('');
+
+  const people = _AST_PEOPLE[a.id] || [];
+  const athletes = people.filter(p => p.role === 'athlete');
+  const askills = _AST_ASSET_SKILLS[a.id] || [];
+
+  const athleteChips = athletes.map(p =>
+    `<span class="ast-tag-person">${escapeHTML(p.display_name)}<button type="button" onclick="_astRemoveAthlete('${p.contact_id}')" aria-label="Remove">&times;</button></span>`
+  ).join('');
+  const athleteSection = `
+    <div class="ast-tag-sec">
+      <div class="ast-tag-label">Athletes in this</div>
+      <div class="ast-tag-people">${athleteChips || '<span class="ast-tag-none">Nobody tagged yet</span>'}</div>
+      <div class="ast-tag-search-wrap">
+        <input id="ast-athlete-search" class="ast-tag-search" type="text" placeholder="Search your contacts by name..."
+               oninput="_astAthleteSearch(this.value)" autocomplete="off">
+        <div id="ast-athlete-results" class="ast-tag-results"></div>
+      </div>
+    </div>`;
+
+  const staffChips = _ASSET_TARGETS.staff.map(s => {
+    const on = people.some(p => p.role === 'staff' && p.client_user_id === s.id);
+    const nm = s.name || s.email || 'Unnamed';
+    return `<button type="button" class="ast-tag-chip${on ? ' on' : ''}" onclick="_astToggleStaff('${s.id}', this)">${escapeHTML(nm)}</button>`;
+  }).join('');
+  const staffSection = `
+    <div class="ast-tag-sec">
+      <div class="ast-tag-label">Coaches / staff in this</div>
+      <div class="ast-tag-chips">${staffChips}
+        <button type="button" class="ast-tag-chip ast-tag-add" onclick="_astStaffQuickAddToggle()">+ Add someone</button>
+      </div>
+      <div id="ast-staff-quickadd" class="ast-tag-quickadd" style="display:none">
+        <input id="ast-staff-quickadd-name" class="ast-tag-search" type="text" placeholder="Their name (that's all we need)">
+        <button type="button" class="ast-tag-qa-btn" onclick="_astStaffQuickAdd()">Add</button>
+      </div>
+    </div>`;
+
+  const skillChips = _AST_SKILLS.map(s =>
+    `<button type="button" class="ast-tag-chip${askills.includes(s.slug) ? ' on' : ''}" onclick="_astToggleSkill('${s.slug}')">${escapeHTML(s.label)}</button>`
+  ).join('');
+  const skillsSection = `
+    <div class="ast-tag-sec">
+      <div class="ast-tag-label">Skills shown</div>
+      <div class="ast-tag-chips">${skillChips}</div>
+      <div class="ast-tag-quickadd">
+        <input id="ast-skill-add" class="ast-tag-search" type="text" placeholder="Add your own skill..."
+               onkeydown="if(event.key==='Enter'){event.preventDefault();_astAddCustomSkill();}">
+        <button type="button" class="ast-tag-qa-btn" onclick="_astAddCustomSkill()">Add</button>
+      </div>
+    </div>`;
+
+  const hlSection = `
+    <div class="ast-tag-sec">
+      <div class="ast-tag-label">Highlight or lowlight?</div>
+      <div class="ast-tag-chips">
+        <button type="button" class="ast-tag-chip${a.highlight === true ? ' on' : ''}" onclick="_astSetHighlight(true)">Highlight</button>
+        <button type="button" class="ast-tag-chip${a.highlight === false ? ' on' : ''}" onclick="_astSetHighlight(false)">Lowlight</button>
+      </div>
+    </div>`;
+
+  // Free-text "extra tags" - available for EVERY content type.
+  const tags = _AST_TAGS[a.id] || [];
+  const tagChips = tags.map(t =>
+    `<span class="ast-tag-person">${escapeHTML(t)}<button type="button" data-tag="${escapeHTML(t)}" onclick="_astRemoveTag(this.dataset.tag)" aria-label="Remove">&times;</button></span>`
+  ).join('');
+  const tagsSection = `
+    <div class="ast-tag-sec">
+      <div class="ast-tag-label">Extra tags</div>
+      <div class="ast-tag-people">${tagChips || '<span class="ast-tag-none">No extra tags yet</span>'}</div>
+      <div class="ast-tag-quickadd">
+        <input id="ast-tag-add" class="ast-tag-search" type="text" placeholder="Add a tag (e.g. championship, u13, drills)..."
+               onkeydown="if(event.key==='Enter'){event.preventDefault();_astAddTag();}">
+        <button type="button" class="ast-tag-qa-btn" onclick="_astAddTag()">Add</button>
+      </div>
+    </div>`;
+
+  // Conditional sections per locked taxonomy, PLUS extra tags on every type:
+  // action -> athletes+skills+hl; coaching -> staff; culture/testimonial ->
+  // athletes+staff; other -> just tags.
+  let conditional = '';
+  if (a.content_type === 'action') conditional = athleteSection + skillsSection + hlSection + tagsSection;
+  else if (a.content_type === 'coaching') conditional = staffSection + tagsSection;
+  else if (a.content_type === 'culture' || a.content_type === 'testimonial') conditional = athleteSection + staffSection + tagsSection;
+  else if (a.content_type === 'other') conditional = '<div class="ast-tag-sec"><div class="ast-tag-none">Filed as general content. Add a clear label and any tags so we know what it is.</div></div>' + tagsSection;
+
+  const footer = frame
+    ? `<div class="ast-tag-foot"><button type="button" class="ast-tag-done" onclick="_astTagClose()">Done</button></div>`
+    : '';
+
+  modal.innerHTML = `
+    <div class="ast-tag-head">
+      ${previewStrip}
+      <div class="ast-tag-title">
+        <div class="ast-tag-name">${escapeHTML(title)}</div>
+        <div class="ast-tag-sub">${escapeHTML(sub)}</div>
+      </div>
+      <button type="button" class="ast-tag-close" onclick="_astTagClose()" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="ast-tag-body">
+      ${uploadZone}
+      <div class="ast-tag-sec">
+        <div class="ast-tag-label">What is this?</div>
+        <div class="ast-tag-chips">${typeChips}</div>
+      </div>
+      ${conditional}
+    </div>
+    ${footer}`;
+}
+
+// Upload from inside the popup frame: files chosen / dropped here upload and
+// then append to the current tag session (the strip fills, tagging applies to
+// all). Routes _uploadAssetFiles' results into this popup via the flag.
+async function _astPopupUpload(inputEl) {
+  const files = Array.from(inputEl.files || []); inputEl.value = '';
+  await _astPopupUploadFiles(files, false);
+}
+function _astPopupDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag');
+  const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+  if (files.length) _astPopupUploadFiles(files, false);
+}
+async function _astPopupUploadFiles(files, fromFolder) {
+  if (!files.length) return;
+  const zone = document.querySelector('#ast-tag-modal .ast-up-zone');
+  if (zone) zone.innerHTML = `<span class="req-spin"></span> <span class="ast-up-hint">Uploading ${files.length} file${files.length > 1 ? 's' : ''}...</span>`;
+  _astUploadTargetPopup = true;
+  try { await _uploadAssetFiles(files, fromFolder); }
+  finally { _astUploadTargetPopup = false; }
+}
+
+async function _astSetContentType(type) {
+  const p = _astTagPrimary(); if (!p) return;
+  const next = p.content_type === type ? null : type;   // tap again to untype
+  _astTagAssetsAll().forEach(x => { x.content_type = next; if (next !== 'action') x.highlight = null; });
+  _astTagRender();
+  try {
+    const patch = { content_type: next, updated_at: new Date().toISOString() };
+    if (next !== 'action') patch.highlight = null;
+    const { error } = await _sb.from('client_assets').update(patch).in('id', _astTagTargets());
+    if (error) throw error;
+  } catch (e) { alert('Save failed: ' + (e.message || e)); }
+}
+
+async function _astSetHighlight(v) {
+  const p = _astTagPrimary(); if (!p) return;
+  const next = p.highlight === v ? null : v;
+  _astTagAssetsAll().forEach(x => x.highlight = next);
+  _astTagRender();
+  try {
+    const { error } = await _sb.from('client_assets')
+      .update({ highlight: next, updated_at: new Date().toISOString() }).in('id', _astTagTargets());
+    if (error) throw error;
+  } catch (e) { alert('Save failed: ' + (e.message || e)); }
+}
+
+function _astAthleteSearch(q) {
+  clearTimeout(_astAthleteTimer);
+  const box = document.getElementById('ast-athlete-results');
+  if (!box) return;
+  const query = (q || '').trim();
+  if (query.length < 2) { box.innerHTML = ''; return; }
+  _astAthleteTimer = setTimeout(async () => {
+    try {
+      const { data } = await _sb.from('contacts')
+        .select('id, name, first_name, last_name, athlete_name')
+        .eq('client_id', CLIENT_ID)
+        .or(`name.ilike.%${query}%,athlete_name.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+        .limit(8);
+      const p = _astTagPrimary();
+      const taken = new Set(((_AST_PEOPLE[p?.id] || []).filter(pp => pp.role === 'athlete')).map(pp => pp.contact_id));
+      const rows = (data || []).filter(c => !taken.has(c.id));
+      box.innerHTML = rows.length ? rows.map(c => {
+        const display = c.athlete_name || c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unnamed';
+        const sub = c.athlete_name && c.name && c.athlete_name !== c.name ? ` <span class="ast-tag-res-sub">(${escapeHTML(c.name)})</span>` : '';
+        return `<button type="button" class="ast-tag-res" onclick="_astAddAthlete('${c.id}', this)" data-name="${escapeHTML(display)}">${escapeHTML(display)}${sub}</button>`;
+      }).join('') : '<div class="ast-tag-none" style="padding:8px 10px">No matches in your contacts</div>';
+    } catch (_) { box.innerHTML = ''; }
+  }, 250);
+}
+
+// All person/skill writes below apply to EVERY asset in _astTagTargets() (one
+// for a card click, many for an upload batch), so tagging a batch tags them all.
+async function _astAddAthlete(contactId, btn) {
+  const display = btn?.dataset?.name || 'Athlete';
+  const targets = _astTagTargets().filter(id => !((_AST_PEOPLE[id] || []).some(pp => pp.role === 'athlete' && pp.contact_id === contactId)));
+  if (!targets.length) return;
+  try {
+    const { data, error } = await _sb.from('client_asset_people')
+      .insert(targets.map(id => ({ asset_id: id, client_id: CLIENT_ID, role: 'athlete', contact_id: contactId, display_name: display })))
+      .select();
+    if (error) throw error;
+    (data || []).forEach(r => { (_AST_PEOPLE[r.asset_id] = _AST_PEOPLE[r.asset_id] || []).push(r); });
+    const s = document.getElementById('ast-athlete-search'); if (s) s.value = '';
+    _astTagRender();
+  } catch (e) { alert('Tag failed: ' + (e.message || e)); }
+}
+
+async function _astRemoveAthlete(contactId) {
+  try {
+    const { error } = await _sb.from('client_asset_people').delete()
+      .in('asset_id', _astTagTargets()).eq('role', 'athlete').eq('contact_id', contactId);
+    if (error) throw error;
+    _astTagTargets().forEach(id => { _AST_PEOPLE[id] = (_AST_PEOPLE[id] || []).filter(pp => !(pp.role === 'athlete' && pp.contact_id === contactId)); });
+    _astTagRender();
+  } catch (e) { alert('Remove failed: ' + (e.message || e)); }
+}
+
+async function _astToggleStaff(clientUserId, btn) {
+  const nm = (btn?.textContent || '').trim() || 'Staff';
+  const anyHas = _astTagTargets().some(id => (_AST_PEOPLE[id] || []).some(pp => pp.role === 'staff' && pp.client_user_id === clientUserId));
+  try {
+    if (anyHas) {
+      const { error } = await _sb.from('client_asset_people').delete()
+        .in('asset_id', _astTagTargets()).eq('role', 'staff').eq('client_user_id', clientUserId);
+      if (error) throw error;
+      _astTagTargets().forEach(id => { _AST_PEOPLE[id] = (_AST_PEOPLE[id] || []).filter(pp => !(pp.role === 'staff' && pp.client_user_id === clientUserId)); });
+    } else {
+      const targets = _astTagTargets().filter(id => !((_AST_PEOPLE[id] || []).some(pp => pp.role === 'staff' && pp.client_user_id === clientUserId)));
+      const { data, error } = await _sb.from('client_asset_people')
+        .insert(targets.map(id => ({ asset_id: id, client_id: CLIENT_ID, role: 'staff', client_user_id: clientUserId, display_name: nm })))
+        .select();
+      if (error) throw error;
+      (data || []).forEach(r => { (_AST_PEOPLE[r.asset_id] = _AST_PEOPLE[r.asset_id] || []).push(r); });
+    }
+    _astTagRender();
+  } catch (e) { alert('Tag failed: ' + (e.message || e)); }
+}
+
+// A baked-in default skill has no DB row until it's first used. Create it
+// (is_default=false so client RLS allows the insert) so the asset<->skill FK
+// never fails on a not-yet-seeded academy. Seeded academies already have ids.
+async function _astEnsureSkillRow(slug) {
+  const meta = _AST_SKILLS.find(s => s.slug === slug);
+  if (!meta || meta.id) return;
+  try {
+    const { data, error } = await _sb.from('client_content_skills')
+      .insert({ client_id: CLIENT_ID, slug, label: meta.label, is_default: false, sort_order: meta.sort_order || 0 })
+      .select().single();
+    if (!error && data) { meta.id = data.id; return; }
+    throw error || new Error('no row');
+  } catch (_) {
+    try {
+      const { data } = await _sb.from('client_content_skills').select('id').eq('client_id', CLIENT_ID).eq('slug', slug).single();
+      if (data) meta.id = data.id;
+    } catch (__) {}
+  }
+}
+
+async function _astToggleSkill(slug) {
+  const p = _astTagPrimary(); if (!p) return;
+  const has = (_AST_ASSET_SKILLS[p.id] || []).includes(slug);
+  try {
+    if (has) {
+      const { error } = await _sb.from('client_asset_skills').delete().in('asset_id', _astTagTargets()).eq('skill_slug', slug);
+      if (error) throw error;
+      _astTagTargets().forEach(id => { _AST_ASSET_SKILLS[id] = (_AST_ASSET_SKILLS[id] || []).filter(s => s !== slug); });
+    } else {
+      await _astEnsureSkillRow(slug);
+      const targets = _astTagTargets().filter(id => !((_AST_ASSET_SKILLS[id] || []).includes(slug)));
+      if (targets.length) {
+        const { error } = await _sb.from('client_asset_skills').insert(targets.map(id => ({ asset_id: id, client_id: CLIENT_ID, skill_slug: slug })));
+        if (error) throw error;
+      }
+      _astTagTargets().forEach(id => { _AST_ASSET_SKILLS[id] = _AST_ASSET_SKILLS[id] || []; if (!_AST_ASSET_SKILLS[id].includes(slug)) _AST_ASSET_SKILLS[id].push(slug); });
+    }
+    _astTagRender();
+  } catch (e) { alert('Save failed: ' + (e.message || e)); }
+}
+
+async function _astAddCustomSkill() {
+  const inp = document.getElementById('ast-skill-add');
+  const label = (inp?.value || '').trim();
+  if (!label) { inp?.focus(); return; }
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  if (!slug) return;
+  try {
+    if (!_AST_SKILLS.some(s => s.slug === slug)) {
+      const { data, error } = await _sb.from('client_content_skills')
+        .insert({ client_id: CLIENT_ID, slug, label, is_default: false, sort_order: 100 + _AST_SKILLS.length })
+        .select().single();
+      if (error) throw error;
+      _AST_SKILLS.push(data);
+    }
+    if (inp) inp.value = '';
+    await _astToggleSkill(slug);   // tag the current asset(s) with it right away
+  } catch (e) {
+    // Duplicate slug -> just toggle the existing one on.
+    if (/duplicate|unique/i.test(e.message || '')) { if (inp) inp.value = ''; _astToggleSkill(slug); }
+    else alert('Add failed: ' + (e.message || e));
+  }
+}
+
+// Free-text extra tags - available on any content type; applies to every asset
+// in the session (single or upload batch).
+async function _astAddTag() {
+  const inp = document.getElementById('ast-tag-add');
+  const raw = (inp?.value || '').trim();
+  if (!raw) { inp?.focus(); return; }
+  const tag = raw.slice(0, 40);
+  const targets = _astTagTargets().filter(id => !((_AST_TAGS[id] || []).some(t => t.toLowerCase() === tag.toLowerCase())));
+  if (inp) inp.value = '';
+  if (!targets.length) { _astTagRender(); return; }
+  try {
+    const { error } = await _sb.from('client_asset_tags').insert(targets.map(id => ({ asset_id: id, client_id: CLIENT_ID, tag })));
+    if (error) throw error;
+    targets.forEach(id => { (_AST_TAGS[id] = _AST_TAGS[id] || []).push(tag); });
+    _astTagRender();
+    setTimeout(() => document.getElementById('ast-tag-add')?.focus(), 0);
+  } catch (e) { alert('Add tag failed: ' + (e.message || e)); }
+}
+
+async function _astRemoveTag(tag) {
+  try {
+    const { error } = await _sb.from('client_asset_tags').delete().in('asset_id', _astTagTargets()).eq('tag', tag);
+    if (error) throw error;
+    _astTagTargets().forEach(id => { _AST_TAGS[id] = (_AST_TAGS[id] || []).filter(t => t !== tag); });
+    _astTagRender();
+  } catch (e) { alert('Remove tag failed: ' + (e.message || e)); }
+}
+
+function _astStaffQuickAddToggle() {
+  const el = document.getElementById('ast-staff-quickadd');
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+  if (el.style.display !== 'none') document.getElementById('ast-staff-quickadd-name')?.focus();
+}
+
+// Name-only staff add: rides the existing add-teammate API (email/phone
+// optional there), then refreshes the staff target list + tags them.
+async function _astStaffQuickAdd() {
+  const inp = document.getElementById('ast-staff-quickadd-name');
+  const name = (inp?.value || '').trim();
+  if (!name) { inp?.focus(); return; }
+  try {
+    const { data: { session } } = await _sb.auth.getSession();
+    if (!session) throw new Error('Session expired - sign in again.');
+    const res = await fetch('/api/clients?action=add-teammate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({ client_id: CLIENT_ID, name, email: '', phone: '' }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    const { data: staffRows } = await _sb.from('client_users').select('id,name,email').eq('client_id', CLIENT_ID).eq('hide_from_team', false);
+    _ASSET_TARGETS.staff = staffRows || [];
+    const added = (_ASSET_TARGETS.staff || []).find(s => (s.name || '') === name);
+    if (added) await _astToggleStaff(added.id, { textContent: name });
+    else _astTagRender();
+  } catch (e) { alert('Add failed: ' + (e.message || e)); }
+}
 
 // Add a large file as a share link (Drive/Dropbox/etc.) instead of uploading it.
 // Reuses _isValidAssetLink from the content flow. Link assets have no storage_path.
@@ -12027,6 +12928,7 @@ async function _uploadAssetFiles(all, fromFolder) {
   const progLabel = document.getElementById('ast-progress-label');
   const progFill = document.getElementById('ast-progress-fill');
   if (prog) prog.classList.add('active');
+  const _newIds = [];   // collect fresh asset ids so the Content Library can tag them
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const pct = Math.round((i / files.length) * 100);
@@ -12040,11 +12942,12 @@ async function _uploadAssetFiles(all, fromFolder) {
       const folder = rel.includes('/') ? rel.split('/')[0] : null;
       const category = (file.type || '').startsWith('video/') ? 'video' : 'photo';
       await _storageUpload('client-assets', path, file);
-      const { error: insErr } = await _sb.from('client_assets').insert({
+      const { data: insRow, error: insErr } = await _sb.from('client_assets').insert({
         client_id: CLIENT_ID, label: file.name.replace(/\.[^.]+$/, ''), category,
         folder, storage_path: path, mime_type: file.type || null, size_bytes: file.size,
-      });
+      }).select('id').single();
       if (insErr) { await _sb.storage.from('client-assets').remove([path]).catch(() => {}); throw insErr; }
+      if (insRow) _newIds.push(insRow.id);
     } catch (e) { alert("Couldn't upload " + file.name + ' - ' + (e.message || e)); }
   }
   if (progFill) progFill.style.width = '100%';
@@ -12052,6 +12955,15 @@ async function _uploadAssetFiles(all, fromFolder) {
   setTimeout(() => { if (prog) prog.classList.remove('active'); }, 800);
   _astRendered = false; // reset stagger for new batch
   await openAssetsView();
+  // Content Library: surface the just-uploaded files in the tag popup (files on
+  // top, tagging below) so clients tag as they upload.
+  if (_astUploadTargetPopup) {
+    // Already inside the popup frame - append the new files + re-render.
+    _astTagIds = _astTagIds.concat(_newIds);
+    _astTagRender();
+  } else if (_AST_LIB_MODE && _newIds.length) {
+    _astTagOpenBatch(_newIds);
+  }
 }
 
 async function _assetSetTag(id, field, value) {
@@ -18234,7 +19146,7 @@ function switchView(name, el) {
 
   if (name === 'resources') openResourcesView();
 
-  if (name === 'assets') { _ASSETS_HOST_ID = 'assets-content'; openAssetsView(); }
+  if (name === 'assets') { _AST_LIB_MODE = false; _ASSETS_HOST_ID = 'assets-content'; openAssetsView(); }
 
   if (name === 'contacts') openContactsView();
 
@@ -21896,10 +22808,13 @@ function applyV15NavState(v15) {
     mNav.classList.toggle('is-v15', !onV2 && V15_ACCESS === true);
   }
   // Assets: V1.5 moved the asset library INTO Business Blueprint, so hide the
-  // standalone left-nav item for V1.5 only. V1 + V2 keep the standalone item.
+  // standalone left-nav item for V1.5. V2 hides it too - the library lives as
+  // the Content Library blueprint card + the bottom-left orb fan (P1, Zoran
+  // 2026-07-20). V1 keeps the standalone item.
   const _v15only = V15_ACCESS && !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const _onV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true);
   const assetsNav = document.getElementById('nav-assets');
-  if (assetsNav) assetsNav.style.display = _v15only ? 'none' : '';
+  if (assetsNav) assetsNav.style.display = (_v15only || _onV2) ? 'none' : '';
   // Contacts/Inbox/KPIs sharing + the Marketing "narrative" treatment now live in
   // applyCrmSupersetNav so V2 gets them too - override the bulk v15 toggle above.
   applyCrmSupersetNav();
@@ -23270,17 +24185,26 @@ const _bbCards = [
 // The Assets card only appears inside the Blueprint for V1.5 (Zoran, 2026-06-22).
 const _bbAssetsCard = { id:'assets', label:'Assets', desc:'Your brand files, photos, and videos - logos, headshots, b-roll' };
 
-// Tier-aware card list. V1 + V2 keep the master list unchanged. V1.5 drops
+// V2 Content Library (Track 2 / P1, Zoran 2026-07-20): the asset library
+// reborn with the content taxonomy. Lives here + the bottom-left orb fan; the
+// standalone left-nav Assets item is hidden for V2.
+const _bbContentLibraryCard = { id:'content_library', label:'Content Library', desc:'Your photos and videos, tagged so we can build ads from them. Keep it growing.' };
+
+// Tier-aware card list. V1 keeps the master list unchanged. V1.5 drops
 // Member Onboarding + Agent learnings (not part of the V1.5 experience) and
-// gains Assets (moved out of the left nav into the Blueprint).
+// gains Assets (moved out of the left nav into the Blueprint). V2 gains the
+// Content Library card.
 function _bbIsV15Only() {
   return (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) &&
          !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
 }
 function _bbEffectiveCards() {
-  if (!_bbIsV15Only()) return _bbCards;
-  const base = _bbCards.filter(c => c.id !== 'member_onboarding' && c.id !== 'agent-learnings');
-  return [...base, _bbAssetsCard];
+  if (_bbIsV15Only()) {
+    const base = _bbCards.filter(c => c.id !== 'member_onboarding' && c.id !== 'agent-learnings');
+    return [...base, _bbAssetsCard];
+  }
+  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) return [..._bbCards, _bbContentLibraryCard];
+  return _bbCards;
 }
 
 let _bbState = {
@@ -23422,6 +24346,7 @@ function _bbRenderFromHash() {
   if (card === 'offers' && id) return _bbRenderOfferWizard(panel, id);
   if (card === 'offers') return _bbRenderOffersList(panel);
   if (card === 'assets') return _bbRenderAssets(panel);
+  if (card === 'content_library') return _bbRenderContentLibrary(panel);
   if (card === 'member_onboarding') return _bbRenderMemberOnboarding(panel);
   if (card === 'agent-learnings') return _bbRenderAgentLearnings(panel);
   return _bbRenderCardPlaceholder(panel, card);
@@ -23432,6 +24357,7 @@ function _bbRenderFromHash() {
 const _bbCardIcons = {
   member_onboarding: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>',
   assets:    '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  content_library: '<path d="M2 6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="m10 12 4 2.5-4 2.5z"/>',
   offers:    '<path d="M16 10a4 4 0 0 1-8 0"/><path d="M3.103 6.034h17.794L20 18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>',
   general:   '<path d="M3 21V7l9-4 9 4v14"/><path d="M9 21V12h6v9"/><path d="M3 21h18"/>',
   staff:     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -23460,6 +24386,29 @@ function _bbRenderAssets(panel) {
     </div>
     <div id="bb-assets-content"></div>
   `;
+  _AST_LIB_MODE = false;
+  _ASSETS_HOST_ID = 'bb-assets-content';
+  openAssetsView();
+}
+
+// V2 Content Library (Track 2 / P1). Same engine as the asset library, with
+// the content taxonomy UI on top (_AST_LIB_MODE gates it in _assetCard) and
+// the standing "keep adding content" nudge in the chrome.
+function _bbRenderContentLibrary(panel) {
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">Content Library</div>
+        <div class="bb-page-sub">Every photo and video you add here is raw material for your ads and socials. Tag who is in it and what it shows, and our team can build from it any time. Keep it growing: fresh content means fresh ads.</div>
+      </div>
+    </div>
+    <div id="bb-assets-content"></div>
+  `;
+  _AST_LIB_MODE = true;
   _ASSETS_HOST_ID = 'bb-assets-content';
   openAssetsView();
 }
@@ -51333,6 +52282,166 @@ function onAdminFeedbackFilePick() {
     : 'No file selected';
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   Zoran door - Track 2 T2-a (FRONT-END TEMPLATE ONLY)
+   Tapping the Zoran icon on V2 opens this support front door: live tickets
+   list (MOCK data below) + 4 lanes + free-type box. No backend: intake, the
+   real tickets table, agent + notifications land in later chunks. V1/V1.5
+   keep the old feedback modal (onZoranIconClick routes by tier).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// Shared 5-state ladder -> client label + semantic color (locked 2026-07-20).
+const _ZD_STATUS = {
+  received:       { label: 'Received',      color: 'var(--blue, #5B9BD5)' },
+  in_progress:    { label: 'Working on it', color: 'var(--amber, #E0A64B)' },
+  waiting_client: { label: 'Needs you',     color: 'var(--gold, #D4B65C)' },
+  resolved:       { label: 'Done',          color: 'var(--green, #6FBF73)' },
+  closed:         { label: 'Closed',        color: 'var(--text-mute, #8A8A93)' },
+};
+
+// MOCK tickets - stand-ins so the template feels real. Replaced by the tickets
+// table in a later chunk.
+const _ZD_MOCK_TICKETS = [
+  {
+    id: 't1', title: 'A parent got charged twice', lane: 'Billing',
+    status: 'waiting_client', updated: '2h ago',
+    thread: [
+      { who: 'me',    name: 'You',       body: 'A parent got charged twice for the August membership.' },
+      { who: 'them',  name: 'Assistant', body: "Got it. What's the parent's email so we can pull the charge?" },
+    ],
+  },
+  {
+    id: 't2', title: 'Swap in the new team photos', lane: 'Website',
+    status: 'in_progress', updated: 'yesterday',
+    thread: [
+      { who: 'me',   name: 'You',      body: 'Can we put the new team photos on the homepage?' },
+      { who: 'them', name: 'BAM team', body: 'On it, updating the homepage gallery now.' },
+    ],
+  },
+  {
+    id: 't3', title: 'Booking page would not load', lane: 'Fix',
+    status: 'resolved', updated: '3 days ago',
+    thread: [
+      { who: 'me',   name: 'You',      body: 'The free-trial booking page was blank this morning.' },
+      { who: 'them', name: 'BAM team', body: 'Fixed. A calendar setting was off. It is live again.' },
+    ],
+  },
+];
+
+let _zdActiveTicket = null;
+
+function onZoranIconClick() {
+  // V2 gets the new door; V1/V1.5 keep the existing feedback modal.
+  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) {
+    openZoranDoor();
+  } else {
+    openAdminFeedback();
+  }
+}
+
+function openZoranDoor() {
+  _zdShowHome();
+  _zdRenderTickets();
+  document.getElementById('zdoor-overlay').classList.add('open');
+}
+
+function closeZoranDoor() {
+  document.getElementById('zdoor-overlay').classList.remove('open');
+  _zdHideHint();
+}
+
+function _zdStatusPill(status) {
+  const s = _ZD_STATUS[status] || _ZD_STATUS.received;
+  return `<span class="zd-pill" style="color:${s.color};background:color-mix(in srgb, ${s.color} 14%, transparent)"><span class="zd-pill-dot"></span>${s.label}</span>`;
+}
+
+function _zdRenderTickets() {
+  const wrap = document.getElementById('zd-ticket-list');
+  if (!wrap) return;
+  const tix = _ZD_MOCK_TICKETS;
+  if (!tix.length) {
+    wrap.innerHTML = `<div class="zd-empty">No tickets yet. Start something new below and it shows up here.</div>`;
+    return;
+  }
+  wrap.innerHTML = tix.map(t => `
+    <button type="button" class="zd-ticket" onclick="_zdOpenThread('${t.id}')">
+      <span class="zd-ticket-body">
+        <span class="zd-ticket-title">${_zdEsc(t.title)}</span>
+        <span class="zd-ticket-meta">${_zdEsc(t.lane)} · ${_zdEsc(t.updated)}</span>
+      </span>
+      ${_zdStatusPill(t.status)}
+    </button>`).join('');
+}
+
+function _zdShowHome() {
+  document.getElementById('zdoor-home').style.display = 'flex';
+  document.getElementById('zdoor-thread').style.display = 'none';
+  _zdActiveTicket = null;
+}
+
+function _zdOpenThread(id) {
+  const t = _ZD_MOCK_TICKETS.find(x => x.id === id);
+  if (!t) return;
+  _zdActiveTicket = t;
+  document.getElementById('zd-thread-title').textContent = t.title;
+  document.getElementById('zd-thread-status').innerHTML = _zdStatusPill(t.status);
+  const msgs = document.getElementById('zd-thread-msgs');
+  msgs.innerHTML = t.thread.map(m => `
+    <div class="zd-msg ${m.who === 'me' ? 'me' : 'them'}">
+      <div class="zd-msg-who">${_zdEsc(m.name)}</div>
+      <div class="zd-msg-bubble">${_zdEsc(m.body)}</div>
+    </div>`).join('');
+  document.getElementById('zdoor-home').style.display = 'none';
+  document.getElementById('zdoor-thread').style.display = 'flex';
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function _zdCloseThread() { _zdShowHome(); }
+
+// Lanes + free-type are visual this chunk. Bug/feature BRIDGE to the existing
+// feedback modal (kind preselected) so V2 academies lose nothing until P5
+// wires the real intake; the other lanes show a gentle inline note.
+function _zdLane(kind) {
+  if (kind === 'bug' || kind === 'feature') {
+    closeZoranDoor();
+    openAdminFeedback();
+    setFeedbackKind(kind);
+    return;
+  }
+  _zdShowHint('This opens the real intake in the next build.');
+}
+function _zdTypeSend() {
+  const el = document.getElementById('zd-type-input');
+  if (el && el.value.trim()) { el.value = ''; _zdShowHint('Chat routing gets wired in the next build.'); }
+}
+function _zdThreadSend() {
+  const el = document.getElementById('zd-thread-input');
+  if (!el || !_zdActiveTicket || !el.value.trim()) return;
+  const body = el.value.trim(); el.value = '';
+  // Local-only echo so the thread feels alive in the template (not persisted).
+  _zdActiveTicket.thread.push({ who: 'me', name: 'You', body });
+  _zdOpenThread(_zdActiveTicket.id);
+}
+
+let _zdHintTimer = null;
+function _zdShowHint(msg) {
+  const el = document.getElementById('zd-hint');
+  if (!el) return;
+  el.textContent = msg; el.classList.add('show');
+  if (_zdHintTimer) clearTimeout(_zdHintTimer);
+  _zdHintTimer = setTimeout(_zdHideHint, 2600);
+}
+function _zdHideHint() {
+  const el = document.getElementById('zd-hint');
+  if (el) el.classList.remove('show');
+}
+
+function _zdEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
 async function submitAdminFeedback() {
   const body = document.getElementById('admin-fb-body').value.trim();
   const msgEl = document.getElementById('admin-fb-msg');
@@ -53813,6 +54922,7 @@ function _ccBuildChrome() {
   dock.innerHTML =
     `<div class="cc-fan" id="cc-fan">
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Info" onclick="_ccDockPop('info')">${_ccIcons().info}</button>
+       ${(typeof V2_ACCESS !== 'undefined' && V2_ACCESS) ? `<button type="button" class="cc-fan-btn cc-glass" data-lab="Content Library" onclick="_ccOrbToggle(false);_ccOpenClassic('blueprint');setTimeout(() => { try { _bbNavigate('content_library'); } catch (_) {} }, 250)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="m10 12 4 2.5-4 2.5z"/></svg></button>` : ''}
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Business blueprint" onclick="_ccOrbToggle(false);_ccOpenClassic('blueprint')">${_ccIcons().grid}</button>
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Settings" onclick="_ccDockPop('settings')">${_ccIcons().gear}</button>
        <button type="button" class="cc-fan-btn cc-glass" id="cc-fan-acct" data-lab="Switch academy" style="display:none" onclick="_ccAcctToggle(true)"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span class="cc-fan-count" id="cc-fan-acct-count"></span></button>
@@ -56978,6 +58088,28 @@ function toggleTheme() {
   .mmc-input::placeholder, .mmc-textarea::placeholder { color:var(--text-mute); }
   .mmc-input:focus, .mmc-textarea:focus { outline:none; border-color:var(--gold); }
   .mmc-textarea { min-height:88px; resize:vertical; line-height:1.5; }
+  /* Track 2 / P3: angle + guide + Content Library picker inside the modal */
+  .mmc-muted { font-family:var(--font-ui); font-size:12px; color:var(--text-mute); padding:4px 0; }
+  .mmc-angles { display:flex; flex-wrap:wrap; gap:6px; }
+  .mmc-angle { font-family:var(--font-ui); font-size:12px; font-weight:600; color:var(--text-sub); background:transparent; border:1px solid var(--border-med); border-radius:999px; padding:7px 14px; cursor:pointer; transition:all var(--t-fast,.12s); }
+  .mmc-angle:hover { border-color:var(--gold); color:var(--text); }
+  .mmc-angle.on { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
+  .mmc-guide { margin-top:10px; padding:12px 14px; background:var(--surface-el); border:1px solid var(--line); border-radius:var(--radius-md); }
+  .mmc-guide-purpose { font-family:var(--font-ui); font-size:12.5px; color:var(--text); line-height:1.5; }
+  .mmc-guide-tips { font-family:var(--font-ui); font-size:12px; color:var(--text-sub); line-height:1.5; margin-top:8px; }
+  .mmc-guide-segs { margin-top:8px; display:flex; flex-direction:column; gap:5px; }
+  .mmc-guide-seg { font-family:var(--font-ui); font-size:12px; color:var(--text-sub); line-height:1.45; }
+  .mmc-guide-seg b { color:var(--text); }
+  .mmc-libfilts { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
+  .mmc-libfilt { font-family:var(--font-ui); font-size:11px; font-weight:600; color:var(--text-sub); background:transparent; border:1px solid var(--border-med); border-radius:999px; padding:5px 11px; cursor:pointer; transition:all var(--t-fast,.12s); }
+  .mmc-libfilt:hover { border-color:var(--gold); color:var(--text); }
+  .mmc-libfilt.on { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
+  .mmc-libgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(76px, 1fr)); gap:8px; max-height:220px; overflow-y:auto; padding:2px; }
+  .mmc-libitem { position:relative; aspect-ratio:1; border:2px solid var(--line); border-radius:var(--radius-sm); overflow:hidden; background:#000; cursor:pointer; padding:0; transition:border-color var(--t-fast,.12s); }
+  .mmc-libitem:hover { border-color:var(--border-str); }
+  .mmc-libitem.sel { border-color:var(--gold); }
+  .mmc-libitem img, .mmc-libitem video { width:100%; height:100%; object-fit:cover; display:block; }
+  .mmc-libcheck { position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:999px; background:var(--gold); color:var(--on-gold); font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; }
   .mmc-foot { display:flex; justify-content:flex-end; gap:10px; margin-top:22px; }
   .mmc-btn-ghost { font-family:var(--font-ui); font-size:13px; font-weight:600; color:var(--text-sub); background:transparent; border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:10px 18px; cursor:pointer; transition:border-color var(--t-fast,.12s), color var(--t-fast,.12s); }
   .mmc-btn-ghost:hover { color:var(--text); border-color:var(--border-str); }
@@ -58008,10 +59140,112 @@ function _mmCreativeAction(action, name) {
 let _MMC = null;
 function _mmcOpen(mode, idx) {
   const ctx = (mode === 'replace' ? (window._MMC_REP || []) : (window._MMC_ADD || []))[idx] || {};
-  _MMC = { mode, step: 'form', files: [], drive: '', brief: '', creative: ctx.creative || null, verdict: ctx.verdict || null, ctx };
+  _MMC = {
+    mode, step: 'form', files: [], drive: '', brief: '', creative: ctx.creative || null, verdict: ctx.verdict || null, ctx,
+    // Track 2 / P3: angle + guide + Content Library picker
+    angleIdx: null, guideLoaded: false, guideCard: null, angles: [],
+    libLoaded: false, libAssets: [], libIds: new Set(), libFilter: 'all',
+  };
   _mmcRender();
   const bd = document.getElementById('mmCreativeModal');
   if (bd) bd.style.display = 'flex';
+  _mmcLoadGuide();
+  _mmcLoadLibrary();
+}
+
+// Pull the guide card that matches this campaign's offer, and its angles.
+// Match by title (the live convention), else the default card, else first.
+async function _mmcLoadGuide() {
+  const want = _MMC;
+  try {
+    const cards = await _fetchGuideCards();
+    const offer = ((want.ctx && want.ctx.offer) || '').toLowerCase().trim();
+    let card = null;
+    if (offer) {
+      card = cards.find(c => (c.title || '').toLowerCase().trim() === offer)
+          || cards.find(c => (c.title || '').toLowerCase().includes(offer) || offer.includes((c.title || '').toLowerCase()));
+    }
+    card = card || cards.find(c => c.is_default) || cards[0] || null;
+    if (_MMC !== want) return;
+    _MMC.guideCard = card;
+    _MMC.angles = card ? _cardAngles(card) : [];
+  } catch (_) { if (_MMC === want) _MMC.angles = []; }
+  if (_MMC === want) { _MMC.guideLoaded = true; if (_MMC.step === 'form') _mmcRender(); }
+}
+
+// Load this academy's Content Library assets for the picker (own, non-ticket).
+async function _mmcLoadLibrary() {
+  const want = _MMC;
+  try {
+    const { data } = await _sb.from('client_assets')
+      .select('id,label,storage_path,link_url,mime_type,category,content_type')
+      .eq('client_id', CLIENT_ID).neq('source', 'ticket')
+      .order('created_at', { ascending: false }).limit(200);
+    if (_MMC !== want) return;
+    _MMC.libAssets = data || [];
+  } catch (_) { if (_MMC === want) _MMC.libAssets = []; }
+  if (_MMC === want) { _MMC.libLoaded = true; if (_MMC.step === 'form') _mmcRender(); }
+}
+
+function _mmcPickAngle(i) { if (!_MMC) return; _mmcCapture(); _MMC.angleIdx = (_MMC.angleIdx === i ? null : i); _mmcRender(); }
+function _mmcLibFilter(f) { if (!_MMC) return; _mmcCapture(); _MMC.libFilter = f; _mmcRender(); }
+function _mmcToggleLib(id) {
+  if (!_MMC) return; _mmcCapture();
+  _MMC.libIds = _MMC.libIds || new Set();
+  if (_MMC.libIds.has(id)) _MMC.libIds.delete(id); else _MMC.libIds.add(id);
+  _mmcRender();
+}
+// Build the angle + guide + library picker block for the form step.
+function _mmcContentBlockHtml() {
+  const m = _MMC;
+  // Angle chips (from the offer's guide card) + Other.
+  let angleBlock = '';
+  if (!m.guideLoaded) {
+    angleBlock = '<div class="mmc-field"><label class="mmc-label">Pick an angle</label><div class="mmc-muted">Loading guide…</div></div>';
+  } else if (m.angles.length) {
+    const chips = m.angles.map((a, i) =>
+      '<button type="button" class="mmc-angle' + (m.angleIdx === i ? ' on' : '') + '" onclick="_mmcPickAngle(' + i + ')">' + _escapeHtml(a.name) + '</button>'
+    ).join('') + '<button type="button" class="mmc-angle' + (m.angleIdx === 'other' ? ' on' : '') + '" onclick="_mmcPickAngle(\'other\')">Other</button>';
+    // Guide for the picked angle.
+    let guide = '';
+    if (typeof m.angleIdx === 'number' && m.angles[m.angleIdx]) {
+      const a = m.angles[m.angleIdx];
+      const exec = a.video || a.graphic;
+      const segs = (exec && exec.segments && exec.segments.length)
+        ? '<div class="mmc-guide-segs">' + exec.segments.map(s => '<div class="mmc-guide-seg"><b>' + _escapeHtml(s.label || '') + '</b>' + (s.text ? ' ' + _escapeHtml(s.text) : '') + '</div>').join('') + '</div>' : '';
+      const tips = (exec && exec.tips) ? '<div class="mmc-guide-tips">' + _escapeHtml(exec.tips) + '</div>' : '';
+      guide = '<div class="mmc-guide">' + (a.purpose ? '<div class="mmc-guide-purpose">' + _escapeHtml(a.purpose) + '</div>' : '') + tips + segs + '</div>';
+    }
+    const cardName = m.guideCard && m.guideCard.title ? ' &middot; ' + _escapeHtml(m.guideCard.title) : '';
+    angleBlock = '<div class="mmc-field"><label class="mmc-label">Pick an angle' + cardName + '</label><div class="mmc-angles">' + chips + '</div>' + guide + '</div>';
+  }
+
+  // Content Library picker.
+  let lib = '';
+  const filt = m.libFilter || 'all';
+  const filtered = (m.libAssets || []).filter(x => filt === 'all' || x.content_type === filt);
+  const filts = ['all', 'action', 'coaching', 'culture', 'testimonial', 'other'].map(f =>
+    '<button type="button" class="mmc-libfilt' + (filt === f ? ' on' : '') + '" onclick="_mmcLibFilter(\'' + f + '\')">' + (f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)) + '</button>'
+  ).join('');
+  if (!m.libLoaded) {
+    lib = '<div class="mmc-muted">Loading your library…</div>';
+  } else if (!filtered.length) {
+    lib = '<div class="mmc-muted">Nothing ' + (filt === 'all' ? 'in your library yet' : 'tagged as ' + filt) + '. Add content in the Content Library, or upload below.</div>';
+  } else {
+    lib = '<div class="mmc-libgrid">' + filtered.map(x => {
+      const sel = m.libIds && m.libIds.has(x.id);
+      const url = x.link_url || _assetUrl(x.storage_path);
+      const isVid = (x.mime_type || '').startsWith('video/') || x.category === 'video';
+      const thumb = isVid
+        ? '<video src="' + _escapeHtml(url) + '#t=0.3" muted playsinline preload="metadata"></video>'
+        : '<img src="' + _escapeHtml(url) + '" alt="" loading="lazy">';
+      return '<button type="button" class="mmc-libitem' + (sel ? ' sel' : '') + '" onclick="_mmcToggleLib(\'' + x.id + '\')">' + thumb + (sel ? '<span class="mmc-libcheck">&#10003;</span>' : '') + '</button>';
+    }).join('') + '</div>';
+  }
+  const selCount = m.libIds ? m.libIds.size : 0;
+  const libBlock = '<div class="mmc-field"><label class="mmc-label">From your Content Library' + (selCount ? ' &middot; ' + selCount + ' selected' : '') + '</label><div class="mmc-libfilts">' + filts + '</div>' + lib + '</div>';
+
+  return angleBlock + libBlock;
 }
 function _mmcClose() { const bd = document.getElementById('mmCreativeModal'); if (bd) bd.style.display = 'none'; _MMC = null; }
 function _mmcPick(input) { if (_MMC && input.files) { _mmcCapture(); for (const f of input.files) _MMC.files.push(f); input.value = ''; _mmcRender(); } }
@@ -58062,12 +59296,13 @@ function _mmcRender() {
       '<button type="button" class="mmc-x" onclick="_mmcClose()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
     '</div>' +
     repCard +
-    '<div class="mmc-field"><label class="mmc-label">Your footage &amp; photos</label>' +
+    _mmcContentBlockHtml() +
+    '<div class="mmc-field"><label class="mmc-label">Or add new footage &amp; photos</label>' +
       '<label class="mmc-drop" id="mmcDrop" ondragover="event.preventDefault();this.classList.add(\'is-over\')" ondragleave="this.classList.remove(\'is-over\')" ondrop="_mmcDrop(event)">' +
         '<input type="file" multiple accept="image/*,video/*" style="display:none" onchange="_mmcPick(this)">' +
         '<svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M8 3L5 6M8 3l3 3"/><path d="M2.5 10.5V12a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-1.5"/></svg>' +
         '<span class="mmc-drop-main">Drop files or <b>browse</b></span>' +
-        '<span class="mmc-drop-sub">Photos and clips. Big files? Paste a Google Drive link below.</span>' +
+        '<span class="mmc-drop-sub">New clips get added to your Content Library too. Big files? Paste a Google Drive link below.</span>' +
       '</label>' + files +
       '<input type="text" id="mmcDrive" class="mmc-input" placeholder="Or paste a Google Drive / Dropbox link" value="' + _escapeHtml(_MMC.drive || '') + '">' +
     '</div>' +
@@ -58098,8 +59333,12 @@ function _mmcConfirmHtml() {
         (stats ? '<div class="mmc-rep-stats">' + stats + '</div>' : '') + '</div></div>';
   }
   const fileCount = _MMC.files.length;
+  const libCount = _MMC.libIds ? _MMC.libIds.size : 0;
+  const angleName = (typeof _MMC.angleIdx === 'number' && _MMC.angles[_MMC.angleIdx])
+    ? _MMC.angles[_MMC.angleIdx].name : (_MMC.angleIdx === 'other' ? 'Other' : null);
   const assetLine = [
-    fileCount ? (fileCount + ' file' + (fileCount === 1 ? '' : 's')) : null,
+    libCount ? (libCount + ' from library') : null,
+    fileCount ? (fileCount + ' new file' + (fileCount === 1 ? '' : 's')) : null,
     (_MMC.drive || '').trim() ? 'a shared link' : null,
   ].filter(Boolean).join(' + ') || 'none';
   const fileList = fileCount
@@ -58116,7 +59355,8 @@ function _mmcConfirmHtml() {
     repCard +
     '<div class="mmc-sum">' +
       row('Request', isRep ? 'Replace this ad with a fresh creative' : 'A brand-new creative') +
-      row('Assets', assetLine) + fileList +
+      (angleName ? row('Angle', _escapeHtml(angleName)) : '') +
+      row('Content', assetLine) + fileList +
       ((_MMC.drive || '').trim() ? row('Link', '<span style="word-break:break-all">' + _escapeHtml(_MMC.drive.trim()) + '</span>') : '') +
       '<div class="mmc-sum-row"><span class="mmc-sum-k">' + (isRep ? 'What to beat' : 'Brief') + '</span></div>' +
       '<div class="mmc-sum-brief">' + _escapeHtml((_MMC.brief || '').trim()) + '</div>' +
@@ -58131,12 +59371,13 @@ function _mmcReview() {   // validate the form, then move to the confirmation st
   if (!_MMC) return;
   _mmcCapture();
   const brief = (_MMC.brief || '').trim(), drive = (_MMC.drive || '').trim();
-  const needAssets = !_MMC.files.length && !drive, needBrief = !brief;
+  const libCount = _MMC.libIds ? _MMC.libIds.size : 0;
+  const needAssets = !_MMC.files.length && !drive && !libCount, needBrief = !brief;
   if (needAssets || needBrief) {
     if (needAssets) _mmcShake('mmcDrop');
     if (needBrief) _mmcShake('mmcBrief');
-    _mmToast(needAssets && needBrief ? 'Add your footage and a quick brief'
-      : needAssets ? 'Add your footage or photos (upload or a Drive link)'
+    _mmToast(needAssets && needBrief ? 'Pick content and add a quick brief'
+      : needAssets ? 'Pick from your library or upload footage'
       : 'Add a quick brief so the team knows the vibe');
     return;
   }
@@ -58151,34 +59392,82 @@ function _mmcShake(id) {   // "no-no" shake + red flag on a missing field
   el.classList.add('mmc-shake', 'mmc-invalid');
   setTimeout(() => el.classList.remove('mmc-invalid'), 1400);
 }
-function _mmcSubmit() {   // fires from the confirmation step (already validated)
+// Upload any newly-dropped files into the Content Library (client-assets), so
+// they are reusable + taggable, and return their ids to attach to the ticket.
+async function _mmcUploadNewFiles() {
+  const ids = [];
+  for (const f of (_MMC.files || [])) {
+    try {
+      const clean = f.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+      const stamp = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      const path = CLIENT_ID + '/' + stamp + '-' + clean;
+      await _storageUpload('client-assets', path, f);
+      const { data } = await _sb.from('client_assets').insert({
+        client_id: CLIENT_ID, label: f.name.replace(/\.[^.]+$/, ''),
+        category: (f.type || '').startsWith('video/') ? 'video' : 'photo',
+        storage_path: path, mime_type: f.type || null, size_bytes: f.size,
+      }).select('id').single();
+      if (data) ids.push(data.id);
+    } catch (_) { /* skip a failed file; the brief + others still go */ }
+  }
+  return ids;
+}
+
+async function _mmcSubmit() {   // fires from the confirmation step (already validated)
   if (!_MMC) return;
   const brief = (_MMC.brief || '').trim(), drive = (_MMC.drive || '').trim();
   const isRep = _MMC.mode === 'replace', c = _MMC.creative, v = _MMC.verdict;
-  const payload = {
-    module: 'meta-ads', request_type: isRep ? 'replace' : 'add', source: 'v2_portal_creative',
-    brief,
-    assets: { files: _MMC.files.map((f) => ({ name: f.name, size: f.size })), drive_link: drive || null },
-    context: {
-      campaign: (_MMC.ctx && _MMC.ctx.campaign) || null,
-      adset: (_MMC.ctx && _MMC.ctx.adset) || null,
-      offer: (_MMC.ctx && _MMC.ctx.offer) || null,
-      replacing: (isRep && c) ? {
-        id: c.id || null, name: c.name || null, cpl: c.cpl, hook_rate: c.hook_rate,
-        frequency: c.frequency, spend: c.spend, verdict: v && v.verdict, why: v && v.note,
-      } : null,
-    },
-  };
-  console.log('[v2-creative] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
-  // Loading -> sent checkmark. The setTimeout stands in for the real POST.
+  const angleName = (typeof _MMC.angleIdx === 'number' && _MMC.angles[_MMC.angleIdx])
+    ? _MMC.angles[_MMC.angleIdx].name : (_MMC.angleIdx === 'other' ? 'Other' : null);
   _MMC.step = 'sending';
   _mmcRender();
-  setTimeout(() => {
+  try {
+    const newIds = await _mmcUploadNewFiles();
+    const libIds = _MMC.libIds ? Array.from(_MMC.libIds) : [];
+    const assetIds = libIds.concat(newIds);
+    const campaign = (_MMC.ctx && _MMC.ctx.campaign) || null;
+    const body = {
+      type: 'content_ask',
+      source: 'editor',
+      client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
+      title: (isRep ? 'Replace creative' : 'New creative') + (campaign ? ' - ' + campaign : ''),
+      intake: {
+        mode: isRep ? 'replace' : 'add',
+        angle: angleName,
+        guide_card: (_MMC.guideCard && _MMC.guideCard.title) || null,
+        brief,
+        drive_link: drive || null,
+        asset_ids: assetIds,
+        replacing: (isRep && c) ? {
+          id: c.id || null, name: c.name || null, cpl: c.cpl, hook_rate: c.hook_rate,
+          frequency: c.frequency, spend: c.spend, verdict: v && v.verdict, why: v && v.note,
+        } : null,
+      },
+      context: {
+        surface: 'meta-ads',
+        campaign,
+        adset: (_MMC.ctx && _MMC.ctx.adset) || null,
+        offer: (_MMC.ctx && _MMC.ctx.offer) || null,
+        page_url: window.location.pathname + window.location.search,
+      },
+      message: brief || null,
+    };
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/v2-tickets?action=create&client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    const j = await _safeJson(res);
+    if (!res.ok || j.error) throw new Error(j.error || ('HTTP ' + res.status));
     if (!_MMC || _MMC.step !== 'sending') return;   // user closed mid-send
     _MMC.step = 'sent';
     _mmcRender();
-    setTimeout(() => { if (_MMC && _MMC.step === 'sent') _mmcClose(); }, 2600);   // auto-dismiss
-  }, 950);
+    setTimeout(() => { if (_MMC && _MMC.step === 'sent') _mmcClose(); }, 2600);
+  } catch (e) {
+    if (_MMC) { _MMC.step = 'form'; _mmcRender(); }
+    _mmToast("Couldn't send: " + (e.message || e));
+  }
 }
 function _mmcSendingHtml() {
   return '<div class="mmc-status">' +

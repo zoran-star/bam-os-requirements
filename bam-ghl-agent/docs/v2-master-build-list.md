@@ -20,22 +20,46 @@ replacement). Update statuses here as PRs land.
 | 6 | Integrations (Leadsie link in Ads step · BAM Connect post-App-Review · phone wrap wiring) | queued |
 | 7 | Front door - "Add academy" (4 fields + GHL dropdown → 7 auto-initializations: v2_access, Slack channel, welcome ping, GHL link, invite, sites scaffold, wizard state) | **SHIPPED** (feat/add-academy + bam-client-sites #90, 2026-07-19) - clients.js action=create-academy (idempotent = the checklist's Retry) · Add Academy modal replaces New client (plain-row escape hatch stays) · Slack conversations.create + staff kickoff ping · GHL name→locationId from GHL_LOCATIONS_JSON (the ONE flag driving the wizard's has_ghl forks, already wired since PR-2) · scaffold robot = workflow_dispatch new-client.yml. ⚠ Needs Zoran one-time: Slack app channels:manage scope + GITHUB_DISPATCH_TOKEN in Vercel (see Clocks) |
 
-## Track 2 - The Zoran icon / V2 ticket system (DESIGNED, NEXT UP)
+## Track 2 - The Zoran icon / V2 ticket system (IN PROGRESS)
 
 Full design in [`zoran-icon-ticket-design.md`](zoran-icon-ticket-design.md).
-**Handoff for the next chat: [`track2-handoff.md`](track2-handoff.md) - run
-`/track2`.** That chat CO-WORKS the user requirements with Zoran first (the
-design is a sketch, not a locked spec), THEN builds chunk by chunk.
-Replaces client-facing Slack. Build chunks when we pick it up:
+**Requirements LOCKED with Zoran 2026-07-20** (see the "Requirements LOCKED"
+section in the design doc). Handoff: [`track2-handoff.md`](track2-handoff.md).
+Replaces client-facing Slack.
 
-| # | Chunk |
-|---|---|
-| T1 | Unified tickets table + statuses + the tickets page (left circle) |
-| T2 | The icon front door: 4 lanes + orchestrator (classify + slot-fill) + bug/feature intake agents |
-| T3 | Notification rail: staff Slack pings + client SMS on status change (rides the phone spine). **DECIDED 2026-07-20: staff pings go to 4 TEAM channels by function - #systems / #marketing / #content / #other - NOT per-client (clients are off Slack). Retrofits WS7 front door + WS3 build pings, removes the Slack channels:manage scope. See [`track2-handoff.md`](track2-handoff.md).** |
-| T4 | Point-of-action side doors (flag-this-reply on Inbox, editor send-to-team, import leftovers, billing panel) |
-| T5 | Staff side: command palette + pre-worked queue (agent drafts, staff approves) |
-| T6 | Pipes: feature ticket → Notion Backlog · ship → "your idea is live" SMS |
+**Locked decisions (headline):** ticket rail first (marketing/content later, an
+ask routes to Cam for now) · build asks straight to Systems (Rosano) · KPI alerts
+parked (Track 3) · statuses-only, no SLA clock · one shared 5-state ladder
+(Received/Working on it/Needs you/Done/Closed) for all 9 types · SMS on
+Received/Needs you/Done/Closed, Slack on new + client-reply · real conversation
+thread (Slack replacement) · 4-lane door replaces today's feedback modal,
+`portal_feedback` migrates into `tickets`.
+
+**The door reshaped:** the icon popout shows live tickets FIRST, then the 4 lanes,
+then the free-type box (folds the old "tickets page" into the popout).
+
+**T-scope ran 2026-07-20 (same day):** three ticket FAMILIES (systems /
+marketing / content), greenfield `v2_tickets` architecture (V1/V1.5 legacy
+tables untouched), Content Library (Assets reborn w/ structured taxonomy tied
+to contacts + client_users), presets = guide-card ANGLES. Full outcome in
+[`zoran-icon-ticket-design.md`](zoran-icon-ticket-design.md) "T-SCOPE OUTCOME".
+The T1-T6 chunks are superseded by the approved P1-P6 bundle:
+
+| # | Chunk | Status |
+|---|---|---|
+| T2-a | Icon popout FE template + bug/feature lanes bridged to old feedback modal | ✅ built 2026-07-20 (PR #1504) |
+| P1 | Content Library: taxonomy migration + rename + V2 BB focus card + circle menu + conditional tagging UI + "keep adding" nudge | ✅ built 2026-07-20 (PR #1504) |
+| P2 | Library search (api/content-library.js) + staff-side browser | later |
+| P3a | RAIL CORE (v2_tickets + v2_ticket_messages + api/v2-tickets.js, notify stubbed) + client ad request in the Meta creative modal: pick angle (offer guide card) → guide → Content Library picker (filter/multi-select) + upload → content_ask ticket. Entry = Marketing → Meta ads → campaign → +add / replace creative (`_mmc`). | ✅ built 2026-07-20 (PR #1504) |
+| P3b | Staff side of the ad flow: angle content_types authoring, staff V2 queue view (Zoran reviews separately) | ⬅ NEXT |
+| P4 | Systems wiring: _v2Submit/_mmcSubmit → rail · staff V2 queue view · portal_feedback backfill · /v2-tickets repoint | after P3 |
+| P5 | Icon popout LIVE: real reads + realtime, lanes create tickets | after P3 |
+| P6 | Notifications (T3 decision): 4 function channels (#systems/#marketing/#content/#other) + client SMS on status change · retrofit WS7/WS3 per-client channels | after P3-P5 |
+
+Still parked: orchestrator/navigator lanes (T2-b), non-editor side doors (old
+T4), staff command palette (old T5), Notion pipes (old T6). The T3 decision
+(4 function Slack channels #systems/#marketing/#content/#other, not per-client)
+is captured in the P6 row above + track2-handoff.md.
 
 ## Track 3 - Running-the-business builds (B-bucket, standalone, schedule anytime)
 

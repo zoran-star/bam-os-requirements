@@ -6,6 +6,43 @@ asset). Replaces ad-hoc per-offer-only assets + hardcoded site images. Pairs
 with the unified site design system (tokens live in git `bam-client-sites`;
 images live here in Supabase, fed by the Business Blueprint).
 
+## V2 = "Content Library" + content taxonomy (Track 2 P1, 2026-07-20)
+
+On V2 the library is surfaced as the **Content Library**: a V2 Business
+Blueprint card (`content_library` in `_bbEffectiveCards`, renderer
+`_bbRenderContentLibrary`) + an orb-fan quick entry; the standalone Assets
+left-nav item is HIDDEN for V2 (V1 keeps it; V1.5 keeps its `assets` BB card).
+`_AST_LIB_MODE` gates the taxonomy UI.
+
+Taxonomy (migrations `20260720120000_content_library_taxonomy.sql` +
+`20260720140000_content_type_other.sql`, applied to prod):
+- `client_assets.content_type` (action|coaching|culture|testimonial|**other**)
+  + `highlight` bool (action only). `other` = catch-all, no conditional fields.
+- `client_asset_people`: athlete tags → **contacts.id**, staff tags →
+  **client_users.id** (name-only rows OK), `display_name` snapshot
+- `client_content_skills` per-academy skill presets (6 defaults seeded per V2
+  academy: ball-handling/shooting/game-iq/defense/athleticism/passing +
+  client custom) + `client_asset_skills` join. The 6 defaults are ALSO baked
+  into the client (`_AST_DEFAULT_SKILLS`) so chips render even pre-seed;
+  `_astEnsureSkillRow` lazily creates a missing preset row before first tag.
+- `client_asset_tags` (migration `20260720160000`): free-text "Extra tags" on
+  any asset, shown for EVERY content_type. Distinct from skills.
+- Conditional rules enforced in UI (tag modal `_astTagOpen`), not DB
+- Client writes blocked on `source='ticket'` assets (mirrors existing rule)
+- Tag UI = a **centered popup module** (`#ast-tag-modal`), NOT a side drawer.
+  Two modes: single (card "+ What is this?") and the **upload frame**. In
+  library mode the toolbar Upload button calls `_astUploadPopupOpen()` -> the
+  popup IS the upload surface: a "Choose files" zone + drop target on top
+  (OS picker fires from inside it via `_astPopupUpload`), thumbnails fill as
+  files upload, taxonomy tagging below, Done to close. `_astUploadTargetPopup`
+  routes `_uploadAssetFiles` results back into the open popup. Every content-
+  type/athlete/staff/skill/highlight pick applies to ALL files in the session
+  (`.in('id', _astTagTargets())`). Folder upload lands in the same frame via
+  `_astTagOpenBatch`.
+
+Core handoff: `docs/core-handoff/content-library-tickets.md`. Full Track 2
+context: `docs/zoran-icon-ticket-design.md` "T-SCOPE OUTCOME".
+
 ## Schema (migration `20260615120000_client_assets_library.sql`)
 - Table **`client_assets`**: `client_id` → clients; `label`, `category`
   (logo|wordmark|hero|photo|**video**|crest|icon|og|favicon|other), `alt`, `storage_path`,
