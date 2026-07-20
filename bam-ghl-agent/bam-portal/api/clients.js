@@ -1889,6 +1889,10 @@ async function handler(req, res) {
           }
           if ("phone" in teamBody) { const ph = (teamBody.phone || "").trim(); patch.phone = ph || null; }
           if ("name" in teamBody) { const nm = (teamBody.name || "").trim(); if (nm) patch.name = nm; }
+          // Public Team-page copy: title (position) + bio (blurb). Both optional,
+          // owner-editable at any point. Empty string clears the field.
+          if ("title" in teamBody) { const t = (teamBody.title || "").trim(); patch.title = t || null; }
+          if ("bio" in teamBody) { const b = (teamBody.bio || "").trim(); patch.bio = b || null; }
           const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
             method: "PATCH",
             headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },

@@ -25298,12 +25298,12 @@ async function _bbStaffRefreshList() {
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
   let { data, error } = await _sb.from('client_users')
-    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members')
+    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members, title, bio')
     .eq('client_id', CLIENT_ID)
     .eq('status', 'active')
     .eq('hide_from_team', false);
   if (error) {
-    // Migration-safe fallback: can_enroll_members may not exist yet.
+    // Migration-safe fallback: can_enroll_members / title / bio may not exist yet.
     ({ data, error } = await _sb.from('client_users')
       .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages')
       .eq('client_id', CLIENT_ID)
@@ -25412,6 +25412,19 @@ async function _bbStaffRefreshList() {
     // Contact edit (email + phone) for any owner-managed teammate - editable at
     // any point, invited or not. Not-yet-invited rows also get the Invite button.
     const canEditContact = iAmOwner && !isOwner;
+    // Public Team-page copy: title (position) + bio (blurb). Owner-editable, feeds
+    // the academy's public "Our Team" website page. Same save path as email/phone.
+    const teamPageHtml = !canEditContact ? '' : `
+      <div style="margin-top:6px;padding:11px 13px;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--r-md,12px)">
+        <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Team page (public website)</div>
+        <input id="staff-title-${r.id}" type="text" value="${_bbEscapeAttr(r.title || '')}" placeholder="Title / role (e.g. Head Coach)"
+          onchange="_bbStaffContactSave('${r.id}', 'title', this.value)"
+          style="width:100%;box-sizing:border-box;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:8px 11px;font-size:13px;outline:none;margin-bottom:8px">
+        <textarea id="staff-bio-${r.id}" rows="3" placeholder="Short bio or notes shown on your website Team page"
+          onchange="_bbStaffContactSave('${r.id}', 'bio', this.value)"
+          style="width:100%;box-sizing:border-box;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:8px 11px;font-size:13px;outline:none;resize:vertical;font-family:inherit;line-height:1.5">${escapeHTML(r.bio || '')}</textarea>
+        <span style="display:block;font-size:11px;color:var(--text-mute);margin-top:6px">Shows on your public Team page. Leave blank to hide.</span>
+      </div>`;
     const inviteHtml = !canEditContact ? '' : `
       <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
         <input id="staff-email-${r.id}" type="email" value="${_bbEscapeAttr(r.email || '')}" placeholder="email@example.com"
@@ -25440,7 +25453,8 @@ async function _bbStaffRefreshList() {
       ${enrollHtml}
       ${stagesHtml}
       ${kpisHtml}
-      <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
+      ${teamPageHtml}
+      <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--r-md,12px)">
         <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Photo / headshot</div>
         ${_assetBankHtml('staff_id', r.id, { category: 'photo' })}
       </div>
