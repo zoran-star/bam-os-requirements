@@ -26,9 +26,15 @@ Taxonomy (migrations `20260720120000_content_library_taxonomy.sql` +
 - Conditional rules enforced in UI (tag modal `_astTagOpen`), not DB
 - Client writes blocked on `source='ticket'` assets (mirrors existing rule)
 - Tag UI = a **centered popup module** (`#ast-tag-modal`), NOT a side drawer.
-  Runs single (card "+ What is this?") OR **batch**: uploading in library mode
-  opens it via `_astTagOpenBatch(newIds)` with the files on top + tagging below;
-  every pick applies to ALL just-uploaded assets (`.in('id', targets)`).
+  Two modes: single (card "+ What is this?") and the **upload frame**. In
+  library mode the toolbar Upload button calls `_astUploadPopupOpen()` -> the
+  popup IS the upload surface: a "Choose files" zone + drop target on top
+  (OS picker fires from inside it via `_astPopupUpload`), thumbnails fill as
+  files upload, taxonomy tagging below, Done to close. `_astUploadTargetPopup`
+  routes `_uploadAssetFiles` results back into the open popup. Every content-
+  type/athlete/staff/skill/highlight pick applies to ALL files in the session
+  (`.in('id', _astTagTargets())`). Folder upload lands in the same frame via
+  `_astTagOpenBatch`.
 
 Core handoff: `docs/core-handoff/content-library-tickets.md`. Full Track 2
 context: `docs/zoran-icon-ticket-design.md` "T-SCOPE OUTCOME".

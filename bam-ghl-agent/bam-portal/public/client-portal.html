@@ -9253,6 +9253,21 @@ Then the call to action."]</div>
         border-radius:var(--r-sm, 8px); background:var(--surface-el, rgba(0,0,0,.05));
         color:var(--text-mute); font-size:12px; font-weight:700;
       }
+      .ast-up-zone {
+        display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+        padding:14px 16px; margin-bottom:18px;
+        border:1px dashed var(--border-med); border-radius:var(--r-md, 12px);
+        background:var(--surface-el, rgba(0,0,0,.02)); transition:border-color .12s, background .12s;
+      }
+      .ast-up-zone.drag { border-color:var(--gold); background:var(--gold-sheen, rgba(212,182,92,.08)); }
+      .ast-up-choose {
+        display:inline-flex; align-items:center; gap:7px; flex:0 0 auto;
+        padding:9px 16px; border-radius:var(--r-sm, 8px); border:none;
+        background:var(--gold); color:var(--on-gold, #131416); font:inherit;
+        font-size:13px; font-weight:700; cursor:pointer;
+      }
+      .ast-up-choose:hover { filter:brightness(1.05); }
+      .ast-up-hint { font-size:12px; color:var(--text-mute); }
       .ast-tag-foot {
         flex:0 0 auto; padding:12px 18px calc(16px + env(safe-area-inset-bottom));
         border-top:1px solid var(--border); display:flex; justify-content:flex-end;
@@ -12148,11 +12163,16 @@ function _renderAssets() {
   // #1: Glass toolbar with upload + link input inline
   host.innerHTML = `
     <div class="ast-toolbar">
+      ${_AST_LIB_MODE ? `
+      <button type="button" class="ast-upload-btn" onclick="_astUploadPopupOpen()">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload
+      </button>` : `
       <label class="ast-upload-btn">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Upload
         <input type="file" accept="image/*,video/*" multiple onchange="_uploadAssets(this)">
-      </label>
+      </label>`}
       <label class="ast-upload-btn secondary">
         Folder
         <input type="file" webkitdirectory directory multiple onchange="_uploadAssets(this, true)">
@@ -12360,16 +12380,21 @@ function _setAssetType(t)   { _ASSET_TYPE   = t; _renderAssets(); }
    card's "What is this?") OR a BATCH just uploaded (the upload flow opens it
    with the files on top; every pick applies to all of them). Saves are
    immediate; local state mirrors so the grid updates without a refetch. */
-let _astTagIds = [];        // asset ids being tagged (1 = card, N = upload batch)
-let _astTagUpload = false;  // opened straight after an upload?
+let _astTagIds = [];            // asset ids being tagged (1 = card, N = upload)
+let _astTagUploadFrame = false; // popup is the upload frame (zone on top + tagging)
+let _astUploadTargetPopup = false; // route _uploadAssetFiles results into the open popup
 let _astAthleteTimer = null;
 
 function _astTagPrimary() { return _ASSETS.find(x => x.id === _astTagIds[0]) || null; }
 function _astTagAssetsAll() { return _astTagIds.map(id => _ASSETS.find(x => x.id === id)).filter(Boolean); }
 function _astTagTargets() { return _astTagIds.slice(); }
 
-function _astTagOpen(id) { _astTagIds = [id]; _astTagUpload = false; _astTagShow(); }
-function _astTagOpenBatch(ids) { _astTagIds = (ids || []).slice(); _astTagUpload = true; if (_astTagIds.length) _astTagShow(); }
+function _astTagOpen(id) { _astTagIds = [id]; _astTagUploadFrame = false; _astTagShow(); }
+// The upload frame: opens the popup as the whole upload+tag surface. Files are
+// chosen from inside it (the OS picker fires from the "Choose files" control),
+// upload, then appear in the strip; tagging below applies to all of them.
+function _astUploadPopupOpen() { _astTagIds = []; _astTagUploadFrame = true; _astTagShow(); }
+function _astTagOpenBatch(ids) { _astTagIds = (ids || []).slice(); _astTagUploadFrame = true; _astTagShow(); }
 
 function _astTagShow() {
   let ov = document.getElementById('ast-tag-overlay');
@@ -12386,7 +12411,7 @@ function _astTagShow() {
 
 function _astTagClose() {
   document.getElementById('ast-tag-overlay')?.classList.remove('open');
-  _astTagIds = []; _astTagUpload = false;
+  _astTagIds = []; _astTagUploadFrame = false;
   _renderAssets();
 }
 
@@ -12401,18 +12426,61 @@ function _astTagThumb(x) {
 
 function _astTagRender() {
   const modal = document.getElementById('ast-tag-modal');
+  if (!modal) return;
   const a = _astTagPrimary();
-  if (!modal || !a) return;
+  const frame = _astTagUploadFrame;
+  if (!a && !frame) return;
   const assets = _astTagAssetsAll();
   const batch = assets.length > 1;
 
-  const previewStrip = batch
-    ? `<div class="ast-tag-strip">${assets.slice(0, 8).map(_astTagThumb).join('')}${assets.length > 8 ? `<span class="ast-tag-more">+${assets.length - 8}</span>` : ''}</div>`
-    : _astTagThumb(a);
-  const title = batch ? `${assets.length} files added` : (a.label || 'Untitled');
-  const sub = batch
-    ? 'Tag what these show. It applies to all of them, and you can fine-tune each one later.'
-    : (_astTagUpload ? 'Tag what this shows so we can find it when we build your ads' : 'Tag it so we can find it when we build your ads');
+  // Header preview: strip of thumbs, one thumb, or (empty frame) an upload glyph.
+  let previewStrip, title, sub;
+  if (frame) {
+    previewStrip = assets.length
+      ? `<div class="ast-tag-strip">${assets.slice(0, 8).map(_astTagThumb).join('')}${assets.length > 8 ? `<span class="ast-tag-more">+${assets.length - 8}</span>` : ''}</div>`
+      : '<div class="ast-tag-thumb ast-tag-thumb-link"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>';
+    title = assets.length ? `${assets.length} file${assets.length > 1 ? 's' : ''} added` : 'Add content';
+    sub = assets.length
+      ? 'Tag what these show. It applies to all of them, and you can fine-tune each one later.'
+      : 'Add photos and videos, then tag what they show so we can build ads from them.';
+  } else {
+    previewStrip = _astTagThumb(a);
+    title = a.label || 'Untitled';
+    sub = 'Tag it so we can find it when we build your ads';
+  }
+
+  // Upload zone (frame only) - the OS picker fires from the "Choose files"
+  // input; drops also land here. Uploads route into this popup.
+  const uploadZone = frame ? `
+    <div class="ast-up-zone" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="_astPopupDrop(event)">
+      <label class="ast-up-choose">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Choose files
+        <input type="file" accept="image/*,video/*" multiple style="display:none" onchange="_astPopupUpload(this)">
+      </label>
+      <span class="ast-up-hint">or drop photos and videos here</span>
+    </div>` : '';
+
+  // Taxonomy needs a real asset to write to; empty frame shows a hint instead.
+  if (!a) {
+    modal.innerHTML = `
+      <div class="ast-tag-head">
+        ${previewStrip}
+        <div class="ast-tag-title">
+          <div class="ast-tag-name">${escapeHTML(title)}</div>
+          <div class="ast-tag-sub">${escapeHTML(sub)}</div>
+        </div>
+        <button type="button" class="ast-tag-close" onclick="_astTagClose()" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="ast-tag-body">
+        ${uploadZone}
+        <div class="ast-tag-sec"><div class="ast-tag-none">Add a file above to start tagging.</div></div>
+      </div>
+      <div class="ast-tag-foot"><button type="button" class="ast-tag-done" onclick="_astTagClose()">Done</button></div>`;
+    return;
+  }
 
   const typeChips = _AST_CONTENT_TYPES.map(([v, l]) =>
     `<button type="button" class="ast-tag-chip${a.content_type === v ? ' on' : ''}" onclick="_astSetContentType('${v}')">${l}</button>`
@@ -12484,7 +12552,7 @@ function _astTagRender() {
   else if (a.content_type === 'culture' || a.content_type === 'testimonial') conditional = athleteSection + staffSection;
   else if (a.content_type === 'other') conditional = '<div class="ast-tag-sec"><div class="ast-tag-none">Filed as general content. Add a clear label so we know what it is.</div></div>';
 
-  const footer = _astTagUpload
+  const footer = frame
     ? `<div class="ast-tag-foot"><button type="button" class="ast-tag-done" onclick="_astTagClose()">Done</button></div>`
     : '';
 
@@ -12500,6 +12568,7 @@ function _astTagRender() {
       </button>
     </div>
     <div class="ast-tag-body">
+      ${uploadZone}
       <div class="ast-tag-sec">
         <div class="ast-tag-label">What is this?</div>
         <div class="ast-tag-chips">${typeChips}</div>
@@ -12507,6 +12576,28 @@ function _astTagRender() {
       ${conditional}
     </div>
     ${footer}`;
+}
+
+// Upload from inside the popup frame: files chosen / dropped here upload and
+// then append to the current tag session (the strip fills, tagging applies to
+// all). Routes _uploadAssetFiles' results into this popup via the flag.
+async function _astPopupUpload(inputEl) {
+  const files = Array.from(inputEl.files || []); inputEl.value = '';
+  await _astPopupUploadFiles(files, false);
+}
+function _astPopupDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag');
+  const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+  if (files.length) _astPopupUploadFiles(files, false);
+}
+async function _astPopupUploadFiles(files, fromFolder) {
+  if (!files.length) return;
+  const zone = document.querySelector('#ast-tag-modal .ast-up-zone');
+  if (zone) zone.innerHTML = `<span class="req-spin"></span> <span class="ast-up-hint">Uploading ${files.length} file${files.length > 1 ? 's' : ''}...</span>`;
+  _astUploadTargetPopup = true;
+  try { await _uploadAssetFiles(files, fromFolder); }
+  finally { _astUploadTargetPopup = false; }
 }
 
 async function _astSetContentType(type) {
@@ -12753,9 +12844,15 @@ async function _uploadAssetFiles(all, fromFolder) {
   setTimeout(() => { if (prog) prog.classList.remove('active'); }, 800);
   _astRendered = false; // reset stagger for new batch
   await openAssetsView();
-  // Content Library: open the tag popup on the just-uploaded files (files on
+  // Content Library: surface the just-uploaded files in the tag popup (files on
   // top, tagging below) so clients tag as they upload.
-  if (_AST_LIB_MODE && _newIds.length) _astTagOpenBatch(_newIds);
+  if (_astUploadTargetPopup) {
+    // Already inside the popup frame - append the new files + re-render.
+    _astTagIds = _astTagIds.concat(_newIds);
+    _astTagRender();
+  } else if (_AST_LIB_MODE && _newIds.length) {
+    _astTagOpenBatch(_newIds);
+  }
 }
 
 async function _assetSetTag(id, field, value) {
