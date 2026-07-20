@@ -13,6 +13,17 @@ that task.
 - Bug fixes that clearly apply to all tiers are fine, but say so explicitly.
 - This rule is the default; only an explicit "edit V1" instruction lifts it.
 
+## ⛔ Client onboarding lives in ONE flow - the paged wizard
+
+Any change to academy-owner onboarding goes in the **new paged wizard** and nowhere else.
+
+- File: [`bam-portal/public/client-portal.html`](bam-portal/public/client-portal.html), the `_obf*` functions.
+- Two arrays drive it: `_OBF_STEPS` (each step's definition, detector, CTA) and `_OBF_SECTIONS` (the 5 sections - Academy · Brand · Wired · Offer · Launch - each listing its step `keys`).
+- **A step renders ONLY if its `key` is in BOTH `_OBF_STEPS` AND a section's `keys` in `_OBF_SECTIONS`.** Adding to `_OBF_STEPS` alone = defined + detected but invisible in the wizard. This bit us with the Gmail inbox step (2026-07-20). When you add a step: registry row in `_OBF_STEPS` + a detector in `_obfFetchState()` + the key in the right `_OBF_SECTIONS` section, all three.
+- Staff-side status backend: `api/offers/setup-status.js`.
+- Do NOT build owner onboarding in the old surfaces: the old checklist renderer is GONE; `onboarding-reloaded.html` and `class-setup/offer-setup/parent-onboarding.html` are archived prototypes. `onboarding.html` is the PUBLIC pre-account signup (different). `ActivationTab.jsx` is the STAFF half of activation (keep in sync, don't confuse for the owner flow).
+- Spec + model (update the relevant one in the SAME commit as any onboarding change): [`docs/onboarding-wizard-spec.md`](docs/onboarding-wizard-spec.md), [`memories/project_v2_onboarding_model.md`](memories/project_v2_onboarding_model.md), [`memories/project_client_onboarding_flow.md`](memories/project_client_onboarding_flow.md).
+
 ## Project memory
 Project notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first (index of one-liners), then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
 
