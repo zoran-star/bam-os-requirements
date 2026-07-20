@@ -78,6 +78,16 @@ export async function googleProfileEmail(accessToken) {
   return (await r.json())?.email || null;
 }
 
+// Does this academy have an active connected mailbox? (drives the inbox email-read
+// branch + onboarding detector without pulling secrets).
+export async function hasActiveMailbox(clientId) {
+  if (!clientId) return false;
+  try {
+    const rows = await sb(`client_mailboxes?client_id=eq.${encodeURIComponent(clientId)}&status=eq.active&select=client_id&limit=1`);
+    return !!(rows && rows[0]);
+  } catch (_) { return false; }
+}
+
 // Load a client's connected mailbox row (or null). Decrypts nothing by itself.
 export async function getMailbox(clientId) {
   if (!clientId) return null;
