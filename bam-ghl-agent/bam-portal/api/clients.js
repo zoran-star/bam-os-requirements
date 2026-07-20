@@ -1870,12 +1870,16 @@ async function handler(req, res) {
           ).catch(() => []);
           if (!targetRows?.length) return res.status(404).json({ error: "teammate not found for this client" });
           const target = targetRows[0];
-          if (target.role === "owner") return res.status(400).json({ error: "can't edit the owner here" });
+          // The owner's contact identity (name/email/phone) is managed via the
+          // clients row (Primary contact), NOT here - but their PUBLIC PROFILE
+          // (title/bio, for the website team page) IS editable here. So allow the
+          // owner through for title/bio only; block name/email/phone edits.
+          const isOwnerTarget = target.role === "owner";
           const patch = { updated_at: new Date().toISOString() };
           // Email + phone are editable at any point - including after the teammate
           // has a login. When they have a linked auth user, sync the login email
           // first (mirrors update-staff) so the row never drifts from the auth email.
-          if ("email" in teamBody) {
+          if (!isOwnerTarget && "email" in teamBody) {
             let email = typeof teamBody.email === "string" ? teamBody.email.trim().toLowerCase() : "";
             if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "enter a valid email or leave it blank" });
             const newEmail = email || null;
@@ -1891,12 +1895,15 @@ async function handler(req, res) {
             }
             patch.email = newEmail;
           }
-          if ("phone" in teamBody) { const ph = (teamBody.phone || "").trim(); patch.phone = ph || null; }
-          if ("name" in teamBody) { const nm = (teamBody.name || "").trim(); if (nm) patch.name = nm; }
+          if (!isOwnerTarget && "phone" in teamBody) { const ph = (teamBody.phone || "").trim(); patch.phone = ph || null; }
+          if (!isOwnerTarget && "name" in teamBody) { const nm = (teamBody.name || "").trim(); if (nm) patch.name = nm; }
           // Public Team-page copy: title (position) + bio (blurb). Both optional,
-          // owner-editable at any point. Empty string clears the field.
+          // editable for ANY teammate including the owner. Empty string clears it.
           if ("title" in teamBody) { const t = (teamBody.title || "").trim(); patch.title = t || null; }
           if ("bio" in teamBody) { const b = (teamBody.bio || "").trim(); patch.bio = b || null; }
+          if (isOwnerTarget && !("title" in teamBody) && !("bio" in teamBody)) {
+            return res.status(400).json({ error: "the owner's contact details are managed in Primary contact" });
+          }
           const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
             method: "PATCH",
             headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
