@@ -316,6 +316,22 @@ if (window.__MOCK__) (() => {
       let b = {}; try { b = JSON.parse((init && init.body) || '{}'); } catch (_) {}
       if (act === 'list') return { cards: MEMBER_CARE_CARDS.filter(c => c.status === 'pending' && (!b.member_id || c.member_id === b.member_id)) };
       if (act === 'counts') { const counts = {}; MEMBER_CARE_CARDS.filter(c => c.status === 'pending').forEach(c => { counts[c.member_id] = 1; }); return { counts }; }
+      if (act === 'draft-now') {
+        const existing = MEMBER_CARE_CARDS.find(c => c.member_id === b.member_id && c.status === 'pending');
+        if (existing) return { ok: true, result: { existing: true } };
+        const mem = MEMBERS.find(m => m.id === b.member_id);
+        // Half the time the agent has a recommendation, half the time it doesn't -
+        // so both button outcomes are exercisable in the mock loop.
+        if (!mem || String(b.member_id).endsWith('2')) return { ok: true, result: { skipped: 'no_op' } };
+        const card = { id: 'mcc-ask-' + b.member_id, member_id: b.member_id, ghl_contact_id: mem.ghl_contact_id, member_name: mem.athlete_name, parent_name: mem.parent_name,
+          action: null, action_body: null, action_summary: null, action_status: 'none',
+          draft_reply: 'Thanks for reaching out! Let me check on that and get right back to you.', reply_channel: 'SMS', reply_status: 'pending',
+          action_items: [{ title: 'Follow up with ' + mem.parent_name + ' about their question', notes: 'Raised in the conversation' }], action_items_status: 'pending',
+          reasoning: 'Manual ask - parent has an open question in the thread.', confidence: 0.7, escalate: false, escalate_reason: null,
+          summary: 'You asked the agent to look at ' + mem.athlete_name + "'s conversation.", last_message: 'Thanks!', status: 'pending', created_at: iso(0, 0) };
+        MEMBER_CARE_CARDS.push(card);
+        return { ok: true, result: { inserted: true, card } };
+      }
       const c = MEMBER_CARE_CARDS.find(x => x.id === b.id);
       if (c) {
         const part = b.part || 'all';
@@ -45463,7 +45479,7 @@ function _renderMemberInbox(sec, messages) {
     const when = escapeHTML(_ibFormatDate(mm.date));
     return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(mm.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
   }).join('') : `<div style="font-size:12px;color:var(--text-mute)">No messages yet.</div>`;
-  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Latest ${recent.length} of ${asc.length} messages</div>` : ''}<div id="member-inbox-thread" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px">${thread}</div>${_memberCareCardsHtml()}${_memberInboxComposer()}`;
+  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Latest ${recent.length} of ${asc.length} messages</div>` : ''}<div id="member-inbox-thread" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px">${thread}</div>${_memberCareCardsHtml()}${_memberCareAskButton()}${_memberInboxComposer()}`;
   // Load scrolled to the bottom so the newest message is in view.
   const tc = document.getElementById('member-inbox-thread');
   if (tc) tc.scrollTop = tc.scrollHeight;
@@ -45685,6 +45701,47 @@ async function _memberCareDismiss(cardId) {
   } finally {
     _MEMBER_CARE.busy = false;
     _memberCareReload();
+  }
+}
+
+// On-demand "Ask the agent" - a manual trigger that runs the SAME AI draft for
+// THIS conversation right now, regardless of the academy's on/off toggle. Hidden
+// once a card is already showing (nothing to ask for - it's right there).
+function _memberCareAskButton() {
+  const i = _MEMBER_INBOX;
+  if (!i || !i.memberId) return '';
+  if ((_MEMBER_CARE.cards || []).some(c => c && c.id)) return '';   // a proposal is already on screen
+  return `<div style="margin-bottom:12px">
+      <button id="mcare-ask-btn" onclick="_memberCareAskAgent()" style="display:inline-flex;align-items:center;gap:7px;background:transparent;color:var(--gold,#D4B65C);border:1px solid var(--gold,#D4B65C);border-radius:8px;padding:8px 14px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2Z"/><path d="M9 21h6"/></svg>
+        Ask the agent
+      </button>
+    </div>`;
+}
+
+async function _memberCareAskAgent() {
+  const i = _MEMBER_INBOX;
+  if (!i || !i.memberId || _MEMBER_CARE.busy) return;
+  _MEMBER_CARE.busy = true;
+  const btn = document.getElementById('mcare-ask-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="req-spin"></span> Thinking…'; }
+  try {
+    const j = await _memberCarePost({ action: 'draft-now', client_id: i.clientId, member_id: i.memberId });
+    const r = (j && j.result) || {};
+    if (r.inserted) {
+      _memberCareReload();   // the new card renders inline
+    } else if (r.existing) {
+      _memberCareReload();   // a card already exists - surface it
+    } else {
+      // no_op / empty thread / nothing to propose
+      if (typeof _plToast === 'function') _plToast('Agent looked - nothing to recommend right now');
+      if (btn) { btn.disabled = false; btn.innerHTML = 'Ask the agent'; }
+      _MEMBER_CARE.busy = false;
+    }
+  } catch (e) {
+    alert("Couldn't reach the agent: " + (e.message || e));
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Ask the agent'; }
+    _MEMBER_CARE.busy = false;
   }
 }
 
