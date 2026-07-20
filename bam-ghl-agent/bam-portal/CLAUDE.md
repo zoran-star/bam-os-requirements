@@ -1,5 +1,14 @@
 # bam-portal Agent Notes
 
+## ⛔ Academy-owner onboarding = the `_obf*` paged wizard here, ONE place
+
+All owner onboarding changes live in `public/client-portal.html` (`_obf*`). A step
+renders ONLY if its `key` is in BOTH `_OBF_STEPS` (definition + detector + CTA) AND
+a section's `keys` in `_OBF_SECTIONS` (Academy · Brand · Wired · Offer · Launch).
+Adding to `_OBF_STEPS` alone = invisible in the wizard. The old checklist renderer
+is gone; do not build onboarding anywhere else. Full rule + do-not-touch list in
+[`../CLAUDE.md`](../CLAUDE.md).
+
 ## ⛔ Front-end work: load the design system first
 
 Before ANY UI/front-end change in this folder (client portal, new pages, components), read [`design-system/DESIGN.md`](design-system/DESIGN.md) and use the tokens in [`design-system/tokens.css`](design-system/tokens.css). Never hardcode colors/radii/fonts/shadows a token covers. If a token changes, mirror it in `public/client-portal.html`'s `:root` in the same commit (and vice versa). The V2 Home / Assets / Calendar views are the reference implementations.
