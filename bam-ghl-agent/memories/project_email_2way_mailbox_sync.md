@@ -161,6 +161,26 @@ guess. Safeguards on connect:
 - Red "Reconnect inbox" status badge when the token expires/revokes (never fails
   silent) → renewal cron + reconnect CTA.
 
+### Google OAuth publishing strategy (pilot many academies during verification)
+- The Cloud project's OAuth app was **Internal** (only same-Workspace-org accounts
+  can connect) - fine for one org, but **will NOT scale**: each academy is its own
+  Google Workspace org, so scaling REQUIRES **External** + Google verification.
+- **gmail.modify is a RESTRICTED scope** → full verification path applies:
+  External → Branding (name/logo/homepage + privacy + terms on an owned, Search-
+  Console-verified domain) → submit in Verification Center → **CASA** 3rd-party
+  security assessment (annual, ~$500-2k/yr, multi-week) → demo video → approval
+  (removes the unverified warning + 100-user cap).
+- **GOTCHA (the key one): "Testing" publishing status expires refresh tokens after
+  7 DAYS** for sensitive/restricted scopes → sync would break weekly. To pilot real
+  inboxes for weeks, set the app to **"In Production" (even while unverified)** →
+  refresh tokens become long-lived. Cost = a one-time "unverified app" warning at
+  connect that STAFF click through (Advanced → continue); ~100-account cap until
+  verified = up to ~100 pilot academies (1 shared info@ each). Our sync already
+  flags needs_reconnect + shows a reconnect badge if a token ever drops.
+- **Strategy: two tracks** - (1) External + In-Production now → connect the pilot
+  batch through the warning; (2) verification + CASA in parallel (the long pole) →
+  when approved, warning/cap gone, roll out to all.
+
 ### MX / DNS at connect time
 Turning on the real inbox = the domain's MX points at Google (GTA already does -
 they run Workspace). Inbound then syncs via Gmail API (Resend inbound webhook stops
