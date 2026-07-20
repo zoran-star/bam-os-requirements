@@ -25429,7 +25429,7 @@ async function _bbRenderStaffCard(panel, meta) {
     </div>
 
     <p style="font-size:13px;color:var(--text-sub);line-height:1.55;margin:0 0 16px;max-width:680px">
-      Everyone listed here can log in to this portal with full access. Anyone on the team can invite more people; only the account owner can revoke access.
+      Add your team here. New teammates start with no access: you choose which tabs each one can see under Tab access. Anyone on the team can invite more people; only the account owner can revoke access.
     </p>
     <div id="bb-staff-list"><div class="bb-empty">Loading…</div></div>
     <div id="bb-notif-panel"></div>
@@ -55522,6 +55522,12 @@ function _ccDockPop(kind) {
   pop.dataset.kind = kind;
   pop.innerHTML = kind === 'settings'
     ? _obfPopItem() +
+      // The command center hides the sidebar, so the owner-only Settings view
+      // (integrations + time zone) is only reachable from here. Opens the classic
+      // view over the CC. Owner / BAM staff only.
+      ((_MY_TAB_ROLE === 'owner' || _IS_BAM_STAFF === true)
+        ? `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');_ccOpenClassic('settings')">Settings</button>`
+        : '') +
       `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
       `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
       `<button type="button" class="cc-pop-item" onclick="var off=localStorage.getItem('bam_haptics_off')==='1';localStorage.setItem('bam_haptics_off', off?'0':'1');this.textContent='Haptics: '+(off?'on':'off')">Haptics: ${(function(){try{return localStorage.getItem('bam_haptics_off')==='1'?'off':'on'}catch(_){return 'on'}})()}</button>` +
