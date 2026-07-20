@@ -77,11 +77,11 @@ async function resolveUser(req) {
     staff = await sb(`staff?email=eq.${encodeURIComponent(user.email)}&select=id,name&limit=1`);
   }
   const staffRow = Array.isArray(staff) && staff[0] ? staff[0] : null;
-  // Migration-safe: fall back to role-only if can_enroll_members doesn't exist yet
-  // (owners keep working; grantees need the migration).
+  // Enroll access now follows Members-tab access (allowed_tabs), not a separate
+  // grant. Migration-safe fallback to role-only if allowed_tabs is unavailable.
   let memberships;
   try {
-    memberships = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&select=client_id,role,can_enroll_members`);
+    memberships = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&select=client_id,role,allowed_tabs`);
   } catch (_) {
     memberships = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&select=client_id,role`);
   }
@@ -703,9 +703,11 @@ async function handler(req, res) {
     const clientId = body.client_id;
     if (!clientId) return res.status(400).json({ error: "client_id required" });
 
-    // Access: BAM staff, the academy owner, or a can_enroll_members grantee.
+    // Access: BAM staff, the academy owner, or anyone with Members-tab access
+    // (allowed_tabs null = all tabs; otherwise must include "members").
     const membership = ctx.memberships.find(m => m.client_id === clientId) || null;
-    const allowed = Boolean(ctx.staff) || (membership && (membership.role === "owner" || membership.can_enroll_members === true));
+    const hasMembersTab = membership && (membership.role === "owner" || !Array.isArray(membership.allowed_tabs) || membership.allowed_tabs.includes("members"));
+    const allowed = Boolean(ctx.staff) || Boolean(hasMembersTab);
     if (!allowed) return res.status(403).json({ error: "you don't have access to sign up returning clients - ask the account owner" });
 
     const clientRows = await sb(
