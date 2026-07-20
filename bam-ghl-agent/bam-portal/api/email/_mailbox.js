@@ -104,3 +104,80 @@ export async function saveGoogleMailbox({ clientId, email, refreshToken, connect
     }]),
   });
 }
+
+// Mark a mailbox as needing reconnect (e.g. refresh token revoked). Surfaced as a
+// red badge in the UI; the sync/send paths skip it until reconnected.
+export async function flagMailbox(clientId, status, lastError) {
+  try {
+    await sb(`client_mailboxes?client_id=eq.${encodeURIComponent(clientId)}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status, last_error: (lastError || "").slice(0, 300), updated_at: new Date().toISOString() }),
+    });
+  } catch (_) { /* best-effort */ }
+}
+
+// A fresh access token for a stored mailbox row. Throws (caller flags reconnect) if
+// the refresh token is gone/revoked.
+export async function accessTokenForMailbox(mailbox) {
+  const rt = decryptSecret(mailbox.refresh_token_enc);
+  if (!rt) throw new Error("no refresh token stored");
+  return freshGoogleAccessToken(rt);
+}
+
+// ── Gmail REST helpers (v1) ────────────────────────────────────────────────────
+const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
+export async function gmailGet(accessToken, path) {
+  const r = await fetch(`${GMAIL}${path}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!r.ok) { const t = await r.text(); const e = new Error(`gmail ${r.status}: ${t.slice(0, 200)}`); e.status = r.status; throw e; }
+  return r.json();
+}
+export async function gmailPost(accessToken, path, body) {
+  const r = await fetch(`${GMAIL}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const t = await r.text(); const e = new Error(`gmail ${r.status}: ${t.slice(0, 200)}`); e.status = r.status; throw e; }
+  return r.json();
+}
+
+// The mailbox's current historyId (sync cursor baseline).
+export async function gmailProfileHistoryId(accessToken) {
+  const p = await gmailGet(accessToken, "/profile");
+  return p.historyId || null;
+}
+
+const b64urlToUtf8 = (s) => { try { return Buffer.from(String(s || "").replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"); } catch (_) { return ""; } };
+
+function walkParts(payload, out) {
+  if (!payload) return;
+  const mime = payload.mimeType || "";
+  if (payload.body && payload.body.data) {
+    if (mime === "text/plain") out.text += b64urlToUtf8(payload.body.data);
+    else if (mime === "text/html") out.html += b64urlToUtf8(payload.body.data);
+  }
+  for (const p of payload.parts || []) walkParts(p, out);
+}
+
+// Normalize a full Gmail message resource into the shape the store wants.
+export function parseGmailMessage(msg) {
+  const headers = {};
+  for (const h of (msg.payload && msg.payload.headers) || []) headers[String(h.name || "").toLowerCase()] = h.value || "";
+  const labels = msg.labelIds || [];
+  const outbound = labels.includes("SENT") && !labels.includes("INBOX");
+  const bodyParts = { text: "", html: "" };
+  walkParts(msg.payload, bodyParts);
+  const bodyText = (bodyParts.text || bodyParts.html.replace(/<[^>]+>/g, " ") || msg.snippet || "").trim();
+  return {
+    id: msg.id,
+    threadId: msg.threadId,
+    direction: outbound ? "outbound" : "inbound",
+    from: headers.from || "",
+    to: headers.to || "",
+    subject: headers.subject || "",
+    messageIdHeader: headers["message-id"] || null,
+    inReplyTo: headers["in-reply-to"] || null,
+    body: bodyText,
+    internalDate: msg.internalDate ? new Date(Number(msg.internalDate)).toISOString() : null,
+  };
+}

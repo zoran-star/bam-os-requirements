@@ -63,10 +63,25 @@ Resend) - sending auth is separate from MX receiving, so they coexide fine.
     Cloud project as the staff calendar OAuth) - just add the Gmail API + scopes +
     the new redirect URI. Optional `EMAIL_OAUTH_BASE_URL` (default
     portal.byanymeansbusiness.com).
-- **NEXT (not built): Phase 1b inbound sync + Phase 2 send routing.** Inbound =
-  poll each connected mailbox via Gmail history (cron) OR watch→Pub/Sub; Phase 2 =
-  `maybeSendEmailViaMailbox()` gate for human replies + inbox read-merge. Build +
-  test these AFTER the connect flow is proven end-to-end with GTA's real inbox.
+- **Phase 1b (Gmail inbound sync) — BUILT, needs live test.**
+  `api/email/sync-gmail.js` (cron `*/3 * * * *`, also `?client_id=` for a single
+  academy + Bearer CRON_SECRET / staff auth). Per active gmail mailbox: fresh
+  access token (flags `needs_reconnect` if revoked), pulls new messages via the
+  Gmail history cursor (`client_mailboxes.history_id`; baseline/backfill on
+  missing/expired cursor = `newer_than:2d in:inbox OR in:sent`), mirrors BOTH
+  directions into email_threads/email_messages (idempotent on
+  `client_id+mailbox_message_id`), and fires the SAME inbound side-effects as the
+  Resend webhook (notify owner, cancel agent drafts, exit automation→Responded).
+  Gmail helpers (history/get/profile/parse) added to `_mailbox.js`. Side-effects
+  are DUPLICATED from resend/inbound-webhook.js (Twilio-spine precedent) - keep in
+  sync. NOTE: with a mailbox connected, MX points at Google so the Resend inbound
+  webhook stops receiving for that domain; this cron becomes the inbound source.
+- **NEXT (not built): Phase 2 send routing + UI.** `maybeSendEmailViaMailbox()`
+  gate so human replies/compose go out via Gmail (threaded, shows in Gmail Sent),
+  bulk/agent stays on Resend; merge mailbox threads into `api/ghl/inbox.js` read;
+  "Connect your inbox" Settings card (mirror PhoneTab) with the green/reconnect
+  badge. Optional: fire an instant `?client_id=` sync right after connect instead
+  of waiting for the cron tick.
 
 ### What Zoran must do (Google-side, one-time, unblocks Phase 1a testing)
 1. Google Cloud Console → the existing OAuth project → **enable the Gmail API**.

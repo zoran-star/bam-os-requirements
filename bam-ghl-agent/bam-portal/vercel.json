@@ -49,6 +49,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/email/sync-gmail",
+      "schedule": "*/3 * * * *"
+    },
+    {
       "path": "/api/marketing?resource=meta-health-cron",
       "schedule": "0 13 * * *"
     },
