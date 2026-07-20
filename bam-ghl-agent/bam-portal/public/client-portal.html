@@ -9569,9 +9569,13 @@ Then the call to action."]</div>
           .hk2-esc{font-size:11.5px;color:#e0a020}
           .hk2-thread{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:2px}
           .hk2-thread-load{flex-direction:row;align-items:center;justify-content:center;gap:8px;min-height:44px;color:var(--text-sub);font-size:12.5px;cursor:default}
-          .hk2-bub{font-size:13px;line-height:1.5;padding:8px 12px;border-radius:13px;max-width:82%;white-space:pre-wrap;word-break:break-word}
-          .hk2-bub.in{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px;align-self:flex-start}
-          .hk2-bub.bot{background:var(--accent-glow,rgba(212,182,92,.10));border:1px solid var(--accent-border,rgba(212,182,92,.3));color:var(--text);border-bottom-right-radius:4px;align-self:flex-end}
+          .hk2-msg{display:flex;flex-direction:column;gap:2px;max-width:82%}
+          .hk2-msg.in{align-self:flex-start;align-items:flex-start}
+          .hk2-msg.bot{align-self:flex-end;align-items:flex-end}
+          .hk2-bub{font-size:13px;line-height:1.5;padding:8px 12px;border-radius:13px;max-width:100%;white-space:pre-wrap;word-break:break-word}
+          .hk2-bub.in{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px}
+          .hk2-bub.bot{background:var(--accent-glow,rgba(212,182,92,.10));border:1px solid var(--accent-border,rgba(212,182,92,.3));color:var(--text);border-bottom-right-radius:4px}
+          .hk2-time{font-size:9.5px;color:var(--text-mute);padding:0 5px;white-space:nowrap}
           .hk2-lbl{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}
           .hk2-planwhen{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}
           .hk2-when{background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font:inherit;font-size:11px;font-weight:700;padding:3px 7px;outline:none;text-transform:none;letter-spacing:normal;cursor:pointer}
@@ -9629,7 +9633,7 @@ Then the call to action."]</div>
              as "outside" at phone width, so the draft goes full-width. */
           @media(max-width:640px){
             .hk2-deck{min-height:0}
-            .hk2-bub{max-width:92%}
+            .hk2-msg{max-width:92%}
             .hk2-draftwrap{align-items:stretch}
             .hk2-draft-bubble{width:100%;max-width:100%;align-self:stretch}
             .hk2-draftcap{align-self:flex-end}
@@ -35994,13 +35998,33 @@ function _hk2Initials(name) {
 // so the TOP card lazy-loads its last few messages (_hk2HydrateThread) - the
 // reviewer should always see the bit of conversation they're replying to
 // (Zoran 2026-07-11). Tap = the full thread.
+// Compact relative timestamp for deck message bubbles (Zoran 2026-07-20): "just
+// now", "5m ago", "2h ago", "3d ago", then a short date past a week so old
+// imported threads don't read as "412d ago". '' on a missing/bad timestamp.
+function _hk2Ago(iso) {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (!t || isNaN(t)) return '';
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 45) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return m + 'm ago';
+  const h = Math.round(m / 60);
+  if (h < 24) return h + 'h ago';
+  const d = Math.round(h / 24);
+  if (d < 7) return d + 'd ago';
+  return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 function _hk2Bubbles(tail, lastMessage) {
   let bubs = (Array.isArray(tail) ? tail : []).map(m => {
     const out = m.role === 'agent';
     const t = String(m.text || '').trim();
-    return t ? `<div class="hk2-bub ${out ? 'bot' : 'in'}">${escapeHTML(t)}</div>` : '';
+    if (!t) return '';
+    const when = _hk2Ago(m.at);
+    const time = when ? `<div class="hk2-time">${escapeHTML(when)}</div>` : '';
+    return `<div class="hk2-msg ${out ? 'bot' : 'in'}"><div class="hk2-bub ${out ? 'bot' : 'in'}">${escapeHTML(t)}</div>${time}</div>`;
   }).join('');
-  if (!bubs && lastMessage) bubs = `<div class="hk2-bub in">${escapeHTML(String(lastMessage).trim())}</div>`;
+  if (!bubs && lastMessage) bubs = `<div class="hk2-msg in"><div class="hk2-bub in">${escapeHTML(String(lastMessage).trim())}</div></div>`;
   return bubs;
 }
 function _hk2ThreadHtml(r, isTop) {
@@ -36032,7 +36056,7 @@ async function _hk2HydrateThread() {
     let _lastOut = -1;
     for (let i = msgs.length - 1; i >= 0; i--) { if ((msgs[i].direction || '').toLowerCase() === 'outbound') { _lastOut = i; break; } }
     const _win = (_lastOut >= 0 ? msgs.slice(_lastOut) : msgs.slice(-2)).slice(-4);
-    r.thread_tail = _win.map(m => ({ role: (m.direction || '').toLowerCase() === 'outbound' ? 'agent' : 'parent', text: m.body }));
+    r.thread_tail = _win.map(m => ({ role: (m.direction || '').toLowerCase() === 'outbound' ? 'agent' : 'parent', text: m.body, at: m.date || null }));
   } catch (_) { r.thread_tail = r.thread_tail || []; }
   // The owner may have skipped / resolved this card while the fetch was in flight.
   const el = document.getElementById('hk2-thread-slot');
