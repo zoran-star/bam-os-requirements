@@ -506,26 +506,31 @@ async function runWork(res) {
   return res.status(200).json({ ok: true, picked: jobs.length, sent, deferred, advanced, completed, failed, canceled, nurture_lost: nurtureLost, ghosted_lost: ghostedLost, form_to_ghosted: formToGhosted, lost_race: lost });
 }
 
-// Newest message timestamp (ms, ANY direction) for a contact — the SAME idle signal
-// the client-portal panel/inbox trusts. Two sources, take the max:
+// Newest message timestamp (ms) + its DIRECTION for a contact — the SAME idle signal
+// the client-portal panel/inbox trusts. Two sources, take the newest across both:
 //   1. Portal STORE threads (Twilio SMS / Resend email / Meta DM) — the PRIMARY
 //      messaging source for portal-native academies (GTA). Keyed by ghl_contact_id
 //      even for portal-native (UUID) contacts that never existed in GHL, so this
-//      also covers leads the GHL lookup below can't resolve.
-//   2. GHL conversations — for academies still messaging through GHL directly.
-// Any-direction is deliberate: our own outbound sends land here too, so we never
-// re-arm right after messaging a lead. Returns null ONLY when NEITHER source could
-// be read (fail SAFE — never re-arm a lead we couldn't verify).
-async function lastContactMessageMs(clientId, token, locationId, contactId) {
+//      also covers leads the GHL lookup below can't resolve. Each thread carries
+//      last_message_at + last_direction.
+//   2. GHL conversations — for academies still messaging through GHL directly
+//      (lastMessageDate + lastMessageDirection).
+// Any-direction is deliberate for the idle CLOCK: our own outbound sends land here
+// too, so we never re-arm right after messaging a lead. `direction` is the direction
+// of that newest message so the re-arm sweep can tell "lead replied last (waiting on
+// US)" from "our message got no response" — only the latter is a real ghost.
+// Returns { ms:null } ONLY when NEITHER source could be read (fail SAFE — never
+// re-arm a lead we couldn't verify).
+async function lastContactMessage(clientId, token, locationId, contactId) {
   const enc = encodeURIComponent(String(contactId));
-  let ms = 0, known = false;
+  let ms = 0, direction = null, known = false;
+  const consider = (t, dir) => { if (t > ms) { ms = t; direction = dir ? String(dir).toLowerCase() : null; } };
   for (const tbl of ["sms_threads", "email_threads", "dm_threads"]) {
     try {
-      const rows = await sb(`${tbl}?client_id=eq.${clientId}&ghl_contact_id=eq.${enc}&select=last_message_at&order=last_message_at.desc.nullslast&limit=1`);
+      const rows = await sb(`${tbl}?client_id=eq.${clientId}&ghl_contact_id=eq.${enc}&select=last_message_at,last_direction&order=last_message_at.desc.nullslast&limit=1`);
       if (Array.isArray(rows) && rows[0]) {
         known = true;
-        const t = rows[0].last_message_at ? new Date(rows[0].last_message_at).getTime() : 0;
-        if (t > ms) ms = t;
+        consider(rows[0].last_message_at ? new Date(rows[0].last_message_at).getTime() : 0, rows[0].last_direction);
       }
     } catch (_) { /* one store table down must not blind the others */ }
   }
@@ -534,10 +539,10 @@ async function lastContactMessageMs(clientId, token, locationId, contactId) {
       const search = await ghl("GET", `/conversations/search?${new URLSearchParams({ locationId, contactId: String(contactId) })}`, { token });
       known = true; // a successful GHL response is a valid (possibly empty) signal
       const convos = (search && (search.conversations || search.data)) || [];
-      for (const c of convos) { const t = c.lastMessageDate ? new Date(c.lastMessageDate).getTime() : 0; if (t > ms) ms = t; }
+      for (const c of convos) consider(c.lastMessageDate ? new Date(c.lastMessageDate).getTime() : 0, c.lastMessageDirection);
     } catch (_) { /* GHL blip — rely on the store signal if we got one */ }
   }
-  return known ? ms : null;
+  return known ? { ms, direction } : { ms: null, direction: null };
 }
 
 // ── the re-arm sweep: put silently-stuck Responded leads back into 👻 Ghosted ──
@@ -566,7 +571,7 @@ async function runRearm(res) {
   const ghAutoCache = new Map();   // clientId -> ghosted automation id[]
   const clientCache = new Map();
   const tokenCache  = new Map();
-  let armed = 0, noLive = 0, hasActive = 0, agentBusy = 0, recentTouch = 0, cooldown = 0, capped = 0, noCreds = 0, errors = 0;
+  let armed = 0, noLive = 0, hasActive = 0, agentBusy = 0, recentTouch = 0, repliedLast = 0, cooldown = 0, capped = 0, noCreds = 0, errors = 0;
 
   const creds = async (clientId) => {
     if (!clientCache.has(clientId)) clientCache.set(clientId, await loadClient(clientId));
@@ -603,10 +608,19 @@ async function runRearm(res) {
       //    into Responded (no new message yet) isn't re-armed. Creds are best-effort
       //    here (the store signal works without GHL) but required to move the stage.
       const c = await creds(clientId);
-      const msgMs = await lastContactMessageMs(clientId, c && c.token, c && c.locationId, cid);
+      const { ms: msgMs, direction: lastDir } = await lastContactMessage(clientId, c && c.token, c && c.locationId, cid);
       if (msgMs === null) { noCreds++; continue; }
       const lastTouch = Math.max(new Date(o.updated_at).getTime(), msgMs);
       if (Date.now() - lastTouch < IDLE_MS) { recentTouch++; continue; }
+
+      // 4b) REPLIED-LAST GUARD: the re-arm only chases leads whose OUR-message got no
+      //     response. A lead whose most recent message is INBOUND replied to us and is
+      //     waiting on a real answer — re-enrolling them into Ghosted restarts it at
+      //     step 0 and re-fires the identical opener at someone we OWE a reply. That is
+      //     exactly the "you keep sending the same message" complaint. Leave them for
+      //     the reply agent (Hawkeye / self-drive), never re-arm. Only skip on a DEFINITE
+      //     inbound; unknown direction falls through to the prior behavior.
+      if (lastDir === "inbound") { repliedLast++; continue; }
 
       // 5) Cooldown + cap: don't loop on a lead that keeps re-ghosting. Count this
       //    lead's prior Ghosted enrollments (any status) — cap total, and honor a
@@ -643,7 +657,7 @@ async function runRearm(res) {
       armed++;
     } catch (_) { errors++; }
   }
-  return res.status(200).json({ ok: true, scanned: opps.length, armed, skipped: { no_live: noLive, has_active: hasActive, agent_busy: agentBusy, recent_touch: recentTouch, cooldown, capped, no_creds: noCreds }, errors });
+  return res.status(200).json({ ok: true, scanned: opps.length, armed, skipped: { no_live: noLive, has_active: hasActive, agent_busy: agentBusy, recent_touch: recentTouch, replied_last: repliedLast, cooldown, capped, no_creds: noCreds }, errors });
 }
 
 // ── staff CRUD (backs the P4b step-builder) ──

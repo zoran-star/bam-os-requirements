@@ -57,7 +57,9 @@ The T1-T6 chunks are superseded by the approved P1-P6 bundle:
 | P6 | Notifications (T3 decision): 4 function channels (#systems/#marketing/#content/#other) + client SMS on status change · retrofit WS7/WS3 per-client channels | after P3-P5 |
 
 Still parked: orchestrator/navigator lanes (T2-b), non-editor side doors (old
-T4), staff command palette (old T5), Notion pipes (old T6).
+T4), staff command palette (old T5), Notion pipes (old T6). The T3 decision
+(4 function Slack channels #systems/#marketing/#content/#other, not per-client)
+is captured in the P6 row above + track2-handoff.md.
 
 ## Track 3 - Running-the-business builds (B-bucket, standalone, schedule anytime)
 

@@ -316,6 +316,22 @@ if (window.__MOCK__) (() => {
       let b = {}; try { b = JSON.parse((init && init.body) || '{}'); } catch (_) {}
       if (act === 'list') return { cards: MEMBER_CARE_CARDS.filter(c => c.status === 'pending' && (!b.member_id || c.member_id === b.member_id)) };
       if (act === 'counts') { const counts = {}; MEMBER_CARE_CARDS.filter(c => c.status === 'pending').forEach(c => { counts[c.member_id] = 1; }); return { counts }; }
+      if (act === 'draft-now') {
+        const existing = MEMBER_CARE_CARDS.find(c => c.member_id === b.member_id && c.status === 'pending');
+        if (existing) return { ok: true, result: { existing: true } };
+        const mem = MEMBERS.find(m => m.id === b.member_id);
+        // Half the time the agent has a recommendation, half the time it doesn't -
+        // so both button outcomes are exercisable in the mock loop.
+        if (!mem || String(b.member_id).endsWith('2')) return { ok: true, result: { skipped: 'no_op' } };
+        const card = { id: 'mcc-ask-' + b.member_id, member_id: b.member_id, ghl_contact_id: mem.ghl_contact_id, member_name: mem.athlete_name, parent_name: mem.parent_name,
+          action: null, action_body: null, action_summary: null, action_status: 'none',
+          draft_reply: 'Thanks for reaching out! Let me check on that and get right back to you.', reply_channel: 'SMS', reply_status: 'pending',
+          action_items: [{ title: 'Follow up with ' + mem.parent_name + ' about their question', notes: 'Raised in the conversation' }], action_items_status: 'pending',
+          reasoning: 'Manual ask - parent has an open question in the thread.', confidence: 0.7, escalate: false, escalate_reason: null,
+          summary: 'You asked the agent to look at ' + mem.athlete_name + "'s conversation.", last_message: 'Thanks!', status: 'pending', created_at: iso(0, 0) };
+        MEMBER_CARE_CARDS.push(card);
+        return { ok: true, result: { inserted: true, card } };
+      }
       const c = MEMBER_CARE_CARDS.find(x => x.id === b.id);
       if (c) {
         const part = b.part || 'all';
@@ -9919,9 +9935,13 @@ Then the call to action."]</div>
           .hk2-esc{font-size:11.5px;color:#e0a020}
           .hk2-thread{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:2px}
           .hk2-thread-load{flex-direction:row;align-items:center;justify-content:center;gap:8px;min-height:44px;color:var(--text-sub);font-size:12.5px;cursor:default}
-          .hk2-bub{font-size:13px;line-height:1.5;padding:8px 12px;border-radius:13px;max-width:82%;white-space:pre-wrap;word-break:break-word}
-          .hk2-bub.in{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px;align-self:flex-start}
-          .hk2-bub.bot{background:var(--accent-glow,rgba(212,182,92,.10));border:1px solid var(--accent-border,rgba(212,182,92,.3));color:var(--text);border-bottom-right-radius:4px;align-self:flex-end}
+          .hk2-msg{display:flex;flex-direction:column;gap:2px;max-width:82%}
+          .hk2-msg.in{align-self:flex-start;align-items:flex-start}
+          .hk2-msg.bot{align-self:flex-end;align-items:flex-end}
+          .hk2-bub{font-size:13px;line-height:1.5;padding:8px 12px;border-radius:13px;max-width:100%;white-space:pre-wrap;word-break:break-word}
+          .hk2-bub.in{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px}
+          .hk2-bub.bot{background:var(--accent-glow,rgba(212,182,92,.10));border:1px solid var(--accent-border,rgba(212,182,92,.3));color:var(--text);border-bottom-right-radius:4px}
+          .hk2-time{font-size:9.5px;color:var(--text-mute);padding:0 5px;white-space:nowrap}
           .hk2-lbl{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}
           .hk2-planwhen{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}
           .hk2-when{background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font:inherit;font-size:11px;font-weight:700;padding:3px 7px;outline:none;text-transform:none;letter-spacing:normal;cursor:pointer}
@@ -9979,7 +9999,7 @@ Then the call to action."]</div>
              as "outside" at phone width, so the draft goes full-width. */
           @media(max-width:640px){
             .hk2-deck{min-height:0}
-            .hk2-bub{max-width:92%}
+            .hk2-msg{max-width:92%}
             .hk2-draftwrap{align-items:stretch}
             .hk2-draft-bubble{width:100%;max-width:100%;align-self:stretch}
             .hk2-draftcap{align-self:flex-end}
@@ -16526,20 +16546,31 @@ async function _edwApi(action, extra) {
   if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
   return j;
 }
+// Copy a DNS cell's exact value (from data-copy, so the visible priority tag
+// never rides along) and flash a small "copied" pill without touching the text.
+function _edwCopyCell(el) {
+  try { navigator.clipboard.writeText(el.getAttribute('data-copy') || ''); } catch (_) {}
+  const ok = el.querySelector('.edw-ok');
+  if (ok) { ok.style.opacity = '1'; clearTimeout(el._edwT); el._edwT = setTimeout(() => { ok.style.opacity = '0'; }, 1100); }
+}
 function _edwRecordsHtml(records) {
+  const cell = (text, extra) => `<td class="edw-copy" data-copy="${escapeHTML(text)}" onclick="_edwCopyCell(this)" title="Click to copy" style="position:relative;padding:7px 26px 7px 8px;font-size:11.5px;color:var(--text);word-break:break-all;cursor:pointer">${escapeHTML(text)}${extra || ''}<span class="edw-ok" style="position:absolute;top:5px;right:6px;background:var(--gold,#D4B65C);color:#0B0B0D;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px;opacity:0;transition:opacity .15s;pointer-events:none">copied</span></td>`;
   const rows = (records || []).map(rc => `
     <tr>
       <td style="padding:7px 8px;font-size:11px;color:var(--text-mute);white-space:nowrap">${escapeHTML(rc.type || '')}</td>
-      <td style="padding:7px 8px;font-size:11.5px;color:var(--text);word-break:break-all">${escapeHTML(rc.name || '')}</td>
-      <td style="padding:7px 8px;font-size:11.5px;color:var(--text);word-break:break-all">${escapeHTML(rc.value || '')}${rc.priority != null ? ` <span style=\"color:var(--text-mute)\">(priority ${escapeHTML(String(rc.priority))})</span>` : ''}</td>
-      <td style="padding:7px 4px"><button data-edw-copy="${escapeHTML(rc.value || '')}" onclick="navigator.clipboard.writeText(this.dataset.edwCopy);this.textContent='Copied';setTimeout(()=>this.textContent='Copy',1200)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-sub);padding:3px 8px;font-size:11px;cursor:pointer">Copy</button></td>
+      ${cell(rc.name || '')}
+      ${cell(rc.value || '', rc.priority != null ? ` <span style=\"color:var(--text-mute)\">(priority ${escapeHTML(String(rc.priority))})</span>` : '')}
     </tr>`).join('');
-  return `<div style="border:1px solid var(--border);border-radius:8px;overflow-x:auto;margin:10px 0">
+  return `<style>.edw-copy:hover{background:var(--surface-2,rgba(255,255,255,.05))}</style>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow-x:auto;margin:10px 0 6px">
     <table style="width:100%;border-collapse:collapse"><thead><tr>
       <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Type</th>
       <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Name</th>
-      <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Value</th><th></th>
-    </tr></thead><tbody>${rows}</tbody></table></div>`;
+      <th style="text-align:left;padding:7px 8px;font-size:10.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Value</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="font-size:11px;color:var(--text-mute);margin:0 0 4px;display:flex;align-items:center;gap:5px">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Tap any name or value to copy it</div>`;
 }
 async function _edwRender() {
   const card = document.getElementById('email-domain-card');
@@ -18138,6 +18169,7 @@ function _contactsCloseModal() {
   if (o) o.remove();
   document.removeEventListener('keydown', _contactsModalEsc);
   document.body.classList.remove('ctx-modal-open');
+  try { _ccClearStaleClassic(); } catch (_) {}
 }
 function openContactsModal(opts) {
   opts = opts || {};
@@ -36943,13 +36975,33 @@ function _hk2Initials(name) {
 // so the TOP card lazy-loads its last few messages (_hk2HydrateThread) - the
 // reviewer should always see the bit of conversation they're replying to
 // (Zoran 2026-07-11). Tap = the full thread.
+// Compact relative timestamp for deck message bubbles (Zoran 2026-07-20): "just
+// now", "5m ago", "2h ago", "3d ago", then a short date past a week so old
+// imported threads don't read as "412d ago". '' on a missing/bad timestamp.
+function _hk2Ago(iso) {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (!t || isNaN(t)) return '';
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 45) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return m + 'm ago';
+  const h = Math.round(m / 60);
+  if (h < 24) return h + 'h ago';
+  const d = Math.round(h / 24);
+  if (d < 7) return d + 'd ago';
+  return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 function _hk2Bubbles(tail, lastMessage) {
   let bubs = (Array.isArray(tail) ? tail : []).map(m => {
     const out = m.role === 'agent';
     const t = String(m.text || '').trim();
-    return t ? `<div class="hk2-bub ${out ? 'bot' : 'in'}">${escapeHTML(t)}</div>` : '';
+    if (!t) return '';
+    const when = _hk2Ago(m.at);
+    const time = when ? `<div class="hk2-time">${escapeHTML(when)}</div>` : '';
+    return `<div class="hk2-msg ${out ? 'bot' : 'in'}"><div class="hk2-bub ${out ? 'bot' : 'in'}">${escapeHTML(t)}</div>${time}</div>`;
   }).join('');
-  if (!bubs && lastMessage) bubs = `<div class="hk2-bub in">${escapeHTML(String(lastMessage).trim())}</div>`;
+  if (!bubs && lastMessage) bubs = `<div class="hk2-msg in"><div class="hk2-bub in">${escapeHTML(String(lastMessage).trim())}</div></div>`;
   return bubs;
 }
 function _hk2ThreadHtml(r, isTop) {
@@ -36981,7 +37033,7 @@ async function _hk2HydrateThread() {
     let _lastOut = -1;
     for (let i = msgs.length - 1; i >= 0; i--) { if ((msgs[i].direction || '').toLowerCase() === 'outbound') { _lastOut = i; break; } }
     const _win = (_lastOut >= 0 ? msgs.slice(_lastOut) : msgs.slice(-2)).slice(-4);
-    r.thread_tail = _win.map(m => ({ role: (m.direction || '').toLowerCase() === 'outbound' ? 'agent' : 'parent', text: m.body }));
+    r.thread_tail = _win.map(m => ({ role: (m.direction || '').toLowerCase() === 'outbound' ? 'agent' : 'parent', text: m.body, at: m.date || null }));
   } catch (_) { r.thread_tail = r.thread_tail || []; }
   // The owner may have skipped / resolved this card while the fetch was in flight.
   const el = document.getElementById('hk2-thread-slot');
@@ -46376,7 +46428,7 @@ function _renderMemberInbox(sec, messages) {
     const when = escapeHTML(_ibFormatDate(mm.date));
     return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">${hasBody ? escapeHTML(mm.body.trim()) : (atts ? '' : '(no body)')}${atts}<div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div></div>`;
   }).join('') : `<div style="font-size:12px;color:var(--text-mute)">No messages yet.</div>`;
-  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Latest ${recent.length} of ${asc.length} messages</div>` : ''}<div id="member-inbox-thread" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px">${thread}</div>${_memberCareCardsHtml()}${_memberInboxComposer()}`;
+  sec.innerHTML = `${more > 0 ? `<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Latest ${recent.length} of ${asc.length} messages</div>` : ''}<div id="member-inbox-thread" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:12px">${thread}</div>${_memberCareCardsHtml()}${_memberCareAskButton()}${_memberInboxComposer()}`;
   // Load scrolled to the bottom so the newest message is in view.
   const tc = document.getElementById('member-inbox-thread');
   if (tc) tc.scrollTop = tc.scrollHeight;
@@ -46598,6 +46650,47 @@ async function _memberCareDismiss(cardId) {
   } finally {
     _MEMBER_CARE.busy = false;
     _memberCareReload();
+  }
+}
+
+// On-demand "Ask the agent" - a manual trigger that runs the SAME AI draft for
+// THIS conversation right now, regardless of the academy's on/off toggle. Hidden
+// once a card is already showing (nothing to ask for - it's right there).
+function _memberCareAskButton() {
+  const i = _MEMBER_INBOX;
+  if (!i || !i.memberId) return '';
+  if ((_MEMBER_CARE.cards || []).some(c => c && c.id)) return '';   // a proposal is already on screen
+  return `<div style="margin-bottom:12px">
+      <button id="mcare-ask-btn" onclick="_memberCareAskAgent()" style="display:inline-flex;align-items:center;gap:7px;background:transparent;color:var(--gold,#D4B65C);border:1px solid var(--gold,#D4B65C);border-radius:8px;padding:8px 14px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2Z"/><path d="M9 21h6"/></svg>
+        Ask the agent
+      </button>
+    </div>`;
+}
+
+async function _memberCareAskAgent() {
+  const i = _MEMBER_INBOX;
+  if (!i || !i.memberId || _MEMBER_CARE.busy) return;
+  _MEMBER_CARE.busy = true;
+  const btn = document.getElementById('mcare-ask-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="req-spin"></span> Thinking…'; }
+  try {
+    const j = await _memberCarePost({ action: 'draft-now', client_id: i.clientId, member_id: i.memberId });
+    const r = (j && j.result) || {};
+    if (r.inserted) {
+      _memberCareReload();   // the new card renders inline
+    } else if (r.existing) {
+      _memberCareReload();   // a card already exists - surface it
+    } else {
+      // no_op / empty thread / nothing to propose
+      if (typeof _plToast === 'function') _plToast('Agent looked - nothing to recommend right now');
+      if (btn) { btn.disabled = false; btn.innerHTML = 'Ask the agent'; }
+      _MEMBER_CARE.busy = false;
+    }
+  } catch (e) {
+    alert("Couldn't reach the agent: " + (e.message || e));
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Ask the agent'; }
+    _MEMBER_CARE.busy = false;
   }
 }
 
@@ -54681,6 +54774,18 @@ function _ccReturn() {
   const m = document.querySelector('.main');
   if (m) requestAnimationFrame(() => m.dispatchEvent(new Event('scroll')));
 }
+// Blueprint / Calendar / Contacts open as focus overlays ON TOP of the Command
+// Center, but the dock + quick actions flip on `cc-classic` (the classic
+// breadcrumb chrome) when launching them. Their own close functions only hide
+// the overlay, so the CC home was left wearing the "‹ Command center › X" bar
+// and read as a separate full-screen page. When the CC is what's revealed and
+// nothing else is still stacked on top, drop back to the clean command center.
+function _ccClearStaleClassic() {
+  if (!document.body.classList.contains('cc-classic')) return;
+  if (!document.getElementById('view-cc')?.classList.contains('active')) return;
+  if (document.querySelector('.mm-open')) return;   // another overlay still open
+  if (typeof _ccReturn === 'function') _ccReturn();
+}
 function _ccExitBeta() {
   try { localStorage.setItem('bam_cc_optout', '1'); } catch (_) {}
   location.reload();
@@ -55082,7 +55187,13 @@ function _ccFocusCloseOpen() {
     else if (open.id === 'landingMachineModal') closeLandingMachine();
     else if (open.id === 'membersMachineModal') closeMembersFocus();
     else if (open.id === 'gmMachineModal') closeGmFocus();
-    else { open.classList.remove('mm-open'); document.documentElement.classList.remove('mm-focus-open'); }
+    // Route the CC-launched overlays through their real close fns so the classic
+    // breadcrumb chrome (cc-classic) gets cleared - otherwise swipe / Escape /
+    // hardware-back strands the "‹ Command center › X" bar over the home page.
+    else if (open.id === 'view-blueprint' && typeof closeBlueprint === 'function') closeBlueprint();
+    else if (open.id === 'view-calendar' && typeof closeCalendar === 'function') closeCalendar();
+    else if (open.id === 'view-ad-previews' && typeof closeAdPreviews === 'function') closeAdPreviews();
+    else { open.classList.remove('mm-open'); document.documentElement.classList.remove('mm-focus-open'); try { _ccClearStaleClassic(); } catch (_) {} }
   } catch (_) {}
   return true;
 }
@@ -58575,6 +58686,7 @@ function _mmCloseFocus(modalId) {
       document.documentElement.classList.remove('mm-prewarm');
     }, 700);
   }
+  try { _ccClearStaleClassic(); } catch (_) {}
 }
 function openMarketingMachine() {
   if (!_MM) return;

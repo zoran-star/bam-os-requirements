@@ -262,6 +262,28 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, card: fresh });
     }
 
+    // Manual, per-conversation "Ask the agent" button in the member drawer. Runs
+    // the SAME AI draft on demand for ONE member, and works regardless of the
+    // academy's member_care_agent_mode toggle - the toggle only governs the
+    // background cron/webhook sweep; an explicit human click always runs.
+    if (b.action === "draft-now") {
+      const clientId = b.client_id;
+      if (!clientId) return res.status(400).json({ error: "client_id required" });
+      if (!b.member_id) return res.status(400).json({ error: "member_id required" });
+      if (!actor.canActOn(clientId)) return res.status(403).json({ error: "not your academy" });
+      const client = await loadClient(clientId);
+      if (!client) return res.status(404).json({ error: "academy not found" });
+      const rows = await sb(`members?id=eq.${encodeURIComponent(b.member_id)}&client_id=eq.${clientId}&select=${MEMBER_CARE_SELECT}&limit=1`);
+      const member = Array.isArray(rows) && rows[0];
+      if (!member) return res.status(404).json({ error: "member not found for this academy" });
+      const provider = await smsProvider(clientId).catch(() => "ghl");
+      const creds = provider === "twilio" ? null : await pickGhlToken(client);
+      const result = await draftMemberCareForMember(client, member, {
+        token: creds?.token, locationId: creds?.locationId, createdBy: "manual", manual: true,
+      });
+      return res.status(200).json({ ok: true, result });
+    }
+
     if (b.action === "detect-now") {
       const clientId = b.client_id;
       if (!clientId) return res.status(400).json({ error: "client_id required" });
