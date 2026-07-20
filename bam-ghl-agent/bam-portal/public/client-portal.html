@@ -9212,6 +9212,105 @@ Then the call to action."]</div>
         height:100%; background:var(--gold); border-radius:2px; width:0%; transition:width .2s;
       }
       /* Lightbox */
+      /* ── Content Library taxonomy (Track 2 / P1) ── */
+      .ast-tax-row {
+        display:flex; align-items:center; gap:6px; width:100%; margin:6px 0 2px;
+        padding:6px 8px; background:transparent; border:1px dashed var(--border-med);
+        border-radius:var(--r-sm, 8px); cursor:pointer; text-align:left; font:inherit;
+        transition:border-color .12s, background .12s;
+      }
+      .ast-tax-row:hover { border-color:var(--gold); background:var(--gold-sheen, rgba(212,182,92,.06)); }
+      .ast-tax-row.typed { border-style:solid; border-color:var(--accent-border, rgba(212,182,92,.25)); }
+      .ast-tax-type { font-size:11px; font-weight:700; color:var(--gold); white-space:nowrap; }
+      .ast-tax-bits {
+        font-size:11px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      }
+      #ast-tag-overlay {
+        /* Above the Business Blueprint focus overlay (z 10050) - the library
+           opens inside it, so the tag drawer must outrank it. */
+        position:fixed; inset:0; z-index:10080; background:rgba(0,0,0,.55);
+        opacity:0; pointer-events:none; transition:opacity .2s ease;
+      }
+      #ast-tag-overlay.open { opacity:1; pointer-events:auto; }
+      #ast-tag-drawer {
+        position:absolute; top:0; right:0; bottom:0; width:440px; max-width:100%;
+        background:var(--surface); border-left:1px solid var(--border);
+        display:flex; flex-direction:column; overflow:hidden;
+        transform:translateX(24px); transition:transform .22s ease;
+      }
+      #ast-tag-overlay.open #ast-tag-drawer { transform:translateX(0); }
+      .ast-tag-head {
+        display:flex; align-items:center; gap:12px; padding:16px 18px;
+        border-bottom:1px solid var(--border); flex:0 0 auto;
+      }
+      .ast-tag-thumb {
+        width:52px; height:52px; border-radius:var(--r-md, 12px); object-fit:cover;
+        background:#000; flex:0 0 auto;
+      }
+      .ast-tag-thumb-link { display:flex; align-items:center; justify-content:center; background:var(--surface-el, rgba(0,0,0,.05)); color:var(--text-mute); }
+      .ast-tag-title { flex:1; min-width:0; }
+      .ast-tag-name { font-size:14px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .ast-tag-sub { font-size:11px; color:var(--text-mute); margin-top:2px; }
+      .ast-tag-close {
+        display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px;
+        border-radius:var(--r-sm, 8px); background:transparent; border:none; color:var(--text-mute); cursor:pointer;
+      }
+      .ast-tag-close:hover { color:var(--text); background:var(--surface-el, rgba(0,0,0,.05)); }
+      .ast-tag-body { overflow-y:auto; padding:16px 18px calc(24px + env(safe-area-inset-bottom)); flex:1; min-height:0; }
+      .ast-tag-sec { margin-bottom:20px; }
+      .ast-tag-label {
+        font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+        color:var(--text-mute); margin-bottom:8px;
+      }
+      .ast-tag-chips { display:flex; flex-wrap:wrap; gap:6px; }
+      .ast-tag-chip {
+        padding:7px 13px; border-radius:var(--r-full, 999px); border:1px solid var(--border-med);
+        background:transparent; color:var(--text-sub); font:inherit; font-size:12px; font-weight:600;
+        cursor:pointer; transition:all .12s;
+      }
+      .ast-tag-chip:hover { border-color:var(--gold); color:var(--text); }
+      .ast-tag-chip.on { background:var(--gold); border-color:var(--gold); color:var(--on-gold, #131416); }
+      .ast-tag-add { border-style:dashed; }
+      .ast-tag-people { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+      .ast-tag-person {
+        display:inline-flex; align-items:center; gap:6px; padding:5px 6px 5px 12px;
+        border-radius:var(--r-full, 999px); background:var(--gold-sheen, rgba(212,182,92,.08));
+        border:1px solid var(--accent-border, rgba(212,182,92,.25)); color:var(--text);
+        font-size:12px; font-weight:600;
+      }
+      .ast-tag-person button {
+        display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px;
+        border-radius:999px; border:none; background:transparent; color:var(--text-mute);
+        font-size:14px; line-height:1; cursor:pointer;
+      }
+      .ast-tag-person button:hover { color:var(--red, #ED7969); }
+      .ast-tag-none { font-size:12px; color:var(--text-mute); }
+      .ast-tag-search-wrap { position:relative; }
+      .ast-tag-search {
+        width:100%; height:38px; padding:0 12px; border-radius:var(--r-sm, 8px);
+        border:1px solid var(--border-med); background:var(--surface-el, rgba(0,0,0,.02));
+        color:var(--text); font:inherit; font-size:13px; outline:none;
+      }
+      .ast-tag-search:focus { border-color:var(--gold); }
+      .ast-tag-results { display:flex; flex-direction:column; gap:2px; margin-top:4px; }
+      .ast-tag-res {
+        text-align:left; padding:8px 10px; border-radius:var(--r-sm, 8px); border:none;
+        background:transparent; color:var(--text); font:inherit; font-size:13px; cursor:pointer;
+      }
+      .ast-tag-res:hover { background:var(--gold-sheen, rgba(212,182,92,.08)); }
+      .ast-tag-res-sub { color:var(--text-mute); font-size:11px; }
+      .ast-tag-quickadd { display:flex; gap:6px; margin-top:8px; }
+      .ast-tag-qa-btn {
+        flex:0 0 auto; padding:0 16px; border-radius:var(--r-sm, 8px); border:none;
+        background:var(--gold); color:var(--on-gold, #131416); font:inherit; font-size:12px;
+        font-weight:700; cursor:pointer;
+      }
+      @media (max-width: 620px) {
+        #ast-tag-drawer { width:100%; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #ast-tag-overlay, #ast-tag-drawer { transition:none; }
+      }
       .ast-lightbox {
         position:fixed; inset:0; z-index:9500; background:rgba(0,0,0,.88); display:flex;
         align-items:center; justify-content:center; cursor:zoom-out;
@@ -11869,6 +11968,20 @@ let _astRendered = false;  // stagger flag
 let _astSelected = new Set(); // bulk select
 let _astFolderState = {};  // folder open/close memory
 
+// V2 Content Library taxonomy state (Track 2 / P1). _AST_LIB_MODE is true only
+// when the library renders as the V2 Content Library card; it gates the
+// taxonomy row on asset cards + the tag drawer.
+let _AST_LIB_MODE = false;
+let _AST_SKILLS = [];        // client_content_skills rows (defaults + custom)
+let _AST_PEOPLE = {};        // asset_id -> client_asset_people rows
+let _AST_ASSET_SKILLS = {};  // asset_id -> [skill_slug]
+const _AST_CONTENT_TYPES = [
+  ['action',      'Action'],
+  ['coaching',    'Coaching'],
+  ['culture',     'Culture'],
+  ['testimonial', 'Testimonial'],
+];
+
 // Where the asset library renders. Standalone view = 'assets-content';
 // when embedded in Business Blueprint (V1.5) = 'bb-assets-content'. Set by
 // whichever entry point opens it; all re-renders read this.
@@ -11896,6 +12009,21 @@ async function openAssetsView() {
     ]);
     _ASSETS = assets.data || [];
     _ASSET_TARGETS = { offers: offers.data || [], staff: staff.data || [], locations: locations.data || [] };
+    // Content Library mode: pull the taxonomy alongside (skills + person tags).
+    if (_AST_LIB_MODE) {
+      try {
+        const [skills, people, askills] = await Promise.all([
+          _sb.from('client_content_skills').select('id,slug,label,is_default,sort_order').eq('client_id', CLIENT_ID).order('sort_order'),
+          _sb.from('client_asset_people').select('id,asset_id,role,contact_id,client_user_id,display_name').eq('client_id', CLIENT_ID),
+          _sb.from('client_asset_skills').select('asset_id,skill_slug').eq('client_id', CLIENT_ID),
+        ]);
+        _AST_SKILLS = skills.data || [];
+        _AST_PEOPLE = {};
+        (people.data || []).forEach(p => { (_AST_PEOPLE[p.asset_id] = _AST_PEOPLE[p.asset_id] || []).push(p); });
+        _AST_ASSET_SKILLS = {};
+        (askills.data || []).forEach(s => { (_AST_ASSET_SKILLS[s.asset_id] = _AST_ASSET_SKILLS[s.asset_id] || []).push(s.skill_slug); });
+      } catch (_) { _AST_SKILLS = []; _AST_PEOPLE = {}; _AST_ASSET_SKILLS = {}; }
+    }
     _renderAssets();
   } catch (e) {
     host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load assets - ${escapeHTML(e.message || String(e))}</div>`;
@@ -11965,8 +12093,14 @@ function _renderAssets() {
   const grid = (list, offset) => `<div class="ast-grid">${list.map((a, i) => _assetCard(a, doStagger ? (offset || 0) + i : -1)).join('')}</div>`;
   let cards;
   if (!shown.length) {
-    // #12: Empty state with icon
-    cards = `<div class="ast-empty">
+    // #12: Empty state with icon (Content Library mode carries the nudge)
+    cards = _AST_LIB_MODE
+      ? `<div class="ast-empty">
+         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="m10 12 4 2.5-4 2.5z"/></svg>
+         <div style="font-size:14px;color:var(--text-sub)">Your library ${_ASSET_FILTER === 'all' ? 'is empty' : 'has nothing in this filter'}</div>
+         <div style="font-size:12px;margin-top:6px">Upload game clips, practice footage, and photos any time. The more you add, the faster we can build ads for you.</div>
+       </div>`
+      : `<div class="ast-empty">
          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
          <div style="font-size:14px;color:var(--text-sub)">No assets ${_ASSET_FILTER === 'all' ? 'yet' : 'in this filter'}</div>
          <div style="font-size:12px;margin-top:6px">Drop files here, or use the upload buttons above</div>
@@ -12147,12 +12281,31 @@ function _assetCard(a, staggerIdx) {
           </span>
           <span class="ast-detail-pill" style="position:relative;overflow:hidden">${escapeHTML(_assetTargetName(a).split(' · ')[0])}${tagSel}</span>
         </div>
+        ${_AST_LIB_MODE ? _astTaxRow(a) : ''}
         <div class="ast-card-actions">
           <a href="${escapeHTML(url)}" target="_blank" rel="noopener">Open ↗</a>
           <button onclick="_assetRemove('${a.id}')">Remove</button>
         </div>
       </div>
     </div>`;
+}
+
+// Content Library taxonomy row on an asset card: content-type pill + a
+// compact summary of who/what is tagged. Clicking opens the tag drawer.
+function _astTaxRow(a) {
+  const typeLabel = (_AST_CONTENT_TYPES.find(([v]) => v === a.content_type) || [])[1];
+  const people = _AST_PEOPLE[a.id] || [];
+  const skills = _AST_ASSET_SKILLS[a.id] || [];
+  const bits = [];
+  if (a.content_type === 'action' && typeof a.highlight === 'boolean') bits.push(a.highlight ? 'Highlight' : 'Lowlight');
+  people.slice(0, 2).forEach(p => bits.push(p.display_name));
+  if (people.length > 2) bits.push('+' + (people.length - 2));
+  skills.slice(0, 2).forEach(s => { const sk = _AST_SKILLS.find(x => x.slug === s); if (sk) bits.push(sk.label); });
+  if (skills.length > 2) bits.push('+' + (skills.length - 2));
+  return `<button type="button" class="ast-tax-row${typeLabel ? ' typed' : ''}" onclick="_astTagOpen('${a.id}')">
+    <span class="ast-tax-type">${typeLabel || '+ What is this?'}</span>
+    ${bits.length ? `<span class="ast-tax-bits">${escapeHTML(bits.join(' · '))}</span>` : (typeLabel ? '<span class="ast-tax-bits">Tag people + skills</span>' : '')}
+  </button>`;
 }
 
 // Combined "Tagged to" - value is '' (brand) | 'offer:<id>' | 'staff:<id>' |
@@ -12176,6 +12329,298 @@ async function _assetSetTag2(id, value) {
 
 function _assetSetFilter(k) { _ASSET_FILTER = k; _renderAssets(); }
 function _setAssetType(t)   { _ASSET_TYPE   = t; _renderAssets(); }
+
+/* ── Content Library tag drawer (Track 2 / P1) ─────────────────────────
+   Right-side drawer (house idiom) for the content taxonomy: pick what the
+   asset IS (action/coaching/culture/testimonial), then the conditional
+   fields - athletes come from contacts, staff from client_users (with a
+   name-only quick-add), skills from the per-academy preset list (+ custom).
+   Every change saves immediately; local state mirrors so the grid updates
+   without a refetch. */
+let _astTagAssetId = null;
+let _astAthleteTimer = null;
+
+function _astTagAsset() { return _ASSETS.find(x => x.id === _astTagAssetId) || null; }
+
+function _astTagOpen(id) {
+  _astTagAssetId = id;
+  let ov = document.getElementById('ast-tag-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'ast-tag-overlay';
+    ov.onclick = (e) => { if (e.target === ov) _astTagClose(); };
+    ov.innerHTML = '<div id="ast-tag-drawer" role="dialog" aria-label="Tag content"></div>';
+    document.body.appendChild(ov);
+  }
+  _astTagRender();
+  requestAnimationFrame(() => ov.classList.add('open'));
+}
+
+function _astTagClose() {
+  document.getElementById('ast-tag-overlay')?.classList.remove('open');
+  _astTagAssetId = null;
+  _renderAssets();
+}
+
+function _astTagRender() {
+  const drawer = document.getElementById('ast-tag-drawer');
+  const a = _astTagAsset();
+  if (!drawer || !a) return;
+  const isLink = !!a.link_url;
+  const url = isLink ? a.link_url : _assetUrl(a.storage_path);
+  const isVideo = (a.mime_type || '').startsWith('video/') || a.category === 'video';
+  const thumb = isLink
+    ? '<div class="ast-tag-thumb ast-tag-thumb-link"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>'
+    : (isVideo
+      ? `<video class="ast-tag-thumb" src="${escapeHTML(url)}#t=0.5" preload="metadata" muted playsinline></video>`
+      : `<img class="ast-tag-thumb" src="${escapeHTML(url)}" alt="">`);
+
+  const typeChips = _AST_CONTENT_TYPES.map(([v, l]) =>
+    `<button type="button" class="ast-tag-chip${a.content_type === v ? ' on' : ''}" onclick="_astSetContentType('${v}')">${l}</button>`
+  ).join('');
+
+  const people = _AST_PEOPLE[a.id] || [];
+  const athletes = people.filter(p => p.role === 'athlete');
+  const staff = people.filter(p => p.role === 'staff');
+  const askills = _AST_ASSET_SKILLS[a.id] || [];
+
+  const athleteChips = athletes.map(p =>
+    `<span class="ast-tag-person">${escapeHTML(p.display_name)}<button type="button" onclick="_astRemovePerson('${p.id}')" aria-label="Remove">&times;</button></span>`
+  ).join('');
+  const athleteSection = `
+    <div class="ast-tag-sec">
+      <div class="ast-tag-label">Athletes in this</div>
+      <div class="ast-tag-people">${athleteChips || '<span class="ast-tag-none">Nobody tagged yet</span>'}</div>
+      <div class="ast-tag-search-wrap">
+        <input id="ast-athlete-search" class="ast-tag-search" type="text" placeholder="Search your contacts by name..."
+               oninput="_astAthleteSearch(this.value)" autocomplete="off">
+        <div id="ast-athlete-results" class="ast-tag-results"></div>
+      </div>
+    </div>`;
+
+  const staffChips = _ASSET_TARGETS.staff.map(s => {
+    const tagged = staff.find(p => p.client_user_id === s.id);
+    const nm = s.name || s.email || 'Unnamed';
+    return `<button type="button" class="ast-tag-chip${tagged ? ' on' : ''}" onclick="_astToggleStaff('${s.id}', ${tagged ? `'${tagged.id}'` : 'null'}, this)">${escapeHTML(nm)}</button>`;
+  }).join('');
+  const staffSection = `
+    <div class="ast-tag-sec">
+      <div class="ast-tag-label">Coaches / staff in this</div>
+      <div class="ast-tag-chips">${staffChips || ''}
+        <button type="button" class="ast-tag-chip ast-tag-add" onclick="_astStaffQuickAddToggle()">+ Add someone</button>
+      </div>
+      <div id="ast-staff-quickadd" class="ast-tag-quickadd" style="display:none">
+        <input id="ast-staff-quickadd-name" class="ast-tag-search" type="text" placeholder="Their name (that's all we need)">
+        <button type="button" class="ast-tag-qa-btn" onclick="_astStaffQuickAdd()">Add</button>
+      </div>
+    </div>`;
+
+  const skillChips = _AST_SKILLS.map(s =>
+    `<button type="button" class="ast-tag-chip${askills.includes(s.slug) ? ' on' : ''}" onclick="_astToggleSkill('${s.slug}')">${escapeHTML(s.label)}</button>`
+  ).join('');
+  const skillsSection = `
+    <div class="ast-tag-sec">
+      <div class="ast-tag-label">Skills shown</div>
+      <div class="ast-tag-chips">${skillChips}</div>
+      <div class="ast-tag-quickadd">
+        <input id="ast-skill-add" class="ast-tag-search" type="text" placeholder="Add your own skill..."
+               onkeydown="if(event.key==='Enter'){event.preventDefault();_astAddCustomSkill();}">
+        <button type="button" class="ast-tag-qa-btn" onclick="_astAddCustomSkill()">Add</button>
+      </div>
+    </div>`;
+
+  const hlSection = `
+    <div class="ast-tag-sec">
+      <div class="ast-tag-label">Highlight or lowlight?</div>
+      <div class="ast-tag-chips">
+        <button type="button" class="ast-tag-chip${a.highlight === true ? ' on' : ''}" onclick="_astSetHighlight(true)">Highlight</button>
+        <button type="button" class="ast-tag-chip${a.highlight === false ? ' on' : ''}" onclick="_astSetHighlight(false)">Lowlight</button>
+      </div>
+    </div>`;
+
+  // Conditional sections per locked taxonomy: action -> athletes+skills+hl;
+  // coaching -> staff; culture/testimonial -> athletes+staff.
+  let conditional = '';
+  if (a.content_type === 'action') conditional = athleteSection + skillsSection + hlSection;
+  else if (a.content_type === 'coaching') conditional = staffSection;
+  else if (a.content_type === 'culture' || a.content_type === 'testimonial') conditional = athleteSection + staffSection;
+
+  drawer.innerHTML = `
+    <div class="ast-tag-head">
+      ${thumb}
+      <div class="ast-tag-title">
+        <div class="ast-tag-name">${escapeHTML(a.label || 'Untitled')}</div>
+        <div class="ast-tag-sub">Tag it so we can find it when we build your ads</div>
+      </div>
+      <button type="button" class="ast-tag-close" onclick="_astTagClose()" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="ast-tag-body">
+      <div class="ast-tag-sec">
+        <div class="ast-tag-label">What is this?</div>
+        <div class="ast-tag-chips">${typeChips}</div>
+      </div>
+      ${conditional}
+    </div>`;
+}
+
+async function _astSetContentType(type) {
+  const a = _astTagAsset(); if (!a) return;
+  const next = a.content_type === type ? null : type;   // tap again to untype
+  a.content_type = next;
+  if (next !== 'action') a.highlight = null;
+  _astTagRender();
+  try {
+    const { error } = await _sb.from('client_assets')
+      .update({ content_type: next, highlight: next === 'action' ? a.highlight : null, updated_at: new Date().toISOString() })
+      .eq('id', a.id);
+    if (error) throw error;
+  } catch (e) { alert('Save failed: ' + (e.message || e)); }
+}
+
+async function _astSetHighlight(v) {
+  const a = _astTagAsset(); if (!a) return;
+  a.highlight = a.highlight === v ? null : v;
+  _astTagRender();
+  try {
+    const { error } = await _sb.from('client_assets')
+      .update({ highlight: a.highlight, updated_at: new Date().toISOString() }).eq('id', a.id);
+    if (error) throw error;
+  } catch (e) { alert('Save failed: ' + (e.message || e)); }
+}
+
+function _astAthleteSearch(q) {
+  clearTimeout(_astAthleteTimer);
+  const box = document.getElementById('ast-athlete-results');
+  if (!box) return;
+  const query = (q || '').trim();
+  if (query.length < 2) { box.innerHTML = ''; return; }
+  _astAthleteTimer = setTimeout(async () => {
+    try {
+      const { data } = await _sb.from('contacts')
+        .select('id, name, first_name, last_name, athlete_name')
+        .eq('client_id', CLIENT_ID)
+        .or(`name.ilike.%${query}%,athlete_name.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+        .limit(8);
+      const a = _astTagAsset();
+      const taken = new Set(((_AST_PEOPLE[a?.id] || []).filter(p => p.role === 'athlete')).map(p => p.contact_id));
+      const rows = (data || []).filter(c => !taken.has(c.id));
+      box.innerHTML = rows.length ? rows.map(c => {
+        const display = c.athlete_name || c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unnamed';
+        const sub = c.athlete_name && c.name && c.athlete_name !== c.name ? ` <span class="ast-tag-res-sub">(${escapeHTML(c.name)})</span>` : '';
+        return `<button type="button" class="ast-tag-res" onclick="_astAddAthlete('${c.id}', this)" data-name="${escapeHTML(display)}">${escapeHTML(display)}${sub}</button>`;
+      }).join('') : '<div class="ast-tag-none" style="padding:8px 10px">No matches in your contacts</div>';
+    } catch (_) { box.innerHTML = ''; }
+  }, 250);
+}
+
+async function _astAddAthlete(contactId, btn) {
+  const a = _astTagAsset(); if (!a) return;
+  const display = btn?.dataset?.name || 'Athlete';
+  try {
+    const { data, error } = await _sb.from('client_asset_people')
+      .insert({ asset_id: a.id, client_id: CLIENT_ID, role: 'athlete', contact_id: contactId, display_name: display })
+      .select().single();
+    if (error) throw error;
+    (_AST_PEOPLE[a.id] = _AST_PEOPLE[a.id] || []).push(data);
+    _astTagRender();
+  } catch (e) { alert('Tag failed: ' + (e.message || e)); }
+}
+
+async function _astToggleStaff(clientUserId, personRowId, btn) {
+  const a = _astTagAsset(); if (!a) return;
+  if (personRowId) return _astRemovePerson(personRowId);
+  const nm = (btn?.textContent || '').trim() || 'Staff';
+  try {
+    const { data, error } = await _sb.from('client_asset_people')
+      .insert({ asset_id: a.id, client_id: CLIENT_ID, role: 'staff', client_user_id: clientUserId, display_name: nm })
+      .select().single();
+    if (error) throw error;
+    (_AST_PEOPLE[a.id] = _AST_PEOPLE[a.id] || []).push(data);
+    _astTagRender();
+  } catch (e) { alert('Tag failed: ' + (e.message || e)); }
+}
+
+async function _astRemovePerson(personRowId) {
+  const a = _astTagAsset(); if (!a) return;
+  try {
+    const { error } = await _sb.from('client_asset_people').delete().eq('id', personRowId);
+    if (error) throw error;
+    _AST_PEOPLE[a.id] = (_AST_PEOPLE[a.id] || []).filter(p => p.id !== personRowId);
+    _astTagRender();
+  } catch (e) { alert('Remove failed: ' + (e.message || e)); }
+}
+
+async function _astToggleSkill(slug) {
+  const a = _astTagAsset(); if (!a) return;
+  const list = _AST_ASSET_SKILLS[a.id] = _AST_ASSET_SKILLS[a.id] || [];
+  try {
+    if (list.includes(slug)) {
+      const { error } = await _sb.from('client_asset_skills').delete().eq('asset_id', a.id).eq('skill_slug', slug);
+      if (error) throw error;
+      _AST_ASSET_SKILLS[a.id] = list.filter(s => s !== slug);
+    } else {
+      const { error } = await _sb.from('client_asset_skills')
+        .insert({ asset_id: a.id, client_id: CLIENT_ID, skill_slug: slug });
+      if (error) throw error;
+      list.push(slug);
+    }
+    _astTagRender();
+  } catch (e) { alert('Save failed: ' + (e.message || e)); }
+}
+
+async function _astAddCustomSkill() {
+  const inp = document.getElementById('ast-skill-add');
+  const label = (inp?.value || '').trim();
+  if (!label) { inp?.focus(); return; }
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  if (!slug) return;
+  try {
+    const { data, error } = await _sb.from('client_content_skills')
+      .insert({ client_id: CLIENT_ID, slug, label, is_default: false, sort_order: 100 + _AST_SKILLS.length })
+      .select().single();
+    if (error) throw error;
+    _AST_SKILLS.push(data);
+    if (inp) inp.value = '';
+    await _astToggleSkill(slug);   // tag the current asset with it right away
+  } catch (e) {
+    // Duplicate slug -> just toggle the existing one on.
+    if (/duplicate|unique/i.test(e.message || '')) { if (inp) inp.value = ''; _astToggleSkill(slug); }
+    else alert('Add failed: ' + (e.message || e));
+  }
+}
+
+function _astStaffQuickAddToggle() {
+  const el = document.getElementById('ast-staff-quickadd');
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+  if (el.style.display !== 'none') document.getElementById('ast-staff-quickadd-name')?.focus();
+}
+
+// Name-only staff add: rides the existing add-teammate API (email/phone
+// optional there), then refreshes the staff target list + tags them.
+async function _astStaffQuickAdd() {
+  const inp = document.getElementById('ast-staff-quickadd-name');
+  const name = (inp?.value || '').trim();
+  if (!name) { inp?.focus(); return; }
+  try {
+    const { data: { session } } = await _sb.auth.getSession();
+    if (!session) throw new Error('Session expired - sign in again.');
+    const res = await fetch('/api/clients?action=add-teammate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({ client_id: CLIENT_ID, name, email: '', phone: '' }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    const { data: staffRows } = await _sb.from('client_users').select('id,name,email').eq('client_id', CLIENT_ID).eq('hide_from_team', false);
+    _ASSET_TARGETS.staff = staffRows || [];
+    const added = (_ASSET_TARGETS.staff || []).find(s => (s.name || '') === name);
+    if (added) await _astToggleStaff(added.id, null, { textContent: name });
+    else _astTagRender();
+  } catch (e) { alert('Add failed: ' + (e.message || e)); }
+}
 
 // Add a large file as a share link (Drive/Dropbox/etc.) instead of uploading it.
 // Reuses _isValidAssetLink from the content flow. Link assets have no storage_path.
@@ -18417,7 +18862,7 @@ function switchView(name, el) {
 
   if (name === 'resources') openResourcesView();
 
-  if (name === 'assets') { _ASSETS_HOST_ID = 'assets-content'; openAssetsView(); }
+  if (name === 'assets') { _AST_LIB_MODE = false; _ASSETS_HOST_ID = 'assets-content'; openAssetsView(); }
 
   if (name === 'contacts') openContactsView();
 
@@ -22079,10 +22524,13 @@ function applyV15NavState(v15) {
     mNav.classList.toggle('is-v15', !onV2 && V15_ACCESS === true);
   }
   // Assets: V1.5 moved the asset library INTO Business Blueprint, so hide the
-  // standalone left-nav item for V1.5 only. V1 + V2 keep the standalone item.
+  // standalone left-nav item for V1.5. V2 hides it too - the library lives as
+  // the Content Library blueprint card + the bottom-left orb fan (P1, Zoran
+  // 2026-07-20). V1 keeps the standalone item.
   const _v15only = V15_ACCESS && !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const _onV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true);
   const assetsNav = document.getElementById('nav-assets');
-  if (assetsNav) assetsNav.style.display = _v15only ? 'none' : '';
+  if (assetsNav) assetsNav.style.display = (_v15only || _onV2) ? 'none' : '';
   // Contacts/Inbox/KPIs sharing + the Marketing "narrative" treatment now live in
   // applyCrmSupersetNav so V2 gets them too - override the bulk v15 toggle above.
   applyCrmSupersetNav();
@@ -23453,17 +23901,26 @@ const _bbCards = [
 // The Assets card only appears inside the Blueprint for V1.5 (Zoran, 2026-06-22).
 const _bbAssetsCard = { id:'assets', label:'Assets', desc:'Your brand files, photos, and videos - logos, headshots, b-roll' };
 
-// Tier-aware card list. V1 + V2 keep the master list unchanged. V1.5 drops
+// V2 Content Library (Track 2 / P1, Zoran 2026-07-20): the asset library
+// reborn with the content taxonomy. Lives here + the bottom-left orb fan; the
+// standalone left-nav Assets item is hidden for V2.
+const _bbContentLibraryCard = { id:'content_library', label:'Content Library', desc:'Your photos and videos, tagged so we can build ads from them. Keep it growing.' };
+
+// Tier-aware card list. V1 keeps the master list unchanged. V1.5 drops
 // Member Onboarding + Agent learnings (not part of the V1.5 experience) and
-// gains Assets (moved out of the left nav into the Blueprint).
+// gains Assets (moved out of the left nav into the Blueprint). V2 gains the
+// Content Library card.
 function _bbIsV15Only() {
   return (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) &&
          !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
 }
 function _bbEffectiveCards() {
-  if (!_bbIsV15Only()) return _bbCards;
-  const base = _bbCards.filter(c => c.id !== 'member_onboarding' && c.id !== 'agent-learnings');
-  return [...base, _bbAssetsCard];
+  if (_bbIsV15Only()) {
+    const base = _bbCards.filter(c => c.id !== 'member_onboarding' && c.id !== 'agent-learnings');
+    return [...base, _bbAssetsCard];
+  }
+  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) return [..._bbCards, _bbContentLibraryCard];
+  return _bbCards;
 }
 
 let _bbState = {
@@ -23605,6 +24062,7 @@ function _bbRenderFromHash() {
   if (card === 'offers' && id) return _bbRenderOfferWizard(panel, id);
   if (card === 'offers') return _bbRenderOffersList(panel);
   if (card === 'assets') return _bbRenderAssets(panel);
+  if (card === 'content_library') return _bbRenderContentLibrary(panel);
   if (card === 'member_onboarding') return _bbRenderMemberOnboarding(panel);
   if (card === 'agent-learnings') return _bbRenderAgentLearnings(panel);
   return _bbRenderCardPlaceholder(panel, card);
@@ -23615,6 +24073,7 @@ function _bbRenderFromHash() {
 const _bbCardIcons = {
   member_onboarding: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>',
   assets:    '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  content_library: '<path d="M2 6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="m10 12 4 2.5-4 2.5z"/>',
   offers:    '<path d="M16 10a4 4 0 0 1-8 0"/><path d="M3.103 6.034h17.794L20 18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>',
   general:   '<path d="M3 21V7l9-4 9 4v14"/><path d="M9 21V12h6v9"/><path d="M3 21h18"/>',
   staff:     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -23643,6 +24102,29 @@ function _bbRenderAssets(panel) {
     </div>
     <div id="bb-assets-content"></div>
   `;
+  _AST_LIB_MODE = false;
+  _ASSETS_HOST_ID = 'bb-assets-content';
+  openAssetsView();
+}
+
+// V2 Content Library (Track 2 / P1). Same engine as the asset library, with
+// the content taxonomy UI on top (_AST_LIB_MODE gates it in _assetCard) and
+// the standing "keep adding content" nudge in the chrome.
+function _bbRenderContentLibrary(panel) {
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">Content Library</div>
+        <div class="bb-page-sub">Every photo and video you add here is raw material for your ads and socials. Tag who is in it and what it shows, and our team can build from it any time. Keep it growing: fresh content means fresh ads.</div>
+      </div>
+    </div>
+    <div id="bb-assets-content"></div>
+  `;
+  _AST_LIB_MODE = true;
   _ASSETS_HOST_ID = 'bb-assets-content';
   openAssetsView();
 }
@@ -54083,6 +54565,7 @@ function _ccBuildChrome() {
   dock.innerHTML =
     `<div class="cc-fan" id="cc-fan">
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Info" onclick="_ccDockPop('info')">${_ccIcons().info}</button>
+       ${(typeof V2_ACCESS !== 'undefined' && V2_ACCESS) ? `<button type="button" class="cc-fan-btn cc-glass" data-lab="Content Library" onclick="_ccOrbToggle(false);_ccOpenClassic('blueprint');setTimeout(() => { try { _bbNavigate('content_library'); } catch (_) {} }, 250)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="m10 12 4 2.5-4 2.5z"/></svg></button>` : ''}
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Business blueprint" onclick="_ccOrbToggle(false);_ccOpenClassic('blueprint')">${_ccIcons().grid}</button>
        <button type="button" class="cc-fan-btn cc-glass" data-lab="Settings" onclick="_ccDockPop('settings')">${_ccIcons().gear}</button>
        <button type="button" class="cc-fan-btn cc-glass" id="cc-fan-acct" data-lab="Switch academy" style="display:none" onclick="_ccAcctToggle(true)"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span class="cc-fan-count" id="cc-fan-acct-count"></span></button>
