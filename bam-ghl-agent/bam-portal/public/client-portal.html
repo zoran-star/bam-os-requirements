@@ -9226,23 +9226,43 @@ Then the call to action."]</div>
         font-size:11px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
       }
       #ast-tag-overlay {
-        /* Above the Business Blueprint focus overlay (z 10050) - the library
-           opens inside it, so the tag drawer must outrank it. */
+        /* Centered popup module. Above the Business Blueprint focus overlay
+           (z 10050) - the library opens inside it, so this must outrank it. */
         position:fixed; inset:0; z-index:10080; background:rgba(0,0,0,.55);
+        display:flex; align-items:center; justify-content:center; padding:24px;
         opacity:0; pointer-events:none; transition:opacity .2s ease;
       }
       #ast-tag-overlay.open { opacity:1; pointer-events:auto; }
-      #ast-tag-drawer {
-        position:absolute; top:0; right:0; bottom:0; width:440px; max-width:100%;
-        background:var(--surface); border-left:1px solid var(--border);
+      #ast-tag-modal {
+        width:480px; max-width:100%; max-height:86vh;
+        background:var(--surface); border:1px solid var(--border);
+        border-radius:var(--r-xl, 24px); box-shadow:var(--shadow-pop, 0 24px 60px rgba(0,0,0,.4));
         display:flex; flex-direction:column; overflow:hidden;
-        transform:translateX(24px); transition:transform .22s ease;
+        transform:translateY(12px) scale(.98); opacity:.6;
+        transition:transform .2s var(--es, cubic-bezier(.4,0,.2,1)), opacity .2s;
       }
-      #ast-tag-overlay.open #ast-tag-drawer { transform:translateX(0); }
+      #ast-tag-overlay.open #ast-tag-modal { transform:translateY(0) scale(1); opacity:1; }
       .ast-tag-head {
         display:flex; align-items:center; gap:12px; padding:16px 18px;
         border-bottom:1px solid var(--border); flex:0 0 auto;
       }
+      .ast-tag-strip { display:flex; align-items:center; gap:5px; flex:0 0 auto; }
+      .ast-tag-strip .ast-tag-thumb { width:40px; height:40px; }
+      .ast-tag-more {
+        display:inline-flex; align-items:center; justify-content:center; height:40px; padding:0 8px;
+        border-radius:var(--r-sm, 8px); background:var(--surface-el, rgba(0,0,0,.05));
+        color:var(--text-mute); font-size:12px; font-weight:700;
+      }
+      .ast-tag-foot {
+        flex:0 0 auto; padding:12px 18px calc(16px + env(safe-area-inset-bottom));
+        border-top:1px solid var(--border); display:flex; justify-content:flex-end;
+      }
+      .ast-tag-done {
+        padding:9px 22px; border-radius:var(--r-sm, 8px); border:none;
+        background:var(--gold); color:var(--on-gold, #131416); font:inherit;
+        font-size:13px; font-weight:700; cursor:pointer;
+      }
+      .ast-tag-done:hover { filter:brightness(1.05); }
       .ast-tag-thumb {
         width:52px; height:52px; border-radius:var(--r-md, 12px); object-fit:cover;
         background:#000; flex:0 0 auto;
@@ -9306,10 +9326,11 @@ Then the call to action."]</div>
         font-weight:700; cursor:pointer;
       }
       @media (max-width: 620px) {
-        #ast-tag-drawer { width:100%; }
+        #ast-tag-overlay { padding:14px; }
+        #ast-tag-modal { width:100%; max-width:100%; max-height:90vh; }
       }
       @media (prefers-reduced-motion: reduce) {
-        #ast-tag-overlay, #ast-tag-drawer { transition:none; }
+        #ast-tag-overlay, #ast-tag-modal { transition:none; }
       }
       .ast-lightbox {
         position:fixed; inset:0; z-index:9500; background:rgba(0,0,0,.88); display:flex;
@@ -11980,6 +12001,7 @@ const _AST_CONTENT_TYPES = [
   ['coaching',    'Coaching'],
   ['culture',     'Culture'],
   ['testimonial', 'Testimonial'],
+  ['other',       'Other'],
 ];
 
 // Where the asset library renders. Standalone view = 'assets-content';
@@ -12330,26 +12352,32 @@ async function _assetSetTag2(id, value) {
 function _assetSetFilter(k) { _ASSET_FILTER = k; _renderAssets(); }
 function _setAssetType(t)   { _ASSET_TYPE   = t; _renderAssets(); }
 
-/* ── Content Library tag drawer (Track 2 / P1) ─────────────────────────
-   Right-side drawer (house idiom) for the content taxonomy: pick what the
-   asset IS (action/coaching/culture/testimonial), then the conditional
-   fields - athletes come from contacts, staff from client_users (with a
-   name-only quick-add), skills from the per-academy preset list (+ custom).
-   Every change saves immediately; local state mirrors so the grid updates
-   without a refetch. */
-let _astTagAssetId = null;
+/* ── Content Library tag modal (Track 2 / P1) ──────────────────────────
+   Centered popup for the content taxonomy: pick what the asset IS
+   (action/coaching/culture/testimonial/other), then the conditional fields -
+   athletes from contacts, staff from client_users (name-only quick-add ok),
+   skills from the per-academy preset list (+ custom). Runs on ONE asset (a
+   card's "What is this?") OR a BATCH just uploaded (the upload flow opens it
+   with the files on top; every pick applies to all of them). Saves are
+   immediate; local state mirrors so the grid updates without a refetch. */
+let _astTagIds = [];        // asset ids being tagged (1 = card, N = upload batch)
+let _astTagUpload = false;  // opened straight after an upload?
 let _astAthleteTimer = null;
 
-function _astTagAsset() { return _ASSETS.find(x => x.id === _astTagAssetId) || null; }
+function _astTagPrimary() { return _ASSETS.find(x => x.id === _astTagIds[0]) || null; }
+function _astTagAssetsAll() { return _astTagIds.map(id => _ASSETS.find(x => x.id === id)).filter(Boolean); }
+function _astTagTargets() { return _astTagIds.slice(); }
 
-function _astTagOpen(id) {
-  _astTagAssetId = id;
+function _astTagOpen(id) { _astTagIds = [id]; _astTagUpload = false; _astTagShow(); }
+function _astTagOpenBatch(ids) { _astTagIds = (ids || []).slice(); _astTagUpload = true; if (_astTagIds.length) _astTagShow(); }
+
+function _astTagShow() {
   let ov = document.getElementById('ast-tag-overlay');
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'ast-tag-overlay';
     ov.onclick = (e) => { if (e.target === ov) _astTagClose(); };
-    ov.innerHTML = '<div id="ast-tag-drawer" role="dialog" aria-label="Tag content"></div>';
+    ov.innerHTML = '<div id="ast-tag-modal" role="dialog" aria-label="Tag content"></div>';
     document.body.appendChild(ov);
   }
   _astTagRender();
@@ -12358,22 +12386,33 @@ function _astTagOpen(id) {
 
 function _astTagClose() {
   document.getElementById('ast-tag-overlay')?.classList.remove('open');
-  _astTagAssetId = null;
+  _astTagIds = []; _astTagUpload = false;
   _renderAssets();
 }
 
+function _astTagThumb(x) {
+  const isLink = !!x.link_url;
+  const url = isLink ? x.link_url : _assetUrl(x.storage_path);
+  const isVideo = (x.mime_type || '').startsWith('video/') || x.category === 'video';
+  if (isLink) return '<div class="ast-tag-thumb ast-tag-thumb-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>';
+  if (isVideo) return `<video class="ast-tag-thumb" src="${escapeHTML(url)}#t=0.5" preload="metadata" muted playsinline></video>`;
+  return `<img class="ast-tag-thumb" src="${escapeHTML(url)}" alt="">`;
+}
+
 function _astTagRender() {
-  const drawer = document.getElementById('ast-tag-drawer');
-  const a = _astTagAsset();
-  if (!drawer || !a) return;
-  const isLink = !!a.link_url;
-  const url = isLink ? a.link_url : _assetUrl(a.storage_path);
-  const isVideo = (a.mime_type || '').startsWith('video/') || a.category === 'video';
-  const thumb = isLink
-    ? '<div class="ast-tag-thumb ast-tag-thumb-link"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>'
-    : (isVideo
-      ? `<video class="ast-tag-thumb" src="${escapeHTML(url)}#t=0.5" preload="metadata" muted playsinline></video>`
-      : `<img class="ast-tag-thumb" src="${escapeHTML(url)}" alt="">`);
+  const modal = document.getElementById('ast-tag-modal');
+  const a = _astTagPrimary();
+  if (!modal || !a) return;
+  const assets = _astTagAssetsAll();
+  const batch = assets.length > 1;
+
+  const previewStrip = batch
+    ? `<div class="ast-tag-strip">${assets.slice(0, 8).map(_astTagThumb).join('')}${assets.length > 8 ? `<span class="ast-tag-more">+${assets.length - 8}</span>` : ''}</div>`
+    : _astTagThumb(a);
+  const title = batch ? `${assets.length} files added` : (a.label || 'Untitled');
+  const sub = batch
+    ? 'Tag what these show. It applies to all of them, and you can fine-tune each one later.'
+    : (_astTagUpload ? 'Tag what this shows so we can find it when we build your ads' : 'Tag it so we can find it when we build your ads');
 
   const typeChips = _AST_CONTENT_TYPES.map(([v, l]) =>
     `<button type="button" class="ast-tag-chip${a.content_type === v ? ' on' : ''}" onclick="_astSetContentType('${v}')">${l}</button>`
@@ -12381,11 +12420,10 @@ function _astTagRender() {
 
   const people = _AST_PEOPLE[a.id] || [];
   const athletes = people.filter(p => p.role === 'athlete');
-  const staff = people.filter(p => p.role === 'staff');
   const askills = _AST_ASSET_SKILLS[a.id] || [];
 
   const athleteChips = athletes.map(p =>
-    `<span class="ast-tag-person">${escapeHTML(p.display_name)}<button type="button" onclick="_astRemovePerson('${p.id}')" aria-label="Remove">&times;</button></span>`
+    `<span class="ast-tag-person">${escapeHTML(p.display_name)}<button type="button" onclick="_astRemoveAthlete('${p.contact_id}')" aria-label="Remove">&times;</button></span>`
   ).join('');
   const athleteSection = `
     <div class="ast-tag-sec">
@@ -12399,14 +12437,14 @@ function _astTagRender() {
     </div>`;
 
   const staffChips = _ASSET_TARGETS.staff.map(s => {
-    const tagged = staff.find(p => p.client_user_id === s.id);
+    const on = people.some(p => p.role === 'staff' && p.client_user_id === s.id);
     const nm = s.name || s.email || 'Unnamed';
-    return `<button type="button" class="ast-tag-chip${tagged ? ' on' : ''}" onclick="_astToggleStaff('${s.id}', ${tagged ? `'${tagged.id}'` : 'null'}, this)">${escapeHTML(nm)}</button>`;
+    return `<button type="button" class="ast-tag-chip${on ? ' on' : ''}" onclick="_astToggleStaff('${s.id}', this)">${escapeHTML(nm)}</button>`;
   }).join('');
   const staffSection = `
     <div class="ast-tag-sec">
       <div class="ast-tag-label">Coaches / staff in this</div>
-      <div class="ast-tag-chips">${staffChips || ''}
+      <div class="ast-tag-chips">${staffChips}
         <button type="button" class="ast-tag-chip ast-tag-add" onclick="_astStaffQuickAddToggle()">+ Add someone</button>
       </div>
       <div id="ast-staff-quickadd" class="ast-tag-quickadd" style="display:none">
@@ -12439,18 +12477,23 @@ function _astTagRender() {
     </div>`;
 
   // Conditional sections per locked taxonomy: action -> athletes+skills+hl;
-  // coaching -> staff; culture/testimonial -> athletes+staff.
+  // coaching -> staff; culture/testimonial -> athletes+staff; other -> none.
   let conditional = '';
   if (a.content_type === 'action') conditional = athleteSection + skillsSection + hlSection;
   else if (a.content_type === 'coaching') conditional = staffSection;
   else if (a.content_type === 'culture' || a.content_type === 'testimonial') conditional = athleteSection + staffSection;
+  else if (a.content_type === 'other') conditional = '<div class="ast-tag-sec"><div class="ast-tag-none">Filed as general content. Add a clear label so we know what it is.</div></div>';
 
-  drawer.innerHTML = `
+  const footer = _astTagUpload
+    ? `<div class="ast-tag-foot"><button type="button" class="ast-tag-done" onclick="_astTagClose()">Done</button></div>`
+    : '';
+
+  modal.innerHTML = `
     <div class="ast-tag-head">
-      ${thumb}
+      ${previewStrip}
       <div class="ast-tag-title">
-        <div class="ast-tag-name">${escapeHTML(a.label || 'Untitled')}</div>
-        <div class="ast-tag-sub">Tag it so we can find it when we build your ads</div>
+        <div class="ast-tag-name">${escapeHTML(title)}</div>
+        <div class="ast-tag-sub">${escapeHTML(sub)}</div>
       </div>
       <button type="button" class="ast-tag-close" onclick="_astTagClose()" aria-label="Close">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -12462,30 +12505,31 @@ function _astTagRender() {
         <div class="ast-tag-chips">${typeChips}</div>
       </div>
       ${conditional}
-    </div>`;
+    </div>
+    ${footer}`;
 }
 
 async function _astSetContentType(type) {
-  const a = _astTagAsset(); if (!a) return;
-  const next = a.content_type === type ? null : type;   // tap again to untype
-  a.content_type = next;
-  if (next !== 'action') a.highlight = null;
+  const p = _astTagPrimary(); if (!p) return;
+  const next = p.content_type === type ? null : type;   // tap again to untype
+  _astTagAssetsAll().forEach(x => { x.content_type = next; if (next !== 'action') x.highlight = null; });
   _astTagRender();
   try {
-    const { error } = await _sb.from('client_assets')
-      .update({ content_type: next, highlight: next === 'action' ? a.highlight : null, updated_at: new Date().toISOString() })
-      .eq('id', a.id);
+    const patch = { content_type: next, updated_at: new Date().toISOString() };
+    if (next !== 'action') patch.highlight = null;
+    const { error } = await _sb.from('client_assets').update(patch).in('id', _astTagTargets());
     if (error) throw error;
   } catch (e) { alert('Save failed: ' + (e.message || e)); }
 }
 
 async function _astSetHighlight(v) {
-  const a = _astTagAsset(); if (!a) return;
-  a.highlight = a.highlight === v ? null : v;
+  const p = _astTagPrimary(); if (!p) return;
+  const next = p.highlight === v ? null : v;
+  _astTagAssetsAll().forEach(x => x.highlight = next);
   _astTagRender();
   try {
     const { error } = await _sb.from('client_assets')
-      .update({ highlight: a.highlight, updated_at: new Date().toISOString() }).eq('id', a.id);
+      .update({ highlight: next, updated_at: new Date().toISOString() }).in('id', _astTagTargets());
     if (error) throw error;
   } catch (e) { alert('Save failed: ' + (e.message || e)); }
 }
@@ -12503,8 +12547,8 @@ function _astAthleteSearch(q) {
         .eq('client_id', CLIENT_ID)
         .or(`name.ilike.%${query}%,athlete_name.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
         .limit(8);
-      const a = _astTagAsset();
-      const taken = new Set(((_AST_PEOPLE[a?.id] || []).filter(p => p.role === 'athlete')).map(p => p.contact_id));
+      const p = _astTagPrimary();
+      const taken = new Set(((_AST_PEOPLE[p?.id] || []).filter(pp => pp.role === 'athlete')).map(pp => pp.contact_id));
       const rows = (data || []).filter(c => !taken.has(c.id));
       box.innerHTML = rows.length ? rows.map(c => {
         const display = c.athlete_name || c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unnamed';
@@ -12515,56 +12559,69 @@ function _astAthleteSearch(q) {
   }, 250);
 }
 
+// All person/skill writes below apply to EVERY asset in _astTagTargets() (one
+// for a card click, many for an upload batch), so tagging a batch tags them all.
 async function _astAddAthlete(contactId, btn) {
-  const a = _astTagAsset(); if (!a) return;
   const display = btn?.dataset?.name || 'Athlete';
+  const targets = _astTagTargets().filter(id => !((_AST_PEOPLE[id] || []).some(pp => pp.role === 'athlete' && pp.contact_id === contactId)));
+  if (!targets.length) return;
   try {
     const { data, error } = await _sb.from('client_asset_people')
-      .insert({ asset_id: a.id, client_id: CLIENT_ID, role: 'athlete', contact_id: contactId, display_name: display })
-      .select().single();
+      .insert(targets.map(id => ({ asset_id: id, client_id: CLIENT_ID, role: 'athlete', contact_id: contactId, display_name: display })))
+      .select();
     if (error) throw error;
-    (_AST_PEOPLE[a.id] = _AST_PEOPLE[a.id] || []).push(data);
+    (data || []).forEach(r => { (_AST_PEOPLE[r.asset_id] = _AST_PEOPLE[r.asset_id] || []).push(r); });
+    const s = document.getElementById('ast-athlete-search'); if (s) s.value = '';
     _astTagRender();
   } catch (e) { alert('Tag failed: ' + (e.message || e)); }
 }
 
-async function _astToggleStaff(clientUserId, personRowId, btn) {
-  const a = _astTagAsset(); if (!a) return;
-  if (personRowId) return _astRemovePerson(personRowId);
-  const nm = (btn?.textContent || '').trim() || 'Staff';
+async function _astRemoveAthlete(contactId) {
   try {
-    const { data, error } = await _sb.from('client_asset_people')
-      .insert({ asset_id: a.id, client_id: CLIENT_ID, role: 'staff', client_user_id: clientUserId, display_name: nm })
-      .select().single();
+    const { error } = await _sb.from('client_asset_people').delete()
+      .in('asset_id', _astTagTargets()).eq('role', 'athlete').eq('contact_id', contactId);
     if (error) throw error;
-    (_AST_PEOPLE[a.id] = _AST_PEOPLE[a.id] || []).push(data);
-    _astTagRender();
-  } catch (e) { alert('Tag failed: ' + (e.message || e)); }
-}
-
-async function _astRemovePerson(personRowId) {
-  const a = _astTagAsset(); if (!a) return;
-  try {
-    const { error } = await _sb.from('client_asset_people').delete().eq('id', personRowId);
-    if (error) throw error;
-    _AST_PEOPLE[a.id] = (_AST_PEOPLE[a.id] || []).filter(p => p.id !== personRowId);
+    _astTagTargets().forEach(id => { _AST_PEOPLE[id] = (_AST_PEOPLE[id] || []).filter(pp => !(pp.role === 'athlete' && pp.contact_id === contactId)); });
     _astTagRender();
   } catch (e) { alert('Remove failed: ' + (e.message || e)); }
 }
 
-async function _astToggleSkill(slug) {
-  const a = _astTagAsset(); if (!a) return;
-  const list = _AST_ASSET_SKILLS[a.id] = _AST_ASSET_SKILLS[a.id] || [];
+async function _astToggleStaff(clientUserId, btn) {
+  const nm = (btn?.textContent || '').trim() || 'Staff';
+  const anyHas = _astTagTargets().some(id => (_AST_PEOPLE[id] || []).some(pp => pp.role === 'staff' && pp.client_user_id === clientUserId));
   try {
-    if (list.includes(slug)) {
-      const { error } = await _sb.from('client_asset_skills').delete().eq('asset_id', a.id).eq('skill_slug', slug);
+    if (anyHas) {
+      const { error } = await _sb.from('client_asset_people').delete()
+        .in('asset_id', _astTagTargets()).eq('role', 'staff').eq('client_user_id', clientUserId);
       if (error) throw error;
-      _AST_ASSET_SKILLS[a.id] = list.filter(s => s !== slug);
+      _astTagTargets().forEach(id => { _AST_PEOPLE[id] = (_AST_PEOPLE[id] || []).filter(pp => !(pp.role === 'staff' && pp.client_user_id === clientUserId)); });
     } else {
-      const { error } = await _sb.from('client_asset_skills')
-        .insert({ asset_id: a.id, client_id: CLIENT_ID, skill_slug: slug });
+      const targets = _astTagTargets().filter(id => !((_AST_PEOPLE[id] || []).some(pp => pp.role === 'staff' && pp.client_user_id === clientUserId)));
+      const { data, error } = await _sb.from('client_asset_people')
+        .insert(targets.map(id => ({ asset_id: id, client_id: CLIENT_ID, role: 'staff', client_user_id: clientUserId, display_name: nm })))
+        .select();
       if (error) throw error;
-      list.push(slug);
+      (data || []).forEach(r => { (_AST_PEOPLE[r.asset_id] = _AST_PEOPLE[r.asset_id] || []).push(r); });
+    }
+    _astTagRender();
+  } catch (e) { alert('Tag failed: ' + (e.message || e)); }
+}
+
+async function _astToggleSkill(slug) {
+  const p = _astTagPrimary(); if (!p) return;
+  const has = (_AST_ASSET_SKILLS[p.id] || []).includes(slug);
+  try {
+    if (has) {
+      const { error } = await _sb.from('client_asset_skills').delete().in('asset_id', _astTagTargets()).eq('skill_slug', slug);
+      if (error) throw error;
+      _astTagTargets().forEach(id => { _AST_ASSET_SKILLS[id] = (_AST_ASSET_SKILLS[id] || []).filter(s => s !== slug); });
+    } else {
+      const targets = _astTagTargets().filter(id => !((_AST_ASSET_SKILLS[id] || []).includes(slug)));
+      if (targets.length) {
+        const { error } = await _sb.from('client_asset_skills').insert(targets.map(id => ({ asset_id: id, client_id: CLIENT_ID, skill_slug: slug })));
+        if (error) throw error;
+      }
+      _astTagTargets().forEach(id => { _AST_ASSET_SKILLS[id] = _AST_ASSET_SKILLS[id] || []; if (!_AST_ASSET_SKILLS[id].includes(slug)) _AST_ASSET_SKILLS[id].push(slug); });
     }
     _astTagRender();
   } catch (e) { alert('Save failed: ' + (e.message || e)); }
@@ -12577,13 +12634,15 @@ async function _astAddCustomSkill() {
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
   if (!slug) return;
   try {
-    const { data, error } = await _sb.from('client_content_skills')
-      .insert({ client_id: CLIENT_ID, slug, label, is_default: false, sort_order: 100 + _AST_SKILLS.length })
-      .select().single();
-    if (error) throw error;
-    _AST_SKILLS.push(data);
+    if (!_AST_SKILLS.some(s => s.slug === slug)) {
+      const { data, error } = await _sb.from('client_content_skills')
+        .insert({ client_id: CLIENT_ID, slug, label, is_default: false, sort_order: 100 + _AST_SKILLS.length })
+        .select().single();
+      if (error) throw error;
+      _AST_SKILLS.push(data);
+    }
     if (inp) inp.value = '';
-    await _astToggleSkill(slug);   // tag the current asset with it right away
+    await _astToggleSkill(slug);   // tag the current asset(s) with it right away
   } catch (e) {
     // Duplicate slug -> just toggle the existing one on.
     if (/duplicate|unique/i.test(e.message || '')) { if (inp) inp.value = ''; _astToggleSkill(slug); }
@@ -12617,7 +12676,7 @@ async function _astStaffQuickAdd() {
     const { data: staffRows } = await _sb.from('client_users').select('id,name,email').eq('client_id', CLIENT_ID).eq('hide_from_team', false);
     _ASSET_TARGETS.staff = staffRows || [];
     const added = (_ASSET_TARGETS.staff || []).find(s => (s.name || '') === name);
-    if (added) await _astToggleStaff(added.id, null, { textContent: name });
+    if (added) await _astToggleStaff(added.id, { textContent: name });
     else _astTagRender();
   } catch (e) { alert('Add failed: ' + (e.message || e)); }
 }
@@ -12667,6 +12726,7 @@ async function _uploadAssetFiles(all, fromFolder) {
   const progLabel = document.getElementById('ast-progress-label');
   const progFill = document.getElementById('ast-progress-fill');
   if (prog) prog.classList.add('active');
+  const _newIds = [];   // collect fresh asset ids so the Content Library can tag them
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const pct = Math.round((i / files.length) * 100);
@@ -12680,11 +12740,12 @@ async function _uploadAssetFiles(all, fromFolder) {
       const folder = rel.includes('/') ? rel.split('/')[0] : null;
       const category = (file.type || '').startsWith('video/') ? 'video' : 'photo';
       await _storageUpload('client-assets', path, file);
-      const { error: insErr } = await _sb.from('client_assets').insert({
+      const { data: insRow, error: insErr } = await _sb.from('client_assets').insert({
         client_id: CLIENT_ID, label: file.name.replace(/\.[^.]+$/, ''), category,
         folder, storage_path: path, mime_type: file.type || null, size_bytes: file.size,
-      });
+      }).select('id').single();
       if (insErr) { await _sb.storage.from('client-assets').remove([path]).catch(() => {}); throw insErr; }
+      if (insRow) _newIds.push(insRow.id);
     } catch (e) { alert("Couldn't upload " + file.name + ' - ' + (e.message || e)); }
   }
   if (progFill) progFill.style.width = '100%';
@@ -12692,6 +12753,9 @@ async function _uploadAssetFiles(all, fromFolder) {
   setTimeout(() => { if (prog) prog.classList.remove('active'); }, 800);
   _astRendered = false; // reset stagger for new batch
   await openAssetsView();
+  // Content Library: open the tag popup on the just-uploaded files (files on
+  // top, tagging below) so clients tag as they upload.
+  if (_AST_LIB_MODE && _newIds.length) _astTagOpenBatch(_newIds);
 }
 
 async function _assetSetTag(id, field, value) {
