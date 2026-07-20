@@ -382,6 +382,12 @@ session):**
 - **Client focus mode: "+ Add content" is ALWAYS available on any content
   ticket** -> opens the P1 upload popup. Clients can add more content anytime,
   not only when asked.
+- **Content approvals show the actual piece IN the window (LOCKED).** Anywhere a
+  client is asked to approve content (the review gate / "an approval" request),
+  the finished creative is VIEWABLE inline - video plays, images zoom - before
+  they can approve. Never approve blind. Approve -> marketing posts; Request
+  changes -> back to the content team with the note. Applies to every content
+  approval surface (focus mode, the approval request card, the review gate).
 
 **TAG AT EVERY CONTENT IMPORT (LOCKED 2026-07-20).** The content taxonomy must
 be applied by the client at EVERY place they import content-for-ads/socials
