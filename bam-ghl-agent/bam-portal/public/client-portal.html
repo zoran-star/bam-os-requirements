@@ -59556,6 +59556,14 @@ function _mmRenderMetaFocus(d) {
         '<button type="button" class="mm-addbtn" onclick="event.stopPropagation();_mmcOpen(\'add\',' + (window._MMC_ADD.push({ campaign: cp.name || null, adset: a2.name || null, offer: _mmcOffer }) - 1) + ')">+ add a new creative</button>' +
         '</div>';
     });
+    // Campaign-level entry: when Meta returns no ad-set/creative breakdown, the
+    // per-ad-set add button never renders. Keep the creative flow reachable.
+    if (!(cp.adsets || []).length) {
+      out += '<div class="mm-adset">' +
+        '<div class="mm-driver-sub" style="margin:0 0 8px">Add a creative to this campaign.</div>' +
+        '<button type="button" class="mm-addbtn" onclick="event.stopPropagation();_mmcOpen(\'add\',' + (window._MMC_ADD.push({ campaign: cp.name || null, adset: null, offer: _mmcOffer }) - 1) + ')">+ add a new creative</button>' +
+        '</div>';
+    }
   });
 
   // results + spend range at the bottom
