@@ -17230,6 +17230,7 @@ function _contactsCloseModal() {
   if (o) o.remove();
   document.removeEventListener('keydown', _contactsModalEsc);
   document.body.classList.remove('ctx-modal-open');
+  try { _ccClearStaleClassic(); } catch (_) {}
 }
 function openContactsModal(opts) {
   opts = opts || {};
@@ -53596,6 +53597,18 @@ function _ccReturn() {
   const m = document.querySelector('.main');
   if (m) requestAnimationFrame(() => m.dispatchEvent(new Event('scroll')));
 }
+// Blueprint / Calendar / Contacts open as focus overlays ON TOP of the Command
+// Center, but the dock + quick actions flip on `cc-classic` (the classic
+// breadcrumb chrome) when launching them. Their own close functions only hide
+// the overlay, so the CC home was left wearing the "‹ Command center › X" bar
+// and read as a separate full-screen page. When the CC is what's revealed and
+// nothing else is still stacked on top, drop back to the clean command center.
+function _ccClearStaleClassic() {
+  if (!document.body.classList.contains('cc-classic')) return;
+  if (!document.getElementById('view-cc')?.classList.contains('active')) return;
+  if (document.querySelector('.mm-open')) return;   // another overlay still open
+  if (typeof _ccReturn === 'function') _ccReturn();
+}
 function _ccExitBeta() {
   try { localStorage.setItem('bam_cc_optout', '1'); } catch (_) {}
   location.reload();
@@ -53996,7 +54009,13 @@ function _ccFocusCloseOpen() {
     else if (open.id === 'landingMachineModal') closeLandingMachine();
     else if (open.id === 'membersMachineModal') closeMembersFocus();
     else if (open.id === 'gmMachineModal') closeGmFocus();
-    else { open.classList.remove('mm-open'); document.documentElement.classList.remove('mm-focus-open'); }
+    // Route the CC-launched overlays through their real close fns so the classic
+    // breadcrumb chrome (cc-classic) gets cleared - otherwise swipe / Escape /
+    // hardware-back strands the "‹ Command center › X" bar over the home page.
+    else if (open.id === 'view-blueprint' && typeof closeBlueprint === 'function') closeBlueprint();
+    else if (open.id === 'view-calendar' && typeof closeCalendar === 'function') closeCalendar();
+    else if (open.id === 'view-ad-previews' && typeof closeAdPreviews === 'function') closeAdPreviews();
+    else { open.classList.remove('mm-open'); document.documentElement.classList.remove('mm-focus-open'); try { _ccClearStaleClassic(); } catch (_) {} }
   } catch (_) {}
   return true;
 }
@@ -57467,6 +57486,7 @@ function _mmCloseFocus(modalId) {
       document.documentElement.classList.remove('mm-prewarm');
     }, 700);
   }
+  try { _ccClearStaleClassic(); } catch (_) {}
 }
 function openMarketingMachine() {
   if (!_MM) return;
