@@ -19285,6 +19285,24 @@ function _mobileMorePick(view) { _mobileMoreClose(); mobileSwitchView(view); }
 // into the real tabs, plus 2 quick actions. Counts come from data the app
 // already maintains (tickets global, _msgConversations) + one light query
 // for open action items. Renders instantly; numbers fill in as they resolve.
+// Empty-state shown on Home to a teammate with no tab grants yet ([]). It's the
+// only surface they can reach until the owner grants access in Blueprint > Staff.
+function _renderHomeNoAccess() {
+  const wrap = document.querySelector('#view-home .home-wrap');
+  if (!wrap) return;
+  let host = document.getElementById('home-no-access');
+  if (!host) { host = document.createElement('div'); host.id = 'home-no-access'; wrap.appendChild(host); }
+  host.style.display = '';
+  host.innerHTML = `
+    <div style="max-width:520px;margin:40px auto;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg,16px);box-shadow:var(--shadow-card);padding:40px 32px">
+      <div style="width:52px;height:52px;margin:0 auto 18px;border-radius:var(--r-full,999px);background:var(--gold-sheen,rgba(212,182,92,.08));display:flex;align-items:center;justify-content:center;color:var(--gold,#D4B65C)">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px">No access yet</div>
+      <div style="font-size:14px;color:var(--text-sub);line-height:1.6">Your academy owner hasn't set your permissions yet. Ask them to give you access, then refresh this page.</div>
+    </div>`;
+}
+
 async function openHomeView() {
   // #1 - greeting + first name
   const hour = new Date().getHours();
@@ -19293,6 +19311,18 @@ async function openHomeView() {
   const g = document.getElementById('home-greeting');
   if (g) g.textContent = (first && first !== '-') ? `${part}, ${first}` : part;
   loadMyAvatar();   // show / refresh my profile photo
+
+  // No-access member ([] tab grant = "nothing yet"): Home is their only screen,
+  // and it shows the access-request prompt instead of any dashboard. Everyone
+  // else (owner / BAM / granted members) falls through to the normal home.
+  if (_hasNoTabAccess()) {
+    ['home-v15', 'home-v2', 'home-tiles-sec', 'home-tiles', 'home-week-sec', 'home-week',
+     'home-activity-sec', 'home-activity', 'home-qa-sec', 'home-qa', 'home-status']
+      .forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+    _renderHomeNoAccess();
+    return;
+  }
+  { const naEl = document.getElementById('home-no-access'); if (naEl) naEl.style.display = 'none'; }
 
   // V1.5 academies get a dedicated dashboard (trials today · missed calls ·
   // action items) instead of the ticket-centric tiles.
@@ -22549,6 +22579,14 @@ function applyTabPermissions() {
       document.querySelectorAll(`.mobile-nav-item[data-view="${v}"]`).forEach(el => { el.style.setProperty('display', 'none', 'important'); });
     }
   }
+  // No grants yet ([] = nothing) → also hide Messages + Parent Inbox (both
+  // normally always-on) so the teammate is left with Home only.
+  if (_hasNoTabAccess()) {
+    for (const v of ['messages', 'parent-messages']) {
+      document.querySelectorAll(`.nav-item[onclick*="switchView('${v}'"]`).forEach(el => { el.style.display = 'none'; });
+      document.querySelectorAll(`.mobile-nav-item[data-view="${v}"]`).forEach(el => { el.style.setProperty('display', 'none', 'important'); });
+    }
+  }
 }
 
 // Is a view allowed for the current user? Owner/unrestricted = always yes.
@@ -22557,9 +22595,21 @@ function _isViewTabAllowed(view) {
   if (_effTabRole() === 'owner') return true;
   const tabs = _effAllowedTabs();
   if (!Array.isArray(tabs)) return true;
+  // No grants yet ([] = nothing) → only Home is reachable; it shows the
+  // "ask your owner for access" prompt. Everything else bounces to Home.
+  if (tabs.length === 0) return view === 'home';
   const tab = _PERMISSIONABLE_TABS.find(t => t.views.includes(view));
   if (!tab) return true;
   return tabs.includes(tab.key);
+}
+
+// A member whose tab grant is an explicit empty array ([] = "nothing yet") sees
+// ONLY Home, which shows the access-request prompt. Owner / BAM staff / null(=all)
+// members are never in this state.
+function _hasNoTabAccess() {
+  if (_effTabRole() === 'owner' || _IS_BAM_STAFF === true) return false;
+  const tabs = _effAllowedTabs();
+  return Array.isArray(tabs) && tabs.length === 0;
 }
 
 // ── Owner: preview a teammate's view ──
@@ -22701,6 +22751,14 @@ async function loadMyPermissionsAndApply() {
     _MY_CAN_ENROLL_MEMBERS = row?.can_enroll_members === true;
   } catch (_) { _MY_ALLOWED_TABS = null; _MY_ALLOWED_STAGES = null; _MY_ALLOWED_KPIS = null; }
   applyTabPermissions();
+  // Perms load async: if this resolves while a no-access member is sitting in the
+  // command center (or any non-Home view), pull them back to the Home prompt.
+  if (typeof _hasNoTabAccess === 'function' && _hasNoTabAccess()) {
+    try {
+      if (typeof _ccActive === 'function' && _ccActive()) _ccOpenClassic('home');
+      else if (typeof switchView === 'function') switchView('home');
+    } catch (_) {}
+  }
   if (typeof _renderPreviewAsMenu === 'function') _renderPreviewAsMenu(); // owner role now known
   if (typeof applyTalkToBamInboxState === 'function') applyTalkToBamInboxState();
 }
@@ -57466,7 +57524,10 @@ async function boot() {
   applyV2NavState(clientRow.v2_access === true);
   applyV15NavState(clientRow.v15_access === true);
   applyV4NavState(clientRow.v4_access === true);
-  loadMyPermissionsAndApply(); // per-staff tab perms (subtractive, async)
+  // Await per-staff perms BEFORE the landing decision below: a no-access member
+  // ([] tabs) must not fall into the command center (the V2 default landing).
+  // Also removes the flash of full nav before subtraction. Always resolves.
+  await loadMyPermissionsAndApply(); // per-staff tab perms (subtractive)
   _loadPreviewStaff();         // populate the "Preview as" account-menu switcher
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
@@ -57543,7 +57604,8 @@ async function boot() {
     // Returning user (tour already done) → land on Home, or their first tab when
     // Home is hidden (V2 users). Skip when a deep link already targets a view.
     // Command center beta (?cc=1, V2 only) replaces the landing entirely.
-    if (typeof _ccWanted === 'function' && _ccWanted() && typeof V2_ACCESS !== 'undefined' && V2_ACCESS) {
+    if (typeof _ccWanted === 'function' && _ccWanted() && typeof V2_ACCESS !== 'undefined' && V2_ACCESS
+        && !(typeof _hasNoTabAccess === 'function' && _hasNoTabAccess())) {
       openCommandCenter();
     } else {
       switchView(typeof _landingView === 'function' ? _landingView() : 'home');
