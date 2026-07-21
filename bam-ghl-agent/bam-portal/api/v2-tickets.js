@@ -36,7 +36,7 @@ async function sb(path, opts = {}) {
 
 // type -> the role that OWNS the work (locked registry, see the design doc).
 const TYPE_ROLE = {
-  fix: "systems",
+  fix: "backlog", // Zoran triages ALL client-reported bugs first; he re-lanes real system faults via ?action=reassign
   website_change: "systems",
   billing_fix: "systems",
   data_fix: "systems",
