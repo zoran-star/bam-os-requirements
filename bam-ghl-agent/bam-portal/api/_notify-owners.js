@@ -26,24 +26,39 @@ export async function notifyOwners(clientId, eventKey, message) {
   const result = { ok: false, recipients: 0, sent: 0 };
   try {
     if (!clientId || !eventKey || !message) return result;
-    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,v2_access,v15_access,notification_prefs`);
+    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,v2_access,v15_access,notification_prefs,onboarding_setup`);
     const client = Array.isArray(rows) ? rows[0] : rows;
     if (!client) return result;
     // Owner-SMS is a V1.5/V2 feature.
     if (!client.v15_access && !client.v2_access) { result.ok = true; return result; }
     const prefs = client.notification_prefs || {};
     const ids = Array.isArray(prefs[eventKey]) ? prefs[eventKey].filter(x => typeof x === "string") : [];
-    result.recipients = ids.length;
-    if (!ids.length) { result.ok = true; return result; }
-    const users = await sb(`client_users?id=in.(${ids.join(",")})&status=eq.active&select=id,name,phone`);
+
+    // Recipients = the teammates the academy explicitly picked for this event...
+    const explicit = ids.length
+      ? (await sb(`client_users?id=in.(${ids.join(",")})&status=eq.active&select=id,name,phone`).catch(() => [])) || []
+      : [];
+    // ...PLUS the owner ALWAYS - they get every notification by default, the same
+    // way they always see every tab. Their phone falls back to
+    // onboarding_setup.owner_phone (captured at Add-academy) when the owner's
+    // client_users row never got a phone. Owner opt-out is a later addition.
+    const owners = (await sb(`client_users?client_id=eq.${encodeURIComponent(clientId)}&role=eq.owner&status=eq.active&select=id,name,phone`).catch(() => [])) || [];
+    const ownerFallbackPhone = ((client.onboarding_setup && client.onboarding_setup.owner_phone) || "").trim();
+
+    const recipients = [
+      ...explicit.map(u => ({ name: u.name, phone: (u.phone || "").trim() })),
+      ...owners.map(o => ({ name: o.name || "Owner", phone: (o.phone || "").trim() || ownerFallbackPhone })),
+    ];
+
     const seen = new Set();
-    for (const u of (Array.isArray(users) ? users : [])) {
-      const phone = (u.phone || "").trim();
+    for (const rcpt of recipients) {
+      const phone = (rcpt.phone || "").trim();
       if (!phone || seen.has(phone)) continue;
       seen.add(phone);
-      const r = await sendSms({ client, toPhone: phone, message, contactName: u.name || "BAM" });
+      const r = await sendSms({ client, toPhone: phone, message, contactName: rcpt.name || "BAM" });
       if (r && r.ok) result.sent++;
     }
+    result.recipients = seen.size;
     result.ok = true;
     return result;
   } catch (_) {
