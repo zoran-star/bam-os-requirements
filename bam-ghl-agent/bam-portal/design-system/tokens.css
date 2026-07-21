@@ -2,10 +2,8 @@
    FullControl V2 Portal - Design Tokens (canonical)
    ============================================================
    Source of truth for every V2 front-end build (LIVE PRODUCT: staff + client
-   portals; BAM GTA runs on V2). The prototype theme.css files are a SEPARATE
+   portals; BAM GTA runs on V2). The prototype/**/theme.css files are a SEPARATE
    reference lineage (gold #C8A84E) - this is not those. Full map: repo-root CLAUDE.md.
-   (Note: never write a glob with asterisk-slash in this comment - it closes
-   the comment early and breaks the file for any real CSS import.)
    Read design-system/DESIGN.md before using.
 
    - client-portal.html defines these same tokens inline in its
