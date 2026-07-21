@@ -57956,6 +57956,19 @@ async function boot() {
     // Gated resource share link (#resource=<id>) → open the Resources view,
     // which reads the hash and renders that resource's detail.
     switchView('resources');
+  } else if (location.hash && location.hash.indexOf('#bb=') === 0) {
+    // Blueprint deep link (#bb=<card>) → do the normal landing FIRST (command
+    // center for V2), then open the Blueprint overlay on the hash's card.
+    // Without this branch a #bb hash skipped the landing entirely, stranding
+    // the user on the raw default Systems view (reads as V1.5 even for V2
+    // academies) with the overlay never opening.
+    if (typeof _ccWanted === 'function' && _ccWanted() && typeof V2_ACCESS !== 'undefined' && V2_ACCESS
+        && !(typeof _hasNoTabAccess === 'function' && _hasNoTabAccess())) {
+      openCommandCenter();
+    } else {
+      switchView(typeof _landingView === 'function' ? _landingView() : 'home');
+    }
+    setTimeout(() => { try { openBlueprint(); } catch (_) {} }, 60);
   } else if (!location.hash) {
     // Returning user (tour already done) → land on Home, or their first tab when
     // Home is hidden (V2 users). Skip when a deep link already targets a view.
