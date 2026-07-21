@@ -1897,11 +1897,13 @@ async function handler(req, res) {
           }
           if (!isOwnerTarget && "phone" in teamBody) { const ph = (teamBody.phone || "").trim(); patch.phone = ph || null; }
           if (!isOwnerTarget && "name" in teamBody) { const nm = (teamBody.name || "").trim(); if (nm) patch.name = nm; }
-          // Public Team-page copy: title (position) + bio (blurb). Both optional,
-          // editable for ANY teammate including the owner. Empty string clears it.
+          // Public Team-page fields: title (position) + bio (blurb) + instagram
+          // handle. All optional, editable for ANY teammate including the owner.
+          // Empty string clears the field.
           if ("title" in teamBody) { const t = (teamBody.title || "").trim(); patch.title = t || null; }
           if ("bio" in teamBody) { const b = (teamBody.bio || "").trim(); patch.bio = b || null; }
-          if (isOwnerTarget && !("title" in teamBody) && !("bio" in teamBody)) {
+          if ("instagram" in teamBody) { const ig = (teamBody.instagram || "").trim(); patch.instagram = ig || null; }
+          if (isOwnerTarget && !("title" in teamBody) && !("bio" in teamBody) && !("instagram" in teamBody)) {
             return res.status(400).json({ error: "the owner's contact details are managed in Primary contact" });
           }
           const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
