@@ -59574,7 +59574,7 @@ function toggleTheme() {
 
 <!-- ── New-creative / replace-creative request modal (Meta Ads support ticket) ──
      Centered modal (design system idiom); content rendered by _mmcRender.
-     Submit MOCKED until v2_support_tickets lands. -->
+     Submit posts a content_ask ticket via /api/v2-tickets?action=create. -->
 <div id="mmCreativeModal" class="modal-backdrop" style="display:none;z-index:10060" onclick="if(event.target===this)_mmcClose()">
   <div class="mmc-card" id="mmcCard" onclick="event.stopPropagation()"></div>
 </div>
@@ -59585,8 +59585,8 @@ function toggleTheme() {
 <!-- ── V2 "Request a change" annotator (V2 only) ──
      Live-iframe the client's own V2 page; parent-side overlay drops numbered
      pins + notes. Hover-highlight of SECTIONS arrives when the bam-client-sites
-     annotation bridge lands (postMessage) - listener is wired below. Submit is
-     mocked until the v2_support_tickets table is created (core access pending). -->
+     annotation bridge lands (postMessage) - listener is wired below. Submit
+     posts a website_change ticket via /api/v2-tickets?action=create. -->
 <!-- v2 "Request a change" renders INLINE inside the landing focus view now
      (_v2InlineHtml); no separate modal. The note popover below is still used. -->
 
@@ -59617,11 +59617,48 @@ function toggleTheme() {
     </div>
     <div class="v2rev-list" id="v2RevList"></div>
     <div class="v2rev-foot">
+      <!-- Locked mockup 2b: optional content attach - pick from the Content
+           Library (multi-select) or upload new files (they land in the library). -->
+      <div class="v2rev-content">
+        <div class="v2rev-content-label">Content for these changes <span class="v2rev-content-opt">optional</span></div>
+        <div class="v2rev-libcard">
+          <span class="v2rev-libcard-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></span>
+          <span class="v2rev-libcard-txt">
+            <span class="v2rev-libcard-t">Add from your Content Library</span>
+            <span class="v2rev-libcard-s">Photos or clips the team should use in these changes</span>
+          </span>
+          <button type="button" class="v2rev-libcard-btn" onclick="_v2LibOpen()">Pick</button>
+        </div>
+        <div class="v2rev-chips" id="v2RevChips" style="display:none"></div>
+        <label class="v2rev-upload">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M8 3L5 6M8 3l3 3"/><path d="M2.5 10.5V12a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-1.5"/></svg>
+          <span>Or upload new files - they land in your Content Library too</span>
+          <input type="file" multiple accept="image/*,video/*,audio/*" style="display:none" onchange="_v2LibPickFiles(this)">
+        </label>
+      </div>
       <textarea id="v2ReqDesc" class="v2rev-desc" rows="2" placeholder="Anything else? (optional)"></textarea>
       <div class="v2rev-foot-row">
         <button type="button" class="v2rev-back" onclick="_v2CloseReview()">&lsaquo; Back to page</button>
-        <button type="button" class="v2rev-send" onclick="_v2Submit()">Send request &rarr;</button>
+        <button type="button" class="v2rev-send" id="v2RevSend" onclick="_v2Submit()">Send request &rarr;</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Content Library picker for the review screen: filter chips + multi-select
+     grid, same behavior as the Meta creative modal's picker (shared thumb helper). -->
+<div id="v2LibModal" class="v2lib-backdrop" style="display:none" onclick="if(event.target===this)_v2LibClose()">
+  <div class="v2lib-card" onclick="event.stopPropagation()">
+    <div class="v2rev-head">
+      <div>
+        <div class="v2rev-title">Your Content Library</div>
+        <div class="v2rev-sub" id="v2LibCount"></div>
+      </div>
+      <button type="button" class="v2rev-close" onclick="_v2LibClose()" aria-label="Close">&times;</button>
+    </div>
+    <div class="v2lib-body" id="v2LibBody"></div>
+    <div class="v2lib-foot">
+      <button type="button" class="v2rev-send" onclick="_v2LibClose()">Done</button>
     </div>
   </div>
 </div>
@@ -59655,6 +59692,31 @@ function toggleTheme() {
   .v2rev-foot-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .v2rev-back { font-family:var(--mm-ff); font-size:13px; font-weight:600; color:var(--text-sub); background:none; border:none; cursor:pointer; }
   .v2rev-send { font-family:var(--mm-ff); font-size:14px; font-weight:700; border:none; border-radius:10px; padding:12px 22px; background:var(--gold); color:#0B0B0D; cursor:pointer; }
+  .v2rev-send:disabled { opacity:.6; cursor:default; }
+  /* "Content for these changes" block (locked mockup 2b) */
+  .v2rev-content { margin-bottom:12px; }
+  .v2rev-content-label { font-family:var(--mm-ff); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-mute); margin-bottom:8px; }
+  .v2rev-content-opt { font-weight:600; text-transform:none; letter-spacing:0; color:var(--text-mute); opacity:.8; }
+  .v2rev-libcard { display:flex; align-items:center; gap:10px; border:1px dashed var(--border-med, var(--line)); border-radius:12px; padding:10px 12px; }
+  .v2rev-libcard-ico { flex:0 0 auto; width:32px; height:32px; border-radius:8px; background:var(--surface-el); color:var(--gold); display:flex; align-items:center; justify-content:center; }
+  .v2rev-libcard-txt { flex:1; min-width:0; }
+  .v2rev-libcard-t { display:block; font-family:var(--mm-ff); font-size:13px; font-weight:700; color:var(--text); }
+  .v2rev-libcard-s { display:block; font-family:var(--mm-ff); font-size:11.5px; color:var(--text-mute); margin-top:1px; }
+  .v2rev-libcard-btn { flex:0 0 auto; font-family:var(--mm-ff); font-size:12.5px; font-weight:700; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:8px; padding:7px 16px; cursor:pointer; }
+  .v2rev-libcard-btn:hover { border-color:var(--gold); }
+  .v2rev-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .v2rev-chip { display:inline-flex; align-items:center; gap:6px; max-width:100%; font-family:var(--mm-ff); font-size:12px; font-weight:600; color:var(--text); background:var(--surface-el); border:1px solid var(--line); border-radius:999px; padding:4px 6px 4px 10px; }
+  .v2rev-chip-name { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .v2rev-chip-x { background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:14px; line-height:1; padding:0 2px; }
+  .v2rev-chip-x:hover { color:var(--text); }
+  .v2rev-upload { display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-family:var(--mm-ff); font-size:12px; color:var(--text-sub); cursor:pointer; }
+  .v2rev-upload:hover span { color:var(--text); text-decoration:underline; }
+  /* Library picker overlay (sits above the review modal) */
+  .v2lib-backdrop { position:fixed; inset:0; z-index:1850; background:rgba(20,18,14,.5); display:flex; align-items:center; justify-content:center; padding:20px; }
+  .v2lib-card { width:min(480px,96vw); max-height:80vh; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:0 24px 60px rgba(0,0,0,.35); overflow:hidden; }
+  .v2lib-body { flex:1; overflow-y:auto; padding:0 20px 12px; }
+  .v2lib-body .mmc-libgrid { max-height:none; }
+  .v2lib-foot { padding:12px 20px 16px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; }
 </style>
 
 <style>
@@ -60546,6 +60608,7 @@ function _crBodyHtml() {
 function openChangeRequest() {
   if (!_MM) return;
   _V2_OPEN = true; _V2_PINS = []; _V2_PENDING = null; _V2_STEPS = []; _V2_STAGE = null;
+  try { _v2LibReset(); } catch (_) {}
   const t = document.getElementById('cr-modal-title');
   if (t) t.textContent = 'Request a change · ' + (_FN_ACTIVE ? _FN_ACTIVE.label : 'Free trial');
   const b = document.getElementById('cr-modal-body');
@@ -60594,6 +60657,7 @@ function openPageAnnotator(page) {
   _FN_ACTIVE = page;                       // annotator reads url_resolved / label / offer_id off this
   window._CR_FROM_BLUEPRINT = true;
   _V2_OPEN = true; _V2_PINS = []; _V2_PENDING = null; _V2_STEPS = []; _V2_STAGE = null;
+  try { _v2LibReset(); } catch (_) {}
   const t = document.getElementById('cr-modal-title');
   if (t) t.textContent = 'Request a change · ' + (page.label || 'Page');
   const b = document.getElementById('cr-modal-body');
@@ -60808,9 +60872,8 @@ function _mmCreativeAction(action, name) {
 
 /* ── New-creative / replace-creative request (Meta Ads support ticket) ──
    Front end built 2026-07-05 with Zoran (centered modal, assets + brief).
-   Submit is MOCKED (console + toast) like the landing-page "Request a change"
-   until v2_support_tickets lands. Context (campaign/ad set/offer + the creative
-   being replaced) is auto-attached. */
+   Submit posts a content_ask ticket via /api/v2-tickets?action=create.
+   Context (campaign/ad set/offer + the creative being replaced) is auto-attached. */
 let _MMC = null;
 function _mmcOpen(mode, idx) {
   const ctx = (mode === 'replace' ? (window._MMC_REP || []) : (window._MMC_ADD || []))[idx] || {};
@@ -60869,6 +60932,18 @@ function _mmcToggleLib(id) {
   if (_MMC.libIds.has(id)) _MMC.libIds.delete(id); else _MMC.libIds.add(id);
   _mmcRender();
 }
+// Thumbnail html for one Content Library asset (image / video / audio).
+// Shared by the Meta creative modal's picker AND the annotator's picker.
+function _libAssetThumbHtml(x) {
+  const url = x.link_url || _assetUrl(x.storage_path);
+  const isVid = (x.mime_type || '').startsWith('video/') || x.category === 'video';
+  const isAud = (x.mime_type || '').startsWith('audio/') || x.category === 'audio';
+  return isVid
+    ? '<video src="' + _escapeHtml(url) + '#t=0.3" muted playsinline preload="metadata"></video>'
+    : isAud
+    ? '<span class="mmc-libaudio"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>'
+    : '<img src="' + _escapeHtml(url) + '" alt="" loading="lazy">';
+}
 // Build the angle + guide + library picker block for the form step.
 function _mmcContentBlockHtml() {
   const m = _MMC;
@@ -60908,15 +60983,7 @@ function _mmcContentBlockHtml() {
   } else {
     lib = '<div class="mmc-libgrid">' + filtered.map(x => {
       const sel = m.libIds && m.libIds.has(x.id);
-      const url = x.link_url || _assetUrl(x.storage_path);
-      const isVid = (x.mime_type || '').startsWith('video/') || x.category === 'video';
-      const isAud = (x.mime_type || '').startsWith('audio/') || x.category === 'audio';
-      const thumb = isVid
-        ? '<video src="' + _escapeHtml(url) + '#t=0.3" muted playsinline preload="metadata"></video>'
-        : isAud
-        ? '<span class="mmc-libaudio"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>'
-        : '<img src="' + _escapeHtml(url) + '" alt="" loading="lazy">';
-      return '<button type="button" class="mmc-libitem' + (sel ? ' sel' : '') + '" onclick="_mmcToggleLib(\'' + x.id + '\')">' + thumb + (sel ? '<span class="mmc-libcheck">&#10003;</span>' : '') + '</button>';
+      return '<button type="button" class="mmc-libitem' + (sel ? ' sel' : '') + '" onclick="_mmcToggleLib(\'' + x.id + '\')">' + _libAssetThumbHtml(x) + (sel ? '<span class="mmc-libcheck">&#10003;</span>' : '') + '</button>';
     }).join('') + '</div>';
   }
   const selCount = m.libIds ? m.libIds.size : 0;
@@ -61069,11 +61136,12 @@ function _mmcShake(id) {   // "no-no" shake + red flag on a missing field
   el.classList.add('mmc-shake', 'mmc-invalid');
   setTimeout(() => el.classList.remove('mmc-invalid'), 1400);
 }
-// Upload any newly-dropped files into the Content Library (client-assets), so
-// they are reusable + taggable, and return their ids to attach to the ticket.
-async function _mmcUploadNewFiles() {
+// Upload files into the Content Library (client-assets), so they are reusable
+// + taggable, and return their ids to attach to a ticket. Shared by the Meta
+// creative modal and the annotator's review screen.
+async function _uploadFilesToLibrary(files) {
   const ids = [];
-  for (const f of (_MMC.files || [])) {
+  for (const f of (files || [])) {
     try {
       const clean = f.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
       const stamp = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
@@ -61089,6 +61157,7 @@ async function _mmcUploadNewFiles() {
   }
   return ids;
 }
+async function _mmcUploadNewFiles() { return _uploadFilesToLibrary(_MMC.files || []); }
 
 async function _mmcSubmit() {   // fires from the confirmation step (already validated)
   if (!_MMC) return;
@@ -61485,7 +61554,7 @@ function _v2Sync() {
 }
 function _v2Toggle() {
   _V2_OPEN = !_V2_OPEN;
-  if (_V2_OPEN) { _V2_PINS = []; _V2_TYPE = 'change'; _V2_PENDING = null; const dsc = document.getElementById('v2ReqDesc'); if (dsc) dsc.value = ''; }
+  if (_V2_OPEN) { _V2_PINS = []; _V2_TYPE = 'change'; _V2_PENDING = null; try { _v2LibReset(); } catch (_) {} const dsc = document.getElementById('v2ReqDesc'); if (dsc) dsc.value = ''; }
   else _v2NoteCancel();
   _v2Sync();
   if (_V2_OPEN) { const p = document.getElementById('v2ReqPanel'); if (p) setTimeout(() => p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60); }
@@ -61639,6 +61708,7 @@ function _v2OpenReview() {
   _V2_REVIEW_OPEN = true;
   document.querySelectorAll('#v2RevFilter button').forEach(b => b.classList.toggle('is-on', b.dataset.f === _V2_REVIEW_FILTER));
   _v2RenderReview();
+  try { _v2RenderContentChips(); } catch (_) {}
   const m = document.getElementById('v2ReviewModal');
   if (m) m.style.display = 'flex';
 }
@@ -61674,32 +61744,148 @@ function _v2RenderReview() {
 }
 function _v2ReviewEdit(i, val) { if (_V2_PINS[i]) { _V2_PINS[i].note = val; _v2RenderNotes(); } }
 function _v2ReviewDel(i) { _V2_PINS.splice(i, 1); _v2RenderReview(); _v2RenderNotes(); }
-function _v2Submit() {
+
+/* ── "Content for these changes" (review screen, locked mockup 2b) ──
+   Optional attach: pick from the Content Library (same multi-select grid as
+   the Meta creative modal - shared _libAssetThumbHtml) and/or upload new files
+   (shared _uploadFilesToLibrary, so they land in the library too). */
+let _V2_LIB = { loaded: false, assets: [], ids: new Set(), filter: 'all', files: [], open: false };
+function _v2LibReset() {
+  _V2_LIB = { loaded: false, assets: [], ids: new Set(), filter: 'all', files: [], open: false };
+  _v2RenderContentChips();
+}
+async function _v2LibLoad() {
+  try {
+    const { data } = await _sb.from('client_assets')
+      .select('id,label,storage_path,link_url,mime_type,category,content_type')
+      .eq('client_id', CLIENT_ID).neq('source', 'ticket')
+      .order('created_at', { ascending: false }).limit(200);
+    _V2_LIB.assets = data || [];
+  } catch (_) { _V2_LIB.assets = []; }
+  _V2_LIB.loaded = true;
+  if (_V2_LIB.open) _v2LibRender();
+}
+function _v2LibOpen() {
+  _V2_LIB.open = true;
+  const m = document.getElementById('v2LibModal');
+  if (m) m.style.display = 'flex';
+  if (!_V2_LIB.loaded) _v2LibLoad();
+  _v2LibRender();
+}
+function _v2LibClose() {
+  _V2_LIB.open = false;
+  const m = document.getElementById('v2LibModal');
+  if (m) m.style.display = 'none';
+  _v2RenderContentChips();
+}
+function _v2LibFilter(f) { _V2_LIB.filter = f; _v2LibRender(); }
+function _v2LibToggle(id) {
+  if (_V2_LIB.ids.has(id)) _V2_LIB.ids.delete(id); else _V2_LIB.ids.add(id);
+  _v2LibRender();
+}
+function _v2LibRender() {
+  const body = document.getElementById('v2LibBody'), cnt = document.getElementById('v2LibCount');
+  if (!body) return;
+  const filt = _V2_LIB.filter || 'all';
+  const filtered = (_V2_LIB.assets || []).filter(x => filt === 'all' || x.content_type === filt);
+  const filts = ['all', 'action', 'coaching', 'culture', 'testimonial', 'other'].map(f =>
+    '<button type="button" class="mmc-libfilt' + (filt === f ? ' on' : '') + '" onclick="_v2LibFilter(\'' + f + '\')">' + (f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)) + '</button>'
+  ).join('');
+  let grid = '';
+  if (!_V2_LIB.loaded) {
+    grid = '<div class="mmc-muted">Loading your library&hellip;</div>';
+  } else if (!filtered.length) {
+    grid = '<div class="mmc-muted">Nothing ' + (filt === 'all' ? 'in your library yet' : 'tagged as ' + filt) + '. Add content in the Content Library, or upload from the review screen.</div>';
+  } else {
+    grid = '<div class="mmc-libgrid">' + filtered.map(x => {
+      const sel = _V2_LIB.ids.has(x.id);
+      return '<button type="button" class="mmc-libitem' + (sel ? ' sel' : '') + '" onclick="_v2LibToggle(\'' + x.id + '\')">' + _libAssetThumbHtml(x) + (sel ? '<span class="mmc-libcheck">&#10003;</span>' : '') + '</button>';
+    }).join('') + '</div>';
+  }
+  body.innerHTML = '<div class="mmc-libfilts">' + filts + '</div>' + grid;
+  if (cnt) cnt.textContent = _V2_LIB.ids.size ? (_V2_LIB.ids.size + ' selected') : 'Tap to select - as many as you like';
+}
+function _v2LibPickFiles(input) {
+  if (!input.files) return;
+  for (const f of input.files) _V2_LIB.files.push(f);
+  input.value = '';
+  _v2RenderContentChips();
+}
+function _v2LibRmAsset(id) { _V2_LIB.ids.delete(id); _v2RenderContentChips(); }
+function _v2LibRmFile(i) { _V2_LIB.files.splice(i, 1); _v2RenderContentChips(); }
+function _v2RenderContentChips() {
+  const host = document.getElementById('v2RevChips');
+  if (!host) return;
+  const byId = {};
+  (_V2_LIB.assets || []).forEach(a => { byId[a.id] = a; });
+  const chips = [];
+  _V2_LIB.ids.forEach(id => {
+    const a = byId[id];
+    chips.push('<span class="v2rev-chip"><span class="v2rev-chip-name">' + _escapeHtml((a && (a.label || a.title || a.name)) || 'Library item') + '</span>' +
+      '<button type="button" class="v2rev-chip-x" onclick="_v2LibRmAsset(\'' + id + '\')" aria-label="Remove">&times;</button></span>');
+  });
+  _V2_LIB.files.forEach((f, i) => {
+    chips.push('<span class="v2rev-chip"><span class="v2rev-chip-name">' + _escapeHtml(f.name) + '</span>' +
+      '<span style="color:var(--text-mute);font-weight:500">' + _formatFileSize(f.size) + '</span>' +
+      '<button type="button" class="v2rev-chip-x" onclick="_v2LibRmFile(' + i + ')" aria-label="Remove">&times;</button></span>');
+  });
+  host.innerHTML = chips.join('');
+  host.style.display = chips.length ? 'flex' : 'none';
+}
+
+async function _v2Submit() {
   const desc = (document.getElementById('v2ReqDesc')?.value || '').trim();
   if (!_V2_PINS.length && !desc) { _mmToast('Add a note or a line of context first'); return; }
   const onOther = typeof _FN_ACTIVE !== 'undefined' && !!_FN_ACTIVE;   // annotating an "other" funnel page
   // Tie the request to the offer that owns this page. Every funnel row carries
   // offer_id; for the main free-trial page use the primary funnel's offer.
   const _srcFunnel = onOther ? _FN_ACTIVE : (Array.isArray(_FN) ? _FN.find(f => f.is_primary) : null);
-  const payload = {
-    module: 'landing-page', request_type: _V2_TYPE, source: 'v2_portal_oneclick',
-    description: desc,
-    context: {
-      funnel: onOther ? _FN_ACTIVE.key : 'free-trial',
-      funnel_id: _srcFunnel?.id || null,
-      offer_id: _srcFunnel?.offer_id || null,
-      page_url: onOther ? (_FN_ACTIVE.url_resolved || null) : ((typeof _MM !== 'undefined' && _MM?.page?.url) || null),
-      metric_snapshot: (!onOther && typeof _MM !== 'undefined' && _MM?.page) ? {
-        visitors: _MM.page.visitors, form_started: _MM.page.form_started,
-        saw_calendar: _MM.page.saw_calendar, booked: _MM.page.booked_sessions,
-      } : null,
-      annotations: _V2_PINS.map(p => ({ note: p.note, section: p.section || null, device: p.device || 'desktop' })),
-    },
+  const context = {
+    funnel: onOther ? _FN_ACTIVE.key : 'free-trial',
+    funnel_id: _srcFunnel?.id || null,
+    offer_id: _srcFunnel?.offer_id || null,
+    page_url: onOther ? (_FN_ACTIVE.url_resolved || null) : ((typeof _MM !== 'undefined' && _MM?.page?.url) || null),
+    metric_snapshot: (!onOther && typeof _MM !== 'undefined' && _MM?.page) ? {
+      visitors: _MM.page.visitors, form_started: _MM.page.form_started,
+      saw_calendar: _MM.page.saw_calendar, booked: _MM.page.booked_sessions,
+    } : null,
+    annotations: _V2_PINS.map(p => ({ note: p.note, section: p.section || null, device: p.device || 'desktop' })),
   };
-  console.log('[v2-request] MOCK submit (no table yet):', payload);   // TODO: POST /api/v2-support-tickets
-  _V2_PINS = []; _v2NoteCancel(); _v2CloseReview();
-  _mmToast('Request sent - staff will take a look');
-  closeChangeRequest();   // leave the annotator focus, back to the config screen
+  const n = _V2_PINS.length;
+  const pageName = onOther ? (_FN_ACTIVE.label || _FN_ACTIVE.key || 'Page') : 'Free trial page';
+  const btn = document.getElementById('v2RevSend');
+  if (btn && btn.disabled) return;   // double-click guard while sending
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    // Any new files land in the Content Library first, then ride along as ids.
+    const newIds = await _uploadFilesToLibrary(_V2_LIB.files);
+    const body = {
+      type: 'website_change',
+      source: 'editor',
+      client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
+      title: pageName + ' - ' + (n ? n + ' change' + (n === 1 ? '' : 's') : 'change request'),
+      intake: { request_type: _V2_TYPE, description: desc, asset_ids: Array.from(_V2_LIB.ids).concat(newIds) },
+      context,
+    };
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/v2-tickets?action=create&client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    const j = await _safeJson(res);
+    if (!res.ok || j.error) throw new Error(j.error || ('HTTP ' + res.status));
+    _V2_PINS = []; _v2LibReset(); _v2NoteCancel(); _v2CloseReview();
+    const dsc = document.getElementById('v2ReqDesc'); if (dsc) dsc.value = '';
+    _mmToast('Request sent - staff will take a look');
+    closeChangeRequest();   // leave the annotator focus, back to the config screen
+    // The new row should show on the support surfaces (home card / orb badge / rail).
+    try { _zdLoadTickets().then(() => _zdRefreshSurfaces()).catch(() => {}); } catch (_) {}
+  } catch (e) {
+    _mmToast("Couldn't send: " + ((e && e.message) || e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Send request &rarr;'; }
+  }
 }
 // Bridge listener: the client's V2 page (bam-client-sites) posts section hover/
 // click events when it loads in annotate mode. Until that ships this is dormant.
