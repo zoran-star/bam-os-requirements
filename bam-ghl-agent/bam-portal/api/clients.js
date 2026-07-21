@@ -1849,6 +1849,10 @@ async function handler(req, res) {
             const rows = await supabaseInsert("client_users", {
               client_id, name, email: email || null, phone: phone || null,
               role: "member", status: "active", user_id: null, hide_from_team: false,
+              // New teammates start with NO tab access ([] = nothing). They land on
+              // a Home screen prompting the owner to grant permissions. (null would
+              // mean "all"; existing members keep whatever they have.)
+              allowed_tabs: [],
             });
             return res.status(200).json({ ok: true, member: Array.isArray(rows) ? rows[0] : rows });
           } catch (e) { return res.status(500).json({ error: `add teammate failed: ${e.message}` }); }
@@ -1866,12 +1870,16 @@ async function handler(req, res) {
           ).catch(() => []);
           if (!targetRows?.length) return res.status(404).json({ error: "teammate not found for this client" });
           const target = targetRows[0];
-          if (target.role === "owner") return res.status(400).json({ error: "can't edit the owner here" });
+          // The owner's contact identity (name/email/phone) is managed via the
+          // clients row (Primary contact), NOT here - but their PUBLIC PROFILE
+          // (title/bio, for the website team page) IS editable here. So allow the
+          // owner through for title/bio only; block name/email/phone edits.
+          const isOwnerTarget = target.role === "owner";
           const patch = { updated_at: new Date().toISOString() };
           // Email + phone are editable at any point - including after the teammate
           // has a login. When they have a linked auth user, sync the login email
           // first (mirrors update-staff) so the row never drifts from the auth email.
-          if ("email" in teamBody) {
+          if (!isOwnerTarget && "email" in teamBody) {
             let email = typeof teamBody.email === "string" ? teamBody.email.trim().toLowerCase() : "";
             if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "enter a valid email or leave it blank" });
             const newEmail = email || null;
@@ -1887,8 +1895,15 @@ async function handler(req, res) {
             }
             patch.email = newEmail;
           }
-          if ("phone" in teamBody) { const ph = (teamBody.phone || "").trim(); patch.phone = ph || null; }
-          if ("name" in teamBody) { const nm = (teamBody.name || "").trim(); if (nm) patch.name = nm; }
+          if (!isOwnerTarget && "phone" in teamBody) { const ph = (teamBody.phone || "").trim(); patch.phone = ph || null; }
+          if (!isOwnerTarget && "name" in teamBody) { const nm = (teamBody.name || "").trim(); if (nm) patch.name = nm; }
+          // Public Team-page copy: title (position) + bio (blurb). Both optional,
+          // editable for ANY teammate including the owner. Empty string clears it.
+          if ("title" in teamBody) { const t = (teamBody.title || "").trim(); patch.title = t || null; }
+          if ("bio" in teamBody) { const b = (teamBody.bio || "").trim(); patch.bio = b || null; }
+          if (isOwnerTarget && !("title" in teamBody) && !("bio" in teamBody)) {
+            return res.status(400).json({ error: "the owner's contact details are managed in Primary contact" });
+          }
           const upd = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(memberId)}`, {
             method: "PATCH",
             headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
@@ -2035,6 +2050,9 @@ async function handler(req, res) {
               const rows = await supabaseInsert("client_users", {
                 user_id: memberUserId, client_id, name, email, phone: phone || null,
                 role: "member", status: "active",
+                // New teammates start with NO tab access ([] = nothing) - owner grants
+                // access afterward. See add-teammate for the same default.
+                allowed_tabs: [],
               });
               memberRow = Array.isArray(rows) ? rows[0] : rows;
             } catch (insErr) {

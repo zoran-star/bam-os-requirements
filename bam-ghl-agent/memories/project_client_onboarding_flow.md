@@ -47,7 +47,7 @@ Zoran: the navigation orb's CASCADE (the fan that springs up from the circle) is
 ## Gotchas
 - The pop only exists in command-center mode (the orb is `cc-mode` only); classic mode has no entry yet - add a sidebar nav item when non-CC academies reach V2.
 - Completion is data-derived: a step can UN-complete if the underlying state regresses (that is intentional).
-- When adding a step: add the registry row + a detector in `_obfFetchState()`; keep detectors to existing endpoints where possible.
+- When adding a step, THREE places or it won't show: (1) registry row in `_OBF_STEPS`, (2) a detector in `_obfFetchState()`, (3) the step `key` in the right section's `keys` in `_OBF_SECTIONS` (Academy/Brand/Wired/Offer/Launch). The new paged wizard renders only keys listed in `_OBF_SECTIONS` (`_obfWizSections` filters on it) - a step in `_OBF_STEPS` alone is defined + detected but INVISIBLE. This bit the Gmail inbox step (2026-07-20): added to `_OBF_STEPS` but not `_OBF_SECTIONS.wired.keys`, so it never rendered until the key was added. Keep detectors to existing endpoints where possible.
 
 ## Onboarding architecture & roadmap (thoughts to continue - Zoran, 2026-07-09)
 

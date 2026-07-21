@@ -7504,6 +7504,19 @@ if (window.__MOCK__) (() => {
         Business Blueprint
       </div>
 
+      <!-- Settings: owner-only system config (integrations + timezone). Never
+           grantable to a teammate (not in _PERMISSIONABLE_TABS); revealed by
+           applySettingsNavState() once role/BAM-staff is known. -->
+      <div class="nav-item" id="nav-settings" style="display:none" onclick="switchView('settings', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </span>
+        Settings
+      </div>
+
       <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('members', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -12090,6 +12103,9 @@ Then the call to action."]</div>
       </button>
     </div>
 
+    <!-- #view-settings moved OUT of .main (focus overlay, just after .main) so it
+         opens in focus mode like Business Blueprint, not as an in-.main view. -->
+
     <div class="view" id="view-train-agent">
       <div class="topbar">
         <div>
@@ -12218,6 +12234,15 @@ Then the call to action."]</div>
         <aside class="sup-rail" id="sup-rail"><!-- rendered by _zdRenderFocusRail() --></aside>
         <section class="sup-pane" id="sup-pane"><!-- rendered by _zdRenderFocusPane() --></section>
       </div>
+  <!-- Settings focus overlay (mirrors Business Blueprint). Owner-only; opened by
+       openSettingsFocus() from the sidebar nav + the command-center gear menu. -->
+  <div class="modal-backdrop mm-focus-page" id="view-settings" style="display:none" onclick="if(event.target===this)closeSettings()">
+    <div class="modal-card mm-modal-card bb-focus-card" onclick="event.stopPropagation()">
+      <div class="bb-focus-head">
+        <button type="button" class="mm-back-btn" onclick="closeSettings()">&lsaquo; Back</button>
+        <span class="topbar-kicker">§ Settings</span>
+      </div>
+      <div id="settings-body"><div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div></div>
     </div>
   </div>
 
@@ -17123,7 +17148,7 @@ let _OBF_AT = 0;
 const _OBF_SECTIONS = [
   { id: 'academy', label: 'Academy', full: 'Your academy', keys: ['basics', 'locations', 'coaches'] },
   { id: 'brand',   label: 'Brand',   full: 'Your brand',   keys: ['brand', 'sitecopy', 'instagram', 'brandboard'] },
-  { id: 'wired',   label: 'Wired',   full: 'Get wired',    keys: ['stripe', 'contacts', 'email', 'texting', 'ads'] },
+  { id: 'wired',   label: 'Wired',   full: 'Get wired',    keys: ['stripe', 'contacts', 'email', 'inbox', 'texting', 'ads'] },
   { id: 'offer',   label: 'Offer',   full: 'Your offer',   keys: ['define', 'schedule', 'pricing', 'policy', 'preset', 'leads', 'onboardingform', 'members', 'cancelled'] },
   { id: 'launch',  label: 'Launch',  full: 'Launch',       keys: ['website'] },
 ];
@@ -17147,7 +17172,8 @@ const _OBF_STEPS = [
   { key: 'locations', railLabel: 'Locations', group: 'general', title: 'Add your locations', sub: 'Address, how to find the door, photos. Your agent quotes these to parents', cta: 'Add locations', go: "_obfGoCard('locations')" },
   { key: 'coaches', railLabel: 'Team',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
   { key: 'stripe', railLabel: 'Stripe',    group: 'general', title: 'Connect Stripe', sub: 'Your own Stripe account: every payment lands there, not with us', cta: 'Connect', go: '_obfGoStripe()', launch: true },
-  { key: 'email', railLabel: 'Email',     group: 'general', title: 'Connect your email domain', sub: 'Emails send from your own domain. One DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'email', railLabel: 'Auto email', group: 'general', title: 'Connect your email domain', sub: 'For the emails your system sends for you: booking confirmations, follow-ups and campaigns, all from your own domain. One DNS paste at your registrar', cta: 'Set up email', go: '_obfGoDomains()' },
+  { key: 'inbox', railLabel: 'Inbox',     group: 'general', title: 'Connect your inbox', sub: 'For the emails you and your team write by hand. Sign in to your inbox once and it stays in sync with the portal both ways: what you send shows in your Sent, what comes in lands in both places', cta: 'Connect inbox', go: '_obfConnectInbox()', skippable: true, optional: true },
   { key: 'website', railLabel: 'Go live',   group: 'general', title: 'Launch your new website', sub: 'Point your domain at the rebuilt site. The old one retires on the flip', cta: 'Set up website', go: '_obfGoDomains()', note: '_obfWebsiteNote' },
   { key: 'contacts', railLabel: 'Contacts',  group: 'general', title: 'Import your contacts', sub: 'Every lead, parent and past inquiry you have, into one system right at the start. Names and numbers only; program details come later in your offer.', note: '_obfContactsNote' },
   { key: 'instagram', railLabel: 'Instagram', group: 'general', title: 'Connect Instagram DMs', sub: 'Your IG messages land in the portal inbox. Skip it and add later', cta: 'Connect', go: '_obfGoInstagram()', skippable: true, optional: true },
@@ -17325,13 +17351,13 @@ function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
 async function _obfFetchState() {
   const token = await _mreqAuthToken();
   const next = { basics: false, ein: false, brand: false, locations: false, coaches: false, sitecopy: false,
-    stripe: false, email: false, website: false, contacts: false, instagram: false,
+    stripe: false, email: false, inbox: false, website: false, contacts: false, instagram: false,
     define: false, schedule: false, pricing: false, policy: false,
     preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
     offer_id: null, booking: false, has_ghl: true, contacts_n: 0,
     website_build: null, staging_url: null, site_accepted: false, brandboard: false,
     texting: false, ads: false, ob: {}, legal_name: '', ein_value: '', address: '', chunks: {} };
-  const [em, web, ss, prog] = await Promise.allSettled([
+  const [em, web, ss, prog, mbx] = await Promise.allSettled([
     _edwApi('status'),
     _wdwApi('status'),
     fetch('/api/offers/setup-status?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
@@ -17339,8 +17365,11 @@ async function _obfFetchState() {
     // mark_onboarding_section RPC; the flow reads those SAME flags. The flow
     // is the checklist, the Blueprint is the workbench - one source of truth.
     _sb ? _sb.rpc('get_onboarding_progress', { p_client_id: CLIENT_ID }) : Promise.reject(new Error('no sb')),
+    // Connected-mailbox (2-way sync) status for the "Connect your inbox" step.
+    fetch('/api/email/mailbox-status?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(_safeJson),
   ]);
   if (em.status === 'fulfilled') { next.email = em.value.status === 'live'; next.ein = !!em.value.ein_set || _obfSkipped('ein'); }
+  if (mbx.status === 'fulfilled' && mbx.value) next.inbox = !!mbx.value.connected || _obfSkipped('inbox');
   if (web.status === 'fulfilled') next.website = web.value.status === 'live';
   if (prog.status === 'fulfilled' && prog.value && prog.value.data) {
     const p = prog.value.data;
@@ -17469,6 +17498,70 @@ function _obfGoStripe() {
 function _obfGoInstagram() {
   _obfNav('messages');
   setTimeout(() => { try { document.getElementById('ig-connect-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }, 500);
+}
+
+// Connect your inbox (2-way Gmail sync). One-time Google OAuth: the academy
+// signs into its own inbox once, then sent + received email mirrors between
+// Gmail and the portal. Staff/owner enters the EXACT inbox to connect (the
+// backend matches the Google-authorized address against it), so it works even
+// when the inbox domain differs from the Resend sending domain.
+function _obfConnectInbox() {
+  _obfClose();
+  document.getElementById('obf-inbox-modal')?.remove();
+  const prefill = (_OBF_STATE && _OBF_STATE.mailbox_email) || '';
+  document.body.insertAdjacentHTML('beforeend', `<div id="obf-inbox-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-24,24px);width:100%;max-width:460px;padding:24px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:var(--font-ui);font-weight:700;font-size:18px">Connect your inbox</div>
+      <div style="color:var(--text-muted);font-size:14px;line-height:1.5">Sign in to your Google inbox once. After that, the emails you send and receive sync between your inbox and the portal. Automated emails keep sending from your domain as usual.</div>
+      <label style="font-size:12px;color:var(--text-muted);margin-top:4px">Your inbox address</label>
+      <input id="obf-inbox-email" type="email" value="${prefill}" placeholder="info@yourdomain.com" autocomplete="off" style="background:var(--surface-2,var(--bg));border:1px solid var(--border);border-radius:var(--r-8,8px);padding:10px 12px;color:var(--text);font-size:14px" />
+      <div style="font-size:12px;color:var(--text-muted)">Use the exact Google address you want connected.</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+        <button class="btn" onclick="document.getElementById('obf-inbox-modal').remove()" style="background:transparent;border:1px solid var(--border);border-radius:var(--r-999,999px);padding:8px 16px;color:var(--text);cursor:pointer">Cancel</button>
+        <button class="btn" onclick="_obfInboxGo()" style="background:var(--gold);border:none;border-radius:var(--r-999,999px);padding:8px 18px;color:#1a1a1a;font-weight:600;cursor:pointer">Connect Gmail</button>
+      </div>
+    </div></div>`);
+  setTimeout(() => document.getElementById('obf-inbox-email')?.focus(), 50);
+}
+async function _obfInboxGo() {
+  const email = (document.getElementById('obf-inbox-email')?.value || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { _plToast('Enter the inbox address to connect (e.g. info@yourdomain.com)'); return; }
+  const token = await _mreqAuthToken();
+  if (!token) { _plToast('Please sign in again, then reconnect.'); return; }
+  const url = '/api/email/connect?' + new URLSearchParams({ token, client_id: CLIENT_ID, email, ret: window.location.origin });
+  window.location.href = url;
+}
+
+// Handle the OAuth return (?mailbox=connected|error). Toasts the result, kicks an
+// immediate first sync so mail shows up without waiting for the 3-min cron, and
+// refreshes the onboarding state. Mirrors _igwBoot's return handling.
+let _MBX_BOOTED = false;
+async function _mbxBoot() {
+  if (_MBX_BOOTED) return; _MBX_BOOTED = true;
+  try {
+    const u = new URL(window.location.href);
+    const p = u.searchParams.get('mailbox');
+    if (!p) return;
+    const email = u.searchParams.get('email') || '';
+    const reason = u.searchParams.get('reason') || '';
+    ['mailbox', 'email', 'reason', 'got', 'want'].forEach(k => u.searchParams.delete(k));
+    window.history.replaceState({}, document.title, u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '') + u.hash);
+    if (p === 'connected') {
+      _plToast('Inbox connected' + (email ? ' - ' + email : '') + '. Syncing your email now.');
+      try {
+        const token = await _mreqAuthToken();
+        // First pull now (staff JWT); the cron keeps it fresh after.
+        fetch('/api/email/sync-gmail?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).catch(() => {});
+      } catch (_) {}
+      _obfFetchState().catch(() => {});
+    } else if (p === 'error') {
+      const human = reason === 'inbox_mismatch' ? 'that Google account did not match the inbox you entered'
+        : reason === 'no_refresh_token' ? 'Google did not return access - try again and click Allow'
+        : reason === 'no_target_inbox' ? 'no inbox address was provided'
+        : (reason || 'please try again');
+      _plToast('Inbox connect failed - ' + human + '.');
+    }
+  } catch (_) {}
 }
 
 // Deep-link into the training offer's wizard at a section (mirrors
@@ -19446,6 +19539,14 @@ function switchView(name, el) {
     openCalendar();
     return;
   }
+  // Settings is a focus-mode overlay (like Blueprint/Calendar), not an in-.main
+  // view: pop it over the current page and return. Placed before the command-
+  // center check so it opens cleanly without the cc-classic chrome. Owner-gated.
+  if (name === 'settings') {
+    if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed('settings')) { switchView(_landingView ? _landingView() : 'home'); return; }
+    openSettingsFocus();
+    return;
+  }
   // Command center (beta): while the one-page flow is active, section-mapped
   // views scroll to their section instead of swapping views; anything else
   // opens classically with a "back to command center" pill. _CC_BYPASS lets
@@ -19485,6 +19586,8 @@ function switchView(name, el) {
   // Same for the Calendar focus overlay: if it's open and we're heading to any
   // other view, step out of it first (the target view then swaps in normally).
   if (name !== 'calendar' && typeof _calIsOpen === 'function' && _calIsOpen()) _mmCloseFocus('view-calendar');
+  // Same for the Settings focus overlay: step out if heading elsewhere.
+  if (name !== 'settings' && typeof _settingsIsOpen === 'function' && _settingsIsOpen()) closeSettings();
   if (name === 'blueprint') {
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
     if (!el) el = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'blueprint'"));
@@ -19544,6 +19647,8 @@ function switchView(name, el) {
   if (name === 'home') openHomeView();
 
   if (name === 'resources') openResourcesView();
+
+  // Settings renders via its focus overlay (openSettingsFocus), not here.
 
   if (name === 'assets') { _AST_LIB_MODE = false; _ASSETS_HOST_ID = 'assets-content'; openAssetsView(); }
 
@@ -19684,6 +19789,88 @@ function _mobileMorePick(view) { _mobileMoreClose(); mobileSwitchView(view); }
 // into the real tabs, plus 2 quick actions. Counts come from data the app
 // already maintains (tickets global, _msgConversations) + one light query
 // for open action items. Renders instantly; numbers fill in as they resolve.
+// ─── SETTINGS VIEW (owner-only) ─────────────────────────────────────────────
+// System config split out of the Business Blueprint: integrations/connections
+// status + the account time zone. Business identity stays in the Blueprint.
+function _settingsSaveTimezone(val) {
+  const statusEl = document.getElementById('settings-tz-status');
+  if (statusEl) statusEl.textContent = 'Saving…';
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+  if (c) c.time_zone = val;
+  Promise.resolve(_bbSaveClientBasics({ time_zone: val })).then(ok => {
+    if (statusEl) { statusEl.textContent = ok ? 'Saved' : "Couldn't save"; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 1500); }
+  }).catch(() => { if (statusEl) statusEl.textContent = "Couldn't save"; });
+}
+
+function _settingsIntegRow(name, desc, connected, actionLabel, actionFn) {
+  const pill = connected
+    ? `<span style="font-size:11px;font-weight:700;color:var(--green,#2e7d5b);background:var(--green-soft,rgba(46,125,91,.12));border-radius:var(--r-full,999px);padding:3px 10px;white-space:nowrap">Connected</span>`
+    : `<span style="font-size:11px;font-weight:700;color:var(--amber,#b5851f);background:var(--amber-soft,rgba(181,133,31,.12));border-radius:var(--r-full,999px);padding:3px 10px;white-space:nowrap">Not set up</span>`;
+  const action = actionFn
+    ? `<button onclick="${actionFn}" style="background:transparent;color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">${actionLabel}</button>`
+    : `<span style="font-size:12px;color:var(--text-mute);white-space:nowrap">${actionLabel}</span>`;
+  return `<div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-top:1px solid var(--border)">
+    <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--text)">${name}</div><div style="font-size:12px;color:var(--text-mute)">${desc}</div></div>
+    ${pill}${action}
+  </div>`;
+}
+
+function _settingsRenderIntegrations(st) {
+  const el = document.getElementById('settings-integrations');
+  if (!el) return;
+  st = st || {};
+  el.innerHTML = [
+    _settingsIntegRow('Stripe', 'Take payments and subscriptions.', !!st.stripe, 'Manage', '_obfGoStripe()'),
+    _settingsIntegRow('Email domain', 'Send email from your own domain.', !!st.email, 'Manage', '_obfGoDomains()'),
+    _settingsIntegRow('Website', 'Your live website domain.', !!st.website, 'Set up during onboarding', null),
+    _settingsIntegRow('Texting', 'Send SMS from your academy number.', !!st.texting, 'Set up during onboarding', null),
+    _settingsIntegRow('Instagram / Meta', 'Connect your Instagram inbox.', !!st.instagram, 'Manage', '_obfGoInstagram()'),
+    _settingsIntegRow('CRM (GHL)', 'Your BAM-managed CRM sub-account.', st.has_ghl !== false, 'Managed by BAM', null),
+  ].join('');
+}
+
+async function openSettingsView() {
+  const host = document.getElementById('settings-body');
+  if (!host) return;
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  const tzOpts = _BB_TZ_OPTS.map(([val, label]) => `<option value="${val}" ${(c.time_zone || '') === val ? 'selected' : ''}>${_bbEscapeHtml(label)}</option>`).join('');
+  const card = 'background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg,16px);box-shadow:var(--shadow-card);padding:22px 24px';
+  host.innerHTML = `
+    <div style="max-width:720px">
+      <div style="${card};margin-bottom:18px">
+        <div style="font-family:var(--font-num,inherit);font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">Time zone</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-bottom:14px">Used to time automations, reminders, and reports correctly.</div>
+        <select onchange="_settingsSaveTimezone(this.value)" style="width:100%;max-width:360px;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:10px 12px;font-size:14px;font-family:inherit;outline:none">${tzOpts}</select>
+        <span id="settings-tz-status" style="display:inline-block;margin-left:10px;font-size:12px;color:var(--text-mute)"></span>
+      </div>
+      <div style="${card}">
+        <div style="font-family:var(--font-num,inherit);font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">Integrations</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-bottom:8px">The accounts that power your payments, messaging, and automations.</div>
+        <div id="settings-integrations"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span> Checking connections…</div></div>
+      </div>
+    </div>`;
+  try { _settingsRenderIntegrations(await _obfFetchState()); }
+  catch (_) { const el = document.getElementById('settings-integrations'); if (el) el.innerHTML = '<div style="font-size:13px;color:var(--text-mute);padding:12px 0">Couldn\'t load connection status right now.</div>'; }
+}
+
+// Empty-state shown on Home to a teammate with no tab grants yet ([]). It's the
+// only surface they can reach until the owner grants access in Blueprint > Staff.
+function _renderHomeNoAccess() {
+  const wrap = document.querySelector('#view-home .home-wrap');
+  if (!wrap) return;
+  let host = document.getElementById('home-no-access');
+  if (!host) { host = document.createElement('div'); host.id = 'home-no-access'; wrap.appendChild(host); }
+  host.style.display = '';
+  host.innerHTML = `
+    <div style="max-width:520px;margin:40px auto;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg,16px);box-shadow:var(--shadow-card);padding:40px 32px">
+      <div style="width:52px;height:52px;margin:0 auto 18px;border-radius:var(--r-full,999px);background:var(--gold-sheen,rgba(212,182,92,.08));display:flex;align-items:center;justify-content:center;color:var(--gold,#D4B65C)">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px">No access yet</div>
+      <div style="font-size:14px;color:var(--text-sub);line-height:1.6">Your academy owner hasn't set your permissions yet. Ask them to give you access, then refresh this page.</div>
+    </div>`;
+}
+
 async function openHomeView() {
   // #1 - greeting + first name
   const hour = new Date().getHours();
@@ -19692,6 +19879,18 @@ async function openHomeView() {
   const g = document.getElementById('home-greeting');
   if (g) g.textContent = (first && first !== '-') ? `${part}, ${first}` : part;
   loadMyAvatar();   // show / refresh my profile photo
+
+  // No-access member ([] tab grant = "nothing yet"): Home is their only screen,
+  // and it shows the access-request prompt instead of any dashboard. Everyone
+  // else (owner / BAM / granted members) falls through to the normal home.
+  if (_hasNoTabAccess()) {
+    ['home-v15', 'home-v2', 'home-tiles-sec', 'home-tiles', 'home-week-sec', 'home-week',
+     'home-activity-sec', 'home-activity', 'home-qa-sec', 'home-qa', 'home-status']
+      .forEach(id => { const e = document.getElementById(id); if (e) e.style.display = 'none'; });
+    _renderHomeNoAccess();
+    return;
+  }
+  { const naEl = document.getElementById('home-no-access'); if (naEl) naEl.style.display = 'none'; }
 
   // V1.5 academies get a dedicated dashboard (trials today · missed calls ·
   // action items) instead of the ticket-centric tiles.
@@ -22950,17 +23149,39 @@ function applyTabPermissions() {
       document.querySelectorAll(`.mobile-nav-item[data-view="${v}"]`).forEach(el => { el.style.setProperty('display', 'none', 'important'); });
     }
   }
+  // No grants yet ([] = nothing) → also hide Messages + Parent Inbox (both
+  // normally always-on) so the teammate is left with Home only.
+  if (_hasNoTabAccess()) {
+    for (const v of ['messages', 'parent-messages']) {
+      document.querySelectorAll(`.nav-item[onclick*="switchView('${v}'"]`).forEach(el => { el.style.display = 'none'; });
+      document.querySelectorAll(`.mobile-nav-item[data-view="${v}"]`).forEach(el => { el.style.setProperty('display', 'none', 'important'); });
+    }
+  }
 }
 
 // Is a view allowed for the current user? Owner/unrestricted = always yes.
 // Views not under a permissionable tab (home, messages…) = always yes.
 function _isViewTabAllowed(view) {
   if (_effTabRole() === 'owner') return true;
+  // Settings is owner-only, never grantable. Non-owners: only BAM staff (support).
+  if (view === 'settings') return _IS_BAM_STAFF === true;
   const tabs = _effAllowedTabs();
   if (!Array.isArray(tabs)) return true;
+  // No grants yet ([] = nothing) → only Home is reachable; it shows the
+  // "ask your owner for access" prompt. Everything else bounces to Home.
+  if (tabs.length === 0) return view === 'home';
   const tab = _PERMISSIONABLE_TABS.find(t => t.views.includes(view));
   if (!tab) return true;
   return tabs.includes(tab.key);
+}
+
+// A member whose tab grant is an explicit empty array ([] = "nothing yet") sees
+// ONLY Home, which shows the access-request prompt. Owner / BAM staff / null(=all)
+// members are never in this state.
+function _hasNoTabAccess() {
+  if (_effTabRole() === 'owner' || _IS_BAM_STAFF === true) return false;
+  const tabs = _effAllowedTabs();
+  return Array.isArray(tabs) && tabs.length === 0;
 }
 
 // ── Owner: preview a teammate's view ──
@@ -23034,6 +23255,7 @@ async function _ensureStaffFlag() {
   // Now that we know staff status, re-apply Home visibility (staff keep Home).
   try { if (typeof applyHomeNavState === 'function') applyHomeNavState(); } catch (_) {}
   try { if (typeof applyTrainAgentNavState === 'function') applyTrainAgentNavState(); } catch (_) {}
+  try { if (typeof applySettingsNavState === 'function') applySettingsNavState(); } catch (_) {}
   return _IS_BAM_STAFF;
 }
 
@@ -23102,6 +23324,15 @@ async function loadMyPermissionsAndApply() {
     _MY_CAN_ENROLL_MEMBERS = row?.can_enroll_members === true;
   } catch (_) { _MY_ALLOWED_TABS = null; _MY_ALLOWED_STAGES = null; _MY_ALLOWED_KPIS = null; }
   applyTabPermissions();
+  try { if (typeof applySettingsNavState === 'function') applySettingsNavState(); } catch (_) {} // owner-only Settings nav
+  // Perms load async: if this resolves while a no-access member is sitting in the
+  // command center (or any non-Home view), pull them back to the Home prompt.
+  if (typeof _hasNoTabAccess === 'function' && _hasNoTabAccess()) {
+    try {
+      if (typeof _ccActive === 'function' && _ccActive()) _ccOpenClassic('home');
+      else if (typeof switchView === 'function') switchView('home');
+    } catch (_) {}
+  }
   if (typeof _renderPreviewAsMenu === 'function') _renderPreviewAsMenu(); // owner role now known
   if (typeof applyTalkToBamInboxState === 'function') applyTalkToBamInboxState();
 }
@@ -23134,6 +23365,16 @@ function applyHomeNavState() {
   document.querySelectorAll('.mobile-nav-item[data-view="home"]').forEach(m => { m.style.display = hide ? 'none' : ''; });
 }
 
+// Settings is owner-only system config (integrations + timezone) - never
+// grantable to a teammate. Show it only for the academy owner or a BAM staff
+// admin. Called whenever role / BAM-staff status becomes known.
+function applySettingsNavState() {
+  const show = (_MY_TAB_ROLE === 'owner') || (_IS_BAM_STAFF === true);
+  const el = document.getElementById('nav-settings');
+  if (el) el.style.display = show ? '' : 'none';
+  document.querySelectorAll('.mobile-nav-item[data-view="settings"]').forEach(m => { m.style.setProperty('display', show ? '' : 'none', 'important'); });
+}
+
 // Where a user lands when Home isn't available to them - first visible tab.
 function _landingView() {
   if (!_homeHiddenForMe()) return 'home';
@@ -23163,9 +23404,18 @@ function applyCrmSupersetNav() {
   // a first-class target now.
   const show = crm;
   // Full-CRM nav items shared by V1.5 + V2
-  ['nav-contacts', 'nav-v15inbox', 'nav-v15kpis'].forEach(id => {
+  ['nav-contacts', 'nav-v15inbox'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = show ? '' : 'none';
+  });
+  // Standalone KPIs tab: V1.5 only. V2 integrates KPIs into each section, so the
+  // standalone tab is retired there - which also drops it out of the staff
+  // Tab-access grant list (relevantTabs keys off nav visibility).
+  const kpiNav = document.getElementById('nav-v15kpis');
+  if (kpiNav) kpiNav.style.display = (show && !isV2) ? '' : 'none';
+  document.querySelectorAll('.mobile-nav-item[data-view="v15kpis"]').forEach(el => {
+    if (show && !isV2) el.style.removeProperty('display');
+    else el.style.setProperty('display', 'none', 'important');
   });
   // V2 uses the upgraded v15 inbox → retire the older V2 inbox nav item
   const oldInbox = document.getElementById('nav-v2inbox');
@@ -23183,6 +23433,7 @@ function applyCrmSupersetNav() {
   // their GHL social threads (the inbox_live dedupe trap - see
   // memories/project_meta_dm_spine.md).
   if (isV2 && typeof _igwBoot === 'function') { try { _igwBoot(); } catch (_) {} }
+  if (isV2 && typeof _mbxBoot === 'function') { try { _mbxBoot(); } catch (_) {} }
 }
 
 // ── V1.5 feature gate ──
@@ -24683,6 +24934,40 @@ function closeBlueprint() {
 }
 async function openBlueprintView() { _bbRenderFromHash(); }
 
+// ── Settings focus overlay (mirrors openBlueprint/closeBlueprint) ──
+// #view-settings lives OUTSIDE .main so the camera-pan doesn't blank it. Opened
+// from the sidebar nav + the command-center gear menu; Back / backdrop closes it.
+let _SET_RETURN = null;
+function _settingsIsOpen() { return !!document.getElementById('view-settings')?.classList.contains('mm-open'); }
+function openSettingsFocus() {
+  const modal = document.getElementById('view-settings');
+  if (!modal) return;
+  if (!_settingsIsOpen()) {
+    const cur = document.querySelector('.view.active');
+    _SET_RETURN = cur ? cur.id.replace('view-', '') : null;
+  }
+  try { openSettingsView(); } catch (_) {}   // render integrations + time zone before the pan
+  if (typeof _ccOpenFocusPage === 'function') {
+    _ccOpenFocusPage('view-settings', '#nav-settings');
+  } else {
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => { document.documentElement.classList.add('mm-focus-open'); modal.classList.add('mm-open'); });
+  }
+}
+function closeSettings() {
+  if (typeof _mmCloseFocus === 'function') _mmCloseFocus('view-settings');
+  else {
+    const m = document.getElementById('view-settings');
+    if (m) { m.classList.remove('mm-open'); m.style.display = 'none'; }
+    document.documentElement.classList.remove('mm-focus-open');
+  }
+  const back = _SET_RETURN || (typeof _landingView === 'function' ? _landingView() : 'home');
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
+  if (item) item.classList.add('active');
+  try { syncMobileNav(back); } catch (_) {}
+}
+
 // ── Calendar focus overlay (mirrors openBlueprint/closeBlueprint) ──
 // Calendar lives OUTSIDE .main (sibling of it) so the mm-focus-open camera-pan
 // that blanks .main doesn't blank the overlay. Open pops it over the current
@@ -25073,13 +25358,9 @@ function _bbRenderGeneralCard(panel, meta) {
       <div class="bb-field-hint">Federal tax ID - required so we can set up Stripe Connect under your business.</div>
     </div>
 
-    <div class="bb-field">
-      <div class="bb-field-label">Time zone</div>
-      <select id="bb-gen-time_zone" class="bb-input" onchange="_bbGenChanged()">
-        ${_BB_TZ_OPTS.map(([val, label]) => `<option value="${val}" ${(c.time_zone || '') === val ? 'selected' : ''}>${label}</option>`).join('')}
-      </select>
-      <div class="bb-field-hint">Used to time automations, reminders, and reports correctly.</div>
-    </div>
+    <!-- Time zone MOVED to Settings (owner-only system config) 2026-07-20.
+         It's a system setting, not business identity. Edited at Settings >
+         Time zone; still persisted to clients.time_zone via the same RPC. -->
 
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
   `;
@@ -25105,7 +25386,8 @@ function _bbGenChanged() {
     legal_name:    document.getElementById('bb-gen-legal_name')?.value || '',
     address:       document.getElementById('bb-gen-address')?.value || '',
     ein:           document.getElementById('bb-gen-ein')?.value || '',
-    time_zone:     document.getElementById('bb-gen-time_zone')?.value || '',
+    // time_zone moved to Settings; do NOT read it here (the field is gone, so
+    // reading it would save an empty value and wipe the saved zone).
   }));
 }
 
@@ -25580,29 +25862,10 @@ async function _bbRenderStaffCard(panel, meta) {
       <button class="btn-primary-bb" onclick="openInviteTeamModal()">+ Invite teammate</button>
     </div>
 
-    <div style="background:var(--surface-el);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:0 0 20px">
-      <div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--text)">Owner / primary contact</div>
-      <div style="font-size:12px;color:var(--text-mute);margin:4px 0 12px">The main person we deal with - used across the portal, emails, and billing.</div>
-      <div class="bb-field">
-        <div class="bb-field-label">Owner name <span class="bb-field-req">*</span></div>
-        <input id="bb-owner-name" type="text" class="bb-input" value="${ov('owner_name')}" oninput="_bbStaffOwnerChanged()" />
-      </div>
-      <div class="bb-field">
-        <div class="bb-field-label">Owner email <span class="bb-field-req">*</span></div>
-        <input id="bb-owner-email" type="email" class="bb-input" value="${ov('email')}" oninput="_bbStaffOwnerChanged()" />
-      </div>
-      <div class="bb-field" style="margin-bottom:0">
-        <div class="bb-field-label">Owner phone</div>
-        <input id="bb-owner-phone" type="tel" class="bb-input" value="${ov('phone')}" oninput="_bbStaffOwnerChanged()" />
-      </div>
-      <div style="font-size:11px;color:var(--text-mute);margin-top:8px;text-align:right">Auto-saves as you type.</div>
-    </div>
-
     <p style="font-size:13px;color:var(--text-sub);line-height:1.55;margin:0 0 16px;max-width:680px">
-      Everyone listed here can log in to this portal with full access. Anyone on the team can invite more people; only the account owner can revoke access.
+      Everyone on your team, in one card each. New teammates start with no access: you choose which tabs each one can see. Anyone on the team can invite more people; only the account owner can revoke access.
     </p>
     <div id="bb-staff-list"><div class="bb-empty">Loading…</div></div>
-    <div id="bb-notif-panel"></div>
     ${_bbMarkDoneCta('staff', 'Staff')}
   `;
 
@@ -25670,7 +25933,13 @@ function _bbNotifToggle(eventKey, cuId) {
   const i = arr.indexOf(cuId);
   if (i >= 0) arr.splice(i, 1); else arr.push(cuId);
   _BB_NOTIF_PREFS[eventKey] = arr;
-  _bbRenderNotifPanel(_BB_NOTIF_STAFF, true);
+  // Re-render just this person's pills (per-person, not a matrix anymore).
+  const host = document.getElementById('staff-notif-' + cuId);
+  if (host) {
+    const person = (_BB_NOTIF_STAFF || []).find(s => s.id === cuId);
+    const hasPhone = !!(person && person.phone && String(person.phone).trim());
+    host.innerHTML = _bbStaffNotifPillsHtml(cuId, hasPhone);
+  }
   _bbNotifSave();
 }
 function _bbNotifSave() {
@@ -25699,12 +25968,12 @@ async function _bbStaffRefreshList() {
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
   let { data, error } = await _sb.from('client_users')
-    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members')
+    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members, title, bio')
     .eq('client_id', CLIENT_ID)
     .eq('status', 'active')
     .eq('hide_from_team', false);
   if (error) {
-    // Migration-safe fallback: can_enroll_members may not exist yet.
+    // Migration-safe fallback: can_enroll_members / title / bio may not exist yet.
     ({ data, error } = await _sb.from('client_users')
       .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages')
       .eq('client_id', CLIENT_ID)
@@ -25721,7 +25990,20 @@ async function _bbStaffRefreshList() {
   const myRow = (data || []).find(r => r.user_id === myId);
   if (typeof TEAM_MY_ROLE !== 'undefined') TEAM_MY_ROLE = myRow?.role || null;
 
-  _bbRenderNotifPanel(data || [], (myRow?.role === 'owner' || _IS_BAM_STAFF === true));
+  // Notifications now live per-person inside each card (not a separate matrix).
+  // Load the academy's prefs once so each card can render its own event pills.
+  const _canManageAll = (myRow?.role === 'owner' || _IS_BAM_STAFF === true);
+  _BB_NOTIF_STAFF = data || [];
+  if (_canManageAll && !_BB_NOTIF_LOADED) {
+    try {
+      const { data: cprefs } = await _sb.from('clients').select('notification_prefs').eq('id', CLIENT_ID).single();
+      _BB_NOTIF_PREFS = (cprefs && cprefs.notification_prefs) || {};
+    } catch (_) { _BB_NOTIF_PREFS = {}; }
+    _BB_NOTIF_LOADED = true;
+  }
+  // Clients row = source of the owner's Primary contact (owner_name/email/phone).
+  const cRow = (CLIENT_ROWS || []).find(x => x.id === CLIENT_ID) || {};
+  const ov2 = (k) => _bbEscapeAttr(cRow[k] || '');
 
   if (!data || data.length === 0) {
     list.innerHTML = '<div class="bb-empty">No teammates yet. Click "+ Invite teammate" to add the first one.</div>';
@@ -25768,21 +26050,11 @@ async function _bbStaffRefreshList() {
         <div id="staff-stages-${r.id}" style="padding:11px 13px;background:var(--surface);border:1px solid var(--border-med);border-top:none;border-radius:0 0 10px 10px;display:flex;flex-wrap:wrap;gap:9px 18px">
           <div style="color:var(--text-mute);font-size:12px">Open to load stages…</div>
         </div>
+        <div style="font-size:11px;color:var(--text-mute);margin:7px 2px 0;line-height:1.5">A granted stage lets this person operate its engine: steer the agent in Hawkeye, or message the leads directly if it's a human stage. Automation stages need no action.</div>
       </details>`;
-    const kpisHtml = !canManageKpis ? '' : `
-      <details class="staff-kpis" style="margin-top:6px">
-        <summary style="cursor:pointer;font-size:12px;color:var(--text-sub);padding:9px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px;display:flex;justify-content:space-between;align-items:center">
-          <span>KPI categories</span><span id="staff-kpis-status-${r.id}" style="font-size:11px;color:var(--text-mute)"></span>
-        </summary>
-        <div id="staff-kpis-${r.id}" style="padding:11px 13px;background:var(--surface);border:1px solid var(--border-med);border-top:none;border-radius:0 0 10px 10px;display:flex;flex-wrap:wrap;gap:9px 18px">
-          ${_KPI_CATEGORIES.map(c => {
-            const on = !Array.isArray(r.allowed_kpis) || r.allowed_kpis.includes(c.key);
-            return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-              <input type="checkbox" data-kpicat="${c.key}" ${on ? 'checked' : ''} onchange="_bbStaffKpisSave('${r.id}')"> ${c.icon} ${escapeHTML(c.label)}</label>`;
-          }).join('')}
-          <div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Unchecked categories are hidden from this teammate in the KPIs tab.</div>
-        </div>
-      </details>`;
+    // KPI-categories grant removed: in V2, KPIs live inside each section, so tab
+    // access carries them (Marketing tab -> marketing KPIs, etc). Revenue/financial
+    // KPIs stay hidden until the Financials section ships.
     const tabsHtml = !canManageTabs ? '' : `
       <details class="staff-tabs" style="margin-top:6px">
         <summary style="cursor:pointer;font-size:12px;color:var(--text-sub);padding:9px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px;display:flex;justify-content:space-between;align-items:center">
@@ -25794,38 +26066,68 @@ async function _bbStaffRefreshList() {
             return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
               <input type="checkbox" data-tabkey="${t.key}" ${on ? 'checked' : ''} onchange="_bbStaffTabsSave('${r.id}')"> ${t.icon} ${escapeHTML(t.label)}</label>`;
           }).join('')}
-          <div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Home &amp; Messages are always visible. Unchecked = hidden for this teammate.</div>
+          <div style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Home &amp; Messages are always visible. Each tab carries its own tools: the Members tab also lets this person sign up returning clients, and each section shows its own KPIs.</div>
         </div>
       </details>`;
-    // Opt-in grant: teammate may use the Returning Client Enroll flow in
-    // Members. Only offered when this academy actually has the Members tab.
-    const canManageEnroll = iAmOwner && !isOwner && relevantTabs.some(t => t.key === 'members');
-    const enrollHtml = !canManageEnroll ? '' : `
-      <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-          <input type="checkbox" ${r.can_enroll_members === true ? 'checked' : ''} onchange="_bbStaffEnrollSave('${r.id}', this.checked)">
-          Can sign up returning clients
-        </label>
-        <span id="staff-enroll-status-${r.id}" style="font-size:11px;color:var(--text-mute)"></span>
-        <span style="flex-basis:100%;font-size:11px;color:var(--text-mute)">Lets this teammate enroll past clients from the Members tab. You always can.</span>
-      </div>`;
+    // "Can sign up returning clients" toggle removed: the Members tab now grants it
+    // (enforced by _canEnrollReturning + api/members/enroll via members-tab access).
     const notInvited = !r.user_id;
-    // Contact edit (email + phone) for any owner-managed teammate - editable at
-    // any point, invited or not. Not-yet-invited rows also get the Invite button.
     const canEditContact = iAmOwner && !isOwner;
-    const inviteHtml = !canEditContact ? '' : `
-      <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
-        <input id="staff-email-${r.id}" type="email" value="${_bbEscapeAttr(r.email || '')}" placeholder="email@example.com"
-          onchange="_bbStaffContactSave('${r.id}', 'email', this.value)"
-          style="flex:1;min-width:170px;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:8px;padding:8px 11px;font-size:13px;outline:none">
-        <input id="staff-phone-${r.id}" type="tel" inputmode="tel" value="${_bbEscapeAttr(r.phone || '')}" placeholder="phone (optional)"
-          onchange="_bbStaffContactSave('${r.id}', 'phone', this.value)"
-          style="flex:1;min-width:140px;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:8px;padding:8px 11px;font-size:13px;outline:none">
-        ${notInvited ? `<button onclick="_bbStaffInvite('${r.id}')" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Invite</button>` : ''}
-        <span id="staff-invite-status-${r.id}" style="flex-basis:100%;font-size:11px;color:var(--text-mute)"></span>
+    const crm = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) || (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+    const hasPhone = !!(r.phone && String(r.phone).trim());
+    // Shared zone styling: each card is split by hairline-topped, labelled zones.
+    const ZONE = 'border-top:1px solid var(--border);margin-top:14px;padding-top:13px';
+    const ZLAB = 'font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-mute);margin-bottom:11px;display:flex;align-items:center;gap:6px';
+    const FLD = 'width:100%;box-sizing:border-box;background:var(--bg);color:var(--text);border:1px solid var(--border-med);border-radius:var(--r-sm,8px);padding:9px 11px;font-size:13px;outline:none;font-family:inherit';
+    const ic = (p) => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+
+    // Owner Primary contact (owner card only) - name/email/phone save to clients.
+    const ownerContactZone = !(isOwner && iAmOwner) ? '' : `
+      <div style="${ZONE}">
+        <div style="${ZLAB}">${ic('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>')}Primary contact · used across the portal, emails, billing</div>
+        <input id="bb-owner-name" type="text" value="${ov2('owner_name')}" placeholder="Owner name" oninput="_bbStaffOwnerChanged()" style="${FLD};margin-bottom:8px">
+        <input id="bb-owner-email" type="email" value="${ov2('email')}" placeholder="Owner email" oninput="_bbStaffOwnerChanged()" style="${FLD};margin-bottom:8px">
+        <input id="bb-owner-phone" type="tel" value="${ov2('phone')}" placeholder="Owner phone" oninput="_bbStaffOwnerChanged()" style="${FLD}">
       </div>`;
-    return `<div style="margin-bottom:10px">
-      <div class="team-row">
+
+    // Public profile (everyone the owner manages, incl the owner): photo + title + bio.
+    const profileZone = !iAmOwner ? '' : `
+      <div style="${ZONE}">
+        <div style="${ZLAB}">${ic('<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>')}Public profile · shows on your website team page</div>
+        <div style="margin-bottom:11px">${_assetBankHtml('staff_id', r.id, { category: 'photo' })}</div>
+        <input id="staff-title-${r.id}" type="text" value="${_bbEscapeAttr(r.title || '')}" placeholder="Title / role (e.g. Head Coach)" onchange="_bbStaffContactSave('${r.id}', 'title', this.value)" style="${FLD};margin-bottom:8px">
+        <textarea id="staff-bio-${r.id}" rows="2" placeholder="Short bio shown on your website team page" onchange="_bbStaffContactSave('${r.id}', 'bio', this.value)" style="${FLD};resize:vertical;line-height:1.5">${escapeHTML(r.bio || '')}</textarea>
+        <span style="display:block;font-size:11px;color:var(--text-mute);margin-top:6px">Leave blank to hide from the team page.</span>
+      </div>`;
+
+    // Contact + invite (members only): email + phone (drives notifications) + invite.
+    const contactZone = !canEditContact ? '' : `
+      <div style="${ZONE}">
+        <div style="${ZLAB}">${ic('<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m22 6-10 7L2 6"/>')}Contact</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="staff-email-${r.id}" type="email" value="${_bbEscapeAttr(r.email || '')}" placeholder="email@example.com" onchange="_bbStaffContactSave('${r.id}', 'email', this.value)" style="${FLD};flex:1;min-width:170px;width:auto">
+          <input id="staff-phone-${r.id}" type="tel" inputmode="tel" value="${_bbEscapeAttr(r.phone || '')}" placeholder="phone (for text alerts)" onchange="_bbStaffContactSave('${r.id}', 'phone', this.value)" style="${FLD};flex:1;min-width:150px;width:auto">
+          ${notInvited ? `<button onclick="_bbStaffInvite('${r.id}')" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:var(--r-sm,8px);padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Invite</button>` : ''}
+        </div>
+        <span id="staff-invite-status-${r.id}" style="display:block;font-size:11px;color:var(--text-mute);margin-top:6px"></span>
+      </div>`;
+
+    // Access (members only): tab / stage / KPI grants + returning-client enroll.
+    const accessZone = !(canManageTabs || canManageStages) ? '' : `
+      <div style="${ZONE}">
+        <div style="${ZLAB}">${ic('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>')}Access · starts with nothing until you grant it</div>
+        ${tabsHtml}${stagesHtml}
+      </div>`;
+
+    // Notifications (owner-manage, CRM/V2 tiers): which events text this person.
+    const notifZone = !(iAmOwner && crm) ? '' : `
+      <div style="${ZONE}">
+        <div style="${ZLAB}">${ic('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>')}Text notifications${hasPhone ? '' : ' · add a phone above to enable'}</div>
+        <div id="staff-notif-${r.id}" style="display:flex;flex-wrap:wrap;gap:7px">${_bbStaffNotifPillsHtml(r.id, hasPhone)}</div>
+      </div>`;
+
+    return `<div style="border:1px solid var(--border-med);border-radius:var(--r-lg,16px);background:var(--surface);padding:15px 17px;margin-bottom:14px">
+      <div class="team-row" style="border:none;padding:0;background:none">
         <div class="team-avatar">${escapeHTML(initial)}</div>
         <div class="team-meta">
           <div class="team-name">${escapeHTML(r.name || '(no name)')}${isMe ? '<span class="team-you">You</span>' : ''}</div>
@@ -25836,16 +26138,25 @@ async function _bbStaffRefreshList() {
         ${canPreview ? `<button class="team-revoke-btn" style="border-color:var(--gold,#D4B65C);color:var(--gold,#D4B65C)" onclick="_previewAsStaff('${r.id}')">Preview</button>` : ''}
         ${canRevoke ? `<button class="team-revoke-btn" onclick="openRevokeTeamModal('${r.id}')">Revoke</button>` : ''}
       </div>
-      ${inviteHtml}
-      ${tabsHtml}
-      ${enrollHtml}
-      ${stagesHtml}
-      ${kpisHtml}
-      <div style="margin-top:6px;padding:10px 12px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px">
-        <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Photo / headshot</div>
-        ${_assetBankHtml('staff_id', r.id, { category: 'photo' })}
-      </div>
+      ${ownerContactZone}
+      ${profileZone}
+      ${contactZone}
+      ${accessZone}
+      ${notifZone}
     </div>`;
+  }).join('');
+}
+
+// Per-person notification pills: which events text this teammate. Reads the
+// academy's notification_prefs (loaded in _bbStaffRefreshList) and toggles this
+// person in/out of each event. Replaces the old event x person matrix panel.
+function _bbStaffNotifPillsHtml(personId, hasPhone) {
+  const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const events = _NOTIF_EVENTS.filter(e => e.tier === 'crm' || (e.tier === 'v2' && isV2));
+  const prefs = _BB_NOTIF_PREFS || {};
+  return events.map(ev => {
+    const on = Array.isArray(prefs[ev.key]) && prefs[ev.key].includes(personId);
+    return `<button onclick="_bbNotifToggle('${ev.key}','${personId}')" title="${_bbEscapeAttr(ev.hint)}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${on ? 'var(--gold,#D4B65C)' : 'var(--border-med)'};background:${on ? 'var(--gold,#D4B65C)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'}${!hasPhone && !on ? ';opacity:.55' : ''}">${escapeHTML(ev.label)}</button>`;
   }).join('');
 }
 
@@ -34968,7 +35279,9 @@ function _renderMembersView() {
 
 function _canEnrollReturning() {
   if (_PREVIEW_AS) return false; // previewing a teammate: keep the surface conservative
-  return _IS_BAM_STAFF === true || _MY_TAB_ROLE === 'owner' || _MY_CAN_ENROLL_MEMBERS === true;
+  // Returning-client enroll is now bundled into Members-tab access (no separate
+  // grant): anyone who can see Members can enroll. Owner/BAM always can.
+  return _IS_BAM_STAFF === true || _MY_TAB_ROLE === 'owner' || (typeof _isViewTabAllowed === 'function' && _isViewTabAllowed('members'));
 }
 
 let _ENROLL = null;
@@ -52870,6 +53183,7 @@ function _zdHideHint() {
   const el = document.getElementById('zd-hint');
   if (el) el.classList.remove('show');
 }
+
 function _zdEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -56186,6 +56500,12 @@ function _ccDockPop(kind) {
   pop.dataset.kind = kind;
   pop.innerHTML = kind === 'settings'
     ? _obfPopItem() +
+      // The command center hides the sidebar, so the owner-only Settings view
+      // (integrations + time zone) is only reachable from here. Opens the classic
+      // view over the CC. Owner / BAM staff only.
+      ((_MY_TAB_ROLE === 'owner' || _IS_BAM_STAFF === true)
+        ? `<button type="button" class="cc-pop-item" onclick="document.getElementById('cc-dock-pop').classList.remove('open');switchView('settings')">Settings</button>`
+        : '') +
       `<button type="button" class="cc-pop-item" onclick="toggleTheme()">Toggle light / dark</button>` +
       `<button type="button" class="cc-pop-item" onclick="this.textContent='Sounds: ' + (_SFX.toggleMute() ? 'off' : 'on')">Sounds: ${_SFX._isMuted() ? 'off' : 'on'}</button>` +
       `<button type="button" class="cc-pop-item" onclick="var off=localStorage.getItem('bam_haptics_off')==='1';localStorage.setItem('bam_haptics_off', off?'0':'1');this.textContent='Haptics: '+(off?'on':'off')">Haptics: ${(function(){try{return localStorage.getItem('bam_haptics_off')==='1'?'off':'on'}catch(_){return 'on'}})()}</button>` +
@@ -58361,7 +58681,10 @@ async function boot() {
   applyV2NavState(clientRow.v2_access === true);
   applyV15NavState(clientRow.v15_access === true);
   applyV4NavState(clientRow.v4_access === true);
-  loadMyPermissionsAndApply(); // per-staff tab perms (subtractive, async)
+  // Await per-staff perms BEFORE the landing decision below: a no-access member
+  // ([] tabs) must not fall into the command center (the V2 default landing).
+  // Also removes the flash of full nav before subtraction. Always resolves.
+  await loadMyPermissionsAndApply(); // per-staff tab perms (subtractive)
   _loadPreviewStaff();         // populate the "Preview as" account-menu switcher
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
@@ -58440,7 +58763,8 @@ async function boot() {
     // Returning user (tour already done) → land on Home, or their first tab when
     // Home is hidden (V2 users). Skip when a deep link already targets a view.
     // Command center beta (?cc=1, V2 only) replaces the landing entirely.
-    if (typeof _ccWanted === 'function' && _ccWanted() && typeof V2_ACCESS !== 'undefined' && V2_ACCESS) {
+    if (typeof _ccWanted === 'function' && _ccWanted() && typeof V2_ACCESS !== 'undefined' && V2_ACCESS
+        && !(typeof _hasNoTabAccess === 'function' && _hasNoTabAccess())) {
       openCommandCenter();
     } else {
       switchView(typeof _landingView === 'function' ? _landingView() : 'home');
