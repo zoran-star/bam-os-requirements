@@ -33,6 +33,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/ghl/cron-import-history",
+      "schedule": "5-55/10 * * * *"
+    },
+    {
       "path": "/api/mass-send?action=work",
       "schedule": "* * * * *"
     },

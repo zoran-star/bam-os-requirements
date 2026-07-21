@@ -94,5 +94,22 @@ Pending / to add as steps: locations, staff invites, branding, Stripe Connect ch
 ### Detail Miami status (the live proving ground)
 Steps 1+2 of the activation checklist DONE (sellable + booking flipped to portal, tested end to end). Remaining for Detail = Mike's manual work: member import (Sorter), email+website DNS pastes, EIN, sales-workflow copy (gated on Hawkeye/GTA). See [[project_detail_portal_native_plan.md]] + the handoff doc.
 
+## Step completion detectors (the EXACT source per step - 2026-07-21)
+`_obfFetchState` merges 5 calls: `_edwApi('status')` (email domain-setup), `_wdwApi('status')` (website domain-setup), `/api/offers/setup-status` (`v`), the `get_onboarding_progress` RPC (`p`), `/api/email/mailbox-status` (inbox). Don't guess - a step greens ONLY when its exact source flips:
+
+**Academy/Brand come from the RPC (`clients.*_marked_done_at` stamp columns), NOT raw data:**
+- basics = `general_done` = `general_marked_done_at` set OR (business_name+owner_name+email all present, so it auto-greens)
+- coaches(Team) = `staff_marked_done_at` · locations = `locations_marked_done_at` · brand(Look) = `brand_marked_done_at` (these three are MANUAL stamps - having real location/brand rows does NOT green them; stamp the column)
+
+**Brand extras + Wired from setup-status `v` / others:**
+- sitecopy(Story) = `brand_data.story` non-empty · brandboard = `website_setup.readiness.manual.brand_ok` · stripe = stripe_connect_status='connected' · email(Auto email) = domain-setup status='live' · inbox = mailbox connected · contacts = contacts>0 (or `onboarding_setup.contacts_source` for non-GHL) · ads = `onboarding_setup.ads_choice` set · instagram = ig_live (optional/skip)
+- **texting = `onboarding_setup.texting_choice` AND `legal_name` AND ein** where **ein = `clients.ein` set** OR localStorage skip. So a Canadian academy with no EIN can't green texting server-side - owner enters BN or clicks skip (localStorage `bam_obf_skip_<clientId>`, NOT settable from DB).
+
+**Offer(training) from setup-status, all read `offers.data` of the PUBLISHED offer:**
+- define = `data.general_info.age_range && .capacity` (NOT `data.general`!) · schedule = `data.schedule.classes[]` len>0 · pricing = matched `offer_prices` (source_offer_id=offer) >0 · policy = `data.policy` has keys · preset = `data.sales.preset_key` set · leads = has_ghl? pipeline_provider='portal' : true · onboardingform = `custom_field_defs` section='onboarding' count>0 · members = members>0 · cancelled = cancelled_contacts>0 or skip
+- Launch: build&review = `website_setup.readiness.manual.site_accepted` · go-live = website domain-setup status='live'
+
+**Prefill recipe (used for GTA + DETAIL):** stamp `{general,brand,locations,staff}_marked_done_at`; brand_data look+story; `onboarding_setup.brief_submitted_at`; `readiness.manual.{brand_ok,site_accepted}=true`; offer `data.general_info.{age_range,capacity}` + `data.sales.preset_key`; one onboarding `custom_field_defs` row; pre-stamp `website_setup.chunks.*='published'` to suppress the setup-status Slack pings. EIN/texting stays owner-action for CA academies.
+
 ## When to update this note
 New steps, detector changes, moving the flow off the modal onto a routed view, a classic-mode entry point, a new offer type joining the per-offer block, or any change to the general-vs-per-offer model.
