@@ -171,7 +171,7 @@ values (
   '+14165550110',
   'Jordan Lee',
   'Invite Child',
-  'interested',
+  'ghosted',
   'open',
   'local-parent-invite',
   'free-trial',

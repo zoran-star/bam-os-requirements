@@ -14,7 +14,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import crypto from "node:crypto";
 import { pickGhlToken, sendSms, ghl } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
-import { respondedStage, contactInRespondedStage, interestedStage, nurtureStage, isRealInbound } from "../agent/_stage.js";
+import { respondedStage, contactInRespondedStage, ghostedStage, nurtureStage, isRealInbound } from "../agent/_stage.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, memberCareAgentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
@@ -107,7 +107,7 @@ async function handler(req, res) {
   // most common REAL replies ("still interested?" -> "Yes") and the old early
   // return threw the hottest signal away - no automation exit, no bounce to
   // Responded, no Hawkeye card (caught live on GTA 2026-07-10: lead Augustina
-  // answered a ghost nudge with "Yes" and stayed stuck in Interested). A true
+  // answered a ghost nudge with "Yes" and stayed stuck in Ghosted). A true
   // re-opt-in ("start"/"unstop") re-engaging the agent is desired behavior.
   const norm = bodyText.trim().toLowerCase().replace(/\s+/g, " ");
   if (STOP_WORDS.has(norm)) return xmlOk(res);
@@ -157,7 +157,7 @@ async function handler(req, res) {
 
     // Replied while in a portal automation → exit (keyless exit spares 🎉 onboarding) +
     // bounce to Responded. GUARD: only move when the open opp is currently in a NUDGE/
-    // GHOST stage (Interested/ghosted or Lead Nurture). Never yank a paid member, a
+    // GHOST stage (Ghosted or Lead Nurture). Never yank a paid member, a
     // booked Scheduled-Trial lead, an attended Done-Trial lead, or a won/closed opp back
     // to Booking on a single reply.
     try {
@@ -172,7 +172,7 @@ async function handler(req, res) {
             // nurture stage (same guard, read from the store where the true stage lives).
             const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(client.id)}&ghl_contact_id=eq.${encodeURIComponent(String(ghlContactId))}&status=eq.open&select=id,ghl_opportunity_id,stage_role&limit=1`);
             const opp = Array.isArray(rows) && rows[0];
-            if (opp && (opp.stage_role === "interested" || opp.stage_role === "nurture")) {
+            if (opp && (opp.stage_role === "ghosted" || opp.stage_role === "nurture")) {
               await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id }, stage: rs, role: "responded", contactId: String(ghlContactId) });
             }
           } else if (rs) {
@@ -182,7 +182,7 @@ async function handler(req, res) {
             if (opp) {
               const curStageId = opp.pipelineStageId || opp.stageId || null;
               const [is, ns] = await Promise.all([
-                interestedStage(creds.token, creds.locationId).catch(() => null),
+                ghostedStage(creds.token, creds.locationId).catch(() => null),
                 nurtureStage(creds.token, creds.locationId).catch(() => null),
               ]);
               const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));

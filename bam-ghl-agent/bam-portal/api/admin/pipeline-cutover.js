@@ -51,7 +51,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.en
 
 // The 7 stage roles the registry + opportunities store track (see the E1 migration).
 const ROLES = [
-  "responded", "interested", "scheduled_trial", "done_trial",
+  "responded", "ghosted", "scheduled_trial", "done_trial",
   "nurture", "won", "unqualified",
 ];
 

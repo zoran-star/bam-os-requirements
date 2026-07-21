@@ -1,6 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { isAutomationLive, enrollContact } from "../automations.js";
-import { nurtureStage, interestedStage } from "../agent/_stage.js";
+import { nurtureStage, ghostedStage } from "../agent/_stage.js";
 import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard, findOpenOpp, setStatus, moveStage, oppMatchClause } from "../agent/_store.js";
 // Vercel Serverless Function — Per-academy GHL Pipelines (kanban + moves)
 //
@@ -476,15 +476,15 @@ async function handler(req, res) {
 
     // Portal-native ☀️ Summer Special: when this academy runs the portal sequence
     // (sends via Twilio through the automation engine), enroll into it + move the opp
-    // to the Training Pipeline "Interested" stage, INSTEAD of poking a GHL workflow.
+    // to the Training Pipeline "Ghosted" stage, INSTEAD of poking a GHL workflow.
     // Gated on isAutomationLive so every academy without it stays on the GHL path
     // below - same provider-aware pattern the P6 triggers use. (Not the ghosted path.)
     if (!isGhosted && await isAutomationLive(clientId, "summer_special")) {
       const enr = await enrollContact({ clientId, automationKey: "summer_special", contactId });
       try {
-        const is = await interestedStage(token, locationId, { sb, clientId });
+        const is = await ghostedStage(token, locationId, { sb, clientId });
         if (is && oppId) {
-          // Route the Interested-stage move through the provider-aware store so a
+          // Route the Ghosted-stage move through the provider-aware store so a
           // provider='portal' academy persists it to its own opportunities row.
           // On provider='ghl' (every client today) moveStage issues the EXACT same
           // PUT /opportunities/{id} { pipelineId, pipelineStageId } as before, and
@@ -495,7 +495,7 @@ async function handler(req, res) {
           await moveStage({
             clientId, provider, shadow, ghl, token, oppRef,
             stage: { pipelineId: is.pipelineId, stageId: is.stageId, stageName: is.stageName || null },
-            role: "interested", contactId, reason: "summer special enroll",
+            role: "ghosted", contactId, reason: "summer special enroll",
           });
         }
       } catch (_) { /* stage move is best-effort */ }

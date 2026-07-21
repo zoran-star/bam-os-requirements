@@ -61,7 +61,9 @@ async function defaultSbGet(path) {
 // registry can still hold those roles, they just have null ghl_* until seeded.
 export const ROLE_MATCHERS = {
   responded:       (s) => /respond/i.test(s.name || ""),
-  interested:      (s) => /interest/i.test(s.name || ""),
+  // role key renamed interested->ghosted (2026-07-21); still matches GHL stages
+  // named "Interested" (V1 sub-accounts) OR "Ghosted" so name reconciliation holds.
+  ghosted:         (s) => /interest|ghost/i.test(s.name || ""),
   scheduled_trial: (s) => /(schedul|book).*trial/i.test(s.name || ""),
   nurture:         (s) => /nurtur/i.test(s.name || ""),
   done_trial:      (s) => {

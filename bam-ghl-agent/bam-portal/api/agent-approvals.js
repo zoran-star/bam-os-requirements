@@ -25,7 +25,7 @@ import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial, passedTrialContactIds, upcomingBookedContactIds } from "./agent/booking.js";
-import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
+import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, ghostedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
 import { sendOn } from "./_send.js";
@@ -1566,7 +1566,7 @@ async function handler(req, res) {
     }
 
     // Human ✓ on a Ghost card → enroll the lead in the academy's Ghosted automation
-    // and move them to Interested (out of Responded). The GHL workflow then does the
+    // and move them to the Ghosted stage (out of Responded). The GHL workflow then does the
     // multi-touch follow-up: reply → back to Responded, no reply → marked Lost.
     // This REPLACES drafting one-off follow-up nudges. Works from a ghost ready-row
     // (ready_id) OR straight from a contact_id (the board "Needs action" badge).
@@ -1596,16 +1596,16 @@ async function handler(req, res) {
         }
       } catch (e) { return res.status(e.status || 502).json({ error: e.message }); }
       // Move the opp OUT of Responded per the academy's authored flow (the
-      // went_quiet edge; GTA seed = -> Interested). Best-effort — the enroll
+      // went_quiet edge; GTA seed = -> Ghosted). Best-effort — the enroll
       // already happened; the GHL workflow will move them too. Router reads the
       // stage_transitions edge; if the academy has no edge (unseeded / paused /
       // lookup blip) it returns matched:false and we run the original hardcoded
-      // move to Interested — behavior-identical for GTA, zero regression.
+      // move to Ghosted — behavior-identical for GTA, zero regression.
       try {
         const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "responded", trigger: "went_quiet", contactId, oppRef, reason: "confirm-ghost: went quiet" });
         if (!routed.matched) {
-          const is = await interestedStage(token, locationId, { clientId, sb });
-          if (is && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: is, role: "interested", contactId });
+          const is = await ghostedStage(token, locationId, { clientId, sb });
+          if (is && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: is, role: "ghosted", contactId });
         }
       } catch (_) {}
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "ghosted", reason: "sent to ghosted automation" }]) }); } catch (_) {}

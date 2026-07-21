@@ -88,11 +88,12 @@ export async function respondedStage(token, locationId, ctx = {}) {
   return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "responded" });
 }
 
-// The Training Pipeline "Interested" stage — where a lead lands when we send them
+// The Training Pipeline "Ghosted" stage — where a lead lands when we send them
 // to the Ghosted automation (the workflow then bounces them back to Responded on
-// reply, or marks them lost). Same shape as respondedStage.
-export async function interestedStage(token, locationId, ctx = {}) {
-  return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "interested" });
+// reply, or marks them lost). Same shape as respondedStage. (The role key used to
+// be "interested"; renamed to "ghosted" 2026-07-21 to match the UI label.)
+export async function ghostedStage(token, locationId, ctx = {}) {
+  return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "ghosted" });
 }
 
 // The Training Pipeline "Scheduled Trial" (a.k.a. "Booked Trial") stage — where a

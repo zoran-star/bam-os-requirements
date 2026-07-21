@@ -54,7 +54,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 // api/agent/_store.js so the seeded ids match what the finders resolve today.
 const ROLES = [
   { role: "responded",       label: "Booking",      position: 0, is_terminal: false, match: (s) => /respond/i.test(s.name || "") },
-  { role: "interested",      label: "Ghosted",      position: 1, is_terminal: false, match: (s) => /interest/i.test(s.name || "") },
+  { role: "ghosted",         label: "Ghosted",      position: 1, is_terminal: false, match: (s) => /interest|ghost/i.test(s.name || "") },
   { role: "scheduled_trial", label: "Confirm",      position: 2, is_terminal: false, match: (s) => /(schedul|book).*trial/i.test(s.name || "") },
   { role: "done_trial",      label: "Closing",      position: 3, is_terminal: false, match: (s) => {
       const n = (s.name || "").toLowerCase();

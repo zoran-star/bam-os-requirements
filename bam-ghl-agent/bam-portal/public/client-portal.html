@@ -139,10 +139,10 @@ if (window.__MOCK__) (() => {
   }));
   // Canonical V2 training-pipeline stage names: _plStageBot() maps them to the
   // agent lanes (Responded=Booking, Scheduled Trial=Confirm, Done Trial=Closing,
-  // Interested=Ghosted, Won=Member) so the sales board renders like BAM GTA.
+  // Ghosted automation, Won=Member) so the sales board renders like BAM GTA.
   const STAGES = [
     { id: 'st-1', name: 'New Lead' }, { id: 'st-2', name: 'Responded' }, { id: 'st-3', name: 'Scheduled Trial' },
-    { id: 'st-4', name: 'Done Trial' }, { id: 'st-5', name: 'Interested' }, { id: 'st-6', name: 'Won' },
+    { id: 'st-4', name: 'Done Trial' }, { id: 'st-5', name: 'Ghosted' }, { id: 'st-6', name: 'Won' },
   ];
   const OPPS = [
     ['Jordan Price', 'st-1', 'Micah Price'], ['Riley Chen', 'st-1', 'Lucas Chen'],
@@ -29122,7 +29122,7 @@ const _bbOfferConfigs = {
       { key:'missed_trial_workflow', type:'ghl_workflow', label:'Missed-trial automation',
         hint:'GHL workflow that fires automatically when a trainer marks an athlete as "Didn\'t show up" on the post-trial form. Pick the workflow that handles a no-show (reschedule nudge, re-book sequence, etc.).' },
       { key:'ghosted_workflow', type:'ghl_workflow', label:'Ghosted automation',
-        hint:'GHL workflow fired when staff hit "Ghosted" on a lead card. It should text the lead a few times, then move them to the Responded stage if they reply or mark them lost if they don\'t. (The card auto-moves to Interested when you enroll.)' },
+        hint:'GHL workflow fired when staff hit "Ghosted" on a lead card. It should text the lead a few times, then move them to the Responded stage if they reply or mark them lost if they don\'t. (The card auto-moves to Ghosted when you enroll.)' },
       { key:'sales_path', type:'check_one', label:'Sales path', required:true,
         options:['Free trial','Paid trial','Discovery call first','Direct signup','Other'],
         hint:'Gates the next set of questions' },
@@ -35777,7 +35777,7 @@ async function _plLoadNeedsAction() {
 // cards: show when the last message was + glow if the LEAD messaged last.
 let _PL_LASTMSG = null;   // contactId → { direction, date }
 // Contacts with an ACTIVE automation enrollment (portal automation engine).
-// Powers the Interested-stage "!" - the REAL "is anybody messaging this lead"
+// Powers the Ghosted-stage "!" - the REAL "is anybody messaging this lead"
 // check. null until loaded; on failure the badge falls back to message age.
 let _PL_AUTO = null;      // Set<contactId>
 // Active enrollment detail per contact: { step, steps_total, entered_at, next_run_after }.
@@ -35917,7 +35917,7 @@ async function _plLoadAgentMode() {
   } catch (_) { _PL_AGENT_MODE = 'off'; }
   if (_PL_AGENT_MODE && _PL_AGENT_MODE !== 'off') { _plLoadNeedsAction(); try { _plScanNow(null, true); } catch (_) {} }   // load badges + auto-scan once the agent is known to be on
   _plLoadLastMessages();   // Done Trial cards: last-message time + lead-last glow
-  _plLoadActiveAutomations();   // Interested "!": real automation-enrollment check
+  _plLoadActiveAutomations();   // Ghosted "!": real automation-enrollment check
   try { if (typeof _renderPipelineBoard === 'function') _renderPipelineBoard(); } catch (_) {}
 }
 
@@ -36123,7 +36123,7 @@ async function fetchAndRenderPipelines() {
     _renderPipelineTabs();
     _renderPipelineBoard();
     _plLoadLastMessages();   // Done Trial cards: last-message time + lead-last glow
-    _plLoadActiveAutomations();   // Interested "!": real automation-enrollment check
+    _plLoadActiveAutomations();   // Ghosted "!": real automation-enrollment check
     // Auto-scan on load so recommendations are fresh without waiting for the cron
     // (debounced to 5 min; greys the Responded cards while it runs). If the agent
     // mode isn't known yet, _plLoadAgentMode kicks the scan once it resolves.
@@ -36842,15 +36842,15 @@ function _plDrawerConfirm(icon, label, sub) {
   setTimeout(() => { try { ov.remove(); } catch (_) {} closePipelineDrawer(); }, 1800);
 }
 
-// Move a lead's board card to its pipeline's Interested stage locally (optimistic),
+// Move a lead's board card to its pipeline's Ghosted stage locally (optimistic),
 // keyed by GHL contact id. Used when sending to Ghosted (the automation also moves
 // them, but we reflect it on the board immediately).
-function _plMoveContactToInterested(contactId) {
+function _plMoveContactToGhosted(contactId) {
   if (!_PL_DATA || !contactId) return false;
   for (const pl of (_PL_DATA.pipelines || [])) {
     const opp = (pl.opportunities || []).find(o => String(o.contactId || '') === String(contactId));
-    const interested = (pl.stages || []).find(s => /interest/i.test(s.name || ''));
-    if (opp && interested) { opp.stageId = interested.id; opp.lastStageChangeAt = new Date().toISOString(); try { _renderPipelineBoard(); } catch (_) {} return true; }
+    const ghosted = (pl.stages || []).find(s => /interest|ghost/i.test(s.name || ''));
+    if (opp && ghosted) { opp.stageId = ghosted.id; opp.lastStageChangeAt = new Date().toISOString(); try { _renderPipelineBoard(); } catch (_) {} return true; }
   }
   return false;
 }
@@ -36914,14 +36914,14 @@ function _plToast(msg) {
 }
 
 // Drop the contact into the academy's configured nudge automation (summer
-// special) AND auto-move the card to the "Interested" stage (portal-side, no
+// special) AND auto-move the card to the "Ghosted" stage (portal-side, no
 // GHL automation). Works from any card / any stage.
 function _plEnrollSpecial(oppId) {
   if (!_sendGuard('plEnrollSpecial-' + oppId)) return;
   _plConfirmModal({
     icon: '',
     title: 'Send to Summer Special?',
-    body: 'They\'ll start getting the text sequence, and the card moves to the <b>Interested</b> stage.',
+    body: 'They\'ll start getting the text sequence, and the card moves to the <b>Ghosted</b> stage.',
     okLabel: 'Send',
     onOk: () => _plEnrollSpecialGo(oppId),
   });
@@ -36946,22 +36946,22 @@ function _plConfirmModal(opts) {
   };
 }
 
-// Move an opp's card to its pipeline's "Interested" stage (portal-side, optimistic).
+// Move an opp's card to its pipeline's "Ghosted" stage (portal-side, optimistic).
 // Returns true if it actually moved. Shared by Summer Special + Ghosted enroll.
-async function _plMoveToInterested(oppId, token) {
+async function _plMoveToGhosted(oppId, token) {
   let opp = null, pipe = null;
   for (const pl of (_PL_DATA && _PL_DATA.pipelines) || []) {
     const f = (pl.opportunities || []).find(x => x.id === oppId);
     if (f) { opp = f; pipe = pl; break; }
   }
-  const interested = pipe && (pipe.stages || []).find(s => /interested/i.test(s.name || ''));
-  if (!opp || !pipe || !interested || opp.stageId === interested.id) return false;
+  const ghosted = pipe && (pipe.stages || []).find(s => /interest|ghost/i.test(s.name || ''));
+  if (!opp || !pipe || !ghosted || opp.stageId === ghosted.id) return false;
   const pr = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(oppId)}`, {
     method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pipeline_id: pipe.id, stage_id: interested.id }),
+    body: JSON.stringify({ pipeline_id: pipe.id, stage_id: ghosted.id }),
   });
   if (!pr.ok) return false;
-  opp.stageId = interested.id; opp.lastStageChangeAt = new Date().toISOString();
+  opp.stageId = ghosted.id; opp.lastStageChangeAt = new Date().toISOString();
   return true;
 }
 
@@ -36974,7 +36974,7 @@ async function _plEnrollSpecialGo(oppId) {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    // Do NOT move the card to Interested from the portal — the GHL Summer Special
+    // Do NOT move the card to Ghosted from the portal — the GHL Summer Special
     // automation handles that move itself (set up in GoHighLevel).
     _plToast('Sent to Summer Special');
   } catch (e) {
@@ -36983,14 +36983,14 @@ async function _plEnrollSpecialGo(oppId) {
 }
 
 // Ghosted: enroll the lead in the academy's ghosted automation (chosen on the
-// training offer's Sales step) and move the card to Interested. The GHL workflow
+// training offer's Sales step) and move the card to Ghosted. The GHL workflow
 // then texts them - reply → Responded stage, no reply → marked lost.
 function _plGhost(oppId) {
   if (!_sendGuard('plGhost-' + oppId)) return;
   _plConfirmModal({
     icon: _plIcon('ghost', 30),
     title: 'Send to Ghosted automation?',
-    body: 'They\'ll get the ghosted text sequence and the card moves to <b>Interested</b>. If they reply they go to <b>Responded</b>; if they don\'t, they get marked <b>lost</b> automatically.',
+    body: 'They\'ll get the ghosted text sequence and the card moves to <b>Ghosted</b>. If they reply they go to <b>Responded</b>; if they don\'t, they get marked <b>lost</b> automatically.',
     okLabel: 'Send',
     onOk: () => _plGhostGo(oppId),
   });
@@ -37005,9 +37005,9 @@ async function _plGhostGo(oppId) {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    const moved = await _plMoveToInterested(oppId, token);
+    const moved = await _plMoveToGhosted(oppId, token);
     if (moved && typeof _renderPipelineBoard === 'function') _renderPipelineBoard();
-    _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', moved ? 'Moved to Interested - the automation takes over' : 'The automation takes over');
+    _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', moved ? 'Moved to Ghosted - the automation takes over' : 'The automation takes over');
   } catch (e) {
     alert('Could not send to Ghosted automation: ' + (e.message || e));
   }
@@ -37155,7 +37155,7 @@ function _plStageBot(name) {
   if (/respond/.test(n))                                     return { color: '#5A8FB8', kind: 'agent',      key: 'booking',     icon: 'phone',  tag: 'Booking' };
   if (/(schedul|book)/.test(n) && /trial/.test(n))           return { color: '#3DBE8B', kind: 'agent',      key: 'confirm',     icon: 'check',  tag: 'Confirm' };
   if (/trial/.test(n) && /(done|complete|attend)/.test(n))   return { color: '#B084E8', kind: 'agent',      key: 'closing',     icon: 'target', tag: 'Closing' };
-  if (/interest/.test(n))                                    return { color: '#D4B65C', kind: 'automation', key: 'ghosted',     icon: 'ghost',  tag: 'Ghosted' };
+  if (/interest|ghost/.test(n))                              return { color: '#D4B65C', kind: 'automation', key: 'ghosted',     icon: 'ghost',  tag: 'Ghosted' };
   if (/nurtur/.test(n))                                      return { color: '#3B6FD4', kind: 'automation', key: 'nurture',     icon: 'heart',  tag: 'Nurture' };
   if (/member|liveclient|enrolled|\bwon\b/.test(n))          return { color: '#EC4899', kind: 'terminal',   key: 'member',      icon: 'award',  tag: 'Member' };
   if (/unqualif/.test(n))                                    return { color: '#FB923C', kind: 'terminal',   key: 'unqualified', icon: 'ban',    tag: 'Unqualified' };
@@ -37167,7 +37167,7 @@ function _plStageBot(name) {
 // leaving its role. Rows live in `stage_transitions` (client-scoped RLS), the
 // standard flow is seeded per academy, and academies can author their own via
 // the Exit editor in focus mode. Enums:
-//   stage_role      = responded | interested | scheduled_trial | done_trial | nurture
+//   stage_role      = responded | ghosted | scheduled_trial | done_trial | nurture
 //   trigger         = base library (below)
 //   destination     = a role (to_kind='stage') OR a terminal member/unqualified/human.
 let _PL_EDGES = null;        // cached edge rows for CLIENT_ID
@@ -37177,7 +37177,7 @@ let _PL_EDGE_FORM = null;    // {mode:'add'|'edit', role, id?} — the open inli
 function _plStageRole(name) {
   const b = _plStageBot(name);
   if (!b) return null;
-  return ({ booking: 'responded', confirm: 'scheduled_trial', closing: 'done_trial', ghosted: 'interested', nurture: 'nurture' })[b.key] || null;
+  return ({ booking: 'responded', confirm: 'scheduled_trial', closing: 'done_trial', ghosted: 'ghosted', nurture: 'nurture' })[b.key] || null;
 }
 // Human-readable trigger labels (order = the library shown in the destination picker).
 const _EDGE_TRIGGERS = {
@@ -37197,9 +37197,9 @@ const _EDGE_TRIGGERS = {
   complaint_offtopic:  'Complaint / off-topic',
   ghosted_ran_out:     'Nudges ran out',
 };
-const _EDGE_ROLE_LABEL = { responded: 'Responded', interested: 'Interested', scheduled_trial: 'Scheduled Trial', done_trial: 'Done Trial', nurture: 'Nurture' };
+const _EDGE_ROLE_LABEL = { responded: 'Responded', ghosted: 'Ghosted', scheduled_trial: 'Scheduled Trial', done_trial: 'Done Trial', nurture: 'Nurture' };
 const _EDGE_TERMINAL_LABEL = { member: 'Member', unqualified: 'Unqualified', human: 'Human takeover' };
-const _EDGE_ROLE_ICON = { responded: 'phone', interested: 'ghost', scheduled_trial: 'calendar', done_trial: 'target', nurture: 'heart' };
+const _EDGE_ROLE_ICON = { responded: 'phone', ghosted: 'ghost', scheduled_trial: 'calendar', done_trial: 'target', nurture: 'heart' };
 const _EDGE_TERMINAL_ICON = { member: 'award', unqualified: 'ban', human: 'alert' };
 // A destination's label + icon, whether it's a role or a terminal.
 function _edgeDestLabel(e) { return e.to_kind === 'terminal' ? (_EDGE_TERMINAL_LABEL[e.to_terminal] || e.to_terminal) : (_EDGE_ROLE_LABEL[e.to_stage_role] || e.to_stage_role); }
@@ -38290,7 +38290,7 @@ function _hk2Confirm() {
         _apxToast('Message sent - still in Booking', true);
       } else {
         chk(await _apxPost(ep, 'confirm-ghost', { ready_id: r.id }));
-        try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
+        try { _plMoveContactToGhosted(r.ghl_contact_id); } catch (_) {}
         _apxToast('Sent to Ghosted', true);
       }
     } else if (k === 'handoff') {
@@ -38416,7 +38416,7 @@ function _hk2Move(op, btn) {
   _hawkDefer({ cardId: 'hk2-topcard', label, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
     if (op === 'ghost') {
       chk(await _apxPost(ep, 'confirm-ghost', { ready_id: readyId }));
-      try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
+      try { _plMoveContactToGhosted(r.ghl_contact_id); } catch (_) {}
       _apxToast('Sent to Ghosted', true);
     } else if (op === 'handoff') {
       chk(await _apxPost(ep, 'confirm-handoff', { ready_id: readyId, reply: '', handoff_note: r.handoff_note || 'Needs a new time - rebook.' }));
@@ -38678,7 +38678,7 @@ function _plRenderOverview() {
 // (terminal) stages get NO pill; unmapped custom stages keep their pipeline
 // position after the known ones.
 function _plo2Order(stages) {
-  const ORD = { nurture: 0, interested: 1, responded: 2, scheduled_trial: 3, done_trial: 4 };
+  const ORD = { nurture: 0, ghosted: 1, responded: 2, scheduled_trial: 3, done_trial: 4 };
   return stages
     .filter(s => { const b = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null; return !(b && b.kind === 'terminal'); })
     .map((s, i) => { const r = _plStageRole(s.name); return { s, k: (r && ORD[r] != null) ? ORD[r] : 10 + i }; })
@@ -39338,7 +39338,7 @@ function _renderPipelineBoard() {
     // Trial-today gold glow (non-done stages); Done Trial glows only on lead-last.
     let glow = isDone ? (_clientLast ? _goldGlow : '') : (todayTrial ? _goldGlow : '');
     // "Nobody's working this lead" alert (red ! + red glow), per stage owner:
-    // - Interested stage (Ghosted automation owns it): RED as soon as the lead
+    // - Ghosted stage (Ghosted automation owns it): RED as soon as the lead
     //   has NO active automation enrollment - the real check via
     //   automation_enrollments (V2). Until that set loads, or on V1.5, fall
     //   back to the old proxy: no text/email in 5+ days.
@@ -41298,7 +41298,7 @@ function _apxBookSkip(id) { _hawkDefer({ cardId: 'apx-' + id, label: 'Skipped', 
 
 // A gold "went quiet" card. The lead hasn't replied in ~a day. The recommended
 // action is Send to Ghosted (enroll in the academy's ghosted automation + move to
-// Interested); you can also Lost / Abandon / Skip. The GHL workflow handles the
+// the Ghosted stage); you can also Lost / Abandon / Skip. The GHL workflow handles the
 // actual multi-touch follow-up - we no longer draft one-off nudge messages.
 function _apxGhostCard(r) {
   const last = _apxContext(r);
@@ -41310,7 +41310,7 @@ function _apxGhostCard(r) {
     </div>
     ${r.reasoning ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(r.reasoning)}</div>` : ''}
     ${last}
-    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Sends them the <b>Ghosted</b> text sequence and moves the card to <b>Interested</b>. Reply → back to Responded; no reply → marked Lost automatically.</div>
+    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Sends them the <b>Ghosted</b> text sequence and moves the card to <b>Ghosted</b>. Reply → back to Responded; no reply → marked Lost automatically.</div>
     <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
       <div style="flex:1"></div>
@@ -41329,9 +41329,9 @@ function _apxGhostConfirm(id, btn) {
       await _apxPost('/api/agent-approvals', 'confirm-ghost', { ready_id: r.id });
       if (_PL_NEEDS && r.ghl_contact_id) _PL_NEEDS.delete(String(r.ghl_contact_id));
       _apxRemove(id);
-      _plMoveContactToInterested(r.ghl_contact_id);
+      _plMoveContactToGhosted(r.ghl_contact_id);
       if (document.getElementById('pl-drawer')?.classList.contains('open')) {
-        _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', 'Moved to Interested - the automation takes over');
+        _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', 'Moved to Ghosted - the automation takes over');
       } else {
         _apxToast('Sent to Ghosted', true);
       }
