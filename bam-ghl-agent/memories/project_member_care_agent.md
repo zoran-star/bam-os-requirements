@@ -25,6 +25,20 @@ runs). Driven by `opts.manual` in `draftMemberCareForMember`, which bypasses the
 automatic-run guards (mute, wait-for-parent, this-inbound dedup) but still refuses to
 stack a second card when one is already pending (returns `{skipped, existing:true}`).
 
+**"Scan for action items" on the members widget** (added 2026-07-21): the command
+center "Unread member messages" rows (and the member-inbox popup rows) get a gold
+hover button (always-visible icon on touch via `@media(hover:none)`) that opens the
+`_hmMsgPeek` conversation popup and runs the same `draft-now`. The FULL proposal card
+renders under the thread (`#hm-peek-agent`). Clicking the action closes the peek and
+opens the matching PREFILLED action modal (`mPause`/`mUnpause`/`mCancel`/`mChange`
+accept `opts.prefill` = the card's `action_body`; the m* modals now `return true` on
+success), then reopens the peek with the card's remaining parts. Key functions:
+`_mcScanBtn/_mcScanTarget/_mcScanOpen/_mcScanRender/_mcScanAction/_mcCareFind` -
+`_mcCareFind` lets ONE set of approve/dismiss handlers serve both the drawer and the
+scan popup (`_memberCareCardsHtml(cards, {scan:true})`). Button only shows when the
+conversation resolves to a roster member WITH a `ghl_contact_id` (name-only matches
+can't be scanned - the agent finds the thread through the contact id).
+
 ## Pieces
 
 | Piece | Where |
