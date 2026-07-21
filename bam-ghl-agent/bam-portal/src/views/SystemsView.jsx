@@ -41,6 +41,39 @@ const STATUS_LABEL = {
   cancelled:        "Cancelled",
 };
 
+// A human-readable title for a ticket so the queue is scannable instead of a
+// wall of identical "Error report" / "Change request" rows. Precedence:
+//   1. an explicit title (fields.title) set by staff or the client
+//   2. the systems-menu item name (build tickets already carry one)
+//   3. a subject derived from the ticket's own content
+//   4. a generic label as a last resort
+// Title lives in fields.title (no dedicated column): the drawer already saves
+// fields, and it keeps this fully isolated from the v2 ticket system.
+function deriveTicketSubject(x) {
+  const f = x.fields || {};
+  const cand =
+    f.subject || f.what || f.summary || f.Summary ||
+    f.Description || f.description || f.Problem || f.problem ||
+    f["Describe the item"] || f["Selected System"] ||
+    (Array.isArray(x.messages) && x.messages.length ? (x.messages[0].body || x.messages[0].text) : "") ||
+    x.category || "";
+  return String(cand || "").replace(/\s+/g, " ").trim();
+}
+
+function resolveTicketTitle(x) {
+  if (!x) return "Request";
+  const explicit = x.fields && x.fields.title;
+  if (explicit && String(explicit).trim()) return String(explicit).trim();
+  if (x.menu_item) return x.menu_item;
+  const base =
+    x.type === "error" ? "Error" :
+    x.type === "change" ? "Change" :
+    x.type === "onboarding" ? "Onboarding" : "Build";
+  const subject = deriveTicketSubject(x);
+  if (subject) return `${base}: ${subject.slice(0, 60)}`;
+  return x.type === "error" ? "Error report" : x.type === "change" ? "Change request" : `${base} request`;
+}
+
 function statusColor(status, t) {
   switch (status) {
     case "open":             return t.amber;
@@ -147,7 +180,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
 
   // Completed tab: title + academy/assignee/details search and an academy
   // dropdown. Academy options come from the completed tickets in scope.
-  const ticketTitle = (x) => x.menu_item || (x.type === "error" ? "Error report" : x.type === "change" ? "Change request" : "Build request");
+  const ticketTitle = (x) => resolveTicketTitle(x);
   const completedAcademies = [...new Set(
     visibleTickets.map(x => x.client?.business_name).filter(Boolean)
   )].sort((a, b) => a.localeCompare(b));
@@ -487,8 +520,7 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
 // "Timeline sensitive" pill next to the title so we can dedup the row
 // from the Timeline Sensitive section while keeping the urgency visible.
 function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensitive, onPing, pingState }) {
-  const title = ticket.menu_item
-    || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request");
+  const title = resolveTicketTitle(ticket);
   const clientName = ticket.client?.business_name || "Unknown";
   const isUrgent = variant === "urgent";
   const redBg = dark ? "rgba(232,117,96,0.08)" : "rgba(232,117,96,0.10)";
@@ -584,8 +616,7 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensit
 }
 
 function TicketCard({ ticket, tokens: t, onOpen, completed }) {
-  const title = ticket.menu_item
-    || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request");
+  const title = resolveTicketTitle(ticket);
   const preview = Object.values(ticket.fields || {}).filter(Boolean).join(" · ").slice(0, 120);
   // On the Completed tab, surface the completion date (resolved_at) large
   // on the right so staff can scan "what got finished and when" at a glance.
@@ -725,6 +756,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [fieldEdits, setFieldEdits] = useState({});
+  const [titleDraft, setTitleDraft] = useState(null);   // null = not renaming
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
   const [questionMap, setQuestionMap] = useState({});
@@ -847,9 +879,36 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             )}
             <span style={{ fontSize: 11, color: t.textMute, fontFamily: "monospace", marginLeft: "auto" }}>{ticket.id.slice(0, 8)}</span>
           </div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: t.text, margin: 0 }}>
-            {ticket.menu_item || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request")}
-          </h2>
+          {titleDraft === null ? (
+            <h2
+              onClick={canExec ? () => setTitleDraft(resolveTicketTitle(ticket)) : undefined}
+              title={canExec ? "Click to rename this ticket" : undefined}
+              style={{ fontSize: 20, fontWeight: 700, color: t.text, margin: 0, cursor: canExec ? "text" : "default" }}
+            >
+              {resolveTicketTitle(ticket)}
+            </h2>
+          ) : (
+            <input
+              autoFocus
+              value={titleDraft}
+              onChange={e => setTitleDraft(e.target.value)}
+              onMouseDown={e => e.stopPropagation()}
+              onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") setTitleDraft(null); }}
+              onBlur={() => {
+                const nv = titleDraft.trim();
+                const cur = String(ticket.fields?.title || "").trim();
+                if (nv && nv !== cur) wrap(() => saveTicketFields(ticket.id, { title: nv }), { toast: "Title updated" });
+                setTitleDraft(null);
+              }}
+              disabled={busy}
+              placeholder="Short title for this ticket"
+              style={{
+                fontSize: 20, fontWeight: 700, color: t.text, margin: 0, width: "100%",
+                background: t.surface, border: `1px solid ${t.accent || t.border}`, borderRadius: 8,
+                padding: "6px 10px", fontFamily: "inherit",
+              }}
+            />
+          )}
           <div style={{ display: "flex", gap: 14, fontSize: 13, color: t.textMute, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
             <span>{ticket.client?.business_name || "Unknown client"}</span>
             {(ticket.client?.owner_name || ticket.fields?.owner_name) && (
