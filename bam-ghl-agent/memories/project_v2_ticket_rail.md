@@ -34,33 +34,6 @@ land in client-assets too) → brief → `_mmcSubmit` POSTs
 `/api/v2-tickets?action=create` a `content_ask` (source='editor'). The old
 `_v2Submit` (page-annotator) + icon popup are still on the mock/FE path (P4/P5).
 
-## Staff pages (built 2026-07-20)
-Two NEW staff-portal pages on the V2 rail, V2 design system (tokens.css), nav
-keys `content-v2` + `marketing-v2` (App.jsx), gated by canSeeContent/
-canSeeMarketing. Legacy ContentView/MarketingView UNTOUCHED.
-- Shared primitives: `src/components/v2rail/` (V2Page, StatusPill, StatusLadder,
-  QueueRow, TicketDrawer, v2rail.css).
-- `src/views/ContentV2View.jsx` + `contentv2/` - queue (New/In progress/Needs
-  client/Done) + workbench drawer: Offer/Preset/Angle chips, client content,
-  upload-finished, request-from-client (reply/upload/approval), send-to-marketing
-  (+ review gate), thread w/ internal notes.
-- `src/views/MarketingV2View.jsx` + `marketingv2/` - queue by mode (post/budget/
-  remove/new-campaign) + per-mode drawer: Download creative + Mark live (post),
-  spend/reason (budget), remove, new-campaign with the landing-page GUARDRAIL
-  (context.blocked_by -> disabled Launch + Ping Systems).
-- Reads via supabase-js + realtime; mutations via /api/v2-tickets (Bearer token).
-- API (api/v2-tickets.js) actions added: auto-assign on create (Cam ladder),
-  upload-final, send-to-marketing (spawns linked marketing_ask), mark-live
-  (+ archive finals to client_assets category 'ads'), request-client-action,
-  reassign.
-
-## Audio-as-assets (2026-07-20)
-Content Library + upload flows accept ALL audio formats (accept image/video/
-audio, audio/* -> category 'audio', "Audio" filter tab, audio assets render as
-`<audio controls>` in the grid/tag-popup/creative-picker + the staff drawers via
-an isAudio branch). Migration `20260720210000_ticket_files_allow_audio.sql`
-widens the ticket-files bucket MIME allowlist (client-assets is unrestricted).
-
 ## Still to wire
 - P3b: staff angle content_types authoring + staff V2 queue view
 - P4: page-annotator `_v2Submit` → rail; portal_feedback backfill; /v2-tickets repoint
