@@ -5237,6 +5237,18 @@ if (window.__MOCK__) (() => {
   #admin-fb-wrap {
     position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: 24px; z-index: 9700;
   }
+  /* V2 action-item count badge on the orb (waiting_client tickets). Hidden at
+     zero via inline display; shown top-right of the button. Design tokens. */
+  #admin-fb-badge {
+    display: none; position: absolute; top: -5px; right: -5px; z-index: 2;
+    min-width: 21px; height: 21px; padding: 0 6px; box-sizing: border-box;
+    align-items: center; justify-content: center;
+    background: var(--gold, #D4B65C); color: var(--on-gold, #131416);
+    font-family: var(--font-num, inherit); font-size: 11px; font-weight: 800; line-height: 1;
+    border-radius: 999px; border: 2px solid var(--bg, #131416);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35); pointer-events: none;
+  }
+  #admin-fb-badge.show { display: inline-flex; }
   @media (max-width: 640px) {
     #admin-fb-wrap { bottom: calc(14px + env(safe-area-inset-bottom)); right: 12px; }
     #admin-fb-btn { width: 44px; height: 44px; }
@@ -6964,6 +6976,38 @@ if (window.__MOCK__) (() => {
   .sup-row-meta { display: block; font-size: 11px; color: var(--text-mute); margin-top: 1px; }
   .sup-loading, .sup-empty { padding: 20px 12px; text-align: center; color: var(--text-mute); font-size: 12.5px; line-height: 1.5; }
 
+  /* "Start something new" (4 lanes + free-type), relocated into the rail */
+  .sup-new { margin-top: 8px; padding: 12px 8px 4px; border-top: 1px solid var(--border); }
+  .sup-new-lab { font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-mute); padding: 2px 4px 8px; }
+  .sup-new-lanes { display: flex; flex-direction: column; gap: 5px; }
+  .sup-lane {
+    display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 10px;
+    background: transparent; border: 1px solid var(--border); border-radius: var(--radius, 12px);
+    cursor: pointer; text-align: left; transition: border-color .12s, background .12s, transform .12s var(--es, ease);
+  }
+  .sup-lane:hover { border-color: var(--accent-border, var(--gold)); background: var(--gold-sheen, rgba(212,182,92,.06)); transform: translateY(-1px); }
+  .sup-lane-ic { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 30px; height: 30px; border-radius: var(--radius-sm, 8px); background: var(--gold-sheen, rgba(212,182,92,.08)); color: var(--gold, #D4B65C); }
+  .sup-lane-ic svg { width: 16px; height: 16px; }
+  .sup-lane-txt { display: flex; flex-direction: column; min-width: 0; }
+  .sup-lane-t { font-size: 12.5px; font-weight: 600; color: var(--text); }
+  .sup-lane-s { font-size: 10.5px; color: var(--text-mute); margin-top: 1px; }
+  .sup-new-type { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+  .sup-new-input {
+    flex: 1 1 auto; min-width: 0; height: 38px; padding: 0 13px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-full, 999px);
+    color: var(--text); font-size: 12.5px; font-family: inherit; outline: none; transition: border-color .12s;
+  }
+  .sup-new-input:focus { border-color: var(--accent-border, var(--gold)); }
+  .sup-new-input::placeholder { color: var(--text-mute); }
+  .sup-new-send {
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    width: 38px; height: 38px; border-radius: 999px; background: var(--gold, #D4B65C);
+    color: var(--on-gold, #131416); border: none; cursor: pointer; transition: filter .12s;
+  }
+  .sup-new-send:hover { filter: brightness(1.06); }
+  .sup-new-hint { height: 0; overflow: hidden; opacity: 0; font-size: 11.5px; color: var(--text-mute); text-align: center; transition: height .12s, opacity .12s; }
+  .sup-new-hint.show { height: auto; opacity: 1; padding: 8px 4px 2px; }
+
   /* Main pane */
   .sup-pane { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
   .sup-pane-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-mute); font-size: 13px; padding: 30px; line-height: 1.5; }
@@ -7123,6 +7167,9 @@ if (window.__MOCK__) (() => {
   <button id="admin-fb-btn" onclick="onZoranIconClick()" aria-label="Support">
     <img src="/help-zoran.png" alt="Support" />
   </button>
+  <!-- V2 action-item badge: count of the client's waiting_client ("Needs you")
+       tickets. Hidden at zero; kept live by _zdUpdateOrbBadge() on load + realtime. -->
+  <span id="admin-fb-badge" aria-hidden="true"></span>
 </div>
 
 <div id="admin-fb-overlay" onclick="if (event.target === this) closeAdminFeedback()">
@@ -52729,13 +52776,16 @@ function _zdReqVerb(t) {
   return 'Needs your input';
 }
 
-// ── Icon router (V2 door vs V1/V1.5 feedback modal) ──
+// ── Icon router (V2 -> Support focus hub directly; V1/V1.5 feedback modal) ──
+// The orb no longer opens the intermediate popout on V2: it drops straight into
+// the Support focus mode (the whole hub - tickets + start-something-new). The
+// old popout (#zdoor-overlay) stays in the DOM but is unused on V2.
 function onZoranIconClick() {
-  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) openZoranDoor();
+  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) _zdOpenFocus(null);
   else openAdminFeedback();
 }
 
-// ── Orb popout: 4 lanes + free-type + a compact summary row ──
+// ── Orb popout (legacy, retained but unused on V2) ──
 function openZoranDoor() {
   _zdShowHome();
   _zdRenderTickets();   // shows a loading/summary placeholder immediately
@@ -52831,9 +52881,29 @@ function _zdEsc(s) {
 // HIDDEN when zero. Row tap opens focus mode straight on that ticket.
 // ══════════════════════════════════════════════════════════════════════════
 async function _zdLoadHomeCard() {
-  if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) return;
-  await _zdLoadTickets();
-  _zdRenderHomeCard();
+  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) {
+    await _zdLoadTickets();
+    _zdRenderHomeCard();
+  }
+  _zdUpdateOrbBadge();   // keep the orb action-item badge in sync (hidden for non-V2)
+}
+
+// Orb badge = the client's ACTION ITEMS = waiting_client ("Needs you") tickets.
+// Hidden at zero; V2 only. Called on load, on realtime, and after every reply.
+function _zdUpdateOrbBadge() {
+  const badge = document.getElementById('admin-fb-badge');
+  if (!badge) return;
+  const on = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const n = on ? _zdNeeds().length : 0;
+  if (n > 0) {
+    badge.textContent = n > 99 ? '99+' : String(n);
+    badge.classList.add('show');
+    badge.setAttribute('aria-label', `${n} support ${n === 1 ? 'item needs' : 'items need'} your attention`);
+  } else {
+    badge.textContent = '';
+    badge.classList.remove('show');
+    badge.removeAttribute('aria-label');
+  }
 }
 function _zdRenderHomeCard() {
   const host = document.getElementById('hm-support-card');
@@ -52922,6 +52992,8 @@ function _zdRailRow(t) {
 function _zdRenderFocusRail() {
   const rail = document.getElementById('sup-rail');
   if (!rail) return;
+  // Preserve a half-typed free-type entry across a realtime/selection re-render.
+  const prevType = (document.getElementById('sup-type-input') || {}).value || '';
   const { needs, prog, done } = _zdGroup();
   const grp = (label, arr, cls) => arr.length
     ? `<div class="sup-grp"><div class="sup-grp-lab ${cls}">${label} <span class="sup-grp-n">${arr.length}</span></div>${arr.map(_zdRailRow).join('')}</div>`
@@ -52930,15 +53002,72 @@ function _zdRenderFocusRail() {
   const body = !_ZD_TICKETS_LOADED
     ? `<div class="sup-loading"><span class="req-spin"></span> Loading…</div>`
     : total === 0
-      ? `<div class="sup-empty">No requests yet. Tap + New to start one, or use the support orb.</div>`
+      ? `<div class="sup-empty">No requests yet. Start something new below.</div>`
       : (grp('Needs you', needs, 'needs') + grp('In progress', prog, 'prog') + grp('Done', done, 'done'));
   rail.innerHTML = `
     <div class="sup-rail-head">
       <div class="sup-rail-title">Support</div>
       <button type="button" class="sup-new-btn" onclick="_zdFocusStartNew()">+ New</button>
     </div>
-    <div class="sup-rail-scroll">${body}</div>`;
+    <div class="sup-rail-scroll">
+      ${body}
+      ${_zdStartNewHtml()}
+    </div>`;
+  const ti = document.getElementById('sup-type-input');
+  if (ti && prevType) ti.value = prevType;
 }
+
+// The 4 lanes + free-type box, relocated OUT of the popout INTO focus mode as a
+// persistent "Start something new" section (below the ticket rail). Same four
+// lanes as before; bug/feature still bridge to the old feedback modal.
+function _zdStartNewHtml() {
+  const lane = (kind, title, sub, svg) =>
+    `<button type="button" class="sup-lane" onclick="_zdFocusLane('${kind}')">
+      <span class="sup-lane-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg></span>
+      <span class="sup-lane-txt"><span class="sup-lane-t">${title}</span><span class="sup-lane-s">${sub}</span></span>
+    </button>`;
+  return `
+    <div class="sup-new" id="sup-new">
+      <div class="sup-new-lab">Start something new</div>
+      <div class="sup-new-lanes">
+        ${lane('navigator', 'Where do I…?', 'Get a quick answer', '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>')}
+        ${lane('support', 'Get help from our team', 'Talk to a human', '<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>')}
+        ${lane('bug', 'Report a problem', 'Something is broken', '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>')}
+        ${lane('feature', 'Suggest a feature', 'An idea for us', '<path d="M12 3l2.09 6.26L20.5 9.5l-5 3.9 1.9 6.1L12 15.9 6.6 19.5l1.9-6.1-5-3.9 6.41-.24z"/>')}
+      </div>
+      <div class="sup-new-type">
+        <input id="sup-type-input" class="sup-new-input" type="text" placeholder="…or just type what you need" onkeydown="if(event.key==='Enter')_zdFocusTypeSend()">
+        <button type="button" class="sup-new-send" onclick="_zdFocusTypeSend()" aria-label="Send">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
+        </button>
+      </div>
+      <div class="sup-new-hint" id="sup-new-hint"></div>
+    </div>`;
+}
+// Lanes inside focus mode: bug/feature BRIDGE to the old feedback modal exactly
+// as the popout did; navigator/support + free-type show a gentle inline note.
+function _zdFocusLane(kind) {
+  if (kind === 'bug' || kind === 'feature') {
+    closeSupportFocus();
+    openAdminFeedback();
+    setFeedbackKind(kind);
+    return;
+  }
+  _zdFocusNewHint('This opens the real intake in the next build.');
+}
+function _zdFocusTypeSend() {
+  const el = document.getElementById('sup-type-input');
+  if (el && el.value.trim()) { el.value = ''; _zdFocusNewHint('Chat routing gets wired in the next build.'); }
+}
+let _zdNewHintTimer = null;
+function _zdFocusNewHint(msg) {
+  const el = document.getElementById('sup-new-hint');
+  if (!el) return;
+  el.textContent = msg; el.classList.add('show');
+  if (_zdNewHintTimer) clearTimeout(_zdNewHintTimer);
+  _zdNewHintTimer = setTimeout(() => { if (el) el.classList.remove('show'); }, 2600);
+}
+
 function _zdOpenTicket(id) {
   _ZD_FOCUS_TICKET = id;
   document.body.classList.add('sup-detail');   // mobile: reveal the pane
@@ -52946,14 +53075,22 @@ function _zdOpenTicket(id) {
   _zdRenderFocusPane();
 }
 function _zdFocusBackToList() { document.body.classList.remove('sup-detail'); }
-function _zdFocusStartNew() { closeSupportFocus(); setTimeout(() => openZoranDoor(), 240); }
+// "+ New" = jump to the Start-something-new section (mobile shows the list/rail
+// first, so ensure it's visible, then scroll it into view + focus the box).
+function _zdFocusStartNew() {
+  document.body.classList.remove('sup-detail');
+  const el = document.getElementById('sup-new');
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const inp = document.getElementById('sup-type-input');
+  if (inp) setTimeout(() => { try { inp.focus(); } catch (_) {} }, 140);
+}
 
 async function _zdRenderFocusPane() {
   const pane = document.getElementById('sup-pane');
   if (!pane) return;
   const id = _ZD_FOCUS_TICKET;
   if (!id) {
-    pane.innerHTML = `<div class="sup-pane-empty">Pick a request on the left to see the conversation and anything your team needs.</div>`;
+    pane.innerHTML = `<div class="sup-pane-empty">Pick a request on the left to open the conversation, or start something new from the panel on the left.</div>`;
     return;
   }
   const t = _ZD_TICKETS.find(x => x.id === id);
@@ -53185,6 +53322,7 @@ async function _zdAttachUploaded(id, ids, note) {
 // Re-render whichever other surfaces are on screen from the current cache.
 function _zdRefreshSurfaces() {
   try { _zdRenderHomeCard(); } catch (_) {}
+  try { _zdUpdateOrbBadge(); } catch (_) {}
   if (document.getElementById('zdoor-overlay')?.classList.contains('open')) { try { _zdRenderTickets(); } catch (_) {} }
 }
 
@@ -53206,6 +53344,7 @@ function _zdOnRealtime() {
   _zdRtTimer = setTimeout(async () => {
     await _zdLoadTickets();
     _zdRenderHomeCard();
+    _zdUpdateOrbBadge();   // action-item badge stays live on any ticket change
     if (document.getElementById('zdoor-overlay')?.classList.contains('open')) _zdRenderTickets();
     if (_zdIsFocusOpen()) { _zdRenderFocusRail(); if (_ZD_FOCUS_TICKET) _zdRenderFocusPane(); }
   }, 250);
