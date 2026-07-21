@@ -116,6 +116,31 @@ if (window.__MOCK__) (() => {
       { id: 'as-1', client_id: CID, source: 'upload', kind: 'image', name: 'team-photo-2026.jpg', title: 'Team photo 2026', url: AV('Team Photo', '#31405a'), mime: 'image/jpeg', size: 482000, created_at: iso(8) },
       { id: 'as-2', client_id: CID, source: 'upload', kind: 'image', name: 'summer-camp-flyer.png', title: 'Summer camp flyer', url: AV('Camp Flyer', '#523a2e'), mime: 'image/png', size: 861000, created_at: iso(5) },
     ],
+    // V2 support rail (Track 2 P5) fixtures so ?mock=1 shows the client surfaces.
+    v2_tickets: [
+      { id: 'vt-1', client_id: CID, type: 'content_ask', status: 'waiting_client', assignee_role: 'content',
+        title: 'New Free-session ad', source: 'offer-flow', created_at: iso(3), updated_at: iso(0),
+        intake: { pending_request: { kind: 'approval', message: 'Here is the finished ad - happy for us to run it?' },
+                  final_files: [{ name: 'free-session-ad.png', url: AV('Free Session Ad', '#2e4a3a'), mime: 'image/png', size: 940000 }] } },
+      { id: 'vt-2', client_id: CID, type: 'content_ask', status: 'waiting_client', assignee_role: 'content',
+        title: 'Testimonial ad', source: 'offer-flow', created_at: iso(2), updated_at: iso(0),
+        intake: { pending_request: { kind: 'upload', message: 'Can you send 3-5 clips of game footage from last weekend? Landscape if possible.' } } },
+      { id: 'vt-3', client_id: CID, type: 'website_change', status: 'in_progress', assignee_role: 'systems',
+        title: 'Swap in the new team photos', source: 'icon-chat', created_at: iso(4), updated_at: iso(1), intake: {} },
+      { id: 'vt-4', client_id: CID, type: 'billing_fix', status: 'new', assignee_role: 'systems',
+        title: 'A parent got charged twice', source: 'icon-chat', created_at: iso(1), updated_at: iso(1), intake: {} },
+      { id: 'vt-5', client_id: CID, type: 'fix', status: 'resolved', assignee_role: 'systems',
+        title: 'Booking page would not load', source: 'icon-chat', created_at: iso(9), updated_at: iso(6), resolved_at: iso(6), intake: {} },
+    ],
+    v2_ticket_messages: [
+      { id: 'vm-1', ticket_id: 'vt-1', client_id: CID, author_kind: 'client', author_name: 'You', body: 'Would love a fresh Free-session ad for the fall push.', attachments: [], internal: false, created_at: iso(3) },
+      { id: 'vm-2', ticket_id: 'vt-1', client_id: CID, author_kind: 'staff', author_name: 'Cam', body: 'On it. Cutting a 15s version now.', attachments: [], internal: false, created_at: iso(2) },
+      { id: 'vm-3', ticket_id: 'vt-1', client_id: CID, author_kind: 'system', author_name: 'System', body: 'Sent for client review', attachments: [], internal: false, created_at: iso(0) },
+      { id: 'vm-4', ticket_id: 'vt-2', client_id: CID, author_kind: 'staff', author_name: 'Cam', body: 'Can you send 3-5 clips of game footage from last weekend? Landscape if possible.', attachments: [], internal: false, created_at: iso(0) },
+      { id: 'vm-5', ticket_id: 'vt-3', client_id: CID, author_kind: 'client', author_name: 'You', body: 'Can we put the new team photos on the homepage?', attachments: [], internal: false, created_at: iso(4) },
+      { id: 'vm-6', ticket_id: 'vt-3', client_id: CID, author_kind: 'staff', author_name: 'BAM team', body: 'On it, updating the homepage gallery now.', attachments: [], internal: false, created_at: iso(1) },
+      { id: 'vm-7', ticket_id: 'vt-5', client_id: CID, author_kind: 'system', author_name: 'System', body: 'Status: resolved', attachments: [], internal: false, created_at: iso(6) },
+    ],
     staff: [], offer_teams: [], offer_files: [], member_files: [], stage_transitions: [],
     action_items: [], device_tokens: [], 'Questions Database': [],
   };
@@ -5212,6 +5237,18 @@ if (window.__MOCK__) (() => {
   #admin-fb-wrap {
     position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: 24px; z-index: 9700;
   }
+  /* V2 action-item count badge on the orb (waiting_client tickets). Hidden at
+     zero via inline display; shown top-right of the button. Design tokens. */
+  #admin-fb-badge {
+    display: none; position: absolute; top: -5px; right: -5px; z-index: 2;
+    min-width: 21px; height: 21px; padding: 0 6px; box-sizing: border-box;
+    align-items: center; justify-content: center;
+    background: var(--gold, #D4B65C); color: var(--on-gold, #131416);
+    font-family: var(--font-num, inherit); font-size: 11px; font-weight: 800; line-height: 1;
+    border-radius: 999px; border: 2px solid var(--bg, #131416);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35); pointer-events: none;
+  }
+  #admin-fb-badge.show { display: inline-flex; }
   @media (max-width: 640px) {
     #admin-fb-wrap { bottom: calc(14px + env(safe-area-inset-bottom)); right: 12px; }
     #admin-fb-btn { width: 44px; height: 44px; }
@@ -6812,11 +6849,327 @@ if (window.__MOCK__) (() => {
   }
 </style>
 
+<!-- ─── V2 Support rail (Track 2 / P5) - client-side ticket surfaces ───────
+     Popout summary row + Home attention card + the SUPPORT focus overlay.
+     All V2-gated (V2_ACCESS); V1/V1.5 never render any of this. Reads the
+     client's own v2_tickets/v2_ticket_messages (RLS-scoped) direct via _sb;
+     mutations go through /api/v2-tickets. Design tokens only, no emojis. -->
+<style>
+  /* Popout: compact summary row (taps straight into focus mode) */
+  .zd-summary {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 13px 14px; background: var(--surface-el, rgba(0,0,0,.02));
+    border: 1px solid var(--border); border-radius: var(--radius, 12px);
+    cursor: pointer; text-align: left;
+    transition: transform .12s var(--es, ease), border-color .12s;
+  }
+  .zd-summary:hover { transform: translateY(-1px); border-color: var(--border-med, var(--border)); }
+  .zd-summary.needs { border-color: var(--accent-border, rgba(212,182,92,.25)); background: var(--gold-sheen, rgba(212,182,92,.06)); }
+  .zd-summary-ic {
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    width: 34px; height: 34px; border-radius: var(--radius-sm, 8px);
+    background: var(--gold-sheen, rgba(212,182,92,.08)); color: var(--gold, #D4B65C);
+  }
+  .zd-summary-ic svg { width: 18px; height: 18px; }
+  .zd-summary-body { flex: 1 1 auto; min-width: 0; }
+  .zd-summary-title { font-size: 13px; font-weight: 700; color: var(--text); }
+  .zd-summary-sub { font-size: 11.5px; color: var(--text-mute); margin-top: 2px; }
+  .zd-summary.needs .zd-summary-sub { color: var(--gold, #D4B65C); font-weight: 600; }
+  .zd-summary-badge {
+    flex: 0 0 auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+    background: var(--gold, #D4B65C); color: var(--on-gold, #131416);
+    font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .zd-summary-chev { flex: 0 0 auto; color: var(--text-mute); }
+
+  /* Home attention card (right rail) - hidden when zero */
+  .sup-home-card {
+    background: var(--surface); border: 1px solid var(--accent-border, rgba(212,182,92,.25));
+    border-radius: var(--radius-lg, 16px); box-shadow: var(--card-shadow, none);
+    overflow: hidden; margin-bottom: 16px;
+  }
+  .sup-home-head {
+    display: flex; align-items: center; gap: 10px; padding: 13px 16px 11px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sup-home-lab {
+    font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-sub); flex: 1;
+  }
+  .sup-home-badge {
+    font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px;
+    background: var(--gold-sheen, rgba(212,182,92,.10)); color: var(--gold, #D4B65C);
+    border: 1px solid var(--accent-border, rgba(212,182,92,.25)); white-space: nowrap;
+  }
+  .sup-home-row {
+    display: flex; align-items: center; gap: 11px; width: 100%;
+    padding: 12px 16px; background: transparent; border: none;
+    border-bottom: 1px solid var(--border); cursor: pointer; text-align: left;
+    transition: background .12s;
+  }
+  .sup-home-row:last-of-type { border-bottom: none; }
+  .sup-home-row:hover { background: var(--surface-el, rgba(0,0,0,.03)); }
+  .sup-home-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; background: var(--gold, #D4B65C); }
+  .sup-home-rbody { flex: 1 1 auto; min-width: 0; }
+  .sup-home-rtitle { display: block; font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sup-home-rmeta { display: block; font-size: 11.5px; color: var(--gold, #D4B65C); font-weight: 600; margin-top: 1px; }
+  .sup-home-chev { flex: 0 0 auto; color: var(--text-mute); }
+  .sup-home-more {
+    display: block; width: 100%; padding: 11px 16px; background: transparent; border: none;
+    border-top: 1px solid var(--border); color: var(--text-sub); font-size: 12.5px; font-weight: 700;
+    font-family: inherit; cursor: pointer; text-align: center;
+  }
+  .sup-home-more:hover { color: var(--text); }
+
+  /* ── SUPPORT focus overlay (house .mm-focus-page shell) ── */
+  #view-support .sup-focus-card { max-width: 1160px; width: min(1160px, 96vw); }
+  .sup-focus-head { display: flex; align-items: center; gap: 13px; margin-bottom: 12px; }
+  .sup-focus-head .mm-back-btn { margin-bottom: 0; }
+  .sup-crumb {
+    font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--gold, #D4B65C); display: inline-flex; align-items: center; gap: 8px;
+  }
+  .sup-crumb i { color: var(--text-mute); font-style: normal; font-weight: 600; opacity: .6; }
+
+  .sup-shell {
+    display: flex; min-height: 0; height: min(calc(100vh - 150px), 720px);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 16px); box-shadow: var(--shadow-lg, none); overflow: hidden;
+  }
+  .sup-rail {
+    flex: 0 0 300px; min-width: 0; display: flex; flex-direction: column;
+    border-right: 1px solid var(--border); background: var(--surface-el, var(--surface)); min-height: 0;
+  }
+  .sup-rail-head {
+    display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--border); flex: 0 0 auto;
+  }
+  .sup-rail-title { font-family: var(--font-num, inherit); font-weight: 800; font-size: 16px; color: var(--text); flex: 1; }
+  .sup-new-btn {
+    font-size: 12px; font-weight: 700; font-family: inherit; padding: 6px 12px; border-radius: 999px;
+    background: var(--gold-sheen, rgba(212,182,92,.08)); color: var(--gold, #D4B65C);
+    border: 1px solid var(--accent-border, rgba(212,182,92,.25)); cursor: pointer; transition: filter .12s;
+  }
+  .sup-new-btn:hover { filter: brightness(1.08); }
+  .sup-rail-scroll { overflow-y: auto; padding: 10px 10px 14px; flex: 1 1 auto; min-height: 0; }
+  .sup-grp { margin-bottom: 12px; }
+  .sup-grp-lab {
+    display: flex; align-items: center; gap: 7px; padding: 4px 8px 8px;
+    font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-mute);
+  }
+  .sup-grp-lab.needs { color: var(--gold, #D4B65C); }
+  .sup-grp-n {
+    font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-sub);
+  }
+  .sup-grp-lab.needs .sup-grp-n { background: var(--gold-sheen, rgba(212,182,92,.10)); color: var(--gold, #D4B65C); border-color: var(--accent-border, rgba(212,182,92,.25)); }
+  .sup-row {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 11px; margin-bottom: 4px;
+    background: transparent; border: 1px solid transparent; border-radius: var(--radius, 12px);
+    cursor: pointer; text-align: left; transition: background .12s, border-color .12s;
+  }
+  .sup-row:hover { background: var(--surface); border-color: var(--border); }
+  .sup-row.active { background: var(--surface); border-color: var(--accent-border, rgba(212,182,92,.25)); }
+  .sup-row-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; }
+  .sup-row-body { flex: 1 1 auto; min-width: 0; }
+  .sup-row-title { display: block; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sup-row-meta { display: block; font-size: 11px; color: var(--text-mute); margin-top: 1px; }
+  .sup-loading, .sup-empty { padding: 20px 12px; text-align: center; color: var(--text-mute); font-size: 12.5px; line-height: 1.5; }
+
+  /* "Start something new" (4 lanes + free-type), relocated into the rail */
+  .sup-new { margin-top: 8px; padding: 12px 8px 4px; border-top: 1px solid var(--border); }
+  .sup-new-lab { font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-mute); padding: 2px 4px 8px; }
+  .sup-new-lanes { display: flex; flex-direction: column; gap: 5px; }
+  .sup-lane {
+    display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 10px;
+    background: transparent; border: 1px solid var(--border); border-radius: var(--radius, 12px);
+    cursor: pointer; text-align: left; transition: border-color .12s, background .12s, transform .12s var(--es, ease);
+  }
+  .sup-lane:hover { border-color: var(--accent-border, var(--gold)); background: var(--gold-sheen, rgba(212,182,92,.06)); transform: translateY(-1px); }
+  .sup-lane-ic { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 30px; height: 30px; border-radius: var(--radius-sm, 8px); background: var(--gold-sheen, rgba(212,182,92,.08)); color: var(--gold, #D4B65C); }
+  .sup-lane-ic svg { width: 16px; height: 16px; }
+  .sup-lane-txt { display: flex; flex-direction: column; min-width: 0; }
+  .sup-lane-t { font-size: 12.5px; font-weight: 600; color: var(--text); }
+  .sup-lane-s { font-size: 10.5px; color: var(--text-mute); margin-top: 1px; }
+  .sup-new-type { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+  .sup-new-input {
+    flex: 1 1 auto; min-width: 0; height: 38px; padding: 0 13px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-full, 999px);
+    color: var(--text); font-size: 12.5px; font-family: inherit; outline: none; transition: border-color .12s;
+  }
+  .sup-new-input:focus { border-color: var(--accent-border, var(--gold)); }
+  .sup-new-input::placeholder { color: var(--text-mute); }
+  .sup-new-send {
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    width: 38px; height: 38px; border-radius: 999px; background: var(--gold, #D4B65C);
+    color: var(--on-gold, #131416); border: none; cursor: pointer; transition: filter .12s;
+  }
+  .sup-new-send:hover { filter: brightness(1.06); }
+  .sup-new-hint { height: 0; overflow: hidden; opacity: 0; font-size: 11.5px; color: var(--text-mute); text-align: center; transition: height .12s, opacity .12s; }
+  .sup-new-hint.show { height: auto; opacity: 1; padding: 8px 4px 2px; }
+
+  /* Main pane */
+  .sup-pane { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+  .sup-pane-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-mute); font-size: 13px; padding: 30px; line-height: 1.5; }
+  .sup-pane-head {
+    display: flex; align-items: center; gap: 12px; padding: 16px 20px 14px;
+    border-bottom: 1px solid var(--border); flex: 0 0 auto;
+  }
+  .sup-pane-back {
+    display: none; align-items: center; justify-content: center; flex: 0 0 auto;
+    width: 32px; height: 32px; border-radius: var(--radius-sm, 8px); background: transparent;
+    border: 1px solid transparent; color: var(--text-mute); cursor: pointer;
+  }
+  .sup-pane-back:hover { background: var(--surface-el, rgba(0,0,0,.04)); color: var(--text); }
+  .sup-pane-titles { flex: 1 1 auto; min-width: 0; }
+  .sup-pane-title { font-family: var(--font-num, inherit); font-weight: 800; font-size: 17px; color: var(--text); line-height: 1.25; }
+  .sup-pane-meta { font-size: 11.5px; color: var(--text-mute); margin-top: 2px; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+  .zd-pill {
+    display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
+    font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  }
+  .zd-pill-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+
+  /* Status ladder */
+  .sup-ladder {
+    display: flex; align-items: center; gap: 6px; padding: 11px 20px; flex: 0 0 auto;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .sup-lad-step { display: inline-flex; align-items: center; gap: 6px; }
+  .sup-lad-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--border-med, var(--border)); flex: 0 0 auto; }
+  .sup-lad-lab { font-size: 11px; font-weight: 700; color: var(--text-mute); white-space: nowrap; }
+  .sup-lad-step.done .sup-lad-dot { background: var(--green, #4CC76A); }
+  .sup-lad-step.done .sup-lad-lab { color: var(--text-sub); }
+  .sup-lad-step.cur .sup-lad-dot { background: var(--gold, #D4B65C); box-shadow: 0 0 0 3px var(--gold-sheen, rgba(212,182,92,.15)); }
+  .sup-lad-step.cur .sup-lad-lab { color: var(--text); }
+  .sup-lad-bar { width: 16px; height: 2px; background: var(--border); border-radius: 2px; }
+  .sup-lad-needs {
+    margin-left: auto; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--gold, #D4B65C); background: var(--gold-sheen, rgba(212,182,92,.10));
+    border: 1px solid var(--accent-border, rgba(212,182,92,.25)); padding: 3px 9px; border-radius: 999px;
+  }
+  .sup-closed-note { padding: 10px 20px; font-size: 12.5px; color: var(--text-sub); background: var(--surface-el, rgba(0,0,0,.02)); border-bottom: 1px solid var(--border); }
+
+  /* "Your team needs something" gold action card */
+  .sup-req-card {
+    margin: 14px 20px 0; padding: 15px 16px; border-radius: var(--radius, 12px);
+    background: var(--gold-sheen, rgba(212,182,92,.06));
+    border: 1px solid var(--accent-border, rgba(212,182,92,.30)); flex: 0 0 auto;
+  }
+  .sup-req-lab { margin-bottom: 8px; }
+  .sup-req-badge {
+    font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--gold, #D4B65C);
+  }
+  .sup-req-msg { font-size: 14px; color: var(--text); line-height: 1.5; margin-bottom: 12px; white-space: pre-wrap; }
+  .sup-req-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .sup-req-input {
+    width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: var(--radius-sm, 8px);
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-family: inherit; font-size: 13.5px; resize: vertical; outline: none; margin-top: 4px;
+  }
+  .sup-req-input:focus { border-color: var(--accent-border, var(--gold)); }
+  .sup-btn-gold {
+    padding: 9px 18px; border-radius: var(--radius-sm, 8px); border: none;
+    background: var(--gold, #D4B65C); color: var(--on-gold, #131416);
+    font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: filter .12s;
+  }
+  .sup-btn-gold:hover { filter: brightness(1.06); }
+  .sup-btn-ghost {
+    padding: 9px 18px; border-radius: var(--radius-sm, 8px);
+    background: transparent; border: 1px solid var(--border-med, var(--border)); color: var(--text-sub);
+    font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: color .12s, border-color .12s;
+  }
+  .sup-btn-ghost:hover { color: var(--text); border-color: var(--text-sub); }
+
+  /* Creative viewer (approvals) */
+  .sup-creative-wrap { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .sup-creative { display: block; width: 100%; max-height: 340px; border-radius: var(--radius-sm, 8px); background: #000; object-fit: contain; border: 1px solid var(--border); }
+  .sup-creative-imglink { display: block; }
+  .sup-creative-imglink .sup-creative { cursor: zoom-in; object-fit: contain; }
+  .sup-creative-aud { width: 100%; }
+  .sup-creative-none { padding: 16px; text-align: center; color: var(--text-mute); font-size: 12.5px; border: 1px dashed var(--border-med, var(--border)); border-radius: var(--radius-sm, 8px); margin-bottom: 12px; }
+
+  /* Scroll region (req-card + thread scroll together; composer stays pinned) */
+  .sup-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+  /* Thread */
+  .sup-thread { flex: 0 0 auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .sup-thread-loading, .sup-thread-err, .sup-thread-empty { color: var(--text-mute); font-size: 12.5px; text-align: center; padding: 20px; }
+  .sup-thread-err { color: var(--danger, #ED7969); }
+  .sup-msg { max-width: 78%; display: flex; flex-direction: column; }
+  .sup-msg.me { align-self: flex-end; align-items: flex-end; }
+  .sup-msg-who { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--text-mute); margin: 0 3px 3px; }
+  .sup-agent-tag { font-size: 8.5px; font-weight: 800; color: var(--gold, #D4B65C); border: 1px solid var(--accent-border, rgba(212,182,92,.25)); border-radius: 999px; padding: 0 4px; margin-left: 4px; }
+  .sup-msg-bubble { padding: 10px 13px; border-radius: var(--radius, 12px); font-size: 13.5px; line-height: 1.5; color: var(--text); background: var(--surface-el, rgba(0,0,0,.04)); border: 1px solid var(--border); border-top-left-radius: 4px; word-break: break-word; }
+  .sup-msg.me .sup-msg-bubble { background: var(--gold, #D4B65C); color: var(--on-gold, #131416); border: none; border-top-left-radius: var(--radius, 12px); border-top-right-radius: 4px; }
+  .sup-msg.k-agent .sup-msg-bubble { background: var(--gold-sheen, rgba(212,182,92,.06)); border-color: var(--accent-border, rgba(212,182,92,.20)); }
+  .sup-msg-time { font-size: 10px; color: var(--text-mute); margin: 3px 3px 0; }
+  .sup-att { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .sup-att-thumb { display: block; width: 92px; height: 92px; border-radius: var(--radius-sm, 8px); overflow: hidden; border: 1px solid var(--border); background: #000; }
+  .sup-att-thumb img, .sup-att-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sup-att-file { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-sub); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm, 8px); padding: 6px 10px; text-decoration: none; }
+  .sup-att-file:hover { color: var(--text); }
+  .sup-sys { display: flex; align-items: center; gap: 10px; align-self: center; max-width: 100%; }
+  .sup-sys-line { flex: 1; height: 1px; background: var(--border); min-width: 12px; }
+  .sup-sys-txt { font-size: 10.5px; font-weight: 700; color: var(--text-mute); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+  .sup-sys-time { font-size: 10px; color: var(--text-mute); }
+
+  /* Composer */
+  .sup-composer { flex: 0 0 auto; padding: 12px 20px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
+  .sup-composer.closed { text-align: center; }
+  .sup-closed-msg { font-size: 12.5px; color: var(--text-mute); padding: 4px 0; }
+  .sup-add-content {
+    display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px;
+    font-size: 12.5px; font-weight: 700; font-family: inherit; padding: 7px 13px; border-radius: 999px;
+    background: var(--gold-sheen, rgba(212,182,92,.08)); color: var(--gold, #D4B65C);
+    border: 1px solid var(--accent-border, rgba(212,182,92,.25)); cursor: pointer; transition: filter .12s;
+  }
+  .sup-add-content:hover { filter: brightness(1.08); }
+  .sup-composer-row { display: flex; align-items: flex-end; gap: 10px; }
+  .sup-reply-input {
+    flex: 1 1 auto; min-width: 0; max-height: 120px; padding: 11px 14px; border-radius: var(--radius-md, 16px);
+    background: var(--surface-el, rgba(0,0,0,.03)); border: 1px solid var(--border); color: var(--text);
+    font-family: inherit; font-size: 13.5px; line-height: 1.4; resize: none; outline: none;
+  }
+  .sup-reply-input:focus { border-color: var(--accent-border, var(--gold)); }
+  .sup-send {
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    width: 42px; height: 42px; border-radius: 50%; background: var(--gold, #D4B65C);
+    color: var(--on-gold, #131416); border: none; cursor: pointer; transition: filter .12s;
+  }
+  .sup-send:hover { filter: brightness(1.06); }
+
+  /* Pinned "your team asked for" note atop the upload popup */
+  .ast-req-pin {
+    margin: 0 0 12px; padding: 11px 13px; border-radius: var(--radius-sm, 8px);
+    background: var(--gold-sheen, rgba(212,182,92,.06)); border: 1px solid var(--accent-border, rgba(212,182,92,.25));
+  }
+  .ast-req-pin-lab { display: block; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--gold, #D4B65C); margin-bottom: 4px; }
+  .ast-req-pin-msg { font-size: 13px; color: var(--text); line-height: 1.45; white-space: pre-wrap; }
+
+  /* Mobile: rail + pane stack; list first, tap in */
+  @media (max-width: 760px) {
+    #view-support .sup-focus-card { width: 100%; }
+    .sup-shell { flex-direction: column; height: min(calc(100vh - 120px), 760px); border-radius: var(--radius-md, 12px); }
+    .sup-rail { flex: 1 1 auto; border-right: none; border-bottom: 1px solid var(--border); }
+    .sup-pane { display: none; }
+    .sup-pane-back { display: inline-flex; }
+    body.sup-detail .sup-rail { display: none; }
+    body.sup-detail .sup-pane { display: flex; flex: 1 1 auto; }
+    .sup-msg { max-width: 86%; }
+  }
+  /* Orb is the support launcher - hide it while the focus page owns the screen */
+  body:has(#view-support.mm-open) #admin-fb-wrap { display: none; }
+</style>
+
 <div id="admin-fb-wrap">
   <div id="admin-fb-tip">help zoran out...</div>
   <button id="admin-fb-btn" onclick="onZoranIconClick()" aria-label="Support">
     <img src="/help-zoran.png" alt="Support" />
   </button>
+  <!-- V2 action-item badge: count of the client's waiting_client ("Needs you")
+       tickets. Hidden at zero; kept live by _zdUpdateOrbBadge() on load + realtime. -->
+  <span id="admin-fb-badge" aria-hidden="true"></span>
 </div>
 
 <div id="admin-fb-overlay" onclick="if (event.target === this) closeAdminFeedback()">
@@ -11863,6 +12216,24 @@ Then the call to action."]</div>
     </div>
   </div>
 
+  <!-- ── SUPPORT: focus-mode overlay (V2 / Track 2 P5) ──
+       Sibling of .main so the camera-pan blurs the app chrome behind it.
+       Opened by _zdOpenFocus() (orb popout summary + Home attention card +
+       any Needs-you row) via the shared _ccOpenFocusPage pan. Left rail groups
+       the client's own tickets (Needs you / In progress / Done); main pane =
+       one ticket: status ladder, "your team needs something" card, the shared
+       v2_ticket_messages thread, a reply composer + "+ Add content". V2-gated;
+       V1/V1.5 never open it. -->
+  <div class="modal-backdrop mm-focus-page" id="view-support" style="display:none" onclick="if(event.target===this)closeSupportFocus()">
+    <div class="modal-card mm-modal-card sup-focus-card" onclick="event.stopPropagation()">
+      <div class="sup-focus-head">
+        <button type="button" class="mm-back-btn" onclick="closeSupportFocus()">&lsaquo; Back</button>
+        <span class="sup-crumb">FOCUS <i>/</i> SUPPORT <i>/</i> LIVE</span>
+      </div>
+      <div class="sup-shell">
+        <aside class="sup-rail" id="sup-rail"><!-- rendered by _zdRenderFocusRail() --></aside>
+        <section class="sup-pane" id="sup-pane"><!-- rendered by _zdRenderFocusPane() --></section>
+      </div>
   <!-- Settings focus overlay (mirrors Business Blueprint). Owner-only; opened by
        openSettingsFocus() from the sidebar nav + the command-center gear menu. -->
   <div class="modal-backdrop mm-focus-page" id="view-settings" style="display:none" onclick="if(event.target===this)closeSettings()">
@@ -12044,10 +12415,10 @@ function hapticTap(style) {
 // ══════════════════════════════════════════════════════════════
 let _ASSETS = [];
 let _ASSET_FILTER = 'all';
-let _ASSET_TYPE   = 'all'; // 'all' | 'images' | 'videos'
+let _ASSET_TYPE   = 'all'; // 'all' | 'images' | 'videos' | 'audio'
 let _ASSET_TARGETS = { offers: [], staff: [], locations: [] };
 let _assetUploadNudge = '';   // one-shot message shown when over-limit files were skipped
-const _ASSET_CATS = ['logo','wordmark','hero','photo','video','crest','icon','og','favicon','other'];
+const _ASSET_CATS = ['logo','wordmark','hero','photo','video','audio','crest','icon','og','favicon','other'];
 let _astRendered = false;  // stagger flag
 let _astSelected = new Set(); // bulk select
 let _astFolderState = {};  // folder open/close memory
@@ -12145,8 +12516,9 @@ function _assetTargetName(a) {
 }
 
 function _assetMatchesFilter(a) {
-  if (_ASSET_TYPE === 'images' && a.category === 'video') return false;
+  if (_ASSET_TYPE === 'images' && (a.category === 'video' || a.category === 'audio')) return false;
   if (_ASSET_TYPE === 'videos' && a.category !== 'video') return false;
+  if (_ASSET_TYPE === 'audio' && a.category !== 'audio') return false;
   const tagged = a.offer_id || a.staff_id || a.location_id;
   switch (_ASSET_FILTER) {
     case 'brand':     return !tagged;
@@ -12172,7 +12544,7 @@ function _renderAssets() {
   _astRendered = true;
 
   // #2: Compact type tabs
-  const typeTabs = [['all','All'],['images','Images'],['videos','Videos']].map(([t,l]) => {
+  const typeTabs = [['all','All'],['images','Images'],['videos','Videos'],['audio','Audio']].map(([t,l]) => {
     const on = _ASSET_TYPE === t;
     return `<button onclick="_setAssetType('${t}')" class="ast-tab${on ? ' on' : ''}">${l}</button>`;
   }).join('');
@@ -12241,7 +12613,7 @@ function _renderAssets() {
       <label class="ast-upload-btn">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Upload
-        <input type="file" accept="image/*,video/*" multiple onchange="_uploadAssets(this)">
+        <input type="file" accept="image/*,video/*,audio/*" multiple onchange="_uploadAssets(this)">
       </label>`}
       <label class="ast-upload-btn secondary">
         Folder
@@ -12307,7 +12679,7 @@ function _astInitDropZone() {
   dz.addEventListener('dragover', (e) => { e.preventDefault(); });
   dz.addEventListener('drop', async (e) => {
     e.preventDefault(); hide();
-    const files = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+    const files = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/') || f.type.startsWith('audio/'));
     if (!files.length) return;
     await _uploadAssetFiles(files, false);
   });
@@ -12345,6 +12717,7 @@ function _assetCard(a, staggerIdx) {
   const isLink = !!a.link_url;
   const url = isLink ? a.link_url : _assetUrl(a.storage_path);
   const isVideo = (a.mime_type || '').startsWith('video/') || a.category === 'video';
+  const isAudio = (a.mime_type || '').startsWith('audio/') || a.category === 'audio';
   const stagger = staggerIdx >= 0 && staggerIdx < 30 ? `animation-delay:${staggerIdx * 30}ms;` : '';
   const checked = _astSelected.has(a.id) ? 'checked' : '';
 
@@ -12373,6 +12746,11 @@ function _assetCard(a, staggerIdx) {
       </a>`;
   } else if (isVideo) {
     thumbContent = `<video src="${escapeHTML(url)}#t=0.5" preload="metadata" muted playsinline onclick="_astLightbox('${escapeHTML(url)}',true)" style="max-width:100%;max-height:100%;background:#000;cursor:pointer"></video>`;
+  } else if (isAudio) {
+    thumbContent = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px" onclick="event.stopPropagation()">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gold)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <audio controls preload="metadata" src="${escapeHTML(url)}" style="width:100%;max-width:180px"></audio>
+      </div>`;
   } else {
     thumbContent = `<img src="${escapeHTML(url)}" alt="${escapeHTML(a.alt || '')}" loading="lazy" onclick="_astLightbox('${escapeHTML(url)}',false)">
       <svg class="ast-zoom" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`;
@@ -12456,6 +12834,8 @@ function _setAssetType(t)   { _ASSET_TYPE   = t; _renderAssets(); }
 let _astTagIds = [];            // asset ids being tagged (1 = card, N = upload)
 let _astTagUploadFrame = false; // popup is the upload frame (zone on top + tagging)
 let _astUploadTargetPopup = false; // route _uploadAssetFiles results into the open popup
+let _astTagPinnedNote = '';     // optional "your team asked for" note pinned atop the upload frame (support requests)
+let _astTagCloseCb = null;      // fired once on close with this session's asset ids (support "+ Add content")
 let _astAthleteTimer = null;
 
 function _astTagPrimary() { return _ASSETS.find(x => x.id === _astTagIds[0]) || null; }
@@ -12484,16 +12864,23 @@ function _astTagShow() {
 
 function _astTagClose() {
   document.getElementById('ast-tag-overlay')?.classList.remove('open');
-  _astTagIds = []; _astTagUploadFrame = false;
+  // Capture the session's asset ids + callback BEFORE reset so a support
+  // "+ Add content" flow can attach the just-uploaded files to its ticket.
+  const doneIds = _astTagIds.slice();
+  const cb = _astTagCloseCb;
+  _astTagIds = []; _astTagUploadFrame = false; _astTagPinnedNote = ''; _astTagCloseCb = null;
   _renderAssets();
+  if (cb) { try { cb(doneIds); } catch (_) {} }
 }
 
 function _astTagThumb(x) {
   const isLink = !!x.link_url;
   const url = isLink ? x.link_url : _assetUrl(x.storage_path);
   const isVideo = (x.mime_type || '').startsWith('video/') || x.category === 'video';
+  const isAudio = (x.mime_type || '').startsWith('audio/') || x.category === 'audio';
   if (isLink) return '<div class="ast-tag-thumb ast-tag-thumb-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>';
   if (isVideo) return `<video class="ast-tag-thumb" src="${escapeHTML(url)}#t=0.5" preload="metadata" muted playsinline></video>`;
+  if (isAudio) return `<div class="ast-tag-thumb ast-tag-thumb-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
   return `<img class="ast-tag-thumb" src="${escapeHTML(url)}" alt="">`;
 }
 
@@ -12529,10 +12916,16 @@ function _astTagRender() {
       <label class="ast-up-choose">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Choose files
-        <input type="file" accept="image/*,video/*" multiple style="display:none" onchange="_astPopupUpload(this)">
+        <input type="file" accept="image/*,video/*,audio/*" multiple style="display:none" onchange="_astPopupUpload(this)">
       </label>
       <span class="ast-up-hint">or drop photos and videos here</span>
     </div>` : '';
+
+  // A support "upload" request pins the team's note on top of the frame so the
+  // client sees exactly what was asked for while they add + tag content.
+  const pinnedNote = (frame && _astTagPinnedNote)
+    ? `<div class="ast-req-pin"><span class="ast-req-pin-lab">Your team asked for</span><div class="ast-req-pin-msg">${escapeHTML(_astTagPinnedNote)}</div></div>`
+    : '';
 
   // Taxonomy needs a real asset to write to; empty frame shows a hint instead.
   if (!a) {
@@ -12548,6 +12941,7 @@ function _astTagRender() {
         </button>
       </div>
       <div class="ast-tag-body">
+        ${pinnedNote}
         ${uploadZone}
         <div class="ast-tag-sec"><div class="ast-tag-none">Add a file above to start tagging.</div></div>
       </div>
@@ -12658,6 +13052,7 @@ function _astTagRender() {
       </button>
     </div>
     <div class="ast-tag-body">
+      ${pinnedNote}
       ${uploadZone}
       <div class="ast-tag-sec">
         <div class="ast-tag-label">What is this?</div>
@@ -12678,7 +13073,7 @@ async function _astPopupUpload(inputEl) {
 function _astPopupDrop(e) {
   e.preventDefault();
   e.currentTarget.classList.remove('drag');
-  const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+  const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/') || f.type.startsWith('audio/'));
   if (files.length) _astPopupUploadFiles(files, false);
 }
 async function _astPopupUploadFiles(files, fromFolder) {
@@ -12968,7 +13363,8 @@ async function _uploadAssetFiles(all, fromFolder) {
       const path = `${CLIENT_ID}/${stamp}-${clean}`;
       const rel = (fromFolder && file.webkitRelativePath) ? file.webkitRelativePath : '';
       const folder = rel.includes('/') ? rel.split('/')[0] : null;
-      const category = (file.type || '').startsWith('video/') ? 'video' : 'photo';
+      const _mt = (file.type || '');
+      const category = _mt.startsWith('video/') ? 'video' : _mt.startsWith('audio/') ? 'audio' : 'photo';
       await _storageUpload('client-assets', path, file);
       const { data: insRow, error: insErr } = await _sb.from('client_assets').insert({
         client_id: CLIENT_ID, label: file.name.replace(/\.[^.]+$/, ''), category,
@@ -20028,6 +20424,7 @@ function renderHomeV2() {
       </div>
     </div>
     <div class="hm-right">
+      <div id="hm-support-card" style="display:none"><!-- V2 Support attention card - _zdRenderHomeCard() --></div>
       <div class="hm-score" id="hm-score">
         <div class="hm-score-head">
           <div class="hm-score-title">${_HV2_ICONS.trend} Your business right now</div>
@@ -20047,6 +20444,7 @@ function _hv2Load() {
   _hmLoadScoreboard();
   _hmLoadRailBottom();
   _hmLoadReplyTime();
+  try { _zdLoadHomeCard(); } catch (_) {}   // V2 Support attention card (hidden at zero)
   // UX #6: Init drag reorder (only if enabled)
   _hmInitDragReorder();
   // Visual effects
@@ -31951,6 +32349,9 @@ async function switchClient(newId) {
   await loadAcademyName();
   await loadTickets();
   subscribeTicketsRealtime();   // re-scope tickets subscription to new CLIENT_ID
+  _ZD_TICKETS = []; _ZD_TICKETS_LOADED = false; _ZD_FOCUS_TICKET = null;
+  if (typeof _zdSubscribeRealtime === 'function') _zdSubscribeRealtime();  // V2 support rail -> new CLIENT_ID
+  if (typeof _zdLoadHomeCard === 'function') _zdLoadHomeCard();            // refresh the Home Support card
   _obtLoadProgress();           // refresh tracker for the new client's progress state
   _checkCompletedBanner();      // re-check "while you were away" for the new academy
   _checkActionBanner();         // re-check "waiting on you" for the new academy
@@ -52622,14 +53023,19 @@ function onAdminFeedbackFilePick() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Zoran door - Track 2 T2-a (FRONT-END TEMPLATE ONLY)
-   Tapping the Zoran icon on V2 opens this support front door: live tickets
-   list (MOCK data below) + 4 lanes + free-type box. No backend: intake, the
-   real tickets table, agent + notifications land in later chunks. V1/V1.5
-   keep the old feedback modal (onZoranIconClick routes by tier).
+   V2 Support rail - Track 2 P5 (client-side ticket surfaces, LIVE)
+   Three zoom levels, one rail (design 2026-07-20):
+     - HOME "Support" attention card  -> _zdRenderHomeCard (waiting_client only)
+     - ORB POPOUT summary row         -> _zdRenderTickets  (taps into focus)
+     - SUPPORT FOCUS MODE             -> _zdOpenFocus / _zdRenderFocus*
+   Reads the client's OWN v2_tickets / v2_ticket_messages direct via _sb
+   (RLS-scoped); every mutation (reply / approve / attach) goes through
+   /api/v2-tickets so the P6 notification hooks stay a single choke point.
+   ALL V2-gated (onZoranIconClick routes V1/V1.5 to the old feedback modal).
    ═══════════════════════════════════════════════════════════════════════ */
 
 // Shared 5-state ladder -> client label + semantic color (locked 2026-07-20).
+// Keyed by the client-facing key; DB status maps in via _ZD_DB2KEY.
 const _ZD_STATUS = {
   received:       { label: 'Received',      color: 'var(--blue, #5B9BD5)' },
   in_progress:    { label: 'Working on it', color: 'var(--amber, #E0A64B)' },
@@ -52637,109 +53043,138 @@ const _ZD_STATUS = {
   resolved:       { label: 'Done',          color: 'var(--green, #6FBF73)' },
   closed:         { label: 'Closed',        color: 'var(--text-mute, #8A8A93)' },
 };
-
-// MOCK tickets - stand-ins so the template feels real. Replaced by the tickets
-// table in a later chunk.
-const _ZD_MOCK_TICKETS = [
-  {
-    id: 't1', title: 'A parent got charged twice', lane: 'Billing',
-    status: 'waiting_client', updated: '2h ago',
-    thread: [
-      { who: 'me',    name: 'You',       body: 'A parent got charged twice for the August membership.' },
-      { who: 'them',  name: 'Assistant', body: "Got it. What's the parent's email so we can pull the charge?" },
-    ],
-  },
-  {
-    id: 't2', title: 'Swap in the new team photos', lane: 'Website',
-    status: 'in_progress', updated: 'yesterday',
-    thread: [
-      { who: 'me',   name: 'You',      body: 'Can we put the new team photos on the homepage?' },
-      { who: 'them', name: 'BAM team', body: 'On it, updating the homepage gallery now.' },
-    ],
-  },
-  {
-    id: 't3', title: 'Booking page would not load', lane: 'Fix',
-    status: 'resolved', updated: '3 days ago',
-    thread: [
-      { who: 'me',   name: 'You',      body: 'The free-trial booking page was blank this morning.' },
-      { who: 'them', name: 'BAM team', body: 'Fixed. A calendar setting was off. It is live again.' },
-    ],
-  },
-];
-
-let _zdActiveTicket = null;
-
-function onZoranIconClick() {
-  // V2 gets the new door; V1/V1.5 keep the existing feedback modal.
-  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) {
-    openZoranDoor();
-  } else {
-    openAdminFeedback();
-  }
+const _ZD_DB2KEY = {
+  new: 'received', triaging: 'received', in_progress: 'in_progress',
+  waiting_client: 'waiting_client', resolved: 'resolved', closed: 'closed',
+};
+function _zdStatusMeta(dbStatus) { return _ZD_STATUS[_ZD_DB2KEY[dbStatus] || 'received'] || _ZD_STATUS.received; }
+function _zdStatusPill(dbStatus) {
+  const s = _zdStatusMeta(dbStatus);
+  return `<span class="zd-pill" style="color:${s.color};background:color-mix(in srgb, ${s.color} 16%, transparent)"><span class="zd-pill-dot"></span>${s.label}</span>`;
 }
 
+// type -> short client-facing lane label (internal registry stays hidden).
+const _ZD_TYPE_LABEL = {
+  fix: 'Fix', website_change: 'Website', billing_fix: 'Billing', data_fix: 'Data',
+  build_ask: 'Build', agent_correction: 'Agent', marketing_ask: 'Marketing',
+  content_ask: 'Content', feature_idea: 'Idea', general: 'Support',
+};
+function _zdTypeLabel(t) { return _ZD_TYPE_LABEL[t] || 'Support'; }
+function _zdIsContent(t) { return !!t && (t.type === 'content_ask' || t.type === 'marketing_ask'); }
+function _zdTitle(t) { return (t && t.title && String(t.title).trim()) || _zdTypeLabel(t && t.type) + ' request'; }
+
+// ── Live state ──
+let _ZD_TICKETS = [];
+let _ZD_TICKETS_LOADED = false;
+let _ZD_FOCUS_TICKET = null;   // ticket id open in the focus main pane
+let _ZD_RETURN = null;         // view to restore when the focus overlay closes
+
+async function _zdLoadTickets() {
+  if (!_sb || typeof CLIENT_ID === 'undefined' || !CLIENT_ID) { _ZD_TICKETS = []; _ZD_TICKETS_LOADED = true; return _ZD_TICKETS; }
+  try {
+    const { data, error } = await _sb.from('v2_tickets')
+      .select('*').eq('client_id', CLIENT_ID)
+      .order('updated_at', { ascending: false }).limit(200);
+    if (error) throw error;
+    _ZD_TICKETS = data || [];
+  } catch (e) { console.warn('[support] load tickets failed:', (e && e.message) || e); }
+  _ZD_TICKETS_LOADED = true;
+  return _ZD_TICKETS;
+}
+function _zdGroup() {
+  const needs = [], prog = [], done = [];
+  for (const t of _ZD_TICKETS) {
+    if (t.status === 'waiting_client') needs.push(t);
+    else if (t.status === 'resolved' || t.status === 'closed') done.push(t);
+    else prog.push(t); // new / triaging / in_progress
+  }
+  return { needs, prog, done };
+}
+function _zdNeeds() { return _ZD_TICKETS.filter(t => t.status === 'waiting_client'); }
+
+function _zdWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso).getTime();
+  if (!(d > 0)) return '';
+  const s = Math.floor((Date.now() - d) / 1000);
+  if (s < 45) return 'just now';
+  const m = Math.floor(s / 60); if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60); if (h < 24) return h + 'h ago';
+  const dd = Math.floor(h / 24); if (dd === 1) return 'yesterday';
+  if (dd < 7) return dd + 'd ago';
+  try { return new Date(iso).toLocaleDateString(); } catch (_) { return ''; }
+}
+function _zdReqVerb(t) {
+  const pr = t && t.intake && t.intake.pending_request;
+  if (pr && pr.kind === 'reply') return 'Answer a question';
+  if (pr && pr.kind === 'upload') return 'Add some content';
+  if (pr && pr.kind === 'approval') return 'Review and approve';
+  return 'Needs your input';
+}
+
+// ── Icon router (V2 -> Support focus hub directly; V1/V1.5 feedback modal) ──
+// The orb no longer opens the intermediate popout on V2: it drops straight into
+// the Support focus mode (the whole hub - tickets + start-something-new). The
+// old popout (#zdoor-overlay) stays in the DOM but is unused on V2.
+function onZoranIconClick() {
+  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) _zdOpenFocus(null);
+  else openAdminFeedback();
+}
+
+// ── Orb popout (legacy, retained but unused on V2) ──
 function openZoranDoor() {
   _zdShowHome();
-  _zdRenderTickets();
+  _zdRenderTickets();   // shows a loading/summary placeholder immediately
   document.getElementById('zdoor-overlay').classList.add('open');
+  _zdLoadTickets().then(() => _zdRenderTickets()).catch(() => {});
 }
-
 function closeZoranDoor() {
   document.getElementById('zdoor-overlay').classList.remove('open');
   _zdHideHint();
 }
-
-function _zdStatusPill(status) {
-  const s = _ZD_STATUS[status] || _ZD_STATUS.received;
-  return `<span class="zd-pill" style="color:${s.color};background:color-mix(in srgb, ${s.color} 14%, transparent)"><span class="zd-pill-dot"></span>${s.label}</span>`;
+function _zdShowHome() {
+  document.getElementById('zdoor-home').style.display = 'flex';
+  const thread = document.getElementById('zdoor-thread');
+  if (thread) thread.style.display = 'none';
 }
 
+// Popout tickets area = ONE summary row that taps STRAIGHT into focus mode
+// (no mini-thread in the popout, per the locked design).
 function _zdRenderTickets() {
   const wrap = document.getElementById('zd-ticket-list');
   if (!wrap) return;
-  const tix = _ZD_MOCK_TICKETS;
-  if (!tix.length) {
-    wrap.innerHTML = `<div class="zd-empty">No tickets yet. Start something new below and it shows up here.</div>`;
+  if (!_ZD_TICKETS_LOADED) {
+    wrap.innerHTML = `<div class="zd-empty"><span class="req-spin"></span> Loading your requests…</div>`;
     return;
   }
-  wrap.innerHTML = tix.map(t => `
-    <button type="button" class="zd-ticket" onclick="_zdOpenThread('${t.id}')">
-      <span class="zd-ticket-body">
-        <span class="zd-ticket-title">${_zdEsc(t.title)}</span>
-        <span class="zd-ticket-meta">${_zdEsc(t.lane)} · ${_zdEsc(t.updated)}</span>
+  const n = _ZD_TICKETS.length;
+  if (!n) {
+    wrap.innerHTML = `<div class="zd-empty">No requests yet. Start something new below and it shows up here.</div>`;
+    return;
+  }
+  const needs = _zdNeeds().length;
+  const sub = needs > 0
+    ? `${needs} need${needs === 1 ? 's' : ''} you now`
+    : `${n} request${n === 1 ? '' : 's'} · all up to date`;
+  wrap.innerHTML = `
+    <button type="button" class="zd-summary${needs > 0 ? ' needs' : ''}" onclick="_zdOpenFocusFromPopout()">
+      <span class="zd-summary-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+      <span class="zd-summary-body">
+        <span class="zd-summary-title">Your requests</span>
+        <span class="zd-summary-sub">${_zdEsc(sub)}</span>
       </span>
-      ${_zdStatusPill(t.status)}
-    </button>`).join('');
+      ${needs > 0 ? `<span class="zd-summary-badge">${needs}</span>` : ''}
+      <svg class="zd-summary-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    </button>`;
+}
+function _zdOpenFocusFromPopout() {
+  closeZoranDoor();
+  const first = _zdNeeds()[0] || _ZD_TICKETS[0] || null;
+  _zdOpenFocus(first ? first.id : null);
 }
 
-function _zdShowHome() {
-  document.getElementById('zdoor-home').style.display = 'flex';
-  document.getElementById('zdoor-thread').style.display = 'none';
-  _zdActiveTicket = null;
-}
-
-function _zdOpenThread(id) {
-  const t = _ZD_MOCK_TICKETS.find(x => x.id === id);
-  if (!t) return;
-  _zdActiveTicket = t;
-  document.getElementById('zd-thread-title').textContent = t.title;
-  document.getElementById('zd-thread-status').innerHTML = _zdStatusPill(t.status);
-  const msgs = document.getElementById('zd-thread-msgs');
-  msgs.innerHTML = t.thread.map(m => `
-    <div class="zd-msg ${m.who === 'me' ? 'me' : 'them'}">
-      <div class="zd-msg-who">${_zdEsc(m.name)}</div>
-      <div class="zd-msg-bubble">${_zdEsc(m.body)}</div>
-    </div>`).join('');
-  document.getElementById('zdoor-home').style.display = 'none';
-  document.getElementById('zdoor-thread').style.display = 'flex';
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-function _zdCloseThread() { _zdShowHome(); }
-
-// Lanes + free-type are visual this chunk. Bug/feature BRIDGE to the existing
-// feedback modal (kind preselected) so V2 academies lose nothing until P5
-// wires the real intake; the other lanes show a gentle inline note.
+// Lanes + free-type (unchanged this chunk): bug/feature BRIDGE to the existing
+// feedback modal; navigator/support show a gentle inline note.
 function _zdLane(kind) {
   if (kind === 'bug' || kind === 'feature') {
     closeZoranDoor();
@@ -52753,14 +53188,11 @@ function _zdTypeSend() {
   const el = document.getElementById('zd-type-input');
   if (el && el.value.trim()) { el.value = ''; _zdShowHint('Chat routing gets wired in the next build.'); }
 }
-function _zdThreadSend() {
-  const el = document.getElementById('zd-thread-input');
-  if (!el || !_zdActiveTicket || !el.value.trim()) return;
-  const body = el.value.trim(); el.value = '';
-  // Local-only echo so the thread feels alive in the template (not persisted).
-  _zdActiveTicket.thread.push({ who: 'me', name: 'You', body });
-  _zdOpenThread(_zdActiveTicket.id);
-}
+// The popout no longer opens a mini-thread on V2 (taps go to focus mode). These
+// stubs stay so the unused #zdoor-thread controls can never throw.
+function _zdOpenThread(id) { closeZoranDoor(); _zdOpenFocus(id); }
+function _zdCloseThread() { _zdShowHome(); }
+function _zdThreadSend() {}
 
 let _zdHintTimer = null;
 function _zdShowHint(msg) {
@@ -52779,6 +53211,480 @@ function _zdEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// HOME "Support" attention card (right rail). Lists waiting_client tickets;
+// HIDDEN when zero. Row tap opens focus mode straight on that ticket.
+// ══════════════════════════════════════════════════════════════════════════
+async function _zdLoadHomeCard() {
+  if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS) {
+    await _zdLoadTickets();
+    _zdRenderHomeCard();
+  }
+  _zdUpdateOrbBadge();   // keep the orb action-item badge in sync (hidden for non-V2)
+}
+
+// Orb badge = the client's ACTION ITEMS = waiting_client ("Needs you") tickets.
+// Hidden at zero; V2 only. Called on load, on realtime, and after every reply.
+function _zdUpdateOrbBadge() {
+  const badge = document.getElementById('admin-fb-badge');
+  if (!badge) return;
+  const on = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const n = on ? _zdNeeds().length : 0;
+  if (n > 0) {
+    badge.textContent = n > 99 ? '99+' : String(n);
+    badge.classList.add('show');
+    badge.setAttribute('aria-label', `${n} support ${n === 1 ? 'item needs' : 'items need'} your attention`);
+  } else {
+    badge.textContent = '';
+    badge.classList.remove('show');
+    badge.removeAttribute('aria-label');
+  }
+}
+function _zdRenderHomeCard() {
+  const host = document.getElementById('hm-support-card');
+  if (!host) return;
+  const needs = _zdNeeds();
+  if (!needs.length) { host.style.display = 'none'; host.innerHTML = ''; return; }
+  host.style.display = '';
+  const rows = needs.slice(0, 4).map(t => `
+    <button type="button" class="sup-home-row" onclick="_zdOpenFocus('${t.id}')">
+      <span class="sup-home-dot"></span>
+      <span class="sup-home-rbody">
+        <span class="sup-home-rtitle">${escapeHTML(_zdTitle(t))}</span>
+        <span class="sup-home-rmeta">${escapeHTML(_zdReqVerb(t))}</span>
+      </span>
+      <svg class="sup-home-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    </button>`).join('');
+  host.innerHTML = `
+    <div class="sup-home-card">
+      <div class="sup-home-head">
+        <span class="sup-home-lab">Support</span>
+        <span class="sup-home-badge">${needs.length} need${needs.length === 1 ? 's' : ''} your attention</span>
+      </div>
+      ${rows}
+      ${needs.length > 4 ? `<button type="button" class="sup-home-more" onclick="_zdOpenFocus(null)">View all ${needs.length} ›</button>` : ''}
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// SUPPORT FOCUS MODE (house .mm-focus-page overlay). Left rail grouped
+// Needs you / In progress / Done; main pane = the ticket (ladder, "your team
+// needs something" card, the shared thread, a reply composer + "+ Add content").
+// ══════════════════════════════════════════════════════════════════════════
+function _zdIsFocusOpen() { return !!document.getElementById('view-support')?.classList.contains('mm-open'); }
+
+function _zdOpenFocus(ticketId) {
+  const modal = document.getElementById('view-support');
+  if (!modal) return;
+  if (!_zdIsFocusOpen()) {
+    const cur = document.querySelector('.view.active');
+    _ZD_RETURN = cur ? cur.id.replace('view-', '') : null;
+  }
+  _ZD_FOCUS_TICKET = ticketId || null;
+  document.body.classList.toggle('sup-detail', !!ticketId);
+  _zdRenderFocus();
+  _zdSubscribeRealtime();
+  if (typeof _ccOpenFocusPage === 'function') {
+    _ccOpenFocusPage('view-support', '#admin-fb-btn');
+  } else {
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => { document.documentElement.classList.add('mm-focus-open'); modal.classList.add('mm-open'); });
+  }
+  // Refresh against live data once the pan is under way.
+  _zdLoadTickets().then(() => {
+    _zdRenderFocusRail();
+    if (_ZD_FOCUS_TICKET) _zdRenderFocusPane();
+  }).catch(() => {});
+}
+function closeSupportFocus() {
+  if (typeof _mmCloseFocus === 'function') _mmCloseFocus('view-support');
+  else {
+    const m = document.getElementById('view-support');
+    if (m) { m.classList.remove('mm-open'); m.style.display = 'none'; }
+    document.documentElement.classList.remove('mm-focus-open');
+  }
+  document.body.classList.remove('sup-detail');
+  const back = _ZD_RETURN || (typeof _landingView === 'function' ? _landingView() : 'home');
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
+  if (item) item.classList.add('active');
+  try { syncMobileNav(back); } catch (_) {}
+}
+
+function _zdRenderFocus() { _zdRenderFocusRail(); _zdRenderFocusPane(); }
+
+function _zdRailRow(t) {
+  const active = t.id === _ZD_FOCUS_TICKET ? ' active' : '';
+  const meta = _zdStatusMeta(t.status);
+  return `<button type="button" class="sup-row${active}" onclick="_zdOpenTicket('${t.id}')">
+    <span class="sup-row-dot" style="background:${meta.color}"></span>
+    <span class="sup-row-body">
+      <span class="sup-row-title">${escapeHTML(_zdTitle(t))}</span>
+      <span class="sup-row-meta">${escapeHTML(_zdTypeLabel(t.type))} · ${escapeHTML(_zdWhen(t.updated_at))}</span>
+    </span>
+  </button>`;
+}
+function _zdRenderFocusRail() {
+  const rail = document.getElementById('sup-rail');
+  if (!rail) return;
+  // Preserve a half-typed free-type entry across a realtime/selection re-render.
+  const prevType = (document.getElementById('sup-type-input') || {}).value || '';
+  const { needs, prog, done } = _zdGroup();
+  const grp = (label, arr, cls) => arr.length
+    ? `<div class="sup-grp"><div class="sup-grp-lab ${cls}">${label} <span class="sup-grp-n">${arr.length}</span></div>${arr.map(_zdRailRow).join('')}</div>`
+    : '';
+  const total = _ZD_TICKETS.length;
+  const body = !_ZD_TICKETS_LOADED
+    ? `<div class="sup-loading"><span class="req-spin"></span> Loading…</div>`
+    : total === 0
+      ? `<div class="sup-empty">No requests yet. Start something new below.</div>`
+      : (grp('Needs you', needs, 'needs') + grp('In progress', prog, 'prog') + grp('Done', done, 'done'));
+  rail.innerHTML = `
+    <div class="sup-rail-head">
+      <div class="sup-rail-title">Support</div>
+      <button type="button" class="sup-new-btn" onclick="_zdFocusStartNew()">+ New</button>
+    </div>
+    <div class="sup-rail-scroll">
+      ${body}
+      ${_zdStartNewHtml()}
+    </div>`;
+  const ti = document.getElementById('sup-type-input');
+  if (ti && prevType) ti.value = prevType;
+}
+
+// The 4 lanes + free-type box, relocated OUT of the popout INTO focus mode as a
+// persistent "Start something new" section (below the ticket rail). Same four
+// lanes as before; bug/feature still bridge to the old feedback modal.
+function _zdStartNewHtml() {
+  const lane = (kind, title, sub, svg) =>
+    `<button type="button" class="sup-lane" onclick="_zdFocusLane('${kind}')">
+      <span class="sup-lane-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg></span>
+      <span class="sup-lane-txt"><span class="sup-lane-t">${title}</span><span class="sup-lane-s">${sub}</span></span>
+    </button>`;
+  return `
+    <div class="sup-new" id="sup-new">
+      <div class="sup-new-lab">Start something new</div>
+      <div class="sup-new-lanes">
+        ${lane('navigator', 'Where do I…?', 'Get a quick answer', '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>')}
+        ${lane('support', 'Get help from our team', 'Talk to a human', '<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>')}
+        ${lane('bug', 'Report a problem', 'Something is broken', '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>')}
+        ${lane('feature', 'Suggest a feature', 'An idea for us', '<path d="M12 3l2.09 6.26L20.5 9.5l-5 3.9 1.9 6.1L12 15.9 6.6 19.5l1.9-6.1-5-3.9 6.41-.24z"/>')}
+      </div>
+      <div class="sup-new-type">
+        <input id="sup-type-input" class="sup-new-input" type="text" placeholder="…or just type what you need" onkeydown="if(event.key==='Enter')_zdFocusTypeSend()">
+        <button type="button" class="sup-new-send" onclick="_zdFocusTypeSend()" aria-label="Send">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
+        </button>
+      </div>
+      <div class="sup-new-hint" id="sup-new-hint"></div>
+    </div>`;
+}
+// Lanes inside focus mode: bug/feature BRIDGE to the old feedback modal exactly
+// as the popout did; navigator/support + free-type show a gentle inline note.
+function _zdFocusLane(kind) {
+  if (kind === 'bug' || kind === 'feature') {
+    closeSupportFocus();
+    openAdminFeedback();
+    setFeedbackKind(kind);
+    return;
+  }
+  _zdFocusNewHint('This opens the real intake in the next build.');
+}
+function _zdFocusTypeSend() {
+  const el = document.getElementById('sup-type-input');
+  if (el && el.value.trim()) { el.value = ''; _zdFocusNewHint('Chat routing gets wired in the next build.'); }
+}
+let _zdNewHintTimer = null;
+function _zdFocusNewHint(msg) {
+  const el = document.getElementById('sup-new-hint');
+  if (!el) return;
+  el.textContent = msg; el.classList.add('show');
+  if (_zdNewHintTimer) clearTimeout(_zdNewHintTimer);
+  _zdNewHintTimer = setTimeout(() => { if (el) el.classList.remove('show'); }, 2600);
+}
+
+function _zdOpenTicket(id) {
+  _ZD_FOCUS_TICKET = id;
+  document.body.classList.add('sup-detail');   // mobile: reveal the pane
+  _zdRenderFocusRail();
+  _zdRenderFocusPane();
+}
+function _zdFocusBackToList() { document.body.classList.remove('sup-detail'); }
+// "+ New" = jump to the Start-something-new section (mobile shows the list/rail
+// first, so ensure it's visible, then scroll it into view + focus the box).
+function _zdFocusStartNew() {
+  document.body.classList.remove('sup-detail');
+  const el = document.getElementById('sup-new');
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const inp = document.getElementById('sup-type-input');
+  if (inp) setTimeout(() => { try { inp.focus(); } catch (_) {} }, 140);
+}
+
+async function _zdRenderFocusPane() {
+  const pane = document.getElementById('sup-pane');
+  if (!pane) return;
+  const id = _ZD_FOCUS_TICKET;
+  if (!id) {
+    pane.innerHTML = `<div class="sup-pane-empty">Pick a request on the left to open the conversation, or start something new from the panel on the left.</div>`;
+    return;
+  }
+  const t = _ZD_TICKETS.find(x => x.id === id);
+  if (!t) { pane.innerHTML = `<div class="sup-pane-empty">This request is no longer available.</div>`; return; }
+  // Preserve any half-typed reply across a realtime-driven re-render.
+  const prevReply = (document.getElementById('sup-reply-input') || {}).value || '';
+  pane.innerHTML = _zdPaneShell(t, `<div class="sup-thread-loading"><span class="req-spin"></span> Loading the conversation…</div>`);
+  let msgs = [];
+  try {
+    const { data, error } = await _sb.from('v2_ticket_messages')
+      .select('*').eq('ticket_id', id).order('created_at', { ascending: true });
+    if (error) throw error;
+    msgs = (data || []).filter(m => !m.internal);   // internal already stripped server-side; belt + braces
+  } catch (e) {
+    if (_ZD_FOCUS_TICKET === id) pane.innerHTML = _zdPaneShell(t, `<div class="sup-thread-err">Couldn't load the conversation. ${escapeHTML((e && e.message) || '')}</div>`);
+    return;
+  }
+  if (_ZD_FOCUS_TICKET !== id) return;   // user switched tickets mid-fetch
+  pane.innerHTML = _zdPaneShell(t, _zdThreadHtml(msgs));
+  const ri = pane.querySelector('#sup-reply-input');
+  if (ri && prevReply && !ri.value) ri.value = prevReply;
+  // A pending "your team needs something" card is the priority - keep it in
+  // view (scroll to top); otherwise jump to the latest message.
+  const sc = pane.querySelector('.sup-scroll');
+  const pending = t.intake && t.intake.pending_request;
+  if (sc) sc.scrollTop = pending ? 0 : sc.scrollHeight;
+}
+
+function _zdPaneShell(t, threadHtml) {
+  const pending = (t.intake && t.intake.pending_request) ? t.intake.pending_request : null;
+  const closed = t.status === 'closed';
+  return `
+    <div class="sup-pane-head">
+      <button type="button" class="sup-pane-back" onclick="_zdFocusBackToList()" aria-label="Back to list">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="sup-pane-titles">
+        <div class="sup-pane-title">${escapeHTML(_zdTitle(t))}</div>
+        <div class="sup-pane-meta">${escapeHTML(_zdTypeLabel(t.type))}</div>
+      </div>
+      ${_zdStatusPill(t.status)}
+    </div>
+    ${_zdLadderHtml(t.status)}
+    ${closed && t.close_reason ? `<div class="sup-closed-note">Closed - ${escapeHTML(t.close_reason)}</div>` : ''}
+    <div class="sup-scroll">
+      ${pending ? _zdPendingCard(t, pending) : ''}
+      <div class="sup-thread">${threadHtml}</div>
+    </div>
+    ${_zdComposerHtml(t)}`;
+}
+
+function _zdLadderHtml(status) {
+  const steps = [['Received'], ['Working on it'], ['Done']];
+  const orderMap = { new: 0, triaging: 0, in_progress: 1, waiting_client: 1, resolved: 2, closed: 2 };
+  const cur = orderMap[status] != null ? orderMap[status] : 0;
+  const needs = status === 'waiting_client';
+  const parts = steps.map(([label], i) => {
+    const state = i < cur ? 'done' : (i === cur ? 'cur' : 'todo');
+    return `<div class="sup-lad-step ${state}"><span class="sup-lad-dot"></span><span class="sup-lad-lab">${label}</span></div>`;
+  }).join('<span class="sup-lad-bar"></span>');
+  return `<div class="sup-ladder${needs ? ' needs' : ''}">${parts}${needs ? '<span class="sup-lad-needs">Needs you</span>' : ''}</div>`;
+}
+
+// The gold "your team needs something" card: one mechanism, three kinds.
+function _zdPendingCard(t, pr) {
+  const kind = pr.kind;
+  let action = '';
+  if (kind === 'reply') {
+    action = `
+      <textarea id="sup-req-reply" class="sup-req-input" rows="3" placeholder="Type your answer…"></textarea>
+      <div class="sup-req-actions"><button type="button" class="sup-btn-gold" onclick="_zdSubmitReplyRequest('${t.id}')">Send answer</button></div>`;
+  } else if (kind === 'upload') {
+    action = `<div class="sup-req-actions"><button type="button" class="sup-btn-gold" onclick="_zdAddContent('${t.id}')">Add content</button></div>`;
+  } else if (kind === 'approval') {
+    const files = Array.isArray(t.intake && t.intake.final_files) ? t.intake.final_files : [];
+    action = `
+      ${_zdCreativeHtml(files)}
+      <textarea id="sup-req-note" class="sup-req-input" rows="2" placeholder="Add a note (needed if you want changes)…"></textarea>
+      <div class="sup-req-actions">
+        <button type="button" class="sup-btn-gold" onclick="_zdApprove('${t.id}')">Approve</button>
+        <button type="button" class="sup-btn-ghost" onclick="_zdRequestChanges('${t.id}')">Request changes</button>
+      </div>`;
+  }
+  return `<div class="sup-req-card">
+    <div class="sup-req-lab"><span class="sup-req-badge">Your team needs something</span></div>
+    <div class="sup-req-msg">${escapeHTML(pr.message || '')}</div>
+    ${action}
+  </div>`;
+}
+
+// View-before-approve: the finished creative is playable/zoomable inline.
+function _zdCreativeHtml(files) {
+  if (!files || !files.length) return `<div class="sup-creative-none">The finished piece will appear here to review.</div>`;
+  return `<div class="sup-creative-wrap">${files.map(f => {
+    const url = f.url || ''; const mime = (f.mime || '').toLowerCase();
+    const isVid = mime.startsWith('video/') || /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url);
+    const isAud = mime.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(url);
+    if (isVid) return `<video class="sup-creative" src="${escapeHTML(url)}" controls playsinline preload="metadata"></video>`;
+    if (isAud) return `<audio class="sup-creative-aud" src="${escapeHTML(url)}" controls preload="metadata"></audio>`;
+    return `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" class="sup-creative-imglink"><img class="sup-creative" src="${escapeHTML(url)}" alt="${escapeHTML(f.name || '')}" loading="lazy"></a>`;
+  }).join('')}</div>`;
+}
+
+function _zdSysLabel(body) {
+  const s = String(body || '');
+  const m = s.match(/^Status:\s*(.+)$/i);
+  if (m) return 'Status: ' + _zdStatusMeta(m[1].trim()).label;
+  return s;
+}
+function _zdBodyHtml(body) { return escapeHTML(String(body == null ? '' : body)).replace(/\n/g, '<br>'); }
+function _zdAttachHtml(atts) {
+  if (!Array.isArray(atts) || !atts.length) return '';
+  return `<div class="sup-att">${atts.map(a => {
+    const url = (a && a.url) || ''; if (!url) return '';
+    const mime = (a.mime || '').toLowerCase();
+    const isImg = mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(url);
+    const isVid = mime.startsWith('video/') || /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url);
+    if (isImg) return `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" class="sup-att-thumb"><img src="${escapeHTML(url)}" alt="${escapeHTML(a.name || '')}" loading="lazy"></a>`;
+    if (isVid) return `<video class="sup-att-thumb" src="${escapeHTML(url)}" controls playsinline preload="metadata"></video>`;
+    return `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" class="sup-att-file"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>${escapeHTML(a.name || 'file')}</a>`;
+  }).join('')}</div>`;
+}
+function _zdThreadHtml(msgs) {
+  if (!msgs.length) return `<div class="sup-thread-empty">No messages yet. Say hello or add anything your team should know.</div>`;
+  return msgs.map(m => {
+    const kind = m.author_kind || 'staff';
+    if (kind === 'system') {
+      return `<div class="sup-sys"><span class="sup-sys-line"></span><span class="sup-sys-txt">${escapeHTML(_zdSysLabel(m.body))}</span><span class="sup-sys-time">${escapeHTML(_zdWhen(m.created_at))}</span><span class="sup-sys-line"></span></div>`;
+    }
+    const mine = kind === 'client';
+    const who = mine ? 'You' : (m.author_name || (kind === 'agent' ? 'Assistant' : 'BAM team'));
+    return `<div class="sup-msg ${mine ? 'me' : 'them'} k-${escapeHTML(kind)}">
+      <div class="sup-msg-who">${escapeHTML(who)}${kind === 'agent' ? '<span class="sup-agent-tag">AI</span>' : ''}</div>
+      <div class="sup-msg-bubble">${_zdBodyHtml(m.body)}${_zdAttachHtml(m.attachments)}</div>
+      <div class="sup-msg-time">${escapeHTML(_zdWhen(m.created_at))}</div>
+    </div>`;
+  }).join('');
+}
+
+function _zdComposerHtml(t) {
+  if (t.status === 'closed') {
+    return `<div class="sup-composer closed"><div class="sup-closed-msg">This request is closed. Start a new one from the support orb if you need us again.</div></div>`;
+  }
+  const addContent = _zdIsContent(t)
+    ? `<button type="button" class="sup-add-content" onclick="_zdAddContent('${t.id}')"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Add content</button>`
+    : '';
+  return `<div class="sup-composer">
+    ${addContent}
+    <div class="sup-composer-row">
+      <textarea id="sup-reply-input" class="sup-reply-input" rows="1" placeholder="Reply to your team…" onkeydown="_zdComposerKey(event, '${t.id}')" oninput="_zdAutoGrow(this)"></textarea>
+      <button type="button" class="sup-send" onclick="_zdSendReply('${t.id}')" aria-label="Send">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
+      </button>
+    </div>
+  </div>`;
+}
+function _zdAutoGrow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
+function _zdComposerKey(e, id) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _zdSendReply(id); } }
+
+// ── Mutations (all through /api/v2-tickets) ──
+async function _zdSendReply(id, bodyOverride, attachments) {
+  const input = document.getElementById('sup-reply-input');
+  const body = (bodyOverride != null ? bodyOverride : (input ? input.value : '')).trim();
+  if (!body) { if (input && bodyOverride == null) input.focus(); return; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/v2-tickets?action=reply&id=${encodeURIComponent(id)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ body, attachments: Array.isArray(attachments) ? attachments : [] }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (input && bodyOverride == null) input.value = '';
+    await _zdLoadTickets();
+    _zdRenderFocusRail();
+    await _zdRenderFocusPane();
+    _zdRefreshSurfaces();
+  } catch (e) { alert("Couldn't send - " + ((e && e.message) || e)); }
+}
+function _zdSubmitReplyRequest(id) {
+  const ta = document.getElementById('sup-req-reply');
+  const body = ta ? ta.value.trim() : '';
+  if (!body) { if (ta) ta.focus(); return; }
+  _zdSendReply(id, body);
+}
+function _zdApprove(id) { _zdSendReply(id, 'Approved'); }
+function _zdRequestChanges(id) {
+  const ta = document.getElementById('sup-req-note');
+  const note = ta ? ta.value.trim() : '';
+  if (!note) { if (ta) ta.focus(); alert('Add a quick note on what to change first.'); return; }
+  _zdSendReply(id, 'Requested changes: ' + note);
+}
+
+// "+ Add content" / an "upload" request: open the SAME P1 Content Library
+// upload popup (tag-on-upload) with the team's note pinned, then attach the
+// newly-uploaded assets to the ticket via a reply.
+function _zdAddContent(id) {
+  const t = _ZD_TICKETS.find(x => x.id === id);
+  const pr = t && t.intake && t.intake.pending_request;
+  const note = (pr && pr.kind === 'upload') ? (pr.message || '') : '';
+  _AST_LIB_MODE = true;                 // full Content Library taxonomy in the popup
+  _ASSETS_HOST_ID = 'assets-content';
+  _astTagPinnedNote = note;
+  _astTagCloseCb = (ids) => _zdAttachUploaded(id, ids, note);
+  _astUploadPopupOpen();
+}
+async function _zdAttachUploaded(id, ids, note) {
+  ids = (ids || []).filter(Boolean);
+  if (!ids.length) return;   // popup closed without uploading anything
+  let files = [];
+  try {
+    const { data } = await _sb.from('client_assets')
+      .select('id,label,storage_path,link_url,mime_type,size_bytes').in('id', ids);
+    files = (data || []).map(a => ({
+      name: a.label || 'file',
+      url: a.link_url || _assetUrl(a.storage_path),
+      mime: a.mime_type || '',
+      size: a.size_bytes || 0,
+    })).filter(f => f.url);
+  } catch (e) { console.warn('[support] attach lookup failed:', (e && e.message) || e); }
+  if (!files.length) return;
+  const body = note
+    ? `Added ${files.length} file${files.length === 1 ? '' : 's'} for: ${note}`
+    : `Added ${files.length} file${files.length === 1 ? '' : 's'}`;
+  await _zdSendReply(id, body, files);
+}
+
+// Re-render whichever other surfaces are on screen from the current cache.
+function _zdRefreshSurfaces() {
+  try { _zdRenderHomeCard(); } catch (_) {}
+  try { _zdUpdateOrbBadge(); } catch (_) {}
+  if (document.getElementById('zdoor-overlay')?.classList.contains('open')) { try { _zdRenderTickets(); } catch (_) {} }
+}
+
+// ── Realtime (v2_tickets + v2_ticket_messages, scoped to this client) ──
+let _zdChannel = null;
+let _zdRtTimer = null;
+function _zdSubscribeRealtime() {
+  if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) return;
+  if (!_sb || typeof CLIENT_ID === 'undefined' || !CLIENT_ID) return;
+  if (_zdChannel) { try { _sb.removeChannel(_zdChannel); } catch (_) {} _zdChannel = null; }
+  _zdChannel = _sb
+    .channel('v2support:client:' + CLIENT_ID)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'v2_tickets', filter: 'client_id=eq.' + CLIENT_ID }, () => _zdOnRealtime())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'v2_ticket_messages', filter: 'client_id=eq.' + CLIENT_ID }, () => _zdOnRealtime())
+    .subscribe();
+}
+function _zdOnRealtime() {
+  if (_zdRtTimer) clearTimeout(_zdRtTimer);
+  _zdRtTimer = setTimeout(async () => {
+    await _zdLoadTickets();
+    _zdRenderHomeCard();
+    _zdUpdateOrbBadge();   // action-item badge stays live on any ticket change
+    if (document.getElementById('zdoor-overlay')?.classList.contains('open')) _zdRenderTickets();
+    if (_zdIsFocusOpen()) { _zdRenderFocusRail(); if (_ZD_FOCUS_TICKET) _zdRenderFocusPane(); }
+  }, 250);
 }
 
 async function submitAdminFeedback() {
@@ -55452,6 +56358,7 @@ function _ccFocusHud(modalId) {
     : modalId === 'landingMachineModal' ? 'LANDING PAGE'
     : modalId === 'view-blueprint' ? 'BLUEPRINT'
     : modalId === 'view-calendar' ? 'CALENDAR'
+    : modalId === 'view-support' ? 'SUPPORT'
     : 'MARKETING';
   _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE');
   _ccFocusWallpaper(modalId);
@@ -57841,6 +58748,8 @@ async function boot() {
   await loadTickets();
   subscribeTicketsRealtime();
   subscribeAllConversationsRealtime();
+  _zdSubscribeRealtime();          // V2 support rail realtime (v2_tickets + messages)
+  _zdLoadHomeCard();               // V2 Home "Support" attention card (hidden at zero)
   loadParentUnreadCount().catch(() => {});
 
   // Presence heartbeat - updates last_seen_at on every client_users row
@@ -58458,6 +59367,7 @@ function toggleTheme() {
   .mmc-libitem:hover { border-color:var(--border-str); }
   .mmc-libitem.sel { border-color:var(--gold); }
   .mmc-libitem img, .mmc-libitem video { width:100%; height:100%; object-fit:cover; display:block; }
+  .mmc-libaudio { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:var(--surface-el); color:var(--gold); }
   .mmc-libcheck { position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:999px; background:var(--gold); color:var(--on-gold); font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; }
   .mmc-foot { display:flex; justify-content:flex-end; gap:10px; margin-top:22px; }
   .mmc-btn-ghost { font-family:var(--font-ui); font-size:13px; font-weight:600; color:var(--text-sub); background:transparent; border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:10px 18px; cursor:pointer; transition:border-color var(--t-fast,.12s), color var(--t-fast,.12s); }
@@ -59585,8 +60495,11 @@ function _mmcContentBlockHtml() {
       const sel = m.libIds && m.libIds.has(x.id);
       const url = x.link_url || _assetUrl(x.storage_path);
       const isVid = (x.mime_type || '').startsWith('video/') || x.category === 'video';
+      const isAud = (x.mime_type || '').startsWith('audio/') || x.category === 'audio';
       const thumb = isVid
         ? '<video src="' + _escapeHtml(url) + '#t=0.3" muted playsinline preload="metadata"></video>'
+        : isAud
+        ? '<span class="mmc-libaudio"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>'
         : '<img src="' + _escapeHtml(url) + '" alt="" loading="lazy">';
       return '<button type="button" class="mmc-libitem' + (sel ? ' sel' : '') + '" onclick="_mmcToggleLib(\'' + x.id + '\')">' + thumb + (sel ? '<span class="mmc-libcheck">&#10003;</span>' : '') + '</button>';
     }).join('') + '</div>';
@@ -59648,7 +60561,7 @@ function _mmcRender() {
     _mmcContentBlockHtml() +
     '<div class="mmc-field"><label class="mmc-label">Or add new footage &amp; photos</label>' +
       '<label class="mmc-drop" id="mmcDrop" ondragover="event.preventDefault();this.classList.add(\'is-over\')" ondragleave="this.classList.remove(\'is-over\')" ondrop="_mmcDrop(event)">' +
-        '<input type="file" multiple accept="image/*,video/*" style="display:none" onchange="_mmcPick(this)">' +
+        '<input type="file" multiple accept="image/*,video/*,audio/*" style="display:none" onchange="_mmcPick(this)">' +
         '<svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M8 3L5 6M8 3l3 3"/><path d="M2.5 10.5V12a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-1.5"/></svg>' +
         '<span class="mmc-drop-main">Drop files or <b>browse</b></span>' +
         '<span class="mmc-drop-sub">New clips get added to your Content Library too. Big files? Paste a Google Drive link below.</span>' +
@@ -59753,7 +60666,7 @@ async function _mmcUploadNewFiles() {
       await _storageUpload('client-assets', path, f);
       const { data } = await _sb.from('client_assets').insert({
         client_id: CLIENT_ID, label: f.name.replace(/\.[^.]+$/, ''),
-        category: (f.type || '').startsWith('video/') ? 'video' : 'photo',
+        category: (f.type || '').startsWith('video/') ? 'video' : (f.type || '').startsWith('audio/') ? 'audio' : 'photo',
         storage_path: path, mime_type: f.type || null, size_bytes: f.size,
       }).select('id').single();
       if (data) ids.push(data.id);

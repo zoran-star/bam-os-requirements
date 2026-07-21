@@ -23,6 +23,9 @@ const SystemsView          = lazy(() => import('./views/SystemsView'));
 const MarketingView        = lazy(() => import('./views/MarketingView'));
 const TeamView             = lazy(() => import('./views/TeamView'));
 const ContentView          = lazy(() => import('./views/ContentView'));
+// V2 ticket rail pages (design-system tokens, separate from legacy Content/Marketing)
+const ContentV2View        = lazy(() => import('./views/ContentV2View'));
+const MarketingV2View      = lazy(() => import('./views/MarketingV2View'));
 const ClientsCombinedView  = lazy(() => import('./views/ClientsCombinedView'));
 const FeedbackView         = lazy(() => import('./views/FeedbackView'));
 const InboxView            = lazy(() => import('./views/InboxView'));
@@ -264,6 +267,7 @@ export default function BAMPortal() {
     if (!me || me.role === "systems_manager" || me.role === "systems_executor") return;
     const gated = {
       systems: canSeeSystems, marketing: canSeeMarketing, content: canSeeContent,
+      "marketing-v2": canSeeMarketing, "content-v2": canSeeContent,
       team: canSeeTeam, resources: canSeeResources, feedback: canSeeFeedback,
       financials: canSeeFinancials, ourads: canSeeOurAds, customfields: canSeeCustomFields,
       stripelink: canSeeStripeLink,
@@ -489,7 +493,9 @@ export default function BAMPortal() {
     communication: ["Communication", "Slack channels & messages"],
     systems: ["Systems", "Ticket delegation & execution"],
     marketing: ["Marketing", "Client ad-campaign tickets"],
+    "marketing-v2": ["Marketing V2", "V2 rail campaign asks"],
     content: ["Content", "Guide cards & ad creative content"],
+    "content-v2": ["Content V2", "V2 rail creative asks"],
     team: ["Team", "Staff members & roles"],
     customfields: ["Custom Fields", "Portal-native contact fields per academy"],
     stripelink: ["Stripe Link-Up", "Match Stripe customers to contacts per academy"],
@@ -512,7 +518,9 @@ export default function BAMPortal() {
     communication: IconMessage,
     systems: IconTasks,
     marketing: IconFinancials,
+    "marketing-v2": IconFinancials,
     content: IconKnowledge,
+    "content-v2": IconKnowledge,
     team: IconClients,
     ourads: IconFinancials,
     training: IconTraining,
@@ -534,7 +542,9 @@ export default function BAMPortal() {
         { label: "Clients", key: "clients", count: onboardingClients.length + activeClients.length },
         ...(canSeeSystems ? [{ label: "Systems", key: "systems" }] : []),
         ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
+        ...(canSeeMarketing ? [{ label: "Marketing V2", key: "marketing-v2" }] : []),
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
+        ...(canSeeContent ? [{ label: "Content V2", key: "content-v2" }] : []),
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
         ...(canSeeCustomFields ? [{ label: "Custom Fields", key: "customfields" }] : []),
         ...(canSeeStripeLink ? [{ label: "Stripe Link-Up", key: "stripelink" }] : []),
@@ -810,7 +820,9 @@ export default function BAMPortal() {
               overflow:hidden instead of scrolling. */}
           <div style={{ flex: 1, minHeight: 0, padding: isMobile ? "24px 16px 64px" : "40px 44px 80px", ...(["communication", "clients"].includes(nav) ? { overflow: "hidden", display: "flex", flexDirection: "column" } : { overflowY: "auto" }) }}>
 
-            {!(nav === "clients" && clientsOpenId) && (
+            {/* V2 rail pages render their own design-system page header, so
+                skip the legacy shell header for them. */}
+            {!(nav === "clients" && clientsOpenId) && !["marketing-v2", "content-v2"].includes(nav) && (
               <div key={nav} style={{ flexShrink: 0, marginBottom: 40, animation: "slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
                 <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 700, color: tk.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>{pageTitle}</h1>
                 <p style={{ fontSize: 15, color: tk.textMute, marginTop: 8 }}>{pageDesc}</p>
@@ -884,6 +896,8 @@ export default function BAMPortal() {
               {nav === "customfields" && canSeeCustomFields && <CustomFieldsView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "stripelink" && canSeeStripeLink && <StripeContactLinkView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
+              {nav === "marketing-v2" && canSeeMarketing && <MarketingV2View tokens={tk} dark={dark} me={me} session={session} />}
+              {nav === "content-v2" && canSeeContent && <ContentV2View tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} session={session} />}
               {nav === "training" && canSeeFeedback && <AgentTrainingView tokens={tk} dark={dark} session={session} />}
               {nav === "resources" && canSeeResources && <ResourcesView tokens={tk} dark={dark} me={me} />}
