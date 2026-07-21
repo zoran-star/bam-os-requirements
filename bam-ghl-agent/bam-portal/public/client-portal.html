@@ -23006,9 +23006,18 @@ function applyCrmSupersetNav() {
   // a first-class target now.
   const show = crm;
   // Full-CRM nav items shared by V1.5 + V2
-  ['nav-contacts', 'nav-v15inbox', 'nav-v15kpis'].forEach(id => {
+  ['nav-contacts', 'nav-v15inbox'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = show ? '' : 'none';
+  });
+  // Standalone KPIs tab: V1.5 only. V2 integrates KPIs into each section, so the
+  // standalone tab is retired there - which also drops it out of the staff
+  // Tab-access grant list (relevantTabs keys off nav visibility).
+  const kpiNav = document.getElementById('nav-v15kpis');
+  if (kpiNav) kpiNav.style.display = (show && !isV2) ? '' : 'none';
+  document.querySelectorAll('.mobile-nav-item[data-view="v15kpis"]').forEach(el => {
+    if (show && !isV2) el.style.removeProperty('display');
+    else el.style.setProperty('display', 'none', 'important');
   });
   // V2 uses the upgraded v15 inbox → retire the older V2 inbox nav item
   const oldInbox = document.getElementById('nav-v2inbox');
