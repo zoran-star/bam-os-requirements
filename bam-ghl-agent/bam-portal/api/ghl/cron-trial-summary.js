@@ -90,7 +90,9 @@ function resolveConfig(client) {
   if (!calendars && Array.isArray(cfg.calendar_ids)) calendars = cfg.calendar_ids.map((id) => ({ id, label: "" }));
   if (!Array.isArray(calendars) || !calendars.length) return null;
   if (!cfg.to_phone && !cfg.to_email) return null; // need at least one destination
-  return { to_phone: cfg.to_phone || null, to_email: cfg.to_email || null, timezone: cfg.timezone || "America/Los_Angeles", calendars };
+  // skip_when_empty: only send on days that actually have a trial booked, so an
+  // academy is never pinged on days it does not run (its schedule drives it).
+  return { to_phone: cfg.to_phone || null, to_email: cfg.to_email || null, timezone: cfg.timezone || "America/Los_Angeles", calendars, skip_when_empty: cfg.skip_when_empty === true };
 }
 
 // Email the summary. Honors a client's own Resend domain, else sends via GHL
@@ -180,6 +182,12 @@ async function handler(req, res) {
       }
 
       const result = { client_id: client.id, business: name, count: appts.length };
+      // Opt-in: on a zero-trial day, stay silent instead of texting "none".
+      if (cfg.skip_when_empty && !appts.length) {
+        result.skipped = "no trials today (skip_when_empty)";
+        out.push(result);
+        continue;
+      }
       if (cfg.to_phone) {
         const r = await sendSms({ client, toPhone: cfg.to_phone, message: smsText, contactName: name });
         result.sms = r.ok ? "sent" : `failed: ${r.error}`;
