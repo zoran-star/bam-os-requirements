@@ -205,3 +205,10 @@ The V2 command-center **Inbox (`#view-v15inbox`) now opens as a focus-mode overl
 - Every entry point already funnels through `switchView('v15inbox')` (sidebar, mobile nav, `_ccOpenClassic`, "Open inbox" buttons), so one seam covers them all. `openV15InboxFocus` strips lingering `cc-classic`/`ib-scroll-lock` since `_ccOpenClassic` adds `cc-classic` before switchView runs.
 - Sub-modals already stack above the focus page (z 1000): compose 9800, voicemail 9400, member drawer 9600 (via `html.mm-focus-open #member-drawer`).
 - The separate `#view-inbox` (V2 All/Members/Leads/Bot) was NOT touched - it's unused for these academies.
+
+## Calendars (V1.5) = focus overlay too (2026-07-21)
+The V1.5 **Calendars view (`#view-v15cal`, the plural GHL booking-calendars page) now opens as a focus-mode overlay**, same treatment as the Inbox above (no "Command center > Calendars" breadcrumb). This is the `#view-v15cal` view (chips + week grid + "Next session" / "Show full day" / "+ New booking"), NOT the singular V2 `#view-calendar` (which was already a focus overlay).
+- Moved `#view-v15cal` OUT of `.main` to a sibling `.modal-backdrop.mm-focus-page.v15cal-focus-page` (kept the id + inner `#v15cal-content` so all CSS/JS still applies). The `+ New booking` button moved into the focus-head actions.
+- `openV15CalFocus()` / `closeV15CalFocus()` / `_v15calFocusIsOpen()` mirror `openV15InboxFocus`/`openCalendar`; render (`openV15Cal()`) runs before the pan. `.v15cal-focus-card` CSS mirrors `cal-focus-card` (92vh floating card, calendar body scrolls inside, full-screen on phones).
+- `switchView('v15cal')` intercept sits right after the `v15inbox` one, BEFORE the cc-classic block; gated by the same `calendar` tab permission (`_isViewTabAllowed('v15cal')` → key `calendar` via `_PERMISSIONABLE_TABS`). `openV15CalFocus` strips lingering `cc-classic` (added by `_ccOpenClassic` before switchView runs). Every entry (sidebar nav, mobile nav, Home "Open the calendar"/"View full calendar" buttons, `_ccOpenClassic`) funnels through that one seam.
+- The sub-drawers (`#v15cal-ov` booking/slot/settings drawers) are body-level, so they still stack above the focus page.

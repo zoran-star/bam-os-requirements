@@ -5032,6 +5032,43 @@ if (window.__MOCK__) (() => {
     .v15cal-board { min-width: 560px; }   /* keep the 7-day grid usable; scroll instead of squish */
   }
 
+  /* ── Calendars focus overlay (mirrors the Calendar cal-focus-card) ──
+     A fixed-height panel floating on the dimmed lit-room backdrop; the calendar
+     body (chips + week nav + grid) scrolls INSIDE the card instead of the page.
+     Scoped under #view-v15cal so it beats .mm-focus-page .mm-modal-card
+     (transparent, 1120px) below. See openV15CalFocus()/closeV15CalFocus(). */
+  #view-v15cal .v15cal-focus-card {
+    max-width: none; width: min(1280px, 96vw); height: 92vh; margin: 4vh auto;
+    display: flex; flex-direction: column; padding: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; box-shadow: var(--shadow-lg); overflow: hidden;
+  }
+  #view-v15cal .v15cal-focus-head {
+    display: flex; align-items: center; gap: 13px;
+    padding: 16px 20px 12px; flex: 0 0 auto;
+  }
+  #view-v15cal .v15cal-focus-head .mm-back-btn { margin-bottom: 0; }
+  #view-v15cal .v15cal-focus-head .topbar-kicker {
+    font-size: 12px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--gold, #D4B65C);
+  }
+  #view-v15cal .v15cal-focus-head-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  /* the card owns the chrome; its .content column scrolls the calendar body */
+  #view-v15cal .v15cal-focus-card .content {
+    flex: 1; min-height: 0; overflow-y: auto;
+    padding: 0 20px 20px;
+  }
+  @media (max-width: 768px) {
+    /* full-screen the focus card on phones (parity with the Calendar overlay) */
+    #view-v15cal .v15cal-focus-card {
+      width: 100%; height: 100dvh; margin: 0; border: none; border-radius: 0;
+    }
+    #view-v15cal .v15cal-focus-head {
+      padding: calc(10px + env(safe-area-inset-top)) 14px 8px;
+    }
+    #view-v15cal .v15cal-focus-card .content { padding: 0 14px 16px; }
+  }
+
   /* ── Theme toggle button ── */
   .theme-toggle {
     width: 100%;
@@ -12239,18 +12276,10 @@ Then the call to action."]</div>
       </div>
     </div>
 
-    <div class="view" id="view-v15cal">
-      <div class="topbar">
-        <div>
-          <span class="topbar-kicker">§ Calendars</span>
-          <div class="topbar-title">Calendars</div>
-        </div>
-        <button onclick="_v15calNewBooking()" style="background:var(--gold);color:#0B0B0D;border:none;padding:9px 18px;border-radius:7px;font-weight:700;font-size:13px;cursor:pointer">+ New booking</button>
-      </div>
-      <div class="content">
-        <div id="v15cal-content"></div>
-      </div>
-    </div>
+    <!-- Calendars moved OUT of .main to a focus-mode overlay (below, just after
+         .main), mirroring the Calendar / Inbox / Blueprint / Settings overlays.
+         It keeps id="view-v15cal" so every #view-v15cal CSS rule + JS render
+         target (#v15cal-content) still applies. Opened by openV15CalFocus(). -->
 
     <div class="view" id="view-action-items">
       <div class="topbar">
@@ -12341,6 +12370,27 @@ Then the call to action."]</div>
         </div>
         <div class="content">
           <div id="v15inbox-content"></div>
+        </div>
+      </div>
+    </div>
+
+  <!-- ── Calendars (V1.5): focus-mode overlay ──
+       Sibling of .main so the focus camera-pan blurs the app chrome behind it
+       (mm-focus-open dims .main + .sidebar). Opened by openV15CalFocus() via the
+       shared _ccOpenFocusPage camera pan; Back / backdrop click closes it.
+       Lives OUTSIDE .main on purpose (mirrors the Calendar overlay). Keeps
+       id="view-v15cal" + inner #v15cal-content so all CSS + JS still apply. -->
+    <div class="modal-backdrop mm-focus-page v15cal-focus-page" id="view-v15cal" style="display:none" onclick="if(event.target===this)closeV15CalFocus()">
+      <div class="modal-card mm-modal-card v15cal-focus-card" onclick="event.stopPropagation()">
+        <div class="v15cal-focus-head">
+          <button type="button" class="mm-back-btn" onclick="closeV15CalFocus()">‹ Back</button>
+          <span class="topbar-kicker">§ Calendars</span>
+          <div class="v15cal-focus-head-actions">
+            <button onclick="_v15calNewBooking()" style="background:var(--gold);color:#0B0B0D;border:none;padding:9px 18px;border-radius:7px;font-weight:700;font-size:13px;cursor:pointer">+ New booking</button>
+          </div>
+        </div>
+        <div class="content">
+          <div id="v15cal-content"></div>
         </div>
       </div>
     </div>
@@ -19762,6 +19812,20 @@ function switchView(name, el) {
     try { syncMobileNav('v15inbox'); } catch (_) {}
     return;
   }
+  // Calendars (V1.5) is a focus-mode overlay (like Calendar/Inbox/Blueprint/
+  // Settings), not an in-.main view: pop it over the current page and return so
+  // closing lands you back where you were. Placed before the command-center
+  // block so it opens as a clean focus session with NO "Command center >
+  // Calendars" breadcrumb. Gated by the same 'calendar' tab permission.
+  if (name === 'v15cal') {
+    if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed('v15cal')) { switchView(_landingView ? _landingView() : 'home'); return; }
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    if (!el) el = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'v15cal'"));
+    if (el) el.classList.add('active');
+    openV15CalFocus();
+    try { syncMobileNav('v15cal'); } catch (_) {}
+    return;
+  }
   // Command center (beta): while the one-page flow is active, section-mapped
   // views scroll to their section instead of swapping views; anything else
   // opens classically with a "back to command center" pill. _CC_BYPASS lets
@@ -19805,6 +19869,8 @@ function switchView(name, el) {
   if (name !== 'settings' && typeof _settingsIsOpen === 'function' && _settingsIsOpen()) closeSettings();
   // Same for the Inbox focus overlay: step out if heading to any other view.
   if (name !== 'v15inbox' && typeof _v15ibFocusIsOpen === 'function' && _v15ibFocusIsOpen()) _mmCloseFocus('view-v15inbox');
+  // Same for the Calendars (V1.5) focus overlay: step out if heading elsewhere.
+  if (name !== 'v15cal' && typeof _v15calFocusIsOpen === 'function' && _v15calFocusIsOpen()) _mmCloseFocus('view-v15cal');
   if (name === 'blueprint') {
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
     if (!el) el = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'blueprint'"));
@@ -25260,6 +25326,48 @@ function closeV15InboxFocus() {
   }
   // restore the sidebar highlight to whatever view we came back out to
   const back = _V15IB_RETURN || (typeof _landingView === 'function' ? _landingView() : 'home');
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
+  if (item) item.classList.add('active');
+  try { syncMobileNav(back); } catch (_) {}
+}
+
+// ── Calendars (V1.5) focus overlay (mirrors openCalendar/closeCalendar) ──
+// #view-v15cal lives OUTSIDE .main so the camera-pan that blanks .main can't
+// blank the overlay. Open pops it over the current page; Back / backdrop click
+// closes it and returns to where you were. openV15Cal() (the async renderer)
+// paints the week grid + booking data before the pan, same as the old on-enter
+// render.
+function _v15calFocusIsOpen() { return !!document.getElementById('view-v15cal')?.classList.contains('mm-open'); }
+let _V15CAL_RETURN = null;
+function openV15CalFocus() {
+  const modal = document.getElementById('view-v15cal');
+  if (!modal) return;
+  if (!_v15calFocusIsOpen()) {
+    const cur = document.querySelector('.view.active');
+    _V15CAL_RETURN = cur ? cur.id.replace('view-', '') : null;
+  }
+  // A command-center entry (_ccOpenClassic) adds the classic breadcrumb chrome
+  // before switchView runs - strip it so the calendar opens as a clean focus
+  // session, not the old "Command center > Calendars" full-screen.
+  document.body.classList.remove('cc-classic');
+  try { openV15Cal(); } catch (_) {}   // render the week grid before the pan
+  if (typeof _ccOpenFocusPage === 'function') {
+    _ccOpenFocusPage('view-v15cal', '.nav-item[data-feature="v15"]');
+  } else {
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => { document.documentElement.classList.add('mm-focus-open'); modal.classList.add('mm-open'); });
+  }
+}
+function closeV15CalFocus() {
+  if (typeof _mmCloseFocus === 'function') _mmCloseFocus('view-v15cal');
+  else {
+    const m = document.getElementById('view-v15cal');
+    if (m) { m.classList.remove('mm-open'); m.style.display = 'none'; }
+    document.documentElement.classList.remove('mm-focus-open');
+  }
+  // restore the sidebar highlight to whatever view we came back out to
+  const back = _V15CAL_RETURN || (typeof _landingView === 'function' ? _landingView() : 'home');
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
   if (item) item.classList.add('active');
