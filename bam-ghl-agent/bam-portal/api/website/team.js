@@ -99,8 +99,19 @@ async function handler(req, res) {
       return { id: p.id, name: p.name || "", title: p.title || "", bio: p.bio || "", instagram: p.instagram || "", photo_url };
     });
 
+    // Whether the owner wants a public team page (Blueprint > Staff toggle,
+    // stored on brand_data.wants_about_page). Undecided defaults to showing it if
+    // there are coaches; an explicit "Not now" (false) hides the section.
+    let show_team_page = coaches.length > 0;
+    try {
+      const cr = await sbReq(`clients?id=eq.${encodeURIComponent(client_id)}&select=brand_data`);
+      const wap = cr && cr[0] && cr[0].brand_data ? cr[0].brand_data.wants_about_page : undefined;
+      if (wap === false) show_team_page = false;
+      else if (wap === true) show_team_page = true;
+    } catch (_) { /* keep the default */ }
+
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
-    return res.status(200).json({ coaches });
+    return res.status(200).json({ coaches, show_team_page });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }

@@ -17147,7 +17147,7 @@ let _OBF_AT = 0;
 // path. Pure VIEW over the same completion flags - no state machine changes.
 const _OBF_SECTIONS = [
   { id: 'academy', label: 'Academy', full: 'Your academy', keys: ['basics', 'locations', 'coaches'] },
-  { id: 'brand',   label: 'Brand',   full: 'Your brand',   keys: ['brand', 'sitecopy', 'instagram', 'brandboard'] },
+  { id: 'brand',   label: 'Brand',   full: 'Your brand',   keys: ['brand', 'sitecopy', 'aboutpage', 'instagram', 'brandboard'] },
   { id: 'wired',   label: 'Wired',   full: 'Get wired',    keys: ['stripe', 'contacts', 'email', 'inbox', 'texting', 'ads'] },
   { id: 'offer',   label: 'Offer',   full: 'Your offer',   keys: ['define', 'schedule', 'pricing', 'policy', 'preset', 'leads', 'onboardingform', 'members', 'cancelled'] },
   { id: 'launch',  label: 'Launch',  full: 'Launch',       keys: ['website'] },
@@ -17168,6 +17168,7 @@ const _OBF_STEPS = [
   { key: 'ads', railLabel: 'Ads',          group: 'general', title: 'Set up your ads', sub: 'Optional. Skip if you are not running ads yet and set it up anytime later. Ads are never required to launch.', optional: true, skippable: true },
   { key: 'brand', railLabel: 'Look',     group: 'general', title: 'Set your brand', sub: 'Logo, colors and fonts. Your website, emails and agreement wear these', cta: 'Set brand', go: "_obfGoCard('brand')" },
   { key: 'sitecopy', railLabel: 'Story',  group: 'general', title: 'Tell your story', sub: 'Why families should pick you, who your dream athletes are, your story and your proof. Your website and emails get written from these, in your words', cta: 'Write it', go: "_obfGoCard('brand')" },
+  { key: 'aboutpage', railLabel: 'Team page', group: 'general', title: 'Add a team page to your website?', sub: 'Show your coaches on your public About page with photo, title, bio and Instagram. Decide now, fill it anytime in Blueprint > Staff.', cta: 'Set it up', go: "_obfGoCard('staff')" },
   { key: 'brandboard', railLabel: 'Brand board', group: 'general', title: 'Approve your brand board', sub: 'One page with your colors, type and components: the system every asset ships from', cta: 'Review board', go: '_obfBrandBoardOpen()', needsStaging: true },
   { key: 'locations', railLabel: 'Locations', group: 'general', title: 'Add your locations', sub: 'Address, how to find the door, photos. Your agent quotes these to parents', cta: 'Add locations', go: "_obfGoCard('locations')" },
   { key: 'coaches', railLabel: 'Team',   group: 'general', title: 'Add your coaches and team', sub: 'Owner contact, coach info, teammate invites and who gets notified', cta: 'Add team', go: "_obfGoCard('staff')" },
@@ -17350,7 +17351,7 @@ function _obfIsV2() { return typeof V2_ACCESS !== 'undefined' && !!V2_ACCESS; }
 
 async function _obfFetchState() {
   const token = await _mreqAuthToken();
-  const next = { basics: false, ein: false, brand: false, locations: false, coaches: false, sitecopy: false,
+  const next = { basics: false, ein: false, brand: false, locations: false, coaches: false, sitecopy: false, aboutpage: false,
     stripe: false, email: false, inbox: false, website: false, contacts: false, instagram: false,
     define: false, schedule: false, pricing: false, policy: false,
     preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
@@ -17420,6 +17421,13 @@ async function _obfFetchState() {
     // Contacts for a no-GHL academy: done once they point us at their list.
     if (next.has_ghl === false) next.contacts = next.contacts || !!next.ob.contacts_source;
   }
+  // About-page step (Brand section): done once the owner decides yes/no. Stored
+  // on brand_data.wants_about_page (read from the cached client row, no query).
+  try {
+    const _cRow = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+    const _wap = _cRow && _cRow.brand_data && _cRow.brand_data.wants_about_page;
+    next.aboutpage = (_wap === true || _wap === false);
+  } catch (_) {}
   _OBF_STATE = next; _OBF_AT = Date.now();
   _obfFanSync();
   return next;
@@ -25851,6 +25859,7 @@ function _bbKpisChanged() {
 async function _bbRenderStaffCard(panel, meta) {
   const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
   const ov = (k) => _bbEscapeHtml(c[k] || '');
+  const _wap = (c.brand_data || {}).wants_about_page;   // true / false / undefined
   panel.innerHTML = `
     <button class="bb-back" onclick="_bbNavigate(null)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -25867,6 +25876,16 @@ async function _bbRenderStaffCard(panel, meta) {
     <p style="font-size:13px;color:var(--text-sub);line-height:1.55;margin:0 0 16px;max-width:680px">
       Everyone on your team, in one card each. New teammates start with no access: you choose which tabs each one can see. Anyone on the team can invite more people; only the account owner can revoke access.
     </p>
+    <div style="background:var(--surface);border:1px solid var(--border-med);border-radius:var(--r-lg,16px);padding:14px 16px;margin:0 0 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">Show a team page on your website?</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Your coaches (photo, title, bio, Instagram) appear on your public About page.</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="_bbAboutPageSet(true)" style="padding:8px 16px;border-radius:999px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;border:1px solid ${_wap===true?'var(--gold,#D4B65C)':'var(--border-med)'};background:${_wap===true?'var(--gold,#D4B65C)':'transparent'};color:${_wap===true?'#0B0B0D':'var(--text-sub)'}">Yes</button>
+        <button onclick="_bbAboutPageSet(false)" style="padding:8px 16px;border-radius:999px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;border:1px solid ${_wap===false?'var(--gold,#D4B65C)':'var(--border-med)'};background:${_wap===false?'var(--gold,#D4B65C)':'transparent'};color:${_wap===false?'#0B0B0D':'var(--text-sub)'}">Not now</button>
+      </div>
+    </div>
     <div id="bb-staff-list"><div class="bb-empty">Loading…</div></div>
     <!-- Staff auto-completes once the owner engages (no manual "I'm done" button) -->
 
@@ -25878,6 +25897,19 @@ async function _bbRenderStaffCard(panel, meta) {
   }
 
   await _bbStaffRefreshList();
+}
+
+// Owner decides whether the website shows a public team/About page. Stored on
+// brand_data.wants_about_page; the api/website/team endpoint reports it as
+// show_team_page, and it completes the onboarding "About page" step. Sends the
+// FULL brand_data (the update_client_basics RPC replaces the jsonb, not merges).
+function _bbAboutPageSet(val) {
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+  const next = { ...((c && c.brand_data) || {}), wants_about_page: val === true };
+  if (c) c.brand_data = next;
+  _bbSaveClientBasics({ brand_data: next });  // also kicks _obtScheduleRefresh → the
+                                              // onboarding "About page" step re-derives
+  _bbRenderFromHash();           // refresh the Yes/Not-now highlight
 }
 
 // ── Owner/staff SMS notification prefs (V1.5/V2) — which teammates get texted
