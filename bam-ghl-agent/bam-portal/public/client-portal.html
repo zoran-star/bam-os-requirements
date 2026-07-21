@@ -131,6 +131,18 @@ if (window.__MOCK__) (() => {
         title: 'A parent got charged twice', source: 'icon-chat', created_at: iso(1), updated_at: iso(1), intake: {} },
       { id: 'vt-5', client_id: CID, type: 'fix', status: 'resolved', assignee_role: 'systems',
         title: 'Booking page would not load', source: 'icon-chat', created_at: iso(9), updated_at: iso(6), resolved_at: iso(6), intake: {} },
+      // FC product feedback (bug reports + feature ideas -> Zoran's triage):
+      // exercises the fix/feature_idea pill vocabulary + the "Your idea is
+      // live" celebration card on a shipped idea.
+      { id: 'vt-6', client_id: CID, type: 'fix', status: 'in_progress', assignee_role: 'backlog',
+        title: 'Calendar tab shows a blank page', source: 'icon-chat', created_at: iso(2), updated_at: iso(0, 6),
+        intake: { description: 'Calendar tab shows a blank page on my phone.' } },
+      { id: 'vt-7', client_id: CID, type: 'feature_idea', status: 'in_progress', assignee_role: 'backlog',
+        title: 'Let parents reschedule from the app', source: 'icon-chat', created_at: iso(6), updated_at: iso(2),
+        intake: { description: 'Would love parents to be able to reschedule a session themselves from the app.' } },
+      { id: 'vt-8', client_id: CID, type: 'feature_idea', status: 'resolved', assignee_role: 'backlog',
+        title: 'Dark mode for the portal', source: 'icon-chat', created_at: iso(14), updated_at: iso(3), resolved_at: iso(3),
+        intake: { description: 'A dark mode option would be easier on the eyes at night.' } },
     ],
     v2_ticket_messages: [
       { id: 'vm-1', ticket_id: 'vt-1', client_id: CID, author_kind: 'client', author_name: 'You', body: 'Would love a fresh Free-session ad for the fall push.', attachments: [], internal: false, created_at: iso(3) },
@@ -140,6 +152,12 @@ if (window.__MOCK__) (() => {
       { id: 'vm-5', ticket_id: 'vt-3', client_id: CID, author_kind: 'client', author_name: 'You', body: 'Can we put the new team photos on the homepage?', attachments: [], internal: false, created_at: iso(4) },
       { id: 'vm-6', ticket_id: 'vt-3', client_id: CID, author_kind: 'staff', author_name: 'BAM team', body: 'On it, updating the homepage gallery now.', attachments: [], internal: false, created_at: iso(1) },
       { id: 'vm-7', ticket_id: 'vt-5', client_id: CID, author_kind: 'system', author_name: 'System', body: 'Status: resolved', attachments: [], internal: false, created_at: iso(6) },
+      { id: 'vm-8', ticket_id: 'vt-6', client_id: CID, author_kind: 'client', author_name: 'You', body: 'Calendar tab shows a blank page on my phone.', attachments: [], internal: false, created_at: iso(2) },
+      { id: 'vm-9', ticket_id: 'vt-6', client_id: CID, author_kind: 'system', author_name: 'System', body: 'Status: in_progress', attachments: [], internal: false, created_at: iso(0, 6) },
+      { id: 'vm-10', ticket_id: 'vt-7', client_id: CID, author_kind: 'client', author_name: 'You', body: 'Would love parents to be able to reschedule a session themselves from the app.', attachments: [], internal: false, created_at: iso(6) },
+      { id: 'vm-11', ticket_id: 'vt-7', client_id: CID, author_kind: 'system', author_name: 'System', body: 'Status: in_progress', attachments: [], internal: false, created_at: iso(2) },
+      { id: 'vm-12', ticket_id: 'vt-8', client_id: CID, author_kind: 'client', author_name: 'You', body: 'A dark mode option would be easier on the eyes at night.', attachments: [], internal: false, created_at: iso(14) },
+      { id: 'vm-13', ticket_id: 'vt-8', client_id: CID, author_kind: 'system', author_name: 'System', body: 'Status: resolved', attachments: [], internal: false, created_at: iso(3) },
     ],
     staff: [], offer_teams: [], offer_files: [], member_files: [], stage_transitions: [],
     action_items: [], device_tokens: [], 'Questions Database': [],
@@ -374,6 +392,28 @@ if (window.__MOCK__) (() => {
     }
     if (p === '/api/action-items') return { items: [], team: [], sm: null, mktg: null, ads: null, review_ready: false };
     if (p === '/api/kpis-v15') return { ...DEFAULT_API };
+    // ── V2 ticket rail (support focus mode + the product-feedback intake) ──
+    // create pushes into T so the new row shows up when the rail re-reads _sb.
+    if (p === '/api/v2-tickets') {
+      const qa = q.get('action');
+      if (qa === 'create') {
+        let b = {}; try { b = JSON.parse((init && init.body) || '{}'); } catch (_) {}
+        const now = new Date().toISOString();
+        const role = (b.type === 'marketing_ask') ? 'marketing'
+          : (b.type === 'content_ask') ? 'content'
+          : (b.type === 'fix' || b.type === 'feature_idea') ? 'backlog'
+          : 'systems';
+        const t = {
+          id: 'vt-mock-' + Date.now(), client_id: CID, type: b.type || 'general',
+          status: 'new', assignee_role: role, title: b.title || '',
+          source: b.source || 'icon-chat', intake: b.intake || {}, context: b.context || {},
+          created_at: now, updated_at: now,
+        };
+        (T.v2_tickets = T.v2_tickets || []).unshift(t);
+        return { ok: true, ticket: t };
+      }
+      return { ok: true, tickets: (T.v2_tickets || []) };
+    }
     return null;
   }
   const _realFetch = window.fetch.bind(window);
@@ -7158,6 +7198,21 @@ if (window.__MOCK__) (() => {
     body.sup-detail .sup-pane { display: flex; flex: 1 1 auto; }
     .sup-msg { max-width: 86%; }
   }
+  /* Shipped idea celebration: the gold-bordered house card, turned up a notch */
+  .sup-idea-live { border-color: var(--gold, #D4B65C); background: var(--gold-sheen, rgba(212,182,92,.10)); }
+  .sup-idea-live .sup-req-msg { margin-bottom: 0; }
+
+  /* V2 product-feedback intake modal (layers OVER the support focus mode) */
+  #fcfb-modal { z-index: 10070; }
+  #fcfb-modal .modal-textarea { min-height: 110px; }
+  #fcfb-modal .modal-label { margin-top: 18px; }
+  .fcfb-hint { font-size: 11.5px; color: var(--text-mute); margin-top: 6px; line-height: 1.45; }
+  .fcfb-opt { color: var(--text-mute); text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .fcfb-file-row { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+  #fcfb-file-name { font-size: 12px; color: var(--text-sub); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #fcfb-msg { font-size: 12px; margin-top: 10px; min-height: 16px; color: var(--danger, #ED7969); }
+  #fcfb-msg.ok { color: var(--green, #6FBF73); }
+
   /* Orb is the support launcher - hide it while the focus page owns the screen */
   body:has(#view-support.mm-open) #admin-fb-wrap { display: none; }
 </style>
@@ -7212,6 +7267,33 @@ if (window.__MOCK__) (() => {
                 display:inline-flex;align-items:center;gap:6px">
         Book time with Zoran →
       </a>
+    </div>
+  </div>
+</div>
+
+<!-- ── V2 product-feedback intake (Report a problem / Suggest a feature) ──
+     Locked design 2026-07-21: the support lanes open THIS modal - the lane
+     already chose bug vs idea, so there is no Bug/Feature toggle. Rides the
+     v2_tickets rail (type fix | feature_idea -> Zoran's backlog triage) via
+     /api/v2-tickets?action=create. V1/V1.5 keep the old #admin-fb-overlay. -->
+<div class="modal-backdrop" id="fcfb-modal" style="display:none" onclick="if(event.target===this)_fcfbClose()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-kicker" id="fcfb-kicker">Something is broken</div>
+    <div class="modal-title" id="fcfb-title">Report a problem</div>
+    <div class="modal-sub" id="fcfb-sub">Tell us what you saw. Goes straight to Zoran.</div>
+    <label class="modal-label" for="fcfb-body" id="fcfb-body-label">What's the bug?</label>
+    <textarea id="fcfb-body" class="modal-textarea" placeholder="Just describe what you saw and what you expected..."></textarea>
+    <div class="fcfb-hint">Your page and recent taps are attached automatically - no need to explain where you were</div>
+    <label class="modal-label">Attach a screenshot or file <span class="fcfb-opt">(optional)</span></label>
+    <div class="fcfb-file-row">
+      <button type="button" class="btn-modal-secondary" onclick="document.getElementById('fcfb-file').click()">Choose file</button>
+      <span id="fcfb-file-name">No file selected</span>
+      <input id="fcfb-file" type="file" style="display:none" onchange="_fcfbFilePick()">
+    </div>
+    <div id="fcfb-msg"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn-modal-secondary" onclick="_fcfbClose()">Cancel</button>
+      <button type="button" id="fcfb-send" class="btn-modal-primary" onclick="_fcfbSubmit()">Send it</button>
     </div>
   </div>
 </div>
@@ -53208,9 +53290,27 @@ const _ZD_DB2KEY = {
   new: 'received', triaging: 'received', in_progress: 'in_progress',
   waiting_client: 'waiting_client', resolved: 'resolved', closed: 'closed',
 };
-function _zdStatusMeta(dbStatus) { return _ZD_STATUS[_ZD_DB2KEY[dbStatus] || 'received'] || _ZD_STATUS.received; }
-function _zdStatusPill(dbStatus) {
-  const s = _zdStatusMeta(dbStatus);
+// FC product feedback (type fix = FullControl bug report, feature_idea = idea)
+// rides the same rail into ZORAN's triage but speaks its own client language
+// (locked 2026-07-21). Labels override per DB status; colors stay semantic.
+// Statuses missing here (e.g. feature_idea waiting_client) fall back to the
+// shared vocabulary above.
+const _ZD_FC_LABELS = {
+  fix:          { new: 'Sent', triaging: 'Sent', in_progress: 'Being fixed', waiting_client: 'Needs you', resolved: 'Fixed', closed: 'Closed' },
+  feature_idea: { new: 'Sent', triaging: 'Sent', in_progress: 'Building', resolved: 'Shipped' },
+};
+// 3-step ladder labels per type (default = the shared ladder).
+const _ZD_FC_LADDER = {
+  fix: ['Sent', 'Being fixed', 'Fixed'],
+  feature_idea: ['Sent', 'Building', 'Shipped'],
+};
+function _zdStatusMeta(dbStatus, type) {
+  const base = _ZD_STATUS[_ZD_DB2KEY[dbStatus] || 'received'] || _ZD_STATUS.received;
+  const over = _ZD_FC_LABELS[type];
+  return (over && over[dbStatus]) ? { ...base, label: over[dbStatus] } : base;
+}
+function _zdStatusPill(dbStatus, type) {
+  const s = _zdStatusMeta(dbStatus, type);
   return `<span class="zd-pill" style="color:${s.color};background:color-mix(in srgb, ${s.color} 16%, transparent)"><span class="zd-pill-dot"></span>${s.label}</span>`;
 }
 
@@ -53334,13 +53434,13 @@ function _zdOpenFocusFromPopout() {
   _zdOpenFocus(first ? first.id : null);
 }
 
-// Lanes + free-type (unchanged this chunk): bug/feature BRIDGE to the existing
-// feedback modal; navigator/support show a gentle inline note.
+// Lanes + free-type: bug/feature open the V2 product-feedback intake
+// (#fcfb-modal -> the v2_tickets rail); navigator/support show a gentle
+// inline note. (Legacy popout surface, unused on V2 - kept consistent.)
 function _zdLane(kind) {
   if (kind === 'bug' || kind === 'feature') {
     closeZoranDoor();
-    openAdminFeedback();
-    setFeedbackKind(kind);
+    _fcfbOpen(kind);
     return;
   }
   _zdShowHint('This opens the real intake in the next build.');
@@ -53480,7 +53580,7 @@ function _zdRenderFocus() { _zdRenderFocusRail(); _zdRenderFocusPane(); }
 
 function _zdRailRow(t) {
   const active = t.id === _ZD_FOCUS_TICKET ? ' active' : '';
-  const meta = _zdStatusMeta(t.status);
+  const meta = _zdStatusMeta(t.status, t.type);
   return `<button type="button" class="sup-row${active}" onclick="_zdOpenTicket('${t.id}')">
     <span class="sup-row-dot" style="background:${meta.color}"></span>
     <span class="sup-row-body">
@@ -53519,7 +53619,7 @@ function _zdRenderFocusRail() {
 
 // The 4 lanes + free-type box, relocated OUT of the popout INTO focus mode as a
 // persistent "Start something new" section (below the ticket rail). Same four
-// lanes as before; bug/feature still bridge to the old feedback modal.
+// lanes as before; bug/feature open the V2 product-feedback intake (#fcfb-modal).
 function _zdStartNewHtml() {
   const lane = (kind, title, sub, svg) =>
     `<button type="button" class="sup-lane" onclick="_zdFocusLane('${kind}')">
@@ -53544,13 +53644,13 @@ function _zdStartNewHtml() {
       <div class="sup-new-hint" id="sup-new-hint"></div>
     </div>`;
 }
-// Lanes inside focus mode: bug/feature BRIDGE to the old feedback modal exactly
-// as the popout did; navigator/support + free-type show a gentle inline note.
+// Lanes inside focus mode: bug/feature open the V2 product-feedback intake
+// LAYERED OVER the focus mode (so the fresh row lands in the rail on send);
+// navigator/support + free-type show a gentle inline note. V1/V1.5 never get
+// here - their orb still opens the old #admin-fb-overlay feedback modal.
 function _zdFocusLane(kind) {
   if (kind === 'bug' || kind === 'feature') {
-    closeSupportFocus();
-    openAdminFeedback();
-    setFeedbackKind(kind);
+    _fcfbOpen(kind);
     return;
   }
   _zdFocusNewHint('This opens the real intake in the next build.');
@@ -53566,6 +53666,127 @@ function _zdFocusNewHint(msg) {
   el.textContent = msg; el.classList.add('show');
   if (_zdNewHintTimer) clearTimeout(_zdNewHintTimer);
   _zdNewHintTimer = setTimeout(() => { if (el) el.classList.remove('show'); }, 2600);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// V2 PRODUCT-FEEDBACK INTAKE (#fcfb-modal) - locked design 2026-07-21.
+// FC product feedback = bugs about FullControl + feature ideas. It goes to
+// ZORAN's triage (assignee_role backlog via the API), NOT the staff queues.
+// The lane already chose bug vs idea, so there is NO toggle in the modal.
+// Reuses the old feedback modal's plumbing (auto-context via _fbBuildContext,
+// the ticket-files/feedback upload path) but lands on the v2_tickets rail
+// (type fix | feature_idea) so it rides the focus rail with the FC pills.
+// V1/V1.5 untouched: their orb still opens the old #admin-fb-overlay.
+// ══════════════════════════════════════════════════════════════════════════
+let _fcfbKind = 'bug';
+let _fcfbFile = null;
+const _FCFB_COPY = {
+  bug: {
+    kicker: 'Something is broken',
+    title: 'Report a problem',
+    sub: 'Tell us what you saw. Goes straight to Zoran.',
+    label: "What's the bug?",
+    placeholder: 'Just describe what you saw and what you expected...',
+  },
+  feature: {
+    kicker: 'An idea for us',
+    title: 'Suggest a feature',
+    sub: 'Your ideas shape what gets built next. Goes straight to Zoran.',
+    label: 'The idea',
+    placeholder: 'What would you like to be able to do? Who needs it, why...',
+  },
+};
+function _fcfbOpen(kind) {
+  _fcfbKind = (kind === 'feature') ? 'feature' : 'bug';
+  const c = _FCFB_COPY[_fcfbKind];
+  document.getElementById('fcfb-kicker').textContent = c.kicker;
+  document.getElementById('fcfb-title').textContent = c.title;
+  document.getElementById('fcfb-sub').textContent = c.sub;
+  document.getElementById('fcfb-body-label').textContent = c.label;
+  const body = document.getElementById('fcfb-body');
+  body.placeholder = c.placeholder;
+  document.getElementById('fcfb-modal').style.display = 'flex';
+  setTimeout(() => { try { body.focus(); } catch (_) {} }, 60);
+}
+function _fcfbClose() {
+  document.getElementById('fcfb-modal').style.display = 'none';
+  document.getElementById('fcfb-body').value = '';
+  document.getElementById('fcfb-file').value = '';
+  document.getElementById('fcfb-file-name').textContent = 'No file selected';
+  const msg = document.getElementById('fcfb-msg');
+  msg.textContent = ''; msg.classList.remove('ok');
+  _fcfbFile = null;
+  const btn = document.getElementById('fcfb-send');
+  btn.disabled = false; btn.textContent = 'Send it';
+}
+function _fcfbFilePick() {
+  const input = document.getElementById('fcfb-file');
+  const f = input.files && input.files[0];
+  _fcfbFile = f || null;
+  document.getElementById('fcfb-file-name').textContent = f
+    ? `${f.name} · ${(f.size / 1024).toFixed(0)} KB`
+    : 'No file selected';
+}
+async function _fcfbSubmit() {
+  const bodyEl = document.getElementById('fcfb-body');
+  const text = bodyEl.value.trim();
+  const msgEl = document.getElementById('fcfb-msg');
+  const btn = document.getElementById('fcfb-send');
+  msgEl.classList.remove('ok'); msgEl.textContent = '';
+  if (!text) { msgEl.textContent = 'Type something first.'; bodyEl.focus(); return; }
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    // Optional attachment: same bucket + folder the old feedback modal used.
+    // An upload failure is non-fatal - the report still goes through text-only.
+    let fileUrl = null, fileName = null;
+    if (_fcfbFile) {
+      try {
+        const file = _fcfbFile;
+        const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+        const safe = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `feedback/${uid}-${safe}`;
+        const { error: upErr } = await _sb.storage.from('ticket-files').upload(path, file, {
+          contentType: file.type || 'application/octet-stream', cacheControl: '3600',
+        });
+        if (upErr) throw new Error(upErr.message);
+        fileUrl = _sb.storage.from('ticket-files').getPublicUrl(path).data.publicUrl;
+        fileName = file.name;
+      } catch (upErr) {
+        console.warn('[support] intake file upload failed (continuing text-only):', upErr?.message || upErr);
+      }
+    }
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/v2-tickets?action=create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        type: _fcfbKind === 'bug' ? 'fix' : 'feature_idea',
+        source: 'icon-chat',
+        title: text.replace(/\s+/g, ' ').slice(0, 60),
+        intake: {
+          description: text,
+          file_url: fileUrl,
+          file_name: fileName,
+          page: window.location.pathname + window.location.search,
+          context: (() => { try { return _fbBuildContext(); } catch (_) { return null; } })(),
+        },
+      }),
+    });
+    const j = await _safeJson(res);
+    if (!res.ok || j.error) throw new Error(j.error || ('HTTP ' + res.status));
+    msgEl.classList.add('ok');
+    msgEl.textContent = 'Sent. Thanks.';
+    btn.textContent = 'Sent';
+    // Surface the fresh row wherever support is on screen (rail, badge, home).
+    _zdLoadTickets().then(() => {
+      if (_zdIsFocusOpen()) _zdRenderFocusRail();
+      _zdRefreshSurfaces();
+    }).catch(() => {});
+    setTimeout(_fcfbClose, 900);
+  } catch (err) {
+    msgEl.textContent = (err && err.message) || 'Failed to send. Try again.';
+    btn.disabled = false; btn.textContent = 'Send it';
+  }
 }
 
 function _zdOpenTicket(id) {
@@ -53609,7 +53830,7 @@ async function _zdRenderFocusPane() {
     return;
   }
   if (_ZD_FOCUS_TICKET !== id) return;   // user switched tickets mid-fetch
-  pane.innerHTML = _zdPaneShell(t, _zdThreadHtml(msgs));
+  pane.innerHTML = _zdPaneShell(t, _zdThreadHtml(msgs, t));
   const ri = pane.querySelector('#sup-reply-input');
   if (ri && prevReply && !ri.value) ri.value = prevReply;
   // A pending "your team needs something" card is the priority - keep it in
@@ -53622,6 +53843,8 @@ async function _zdRenderFocusPane() {
 function _zdPaneShell(t, threadHtml) {
   const pending = (t.intake && t.intake.pending_request) ? t.intake.pending_request : null;
   const closed = t.status === 'closed';
+  // Shipped idea = the gold celebration card leads the thread.
+  const ideaLive = t.type === 'feature_idea' && t.status === 'resolved';
   return `
     <div class="sup-pane-head">
       <button type="button" class="sup-pane-back" onclick="_zdFocusBackToList()" aria-label="Back to list">
@@ -53631,27 +53854,37 @@ function _zdPaneShell(t, threadHtml) {
         <div class="sup-pane-title">${escapeHTML(_zdTitle(t))}</div>
         <div class="sup-pane-meta">${escapeHTML(_zdTypeLabel(t.type))}</div>
       </div>
-      ${_zdStatusPill(t.status)}
+      ${_zdStatusPill(t.status, t.type)}
     </div>
-    ${_zdLadderHtml(t.status)}
+    ${_zdLadderHtml(t.status, t.type)}
     ${closed && t.close_reason ? `<div class="sup-closed-note">Closed - ${escapeHTML(t.close_reason)}</div>` : ''}
     <div class="sup-scroll">
+      ${ideaLive ? _zdIdeaLiveCard() : ''}
       ${pending ? _zdPendingCard(t, pending) : ''}
       <div class="sup-thread">${threadHtml}</div>
     </div>
     ${_zdComposerHtml(t)}`;
 }
 
-function _zdLadderHtml(status) {
-  const steps = [['Received'], ['Working on it'], ['Done']];
+function _zdLadderHtml(status, type) {
+  const steps = _ZD_FC_LADDER[type] || ['Received', 'Working on it', 'Done'];
   const orderMap = { new: 0, triaging: 0, in_progress: 1, waiting_client: 1, resolved: 2, closed: 2 };
   const cur = orderMap[status] != null ? orderMap[status] : 0;
   const needs = status === 'waiting_client';
-  const parts = steps.map(([label], i) => {
+  const parts = steps.map((label, i) => {
     const state = i < cur ? 'done' : (i === cur ? 'cur' : 'todo');
     return `<div class="sup-lad-step ${state}"><span class="sup-lad-dot"></span><span class="sup-lad-lab">${label}</span></div>`;
   }).join('<span class="sup-lad-bar"></span>');
   return `<div class="sup-ladder${needs ? ' needs' : ''}">${parts}${needs ? '<span class="sup-lad-needs">Needs you</span>' : ''}</div>`;
+}
+
+// Gold celebration on a shipped idea (house gold-bordered card style): the
+// client suggested it, Zoran built it, it is live in their portal.
+function _zdIdeaLiveCard() {
+  return `<div class="sup-req-card sup-idea-live">
+    <div class="sup-req-lab"><span class="sup-req-badge">Your idea is live</span></div>
+    <div class="sup-req-msg">You suggested it, we built it. It is in your portal now.</div>
+  </div>`;
 }
 
 // The gold "your team needs something" card: one mechanism, three kinds.
@@ -53694,10 +53927,10 @@ function _zdCreativeHtml(files) {
   }).join('')}</div>`;
 }
 
-function _zdSysLabel(body) {
+function _zdSysLabel(body, type) {
   const s = String(body || '');
   const m = s.match(/^Status:\s*(.+)$/i);
-  if (m) return 'Status: ' + _zdStatusMeta(m[1].trim()).label;
+  if (m) return 'Status: ' + _zdStatusMeta(m[1].trim(), type).label;
   return s;
 }
 function _zdBodyHtml(body) { return escapeHTML(String(body == null ? '' : body)).replace(/\n/g, '<br>'); }
@@ -53713,12 +53946,12 @@ function _zdAttachHtml(atts) {
     return `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" class="sup-att-file"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>${escapeHTML(a.name || 'file')}</a>`;
   }).join('')}</div>`;
 }
-function _zdThreadHtml(msgs) {
+function _zdThreadHtml(msgs, t) {
   if (!msgs.length) return `<div class="sup-thread-empty">No messages yet. Say hello or add anything your team should know.</div>`;
   return msgs.map(m => {
     const kind = m.author_kind || 'staff';
     if (kind === 'system') {
-      return `<div class="sup-sys"><span class="sup-sys-line"></span><span class="sup-sys-txt">${escapeHTML(_zdSysLabel(m.body))}</span><span class="sup-sys-time">${escapeHTML(_zdWhen(m.created_at))}</span><span class="sup-sys-line"></span></div>`;
+      return `<div class="sup-sys"><span class="sup-sys-line"></span><span class="sup-sys-txt">${escapeHTML(_zdSysLabel(m.body, t && t.type))}</span><span class="sup-sys-time">${escapeHTML(_zdWhen(m.created_at))}</span><span class="sup-sys-line"></span></div>`;
     }
     const mine = kind === 'client';
     const who = mine ? 'You' : (m.author_name || (kind === 'agent' ? 'Assistant' : 'BAM team'));

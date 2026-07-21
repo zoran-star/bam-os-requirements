@@ -2,13 +2,17 @@
 description: Triage all outstanding tickets from the lil Zoran icon one by one - client-side V2 tickets AND staff-side bug reports - understand each, propose a fix in plain English, workshop it with Zoran, then move to the next until the queue is empty.
 ---
 
-Walk Zoran through every **outstanding ticket** submitted via the feedback widget
-(the lil Zoran icon - lives on BOTH the client portal and the staff portal, same
-table `portal_feedback`), **one at a time**. Covers client-side V2 feature tickets
-AND staff-side internal bug reports in one combined queue. For each ticket: gather
-ALL the context, propose an update/fix in **non-technical terms**, workshop it with
-Zoran, record the decision, then move to the next. Stop only when there are no
-outstanding tickets left.
+Walk Zoran through every **outstanding product-feedback ticket**, **one at a time**.
+
+The queue now lives on the **v2_tickets rail**: the V2 client portal's "Report a
+problem" / "Suggest a feature" intakes create `v2_tickets` rows with
+`assignee_role='backlog'` (type `fix` = bug report, `feature_idea` = idea).
+The staff portal's lil-Zoran widget still writes `portal_feedback`, and any
+client rows not yet moved by `bam-ghl-agent/bam-portal/scripts/feedback-backfill.mjs`
+also still sit there - so the queue is BOTH sources until the backfill runs.
+For each ticket: gather ALL the context, propose an update/fix in
+**non-technical terms**, workshop it with Zoran, record the decision, then move
+to the next. Stop only when there are no outstanding tickets left.
 
 ## Ground rules (read before starting)
 
@@ -20,6 +24,13 @@ outstanding tickets left.
 - **Short + visual.** Ticket cards, bold key info, one clear question per message.
 - **Never use an em dash** in anything you output. Hyphens only.
 - **Progress tracker at the end of every message** (format below).
+- **The client is watching the rail.** Every status you set on a `v2_tickets` row
+  changes the pill the academy sees in their portal: for a `fix` ticket
+  new='Sent', in_progress='Being fixed', waiting_client='Needs you',
+  resolved='Fixed', closed='Closed'; for a `feature_idea` new='Sent',
+  in_progress='Building', resolved='Shipped'. Resolving a `feature_idea` ALSO
+  shows the client a gold "Your idea is live" celebration card in the thread -
+  only resolve an idea when it has actually shipped.
 
 ## Step 0 - Connect + fetch the queue
 
@@ -31,14 +42,25 @@ Data lives in the bam-portal Supabase project, ref `jnojmfmpnsfmtqmwhopz`.
    API (`POST https://api.supabase.com/v1/projects/jnojmfmpnsfmtqmwhopz/database/query`
    with `{"query": "..."}`). Never print or commit the token.
 
-2. Make sure the context column exists (idempotent, safe to always run):
+2. **Primary queue - the rail.** Zoran's triage lane is `assignee_role='backlog'`,
+   types `fix` + `feature_idea`, anything not yet resolved/closed:
    ```sql
-   alter table public.portal_feedback add column if not exists context jsonb;
+   select t.id, t.created_at, t.type, t.status, t.title, t.source,
+          t.intake->>'description' as body,
+          t.intake->>'page' as page, t.intake->'context' as context,
+          t.intake->>'file_url' as file_url, t.intake->>'file_name' as file_name,
+          t.legacy_feedback_id, t.client_id, c.business_name
+   from v2_tickets t
+   left join clients c on c.id = t.client_id
+   where t.assignee_role = 'backlog'
+     and t.type in ('fix','feature_idea')
+     and t.status not in ('resolved','closed')
+   order by t.created_at asc;
    ```
 
-3. Fetch outstanding tickets from BOTH portals, **oldest first** (first in, first
-   served). Client-side is scoped to V2 (tier from `clients.v2_access` or the
-   context snapshot); staff-side has no tier gate - all open staff feedback counts:
+3. **Leftover legacy queue** (staff-side bug reports ALWAYS; client rows only
+   until the backfill has moved them - anything already migrated shows up as a
+   `legacy_feedback_id` on the rail, so exclude those):
    ```sql
    select f.id, f.created_at, f.kind, f.body, f.page, f.context,
           f.file_url, f.file_name, f.submitter_email, f.status, f.notes,
@@ -46,6 +68,7 @@ Data lives in the bam-portal Supabase project, ref `jnojmfmpnsfmtqmwhopz`.
    from portal_feedback f
    left join clients c on c.id = f.client_id
    where f.resolved_at is null
+     and f.id not in (select legacy_feedback_id from v2_tickets where legacy_feedback_id is not null)
      and (
        (f.portal = 'client' and (c.v2_access = true or f.context->>'tier' = 'v2'))
        or f.portal = 'staff'
@@ -53,35 +76,40 @@ Data lives in the bam-portal Supabase project, ref `jnojmfmpnsfmtqmwhopz`.
    order by f.created_at asc;
    ```
 
-4. Grab Zoran's staff id once (used when resolving tickets):
+4. Grab Zoran's staff id once (used when resolving legacy tickets):
    ```sql
    select id from staff where email = 'zoran@byanymeansbball.com';
    ```
 
-5. Open with a queue summary, split by source, e.g. **"9 outstanding tickets: 7
-   client V2 (5 bugs, 2 features), 2 staff bug reports, oldest from Jun 30."** If
-   the queue is empty: say so, show the last 3 resolved as proof of life, and stop.
+5. Merge both queues **oldest first** (first in, first served) and open with a
+   summary split by source, e.g. **"9 outstanding tickets: 6 rail (4 bugs, 2
+   ideas), 1 legacy client, 2 staff bug reports, oldest from Jun 30."** If the
+   queue is empty: say so, show the last 3 resolved as proof of life, and stop.
 
 ## Step 1 - Per ticket: understand it fully (do this silently)
 
-Before saying anything to Zoran, collect everything useful. **Branch on `f.portal`**
-- the two sources carry different context shapes:
+Before saying anything to Zoran, collect everything useful. **Branch on the
+source** - rail rows and legacy rows carry the same context payload in
+different spots:
 
-- **The ticket row**: body (verbatim), kind, who (client: `submitter_email` +
-  `business_name`; staff: `submitter_email` is the staff member), when, page,
-  screenshot (`file_url`).
-- **The context snapshot** (`context` jsonb, if present):
-  - **Client tickets** (`portal='client'`): `tier`, `view`, `view_trail`, `clicks`
-    (last 30, `{t, view, el}`), `errors`, `viewport`/`ua`/`native_app`,
-    `seconds_on_page`.
-  - **Staff tickets** (`portal='staff'`): same shape minus `tier`/`native_app`, plus
-    `staff_email`. `view`/`view_trail` are the `?p=` page names from the staff React
-    app (e.g. `inbox`, `clients`, `marketing`) - not the same id space as client
-    `view-*` ids, don't confuse them.
+- **Rail tickets** (`v2_tickets`): body = `intake.description`, kind = `type`
+  (`fix` = bug, `feature_idea` = idea), who = `business_name` (+ `created_by`
+  client_user if you need the person), when, page = `intake.page`,
+  screenshot = `intake.file_url`, snapshot = `intake.context`. The full client
+  conversation lives in `v2_ticket_messages` (`ticket_id = t.id`) - read it,
+  staff may already have replied.
+- **Legacy tickets** (`portal_feedback`): body (verbatim), kind, who (client:
+  `submitter_email` + `business_name`; staff: `submitter_email` is the staff
+  member), when, page, screenshot (`file_url`), snapshot in `context`.
+- **The context snapshot** (both sources, if present):
+  - **Client tickets**: `tier`, `view`, `view_trail`, `clicks` (last 30,
+    `{t, view, el}`), `errors`, `viewport`/`ua`/`native_app`, `seconds_on_page`.
+  - **Staff tickets** (`portal='staff'`, legacy only): same shape minus
+    `tier`/`native_app`, plus `staff_email`. `view`/`view_trail` are the `?p=`
+    page names from the staff React app (e.g. `inbox`, `clients`, `marketing`)
+    - not the same id space as client `view-*` ids, don't confuse them.
   - A ticket with JS errors in context is almost certainly a real bug - start there.
-  - Older tickets (client: before 2026-07-08; staff: before the staff-widget parity
-    shipped same day) won't have context. Infer from body + page, and say
-    confidence is lower.
+  - Old tickets without context: infer from body + page, and say confidence is lower.
 - **The code**: use the context to find the exact spot.
   - Client tickets → `bam-ghl-agent/bam-portal/public/client-portal.html` (view ids
     match `context.view`, e.g. `view-marketing`).
@@ -138,29 +166,53 @@ move on.
 
 ## Step 4 - Record the decision, then advance
 
-Always stamp the decision on the ticket so nothing is re-litigated next run
-(append to notes, don't overwrite):
+**Rail tickets** (`v2_tickets`) - remember: the status you set is the pill the
+client sees, and it changes the moment you write it (realtime).
+
+- **Build now** → make the change (design rules below). When shipped:
+  ```sql
+  update v2_tickets
+  set status = 'resolved', resolved_at = now(), updated_at = now()
+  where id = '<ticket id>';
+  ```
+  The client's pill flips to **Fixed** (fix) or **Shipped** (feature_idea, plus
+  the gold "Your idea is live" card). Optionally drop a human line on the thread
+  first (insert into `v2_ticket_messages` with `author_kind='staff'`), or use
+  `/api/v2-tickets?action=status` so a system status row lands automatically.
+- **In progress** (started but not finished this session) → `status='in_progress'`
+  (client sees **Being fixed** / **Building**).
+- **Queue it** → leave `status='new'` (client keeps seeing **Sent** - honest).
+  Stamp the decision in `intake`:
+  ```sql
+  update v2_tickets
+  set intake = jsonb_set(intake, '{triage_note}',
+        to_jsonb('[triage 2026-07-21] <decision + agreed fix in one line>'::text), true),
+      updated_at = now()
+  where id = '<ticket id>';
+  ```
+  Offer the existing spec engine ("Build spec" makes a GitHub issue) or a Notion
+  Backlog item if it's a prototype-level idea.
+- **Reject** → `status='closed'`, `closed_at = now()`, `close_reason` says why in
+  client-friendly words (they see "Closed - <reason>"). Rejected is final.
+- **Skip** → touch nothing, it stays in the queue for next run.
+
+**Legacy tickets** (`portal_feedback`) - same stamps as before (append to notes,
+don't overwrite):
 
 ```sql
 update portal_feedback
-set notes = coalesce(nullif(notes,''), '') || E'\n[triage 2026-07-08] <decision + agreed fix in one line>',
+set notes = coalesce(nullif(notes,''), '') || E'\n[triage 2026-07-21] <decision + agreed fix in one line>',
     status = '<approved | rejected | done>',
     updated_at = now()
 where id = '<ticket id>';
 ```
+Done/rejected also set `resolved_at = now()` + `resolved_by = <Zoran's staff id>`.
 
-- **Build now** → make the change. Either source: read
-  `bam-ghl-agent/bam-portal/design-system/DESIGN.md` first, use tokens, no emojis in
-  product UI, no em dashes. Client-portal edits specifically: after ANY
-  `client-portal.html` edit run
-  `node bam-ghl-agent/bam-portal/scripts/verify-client-portal-ui.mjs`. When shipped:
-  `status='done'`, set `resolved_at = now()` and `resolved_by = <Zoran's staff id>`.
-- **Queue it** → `status='approved'`, leave `resolved_at` null. Offer the existing
-  spec engine ("Build spec" makes a GitHub issue) or a Notion Backlog item if it's a
-  prototype-level idea.
-- **Reject** → `status='rejected'`, `resolved_at = now()`, `resolved_by = <staff id>`,
-  note says why. Rejected is final.
-- **Skip** → touch nothing, it stays in the queue for next run.
+**Build rules, either source**: read
+`bam-ghl-agent/bam-portal/design-system/DESIGN.md` first, use tokens, no emojis in
+product UI, no em dashes. Client-portal edits specifically: after ANY
+`client-portal.html` edit run
+`node bam-ghl-agent/bam-portal/scripts/verify-client-portal-ui.mjs`.
 
 Then IMMEDIATELY present the next ticket (back to Step 1).
 
@@ -171,13 +223,16 @@ Then IMMEDIATELY present the next ticket (back to Step 1).
    the body) so Vercel deploys and collaborators get it.
 3. Memory check: anything learned worth saving →
    `bam-ghl-agent/memories/project_feedback_to_action.md`.
-4. Suggest next steps (e.g. "2 queued tickets have specs ready to build").
+4. If legacy client rows keep showing up: suggest running the backfill
+   (`node bam-ghl-agent/bam-portal/scripts/feedback-backfill.mjs`, dry-run first)
+   so next run is rail-only.
+5. Suggest next steps (e.g. "2 queued tickets have specs ready to build").
 
 ## Progress tracker (end of EVERY message)
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 TICKET TRIAGE — 3 of 9
+📍 TICKET TRIAGE - 3 of 9
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. 🧑‍💻 Campaign button dead     ✅ built + shipped
 2. 🧑‍💻 Add SMS blast idea       ✅ queued
