@@ -25971,7 +25971,7 @@ async function _bbStaffRefreshList() {
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
   let { data, error } = await _sb.from('client_users')
-    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members, title, bio')
+    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members, title, bio, instagram')
     .eq('client_id', CLIENT_ID)
     .eq('status', 'active')
     .eq('hide_from_team', false);
@@ -26099,6 +26099,7 @@ async function _bbStaffRefreshList() {
         <div style="${ZLAB}">${ic('<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>')}Public profile · shows on your website team page</div>
         <div style="margin-bottom:11px">${_assetBankHtml('staff_id', r.id, { category: 'photo' })}</div>
         <input id="staff-title-${r.id}" type="text" value="${_bbEscapeAttr(r.title || '')}" placeholder="Title / role (e.g. Head Coach)" onchange="_bbStaffContactSave('${r.id}', 'title', this.value)" style="${FLD};margin-bottom:8px">
+        <input id="staff-instagram-${r.id}" type="text" value="${_bbEscapeAttr(r.instagram || '')}" placeholder="Instagram (e.g. @coachname)" onchange="_bbStaffContactSave('${r.id}', 'instagram', this.value)" style="${FLD};margin-bottom:8px">
         <textarea id="staff-bio-${r.id}" rows="2" placeholder="Short bio shown on your website team page" onchange="_bbStaffContactSave('${r.id}', 'bio', this.value)" style="${FLD};resize:vertical;line-height:1.5">${escapeHTML(r.bio || '')}</textarea>
         <span style="display:block;font-size:11px;color:var(--text-mute);margin-top:6px">Leave blank to hide from the team page.</span>
       </div>`;

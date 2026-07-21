@@ -68,7 +68,7 @@ async function handler(req, res) {
     const people = await sbReq(
       `client_users?client_id=eq.${encodeURIComponent(client_id)}` +
       `&status=eq.active&hide_from_team=eq.false&or=(title.not.is.null,bio.not.is.null)` +
-      `&select=id,name,title,bio,role,created_at&order=created_at.asc`
+      `&select=id,name,title,bio,instagram,role,created_at&order=created_at.asc`
     );
     const list = Array.isArray(people) ? people : [];
     // Owner first, then by creation order (matches how a team page usually reads).
@@ -96,7 +96,7 @@ async function handler(req, res) {
     const coaches = list.map((p) => {
       const a = photoByStaff[p.id];
       const photo_url = a ? (a.storage_path ? publicUrl(a.storage_path) : (a.link_url || "")) : "";
-      return { id: p.id, name: p.name || "", title: p.title || "", bio: p.bio || "", photo_url };
+      return { id: p.id, name: p.name || "", title: p.title || "", bio: p.bio || "", instagram: p.instagram || "", photo_url };
     });
 
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
