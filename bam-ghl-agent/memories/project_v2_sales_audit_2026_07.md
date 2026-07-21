@@ -26,8 +26,9 @@ internal notes); self-drive auto-sends pass clientId (provider seam) in confirm
 closing reactive path cancels stale cards for OLDER inbounds (fresh message
 finally gets answered; same-inbound card survives = no churn); confirm-enroll
 guarded (Done-Trial stage + not-already-a-member); automations form-intro
-rollover stamps stage_role 'interested' (was 'ghosted' - reply-bounce guards
-never matched); automation 'sending' jobs reclaim after 15 min (crashed worker
+rollover stamps the canonical ghosted-stage role so reply-bounce guards match
+(that role was named 'interested' here until the 2026-07-21 rename to 'ghosted' -
+see [[project_stage_role_ghosted_rename]]); automation 'sending' jobs reclaim after 15 min (crashed worker
 no longer stalls enrollments forever); GHL inbound webhook reads the portal
 store for the reply-bounce (was frozen GHL board); Twilio webhook got the
 'Liked' tapback rule; post-trial first message rides the provider seam (was raw

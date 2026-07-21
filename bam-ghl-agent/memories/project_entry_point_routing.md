@@ -8,8 +8,8 @@ Pairs with [[project_sales_crew_model]].
 ## The model (per entry point)
 
 ### 📝 Contact form
-- Card created in **🟡 Interested** stage (`interestedStage`, `/interest/i` ... actually
-  the ghosted stage; confirm anchor in `_stage.js interestedStage`).
+- Card created in the **👻 Ghosted** stage (`ghostedStage`, matches `/interest|ghost/`;
+  anchor in `_stage.js ghostedStage`. Role key renamed interested→ghosted 2026-07-21).
 - **👻 Ghosted automation enrolls IMMEDIATELY** on form fill (not after a quiet period).
 - Lead **replies** → move to **✅ Responded** → 📞 Booking agent (Hawkeye).
 - Ghosted runs out silent → **💔 Lead Nurture** (already wired, P6).

@@ -26,7 +26,7 @@ Migrated every remaining direct `ghl PUT /opportunities/{id}` (stage move + stat
 lost/abandoned) in the AGENT + AUTOMATION paths to the provider-aware
 `moveStage`/`setStatus`. These bypassed the seam and dual-wrote GHL on every
 AI/automation-driven move. Sites (14 + 1):
-- `api/agent-approvals.js` ×5 (nurture move, lost, abandoned, scheduled_trial, interested)
+- `api/agent-approvals.js` ×5 (nurture move, lost, abandoned, scheduled_trial, ghosted)
 - `api/agent-confirm.js` ×3 (responded bounce, nurture, lost)
 - `api/agent-closing.js` ×2 (nurture, lost)
 - `api/automations.js` ×4 (ghosted roll, nurture roll, ×2 exhausted-lost)
@@ -59,10 +59,10 @@ Migrated the find-opp locators from `ghl /opportunities/search` to the provider-
   /opportunities/{id}` (which 404'd on a portal uuid); threads the oppRef into both moves.
 - `api/twilio/inbound-webhook.js` + `api/resend/inbound-webhook.js` (reply -> bounce to Responded):
   provider branch - for portal reads the open opp + `stage_role` from the store (the true stage
-  lives there; the GHL stage is stale) and bounces only from interested/nurture.
+  lives there; the GHL stage is stale) and bounces only from ghosted/nurture.
 
 ## Stage-NAME reads - DONE 2026-07-01 (registry-first, 4th PR)
-- `api/ghl/post-trial.js`: both stage lookups (interested + done_trial) branch on provider -
+- `api/ghl/post-trial.js`: both stage lookups (ghosted + done_trial) branch on provider -
   portal resolves via `resolveStage` (the `pipeline_stages` registry, no GHL read); ghl keeps
   the exact pipelines fetch + name regex. GTA's registry has all 5 roles seeded with real ids.
 - `api/website/leads.js` `resolvePipelineStage`: registry-first for pipeline_provider='portal'

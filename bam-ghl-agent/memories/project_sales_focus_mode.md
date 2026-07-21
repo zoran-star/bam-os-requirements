@@ -26,7 +26,7 @@ edge-per-row (`from_stage_role, trigger, to_kind, to_stage_role|to_terminal`), c
 `client-portal.html`: `_plEdgesEnsure()` loads edges via `_sb` (client-scoped RLS,
 `stage_transitions_rw` = is_staff OR my_client_ids, so the logged-in client can CRUD);
 `_plStageRole(name)` maps GHL stage → role (booking→responded, confirm→scheduled_trial,
-closing→done_trial, ghosted→interested, nurture→nurture). Entry section = read-only
+closing→done_trial, ghosted→ghosted, nurture→nurture). Entry section = read-only
 (each chip = another stage's exit, with a "Configure {source}" jump); Exit section =
 editable rows (toggle `enabled`, edit trigger+destination, delete) + "Add exit branch"
 inline form. One-destination-per-trigger enforced in UI; DB unique/check constraints +
@@ -52,11 +52,11 @@ academies, so leads move by the academy's authored edges, not hardcoded per-agen
   (a deleted row is indistinguishable from unseeded → fallback fires) — only becomes real at
   Phase 4 when fallbacks are removed. GTA unaffected (all edges enabled).
 - **Swaps DONE (all stage→stage, each keeps old move as matched:false fallback, GTA-identical):**
-  #1 `went_quiet` responded→interested (`agent-approvals.js` confirm-ghost) ·
+  #1 `went_quiet` responded→ghosted (`agent-approvals.js` confirm-ghost) ·
   #2 `booked` responded→scheduled_trial (`agent-approvals.js` booking; `kpiTrialBooked` fires
   either path so KPI unaffected) ·
   #3 `cant_make_it` scheduled_trial→responded (`agent-confirm.js` confirm-handoff rebook) ·
-  #4 `ghosted_ran_out` interested→nurture (`automations.js` seq-complete; covers ghosted +
+  #4 `ghosted_ran_out` ghosted→nurture (`automations.js` seq-complete; covers ghosted +
   summer_special; nurture-off LOST branch untouched) ·
   #5 `not_interested` responded→nurture (`agent-approvals.js` confirm-lost; nurture-live-gated,
   paused→falls through to LOST, enroll + routedToNurture preserved) ·
@@ -113,7 +113,7 @@ academies, so leads move by the academy's authored edges, not hardcoded per-agen
   **DECIDED: retire `missed_trial`** (Zoran). **NOTE:** none of B-E prod-verified yet — verify on
   GTA. `reengaged` entry defined but unwired (no caller writes that note; the nurture/ghosted reply
   bounce may be a GHL workflow — Phase C+ once it's portal code). See [[project_client_agent_training]].
-- **⏭ OTHER remaining swaps:** `replied` interested/nurture→responded (the ghosted/nurture reply
+- **⏭ OTHER remaining swaps:** `replied` ghosted/nurture→responded (the ghosted/nurture reply
   bounce — likely a **GHL workflow, not portal code**; confirm before assuming a site) ·
   `enrolls`→member (Stripe payment path — deterministic, low value, probably leave direct) ·
   `marked_unqualified` (manual confirm-abandoned action — from-role-agnostic; probably leave direct).

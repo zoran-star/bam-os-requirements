@@ -17,8 +17,8 @@ Responded, e.g. `source='ghl-import'`) never had a Ghosted safety net at all.
 
 ## What it does
 Finds open opps `stage_role='responded'` that are truly idle, then `enrollContact(ghosted)`
-+ `moveStage(role='interested')` - the SAME handoff `runWork`'s form-intro roll-forward
-does. Operationalizes the seed edge `responded --went_quiet--> interested` (which had no
++ `moveStage(role='ghosted')` - the SAME handoff `runWork`'s form-intro roll-forward
+does. Operationalizes the seed edge `responded --went_quiet--> ghosted` (which had no
 engine firing `went_quiet` for Responded leads until now). Next inbound reply bounces the
 lead back to Responded and the agent re-engages.
 

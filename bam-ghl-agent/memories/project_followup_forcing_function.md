@@ -42,7 +42,7 @@ every lead. Instead: if a lead's quiet ~a day, the action is **Send to Ghosted**
   pipeline (`/api/agent-train` teach). Train-the-brain = optional note field.
 - **Send to Ghosted** = `POST /api/agent-approvals {action:'confirm-ghost', ready_id|contact_id}`:
   enrolls the contact in the academy's `offers.data.ghosted_workflow` (helper
-  `enrollGhosted`), moves the opp to **Interested** (`interestedStage` in `_stage.js`),
+  `enrollGhosted`), moves the opp to the **Ghosted** stage (`ghostedStage` in `_stage.js`),
   logs `pipeline_outcomes` status `ghosted`, cancels the lead's queued cards. The GHL
   workflow then does the actual multi-touch follow-up.
 - **Sales-board badge** (per Responded card): 🔴 **Needs action** = has a pending ghost
@@ -81,8 +81,8 @@ every lead. Instead: if a lead's quiet ~a day, the action is **Send to Ghosted**
 
 ## Files
 - `api/agent-followups.js` — detector now queues ghost cards (LLM-free); draft-one + nudge LLM removed.
-- `api/agent-approvals.js` — `confirm-ghost` action + `enrollGhosted` helper; imports `interestedStage`.
-- `api/agent/_stage.js` — new `interestedStage()` (regex /interest/i on Training pipeline).
+- `api/agent-approvals.js` — `confirm-ghost` action + `enrollGhosted` helper; imports `ghostedStage`.
+- `api/agent/_stage.js` — `ghostedStage()` (regex /interest|ghost/ on Training pipeline; was `interestedStage`, renamed 2026-07-21).
 - `client-portal.html` — ghost tab + `_apxGhostCard`/`_apxGhostConfirm`/`_apxGhostSkip`,
   badge flip (`_PL_GHOST`/`_plLoadNeedsAction`), mandatory-modal family removed.
 

@@ -41,7 +41,7 @@ core_commit_reviewed: unavailable
 
 - **Prototype (model of record):** `bam-ghl-agent/docs/sales-crew-model.html` ("The Sales Crew").
 - **Prototype (current, hardcoded):** `bam-ghl-agent/bam-portal/api/agent/_stage.js` (role finders:
-  responded / interested / scheduled_trial / nurture), the agents (`agent-approvals`/`agent-confirm`/
+  responded / ghosted / scheduled_trial / nurture), the agents (`agent-approvals`/`agent-confirm`/
   `agent-closing`), `api/automations.js` + tables `automations`, `automation_steps`,
   `automation_enrollments`, `automation_jobs`, `automation_events`; `entry_points` table;
   `clients.ghl_kpi_config.portal_entry_routing` (contact_stage / trial_stage / scheduled_stage + bot).
@@ -54,7 +54,7 @@ core_commit_reviewed: unavailable
 
 | Concept | Purpose | Relationships and scope |
 |---|---|---|
-| `stage_role` (enum) | Provider-neutral stage identity | responded · interested · scheduled_trial · done_trial · nurture (+ terminals member · unqualified). Mapped to a GHL/portal stage id via the existing `resolveStage`. **Never** the display name. |
+| `stage_role` (open text) | Provider-neutral stage identity | responded · ghosted · scheduled_trial · done_trial · nurture (+ terminals member · unqualified). Mapped to a GHL/portal stage id via the existing `resolveStage`. **Never** the display name. (Role key renamed interested→ghosted 2026-07-21; the enum was opened to text in 20260710181458.) |
 | `stage_engine` (enum) | What works a stage | `agent` (booking/confirm/closing) · `automation` (ghosted/lead_nurture) · `human`. One per stage. |
 | `transition_trigger` (enum) | What the lead/coach did | new_lead · replied · went_quiet · booked · cant_make_it · no_show · post_trial_good_fit · post_trial_not_fit · not_interested · no_longer_wants · says_no · enrolls · marked_unqualified · complaint_offtopic · ghosted_ran_out |
 | `transition_destination` (enum) | Where they go | a `stage_role` OR a terminal (member · unqualified · human) |
@@ -65,11 +65,11 @@ core_commit_reviewed: unavailable
 The backend router replaces the hardcoded moves by reading enabled transitions for `(from_stage, trigger)`.
 
 **The Sales-Crew default edges (seed):**
-`responded`: new_lead/replied/nurture_reply/ghosted_reply → in; booked→scheduled_trial · not_interested→nurture(lost) · marked_unqualified→unqualified · went_quiet→interested · complaint→human.
+`responded`: new_lead/replied/nurture_reply/ghosted_reply → in; booked→scheduled_trial · not_interested→nurture(lost) · marked_unqualified→unqualified · went_quiet→ghosted · complaint→human.
 `scheduled_trial`: booked→in; post_trial_form→(router) · cant_make_it→responded · no_longer_wants→nurture · unqualified · complaint→human.
 post-trial router: good_fit→done_trial · not_fit→unqualified · no_show→responded.
 `done_trial`: good_fit→in; enrolls→member · says_no→nurture · unqualified · complaint→human.
-`interested` (Ghosted auto): went_quiet→in; replied→responded · ghosted_ran_out→nurture.
+`ghosted` (Ghosted auto): went_quiet→in; replied→responded · ghosted_ran_out→nurture.
 `nurture` (Lead Nurture auto): ghosted_ran_out + any lost(non-unqualified)→in; replied→responded.
 
 ## 🔥 Reignition (added 2026-07-10, LIVE in prod)
@@ -98,7 +98,7 @@ a core contact FK - migrate via the existing contact mapping.
 
 ## 🔁 Re-arm sweep (added 2026-07-14, LIVE in prod)
 
-Operationalizes the seed edge **`responded --went_quiet--> interested`** (line 68).
+Operationalizes the seed edge **`responded --went_quiet--> ghosted`** (line 68).
 That edge exists in every academy's seed, but until now **no engine emitted
 `went_quiet` for a Responded lead**: the agent only acts on inbound replies, and
 👻 Ghosted exits permanently on the reply that first bounced the lead to Responded.
@@ -120,7 +120,7 @@ engine** and sat silently open. The client-portal "not flowing" panel only
   fallback for GHL-messaging academies. `opportunities.updated_at` is only a coarse
   candidate FLOOR (the pipeline sync rewrites it in bulk). Fails SAFE (skip, never
   arm) only when NEITHER source can be read.
-- **Action:** `enrollContact(ghosted)` + `moveStage(role='interested')` - the exact
+- **Action:** `enrollContact(ghosted)` + `moveStage(role='ghosted')` - the exact
   handoff the worker's form-intro roll-forward already does (`runWork` completion
   branch), so the lead leaves Responded (where the agent + ghost detector scan) and
   the long game owns it. On the next inbound reply the bounce guard returns it to
