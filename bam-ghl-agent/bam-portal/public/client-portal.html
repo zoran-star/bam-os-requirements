@@ -25181,7 +25181,8 @@ function _bbRenderBrandCard(panel, meta) {
       </div>
     </div>
 
-    ${_bbMarkDoneCta('brand', 'Brand')}
+    <!-- Brand auto-completes on any edit (no manual "I'm done" button) -->
+
   `;
   const _wp = document.getElementById('bb-website-pages');
   if (_wp) _bbRenderWebsitePages(_wp);
@@ -25345,6 +25346,7 @@ function _bbBrandChanged() {
     };
     return { brand_data: next };
   });
+  _bbAutoDone('brand');   // any brand edit = the section is engaged
 }
 
 async function _bbBrandSetWebsiteStatus(opt) {
@@ -25468,7 +25470,8 @@ async function _bbRenderStaffCard(panel, meta) {
       Everyone on your team, in one card each. New teammates start with no access: you choose which tabs each one can see. Anyone on the team can invite more people; only the account owner can revoke access.
     </p>
     <div id="bb-staff-list"><div class="bb-empty">Loading…</div></div>
-    ${_bbMarkDoneCta('staff', 'Staff')}
+    <!-- Staff auto-completes once the owner engages (no manual "I'm done" button) -->
+
   `;
 
   if (!CLIENT_ID || !_sb) {
@@ -25747,6 +25750,10 @@ async function _bbStaffRefreshList() {
       ${notifZone}
     </div>`;
   }).join('');
+  // Auto-complete the Staff onboarding section once the owner has engaged: a
+  // teammate exists, or the owner filled their own public profile.
+  const _ownerRow = (data || []).find(r => r.role === 'owner');
+  if ((data || []).length > 1 || (_ownerRow && (_ownerRow.title || _ownerRow.bio))) _bbAutoDone('staff');
 }
 
 // Per-person notification pills: which events text this teammate. Reads the
@@ -26017,7 +26024,8 @@ async function _bbRenderLocationsCard(panel, meta) {
       <button class="btn-primary-bb" onclick="_bbOpenAddLocationModal(_bbAfterLocAdd)">+ Add location</button>
     </div>
     <div id="bb-locations-list"><div class="bb-empty">Loading…</div></div>
-    ${_bbMarkDoneCta('locations', 'Locations')}
+    <!-- Locations auto-completes once a location exists (no manual "I'm done" button) -->
+
   `;
 
   await _bbLoadLocations();
@@ -26053,6 +26061,7 @@ function _bbRenderLocationsListInPanel() {
       </div>
     </div>
   `).join('');
+  if (_bbLocations.length) _bbAutoDone('locations');   // auto-complete once a location exists
 }
 
 async function _bbDeleteLocation(locationId) {
@@ -28540,6 +28549,20 @@ async function _obtMarkSectionDone(section, done) {
   if (error) { console.warn('obt: mark-done failed', error.message); return false; }
   _obtLoadProgress();
   return true;
+}
+
+// Auto-complete the manual-flip Blueprint sections (Staff / Brand / Locations)
+// once they have real content, replacing the old "I'm done with X" button. Every
+// field already auto-saves; this just stamps the onboarding-tracker flag. Fires
+// at most once per section per session, and never auto-un-marks.
+const _bbAutoDoneStamped = new Set();
+function _bbAutoDone(section) {
+  try {
+    if (_bbAutoDoneStamped.has(section)) return;
+    if (typeof _obtProgress !== 'undefined' && _obtProgress && _obtProgress[section + '_done']) { _bbAutoDoneStamped.add(section); return; }
+    _bbAutoDoneStamped.add(section);
+    _obtMarkSectionDone(section, true);
+  } catch (_) {}
 }
 
 async function _obtDismiss() {
