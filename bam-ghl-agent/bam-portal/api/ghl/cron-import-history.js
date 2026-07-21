@@ -72,9 +72,25 @@ async function runImportToDone(path, clientId, deadline) {
   return { done, calls, pages, imported, error };
 }
 
+// A connected Gmail (2-way sync) IS the academy's email inbox + history, and it
+// writes the SAME email_threads/email_messages store as the GHL email import
+// (provider 'gmail' vs 'ghl') - running both would double every email thread.
+// So: SMS history always imports (texts live only in GHL), but the GHL EMAIL
+// import is skipped when a Gmail mailbox is connected. Academies without Gmail
+// still import their GHL email history (they'd otherwise lose it at cutover).
+async function hasGmailMailbox(clientId) {
+  try {
+    const rows = await sb(`client_mailboxes?client_id=eq.${encodeURIComponent(clientId)}&provider=eq.gmail&status=eq.active&select=client_id&limit=1`);
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (_) { return false; }
+}
+
 async function importForAcademy(client, deadline) {
-  const sms   = await runImportToDone("/api/messaging/import-ghl-history", client.id, deadline);
-  const email = await runImportToDone("/api/messaging/email-import-ghl-history", client.id, deadline);
+  const sms = await runImportToDone("/api/messaging/import-ghl-history", client.id, deadline);
+  const gmail = await hasGmailMailbox(client.id);
+  const email = gmail
+    ? { done: true, skipped: "gmail-connected" }
+    : await runImportToDone("/api/messaging/email-import-ghl-history", client.id, deadline);
   const stamped = !!(sms.done && email.done);
   if (stamped) {
     await sb(`clients?id=eq.${encodeURIComponent(client.id)}`, {
