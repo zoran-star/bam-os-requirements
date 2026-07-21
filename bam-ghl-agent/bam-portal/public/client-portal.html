@@ -5254,8 +5254,8 @@ if (window.__MOCK__) (() => {
   body:has(#view-messages.active) #admin-fb-overlay,
   body:has(#view-parent-messages.active) #admin-fb-wrap,
   body:has(#view-parent-messages.active) #admin-fb-overlay,
-  body:has(#view-v15inbox.active) #admin-fb-wrap,
-  body:has(#view-v15inbox.active) #admin-fb-overlay { display: none !important; }
+  body:has(#view-v15inbox.mm-open) #admin-fb-wrap,
+  body:has(#view-v15inbox.mm-open) #admin-fb-overlay { display: none !important; }
   #admin-fb-modal {
     background: #131318; border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px; padding: 28px; max-width: 520px; width: 100%;
@@ -6604,8 +6604,8 @@ if (window.__MOCK__) (() => {
     body:has(#view-messages.active) #admin-fb-overlay,
     body:has(#view-parent-messages.active) #admin-fb-wrap,
     body:has(#view-parent-messages.active) #admin-fb-overlay,
-    body:has(#view-v15inbox.active) #admin-fb-wrap,
-    body:has(#view-v15inbox.active) #admin-fb-overlay { display: none; }
+    body:has(#view-v15inbox.mm-open) #admin-fb-wrap,
+    body:has(#view-v15inbox.mm-open) #admin-fb-overlay { display: none; }
 
     /* ── Inputs ≥16px so iOS doesn't zoom on focus ── */
     input, textarea, select,
@@ -8858,6 +8858,46 @@ Then the call to action."]</div>
       .v15ib-split-list .v15ib-list-scroll { flex:1; overflow-y:auto; }
       .v15ib-split-thread { flex:1; min-width:0; overflow-y:auto; display:flex; flex-direction:column; }
       .v15ib-split-thread-inner { display:flex; flex-direction:column; height:100%; animation:ibFadeSlide .2s ease; }
+      /* ── Inbox focus overlay (mirrors the Calendar cal-focus-card) ──
+         A fixed-height panel floating on the dimmed lit-room backdrop; the
+         two-pane split scrolls INSIDE the card instead of the page. Scoped
+         under #view-v15inbox so it beats .mm-focus-page .mm-modal-card
+         (transparent, 1120px) below. */
+      #view-v15inbox .v15ib-focus-card {
+        max-width:none; width:min(1280px, 96vw); height:92vh; margin:4vh auto;
+        display:flex; flex-direction:column; padding:0;
+        background:var(--surface); border:1px solid var(--border);
+        border-radius:16px; box-shadow:var(--shadow-lg); overflow:hidden;
+      }
+      #view-v15inbox .v15ib-focus-head {
+        display:flex; align-items:center; gap:13px;
+        padding:16px 20px 12px; flex:0 0 auto;
+      }
+      #view-v15inbox .v15ib-focus-head .mm-back-btn { margin-bottom:0; }
+      #view-v15inbox .v15ib-focus-head .topbar-kicker {
+        font-size:12px; font-weight:700; letter-spacing:.06em;
+        text-transform:uppercase; color:var(--gold, #D4B65C);
+      }
+      #view-v15inbox .v15ib-focus-head-actions { margin-left:auto; display:flex; gap:8px; align-items:center; }
+      /* the card owns the chrome; the content column drives the flex + the
+         split fills it (list scroll + thread pane both scroll internally) */
+      #view-v15inbox .v15ib-focus-card .content {
+        flex:1; min-height:0; display:flex; flex-direction:column;
+        padding:0; overflow:hidden;
+      }
+      #view-v15inbox .v15ib-focus-card #v15inbox-content {
+        flex:1; min-height:0; display:flex; flex-direction:column;
+      }
+      @media (max-width:768px) {
+        /* full-screen the focus card on phones (parity with the desktop overlay
+           and with the Calendar focus page) */
+        #view-v15inbox .v15ib-focus-card {
+          width:100%; height:100dvh; margin:0; border:none; border-radius:0;
+        }
+        #view-v15inbox .v15ib-focus-head {
+          padding:calc(10px + env(safe-area-inset-top)) 14px 8px;
+        }
+      }
       .v15ib-split-thread-inner .v15ib-suggest-bar, .v15ib-split-thread-inner .v15ib-quick-replies { padding:4px 18px; }
       .v15ib-summary { font-size:12px; color:var(--text-mute); padding:6px 18px; border-bottom:1px solid var(--border); font-style:italic; }
       /* Empty state for thread pane */
@@ -11669,25 +11709,11 @@ Then the call to action."]</div>
          switchView('contacts') can't crash; #contacts-content lives in the modal. -->
     <div class="view" id="view-contacts"></div>
 
-    <div class="view" id="view-v15inbox">
-      <div class="topbar">
-        <div>
-          <span class="topbar-kicker">§ Inbox</span>
-          <div class="topbar-title">Inbox</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button id="inbox-contacts-btn" onclick="switchView('contacts')" style="display:none;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;align-items:center;gap:7px">Contacts</button>
-          <button class="v15ib-mute-btn" id="ib-mute-btn" onclick="_ibToggleMute()" title="Toggle sounds">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path id="ib-mute-waves" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-            <span id="ib-mute-label">Sound on</span>
-          </button>
-          <button class="inbox-talk-btn" onclick="switchView('messages')" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px">Talk to BAM Business</button>
-        </div>
-      </div>
-      <div class="content">
-        <div id="v15inbox-content"></div>
-      </div>
-    </div>
+    <!-- Inbox moved OUT of .main to a focus-mode overlay (below, just after .main),
+         mirroring the Calendar / Blueprint / Settings overlays. It keeps
+         id="view-v15inbox" so every #view-v15inbox CSS rule + JS render target
+         (#v15inbox-content) still applies. Opened by openV15InboxFocus(). -->
+
 
     <div class="view" id="view-v15kpis">
       <div class="topbar">
@@ -11792,6 +11818,32 @@ Then the call to action."]</div>
          used by BB Staff) sit below in the modals block. -->
 
   </div>
+
+  <!-- ── Inbox: focus-mode overlay ──
+       Sibling of .main so the focus camera-pan blurs the app chrome behind it
+       (mm-focus-open dims .main + .sidebar). Opened by openV15InboxFocus() via
+       the shared _ccOpenFocusPage camera pan; Back / backdrop click closes it.
+       Lives OUTSIDE .main on purpose (mirrors the Calendar overlay). Keeps
+       id="view-v15inbox" + inner #v15inbox-content so all CSS + JS still apply. -->
+    <div class="modal-backdrop mm-focus-page v15ib-focus-page" id="view-v15inbox" style="display:none" onclick="if(event.target===this)closeV15InboxFocus()">
+      <div class="modal-card mm-modal-card v15ib-focus-card" onclick="event.stopPropagation()">
+        <div class="v15ib-focus-head">
+          <button type="button" class="mm-back-btn" onclick="closeV15InboxFocus()">‹ Back</button>
+          <span class="topbar-kicker">§ Inbox</span>
+          <div class="v15ib-focus-head-actions">
+            <button id="inbox-contacts-btn" onclick="switchView('contacts')" style="display:none;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;align-items:center;gap:7px">Contacts</button>
+            <button class="v15ib-mute-btn" id="ib-mute-btn" onclick="_ibToggleMute()" title="Toggle sounds">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path id="ib-mute-waves" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              <span id="ib-mute-label">Sound on</span>
+            </button>
+            <button class="inbox-talk-btn" onclick="switchView('messages')" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px">Talk to BAM Business</button>
+          </div>
+        </div>
+        <div class="content">
+          <div id="v15inbox-content"></div>
+        </div>
+      </div>
+    </div>
 
   <!-- ── Calendar: focus-mode overlay ──
        Sibling of .main so the focus camera-pan blurs the app chrome behind it
@@ -19159,6 +19211,19 @@ function switchView(name, el) {
     openSettingsFocus();
     return;
   }
+  // Inbox is a focus-mode overlay (like Calendar/Blueprint/Settings), not an
+  // in-.main view: pop it over the current page and return so closing lands you
+  // back where you were. Placed before the command-center block so it opens as a
+  // clean focus session with NO "Command center > Inbox" breadcrumb. Gated.
+  if (name === 'v15inbox') {
+    if (typeof _isViewTabAllowed === 'function' && !_isViewTabAllowed('v15inbox')) { switchView(_landingView ? _landingView() : 'home'); return; }
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    if (!el) el = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'v15inbox'"));
+    if (el) el.classList.add('active');
+    openV15InboxFocus();
+    try { syncMobileNav('v15inbox'); } catch (_) {}
+    return;
+  }
   // Command center (beta): while the one-page flow is active, section-mapped
   // views scroll to their section instead of swapping views; anything else
   // opens classically with a "back to command center" pill. _CC_BYPASS lets
@@ -19200,6 +19265,8 @@ function switchView(name, el) {
   if (name !== 'calendar' && typeof _calIsOpen === 'function' && _calIsOpen()) _mmCloseFocus('view-calendar');
   // Same for the Settings focus overlay: step out if heading elsewhere.
   if (name !== 'settings' && typeof _settingsIsOpen === 'function' && _settingsIsOpen()) closeSettings();
+  // Same for the Inbox focus overlay: step out if heading to any other view.
+  if (name !== 'v15inbox' && typeof _v15ibFocusIsOpen === 'function' && _v15ibFocusIsOpen()) _mmCloseFocus('view-v15inbox');
   if (name === 'blueprint') {
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
     if (!el) el = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'blueprint'"));
@@ -24612,6 +24679,47 @@ function closeCalendar() {
   }
   // restore the sidebar highlight to whatever view we came back out to
   const back = _CAL_RETURN || (typeof _landingView === 'function' ? _landingView() : 'home');
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
+  if (item) item.classList.add('active');
+  try { syncMobileNav(back); } catch (_) {}
+}
+
+// ── Inbox focus overlay (mirrors openCalendar/closeCalendar) ──
+// #view-v15inbox lives OUTSIDE .main so the camera-pan that blanks .main can't
+// blank the overlay. Open pops it over the current page; Back / backdrop click
+// closes it and returns to where you were. openV15Inbox() (the async renderer)
+// paints the two-pane before the pan, same as the old on-enter render.
+function _v15ibFocusIsOpen() { return !!document.getElementById('view-v15inbox')?.classList.contains('mm-open'); }
+let _V15IB_RETURN = null;
+function openV15InboxFocus() {
+  const modal = document.getElementById('view-v15inbox');
+  if (!modal) return;
+  if (!_v15ibFocusIsOpen()) {
+    const cur = document.querySelector('.view.active');
+    _V15IB_RETURN = cur ? cur.id.replace('view-', '') : null;
+  }
+  // A command-center entry (_ccOpenClassic) adds the classic breadcrumb chrome
+  // before switchView runs - strip it so the inbox opens as a clean focus
+  // session, not the old "Command center > Inbox" full-screen.
+  document.body.classList.remove('cc-classic', 'ib-scroll-lock');
+  try { openV15Inbox(); } catch (_) {}   // render the two-pane before the pan
+  if (typeof _ccOpenFocusPage === 'function') {
+    _ccOpenFocusPage('view-v15inbox', '.nav-item[data-feature="v15"]');
+  } else {
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => { document.documentElement.classList.add('mm-focus-open'); modal.classList.add('mm-open'); });
+  }
+}
+function closeV15InboxFocus() {
+  if (typeof _mmCloseFocus === 'function') _mmCloseFocus('view-v15inbox');
+  else {
+    const m = document.getElementById('view-v15inbox');
+    if (m) { m.classList.remove('mm-open'); m.style.display = 'none'; }
+    document.documentElement.classList.remove('mm-focus-open');
+  }
+  // restore the sidebar highlight to whatever view we came back out to
+  const back = _V15IB_RETURN || (typeof _landingView === 'function' ? _landingView() : 'home');
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
   if (item) item.classList.add('active');

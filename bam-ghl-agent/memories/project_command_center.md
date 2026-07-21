@@ -197,3 +197,11 @@ Bar stays HOME / SALES / [Tower orb] / MEMBERS / INBOX. Marketing deliberately h
 2. Wire the real LLM member agent.
 3. Motion pass: weave sections together with transitions/graphics (deliberately bare-bones now).
 4. Later offers (teams/tournaments/leagues) = additional home flows branching from the training flow.
+
+## Inbox = focus overlay, not a classic view (2026-07-21)
+The V2 command-center **Inbox (`#view-v15inbox`) now opens as a focus-mode overlay**, not a `cc-classic` back-pill full-screen. It joins Calendar / Blueprint / Settings as a `switchView` intercept placed BEFORE the cc-classic block, so there is no "Command center > Inbox" breadcrumb.
+- Moved `#view-v15inbox` OUT of `.main` to a sibling `.modal-backdrop.mm-focus-page` (kept the id + inner `#v15inbox-content` so all CSS/JS still applies).
+- `openV15InboxFocus()` / `closeV15InboxFocus()` / `_v15ibFocusIsOpen()` mirror `openCalendar`/`closeCalendar`; render (`openV15Inbox()`) runs before the pan. `.v15ib-focus-card` CSS mirrors `cal-focus-card` (92vh floating card, two-pane scrolls inside, full-screen on phones).
+- Every entry point already funnels through `switchView('v15inbox')` (sidebar, mobile nav, `_ccOpenClassic`, "Open inbox" buttons), so one seam covers them all. `openV15InboxFocus` strips lingering `cc-classic`/`ib-scroll-lock` since `_ccOpenClassic` adds `cc-classic` before switchView runs.
+- Sub-modals already stack above the focus page (z 1000): compose 9800, voicemail 9400, member drawer 9600 (via `html.mm-focus-open #member-drawer`).
+- The separate `#view-inbox` (V2 All/Members/Leads/Bot) was NOT touched - it's unused for these academies.
