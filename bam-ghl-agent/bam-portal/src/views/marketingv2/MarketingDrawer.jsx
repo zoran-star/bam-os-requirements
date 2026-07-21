@@ -231,7 +231,8 @@ export default function MarketingDrawer({
           <span className="v2r-microlabel v2r-mkt-drawer-label">Remove creative</span>
           <FieldRows rows={[
             { k: "Campaign", v: campaign },
-            { k: "Creative", v: intake.creative || intake.creative_name || intake.asset || intake.ad || "" },
+            // intake.creative may be an OBJECT ({id,name,cpl,...}) from the V2 remove flow - never render it raw
+            { k: "Creative", v: (typeof intake.creative === "string" ? intake.creative : intake.creative?.name) || intake.creative_name || intake.asset || intake.ad || "" },
             { k: "Reason", v: intake.reason || intake.note || brief },
           ]} />
         </div>
