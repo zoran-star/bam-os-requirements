@@ -51,15 +51,16 @@ The T1-T6 chunks are superseded by the approved P1-P6 bundle:
 | P1 | Content Library: taxonomy migration + rename + V2 BB focus card + circle menu + conditional tagging UI + "keep adding" nudge | ✅ built 2026-07-20 (PR #1504) |
 | P2 | Library search (api/content-library.js) + staff-side browser | later |
 | P3a | RAIL CORE (v2_tickets + v2_ticket_messages + api/v2-tickets.js, notify stubbed) + client ad request in the Meta creative modal: pick angle (offer guide card) → guide → Content Library picker (filter/multi-select) + upload → content_ask ticket. Entry = Marketing → Meta ads → campaign → +add / replace creative (`_mmc`). | ✅ built 2026-07-20 (PR #1504) |
-| P3b | Staff side of the ad flow: angle content_types authoring, staff V2 queue view (Zoran reviews separately) | ⬅ NEXT |
-| P4 | Systems wiring: _v2Submit/_mmcSubmit → rail · staff V2 queue view · portal_feedback backfill · /v2-tickets repoint | after P3 |
-| P5 | Icon popout LIVE: real reads + realtime, lanes create tickets | after P3 |
-| P6 | Notifications (T3 decision): 4 function channels (#systems/#marketing/#content/#other) + client SMS on status change · retrofit WS7/WS3 per-client channels | after P3-P5 |
+| P3b | Staff Content V2 + Marketing V2 pages + rail API extensions (assign, handoff, mark-live→Ads archive, request-client-action) | ✅ built 2026-07-20 (#1531) |
+| P4/P5 | **W-waves (mockups locked 2026-07-21, see the mockup artifact):** W0 client surfaces RESTORED (root cause: 2 unclosed divs in #view-support swallowed the page - fixed + proven) · W1 feedback lanes on the rail (FC intakes no-toggle, FC pills Sent/Being fixed/Fixed · Building/Shipped, TYPE_ROLE fix→backlog, feedback-backfill.mjs, /v2-tickets triages the rail) · W2 annotator wired → website_change + Content Library picker on review · W3 point-of-action Change spend + Remove + 4-step New campaign wizard (funnel preview, angle reuse, budget chips, final check) · W4 staff Website Sandbox (search, ticket picker, page left/notes right, hover highlight, hand-off to AI) · W5 /website-fix skill (list → implement in bam-client-sites → localhost → publish → resolve) | ✅ built 2026-07-21 (PRs pending review) |
+| P6 | Notifications (T3 decision): 4 function channels (#systems/#marketing/#content/#other) + client SMS on status change · retrofit WS7/WS3 per-client channels | ⬅ NEXT after the W-wave PRs merge |
 
-Still parked: orchestrator/navigator lanes (T2-b), non-editor side doors (old
-T4), staff command palette (old T5), Notion pipes (old T6). The T3 decision
-(4 function Slack channels #systems/#marketing/#content/#other, not per-client)
-is captured in the P6 row above + track2-handoff.md.
+Cut at mockup lock (Zoran 2026-07-21): billing_fix + data_fix ticket types (data
+issues = a feedback bug). Still parked: orchestrator/navigator lanes (T2-b),
+non-editor side doors (old T4), staff command palette (old T5), Notion pipes
+(old T6), one-click in-portal AI drafts (sandbox phase 2). The T3 decision
+(4 function Slack channels, not per-client) is captured in the P6 row +
+track2-handoff.md.
 
 ## Track 3 - Running-the-business builds (B-bucket, standalone, schedule anytime)
 

@@ -34,8 +34,24 @@ land in client-assets too) → brief → `_mmcSubmit` POSTs
 `/api/v2-tickets?action=create` a `content_ask` (source='editor'). The old
 `_v2Submit` (page-annotator) + icon popup are still on the mock/FE path (P4/P5).
 
+## Wired 2026-07-21 (the W-waves; mockups locked with Zoran first)
+- Client surfaces RESTORED (W0): root cause of the twice-shipped marketing-focus
+  blank = two unclosed divs in #view-support swallowing the rest of the page.
+  Every client-portal wave now runs a marketing-focus probe + div-balance check.
+- Feedback (W1): lanes open V2 intakes (no toggle) → rail types fix/feature_idea,
+  assignee backlog (Zoran triages; TYPE_ROLE fix→backlog). FC pill vocab:
+  Sent/Being fixed/Fixed · Sent/Building/Shipped + gold "Your idea is live"
+  card. scripts/feedback-backfill.mjs migrates portal_feedback (dry-run default).
+  /v2-tickets skill reads the rail now.
+- Website (W2+W4+W5): annotator submits real website_change tickets (context
+  verbatim + intake.asset_ids via the review screen's Content Library picker);
+  staff Website V2 Sandbox (search, picker, page iframe left / notes right,
+  hover highlight); /website-fix skill implements in bam-client-sites.
+- Marketing (W3): V2 Meta focus point-of-action Change spend + Remove +
+  4-step New campaign wizard (funnel preview - the FREE TRIAL FUNNEL, never
+  /enroll - angle reuse, budget chips, final check) → marketing_ask modes.
+
 ## Still to wire
-- P3b: staff angle content_types authoring + staff V2 queue view
-- P4: page-annotator `_v2Submit` → rail; portal_feedback backfill; /v2-tickets repoint
-- P5: icon popout live on the rail
-- P6: notifications (4 Slack channels + client SMS)
+- P6: notifications (4 Slack channels + client SMS on status change)
+- Sandbox phase 2: one-click in-portal AI drafts
+- Cut by Zoran: billing_fix + data_fix (data issues = feedback bugs)
