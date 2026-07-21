@@ -1,0 +1,426 @@
+/* ============================================================
+   Content V2 - staff page styles (queue tabs + ticket drawer)
+   ============================================================
+   Additive to components/v2rail/v2rail.css (which imports the
+   design-system tokens). Everything is scoped under .c2-* so it
+   cannot leak into legacy views. Read design-system/DESIGN.md
+   before changing anything here - tokens only, locked radius scale,
+   one gold, no emojis, no em dashes.
+   ============================================================ */
+
+/* ── Queue tabs (live in the v2r-queue-head) ── */
+.c2-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.c2-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--r-full);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-sub);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.c2-tab:hover { background: var(--surface-hov); color: var(--text); }
+.c2-tab.is-active { background: var(--gold); color: var(--on-gold); font-weight: 700; }
+.c2-tab-count { font-family: var(--font-mono); font-size: 10px; opacity: 0.85; }
+
+/* ── Queue states ── */
+.c2-loading, .c2-error {
+  padding: 44px 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-mute);
+}
+.c2-error { color: var(--red); }
+.c2-error .c2-retry {
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-med);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.c2-error .c2-retry:hover { border-color: var(--gold); }
+
+/* ── Drawer header cluster ── */
+.c2-head { display: flex; flex-direction: column; gap: 12px; }
+.c2-head-title {
+  font-family: var(--font-num);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+.c2-head-academy { margin-top: 3px; font-size: 12px; color: var(--text-sub); }
+.c2-head-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── Drawer body block ── */
+.c2-block { display: flex; flex-direction: column; gap: 10px; }
+.c2-block + .c2-block { border-top: 1px solid var(--border); padding-top: 18px; }
+.c2-block-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+}
+.c2-block-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.c2-muted { font-size: 12px; color: var(--text-mute); }
+
+/* ── Intake chips ── */
+.c2-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.c2-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--r-full);
+  background: var(--surface-el);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 100%;
+}
+.c2-chip-key {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-mute);
+}
+.c2-chip-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Reference card (edit / replace) ── */
+.c2-ref {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-el);
+}
+.c2-ref-thumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  background: var(--surface-hov);
+}
+.c2-ref-body { min-width: 0; }
+.c2-ref-kind { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-mute); }
+.c2-ref-name { margin-top: 2px; font-size: 13px; font-weight: 600; color: var(--text); word-break: break-word; }
+.c2-ref-note { margin-top: 6px; font-size: 12px; color: var(--text-sub); line-height: 1.45; white-space: pre-wrap; }
+
+/* ── Thumbnails grid (client content + finals) ── */
+.c2-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; }
+.c2-thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-el);
+  cursor: pointer;
+  display: block;
+}
+.c2-thumb img, .c2-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.c2-thumb-audio { width: auto; min-width: 200px; height: auto; padding: 8px; display: flex; align-items: center; }
+.c2-thumb-audio audio { width: 100%; }
+.c2-thumb-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 6px;
+  font-size: 10px;
+  color: var(--text-mute);
+  text-align: center;
+  word-break: break-word;
+}
+.c2-thumb-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Brief ── */
+.c2-brief {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--surface-el);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px;
+}
+
+/* ── Dropzone ── */
+.c2-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px;
+  border: 1.5px dashed var(--border-med);
+  border-radius: var(--r-md);
+  text-align: center;
+  color: var(--text-mute);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast);
+}
+.c2-drop:hover, .c2-drop.is-over { border-color: var(--gold); background: var(--gold-sheen); color: var(--text-sub); }
+.c2-drop-strong { color: var(--text); font-weight: 600; }
+.c2-drop.is-busy { cursor: wait; opacity: 0.7; }
+
+/* ── File rows (finals) ── */
+.c2-files { display: flex; flex-direction: column; gap: 6px; }
+.c2-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-el);
+  font-size: 12px;
+}
+.c2-file-icon { flex-shrink: 0; color: var(--text-mute); display: flex; }
+.c2-file-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.c2-file-name a { color: var(--text); text-decoration: none; }
+.c2-file-name a:hover { color: var(--gold); }
+.c2-file-size { flex-shrink: 0; font-family: var(--font-mono); font-size: 10px; color: var(--text-mute); }
+
+/* ── Pending client request chip ── */
+.c2-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--gold-glow);
+  border: 1px solid var(--accent-border);
+}
+.c2-pending-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gold);
+}
+.c2-pending-msg { font-size: 12px; color: var(--text); line-height: 1.45; white-space: pre-wrap; }
+
+/* ── Request-from-client control ── */
+.c2-kinds { display: flex; gap: 6px; }
+.c2-kind {
+  flex: 1;
+  padding: 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-med);
+  background: transparent;
+  color: var(--text-sub);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.c2-kind:hover { border-color: var(--gold); color: var(--text); }
+.c2-kind.is-active { border-color: var(--gold); color: var(--gold); background: var(--gold-sheen); }
+
+/* ── Inputs ── */
+.c2-input, .c2-textarea {
+  width: 100%;
+  background: var(--surface-el);
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 9px 12px;
+}
+.c2-textarea { resize: vertical; min-height: 68px; line-height: 1.45; }
+.c2-input:focus, .c2-textarea:focus { outline: none; border-color: var(--gold); }
+.c2-input::placeholder, .c2-textarea::placeholder { color: var(--text-mute); }
+
+/* ── Thread ── */
+.c2-thread { display: flex; flex-direction: column; gap: 12px; }
+.c2-msg { display: flex; flex-direction: column; gap: 3px; max-width: 88%; }
+.c2-msg-staff { align-self: flex-end; align-items: flex-end; }
+.c2-msg-client, .c2-msg-agent { align-self: flex-start; align-items: flex-start; }
+.c2-msg-bubble {
+  padding: 9px 12px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.c2-msg-staff .c2-msg-bubble { background: var(--gold-glow); border: 1px solid var(--accent-border); color: var(--text); }
+.c2-msg-client .c2-msg-bubble { background: var(--surface-el); border: 1px solid var(--border); color: var(--text); }
+.c2-msg-agent .c2-msg-bubble { background: var(--blue-soft); border: 1px solid var(--blue-soft); color: var(--text); }
+.c2-msg-internal .c2-msg-bubble { background: var(--amber-soft); border: 1px dashed var(--amber); }
+.c2-msg-meta { display: flex; gap: 6px; align-items: center; font-size: 10px; color: var(--text-mute); }
+.c2-msg-tag {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--amber);
+}
+.c2-msg-att { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.c2-msg-att a {
+  font-size: 11px;
+  color: var(--text-sub);
+  text-decoration: none;
+  padding: 2px 8px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border);
+  background: var(--surface-el);
+}
+.c2-msg-att a:hover { color: var(--gold); border-color: var(--gold); }
+
+/* system rows = the status log */
+.c2-msg-system { align-self: center; max-width: 100%; }
+.c2-sys {
+  font-size: 11px;
+  color: var(--text-mute);
+  background: var(--surface-el);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  padding: 3px 12px;
+  text-align: center;
+}
+
+/* ── Composer ── */
+.c2-composer { display: flex; flex-direction: column; gap: 8px; }
+.c2-composer-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.c2-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-sub);
+  cursor: pointer;
+  user-select: none;
+}
+.c2-toggle input { accent-color: var(--gold); }
+
+/* ── Menus (reassign / status) ── */
+.c2-menuwrap { position: relative; }
+.c2-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+.c2-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 190px;
+  max-height: 300px;
+  overflow: auto;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+}
+.c2-menu-label {
+  padding: 6px 10px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-mute);
+}
+.c2-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+}
+.c2-menu-item:hover { background: var(--surface-hov); }
+.c2-menu-item.is-current { color: var(--gold); font-weight: 700; }
+
+/* ── Small buttons ── */
+.c2-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-med);
+  background: transparent;
+  color: var(--text-sub);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.c2-mini:hover { border-color: var(--gold); color: var(--text); }
+.c2-mini:disabled { opacity: 0.5; cursor: not-allowed; }
+.c2-mini svg { opacity: 0.7; }
+
+.c2-linkbtn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--gold);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.c2-linkbtn:hover { text-decoration: underline; }
+
+/* ── Footer send controls ── */
+.c2-foot-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  font-size: 11px;
+  color: var(--text-sub);
+  cursor: pointer;
+  user-select: none;
+}
+.c2-foot-review input { accent-color: var(--gold); }
+.v2r-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.v2r-btn-primary:not(:disabled):hover { filter: brightness(1.05); }
+
+/* ── Banner (drawer feedback) ── */
+.c2-banner {
+  padding: 9px 12px;
+  border-radius: var(--r-md);
+  font-size: 12px;
+  font-weight: 600;
+}
+.c2-banner-ok { background: var(--green-soft); color: var(--green); border: 1px solid var(--green-soft); }
+.c2-banner-err { background: var(--red-soft); color: var(--red); border: 1px solid var(--red-soft); }
