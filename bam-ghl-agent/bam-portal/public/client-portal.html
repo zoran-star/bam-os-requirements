@@ -268,6 +268,68 @@ if (window.__MOCK__) (() => {
     return { key, month: key, spend, leads, cpl: +(spend / leads).toFixed(2), impressions: 41000 + i * 900, clicks: 820 + i * 40, trials: Math.round(leads * 0.55), members: Math.round(leads * 0.2) };
   });
 
+  // ── V2 Marketing Machine fixtures (meta-machine + funnels + guide cards) ──
+  // Powers the Meta ads focus so the point-of-action flows (change spend,
+  // remove creative, new-campaign wizard) are exercisable in ?mock=1.
+  const MM_CREATIVES = [
+    { id: 'cr-1', ad_id: 'ad-1', name: 'Coach Dre breakdown', cpl: 8.4, leads: 16, hook_rate: 34, ctr: 1.9, frequency: 2.1, age_days: 18, spend: 134, best: true, image_url: AV('Coach Dre', '#2e4a3a') },
+    { id: 'cr-2', ad_id: 'ad-2', name: 'Game day highlights', cpl: 11.8, leads: 13, hook_rate: 27, ctr: 1.4, frequency: 2.9, age_days: 24, spend: 153, image_url: AV('Highlights', '#31405a') },
+    { id: 'cr-3', ad_id: 'ad-3', name: 'Parent testimonial', cpl: 19.6, leads: 9, hook_rate: 22, ctr: 1.1, frequency: 3.8, age_days: 41, spend: 178, image_url: AV('Testimonial', '#523a2e') },
+  ];
+  const MM_MACHINE = {
+    meta_connected: true,
+    month: { spend: 465, planned: 900, day: new Date(NOW).getDate(), days_in_month: 31, pace_status: 'under' },
+    campaign: {
+      name: 'Training', count: 1, band: 'gold', learning: null, link_clicks: 610,
+      lifetime: { cpl: 9.4 },
+      window: { spend: 465, leads: 38, cpl: 12.2, judged: true, band: 'gold', drift_vs_lifetime_pct: 29 },
+    },
+    sparkline: [{ cpl: 8.9 }, { cpl: 9.6 }, { cpl: 10.4 }, { cpl: 11.1 }, { cpl: 12.2 }],
+    result: { leads: 38, booked: 21, booked_pct: 55, agent_booked: 9, cost_per_booked_trial: 22.1, prev_cost_per_booked_trial: 26.4, cpbt_band: 'green' },
+    pills: { lead_to_booked_band: 'green' },
+    roi: { show_rate: 0.8, attended_to_join: 0.5 },
+    page: {
+      url: 'https://demo.northsidehoops.com/free-trial', funnel: 'free-trial', band: 'green',
+      visitors: 520, form_started: 210, saw_calendar: 150, booked_sessions: 21,
+      clicks_comparable: 610, lpv_comparable: 520, landing_page_views: 520, step_times: {},
+    },
+    creatives: MM_CREATIVES, creatives_live: 3,
+    campaigns: [{
+      id: 'cp-1', name: 'Training', spend: 465, leads: 38, cpl: 12.2, band: 'gold',
+      adsets: [{ id: 'ads-1', name: 'GTA parents broad', daily_budget: 30, learning: null, targeting_brief: null, creatives: MM_CREATIVES }],
+    }],
+  };
+  const MOCK_FUNNELS = [
+    { id: 'fn-1', key: 'free-trial', label: 'Free Trial', is_primary: true, enabled: true, offer_id: 'of-1',
+      url_resolved: 'https://demo.northsidehoops.com/free-trial',
+      entry_points: [{ id: 'ep-1', type: 'website-form', label: 'Free trial form', enabled: true, pipeline_name: 'Training Pipeline', stage_name: 'New Lead' }] },
+    { id: 'fn-2', key: 'contact', label: 'Contact', is_primary: false, enabled: true, offer_id: null,
+      url_resolved: 'https://demo.northsidehoops.com/contact',
+      entry_points: [{ id: 'ep-2', type: 'website-form', label: 'Contact form', enabled: true, ghl_workflow_name: 'Contact router' }] },
+  ];
+  const MOCK_GUIDE_CARDS = [{
+    id: 'gc-1', title: 'Free Trial', is_default: true,
+    angles: [
+      { name: 'Parent testimonial', purpose: 'A real parent says what changed for their kid.',
+        video: { segments: [
+          { label: 'Hook', text: 'Parent on camera: the one thing that surprised them.' },
+          { label: 'Middle', text: 'What their kid can do now that they could not before.' },
+          { label: 'Close', text: 'Invite: come try a free session.' },
+        ], tips: 'Phone camera is fine. Real beats polished.', example_assets: [] } },
+      { name: 'Coach in action', purpose: 'Show the coaching, not just the gym.',
+        video: { segments: [
+          { label: 'Hook', text: 'Mid-drill moment with the coach talking.' },
+          { label: 'Middle', text: 'One teaching point, shown not told.' },
+          { label: 'Close', text: 'Free trial invite over the team huddle.' },
+        ], tips: 'Get the mic close to the coach.', example_assets: [] } },
+      { name: 'Game highlights', purpose: 'Fast cuts of players applying the training.',
+        graphic: { segments: [
+          { label: 'Visual', text: 'Best action shot, ball in frame.' },
+          { label: 'Copy', text: 'One line: where confidence comes from.' },
+        ], tips: 'Bright, sharp, faces visible.', example_assets: [] } },
+    ],
+  }];
+
   // ── Member Care agent cards (inline proposals in the member drawer) ──
   const MEMBER_CARE_CARDS = [
     { id: 'mcc-1', member_id: 'mb-3', ghl_contact_id: 'ct-3', member_name: 'Zion Walker', parent_name: 'Andre Walker',
@@ -353,8 +415,11 @@ if (window.__MOCK__) (() => {
     }
     if (p.startsWith('/api/marketing')) {
       if (q.get('resource') === 'meta-report') return { periods: PERIODS };
+      if (q.get('resource') === 'meta-machine') return MM_MACHINE;
       return { ...DEFAULT_API };
     }
+    if (p === '/api/website/funnels') return { funnels: MOCK_FUNNELS };
+    if (p === '/api/guide-cards') return { guide_cards: MOCK_GUIDE_CARDS };
     if (p === '/api/agent-member-care') {
       let b = {}; try { b = JSON.parse((init && init.body) || '{}'); } catch (_) {}
       if (act === 'list') return { cards: MEMBER_CARE_CARDS.filter(c => c.status === 'pending' && (!b.member_id || c.member_id === b.member_id)) };
@@ -59579,6 +59644,28 @@ function toggleTheme() {
   <div class="mmc-card" id="mmcCard" onclick="event.stopPropagation()"></div>
 </div>
 
+<!-- ── Change monthly spend (V2 Meta ads focus, locked mockup 4b) ──
+     Point-of-action budget request: now vs new side-by-side, optional note,
+     $600/mo minimum. Posts a marketing_ask intake{mode:'budget'} via
+     /api/v2-tickets?action=create. V1.5 keeps the old #budgetModal. -->
+<div id="mbgModal" class="modal-backdrop" style="display:none;z-index:10060" onclick="if(event.target===this)_mbgClose()">
+  <div class="mmc-card" id="mbgCard" onclick="event.stopPropagation()"></div>
+</div>
+
+<!-- ── Remove creative (V2 Meta ads focus, locked mockup 4c) ──
+     The ad's own stats + optional why. Posts a marketing_ask
+     intake{mode:'remove'}. V1.5 keeps the old #removeModal. -->
+<div id="mbrModal" class="modal-backdrop" style="display:none;z-index:10060" onclick="if(event.target===this)_mbrClose()">
+  <div class="mmc-card" id="mbrCard" onclick="event.stopPropagation()"></div>
+</div>
+
+<!-- ── New campaign wizard (V2, locked mockup 5: funnel / angle / budget /
+     final check). Posts a marketing_ask intake{mode:'campaign'}. V1.5 keeps
+     the old #marketing-new-campaign wizard. -->
+<div id="mncModal" class="modal-backdrop" style="display:none;z-index:10060" onclick="if(event.target===this)_mncClose()">
+  <div class="mmc-card" id="mncCard" onclick="event.stopPropagation()" style="max-width:580px"></div>
+</div>
+
 <!-- Mini date picker (Marketing Machine range) - positioned under the trigger -->
 <div id="mmDatePop" class="mm-dp" style="display:none"></div>
 
@@ -59876,6 +59963,40 @@ function toggleTheme() {
   @keyframes mmcPop { from { transform:scale(0.4); opacity:0; } to { transform:scale(1); opacity:1; } }
   .mmc-status .mmc-btn-gold { margin-top:4px; }
   @media (prefers-reduced-motion:reduce) { .mmc-spinner { animation-duration:1.4s; } .mmc-check { animation:none; } }
+
+  /* ── V2 marketing point-of-action modals (budget / remove / new campaign) ── */
+  .mmc-btn-danger { font-family:var(--font-ui); font-size:13px; font-weight:700; color:#fff; background:#C24837; border:none; border-radius:var(--radius-sm); padding:10px 20px; cursor:pointer; transition:filter var(--t-fast,.12s), transform var(--t-fast,.12s); }
+  .mmc-btn-danger:hover { filter:brightness(1.08); }
+  .mmc-btn-danger:active { transform:scale(0.98); }
+  .mbg-cards { display:flex; align-items:stretch; gap:12px; margin-bottom:10px; }
+  .mbg-card { flex:1; min-width:0; background:var(--surface-el); border:1px solid var(--line); border-radius:var(--radius-md); padding:14px 16px; display:flex; flex-direction:column; gap:6px; }
+  .mbg-card.is-new { border-color:var(--gold); background:var(--gold-glow, rgba(212,182,92,0.10)); }
+  .mbg-k { font-family:var(--font-ui); font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-mute); }
+  .mbg-v { font-family:var(--font-num); font-size:24px; font-weight:800; color:var(--text); }
+  .mbg-mo { font-family:var(--font-ui); font-size:12px; font-weight:600; color:var(--text-mute); margin-left:3px; }
+  .mbg-vin { display:flex; align-items:baseline; gap:2px; font-family:var(--font-num); font-size:24px; font-weight:800; color:var(--text); }
+  .mbg-vin input { width:100%; min-width:0; font:inherit; color:inherit; background:none; border:none; border-bottom:2px solid var(--gold); padding:0 0 1px; outline:none; }
+  .mbg-vin input::placeholder { color:var(--text-mute); opacity:0.5; }
+  .mbg-arrow { align-self:center; color:var(--text-mute); flex:0 0 auto; }
+  .mnc-steps { display:flex; align-items:center; gap:7px; margin:2px 0 18px; }
+  .mnc-dot { width:8px; height:8px; border-radius:999px; background:var(--surface-hov); transition:all 0.2s ease; }
+  .mnc-dot.on { background:var(--gold); }
+  .mnc-dot.done { background:var(--gold); opacity:0.45; }
+  .mnc-step-lab { font-family:var(--font-ui); font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--text-mute); margin-left:6px; }
+  .mnc-flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--surface-el); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px 14px; margin-bottom:12px; }
+  .mnc-node { display:inline-flex; align-items:center; gap:7px; font-family:var(--font-ui); font-size:12px; font-weight:700; color:var(--text-sub); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:8px 13px; }
+  .mnc-node.is-gold { border-color:var(--gold); color:var(--text); }
+  .mnc-farrow { color:var(--text-mute); flex:0 0 auto; display:inline-flex; }
+  .mnc-chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .mnc-chip { font-family:var(--font-ui); font-size:11px; font-weight:600; color:var(--text-sub); background:var(--surface-el); border:1px solid var(--line); border-radius:999px; padding:5px 12px; }
+  .mnc-hint { font-family:var(--font-ui); font-size:12px; color:var(--text-mute); line-height:1.5; }
+  .mnc-bchips { display:flex; gap:8px; flex-wrap:wrap; }
+  .mnc-bchip { font-family:var(--font-num); font-size:15px; font-weight:800; color:var(--text-sub); background:transparent; border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:12px 18px; cursor:pointer; transition:all var(--t-fast,.12s); }
+  .mnc-bchip:hover { border-color:var(--gold); color:var(--text); }
+  .mnc-bchip.on { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
+  .mnc-live { display:inline-flex; align-items:center; gap:5px; font-family:var(--font-ui); font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--green); background:var(--green-soft); border-radius:999px; padding:3px 9px; margin-left:8px; }
+  .mnc-live::before { content:''; width:5px; height:5px; border-radius:999px; background:var(--green); }
+  @media (max-width:520px){ .mbg-cards { flex-direction:column; } .mbg-arrow { transform:rotate(90deg); align-self:flex-start; margin-left:18px; } }
   @media (max-width:720px){ .v2req-body{ grid-template-columns:1fr; } .v2req-stage{ min-height:300px; } #v2ReqFrame{ min-height:300px; } .v2req-foot{ flex-direction:column; align-items:stretch; } .v2req-send{ width:100%; } }
 </style>
 
@@ -61231,6 +61352,514 @@ function _mmcSentHtml() {
     '<button type="button" class="mmc-btn-gold" onclick="_mmcClose()">Done</button>' +
   '</div>';
 }
+/* ═══ V2 marketing point-of-action flows (locked mockups 4 + 5) ═══
+   Budget re-point, remove-a-creative and the 4-step new-campaign wizard.
+   All three post a marketing_ask via /api/v2-tickets?action=create and land
+   on the marketing role's rail. V2 only (the entry points render inside the
+   Meta ads focus, which is itself V2-gated); V1.5 keeps the legacy
+   #budgetModal / #removeModal / #marketing-new-campaign flows. */
+
+// Shared create -> rail refresh so the new ticket row shows immediately.
+async function _mktAskCreate(body) {
+  const token = await _mreqAuthToken();
+  const res = await fetch('/api/v2-tickets?action=create&client_id=' + encodeURIComponent(CLIENT_ID), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify(body),
+  });
+  const j = await _safeJson(res);
+  if (!res.ok || j.error) throw new Error(j.error || ('HTTP ' + res.status));
+  try { _zdLoadTickets().then(() => _zdRefreshSurfaces()).catch(() => {}); } catch (_) {}
+  return j;
+}
+function _mktCampaignName() {
+  const camp = (typeof _MM !== 'undefined' && _MM && _MM.campaign) || {};
+  return camp.count > 1 ? 'All campaigns' : (camp.name || null);
+}
+// The live free-trial funnel behind the ads: primary funnel from _FN
+// (api/website/funnels), else the meta-machine page url. Generic label
+// fallback when neither is loaded.
+function _mktFreeTrialFunnel() {
+  const prim = (typeof _FN !== 'undefined' && Array.isArray(_FN)) ? _FN.find((f) => f.is_primary) : null;
+  const url = (prim && prim.url_resolved) || (typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.url) || null;
+  const offer = (prim && prim.label) || 'Free Trial';
+  return { label: offer + ' funnel', offer, url };
+}
+const _MKT_SENDING_HTML = '<div class="mmc-status">' +
+  '<div class="mmc-spinner" role="status" aria-label="Sending"></div>' +
+  '<div class="mmc-status-title">Sending your request</div>' +
+  '<div class="mmc-status-sub">Handing it to your marketing team.</div>' +
+'</div>';
+function _mktSentHtml(sub, closer) {
+  return '<div class="mmc-status">' +
+    '<div class="mmc-check"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></div>' +
+    '<div class="mmc-status-title">Request sent</div>' +
+    '<div class="mmc-status-sub">' + sub + '</div>' +
+    '<button type="button" class="mmc-btn-gold" onclick="' + closer + '()">Done</button>' +
+  '</div>';
+}
+
+/* ── 4b: Change monthly spend ── */
+let _MBG = null;
+function _mbgOpen() {
+  if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) return;
+  const m = (typeof _MM !== 'undefined' && _MM && _MM.month) || {};
+  _MBG = {
+    step: 'form', campaign: _mktCampaignName(),
+    current: m.planned != null ? Math.round(m.planned) : null,
+    value: '', note: '',
+  };
+  _mbgRender();
+  const bd = document.getElementById('mbgModal');
+  if (bd) bd.style.display = 'flex';
+  setTimeout(() => { const i = document.getElementById('mbgInput'); if (i) i.focus(); }, 60);
+}
+function _mbgClose() { const bd = document.getElementById('mbgModal'); if (bd) bd.style.display = 'none'; _MBG = null; }
+function _mbgCapture() {
+  if (!_MBG) return;
+  const i = document.getElementById('mbgInput'); if (i) _MBG.value = i.value;
+  const n = document.getElementById('mbgNote'); if (n) _MBG.note = n.value;
+}
+function _mbgRender() {
+  const card = document.getElementById('mbgCard');
+  if (!card || !_MBG) return;
+  if (_MBG.step === 'sending') { card.innerHTML = _MKT_SENDING_HTML; return; }
+  if (_MBG.step === 'sent') { card.innerHTML = _mktSentHtml('Your team updates the campaign for you. Nothing changes until they do.', '_mbgClose'); return; }
+  card.innerHTML =
+    '<div class="mmc-head">' +
+      '<div><div class="mmc-kicker">Marketing request</div>' +
+        '<div class="mmc-title">Change monthly spend</div>' +
+        (_MBG.campaign ? '<div class="mmc-ctx">' + _escapeHtml(_MBG.campaign) + '</div>' : '') + '</div>' +
+      '<button type="button" class="mmc-x" onclick="_mbgClose()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
+    '</div>' +
+    '<div class="mbg-cards" id="mbgCards">' +
+      '<div class="mbg-card"><span class="mbg-k">Now</span>' +
+        '<span class="mbg-v">' + (_MBG.current != null ? '$' + _MBG.current : '-') + '<span class="mbg-mo">/mo</span></span></div>' +
+      '<span class="mbg-arrow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>' +
+      '<div class="mbg-card is-new"><span class="mbg-k">New</span>' +
+        '<span class="mbg-vin">$<input id="mbgInput" type="text" inputmode="numeric" autocomplete="off" placeholder="' + (_MBG.current != null ? _MBG.current : '900') + '" value="' + _escapeHtml(_MBG.value || '') + '"><span class="mbg-mo">/mo</span></span></div>' +
+    '</div>' +
+    '<div class="mmc-muted" style="margin-bottom:14px">$600/mo minimum</div>' +
+    '<div class="mmc-field"><label class="mmc-label" for="mbgNote">Why the change? (optional)</label>' +
+      '<textarea id="mbgNote" class="mmc-textarea" placeholder="Anything the team should know...">' + _escapeHtml(_MBG.note || '') + '</textarea>' +
+    '</div>' +
+    '<div class="mmc-foot">' +
+      '<button type="button" class="mmc-btn-ghost" onclick="_mbgClose()">Cancel</button>' +
+      '<button type="button" class="mmc-btn-gold" onclick="_mbgSubmit()">Send request &rarr;</button>' +
+    '</div>';
+}
+async function _mbgSubmit() {
+  if (!_MBG) return;
+  _mbgCapture();
+  const n = parseFloat(String(_MBG.value || '').replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(n) || n <= 0) { _mmcShake('mbgCards'); _mmToast('Type your new monthly spend'); return; }
+  if (n < 600) { _mmcShake('mbgCards'); _mmToast('$600/mo is the minimum ad spend'); return; }
+  const note = (_MBG.note || '').trim();
+  _MBG.step = 'sending';
+  _mbgRender();
+  try {
+    await _mktAskCreate({
+      type: 'marketing_ask',
+      source: 'editor',
+      client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
+      title: 'Change monthly spend' + (_MBG.campaign ? ' - ' + _MBG.campaign : ''),
+      intake: {
+        mode: 'budget',
+        campaign: _MBG.campaign,
+        current_spend: _MBG.current != null ? '$' + _MBG.current : null,
+        new_spend: '$' + Math.round(n),
+        note: note || null,
+      },
+      context: { surface: 'meta-ads', campaign: _MBG.campaign, page_url: window.location.pathname + window.location.search },
+      message: note || null,
+    });
+    if (!_MBG || _MBG.step !== 'sending') return;   // user closed mid-send
+    _MBG.step = 'sent';
+    _mbgRender();
+    setTimeout(() => { if (_MBG && _MBG.step === 'sent') _mbgClose(); }, 2600);
+  } catch (e) {
+    if (_MBG) { _MBG.step = 'form'; _mbgRender(); }
+    _mmToast("Couldn't send: " + (e.message || e));
+  }
+}
+
+/* ── 4c: Remove a creative ── */
+let _MBR = null;
+function _mbrOpen(idx) {
+  if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) return;
+  const ctx = (window._MMC_REP || [])[idx] || {};
+  if (!ctx.creative) return;
+  _MBR = { step: 'form', creative: ctx.creative, verdict: ctx.verdict || null, campaign: ctx.campaign || null, adset: ctx.adset || null, note: '' };
+  _mbrRender();
+  const bd = document.getElementById('mbrModal');
+  if (bd) bd.style.display = 'flex';
+}
+function _mbrClose() { const bd = document.getElementById('mbrModal'); if (bd) bd.style.display = 'none'; _MBR = null; }
+function _mbrCapture() { if (!_MBR) return; const n = document.getElementById('mbrNote'); if (n) _MBR.note = n.value; }
+function _mbrRender() {
+  const card = document.getElementById('mbrCard');
+  if (!card || !_MBR) return;
+  if (_MBR.step === 'sending') { card.innerHTML = _MKT_SENDING_HTML; return; }
+  if (_MBR.step === 'sent') { card.innerHTML = _mktSentHtml('Your team pulls it from the campaign within 1 business day.', '_mbrClose'); return; }
+  const c = _MBR.creative, v = _MBR.verdict;
+  const ctxLine = [_MBR.campaign, _MBR.adset].filter(Boolean).join(' &middot; ');
+  const stats = [
+    c.cpl != null ? ('$/lead ' + _mmMoney(c.cpl)) : null,
+    c.frequency != null ? ('freq ' + c.frequency + 'x') : null,
+    c.spend != null ? ('$' + Math.round(c.spend) + ' spent') : null,
+  ].filter(Boolean).join(' &middot; ');
+  card.innerHTML =
+    '<div class="mmc-head">' +
+      '<div><div class="mmc-kicker">Marketing request</div>' +
+        '<div class="mmc-title">Remove this ad?</div>' +
+        (ctxLine ? '<div class="mmc-ctx">' + ctxLine + '</div>' : '') + '</div>' +
+      '<button type="button" class="mmc-x" onclick="_mbrClose()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
+    '</div>' +
+    '<div class="mmc-replacing">' +
+      (c.image_url ? '<img class="mmc-rep-thumb" src="' + _escapeHtml(c.image_url) + '" alt="">' : '<span class="mmc-rep-thumb"></span>') +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="mmc-rep-name">' + _escapeHtml(c.name || 'This creative') + '</div>' +
+        (stats ? '<div class="mmc-rep-stats">' + stats + '</div>' : '') +
+        ((v && v.note) ? '<div class="mmc-rep-why">' + _escapeHtml(v.note) + '</div>' : '') +
+      '</div></div>' +
+    '<div class="mmc-muted" style="margin-bottom:14px">It stops running and comes out of the rotation. Your team actions it within 1 business day.</div>' +
+    '<div class="mmc-field"><label class="mmc-label" for="mbrNote">Why remove it? (optional)</label>' +
+      '<textarea id="mbrNote" class="mmc-textarea" placeholder="Any context for the team...">' + _escapeHtml(_MBR.note || '') + '</textarea>' +
+    '</div>' +
+    '<div class="mmc-foot">' +
+      '<button type="button" class="mmc-btn-ghost" onclick="_mbrClose()">Cancel</button>' +
+      '<button type="button" class="mmc-btn-danger" onclick="_mbrSubmit()">Request removal</button>' +
+    '</div>';
+}
+async function _mbrSubmit() {
+  if (!_MBR) return;
+  _mbrCapture();
+  const c = _MBR.creative;
+  const note = (_MBR.note || '').trim();
+  _MBR.step = 'sending';
+  _mbrRender();
+  try {
+    await _mktAskCreate({
+      type: 'marketing_ask',
+      source: 'editor',
+      client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
+      title: 'Remove creative' + (c.name ? ' - ' + c.name : ''),
+      intake: {
+        mode: 'remove',
+        campaign: _MBR.campaign,
+        creative: { id: c.id || null, name: c.name || null, cpl: c.cpl != null ? c.cpl : null, frequency: c.frequency != null ? c.frequency : null, spend: c.spend != null ? c.spend : null },
+        creative_name: c.name || null,
+        note: note || null,
+      },
+      context: { surface: 'meta-ads', campaign: _MBR.campaign, adset: _MBR.adset, page_url: window.location.pathname + window.location.search },
+      message: note || null,
+    });
+    if (!_MBR || _MBR.step !== 'sending') return;
+    _MBR.step = 'sent';
+    _mbrRender();
+    setTimeout(() => { if (_MBR && _MBR.step === 'sent') _mbrClose(); }, 2600);
+  } catch (e) {
+    if (_MBR) { _MBR.step = 'form'; _mbrRender(); }
+    _mmToast("Couldn't send: " + (e.message || e));
+  }
+}
+
+/* ── 5: New-campaign wizard (funnel -> angle -> budget -> final check) ──
+   Reuses the creative flow's guide + library plumbing (_fetchGuideCards /
+   _cardAngles / _libAssetThumbHtml / _uploadFilesToLibrary) with its own
+   state so the creative modal is untouched. The landing page is always the
+   live free-trial funnel, so this flow never produces a blocked_by. */
+let _MNC = null;
+const _MNC_STEPS = ['Funnel', 'Angle', 'Budget', 'Final check'];
+function _mncOpen() {
+  if (!(typeof V2_ACCESS !== 'undefined' && V2_ACCESS)) return;
+  _MNC = {
+    step: 1,
+    angleIdx: null, angles: [], guideCard: null, guideLoaded: false,
+    libLoaded: false, libAssets: [], libIds: new Set(), libFilter: 'all', files: [],
+    budget: null, custom: '', note: '',
+  };
+  _mncRender();
+  const bd = document.getElementById('mncModal');
+  if (bd) bd.style.display = 'flex';
+  _mncLoadGuide();
+  _mncLoadLibrary();
+  try { if (typeof _fnLoad === 'function' && !_FN_LOADED) _fnLoad(); } catch (_) {}
+}
+function _mncClose() { const bd = document.getElementById('mncModal'); if (bd) bd.style.display = 'none'; _MNC = null; }
+async function _mncLoadGuide() {
+  const want = _MNC;
+  try {
+    const cards = await _fetchGuideCards();
+    // The page IS the training offer: match the free-trial offer, else default.
+    const offer = String((typeof _MM !== 'undefined' && _MM && _MM.page && _MM.page.funnel) || 'free-trial').toLowerCase().trim();
+    let card = cards.find(c => (c.title || '').toLowerCase().trim() === offer)
+      || cards.find(c => (c.title || '').toLowerCase().includes(offer) || offer.includes((c.title || '').toLowerCase()));
+    card = card || cards.find(c => c.is_default) || cards[0] || null;
+    if (_MNC !== want) return;
+    _MNC.guideCard = card;
+    _MNC.angles = card ? _cardAngles(card) : [];
+  } catch (_) { if (_MNC === want) _MNC.angles = []; }
+  if (_MNC === want) { _MNC.guideLoaded = true; if (_MNC.step === 2) _mncRender(); }
+}
+async function _mncLoadLibrary() {
+  const want = _MNC;
+  try {
+    const { data } = await _sb.from('client_assets')
+      .select('id,label,storage_path,link_url,mime_type,category,content_type')
+      .eq('client_id', CLIENT_ID).neq('source', 'ticket')
+      .order('created_at', { ascending: false }).limit(200);
+    if (_MNC !== want) return;
+    _MNC.libAssets = data || [];
+  } catch (_) { if (_MNC === want) _MNC.libAssets = []; }
+  if (_MNC === want) { _MNC.libLoaded = true; if (_MNC.step === 2) _mncRender(); }
+}
+function _mncCapture() {
+  if (!_MNC) return;
+  const c = document.getElementById('mncCustom'); if (c) _MNC.custom = c.value;
+  const n = document.getElementById('mncNote'); if (n) _MNC.note = n.value;
+}
+function _mncAngleName() {
+  if (!_MNC) return null;
+  if (typeof _MNC.angleIdx === 'number' && _MNC.angles[_MNC.angleIdx]) return _MNC.angles[_MNC.angleIdx].name;
+  return _MNC.angleIdx === 'other' ? 'Other' : null;
+}
+function _mncBudgetValue() {
+  if (!_MNC || _MNC.budget == null) return null;
+  if (_MNC.budget === 'custom') {
+    const n = parseFloat(String(_MNC.custom || '').replace(/[^0-9.]/g, ''));
+    return Number.isFinite(n) ? n : null;
+  }
+  return _MNC.budget;
+}
+function _mncGo(step) {
+  if (!_MNC) return;
+  _mncCapture();
+  if (step > 3 && _MNC.step === 3) {   // leaving budget: enforce the floor
+    const n = _mncBudgetValue();
+    if (n == null) { _mmToast('Pick a monthly spend first'); return; }
+    if (n < 600) { _mmcShake('mncCustom'); _mmToast('$600/mo is the minimum ad spend'); return; }
+  }
+  _MNC.step = step;
+  _mncRender();
+}
+function _mncPickAngle(i) { if (!_MNC) return; _mncCapture(); _MNC.angleIdx = (_MNC.angleIdx === i ? null : i); _mncRender(); }
+function _mncLibFilter(f) { if (!_MNC) return; _mncCapture(); _MNC.libFilter = f; _mncRender(); }
+function _mncToggleLib(id) {
+  if (!_MNC) return; _mncCapture();
+  if (_MNC.libIds.has(id)) _MNC.libIds.delete(id); else _MNC.libIds.add(id);
+  _mncRender();
+}
+function _mncPick(input) { if (_MNC && input.files) { _mncCapture(); for (const f of input.files) _MNC.files.push(f); input.value = ''; _mncRender(); } }
+function _mncDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('is-over'); if (_MNC && e.dataTransfer && e.dataTransfer.files) { _mncCapture(); for (const f of e.dataTransfer.files) _MNC.files.push(f); _mncRender(); } }
+function _mncRmFile(i) { if (_MNC) { _mncCapture(); _MNC.files.splice(i, 1); _mncRender(); } }
+function _mncPreviewFunnel() {
+  const f = _mktFreeTrialFunnel();
+  if (f.url) window.open(f.url, '_blank', 'noopener');
+  else _mmToast('No funnel link yet - ask your BAM team');
+}
+function _mncStepsHtml() {
+  const cur = typeof _MNC.step === 'number' ? _MNC.step : 4;
+  return '<div class="mnc-steps">' + _MNC_STEPS.map((lbl, i) =>
+    '<span class="mnc-dot' + (i + 1 === cur ? ' on' : (i + 1 < cur ? ' done' : '')) + '"></span>'
+  ).join('') + '<span class="mnc-step-lab">' + (cur) + ' of 4 &middot; ' + _MNC_STEPS[cur - 1] + '</span></div>';
+}
+function _mncHeadHtml(title) {
+  return '<div class="mmc-head">' +
+    '<div><div class="mmc-kicker">New campaign</div>' +
+      '<div class="mmc-title">' + title + '</div></div>' +
+    '<button type="button" class="mmc-x" onclick="_mncClose()" aria-label="Close"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>' +
+  '</div>';
+}
+function _mncFootHtml(backStep, nextLabel, nextFn) {
+  return '<div class="mmc-foot">' +
+    (backStep ? '<button type="button" class="mmc-btn-ghost" onclick="_mncGo(' + backStep + ')">&lsaquo; Back</button>'
+              : '<button type="button" class="mmc-btn-ghost" onclick="_mncClose()">Cancel</button>') +
+    '<button type="button" class="mmc-btn-gold" onclick="' + nextFn + '">' + nextLabel + '</button>' +
+  '</div>';
+}
+// Step 2 body: the same angle + guide + library pattern as the creative modal.
+function _mncContentBlockHtml() {
+  const m = _MNC;
+  let angleBlock = '';
+  if (!m.guideLoaded) {
+    angleBlock = '<div class="mmc-field"><label class="mmc-label">Pick an angle</label><div class="mmc-muted">Loading guide&hellip;</div></div>';
+  } else {
+    const chips = m.angles.map((a, i) =>
+      '<button type="button" class="mmc-angle' + (m.angleIdx === i ? ' on' : '') + '" onclick="_mncPickAngle(' + i + ')">' + _escapeHtml(a.name) + '</button>'
+    ).join('') + '<button type="button" class="mmc-angle' + (m.angleIdx === 'other' ? ' on' : '') + '" onclick="_mncPickAngle(\'other\')">Other</button>';
+    let guide = '';
+    if (typeof m.angleIdx === 'number' && m.angles[m.angleIdx]) {
+      const a = m.angles[m.angleIdx];
+      const exec = a.video || a.graphic;
+      const segs = (exec && exec.segments && exec.segments.length)
+        ? '<div class="mmc-guide-segs">' + exec.segments.map(s => '<div class="mmc-guide-seg"><b>' + _escapeHtml(s.label || '') + '</b>' + (s.text ? ' ' + _escapeHtml(s.text) : '') + '</div>').join('') + '</div>' : '';
+      const tips = (exec && exec.tips) ? '<div class="mmc-guide-tips">' + _escapeHtml(exec.tips) + '</div>' : '';
+      guide = '<div class="mmc-guide">' + (a.purpose ? '<div class="mmc-guide-purpose">' + _escapeHtml(a.purpose) + '</div>' : '') + tips + segs + '</div>';
+    }
+    const cardName = m.guideCard && m.guideCard.title ? ' &middot; ' + _escapeHtml(m.guideCard.title) : '';
+    angleBlock = '<div class="mmc-field"><label class="mmc-label">Pick an angle' + cardName + '</label><div class="mmc-angles">' + chips + '</div>' + guide + '</div>';
+  }
+  let lib = '';
+  const filt = m.libFilter || 'all';
+  const filtered = (m.libAssets || []).filter(x => filt === 'all' || x.content_type === filt);
+  const filts = ['all', 'action', 'coaching', 'culture', 'testimonial', 'other'].map(f =>
+    '<button type="button" class="mmc-libfilt' + (filt === f ? ' on' : '') + '" onclick="_mncLibFilter(\'' + f + '\')">' + (f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)) + '</button>'
+  ).join('');
+  if (!m.libLoaded) {
+    lib = '<div class="mmc-muted">Loading your library&hellip;</div>';
+  } else if (!filtered.length) {
+    lib = '<div class="mmc-muted">Nothing ' + (filt === 'all' ? 'in your library yet' : 'tagged as ' + filt) + '. Add content in the Content Library, or upload below.</div>';
+  } else {
+    lib = '<div class="mmc-libgrid">' + filtered.map(x => {
+      const sel = m.libIds && m.libIds.has(x.id);
+      return '<button type="button" class="mmc-libitem' + (sel ? ' sel' : '') + '" onclick="_mncToggleLib(\'' + x.id + '\')">' + _libAssetThumbHtml(x) + (sel ? '<span class="mmc-libcheck">&#10003;</span>' : '') + '</button>';
+    }).join('') + '</div>';
+  }
+  const selCount = m.libIds ? m.libIds.size : 0;
+  const files = m.files.length
+    ? '<div class="mmc-files">' + m.files.map((f, i) =>
+        '<div class="mmc-file"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6z"/><path d="M9 2v4h4"/></svg>' +
+          '<span class="mmc-file-name">' + _escapeHtml(f.name) + '</span>' +
+          '<span class="mmc-file-size">' + _formatFileSize(f.size) + '</span>' +
+          '<button type="button" class="mmc-file-x" onclick="_mncRmFile(' + i + ')" aria-label="Remove">&#10005;</button>' +
+        '</div>').join('') + '</div>'
+    : '';
+  return angleBlock +
+    '<div class="mmc-field"><label class="mmc-label">From your Content Library' + (selCount ? ' &middot; ' + selCount + ' selected' : '') + '</label><div class="mmc-libfilts">' + filts + '</div>' + lib + '</div>' +
+    '<div class="mmc-field"><label class="mmc-label">Or add new footage &amp; photos</label>' +
+      '<label class="mmc-drop" id="mncDrop" ondragover="event.preventDefault();this.classList.add(\'is-over\')" ondragleave="this.classList.remove(\'is-over\')" ondrop="_mncDrop(event)">' +
+        '<input type="file" multiple accept="image/*,video/*,audio/*" style="display:none" onchange="_mncPick(this)">' +
+        '<svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M8 3L5 6M8 3l3 3"/><path d="M2.5 10.5V12a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-1.5"/></svg>' +
+        '<span class="mmc-drop-main">Drop files or <b>browse</b></span>' +
+        '<span class="mmc-drop-sub">New clips get added to your Content Library too.</span>' +
+      '</label>' + files +
+    '</div>';
+}
+function _mncRender() {
+  const card = document.getElementById('mncCard');
+  if (!card || !_MNC) return;
+  if (_MNC.step === 'sending') { card.innerHTML = _MKT_SENDING_HTML; return; }
+  if (_MNC.step === 'sent') { card.innerHTML = _mktSentHtml('Your team builds and launches the campaign. Track it anytime from the support icon.', '_mncClose'); return; }
+  const fn = _mktFreeTrialFunnel();
+  if (_MNC.step === 1) {
+    const ICO_AD = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 2.8l9 3.75-3.55 1.2L7.6 12.6 3.6 2.8z"/></svg>';
+    const ICO_PAGE = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 5.5h12"/><circle cx="4.2" cy="4" r="0.3"/><circle cx="6" cy="4" r="0.3"/></svg>';
+    const ICO_BOOK = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="11" height="10.5" rx="1.5"/><path d="M2.5 6.5h11M5.5 1.5v3M10.5 1.5v3"/><path d="M5.8 9.9l1.5 1.5 3-3.1"/></svg>';
+    const farrow = '<span class="mnc-farrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>';
+    card.innerHTML = _mncHeadHtml('Where your ads send people') + _mncStepsHtml() +
+      '<div class="mmc-muted" style="margin-bottom:12px;font-size:13px;color:var(--text-sub)">Every ad you make here sends parents into your free trial funnel.</div>' +
+      '<div class="mnc-flow">' +
+        '<span class="mnc-node">' + ICO_AD + 'Your ad</span>' + farrow +
+        '<span class="mnc-node is-gold">' + ICO_PAGE + _escapeHtml(fn.label) + '</span>' + farrow +
+        '<span class="mnc-node">' + ICO_BOOK + 'Booked free trial</span>' +
+      '</div>' +
+      '<div class="mnc-chips">' +
+        '<span class="mnc-chip">Sales preset &middot; ' + _escapeHtml(fn.offer) + '</span>' +
+        '<span class="mnc-chip">pipeline + follow-ups + booking agent</span>' +
+      '</div>' +
+      (fn.url ? '<div style="margin-bottom:14px"><button type="button" class="mmc-btn-ghost" onclick="_mncPreviewFunnel()">Preview the funnel</button></div>' : '') +
+      '<div class="mnc-hint">Ad &rarr; funnel &rarr; booked free trial, on autopilot. Set up when your offer was initialized.</div>' +
+      _mncFootHtml(null, 'Next &rarr;', '_mncGo(2)');
+    return;
+  }
+  if (_MNC.step === 2) {
+    card.innerHTML = _mncHeadHtml('What should the ads show?') + _mncStepsHtml() +
+      '<div class="mmc-muted" style="margin-bottom:14px;font-size:13px;color:var(--text-sub)">Feel free to pick anything you specifically want in the ads - and keep adding content to your library.</div>' +
+      _mncContentBlockHtml() +
+      _mncFootHtml(1, 'Next &rarr;', '_mncGo(3)');
+    return;
+  }
+  if (_MNC.step === 3) {
+    const chips = [600, 900, 1200].map((v) =>
+      '<button type="button" class="mnc-bchip' + (_MNC.budget === v ? ' on' : '') + '" onclick="_mncPickBudget(' + v + ')">$' + v.toLocaleString('en-US') + '</button>'
+    ).join('') + '<button type="button" class="mnc-bchip' + (_MNC.budget === 'custom' ? ' on' : '') + '" onclick="_mncPickBudget(\'custom\')">Custom</button>';
+    card.innerHTML = _mncHeadHtml('How much per month?') + _mncStepsHtml() +
+      '<div class="mmc-field"><label class="mmc-label">Monthly spend</label>' +
+        '<div class="mnc-bchips">' + chips + '</div>' +
+        (_MNC.budget === 'custom'
+          ? '<input type="text" id="mncCustom" class="mmc-input" inputmode="numeric" autocomplete="off" placeholder="e.g. 1500" value="' + _escapeHtml(_MNC.custom || '') + '">'
+          : '') +
+        '<div class="mmc-muted" style="margin-top:10px">$600/mo minimum</div>' +
+      '</div>' +
+      _mncFootHtml(2, 'Next &rarr;', '_mncGo(4)');
+    if (_MNC.budget === 'custom') setTimeout(() => { const i = document.getElementById('mncCustom'); if (i) i.focus(); }, 40);
+    return;
+  }
+  // Step 4: final check
+  const angleName = _mncAngleName();
+  const libCount = _MNC.libIds ? _MNC.libIds.size : 0;
+  const fileCount = _MNC.files.length;
+  const contentLine = [
+    libCount ? (libCount + ' from library') : null,
+    fileCount ? (fileCount + ' new file' + (fileCount === 1 ? '' : 's')) : null,
+  ].filter(Boolean).join(' + ') || 'Team picks from your library';
+  const budgetN = _mncBudgetValue();
+  const row = (k, val) => '<div class="mmc-sum-row"><span class="mmc-sum-k">' + k + '</span><span class="mmc-sum-v">' + val + '</span></div>';
+  card.innerHTML = _mncHeadHtml('Send this request?') + _mncStepsHtml() +
+    '<div class="mmc-sum" style="margin-bottom:16px">' +
+      row('Funnel', _escapeHtml(fn.label) + '<span class="mnc-live">live</span>') +
+      row('Angle', angleName ? _escapeHtml(angleName) : "Team's call") +
+      row('Content', contentLine) +
+      row('Budget', budgetN != null ? '$' + Math.round(budgetN).toLocaleString('en-US') + '/mo' : '-') +
+    '</div>' +
+    '<div class="mmc-field"><label class="mmc-label" for="mncNote">Anything else? (optional)</label>' +
+      '<textarea id="mncNote" class="mmc-textarea" placeholder="Timing, a promo to mention, anything the team should know...">' + _escapeHtml(_MNC.note || '') + '</textarea>' +
+    '</div>' +
+    _mncFootHtml(3, 'Send request &rarr;', '_mncSubmit()');
+}
+function _mncPickBudget(v) {
+  if (!_MNC) return;
+  _mncCapture();
+  _MNC.budget = (_MNC.budget === v ? null : v);
+  _mncRender();
+}
+async function _mncSubmit() {
+  if (!_MNC) return;
+  _mncCapture();
+  const budgetN = _mncBudgetValue();
+  if (budgetN == null || budgetN < 600) { _mncGo(3); _mmToast('Pick a monthly spend of $600 or more'); return; }
+  const fn = _mktFreeTrialFunnel();
+  const angleName = _mncAngleName();
+  const note = (_MNC.note || '').trim();
+  _MNC.step = 'sending';
+  _mncRender();
+  try {
+    const newIds = await _uploadFilesToLibrary(_MNC.files || []);
+    const assetIds = (_MNC.libIds ? Array.from(_MNC.libIds) : []).concat(newIds);
+    const spend = '$' + Math.round(budgetN);
+    await _mktAskCreate({
+      type: 'marketing_ask',
+      source: 'editor',
+      client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
+      title: 'New campaign' + (angleName ? ' - ' + angleName : ''),
+      intake: {
+        mode: 'campaign',
+        funnel: { label: fn.label, url: fn.url, live: true },
+        angle: angleName,
+        guide_card: (_MNC.guideCard && _MNC.guideCard.title) || null,
+        asset_ids: assetIds,
+        monthly_spend: spend,
+        note: note || null,
+        // Staff-drawer aliases (campaign mode reads offer/preset/spend/landing).
+        offer: fn.offer,
+        preset: fn.offer,
+        spend: spend,
+        landing_page: fn.url,
+      },
+      context: { surface: 'meta-ads', page_url: window.location.pathname + window.location.search },
+      message: note || null,
+    });
+    if (!_MNC || _MNC.step !== 'sending') return;
+    _MNC.step = 'sent';
+    _mncRender();
+    setTimeout(() => { if (_MNC && _MNC.step === 'sent') _mncClose(); }, 2600);
+  } catch (e) {
+    if (_MNC) { _MNC.step = 4; _mncRender(); }
+    _mmToast("Couldn't send: " + (e.message || e));
+  }
+}
+
 function _mmRenderMetaFocus(d) {
   const body = document.getElementById('mm-modal-body');
   if (!body || !d) return;
@@ -61276,8 +61905,9 @@ function _mmRenderMetaFocus(d) {
         '<span class="mm-verdict-chip mm-vc-' + v.verdict + '" style="margin-left:auto">' + v.verdict + '</span></div>' +
         '<div class="mm-tile-stats">' + stats + '</div>' +
         (v.note ? '<div class="mm-cr-note ' + (v.verdict === 'replace' ? 'mm-note-replace' : 'mm-note-edit') + '">' + (v.verdict === 'replace' ? '&#8635; ' : '&#9998; ') + _escapeHtml(v.note) + '</div>' : '') +
-        '<div style="display:flex;gap:8px;margin-top:10px">' +
+        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">' +
           '<button type="button" class="mm-cbtn" onclick="event.stopPropagation();_mmcOpen(\'replace\',' + repIdx + ')">&#8635; replace</button>' +
+          '<button type="button" class="mm-cbtn mm-danger" onclick="event.stopPropagation();_mbrOpen(' + repIdx + ')">&#10005; remove</button>' +
           ((_adprevEnabled() && c.ad_id) ? '<button type="button" class="mm-cbtn" onclick="event.stopPropagation();openAdPreviewsFromMM(' + repIdx + ')">&#9673; preview</button>' : '') +
         '</div>' +
       '</div></div>';
@@ -61311,6 +61941,8 @@ function _mmRenderMetaFocus(d) {
         '</div>';
     }
   });
+  // Point-of-action campaign creation (locked mockup 5): the 4-step wizard.
+  out += '<button type="button" class="mm-addbtn" style="margin-top:2px" onclick="event.stopPropagation();_mncOpen()">+ New campaign</button>';
 
   // results + spend range at the bottom
   const cpbtWas = r.prev_cost_per_booked_trial != null ? ' <span style="color:var(--text-mute);font-weight:400">(was ' + _mmMoney(r.prev_cost_per_booked_trial) + ')</span>' : '';
@@ -61328,6 +61960,8 @@ function _mmRenderMetaFocus(d) {
       (m.pace_status ? ' &middot; <span class="' + _mmBandTxt(paceBand) + '" style="font-weight:700;text-transform:uppercase">' + m.pace_status + '</span>' : '') + '</div>' +
       (m.planned ? _mmBarHtml(spendFill, paceBand, elapsedTick) : '') +
       (m.planned && elapsedTick != null ? '<div class="mm-driver-sub" style="margin-top:5px">the notch is where the month says you should be (day ' + m.day + ' of ' + m.days_in_month + ')</div>' : '') +
+      // Point-of-action budget change (locked mockup 4a/4b)
+      '<button type="button" class="mm-cbtn" style="margin-top:10px" onclick="event.stopPropagation();_mbgOpen()">Change spend</button>' +
     '</div></div>' +
     /* ROI machine hidden for now (Zoran 2026-07-06): restore by re-adding _mmRoiMachineHtml(d) here */
     '</div></div>';
