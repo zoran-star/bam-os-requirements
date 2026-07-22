@@ -106,3 +106,5 @@ BUILT DORMANT (entry routing 2026-06-26 + Booking cold-opener 2026-06-28). To go
 approve+enable the 👻 Ghosted automation (contact path); make sure the Booking agent is on (Hawkeye) so
 it cold-opens trial-no-book leads; then turn OFF the matching GHL "form filled" workflows.
 V2/V1.5 only; V1 untouched.
+
+**UPDATE 2026-07-21 (PR #1548):** contact form now lands in **Responded** (booking agent), NOT Interested/Ghosted - Zoran called the old placement wrong on the July 21 call. Seed + prod entry_points rows backfilled. See [[project_preset_sweep_2026_07_21]].

@@ -306,3 +306,5 @@ P4a automation engine + P4b step-builder · P6 triggers · P7a per-lead mute · 
 
 ### HARD RULE reminder
 NO em dashes (U+2014) in ANYTHING person-facing, EVERY repo, always (now in all 3 CLAUDE.md + memory). Use hyphens.
+
+**UPDATE 2026-07-21 (PR #1548):** Interested stage now DISPLAYS as "Ghosted" everywhere (role key unchanged). New edges: scheduled_trial--cancel_booking-->responded, done_trial--ghosted_ran_out-->nurture, nurture--ghosted_ran_out-->@unqualified (nurture dry now exits as unqualified, not Lost). Not-interested = Nurture, never unqualified; unqualified requires a criteria pick. See [[project_preset_sweep_2026_07_21]].
