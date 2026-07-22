@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales System Board</title>
+<style>
+  :root{
+    --bg:#101114; --grid:#1A1C21; --card:#181B21; --card2:#20242C; --line:#2E333D;
+    --gold:#D4B65C; --blue:#6EA8D8; --green:#5CBF7A; --red:#E06C6C; --grey:#98A0AC;
+    --orange:#E8A050; --purple:#B48CE0; --txt:#ECEEF2; --dim:#9AA1AD;
+  }
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;-webkit-user-select:none;user-select:none}
+  #vp{position:fixed;inset:0;overflow:hidden;cursor:grab;touch-action:none;
+      background-image:radial-gradient(circle,var(--grid) 1.4px,transparent 1.4px);background-size:26px 26px}
+  #vp.panning{cursor:grabbing}
+  #board{position:absolute;top:0;left:0;width:3560px;height:1900px;transform-origin:0 0}
+  #wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  #wires text{font-size:13px;font-weight:700;fill:var(--dim);paint-order:stroke;stroke:var(--bg);stroke-width:5px}
+
+  .node{position:absolute;background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:0 6px 22px rgba(0,0,0,.38);cursor:grab}
+  .node:active{cursor:grabbing}
+  .node h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.2px}
+  .node .desc{font-size:12.5px;color:var(--dim);margin:5px 0 10px;line-height:1.4}
+  .band{font-size:10.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+
+  /* stage cards */
+  .stage{width:500px;border-color:#3A3F4B}
+  .stage h3 .num{color:var(--dim);font-weight:600;margin-right:6px}
+  .eng{display:flex;align-items:center;gap:8px;border-radius:10px;padding:8px 11px;font-size:12.5px;font-weight:700;margin:4px 0 8px}
+  .eng small{font-weight:500;color:var(--dim)}
+  .eng-agent{background:#2A2517;border:1px solid var(--gold);color:var(--gold)}
+  .eng-auto{background:#18222D;border:1px dashed var(--blue);color:var(--blue)}
+  details{border-top:1px dashed var(--line);padding:6px 0}
+  summary{font-size:11.5px;font-weight:800;letter-spacing:.6px;color:var(--dim);cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}
+  summary::before{content:'▸';color:var(--gold);transition:transform .15s}
+  details[open] summary::before{transform:rotate(90deg)}
+  details ul{margin:7px 0 3px;padding-left:16px;font-size:12.5px;line-height:1.55;color:var(--txt)}
+  details li b{font-weight:700}
+  details li .to{color:var(--dim)}
+
+  /* onboarding marker */
+  .ob{display:inline-block;background:var(--orange);color:#1A1206;font-size:9.5px;font-weight:900;border-radius:5px;padding:1px 5px;vertical-align:1px;letter-spacing:.5px}
+
+  /* terminals */
+  .term{width:400px}
+  .t-mem{border-color:var(--green)} .t-mem h3{color:var(--green)}
+  .t-unq{border-color:var(--red)} .t-unq h3{color:var(--red)}
+  .t-hum{border-color:var(--grey)} .t-hum h3{color:var(--grey)}
+
+  /* panels */
+  .panel .item{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-top:8px;font-size:12.5px;line-height:1.45}
+  .panel .item b{font-size:13px}
+  .panel .item .sub{color:var(--dim)}
+  .row2{display:flex;gap:8px}
+  .row2 > *{flex:1}
+  .kv{display:flex;justify-content:space-between;gap:12px;border-top:1px dashed var(--line);padding:6px 2px;font-size:12.5px;align-items:baseline}
+  .kv:first-of-type{border-top:none}
+  .kv .k{font-weight:700}
+  .kv .w{color:var(--dim);font-size:11.5px;text-align:right;white-space:nowrap}
+
+  /* header + zoom */
+  .hdr h2{margin:0;font-size:20px;font-weight:800}
+  .hdr h2 span{color:var(--gold)}
+  .hint{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6}
+  #zoom{position:fixed;right:18px;bottom:18px;display:flex;gap:8px;z-index:50}
+  #zoom button{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--txt);font-size:18px;font-weight:800;cursor:pointer}
+  #zoom button:hover{border-color:var(--gold);color:var(--gold)}
+  #zoom button:focus-visible{outline:2px solid var(--gold)}
+  .fit{font-size:11px !important;letter-spacing:.5px}
+</style>
+
+<div id="vp"><div id="board">
+<svg id="wires"></svg>
+
+<!-- header -->
+<div class="node hdr" id="hdr" style="left:70px;top:60px;width:430px;border-color:var(--gold)">
+  <h2>The Sales System <span>Board</span></h2>
+  <div class="hint">
+    <b style="color:var(--txt)">Drag any card</b> to move it around · drag the background to pan · pinch / scroll or use + and - to zoom.<br>
+    <span class="ob">OB</span>&nbsp; = set or collected during <b style="color:var(--orange)">onboarding</b> (see the Onboarding box).<br>
+    ▸ Click the little arrows on stage cards to open entry + exit details.
+  </div>
+</div>
+
+<!-- shared master principle -->
+<div class="node" id="principle" style="left:560px;top:60px;width:600px;border-color:var(--gold)">
+  <div class="band" style="color:var(--gold)">ONE SHARED PLAYBOOK</div>
+  <div style="font-size:13.5px;line-height:1.55">Every academy runs this <b>exact same machine</b>. We edit the master once and every academy updates instantly. The ONLY thing that differs per academy is their own info - the <span class="ob">OB</span> pieces - which the system pulls live from what they set in onboarding. Nobody gets a custom fork.</div>
+</div>
+
+<!-- guardrails -->
+<div class="node panel" id="guard" style="left:1220px;top:60px;width:540px;border-color:var(--grey)">
+  <div class="band" style="color:var(--grey)">GUARDRAILS - ALWAYS ON</div>
+  <div class="item">Complaint or something off-topic → a <b>human takes over</b>, instantly.</div>
+  <div class="item"><b>Nobody sits untouched.</b> Every stage has an engine working it - no lead is ever just parked.</div>
+  <div class="item">Marking someone <b style="color:var(--red)">Unqualified</b> always needs a reason: too far · age out of range · not a fit · other.</div>
+</div>
+
+<!-- ============ PIPELINE STAGES ============ -->
+<div class="node stage" id="st-booking" style="left:80px;top:470px">
+  <div class="band" style="color:var(--gold)">SALES PIPELINE · STAGE 1</div>
+  <h3>Booking</h3>
+  <div class="desc">A new lead just came in. One goal: get them booked into a free trial.</div>
+  <div class="eng eng-agent">⚙ ENGINE: Booking Agent (AI) <small>- texts the lead, you approve every message</small></div>
+  <details open><summary>ENTRY - how people arrive</summary><ul>
+    <li>Free-trial form on the website <span class="ob">OB</span> <span class="to">(fed by the funnel ↓)</span></li>
+    <li>Contact form on the website</li>
+    <li>No-shows + cancelled bookings coming back around</li>
+    <li>Anyone who replies from Ghosted or Nurture</li>
+  </ul></details>
+  <details><summary>EXIT - where they go next</summary><ul>
+    <li>Books a trial → <b>Confirm</b></li>
+    <li>Goes quiet → <b>Ghosted</b></li>
+    <li>Not interested → <b>Nurture</b></li>
+  </ul></details>
+</div>
+
+<div class="node stage" id="st-ghosted" style="left:650px;top:470px">
+  <div class="band" style="color:var(--blue)">SALES PIPELINE · STAGE 2</div>
+  <h3>Ghosted</h3>
+  <div class="desc">They stopped answering. Three quick texts to restart the conversation.</div>
+  <div class="eng eng-auto">⏱ ENGINE: Automation <small>- text on day 1, day 2, day 3</small></div>
+  <details open><summary>ENTRY</summary><ul>
+    <li>Went quiet in Booking (24h+ of silence)</li>
+  </ul></details>
+  <details><summary>EXIT</summary><ul>
+    <li>They reply → back to <b>Booking</b></li>
+    <li>All 3 texts run dry → <b>Nurture</b></li>
+  </ul></details>
+</div>
+
+<div class="node stage" id="st-confirm" style="left:1220px;top:470px">
+  <div class="band" style="color:var(--gold)">SALES PIPELINE · STAGE 3</div>
+  <h3>Confirm</h3>
+  <div class="desc">The trial is booked. Make sure they actually show up.</div>
+  <div class="eng eng-agent">⚙ ENGINE: Confirm Agent (AI) <small>+ instant confirmation text/email + 9am day-of check-in</small></div>
+  <details open><summary>ENTRY</summary><ul>
+    <li>Books a time on the trial calendar <span class="ob">OB</span></li>
+  </ul></details>
+  <details><summary>EXIT</summary><ul>
+    <li>Showed up + good fit (trainer's post-trial form) → <b>Closing</b></li>
+    <li>No-show / can't make it / cancels → back to <b>Booking</b></li>
+    <li>No longer wants a trial → <b>Nurture</b></li>
+  </ul></details>
+</div>
+
+<div class="node stage" id="st-closing" style="left:1790px;top:470px">
+  <div class="band" style="color:var(--gold)">SALES PIPELINE · STAGE 4</div>
+  <h3>Closing</h3>
+  <div class="desc">They came and it went well. Help them take the next step: becoming a member.</div>
+  <div class="eng eng-agent">⚙ ENGINE: Closing Agent (AI) <small>- knows the trainer's notes + a 2-message follow-up plan</small></div>
+  <details open><summary>ENTRY</summary><ul>
+    <li>Good-fit trial done (from the post-trial form)</li>
+  </ul></details>
+  <details><summary>EXIT</summary><ul>
+    <li>Enrolls → <b style="color:var(--green)">MEMBER</b></li>
+    <li>Says no / ghosts the follow-ups → <b>Nurture</b></li>
+  </ul></details>
+</div>
+
+<div class="node stage" id="st-nurture" style="left:2360px;top:470px">
+  <div class="band" style="color:var(--blue)">SALES PIPELINE · STAGE 5</div>
+  <h3>Nurture</h3>
+  <div class="desc">"Not now" doesn't mean never. A slow drip keeps the door open.</div>
+  <div class="eng eng-auto">⏱ ENGINE: Automation <small>- emails at +1, +2, +3 weeks</small></div>
+  <details open><summary>ENTRY</summary><ul>
+    <li>Every "not interested", "undecided" or "said no" - from any stage</li>
+  </ul></details>
+  <details><summary>EXIT</summary><ul>
+    <li>They reply → back to <b>Booking</b></li>
+    <li>Whole drip runs dry → <b style="color:var(--red)">Unqualified</b></li>
+  </ul></details>
+</div>
+
+<!-- terminals -->
+<div class="node term t-hum" id="t-human" style="left:1220px;top:1180px">
+  <h3>Human takeover</h3>
+  <div class="desc">Complaints and anything weird skip the machine and land with a person in Hawkeye.</div>
+</div>
+<div class="node term t-mem" id="t-member" style="left:1790px;top:1180px">
+  <h3>Member 🏆</h3>
+  <div class="desc">They enrolled. Sales is done - the member-management side takes over from here.</div>
+</div>
+<div class="node term t-unq" id="t-unq" style="left:2360px;top:1180px">
+  <h3>Unqualified</h3>
+  <div class="desc">The ONE dead end. Fully removed from the pipeline, never contacted again. Always requires picking a reason.</div>
+</div>
+
+<!-- funnel -->
+<div class="node panel" id="funnel" style="left:80px;top:1120px;width:620px;border-color:var(--purple)">
+  <div class="band" style="color:var(--purple)">THE FUNNEL - what feeds the pipeline</div>
+  <div class="item"><b>Meta ad</b> <span class="ob">OB</span><br><span class="sub">ad account + which campaign, picked in marketing setup</span></div>
+  <div style="text-align:center;color:var(--purple);font-size:15px;margin:2px 0">↓</div>
+  <div class="item"><b>Free-trial landing page</b> <span class="ob">OB</span><br><span class="sub">brand, photos + selling points come from onboarding</span></div>
+  <div style="text-align:center;color:var(--purple);font-size:15px;margin:2px 0">↓</div>
+  <div class="item"><b>Lead form</b><br><span class="sub">parent name · phone · athlete name · <b>age</b> <span class="ob">OB</span> · <b>location</b> <span class="ob">OB</span> (the qualification questions)</span></div>
+  <div style="text-align:center;color:var(--purple);font-size:15px;margin:2px 0">↓</div>
+  <div class="item"><b>Trial booking calendar</b> <span class="ob">OB</span><br><span class="sub">they pick a session time right there</span></div>
+  <div class="item" style="border-style:dashed"><b>Also feeding in:</b> <span class="sub">contact page form · program pages (Elementary, High School)</span></div>
+</div>
+
+<!-- engines explainer -->
+<div class="node panel" id="engines" style="left:760px;top:1450px;width:640px">
+  <div class="band" style="color:var(--gold)">THE TWO KINDS OF ENGINES</div>
+  <div class="row2">
+    <div class="item" style="border-color:var(--gold)"><b style="color:var(--gold)">⚙ Agent (AI)</b><br>
+      <span class="sub">Reads the whole conversation and writes the next message itself. Nothing sends without your approval.</span><br>
+      <span style="font-size:12px">Booking · Confirm · Closing</span></div>
+    <div class="item" style="border-color:var(--blue);border-style:dashed"><b style="color:var(--blue)">⏱ Automation</b><br>
+      <span class="sub">Pre-written messages on a timer. Approve the sequence once, it runs itself.</span><br>
+      <span style="font-size:12px">Ghosted drip · Nurture drip · instant confirmations · welcome</span></div>
+  </div>
+</div>
+
+<!-- hawkeye -->
+<div class="node panel" id="hawkeye" style="left:1450px;top:1560px;width:500px;border-color:var(--gold)">
+  <div class="band" style="color:var(--gold)">HAWKEYE - mission control</div>
+  <div class="item">Every agent suggestion lands here as a card: <b>approve + send</b>, change it, book them, or mark lost / unqualified.</div>
+  <div class="item">Change something? You add a quick <b>"why"</b> - the agents learn from it.</div>
+</div>
+
+<!-- metrics -->
+<div class="node panel" id="metrics" style="left:2960px;top:430px;width:450px;border-color:var(--green)">
+  <div class="band" style="color:var(--green)">METRICS - what gets calculated</div>
+  <div class="item"><b>Qualified trial close rate</b> ★ the preset's health number<br><span class="sub">of good-fit trials that showed up, how many enrolled (GTA: ~31%)</span></div>
+  <div class="item"><b>Won / Lost / Still deciding</b><br><span class="sub">the marks that feed the close rate</span></div>
+  <div class="item"><b>Trials today + booked this week</b></div>
+  <div class="item"><b>Sales this week</b></div>
+  <div class="item"><b>Cost per lead · cost per booked trial</b><br><span class="sub">from the Meta ads side</span></div>
+  <div class="item"><b>Funnel drop-off</b><br><span class="sub">page views → forms filled → trials booked</span></div>
+</div>
+
+<!-- onboarding data points -->
+<div class="node panel" id="ob-box" style="left:2100px;top:1560px;width:680px;border-color:var(--orange)">
+  <div class="band" style="color:var(--orange)">ONBOARDING DATA POINTS <span class="ob">OB</span> - what we collect + where</div>
+  <div class="kv"><span class="k">Business name, address, phone</span><span class="w">Academy step</span></div>
+  <div class="kv"><span class="k">Schedule</span><span class="w">Offer → Schedule</span></div>
+  <div class="kv"><span class="k">Program info (ages, group size, co-ed...)</span><span class="w">Offer → General info</span></div>
+  <div class="kv"><span class="k">Pricing + how openly to share it</span><span class="w">Offer → Pricing</span></div>
+  <div class="kv"><span class="k">Policies (cancel, makeup, parents watching)</span><span class="w">Offer → Policies</span></div>
+  <div class="kv"><span class="k">Selling points</span><span class="w">Offer (new home - Build 3)</span></div>
+  <div class="kv"><span class="k">Coaches + credentials + ratio</span><span class="w">Staff / Team step</span></div>
+  <div class="kv"><span class="k">Reviews / social proof</span><span class="w">Connect Google (Build 5)</span></div>
+  <div class="kv"><span class="k">Qualification values (city, age range)</span><span class="w">Offer + free-trial form</span></div>
+  <div class="kv"><span class="k">Trial booking calendar</span><span class="w">Booking go-live</span></div>
+  <div class="kv"><span class="k">Meta ad account + campaign</span><span class="w">Marketing setup</span></div>
+  <div style="font-size:11.5px;color:var(--dim);margin-top:9px">The agents + funnel pull all of this LIVE. Change it in onboarding → everything updates. No retyping into the agent.</div>
+</div>
+
+</div></div>
+
+<div id="zoom">
+  <button id="z-out" aria-label="Zoom out">−</button>
+  <button id="z-fit" class="fit" aria-label="Fit board">FIT</button>
+  <button id="z-in" aria-label="Zoom in">+</button>
+</div>
+
+<script>
+(function(){
+  const vp=document.getElementById('vp'), board=document.getElementById('board'), svg=document.getElementById('wires');
+  const BW=3560,BH=1900;
+  let s=0.4, px=0, py=0, zTop=10;
+
+  const CONNS=[
+    {f:'funnel',fs:'top',t:'st-booking',ts:'bottom',c:'var(--purple)',dash:0,label:'new lead'},
+    {f:'st-booking',fs:'top',t:'st-confirm',ts:'top',c:'var(--gold)',dash:0,label:'books a trial'},
+    {f:'st-confirm',fs:'top',t:'st-closing',ts:'top',c:'var(--gold)',dash:0,label:'showed up + good fit'},
+    {f:'st-closing',fs:'bottom',t:'t-member',ts:'top',c:'var(--green)',dash:0,label:'enrolls'},
+    {f:'st-booking',fs:'right',t:'st-ghosted',ts:'left',c:'var(--grey)',dash:1,label:'goes quiet'},
+    {f:'st-ghosted',fs:'bottom',t:'st-booking',ts:'bottom',c:'var(--grey)',dash:1,label:'replies'},
+    {f:'st-ghosted',fs:'top',t:'st-nurture',ts:'top',c:'var(--grey)',dash:1,label:'runs dry'},
+    {f:'st-confirm',fs:'bottom',t:'st-booking',ts:'bottom',c:'var(--grey)',dash:1,label:'no-show / cancels'},
+    {f:'st-closing',fs:'right',t:'st-nurture',ts:'left',c:'var(--grey)',dash:1,label:'says no'},
+    {f:'st-nurture',fs:'bottom',t:'t-unq',ts:'top',c:'var(--red)',dash:0,label:'whole drip dry'},
+    {f:'st-nurture',fs:'top',t:'st-booking',ts:'top',c:'var(--grey)',dash:1,label:'replies'}
+  ];
+
+  function apply(){ board.style.transform='translate('+px+'px,'+py+'px) scale('+s+')'; }
+
+  function anchor(el,side){
+    const x=el.offsetLeft,y=el.offsetTop,w=el.offsetWidth,h=el.offsetHeight;
+    if(side==='top')return[x+w/2,y];
+    if(side==='bottom')return[x+w/2,y+h];
+    if(side==='left')return[x,y+h/2];
+    return[x+w,y+h/2];
+  }
+  function dirv(side,k){ return side==='top'?[0,-k]:side==='bottom'?[0,k]:side==='left'?[-k,0]:[k,0]; }
+
+  function draw(){
+    let html='<defs>';
+    const cols={'var(--gold)':'#D4B65C','var(--grey)':'#98A0AC','var(--green)':'#5CBF7A','var(--red)':'#E06C6C','var(--purple)':'#B48CE0'};
+    let mi=0, mids={};
+    for(const c in cols){ mids[c]='m'+(mi++); html+='<marker id="'+mids[c]+'" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="'+cols[c]+'"/></marker>'; }
+    html+='</defs>';
+    for(const cn of CONNS){
+      const fe=document.getElementById(cn.f), te=document.getElementById(cn.t);
+      if(!fe||!te)continue;
+      const a=anchor(fe,cn.fs), b=anchor(te,cn.ts);
+      const dist=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      const k=Math.min(220,Math.max(90,dist*0.4));
+      const d1=dirv(cn.fs,k), d2=dirv(cn.ts,k);
+      const c1=[a[0]+d1[0],a[1]+d1[1]], c2=[b[0]+d2[0],b[1]+d2[1]];
+      const col=cols[cn.c];
+      html+='<path d="M'+a[0]+','+a[1]+' C'+c1[0]+','+c1[1]+' '+c2[0]+','+c2[1]+' '+b[0]+','+b[1]+'" fill="none" stroke="'+col+'" stroke-width="2.5" '+(cn.dash?'stroke-dasharray="7 6"':'')+' marker-end="url(#'+mids[cn.c]+')" opacity="0.85"/>';
+      const mx=0.125*a[0]+0.375*c1[0]+0.375*c2[0]+0.125*b[0];
+      const my=0.125*a[1]+0.375*c1[1]+0.375*c2[1]+0.125*b[1];
+      if(cn.label) html+='<text x="'+mx+'" y="'+(my-6)+'" text-anchor="middle">'+cn.label+'</text>';
+    }
+    svg.innerHTML=html;
+  }
+
+  // ---- drag nodes ----
+  let drag=null;
+  document.querySelectorAll('.node').forEach(n=>{
+    n.addEventListener('pointerdown',e=>{
+      drag={n:n,sx:e.clientX,sy:e.clientY,ox:n.offsetLeft,oy:n.offsetTop,moved:false};
+      n.style.zIndex=++zTop;
+      e.stopPropagation();
+    });
+  });
+
+  // ---- pan ----
+  let pan=null;
+  const pointers=new Map(); let pinch=null;
+  vp.addEventListener('pointerdown',e=>{
+    pointers.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pointers.size===2){ // pinch start
+      const p=[...pointers.values()];
+      pinch={d:Math.hypot(p[0][0]-p[1][0],p[0][1]-p[1][1]),s:s,cx:(p[0][0]+p[1][0])/2,cy:(p[0][1]+p[1][1])/2,px:px,py:py};
+      drag=null;pan=null;return;
+    }
+    if(!drag){ pan={sx:e.clientX,sy:e.clientY,ox:px,oy:py}; vp.classList.add('panning'); }
+    vp.setPointerCapture(e.pointerId);
+  });
+  window.addEventListener('pointermove',e=>{
+    if(pointers.has(e.pointerId)) pointers.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pinch&&pointers.size===2){
+      const p=[...pointers.values()];
+      const d=Math.hypot(p[0][0]-p[1][0],p[0][1]-p[1][1]);
+      const ns=Math.min(1.6,Math.max(0.18,pinch.s*d/pinch.d));
+      px=pinch.cx-(pinch.cx-pinch.px)*(ns/pinch.s); py=pinch.cy-(pinch.cy-pinch.py)*(ns/pinch.s);
+      s=ns; apply(); return;
+    }
+    if(drag){
+      const dx=(e.clientX-drag.sx)/s, dy=(e.clientY-drag.sy)/s;
+      if(!drag.moved && Math.hypot(dx*s,dy*s)>4) drag.moved=true;
+      if(drag.moved){ drag.n.style.left=(drag.ox+dx)+'px'; drag.n.style.top=(drag.oy+dy)+'px'; requestAnimationFrame(draw); }
+    } else if(pan){
+      px=pan.ox+(e.clientX-pan.sx); py=pan.oy+(e.clientY-pan.sy); apply();
+    }
+  });
+  window.addEventListener('pointerup',e=>{
+    pointers.delete(e.pointerId);
+    if(pointers.size<2)pinch=null;
+    drag=null;pan=null;vp.classList.remove('panning');
+  });
+
+  // ---- wheel zoom ----
+  vp.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const f=e.deltaY<0?1.09:0.92;
+    const ns=Math.min(1.6,Math.max(0.18,s*f));
+    px=e.clientX-(e.clientX-px)*(ns/s); py=e.clientY-(e.clientY-py)*(ns/s);
+    s=ns; apply();
+  },{passive:false});
+
+  // ---- buttons ----
+  function fit(){
+    s=Math.min(innerWidth/BW,innerHeight/BH)*0.96;
+    px=(innerWidth-BW*s)/2; py=(innerHeight-BH*s)/2; apply();
+  }
+  document.getElementById('z-in').onclick=()=>{const ns=Math.min(1.6,s*1.25);px=innerWidth/2-(innerWidth/2-px)*(ns/s);py=innerHeight/2-(innerHeight/2-py)*(ns/s);s=ns;apply();};
+  document.getElementById('z-out').onclick=()=>{const ns=Math.max(0.18,s*0.8);px=innerWidth/2-(innerWidth/2-px)*(ns/s);py=innerHeight/2-(innerHeight/2-py)*(ns/s);s=ns;apply();};
+  document.getElementById('z-fit').onclick=fit;
+
+  document.querySelectorAll('details').forEach(d=>d.addEventListener('toggle',()=>requestAnimationFrame(draw)));
+  window.addEventListener('resize',fit);
+
+  fit(); draw();
+})();
+</script>
+</html>
