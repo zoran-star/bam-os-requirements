@@ -718,6 +718,16 @@ async function handler(req, res) {
       return res.status(200).json({ html, subject: b.subject || "" });
     }
 
+    // Home-screen X (Zoran 2026-07-21): pull one lead out of every active
+    // automation (except onboarding). Deliberately stamps NO unqualified tag -
+    // this is cleanup ("get them out of here"), not a qualification verdict.
+    // The client pairs this with a PATCH status=abandoned on the opportunity.
+    if (b.action === "exit-enrollment") {
+      if (!b.contact_id) return res.status(400).json({ error: "contact_id required" });
+      const n = await exitEnrollment({ clientId, contactId: String(b.contact_id), reason: b.reason || "removed from home screen" });
+      return res.status(200).json({ ok: true, exited: (n && n.exited) || 0 });
+    }
+
     if (b.action === "upsert-automation") {
       if (!b.automation_key) return res.status(400).json({ error: "automation_key required" });
       const row = {

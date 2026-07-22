@@ -109,6 +109,7 @@ const CONFIRM_TRAILER =
   `'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human. ` +
   `If the lead CAN'T make their booked time / needs to reschedule, set 'recommend_handoff' = true with a clear 'handoff_note' capturing the dropped slot + any reason or constraint they gave (this note is what the booking assistant reads to rebook them) — do NOT propose new times yourself; put a warm acknowledgement in 'reply'. ` +
   `If your confirm_lost criteria say the lead no longer wants the trial at all, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms handoff/lost before anything changes. ` +
+  `OPT-OUT: if the lead asks you to STOP contacting them in any phrasing ("stop talking to me", "leave me alone", "don't contact me", "remove me", "stop texting"), set 'recommend_unqualified' = true with 'unqualified_reason' "Opted out" and leave 'reply' EMPTY - send NOTHING, not even a goodbye. This is NOT recommend_lost (Lost routes to nurture texts) and NOT an escalation. A human confirms; approving removes them from the pipeline entirely. ` +
   `REIGNITION: if the lead still WANTS the trial but only at a clearly LATER date ("after summer", "once the season ends", "text us in September") - not just a different time this week or next (that's a handoff to rebook) - set 'reignite_at' (YYYY-MM-DD - resolve a vague timeframe to a concrete date, e.g. "after summer" = Sep 01; a bare "later" = about 30 days out) and 'reignite_message' = the exact re-engagement text to open with ON that date. Make 'reply' the warm acknowledgement to send NOW. A human confirms the date + both messages before anything is scheduled.\n</live_confirm>`;
 function buildSystem({ lessons, overrides, examples }) {
   return buildAgentSystem({ lessons, overrides, examples, trailer: CONFIRM_TRAILER, agent: "confirm" });
@@ -128,8 +129,10 @@ const REPLY_TOOL = {
       escalate_reason:   { type: "string", description: "If escalate: why." },
       recommend_handoff: { type: "boolean", description: "True if the lead can't make their booked time and should be handed BACK to the booking assistant to rebook (do NOT rebook yourself)." },
       handoff_note:      { type: "string", description: "If recommend_handoff: the context the booking assistant needs — which slot they're dropping (day/time) and any reason/constraint they gave. If they gave no reason, say so." },
-      recommend_lost:    { type: "boolean", description: "True only if the lead no longer wants the trial AT ALL (not just this time) — a human confirms before anything changes." },
-      lost_reason:       { type: "string", description: "If recommend_lost: closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Opted out / Other)." },
+      recommend_lost:    { type: "boolean", description: "True only if the lead no longer wants the trial AT ALL (not just this time) — a human confirms before anything changes. NOT for opt-outs - use recommend_unqualified for those." },
+      lost_reason:       { type: "string", description: "If recommend_lost: closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Other)." },
+      recommend_unqualified: { type: "boolean", description: "True if the lead OPTED OUT of being contacted ('stop talking to me', 'leave me alone', 'don't contact me', 'remove me', 'stop texting') - a human confirms; approving removes them from the pipeline entirely (no nurture, no goodbye message, never contacted again). Leave 'reply' empty." },
+      unqualified_reason: { type: "string", description: "If recommend_unqualified: short why - 'Opted out' for any stop/leave-me-alone request." },
       reignite_at:       { type: "string", description: "YYYY-MM-DD. ONLY when the lead still wants the trial but at a clearly LATER date (a season away, not a rebook): the concrete day to re-engage. A human confirms before anything is scheduled." },
       reignite_message:  { type: "string", description: "If reignite_at: the exact re-engagement text to open with on that date - warm, references what they told us, moves toward getting the trial back on the books." },
     },
@@ -263,6 +266,8 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     handoff_note: out.handoff_note || null,
     recommend_lost: !!out.recommend_lost,
     lost_reason: out.lost_reason || null,
+    recommend_unqualified: !!out.recommend_unqualified,
+    unqualified_reason: out.unqualified_reason || null,
     // 🔥 Reignition: "still want it, but later" with a concrete date + pre-written
     // re-engagement message. Invalid/past dates drop out.
     reignite_at: normalizeReigniteAt(out.reignite_at),
@@ -650,7 +655,7 @@ async function detectForClient(client) {
   } catch (_) {}
   queue = queue.filter(q => (q.last_direction || "") === "inbound" || !_confActiveCarded.has(String(q.contact_id)));
 
-  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, handoffs = 0, lostProposed = 0, deferred = 0, reigniteProposed = 0;
+  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, handoffs = 0, lostProposed = 0, unqualifiedProposed = 0, deferred = 0, reigniteProposed = 0;
   const reasons = [];
   let _first = true;
   for (const item of queue.slice(0, DETECT_CAP)) {
@@ -721,6 +726,21 @@ async function detectForClient(client) {
       summary: d.summary || null, thread_tail: d.thread_tail || null, reply_count: d.reply_count,
       last_lead_at: item.last_at || null,
     };
+
+    // Opt-out (2026-07-21 meeting): the lead asked us to STOP contacting them.
+    // Checked FIRST - it beats a handoff/lost read of the same message. Approving
+    // runs confirm-abandoned (pipeline removal, unqualified tag, NO nurture).
+    // draft_message stays EMPTY so nothing can ever be texted to them.
+    if (d.recommend_unqualified) {
+      try {
+        await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          ...baseRow, kind: "confirm_unqualified", lost_reason: d.unqualified_reason || "Opted out",
+          draft_message: "", status: "pending", created_by: "detector",
+        }]) });
+        unqualifiedProposed++;
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: unqualified-insert failed - ${e.message}`); }
+      continue;
+    }
 
     // Handoff: lead can't make it → ALWAYS queue for a human (note + bounce on ✓).
     if (d.recommend_handoff) {
@@ -880,7 +900,7 @@ async function detectForClient(client) {
     }
   } catch (e) { reasons.push(`overdue pass: ${e.message}`); }
 
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, handoffs, lost_proposed: lostProposed, reignite_proposed: reigniteProposed, reignited, auto_sent: autoSent, deferred, flushed, escalated, overdue, skipped, pruned, reasons };
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, handoffs, lost_proposed: lostProposed, unqualified_proposed: unqualifiedProposed, reignite_proposed: reigniteProposed, reignited, auto_sent: autoSent, deferred, flushed, escalated, overdue, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {

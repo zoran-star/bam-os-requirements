@@ -94,6 +94,7 @@ const LIVE_BOOKING_TRAILER =
   `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
   `'asked_to_book' = true if your reply invites them to book/come in; 'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human instead of replying. ` +
   `If your lost_criteria say this lead should be closed out, set 'recommend_lost' = true with a short 'lost_reason' from the taxonomy, and put your warm closing message in 'reply' (a human confirms the Lost before anything changes). ` +
+  `OPT-OUT: if the lead asks you to STOP contacting them in any phrasing ("stop talking to me", "leave me alone", "don't contact me", "remove me", "stop texting"), set 'recommend_unqualified' = true with 'unqualified_reason' "Opted out" and leave 'reply' EMPTY - send NOTHING, not even a goodbye. This is NOT recommend_lost (Lost routes to nurture texts, which would keep messaging them) and NOT an escalation. A human confirms; approving removes them from the pipeline entirely. ` +
   `REIGNITION: if the lead clearly WANTS to proceed but only at a LATER date ("after summer", "once school starts", "text me in September"), do NOT mark them lost and do NOT keep pushing. Set 'reignite_at' (YYYY-MM-DD - resolve a vague timeframe to a concrete date, e.g. "after summer" = Sep 01; a bare "later" with no timeframe = about 30 days out) and 'reignite_message' = the exact re-engagement text we should open with ON that date (warm, references what they told us, moves toward booking). Make 'reply' the acknowledgement to send NOW ("No problem, I'll check back in September!"). A human confirms the date + both messages before anything is scheduled.\n</live_booking>`;
 function buildSystem({ lessons, overrides, examples }) {
   return buildAgentSystem({ lessons, overrides, examples, trailer: LIVE_BOOKING_TRAILER });
@@ -123,8 +124,10 @@ const REPLY_TOOL = {
       asked_to_book:   { type: "boolean", description: "True if this reply invites the lead to book or come in." },
       escalate:        { type: "boolean", description: "True if guardrails say to hand to a human instead of replying." },
       escalate_reason: { type: "string", description: "If escalate: why." },
-      recommend_lost:  { type: "boolean", description: "True if your lost_criteria say this lead should be marked Lost (a human confirms it)." },
-      lost_reason:     { type: "string", description: "If recommend_lost: the closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Opted out / Other)." },
+      recommend_lost:  { type: "boolean", description: "True if your lost_criteria say this lead should be marked Lost (a human confirms it). NOT for opt-outs - use recommend_unqualified for those." },
+      lost_reason:     { type: "string", description: "If recommend_lost: the closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Other)." },
+      recommend_unqualified: { type: "boolean", description: "True if the lead OPTED OUT of being contacted ('stop talking to me', 'leave me alone', 'don't contact me', 'remove me', 'stop texting') - a human confirms; approving removes them from the pipeline entirely (no nurture, no goodbye message, never contacted again). Leave 'reply' empty." },
+      unqualified_reason: { type: "string", description: "If recommend_unqualified: short why - 'Opted out' for any stop/leave-me-alone request." },
       book:            { type: "boolean", description: "True if you are BOOKING the lead into a free trial — ONLY after ALL of: (1) they confirmed a specific day/time, (2) you verified that exact slot is open via check_availability, AND (3) they explicitly said yes to YOU booking it for them (you asked 'want me to book it for you?' and they agreed). Once you have already asked and the lead replies with any clear affirmative to that slot ('sure', 'yes', 'ok', 'sounds good', or thanking you for that day/time), condition (3) is met - set book=true; do NOT ask the book question again. If you have a time but have NOT yet gotten that yes, set book=false and make your reply the confirmation question instead. A human approves before it's created. Your 'reply' is the confirmation you'd send." },
       book_group:      { type: "string", description: "If book: the group by athlete age — 'Group 1' (elementary, 9-13) or 'Group 2' (high school, 14+)." },
       book_slot_at:    { type: "string", description: "If book: the EXACT ISO datetime of the open slot the lead confirmed (must be one of the open_slots from check_availability)." },
@@ -307,6 +310,8 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     asked_to_book: !!out.asked_to_book || BOOK_ASK.test(out.reply || ""),
     recommend_lost: !!out.recommend_lost,
     lost_reason: out.lost_reason || null,
+    recommend_unqualified: !!out.recommend_unqualified,
+    unqualified_reason: out.unqualified_reason || null,
     book,
     book_group: book ? out.book_group : prop.group,
     book_slot_at: book ? out.book_slot_at : prop.slotAt,
@@ -531,7 +536,7 @@ async function detectForClient(client) {
   } catch (_) {}
 
   const cfg = await loadConfig(client.id);
-  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0, deferred = 0, flushed = 0, escalationCards = 0, reignited = 0, reigniteProposed = 0;
+  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, lostProposed = 0, unqualifiedProposed = 0, deferred = 0, flushed = 0, escalationCards = 0, reignited = 0, reigniteProposed = 0;
   const reasons = [];   // diagnostic: why each contact was skipped
   const mutedSet = await mutedContactIdSet(client.id, "booking");
 
@@ -643,6 +648,25 @@ async function detectForClient(client) {
     // so the detector makes ONE GHL call (the thread) per contact, not four.
     try { d = await draftForContact(token, locationId, client.id, contactId, cfg, { rs, conversationId: item.conversation_id, skipStageGuard: true }); }
     catch (e) { skipped++; reasons.push(`${item.name || contactId}: draft threw — ${e.message}`); continue; }
+
+    // Opt-out proposal (2026-07-21 meeting): the lead asked us to STOP contacting
+    // them. ALWAYS queue for a human - approving runs confirm-abandoned (removed
+    // from the pipeline, unqualified tag, NO nurture). draft_message stays EMPTY
+    // on purpose: nothing may ever be texted to a lead who said stop, so the card
+    // carries no sendable goodbye even if the model drafted one.
+    if (d.recommend_unqualified) {
+      try {
+        await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
+          contact_name: item.name || null, kind: "mark_unqualified", lost_reason: d.unqualified_reason || "Opted out",
+          draft_message: "", reasoning: d.reasoning || null,
+          last_message: d.last_message || null, last_outbound: d.last_outbound || null, summary: d.summary || null, thread_tail: d.thread_tail || null,
+          confidence: d.confidence, last_lead_at: item.last_at || null, status: "pending", created_by: "detector",
+        }]) });
+        unqualifiedProposed++;
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: unqualified-insert failed - ${e.message}`); }
+      continue;
+    }
 
     // Lost proposal: the agent thinks this lead is dead. ALWAYS queue it for a
     // human in Hawkeye — never auto-mark, even in self-drive. The warm closing
@@ -889,7 +913,7 @@ async function detectForClient(client) {
     }
   } catch (e) { reasons.push(`rebook pass: ${e.message}`); }
 
-  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, openers, rebook_openers: rebookOpeners, auto_sent: autoSent, deferred, flushed, escalated, escalation_cards: escalationCards, lost_proposed: lostProposed, reignite_proposed: reigniteProposed, reignited, skipped, pruned, reasons };
+  return { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, openers, rebook_openers: rebookOpeners, auto_sent: autoSent, deferred, flushed, escalated, escalation_cards: escalationCards, lost_proposed: lostProposed, unqualified_proposed: unqualifiedProposed, reignite_proposed: reigniteProposed, reignited, skipped, pruned, reasons };
 }
 
 async function runDetect(res, onlyClientId) {
@@ -908,7 +932,7 @@ async function runDetect(res, onlyClientId) {
       // Count EVERY card kind the detector can queue: replies/books, lost
       // proposals, escalations, and the opener/rebook-opener passes (these
       // queued silently before, so staff got no push for them).
-      const fresh = (r.drafted || 0) + (r.lost_proposed || 0) + (r.escalation_cards || 0) + (r.openers || 0) + (r.rebook_openers || 0) + (r.reignite_proposed || 0) + (r.reignited || 0);
+      const fresh = (r.drafted || 0) + (r.lost_proposed || 0) + (r.unqualified_proposed || 0) + (r.escalation_cards || 0) + (r.openers || 0) + (r.rebook_openers || 0) + (r.reignite_proposed || 0) + (r.reignited || 0);
       if (fresh > 0) notifyClientPush(client.id, "hawkeye-ready", { count: fresh }).catch(() => {});
     }
     catch (e) { out.push({ client_id: client.id, error: e.message }); }
@@ -1377,6 +1401,9 @@ async function handler(req, res) {
     // AND stamped with the GHL `unqualified` tag so the state mirrors the portal
     // switch and stays segmentable in GHL. Everyone else who's "Lost" but still a
     // fit flows into 💔 Lead Nurture instead (handled elsewhere). "Get them out."
+    // This is ALSO the approval path for the agent's kind='mark_unqualified'
+    // opt-out cards (ready_id; the reason rides row.lost_reason = "Opted out").
+    // Dismissing one is the shared skip-ready action.
     if (b.action === "confirm-abandoned") {
       let row = null, contactId = b.contact_id || null;
       if (b.ready_id) {
