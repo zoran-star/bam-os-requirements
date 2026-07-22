@@ -206,6 +206,9 @@ if (window.__MOCK__) (() => {
     { id: 'bm-4', body: 'That is everything, thanks team!', author_staff_id: null, author_auth_user_id: 'mock-user-1', files: [], created_at: iso(0, 4), edited_at: null, deleted_at: null },
   ];
   const CONVOS = [
+    // Andre Walker = mb-3's parent; that member has the pending PAUSE card (mcc-1),
+    // so scanning this conversation exercises the action → prefilled-modal path.
+    ['Andre Walker', "Hi, we'd like to pause Zion's membership for two weeks in August - family trip.", 'inbound', 1, 'member', 'Zion Walker'],
     ['Denise Thompson', 'Sounds good, Maya will be at practice Thursday!', 'inbound', 2, 'member', 'Maya Thompson'],
     ['Jordan Price', 'What time do U12 trials run on Saturdays?', 'inbound', 1, 'lead', null],
     ['Sam Reed', 'Can we switch Elijah to the 6pm group next month?', 'inbound', 1, null, 'Elijah Reed'],
@@ -20395,6 +20398,11 @@ function _hv2Style() {
     '.hm-peek-send{background:var(--gold);color:var(--on-gold);border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}' +
     '.hm-peek-full{background:none;border:none;color:var(--gold);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;padding:10px 0 14px}' +
     '.hm-peek-full:hover{text-decoration:underline}' +
+    '#hm-peek-agent{flex:none;max-height:42vh;overflow-y:auto;padding:0 22px;border-top:1px solid var(--border)}' +
+    '#hm-peek-agent .mcare-card{margin-top:12px}' +
+    '.mc-scan-note{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-mute);padding:12px 2px}' +
+    '.mc-scan-note.ok{color:var(--text-sub)}' +
+    '.mc-scan-note svg{flex:none;color:var(--gold)}' +
     '@media(max-width:640px){' +
     '#hm-peek-ov{align-items:flex-end}' +
     '.hm-peek-card{width:100%;max-width:none;max-height:86dvh;border-radius:24px 24px 0 0;border-bottom:none;padding-bottom:env(safe-area-inset-bottom);animation:hmSheetUp .32s cubic-bezier(0.22,1,0.36,1)}' +
@@ -47663,8 +47671,8 @@ async function _memberCareReload() {
   _loadMemberInbox({ id: i.memberId, ghl_contact_id: i.contactId, client_id: i.clientId, athlete_name: i.name, parent_phone: i.phone, parent_email: i.email });
 }
 
-function _memberCareCardsHtml() {
-  const cards = (_MEMBER_CARE.cards || []).filter(c => c && c.id);
+function _memberCareCardsHtml(cardList, opts = {}) {
+  const cards = (cardList || _MEMBER_CARE.cards || []).filter(c => c && c.id);
   if (!cards.length) return '';
   return cards.map(c => {
     const destructive = c.action === 'cancel';
@@ -47676,11 +47684,14 @@ function _memberCareCardsHtml() {
     }
     if (c.summary) parts.push(`<div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:4px">${esc(c.summary)}</div>`);
     if (c.reasoning) parts.push(`<div style="font-size:11.5px;color:var(--text-mute);line-height:1.45;margin-bottom:10px">${esc(c.reasoning)}</div>`);
-    // Part 1: the proposed member action.
+    // Part 1: the proposed member action. In the scan popup the click opens the
+    // matching PREFILLED action modal instead of firing the action directly.
     if (c.action_status === 'pending' && c.action) {
+      const actClick = opts.scan ? `_mcScanAction('${esc(c.id)}')` : `_memberCareDoAction('${esc(c.id)}')`;
+      const actLabel = opts.scan ? 'Review + do action' : 'Do action';
       parts.push(`<div style="border:1px solid var(--border,#2a2a31);border-left:3px solid ${accent};border-radius:8px;padding:9px 11px;margin-bottom:8px">
           <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">${esc(c.action_summary || c.action)}</div>
-          <button onclick="_memberCareDoAction('${esc(c.id)}')" style="background:${accent};color:#0B0B0D;border:none;border-radius:8px;padding:7px 14px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Do action</button>
+          <button onclick="${actClick}" style="background:${accent};color:#0B0B0D;border:none;border-radius:8px;padding:7px 14px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">${actLabel}</button>
         </div>`);
     } else if (c.action_status === 'done') {
       parts.push(`<div style="font-size:11.5px;color:var(--text-mute);margin-bottom:8px">Action done: ${esc(c.action_summary || c.action || '')}</div>`);
@@ -47743,8 +47754,8 @@ async function _memberCareDoAction(cardId) {
 
 async function _memberCareSendReply(cardId) {
   if (!_sendGuard('memberCareSendReply')) return;
-  const c = (_MEMBER_CARE.cards || []).find(x => x.id === cardId);
-  const i = _MEMBER_INBOX;
+  const f = _mcCareFind(cardId);
+  const c = f && f.c, i = f && f.i;
   if (!c || !i || _MEMBER_CARE.busy) return;
   const ta = document.getElementById('mcare-reply-' + cardId);
   const message = (ta && ta.value || '').trim();
@@ -47766,13 +47777,13 @@ async function _memberCareSendReply(cardId) {
     alert('Send failed: ' + e.message);
   } finally {
     _MEMBER_CARE.busy = false;
-    _memberCareReload();
+    f.scan ? _mcScanReload() : _memberCareReload();
   }
 }
 
 async function _memberCareAddItems(cardId) {
-  const c = (_MEMBER_CARE.cards || []).find(x => x.id === cardId);
-  const i = _MEMBER_INBOX;
+  const f = _mcCareFind(cardId);
+  const c = f && f.c, i = f && f.i;
   if (!c || !i || _MEMBER_CARE.busy) return;
   _MEMBER_CARE.busy = true;
   try {
@@ -47790,12 +47801,13 @@ async function _memberCareAddItems(cardId) {
     alert("Couldn't add the to-dos: " + (e.message || e));
   } finally {
     _MEMBER_CARE.busy = false;
-    _memberCareReload();
+    f.scan ? _mcScanReload() : _memberCareReload();
   }
 }
 
 async function _memberCareDismiss(cardId) {
   if (_MEMBER_CARE.busy) return;
+  const f = _mcCareFind(cardId);
   const input = document.getElementById('mcare-teach-' + cardId);
   const lesson = (input && input.value || '').trim();
   _MEMBER_CARE.busy = true;
@@ -47805,7 +47817,7 @@ async function _memberCareDismiss(cardId) {
     alert("Couldn't dismiss: " + (e.message || e));
   } finally {
     _MEMBER_CARE.busy = false;
-    _memberCareReload();
+    (f && f.scan) ? _mcScanReload() : _memberCareReload();
   }
 }
 
@@ -47848,6 +47860,137 @@ async function _memberCareAskAgent() {
     if (btn) { btn.disabled = false; btn.innerHTML = 'Ask the agent'; }
     _MEMBER_CARE.busy = false;
   }
+}
+
+// ── Scan for action items (member-messages widget → Member Care agent) ──
+// The "Scan for action items" button on the Unread member messages rows opens the
+// conversation peek popup and runs the SAME draft-now the drawer's "Ask the agent"
+// uses. The full proposal card (action + reply + to-dos) renders under the thread;
+// clicking the action swaps the popup for the matching PREFILLED action modal
+// (mPause/mCancel/...) so the human reviews real dates before anything fires.
+let _MC_SCAN = null;
+
+// A conversation is scannable only when it resolves to a roster member that has a
+// ghl_contact_id - the agent finds the thread through the contact, so a name-only
+// match with no contact id would always come back "skipped".
+function _mcScanTarget(c) {
+  if (!c) return null;
+  const roster = _ccRoster();
+  let m = c.contactId ? roster.find(x => x.ghl_contact_id === c.contactId) : null;
+  if (!m) {
+    const n = (c.contactName || c.fullName || '').toLowerCase().trim();
+    if (n) m = roster.find(x => [x.athlete_name, x.parent_name].filter(Boolean).some(nm => String(nm).toLowerCase().trim() === n));
+  }
+  return (m && m.id && m.ghl_contact_id) ? m : null;
+}
+
+function _mcScanBtn(c) {
+  if (!_mcScanTarget(c)) return '';
+  const cid = String(c.id).replace(/[^A-Za-z0-9_-]/g, '');
+  return `<button type="button" class="cc-ib-scan" title="Scan for action items" aria-label="Scan for action items" onclick="event.stopPropagation();_mcScanOpen('${cid}')">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2Z"/><path d="M9 21h6"/></svg>
+    <span class="cc-ib-scan-t">Scan for action items</span>
+  </button>`;
+}
+
+async function _mcScanOpen(convId, opts = {}) {
+  const c = (window._hmIbById || {})[convId];
+  const m = _mcScanTarget(c);
+  if (!c || !m) return;
+  _hmMsgPeek(convId);   // inserts the popup DOM synchronously, thread loads async
+  _MC_SCAN = {
+    convId, member: m, cards: [], hadCards: false,
+    clientId: m.client_id || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null),
+    contactId: m.ghl_contact_id, phone: m.parent_phone || m.phone || null,
+    email: m.parent_email || m.email || null, name: m.athlete_name || m.parent_name || 'Member',
+    memberId: m.id,
+  };
+  const thread = document.getElementById('hm-peek-thread');
+  if (!thread) return;
+  document.getElementById('hm-peek-agent')?.remove();
+  thread.insertAdjacentHTML('afterend', `<div id="hm-peek-agent"><div class="mc-scan-note"><span class="req-spin"></span>Scanning for action items...</div></div>`);
+  try {
+    // A pending card first (the agent refuses to stack a second one anyway).
+    let j = await _memberCarePost({ action: 'list', client_id: _MC_SCAN.clientId, member_id: m.id });
+    let cards = Array.isArray(j.cards) ? j.cards : [];
+    if (!cards.length && !opts.listOnly) {
+      const d = await _memberCarePost({ action: 'draft-now', client_id: _MC_SCAN.clientId, member_id: m.id });
+      const r = (d && d.result) || {};
+      if (r.inserted || r.existing) {
+        j = await _memberCarePost({ action: 'list', client_id: _MC_SCAN.clientId, member_id: m.id });
+        cards = Array.isArray(j.cards) ? j.cards : [];
+      }
+    }
+    if (!_MC_SCAN || _MC_SCAN.convId !== convId) return;   // popup moved on mid-flight
+    _MC_SCAN.cards = cards;
+    if (cards.length) _MC_SCAN.hadCards = true;
+    _mcScanRender();
+  } catch (e) {
+    const box = document.getElementById('hm-peek-agent');
+    if (box) box.innerHTML = `<div class="mc-scan-note">Couldn't reach the agent - ${escapeHTML(e.message || 'try again')}.</div>`;
+  }
+}
+
+function _mcScanRender() {
+  const box = document.getElementById('hm-peek-agent');
+  if (!box || !_MC_SCAN) return;
+  const cards = _MC_SCAN.cards || [];
+  if (cards.length) { box.innerHTML = _memberCareCardsHtml(cards, { scan: true }); return; }
+  const check = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  box.innerHTML = `<div class="mc-scan-note ok">${check}${_MC_SCAN.hadCards ? 'All proposals handled.' : 'Agent looked - nothing to recommend right now.'}</div>`;
+}
+
+async function _mcScanReload() {
+  const s = _MC_SCAN;
+  if (!s || !s.memberId) return;
+  try {
+    const j = await _memberCarePost({ action: 'list', client_id: s.clientId, member_id: s.memberId });
+    s.cards = Array.isArray(j.cards) ? j.cards : [];
+    if (s.cards.length) s.hadCards = true;
+  } catch (_) {}
+  _mcScanRender();
+}
+
+// Scan-popup action click: close the peek, open the matching PREFILLED action
+// modal (the popup "turns into" the modal), then reopen the peek with the card's
+// remaining parts. Only a confirmed run (modal returns true) marks the part done.
+async function _mcScanAction(cardId) {
+  const f = _mcCareFind(cardId);
+  if (!f || !f.c || _MEMBER_CARE.busy) return;
+  const c = f.c, b = c.action_body || {};
+  const convId = _MC_SCAN && _MC_SCAN.convId;
+  _hmMsgPeekClose();
+  let ok = false;
+  try {
+    switch (c.action) {
+      case 'pause':           ok = await mPause(c.member_id, { prefill: b }); break;
+      case 'unpause':         ok = await mUnpause(c.member_id, { prefill: b }); break;
+      case 'cancel':          ok = await mCancel(c.member_id, c.member_name, { prefill: b }); break;
+      case 'change':          ok = await mChange(c.member_id, null, { prefill: b }); break;
+      case 'payment-link':    ok = await mPaymentLink(c.member_id); break;
+      case 'card-setup-link': ok = await mGetCardLink(c.member_id); break;
+      default: break;
+    }
+  } catch (_) { ok = false; }
+  if (ok) {
+    try { await _memberCarePost({ action: 'mark-action-done', id: c.id }); } catch (_) {}
+    if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
+  }
+  if (convId) _mcScanOpen(convId, { listOnly: true });
+}
+
+// Resolve a member-care card + its conversation context from EITHER surface:
+// the scan popup (_MC_SCAN, when its box is on screen) or the member drawer
+// (_MEMBER_CARE + _MEMBER_INBOX). Lets one set of approve/dismiss handlers
+// serve both places.
+function _mcCareFind(cardId) {
+  const s = _MC_SCAN;
+  if (s && document.getElementById('hm-peek-agent')) {
+    const c = (s.cards || []).find(x => x && x.id === cardId);
+    if (c) return { c, i: { clientId: s.clientId, memberId: s.memberId, contactId: s.contactId, phone: s.phone, email: s.email, name: s.name }, scan: true };
+  }
+  const c = (_MEMBER_CARE.cards || []).find(x => x && x.id === cardId);
+  return c ? { c, i: _MEMBER_INBOX, scan: false } : null;
 }
 
 async function _loadMemberDocs(memberId, clientId) {
@@ -48401,7 +48544,7 @@ async function _mmProgress(task, opts = {}) {
   }
 }
 
-async function mPause(memberId) {
+async function mPause(memberId, opts = {}) {
   // Re-pause detection. Pull the freshest known state - if we have a list
   // cache, use it; otherwise fall back to a fresh single-member fetch so a
   // stale list doesn't mis-classify the action.
@@ -48434,17 +48577,18 @@ async function mPause(memberId) {
   const bodyHtml = npLine + (note ? `<div style="margin-top:8px">${escapeHTML(note)}</div>` : '');
 
   const today = _localTodayYMD();
+  const pf = (opts && opts.prefill) || {};   // agent-proposed values (scan flow) - human still reviews
   const vals = await _mmModal({
     icon: '', title: labelHead, body: bodyHtml, okLabel: labelHead,
     fields: [
-      { key: 'start', label: 'Start date', type: 'date', value: today, required: true,
+      { key: 'start', label: 'Start date', type: 'date', value: (_isValidYMD(pf.start_date) && pf.start_date) || today, required: true,
         validate: v => _isValidYMD(v) ? '' : 'Use a valid YYYY-MM-DD date.' },
-      { key: 'end', label: 'End date', type: 'date', value: '', required: true,
+      { key: 'end', label: 'End date', type: 'date', value: (_isValidYMD(pf.end_date) && pf.end_date) || '', required: true,
         validate: v => _isValidYMD(v) ? '' : 'Use a valid YYYY-MM-DD date.' },
-      { key: 'next_payment', label: 'Set next payment date (optional)', type: 'date', value: '',
+      { key: 'next_payment', label: 'Set next payment date (optional)', type: 'date', value: (_isValidYMD(pf.next_payment_date) && pf.next_payment_date) || '',
         hint: 'Leave blank to push the next charge out by the pause length. Set it to choose exactly when Stripe charges next - the pause period above is still required.',
         validate: v => (!v || _isValidYMD(v)) ? '' : 'Use a valid YYYY-MM-DD date.' },
-      { key: 'reason', label: 'Reason (optional)', type: 'text', placeholder: 'e.g. Injury, travel' },
+      { key: 'reason', label: 'Reason (optional)', type: 'text', value: pf.reason || '', placeholder: 'e.g. Injury, travel' },
     ],
   });
   if (!vals) return;
@@ -48471,6 +48615,7 @@ async function mPause(memberId) {
     if (extra) _plToast(extra);
     closeMemberPopup();
     await fetchAndRenderMembers();
+    return true;   // callers (scan flow) use this to mark the agent card's action done
   } catch (e) {
     // Translate known backend errors into targeted CTAs.
     const em = (e && e.message) || '';
@@ -48487,15 +48632,16 @@ async function mPause(memberId) {
   }
 }
 
-async function mUnpause(memberId) {
+async function mUnpause(memberId, opts = {}) {
+  const pf = (opts && opts.prefill) || {};   // agent-proposed values (scan flow)
   const vals = await _mmModal({
     icon: '▶', title: 'Unpause', okLabel: 'Apply',
     fields: [
-      { key: 'mode', label: 'How', type: 'radio', value: 'now', options: [
+      { key: 'mode', label: 'How', type: 'radio', value: pf.new_until ? 'shift' : 'now', options: [
         { value: 'now', label: 'Resume now', hint: 'Ends the pause immediately.' },
         { value: 'shift', label: 'Shift the pause end date', hint: 'Keep paused, move the resume date.' },
       ] },
-      { key: 'new_until', label: 'New end date (only if shifting)', type: 'date', value: '' },
+      { key: 'new_until', label: 'New end date (only if shifting)', type: 'date', value: (_isValidYMD(pf.new_until) && pf.new_until) || '' },
     ],
   });
   if (!vals) return;
@@ -48509,17 +48655,19 @@ async function mUnpause(memberId) {
     _plToast(body.new_until ? 'Pause shifted.' : 'Unpaused.');
     closeMemberPopup();
     fetchAndRenderMembers();
+    return true;
   } catch (e) { _plToast('Unpause failed: ' + e.message); }
 }
 
-async function mCancel(memberId, athleteName) {
+async function mCancel(memberId, athleteName, opts = {}) {
+  const pf = (opts && opts.prefill) || {};   // agent-proposed values (scan flow)
   const vals = await _mmModal({
     icon: '', danger: true,
     title: `Cancel ${escapeHTML(athleteName || 'this member')}?`,
     body: `They'll be removed from the active roster. Cancellation history is preserved.`,
     okLabel: 'Cancel membership',
     fields: [
-      { key: 'when', label: 'When', type: 'radio', value: 'period_end', options: [
+      { key: 'when', label: 'When', type: 'radio', value: pf.immediate ? 'immediate' : 'period_end', options: [
         { value: 'period_end', label: 'At period end', hint: 'Stays active until the current paid period ends.' },
         { value: 'immediate', label: 'Immediately', hint: 'Cancels the Stripe subscription right now.' },
       ] },
@@ -48533,7 +48681,7 @@ async function mCancel(memberId, athleteName) {
         { value: 'seasonal', label: 'Seasonal break or other sport' },
         { value: 'other', label: 'Other' },
       ] },
-      { key: 'reason', label: 'Details (optional)', type: 'textarea', rows: 2, placeholder: 'e.g. Moving to Ottawa in August' },
+      { key: 'reason', label: 'Details (optional)', type: 'textarea', rows: 2, value: pf.reason || '', placeholder: 'e.g. Moving to Ottawa in August' },
     ],
   });
   if (!vals) return;
@@ -48546,6 +48694,7 @@ async function mCancel(memberId, athleteName) {
     const _card = document.querySelector('.member-card[data-member-id="' + (window.CSS && CSS.escape ? CSS.escape(memberId) : memberId) + '"]');
     if (_card) { _card.classList.add('member-card-removing'); await new Promise(r => setTimeout(r, 470)); }
     fetchAndRenderMembers();
+    return true;
   } catch (e) { _plToast('Cancel failed: ' + e.message); }
 }
 
@@ -48685,7 +48834,8 @@ async function mRemoveCoupon(memberId, code) {
   } catch (e) { _plToast('Remove failed: ' + e.message); }
 }
 
-async function mChange(memberId, currentPlan) {
+async function mChange(memberId, currentPlan, opts = {}) {
+  const _pf = (opts && opts.prefill) || {};   // agent-proposed values (scan flow)
   // Immediate feedback so a click is NEVER silent - if the pricing/member fetch
   // below is slow or the button was somehow reached in a weird state, the user
   // still sees the click registered. The modal opens over this toast.
@@ -48802,17 +48952,22 @@ async function mChange(memberId, currentPlan) {
     ],
   } : null;
 
+  // Agent suggestion (scan flow): preselect the catalog row whose label matches
+  // the proposed plan vocabulary ("2/wk", "unlmtd"), and say so in the body.
+  const _sug = _pf.new_plan ? String(_pf.new_plan).toLowerCase() : '';
+  const _sugMatch = _sug ? flat.find(o => String(o.label).toLowerCase().indexOf(_sug) >= 0) : null;
+  const _sugLine = _sug ? `<br>Agent suggests: <b>${escapeHTML(_pf.new_plan)}</b>${_sugMatch ? '' : ' (pick the matching plan below)'}` : '';
   let vals;
   try {
     vals = await _mmModal({
       icon: '', title: 'Change plan',
-      body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>${(sj && sj.amount_cents != null) ? ' &middot; ' + _withHst(sj.amount_cents) : ''}<br>Next payment: <b>${escapeHTML(nextLabel)}</b>${curCoupon ? '<br>Coupon: <b>' + escapeHTML(curCoupon.code) + '</b>' : ''}${paymentsHtml}`,
+      body: `Current plan: <b>${escapeHTML(currentPlan || '-')}</b>${(sj && sj.amount_cents != null) ? ' &middot; ' + _withHst(sj.amount_cents) : ''}<br>Next payment: <b>${escapeHTML(nextLabel)}</b>${_sugLine}${curCoupon ? '<br>Coupon: <b>' + escapeHTML(curCoupon.code) + '</b>' : ''}${paymentsHtml}`,
       okLabel: 'Change plan',
       fields: [
-        { key: 'new_price', label: 'New plan', type: 'select', value: flat[0].value, options: grouped },
-        { key: 'next_payment', label: 'Next payment date (leave as-is to keep)', type: 'date', value: nextYMD },
+        { key: 'new_price', label: 'New plan', type: 'select', value: (_sugMatch && _sugMatch.value) || flat[0].value, options: grouped },
+        { key: 'next_payment', label: 'Next payment date (leave as-is to keep)', type: 'date', value: (_isValidYMD(_pf.next_payment_date) && _pf.next_payment_date) || nextYMD },
         ...(couponField ? [couponField] : []),
-        { key: 'prorate', label: 'Proration', type: 'radio', value: 'no', options: [
+        { key: 'prorate', label: 'Proration', type: 'radio', value: _pf.prorate ? 'yes' : 'no', options: [
           { value: 'no',  label: 'No proration', hint: 'Change applies on the next cycle.' },
           { value: 'yes', label: 'Prorate now', hint: 'Charge the prorated difference now (upgrades only).' },
         ] },
@@ -48846,6 +49001,7 @@ async function mChange(memberId, currentPlan) {
     }
     _plToast(`Changed to ${label} (${r.direction}${r.prorated ? ' · prorated' : ''})${npNote}${cpNote}.`);
     _membersRefreshFlash(memberId);
+    return true;
   } catch (e) { _plToast('Change failed: ' + e.message); }
 }
 
@@ -48853,6 +49009,7 @@ async function mPaymentLink(memberId) {
   try {
     const r = await _memberAction(memberId, 'payment-link', {});
     _openPaymentLinkModal(memberId, r);
+    return true;
   } catch (e) { _plToast('Payment link failed: ' + e.message); }
 }
 
@@ -48862,6 +49019,7 @@ async function mGetCardLink(memberId) {
   try {
     const r = await _memberAction(memberId, 'card-setup-link', {});
     _openPaymentLinkModal(memberId, r);
+    return true;
   } catch (e) { _plToast('Card link failed: ' + (e.message || e)); }
 }
 
@@ -56395,6 +56553,9 @@ function _ccStyle() {
     '.cc-ib-reply{flex:none;background:transparent;border:1px solid var(--border-med);border-radius:8px;padding:4px 10px;font:inherit;font-size:11px;font-weight:700;color:var(--text-mute);cursor:pointer;opacity:0;transition:opacity .15s,color .12s,border-color .12s}' +
     '.cc-ib-row:hover .cc-ib-reply{opacity:1}' +
     '.cc-ib-reply:hover{color:var(--gold);border-color:var(--gold)}' +
+    '.cc-ib-scan{flex:none;display:inline-flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--gold);border-radius:8px;padding:4px 10px;font:inherit;font-size:11px;font-weight:700;color:var(--gold);cursor:pointer;opacity:0;white-space:nowrap;transition:opacity .15s,background .12s}' +
+    '.cc-ib-row:hover .cc-ib-scan,.cc-minbox-row:hover .cc-ib-scan{opacity:1}' +
+    '.cc-ib-scan:hover{background:var(--gold-sheen)}' +
     '.cc-qr{display:flex;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--gold-sheen)}' +
     '.cc-qr-in{flex:1;background:var(--surface-el);border:1px solid var(--border-med);border-radius:8px;padding:8px 12px;font:inherit;font-size:12.5px;color:var(--text);outline:none}' +
     '.cc-qr-in:focus{border-color:var(--gold)}' +
@@ -56429,7 +56590,7 @@ function _ccStyle() {
     '.cc-btn{min-height:44px}' +
     '.cc-sage{padding:6px}' +
     '}' +
-    '@media(hover:none){.cc-ib-reply{opacity:1}}' +
+    '@media(hover:none){.cc-ib-reply{opacity:1}.cc-ib-scan{opacity:1}.cc-ib-scan-t{display:none}}' +
     'body.cc-mode .cc-dock{bottom:calc(16px + env(safe-area-inset-bottom))}' +
     '.cc-dock.open::before{content:\'\';position:fixed;inset:0;background:rgba(11,11,13,.32);z-index:-1;animation:hv2In .18s ease}' +
     'html.native-app .hv2-nav-card{display:none !important}' +
@@ -57742,6 +57903,7 @@ function _ccIbRow(c) {
   return `<div class="cc-ib-row${unread ? ' unread' : ''}" data-cid="${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}" onclick="_hmMsgPeek('${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}')">
     <span class="cc-ib-av">${escapeHTML(initials)}</span>
     <div style="flex:1;min-width:0"><div class="cc-ib-name">${escapeHTML(name)}</div><div class="cc-ib-prev">${escapeHTML(preview)}</div></div>
+    ${_mcScanBtn(c)}
     ${reply}
     ${unread ? '<span class="cc-ib-dot"></span>' : ''}
   </div>`;
@@ -57815,6 +57977,7 @@ function _ccMinboxRow(c) {
   return `<div class="cc-minbox-row${unread ? ' unread' : ''}" data-cid="${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}" onclick="_hmMsgPeek('${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}')">
     <span class="cc-minbox-av">${escapeHTML(initials)}</span>
     <div style="flex:1;min-width:0"><div class="cc-minbox-name">${escapeHTML(name)}</div><div class="cc-minbox-prev">${escapeHTML(preview)}</div></div>
+    ${_mcScanBtn(c)}
     <span class="cc-minbox-time">${escapeHTML(timeStr)}</span>
     ${unread ? '<span class="cc-minbox-dot"></span>' : ''}
   </div>`;
