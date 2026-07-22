@@ -92,7 +92,8 @@ export function bookingEntryForTrigger(trigger) {
   switch (trigger) {
     case "new_lead":     return "new_lead";
     case "no_show":
-    case "cant_make_it": return "rebook";
+    case "cant_make_it":
+    case "cancel_booking": return "rebook";  // lead cancelled their booked trial in the calendar
     case "replied":      return "reengaged";
     default:             return null;
   }

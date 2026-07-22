@@ -111,6 +111,7 @@ function closingTrailer(strat) {
   `'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human. ` +
   `If the lead is READY to enroll, set 'recommend_enroll' = true with a short 'enroll_note' (which plan/frequency they want, if known) and put a warm message in 'reply' — the academy's sign-up link is appended to your message and a human approves before it sends. ` +
   `If your closing_lost criteria say the good-fit attendee won't enroll, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms enroll/lost before anything changes. ` +
+  `OPT-OUT: if the lead asks you to STOP contacting them in any phrasing ("stop talking to me", "leave me alone", "don't contact me", "remove me", "stop texting"), set 'recommend_unqualified' = true with 'unqualified_reason' "Opted out" and leave 'reply' EMPTY - send NOTHING, not even a goodbye. This is NOT recommend_lost (Lost routes to nurture texts) and NOT an escalation. A human confirms; approving removes them from the pipeline entirely. ` +
   `Silence alone is NEVER a lost signal: quiet leads are handled by the follow-up loop, which recommends Lost automatically after ${n} unanswered follow-up${n === 1 ? "" : "s"}. Reserve 'recommend_lost' for an explicit no (too expensive, chose another program, not interested). ` +
   `Follow-up timing: your follow-up schedule is preplanned (see your follow-up timing guidance). But if the lead names a specific date or timeframe for their decision ("we'll decide after the weekend", "after the 15th", "once report cards are out"), set 'followup_on' (YYYY-MM-DD) to the day right after it so we don't nag them before they said they'd know. ` +
   `REIGNITION (different from followup_on): if the lead clearly WANTS to enroll but only at a distinctly LATER date ("we'll start after summer", "once basketball season ends", "sign us up in September") - a start-later, not a decide-soon - set 'reignite_at' (YYYY-MM-DD - resolve a vague timeframe to a concrete date, e.g. "after summer" = Sep 01; a bare "later" = about 30 days out) and 'reignite_message' = the exact re-engagement text to open with ON that date. Make 'reply' the warm acknowledgement to send NOW. A human confirms the date + both messages before anything is scheduled.\n</live_closing>`;
@@ -133,8 +134,10 @@ const REPLY_TOOL = {
       escalate_reason:  { type: "string", description: "If escalate: why." },
       recommend_enroll: { type: "boolean", description: "True if the lead is ready to enroll and should be sent the sign-up link (a human confirms and sends it)." },
       enroll_note:      { type: "string", description: "If recommend_enroll: which plan / frequency they want, if known, and any context for the human approving the enrollment." },
-      recommend_lost:   { type: "boolean", description: "True only if the good-fit attendee clearly won't enroll — a human confirms before anything changes." },
-      lost_reason:      { type: "string", description: "If recommend_lost: closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Opted out / Other)." },
+      recommend_lost:   { type: "boolean", description: "True only if the good-fit attendee clearly won't enroll — a human confirms before anything changes. NOT for opt-outs - use recommend_unqualified for those." },
+      lost_reason:      { type: "string", description: "If recommend_lost: closest taxonomy reason (Too expensive / Not enough time / Started other programs / Not locked in / Bad fit / Invalid lead / Other)." },
+      recommend_unqualified: { type: "boolean", description: "True if the lead OPTED OUT of being contacted ('stop talking to me', 'leave me alone', 'don't contact me', 'remove me', 'stop texting') - a human confirms; approving removes them from the pipeline entirely (no nurture, no goodbye message, never contacted again). Leave 'reply' empty." },
+      unqualified_reason: { type: "string", description: "If recommend_unqualified: short why - 'Opted out' for any stop/leave-me-alone request." },
       followup_on:      { type: "string", description: "YYYY-MM-DD. ONLY when the lead named a specific date/timeframe for their decision: the day right after it (the earliest day we should proactively follow up). Omit otherwise - the default cadence is next-day." },
       reignite_at:      { type: "string", description: "YYYY-MM-DD. ONLY when the lead wants to enroll but at a distinctly LATER date (start-later, not decide-soon): the concrete day to re-engage. A human confirms before anything is scheduled." },
       reignite_message: { type: "string", description: "If reignite_at: the exact re-engagement text to open with on that date - warm, references what they told us, moves toward enrolling." },
@@ -344,6 +347,8 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     enroll_note: out.enroll_note || null,
     recommend_lost: !!out.recommend_lost,
     lost_reason: out.lost_reason || null,
+    recommend_unqualified: !!out.recommend_unqualified,
+    unqualified_reason: out.unqualified_reason || null,
     // Lead named a decision date ("after the 15th") → earliest day to follow up.
     followup_on: (typeof out.followup_on === "string" && /^\d{4}-\d{2}-\d{2}$/.test(out.followup_on)) ? out.followup_on : null,
     // 🔥 Reignition: "we'll enroll, but later" with a concrete date + pre-written
@@ -667,7 +672,7 @@ async function detectForClient(client) {
       return new Date(a.last_at || 0) - new Date(b.last_at || 0);               // then oldest silence first
     });
 
-  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, enrollsProposed = 0, lostProposed = 0, deferred = 0, reigniteProposed = 0, reignited = 0;
+  let drafted = 0, autoSent = 0, skipped = 0, escalated = 0, enrollsProposed = 0, lostProposed = 0, unqualifiedProposed = 0, deferred = 0, reigniteProposed = 0, reignited = 0;
   const reasons = [];
 
   // 🔥 Reignition: the parked "we'll enroll later" set (the proactive opener +
@@ -812,6 +817,21 @@ async function detectForClient(client) {
       followup_not_before: d.followup_on ? `${d.followup_on}T14:00:00Z` : null,
     };
 
+    // Opt-out (2026-07-21 meeting): the lead asked us to STOP contacting them.
+    // Checked FIRST - it beats an enroll/lost read of the same message. Approving
+    // runs confirm-abandoned (pipeline removal, unqualified tag, NO nurture).
+    // draft_message stays EMPTY so nothing can ever be texted to them.
+    if (d.recommend_unqualified) {
+      try {
+        await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+          ...baseRow, kind: "closing_unqualified", lost_reason: d.unqualified_reason || "Opted out",
+          draft_message: "", status: "pending", created_by: "detector",
+        }]) });
+        unqualifiedProposed++;
+      } catch (e) { skipped++; reasons.push(`${item.name || contactId}: unqualified-insert failed - ${e.message}`); }
+      continue;
+    }
+
     // Enroll: lead is ready → ALWAYS queue for a human. The card is just a REPLY
     // with the sign-up link (Zoran 2026-07-08): the link (with tracking params) is
     // embedded in the editable draft so the reviewer sees exactly what goes out.
@@ -904,7 +924,7 @@ async function detectForClient(client) {
       } catch (e) { skipped++; reasons.push(`${item.name || contactId}: pending-insert failed — ${e.message}`); }
     }
   }
-  const summary = { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, enrolls_proposed: enrollsProposed, lost_proposed: lostProposed, reignite_proposed: reigniteProposed, reignited, auto_sent: autoSent, deferred, flushed, escalated, skipped, pruned, reasons };
+  const summary = { client_id: client.id, business: client.business_name, mode, queued: queue.length, drafted, enrolls_proposed: enrollsProposed, lost_proposed: lostProposed, unqualified_proposed: unqualifiedProposed, reignite_proposed: reigniteProposed, reignited, auto_sent: autoSent, deferred, flushed, escalated, skipped, pruned, reasons };
   // Persist the run summary - cron responses vanish, so per-lead skip reasons
   // were invisible. Read the latest via:
   //   select payload from automation_events where type='closing_detect_summary'
@@ -1286,11 +1306,16 @@ async function handler(req, res) {
       let routedToNurture = false;
       try {
         if (await isAutomationLive(clientId, "nurture")) {
-          // Route per the academy's authored flow (the says_no edge; GTA seed =
-          // done_trial -> nurture). Paused-aware: a paused edge returns matched
-          // but not moved, so we respect the pause and fall through to LOST. No
-          // edge -> original hardcoded move to nurture (GTA-identical).
-          const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "done_trial", trigger: "says_no", contactId, oppRef, reason });
+          // Route per the academy's authored flow. TWO distinct triggers land here
+          // (2026-07-21): a followup-loop card means the lead GHOSTED every closing
+          // follow-up -> the done_trial ghosted_ran_out edge; everything else is an
+          // explicit decline -> the says_no edge. Both seed to nurture, so GTA is
+          // behavior-identical - but academies can now re-point them separately.
+          // Paused-aware: a paused edge returns matched but not moved, so we
+          // respect the pause and fall through to LOST. No edge -> original
+          // hardcoded move to nurture (GTA-identical).
+          const trigger = (row && row.created_by === "followup-loop") ? "ghosted_ran_out" : "says_no";
+          const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "done_trial", trigger, contactId, oppRef, reason });
           if (routed.matched) {
             if (routed.moved) { await enrollContact({ clientId, automationKey: "nurture", contactId }); routedToNurture = true; }
           } else {

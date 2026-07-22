@@ -61,7 +61,7 @@ async function defaultSbGet(path) {
 // registry can still hold those roles, they just have null ghl_* until seeded.
 export const ROLE_MATCHERS = {
   responded:       (s) => /respond/i.test(s.name || ""),
-  interested:      (s) => /interest/i.test(s.name || ""),
+  interested:      (s) => /interest|ghost/i.test(s.name || ""),
   scheduled_trial: (s) => /(schedul|book).*trial/i.test(s.name || ""),
   nurture:         (s) => /nurtur/i.test(s.name || ""),
   done_trial:      (s) => {

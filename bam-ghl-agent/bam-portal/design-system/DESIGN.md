@@ -1,6 +1,6 @@
 # FullControl V2 Design System
 
-**Version 1.6 - 2026-07-06 | Living document: update it every time the UI evolves.**
+**Version 1.7 - 2026-07-22 | Living document: update it every time the UI evolves.**
 
 > ⛔ **RULE FOR EVERY AGENT + HUMAN: read this file BEFORE any front-end work in the V2 portal.**
 > Use the tokens in [`tokens.css`](tokens.css). Never hardcode a color, radius, font, or shadow that a token covers. If the design needs something the system doesn't have, ADD IT HERE FIRST (see "How to change this system" at the bottom), then use it.
@@ -129,6 +129,7 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 
 | Date | v | Change |
 |---|---|---|
+| 2026-07-22 | 1.7 | Onboarding wizard (`_obf*`) consistency pass: wizard + satellite modals moved onto shared `.obf2-*`/`.obfm-*` classes (step cards = card DNA on `--surface-el`, buttons per section 5 recipes, locked radii replace stray 5/7px, off-token `#c96856`/`#7BC47F`/`#1a1a1a` killed, fade-rise entrances, full-screen wizard on phones). client-portal.html `:root` mirror COMPLETED: `--r-*`, `--shadow-card/hover/pop`, `--t-*` now defined there (values match tokens.css; previously fallback-only). |
 | 2026-07-06 | 1.6 | Emoji purge COMPLETE portal-wide (~520 removed; sole icon slots became 1em stroke SVGs, label prefixes dropped). Monochrome text glyphs (arrows, check/cross, star, theme sun/moon) stay. Member avatars: random 8-color hash replaced by one neutral chip (surface-el + border + muted initials); status pills own the color. |
 | 2026-07-05 | 1.5 | Dark theme moves to true charcoal (bg #131416, surface #1B1D1F, elevated #232629, hover #2B2E32; --on-gold follows to #131416). Neutral graphite replaces the warm brown-black. Sound design added to the command center (SFX set + Settings toggle, off on mobile). |
 | 2026-07-05 | 1.4 | Light theme back to the prototype cream: bg #F8F7F5 (was #EFEAE0, too yellow), neutral rgba(0,0,0,…) borders, prototype text-sub/mute grays. Mirrored in client-portal.html. |

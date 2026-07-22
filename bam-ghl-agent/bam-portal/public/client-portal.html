@@ -185,7 +185,7 @@ if (window.__MOCK__) (() => {
   // Interested=Ghosted, Won=Member) so the sales board renders like BAM GTA.
   const STAGES = [
     { id: 'st-1', name: 'New Lead' }, { id: 'st-2', name: 'Responded' }, { id: 'st-3', name: 'Scheduled Trial' },
-    { id: 'st-4', name: 'Done Trial' }, { id: 'st-5', name: 'Interested' }, { id: 'st-6', name: 'Won' },
+    { id: 'st-4', name: 'Done Trial' }, { id: 'st-5', name: 'Ghosted' }, { id: 'st-6', name: 'Won' },
   ];
   const OPPS = [
     ['Jordan Price', 'st-1', 'Micah Price'], ['Riley Chen', 'st-1', 'Lucas Chen'],
@@ -666,6 +666,22 @@ if (window.__MOCK__) (() => {
     --radius-xl:    24px;
     --radius-2xl:   28px;
     --radius-full:  9999px;
+
+    /* V2 radius scale (LOCKED - mirror of design-system/tokens.css) */
+    --r-xs:   6px;    /* micro badges, tiny tags */
+    --r-sm:   8px;    /* buttons, inputs, icon chips, event chips */
+    --r-md:   12px;   /* small cards, tiles, toolbars, tooltips */
+    --r-lg:   16px;   /* main cards, panels */
+    --r-xl:   24px;   /* modals, celebration cards */
+    --r-full: 999px;  /* pills, dots, avatars */
+
+    /* V2 shadows + motion (mirror of design-system/tokens.css) */
+    --shadow-card:  0 1px 3px rgba(0,0,0,.04);
+    --shadow-hover: 0 4px 14px rgba(0,0,0,.06);
+    --shadow-pop:   0 12px 40px rgba(0,0,0,.3);
+    --t-fast:  .12s;
+    --t-med:   .2s;
+    --t-rise:  .42s;
 
     /* Shadows - multi-layer, dark-friendly */
     --shadow-sm:    0 1px 3px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.15);
@@ -5151,6 +5167,9 @@ if (window.__MOCK__) (() => {
     --shadow-gold:  0 4px 18px rgba(200,168,78,0.12), 0 2px 8px rgba(200,168,78,0.06);
     --card-shadow:  var(--shadow-sm);
     --card-hover:   var(--shadow-md);
+
+    /* V2 shadow mirror (design-system/tokens.css light block) */
+    --shadow-pop:   0 12px 40px rgba(0,0,0,.12);
   }
 
   html[data-theme="light"] body { background: var(--ink); }
@@ -5168,6 +5187,126 @@ if (window.__MOCK__) (() => {
   /* Brand-icon compass strokes - make the rings visible on cream */
   html[data-theme="light"] .brand-icon { color: var(--text-sub); }
   html[data-theme="light"] .client-dot { background: var(--gold-2); }
+
+  /* ══ Academy onboarding wizard (V2 design-system pass, 2026-07-22) ══
+     One visual language for the _obf* paged wizard (#obf-overlay) AND its
+     satellite modals (site accept, brand board, inbox connect, cancelled
+     import). Recipes from design-system/DESIGN.md - tokens only. */
+  .obfm-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:18px; z-index:9500; }
+  .obfm-card, .obf2-card { font-family:var(--font-ui); background:var(--surface); border:1px solid var(--border); border-radius:var(--r-xl); box-shadow:var(--shadow-pop); animation:obf2Pop var(--t-med) var(--es) both; }
+  .obfm-card { width:100%; max-width:520px; max-height:92vh; overflow-y:auto; padding:24px; }
+  .obfm-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:6px; }
+  .obf2-kicker { font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-mute); }
+  .obf2-title { font-family:var(--font-num); font-size:20px; font-weight:800; color:var(--text); }
+  .obf2-sub { font-size:12.5px; color:var(--text-sub); line-height:1.55; margin-top:4px; }
+  .obf2-hint { font-size:11px; color:var(--text-mute); line-height:1.5; margin-top:8px; }
+  .obf2-secthead { font-size:10.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--gold); margin-top:18px; }
+
+  /* Buttons (DESIGN.md section 5 recipes) */
+  .obf2-cta, .obf2-ghost, .obf2-skip, .obf2-notebtn, .obf2-choice, button.obf2-row,
+  #obf-overlay .obf2-nav, #obf-overlay .obf2-seg, #obf-overlay .obf2-pill { -webkit-appearance:none; appearance:none; }
+  .obf2-cta { display:inline-flex; align-items:center; justify-content:center; gap:8px; background:var(--gold); border:none; border-radius:var(--r-sm); color:var(--on-gold); padding:12px 16px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:filter var(--t-fast), box-shadow var(--t-med); }
+  .obf2-cta:hover:not(:disabled) { filter:brightness(1.06); box-shadow:var(--shadow-gold); }
+  .obf2-cta.blk { display:flex; width:100%; }
+  .obf2-cta:disabled { background:transparent; border:1px solid var(--border-med); color:var(--text-mute); cursor:default; }
+  .obf2-ghost { display:inline-flex; align-items:center; justify-content:center; gap:8px; background:var(--surface); border:1px solid var(--border-med); border-radius:var(--r-sm); color:var(--text); padding:8px 14px; font:inherit; font-size:12px; font-weight:600; cursor:pointer; text-decoration:none; transition:border-color var(--t-fast); }
+  .obf2-ghost:hover { border-color:var(--gold); }
+  .obf2-ghost.blk { display:flex; width:100%; }
+  .obf2-skip { display:block; margin:10px auto 0; background:none; border:none; padding:0; font:inherit; font-size:11px; font-weight:600; color:var(--text-mute); text-decoration:underline; cursor:pointer; transition:color var(--t-fast); }
+  .obf2-skip:hover { color:var(--text-sub); }
+
+  /* Step card + list rows */
+  .obf2-stepcard { background:var(--surface-el); border:1px solid var(--border); border-radius:var(--r-lg); box-shadow:var(--shadow-card); padding:20px 20px 22px; margin-top:4px; }
+  .obf2-stepcard.ok { border-color:var(--accent-border); background:var(--gold-sheen); }
+  .obf2-row { display:flex; align-items:center; gap:10px; padding:10px 13px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); margin-top:7px; font-size:12.5px; color:var(--text); }
+  button.obf2-row { width:100%; font:inherit; text-align:left; cursor:pointer; transition:border-color var(--t-fast); }
+  button.obf2-row:hover:not(:disabled) { border-color:var(--border-str); }
+  button.obf2-row:disabled { cursor:default; }
+  .obf2-dot { flex:none; width:8px; height:8px; border-radius:var(--r-full); }
+  .obf2-rowmeta { margin-left:auto; color:var(--text-mute); font-size:11px; text-align:right; }
+
+  /* Tags, checks, status lines */
+  .obf2-tag { display:inline-block; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; border-radius:var(--r-xs); padding:2px 7px; color:var(--text-sub); border:1px solid var(--border-med); }
+  .obf2-tag.gold { color:var(--gold); border-color:var(--accent-border); background:var(--gold-sheen); }
+  .obf2-tag.mute { color:var(--text-mute); }
+  .obf2-check { flex:none; width:24px; height:24px; border-radius:var(--r-full); display:flex; align-items:center; justify-content:center; border:1.5px solid var(--border-med); color:transparent; }
+  .obf2-check.ok { background:var(--gold); border-color:var(--gold); color:var(--on-gold); }
+  .obf2-done { display:flex; align-items:center; gap:7px; margin-top:14px; font-size:12px; font-weight:700; color:var(--green); }
+  .obf2-wait { display:flex; align-items:center; gap:7px; margin-top:14px; font-size:12px; font-weight:600; color:var(--text-sub); }
+  .obf2-note { display:flex; align-items:center; flex-wrap:wrap; gap:7px; margin-top:14px; font-size:12px; font-weight:600; }
+  .obf2-notebtn { background:var(--surface); border:1px solid var(--amber); border-radius:var(--r-xs); color:var(--amber); padding:3px 10px; font:inherit; font-size:11px; font-weight:700; cursor:pointer; transition:background var(--t-fast); }
+  .obf2-notebtn:hover { background:var(--amber-soft); }
+
+  /* Inputs + choice cards + dropzone */
+  .obf2-lab { font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-mute); margin-bottom:5px; }
+  .obf2-inp, .obf2-sel { background:var(--surface); border:1px solid var(--border-med); border-radius:var(--r-sm); color:var(--text); font:inherit; font-size:13px; padding:10px 12px; transition:border-color var(--t-fast), box-shadow var(--t-fast); }
+  .obf2-inp { width:100%; }
+  .obf2-inp:focus, .obf2-sel:focus { outline:none; border-color:var(--gold); box-shadow:var(--accent-glow); }
+  .obf2-inp::placeholder { color:var(--text-mute); }
+  .obf2-choice { display:flex; align-items:flex-start; gap:11px; width:100%; text-align:left; padding:13px 14px; background:var(--surface); border:1.5px solid var(--border-med); border-radius:var(--r-md); margin-top:8px; font:inherit; cursor:pointer; transition:border-color var(--t-fast), background var(--t-fast); }
+  .obf2-choice:hover { border-color:var(--border-str); }
+  .obf2-choice.sel { border-color:var(--gold); background:var(--gold-sheen); }
+  .obf2-radio { flex:none; width:15px; height:15px; margin-top:1px; border-radius:var(--r-full); border:2px solid var(--border-str); transition:border-color var(--t-fast); }
+  .obf2-choice.sel .obf2-radio { border-color:var(--gold); background:var(--gold); box-shadow:inset 0 0 0 3px var(--surface); }
+  .obf2-drop { display:block; background:var(--surface); border:1.5px dashed var(--border-med); border-radius:var(--r-md); padding:22px 16px; margin-top:14px; text-align:center; cursor:pointer; transition:border-color var(--t-fast), background var(--t-fast); }
+  .obf2-drop:hover { border-color:var(--gold); background:var(--gold-sheen); }
+
+  /* The paged wizard shell */
+  #obf-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:18px; z-index:9000; }
+  #obf-overlay .obf2-card { width:100%; max-width:640px; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; }
+  #obf-overlay .obf2-top { padding:22px 24px 0; }
+  #obf-overlay .obf2-segs { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:7px; margin-top:16px; }
+  #obf-overlay .obf2-seg { text-align:left; background:none; border:none; padding:0; cursor:pointer; font:inherit; }
+  #obf-overlay .obf2-seg .lb { display:flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; color:var(--text-mute); margin-bottom:5px; white-space:nowrap; overflow:hidden; transition:color var(--t-fast); }
+  #obf-overlay .obf2-seg:hover .lb { color:var(--text-sub); }
+  #obf-overlay .obf2-seg.cur .lb, #obf-overlay .obf2-seg.cur:hover .lb { color:var(--text); }
+  #obf-overlay .obf2-seg .tk { display:block; height:6px; border-radius:var(--r-full); background:var(--surface-el); border:1px solid var(--border); overflow:hidden; transition:border-color var(--t-fast), box-shadow var(--t-fast); }
+  #obf-overlay .obf2-seg.cur .tk { border-color:var(--accent-border); box-shadow:0 0 0 3px var(--gold-sheen); }
+  #obf-overlay .obf2-seg .fl { display:block; height:100%; border-radius:var(--r-full); background:var(--gold); transition:width .3s var(--es); }
+  #obf-overlay .obf2-seg.done .fl { background:var(--green); }
+  #obf-overlay .obf2-rail { display:flex; gap:6px; overflow-x:auto; padding:12px 24px 10px; scrollbar-width:none; }
+  #obf-overlay .obf2-rail::-webkit-scrollbar { display:none; }
+  #obf-overlay .obf2-pill { flex:none; display:inline-flex; align-items:center; gap:5px; font:inherit; font-size:11px; font-weight:700; color:var(--text-sub); background:var(--surface); border:1px solid var(--border); border-radius:var(--r-full); padding:5px 11px; cursor:pointer; transition:border-color var(--t-fast), color var(--t-fast); }
+  #obf-overlay .obf2-pill:hover { border-color:var(--border-str); color:var(--text); }
+  #obf-overlay .obf2-pill.cur, #obf-overlay .obf2-pill.cur:hover { color:var(--on-gold); background:var(--gold); border-color:var(--gold); }
+  #obf-overlay .obf2-pill.done:not(.cur) { border-color:var(--accent-border); background:var(--gold-sheen); }
+  #obf-overlay .obf2-page { flex:1; overflow-y:auto; padding:6px 24px 18px; }
+  #obf-overlay .obf2-page > * { animation:obf2Rise var(--t-rise) var(--es) both; }
+  #obf-overlay .obf2-foot { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; padding:12px 24px 16px; border-top:1px solid var(--border); }
+  #obf-overlay .obf2-nav { display:inline-flex; align-items:center; gap:6px; font:inherit; font-size:12.5px; font-weight:800; border-radius:var(--r-sm); padding:10px 16px; cursor:pointer; transition:border-color var(--t-fast), filter var(--t-fast); }
+  #obf-overlay .obf2-back { justify-self:start; background:var(--surface); border:1px solid var(--border-med); color:var(--text-sub); }
+  #obf-overlay .obf2-back:hover:not(:disabled) { border-color:var(--gold); color:var(--text); }
+  #obf-overlay .obf2-back:disabled { opacity:.35; cursor:default; }
+  #obf-overlay .obf2-next { justify-self:end; background:var(--gold); border:none; color:var(--on-gold); }
+  #obf-overlay .obf2-next:hover { filter:brightness(1.06); }
+  /* Embedded offer editor (PR-3): the flow hosts the REAL Blueprint offer
+     wizard - hide its duplicate chrome (back link, page head, step dots,
+     its own step header + nav buttons); the flow's bar/rail/arrows drive. */
+  #obf-overlay #obf-bb-host .bb-back,
+  #obf-overlay #obf-bb-host .bb-page-head,
+  #obf-overlay #obf-bb-host .bb-wizard-steps,
+  #obf-overlay #obf-bb-host .bb-wizard-step-head { display:none; }
+  #obf-overlay #obf-bb-host .bb-wizard-foot > div:last-child { display:none; }
+  #obf-overlay #obf-bb-host .bb-wizard-body { border:none; background:transparent; padding:0; box-shadow:none; }
+  #obf-overlay #obf-bb-host .bb-wizard-foot { border:none; background:transparent; padding:8px 0 0; }
+  @keyframes obf2Pop { from { opacity:0; transform:translateY(8px) scale(.985); } to { opacity:1; transform:none; } }
+  @keyframes obf2Rise { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+  @media (prefers-reduced-motion:reduce) {
+    .obfm-card, .obf2-card, #obf-overlay .obf2-page > * { animation:none; }
+  }
+  @media (max-width:560px) {
+    /* Phones: the wizard goes full screen (parity with the calendar focus card) */
+    #obf-overlay { padding:0; }
+    #obf-overlay .obf2-card { max-width:100%; height:100dvh; max-height:100dvh; border-radius:0; border:none; }
+    #obf-overlay .obf2-top { padding:calc(16px + env(safe-area-inset-top)) 16px 0; }
+    #obf-overlay .obf2-seg .lb { font-size:0; height:13px; }
+    #obf-overlay .obf2-seg.cur .lb { font-size:10px; }
+    #obf-overlay .obf2-page { padding-left:16px; padding-right:16px; }
+    #obf-overlay .obf2-rail { padding-left:16px; padding-right:16px; }
+    #obf-overlay .obf2-foot { padding:12px 16px calc(14px + env(safe-area-inset-bottom)); }
+    .obfm-overlay { padding:12px; }
+    .obfm-card { max-height:94vh; padding:20px 18px; }
+  }
 </style>
 </head>
 <body>
@@ -10654,6 +10793,8 @@ Then the call to action."]</div>
           .plo2-lead .st{font-size:11px;color:var(--text-mute);margin-top:1px}
           .plo2-lead.needs .st{color:var(--accent)}
           .plo2-av{width:28px;height:28px;border-radius:50%;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--text-sub);flex-shrink:0}
+          .plo2-x{margin-left:auto;flex-shrink:0;background:transparent;border:none;border-radius:8px;padding:5px 6px;color:var(--text-mute);cursor:pointer;opacity:.55;transition:opacity .12s,color .12s}
+          .plo2-x:hover{opacity:1;color:var(--red,#F07060)}
           .plo2-more{font-size:12px;color:var(--text-sub);text-align:center;padding:8px;cursor:pointer;border:1px dashed var(--border);border-radius:10px}
           .plo2-more:hover{color:var(--text)}
           .plo2-none{font-size:12.5px;color:var(--text-mute);text-align:center;padding:14px}
@@ -17549,21 +17690,21 @@ function _obfSiteAcceptOpen() {
   _obfSiteAcceptClose();
   const st = _OBF_STATE || {};
   const url = st.staging_url || '';
-  document.body.insertAdjacentHTML('beforeend', `<div id="osa-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_obfSiteAcceptClose()">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding:24px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
+  document.body.insertAdjacentHTML('beforeend', `<div id="osa-overlay" class="obfm-overlay" onclick="if(event.target===this)_obfSiteAcceptClose()">
+    <div class="obfm-card">
+      <div class="obfm-head">
         <div>
-          <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Your website</div>
-          <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">Review your new website</div>
+          <div class="obf2-kicker">Your website</div>
+          <div class="obf2-title">Review your new website</div>
         </div>
-        <button onclick="_obfSiteAcceptClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Close</button>
+        <button class="obf2-ghost" onclick="_obfSiteAcceptClose()" style="padding:7px 12px">Close</button>
       </div>
-      <div style="font-size:13px;line-height:1.55;color:var(--text-sub,var(--text-mute));margin:8px 0 14px">Your new site is built and running on a private preview address. Open it and click around like a parent would - every page, the schedule, the enroll flow. Your current site stays live until you flip the domain.</div>
-      ${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border-med);border-radius:8px;padding:11px;font-size:13px;font-weight:700;color:var(--text);text-decoration:none">
+      <div class="obf2-sub" style="font-size:13px;margin:8px 0 14px">Your new site is built and running on a private preview address. Open it and click around like a parent would - every page, the schedule, the enroll flow. Your current site stays live until you flip the domain.</div>
+      ${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" class="obf2-ghost blk" style="padding:11px;font-size:13px;font-weight:700">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
-        Open the preview</a>` : `<div style="border:1px solid var(--border);border-radius:12px;padding:11px;font-size:12.5px;color:var(--text-mute);text-align:center">The preview link is being set up. Check back shortly</div>`}
-      <button onclick="_obfSiteAccept(this)" ${url ? '' : 'disabled'} style="margin-top:10px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;${url ? '' : 'opacity:.5;cursor:default'}">Looks good - accept the site</button>
-      <div style="font-size:11.5px;line-height:1.5;color:var(--text-mute);margin-top:10px">Something needs a fix? Send it to us in Messages and accept once it looks right. Accepting green-lights the final checks before launch.</div>
+        Open the preview</a>` : `<div class="obf2-row" style="justify-content:center;color:var(--text-mute)">The preview link is being set up. Check back shortly</div>`}
+      <button onclick="_obfSiteAccept(this)" ${url ? '' : 'disabled'} class="obf2-cta blk" style="margin-top:10px;font-size:13.5px;font-weight:800">Looks good - accept the site</button>
+      <div class="obf2-hint" style="font-size:11.5px;margin-top:10px">Something needs a fix? Send it to us in Messages and accept once it looks right. Accepting green-lights the final checks before launch.</div>
     </div></div>`);
 }
 async function _obfSiteAccept(btn) {
@@ -17596,25 +17737,25 @@ function _obfBrandBoardOpen() {
   _obfBrandBoardClose();
   const st = _OBF_STATE || {};
   const url = _obfBrandBoardUrl(st);
-  document.body.insertAdjacentHTML('beforeend', `<div id="obb-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_obfBrandBoardClose()">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:760px;max-height:92vh;overflow-y:auto;padding:24px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
+  document.body.insertAdjacentHTML('beforeend', `<div id="obb-overlay" class="obfm-overlay" onclick="if(event.target===this)_obfBrandBoardClose()">
+    <div class="obfm-card" style="max-width:760px">
+      <div class="obfm-head">
         <div>
-          <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Your brand</div>
-          <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">Review your brand board</div>
+          <div class="obf2-kicker">Your brand</div>
+          <div class="obf2-title">Review your brand board</div>
         </div>
-        <button onclick="_obfBrandBoardClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Close</button>
+        <button class="obf2-ghost" onclick="_obfBrandBoardClose()" style="padding:7px 12px">Close</button>
       </div>
-      <div style="font-size:13px;line-height:1.55;color:var(--text-sub,var(--text-mute));margin:8px 0 14px">Your colors, type and components on one page - the system your website, emails, booking and agreement all ship from. Approve it and everything we build stays on it.</div>
-      ${url ? `<iframe src="${escapeHTML(url)}" title="Brand board" loading="lazy" style="width:100%;height:52vh;min-height:320px;border:1px solid var(--border);border-radius:12px;background:#0a0a0a"></iframe>
+      <div class="obf2-sub" style="font-size:13px;margin:8px 0 14px">Your colors, type and components on one page - the system your website, emails, booking and agreement all ship from. Approve it and everything we build stays on it.</div>
+      ${url ? `<iframe src="${escapeHTML(url)}" title="Brand board" loading="lazy" style="width:100%;height:52vh;min-height:320px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--ink)"></iframe>
       <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-        <a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border-med);border-radius:8px;padding:10px 14px;font-size:12.5px;font-weight:700;color:var(--text);text-decoration:none">
+        <a href="${escapeHTML(url)}" target="_blank" rel="noopener" class="obf2-ghost" style="padding:10px 14px;font-size:12.5px;font-weight:700">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
           Open full size</a>
-        <button onclick="_obfBrandApprove(this)" style="flex:1;min-width:200px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">Approve this board</button>
+        <button onclick="_obfBrandApprove(this)" class="obf2-cta" style="flex:1;min-width:200px;padding:11px 16px;font-weight:800">Approve this board</button>
       </div>
-      <div style="font-size:11.5px;line-height:1.5;color:var(--text-mute);margin-top:10px">Want something changed? Adjust your Brand section in the Blueprint or message us - approve once it reads like you.</div>`
-      : `<div style="border:1px solid var(--border);border-radius:12px;padding:11px;font-size:12.5px;color:var(--text-mute);text-align:center">Your board is being set up. Check back shortly</div>`}
+      <div class="obf2-hint" style="font-size:11.5px;margin-top:10px">Want something changed? Adjust your Brand section in the Blueprint or message us - approve once it reads like you.</div>`
+      : `<div class="obf2-row" style="justify-content:center;color:var(--text-mute)">Your board is being set up. Check back shortly</div>`}
     </div></div>`);
 }
 async function _obfBrandApprove(btn) {
@@ -17798,16 +17939,21 @@ function _obfConnectInbox() {
   _obfClose();
   document.getElementById('obf-inbox-modal')?.remove();
   const prefill = (_OBF_STATE && _OBF_STATE.mailbox_email) || '';
-  document.body.insertAdjacentHTML('beforeend', `<div id="obf-inbox-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-24,24px);width:100%;max-width:460px;padding:24px;display:flex;flex-direction:column;gap:12px">
-      <div style="font-family:var(--font-ui);font-weight:700;font-size:18px">Connect your inbox</div>
-      <div style="color:var(--text-muted);font-size:14px;line-height:1.5">Sign in to your Google inbox once. After that, the emails you send and receive sync between your inbox and the portal. Automated emails keep sending from your domain as usual.</div>
-      <label style="font-size:12px;color:var(--text-muted);margin-top:4px">Your inbox address</label>
-      <input id="obf-inbox-email" type="email" value="${prefill}" placeholder="info@yourdomain.com" autocomplete="off" style="background:var(--surface-2,var(--bg));border:1px solid var(--border);border-radius:var(--r-8,8px);padding:10px 12px;color:var(--text);font-size:14px" />
-      <div style="font-size:12px;color:var(--text-muted)">Use the exact Google address you want connected.</div>
+  document.body.insertAdjacentHTML('beforeend', `<div id="obf-inbox-modal" class="obfm-overlay" style="z-index:9100" onclick="if(event.target===this)this.remove()">
+    <div class="obfm-card" style="max-width:460px;display:flex;flex-direction:column;gap:12px;overflow-y:visible">
+      <div>
+        <div class="obf2-kicker">Academy setup</div>
+        <div class="obf2-title" style="font-size:18px">Connect your inbox</div>
+      </div>
+      <div class="obf2-sub" style="font-size:13px;margin-top:0">Sign in to your Google inbox once. After that, the emails you send and receive sync between your inbox and the portal. Automated emails keep sending from your domain as usual.</div>
+      <div>
+        <div class="obf2-lab">Your inbox address</div>
+        <input id="obf-inbox-email" type="email" value="${prefill}" placeholder="info@yourdomain.com" autocomplete="off" class="obf2-inp" />
+      </div>
+      <div class="obf2-hint" style="margin-top:0">Use the exact Google address you want connected.</div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
-        <button class="btn" onclick="document.getElementById('obf-inbox-modal').remove()" style="background:transparent;border:1px solid var(--border);border-radius:var(--r-999,999px);padding:8px 16px;color:var(--text);cursor:pointer">Cancel</button>
-        <button class="btn" onclick="_obfInboxGo()" style="background:var(--gold);border:none;border-radius:var(--r-999,999px);padding:8px 18px;color:#1a1a1a;font-weight:600;cursor:pointer">Connect Gmail</button>
+        <button class="obf2-ghost" onclick="document.getElementById('obf-inbox-modal').remove()" style="padding:8px 16px">Cancel</button>
+        <button class="obf2-cta" onclick="_obfInboxGo()" style="padding:8px 18px;font-size:12.5px">Connect Gmail</button>
       </div>
     </div></div>`);
   setTimeout(() => document.getElementById('obf-inbox-email')?.focus(), 50);
@@ -17879,55 +18025,15 @@ function _obfClose() { document.getElementById('obf-overlay')?.remove(); }
 async function _obfOpen() {
   if (!_obfIsV2()) return;
   _obfClose();
-  document.body.insertAdjacentHTML('beforeend', `<div id="obf-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_obfClose()">
-    <style>
-      #obf-overlay .obf2-card { background:var(--surface); border:1px solid var(--border); border-radius:24px; width:100%; max-width:640px; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; }
-      #obf-overlay .obf2-top { padding:22px 24px 0; }
-      #obf-overlay .obf2-segs { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:7px; margin-top:16px; }
-      #obf-overlay .obf2-seg { text-align:left; background:none; border:none; padding:0; cursor:pointer; font:inherit; }
-      #obf-overlay .obf2-seg .lb { display:flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; color:var(--text-mute); margin-bottom:5px; white-space:nowrap; overflow:hidden; }
-      #obf-overlay .obf2-seg.cur .lb { color:var(--text); }
-      #obf-overlay .obf2-seg .tk { display:block; height:6px; border-radius:999px; background:var(--surface-2,rgba(127,127,127,.12)); border:1px solid var(--border); overflow:hidden; }
-      #obf-overlay .obf2-seg.cur .tk { border-color:var(--accent-border,rgba(212,182,92,.35)); box-shadow:0 0 0 3px var(--gold-sheen,rgba(212,182,92,.09)); }
-      #obf-overlay .obf2-seg .fl { display:block; height:100%; border-radius:999px; background:var(--gold); transition:width .3s; }
-      #obf-overlay .obf2-seg.done .fl { background:var(--green,#4CC76A); }
-      #obf-overlay .obf2-rail { display:flex; gap:6px; overflow-x:auto; padding:12px 24px 10px; scrollbar-width:none; }
-      #obf-overlay .obf2-rail::-webkit-scrollbar { display:none; }
-      #obf-overlay .obf2-pill { flex:none; display:inline-flex; align-items:center; gap:5px; font:inherit; font-size:11px; font-weight:700; color:var(--text-sub,var(--text-mute)); background:transparent; border:1px solid var(--border); border-radius:999px; padding:5px 11px; cursor:pointer; }
-      #obf-overlay .obf2-pill.cur { color:var(--on-gold,#1a1608); background:var(--gold); border-color:var(--gold); }
-      #obf-overlay .obf2-pill.done:not(.cur) { border-color:var(--accent-border,rgba(212,182,92,.3)); background:var(--gold-sheen,rgba(212,182,92,.06)); }
-      #obf-overlay .obf2-page { flex:1; overflow-y:auto; padding:6px 24px 18px; }
-      #obf-overlay .obf2-foot { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; padding:12px 24px 16px; border-top:1px solid var(--border); }
-      #obf-overlay .obf2-nav { display:inline-flex; align-items:center; gap:6px; font:inherit; font-size:12.5px; font-weight:800; border-radius:8px; padding:10px 16px; cursor:pointer; }
-      #obf-overlay .obf2-back { justify-self:start; background:transparent; border:1px solid var(--border-med); color:var(--text-sub,var(--text-mute)); }
-      #obf-overlay .obf2-back:disabled { opacity:.35; cursor:default; }
-      #obf-overlay .obf2-next { justify-self:end; background:var(--gold); border:none; color:var(--on-gold,#1a1608); }
-      /* Embedded offer editor (PR-3): the flow hosts the REAL Blueprint offer
-         wizard - hide its duplicate chrome (back link, page head, step dots,
-         its own step header + nav buttons); the flow's bar/rail/arrows drive. */
-      #obf-overlay #obf-bb-host .bb-back,
-      #obf-overlay #obf-bb-host .bb-page-head,
-      #obf-overlay #obf-bb-host .bb-wizard-steps,
-      #obf-overlay #obf-bb-host .bb-wizard-step-head { display:none; }
-      #obf-overlay #obf-bb-host .bb-wizard-foot > div:last-child { display:none; }
-      #obf-overlay #obf-bb-host .bb-wizard-body { border:none; background:transparent; padding:0; box-shadow:none; }
-      #obf-overlay #obf-bb-host .bb-wizard-foot { border:none; background:transparent; padding:8px 0 0; }
-      @media (max-width:560px) {
-        #obf-overlay { padding:10px; }
-        #obf-overlay .obf2-seg .lb { font-size:0; height:13px; }
-        #obf-overlay .obf2-seg.cur .lb { font-size:10px; }
-        #obf-overlay .obf2-top, #obf-overlay .obf2-page { padding-left:16px; padding-right:16px; }
-        #obf-overlay .obf2-rail, #obf-overlay .obf2-foot { padding-left:16px; padding-right:16px; }
-      }
-    </style>
+  document.body.insertAdjacentHTML('beforeend', `<div id="obf-overlay" onclick="if(event.target===this)_obfClose()">
     <div class="obf2-card">
       <div class="obf2-top">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div class="obfm-head" style="margin-bottom:0">
           <div>
-            <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Academy setup</div>
-            <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">Finish your onboarding</div>
+            <div class="obf2-kicker">Academy setup</div>
+            <div class="obf2-title">Finish your onboarding</div>
           </div>
-          <button onclick="_obfClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Back to home</button>
+          <button class="obf2-ghost" onclick="_obfClose()" style="padding:7px 12px">Back to home</button>
         </div>
         <div class="obf2-segs" id="obf-segs"></div>
       </div>
@@ -18005,7 +18111,7 @@ function _obfWizJumpKey(key) {
 function _obfRender(st) {
   const host = document.getElementById('obf-steps');
   if (!host) return;
-  if (!st) { host.innerHTML = `<div style="font-size:12.5px;color:var(--red,#c96856)">Couldn't check your setup - try again in a minute.</div>`; return; }
+  if (!st) { host.innerHTML = `<div style="font-size:12.5px;color:var(--red)">Couldn't check your setup - try again in a minute.</div>`; return; }
   const secs = _obfWizSections(st);
   if (!secs.length) return;
   // Clamp the parked position (visible steps can shift after a fetch).
@@ -18068,19 +18174,19 @@ function _obfWizOfferPage(st, sec, step, bbSection) {
   const noteFn = step.note && (typeof window !== 'undefined' ? window[step.note] : null);
   const n = (typeof noteFn === 'function') ? noteFn(st) : null;
   if (n) {
-    const color = n.tone === 'good' ? 'var(--green,#4CC76A)' : 'var(--amber,#F0B84A)';
-    note = `<span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:${color}">
+    const color = n.tone === 'good' ? 'var(--green)' : 'var(--amber)';
+    note = `<span class="obf2-note" style="margin-top:0;font-size:11.5px;color:${color}">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${n.tone === 'good' ? '<path d="M20 6 9 17l-5-5"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>'}</svg>${n.text}
-      ${n.cta ? `<button onclick="${n.go}" style="background:none;border:1px solid var(--amber,#F0B84A);border-radius:6px;color:var(--amber,#F0B84A);padding:2px 9px;font:inherit;font-size:10.5px;font-weight:700;cursor:pointer">${n.cta}</button>` : ''}
+      ${n.cta ? `<button class="obf2-notebtn" onclick="${n.go}" style="padding:2px 9px;font-size:10.5px">${n.cta}</button>` : ''}
     </span>`;
   }
   setTimeout(() => _obfWizOfferMount(bbSection), 0);
   return `<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:2px 2px 12px">
-      <span style="flex:none;width:20px;height:20px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
+      <span class="obf2-check ${ok ? 'ok' : ''}" style="width:20px;height:20px">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       </span>
       <span style="font-size:13px;font-weight:800;color:var(--text)">${step.title}</span>
-      ${step.launch && !ok ? `<span style="font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);border:1px solid var(--accent-border,rgba(212,182,92,.35));border-radius:5px;padding:1px 6px">Launch must-have</span>` : ''}
+      ${step.launch && !ok ? `<span class="obf2-tag gold">Launch must-have</span>` : ''}
       ${note}
     </div>
     <div id="obf-bb-host"><div class="bb-empty" style="padding:20px 0">Loading your offer…</div></div>`;
@@ -18113,26 +18219,26 @@ async function _obfSetupSave(patch, direct, btn) {
 }
 // Small shared pieces for the collection pages.
 function _obfWizShell(title, sub, inner, extraTags) {
-  return `<div style="border:1px solid var(--border);border-radius:16px;padding:20px 20px 22px;margin-top:4px">
+  return `<div class="obf2-stepcard">
     ${extraTags ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">${extraTags}</div>` : ''}
-    <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">${title}</div>
-    <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${sub}</div>
+    <div class="obf2-title">${title}</div>
+    <div class="obf2-sub">${sub}</div>
     ${inner}
   </div>`;
 }
 function _obfWizChoice(name, val, cur, title, sub, onpick) {
   const sel = cur === val;
-  return `<button onclick="${onpick}" style="display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;padding:13px 14px;border:1.5px solid ${sel ? 'var(--gold)' : 'var(--border-med)'};background:${sel ? 'var(--gold-sheen,rgba(212,182,92,.06))' : 'transparent'};border-radius:12px;margin-top:8px;font:inherit;cursor:pointer">
-    <span style="flex:none;width:15px;height:15px;margin-top:1px;border-radius:999px;border:2px solid ${sel ? 'var(--gold)' : 'var(--border-str)'};${sel ? 'background:var(--gold);box-shadow:inset 0 0 0 3px var(--surface)' : ''}"></span>
+  return `<button onclick="${onpick}" class="obf2-choice ${sel ? 'sel' : ''}">
+    <span class="obf2-radio"></span>
     <span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:800;color:var(--text)">${title}</span>
     <span style="display:block;font-size:11.5px;color:var(--text-mute);line-height:1.45;margin-top:2px">${sub}</span></span>
   </button>`;
 }
 const _obfInp = (id, label, val, ph) => `<div style="margin-top:10px">
-  <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute);margin-bottom:5px">${label}</div>
-  <input id="${id}" value="${escapeHTML(val || '')}" placeholder="${ph || ''}" style="width:100%;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:8px;color:var(--text);font:inherit;font-size:13px;padding:10px 12px">
+  <div class="obf2-lab">${label}</div>
+  <input id="${id}" value="${escapeHTML(val || '')}" placeholder="${ph || ''}" class="obf2-inp">
 </div>`;
-const _obfDoneLine = (txt) => `<div style="display:flex;align-items:center;gap:7px;margin-top:14px;font-size:12px;font-weight:700;color:var(--green,#4CC76A)">
+const _obfDoneLine = (txt) => `<div class="obf2-done">
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>${txt}</div>`;
 
 // Texting: the number choice (3 paths) + the A2P registration trio. The two
@@ -18153,19 +18259,19 @@ function _obfWizTextingPage(st) {
   const portForm = c === 'port' ? `
     ${_obfInp('obf-port-number', 'The number to port', ob.port_number, '(305) 555-0123')}
     ${_obfInp('obf-port-carrier', 'Current carrier + account number + transfer PIN', ob.port_carrier, 'Verizon · acct 1234 · PIN 0000')}
-    <div style="font-size:11px;color:var(--text-mute);margin-top:8px">Our team collects a recent phone bill from you when we file the port. Most rejections are a wrong PIN or account number, so double-check those.</div>
-    <button onclick="_obfSetupSave({port_number:document.getElementById('obf-port-number').value.trim(), port_carrier:document.getElementById('obf-port-carrier').value.trim()}, null, this)" style="width:100%;margin-top:10px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save port details</button>` : '';
+    <div class="obf2-hint">Our team collects a recent phone bill from you when we file the port. Most rejections are a wrong PIN or account number, so double-check those.</div>
+    <button onclick="_obfSetupSave({port_number:document.getElementById('obf-port-number').value.trim(), port_carrier:document.getElementById('obf-port-carrier').value.trim()}, null, this)" class="obf2-cta blk" style="margin-top:10px;padding:11px;font-size:12.5px;font-weight:800">Save port details</button>` : '';
   const a2p = `
-    <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:20px">Registration details (must match your IRS records exactly)</div>
-    <div style="font-size:11.5px;color:var(--text-mute);line-height:1.5;margin-top:4px">US carriers require every business to register before it can text customers. We file it for you. Carrier approval takes a few days and runs in the background while you finish everything else.</div>
+    <div class="obf2-secthead" style="margin-top:20px">Registration details (must match your IRS records exactly)</div>
+    <div class="obf2-hint" style="font-size:11.5px;margin-top:4px">US carriers require every business to register before it can text customers. We file it for you. Carrier approval takes a few days and runs in the background while you finish everything else.</div>
     ${_obfInp('obf-a2p-legal', 'Legal business name', st.legal_name, 'Exactly as registered with the IRS')}
     ${_obfInp('obf-a2p-ein', 'Tax ID (EIN)', st.ein_value, 'XX-XXXXXXX')}
     ${_obfInp('obf-a2p-address', 'Registered business address', st.address, 'Street, city, state, zip')}
-    <button onclick="_obfSetupSave({}, {legal_name:document.getElementById('obf-a2p-legal').value.trim(), ein:document.getElementById('obf-a2p-ein').value.trim(), address:document.getElementById('obf-a2p-address').value.trim()}, this)" style="width:100%;margin-top:12px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Save registration details</button>
-    <button onclick="_obfSkip('texting')" style="display:block;margin:10px auto 0;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Canadian business without an EIN? Skip for now</button>`;
+    <button onclick="_obfSetupSave({}, {legal_name:document.getElementById('obf-a2p-legal').value.trim(), ein:document.getElementById('obf-a2p-ein').value.trim(), address:document.getElementById('obf-a2p-address').value.trim()}, this)" class="obf2-cta blk" style="margin-top:12px;padding:11px;font-size:12.5px;font-weight:800">Save registration details</button>
+    <button onclick="_obfSkip('texting')" class="obf2-skip">Canadian business without an EIN? Skip for now</button>`;
   return _obfWizShell('Set up texting and calling',
     'The number your academy texts and calls from: booking confirmations, follow-ups, the AI agent, all of it. Nothing switches until the very end, so parents never miss a message.',
-    `<div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:16px">Your number</div>
+    `<div class="obf2-secthead" style="margin-top:16px">Your number</div>
      ${choices}${portForm}${a2p}${st.texting ? _obfDoneLine('Texting setup saved. Our team runs the registration from here') : ''}`);
 }
 
@@ -18183,7 +18289,7 @@ function _obfWizAdsPage(st) {
     ${_obfWizChoice('ads', 'later', c, 'Not running ads yet',
       'Skip it. This lives in your portal whenever you are ready.',
       `_obfSetupSave({ads_choice:'later'})`)}
-    ${c === 'managed' ? `<div style="font-size:11.5px;color:var(--text-mute);line-height:1.5;margin-top:12px">Our team sends your access link right after this. Approve it and ads are wired. Never run ads before? We set the whole account up for you, in your name.</div>` : ''}
+    ${c === 'managed' ? `<div class="obf2-hint" style="font-size:11.5px;margin-top:12px">Our team sends your access link right after this. Approve it and ads are wired. Never run ads before? We set the whole account up for you, in your name.</div>` : ''}
     ${st.ads ? _obfDoneLine('Ads choice saved') : ''}`;
   return _obfWizShell('Set up your ads',
     'Optional: ads are never required to launch. Either way the ad account, pixel and billing stay YOURS; we only ever get partner access.', inner);
@@ -18196,13 +18302,13 @@ function _obfWizStoryPage(st, sec, step) {
   const base = _obfWizStepPage(st, sec, step);
   const submitted = !!(st.ob && st.ob.brief_submitted_at);
   const extra = submitted
-    ? `<div style="display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;font-weight:700;color:var(--green,#4CC76A)">
+    ? `<div class="obf2-done" style="margin-top:10px">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
         Brief submitted. Your branding deck build kicked off; watch it on the Brand board step</div>`
     : st.sitecopy
-      ? `<button onclick="_obfSetupSave({brief_submitted_at:new Date().toISOString()}, null, this)" style="width:100%;margin-top:12px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Submit your brief and start the build</button>
-         <div style="font-size:11px;color:var(--text-mute);line-height:1.5;margin-top:8px;text-align:center">Submitting kicks off your branding deck. You can keep refining your answers after.</div>`
-      : `<div style="font-size:11px;color:var(--text-mute);line-height:1.5;margin-top:10px">Write your story first, then submit the brief here to start the build.</div>`;
+      ? `<button onclick="_obfSetupSave({brief_submitted_at:new Date().toISOString()}, null, this)" class="obf2-cta blk" style="margin-top:12px">Submit your brief and start the build</button>
+         <div class="obf2-hint" style="text-align:center">Submitting kicks off your branding deck. You can keep refining your answers after.</div>`
+      : `<div class="obf2-hint" style="margin-top:10px">Write your story first, then submit the brief here to start the build.</div>`;
   return base.replace(/<\/div>\s*$/, extra + '</div>');
 }
 
@@ -18217,7 +18323,7 @@ function _obfWizContactsPage(st) {
       'Your whole contact list comes over from GoHighLevel automatically. It is the base every lead and member record ties back to.',
       st.contacts
         ? _obfDoneLine(`${n.toLocaleString()} contact${n === 1 ? '' : 's'} in`)
-        : `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:600;color:var(--text-sub,var(--text-mute))"><span class="req-spin" style="width:12px;height:12px"></span> Our team is bringing your contacts over. They land here automatically</div>`);
+        : `<div class="obf2-wait" style="margin-top:16px"><span class="req-spin" style="width:12px;height:12px"></span> Our team is bringing your contacts over. They land here automatically</div>`);
   }
   return _obfWizShell('Import your contacts',
     'Every lead, parent and past inquiry you have, into one system right at the start. Names, phones and emails only; the specific info you collect from new leads and members is set up later in your offer.',
@@ -18240,7 +18346,7 @@ function _cimpBody(st, ob) {
     if (r.merged_in_file) bits.push(`${r.merged_in_file} in-file duplicates folded`);
     if ((r.fields_created || []).length) bits.push(`new fields: ${r.fields_created.join(', ')}`);
     return `${_obfDoneLine(bits.map(escapeHTML).join(' &middot; '))}
-      <button onclick="_CIMP=null;_obfRender(_OBF_STATE)" style="margin-top:12px;background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:8px 14px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Import another file</button>`;
+      <button onclick="_CIMP=null;_obfRender(_OBF_STATE)" class="obf2-ghost" style="margin-top:12px">Import another file</button>`;
   }
   if (c && c.step === 'map') {
     const opts = (sel) => {
@@ -18250,26 +18356,26 @@ function _cimpBody(st, ob) {
     };
     const rows = c.mapping.map((m, i) => {
       const sel = m.field ? 'field:' + m.field : 'fate:' + (m.fate || 'archive');
-      return `<div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px">
+      return `<div class="obf2-row" style="margin-top:6px;padding:8px 10px">
         <div style="flex:1;min-width:0;font-size:12px"><b>${escapeHTML(m.column)}</b>${m.sample ? `<div style="font-size:11px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">e.g. ${escapeHTML(m.sample)}</div>` : ''}</div>
-        <select class="cimp-sel" data-i="${i}" style="flex:none;max-width:200px;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 8px;font:inherit;font-size:11.5px">${opts(sel)}</select>
+        <select class="cimp-sel obf2-sel" data-i="${i}" style="flex:none;max-width:200px;padding:6px 8px;font-size:11.5px">${opts(sel)}</select>
       </div>`;
     }).join('');
-    return `<div style="font-size:12px;color:var(--text-sub,var(--text-mute));margin-top:4px">${c.rows.length.toLocaleString()} rows read. Check what each column becomes. Columns that fit nothing are never lost silently: make them a custom field, keep them on the person's record, or skip them on purpose.</div>
+    return `<div style="font-size:12px;color:var(--text-sub);margin-top:4px">${c.rows.length.toLocaleString()} rows read. Check what each column becomes. Columns that fit nothing are never lost silently: make them a custom field, keep them on the person's record, or skip them on purpose.</div>
       ${rows}
-      ${c.err ? `<div style="font-size:12px;color:var(--red,#c96856);margin-top:10px">${escapeHTML(c.err)}</div>` : ''}
-      <button onclick="_cimpCommit(this)" style="width:100%;margin-top:14px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer">Import ${c.rows.length.toLocaleString()} contacts</button>
-      <button onclick="_CIMP=null;_obfRender(_OBF_STATE)" style="width:100%;margin-top:8px;background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Start over</button>`;
+      ${c.err ? `<div style="font-size:12px;color:var(--red);margin-top:10px">${escapeHTML(c.err)}</div>` : ''}
+      <button onclick="_cimpCommit(this)" class="obf2-cta blk" style="margin-top:14px;padding:11px;font-size:12.5px;font-weight:800">Import ${c.rows.length.toLocaleString()} contacts</button>
+      <button onclick="_CIMP=null;_obfRender(_OBF_STATE)" class="obf2-ghost blk" style="margin-top:8px;padding:9px">Start over</button>`;
   }
-  return `<label style="display:block;border:1.5px dashed var(--border-med);border-radius:12px;padding:22px 16px;margin-top:14px;text-align:center;cursor:pointer">
+  return `<label class="obf2-drop">
       <input type="file" accept=".csv,text/csv" style="display:none" onchange="_cimpFile(this)">
       <div style="font-size:13px;font-weight:700;color:var(--text)">Drop your contact list here</div>
       <div style="font-size:11.5px;color:var(--text-mute);margin-top:4px">CSV export from any tool. Any layout: we map the columns, you confirm.</div>
     </label>
-    ${(_CIMP && _CIMP.err) ? `<div style="font-size:12px;color:var(--red,#c96856);margin-top:10px">${escapeHTML(_CIMP.err)}</div>` : ''}
-    ${(_CIMP && _CIMP.step === 'busy') ? `<div style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:12px;font-weight:600;color:var(--text-sub,var(--text-mute))"><span class="req-spin" style="width:12px;height:12px"></span> Reading your file and mapping the columns…</div>` : ''}
+    ${(_CIMP && _CIMP.err) ? `<div style="font-size:12px;color:var(--red);margin-top:10px">${escapeHTML(_CIMP.err)}</div>` : ''}
+    ${(_CIMP && _CIMP.step === 'busy') ? `<div class="obf2-wait" style="margin-top:12px"><span class="req-spin" style="width:12px;height:12px"></span> Reading your file and mapping the columns…</div>` : ''}
     ${_obfInp('obf-contacts-src', 'No file handy? Tell us where the list lives', ob.contacts_source, 'Paste a Google Sheet link, or tell us where it lives...')}
-    <button onclick="_obfSetupSave({contacts_source:document.getElementById('obf-contacts-src').value.trim()}, null, this)" style="width:100%;margin-top:10px;background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Save the note for our team</button>
+    <button onclick="_obfSetupSave({contacts_source:document.getElementById('obf-contacts-src').value.trim()}, null, this)" class="obf2-ghost blk" style="margin-top:10px;padding:9px">Save the note for our team</button>
     ${st.contacts ? _obfDoneLine('Contacts are in') : ''}`;
 }
 
@@ -18339,37 +18445,37 @@ function _obfWizStepPage(st, sec, s) {
   const noteFn = s.note && (typeof window !== 'undefined' ? window[s.note] : null);
   const n = (typeof noteFn === 'function') ? noteFn(st) : null;
   if (n) {
-    const color = n.tone === 'good' ? 'var(--green,#4CC76A)' : 'var(--amber,#F0B84A)';
-    note = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:14px;font-size:12px;font-weight:600;color:${color}">
+    const color = n.tone === 'good' ? 'var(--green)' : 'var(--amber)';
+    note = `<div class="obf2-note" style="color:${color}">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none">${n.tone === 'good' ? '<path d="M20 6 9 17l-5-5"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>'}</svg>
       <span>${n.text}</span>
-      ${n.cta ? `<button onclick="${n.go}" style="background:none;border:1px solid var(--amber,#F0B84A);border-radius:6px;color:var(--amber,#F0B84A);padding:3px 10px;font:inherit;font-size:11px;font-weight:700;cursor:pointer">${n.cta}</button>` : ''}
+      ${n.cta ? `<button class="obf2-notebtn" onclick="${n.go}">${n.cta}</button>` : ''}
     </div>`;
   }
   const tags = []
-    .concat(s.launch && !ok ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);border:1px solid var(--accent-border,rgba(212,182,92,.35));border-radius:5px;padding:1px 6px">Launch must-have</span>`] : [])
-    .concat(s.optional && !ok ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute);border:1px solid var(--border-med);border-radius:5px;padding:1px 6px">Optional</span>`] : [])
-    .concat(s.team ? [`<span style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--text-sub,var(--text-mute));border:1px solid var(--border-med);border-radius:5px;padding:1px 6px">Our team runs this</span>`] : [])
+    .concat(s.launch && !ok ? [`<span class="obf2-tag gold">Launch must-have</span>`] : [])
+    .concat(s.optional && !ok ? [`<span class="obf2-tag mute">Optional</span>`] : [])
+    .concat(s.team ? [`<span class="obf2-tag">Our team runs this</span>`] : [])
     .join(' ');
-  return `<div style="border:1px solid ${ok ? 'var(--accent-border,rgba(212,182,92,.25))' : 'var(--border)'};background:${ok ? 'var(--gold-sheen,rgba(212,182,92,.05))' : 'transparent'};border-radius:16px;padding:20px 20px 22px;margin-top:4px">
+  return `<div class="obf2-stepcard ${ok ? 'ok' : ''}">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span style="flex:none;width:24px;height:24px;border-radius:999px;display:flex;align-items:center;justify-content:center;${ok ? 'background:var(--gold);color:var(--on-gold,#1a1608)' : 'border:1.5px solid var(--border-med);color:transparent'}">
+      <span class="obf2-check ${ok ? 'ok' : ''}">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       </span>
       ${tags}
     </div>
-    <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text);margin-top:10px">${s.title}</div>
-    <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${s.sub}</div>
+    <div class="obf2-title" style="margin-top:10px">${s.title}</div>
+    <div class="obf2-sub">${s.sub}</div>
     ${note}
-    ${ok ? `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:700;color:var(--green,#4CC76A)">
+    ${ok ? `<div class="obf2-done" style="margin-top:16px">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-        Done. The system sees it live${s.go && !s.team ? ` <button onclick="${s.go}" style="background:none;border:none;padding:0;margin-left:4px;font:inherit;font-size:11.5px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Open anyway</button>` : ''}
+        Done. The system sees it live${s.go && !s.team ? ` <button onclick="${s.go}" class="obf2-skip" style="display:inline;margin:0 0 0 4px;font-size:11.5px">Open anyway</button>` : ''}
       </div>`
-      : s.team ? `<div style="display:flex;align-items:center;gap:7px;margin-top:16px;font-size:12px;font-weight:600;color:var(--text-sub,var(--text-mute))">
+      : s.team ? `<div class="obf2-wait" style="margin-top:16px">
         <span class="req-spin" style="width:12px;height:12px"></span> Our team is on it. Nothing for you to do here
       </div>`
-      : `<button onclick="${s.go}" style="width:100%;margin-top:18px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">${s.cta}</button>`}
-    ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" style="display:block;margin:10px auto 0;background:none;border:none;padding:0;font:inherit;font-size:11px;font-weight:600;color:var(--text-mute);text-decoration:underline;cursor:pointer">Not applicable, skip for now</button>` : ''}
+      : `<button onclick="${s.go}" class="obf2-cta blk" style="margin-top:18px;font-weight:800">${s.cta}</button>`}
+    ${(!ok && s.skippable) ? `<button onclick="_obfSkip('${s.key}')" class="obf2-skip">Not applicable, skip for now</button>` : ''}
   </div>`;
 }
 
@@ -18378,19 +18484,19 @@ function _obfWizStepPage(st, sec, s) {
 // review + Go live; PR-1 renders them together over today's build states).
 function _obfWizLaunchPage(st) {
   const b = st.website_build;
-  const stage = (on, label, meta) => `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:12px;margin-top:7px;font-size:12.5px">
-      <span style="flex:none;width:8px;height:8px;border-radius:999px;background:${on ? 'var(--green,#4CC76A)' : 'var(--amber,#F0B84A)'}"></span>
+  const stage = (on, label, meta) => `<div class="obf2-row">
+      <span class="obf2-dot" style="background:${on ? 'var(--green)' : 'var(--amber)'}"></span>
       <span style="font-weight:700;color:var(--text)">${label}</span>
-      ${meta ? `<span style="margin-left:auto;color:var(--text-mute);font-size:11px;text-align:right">${meta}</span>` : ''}
+      ${meta ? `<span class="obf2-rowmeta">${meta}</span>` : ''}
     </div>`;
   const buildRows = st.website ? '' : `
-    <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:16px">Your site build</div>
+    <div class="obf2-secthead" style="margin-top:16px">Your site build</div>
     ${stage(true, 'Queued', 'brief received')}
     ${stage(b === 'building' || b === 'staging_ready' || b === 'verified', 'Building', 'our team, from your brand and offer')}
     ${stage(b === 'staging_ready' || b === 'verified', 'On staging', st.staging_url ? 'ready to preview' : '')}
     ${stage(b === 'verified', 'Verified', 'all checks + your sign-offs green')}
-    ${b === 'staging_ready' && !st.site_accepted ? `<button onclick="_obfSiteAcceptOpen()" style="width:100%;margin-top:10px;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer">Review your new site &amp; accept</button>` : ''}
-    ${b === 'staging_ready' && st.site_accepted ? `<div style="display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;font-weight:600;color:var(--green,#4CC76A)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> You accepted the new site. Our team runs the final checks</div>` : ''}`;
+    ${b === 'staging_ready' && !st.site_accepted ? `<button onclick="_obfSiteAcceptOpen()" class="obf2-cta blk" style="margin-top:10px;font-weight:800">Review your new site &amp; accept</button>` : ''}
+    ${b === 'staging_ready' && st.site_accepted ? `<div class="obf2-done" style="margin-top:10px;font-weight:600"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> You accepted the new site. Our team runs the final checks</div>` : ''}`;
   // The go-live checklist: every launch must-have + the site itself, each
   // row clickable straight to its page when still open.
   const visible = _obfVisibleSteps(st);
@@ -18398,8 +18504,8 @@ function _obfWizLaunchPage(st) {
     .concat([{ key: null, label: 'Site verified on staging', ok: b === 'verified' || !!st.website }]);
   const allGreen = checks.every(c => c.ok);
   const checkRows = checks.map(c => c.ok
-    ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:12px;margin-top:7px;font-size:12.5px"><span style="flex:none;width:8px;height:8px;border-radius:999px;background:var(--green,#4CC76A)"></span><span style="font-weight:700">${c.label}</span><span style="margin-left:auto;color:var(--text-mute);font-size:11px">done</span></div>`
-    : `<button ${c.key ? `onclick="_obfWizJumpKey('${c.key}')"` : 'disabled'} style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 13px;border:1px solid var(--border);border-radius:12px;margin-top:7px;font:inherit;font-size:12.5px;background:none;color:var(--text);cursor:${c.key ? 'pointer' : 'default'};text-align:left"><span style="flex:none;width:8px;height:8px;border-radius:999px;background:var(--amber,#F0B84A)"></span><span style="font-weight:700">${c.label}</span><span style="margin-left:auto;color:var(--amber,#F0B84A);font-size:11px;font-weight:700">still open${c.key ? ' &middot; fix it' : ''}</span></button>`).join('');
+    ? `<div class="obf2-row"><span class="obf2-dot" style="background:var(--green)"></span><span style="font-weight:700">${c.label}</span><span class="obf2-rowmeta">done</span></div>`
+    : `<button ${c.key ? `onclick="_obfWizJumpKey('${c.key}')"` : 'disabled'} class="obf2-row"><span class="obf2-dot" style="background:var(--amber)"></span><span style="font-weight:700">${c.label}</span><span class="obf2-rowmeta" style="color:var(--amber);font-weight:700">still open${c.key ? ' &middot; fix it' : ''}</span></button>`).join('');
   // The six build artifacts (WS3): status straight from website_setup.chunks -
   // each piece kicks off on its own the moment its inputs land.
   const CHUNK_LABELS = [
@@ -18415,23 +18521,23 @@ function _obfWizLaunchPage(st) {
     const done = c.status === 'published';
     const active = c.status === 'ready' || c.status === 'building';
     const meta = done ? 'published' : c.status === 'building' ? 'our team is building it' : c.status === 'ready' ? 'our team is on it' : hint;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border:1px solid var(--border);border-radius:12px;margin-top:7px;font-size:12.5px">
-      <span style="flex:none;width:8px;height:8px;border-radius:999px;background:${done ? 'var(--green,#4CC76A)' : active ? 'var(--amber,#F0B84A)' : 'var(--border-str)'}"></span>
-      <span style="font-weight:700;color:${done || active ? 'var(--text)' : 'var(--text-sub,var(--text-mute))'}">${label}</span>
-      <span style="margin-left:auto;color:var(--text-mute);font-size:11px;text-align:right">${meta}</span>
+    return `<div class="obf2-row">
+      <span class="obf2-dot" style="background:${done ? 'var(--green)' : active ? 'var(--amber)' : 'var(--border-str)'}"></span>
+      <span style="font-weight:700;color:${done || active ? 'var(--text)' : 'var(--text-sub)'}">${label}</span>
+      <span class="obf2-rowmeta">${meta}</span>
     </div>`;
   };
   const chunkRows = st.website ? '' : `
-    <div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:18px">What we build for you</div>
+    <div class="obf2-secthead">What we build for you</div>
     ${CHUNK_LABELS.map(chunkRow).join('')}`;
-  return `<div style="border:1px solid var(--border);border-radius:16px;padding:20px 20px 22px;margin-top:4px">
-    <div style="font-family:var(--font-num,inherit);font-size:20px;font-weight:800;color:var(--text)">${st.website ? 'Your site is live' : 'Launch your new website'}</div>
-    <div style="font-size:12.5px;color:var(--text-sub,var(--text-mute));line-height:1.55;margin-top:4px">${st.website ? 'The domain points at the new site. Onboarding is done.' : 'Our team builds it from everything you set up. You review it on a private address, accept it, and flip your domain when every light below is green. Your current site stays live until the flip.'}</div>
+  return `<div class="obf2-stepcard">
+    <div class="obf2-title">${st.website ? 'Your site is live' : 'Launch your new website'}</div>
+    <div class="obf2-sub">${st.website ? 'The domain points at the new site. Onboarding is done.' : 'Our team builds it from everything you set up. You review it on a private address, accept it, and flip your domain when every light below is green. Your current site stays live until the flip.'}</div>
     ${chunkRows}
     ${buildRows}
-    ${st.website ? '' : `<div style="font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-top:18px">Ready to go live?</div>
+    ${st.website ? '' : `<div class="obf2-secthead">Ready to go live?</div>
     ${checkRows}
-    <button onclick="_obfGoDomains()" ${allGreen ? '' : 'disabled'} style="width:100%;margin-top:14px;background:${allGreen ? 'var(--gold)' : 'transparent'};border:${allGreen ? 'none' : '1px solid var(--border-med)'};border-radius:8px;color:${allGreen ? 'var(--on-gold,#1a1608)' : 'var(--text-mute)'};padding:13px;font:inherit;font-size:13.5px;font-weight:800;cursor:${allGreen ? 'pointer' : 'default'}">${allGreen ? 'Flip the domain' : 'Flip the domain (unlocks when everything above is green)'}</button>`}
+    <button onclick="_obfGoDomains()" ${allGreen ? '' : 'disabled'} class="obf2-cta blk" style="margin-top:14px;padding:13px;font-size:13.5px;font-weight:800">${allGreen ? 'Flip the domain' : 'Flip the domain (unlocks when everything above is green)'}</button>`}
   </div>`;
 }
 
@@ -18487,14 +18593,14 @@ let _CX = null; // { buckets } from the GET
 function _cxClose() { document.getElementById('cx-overlay')?.remove(); }
 async function _cxOpen() {
   _cxClose();
-  document.body.insertAdjacentHTML('beforeend', `<div id="cx-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_cxClose()">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;padding:24px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
+  document.body.insertAdjacentHTML('beforeend', `<div id="cx-overlay" class="obfm-overlay" onclick="if(event.target===this)_cxClose()">
+    <div class="obfm-card" style="max-width:640px">
+      <div class="obfm-head">
         <div>
-          <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)">Onboarding</div>
-          <div style="font-family:var(--font-num,inherit);font-size:19px;font-weight:800;color:var(--text)">Import cancelled members</div>
+          <div class="obf2-kicker">Onboarding</div>
+          <div class="obf2-title" style="font-size:19px">Import cancelled members</div>
         </div>
-        <button onclick="_cxClose()" style="background:transparent;border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:7px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Close</button>
+        <button class="obf2-ghost" onclick="_cxClose()" style="padding:7px 12px">Close</button>
       </div>
       <div id="cx-body"><div class="req-empty" style="padding:16px 0"><span class="req-spin"></span> Reading your Stripe cancellations and matching contacts…</div></div>
     </div></div>`);
@@ -18507,7 +18613,7 @@ async function _cxOpen() {
     _cxRender();
   } catch (e) {
     const body = document.getElementById('cx-body');
-    if (body) body.innerHTML = `<div style="font-size:12.5px;color:var(--red,#c96856);padding:8px 0">${escapeHTML(e.message || String(e))}</div>`;
+    if (body) body.innerHTML = `<div style="font-size:12.5px;color:var(--red);padding:8px 0">${escapeHTML(e.message || String(e))}</div>`;
   }
 }
 
@@ -18523,44 +18629,44 @@ function _cxRender() {
   const flagBlock = (r) => {
     const flags = Array.isArray(r.flags) ? r.flags : [];
     if (!flags.length) return '';
-    const chips = flags.map(f => `<span style="flex:none;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:6px;border:1px solid rgba(240,184,74,.45);color:var(--amber,#F0B84A)">${escapeHTML(_CX_FLAG_LABELS[f] || f)}</span>`).join('');
+    const chips = flags.map(f => `<span class="obf2-tag" style="flex:none;letter-spacing:normal;text-transform:none;border-color:rgba(240,184,74,.45);color:var(--amber)">${escapeHTML(_CX_FLAG_LABELS[f] || f)}</span>`).join('');
     return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px">${chips}</div>
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:7px;font-size:11.5px;color:var(--text-mute)">
         <span>Left on</span>
-        <input type="date" class="cx-date" data-cid="${escapeHTML(r.customer_id)}" value="${escapeHTML(r.cancelled_at || '')}" style="background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit;font-size:11.5px">
-        <select class="cx-churn" data-cid="${escapeHTML(r.customer_id)}" style="flex:1;min-width:150px;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:6px;color:var(--text);padding:4px 6px;font:inherit;font-size:11.5px">
+        <input type="date" class="cx-date obf2-inp" data-cid="${escapeHTML(r.customer_id)}" value="${escapeHTML(r.cancelled_at || '')}" style="width:auto;padding:4px 6px;font-size:11.5px;border-radius:var(--r-xs)">
+        <select class="cx-churn obf2-sel" data-cid="${escapeHTML(r.customer_id)}" style="flex:1;min-width:150px;padding:4px 6px;font-size:11.5px;border-radius:var(--r-xs)">
           <option value="out" selected>Keep out of churn numbers</option>
           <option value="in">Looks right, count it</option>
         </select>
       </div>`;
   };
   if (!(bk.matched || []).length && !(bk.review || []).length && !(bk.none || []).length) {
-    body.innerHTML = `<div style="border:1px solid var(--border);border-radius:12px;padding:16px;font-size:13px;color:var(--text-sub,var(--text-mute))">No cancelled subscriptions found in your Stripe${(bk.already_member || []).length ? ` (${bk.already_member.length} cancelled-then-resubscribed people are already live members - nothing to do)` : ''}. You're clean - skip this step.</div>
-      <button onclick="_obfSkip('cancelled');_cxClose()" style="margin-top:12px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Done, nothing to import</button>`;
+    body.innerHTML = `<div class="obf2-row" style="display:block;padding:16px;font-size:13px;color:var(--text-sub)">No cancelled subscriptions found in your Stripe${(bk.already_member || []).length ? ` (${bk.already_member.length} cancelled-then-resubscribed people are already live members - nothing to do)` : ''}. You're clean - skip this step.</div>
+      <button onclick="_obfSkip('cancelled');_cxClose()" class="obf2-cta blk" style="margin-top:12px;padding:10px">Done, nothing to import</button>`;
     return;
   }
   const sect = (label, hint, rowsHtml, color) => rowsHtml ? `<div style="margin-top:16px">
-      <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:${color}">${label}</div>
+      <div class="obf2-secthead" style="margin-top:0;font-size:11px;letter-spacing:.06em;color:${color}">${label}</div>
       <div style="font-size:11.5px;color:var(--text-mute);margin:2px 0 6px">${hint}</div>${rowsHtml}</div>` : '';
-  const matchedRows = (bk.matched || []).map((r, i) => `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px">
+  const matchedRows = (bk.matched || []).map((r, i) => `<div class="obf2-row" style="display:block;margin-top:6px;padding:8px 10px">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
         <input type="checkbox" class="cx-m" data-i="${i}" ${r.already_tagged ? '' : 'checked'} ${r.already_tagged ? 'disabled' : ''}>
         <div style="flex:1;min-width:0;font-size:12px"><b>${who(r)}</b> <span style="color:var(--text-mute)">→ ${escapeHTML(r.contact_name)}</span><div style="font-size:11px;color:var(--text-mute)">${meta(r)}${r.already_tagged ? ' &middot; already imported' : ''}</div></div>
-        <span style="flex:none;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:6px;border:1px solid var(--border);color:var(--text-mute)">${r.why.toUpperCase()}</span>
+        <span class="obf2-tag mute" style="flex:none;letter-spacing:normal">${r.why.toUpperCase()}</span>
       </label>${flagBlock(r)}
     </div>`).join('');
-  const reviewRows = (bk.review || []).map((r, i) => `<div style="border:1px solid rgba(240,184,74,.35);border-radius:8px;padding:8px 10px;margin-top:6px">
+  const reviewRows = (bk.review || []).map((r, i) => `<div class="obf2-row" style="display:block;margin-top:6px;padding:8px 10px;border-color:rgba(240,184,74,.35)">
       <div style="font-size:12px"><b>${who(r)}</b><div style="font-size:11px;color:var(--text-mute)">${meta(r)}</div></div>
-      <select class="cx-r" data-i="${i}" style="margin-top:6px;width:100%;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:6px 8px;font:inherit;font-size:12px">
+      <select class="cx-r obf2-sel" data-i="${i}" style="margin-top:6px;width:100%;padding:6px 8px;font-size:12px">
         <option value="link">Link to ${escapeHTML(r.candidate_name)} (${escapeHTML(r.why)} match)</option>
         <option value="create">Not them, create a new contact</option>
         <option value="skip">Skip this one</option>
       </select>${flagBlock(r)}
     </div>`).join('');
-  const noneRows = (bk.none || []).map((r, i) => `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:6px">
+  const noneRows = (bk.none || []).map((r, i) => `<div class="obf2-row" style="display:block;margin-top:6px;padding:8px 10px">
       <div style="display:flex;align-items:center;gap:10px">
         <div style="flex:1;min-width:0;font-size:12px"><b>${who(r)}</b><div style="font-size:11px;color:var(--text-mute)">${meta(r)}</div></div>
-        <select class="cx-n" data-i="${i}" style="flex:none;background:var(--surface-2,transparent);border:1px solid var(--border-med);border-radius:7px;color:var(--text);padding:5px 8px;font:inherit;font-size:11.5px">
+        <select class="cx-n obf2-sel" data-i="${i}" style="flex:none;padding:5px 8px;font-size:11.5px">
           <option value="create">Create contact</option>
           <option value="skip">Skip (test/dupe)</option>
         </select>
@@ -18571,11 +18677,11 @@ function _cxRender() {
   if (_CX.plan_switches) notes.push(`${_CX.plan_switches} plan ${_CX.plan_switches === 1 ? 'switch' : 'switches'} folded in (not counted as churn)`);
   if ((_CX.excluded || []).length) notes.push(`${_CX.excluded.length} skipped: no cancel date in Stripe`);
   body.innerHTML = `
-    <div style="font-size:12px;color:var(--text-sub,var(--text-mute))">${_CX.total} cancelled ${_CX.total === 1 ? 'person' : 'people'} found${notes.length ? ' &middot; ' + notes.map(escapeHTML).join(' &middot; ') : ''}. Each import is tagged "cancelled" for win-back AND written into your churn history, so your retention numbers start true.</div>
-    ${sect('Matched', 'Exact email hits. Untick any you do not want.', matchedRows, 'var(--green,#7BC47F)')}
-    ${sect('Needs a look', 'Fuzzy matches. Confirm each one.', reviewRows, 'var(--amber,#F0B84A)')}
+    <div style="font-size:12px;color:var(--text-sub)">${_CX.total} cancelled ${_CX.total === 1 ? 'person' : 'people'} found${notes.length ? ' &middot; ' + notes.map(escapeHTML).join(' &middot; ') : ''}. Each import is tagged "cancelled" for win-back AND written into your churn history, so your retention numbers start true.</div>
+    ${sect('Matched', 'Exact email hits. Untick any you do not want.', matchedRows, 'var(--green)')}
+    ${sect('Needs a look', 'Fuzzy matches. Confirm each one.', reviewRows, 'var(--amber)')}
     ${sect('No contact found', 'Nobody in your CRM matches. Create them from the Stripe data, or skip.', noneRows, 'var(--text-mute)')}
-    <button id="cx-apply" onclick="_cxApply(this)" style="margin-top:16px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:11px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Import cancelled members</button>`;
+    <button id="cx-apply" onclick="_cxApply(this)" class="obf2-cta blk" style="margin-top:16px;padding:11px">Import cancelled members</button>`;
 }
 
 async function _cxApply(btn) {
@@ -18614,8 +18720,8 @@ async function _cxApply(btn) {
     const j = await _safeJson(r);
     if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
     const body = document.getElementById('cx-body');
-    if (body) body.innerHTML = `<div style="border:1px solid var(--accent-border,rgba(212,182,92,.3));background:var(--gold-sheen,rgba(212,182,92,.06));border-radius:12px;padding:16px;font-size:13px;color:var(--text)"><b>Done.</b> ${j.linked} linked &middot; ${j.created} created &middot; ${j.skipped} skipped. ${j.churn_written ? `${j.churn_written} churn ${j.churn_written === 1 ? 'record' : 'records'} written: your retention numbers now include this history.` : ''}${j.churn_excluded ? ` ${j.churn_excluded} kept out of the numbers per your review.` : ''} They're tagged "cancelled" with their history, so win-back can start whenever you're ready.</div>
-      <button onclick="_cxClose()" style="margin-top:12px;width:100%;background:var(--gold);border:none;border-radius:8px;color:var(--on-gold,#1a1608);padding:10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Back to onboarding</button>`;
+    if (body) body.innerHTML = `<div style="border:1px solid var(--accent-border);background:var(--gold-sheen);border-radius:var(--r-md);padding:16px;font-size:13px;color:var(--text)"><b>Done.</b> ${j.linked} linked &middot; ${j.created} created &middot; ${j.skipped} skipped. ${j.churn_written ? `${j.churn_written} churn ${j.churn_written === 1 ? 'record' : 'records'} written: your retention numbers now include this history.` : ''}${j.churn_excluded ? ` ${j.churn_excluded} kept out of the numbers per your review.` : ''} They're tagged "cancelled" with their history, so win-back can start whenever you're ready.</div>
+      <button onclick="_cxClose()" class="obf2-cta blk" style="margin-top:12px;padding:10px">Back to onboarding</button>`;
     await _obfFetchState().catch(() => {});
     _obfRender(_OBF_STATE);
   } catch (e) {
@@ -20924,6 +21030,7 @@ function _hv2HawkPaint(d, total) {
     : top.kind === 'book' ? `Confirm ${name}'s booking`
     : top.kind === 'ghost' ? `Move ${name} to the Ghosted automation`
     : top.kind === 'mark_lost' ? `Confirm ${name} as lost`
+    : top.kind === 'mark_unqualified' ? `${name} opted out - mark unqualified`
     : `Reply to ${name}`;
   host.innerHTML = `<button class="hv2-one" onclick="_hv2OpenHawkeye()">
     <div style="display:flex;align-items:center;gap:8px"><span class="hv2-lab">${_HV2_ICONS.eye} Hawkeye</span><span class="hv2-pill red">${total} action${total === 1 ? '' : 's'} waiting</span></div>
@@ -22095,18 +22202,18 @@ async function _hmLoadRailBottom() {
 
 function _hmRenderHawkFeed(host, d, total) {
   const items = [];
-  const bookVerb = k => k === 'book' ? 'Trial booking to confirm' : k === 'ghost' ? 'Move to ghosted' : k === 'mark_lost' ? 'Confirm as lost' : k === 'reignite' ? 'Reignite later, parked' : k === 'reignite_due' ? 'Reignition day' : 'Reply drafted';
-  const bookIcon = k => k === 'book' ? { icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check } : k === 'ghost' ? { icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost } : k === 'mark_lost' ? { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x } : { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail };
+  const bookVerb = k => k === 'book' ? 'Trial booking to confirm' : k === 'ghost' ? 'Move to ghosted' : k === 'mark_lost' ? 'Confirm as lost' : k === 'mark_unqualified' ? 'Opted out, confirm unqualified' : k === 'reignite' ? 'Reignite later, parked' : k === 'reignite_due' ? 'Reignition day' : 'Reply drafted';
+  const bookIcon = k => k === 'book' ? { icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check } : k === 'ghost' ? { icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost } : (k === 'mark_lost' || k === 'mark_unqualified') ? { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x } : { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail };
   for (const r of (d.booking || [])) {
     const ic = bookIcon(r.kind);
     items.push({ name: r.contact_name || 'Lead', desc: bookVerb(r.kind), icon: ic.icon, svg: ic.svg, agent: 'booking', cid: r.ghl_contact_id });
   }
   for (const r of (d.confirm || [])) {
-    const verb = r.kind === 'confirm_handoff' ? 'Handoff to booking' : r.kind === 'confirm_lost' ? 'Confirm as lost' : r.kind === 'post_trial' ? 'Post-trial form to send' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Trial confirmation drafted';
+    const verb = r.kind === 'confirm_handoff' ? 'Handoff to booking' : r.kind === 'confirm_lost' ? 'Confirm as lost' : r.kind === 'confirm_unqualified' ? 'Opted out, confirm unqualified' : r.kind === 'post_trial' ? 'Post-trial form to send' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Trial confirmation drafted';
     items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, agent: 'confirm', cid: r.ghl_contact_id });
   }
   for (const r of (d.closing || [])) {
-    const verb = r._plan ? 'Follow-up plan to approve' : r.kind === 'closing_enroll' ? 'Enroll in closing plan' : r.kind === 'closing_lost' ? 'Confirm as lost' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Closing reply drafted';
+    const verb = r._plan ? 'Follow-up plan to approve' : r.kind === 'closing_enroll' ? 'Enroll in closing plan' : r.kind === 'closing_lost' ? 'Confirm as lost' : r.kind === 'closing_unqualified' ? 'Opted out, confirm unqualified' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Closing reply drafted';
     items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, agent: 'closing', cid: r.ghl_contact_id });
   }
 
@@ -28041,8 +28148,11 @@ function _autoCardHtml(a) {
   const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
   const statusLine = (a.enabled && a.approved) ? 'Live - sending on schedule.' : 'Not sending yet.';
   // Ghosted hands a still-silent lead off to Lead Nurture when the sequence ends.
-  // This is automatic (no step) - show it so the end of the sequence is clear.
-  const endNote = (a.automation_key === 'ghosted' && steps.length)
+  // This is automatic (no step). In focus mode the stage's Exit points section
+  // already communicates the hand-off (Zoran 2026-07-21: say it ONCE, in the
+  // exit point) - so only show this note in the standalone Automations tab.
+  const inFocus = (typeof _PL_FOCUS !== 'undefined') && !!_PL_FOCUS;
+  const endNote = inFocus ? '' : (a.automation_key === 'ghosted' && steps.length)
     ? `<div style="display:flex;align-items:center;gap:9px;margin-top:8px;padding:11px 13px;border:1px dashed var(--border);border-radius:9px;background:var(--surface)">
          <span style="font-size:15px">⤵</span>
          <div style="font-size:12.5px;color:var(--text-sub);line-height:1.45">When the sequence ends and the lead still hasn't replied, they roll into <b style="color:var(--text)">Lead Nurture</b> automatically.</div>
@@ -28264,7 +28374,7 @@ async function _taHealthLoad() {
       }
     }
     if (!opps.length) { body.innerHTML = `<div style="font-size:13px;color:var(--text-mute)">No leads in the Responded stage.</div>`; return; }
-    const label = { reply: ['Reply', '#5A8FB8'], ghost: ['Send to Ghosted', 'var(--gold,#D4B65C)'], mark_lost: ['Confirm lost', '#e0654f'], book: ['Confirm booking', '#5A8FB8'] };
+    const label = { reply: ['Reply', '#5A8FB8'], ghost: ['Send to Ghosted', 'var(--gold,#D4B65C)'], mark_lost: ['Confirm lost', '#e0654f'], mark_unqualified: ['Confirm unqualified', '#e0654f'], book: ['Confirm booking', '#5A8FB8'] };
     const rows = opps.map(o => {
       const nm = escapeHTML((o.contact && o.contact.name) || o.name || 'Lead');
       const k = cardBy.get(String(o.contactId || ''));
@@ -29787,7 +29897,7 @@ const _bbOfferConfigs = {
       { key:'missed_trial_workflow', type:'ghl_workflow', label:'Missed-trial automation',
         hint:'GHL workflow that fires automatically when a trainer marks an athlete as "Didn\'t show up" on the post-trial form. Pick the workflow that handles a no-show (reschedule nudge, re-book sequence, etc.).' },
       { key:'ghosted_workflow', type:'ghl_workflow', label:'Ghosted automation',
-        hint:'GHL workflow fired when staff hit "Ghosted" on a lead card. It should text the lead a few times, then move them to the Responded stage if they reply or mark them lost if they don\'t. (The card auto-moves to Interested when you enroll.)' },
+        hint:'GHL workflow fired when staff hit "Ghosted" on a lead card. It should text the lead a few times, then move them to the Responded stage if they reply or mark them lost if they don\'t. (The card auto-moves to Ghosted when you enroll.)' },
       { key:'sales_path', type:'check_one', label:'Sales path', required:true,
         options:['Free trial','Paid trial','Discovery call first','Direct signup','Other'],
         hint:'Gates the next set of questions' },
@@ -36388,8 +36498,8 @@ let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
 let _PL_AGENT_MODE = null;   // 'off' | 'hawkeye' | 'self_drive' | null(unknown) - drives the Responded glow
 
 // Map of Responded-stage contact id → the pending Hawkeye action waiting on staff
-// ('reply' | 'ghost' | 'mark_lost' | 'book'). Drives the per-card badge: any
-// pending card → Needs action (labelled by kind); none → All good.
+// ('reply' | 'ghost' | 'mark_lost' | 'mark_unqualified' | 'book'). Drives the
+// per-card badge: any pending card → Needs action (labelled by kind); none → All good.
 let _PL_NEEDS = null;
 // Contacts with an APPROVED (after-hours parked) send waiting for the 8am flush.
 // Not "needs you" (staff already acted), but the system owns them - the stuck-
@@ -36400,7 +36510,7 @@ let _PL_HELD = null;
 // "Reignite <date>" chips and exempts parked leads from the stuck list.
 let _PL_REIGN = null;
 // If one lead somehow has more than one pending card, show the most decisive one.
-const _PL_NEED_PRIO = { book: 4, mark_lost: 3, reignite: 3, reignite_due: 3, reply: 2, ghost: 1 };
+const _PL_NEED_PRIO = { book: 4, mark_unqualified: 4, confirm_unqualified: 4, closing_unqualified: 4, mark_lost: 3, reignite: 3, reignite_due: 3, reply: 2, ghost: 1 };
 async function _plLoadNeedsAction() {
   try {
     // V2: the needs map spans ALL THREE agents (deck + simple-view highlights).
@@ -37389,6 +37499,23 @@ function _plMarkAbandoned(oppId) { _plOutcome(oppId, 'abandoned'); }
 // Distinct from a plain 'abandoned' (e.g. duplicate cleanup), which never tags.
 function _plMarkUnqualified(oppId, contactId) { _plOutcome(oppId, 'unqualified', contactId); }
 
+// Home-screen X on automation-stage rows (Zoran 2026-07-21): exit every active
+// automation for the lead, then drop the card from the pipeline. Deliberately
+// NO unqualified tag - this is cleanup (test leads, duplicates), not a verdict.
+async function _cc2RemoveFromAuto(oppId, contactId, btn) {
+  if (btn) { btn.disabled = true; btn.style.opacity = '.3'; }
+  try {
+    if (contactId) await _autoApi('exit-enrollment', { contact_id: contactId, reason: 'removed from home screen' });
+    await _plSetStatus(oppId, 'abandoned', 'removed from home screen');
+    _plRemoveOppLocal(oppId);
+    if (typeof _cc2Render === 'function') { try { _cc2Render(); } catch (_) {} }
+    _plToast('Removed - out of the automation and off the pipeline');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+    _plToast('Could not remove: ' + (e.message || e));
+  }
+}
+
 // Per-lead bot mute (guardrail #6): "hands off this lead" - stop the agents from
 // drafting on this specific contact, without turning the whole agent off. A global
 // (all-bots) mute also pulls them out of any running automation sequence.
@@ -37523,23 +37650,47 @@ function _plMoveContactToInterested(contactId) {
   return false;
 }
 
+// Unqualified criteria (Zoran 2026-07-21): marking a lead unqualified ALWAYS
+// requires picking WHY from the preset's qualification criteria. "Not
+// interested" is deliberately absent - not-interested leads go to Nurture,
+// they are never unqualified.
+const _PL_UNQ_CRITERIA = ['Too far away', 'Athlete age out of range', 'Not a fit for the program', 'Other'];
 function _plOutcome(oppId, status, contactId) {
   const label = _PL_STATUS_LABEL[status] || status;
+  const unq = status === 'unqualified';
+  const critHtml = unq ? `
+      <div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Pick the criteria (required). Not interested? Mark them Lost instead - they belong in Nurture.</div>
+      <div id="pl-outcome-crit" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+        ${_PL_UNQ_CRITERIA.map(c => `<button type="button" data-crit="${escapeHTML(c)}" onclick="_plUnqPick(this)" style="background:transparent;border:1px solid var(--border);border-radius:999px;color:var(--text-sub);padding:7px 13px;font:inherit;font-size:12.5px;cursor:pointer">${escapeHTML(c)}</button>`).join('')}
+      </div>` : '';
   document.body.insertAdjacentHTML('beforeend', `<div id="pl-outcome-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:420px;padding:22px">
       <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px">Mark ${label}</div>
-      <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px">Add a quick reason (optional).</div>
-      <textarea id="pl-outcome-reason" placeholder="Reason…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
+      ${critHtml}
+      <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px">${unq ? 'Add a note (optional).' : 'Add a quick reason (optional).'}</div>
+      <textarea id="pl-outcome-reason" placeholder="${unq ? 'Note…' : 'Reason…'}" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
       <div style="display:flex;justify-content:flex-end;gap:10px">
         <button onclick="document.getElementById('pl-outcome-overlay').remove()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 16px;font:inherit;font-size:13px;cursor:pointer">Cancel</button>
-        <button id="pl-outcome-go" onclick="_plOutcomeConfirm('${escapeHTML(oppId)}','${status}','${escapeHTML(contactId||'')}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Mark ${label}</button>
+        <button id="pl-outcome-go" ${unq ? 'disabled' : ''} onclick="_plOutcomeConfirm('${escapeHTML(oppId)}','${status}','${escapeHTML(contactId||'')}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;opacity:${unq ? '.45' : '1'}">Mark ${label}</button>
       </div>
     </div></div>`);
   setTimeout(() => document.getElementById('pl-outcome-reason')?.focus(), 30);
 }
+// Select an unqualified criteria chip; enables the confirm button.
+function _plUnqPick(btn) {
+  const host = document.getElementById('pl-outcome-crit'); if (!host) return;
+  host.querySelectorAll('button').forEach(b => { b.style.background = 'transparent'; b.style.color = 'var(--text-sub)'; b.style.borderColor = 'var(--border)'; b.removeAttribute('data-on'); });
+  btn.style.background = 'var(--gold)'; btn.style.color = '#0B0B0D'; btn.style.borderColor = 'var(--gold)'; btn.setAttribute('data-on', '1');
+  const go = document.getElementById('pl-outcome-go'); if (go) { go.disabled = false; go.style.opacity = '1'; }
+}
 
 async function _plOutcomeConfirm(oppId, status, contactId) {
-  const reason = (document.getElementById('pl-outcome-reason')?.value || '').trim();
+  let reason = (document.getElementById('pl-outcome-reason')?.value || '').trim();
+  if (status === 'unqualified') {
+    const crit = document.querySelector('#pl-outcome-crit button[data-on]')?.dataset?.crit || '';
+    if (!crit) return;   // criteria is required - button stays disabled until picked
+    reason = reason ? `${crit} - ${reason}` : crit;
+  }
   const btn = document.getElementById('pl-outcome-go'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
     // 'unqualified' is a portal concept: GHL has no such status, so it maps to
@@ -37589,7 +37740,7 @@ function _plEnrollSpecial(oppId) {
   _plConfirmModal({
     icon: '',
     title: 'Send to Summer Special?',
-    body: 'They\'ll start getting the text sequence, and the card moves to the <b>Interested</b> stage.',
+    body: 'They\'ll start getting the text sequence, and the card moves to the <b>Ghosted</b> stage.',
     okLabel: 'Send',
     onOk: () => _plEnrollSpecialGo(oppId),
   });
@@ -37658,7 +37809,7 @@ function _plGhost(oppId) {
   _plConfirmModal({
     icon: _plIcon('ghost', 30),
     title: 'Send to Ghosted automation?',
-    body: 'They\'ll get the ghosted text sequence and the card moves to <b>Interested</b>. If they reply they go to <b>Responded</b>; if they don\'t, they get marked <b>lost</b> automatically.',
+    body: 'They\'ll get the ghosted text sequence and the card moves to <b>Ghosted</b>. If they reply they go to <b>Responded</b>; if they don\'t, they get marked <b>lost</b> automatically.',
     okLabel: 'Send',
     onOk: () => _plGhostGo(oppId),
   });
@@ -37675,7 +37826,7 @@ async function _plGhostGo(oppId) {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     const moved = await _plMoveToInterested(oppId, token);
     if (moved && typeof _renderPipelineBoard === 'function') _renderPipelineBoard();
-    _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', moved ? 'Moved to Interested - the automation takes over' : 'The automation takes over');
+    _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', moved ? 'Moved to Ghosted - the automation takes over' : 'The automation takes over');
   } catch (e) {
     alert('Could not send to Ghosted automation: ' + (e.message || e));
   }
@@ -37823,7 +37974,7 @@ function _plStageBot(name) {
   if (/respond/.test(n))                                     return { color: '#5A8FB8', kind: 'agent',      key: 'booking',     icon: 'phone',  tag: 'Booking' };
   if (/(schedul|book)/.test(n) && /trial/.test(n))           return { color: '#3DBE8B', kind: 'agent',      key: 'confirm',     icon: 'check',  tag: 'Confirm' };
   if (/trial/.test(n) && /(done|complete|attend)/.test(n))   return { color: '#B084E8', kind: 'agent',      key: 'closing',     icon: 'target', tag: 'Closing' };
-  if (/interest/.test(n))                                    return { color: '#D4B65C', kind: 'automation', key: 'ghosted',     icon: 'ghost',  tag: 'Ghosted' };
+  if (/interest|ghost/.test(n))                              return { color: '#D4B65C', kind: 'automation', key: 'ghosted',     icon: 'ghost',  tag: 'Ghosted' };
   if (/nurtur/.test(n))                                      return { color: '#3B6FD4', kind: 'automation', key: 'nurture',     icon: 'heart',  tag: 'Nurture' };
   if (/member|liveclient|enrolled|\bwon\b/.test(n))          return { color: '#EC4899', kind: 'terminal',   key: 'member',      icon: 'award',  tag: 'Member' };
   if (/unqualif/.test(n))                                    return { color: '#FB923C', kind: 'terminal',   key: 'unqualified', icon: 'ban',    tag: 'Unqualified' };
@@ -37854,8 +38005,9 @@ const _EDGE_TRIGGERS = {
   booked:              'Books a trial',
   went_quiet:          'Goes quiet',
   cant_make_it:        "Can't make it",
-  no_show:             'No-show',
-  post_trial_good_fit: 'Post-trial: good fit',
+  cancel_booking:      'Cancels the booking',
+  no_show:             'No-show (post-trial form)',
+  post_trial_good_fit: 'Post-trial: good fit + showed up',
   post_trial_not_fit:  'Post-trial: not a fit',
   not_interested:      'Not interested',
   no_longer_wants:     'No longer wants it',
@@ -37865,7 +38017,7 @@ const _EDGE_TRIGGERS = {
   complaint_offtopic:  'Complaint / off-topic',
   ghosted_ran_out:     'Nudges ran out',
 };
-const _EDGE_ROLE_LABEL = { responded: 'Responded', interested: 'Interested', scheduled_trial: 'Scheduled Trial', done_trial: 'Done Trial', nurture: 'Nurture' };
+const _EDGE_ROLE_LABEL = { responded: 'Responded', interested: 'Ghosted', scheduled_trial: 'Scheduled Trial', done_trial: 'Done Trial', nurture: 'Nurture' };
 const _EDGE_TERMINAL_LABEL = { member: 'Member', unqualified: 'Unqualified', human: 'Human takeover' };
 const _EDGE_ROLE_ICON = { responded: 'phone', interested: 'ghost', scheduled_trial: 'calendar', done_trial: 'target', nurture: 'heart' };
 const _EDGE_TERMINAL_ICON = { member: 'award', unqualified: 'ban', human: 'alert' };
@@ -37974,6 +38126,7 @@ const _HK2_KIND = {
   enroll:  { pill: 'Ready to enroll', color: 'var(--green,#4CC76A)',   cls: 'green', go: 'Approve and send',              goEdit: 'Confirm edits and send' },
   plan:    { pill: 'Follow-up plan',  color: 'var(--accent)',          cls: '',      go: 'Approve follow-up schedule', goEdit: 'Confirm edits and schedule' },
   lost:    { pill: 'Suggested lost',  color: 'var(--red,#F07060)',     cls: 'red',   go: 'Mark lost',                     goEdit: 'Confirm edits and mark lost' },
+  unqualified: { pill: 'Wants you to stop', color: 'var(--red,#F07060)', cls: 'red', go: 'Mark unqualified',              goEdit: 'Mark unqualified' },
   form:    { pill: 'Post-trial form', color: 'var(--accent)',          cls: '',      go: 'Submit post-trial form',        goEdit: 'Submit post-trial form' },
   reignite:     { pill: 'Wants to start later', color: 'var(--gold,#D4B65C)', cls: '', go: 'Send ack + schedule reignite', goEdit: 'Confirm edits and schedule' },
   reignite_due: { pill: 'Reignition day',       color: 'var(--gold,#D4B65C)', cls: '', go: 'Approve and send',             goEdit: 'Confirm edits and send' },
@@ -38080,8 +38233,8 @@ async function _hk2Load() {
   ]);
   const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
   const reig = r => r.kind === 'reignite' ? 'reignite' : r.kind === 'reignite_due' ? 'reignite_due' : null;
-  const booking = pend(b).map(r => ({ ...r, _kind: reig(r) || (r.kind === 'book' ? 'book' : r.kind === 'ghost' ? 'ghost' : r.kind === 'mark_lost' ? 'lost' : 'reply') }));
-  const confirm = pend(c).map(r => ({ ...r, _kind: reig(r) || (r.kind === 'confirm_handoff' ? 'handoff' : r.kind === 'confirm_lost' ? 'lost' : r.kind === 'post_trial' ? 'form' : 'reply') }));
+  const booking = pend(b).map(r => ({ ...r, _kind: reig(r) || (r.kind === 'book' ? 'book' : r.kind === 'ghost' ? 'ghost' : r.kind === 'mark_lost' ? 'lost' : r.kind === 'mark_unqualified' ? 'unqualified' : 'reply') }));
+  const confirm = pend(c).map(r => ({ ...r, _kind: reig(r) || (r.kind === 'confirm_handoff' ? 'handoff' : r.kind === 'confirm_lost' ? 'lost' : r.kind === 'confirm_unqualified' ? 'unqualified' : r.kind === 'post_trial' ? 'form' : 'reply') }));
   const clRows = pend(l);
   const plans = new Map(), rest = [];
   for (const r of clRows) {
@@ -38089,7 +38242,7 @@ async function _hk2Load() {
     else rest.push(r);
   }
   const closing = [
-    ...rest.map(r => ({ ...r, _kind: reig(r) || (r.kind === 'closing_enroll' ? 'enroll' : r.kind === 'closing_lost' ? 'lost' : 'reply') })),
+    ...rest.map(r => ({ ...r, _kind: reig(r) || (r.kind === 'closing_enroll' ? 'enroll' : r.kind === 'closing_lost' ? 'lost' : r.kind === 'closing_unqualified' ? 'unqualified' : 'reply') })),
     ...[...plans.values()].map(rows => ({
       _kind: 'plan', id: 'plan:' + rows[0].ghl_contact_id, ghl_contact_id: rows[0].ghl_contact_id,
       ghl_conversation_id: rows[0].ghl_conversation_id, contact_name: rows[0].contact_name,
@@ -38324,7 +38477,7 @@ function _hk2Moves(r) {
   // 🔥 Any card can park the lead for a later date instead ("yes, but later").
   if (k !== 'reignite') m.push(['Reignite later', 'reignite']);
   if ((k === 'reignite' || k === 'book') && r._origKind) m.unshift(['Back to the card', 'unreignite']);
-  m.push([_hk2MoveLabel('unq', hasMsg), 'unq']);
+  if (k !== 'unqualified') m.push([_hk2MoveLabel('unq', hasMsg), 'unq']);
   return m;
 }
 // "Reignite later" from the Other menu: flip the card into the reignite layout
@@ -38418,6 +38571,13 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <div class="hk2-lbl">Optional goodbye - sends with the move${reason}</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       <div class="hk2-note">Approving routes them to Nurture (the long game). You confirm - nothing moves on its own.</div>`;
+  } else if (r._kind === 'unqualified') {
+    // Opt-out card (2026-07-21 meeting): the lead asked us to stop. NO message
+    // box on purpose - nothing may ever be texted to a lead who said stop.
+    const reason = r.lost_reason ? ` <span style="color:var(--red,#F07060);font-weight:700">${escapeHTML(r.lost_reason)}</span>` : '';
+    body = `${_hk2ThreadHtml(r, isTop)}
+      <div class="hk2-lbl">Wants you to stop - mark unqualified?${reason}</div>
+      <div class="hk2-note">They asked you to stop contacting them. Approving removes them from the pipeline with the unqualified tag - nothing sends, no nurture texts, never contacted again. You confirm - nothing moves on its own.</div>`;
   } else if (r._kind === 'reignite') {
     // 🔥 The PARK card: an ack that sends now, the date, and the pre-written
     // message that fires ON that date. All three editable; message edits demand
@@ -38970,6 +39130,11 @@ function _hk2Confirm() {
     } else if (k === 'lost') {
       chk(await _apxPost(ep, 'confirm-lost', { ready_id: r.id, reply, lost_reason: r.lost_reason || 'Other' }));
       _apxToast('Marked lost - Nurture takes over', true);
+    } else if (k === 'unqualified') {
+      // Opt-out approve: same close as the "Mark unqualified" move - NO reply is
+      // passed, so nothing can ever be texted to a lead who said stop.
+      chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: r.id }));
+      _apxToast('Marked unqualified - no more messages', true);
     } else if (k === 'reignite') {
       // 🔥 Park it: ack (if any) sends now, the message fires as a new card on
       // the date. Works from an agent-proposed reignite card OR any card flipped
@@ -39415,6 +39580,7 @@ function _plo2Cascade(stage, nav) {
     mark_lost: 'lost suggested', confirm: 'reply · draft ready', confirm_auto: 'reminder ready',
     confirm_handoff: 'reschedule · needs a new time', confirm_lost: 'lost suggested',
     closing: 'reply · draft ready', closing_enroll: 'ready to enroll', closing_lost: 'lost suggested',
+    mark_unqualified: 'opt-out · unqualified suggested', confirm_unqualified: 'opt-out · unqualified suggested', closing_unqualified: 'opt-out · unqualified suggested',
     post_trial: 'post-trial form to fill',
     reignite: 'wants to start later · reignite to confirm', reignite_due: 'reignition day · message ready',
   };
@@ -39461,9 +39627,14 @@ function _plo2Cascade(stage, nav) {
     const click = need
       ? (leadFn ? `${leadFn}('${escapeHTML(String(o.contactId || ''))}')` : `_hk2Open(null, '${escapeHTML(String(o.contactId || ''))}')`)
       : `${cardFn}('${escapeHTML(o.id)}')`;
+    // Automation stages only (Zoran 2026-07-21): X = pull the lead out of the
+    // automation + off the pipeline. NOT unqualified - just cleanup.
+    const rmv = kind === 'automation'
+      ? `<button class="plo2-x" title="Remove from the automation + pipeline (does not mark unqualified)" onclick="event.stopPropagation();_cc2RemoveFromAuto('${escapeHTML(o.id)}','${escapeHTML(String(o.contactId || ''))}',this)">${_plIcon('x', 13)}</button>`
+      : '';
     return `<div class="plo2-row" style="animation-delay:${Math.min(i, 10) * 45}ms"><div class="plo2-lead${need ? ' needs' : ''}" onclick="${click}">
       <div class="plo2-av">${escapeHTML(initials(nm))}</div>
-      <div style="min-width:0"><div class="who">${escapeHTML(nm)}</div>${st ? `<div class="st">${escapeHTML(st)}</div>` : ''}</div></div></div>`;
+      <div style="min-width:0"><div class="who">${escapeHTML(nm)}</div>${st ? `<div class="st">${escapeHTML(st)}</div>` : ''}</div>${rmv}</div></div>`;
   };
   const all = [...needy, ...plain];
   const showAll = typeof _PLO2_SHOWALL !== 'undefined' && _PLO2_SHOWALL.has(stage.id);
@@ -40037,6 +40208,7 @@ function _renderPipelineBoard() {
       reply:     `${_plIcon('reply', 13)}<span>Reply</span>`,
       ghost:     `${_plIcon('ghost', 13)}<span>Send to Ghosted</span>`,
       mark_lost: `${_plIcon('ban', 13)}<span>Confirm lost</span>`,
+      mark_unqualified: `${_plIcon('ban', 13)}<span>Confirm unqualified</span>`,
       book:      `${_plIcon('calendar', 13)}<span>Confirm booking</span>`,
     }[_need] || (_need ? `${_plIcon('alert', 13)}<span>Needs action</span>` : '');
     // Safety net (#3): a Responded lead with NO agent card that's been sitting a
@@ -40844,10 +41016,11 @@ async function _apxRefreshCount() {
 // ═══════════════════════════════════════════════════════════════
 // CONFIRM AGENT approval inbox () - the SECOND sales agent, working
 // Scheduled-Trial leads. Sibling of the _apx* Hawkeye queue: same look,
-// own endpoint (/api/agent-confirm), 3 card kinds:
-//   confirm          → a drafted confirm/logistics reply (Approve & send)
-//   confirm_handoff  → lead can't make it → hand back to booking (note + bounce)
-//   confirm_lost     → lead doesn't want the trial at all → mark lost
+// own endpoint (/api/agent-confirm), 4 card kinds:
+//   confirm             → a drafted confirm/logistics reply (Approve & send)
+//   confirm_handoff     → lead can't make it → hand back to booking (note + bounce)
+//   confirm_lost        → lead doesn't want the trial at all → mark lost
+//   confirm_unqualified → lead opted out → mark unqualified (no message, no nurture)
 // Reuses _apxPost / _apxToast / _apxErr / _apxOpenThread / _apxMsgWhen / _apxTrim.
 // ═══════════════════════════════════════════════════════════════
 let _ACX_DATA = [];
@@ -40949,7 +41122,7 @@ function _acxRender() {
   const body = document.getElementById('acx-body');
   if (!body) return;
   if (!_ACX_DATA.length) { body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no confirmations waiting.') + '</div>'; return; }
-  const cards = _ACX_DATA.map(r => r.kind === 'confirm_handoff' ? _acxHandoffCard(r) : r.kind === 'confirm_lost' ? _acxLostCard(r) : _acxReplyCard(r)).join('');
+  const cards = _ACX_DATA.map(r => r.kind === 'confirm_handoff' ? _acxHandoffCard(r) : r.kind === 'confirm_lost' ? _acxLostCard(r) : r.kind === 'confirm_unqualified' ? _acxUnqCard(r) : _acxReplyCard(r)).join('');
   body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
 }
 
@@ -41022,6 +41195,19 @@ function _acxLostCard(r) {
     </div>
   </div>`;
 }
+function _acxUnqCard(r) {
+  const reason = r.lost_reason ? `<span style="font-size:10px;font-weight:700;color:var(--red);background:rgba(240,112,96,.12);border-radius:999px;padding:1px 8px">${escapeHTML(r.lost_reason)}</span>` : '';
+  return `<div id="acx-${r.id}" style="background:var(--surface);border:1px solid rgba(240,112,96,.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_acxHeader(r, 'opted out', 'var(--red)')}
+    <div style="font-size:11.5px;color:var(--red);margin-bottom:6px">Wants you to stop - mark unqualified? ${reason}</div>
+    ${_acxContext(r)}
+    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Confirming removes them from the pipeline with the unqualified tag. Nothing sends, no nurture texts.</div>
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxUnqualified('${r.id}')" style="flex:2;background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark unqualified</button>
+    </div>
+  </div>`;
+}
 function _acxRemove(id) {
   _ACX_DATA = _ACX_DATA.filter(x => x.id !== id);
   document.getElementById('acx-' + id)?.remove();
@@ -41071,11 +41257,12 @@ function _acxUnqualified(id) {
 // ═══════════════════════════════════════════════════════════════
 // CLOSING AGENT approval inbox () - the THIRD sales agent, working
 // Done-Trial (good-fit attendee) leads. Sibling of _apx*/_acx*: same look,
-// own endpoint (/api/agent-closing), 3 card kinds:
-//   closing         → a drafted post-trial follow-up reply (Approve & send)
-//   closing_enroll  → lead is ready → send the enroll link (the CLOSE; the opp is
-//                     marked won automatically when they pay, via the enroll flow)
-//   closing_lost    → good-fit attendee won't enroll → mark lost
+// own endpoint (/api/agent-closing), 4 card kinds:
+//   closing             → a drafted post-trial follow-up reply (Approve & send)
+//   closing_enroll      → lead is ready → send the enroll link (the CLOSE; the opp is
+//                         marked won automatically when they pay, via the enroll flow)
+//   closing_lost        → good-fit attendee won't enroll → mark lost
+//   closing_unqualified → lead opted out → mark unqualified (no message, no nurture)
 // Reuses _apxPost / _apxToast / _apxErr / _apxOpenThread / _apxMsgWhen / _apxTrim.
 // Kept a SEPARATE data set from _ACX_DATA / _APX_DATA (never merge them).
 // ═══════════════════════════════════════════════════════════════
@@ -41155,8 +41342,8 @@ function _aclxRender() {
     }
     // Already approved and sitting on its cadence - render a "scheduled" card that
     // shows when it sends and lets staff fire it early (Send now) or drop it.
-    if (r.status === 'approved' && r.kind !== 'closing_enroll' && r.kind !== 'closing_lost') return _aclxScheduledCard(r);
-    return r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : _aclxReplyCard(r);
+    if (r.status === 'approved' && r.kind !== 'closing_enroll' && r.kind !== 'closing_lost' && r.kind !== 'closing_unqualified') return _aclxScheduledCard(r);
+    return r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : r.kind === 'closing_unqualified' ? _aclxUnqCard(r) : _aclxReplyCard(r);
   }).join('');
   body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
   const _notesDone = new Set();
@@ -41345,6 +41532,20 @@ function _aclxLostCard(r) {
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
       <button onclick="_aclxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_aclxLost('${r.id}')" style="flex:2;background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark lost</button>
+    </div>
+  </div>`;
+}
+function _aclxUnqCard(r) {
+  const reason = r.lost_reason ? `<span style="font-size:10px;font-weight:700;color:var(--red);background:rgba(240,112,96,.12);border-radius:999px;padding:1px 8px">${escapeHTML(r.lost_reason)}</span>` : '';
+  return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid rgba(240,112,96,.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(r, 'opted out', 'var(--red)')}
+    <div style="font-size:11.5px;color:var(--red);margin-bottom:6px">Wants you to stop - mark unqualified? ${reason}</div>
+    ${_aclxContext(r)}
+    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Confirming removes them from the pipeline with the unqualified tag. Nothing sends, no nurture texts.</div>
+    ${_aclxNotesBlock(r)}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxUnqualified('${r.id}')" style="flex:2;background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark unqualified</button>
     </div>
   </div>`;
 }
@@ -41690,8 +41891,10 @@ function _apxSplit(fu, rd) {
     else upcoming.push(f);
   }
   const all = (rd.ready || []).filter(r => r.status === 'pending');
-  const ready = [...overdue, ...all.filter(r => r.kind !== 'mark_lost' && r.kind !== 'book' && r.kind !== 'ghost')];
-  const lost = all.filter(r => r.kind === 'mark_lost');
+  const ready = [...overdue, ...all.filter(r => r.kind !== 'mark_lost' && r.kind !== 'mark_unqualified' && r.kind !== 'book' && r.kind !== 'ghost')];
+  // Opt-out (mark_unqualified) cards live in the Lost tab - the renderer branches
+  // per kind, and every lost-tab helper looks the row up in this same list.
+  const lost = all.filter(r => r.kind === 'mark_lost' || r.kind === 'mark_unqualified');
   const book = all.filter(r => r.kind === 'book');
   const ghost = all.filter(r => r.kind === 'ghost');
   return { followups: upcoming, ready, lost, book, ghost };
@@ -41926,6 +42129,32 @@ function _apxLostAbandon(id) {
   } });
 }
 
+// An opt-out "mark unqualified" card (2026-07-21 meeting): the lead asked us to
+// stop contacting them. NO message box on purpose - confirming removes them from
+// the pipeline as unqualified (confirm-abandoned): no text, no nurture. Lives in
+// the Lost tab; reuses _apxLostAbandon (searches the same lost list) to confirm.
+function _apxUnqCard(r) {
+  const reason = escapeHTML(r.lost_reason || 'Opted out');
+  const last = _apxContext(r);
+  return `<div id="apx-${r.id}" style="background:rgba(240,112,96,0.05);border:1px solid rgba(240,112,96,0.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+      <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+      <span style="font-size:11px;font-weight:700;color:var(--red);background:rgba(240,112,96,0.12);border-radius:999px;padding:2px 9px">${_plIcon('ban', 11)} ${reason}</span>
+      <div style="flex:1"></div>
+      ${typeof r.confidence === 'number' ? `<span style="font-size:11px;color:var(--text-mute)">${Math.round(r.confidence * 100)}% sure</span>` : ''}
+    </div>
+    ${last}
+    ${r.reasoning ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(r.reasoning)}</div>` : ''}
+    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Wants you to stop - mark unqualified? Confirming removes them from the pipeline with the unqualified tag. Nothing sends, no nurture texts.</div>
+    <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
+      <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
+      <div style="flex:1"></div>
+      <button onclick="_apxLostDismiss('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">✕ Dismiss</button>
+      <button onclick="_apxLostAbandon('${r.id}')" title="Remove from pipeline as unqualified - no message, no nurture" style="background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">${_plIcon('ban', 12)} Mark unqualified</button>
+    </div>
+  </div>`;
+}
+
 // A blue "booking request" card. The lead confirmed a slot; confirming creates
 // the real GHL appointment (GHL's automation then sends the confirmation).
 function _apxBookSlotStr(ts) {
@@ -41978,7 +42207,7 @@ function _apxGhostCard(r) {
     </div>
     ${r.reasoning ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(r.reasoning)}</div>` : ''}
     ${last}
-    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Sends them the <b>Ghosted</b> text sequence and moves the card to <b>Interested</b>. Reply → back to Responded; no reply → marked Lost automatically.</div>
+    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Sends them the <b>Ghosted</b> text sequence and moves the card to the <b>Ghosted</b> stage. Reply → back to Responded; no reply → marked Lost automatically.</div>
     <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
       <div style="flex:1"></div>
@@ -41999,7 +42228,7 @@ function _apxGhostConfirm(id, btn) {
       _apxRemove(id);
       _plMoveContactToInterested(r.ghl_contact_id);
       if (document.getElementById('pl-drawer')?.classList.contains('open')) {
-        _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', 'Moved to Interested - the automation takes over');
+        _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', 'Moved to Ghosted - the automation takes over');
       } else {
         _apxToast('Sent to Ghosted', true);
       }
@@ -42069,7 +42298,7 @@ function _apxRender() {
     }
     if (!readyN) inner = _apxEmpty('Nothing ready to send.');
   } else if (_APX_TAB === 'lost') {
-    inner = lostN ? lost.map(_apxLostCard).join('') : _apxEmpty('No suggested-lost leads.');
+    inner = lostN ? lost.map(r => r.kind === 'mark_unqualified' ? _apxUnqCard(r) : _apxLostCard(r)).join('') : _apxEmpty('No suggested-lost leads.');
   } else if (_APX_TAB === 'ghost') {
     inner = ghostN ? ghost.map(_apxGhostCard).join('') : _apxEmpty('No quiet leads waiting.');
   }
@@ -42964,7 +43193,7 @@ function _aiRow(p, checkedDefault) {
   const tierOpts = _AI_TIER_OPTS.map(([v, l]) => `<option value="${v}" ${v === tier ? 'selected' : ''}>${l}</option>`).join('');
   const conf = p.confidence != null ? Math.round(p.confidence * 100) + '%' : '';
   const members = p.sub_count ? `${p.sub_count} member${p.sub_count === 1 ? '' : 's'}` : 'no members';
-  const ciq = p.coachiq_product_id ? ' · CoachIQ ✓' : '';
+  const ciq = (p.coachiq_product_id && !(typeof _CIQ_BURY_PRICING !== 'undefined' && _CIQ_BURY_PRICING)) ? ' · CoachIQ ✓' : '';
   return `
     <div class="ai-row" data-pid="${escapeHTML(p.price_id)}" data-ciq="${escapeHTML(p.coachiq_product_id || '')}" data-conf="${p.confidence != null ? p.confidence : ''}"
       style="display:grid; grid-template-columns:auto 1fr 150px 110px; gap:10px; align-items:center; padding:9px 12px; border:1px solid var(--border,#2a2a31); border-radius:9px; margin-bottom:7px; background:${p.needs_review ? 'rgba(224,169,63,0.06)' : 'transparent'};">
@@ -43272,7 +43501,12 @@ function _ciqSaveFromInput(inputId, statusId) {
 // Body for the offer-builder "CoachIQ" step (per-plan inputs)
 // CoachIQ status pill on plan rows (mirrors _bbLivePill's placeholder→async-fill).
 // A plan is "linked" if any of its plan keys has a coachiq_automation_url set.
+// BURIED (Zoran 2026-07-21): CoachIQ ties are hidden from the pricing options /
+// offer builder for now - flip to false to bring them back. Data + the staff
+// sorter strip / CoachIQ Links modal stay intact (GTA runs on them).
+const _CIQ_BURY_PRICING = true;
 function _ciqPill(keys) {
+  if (_CIQ_BURY_PRICING) return '';
   if (typeof _bbIsV1 === 'function' && _bbIsV1()) return '';
   if (!keys || !keys.length) return '';
   setTimeout(_ciqApplyPills, 0);
@@ -57792,6 +58026,7 @@ function _ccHawkVerb(kind) {
     mark_lost: 'to confirm as lost', confirm: 'needs a reply', confirm_auto: 'has a reminder to approve',
     confirm_handoff: 'needs a new time', confirm_lost: 'to confirm as lost',
     closing: 'needs a reply', closing_enroll: 'is ready to enroll', closing_lost: 'to confirm as lost',
+    mark_unqualified: 'opted out - confirm unqualified', confirm_unqualified: 'opted out - confirm unqualified', closing_unqualified: 'opted out - confirm unqualified',
     post_trial: 'needs the post-trial form',
   })[kind] || 'needs a look';
 }

@@ -19,6 +19,14 @@ checklist reads - which is why every academy (including mid-flow ones like
 DETAIL) moves to it with progress already lit. One flow, no forks.
 
 Design language: V2 tokens (design-system/tokens.css). No emojis, no em dashes.
+V2 design-system pass (2026-07-22): the wizard + its satellite modals (site
+accept, brand board, inbox connect, cancelled import) share one class set in
+client-portal.html's main stylesheet (`.obf2-*` components + `.obfm-*` modal
+shell) - card DNA on step cards (surface-el, --r-lg, --shadow-card), gold
+primary / bordered secondary buttons on --r-sm, locked radii only, fade-rise
+page entrances (reduced-motion gated), Plus Jakarta Sans via --font-ui.
+On phones (<=560px) the wizard goes full screen with safe-area padding
+(parity with the calendar focus card).
 Required questions: gold left bar + `required` chip + per-page count.
 Conditionals indent with an amber "if X". System actions render as gold rows.
 "Our team runs this" steps never block Next.

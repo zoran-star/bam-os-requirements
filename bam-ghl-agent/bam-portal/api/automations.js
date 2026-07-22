@@ -22,6 +22,7 @@ import { sendOn } from "./_send.js";
 import { renderEmail } from "./email-shells.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { isMuted } from "./agent/_mutes.js";
+import { markUnqualified } from "./agent/_tags.js";
 import { resolveAgentActor } from "./agent/_auth.js";
 import { FORM_INTRO_DEFAULTS, GHOSTED_DEFAULT, NURTURE_DEFAULT, ONBOARDING_DEFAULT } from "./form-intro-automations.js";
 import { presetAutomationKeys } from "./agent/presets.js";
@@ -357,27 +358,42 @@ async function runWork(res) {
         } catch (_) { /* best-effort roll-forward */ }
         // Model: 💔 Lead Nurture is the LAST stop. If the nurture sequence itself runs
         // out and they're STILL silent, the lead has been worked the full long game with
-        // no reply -> terminal LOST. Mark the opp lost (leaves the open board) + write a
-        // pipeline_outcomes row. Do NOT re-enroll anywhere (that would loop). Best-effort
-        // + idempotent: a nurture enrollment completes exactly once (status flips to
+        // no reply -> they exit the pipeline as UNQUALIFIED (Zoran, 2026-07-21). Route
+        // per the academy's authored flow (the ghosted_ran_out edge; seed = nurture ->
+        // @unqualified): the router's terminal close stamps status=abandoned +
+        // role=unqualified, and we mirror confirm-abandoned's side effects (the
+        // unqualified tag + a pipeline_outcomes 'abandoned' row). A paused or
+        // re-authored edge is respected as-is; on NO edge (unseeded academy / lookup
+        // blip) fall back to the original terminal LOST so the lead still leaves the
+        // open board. Do NOT re-enroll anywhere (that would loop). Best-effort +
+        // idempotent: a nurture enrollment completes exactly once (status flips to
         // 'completed' so this branch can't re-fire for the same enrollment).
-        // TODO: the GHL PUT becomes portal-native once effort E (opportunity store) lands.
         try {
           const a = autoCache.get(job.automation_id);
           if (a && a.automation_key === "nurture") {
-            // creds may not be cached on the step-missing/disabled advance path — load them.
-            if (!clientCache.has(job.client_id)) clientCache.set(job.client_id, await loadClient(job.client_id));
-            const client = clientCache.get(job.client_id);
-            if (!tokenCache.has(job.client_id)) tokenCache.set(job.client_id, client ? await pickGhlToken(client) : null);
-            const creds = tokenCache.get(job.client_id);
+            const creds = await ensureCreds();
             if (creds && creds.token) {
               const oppRef = await findOpenOppRef(job.client_id, creds.token, creds.locationId, job.contact_id);
               const oppId = oppRef && (oppRef.ghlOpportunityId || oppRef.id) || null;
               if (oppRef) {
-                try { await setStatus({ clientId: job.client_id, ghl, token: creds.token, oppRef, status: "lost", contactId: job.contact_id, reason: "nurture sequence exhausted" }); } catch (_) { /* best-effort */ }
-                try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: job.client_id, opportunity_id: oppId, status: "lost", reason: "nurture sequence exhausted" }]) }); } catch (_) {}
-                await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "nurture_exhausted_lost", payload: { opportunity_id: oppId } });
-                nurtureLost++;
+                let routed = { matched: false };
+                try { routed = await routeTransition({ clientId: job.client_id, sb, ghl, token: creds.token, locationId: creds.locationId, fromRole: "nurture", trigger: "ghosted_ran_out", contactId: job.contact_id, oppRef, allowTerminal: true, reason: "nurture sequence exhausted" }); } catch (_) { /* fall back below */ }
+                if (routed.matched && routed.terminal === "unqualified") {
+                  try { await markUnqualified(creds.token, job.contact_id, job.client_id); } catch (_) { /* best-effort tag */ }
+                  try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: job.client_id, opportunity_id: oppId, status: "abandoned", reason: "nurture sequence exhausted" }]) }); } catch (_) {}
+                  await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "nurture_exhausted_unqualified", payload: { opportunity_id: oppId } });
+                  nurtureLost++;
+                } else if (!routed.matched) {
+                  try { await setStatus({ clientId: job.client_id, ghl, token: creds.token, oppRef, status: "lost", contactId: job.contact_id, reason: "nurture sequence exhausted" }); } catch (_) { /* best-effort */ }
+                  try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: job.client_id, opportunity_id: oppId, status: "lost", reason: "nurture sequence exhausted" }]) }); } catch (_) {}
+                  await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "nurture_exhausted_lost", payload: { opportunity_id: oppId } });
+                  nurtureLost++;
+                } else {
+                  // Edge matched but paused / re-pointed by the academy: the
+                  // authored flow already handled the lead - just log the outcome.
+                  await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "nurture_exhausted_routed", payload: { opportunity_id: oppId, terminal: routed.terminal || null, role: routed.role || null, paused: !!routed.paused } });
+                  nurtureLost++;
+                }
               }
             }
           }
@@ -700,6 +716,16 @@ async function handler(req, res) {
         vars: { first_name: "Alex", athlete: "Jordan" },
       });
       return res.status(200).json({ html, subject: b.subject || "" });
+    }
+
+    // Home-screen X (Zoran 2026-07-21): pull one lead out of every active
+    // automation (except onboarding). Deliberately stamps NO unqualified tag -
+    // this is cleanup ("get them out of here"), not a qualification verdict.
+    // The client pairs this with a PATCH status=abandoned on the opportunity.
+    if (b.action === "exit-enrollment") {
+      if (!b.contact_id) return res.status(400).json({ error: "contact_id required" });
+      const n = await exitEnrollment({ clientId, contactId: String(b.contact_id), reason: b.reason || "removed from home screen" });
+      return res.status(200).json({ ok: true, exited: (n && n.exited) || 0 });
     }
 
     if (b.action === "upsert-automation") {
