@@ -382,10 +382,15 @@ async function sendToMarketing(req, res, ctx) {
   await systemMessage(id, ticket.client_id, "Sent to marketing");
 
   const originIntake = ticket.intake || {};
-  const spawnIntake = { mode: "post", origin_ticket_id: ticket.id, final_files: finals };
-  // Carry the creative brief along (current P3a keys + the locked
-  // Offer / Sales preset / Angle spellings landing in P3b).
-  for (const k of ["brief", "offer", "offer_id", "preset", "sales_preset", "angle"]) {
+  // CONTENT-FIRST (Zoran 2026-07-21): campaigns start as content_ask so the
+  // content team vets the creative; the handoff spawns the LAUNCH ticket.
+  // origin mode 'campaign' -> marketing mode 'campaign' (Launch drawer, spend +
+  // landing page carried); everything else -> mode 'post' (Mark live drawer).
+  const isCampaign = originIntake.mode === "campaign";
+  const spawnIntake = { mode: isCampaign ? "campaign" : "post", origin_ticket_id: ticket.id, final_files: finals };
+  const carry = ["brief", "offer", "offer_id", "preset", "sales_preset", "angle",
+    "spend", "monthly_spend", "landing_page", "funnel", "note", "asset_ids"];
+  for (const k of carry) {
     if (originIntake[k] !== undefined && originIntake[k] !== null) spawnIntake[k] = originIntake[k];
   }
   const spawnContext = { origin_ticket_id: ticket.id };
@@ -400,7 +405,9 @@ async function sendToMarketing(req, res, ctx) {
       status: "new",
       assignee_role: "marketing",
       assigned_to: assignedTo,
-      title: (ticket.title ? `Post the ad - ${ticket.title}` : "Post the ad").slice(0, 200),
+      title: (isCampaign
+        ? (ticket.title ? `Launch - ${ticket.title}` : "Launch the campaign")
+        : (ticket.title ? `Post the ad - ${ticket.title}` : "Post the ad")).slice(0, 200),
       source: "staff",
       intake: spawnIntake,
       context: spawnContext,
