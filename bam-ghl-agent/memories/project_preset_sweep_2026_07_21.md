@@ -17,7 +17,7 @@ PR #1548. All the sales-preset corrections from Zoran's July 21 walkthrough with
 
 ## Gotchas
 - Preset compiles to 5 stages + 23 edges. Presets are authored in `api/agent/presets.js` - no presets table.
-- Migrations must be applied to live Supabase ON MERGE of PR #1548 (deliberately not applied before).
+- Migrations APPLIED to live Supabase 2026-07-22 right after PR #1548 merged (verified: cancel_booking + both ghosted_ran_out edges live, contact entry on responded).
 - Ghosted→Nurture hand-off note now shows ONCE in focus mode (exit point only, engine panel suppresses it via `_PL_FOCUS`).
 
 **UPDATE 2026-07-22:** do NOT apply presets per-academy anymore (Detail Miami application deliberately skipped). Zoran is reworking presets into a SHARED ENTITY - one preset shared by academies, update it once and all academies get the update. Until that lands, leave per-academy preset stamping alone. (For reference: Detail's live state = 4 stages, role `ghosted` not `interested`, ZERO stage_transitions, prefill-stamped free_trial that was never really applied.)

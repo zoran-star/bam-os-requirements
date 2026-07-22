@@ -7,7 +7,7 @@ When a lead opts out ("stop texting me", "leave me alone", "remove my number", "
 - Approving = the existing confirm-abandoned path: abandoned + unqualified tag, no nurture, no message, queues swept.
 - Prompt rules: opt-out is never Lost, never a complaint escalation; "Opted out" removed from the Lost taxonomy.
 - Both inbound webhooks (Twilio + GHL) run a soft opt-out regex and write a persistent agent_contact_notes flag ("suggest mark unqualified, do not keep messaging") without blocking the reply flow. Literal STOP still handled by the exact-match early-return.
-- Migration `20260722120000_unqualified_card_kinds.sql` widens confirm/closing kind CHECKs - booking cards work without it, confirm/closing insert fails soft until applied.
+- Migration `20260722120000_unqualified_card_kinds.sql` APPLIED live 2026-07-22 - all three card kinds insertable.
 
 ## Known leak paths (accepted for now)
 1. Human override: approving a plain Lost card / Nurture move on an opted-out lead still nurtures (human-confirmed).
