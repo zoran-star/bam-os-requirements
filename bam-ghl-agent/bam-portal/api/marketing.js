@@ -1980,6 +1980,19 @@ async function handleContentTickets(req, res) {
 
 const META_API_VERSION = "v22.0";
 const META_GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
+
+// The "All Academies" ad account is SHARED by ~12 clients — every academy's
+// campaigns live in it, so an empty campaign allow-list there MUST resolve to
+// "nothing" (never "all"), or one client would see every other academy's
+// campaigns + spend. Dedicated (client-owned) accounts hold only that client's
+// campaigns, so there empty === "surface all active" (matches the staff
+// picker's "None ticked — all active campaigns will show" contract).
+const SHARED_META_AD_ACCOUNT = "act_847162517367847";
+const isSharedAdAccount = (id) => {
+  if (!id) return false;
+  const norm = String(id).startsWith("act_") ? String(id) : `act_${id}`;
+  return norm === SHARED_META_AD_ACCOUNT;
+};
 // Messaging scopes (Meta DM spine, 2026-07-03): pages_messaging +
 // instagram_manage_messages power direct IG/Messenger DMs; pages_show_list +
 // pages_manage_metadata let us derive the Page token + subscribe the Page to
@@ -2306,10 +2319,18 @@ async function handleMetaCampaigns(req, res) {
   let filtered = campaigns;
   if (!isStaffPicker) {
     if (!associated || !associated.length) {
-      return res.status(200).json({ campaigns: [], reason: "no_campaigns_selected" });
+      // Empty allow-list. On the SHARED "All Academies" account this MUST
+      // resolve to nothing (see SHARED_META_AD_ACCOUNT) so a client never sees
+      // another academy's campaigns. On a dedicated account it means "surface
+      // all active" — `campaigns` is already ACTIVE-only above, so fall through
+      // and return it unfiltered (matches the staff picker's "None ticked" copy).
+      if (isSharedAdAccount(clientFull.meta_ad_account_id)) {
+        return res.status(200).json({ campaigns: [], reason: "no_campaigns_selected" });
+      }
+    } else {
+      const allow = new Set(associated);
+      filtered = campaigns.filter(c => allow.has(c.id));
     }
-    const allow = new Set(associated);
-    filtered = campaigns.filter(c => allow.has(c.id));
   }
 
   return res.status(200).json({
@@ -3656,12 +3677,27 @@ async function handleMetaMachine(req, res) {
   if (!clientFull?.meta_ad_account_id) return notReady("no_ad_account");
   const staffToken = await getAnyStaffMetaToken();
   if (!staffToken) return notReady("no_staff_token");
-  const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
-    ? clientFull.meta_campaign_ids.map(String) : null;
-  if (!allow) return notReady("no_campaigns_selected");
-  const allowSet = new Set(allow);
   const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
     ? clientFull.meta_ad_account_id : `act_${clientFull.meta_ad_account_id}`;
+  // Resolve the campaign allow-list. Explicit selection always wins. Empty
+  // selection: the SHARED account stays "nothing" (never leak another academy's
+  // ads); a dedicated account falls back to ALL ACTIVE campaigns so the machine
+  // populates without staff hand-ticking (honors the picker's "None ticked" copy).
+  let allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
+    ? clientFull.meta_campaign_ids.map(String) : null;
+  if (!allow) {
+    if (isSharedAdAccount(clientFull.meta_ad_account_id)) return notReady("no_campaigns_selected");
+    try {
+      const actJson = await fetch(`${META_GRAPH}/${adAcct}/campaigns?` + new URLSearchParams({
+        fields: "id",
+        filtering: JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]),
+        access_token: staffToken, limit: "500",
+      })).then(r => r.json());
+      allow = (actJson?.data || []).map(c => String(c.id));
+    } catch { allow = []; }
+    if (!allow.length) return notReady("no_active_campaigns");
+  }
+  const allowSet = new Set(allow);
 
   const graph = async (url) => {
     const r = await fetch(url);
