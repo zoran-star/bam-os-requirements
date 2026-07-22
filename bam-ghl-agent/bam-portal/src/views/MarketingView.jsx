@@ -1118,6 +1118,10 @@ function renderSubmittedInfo(t, tk) {
     rows.push(["Landing page", t.landingPage
       ? <a href={t.landingPage} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{t.landingPage} ↗</a>
       : <span style={{ color: tk.textMute }}>Using default funnel</span>]);
+    // Finals from the content team land in `files` via send-to-marketing -
+    // without this row campaign-create tickets HID their attached creatives
+    // (replace/add always showed them; this branch never did).
+    rows.push(["Final creatives", t.files && t.files.length ? filesGrid : <span style={{ color: tk.textMute }}>None attached yet - content team hasn't sent finals</span>]);
   } else if (t.type === "budget-review") {
     const cb = Array.isArray(t.confirmedBudgets) ? t.confirmedBudgets : [];
     if (cb.length) {

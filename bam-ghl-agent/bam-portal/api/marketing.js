@@ -278,6 +278,43 @@ async function contentDeadlinesDigestCron(req, res) {
   if (!process.env.SLACK_BOT_TOKEN || !process.env.CONTENT_MARKETING_SLACK_CHANNEL) {
     return res.status(200).json({ sent: false, reason: "slack_not_configured" });
   }
+  // ── Client re-nudges (Cam 2026-07-16): every business day, remind each
+  // academy IN THEIR OWN CHANNEL what's sitting with them. Most client
+  // actions are quick, so daily beats every-2-days. Tickets whose action
+  // request fired in the last ~20h are skipped - the request-time ping
+  // already covered them. Failures never block the staff digest below.
+  try {
+    const dow = new Date().getUTCDay();
+    if (dow !== 0 && dow !== 6) {
+      const waitingRows = await sb(`content_tickets?status=eq.client-dependent&client_action_status=in.(requested,review-requested)&select=id,title,type,client_id,client_action_status,messages`) || [];
+      const freshCutoff = Date.now() - 20 * 3600 * 1000;
+      const byClient = new Map();
+      for (const t of waitingRows) {
+        let reqAt = 0;
+        for (const m of (Array.isArray(t.messages) ? t.messages : [])) {
+          if (m && m.is_action_request && m.created_at) reqAt = Math.max(reqAt, Date.parse(m.created_at) || 0);
+        }
+        if (reqAt && reqAt > freshCutoff) continue;
+        if (!byClient.has(t.client_id)) byClient.set(t.client_id, []);
+        byClient.get(t.client_id).push(t);
+      }
+      for (const [cid, list] of byClient) {
+        const lines = list.map(t => {
+          const code = String(t.id || "").slice(0, 3).toUpperCase();
+          const label = (t.title || "").trim() || ((t.type === "video" ? "Video" : t.type === "graphic" ? "Graphic" : "Content") + " request");
+          const ask = t.client_action_status === "review-requested" ? "waiting on your review" : "waiting on your reply";
+          return `• ${label} [${code}] - ${ask}`;
+        });
+        postClientSlackNotification(cid,
+          `⏳ Quick reminder - we're waiting on you:\n${lines.join("\n")}\nRespond in your portal: https://portal.byanymeansbusiness.com`, req);
+        notifyClientPush(cid, "ticket-action-needed", {
+          ticketTitle: list.length === 1 ? "a waiting request" : `${list.length} waiting requests`,
+          ticketId: list[0].id, view: "marketing",
+        }).catch(() => {});
+      }
+    }
+  } catch (e) { console.error("client re-nudge error:", e?.message || e); }
+
   try {
     const mktExecSid = await marketingExecutorSlackId();
     const contentTickets = await sb(`content_tickets?status=in.(active,client-dependent)&select=id,channel,context,status,submitted_at,assigned_to,client_id`) || [];
@@ -1943,6 +1980,19 @@ async function handleContentTickets(req, res) {
 
 const META_API_VERSION = "v22.0";
 const META_GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
+
+// The "All Academies" ad account is SHARED by ~12 clients — every academy's
+// campaigns live in it, so an empty campaign allow-list there MUST resolve to
+// "nothing" (never "all"), or one client would see every other academy's
+// campaigns + spend. Dedicated (client-owned) accounts hold only that client's
+// campaigns, so there empty === "surface all active" (matches the staff
+// picker's "None ticked — all active campaigns will show" contract).
+const SHARED_META_AD_ACCOUNT = "act_847162517367847";
+const isSharedAdAccount = (id) => {
+  if (!id) return false;
+  const norm = String(id).startsWith("act_") ? String(id) : `act_${id}`;
+  return norm === SHARED_META_AD_ACCOUNT;
+};
 // Messaging scopes (Meta DM spine, 2026-07-03): pages_messaging +
 // instagram_manage_messages power direct IG/Messenger DMs; pages_show_list +
 // pages_manage_metadata let us derive the Page token + subscribe the Page to
@@ -2269,10 +2319,18 @@ async function handleMetaCampaigns(req, res) {
   let filtered = campaigns;
   if (!isStaffPicker) {
     if (!associated || !associated.length) {
-      return res.status(200).json({ campaigns: [], reason: "no_campaigns_selected" });
+      // Empty allow-list. On the SHARED "All Academies" account this MUST
+      // resolve to nothing (see SHARED_META_AD_ACCOUNT) so a client never sees
+      // another academy's campaigns. On a dedicated account it means "surface
+      // all active" — `campaigns` is already ACTIVE-only above, so fall through
+      // and return it unfiltered (matches the staff picker's "None ticked" copy).
+      if (isSharedAdAccount(clientFull.meta_ad_account_id)) {
+        return res.status(200).json({ campaigns: [], reason: "no_campaigns_selected" });
+      }
+    } else {
+      const allow = new Set(associated);
+      filtered = campaigns.filter(c => allow.has(c.id));
     }
-    const allow = new Set(associated);
-    filtered = campaigns.filter(c => allow.has(c.id));
   }
 
   return res.status(200).json({
@@ -3619,12 +3677,27 @@ async function handleMetaMachine(req, res) {
   if (!clientFull?.meta_ad_account_id) return notReady("no_ad_account");
   const staffToken = await getAnyStaffMetaToken();
   if (!staffToken) return notReady("no_staff_token");
-  const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
-    ? clientFull.meta_campaign_ids.map(String) : null;
-  if (!allow) return notReady("no_campaigns_selected");
-  const allowSet = new Set(allow);
   const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
     ? clientFull.meta_ad_account_id : `act_${clientFull.meta_ad_account_id}`;
+  // Resolve the campaign allow-list. Explicit selection always wins. Empty
+  // selection: the SHARED account stays "nothing" (never leak another academy's
+  // ads); a dedicated account falls back to ALL ACTIVE campaigns so the machine
+  // populates without staff hand-ticking (honors the picker's "None ticked" copy).
+  let allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
+    ? clientFull.meta_campaign_ids.map(String) : null;
+  if (!allow) {
+    if (isSharedAdAccount(clientFull.meta_ad_account_id)) return notReady("no_campaigns_selected");
+    try {
+      const actJson = await fetch(`${META_GRAPH}/${adAcct}/campaigns?` + new URLSearchParams({
+        fields: "id",
+        filtering: JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]),
+        access_token: staffToken, limit: "500",
+      })).then(r => r.json());
+      allow = (actJson?.data || []).map(c => String(c.id));
+    } catch { allow = []; }
+    if (!allow.length) return notReady("no_active_campaigns");
+  }
+  const allowSet = new Set(allow);
 
   const graph = async (url) => {
     const r = await fetch(url);

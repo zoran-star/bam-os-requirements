@@ -269,3 +269,22 @@ Live: `https://portal.byanymeansbusiness.com/marketing-content-ticket-flow.html`
 
 - Client `test business` (id `71d01c0f-...`, auth user `543cc072-...`, email `zoransavic2000@gmail.com`) is the safe sandbox. Use this account on the client portal.
 - Same user is also Zoran's admin staff row, so the dual-role scope logic kicks in. Sign in to portal.byanymeansbusiness.com as staff with `zoran@byanymeansbball.com` / `systems` to access staff side as pure-admin.
+
+## Client re-nudge in the deadlines digest cron (2026-07-16, Cam)
+`contentDeadlinesDigestCron` (13:00 UTC daily) now ALSO re-pings clients:
+every business day (UTC weekend skip), each academy with content tickets in
+`status=client-dependent` + `client_action_status in (requested,
+review-requested)` gets ONE message in their client Slack channel listing
+what's waiting on them ("waiting on your reply" vs "waiting on your review")
+plus a push notification. Tickets whose is_action_request message is < ~20h
+old are skipped (request-time ping already covered them). Runs before the
+staff digest and never blocks it. Repeats daily until the client responds.
+
+## Gotcha: campaign-create tickets HID their finals (fixed 2026-07-22)
+Ximena's red-alert: finals sent from content tickets never appeared on
+new-campaign marketing tickets. Data was FINE (send-to-marketing PATCHes
+`files` onto the linked marketing ticket) - `renderSubmittedInfo` in
+MarketingView.jsx only rendered the "Final creatives" grid for replace/add
+types, never for campaign-create. Rule: every marketing ticket type that can
+receive finals must render `t.files`. Also remember: the revision round-trip
+REPLACES `files` wholesale (by design - new version supersedes).
