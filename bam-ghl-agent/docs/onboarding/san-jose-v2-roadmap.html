@@ -1,0 +1,315 @@
+<style>
+  :root {
+    --bg: #f6f2e9;
+    --surface: #ffffff;
+    --surface-2: #fbf8f0;
+    --border: #e6ddc8;
+    --border-strong: #d8ccae;
+    --text: #211d12;
+    --muted: #726b56;
+    --faint: #9a927b;
+    --gold: #b9932f;
+    --gold-soft: #f0e4c2;
+    --good: #3f8f57;
+    --good-soft: #e0f0e2;
+    --now: #b9932f;
+    --now-soft: #f7ebca;
+    --wait: #948b73;
+    --wait-soft: #efeadd;
+    --shadow: 0 1px 2px rgba(40,34,15,.05), 0 8px 24px -12px rgba(40,34,15,.18);
+    --r-s: 8px; --r-m: 12px; --r-l: 16px; --r-pill: 999px;
+    --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", ui-monospace, "JetBrains Mono", "DM Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #100e08;
+      --surface: #1a1810;
+      --surface-2: #201d13;
+      --border: #322d1d;
+      --border-strong: #433c26;
+      --text: #f1ecdd;
+      --muted: #a49d85;
+      --faint: #79725d;
+      --gold: #d4b65c;
+      --gold-soft: #38300f;
+      --good: #6fc27f;
+      --good-soft: #17311c;
+      --now: #d4b65c;
+      --now-soft: #362d0c;
+      --wait: #8b846c;
+      --wait-soft: #26231a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f2e9; --surface: #ffffff; --surface-2: #fbf8f0; --border: #e6ddc8;
+    --border-strong: #d8ccae; --text: #211d12; --muted: #726b56; --faint: #9a927b;
+    --gold: #b9932f; --gold-soft: #f0e4c2; --good: #3f8f57; --good-soft: #e0f0e2;
+    --now: #b9932f; --now-soft: #f7ebca; --wait: #948b73; --wait-soft: #efeadd;
+    --shadow: 0 1px 2px rgba(40,34,15,.05), 0 8px 24px -12px rgba(40,34,15,.18);
+  }
+  :root[data-theme="dark"] {
+    --bg: #100e08; --surface: #1a1810; --surface-2: #201d13; --border: #322d1d;
+    --border-strong: #433c26; --text: #f1ecdd; --muted: #a49d85; --faint: #79725d;
+    --gold: #d4b65c; --gold-soft: #38300f; --good: #6fc27f; --good-soft: #17311c;
+    --now: #d4b65c; --now-soft: #362d0c; --wait: #8b846c; --wait-soft: #26231a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 30px -14px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .sj {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--ui);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 40px 24px 72px;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  /* ---- Header ---- */
+  .eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--gold); margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 44px); line-height: 1.04; margin: 0;
+    letter-spacing: -.02em; font-weight: 800; text-wrap: balance;
+  }
+  .sub { color: var(--muted); font-size: 15px; margin: 12px 0 0; max-width: 60ch; }
+  .flag {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 20px;
+    background: var(--good-soft); color: var(--good); border: 1px solid transparent;
+    padding: 7px 14px 7px 11px; border-radius: var(--r-pill);
+    font-size: 13px; font-weight: 700;
+  }
+  .flag .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+  .flag code { font-family: var(--mono); font-size: 12px; font-weight: 600; opacity: .85; }
+
+  /* ---- Snapshot tiles ---- */
+  .tiles {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin: 30px 0 8px;
+  }
+  @media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  .tile {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-m);
+    padding: 14px 15px; box-shadow: var(--shadow);
+  }
+  .tile .k { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  .tile .v { font-size: 24px; font-weight: 800; margin-top: 5px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .tile .n { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .tile.warn .v { color: var(--gold); }
+
+  /* ---- Section label ---- */
+  .seclabel {
+    display: flex; align-items: center; gap: 12px; margin: 44px 0 6px;
+    font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+  }
+  .seclabel::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+  /* ---- Timeline ---- */
+  .phase {
+    position: relative; display: grid; grid-template-columns: 52px 1fr; gap: 18px;
+    padding-bottom: 8px;
+  }
+  .rail { display: flex; flex-direction: column; align-items: center; }
+  .num {
+    width: 42px; height: 42px; border-radius: 12px; flex: none;
+    display: grid; place-items: center; font-weight: 800; font-size: 17px;
+    border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted);
+    font-variant-numeric: tabular-nums; z-index: 1;
+  }
+  .phase.done .num { background: var(--good-soft); color: var(--good); border-color: transparent; }
+  .phase.now  .num { background: var(--now); color: #1a1508; border-color: transparent; box-shadow: 0 0 0 4px var(--now-soft); }
+  .line { width: 2px; flex: 1; background: var(--border); margin: 6px 0 0; border-radius: 2px; min-height: 24px; }
+  .phase:last-child .line { display: none; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-l);
+    padding: 18px 20px; margin-bottom: 20px; box-shadow: var(--shadow);
+  }
+  .phase.now .card { border-color: var(--gold); }
+  .chead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .ctitle { font-size: 19px; font-weight: 800; letter-spacing: -.01em; margin: 0; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge {
+    font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: var(--r-pill); border: 1px solid var(--border-strong); color: var(--muted);
+    white-space: nowrap;
+  }
+  .badge.bam  { background: var(--gold-soft); color: var(--gold); border-color: transparent; }
+  .badge.owner{ background: var(--surface-2); }
+  .status {
+    font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: var(--r-pill);
+  }
+  .status.done { background: var(--good-soft); color: var(--good); }
+  .status.now  { background: var(--now); color: #1a1508; }
+  .status.wait { background: var(--wait-soft); color: var(--wait); }
+
+  .cdesc { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+
+  /* step list */
+  .steps { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+  .steps li {
+    display: grid; grid-template-columns: 20px 1fr auto; align-items: start; gap: 11px;
+    padding: 9px 0; border-top: 1px solid var(--border);
+  }
+  .steps li:first-child { border-top: none; }
+  .mk { width: 18px; height: 18px; border-radius: 50%; margin-top: 1px; flex: none; display: grid; place-items: center; }
+  .mk svg { width: 12px; height: 12px; display: block; }
+  .mk.ok  { background: var(--good); color: #fff; }
+  .mk.no  { background: transparent; border: 1.6px dashed var(--border-strong); }
+  .mk.dot { background: transparent; border: 1.6px solid var(--gold); }
+  .stxt { font-size: 14px; }
+  .stxt b { font-weight: 700; }
+  .smeta { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+  .run {
+    font-family: var(--mono); font-size: 11.5px; color: var(--gold);
+    background: var(--gold-soft); padding: 2px 7px; border-radius: 6px; white-space: nowrap;
+    align-self: center; font-weight: 600;
+  }
+  .trig { font-size: 11px; color: var(--faint); align-self: center; text-align: right; max-width: 46%; }
+
+  /* trigger chip row for build chunks */
+  .chunks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  @media (max-width: 640px) { .chunks { grid-template-columns: 1fr; } }
+  .chunk {
+    border: 1px solid var(--border); border-radius: var(--r-m); padding: 11px 13px; background: var(--surface-2);
+  }
+  .chunk .ct { font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 7px; }
+  .chunk .cw { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .cdotw { width: 7px; height: 7px; border-radius: 50%; background: var(--wait); flex: none; }
+
+  .foot { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--faint); font-size: 12.5px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .foot .legend { display: flex; gap: 16px; flex-wrap: wrap; }
+  .foot .lg { display: inline-flex; align-items: center; gap: 6px; }
+  .lgd { width: 9px; height: 9px; border-radius: 50%; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .phase.now .num { animation: pulse 2.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 4px var(--now-soft); } 50% { box-shadow: 0 0 0 7px var(--now-soft); } }
+  }
+</style>
+
+<div class="sj">
+<div class="wrap">
+
+  <p class="eyebrow">V2 Onboarding · Roadmap</p>
+  <h1>BAM San Jose &rarr; V2</h1>
+  <p class="sub">Elijah De Guzman's academy is a live V1.5 client. This is the full road from today's flip to go-live: what BAM does, what the owner does, and what unlocks what.</p>
+  <div class="flag"><span class="dot"></span> Flipped to V2 today &nbsp;<code>v2_access: true</code></div>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">Tier</div><div class="v">V2</div><div class="n">was V1.5</div></div>
+    <div class="tile"><div class="k">Contacts</div><div class="v">536</div><div class="n">live in GHL</div></div>
+    <div class="tile"><div class="k">Portal logins</div><div class="v">4</div><div class="n">owner + team</div></div>
+    <div class="tile warn"><div class="k">Stripe</div><div class="v">Off</div><div class="n">owner connects</div></div>
+  </div>
+
+  <div class="seclabel">The road</div>
+
+  <!-- PHASE 1 -->
+  <div class="phase done">
+    <div class="rail"><div class="num">1</div><div class="line"></div></div>
+    <div class="card">
+      <div class="chead">
+        <h2 class="ctitle">Flip to V2</h2>
+        <div class="badges"><span class="badge bam">BAM</span><span class="status done">Done</span></div>
+      </div>
+      <p class="cdesc">The gate. Sets the tier flags and unlocks the member-management surfaces + the onboarding wizard for the owner. Nothing destructive: every V1.5 surface stays (V2 is a full superset).</p>
+      <ul class="steps">
+        <li><span class="mk ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></span><span><span class="stxt"><b>v2_access = true</b>, v15_access = false</span><div class="smeta">Mutually exclusive tier flags flipped</div></span></li>
+        <li><span class="mk ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></span><span><span class="stxt">Unlocked <b>Members · Pricing · Inbox · Pipelines · Calendar</b></span><div class="smeta">Plus the 5-section onboarding wizard in Elijah's portal</div></span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div class="phase now">
+    <div class="rail"><div class="num">2</div><div class="line"></div></div>
+    <div class="card">
+      <div class="chead">
+        <h2 class="ctitle">Owner fills the wizard</h2>
+        <div class="badges"><span class="badge owner">Owner</span><span class="status now">You are here</span></div>
+      </div>
+      <p class="cdesc">Elijah works the 5-section wizard in his portal (Academy &middot; Brand &middot; Wired &middot; Offer &middot; Launch). BAM already pre-filled Academy, Brand, and the Offer skeleton from their website - Lij's remaining work is pricing, policies, EIN, coaches, and Stripe.</p>
+      <ul class="steps">
+        <li><span class="mk ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></span><span><span class="stxt"><b>Academy</b> &mdash; legal name, EIN, address, time zone</span><div class="smeta">Legal name, phone, address, TZ prefilled &middot; EIN + primary email to confirm</div></span><span class="trig">EIN + legal name feed A2P texting + agreement</span></li>
+        <li><span class="mk ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></span><span><span class="stxt"><b>Brand</b> &mdash; identity, story, "Submit brief"</span><div class="smeta">Brand cloned from BAM GTA (shared By Any Means look) &middot; story/brief still from Lij</div></span><span class="trig">Submitting the brief fires the Branding deck</span></li>
+        <li><span class="mk no"></span><span><span class="stxt"><b>Wired</b> &mdash; connect Stripe, texting choice, contacts source</span><div class="smeta">Stripe not connected &middot; contacts already live in GHL</div></span><span class="trig">Stripe unlocks pricing + members</span></li>
+        <li><span class="mk dot"></span><span><span class="stxt"><b>Offer</b> &mdash; define, schedule, pricing, policy</span><div class="smeta">3-program skeleton + schedule prefilled &middot; pricing + policy still from Lij</div></span><span class="trig">Pricing + policy feed onboarding funnel</span></li>
+        <li><span class="mk no"></span><span><span class="stxt"><b>Launch</b> &mdash; review build board, sign off</span><div class="smeta">Opens once build chunks are moving</div></span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div class="phase wait">
+    <div class="rail"><div class="num">3</div><div class="line"></div></div>
+    <div class="card">
+      <div class="chead">
+        <h2 class="ctitle">We build the site + systems</h2>
+        <div class="badges"><span class="badge bam">BAM team</span><span class="status wait">Waiting on 2</span></div>
+      </div>
+      <p class="cdesc">Owner inputs trip six build chunks. Each fires a Slack ping to San Jose's channel with the runbook to use (run in the <b>bam-client-sites</b> repo). Deck published cascades core + templates.</p>
+      <div class="chunks">
+        <div class="chunk"><div class="ct"><span class="cdotw"></span>Branding deck</div><div class="cw">brief submitted + story &rarr; <span class="run">/branding-deck</span></div></div>
+        <div class="chunk"><div class="ct"><span class="cdotw"></span>Core site pages</div><div class="cw">after deck published &rarr; <span class="run">/site-build --phase core</span></div></div>
+        <div class="chunk"><div class="ct"><span class="cdotw"></span>Email templates</div><div class="cw">after deck published &rarr; <span class="run">/email-templates</span></div></div>
+        <div class="chunk"><div class="ct"><span class="cdotw"></span>Sales funnel + emails</div><div class="cw">sales preset applied &rarr; <span class="run">/site-build --phase sales</span></div></div>
+        <div class="chunk"><div class="ct"><span class="cdotw"></span>Onboarding funnel</div><div class="cw">prices + policy + fields &rarr; <span class="run">/site-build --phase onboarding</span></div></div>
+        <div class="chunk"><div class="ct"><span class="cdotw"></span>Branded agreement</div><div class="cw">policy + legal name &rarr; <span class="run">/agreement</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 4 -->
+  <div class="phase wait">
+    <div class="rail"><div class="num">4</div><div class="line"></div></div>
+    <div class="card">
+      <div class="chead">
+        <h2 class="ctitle">Bring their GHL over</h2>
+        <div class="badges"><span class="badge bam">BAM</span><span class="status wait">Waiting</span></div>
+      </div>
+      <p class="cdesc">Migrate the live business off GHL onto portal-native services and switch the money on. This is where the 536 contacts and their pipeline become portal data.</p>
+      <ul class="steps">
+        <li><span class="mk no"></span><span><span class="stxt"><b>Import GHL pipeline + contacts</b></span><div class="smeta">Their 536 contacts &amp; deals &rarr; portal (shadow, reconcile, flip)</div></span><span class="run">/ghl-pipeline-import</span></li>
+        <li><span class="mk no"></span><span><span class="stxt"><b>Apply the sales preset</b></span><div class="smeta">Seeds pipeline stages, automations, AI agent, entry points</div></span><span class="trig">0 of each today</span></li>
+        <li><span class="mk no"></span><span><span class="stxt"><b>Connect Stripe + import members</b></span><div class="smeta">Match prices &rarr; import members &rarr; cleanup &amp; promote</div></span><span class="trig">0 members today</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- PHASE 5 -->
+  <div class="phase wait">
+    <div class="rail"><div class="num">5</div><div class="line"></div></div>
+    <div class="card">
+      <div class="chead">
+        <h2 class="ctitle">Sign off &amp; go live</h2>
+        <div class="badges"><span class="badge owner">Owner</span><span class="badge bam">BAM</span><span class="status wait">Waiting</span></div>
+      </div>
+      <p class="cdesc">Two owner sign-offs gate go-live. When both are green, San Jose is fully operating on V2.</p>
+      <ul class="steps">
+        <li><span class="mk no"></span><span><span class="stxt"><b>Approve the brand board</b></span><div class="smeta">Owner clicks approve &rarr; brand_ok</div></span></li>
+        <li><span class="mk no"></span><span><span class="stxt"><b>Accept the site</b></span><div class="smeta">Owner accepts the staging link &rarr; site_accepted</div></span></li>
+        <li><span class="mk no"></span><span><span class="stxt"><b>Flip agent live + go</b></span><div class="smeta">Hawkeye operating toggle on &rarr; academy is live</div></span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="legend">
+      <span class="lg"><span class="lgd" style="background:var(--good)"></span> Done</span>
+      <span class="lg"><span class="lgd" style="background:var(--now)"></span> Now</span>
+      <span class="lg"><span class="lgd" style="background:var(--wait)"></span> Waiting</span>
+    </div>
+    <div>BAM San Jose &middot; <span style="font-family:var(--mono)">5576acf0</span> &middot; owner: Elijah De Guzman</div>
+  </div>
+
+</div>
+</div>
