@@ -21,3 +21,5 @@ PR #1548. All the sales-preset corrections from Zoran's July 21 walkthrough with
 - Ghosted→Nurture hand-off note now shows ONCE in focus mode (exit point only, engine panel suppresses it via `_PL_FOCUS`).
 
 **UPDATE 2026-07-22:** do NOT apply presets per-academy anymore (Detail Miami application deliberately skipped). Zoran is reworking presets into a SHARED ENTITY - one preset shared by academies, update it once and all academies get the update. Until that lands, leave per-academy preset stamping alone. (For reference: Detail's live state = 4 stages, role `ghosted` not `interested`, ZERO stage_transitions, prefill-stamped free_trial that was never really applied.)
+
+**UPDATE 2026-07-22 (2):** the context ↔ onboarding editing loop (agent context tagged global/academy + click-through editors, Sembly notes #4/#5) is ALSO part of Zoran's sales-entity rework in another session - do not build it separately. Same for anything preset/context-architecture shaped: check with Zoran first.
