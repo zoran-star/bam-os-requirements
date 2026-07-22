@@ -44,7 +44,7 @@ export const SECTIONS = [
     "tag": "qualification",
     "layer": "general",
     "label": "Qualification approach",
-    "body": "Naturally qualify leads during conversation. Qualification prevents wasted time for both the lead and the academy.\n\n1. Location proximity: Are they close enough to realistically attend (see the academy's service area)? If they mention being far, be honest about the commute without discouraging them.\n2. Athlete age: Is the athlete within the program's age range? If too young, be kind and let them know when they can start. If too old for the youth program, check whether adult classes apply.\n3. Skill level: Help place them in the right group for their level (see program). Be upfront if the program isn't a fit.\n4. Interest level: Browsers get a softer touch. Ready leads get a direct path to booking.\n\nIf a lead does not qualify (outside the program's age range or too far away), be honest and helpful rather than stringing them along."
+    "body": "Naturally qualify leads during conversation. Qualification prevents wasted time for both the lead and the academy.\n\n1. Location proximity: Are they close enough to realistically attend (see the academy's service area)? If they mention being far, be honest about the commute without discouraging them.\n2. Athlete age: Is the athlete within the program's age range? If too young, be kind and let them know when they can start. If too old for the youth program, check whether adult classes apply.\n3. Program fit: Help place them in the right group for their level (see program). Be upfront if the program isn't a fit.\n\nInterest is NOT a qualification dimension. Leads who aren't interested are never marked unqualified - they get moved to Nurture instead. Unqualified means they cannot be a customer (too far, wrong age, not a fit) and it removes them from the pipeline entirely. If a lead does not qualify, be honest and helpful rather than stringing them along."
   },
   {
     "key": "objection_handling",
@@ -142,7 +142,7 @@ export const SECTIONS = [
     "tag": "qualification_config",
     "layer": "offer",
     "label": "Who qualifies",
-    "body": "Qualify leads on these dimensions:\n- Location: Are they in or near Oakville/GTA?\n- Age: Athlete must be within the program's age range (see program)\n- Skill level: All skill levels accepted\n- Interest level: Adjust urgency based on how ready they are"
+    "body": "Qualify leads on these dimensions:\n- Location proximity: Are they in or near Oakville/GTA?\n- Athlete age: Athlete must be within the program's age range (see program)\n- Program fit: All skill levels accepted - place them in the right group for their level\n\nInterest level is NOT a qualification. Leads who aren't interested are never marked unqualified - they get moved to Nurture. Unqualified means they cannot be a customer (too far, wrong age, not a fit) and it removes them from the pipeline entirely."
   },
   {
     "key": "followup_triggers",

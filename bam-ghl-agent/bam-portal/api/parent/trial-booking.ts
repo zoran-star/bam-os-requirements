@@ -7,6 +7,7 @@ import {
 } from "./_parent-context.js";
 import { eq, rpc, sb } from "./_supabase.js";
 import type { ParentApiRequest, ParentApiResponse } from "./_types.js";
+import { bounceCancelledTrialToRebook } from "../agent/_rebook.js";
 
 type TrialBookingRequest = {
   academy_id: string;
@@ -23,6 +24,7 @@ type ParentTrialBookingRow = {
   slot_id: string;
   customer_profile_id: string | null;
   student_id: string | null;
+  ghl_contact_id: string | null;
   source: string | null;
   status: "BOOKED" | "CANCELLED" | "SHOWED" | "NO_SHOW" | "CONVERTED";
 };
@@ -89,6 +91,18 @@ async function cancelParentTrialBooking(context: ParentReadContext, trialBooking
     p_trial_booking_id: booking.id,
   });
 
+  // Lead-initiated cancel of an upcoming booked trial: hand the lead back to
+  // the booking agent to rebook (cancel_booking edge + the rebook handshake
+  // notes the A5 rebook pass consumes). Best-effort - the cancel already landed.
+  if (cancelled) {
+    await bounceCancelledTrialToRebook({
+      clientId: booking.tenant_id,
+      contactId: booking.ghl_contact_id,
+      trialBookingId: booking.id,
+      source: "parent-app-cancel",
+    });
+  }
+
   return {
     academy_id: booking.tenant_id,
     slot_id: booking.slot_id,
@@ -104,7 +118,7 @@ async function getParentTrialBooking(
 ): Promise<ParentTrialBookingRow | null> {
   const rows = await sb<ParentTrialBookingRow[]>(
     `trial_bookings?id=eq.${eq(trialBookingId)}` +
-      "&select=id,tenant_id,slot_id,customer_profile_id,student_id,source,status" +
+      "&select=id,tenant_id,slot_id,customer_profile_id,student_id,ghl_contact_id,source,status" +
       "&limit=1",
   );
 
