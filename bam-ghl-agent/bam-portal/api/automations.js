@@ -14,7 +14,7 @@ import { contactsReadTable } from "./_contacts.js";
 // CLAIMS a job with a conditional pending->sending update before sending.
 
 import { pickGhlToken, ghl } from "./ghl/_core.js";
-import { nurtureStage, interestedStage, scheduledTrialContactIdSetCached } from "./agent/_stage.js";
+import { nurtureStage, ghostedStage, scheduledTrialContactIdSetCached } from "./agent/_stage.js";
 import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_store.js";
 import { routeTransition } from "./agent/_router.js";
 import { nextSessionLabel } from "./_next_session.js";
@@ -38,7 +38,7 @@ const RETRY_BACKOFF_MS     = 5 * 60 * 1000;
 // only acts on inbound replies, and Ghosted exited permanently on that one reply.
 // After a few days it's the classic "silently stuck" case the client-portal panel
 // only DISPLAYS. This sweep ACTS on it: re-enroll into Ghosted (+ move the opp back
-// to the Interested/ghosted stage, mirroring the worker's form-intro roll-forward)
+// to the Ghosted stage, mirroring the worker's form-intro roll-forward)
 // so the long game picks the lead back up. Env-tunable; sane defaults for v1.
 const REARM_IDLE_DAYS    = Number(process.env.REARM_IDLE_DAYS || 3);      // silent this long → re-arm (matches the panel's 3d)
 const REARM_COOLDOWN_HRS = Number(process.env.REARM_COOLDOWN_HRS || 48);  // don't re-arm within this of the last Ghosted enrollment (anti-loop)
@@ -290,10 +290,10 @@ async function runWork(res) {
         await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "completed", payload: null });
         completed++;
         // L1/L3: 📝 contact_form / 🏀 trial_form / ⏰ missed_trial INTRO sent its step(s) and they
-        // never replied -> the lead is stranded in Interested where nobody watches
+        // never replied -> the lead is stranded in Ghosted where nobody watches
         // (the ghost detector + agent only scan Responded). Roll them into 👻 Ghosted
         // so the long game picks up, mirroring the ghosted->nurture roll below
-        // (enroll + move the opp to the Interested/ghosted stage via interestedStage).
+        // (enroll + move the opp to the Ghosted stage via ghostedStage).
         // Best-effort + idempotent; only when ghosted is live, else leave them put.
         try {
           const a = autoCache.get(job.automation_id);
@@ -301,14 +301,13 @@ async function runWork(res) {
             await enrollContact({ clientId: job.client_id, automationKey: "ghosted", contactId: job.contact_id });
             const creds = await ensureCreds();
             if (creds && creds.token) {
-              const is = await interestedStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
+              const is = await ghostedStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
               const oppRef = await findOpenOppRef(job.client_id, creds.token, creds.locationId, job.contact_id);
-              // role MUST be "interested" - that's the canonical stage_role for the
-              // Ghosted-automation stage everywhere (seed, enum, reply-bounce guards).
-              // Stamping "ghosted" here left portal-store opps invisible to every
-              // guard that checks stage_role=interested, so a reply from Ghosted
-              // exited the automation but never bounced back to Booking.
-              if (is && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: is, role: "interested", contactId: job.contact_id, reason: "intro form sent, no reply - rolled into ghosted" });
+              // role MUST be "ghosted" - the canonical stage_role for the
+              // Ghosted-automation stage everywhere (seed, reply-bounce guards).
+              // (Was "interested" until the 2026-07-21 rename; a mismatched role
+              // here left portal-store opps invisible to the reply-bounce guards.)
+              if (is && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: is, role: "ghosted", contactId: job.contact_id, reason: "intro form sent, no reply - rolled into ghosted" });
             }
             await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "form_intro_to_ghosted", payload: { automation_key: a.automation_key } });
             formToGhosted++;
@@ -329,11 +328,11 @@ async function runWork(res) {
               if (creds && creds.token) {
                 const oppRef = await findOpenOppRef(job.client_id, creds.token, creds.locationId, job.contact_id);
                 // Roll into the long game per the academy's authored flow (the
-                // ghosted_ran_out edge; GTA seed = interested -> nurture). Router
+                // ghosted_ran_out edge; GTA seed = ghosted -> nurture). Router
                 // reads the edge; on no edge (unseeded / paused / lookup blip) it
                 // returns matched:false and we run the original hardcoded move to
                 // nurture - behavior-identical for GTA.
-                const routed = await routeTransition({ clientId: job.client_id, sb, ghl, token: creds.token, locationId: creds.locationId, fromRole: "interested", trigger: "ghosted_ran_out", contactId: job.contact_id, oppRef, reason: `${a.automation_key} ran out - rolled into nurture` });
+                const routed = await routeTransition({ clientId: job.client_id, sb, ghl, token: creds.token, locationId: creds.locationId, fromRole: "ghosted", trigger: "ghosted_ran_out", contactId: job.contact_id, oppRef, reason: `${a.automation_key} ran out - rolled into nurture` });
                 if (!routed.matched) {
                   const ns = await nurtureStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
                   if (ns && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: ns, role: "nurture", contactId: job.contact_id, reason: `${a.automation_key} ran out - rolled into nurture` });
@@ -639,7 +638,7 @@ async function runRearm(res) {
         if (ref && (Date.now() - new Date(ref).getTime()) < COOLDOWN_MS) { cooldown++; continue; }
       }
 
-      // 6) ARM. Re-enroll into Ghosted and move the opp back to the Interested/ghosted
+      // 6) ARM. Re-enroll into Ghosted and move the opp back to the Ghosted
       //    stage — the SAME handoff the worker's form-intro roll-forward does, so the
       //    lead leaves Responded (where the agent + ghost detector scan) and the long
       //    game owns it. On the next inbound reply the bounce guard returns them to
@@ -648,9 +647,9 @@ async function runRearm(res) {
       if (!enr || (!enr.ok && !enr.enrollment_id)) { errors++; continue; }
       try {
         if (c && c.token && c.locationId) {
-          const is = await interestedStage(c.token, c.locationId, { clientId, sb });
+          const is = await ghostedStage(c.token, c.locationId, { clientId, sb });
           const oppRef = await findOpenOppRef(clientId, c.token, c.locationId, cid);
-          if (is && oppRef) await moveStage({ clientId, ghl, token: c.token, oppRef, stage: is, role: "interested", contactId: cid, reason: "re-arm: Responded lead went silent, rolled back into ghosted" });
+          if (is && oppRef) await moveStage({ clientId, ghl, token: c.token, oppRef, stage: is, role: "ghosted", contactId: cid, reason: "re-arm: Responded lead went silent, rolled back into ghosted" });
         }
       } catch (_) { /* enrollment stands even if the stage move blips */ }
       await logEvent({ clientId, contactId: cid, automationId: null, type: "rearm_ghosted", payload: { from: "responded", idle_days: REARM_IDLE_DAYS } });

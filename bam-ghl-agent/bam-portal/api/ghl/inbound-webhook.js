@@ -1,7 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
-import { respondedStage, contactInRespondedStage, scheduledTrialStage, interestedStage, nurtureStage } from "../agent/_stage.js";
+import { respondedStage, contactInRespondedStage, scheduledTrialStage, ghostedStage, nurtureStage } from "../agent/_stage.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, memberCareAgentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
@@ -299,7 +299,7 @@ async function handler(req, res) {
   // and bounce them to Booking (Responded) so the booking agent picks them up warm
   // (mirrors the GHL ghosted "reply -> Responded" behavior). Best-effort.
   // GUARD: ONLY move the card when its open opp is currently in a NUDGE/GHOST stage
-  // (Interested/ghosted or Lead Nurture). A reply from a paid member, a booked
+  // (Ghosted or Lead Nurture). A reply from a paid member, a booked
   // Scheduled-Trial lead, an attended Done-Trial lead, or any won/closed opp must NOT
   // be yanked back to Booking - leave those put.
   try {
@@ -316,7 +316,7 @@ async function handler(req, res) {
             // Same guard: bounce to Responded ONLY from a ghost/nurture stage.
             const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(client.id)}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}&status=eq.open&select=id,ghl_opportunity_id,stage_role&limit=1`);
             const opp = Array.isArray(rows) && rows[0];
-            if (opp && (opp.stage_role === "interested" || opp.stage_role === "nurture")) {
+            if (opp && (opp.stage_role === "ghosted" || opp.stage_role === "nurture")) {
               await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id }, stage: rs, role: "responded", contactId: String(contactId) });
             }
           } else if (rs) {
@@ -326,12 +326,12 @@ async function handler(req, res) {
             if (opp) {
               const curStageId = opp.pipelineStageId || opp.stageId || null;
               const [is, ns] = await Promise.all([
-                interestedStage(creds.token, creds.locationId).catch(() => null),
+                ghostedStage(creds.token, creds.locationId).catch(() => null),
                 nurtureStage(creds.token, creds.locationId).catch(() => null),
               ]);
               const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
               if (ghostStageIds.has(curStageId)) {
-                // Guard preserved exactly (open opp currently in Interested/Nurture). The
+                // Guard preserved exactly (open opp currently in Ghosted/Nurture). The
                 // move runs through the provider-aware store; on ghl it is the identical PUT.
                 await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: opp.id }, stage: rs, role: "responded", contactId: String(contactId) });
               }

@@ -57,7 +57,7 @@ lead replies, GHL moves them to Responded and the sales agent takes over.
    `ghl_inbound_messages` in later phases. Per-academy rollout: add the same
    workflow to each v15/v2 academy's GHL.
 2. **Nudge engine** ("sms ghosted" first): enroll when a website lead lands
-   at "interested"; strict-schedule texts/emails; instant exits (reply via
+   at the ghosted stage; strict-schedule texts/emails; instant exits (reply via
    webhook, booking via our endpoint, stage-leave). BLOCKED ON: Zoran's
    message copy + timings. Owner-flag ledger: ENGINE → AGENT → HUMAN; flip
    cancels pending sends atomically; fire-time recheck kills races.

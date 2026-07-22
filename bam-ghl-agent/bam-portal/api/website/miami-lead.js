@@ -129,7 +129,7 @@ async function handler(req, res) {
       // Portal-native pipeline: when Detail's pipeline_provider='portal', the
       // portal board reads the store - and Detail's GHL workflow (which creates
       // the GHL opp off the miami-lead tag) is invisible to it. Mint the store
-      // card here so every new lead lands on the board (Interested; offer_id
+      // card here so every new lead lands on the board (Ghosted; offer_id
       // inherits Training from the seeded stage row). Gated on provider so on
       // 'ghl' we change NOTHING (the workflow keeps sole ownership - calling
       // createOpp there would double-create on the GHL board). Best-effort.
@@ -139,7 +139,7 @@ async function handler(req, res) {
           await createOpp({
             clientId: MIAMI_CLIENT_UUID,
             contactId,
-            role: "interested",
+            role: "ghosted",
             name: `${firstName.trim()} ${lastName?.trim() || ""}`.trim(),
             contactPhone: phone?.trim() || null,
             source: "website",

@@ -257,7 +257,7 @@ async function handler(req, res) {
   const result = { ok: true, good_fit: goodFit, showed_up: showedUp, moved: false, trainer, signup_text: "none" };
 
   // No-show: bounce the lead back to RESPONDED so the BOOKING agent actively
-  // rebooks them (Zoran 2026-07-06). This REPLACES the old Interested + missed_trial
+  // rebooks them (Zoran 2026-07-06). This REPLACES the old Ghosted + missed_trial
   // nurture path - the standalone missed_trial firing is retired here; the booking
   // rebook opener (scripted if the academy approved its booking initial automations,
   // else the AI opener) owns the outreach. Route the no_show edge (GTA seed =
