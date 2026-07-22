@@ -185,7 +185,7 @@ async function loadAcademyAndToken(clientId, ctx, res) {
   }
   const rows = await sb(
     `clients?id=eq.${clientId}` +
-    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,pipeline_shadow,pipeline_provider` +
+    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,pipeline_shadow,pipeline_provider,booking_provider` +
     `&limit=1`
   );
   const client = Array.isArray(rows) && rows[0];
@@ -672,6 +672,42 @@ async function handler(req, res) {
       o.trialDate = led?.trialDate || null;
       o.formFilledAt = led?.formFilledAt || null;
     }
+  }
+
+  // 4a. AUTHORITATIVE booked-trial date for off-GHL academies: the portal's own
+  //     trial_bookings + schedule_slots spine. This is the real booking source
+  //     once a client is off GHL, and it MUST override the website_leads
+  //     booked_slot from step 4 - that field is a form-fill-time snapshot and
+  //     goes stale the moment a parent rebooks. Without this, a rebooked trial
+  //     (e.g. moved from Jul 7 to Jul 22) still reads the old, now-past date, so
+  //     the "not flowing" safety net thinks the trial already happened and
+  //     wrongly flags a lead whose trial is actually still ahead (Zoran
+  //     2026-07-22, Meg/Blake Pappas). Keyed by ghl_contact_id; the newest
+  //     non-cancelled booking per contact wins (rebooking = latest intent).
+  if (provider === "portal" || client.booking_provider === "portal") {
+    try {
+      const [tbRows, slotRows] = await Promise.all([
+        sb(`trial_bookings?tenant_id=eq.${clientId}&ghl_contact_id=not.is.null` +
+           `&select=ghl_contact_id,slot_id,status,cancelled_at,booked_at&order=booked_at.desc.nullslast&limit=5000`).catch(() => []),
+        sb(`schedule_slots?tenant_id=eq.${clientId}&select=id,start_time,is_cancelled&limit=8000`).catch(() => []),
+      ]);
+      const slotById = new Map();
+      for (const s of (Array.isArray(slotRows) ? slotRows : [])) slotById.set(s.id, s);
+      const trialByContact = new Map(); // ghl_contact_id -> slot start_time (ISO)
+      for (const b of (Array.isArray(tbRows) ? tbRows : [])) {
+        const cid = b.ghl_contact_id;
+        if (!cid || trialByContact.has(cid)) continue;            // rows are newest-booked first
+        if (b.cancelled_at || /cancel/i.test(String(b.status || ""))) continue;
+        const slot = b.slot_id ? slotById.get(b.slot_id) : null;
+        if (!slot || slot.is_cancelled || !slot.start_time) continue;
+        trialByContact.set(cid, slot.start_time);
+      }
+      if (trialByContact.size) {
+        for (const p of enriched) for (const o of p.opportunities) {
+          if (o.contactId && trialByContact.has(o.contactId)) o.trialDate = trialByContact.get(o.contactId); // authoritative override
+        }
+      }
+    } catch (_) { /* non-fatal - fall back to the step-4 date */ }
   }
 
   // 4b. Booked-trial dates from the ACTUAL GHL appointments on the client's
