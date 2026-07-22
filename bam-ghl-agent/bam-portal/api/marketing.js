@@ -278,6 +278,43 @@ async function contentDeadlinesDigestCron(req, res) {
   if (!process.env.SLACK_BOT_TOKEN || !process.env.CONTENT_MARKETING_SLACK_CHANNEL) {
     return res.status(200).json({ sent: false, reason: "slack_not_configured" });
   }
+  // ── Client re-nudges (Cam 2026-07-16): every business day, remind each
+  // academy IN THEIR OWN CHANNEL what's sitting with them. Most client
+  // actions are quick, so daily beats every-2-days. Tickets whose action
+  // request fired in the last ~20h are skipped - the request-time ping
+  // already covered them. Failures never block the staff digest below.
+  try {
+    const dow = new Date().getUTCDay();
+    if (dow !== 0 && dow !== 6) {
+      const waitingRows = await sb(`content_tickets?status=eq.client-dependent&client_action_status=in.(requested,review-requested)&select=id,title,type,client_id,client_action_status,messages`) || [];
+      const freshCutoff = Date.now() - 20 * 3600 * 1000;
+      const byClient = new Map();
+      for (const t of waitingRows) {
+        let reqAt = 0;
+        for (const m of (Array.isArray(t.messages) ? t.messages : [])) {
+          if (m && m.is_action_request && m.created_at) reqAt = Math.max(reqAt, Date.parse(m.created_at) || 0);
+        }
+        if (reqAt && reqAt > freshCutoff) continue;
+        if (!byClient.has(t.client_id)) byClient.set(t.client_id, []);
+        byClient.get(t.client_id).push(t);
+      }
+      for (const [cid, list] of byClient) {
+        const lines = list.map(t => {
+          const code = String(t.id || "").slice(0, 3).toUpperCase();
+          const label = (t.title || "").trim() || ((t.type === "video" ? "Video" : t.type === "graphic" ? "Graphic" : "Content") + " request");
+          const ask = t.client_action_status === "review-requested" ? "waiting on your review" : "waiting on your reply";
+          return `• ${label} [${code}] - ${ask}`;
+        });
+        postClientSlackNotification(cid,
+          `⏳ Quick reminder - we're waiting on you:\n${lines.join("\n")}\nRespond in your portal: https://portal.byanymeansbusiness.com`, req);
+        notifyClientPush(cid, "ticket-action-needed", {
+          ticketTitle: list.length === 1 ? "a waiting request" : `${list.length} waiting requests`,
+          ticketId: list[0].id, view: "marketing",
+        }).catch(() => {});
+      }
+    }
+  } catch (e) { console.error("client re-nudge error:", e?.message || e); }
+
   try {
     const mktExecSid = await marketingExecutorSlackId();
     const contentTickets = await sb(`content_tickets?status=in.(active,client-dependent)&select=id,channel,context,status,submitted_at,assigned_to,client_id`) || [];
