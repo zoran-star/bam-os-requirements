@@ -49,6 +49,33 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// Soft opt-out phrases inside a longer message ("please stop texting me", "leave
+// me alone") - an opt-out signal even without a carrier STOP keyword. Deliberately
+// conservative: verbs require the texting/contacting object or a me/us target so
+// chatty phrases like "can't stop talking about it" never match ("stop talking"
+// only matches with "to me/us"). Shared shape with api/twilio/inbound-webhook.js.
+const SOFT_OPTOUT_RE = /\b(?:stop\s+(?:texting|messaging|contacting)(?:\s+(?:me|us))?|stop\s+talking\s+to\s+(?:me|us)|leave\s+(?:me|us)\s+alone|(?:don'?t|do\s+not)\s+(?:text|message|contact|call)\s+(?:me|us)|remove\s+(?:me|us|my\s+number)|take\s+(?:me|us)\s+off\s+(?:your|the|this)\s+list|unsubscribe)\b/i;
+
+// Persistent opt-out note → agent contact memory. The lead said some form of
+// "stop contacting me": do NOT block the normal flow (the bounce + Hawkeye draft
+// still run so a human sees it), but stamp agent_contact_notes so the agent
+// suggests MARK UNQUALIFIED even if the model misses the phrasing. One active
+// note per contact (no dupes). Best-effort - never blocks the webhook 200.
+async function flagSoftOptOut(clientId, contactId, text, createdBy) {
+  try {
+    if (!clientId || !contactId || !SOFT_OPTOUT_RE.test(String(text || ""))) return;
+    const prefix = "Lead appears to have OPTED OUT";
+    const existing = await sb(`agent_contact_notes?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}&active=eq.true&note=ilike.${encodeURIComponent(prefix)}*&select=id&limit=1`);
+    if (Array.isArray(existing) && existing.length) return;
+    const snip = String(text || "").trim().slice(0, 120);
+    await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+      client_id: clientId, ghl_contact_id: String(contactId), active: true,
+      note: `${prefix} ("${snip}") - suggest mark unqualified, do not keep messaging`,
+      created_by: createdBy,
+    }]) });
+  } catch (e) { console.error("soft opt-out note:", e.message); }
+}
+
 // GHL's webhook payload keys vary by trigger/marketplace-vs-workflow, so read
 // each value from a small list of likely field names.
 function pick(obj, keys) {
@@ -255,6 +282,10 @@ async function handler(req, res) {
     notifyOwners(client.id, "inbox_message",
       `💬 New ${channel || "message"} in your inbox${snip ? `: "${snip}"` : "."}`).catch(() => {});
   } catch (_) { /* non-fatal */ }
+
+  // Soft opt-out ("please stop texting me", "leave me alone"): flag it into the
+  // agent's contact memory. Never blocks the flow - bounce + draft still run.
+  if (contactId && body) await flagSoftOptOut(client.id, String(contactId), body, "ghl-inbound-webhook");
 
   // Lead just replied → cancel any pending/approved drafts for them (don't text
   // someone who's already talking to us): every agent queue (followups, ready,

@@ -34,6 +34,33 @@ async function sb(path, init = {}) {
 
 const STOP_WORDS  = new Set(["stop", "stopall", "stop all", "unsubscribe", "cancel", "end", "quit", "revoke", "optout", "opt out", "opt-out"]);
 
+// Soft opt-out phrases inside a longer message ("please stop texting me", "leave
+// me alone") - the exact-match STOP_WORDS above miss these. Deliberately
+// conservative: verbs require the texting/contacting object or a me/us target so
+// chatty phrases like "can't stop talking about it" never match ("stop talking"
+// only matches with "to me/us"). Shared shape with api/ghl/inbound-webhook.js.
+const SOFT_OPTOUT_RE = /\b(?:stop\s+(?:texting|messaging|contacting)(?:\s+(?:me|us))?|stop\s+talking\s+to\s+(?:me|us)|leave\s+(?:me|us)\s+alone|(?:don'?t|do\s+not)\s+(?:text|message|contact|call)\s+(?:me|us)|remove\s+(?:me|us|my\s+number)|take\s+(?:me|us)\s+off\s+(?:your|the|this)\s+list|unsubscribe)\b/i;
+
+// Persistent opt-out note → agent contact memory. The lead said some form of
+// "stop contacting me" without hitting a carrier STOP word: do NOT block the
+// normal flow (the bounce + Hawkeye draft still run so a human sees it), but
+// stamp the contact notes so the agent suggests MARK UNQUALIFIED even if the
+// model misses the phrasing. One active note per contact (no dupes). Best-effort.
+async function flagSoftOptOut(clientId, contactId, text, createdBy) {
+  try {
+    if (!clientId || !contactId || !SOFT_OPTOUT_RE.test(String(text || ""))) return;
+    const prefix = "Lead appears to have OPTED OUT";
+    const existing = await sb(`agent_contact_notes?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}&active=eq.true&note=ilike.${encodeURIComponent(prefix)}*&select=id&limit=1`);
+    if (Array.isArray(existing) && existing.length) return;
+    const snip = String(text || "").trim().slice(0, 120);
+    await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+      client_id: clientId, ghl_contact_id: String(contactId), active: true,
+      note: `${prefix} ("${snip}") - suggest mark unqualified, do not keep messaging`,
+      created_by: createdBy,
+    }]) });
+  } catch (e) { console.error("soft opt-out note:", e.message); }
+}
+
 // Twilio request signature: base64(HMAC-SHA1(authToken, url + sorted(k+v)…)).
 function validSignature(authToken, url, params, signature) {
   if (!authToken || !signature) return false;
@@ -126,6 +153,10 @@ async function handler(req, res) {
   } catch (_) {}
 
   if (ghlContactId) {
+    // Soft opt-out ("please stop texting me", "leave me alone"): flag it into the
+    // agent's contact memory. Never blocks the flow - bounce + draft still run.
+    await flagSoftOptOut(client.id, ghlContactId, bodyText, "twilio-inbound-webhook");
+
     // Lead replied → cancel pending/approved drafts across every agent queue +
     // any parked reignition (shared helper, same sweep as the GHL reply webhook
     // and the signup path). The detector re-drafts against what they just said.

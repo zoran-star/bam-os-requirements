@@ -10654,6 +10654,8 @@ Then the call to action."]</div>
           .plo2-lead .st{font-size:11px;color:var(--text-mute);margin-top:1px}
           .plo2-lead.needs .st{color:var(--accent)}
           .plo2-av{width:28px;height:28px;border-radius:50%;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--text-sub);flex-shrink:0}
+          .plo2-x{margin-left:auto;flex-shrink:0;background:transparent;border:none;border-radius:8px;padding:5px 6px;color:var(--text-mute);cursor:pointer;opacity:.55;transition:opacity .12s,color .12s}
+          .plo2-x:hover{opacity:1;color:var(--red,#F07060)}
           .plo2-more{font-size:12px;color:var(--text-sub);text-align:center;padding:8px;cursor:pointer;border:1px dashed var(--border);border-radius:10px}
           .plo2-more:hover{color:var(--text)}
           .plo2-none{font-size:12.5px;color:var(--text-mute);text-align:center;padding:14px}
@@ -20890,6 +20892,7 @@ function _hv2HawkPaint(d, total) {
     : top.kind === 'book' ? `Confirm ${name}'s booking`
     : top.kind === 'ghost' ? `Move ${name} to the Ghosted automation`
     : top.kind === 'mark_lost' ? `Confirm ${name} as lost`
+    : top.kind === 'mark_unqualified' ? `${name} opted out - mark unqualified`
     : `Reply to ${name}`;
   host.innerHTML = `<button class="hv2-one" onclick="_hv2OpenHawkeye()">
     <div style="display:flex;align-items:center;gap:8px"><span class="hv2-lab">${_HV2_ICONS.eye} Hawkeye</span><span class="hv2-pill red">${total} action${total === 1 ? '' : 's'} waiting</span></div>
@@ -22061,18 +22064,18 @@ async function _hmLoadRailBottom() {
 
 function _hmRenderHawkFeed(host, d, total) {
   const items = [];
-  const bookVerb = k => k === 'book' ? 'Trial booking to confirm' : k === 'ghost' ? 'Move to ghosted' : k === 'mark_lost' ? 'Confirm as lost' : k === 'reignite' ? 'Reignite later, parked' : k === 'reignite_due' ? 'Reignition day' : 'Reply drafted';
-  const bookIcon = k => k === 'book' ? { icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check } : k === 'ghost' ? { icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost } : k === 'mark_lost' ? { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x } : { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail };
+  const bookVerb = k => k === 'book' ? 'Trial booking to confirm' : k === 'ghost' ? 'Move to ghosted' : k === 'mark_lost' ? 'Confirm as lost' : k === 'mark_unqualified' ? 'Opted out, confirm unqualified' : k === 'reignite' ? 'Reignite later, parked' : k === 'reignite_due' ? 'Reignition day' : 'Reply drafted';
+  const bookIcon = k => k === 'book' ? { icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check } : k === 'ghost' ? { icon: 'hm-feed-ic-ghost', svg: _HV2_ICONS.ghost } : (k === 'mark_lost' || k === 'mark_unqualified') ? { icon: 'hm-feed-ic-lost', svg: _HV2_ICONS.x } : { icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail };
   for (const r of (d.booking || [])) {
     const ic = bookIcon(r.kind);
     items.push({ name: r.contact_name || 'Lead', desc: bookVerb(r.kind), icon: ic.icon, svg: ic.svg, agent: 'booking', cid: r.ghl_contact_id });
   }
   for (const r of (d.confirm || [])) {
-    const verb = r.kind === 'confirm_handoff' ? 'Handoff to booking' : r.kind === 'confirm_lost' ? 'Confirm as lost' : r.kind === 'post_trial' ? 'Post-trial form to send' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Trial confirmation drafted';
+    const verb = r.kind === 'confirm_handoff' ? 'Handoff to booking' : r.kind === 'confirm_lost' ? 'Confirm as lost' : r.kind === 'confirm_unqualified' ? 'Opted out, confirm unqualified' : r.kind === 'post_trial' ? 'Post-trial form to send' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Trial confirmation drafted';
     items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-book', svg: _HV2_ICONS.check, agent: 'confirm', cid: r.ghl_contact_id });
   }
   for (const r of (d.closing || [])) {
-    const verb = r._plan ? 'Follow-up plan to approve' : r.kind === 'closing_enroll' ? 'Enroll in closing plan' : r.kind === 'closing_lost' ? 'Confirm as lost' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Closing reply drafted';
+    const verb = r._plan ? 'Follow-up plan to approve' : r.kind === 'closing_enroll' ? 'Enroll in closing plan' : r.kind === 'closing_lost' ? 'Confirm as lost' : r.kind === 'closing_unqualified' ? 'Opted out, confirm unqualified' : r.kind === 'reignite' ? 'Reignite later, parked' : r.kind === 'reignite_due' ? 'Reignition day' : 'Closing reply drafted';
     items.push({ name: r.contact_name || 'Lead', desc: verb, icon: 'hm-feed-ic-reply', svg: _HV2_ICONS.mail, agent: 'closing', cid: r.ghl_contact_id });
   }
 
@@ -28233,7 +28236,7 @@ async function _taHealthLoad() {
       }
     }
     if (!opps.length) { body.innerHTML = `<div style="font-size:13px;color:var(--text-mute)">No leads in the Responded stage.</div>`; return; }
-    const label = { reply: ['Reply', '#5A8FB8'], ghost: ['Send to Ghosted', 'var(--gold,#D4B65C)'], mark_lost: ['Confirm lost', '#e0654f'], book: ['Confirm booking', '#5A8FB8'] };
+    const label = { reply: ['Reply', '#5A8FB8'], ghost: ['Send to Ghosted', 'var(--gold,#D4B65C)'], mark_lost: ['Confirm lost', '#e0654f'], mark_unqualified: ['Confirm unqualified', '#e0654f'], book: ['Confirm booking', '#5A8FB8'] };
     const rows = opps.map(o => {
       const nm = escapeHTML((o.contact && o.contact.name) || o.name || 'Lead');
       const k = cardBy.get(String(o.contactId || ''));
@@ -36357,8 +36360,8 @@ let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
 let _PL_AGENT_MODE = null;   // 'off' | 'hawkeye' | 'self_drive' | null(unknown) - drives the Responded glow
 
 // Map of Responded-stage contact id → the pending Hawkeye action waiting on staff
-// ('reply' | 'ghost' | 'mark_lost' | 'book'). Drives the per-card badge: any
-// pending card → Needs action (labelled by kind); none → All good.
+// ('reply' | 'ghost' | 'mark_lost' | 'mark_unqualified' | 'book'). Drives the
+// per-card badge: any pending card → Needs action (labelled by kind); none → All good.
 let _PL_NEEDS = null;
 // Contacts with an APPROVED (after-hours parked) send waiting for the 8am flush.
 // Not "needs you" (staff already acted), but the system owns them - the stuck-
@@ -36369,7 +36372,7 @@ let _PL_HELD = null;
 // "Reignite <date>" chips and exempts parked leads from the stuck list.
 let _PL_REIGN = null;
 // If one lead somehow has more than one pending card, show the most decisive one.
-const _PL_NEED_PRIO = { book: 4, mark_lost: 3, reignite: 3, reignite_due: 3, reply: 2, ghost: 1 };
+const _PL_NEED_PRIO = { book: 4, mark_unqualified: 4, confirm_unqualified: 4, closing_unqualified: 4, mark_lost: 3, reignite: 3, reignite_due: 3, reply: 2, ghost: 1 };
 async function _plLoadNeedsAction() {
   try {
     // V2: the needs map spans ALL THREE agents (deck + simple-view highlights).
@@ -37358,6 +37361,23 @@ function _plMarkAbandoned(oppId) { _plOutcome(oppId, 'abandoned'); }
 // Distinct from a plain 'abandoned' (e.g. duplicate cleanup), which never tags.
 function _plMarkUnqualified(oppId, contactId) { _plOutcome(oppId, 'unqualified', contactId); }
 
+// Home-screen X on automation-stage rows (Zoran 2026-07-21): exit every active
+// automation for the lead, then drop the card from the pipeline. Deliberately
+// NO unqualified tag - this is cleanup (test leads, duplicates), not a verdict.
+async function _cc2RemoveFromAuto(oppId, contactId, btn) {
+  if (btn) { btn.disabled = true; btn.style.opacity = '.3'; }
+  try {
+    if (contactId) await _autoApi('exit-enrollment', { contact_id: contactId, reason: 'removed from home screen' });
+    await _plSetStatus(oppId, 'abandoned', 'removed from home screen');
+    _plRemoveOppLocal(oppId);
+    if (typeof _cc2Render === 'function') { try { _cc2Render(); } catch (_) {} }
+    _plToast('Removed - out of the automation and off the pipeline');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+    _plToast('Could not remove: ' + (e.message || e));
+  }
+}
+
 // Per-lead bot mute (guardrail #6): "hands off this lead" - stop the agents from
 // drafting on this specific contact, without turning the whole agent off. A global
 // (all-bots) mute also pulls them out of any running automation sequence.
@@ -37968,6 +37988,7 @@ const _HK2_KIND = {
   enroll:  { pill: 'Ready to enroll', color: 'var(--green,#4CC76A)',   cls: 'green', go: 'Approve and send',              goEdit: 'Confirm edits and send' },
   plan:    { pill: 'Follow-up plan',  color: 'var(--accent)',          cls: '',      go: 'Approve follow-up schedule', goEdit: 'Confirm edits and schedule' },
   lost:    { pill: 'Suggested lost',  color: 'var(--red,#F07060)',     cls: 'red',   go: 'Mark lost',                     goEdit: 'Confirm edits and mark lost' },
+  unqualified: { pill: 'Wants you to stop', color: 'var(--red,#F07060)', cls: 'red', go: 'Mark unqualified',              goEdit: 'Mark unqualified' },
   form:    { pill: 'Post-trial form', color: 'var(--accent)',          cls: '',      go: 'Submit post-trial form',        goEdit: 'Submit post-trial form' },
   reignite:     { pill: 'Wants to start later', color: 'var(--gold,#D4B65C)', cls: '', go: 'Send ack + schedule reignite', goEdit: 'Confirm edits and schedule' },
   reignite_due: { pill: 'Reignition day',       color: 'var(--gold,#D4B65C)', cls: '', go: 'Approve and send',             goEdit: 'Confirm edits and send' },
@@ -38074,8 +38095,8 @@ async function _hk2Load() {
   ]);
   const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
   const reig = r => r.kind === 'reignite' ? 'reignite' : r.kind === 'reignite_due' ? 'reignite_due' : null;
-  const booking = pend(b).map(r => ({ ...r, _kind: reig(r) || (r.kind === 'book' ? 'book' : r.kind === 'ghost' ? 'ghost' : r.kind === 'mark_lost' ? 'lost' : 'reply') }));
-  const confirm = pend(c).map(r => ({ ...r, _kind: reig(r) || (r.kind === 'confirm_handoff' ? 'handoff' : r.kind === 'confirm_lost' ? 'lost' : r.kind === 'post_trial' ? 'form' : 'reply') }));
+  const booking = pend(b).map(r => ({ ...r, _kind: reig(r) || (r.kind === 'book' ? 'book' : r.kind === 'ghost' ? 'ghost' : r.kind === 'mark_lost' ? 'lost' : r.kind === 'mark_unqualified' ? 'unqualified' : 'reply') }));
+  const confirm = pend(c).map(r => ({ ...r, _kind: reig(r) || (r.kind === 'confirm_handoff' ? 'handoff' : r.kind === 'confirm_lost' ? 'lost' : r.kind === 'confirm_unqualified' ? 'unqualified' : r.kind === 'post_trial' ? 'form' : 'reply') }));
   const clRows = pend(l);
   const plans = new Map(), rest = [];
   for (const r of clRows) {
@@ -38083,7 +38104,7 @@ async function _hk2Load() {
     else rest.push(r);
   }
   const closing = [
-    ...rest.map(r => ({ ...r, _kind: reig(r) || (r.kind === 'closing_enroll' ? 'enroll' : r.kind === 'closing_lost' ? 'lost' : 'reply') })),
+    ...rest.map(r => ({ ...r, _kind: reig(r) || (r.kind === 'closing_enroll' ? 'enroll' : r.kind === 'closing_lost' ? 'lost' : r.kind === 'closing_unqualified' ? 'unqualified' : 'reply') })),
     ...[...plans.values()].map(rows => ({
       _kind: 'plan', id: 'plan:' + rows[0].ghl_contact_id, ghl_contact_id: rows[0].ghl_contact_id,
       ghl_conversation_id: rows[0].ghl_conversation_id, contact_name: rows[0].contact_name,
@@ -38318,7 +38339,7 @@ function _hk2Moves(r) {
   // 🔥 Any card can park the lead for a later date instead ("yes, but later").
   if (k !== 'reignite') m.push(['Reignite later', 'reignite']);
   if ((k === 'reignite' || k === 'book') && r._origKind) m.unshift(['Back to the card', 'unreignite']);
-  m.push([_hk2MoveLabel('unq', hasMsg), 'unq']);
+  if (k !== 'unqualified') m.push([_hk2MoveLabel('unq', hasMsg), 'unq']);
   return m;
 }
 // "Reignite later" from the Other menu: flip the card into the reignite layout
@@ -38412,6 +38433,13 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <div class="hk2-lbl">Optional goodbye - sends with the move${reason}</div>
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       <div class="hk2-note">Approving routes them to Nurture (the long game). You confirm - nothing moves on its own.</div>`;
+  } else if (r._kind === 'unqualified') {
+    // Opt-out card (2026-07-21 meeting): the lead asked us to stop. NO message
+    // box on purpose - nothing may ever be texted to a lead who said stop.
+    const reason = r.lost_reason ? ` <span style="color:var(--red,#F07060);font-weight:700">${escapeHTML(r.lost_reason)}</span>` : '';
+    body = `${_hk2ThreadHtml(r, isTop)}
+      <div class="hk2-lbl">Wants you to stop - mark unqualified?${reason}</div>
+      <div class="hk2-note">They asked you to stop contacting them. Approving removes them from the pipeline with the unqualified tag - nothing sends, no nurture texts, never contacted again. You confirm - nothing moves on its own.</div>`;
   } else if (r._kind === 'reignite') {
     // 🔥 The PARK card: an ack that sends now, the date, and the pre-written
     // message that fires ON that date. All three editable; message edits demand
@@ -38964,6 +38992,11 @@ function _hk2Confirm() {
     } else if (k === 'lost') {
       chk(await _apxPost(ep, 'confirm-lost', { ready_id: r.id, reply, lost_reason: r.lost_reason || 'Other' }));
       _apxToast('Marked lost - Nurture takes over', true);
+    } else if (k === 'unqualified') {
+      // Opt-out approve: same close as the "Mark unqualified" move - NO reply is
+      // passed, so nothing can ever be texted to a lead who said stop.
+      chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: r.id }));
+      _apxToast('Marked unqualified - no more messages', true);
     } else if (k === 'reignite') {
       // 🔥 Park it: ack (if any) sends now, the message fires as a new card on
       // the date. Works from an agent-proposed reignite card OR any card flipped
@@ -39409,6 +39442,7 @@ function _plo2Cascade(stage, nav) {
     mark_lost: 'lost suggested', confirm: 'reply · draft ready', confirm_auto: 'reminder ready',
     confirm_handoff: 'reschedule · needs a new time', confirm_lost: 'lost suggested',
     closing: 'reply · draft ready', closing_enroll: 'ready to enroll', closing_lost: 'lost suggested',
+    mark_unqualified: 'opt-out · unqualified suggested', confirm_unqualified: 'opt-out · unqualified suggested', closing_unqualified: 'opt-out · unqualified suggested',
     post_trial: 'post-trial form to fill',
     reignite: 'wants to start later · reignite to confirm', reignite_due: 'reignition day · message ready',
   };
@@ -39455,9 +39489,14 @@ function _plo2Cascade(stage, nav) {
     const click = need
       ? (leadFn ? `${leadFn}('${escapeHTML(String(o.contactId || ''))}')` : `_hk2Open(null, '${escapeHTML(String(o.contactId || ''))}')`)
       : `${cardFn}('${escapeHTML(o.id)}')`;
+    // Automation stages only (Zoran 2026-07-21): X = pull the lead out of the
+    // automation + off the pipeline. NOT unqualified - just cleanup.
+    const rmv = kind === 'automation'
+      ? `<button class="plo2-x" title="Remove from the automation + pipeline (does not mark unqualified)" onclick="event.stopPropagation();_cc2RemoveFromAuto('${escapeHTML(o.id)}','${escapeHTML(String(o.contactId || ''))}',this)">${_plIcon('x', 13)}</button>`
+      : '';
     return `<div class="plo2-row" style="animation-delay:${Math.min(i, 10) * 45}ms"><div class="plo2-lead${need ? ' needs' : ''}" onclick="${click}">
       <div class="plo2-av">${escapeHTML(initials(nm))}</div>
-      <div style="min-width:0"><div class="who">${escapeHTML(nm)}</div>${st ? `<div class="st">${escapeHTML(st)}</div>` : ''}</div></div></div>`;
+      <div style="min-width:0"><div class="who">${escapeHTML(nm)}</div>${st ? `<div class="st">${escapeHTML(st)}</div>` : ''}</div>${rmv}</div></div>`;
   };
   const all = [...needy, ...plain];
   const showAll = typeof _PLO2_SHOWALL !== 'undefined' && _PLO2_SHOWALL.has(stage.id);
@@ -40031,6 +40070,7 @@ function _renderPipelineBoard() {
       reply:     `${_plIcon('reply', 13)}<span>Reply</span>`,
       ghost:     `${_plIcon('ghost', 13)}<span>Send to Ghosted</span>`,
       mark_lost: `${_plIcon('ban', 13)}<span>Confirm lost</span>`,
+      mark_unqualified: `${_plIcon('ban', 13)}<span>Confirm unqualified</span>`,
       book:      `${_plIcon('calendar', 13)}<span>Confirm booking</span>`,
     }[_need] || (_need ? `${_plIcon('alert', 13)}<span>Needs action</span>` : '');
     // Safety net (#3): a Responded lead with NO agent card that's been sitting a
@@ -40838,10 +40878,11 @@ async function _apxRefreshCount() {
 // ═══════════════════════════════════════════════════════════════
 // CONFIRM AGENT approval inbox () - the SECOND sales agent, working
 // Scheduled-Trial leads. Sibling of the _apx* Hawkeye queue: same look,
-// own endpoint (/api/agent-confirm), 3 card kinds:
-//   confirm          → a drafted confirm/logistics reply (Approve & send)
-//   confirm_handoff  → lead can't make it → hand back to booking (note + bounce)
-//   confirm_lost     → lead doesn't want the trial at all → mark lost
+// own endpoint (/api/agent-confirm), 4 card kinds:
+//   confirm             → a drafted confirm/logistics reply (Approve & send)
+//   confirm_handoff     → lead can't make it → hand back to booking (note + bounce)
+//   confirm_lost        → lead doesn't want the trial at all → mark lost
+//   confirm_unqualified → lead opted out → mark unqualified (no message, no nurture)
 // Reuses _apxPost / _apxToast / _apxErr / _apxOpenThread / _apxMsgWhen / _apxTrim.
 // ═══════════════════════════════════════════════════════════════
 let _ACX_DATA = [];
@@ -40943,7 +40984,7 @@ function _acxRender() {
   const body = document.getElementById('acx-body');
   if (!body) return;
   if (!_ACX_DATA.length) { body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + _apxEmpty('All clear - no confirmations waiting.') + '</div>'; return; }
-  const cards = _ACX_DATA.map(r => r.kind === 'confirm_handoff' ? _acxHandoffCard(r) : r.kind === 'confirm_lost' ? _acxLostCard(r) : _acxReplyCard(r)).join('');
+  const cards = _ACX_DATA.map(r => r.kind === 'confirm_handoff' ? _acxHandoffCard(r) : r.kind === 'confirm_lost' ? _acxLostCard(r) : r.kind === 'confirm_unqualified' ? _acxUnqCard(r) : _acxReplyCard(r)).join('');
   body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
 }
 
@@ -41016,6 +41057,19 @@ function _acxLostCard(r) {
     </div>
   </div>`;
 }
+function _acxUnqCard(r) {
+  const reason = r.lost_reason ? `<span style="font-size:10px;font-weight:700;color:var(--red);background:rgba(240,112,96,.12);border-radius:999px;padding:1px 8px">${escapeHTML(r.lost_reason)}</span>` : '';
+  return `<div id="acx-${r.id}" style="background:var(--surface);border:1px solid rgba(240,112,96,.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_acxHeader(r, 'opted out', 'var(--red)')}
+    <div style="font-size:11.5px;color:var(--red);margin-bottom:6px">Wants you to stop - mark unqualified? ${reason}</div>
+    ${_acxContext(r)}
+    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Confirming removes them from the pipeline with the unqualified tag. Nothing sends, no nurture texts.</div>
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_acxUnqualified('${r.id}')" style="flex:2;background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark unqualified</button>
+    </div>
+  </div>`;
+}
 function _acxRemove(id) {
   _ACX_DATA = _ACX_DATA.filter(x => x.id !== id);
   document.getElementById('acx-' + id)?.remove();
@@ -41065,11 +41119,12 @@ function _acxUnqualified(id) {
 // ═══════════════════════════════════════════════════════════════
 // CLOSING AGENT approval inbox () - the THIRD sales agent, working
 // Done-Trial (good-fit attendee) leads. Sibling of _apx*/_acx*: same look,
-// own endpoint (/api/agent-closing), 3 card kinds:
-//   closing         → a drafted post-trial follow-up reply (Approve & send)
-//   closing_enroll  → lead is ready → send the enroll link (the CLOSE; the opp is
-//                     marked won automatically when they pay, via the enroll flow)
-//   closing_lost    → good-fit attendee won't enroll → mark lost
+// own endpoint (/api/agent-closing), 4 card kinds:
+//   closing             → a drafted post-trial follow-up reply (Approve & send)
+//   closing_enroll      → lead is ready → send the enroll link (the CLOSE; the opp is
+//                         marked won automatically when they pay, via the enroll flow)
+//   closing_lost        → good-fit attendee won't enroll → mark lost
+//   closing_unqualified → lead opted out → mark unqualified (no message, no nurture)
 // Reuses _apxPost / _apxToast / _apxErr / _apxOpenThread / _apxMsgWhen / _apxTrim.
 // Kept a SEPARATE data set from _ACX_DATA / _APX_DATA (never merge them).
 // ═══════════════════════════════════════════════════════════════
@@ -41149,8 +41204,8 @@ function _aclxRender() {
     }
     // Already approved and sitting on its cadence - render a "scheduled" card that
     // shows when it sends and lets staff fire it early (Send now) or drop it.
-    if (r.status === 'approved' && r.kind !== 'closing_enroll' && r.kind !== 'closing_lost') return _aclxScheduledCard(r);
-    return r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : _aclxReplyCard(r);
+    if (r.status === 'approved' && r.kind !== 'closing_enroll' && r.kind !== 'closing_lost' && r.kind !== 'closing_unqualified') return _aclxScheduledCard(r);
+    return r.kind === 'closing_enroll' ? _aclxEnrollCard(r) : r.kind === 'closing_lost' ? _aclxLostCard(r) : r.kind === 'closing_unqualified' ? _aclxUnqCard(r) : _aclxReplyCard(r);
   }).join('');
   body.innerHTML = '<div style="max-width:860px;margin:0 auto">' + cards + '</div>';
   const _notesDone = new Set();
@@ -41339,6 +41394,20 @@ function _aclxLostCard(r) {
       <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
       <button onclick="_aclxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
       <button onclick="_aclxLost('${r.id}')" style="flex:2;background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark lost</button>
+    </div>
+  </div>`;
+}
+function _aclxUnqCard(r) {
+  const reason = r.lost_reason ? `<span style="font-size:10px;font-weight:700;color:var(--red);background:rgba(240,112,96,.12);border-radius:999px;padding:1px 8px">${escapeHTML(r.lost_reason)}</span>` : '';
+  return `<div id="aclx-${r.id}" style="background:var(--surface);border:1px solid rgba(240,112,96,.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    ${_aclxHeader(r, 'opted out', 'var(--red)')}
+    <div style="font-size:11.5px;color:var(--red);margin-bottom:6px">Wants you to stop - mark unqualified? ${reason}</div>
+    ${_aclxContext(r)}
+    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Confirming removes them from the pipeline with the unqualified tag. Nothing sends, no nurture texts.</div>
+    ${_aclxNotesBlock(r)}
+    <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
+      <button onclick="_aclxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
+      <button onclick="_aclxUnqualified('${r.id}')" style="flex:2;background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer">Mark unqualified</button>
     </div>
   </div>`;
 }
@@ -41684,8 +41753,10 @@ function _apxSplit(fu, rd) {
     else upcoming.push(f);
   }
   const all = (rd.ready || []).filter(r => r.status === 'pending');
-  const ready = [...overdue, ...all.filter(r => r.kind !== 'mark_lost' && r.kind !== 'book' && r.kind !== 'ghost')];
-  const lost = all.filter(r => r.kind === 'mark_lost');
+  const ready = [...overdue, ...all.filter(r => r.kind !== 'mark_lost' && r.kind !== 'mark_unqualified' && r.kind !== 'book' && r.kind !== 'ghost')];
+  // Opt-out (mark_unqualified) cards live in the Lost tab - the renderer branches
+  // per kind, and every lost-tab helper looks the row up in this same list.
+  const lost = all.filter(r => r.kind === 'mark_lost' || r.kind === 'mark_unqualified');
   const book = all.filter(r => r.kind === 'book');
   const ghost = all.filter(r => r.kind === 'ghost');
   return { followups: upcoming, ready, lost, book, ghost };
@@ -41920,6 +41991,32 @@ function _apxLostAbandon(id) {
   } });
 }
 
+// An opt-out "mark unqualified" card (2026-07-21 meeting): the lead asked us to
+// stop contacting them. NO message box on purpose - confirming removes them from
+// the pipeline as unqualified (confirm-abandoned): no text, no nurture. Lives in
+// the Lost tab; reuses _apxLostAbandon (searches the same lost list) to confirm.
+function _apxUnqCard(r) {
+  const reason = escapeHTML(r.lost_reason || 'Opted out');
+  const last = _apxContext(r);
+  return `<div id="apx-${r.id}" style="background:rgba(240,112,96,0.05);border:1px solid rgba(240,112,96,0.4);border-radius:11px;padding:12px 14px;margin-bottom:9px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+      <span style="font-weight:700;font-size:13.5px">${escapeHTML(r.contact_name || 'Lead')}</span>
+      <span style="font-size:11px;font-weight:700;color:var(--red);background:rgba(240,112,96,0.12);border-radius:999px;padding:2px 9px">${_plIcon('ban', 11)} ${reason}</span>
+      <div style="flex:1"></div>
+      ${typeof r.confidence === 'number' ? `<span style="font-size:11px;color:var(--text-mute)">${Math.round(r.confidence * 100)}% sure</span>` : ''}
+    </div>
+    ${last}
+    ${r.reasoning ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(r.reasoning)}</div>` : ''}
+    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Wants you to stop - mark unqualified? Confirming removes them from the pipeline with the unqualified tag. Nothing sends, no nurture texts.</div>
+    <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
+      <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
+      <div style="flex:1"></div>
+      <button onclick="_apxLostDismiss('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer">✕ Dismiss</button>
+      <button onclick="_apxLostAbandon('${r.id}')" title="Remove from pipeline as unqualified - no message, no nurture" style="background:var(--red);border:1px solid var(--red);color:#fff;border-radius:8px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer">${_plIcon('ban', 12)} Mark unqualified</button>
+    </div>
+  </div>`;
+}
+
 // A blue "booking request" card. The lead confirmed a slot; confirming creates
 // the real GHL appointment (GHL's automation then sends the confirmation).
 function _apxBookSlotStr(ts) {
@@ -42063,7 +42160,7 @@ function _apxRender() {
     }
     if (!readyN) inner = _apxEmpty('Nothing ready to send.');
   } else if (_APX_TAB === 'lost') {
-    inner = lostN ? lost.map(_apxLostCard).join('') : _apxEmpty('No suggested-lost leads.');
+    inner = lostN ? lost.map(r => r.kind === 'mark_unqualified' ? _apxUnqCard(r) : _apxLostCard(r)).join('') : _apxEmpty('No suggested-lost leads.');
   } else if (_APX_TAB === 'ghost') {
     inner = ghostN ? ghost.map(_apxGhostCard).join('') : _apxEmpty('No quiet leads waiting.');
   }
@@ -57786,6 +57883,7 @@ function _ccHawkVerb(kind) {
     mark_lost: 'to confirm as lost', confirm: 'needs a reply', confirm_auto: 'has a reminder to approve',
     confirm_handoff: 'needs a new time', confirm_lost: 'to confirm as lost',
     closing: 'needs a reply', closing_enroll: 'is ready to enroll', closing_lost: 'to confirm as lost',
+    mark_unqualified: 'opted out - confirm unqualified', confirm_unqualified: 'opted out - confirm unqualified', closing_unqualified: 'opted out - confirm unqualified',
     post_trial: 'needs the post-trial form',
   })[kind] || 'needs a look';
 }
