@@ -1286,11 +1286,16 @@ async function handler(req, res) {
       let routedToNurture = false;
       try {
         if (await isAutomationLive(clientId, "nurture")) {
-          // Route per the academy's authored flow (the says_no edge; GTA seed =
-          // done_trial -> nurture). Paused-aware: a paused edge returns matched
-          // but not moved, so we respect the pause and fall through to LOST. No
-          // edge -> original hardcoded move to nurture (GTA-identical).
-          const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "done_trial", trigger: "says_no", contactId, oppRef, reason });
+          // Route per the academy's authored flow. TWO distinct triggers land here
+          // (2026-07-21): a followup-loop card means the lead GHOSTED every closing
+          // follow-up -> the done_trial ghosted_ran_out edge; everything else is an
+          // explicit decline -> the says_no edge. Both seed to nurture, so GTA is
+          // behavior-identical - but academies can now re-point them separately.
+          // Paused-aware: a paused edge returns matched but not moved, so we
+          // respect the pause and fall through to LOST. No edge -> original
+          // hardcoded move to nurture (GTA-identical).
+          const trigger = (row && row.created_by === "followup-loop") ? "ghosted_ran_out" : "says_no";
+          const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "done_trial", trigger, contactId, oppRef, reason });
           if (routed.matched) {
             if (routed.moved) { await enrollContact({ clientId, automationKey: "nurture", contactId }); routedToNurture = true; }
           } else {

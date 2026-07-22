@@ -185,7 +185,7 @@ if (window.__MOCK__) (() => {
   // Interested=Ghosted, Won=Member) so the sales board renders like BAM GTA.
   const STAGES = [
     { id: 'st-1', name: 'New Lead' }, { id: 'st-2', name: 'Responded' }, { id: 'st-3', name: 'Scheduled Trial' },
-    { id: 'st-4', name: 'Done Trial' }, { id: 'st-5', name: 'Interested' }, { id: 'st-6', name: 'Won' },
+    { id: 'st-4', name: 'Done Trial' }, { id: 'st-5', name: 'Ghosted' }, { id: 'st-6', name: 'Won' },
   ];
   const OPPS = [
     ['Jordan Price', 'st-1', 'Micah Price'], ['Riley Chen', 'st-1', 'Lucas Chen'],
@@ -28007,8 +28007,11 @@ function _autoCardHtml(a) {
   const seg = (on) => `background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'};border:1px solid ${on ? 'var(--gold)' : 'var(--border)'};border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit`;
   const statusLine = (a.enabled && a.approved) ? 'Live - sending on schedule.' : 'Not sending yet.';
   // Ghosted hands a still-silent lead off to Lead Nurture when the sequence ends.
-  // This is automatic (no step) - show it so the end of the sequence is clear.
-  const endNote = (a.automation_key === 'ghosted' && steps.length)
+  // This is automatic (no step). In focus mode the stage's Exit points section
+  // already communicates the hand-off (Zoran 2026-07-21: say it ONCE, in the
+  // exit point) - so only show this note in the standalone Automations tab.
+  const inFocus = (typeof _PL_FOCUS !== 'undefined') && !!_PL_FOCUS;
+  const endNote = inFocus ? '' : (a.automation_key === 'ghosted' && steps.length)
     ? `<div style="display:flex;align-items:center;gap:9px;margin-top:8px;padding:11px 13px;border:1px dashed var(--border);border-radius:9px;background:var(--surface)">
          <span style="font-size:15px">⤵</span>
          <div style="font-size:12.5px;color:var(--text-sub);line-height:1.45">When the sequence ends and the lead still hasn't replied, they roll into <b style="color:var(--text)">Lead Nurture</b> automatically.</div>
@@ -29753,7 +29756,7 @@ const _bbOfferConfigs = {
       { key:'missed_trial_workflow', type:'ghl_workflow', label:'Missed-trial automation',
         hint:'GHL workflow that fires automatically when a trainer marks an athlete as "Didn\'t show up" on the post-trial form. Pick the workflow that handles a no-show (reschedule nudge, re-book sequence, etc.).' },
       { key:'ghosted_workflow', type:'ghl_workflow', label:'Ghosted automation',
-        hint:'GHL workflow fired when staff hit "Ghosted" on a lead card. It should text the lead a few times, then move them to the Responded stage if they reply or mark them lost if they don\'t. (The card auto-moves to Interested when you enroll.)' },
+        hint:'GHL workflow fired when staff hit "Ghosted" on a lead card. It should text the lead a few times, then move them to the Responded stage if they reply or mark them lost if they don\'t. (The card auto-moves to Ghosted when you enroll.)' },
       { key:'sales_path', type:'check_one', label:'Sales path', required:true,
         options:['Free trial','Paid trial','Discovery call first','Direct signup','Other'],
         hint:'Gates the next set of questions' },
@@ -37489,23 +37492,47 @@ function _plMoveContactToInterested(contactId) {
   return false;
 }
 
+// Unqualified criteria (Zoran 2026-07-21): marking a lead unqualified ALWAYS
+// requires picking WHY from the preset's qualification criteria. "Not
+// interested" is deliberately absent - not-interested leads go to Nurture,
+// they are never unqualified.
+const _PL_UNQ_CRITERIA = ['Too far away', 'Athlete age out of range', 'Not a fit for the program', 'Other'];
 function _plOutcome(oppId, status, contactId) {
   const label = _PL_STATUS_LABEL[status] || status;
+  const unq = status === 'unqualified';
+  const critHtml = unq ? `
+      <div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Pick the criteria (required). Not interested? Mark them Lost instead - they belong in Nurture.</div>
+      <div id="pl-outcome-crit" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+        ${_PL_UNQ_CRITERIA.map(c => `<button type="button" data-crit="${escapeHTML(c)}" onclick="_plUnqPick(this)" style="background:transparent;border:1px solid var(--border);border-radius:999px;color:var(--text-sub);padding:7px 13px;font:inherit;font-size:12.5px;cursor:pointer">${escapeHTML(c)}</button>`).join('')}
+      </div>` : '';
   document.body.insertAdjacentHTML('beforeend', `<div id="pl-outcome-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)this.remove()">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:420px;padding:22px">
       <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px">Mark ${label}</div>
-      <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px">Add a quick reason (optional).</div>
-      <textarea id="pl-outcome-reason" placeholder="Reason…" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
+      ${critHtml}
+      <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px">${unq ? 'Add a note (optional).' : 'Add a quick reason (optional).'}</div>
+      <textarea id="pl-outcome-reason" placeholder="${unq ? 'Note…' : 'Reason…'}" style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
       <div style="display:flex;justify-content:flex-end;gap:10px">
         <button onclick="document.getElementById('pl-outcome-overlay').remove()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 16px;font:inherit;font-size:13px;cursor:pointer">Cancel</button>
-        <button id="pl-outcome-go" onclick="_plOutcomeConfirm('${escapeHTML(oppId)}','${status}','${escapeHTML(contactId||'')}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Mark ${label}</button>
+        <button id="pl-outcome-go" ${unq ? 'disabled' : ''} onclick="_plOutcomeConfirm('${escapeHTML(oppId)}','${status}','${escapeHTML(contactId||'')}')" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;opacity:${unq ? '.45' : '1'}">Mark ${label}</button>
       </div>
     </div></div>`);
   setTimeout(() => document.getElementById('pl-outcome-reason')?.focus(), 30);
 }
+// Select an unqualified criteria chip; enables the confirm button.
+function _plUnqPick(btn) {
+  const host = document.getElementById('pl-outcome-crit'); if (!host) return;
+  host.querySelectorAll('button').forEach(b => { b.style.background = 'transparent'; b.style.color = 'var(--text-sub)'; b.style.borderColor = 'var(--border)'; b.removeAttribute('data-on'); });
+  btn.style.background = 'var(--gold)'; btn.style.color = '#0B0B0D'; btn.style.borderColor = 'var(--gold)'; btn.setAttribute('data-on', '1');
+  const go = document.getElementById('pl-outcome-go'); if (go) { go.disabled = false; go.style.opacity = '1'; }
+}
 
 async function _plOutcomeConfirm(oppId, status, contactId) {
-  const reason = (document.getElementById('pl-outcome-reason')?.value || '').trim();
+  let reason = (document.getElementById('pl-outcome-reason')?.value || '').trim();
+  if (status === 'unqualified') {
+    const crit = document.querySelector('#pl-outcome-crit button[data-on]')?.dataset?.crit || '';
+    if (!crit) return;   // criteria is required - button stays disabled until picked
+    reason = reason ? `${crit} - ${reason}` : crit;
+  }
   const btn = document.getElementById('pl-outcome-go'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
     // 'unqualified' is a portal concept: GHL has no such status, so it maps to
@@ -37555,7 +37582,7 @@ function _plEnrollSpecial(oppId) {
   _plConfirmModal({
     icon: '',
     title: 'Send to Summer Special?',
-    body: 'They\'ll start getting the text sequence, and the card moves to the <b>Interested</b> stage.',
+    body: 'They\'ll start getting the text sequence, and the card moves to the <b>Ghosted</b> stage.',
     okLabel: 'Send',
     onOk: () => _plEnrollSpecialGo(oppId),
   });
@@ -37624,7 +37651,7 @@ function _plGhost(oppId) {
   _plConfirmModal({
     icon: _plIcon('ghost', 30),
     title: 'Send to Ghosted automation?',
-    body: 'They\'ll get the ghosted text sequence and the card moves to <b>Interested</b>. If they reply they go to <b>Responded</b>; if they don\'t, they get marked <b>lost</b> automatically.',
+    body: 'They\'ll get the ghosted text sequence and the card moves to <b>Ghosted</b>. If they reply they go to <b>Responded</b>; if they don\'t, they get marked <b>lost</b> automatically.',
     okLabel: 'Send',
     onOk: () => _plGhostGo(oppId),
   });
@@ -37641,7 +37668,7 @@ async function _plGhostGo(oppId) {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     const moved = await _plMoveToInterested(oppId, token);
     if (moved && typeof _renderPipelineBoard === 'function') _renderPipelineBoard();
-    _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', moved ? 'Moved to Interested - the automation takes over' : 'The automation takes over');
+    _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', moved ? 'Moved to Ghosted - the automation takes over' : 'The automation takes over');
   } catch (e) {
     alert('Could not send to Ghosted automation: ' + (e.message || e));
   }
@@ -37789,7 +37816,7 @@ function _plStageBot(name) {
   if (/respond/.test(n))                                     return { color: '#5A8FB8', kind: 'agent',      key: 'booking',     icon: 'phone',  tag: 'Booking' };
   if (/(schedul|book)/.test(n) && /trial/.test(n))           return { color: '#3DBE8B', kind: 'agent',      key: 'confirm',     icon: 'check',  tag: 'Confirm' };
   if (/trial/.test(n) && /(done|complete|attend)/.test(n))   return { color: '#B084E8', kind: 'agent',      key: 'closing',     icon: 'target', tag: 'Closing' };
-  if (/interest/.test(n))                                    return { color: '#D4B65C', kind: 'automation', key: 'ghosted',     icon: 'ghost',  tag: 'Ghosted' };
+  if (/interest|ghost/.test(n))                              return { color: '#D4B65C', kind: 'automation', key: 'ghosted',     icon: 'ghost',  tag: 'Ghosted' };
   if (/nurtur/.test(n))                                      return { color: '#3B6FD4', kind: 'automation', key: 'nurture',     icon: 'heart',  tag: 'Nurture' };
   if (/member|liveclient|enrolled|\bwon\b/.test(n))          return { color: '#EC4899', kind: 'terminal',   key: 'member',      icon: 'award',  tag: 'Member' };
   if (/unqualif/.test(n))                                    return { color: '#FB923C', kind: 'terminal',   key: 'unqualified', icon: 'ban',    tag: 'Unqualified' };
@@ -37820,8 +37847,9 @@ const _EDGE_TRIGGERS = {
   booked:              'Books a trial',
   went_quiet:          'Goes quiet',
   cant_make_it:        "Can't make it",
-  no_show:             'No-show',
-  post_trial_good_fit: 'Post-trial: good fit',
+  cancel_booking:      'Cancels the booking',
+  no_show:             'No-show (post-trial form)',
+  post_trial_good_fit: 'Post-trial: good fit + showed up',
   post_trial_not_fit:  'Post-trial: not a fit',
   not_interested:      'Not interested',
   no_longer_wants:     'No longer wants it',
@@ -37831,7 +37859,7 @@ const _EDGE_TRIGGERS = {
   complaint_offtopic:  'Complaint / off-topic',
   ghosted_ran_out:     'Nudges ran out',
 };
-const _EDGE_ROLE_LABEL = { responded: 'Responded', interested: 'Interested', scheduled_trial: 'Scheduled Trial', done_trial: 'Done Trial', nurture: 'Nurture' };
+const _EDGE_ROLE_LABEL = { responded: 'Responded', interested: 'Ghosted', scheduled_trial: 'Scheduled Trial', done_trial: 'Done Trial', nurture: 'Nurture' };
 const _EDGE_TERMINAL_LABEL = { member: 'Member', unqualified: 'Unqualified', human: 'Human takeover' };
 const _EDGE_ROLE_ICON = { responded: 'phone', interested: 'ghost', scheduled_trial: 'calendar', done_trial: 'target', nurture: 'heart' };
 const _EDGE_TERMINAL_ICON = { member: 'award', unqualified: 'ban', human: 'alert' };
@@ -41944,7 +41972,7 @@ function _apxGhostCard(r) {
     </div>
     ${r.reasoning ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">${escapeHTML(r.reasoning)}</div>` : ''}
     ${last}
-    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Sends them the <b>Ghosted</b> text sequence and moves the card to <b>Interested</b>. Reply → back to Responded; no reply → marked Lost automatically.</div>
+    <div style="font-size:11.5px;color:var(--text-mute);background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px">Sends them the <b>Ghosted</b> text sequence and moves the card to the <b>Ghosted</b> stage. Reply → back to Responded; no reply → marked Lost automatically.</div>
     <div style="display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap">
       <button onclick="_apxOpenCardThread('${r.id}')" style="background:transparent;border:1px solid var(--border);color:var(--text-mute);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer">${_plIcon('msg', 12)} chat</button>
       <div style="flex:1"></div>
@@ -41965,7 +41993,7 @@ function _apxGhostConfirm(id, btn) {
       _apxRemove(id);
       _plMoveContactToInterested(r.ghl_contact_id);
       if (document.getElementById('pl-drawer')?.classList.contains('open')) {
-        _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', 'Moved to Interested - the automation takes over');
+        _plDrawerConfirm(_plIcon('ghost', 54), 'Sent to Ghosted', 'Moved to Ghosted - the automation takes over');
       } else {
         _apxToast('Sent to Ghosted', true);
       }

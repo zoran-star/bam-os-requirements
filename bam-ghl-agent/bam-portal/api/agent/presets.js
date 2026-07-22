@@ -22,7 +22,9 @@
 //
 // Storage is unchanged: buildPresetRows() compiles the tree into the exact
 // pipeline_stages + stage_transitions rows the board, router, and agents already
-// read. free_trial still compiles to today's 5 stages + 20 edges byte-for-byte.
+// read. free_trial compiles to today's 5 stages + 23 edges (20 original +
+// cancel_booking / done_trial ghosted_ran_out / nurture ghosted_ran_out, added
+// 2026-07-21).
 //
 // Two things share this file:
 //   • AGENT_TEMPLATES - reusable agent definitions. A template = an underlying
@@ -88,12 +90,22 @@ const calendar = ({ ref, label }) => ({ kind: "calendar", ref, label });
 // output identical to the pre-station-model file.
 export const PRESETS = {
   // free_trial = the current live BAM model, reproduced exactly. Stamping it onto
-  // an academy's Training offer must yield today's 5 stages + 20 edges verbatim.
+  // an academy's Training offer must yield today's 5 stages + 23 edges verbatim.
   free_trial: {
     key: "free_trial",
     label: "Free Trial",
     version: 1,
     description: "Lead → book a free trial → confirm the trial → close after a good-fit trial.",
+    // Qualification dimensions (Zoran, 2026-07-21). IMPORTANT: "interested in
+    // basketball" is NOT a qualification - a lead who isn't interested goes to
+    // Nurture, they are never marked unqualified. Unqualified is reserved for
+    // leads who CANNOT be a customer (too far, wrong age, not a fit) and it
+    // removes them from the pipeline entirely.
+    qualifications: [
+      { key: "location", label: "Close to the academy", detail: "Collected on the free-trial form (e.g. 'Are you close to Oakville?')" },
+      { key: "age", label: "Athlete age in program range", detail: "Collected on the free-trial form" },
+      { key: "program_fit", label: "Good fit for the program", detail: "Judged at the trial via the post-trial form" },
+    ],
     // Post-conversion: fires on the @member terminal (a won lead going live) -
     // not a station, but part of what the preset stamps. The worker enrolls
     // automation_key 'onboarding' when a member activates (api/automations.js).
@@ -126,6 +138,9 @@ export const PRESETS = {
           out("post_trial_not_fit", "unqualified"),
           go("no_show", "responded", { action: automation("missed_trial") }),
           go("cant_make_it", "responded"),
+          // Lead cancels their booked trial in the calendar -> back to the
+          // booking agent to rebook (2026-07-21 team meeting).
+          go("cancel_booking", "responded"),
           go("no_longer_wants", "nurture"),
           out("marked_unqualified", "unqualified"),
           out("complaint_offtopic", "human"),
@@ -137,6 +152,9 @@ export const PRESETS = {
         exits: [
           out("enrolls", "member"),
           go("says_no", "nurture"),
+          // Ghosts all of the closing agent's post-trial follow-ups -> roll into
+          // the Nurture long game (2026-07-21 team meeting).
+          go("ghosted_ran_out", "nurture"),
           out("marked_unqualified", "unqualified"),
           out("complaint_offtopic", "human"),
         ],
@@ -158,6 +176,9 @@ export const PRESETS = {
         engine: automation("nurture"),
         exits: [
           go("replied", "responded"),
+          // Completes the ENTIRE nurture sequence without ever replying -> exits
+          // the pipeline as unqualified (2026-07-21 team meeting).
+          out("ghosted_ran_out", "unqualified"),
         ],
       },
     ],
@@ -310,6 +331,9 @@ export function presetContents(presetKey) {
     label: p.label,
     version: p.version || 1,
     description: p.description,
+    // Qualification dimensions the preset judges leads on (see the note on
+    // PRESETS.free_trial: interest is NOT one of them). For UI rendering later.
+    qualifications: p.qualifications || [],
     stages: stages.map((s) => ({ role: s.role, label: s.label, engine: s.engine ? s.engine.kind : "human",
       engine_ref: s.engine ? (s.engine.template || s.engine.key || null) : null })),
     agents: stages.filter((s) => s.engine && s.engine.kind === "agent")

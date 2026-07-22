@@ -59,7 +59,9 @@ values
     'Website Contact Form',
     array['website-inquiry','contact form filled']::text[],
     'TRAINING PIPELINE',
-    'interested',
+    -- 2026-07-21: contact leads land in RESPONDED (the booking agent's stage),
+    -- not 'interested' - matches migration 20260721121000's entry-point backfill.
+    'responded',
     true,
     '{
       "message": "q5d8vr3C9Vy5Xd9eQoDL",

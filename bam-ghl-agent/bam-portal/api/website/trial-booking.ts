@@ -9,6 +9,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { createRuntimeSupabaseClient } from "../_runtime/supabase.js";
 import type { HeaderValue, RuntimeApiRequest, RuntimeApiResponse } from "../runtime/_types.js";
 import { isUuid, parseDateOnly } from "../runtime/schedule/_shared.js";
+import { bounceCancelledTrialToRebook } from "../agent/_rebook.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -30,6 +31,7 @@ type TrialBookingRow = {
   tenant_id: string;
   slot_id: string;
   parent_email: string;
+  ghl_contact_id: string | null;
   status: TrialBookingStatus;
 };
 
@@ -206,6 +208,17 @@ async function cancelTrialBooking(req: RuntimeApiRequest) {
   });
 
   if (error) throw publicRpcError(error.message);
+  // Lead-initiated cancel of an upcoming booked trial: hand the lead back to
+  // the booking agent to rebook (cancel_booking edge + the rebook handshake
+  // notes the A5 rebook pass consumes). Best-effort - the cancel already landed.
+  if (data) {
+    await bounceCancelledTrialToRebook({
+      clientId: booking.tenant_id,
+      contactId: booking.ghl_contact_id,
+      trialBookingId: booking.id,
+      source: "website-cancel",
+    });
+  }
   return {
     trial_booking_id: booking.id,
     status: "CANCELLED",
@@ -299,7 +312,7 @@ async function getTrialBooking(trialBookingId: string): Promise<TrialBookingRow 
   const supabase = createRuntimeSupabaseClient();
   const { data, error } = await supabase
     .from("trial_bookings")
-    .select("id,tenant_id,slot_id,parent_email,status")
+    .select("id,tenant_id,slot_id,parent_email,ghl_contact_id,status")
     .eq("id", trialBookingId)
     .limit(1)
     .maybeSingle();

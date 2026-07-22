@@ -424,10 +424,10 @@
       entries:['Went quiet - the Booking agent proposed it, you approved'],
       engdesc:'A short, aggressive chase. Every step\'s copy is editable; the timing is the cadence below. The moment they reply, the Booking agent takes over.',
       steps:[['Day 1','SMS - quick nudge: "still want that free trial for {{athlete}}?"'],
-             ['Day 3','SMS - different angle: spots filling up this week'],
-             ['Day 7','Email - last call, warm and no-pressure']],
+             ['Day 2','SMS - different angle: spots filling up this week'],
+             ['Day 3','SMS - last call, warm and no-pressure']],
       stepslbl:'The sequence (copy editable per step)',
-      exits:['Replies &#8594; back to Booking','Runs out silent (after day 7) &#8594; Nurture']},
+      exits:['Replies &#8594; back to Booking','Runs out silent (after day 3) &#8594; Nurture']},
     nurture:{title:'Nurture',eng:'AUTOMATION',engc:'var(--deep)',engbg:'var(--deep-soft)',
       entries:['Not interested / no longer wants / says no - any agent\'s Mark Lost','Ghosted ran out silent'],
       engdesc:'The long game: sparse, valuable touches over 8 weeks. Copy editable per step. A reply at ANY point bounces them straight back to the Booking agent.',
@@ -522,7 +522,7 @@
               ['in','sat 10am works for zoe!']],
       draft:''},
     sam:{agent:'booking',kind:'ghost',av:'SK',name:'Sam K.',sub:'Parent of Leo (11)',stage:'Responded',phone:'(647) 555-0117',last:'2 days ago',
-      ctx:'Quiet for 2 days after our last message. Ghosted = day 1 / 3 / 7 nudges; a reply bounces them right back here.',
+      ctx:'Quiet for 2 days after our last message. Ghosted = day 1 / 2 / 3 nudges; a reply bounces them right back here.',
       thread:[['bot','Hey Sam! Do weekday evenings or the weekend work better for Leo?'],
               ['in','ok ill think about it']],
       draft:''},
@@ -609,7 +609,7 @@
         +'<div class="dc-note">Only calendars tied to this lead\'s offer ('+d.offer+') show here. Booking the slot hands them to the Confirm agent (the confirmation + same-day check-in send from config).</div>';
     } else if(d.kind==='ghost'){
       body='<div class="dc-thread">'+th+'</div>'
-        +'<div class="dc-note">Nothing sends now - Ghosted takes over with the day 1 / 3 / 7 nudges. A reply bounces them straight back to Booking.</div>';
+        +'<div class="dc-note">Nothing sends now - Ghosted takes over with the day 1 / 2 / 3 nudges. A reply bounces them straight back to Booking.</div>';
     } else if(d.kind==='plan'){
       body='<div class="dc-thread" style="max-height:90px">'+th+'</div><div class="dc-lbl">The plan - every message editable</div>'
         +d.plan.map(function(t,i){return '<div class="dc-lbl" style="margin-top:2px">Day '+(i+1)+(i===d.plan.length-1?' · final, no-pressure':'')+'</div><textarea class="dc-draft sm" oninput="dcEdited()">'+t+'</textarea>';}).join('');
