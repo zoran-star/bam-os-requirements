@@ -290,6 +290,12 @@ export default function ContentTicketDrawer({
   const offerVal = intake.offer ?? intake.offer_id;
   const presetVal = intake.sales_preset ?? intake.preset;
   const angleVal = intake.angle;
+  // Content-first campaigns: the wizard files a content_ask mode 'campaign';
+  // show the launch details so the content team sees the full picture. The
+  // send-to-marketing handoff spawns the Launch ticket with these carried.
+  const isCampaignAsk = intake.mode === "campaign";
+  const spendVal = intake.spend ?? intake.monthly_spend;
+  const landingVal = intake.landing_page ?? (intake.funnel && (intake.funnel.label || intake.funnel.url)) ?? null;
   const editNote = mode === "edit"
     ? (intake.replacing?.note || intake.note || intake.edit_note || "")
     : "";
@@ -370,11 +376,14 @@ export default function ContentTicketDrawer({
       {/* Intake */}
       <div className="c2-block">
         <div className="c2-block-label">Intake</div>
-        {(offerVal || presetVal || angleVal) ? (
+        {(offerVal || presetVal || angleVal || isCampaignAsk) ? (
           <div className="c2-chips">
+            {isCampaignAsk && <span className="c2-chip"><span className="c2-chip-key">Ask</span><span className="c2-chip-val">New campaign</span></span>}
             {offerVal && <span className="c2-chip"><span className="c2-chip-key">Offer</span><span className="c2-chip-val">{String(offerVal)}</span></span>}
             {presetVal && <span className="c2-chip"><span className="c2-chip-key">Preset</span><span className="c2-chip-val">{String(presetVal)}</span></span>}
             {angleVal && <span className="c2-chip"><span className="c2-chip-key">Angle</span><span className="c2-chip-val">{String(angleVal)}</span></span>}
+            {isCampaignAsk && spendVal != null && <span className="c2-chip"><span className="c2-chip-key">Spend</span><span className="c2-chip-val">{String(spendVal)}</span></span>}
+            {isCampaignAsk && landingVal && <span className="c2-chip"><span className="c2-chip-key">Lands on</span><span className="c2-chip-val">{String(landingVal)}</span></span>}
           </div>
         ) : <div className="c2-muted">No offer, preset or angle on this ask.</div>}
         {(mode === "edit" || mode === "replace") && (

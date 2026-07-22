@@ -13340,6 +13340,40 @@ async function _astPopupUploadFiles(files, fromFolder) {
   finally { _astUploadTargetPopup = false; }
 }
 
+/* ── W7: the sorting popup is THE gate for new content ──────────────────
+   Any flow that uploads fresh files via _uploadFilesToLibrary (the annotator's
+   on-page upload, the campaign wizard's step-2 uploads, the Meta creative
+   modal) calls this right after the upload: it opens the P1 tag popup on the
+   new asset ids so the client sorts what it is, then fires `onDone(ids)` when
+   they hit Done - ids include any EXTRA files added inside the popup.
+   Layering: those flows live inside focus overlays / modals up to z 10060;
+   #ast-tag-overlay is z 10080 already, but we bump it to 10090 inline while
+   invoked from here (and clear it on close) so it always renders on top. */
+async function _astSortNewUploads(ids, onDone) {
+  ids = (ids || []).filter(Boolean);
+  if (!ids.length) { if (onDone) { try { onDone([]); } catch (_) {} } return; }
+  // The tag popup renders from _ASSETS - make sure the fresh rows are there
+  // (_uploadFilesToLibrary already unshifts them; this is the safety net).
+  try {
+    const missing = ids.filter((id) => !_ASSETS.some((a) => a.id === id));
+    if (missing.length) {
+      const { data } = await _sb.from('client_assets').select('*').in('id', missing);
+      (data || []).forEach((r) => { if (!_ASSETS.some((a) => a.id === r.id)) _ASSETS.unshift(r); });
+    }
+  } catch (_) {}
+  if (!_AST_SKILLS || !_AST_SKILLS.length) _AST_SKILLS = _astMergeSkills([]);
+  _AST_LIB_MODE = true;                  // full Content Library taxonomy in the popup
+  _ASSETS_HOST_ID = 'assets-content';    // in-popup extra uploads refresh the main library
+  _astTagCloseCb = (doneIds) => {
+    const ov = document.getElementById('ast-tag-overlay');
+    if (ov) ov.style.zIndex = '';        // drop the temporary z bump
+    if (onDone) { try { onDone(doneIds || []); } catch (_) {} }
+  };
+  _astTagOpenBatch(ids);
+  const ov = document.getElementById('ast-tag-overlay');
+  if (ov) ov.style.zIndex = '10090';     // above the annotator / wizard / creative modal
+}
+
 async function _astSetContentType(type) {
   const p = _astTagPrimary(); if (!p) return;
   const next = p.content_type === type ? null : type;   // tap again to untype
@@ -59931,8 +59965,9 @@ function toggleTheme() {
 </div>
 
 <!-- ── New campaign wizard (V2, locked mockup 5: funnel / angle / budget /
-     final check). Posts a marketing_ask intake{mode:'campaign'}. V1.5 keeps
-     the old #marketing-new-campaign wizard. -->
+     final check). W7 content-first: posts a content_ask intake{mode:'campaign'}
+     (content team checks the content, then spawns the marketing Launch ticket).
+     V1.5 keeps the old #marketing-new-campaign wizard. -->
 <div id="mncModal" class="modal-backdrop" style="display:none;z-index:10060" onclick="if(event.target===this)_mncClose()">
   <div class="mmc-card" id="mncCard" onclick="event.stopPropagation()" style="max-width:580px"></div>
 </div>
@@ -59975,25 +60010,11 @@ function toggleTheme() {
     </div>
     <div class="v2rev-list" id="v2RevList"></div>
     <div class="v2rev-foot">
-      <!-- Locked mockup 2b: optional content attach - pick from the Content
-           Library (multi-select) or upload new files (they land in the library). -->
-      <div class="v2rev-content">
-        <div class="v2rev-content-label">Content for these changes <span class="v2rev-content-opt">optional</span></div>
-        <div class="v2rev-libcard">
-          <span class="v2rev-libcard-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></span>
-          <span class="v2rev-libcard-txt">
-            <span class="v2rev-libcard-t">Add from your Content Library</span>
-            <span class="v2rev-libcard-s">Photos or clips the team should use in these changes</span>
-          </span>
-          <button type="button" class="v2rev-libcard-btn" onclick="_v2LibOpen()">Pick</button>
-        </div>
-        <div class="v2rev-chips" id="v2RevChips" style="display:none"></div>
-        <label class="v2rev-upload">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M8 3L5 6M8 3l3 3"/><path d="M2.5 10.5V12a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-1.5"/></svg>
-          <span>Or upload new files - they land in your Content Library too</span>
-          <input type="file" multiple accept="image/*,video/*,audio/*" style="display:none" onchange="_v2LibPickFiles(this)">
-        </label>
-      </div>
+      <!-- W7: the full content picker (library pick + upload) moved onto the
+           annotator page's right rail, under YOUR NOTES - clients attach content
+           while annotating. The review keeps a read-only summary line only,
+           rendered by _v2RenderContentSummary(). -->
+      <div class="v2rev-content" id="v2RevContentSum" style="display:none"></div>
       <textarea id="v2ReqDesc" class="v2rev-desc" rows="2" placeholder="Anything else? (optional)"></textarea>
       <div class="v2rev-foot-row">
         <button type="button" class="v2rev-back" onclick="_v2CloseReview()">&lsaquo; Back to page</button>
@@ -60022,7 +60043,14 @@ function toggleTheme() {
 </div>
 
 <style>
+  /* Desktop: 1800 sits above the annotator focus (z 1000). Mobile bumps the
+     annotator to 10050, so these must outrank it there or Review/library open
+     UNDERNEATH the annotator (found in W7's mobile hit-test). Sort popup at
+     10080+ still wins over both. */
   .v2rev-backdrop { position:fixed; inset:0; z-index:1800; background:rgba(20,18,14,.5); display:flex; align-items:center; justify-content:center; padding:20px; }
+  @media (max-width: 768px) {
+    .v2rev-backdrop { z-index: 10060; }
+  }
   .v2rev-card { width:min(560px,96vw); max-height:88vh; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:0 24px 60px rgba(0,0,0,.35); overflow:hidden; }
   .v2rev-head { display:flex; align-items:flex-start; justify-content:space-between; padding:18px 20px 12px; }
   .v2rev-title { font-family:var(--mm-ff); font-size:17px; font-weight:800; color:var(--text); }
@@ -60071,6 +60099,8 @@ function toggleTheme() {
   .v2rev-upload:hover span { color:var(--text); text-decoration:underline; }
   /* Library picker overlay (sits above the review modal) */
   .v2lib-backdrop { position:fixed; inset:0; z-index:1850; background:rgba(20,18,14,.5); display:flex; align-items:center; justify-content:center; padding:20px; }
+  /* Mobile: outrank the annotator focus (10050) - see the v2rev note above. */
+  @media (max-width: 768px) { .v2lib-backdrop { z-index: 10061; } }
   .v2lib-card { width:min(480px,96vw); max-height:80vh; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:0 24px 60px rgba(0,0,0,.35); overflow:hidden; }
   .v2lib-body { flex:1; overflow-y:auto; padding:0 20px 12px; }
   .v2lib-body .mmc-libgrid { max-height:none; }
@@ -60988,6 +61018,25 @@ function _crBodyHtml() {
       '<div class="v2req-side">' +
         '<div class="v2req-label">Your notes</div>' +
         '<div class="v2req-notes" id="v2ReqNotes"></div>' +
+        // W7: content attach lives ON the annotator page (was inside the review
+        // modal) - clients attach content while annotating, before Review and send.
+        '<div class="v2req-content" id="v2ReqContent">' +
+          '<div class="v2req-label" style="margin-top:16px">Content for these changes <span class="v2rev-content-opt">optional</span></div>' +
+          '<div class="v2rev-libcard">' +
+            '<span class="v2rev-libcard-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></span>' +
+            '<span class="v2rev-libcard-txt">' +
+              '<span class="v2rev-libcard-t">Add from your Content Library</span>' +
+              '<span class="v2rev-libcard-s">Photos or clips the team should use in these changes</span>' +
+            '</span>' +
+            '<button type="button" class="v2rev-libcard-btn" onclick="_v2LibOpen()">Pick</button>' +
+          '</div>' +
+          '<div class="v2rev-chips" id="v2RevChips" style="display:none"></div>' +
+          '<label class="v2rev-upload">' +
+            '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M8 3L5 6M8 3l3 3"/><path d="M2.5 10.5V12a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-1.5"/></svg>' +
+            '<span>Or upload new files - they land in your Content Library too</span>' +
+            '<input type="file" multiple accept="image/*,video/*,audio/*" style="display:none" onchange="_v2LibPickFiles(this)">' +
+          '</label>' +
+        '</div>' +
       '</div>' +
     '</div>' +
     '<div class="v2req-foot">' +
@@ -61274,6 +61323,9 @@ function _mmcOpen(mode, idx) {
     // Track 2 / P3: angle + guide + Content Library picker
     angleIdx: null, guideLoaded: false, guideCard: null, angles: [],
     libLoaded: false, libAssets: [], libIds: new Set(), libFilter: 'all',
+    // W7: uploads happen at pick time + pass through the sorting popup;
+    // newIds = the tagged asset ids from this session. uploading = in-flight count.
+    newIds: [], uploading: 0,
   };
   _mmcRender();
   const bd = document.getElementById('mmCreativeModal');
@@ -61384,9 +61436,41 @@ function _mmcContentBlockHtml() {
   return angleBlock + libBlock;
 }
 function _mmcClose() { const bd = document.getElementById('mmCreativeModal'); if (bd) bd.style.display = 'none'; _MMC = null; }
-function _mmcPick(input) { if (_MMC && input.files) { _mmcCapture(); for (const f of input.files) _MMC.files.push(f); input.value = ''; _mmcRender(); } }
-function _mmcDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('is-over'); if (_MMC && e.dataTransfer && e.dataTransfer.files) { _mmcCapture(); for (const f of e.dataTransfer.files) _MMC.files.push(f); _mmcRender(); } }
+// W7: files picked here upload to the Content Library immediately, then the
+// sorting popup opens on top of this modal so the client tags what they are.
+// On Done the tagged ids attach to the request (newIds).
+async function _mmcAddFiles(files) {
+  if (!_MMC || !files.length) return;
+  _mmcCapture();
+  const want = _MMC;
+  _MMC.uploading = files.length;
+  _mmcRender();
+  let ids = [];
+  try { ids = await _uploadFilesToLibrary(files); } catch (_) { ids = []; }
+  if (_MMC !== want) return;   // modal closed mid-upload
+  _MMC.uploading = 0;
+  if (!ids.length) { _mmToast("Couldn't upload - try again"); _mmcRender(); return; }
+  _mmcRender();
+  _astSortNewUploads(ids, (doneIds) => {
+    if (_MMC !== want) return;
+    const got = (doneIds && doneIds.length) ? doneIds : ids;
+    got.forEach((id) => {
+      if (!_MMC.newIds.includes(id)) _MMC.newIds.push(id);
+      if (!(_MMC.libAssets || []).some((a) => a.id === id)) {
+        const r = (typeof _ASSETS !== 'undefined' ? _ASSETS : []).find((a) => a.id === id);
+        if (r) _MMC.libAssets.unshift(r);
+      }
+    });
+    _mmcRender();
+  });
+}
+function _mmcPick(input) { if (_MMC && input.files) { const fs = Array.from(input.files); input.value = ''; _mmcAddFiles(fs); } }
+function _mmcDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('is-over'); if (_MMC && e.dataTransfer && e.dataTransfer.files) _mmcAddFiles(Array.from(e.dataTransfer.files)); }
 function _mmcRmFile(i) { if (_MMC) { _mmcCapture(); _MMC.files.splice(i, 1); _mmcRender(); } }
+// Drop a tagged new upload from THIS request (the asset stays in the library).
+function _mmcRmNew(i) { if (_MMC) { _mmcCapture(); _MMC.newIds.splice(i, 1); _mmcRender(); } }
+// Row lookup for a freshly uploaded asset id (label/size for the file list).
+function _libNewRow(id) { return (typeof _ASSETS !== 'undefined' ? _ASSETS : []).find((a) => a.id === id) || { id, label: 'New file', size_bytes: null }; }
 function _mmcCapture() {   // keep the typed brief / drive link across a re-render
   const b = document.getElementById('mmcBrief'); if (b) _MMC.brief = b.value;
   const d = document.getElementById('mmcDrive'); if (d) _MMC.drive = d.value;
@@ -61416,14 +61500,19 @@ function _mmcRender() {
         ((v && v.note) ? '<div class="mmc-rep-why">' + _escapeHtml(v.note) + '</div>' : '') +
       '</div></div>';
   }
-  const files = _MMC.files.length
-    ? '<div class="mmc-files">' + _MMC.files.map((f, i) =>
-        '<div class="mmc-file"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6z"/><path d="M9 2v4h4"/></svg>' +
-          '<span class="mmc-file-name">' + _escapeHtml(f.name) + '</span>' +
-          '<span class="mmc-file-size">' + _formatFileSize(f.size) + '</span>' +
-          '<button type="button" class="mmc-file-x" onclick="_mmcRmFile(' + i + ')" aria-label="Remove">&#10005;</button>' +
-        '</div>').join('') + '</div>'
+  // W7: new uploads are library assets already (tagged via the sorting popup).
+  const fileRows = (_MMC.newIds || []).map((id, i) => {
+    const a = _libNewRow(id);
+    return '<div class="mmc-file"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6z"/><path d="M9 2v4h4"/></svg>' +
+      '<span class="mmc-file-name">' + _escapeHtml(a.label || 'New file') + '</span>' +
+      (a.size_bytes ? '<span class="mmc-file-size">' + _formatFileSize(a.size_bytes) + '</span>' : '') +
+      '<button type="button" class="mmc-file-x" onclick="_mmcRmNew(' + i + ')" aria-label="Remove">&#10005;</button>' +
+    '</div>';
+  }).join('');
+  const uploadingRow = _MMC.uploading
+    ? '<div class="mmc-file"><span class="req-spin"></span><span class="mmc-file-name">Uploading ' + _MMC.uploading + ' file' + (_MMC.uploading === 1 ? '' : 's') + '&hellip;</span></div>'
     : '';
+  const files = (fileRows || uploadingRow) ? '<div class="mmc-files">' + fileRows + uploadingRow + '</div>' : '';
   card.innerHTML =
     '<div class="mmc-head">' +
       '<div><div class="mmc-kicker">' + (isRep ? 'Replace creative' : 'New creative') + '</div>' +
@@ -61468,7 +61557,7 @@ function _mmcConfirmHtml() {
       '<div style="flex:1;min-width:0"><div class="mmc-rep-name">' + _escapeHtml(c.name || 'This creative') + '</div>' +
         (stats ? '<div class="mmc-rep-stats">' + stats + '</div>' : '') + '</div></div>';
   }
-  const fileCount = _MMC.files.length;
+  const fileCount = (_MMC.newIds || []).length + _MMC.files.length;
   const libCount = _MMC.libIds ? _MMC.libIds.size : 0;
   const angleName = (typeof _MMC.angleIdx === 'number' && _MMC.angles[_MMC.angleIdx])
     ? _MMC.angles[_MMC.angleIdx].name : (_MMC.angleIdx === 'other' ? 'Other' : null);
@@ -61478,7 +61567,10 @@ function _mmcConfirmHtml() {
     (_MMC.drive || '').trim() ? 'a shared link' : null,
   ].filter(Boolean).join(' + ') || 'none';
   const fileList = fileCount
-    ? '<div class="mmc-sum-files">' + _MMC.files.map((f) =>
+    ? '<div class="mmc-sum-files">' + (_MMC.newIds || []).map((id) => {
+        const a = _libNewRow(id);
+        return '<div class="mmc-sum-file"><span class="mmc-file-name">' + _escapeHtml(a.label || 'New file') + '</span>' + (a.size_bytes ? '<span class="mmc-file-size">' + _formatFileSize(a.size_bytes) + '</span>' : '') + '</div>';
+      }).join('') + _MMC.files.map((f) =>
         '<div class="mmc-sum-file"><span class="mmc-file-name">' + _escapeHtml(f.name) + '</span><span class="mmc-file-size">' + _formatFileSize(f.size) + '</span></div>').join('') + '</div>'
     : '';
   const row = (k, val) => '<div class="mmc-sum-row"><span class="mmc-sum-k">' + k + '</span><span class="mmc-sum-v">' + val + '</span></div>';
@@ -61508,7 +61600,8 @@ function _mmcReview() {   // validate the form, then move to the confirmation st
   _mmcCapture();
   const brief = (_MMC.brief || '').trim(), drive = (_MMC.drive || '').trim();
   const libCount = _MMC.libIds ? _MMC.libIds.size : 0;
-  const needAssets = !_MMC.files.length && !drive && !libCount, needBrief = !brief;
+  const newCount = (_MMC.newIds || []).length;
+  const needAssets = !newCount && !_MMC.files.length && !drive && !libCount, needBrief = !brief;
   if (needAssets || needBrief) {
     if (needAssets) _mmcShake('mmcDrop');
     if (needBrief) _mmcShake('mmcBrief');
@@ -61543,8 +61636,13 @@ async function _uploadFilesToLibrary(files) {
         client_id: CLIENT_ID, label: f.name.replace(/\.[^.]+$/, ''),
         category: (f.type || '').startsWith('video/') ? 'video' : (f.type || '').startsWith('audio/') ? 'audio' : 'photo',
         storage_path: path, mime_type: f.type || null, size_bytes: f.size,
-      }).select('id').single();
-      if (data) ids.push(data.id);
+      }).select('*').single();
+      if (data) {
+        ids.push(data.id);
+        // W7: mirror the fresh row into local library state so the sorting
+        // popup (and any chip/label lookups) can render it without a refetch.
+        try { if (typeof _ASSETS !== 'undefined' && !_ASSETS.some((a) => a.id === data.id)) _ASSETS.unshift(data); } catch (_) {}
+      }
     } catch (_) { /* skip a failed file; the brief + others still go */ }
   }
   return ids;
@@ -61560,9 +61658,11 @@ async function _mmcSubmit() {   // fires from the confirmation step (already val
   _MMC.step = 'sending';
   _mmcRender();
   try {
-    const newIds = await _mmcUploadNewFiles();
+    // W7: pick-time uploads (already tagged via the sorting popup) ride in
+    // newIds; the files-array upload is a legacy safety net (normally empty).
+    const extraIds = await _mmcUploadNewFiles();
     const libIds = _MMC.libIds ? Array.from(_MMC.libIds) : [];
-    const assetIds = libIds.concat(newIds);
+    const assetIds = Array.from(new Set(libIds.concat(_MMC.newIds || [], extraIds)));
     const campaign = (_MMC.ctx && _MMC.ctx.campaign) || null;
     const body = {
       type: 'content_ask',
@@ -61625,10 +61725,13 @@ function _mmcSentHtml() {
 }
 /* ═══ V2 marketing point-of-action flows (locked mockups 4 + 5) ═══
    Budget re-point, remove-a-creative and the 4-step new-campaign wizard.
-   All three post a marketing_ask via /api/v2-tickets?action=create and land
-   on the marketing role's rail. V2 only (the entry points render inside the
-   Meta ads focus, which is itself V2-gated); V1.5 keeps the legacy
-   #budgetModal / #removeModal / #marketing-new-campaign flows. */
+   Budget + remove post a marketing_ask via /api/v2-tickets?action=create and
+   land on the marketing role's rail. The campaign wizard is content-first (W7):
+   it posts a content_ask mode 'campaign' to the CONTENT rail; the content
+   drawer's send-to-marketing spawns the mode 'campaign' Launch ticket.
+   V2 only (the entry points render inside the Meta ads focus, which is itself
+   V2-gated); V1.5 keeps the legacy #budgetModal / #removeModal /
+   #marketing-new-campaign flows. */
 
 // Shared create -> rail refresh so the new ticket row shows immediately.
 async function _mktAskCreate(body) {
@@ -61848,6 +61951,9 @@ function _mncOpen() {
     step: 1,
     angleIdx: null, angles: [], guideCard: null, guideLoaded: false,
     libLoaded: false, libAssets: [], libIds: new Set(), libFilter: 'all', files: [],
+    // W7: uploads happen at pick time + pass through the sorting popup;
+    // newIds = the tagged asset ids from this session. uploading = in-flight count.
+    newIds: [], uploading: 0,
     budget: null, custom: '', note: '',
   };
   _mncRender();
@@ -61921,9 +62027,38 @@ function _mncToggleLib(id) {
   if (_MNC.libIds.has(id)) _MNC.libIds.delete(id); else _MNC.libIds.add(id);
   _mncRender();
 }
-function _mncPick(input) { if (_MNC && input.files) { _mncCapture(); for (const f of input.files) _MNC.files.push(f); input.value = ''; _mncRender(); } }
-function _mncDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('is-over'); if (_MNC && e.dataTransfer && e.dataTransfer.files) { _mncCapture(); for (const f of e.dataTransfer.files) _MNC.files.push(f); _mncRender(); } }
+// W7: files picked here upload to the Content Library immediately, then the
+// sorting popup opens on top of the wizard so the client tags what they are.
+async function _mncAddFiles(files) {
+  if (!_MNC || !files.length) return;
+  _mncCapture();
+  const want = _MNC;
+  _MNC.uploading = files.length;
+  _mncRender();
+  let ids = [];
+  try { ids = await _uploadFilesToLibrary(files); } catch (_) { ids = []; }
+  if (_MNC !== want) return;   // wizard closed mid-upload
+  _MNC.uploading = 0;
+  if (!ids.length) { _mmToast("Couldn't upload - try again"); _mncRender(); return; }
+  _mncRender();
+  _astSortNewUploads(ids, (doneIds) => {
+    if (_MNC !== want) return;
+    const got = (doneIds && doneIds.length) ? doneIds : ids;
+    got.forEach((id) => {
+      if (!_MNC.newIds.includes(id)) _MNC.newIds.push(id);
+      if (!(_MNC.libAssets || []).some((a) => a.id === id)) {
+        const r = (typeof _ASSETS !== 'undefined' ? _ASSETS : []).find((a) => a.id === id);
+        if (r) _MNC.libAssets.unshift(r);
+      }
+    });
+    _mncRender();
+  });
+}
+function _mncPick(input) { if (_MNC && input.files) { const fs = Array.from(input.files); input.value = ''; _mncAddFiles(fs); } }
+function _mncDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('is-over'); if (_MNC && e.dataTransfer && e.dataTransfer.files) _mncAddFiles(Array.from(e.dataTransfer.files)); }
 function _mncRmFile(i) { if (_MNC) { _mncCapture(); _MNC.files.splice(i, 1); _mncRender(); } }
+// Drop a tagged new upload from THIS campaign ask (the asset stays in the library).
+function _mncRmNew(i) { if (_MNC) { _mncCapture(); _MNC.newIds.splice(i, 1); _mncRender(); } }
 function _mncPreviewFunnel() {
   const f = _mktFreeTrialFunnel();
   if (f.url) window.open(f.url, '_blank', 'noopener');
@@ -61988,14 +62123,19 @@ function _mncContentBlockHtml() {
     }).join('') + '</div>';
   }
   const selCount = m.libIds ? m.libIds.size : 0;
-  const files = m.files.length
-    ? '<div class="mmc-files">' + m.files.map((f, i) =>
-        '<div class="mmc-file"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6z"/><path d="M9 2v4h4"/></svg>' +
-          '<span class="mmc-file-name">' + _escapeHtml(f.name) + '</span>' +
-          '<span class="mmc-file-size">' + _formatFileSize(f.size) + '</span>' +
-          '<button type="button" class="mmc-file-x" onclick="_mncRmFile(' + i + ')" aria-label="Remove">&#10005;</button>' +
-        '</div>').join('') + '</div>'
+  // W7: new uploads are library assets already (tagged via the sorting popup).
+  const fileRows = (m.newIds || []).map((id, i) => {
+    const a = _libNewRow(id);
+    return '<div class="mmc-file"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6z"/><path d="M9 2v4h4"/></svg>' +
+      '<span class="mmc-file-name">' + _escapeHtml(a.label || 'New file') + '</span>' +
+      (a.size_bytes ? '<span class="mmc-file-size">' + _formatFileSize(a.size_bytes) + '</span>' : '') +
+      '<button type="button" class="mmc-file-x" onclick="_mncRmNew(' + i + ')" aria-label="Remove">&#10005;</button>' +
+    '</div>';
+  }).join('');
+  const uploadingRow = m.uploading
+    ? '<div class="mmc-file"><span class="req-spin"></span><span class="mmc-file-name">Uploading ' + m.uploading + ' file' + (m.uploading === 1 ? '' : 's') + '&hellip;</span></div>'
     : '';
+  const files = (fileRows || uploadingRow) ? '<div class="mmc-files">' + fileRows + uploadingRow + '</div>' : '';
   return angleBlock +
     '<div class="mmc-field"><label class="mmc-label">From your Content Library' + (selCount ? ' &middot; ' + selCount + ' selected' : '') + '</label><div class="mmc-libfilts">' + filts + '</div>' + lib + '</div>' +
     '<div class="mmc-field"><label class="mmc-label">Or add new footage &amp; photos</label>' +
@@ -62011,7 +62151,7 @@ function _mncRender() {
   const card = document.getElementById('mncCard');
   if (!card || !_MNC) return;
   if (_MNC.step === 'sending') { card.innerHTML = _MKT_SENDING_HTML; return; }
-  if (_MNC.step === 'sent') { card.innerHTML = _mktSentHtml('Your team builds and launches the campaign. Track it anytime from the support icon.', '_mncClose'); return; }
+  if (_MNC.step === 'sent') { card.innerHTML = _mktSentHtml('Our content team checks your content first, then marketing launches it. Track it anytime from the support icon.', '_mncClose'); return; }
   const fn = _mktFreeTrialFunnel();
   if (_MNC.step === 1) {
     const ICO_AD = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 2.8l9 3.75-3.55 1.2L7.6 12.6 3.6 2.8z"/></svg>';
@@ -62060,7 +62200,7 @@ function _mncRender() {
   // Step 4: final check
   const angleName = _mncAngleName();
   const libCount = _MNC.libIds ? _MNC.libIds.size : 0;
-  const fileCount = _MNC.files.length;
+  const fileCount = (_MNC.newIds || []).length + _MNC.files.length;
   const contentLine = [
     libCount ? (libCount + ' from library') : null,
     fileCount ? (fileCount + ' new file' + (fileCount === 1 ? '' : 's')) : null,
@@ -62068,12 +62208,13 @@ function _mncRender() {
   const budgetN = _mncBudgetValue();
   const row = (k, val) => '<div class="mmc-sum-row"><span class="mmc-sum-k">' + k + '</span><span class="mmc-sum-v">' + val + '</span></div>';
   card.innerHTML = _mncHeadHtml('Send this request?') + _mncStepsHtml() +
-    '<div class="mmc-sum" style="margin-bottom:16px">' +
+    '<div class="mmc-sum" style="margin-bottom:10px">' +
       row('Funnel', _escapeHtml(fn.label) + '<span class="mnc-live">live</span>') +
       row('Angle', angleName ? _escapeHtml(angleName) : "Team's call") +
       row('Content', contentLine) +
       row('Budget', budgetN != null ? '$' + Math.round(budgetN).toLocaleString('en-US') + '/mo' : '-') +
     '</div>' +
+    '<div class="mmc-muted" style="margin-bottom:14px">Goes to your content team first - they check your content, then marketing launches the campaign.</div>' +
     '<div class="mmc-field"><label class="mmc-label" for="mncNote">Anything else? (optional)</label>' +
       '<textarea id="mncNote" class="mmc-textarea" placeholder="Timing, a promo to mention, anything the team should know...">' + _escapeHtml(_MNC.note || '') + '</textarea>' +
     '</div>' +
@@ -62096,11 +62237,16 @@ async function _mncSubmit() {
   _MNC.step = 'sending';
   _mncRender();
   try {
-    const newIds = await _uploadFilesToLibrary(_MNC.files || []);
-    const assetIds = (_MNC.libIds ? Array.from(_MNC.libIds) : []).concat(newIds);
+    // W7: pick-time uploads (already tagged via the sorting popup) ride in
+    // newIds; the files-array upload is a legacy safety net (normally empty).
+    const extraIds = await _uploadFilesToLibrary(_MNC.files || []);
+    const assetIds = Array.from(new Set((_MNC.libIds ? Array.from(_MNC.libIds) : []).concat(_MNC.newIds || [], extraIds)));
     const spend = '$' + Math.round(budgetN);
+    // W7 content-first: the campaign ask goes to the CONTENT team first
+    // (type content_ask, mode campaign); their send-to-marketing spawns the
+    // mode 'campaign' Launch ticket on the marketing rail.
     await _mktAskCreate({
-      type: 'marketing_ask',
+      type: 'content_ask',
       source: 'editor',
       client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
       title: 'New campaign' + (angleName ? ' - ' + angleName : ''),
@@ -62486,6 +62632,7 @@ function _v2MountStage() {
   _v2RenderStages();
   _v2ApplyDevice();
   _v2RenderNotes();
+  try { _v2RenderContentChips(); } catch (_) {}   // W7: on-page content block state
 }
 function _v2ReflectDevice() {
   document.querySelectorAll('#v2ReqDevice .v2req-devbtn').forEach(b => b.classList.toggle('is-on', b.dataset.d === _V2_DEVICE));
@@ -62613,7 +62760,7 @@ function _v2OpenReview() {
   _V2_REVIEW_OPEN = true;
   document.querySelectorAll('#v2RevFilter button').forEach(b => b.classList.toggle('is-on', b.dataset.f === _V2_REVIEW_FILTER));
   _v2RenderReview();
-  try { _v2RenderContentChips(); } catch (_) {}
+  try { _v2RenderContentSummary(); } catch (_) {}
   const m = document.getElementById('v2ReviewModal');
   if (m) m.style.display = 'flex';
 }
@@ -62654,9 +62801,12 @@ function _v2ReviewDel(i) { _V2_PINS.splice(i, 1); _v2RenderReview(); _v2RenderNo
    Optional attach: pick from the Content Library (same multi-select grid as
    the Meta creative modal - shared _libAssetThumbHtml) and/or upload new files
    (shared _uploadFilesToLibrary, so they land in the library too). */
-let _V2_LIB = { loaded: false, assets: [], ids: new Set(), filter: 'all', files: [], open: false };
+// W7: `newIds` = asset ids uploaded during THIS annotator session (they went
+// through the sorting popup and now live in the library). They ride in `ids`
+// too so chips/submit work unchanged; newIds only powers the review summary split.
+let _V2_LIB = { loaded: false, assets: [], ids: new Set(), newIds: new Set(), filter: 'all', files: [], open: false };
 function _v2LibReset() {
-  _V2_LIB = { loaded: false, assets: [], ids: new Set(), filter: 'all', files: [], open: false };
+  _V2_LIB = { loaded: false, assets: [], ids: new Set(), newIds: new Set(), filter: 'all', files: [], open: false };
   _v2RenderContentChips();
 }
 async function _v2LibLoad() {
@@ -62710,13 +62860,36 @@ function _v2LibRender() {
   body.innerHTML = '<div class="mmc-libfilts">' + filts + '</div>' + grid;
   if (cnt) cnt.textContent = _V2_LIB.ids.size ? (_V2_LIB.ids.size + ' selected') : 'Tap to select - as many as you like';
 }
-function _v2LibPickFiles(input) {
-  if (!input.files) return;
-  for (const f of input.files) _V2_LIB.files.push(f);
+// W7: uploads from the annotator go straight into the Content Library, then
+// EVERY new upload passes through the P1 sorting popup (_astSortNewUploads).
+// On Done the tagged ids attach to this request as library picks.
+async function _v2LibPickFiles(input) {
+  if (!input.files || !input.files.length) return;
+  const files = Array.from(input.files);
   input.value = '';
-  _v2RenderContentChips();
+  const host = document.getElementById('v2RevChips');
+  if (host) {
+    host.style.display = 'flex';
+    host.innerHTML = '<span class="v2rev-chip"><span class="req-spin"></span><span class="v2rev-chip-name">Uploading ' + files.length + ' file' + (files.length === 1 ? '' : 's') + '&hellip;</span></span>';
+  }
+  let ids = [];
+  try { ids = await _uploadFilesToLibrary(files); } catch (_) { ids = []; }
+  if (!ids.length) { _mmToast("Couldn't upload - try again"); _v2RenderContentChips(); return; }
+  _astSortNewUploads(ids, (doneIds) => {
+    const got = (doneIds && doneIds.length) ? doneIds : ids;
+    got.forEach((id) => {
+      _V2_LIB.ids.add(id);
+      _V2_LIB.newIds.add(id);
+      if (!(_V2_LIB.assets || []).some((a) => a.id === id)) {
+        const r = (typeof _ASSETS !== 'undefined' ? _ASSETS : []).find((a) => a.id === id);
+        if (r) _V2_LIB.assets.unshift(r);
+      }
+    });
+    _v2RenderContentChips();
+    if (typeof _V2_REVIEW_OPEN !== 'undefined' && _V2_REVIEW_OPEN) { try { _v2RenderContentSummary(); } catch (_) {} }
+  });
 }
-function _v2LibRmAsset(id) { _V2_LIB.ids.delete(id); _v2RenderContentChips(); }
+function _v2LibRmAsset(id) { _V2_LIB.ids.delete(id); _V2_LIB.newIds.delete(id); _v2RenderContentChips(); }
 function _v2LibRmFile(i) { _V2_LIB.files.splice(i, 1); _v2RenderContentChips(); }
 function _v2RenderContentChips() {
   const host = document.getElementById('v2RevChips');
@@ -62736,6 +62909,21 @@ function _v2RenderContentChips() {
   });
   host.innerHTML = chips.join('');
   host.style.display = chips.length ? 'flex' : 'none';
+}
+// W7: the review modal shows a compact read-only summary of what's attached
+// (the full picker lives on the annotator page now).
+function _v2RenderContentSummary() {
+  const el = document.getElementById('v2RevContentSum');
+  if (!el) return;
+  const newN = Array.from(_V2_LIB.newIds || []).filter((id) => _V2_LIB.ids.has(id)).length + (_V2_LIB.files || []).length;
+  const libN = _V2_LIB.ids.size - (newN - (_V2_LIB.files || []).length);
+  const parts = [];
+  if (libN > 0) parts.push(libN + ' from library');
+  if (newN > 0) parts.push(newN + ' new');
+  if (!parts.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<span class="v2rev-chip"><span class="v2rev-chip-name">Content: ' + parts.join(' + ') + '</span></span>' +
+    '<span style="font-family:var(--mm-ff);font-size:11.5px;color:var(--text-mute);margin-left:8px">Edit it back on the page</span>';
 }
 
 async function _v2Submit() {
@@ -62762,14 +62950,15 @@ async function _v2Submit() {
   if (btn && btn.disabled) return;   // double-click guard while sending
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   try {
-    // Any new files land in the Content Library first, then ride along as ids.
+    // W7: uploads already happened at pick time (sorting popup gate) and sit in
+    // _V2_LIB.ids. The files-array upload is a legacy safety net (normally empty).
     const newIds = await _uploadFilesToLibrary(_V2_LIB.files);
     const body = {
       type: 'website_change',
       source: 'editor',
       client_id: (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : undefined),
       title: pageName + ' - ' + (n ? n + ' change' + (n === 1 ? '' : 's') : 'change request'),
-      intake: { request_type: _V2_TYPE, description: desc, asset_ids: Array.from(_V2_LIB.ids).concat(newIds) },
+      intake: { request_type: _V2_TYPE, description: desc, asset_ids: Array.from(new Set(Array.from(_V2_LIB.ids).concat(newIds))) },
       context,
     };
     const token = await _mreqAuthToken();
