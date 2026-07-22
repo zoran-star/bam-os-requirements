@@ -279,3 +279,12 @@ what's waiting on them ("waiting on your reply" vs "waiting on your review")
 plus a push notification. Tickets whose is_action_request message is < ~20h
 old are skipped (request-time ping already covered them). Runs before the
 staff digest and never blocks it. Repeats daily until the client responds.
+
+## Gotcha: campaign-create tickets HID their finals (fixed 2026-07-22)
+Ximena's red-alert: finals sent from content tickets never appeared on
+new-campaign marketing tickets. Data was FINE (send-to-marketing PATCHes
+`files` onto the linked marketing ticket) - `renderSubmittedInfo` in
+MarketingView.jsx only rendered the "Final creatives" grid for replace/add
+types, never for campaign-create. Rule: every marketing ticket type that can
+receive finals must render `t.files`. Also remember: the revision round-trip
+REPLACES `files` wholesale (by design - new version supersedes).
