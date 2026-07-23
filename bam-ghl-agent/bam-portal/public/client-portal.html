@@ -18565,11 +18565,7 @@ async function _obfApplyPreset(btn) {
   const label = (t) => { if (btn) { btn.textContent = t; btn.disabled = true; } };
   try {
     label('Pipeline…');
-    let r1 = await post('/api/offers/apply-preset', { client_id: CLIENT_ID, offer_id: oid, preset: 'free_trial' });
-    if (r1.status === 409 && r1.j.needs_force) {
-      if (!confirm('This offer already has customized pipeline routes. Replace them with the preset?')) { label('Apply preset'); btn.disabled = false; return; }
-      r1 = await post('/api/offers/apply-preset', { client_id: CLIENT_ID, offer_id: oid, preset: 'free_trial', force: true });
-    }
+    const r1 = await post('/api/offers/apply-preset', { client_id: CLIENT_ID, offer_id: oid, preset: 'free_trial' });
     if (!r1.ok || !r1.j.ok) throw new Error(r1.j.error || 'pipeline failed');
     label('Follow-ups…');
     const r2 = await post('/api/automations', { client_id: CLIENT_ID, action: 'seed-preset-automations', offer_id: oid, preset: 'free_trial' });
@@ -38045,16 +38041,32 @@ function _edgeParseDest(v) {
     ? { to_kind: 'terminal', to_stage_role: null, to_terminal: id }
     : { to_kind: 'stage', to_stage_role: id, to_terminal: null };
 }
-// Load (or return cached) the edge rows for this client. Async; callers that
-// need a fresh render pass _plFocusRerender through .then().
+// Load (or return cached) the flow graph. Phase 3 (2026-07-23): the STRUCTURE
+// comes from BAM's master preset (action=graph), the same source the live
+// router reads - per-academy stage_transitions rows are only the PAUSE overlay
+// (an academy can switch a route off; it can no longer re-author the flow).
+// If the graph API is unreachable we fall back to raw rows (pre-Phase-3 view).
 async function _plEdgesEnsure(force) {
   if (!force && Array.isArray(_PL_EDGES)) return _PL_EDGES;
   if (!_sb || typeof CLIENT_ID === 'undefined') { _PL_EDGES = []; return _PL_EDGES; }
   try {
-    const { data, error } = await _sb.from('stage_transitions').select('*').eq('client_id', CLIENT_ID).order('sort_order');
-    if (error) throw error;
-    _PL_EDGES = data || [];
-  } catch (e) { console.warn('stage_transitions load failed', e); if (!Array.isArray(_PL_EDGES)) _PL_EDGES = []; }
+    const token = await _mreqAuthToken();
+    const [gj, rowsRes] = await Promise.all([
+      fetch(`/api/offers/apply-preset?action=graph&client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json()).catch(() => null),
+      _sb.from('stage_transitions').select('*').eq('client_id', CLIENT_ID).order('sort_order'),
+    ]);
+    const rows = (rowsRes && rowsRes.data) || [];
+    const master = (gj && gj.ok && Array.isArray(gj.edges)) ? gj.edges : null;
+    if (!master) { _PL_EDGES = rows; return _PL_EDGES; }
+    const key = (e) => `${e.from_stage_role || ''}|${e.trigger}`;
+    const byKey = new Map(rows.map(r => [key(r), r]));
+    _PL_EDGES = master.map(m => {
+      const ov = byKey.get(key(m));
+      byKey.delete(key(m));
+      return { ...m, id: ov ? ov.id : 'm:' + key(m), enabled: ov ? ov.enabled !== false : true, _master: true };
+    });
+    for (const extra of byKey.values()) _PL_EDGES.push(extra); // pre-Phase-3 custom rows stay visible
+  } catch (e) { console.warn('flow graph load failed', e); if (!Array.isArray(_PL_EDGES)) _PL_EDGES = []; }
   return _PL_EDGES;
 }
 // Entry (edges landing on role) + Exit (edges leaving role), enabled-first-ish
@@ -39967,9 +39979,7 @@ function _plRenderExitSec(role, stage) {
   }
   if (!Array.isArray(_PL_EDGES)) return `<div class="plf-sec"><div class="plf-lab">Exit points</div><div class="plf-empty">Loading flow…</div></div>`;
   const { exit } = _plStageEdges(role);
-  const editing = _PL_EDGE_FORM && _PL_EDGE_FORM.role === role ? _PL_EDGE_FORM : null;
   const rows = exit.map(e => {
-    if (editing && editing.mode === 'edit' && editing.id === e.id) return _plEdgeFormHtml(role, exit, e);
     const isTerm = e.to_kind === 'terminal';
     return `<div class="edge${e.enabled ? '' : ' off'}">
       <span class="etrig">${escapeHTML(_edgeTrigLabel(e.trigger))}</span>
@@ -39977,115 +39987,46 @@ function _plRenderExitSec(role, stage) {
       <span class="edest${isTerm ? ' term' : ''}">${_plIcon(_edgeDestIcon(e), 15)}${escapeHTML(_edgeDestLabel(e))}</span>
       <span class="espacer"></span>
       <button class="eact${e.enabled ? ' on' : ''}" title="${e.enabled ? 'Enabled - click to pause' : 'Paused - click to enable'}" onclick="_plEdgeToggle('${escapeHTML(e.id)}')">${_plIcon('power', 14)}</button>
-      <button class="eact" title="Edit" onclick="_plEdgeEdit('${escapeHTML(e.id)}')">${_plIcon('pencil', 13)}</button>
-      <button class="eact danger" title="Remove" onclick="_plEdgeDelete('${escapeHTML(e.id)}')">${_plIcon('x', 14)}</button>
     </div>`;
   }).join('');
-  const adder = (editing && editing.mode === 'add')
-    ? _plEdgeFormHtml(role, exit, null)
-    : `<button class="plf-addbtn" onclick="_plEdgeAdd('${role}')">${_plIcon('plus', 14)} Add exit branch</button>`;
   return `<div class="plf-sec">
     <div class="plf-sechead"><div class="plf-lab">Exit points</div></div>
-    <div class="plf-hint">Where a lead goes next, and what triggers the move. Fully editable per academy.</div>
-    <div class="plf-flow">${rows || '<div class="plf-empty">No exits yet - add the first branch below.</div>'}</div>
-    ${adder}
+    <div class="plf-hint">Where a lead goes next. The flow itself is the shared BAM playbook (same machine for every academy) - you can pause a route here; flow changes ship from BAM to everyone at once.</div>
+    <div class="plf-flow">${rows || '<div class="plf-empty">No exits from this stage.</div>'}</div>
   </div>`;
 }
 
-// Inline add/edit form. `edit` is the edge being edited (null = add).
-function _plEdgeFormHtml(role, exitEdges, edit) {
-  const usedTriggers = new Set(exitEdges.filter(e => !edit || e.id !== edit.id).map(e => e.trigger));
-  const trigOpts = Object.keys(_EDGE_TRIGGERS)
-    .filter(t => t !== 'new_lead')
-    .filter(t => !usedTriggers.has(t) || (edit && edit.trigger === t))
-    .map(t => `<option value="${t}"${edit && edit.trigger === t ? ' selected' : ''}>${escapeHTML(_edgeTrigLabel(t))}</option>`).join('');
-  const roleOpts = Object.keys(_EDGE_ROLE_LABEL).filter(r => r !== role)
-    .map(r => `<option value="stage:${r}"${edit && _edgeDestValue(edit) === 'stage:' + r ? ' selected' : ''}>${escapeHTML(_EDGE_ROLE_LABEL[r])}</option>`).join('');
-  const termOpts = Object.keys(_EDGE_TERMINAL_LABEL)
-    .map(t => `<option value="terminal:${t}"${edit && _edgeDestValue(edit) === 'terminal:' + t ? ' selected' : ''}>${escapeHTML(_EDGE_TERMINAL_LABEL[t])}</option>`).join('');
-  return `<div class="edge-form">
-    <select id="edge-trig">${trigOpts || '<option value="">All triggers used</option>'}</select>
-    <span class="efarr">${_plIcon('chevR', 13)}</span>
-    <select id="edge-dest"><optgroup label="Move to stage">${roleOpts}</optgroup><optgroup label="End the lead">${termOpts}</optgroup></select>
-    <div class="efbtns">
-      <button class="efcancel" onclick="_plEdgeFormCancel()">Cancel</button>
-      <button class="efsave" onclick="_plEdgeFormSave()">${edit ? 'Save' : 'Add'}</button>
-    </div>
-  </div>`;
-}
-
-function _plEdgeAdd(role) { _PL_EDGE_FORM = { mode: 'add', role }; _plFocusRerender(); }
-function _plEdgeEdit(id) {
-  const e = (_PL_EDGES || []).find(x => x.id === id); if (!e) return;
-  _PL_EDGE_FORM = { mode: 'edit', role: e.from_stage_role, id, trigger: e.trigger, to_kind: e.to_kind, to_stage_role: e.to_stage_role, to_terminal: e.to_terminal };
-  _plFocusRerender();
-}
-function _plEdgeFormCancel() { _PL_EDGE_FORM = null; _plFocusRerender(); }
-
-async function _plEdgeFormSave() {
-  const form = _PL_EDGE_FORM; if (!form) return;
-  const trig = document.getElementById('edge-trig')?.value;
-  const destVal = document.getElementById('edge-dest')?.value;
-  if (!trig || !destVal) { _plToast('Pick a trigger and a destination.'); return; }
-  const dest = _edgeParseDest(destVal);
-  const role = form.role;
-  // One destination per trigger: block a second exit on the same trigger.
-  const clash = (_PL_EDGES || []).find(e => e.from_stage_role === role && e.trigger === trig && (!form.id || e.id !== form.id));
-  if (clash) { _plToast(`"${_edgeTrigLabel(trig)}" already has an exit. Edit or remove it first.`); return; }
-  if (!_sb || typeof CLIENT_ID === 'undefined') { _plToast('Not connected.'); return; }
-  try {
-    if (form.mode === 'edit') {
-      const { error } = await _sb.from('stage_transitions').update({ trigger: trig, to_kind: dest.to_kind, to_stage_role: dest.to_stage_role, to_terminal: dest.to_terminal, is_seed: false }).eq('id', form.id);
-      if (error) throw error;
-    } else {
-      const sorts = (_PL_EDGES || []).filter(e => e.from_stage_role === role).map(e => e.sort_order || 0);
-      const nextSort = (sorts.length ? Math.max(...sorts) : 0) + 1;
-      const { error } = await _sb.from('stage_transitions').insert({
-        client_id: CLIENT_ID, pipeline_id: null, from_stage_role: role, trigger: trig,
-        to_kind: dest.to_kind, to_stage_role: dest.to_stage_role, to_terminal: dest.to_terminal,
-        enabled: true, is_seed: false, sort_order: nextSort,
-      });
-      if (error) throw error;
-    }
-    _PL_EDGE_FORM = null;
-    await _plEdgesEnsure(true);
-    _plFocusRerender();
-    _plToast(form.mode === 'edit' ? 'Exit branch updated.' : 'Exit branch added.');
-  } catch (e) {
-    const msg = (e && e.code === '23505') ? 'That exact branch already exists.' : (e && e.message) || 'Could not save.';
-    _plToast(msg);
-  }
-}
-
+// Phase 3 (2026-07-23): the Exit editor's add / edit-destination / delete are
+// RETIRED - flow structure is tier-1 (BAM's shared master, edited in code and
+// shipped to every academy at once). The only per-academy control left is the
+// pause switch below (tier-2 operational state).
 async function _plEdgeToggle(id) {
   const e = (_PL_EDGES || []).find(x => x.id === id); if (!e) return;
   const next = !e.enabled;
   e.enabled = next; // optimistic
   _plFocusRerender();
   try {
-    const { error } = await _sb.from('stage_transitions').update({ enabled: next }).eq('id', id);
-    if (error) throw error;
-  } catch (err) { e.enabled = !next; _plFocusRerender(); _plToast('Could not update.'); }
-}
-
-function _plEdgeDelete(id) {
-  const e = (_PL_EDGES || []).find(x => x.id === id); if (!e) return;
-  _plConfirmModal({
-    icon: '', title: 'Remove this exit branch?',
-    body: `Leads won't move on <b>${escapeHTML(_edgeTrigLabel(e.trigger))}</b> anymore. You can add it back later.`,
-    okLabel: 'Remove', danger: true,
-    onOk: () => _plEdgeDeleteGo(id),
-  });
-}
-async function _plEdgeDeleteGo(id) {
-  try {
-    const { error } = await _sb.from('stage_transitions').delete().eq('id', id);
-    if (error) throw error;
-    if (_PL_EDGE_FORM && _PL_EDGE_FORM.id === id) _PL_EDGE_FORM = null;
-    await _plEdgesEnsure(true);
+    if (String(id).startsWith('m:')) {
+      // No per-academy row yet (post-Phase-3 academies have none) - create the
+      // pause override row for this route.
+      const { error } = await _sb.from('stage_transitions').insert({
+        client_id: CLIENT_ID, pipeline_id: null, offer_id: e.offer_id || null,
+        from_stage_role: e.from_stage_role, trigger: e.trigger,
+        to_kind: e.to_kind, to_stage_role: e.to_stage_role, to_terminal: e.to_terminal,
+        enabled: next, is_seed: false, sort_order: e.sort_order || 0,
+      });
+      if (error) throw error;
+      await _plEdgesEnsure(true);
+    } else {
+      // Update EVERY row for this (from, trigger) so the router's enabled-first
+      // lookup can't resurrect an enabled duplicate.
+      let q = _sb.from('stage_transitions').update({ enabled: next }).eq('client_id', CLIENT_ID).eq('trigger', e.trigger);
+      q = e.from_stage_role ? q.eq('from_stage_role', e.from_stage_role) : q.is('from_stage_role', null);
+      const { error } = await q;
+      if (error) throw error;
+    }
     _plFocusRerender();
-    _plToast('Exit branch removed.');
-  } catch (e) { _plToast((e && e.message) || 'Could not remove.'); }
+  } catch (err) { e.enabled = !next; _plFocusRerender(); _plToast('Could not update.'); }
 }
 
 function _renderPipelineBoard() {

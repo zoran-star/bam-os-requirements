@@ -381,13 +381,22 @@ export function buildPresetRows(presetKey, clientId, offerId) {
 // unique keys). Writes via the provided sbRest (defaults to _store's service-role
 // reader). Pass { dryRun:true } to get the rows WITHOUT writing.
 //
+// PHASE 3 (2026-07-23): edges are NO LONGER copy-stamped. The router reads the
+// flow graph straight from this file (preset-master.js, live since the Phase 1
+// flip), so per-academy stage_transitions rows are only (a) pause overrides an
+// academy sets in focus mode and (b) the pre-flip rows kept as the emergency
+// fallback. applyPreset now writes ONLY the pipeline_stages IDENTITY ANCHORS
+// (opportunities FK them) - the edge-conflict guard and the 409/force flow died
+// with the stamping. `force` is accepted and ignored so old callers don't break.
+//
 // SCOPE GUARD (Phase 2): the live board/router/agents key the pipeline by
 // (client_id, role), NOT by offer - so a single academy can hold only ONE
 // pipeline today. applyPreset therefore targets a fresh academy (no rows) or a
 // re-stamp of the SAME offer. If the academy already has stages tagged to a
 // DIFFERENT offer, it refuses: running two offer pipelines in one academy needs
-// the offer-aware readers + per-offer unique keys built in Phase 3.
+// the offer-aware readers + per-offer unique keys (parked Phase 3b spec).
 export async function applyPreset({ clientId, offerId, presetKey, dryRun = false, force = false, sb = sbRest, log = console.log } = {}) {
+  void force; // Phase 3: no edge stamping left to force
   const { stageRows, transitionRows } = buildPresetRows(presetKey, clientId, offerId);
 
   // Multi-offer-per-academy guard.
@@ -399,49 +408,15 @@ export async function applyPreset({ clientId, offerId, presetKey, dryRun = false
     throw new Error(
       `academy ${clientId} already has a pipeline for offer ${otherOffer.offer_id}. ` +
       `Running a SECOND offer pipeline in one academy needs offer-aware readers + per-offer ` +
-      `unique keys (Phase 3). Refusing to overwrite.`
+      `unique keys (Phase 3b). Refusing to overwrite.`
     );
-  }
-
-  // Edge-conflict guard: the edge unique key INCLUDES the destination columns, so
-  // stamping a DIFFERENT preset (or a same-preset "upgrade" that moves an edge's
-  // destination) onto this offer does NOT conflict-update the old edge - it INSERTS
-  // a second enabled edge for the same (from, trigger). Two enabled edges with
-  // different destinations route a live event nondeterministically (a booked lead
-  // silently goes to a stage no agent works). Detect that BEFORE writing anything.
-  const sameOffer = (a, b) => (a || null) === (b || null);
-  const newByFromTrig = new Map();
-  for (const t of transitionRows) newByFromTrig.set(`${t.from_stage_role || ""}|${t.trigger}`, `${t.to_kind}|${t.to_stage_role || ""}|${t.to_terminal || ""}`);
-  let conflicts = [];
-  try {
-    const edges = (await sb(`stage_transitions?client_id=eq.${encodeURIComponent(clientId)}&select=offer_id,from_stage_role,trigger,to_kind,to_stage_role,to_terminal,enabled`)) || [];
-    conflicts = edges.filter((e) => {
-      if (!sameOffer(e.offer_id, offerId) || e.enabled === false) return false;
-      const key = `${e.from_stage_role || ""}|${e.trigger}`;
-      const cur = `${e.to_kind}|${e.to_stage_role || ""}|${e.to_terminal || ""}`;
-      return newByFromTrig.has(key) && newByFromTrig.get(key) !== cur;
-    });
-  } catch (_) { /* if the read fails, fall through - the upsert still runs */ }
-  if (conflicts.length && !force) {
-    const list = conflicts.map((e) => `  ${e.from_stage_role || "(entry)"} --${e.trigger}--> ${e.to_kind === "stage" ? e.to_stage_role : "@" + e.to_terminal}`).join("\n");
-    throw new Error(
-      `academy ${clientId} offer ${offerId || "(none)"} already has ${conflicts.length} edge(s) whose destination differs from preset '${presetKey}':\n${list}\n` +
-      `Upserting would leave BOTH enabled (nondeterministic routing). Re-run with force:true to REPLACE this offer's edges cleanly.`
-    );
-  }
-  // force: wipe this offer's existing edges so the preset is a clean replace, not
-  // an additive merge that strands the old preset's edges alongside the new ones.
-  if (force && !dryRun) {
-    const offerFilter = offerId ? `offer_id=eq.${encodeURIComponent(offerId)}` : `offer_id=is.null`;
-    await sb(`stage_transitions?client_id=eq.${encodeURIComponent(clientId)}&${offerFilter}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
-    log(`[force] cleared existing edges for client ${clientId} offer ${offerId || "(none)"} before re-stamping`);
   }
 
   if (dryRun) {
     log(`[dry-run] preset '${presetKey}' → client ${clientId} offer ${offerId || "(none)"}`);
-    log(`[dry-run] ${stageRows.length} pipeline_stages rows:`);
+    log(`[dry-run] ${stageRows.length} pipeline_stages anchor rows:`);
     for (const s of stageRows) log(`   stage  ${s.position}  ${s.role.padEnd(22)} "${s.label}"`);
-    log(`[dry-run] ${transitionRows.length} stage_transitions rows:`);
+    log(`[dry-run] ${transitionRows.length} edges (runtime-read from the master, NOT written):`);
     for (const t of transitionRows) {
       const dest = t.to_kind === "stage" ? t.to_stage_role : `@${t.to_terminal}`;
       log(`   edge   ${String(t.from_stage_role || "(entry)").padEnd(22)} --${t.trigger}--> ${dest}`);
@@ -449,22 +424,14 @@ export async function applyPreset({ clientId, offerId, presetKey, dryRun = false
     return { dryRun: true, stages: stageRows.length, transitions: transitionRows.length, stageRows, transitionRows };
   }
 
-  // Upsert stages on the existing unique (client_id, role); merge so a re-stamp
-  // updates label/position/offer without duplicating.
+  // Upsert the stage IDENTITY ANCHORS on the existing unique (client_id, role);
+  // merge so a re-stamp updates label/position/offer without duplicating.
   await sb(`pipeline_stages?on_conflict=client_id,role`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify(stageRows),
   });
 
-  // Upsert edges on the per-offer edge unique (NULLS NOT DISTINCT, so a re-stamp
-  // of the identical graph is a true no-op even though every edge key holds a NULL).
-  await sb(`stage_transitions?on_conflict=client_id,offer_id,from_stage_role,trigger,to_kind,to_stage_role,to_terminal`, {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify(transitionRows),
-  });
-
-  log(`preset '${presetKey}' applied → ${stageRows.length} stages + ${transitionRows.length} edges for client ${clientId} offer ${offerId || "(none)"}`);
+  log(`preset '${presetKey}' applied → ${stageRows.length} stage anchors for client ${clientId} offer ${offerId || "(none)"}; ${transitionRows.length} edges served live from the master`);
   return { dryRun: false, stages: stageRows.length, transitions: transitionRows.length };
 }
