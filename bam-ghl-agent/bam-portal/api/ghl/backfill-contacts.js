@@ -17,10 +17,10 @@ import { withSentryApiRoute } from "../_sentry.js";
 
 import { timingSafeEqual } from "node:crypto";
 
+import { pickGhlToken } from "./_core.js";
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const GHL_V2        = "https://services.leadconnectorhq.com";
-const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
 const V2_VERSION    = "2021-07-28";
 
 async function sb(path, opts = {}) {
@@ -58,60 +58,6 @@ async function ghl(method, path, { token, body } = {}) {
     throw err;
   }
   return j;
-}
-
-async function refreshGhlToken(client) {
-  const clientIdSec   = process.env.GHL_CLIENT_ID;
-  const clientSecret  = process.env.GHL_CLIENT_SECRET;
-  if (!clientIdSec || !clientSecret || !client.ghl_refresh_token) return null;
-  const r = await fetch(GHL_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id:     clientIdSec,
-      client_secret: clientSecret,
-      grant_type:    "refresh_token",
-      refresh_token: client.ghl_refresh_token,
-    }).toString(),
-  });
-  const tok = await r.json().catch(() => null);
-  if (!r.ok || !tok?.access_token) return null;
-  const expiresAt = new Date(Date.now() + (Number(tok.expires_in) || 86400) * 1000).toISOString();
-  await sb(`clients?id=eq.${client.id}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({
-      ghl_access_token:     tok.access_token,
-      ghl_refresh_token:    tok.refresh_token || client.ghl_refresh_token,
-      ghl_token_expires_at: expiresAt,
-    }),
-  }).catch(() => {});
-  return { token: tok.access_token, locationId: tok.locationId || client.ghl_location_id };
-}
-
-async function pickGhlToken(client) {
-  if (client.ghl_access_token) {
-    const expiresAt = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
-    if (expiresAt - Date.now() <= 60_000 && client.ghl_refresh_token) {
-      const refreshed = await refreshGhlToken(client);
-      if (refreshed) return refreshed;
-    }
-    return { token: client.ghl_access_token, locationId: client.ghl_location_id };
-  }
-  if (process.env.GHL_LOCATIONS_JSON) {
-    let locs;
-    try { locs = JSON.parse(process.env.GHL_LOCATIONS_JSON); } catch (_) { locs = []; }
-    if (Array.isArray(locs)) {
-      const entry =
-        locs.find(l => l.locationId && l.locationId === client.ghl_location_id) ||
-        locs.find(l => l.name && client.business_name && l.name.toLowerCase() === client.business_name.toLowerCase());
-      if (entry && (entry.apiKeyV2 || entry.apiKey)) {
-        return { token: entry.apiKeyV2 || entry.apiKey, locationId: entry.locationId || client.ghl_location_id };
-      }
-    }
-  }
-  const token = process.env.GHL_API_KEY || process.env.GHL_AGENCY_TOKEN || null;
-  return token ? { token, locationId: client.ghl_location_id } : null;
 }
 
 // Lookup a contact by email (preferred — more stable than phone) then phone.

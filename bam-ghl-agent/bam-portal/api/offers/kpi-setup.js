@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { pickGhlToken } from "../ghl/_core.js";
 // Reads ALL Stripe subscriptions + products (paginated) and the GHL pipeline
 // list — more than the default ~10s function budget, so give it headroom.
 export const maxDuration = 60;
@@ -23,7 +24,6 @@ export const maxDuration = 60;
 // Auth: Supabase JWT — staff (any academy) or a client_users member of client_id.
 
 const GHL_V2        = "https://services.leadconnectorhq.com";
-const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
 const V2_VERSION    = "2021-07-28";
 const STRIPE_API    = "https://api.stripe.com/v1";
 
@@ -158,30 +158,6 @@ async function ghl(method, path, { token } = {}) {
   try { json = text ? JSON.parse(text) : null; } catch (_) { json = { raw: text }; }
   if (!res.ok) { const err = new Error((json && (json.message || json.error)) || `GHL ${res.status}`); err.status = res.status; throw err; }
   return json;
-}
-async function refreshGhlToken(client) {
-  const cid = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
-  const sec = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
-  if (!cid || !sec || !client.ghl_refresh_token) throw new Error("GHL refresh not configured");
-  const tokenRes = await fetch(GHL_TOKEN_URL, {
-    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: cid, client_secret: sec, grant_type: "refresh_token", refresh_token: client.ghl_refresh_token, user_type: "Location" }),
-  });
-  const tok = await tokenRes.json();
-  if (!tokenRes.ok || !tok?.access_token) throw new Error(tok?.error_description || "GHL token refresh failed");
-  const expiresAt = new Date(Date.now() + (Number(tok.expires_in) || 86400) * 1000).toISOString();
-  await sb(`clients?id=eq.${client.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ ghl_access_token: tok.access_token, ghl_refresh_token: tok.refresh_token || client.ghl_refresh_token, ghl_token_expires_at: expiresAt }) });
-  return { token: tok.access_token, locationId: tok.locationId || client.ghl_location_id };
-}
-async function pickGhlToken(client) {
-  if (client.ghl_access_token) {
-    const exp = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
-    if (exp - Date.now() <= 60_000 && client.ghl_refresh_token) { try { return await refreshGhlToken(client); } catch (_) {} }
-    return { token: client.ghl_access_token, locationId: client.ghl_location_id };
-  }
-  const tok = process.env.GHL_API_KEY || process.env.GHL_AGENCY_TOKEN || null;
-  return tok ? { token: tok, locationId: client.ghl_location_id } : null;
 }
 async function fetchPipelines(client) {
   let creds;

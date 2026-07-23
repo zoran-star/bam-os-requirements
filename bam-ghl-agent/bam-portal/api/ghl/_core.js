@@ -7,6 +7,7 @@
 // pass a loaded `clients` row (with the ghl_* fields) to these functions.
 
 import { maybeSendSmsViaProvider } from "../messaging/provider.js";
+import { mintForClient, markTokenTrouble, clearTokenTrouble, RENEW_WINDOW_MS } from "./_agency.js";
 
 const GHL_V2 = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
@@ -67,15 +68,65 @@ export async function refreshGhlToken(client) {
   return { token: tok.access_token, locationId: tok.locationId || client.ghl_location_id };
 }
 
-// Pick the GHL token for this academy: per-academy OAuth (auto-refresh near
+// Re-read a client's token straight from the DB and return it if another process
+// has already renewed it. Null when there is nothing newer to use.
+async function rereadToken(client) {
+  try {
+    const rows = await sb(`clients?id=eq.${client.id}&select=ghl_access_token,ghl_location_id,ghl_token_expires_at`);
+    const fresh = rows && rows[0];
+    if (!fresh?.ghl_access_token || fresh.ghl_access_token === client.ghl_access_token) return null;
+    const fexp = fresh.ghl_token_expires_at ? new Date(fresh.ghl_token_expires_at).getTime() : 0;
+    if (fexp <= Date.now()) return null;
+    return { token: fresh.ghl_access_token, locationId: fresh.ghl_location_id || client.ghl_location_id };
+  } catch (_) { return null; }
+}
+
+// Pick the GHL token for this academy: per-academy OAuth (auto-renew near
 // expiry) → GHL_LOCATIONS_JSON entry → plain env fallback. Null if none usable.
+//
+// Renewal order is mint-then-refresh, on purpose:
+//   1. Minting from the agency token always works while the agency is connected,
+//      and is independent of which OAuth app issued the current token.
+//   2. The refresh_token grant is the fallback. It is single-use and bound to the
+//      issuing app, so a lost response permanently kills it - which is exactly how
+//      academies used to go cold and need a human to open their Inbox.
+// The renew window is hours, not seconds, so a transient failure gets many more
+// attempts before the token actually expires.
 export async function pickGhlToken(client) {
   if (client.ghl_access_token) {
     const expiresAt = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
-    const skewMs    = 60 * 1000;
-    if (expiresAt - Date.now() <= skewMs && client.ghl_refresh_token) {
-      try { return await refreshGhlToken(client); }
-      catch (_) { /* fall through to existing token; GHL may still accept */ }
+    // No recorded expiry means we cannot tell how old the token is, so try to
+    // renew it (matching the previous behaviour) but never treat that as an outage.
+    const isExpired = expiresAt > 0 && expiresAt <= Date.now();
+    if (!expiresAt || expiresAt - Date.now() <= RENEW_WINDOW_MS) {
+      try {
+        const minted = await mintForClient(client);
+        if (minted) return minted;
+      } catch (_) { /* fall through to the refresh grant */ }
+
+      if (client.ghl_refresh_token) {
+        try {
+          const refreshed = await refreshGhlToken(client);
+          await clearTokenTrouble(client.id);
+          return refreshed;
+        } catch (e) {
+          // GHL refresh tokens are single-use, so a concurrent process (e.g. the
+          // contacts-sync cron) may have just consumed ours and saved a fresh
+          // access token. Re-read the row rather than falling back to the stale
+          // in-memory token, which surfaced as "Invalid JWT".
+          const fresh = await rereadToken(client);
+          if (fresh) return fresh;
+
+          // Only a token that is ALREADY expired is an outage. Inside the window
+          // it is just an early attempt and the next tick will try again.
+          if (isExpired) {
+            console.error(`[ghl] token renew failed for ${client.business_name || client.id}: ${e.message}`);
+            await markTokenTrouble(client.id, `renew failed: ${e.message}`);
+          }
+        }
+      } else if (isExpired) {
+        await markTokenTrouble(client.id, "token expired and no refresh_token; needs an agency re-mint");
+      }
     }
     return { token: client.ghl_access_token, locationId: client.ghl_location_id };
   }

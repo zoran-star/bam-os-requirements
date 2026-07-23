@@ -2,6 +2,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { isAutomationLive, enrollContact } from "../automations.js";
 import { nurtureStage, interestedStage } from "../agent/_stage.js";
 import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard, findOpenOpp, setStatus, moveStage, oppMatchClause } from "../agent/_store.js";
+import { pickGhlToken } from "./_core.js";
 // Vercel Serverless Function — Per-academy GHL Pipelines (kanban + moves)
 //
 //   GET   /api/ghl/pipelines?client_id=<uuid>
@@ -22,7 +23,6 @@ import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard, findOpenOp
 // Token: per-academy OAuth (clients.ghl_access_token, auto-refresh).
 
 const GHL_V2        = "https://services.leadconnectorhq.com";
-const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
 const V2_VERSION    = "2021-07-28";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -120,62 +120,6 @@ async function ghl(method, path, { token, body } = {}) {
     throw err;
   }
   return json;
-}
-
-async function refreshGhlToken(client) {
-  const cid = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
-  const sec = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
-  if (!cid || !sec) throw new Error("GHL_OAUTH_CLIENT_ID/SECRET not configured");
-  if (!client.ghl_refresh_token) throw new Error("academy has no GHL refresh_token");
-  const tokenRes = await fetch(GHL_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: cid, client_secret: sec,
-      grant_type: "refresh_token",
-      refresh_token: client.ghl_refresh_token,
-      user_type: "Location",
-    }),
-  });
-  const tok = await tokenRes.json();
-  if (!tokenRes.ok || !tok?.access_token) {
-    throw new Error(tok?.error_description || tok?.error || "GHL token refresh failed");
-  }
-  const expiresAt = new Date(Date.now() + (Number(tok.expires_in) || 86400) * 1000).toISOString();
-  await sb(`clients?id=eq.${client.id}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({
-      ghl_access_token: tok.access_token,
-      ghl_refresh_token: tok.refresh_token || client.ghl_refresh_token,
-      ghl_token_expires_at: expiresAt,
-    }),
-  });
-  return { token: tok.access_token, locationId: tok.locationId || client.ghl_location_id };
-}
-
-async function pickGhlToken(client) {
-  if (client.ghl_access_token) {
-    const exp = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
-    if (exp - Date.now() <= 60_000 && client.ghl_refresh_token) {
-      try { return await refreshGhlToken(client); } catch (_) {}
-    }
-    return { token: client.ghl_access_token, locationId: client.ghl_location_id };
-  }
-  if (process.env.GHL_LOCATIONS_JSON) {
-    let locs;
-    try { locs = JSON.parse(process.env.GHL_LOCATIONS_JSON); } catch (_) { locs = []; }
-    if (Array.isArray(locs)) {
-      const entry =
-        locs.find(l => l.locationId && l.locationId === client.ghl_location_id) ||
-        locs.find(l => l.name && client.business_name && l.name.toLowerCase() === client.business_name.toLowerCase());
-      if (entry && (entry.apiKeyV2 || entry.apiKey)) {
-        return { token: entry.apiKeyV2 || entry.apiKey, locationId: entry.locationId || client.ghl_location_id };
-      }
-    }
-  }
-  const tok = process.env.GHL_API_KEY || process.env.GHL_AGENCY_TOKEN || null;
-  return tok ? { token: tok, locationId: client.ghl_location_id } : null;
 }
 
 async function loadAcademyAndToken(clientId, ctx, res) {
