@@ -26,6 +26,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides, loadGlobalSections, isGlobalSection, canEditGlobalBrain, setGlobalSection, deleteGlobalSection } from "./agent/_sections.js";
+import { derivedFactOverrides } from "./agent/fact-render.js";
 
 // Which agent is being trained: booking | confirm | closing. Defaults to booking.
 const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
@@ -282,9 +283,10 @@ async function handler(req, res) {
     if (b.action === "sections") {
       const agent = pickAgent(b.agent);
       // Two override sources: the GLOBAL brain (shared) and this academy's OWN.
-      const [globalMap, clientRows] = await Promise.all([
+      const [globalMap, clientRows, derived] = await Promise.all([
         loadGlobalSections(),
         sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
+        derivedFactOverrides(clientId, sb),   // rendered facts - what the agent ACTUALLY reads
       ]);
       const clientMap = {};
       for (const r of (Array.isArray(clientRows) ? clientRows : [])) clientMap[r.section_key] = r.body;
@@ -293,6 +295,17 @@ async function handler(req, res) {
       const sections = sectionKeysForAgent(agent)
         .map(k => bySection.get(k)).filter(Boolean)
         .map(s => {
+          // Rendered fact sections (Build 2): show the LIVE rendered body - the
+          // stored/default text would lie about what the agent reads - and lock
+          // editing here: the academy edits the SOURCE (offer / locations), not
+          // the text. scope "derived" badges it in the UI.
+          if (derived[s.key] != null) {
+            return {
+              key: s.key, label: s.label, group: s.layer,
+              body: derived[s.key], default_body: s.body,
+              is_default: true, scope: "derived", editable: false,
+            };
+          }
           const glob = isGlobalSection(s.key);
           const ovVal = glob ? globalMap[s.key] : clientMap[s.key];   // global sections show the GLOBAL value
           return {
@@ -310,6 +323,12 @@ async function handler(req, res) {
     if (b.action === "update-section") {
       if (!b.key || !SECTIONS.some(s => s.key === b.key)) return res.status(400).json({ error: "unknown section key" });
       if (b.body == null || !String(b.body).trim()) return res.status(400).json({ error: "body required" });
+      // Rendered fact sections can't be text-edited - the renderer would silently
+      // override the write. Point at the real home instead.
+      {
+        const derived = await derivedFactOverrides(clientId, sb);
+        if (derived[b.key] != null) return res.status(400).json({ error: "this section is rendered live from your offer and locations - edit it in your Business Blueprint, not here" });
+      }
       if (isGlobalSection(b.key)) {
         // GLOBAL section: editing it changes EVERY academy's agents. Gate on a global editor.
         if (!canEditGlobalBrain(ctx, clientId)) return res.status(403).json({ error: "that section is managed by BAM (global) - not editable here" });
@@ -326,6 +345,10 @@ async function handler(req, res) {
 
     if (b.action === "reset-section") {
       if (!b.key) return res.status(400).json({ error: "key required" });
+      {
+        const derived = await derivedFactOverrides(clientId, sb);
+        if (derived[b.key] != null) return res.status(400).json({ error: "this section is rendered live from your offer - there is no stored text to reset" });
+      }
       if (isGlobalSection(b.key)) {
         if (!canEditGlobalBrain(ctx, clientId)) return res.status(403).json({ error: "that section is managed by BAM (global) - not editable here" });
         await deleteGlobalSection(b.key);   // revert the GLOBAL section to its BAM default (for all academies)

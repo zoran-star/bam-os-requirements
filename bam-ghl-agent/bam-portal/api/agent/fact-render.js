@@ -156,6 +156,27 @@ export function renderPolicies(data) {
   return lines.join("\n");
 }
 
+// qualification_config <- the preset's 3 locked criteria (the FRAMEWORK, tier 1)
+// filled with this academy's VALUES: its locations, its age range, its skill
+// levels. Kills the hardcoded "near Oakville/GTA" default leaking to other
+// academies - the exact bug that would have had San Jose's agent qualifying
+// Bay Area parents by Ontario geography.
+export function renderQualification(data, client, locations) {
+  const gi = (data && data.general_info) || {};
+  const locNames = arr(locations).map((l) => l && l.title).filter(Boolean);
+  const where = locNames.length ? locNames.join(" / ") : ((client && client.address) || null);
+  if (!where && !gi.age_range) return null;
+  const skill = gi.skill_level ? String(gi.skill_level) : null;
+  return [
+    "Qualify leads on these dimensions:",
+    `- Location proximity: Are they close enough to realistically attend sessions at ${where || "the academy"}?`,
+    `- Athlete age: Athlete must be within the program's age range${gi.age_range ? ` (${gi.age_range})` : " (see program)"}`,
+    `- Program fit: ${skill && skill.toLowerCase() === "all" ? "All skill levels accepted" : (skill ? `${skill} program` : "See the program")} - place them in the right group for their level`,
+    "",
+    "Interest level is NOT a qualification. Leads who aren't interested are never marked unqualified - they get moved to Nurture. Unqualified means they cannot be a customer (too far, wrong age, not a fit) and it removes them from the pipeline entirely.",
+  ].join("\n");
+}
+
 // selling_points <- offer.data.value (the canonical home - Build 3 resolved,
 // Zoran 2026-07-23: GTA's curated bullets were moved INTO its offer value, so
 // every academy's differentiators now live where the owner edits them).
@@ -206,6 +227,7 @@ export async function derivedFactOverrides(clientId, sbFn) {
     set("policies",       renderPolicies(data));
     set("business_info",  renderBusinessInfo(client, data, locations));
     set("selling_points", renderSellingPoints(data));
+    set("qualification_config", renderQualification(data, client, locations));
     return out;
   } catch (_) {
     return {};
