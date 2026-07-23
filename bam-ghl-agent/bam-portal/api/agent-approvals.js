@@ -614,16 +614,18 @@ async function detectForClient(client) {
     if (mutedSet.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: bot muted on this lead`); continue; }
     if (passedTrial.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: trial already ran → post-trial form`); continue; }
     if (upcomingBooked.has(String(contactId))) { skipped++; reasons.push(`${item.name || contactId}: already booked → has an upcoming trial`); continue; }
-    // A parked lead who texted back re-engaged early: clear the park (belt +
-    // suspenders with the inbound webhook's cancel) and reply normally. But only
-    // when a NEW inbound landed AFTER the park - a silently-parked lead (no ack)
-    // stays inbound-last on their ORIGINAL "later" text, and cancelling on mere
-    // queue membership killed the park every cron (Zoran 2026-07-10). No fresh
-    // inbound => keep the park and skip drafting (silence is the plan).
+    // A parked lead who texted back gets a reply drafted - but the park STAYS
+    // (Zoran 2026-07-23). Cancelling it on any inbound meant a routine logistics
+    // text erased a deliberate "circle back on this date" and the proactive
+    // engines immediately re-queued the follow-ups the park had replaced. Only a
+    // terminal move or the park's own fire date clears it now.
+    // Still gated on a NEW inbound AFTER the park - a silently-parked lead (no ack)
+    // stays inbound-last on their ORIGINAL "later" text, and drafting on mere
+    // queue membership re-opened the park every cron (Zoran 2026-07-10). No fresh
+    // inbound => skip drafting (silence is the plan).
     if (reignSet.has(String(contactId))) {
       if (!repliedAfterPark(reignMap.get(String(contactId)), item.last_at)) { skipped++; reasons.push(`${item.name || contactId}: parked for reignition`); continue; }
-      await cancelReignitions(client.id, contactId, "lead replied before the reignition date");
-      reignSet.delete(String(contactId));
+      reasons.push(`${item.name || contactId}: parked for reignition - answering their reply, park kept`);
     }
     // Fresh inbound only: if the lead's last message is ≥24h old, we dropped the
     // ball — hand them to the ghost engine (Send to Ghosted) instead of a late

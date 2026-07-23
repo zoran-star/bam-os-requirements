@@ -43,7 +43,17 @@ const QUEUES = ["agent_followups", "agent_ready_replies", "agent_confirm_replies
 // for one contact. `sendError` is stamped on the canceled rows (so staff can see WHY
 // they were pulled); `reigniteReason` defaults to it. Returns a per-queue result map;
 // never throws.
-export async function cancelAllSalesOutbound({ clientId, contactId, sendError = "lead converted", reigniteReason = null } = {}) {
+//
+// `keepReignition` (Zoran 2026-07-23): the REPLY callers pass true. A park is a
+// deliberate "circle back on this date" decision - a routine logistics reply
+// ("he can't make Tuesday, see you Thursday") must not silently delete it. It
+// deleted Mike Sandhu's Jul 28 park, and the next cron - seeing no park - queued
+// the 2-message follow-up plan the park existed to prevent. The queued CARDS still
+// get cancelled (never text someone mid-conversation); the park stands and keeps
+// the proactive engines off the lead until its date. CONVERSION callers (Stripe
+// signup, live-member reconcile) still cancel it - a paying member must never get
+// a parked re-engagement.
+export async function cancelAllSalesOutbound({ clientId, contactId, sendError = "lead converted", reigniteReason = null, keepReignition = false } = {}) {
   if (!clientId || !contactId) return { skipped: "missing clientId/contactId" };
   const cid = encodeURIComponent(String(contactId));
   const patch = {
@@ -60,10 +70,14 @@ export async function cancelAllSalesOutbound({ clientId, contactId, sendError = 
       result[t] = String((e && e.message) || e);
     }
   }
-  try {
-    result.reignitions = await cancelReignitions(clientId, String(contactId), reigniteReason || sendError);
-  } catch (e) {
-    result.reignitions = String((e && e.message) || e);
+  if (keepReignition) {
+    result.reignitions = "kept";
+  } else {
+    try {
+      result.reignitions = await cancelReignitions(clientId, String(contactId), reigniteReason || sendError);
+    } catch (e) {
+      result.reignitions = String((e && e.message) || e);
+    }
   }
   return { ok: true, ...result };
 }

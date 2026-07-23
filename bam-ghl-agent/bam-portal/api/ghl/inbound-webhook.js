@@ -298,7 +298,9 @@ async function handler(req, res) {
       await cancelAllSalesOutbound({
         clientId: client.id, contactId,
         sendError: "lead replied",
-        reigniteReason: "lead replied before the reignition date",
+        // A reply pulls the queued cards but NOT the park: "circle back on the
+        // 28th" is a decision, not something a logistics text should erase.
+        keepReignition: true,
       });
     }
   } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }
