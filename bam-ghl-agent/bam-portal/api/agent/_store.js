@@ -61,6 +61,12 @@ async function defaultSbGet(path) {
 // registry can still hold those roles, they just have null ghl_* until seeded.
 export const ROLE_MATCHERS = {
   responded:       (s) => /respond/i.test(s.name || ""),
+  // Canonical role key is `ghosted` (2026-07-23). The GHL sub-account stage is
+  // still NAMED "Interested" on most academies, so the matcher accepts both -
+  // that name mirror is deliberate and does NOT get renamed. `interested` stays
+  // registered as a legacy alias so any row still carrying the old role resolves
+  // during the transition; drop it once every academy reads `ghosted`.
+  ghosted:         (s) => /interest|ghost/i.test(s.name || ""),
   interested:      (s) => /interest|ghost/i.test(s.name || ""),
   scheduled_trial: (s) => /(schedul|book).*trial/i.test(s.name || ""),
   nurture:         (s) => /nurtur/i.test(s.name || ""),

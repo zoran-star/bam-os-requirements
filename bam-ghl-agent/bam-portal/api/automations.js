@@ -309,7 +309,7 @@ async function runWork(res) {
               // Stamping "ghosted" here left portal-store opps invisible to every
               // guard that checks stage_role=interested, so a reply from Ghosted
               // exited the automation but never bounced back to Booking.
-              if (is && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: is, role: "interested", contactId: job.contact_id, reason: "intro form sent, no reply - rolled into ghosted" });
+              if (is && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: is, role: "ghosted", contactId: job.contact_id, reason: "intro form sent, no reply - rolled into ghosted" });
             }
             await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "form_intro_to_ghosted", payload: { automation_key: a.automation_key } });
             formToGhosted++;
@@ -334,7 +334,7 @@ async function runWork(res) {
                 // reads the edge; on no edge (unseeded / paused / lookup blip) it
                 // returns matched:false and we run the original hardcoded move to
                 // nurture - behavior-identical for GTA.
-                const routed = await routeTransition({ clientId: job.client_id, sb, ghl, token: creds.token, locationId: creds.locationId, fromRole: "interested", trigger: "ghosted_ran_out", contactId: job.contact_id, oppRef, reason: `${a.automation_key} ran out - rolled into nurture` });
+                const routed = await routeTransition({ clientId: job.client_id, sb, ghl, token: creds.token, locationId: creds.locationId, fromRole: "ghosted", trigger: "ghosted_ran_out", contactId: job.contact_id, oppRef, reason: `${a.automation_key} ran out - rolled into nurture` });
                 if (!routed.matched) {
                   const ns = await nurtureStage(creds.token, creds.locationId, { clientId: job.client_id, sb });
                   if (ns && oppRef) await moveStage({ clientId: job.client_id, ghl, token: creds.token, oppRef, stage: ns, role: "nurture", contactId: job.contact_id, reason: `${a.automation_key} ran out - rolled into nurture` });
@@ -666,7 +666,7 @@ async function runRearm(res) {
         if (c && c.token && c.locationId) {
           const is = await interestedStage(c.token, c.locationId, { clientId, sb });
           const oppRef = await findOpenOppRef(clientId, c.token, c.locationId, cid);
-          if (is && oppRef) await moveStage({ clientId, ghl, token: c.token, oppRef, stage: is, role: "interested", contactId: cid, reason: "re-arm: Responded lead went silent, rolled back into ghosted" });
+          if (is && oppRef) await moveStage({ clientId, ghl, token: c.token, oppRef, stage: is, role: "ghosted", contactId: cid, reason: "re-arm: Responded lead went silent, rolled back into ghosted" });
         }
       } catch (_) { /* enrollment stands even if the stage move blips */ }
       await logEvent({ clientId, contactId: cid, automationId: null, type: "rearm_ghosted", payload: { from: "responded", idle_days: REARM_IDLE_DAYS } });

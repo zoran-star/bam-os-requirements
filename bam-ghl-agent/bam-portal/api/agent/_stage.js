@@ -91,9 +91,13 @@ export async function respondedStage(token, locationId, ctx = {}) {
 // The Training Pipeline "Interested" stage — where a lead lands when we send them
 // to the Ghosted automation (the workflow then bounces them back to Responded on
 // reply, or marks them lost). Same shape as respondedStage.
-export async function interestedStage(token, locationId, ctx = {}) {
-  return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "interested" });
+export async function ghostedStage(token, locationId, ctx = {}) {
+  return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "ghosted" });
 }
+
+// Legacy alias - the stage was called "Interested" until 2026-07-23. Kept so no
+// caller breaks mid-rename; remove once nothing imports it.
+export const interestedStage = ghostedStage;
 
 // The Training Pipeline "Scheduled Trial" (a.k.a. "Booked Trial") stage — where a
 // lead lands AFTER the booking agent books their trial. This is the CONFIRM agent's

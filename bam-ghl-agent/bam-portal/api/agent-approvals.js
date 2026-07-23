@@ -1632,7 +1632,7 @@ async function handler(req, res) {
         const routed = await routeTransition({ clientId, sb, ghl, token, locationId, fromRole: "responded", trigger: "went_quiet", contactId, oppRef, reason: "confirm-ghost: went quiet" });
         if (!routed.matched) {
           const is = await interestedStage(token, locationId, { clientId, sb });
-          if (is && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: is, role: "interested", contactId });
+          if (is && oppRef) await moveStage({ clientId, ghl, token, oppRef, stage: is, role: "ghosted", contactId });
         }
       } catch (_) {}
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "ghosted", reason: "sent to ghosted automation" }]) }); } catch (_) {}

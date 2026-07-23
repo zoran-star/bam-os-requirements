@@ -139,7 +139,7 @@ async function handler(req, res) {
           await createOpp({
             clientId: MIAMI_CLIENT_UUID,
             contactId,
-            role: "interested",
+            role: "ghosted",
             name: `${firstName.trim()} ${lastName?.trim() || ""}`.trim(),
             contactPhone: phone?.trim() || null,
             source: "website",

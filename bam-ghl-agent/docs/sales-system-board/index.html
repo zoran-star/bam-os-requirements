@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales System Board</title>
+<style>
+  :root{
+    --bg:#101114; --grid:#1A1C21; --card:#181B21; --card2:#20242C; --line:#2E333D;
+    --gold:#D4B65C; --blue:#6EA8D8; --green:#5CBF7A; --red:#E06C6C; --grey:#98A0AC;
+    --orange:#E8A050; --purple:#B48CE0; --txt:#ECEEF2; --dim:#9AA1AD;
+  }
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;-webkit-user-select:none;user-select:none}
+
+  /* tabs */
+  #tabs{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px}
+  #tabs button{border:none;background:transparent;color:var(--dim);font-weight:800;font-size:12px;letter-spacing:.8px;padding:8px 18px;border-radius:999px;cursor:pointer}
+  #tabs button.on{background:var(--gold);color:#1A1206}
+  #tabs button:focus-visible{outline:2px solid var(--gold)}
+
+  #vp{position:fixed;inset:0;overflow:hidden;cursor:grab;touch-action:none;
+      background-image:radial-gradient(circle,var(--grid) 1.4px,transparent 1.4px);background-size:26px 26px}
+  #vp.panning{cursor:grabbing}
+  #board{position:absolute;top:0;left:0;width:3560px;height:1950px;transform-origin:0 0}
+  #wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  #wires text{font-size:13px;font-weight:700;fill:var(--dim);paint-order:stroke;stroke:var(--bg);stroke-width:5px}
+
+  /* pipeline frame */
+  .frame{position:absolute;border:2px dashed #4A4230;border-radius:22px;background:rgba(212,182,92,.03);pointer-events:none}
+  .frame .flabel{position:absolute;top:-15px;left:26px;background:var(--bg);padding:2px 14px;border:1.5px solid var(--gold);border-radius:999px;color:var(--gold);font-size:12.5px;font-weight:800;letter-spacing:1.2px}
+
+  .node{position:absolute;background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:0 6px 22px rgba(0,0,0,.38);cursor:grab}
+  .node:active{cursor:grabbing}
+  .node h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.2px}
+  .node .desc{font-size:12.5px;color:var(--dim);margin:5px 0 10px;line-height:1.4}
+  .band{font-size:10.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+
+  .stage{width:500px;border-color:#3A3F4B}
+  .eng{display:flex;align-items:center;gap:8px;border-radius:10px;padding:8px 11px;font-size:12.5px;font-weight:700;margin:4px 0 8px}
+  .eng small{font-weight:500;color:var(--dim)}
+  .eng-agent{background:#2A2517;border:1px solid var(--gold);color:var(--gold)}
+  .eng-auto{background:#18222D;border:1px dashed var(--blue);color:var(--blue)}
+  details{border-top:1px dashed var(--line);padding:6px 0}
+  summary{font-size:11.5px;font-weight:800;letter-spacing:.6px;color:var(--dim);cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}
+  summary::before{content:'▸';color:var(--gold);transition:transform .15s}
+  details[open] summary::before{transform:rotate(90deg)}
+  details ul{margin:7px 0 3px;padding-left:16px;font-size:12.5px;line-height:1.55;color:var(--txt)}
+  details li b{font-weight:700}
+  details li .to{color:var(--dim)}
+  .src{color:var(--orange);font-size:11px;font-weight:700}
+
+  .term{width:420px}
+  .t-mem{border-color:var(--green);width:440px} .t-mem h3{color:var(--green);font-size:19px}
+  .t-unq{border-color:var(--red)} .t-unq h3{color:var(--red)}
+  .t-hum{border-color:var(--grey)} .t-hum h3{color:var(--grey)}
+
+  .panel .item{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-top:8px;font-size:12.5px;line-height:1.45}
+  .panel .item b{font-size:13px}
+  .panel .item .sub{color:var(--dim)}
+  .row2{display:flex;gap:8px}
+  .row2 > *{flex:1}
+
+  .hdr h2{margin:0;font-size:20px;font-weight:800}
+  .hdr h2 span{color:var(--gold)}
+  .hint{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6}
+  #zoom{position:fixed;right:18px;bottom:18px;display:flex;gap:8px;z-index:50}
+  #zoom button{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--txt);font-size:18px;font-weight:800;cursor:pointer}
+  #zoom button:hover{border-color:var(--gold);color:var(--gold)}
+  #zoom button:focus-visible{outline:2px solid var(--gold)}
+  .fit{font-size:11px !important;letter-spacing:.5px}
+
+  /* ===== page 2: building blocks ===== */
+  #page2{position:fixed;inset:0;overflow-y:auto;display:none;background:var(--bg);
+         background-image:radial-gradient(circle,var(--grid) 1.4px,transparent 1.4px);background-size:26px 26px;
+         -webkit-user-select:text;user-select:text}
+  #page2 .inner{max-width:1060px;margin:0 auto;padding:84px 22px 80px}
+  #page2 h1{font-size:25px;font-weight:800;letter-spacing:-.3px;margin:0}
+  #page2 h1 span{color:var(--gold)}
+  #page2 .lead{color:var(--dim);font-size:13.5px;margin:8px 0 30px;max-width:640px;line-height:1.55}
+  .hier{background:var(--card);border:1.5px solid var(--gold);border-radius:18px;padding:20px;margin-bottom:34px}
+  .hier .hlabel{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:1.2px;margin-bottom:14px}
+  .hrow{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+  .hbox{flex:1;min-width:200px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.5}
+  .hbox b{display:block;font-size:13px;margin-bottom:3px}
+  .harrow{align-self:center;color:var(--gold);font-size:18px;font-weight:800}
+  .hsub{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .hchip{background:var(--bg);border:1px solid var(--line);border-radius:999px;font-size:11px;font-weight:700;padding:3px 10px;color:var(--dim)}
+  .hside{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .hside .hbox{min-width:150px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .comp{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:16px 18px}
+  .comp .cb{font-size:10.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+  .comp h4{margin:0 0 6px;font-size:15px;font-weight:800}
+  .comp p{margin:0;font-size:12.5px;color:var(--dim);line-height:1.55}
+  .comp .ex{margin-top:9px;font-size:12px;background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;line-height:1.5}
+  .comp .ex b{color:var(--gold)}
+</style>
+
+<div id="tabs">
+  <button id="tab-flow" class="on">THE FLOW</button>
+  <button id="tab-blocks">BUILDING BLOCKS</button>
+</div>
+
+<div id="vp"><div id="board">
+<svg id="wires"></svg>
+
+<!-- pipeline frame -->
+<div class="frame" id="frame-pipeline" style="left:700px;top:340px;width:2240px;height:960px">
+  <div class="flabel">SALES PIPELINE - THE 5 STAGES</div>
+</div>
+
+<!-- ===== top info row ===== -->
+<div class="node hdr" id="hdr" style="left:80px;top:50px;width:430px;border-color:var(--gold)">
+  <h2>The Sales System <span>Board</span></h2>
+  <div class="hint">
+    <b style="color:var(--txt)">Drag any card</b> · drag the background to pan · pinch / scroll or + and - to zoom.<br>
+    ▸ Every card has dropdowns - click the little arrows for full detail.<br>
+    The flow reads <b style="color:var(--gold)">left to right</b>: landing page → pipeline → member.
+  </div>
+</div>
+
+<div class="node" id="principle" style="left:570px;top:50px;width:600px;border-color:var(--gold)">
+  <div class="band" style="color:var(--gold)">ONE SHARED PLAYBOOK</div>
+  <div style="font-size:13.5px;line-height:1.55">Every academy runs this <b>exact same machine</b>. We edit the master once and every academy updates instantly. The only per-academy difference is <span class="src">their own info</span> - schedule, pricing, coaches, selling points - which the system pulls live from their settings. Nobody gets a custom fork.</div>
+</div>
+
+<div class="node panel" id="guard" style="left:1230px;top:50px;width:540px;border-color:var(--grey)">
+  <div class="band" style="color:var(--grey)">GUARDRAILS - ALWAYS ON</div>
+  <div class="item">Complaint or something off-topic → a <b>human takes over</b>, instantly.</div>
+  <div class="item"><b>Nobody sits untouched.</b> Every stage has an engine working it.</div>
+  <div class="item">Marking someone <b style="color:var(--red)">Unqualified</b> always needs a reason from the Qualifications card.</div>
+</div>
+
+<div class="node panel" id="metrics" style="left:3040px;top:40px;width:440px;border-color:var(--green)">
+  <div class="band" style="color:var(--green)">METRICS - what gets calculated</div>
+  <div class="item"><b>Qualified trial close rate</b> ★ the health number<br><span class="sub">of good-fit trials that showed up, how many enrolled (GTA: ~31%)</span></div>
+  <div class="item"><b>Won / Lost / Still deciding</b> <span class="sub">- feeds the close rate</span></div>
+  <div class="item"><b>Trials today + booked this week · Sales this week</b></div>
+  <div class="item"><b>Funnel drop-off</b> <span class="sub">page views → forms → bookings</span></div>
+</div>
+
+<!-- ===== MAIN FLOW (left to right) ===== -->
+
+<!-- landing page -->
+<div class="node panel" id="landing" style="left:80px;top:430px;width:540px;border-color:var(--purple)">
+  <div class="band" style="color:var(--purple)">THE FUNNEL</div>
+  <h3>Free-trial landing page</h3>
+  <div class="desc">The academy's web page that turns a visitor into a lead. Brand, photos + selling points pulled from their settings.</div>
+  <details><summary>THE LEAD FORM</summary><ul>
+    <li>Asks: parent name · phone · email · athlete name</li>
+    <li><b>Age + location</b> - two qualification questions, asked up front</li>
+    <li>Submitting creates the contact record the agents work from</li>
+  </ul></details>
+  <details><summary>THE BOOKING CALENDAR</summary><ul>
+    <li>Right after the form, they can pick a trial time on the spot</li>
+    <li>Book right there → they enter the pipeline already booked (straight to Confirm)</li>
+    <li>Skip it → the Booking agent picks them up</li>
+  </ul></details>
+  <details><summary>OTHER WAYS IN</summary><ul>
+    <li>Program pages (Elementary, High School)</li>
+    <li>Contact page <span class="src">only if this is the academy's only offer</span></li>
+  </ul></details>
+  <details><summary>TRACKED THE WHOLE WAY</summary><ul>
+    <li>Page views → forms filled → trials booked <span class="to">(feeds Metrics)</span></li>
+  </ul></details>
+</div>
+
+<!-- stage 1 booking -->
+<div class="node stage" id="st-booking" style="left:760px;top:430px">
+  <div class="band" style="color:var(--gold)">STAGE 1</div>
+  <h3>Booking</h3>
+  <div class="desc">A new lead just came in. One goal: get them booked into a free trial.</div>
+  <div class="eng eng-agent">⚙ ENGINE: Booking Agent (AI) <small>- texts the lead, you approve every message</small></div>
+  <details><summary>ENTRY - how people arrive</summary><ul>
+    <li>The lead form on the landing page ←</li>
+    <li>No-shows + cancelled bookings coming back around</li>
+    <li>Anyone who replies from Ghosted or Nurture</li>
+  </ul></details>
+  <details><summary>WHAT THE AGENT KNOWS</summary><ul>
+    <li>Everything on the <b>Agent Knowledge</b> card ↓</li>
+    <li>Which form they came through + their first message</li>
+    <li>The qualification checklist - it asks what's missing</li>
+  </ul></details>
+  <details><summary>DATA SAVED HERE</summary><ul>
+    <li><b>New contact record:</b> parent name · phone · email · athlete name + age · location answer · which page they came from</li>
+    <li>Every text, in + out, in one conversation thread</li>
+    <li>Qualification answers as they show up in the convo</li>
+    <li>Handoff notes for the other agents</li>
+  </ul></details>
+  <details><summary>EXIT - where they go next</summary><ul>
+    <li>Books a trial → <b>Confirm</b></li>
+    <li>Goes quiet → <b>Ghosted</b> ↓</li>
+    <li>Not interested → <b>Nurture</b> ↓</li>
+  </ul></details>
+</div>
+
+<!-- stage 3 confirm -->
+<div class="node stage" id="st-confirm" style="left:1320px;top:430px">
+  <div class="band" style="color:var(--gold)">STAGE 3</div>
+  <h3>Confirm</h3>
+  <div class="desc">The trial is booked. Make sure they actually show up.</div>
+  <div class="eng eng-agent">⚙ ENGINE: Confirm Agent (AI) <small>+ instant confirmation text/email + 9am day-of check-in</small></div>
+  <details><summary>ENTRY</summary><ul>
+    <li>Books a time on the trial calendar (from the agent or the landing page)</li>
+  </ul></details>
+  <details><summary>WHAT THE AGENT KNOWS</summary><ul>
+    <li>Everything on the <b>Agent Knowledge</b> card ↓</li>
+    <li>The exact booking: session, date, time, location</li>
+    <li>The full conversation so far + the Booking agent's notes</li>
+  </ul></details>
+  <details><summary>DATA SAVED HERE</summary><ul>
+    <li><b>The trial booking</b> (session, date, time)</li>
+    <li>No-show / can't-make-it / cancelled status</li>
+    <li>A rebook note handed back to the Booking agent</li>
+  </ul></details>
+  <details><summary>EXIT</summary><ul>
+    <li>Showed up + good fit (trainer's post-trial form) → <b>Closing</b></li>
+    <li>No-show / can't make it / cancels → back to <b>Booking</b></li>
+    <li>No longer wants a trial → <b>Nurture</b> ↓</li>
+  </ul></details>
+</div>
+
+<!-- stage 4 closing -->
+<div class="node stage" id="st-closing" style="left:1880px;top:430px">
+  <div class="band" style="color:var(--gold)">STAGE 4</div>
+  <h3>Closing</h3>
+  <div class="desc">They came and it went well. Help them take the next step: becoming a member.</div>
+  <div class="eng eng-agent">⚙ ENGINE: Closing Agent (AI) <small>- follows a 2-message follow-up plan</small></div>
+  <details><summary>ENTRY</summary><ul>
+    <li>Good-fit trial done (from the post-trial form)</li>
+  </ul></details>
+  <details><summary>WHAT THE AGENT KNOWS</summary><ul>
+    <li>Everything on the <b>Agent Knowledge</b> card ↓</li>
+    <li>The trainer's post-trial notes <span class="to">("thinking about it, deciding this weekend...")</span></li>
+    <li>Objection handling + sales strategies <span class="src">coming - Zoran + Mike session</span></li>
+  </ul></details>
+  <details><summary>DATA SAVED HERE</summary><ul>
+    <li><b>Post-trial form:</b> showed up? good fit? which trainer + their notes</li>
+    <li>Follow-up progress (message 1 sent, message 2 sent)</li>
+    <li>The final mark: <b>Won / Lost / Still deciding</b> → feeds the close rate</li>
+  </ul></details>
+  <details><summary>EXIT</summary><ul>
+    <li>Enrolls → <b style="color:var(--green)">MEMBER</b> →</li>
+    <li>Says no / ghosts the follow-ups → <b>Nurture</b> ↓</li>
+  </ul></details>
+</div>
+
+<!-- stage 2 ghosted (below booking) -->
+<div class="node stage" id="st-ghosted" style="left:760px;top:940px">
+  <div class="band" style="color:var(--blue)">STAGE 2 - BELOW THE LINE</div>
+  <h3>Ghosted</h3>
+  <div class="desc">They stopped answering. Three quick texts to restart the conversation.</div>
+  <div class="eng eng-auto">⏱ ENGINE: Automation <small>- text on day 1, day 2, day 3</small></div>
+  <details><summary>ENTRY</summary><ul>
+    <li>Went quiet in Booking (24h+ of silence)</li>
+  </ul></details>
+  <details><summary>DATA SAVED HERE</summary><ul>
+    <li>Which day of the drip they're on · replies land in the same thread</li>
+  </ul></details>
+  <details><summary>EXIT</summary><ul>
+    <li>They reply → back to <b>Booking</b></li>
+    <li>All 3 texts run dry → <b>Nurture</b></li>
+  </ul></details>
+</div>
+
+<!-- stage 5 nurture (below, the lost bench) -->
+<div class="node stage" id="st-nurture" style="left:1600px;top:940px;width:560px;border-color:#4A3038">
+  <div class="band" style="color:var(--red)">STAGE 5 - THE LOST BENCH</div>
+  <h3>Nurture</h3>
+  <div class="desc">"Not now" doesn't mean never. Leads here are <b style="color:var(--red)">marked Lost</b> - a slow drip keeps the door open.</div>
+  <div class="eng eng-auto">⏱ ENGINE: Automation <small>- emails at +1, +2, +3 weeks</small></div>
+  <details><summary>ENTRY</summary><ul>
+    <li>Every "not interested", "undecided" or "said no" - from any stage</li>
+  </ul></details>
+  <details><summary>DATA SAVED HERE</summary><ul>
+    <li>Drip position · the reason they said no · the Lost mark</li>
+  </ul></details>
+  <details><summary>EXIT</summary><ul>
+    <li>They reply → back to <b>Booking</b>, and the <b style="color:var(--red)">Lost mark comes OFF</b></li>
+    <li>Whole drip runs dry → <b style="color:var(--red)">Unqualified</b></li>
+  </ul></details>
+</div>
+
+<!-- member (way right) -->
+<div class="node term t-mem" id="t-member" style="left:3040px;top:470px">
+  <h3>Member 🏆</h3>
+  <div class="desc">They enrolled. Sales is done - the member-management system takes over from here <span class="src">(its own preset, confirmed later - onboarding data points live there)</span>.</div>
+</div>
+
+<!-- below the flow -->
+<div class="node term t-unq" id="t-unq" style="left:3040px;top:940px">
+  <h3>Unqualified</h3>
+  <div class="desc">The ONE dead end. Fully removed from the pipeline, never contacted again. The reason picked is saved on the contact.</div>
+</div>
+
+<div class="node panel" id="qual" style="left:3040px;top:1230px;width:440px;border-color:var(--red)">
+  <div class="band" style="color:var(--red)">QUALIFICATIONS - who's a fit</div>
+  <div class="item"><b>1 · Close enough to the academy</b></div>
+  <div class="item"><b>2 · Athlete age in program range</b></div>
+  <div class="item"><b>3 · Good fit for the program</b> <span class="sub">- judged at the trial</span></div>
+  <details><summary>WHERE WE LEARN EACH ONE</summary><ul>
+    <li><b>The lead form</b> asks age + location up front</li>
+    <li><b>The agents</b> read them out of the conversation - and ask about whatever's missing</li>
+    <li><b>The trainer</b> answers "good fit?" on the post-trial form</li>
+  </ul></details>
+  <div style="font-size:11.5px;color:var(--dim);margin-top:8px">Marking someone Unqualified always means picking one of these (or "other").</div>
+</div>
+
+<div class="node panel" id="engines" style="left:80px;top:1420px;width:600px">
+  <div class="band" style="color:var(--gold)">THE TWO KINDS OF ENGINES</div>
+  <div class="row2">
+    <div class="item" style="border-color:var(--gold)"><b style="color:var(--gold)">⚙ Agent (AI)</b><br>
+      <span class="sub">Reads the whole conversation and writes the next message itself. Nothing sends without your approval.</span><br>
+      <span style="font-size:12px">Booking · Confirm · Closing</span></div>
+    <div class="item" style="border-color:var(--blue);border-style:dashed"><b style="color:var(--blue)">⏱ Automation</b><br>
+      <span class="sub">Pre-written messages on a timer. Approve the sequence once, it runs itself.</span><br>
+      <span style="font-size:12px">Ghosted drip · Nurture drip · instant confirmations</span></div>
+  </div>
+</div>
+
+<div class="node panel" id="knowledge" style="left:740px;top:1420px;width:620px;border-color:var(--gold)">
+  <div class="band" style="color:var(--gold)">AGENT KNOWLEDGE - what all 3 agents know</div>
+  <div class="desc" style="margin-top:0">Pulled LIVE from where each fact really lives. Never retyped into the agent.</div>
+  <details><summary>THE FACTS + WHERE EACH COMES FROM</summary><ul>
+    <li><b>Business info</b> (name, address, phone) <span class="src">academy profile</span></li>
+    <li><b>Schedule</b> <span class="src">set in the academy's settings</span></li>
+    <li><b>Program</b> (ages, group size, co-ed, private) <span class="src">the offer</span></li>
+    <li><b>Pricing</b> + how openly to share it <span class="src">the offer</span></li>
+    <li><b>Policies</b> (cancel, makeup, parents watching) <span class="src">the offer</span></li>
+    <li><b>Selling points</b> <span class="src">the offer</span></li>
+    <li><b>Coaches</b> + credentials <span class="src">staff records</span></li>
+    <li><b>Reviews / social proof</b> <span class="src">Google - coming</span></li>
+    <li><b>Qualification criteria</b> <span class="src">Qualifications card →</span></li>
+  </ul></details>
+  <details><summary>PLUS WHAT YOU TEACH IT</summary><ul>
+    <li>Every "why" you type when changing a message in Hawkeye becomes a lesson</li>
+    <li>Lessons get consolidated into the agents' knowledge regularly</li>
+  </ul></details>
+  <div style="font-size:11.5px;color:var(--dim);margin-top:8px">Change something in your settings → every agent updates instantly.</div>
+</div>
+
+<div class="node panel" id="hawkeye" style="left:1420px;top:1460px;width:480px;border-color:var(--gold)">
+  <div class="band" style="color:var(--gold)">HAWKEYE - mission control</div>
+  <div class="item">Every agent suggestion lands here as a card: <b>approve + send</b>, change it, book them, or mark lost / unqualified.</div>
+  <div class="item">Change something? You add a quick <b>"why"</b> - the agents learn from it.</div>
+</div>
+
+<div class="node term t-hum" id="t-human" style="left:1960px;top:1500px">
+  <h3>Human takeover</h3>
+  <div class="desc">Complaints and anything weird skip the machine and land with a person in Hawkeye.</div>
+</div>
+
+</div></div>
+
+<!-- ===================== PAGE 2: BUILDING BLOCKS ===================== -->
+<div id="page2"><div class="inner">
+  <h1>What a sales system is <span>made of</span></h1>
+  <div class="lead">A sales system preset is one complete playbook. Plug it into an academy and every piece below comes with it - already wired together. Here's each building block, from the top down.</div>
+
+  <div class="hier">
+    <div class="hlabel">HOW IT FITS TOGETHER</div>
+    <div class="hrow">
+      <div class="hbox"><b style="color:var(--purple)">Funnel</b>Turns a website visitor into a lead.
+        <div class="hsub"><span class="hchip">landing page</span><span class="hchip">form</span><span class="hchip">calendar</span></div></div>
+      <div class="harrow">→</div>
+      <div class="hbox" style="flex:2"><b style="color:var(--gold)">Pipeline</b>Moves the lead from "just asked" to "member". Made of stages - each one has:
+        <div class="hsub"><span class="hchip">entry points</span><span class="hchip">an engine</span><span class="hchip">exit points</span></div></div>
+      <div class="harrow">→</div>
+      <div class="hbox"><b style="color:var(--green)">Member</b>The goal. Sales hands off to member management.</div>
+    </div>
+    <div class="hside">
+      <div class="hbox"><b style="color:var(--gold)">Engines</b>Agents (AI) + automations do the work</div>
+      <div class="hbox"><b style="color:var(--gold)">Hawkeye</b>You approve everything</div>
+      <div class="hbox"><b style="color:var(--red)">Qualifications</b>Who's a fit</div>
+      <div class="hbox"><b style="color:var(--orange)">Knowledge</b>Facts pulled from settings</div>
+      <div class="hbox"><b style="color:var(--green)">Metrics</b>The score</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="comp"><div class="cb" style="color:var(--gold)">THE PACKAGE</div><h4>Sales system preset</h4>
+      <p>The whole playbook as one package: stages, engines, messages, funnel, qualifications and metrics. One master copy shared by every academy - edit it once, everyone updates.</p>
+      <div class="ex"><b>Free trial</b> is preset #1. More presets later (e.g. discovery-call-first) - same blocks, different arrangement.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--purple)">THE FRONT DOOR</div><h4>Funnel</h4>
+      <p>The web path that turns a stranger into a lead: a landing page they visit, a form they fill, a calendar they book on. Every step is tracked so you see where people drop off.</p>
+      <div class="ex">Landing page → lead form → trial calendar. Program pages feed in too.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--purple)">FUNNEL PIECE</div><h4>Forms</h4>
+      <p>The questions asked up front. Answers create the contact record and pre-fill the qualification checklist, so the agent doesn't have to ask twice.</p>
+      <div class="ex">Parent name · phone · athlete name · <b>age + location</b> (two qualification questions).</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--purple)">FUNNEL PIECE</div><h4>Calendars</h4>
+      <p>Bookable trial times. Booking a slot is what moves a lead forward - whether they book on the landing page or the agent books for them mid-conversation.</p>
+      <div class="ex">Book on the page → skip straight to Confirm. The 9am day-of check-in runs off this booking.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--gold)">THE SPINE</div><h4>Pipeline + stages</h4>
+      <p>The journey map. Each stage is one job to get done with the lead - and a lead is always in exactly one stage, with exactly one engine working them.</p>
+      <div class="ex"><b>Booking → Confirm → Closing</b> on the main line, <b>Ghosted + Nurture</b> below it.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--gold)">STAGE ANATOMY</div><h4>Entry points</h4>
+      <p>The ways someone arrives in a stage. Could be a form fill, a booking, a reply, or a hand-back from another stage.</p>
+      <div class="ex">Booking's entries: the lead form · no-shows returning · replies from Ghosted or Nurture.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--gold)">STAGE ANATOMY</div><h4>Engine</h4>
+      <p>Who works the stage. Every stage has exactly one - an AI agent or an automation. No stage is ever unmanned.</p>
+      <div class="ex">Booking, Confirm + Closing run agents. Ghosted + Nurture run automations.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--gold)">STAGE ANATOMY</div><h4>Exit points</h4>
+      <p>The ways out of a stage and where each one leads. Every hand-off between engines happens at an exit point - that's the only place it's defined.</p>
+      <div class="ex">Confirm's exits: showed up + good fit → Closing · no-show → Booking · no longer wants → Nurture.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--gold)">ENGINE TYPE</div><h4>Agents (AI)</h4>
+      <p>An AI that reads the whole conversation and writes the next message itself, using the academy's real info. It can move leads between stages and book trials. Nothing sends without approval.</p>
+      <div class="ex"><b>Booking</b> gets the trial booked · <b>Confirm</b> gets them to show up · <b>Closing</b> gets them enrolled.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--blue)">ENGINE TYPE</div><h4>Automations</h4>
+      <p>Pre-written message sequences on a timer. You approve the sequence once and it runs itself. The moment a lead replies, the automation stops and an agent takes over.</p>
+      <div class="ex"><b>Ghosted drip</b> (day 1/2/3 texts) · <b>Nurture drip</b> (+1/+2/+3 week emails) · instant confirmations.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--gold)">YOUR CONTROLS</div><h4>Hawkeye</h4>
+      <p>Mission control. Every agent suggestion lands here as a card you approve, change, or redirect. Your edits - with a quick "why" - become lessons the agents learn from.</p>
+      <div class="ex">Approve + send · change it · book them · mark lost or unqualified.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--red)">THE FILTER</div><h4>Qualifications</h4>
+      <p>The short list that defines who's a fit. Collected up front on the form, read out of conversations by the agents, and judged at the trial by the trainer. Marking someone Unqualified always requires picking one.</p>
+      <div class="ex">Close enough · right age · good fit for the program.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--orange)">THE BRAIN</div><h4>Agent knowledge</h4>
+      <p>Everything the agents know about the academy - pulled live from where each fact really lives (settings, the offer, staff records). Change it once, every agent updates. Never retyped.</p>
+      <div class="ex">Schedule, pricing, policies, coaches, selling points + the lessons you teach in Hawkeye.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--green)">THE SCORE</div><h4>Metrics</h4>
+      <p>The numbers the system calculates on its own, so you know if the machine is working - and where it leaks.</p>
+      <div class="ex"><b>Qualified trial close rate</b> is the health number. Plus trials booked, sales, funnel drop-off.</div></div>
+  </div>
+</div></div>
+
+<div id="zoom">
+  <button id="z-out" aria-label="Zoom out">−</button>
+  <button id="z-fit" class="fit" aria-label="Fit board">FIT</button>
+  <button id="z-in" aria-label="Zoom in">+</button>
+</div>
+
+<script>
+(function(){
+  const vp=document.getElementById('vp'), board=document.getElementById('board'), svg=document.getElementById('wires');
+  const BW=3560,BH=1950;
+  let s=0.4, px=0, py=0, zTop=10;
+
+  const CONNS=[
+    {f:'landing',fs:'right',t:'st-booking',ts:'left',c:'var(--purple)',dash:0,label:'new lead'},
+    {f:'st-booking',fs:'right',t:'st-confirm',ts:'left',c:'var(--gold)',dash:0,label:'books a trial'},
+    {f:'st-confirm',fs:'right',t:'st-closing',ts:'left',c:'var(--gold)',dash:0,label:'showed up + good fit'},
+    {f:'st-closing',fs:'right',t:'t-member',ts:'left',c:'var(--green)',dash:0,label:'enrolls'},
+    {f:'st-booking',fs:'bottom',t:'st-ghosted',ts:'top',c:'var(--grey)',dash:1,label:'goes quiet'},
+    {f:'st-ghosted',fs:'left',t:'st-booking',ts:'left',c:'var(--grey)',dash:1,label:'replies'},
+    {f:'st-ghosted',fs:'right',t:'st-nurture',ts:'left',c:'var(--grey)',dash:1,label:'runs dry'},
+    {f:'st-confirm',fs:'bottom',t:'st-booking',ts:'bottom',c:'var(--grey)',dash:1,label:'no-show / cancels'},
+    {f:'st-closing',fs:'bottom',t:'st-nurture',ts:'top',c:'var(--grey)',dash:1,label:'says no · marked Lost'},
+    {f:'st-nurture',fs:'top',t:'st-booking',ts:'bottom',c:'var(--grey)',dash:1,label:'replies · Lost mark comes off'},
+    {f:'st-nurture',fs:'right',t:'t-unq',ts:'left',c:'var(--red)',dash:0,label:'whole drip dry'},
+    {f:'qual',fs:'top',t:'t-unq',ts:'bottom',c:'var(--red)',dash:1,label:'the reason list'},
+    {f:'knowledge',fs:'top',t:'st-confirm',ts:'bottom',c:'var(--gold)',dash:1,label:'feeds all 3 agents'}
+  ];
+
+  function apply(){ board.style.transform='translate('+px+'px,'+py+'px) scale('+s+')'; }
+
+  function anchor(el,side){
+    const x=el.offsetLeft,y=el.offsetTop,w=el.offsetWidth,h=el.offsetHeight;
+    if(side==='top')return[x+w/2,y];
+    if(side==='bottom')return[x+w/2,y+h];
+    if(side==='left')return[x,y+h/2];
+    return[x+w,y+h/2];
+  }
+  function dirv(side,k){ return side==='top'?[0,-k]:side==='bottom'?[0,k]:side==='left'?[-k,0]:[k,0]; }
+
+  function draw(){
+    let html='<defs>';
+    const cols={'var(--gold)':'#D4B65C','var(--grey)':'#98A0AC','var(--green)':'#5CBF7A','var(--red)':'#E06C6C','var(--purple)':'#B48CE0'};
+    let mi=0, mids={};
+    for(const c in cols){ mids[c]='m'+(mi++); html+='<marker id="'+mids[c]+'" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="'+cols[c]+'"/></marker>'; }
+    html+='</defs>';
+    for(const cn of CONNS){
+      const fe=document.getElementById(cn.f), te=document.getElementById(cn.t);
+      if(!fe||!te)continue;
+      const a=anchor(fe,cn.fs), b=anchor(te,cn.ts);
+      const dist=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      const k=Math.min(220,Math.max(90,dist*0.4));
+      const d1=dirv(cn.fs,k), d2=dirv(cn.ts,k);
+      const c1=[a[0]+d1[0],a[1]+d1[1]], c2=[b[0]+d2[0],b[1]+d2[1]];
+      const col=cols[cn.c];
+      html+='<path d="M'+a[0]+','+a[1]+' C'+c1[0]+','+c1[1]+' '+c2[0]+','+c2[1]+' '+b[0]+','+b[1]+'" fill="none" stroke="'+col+'" stroke-width="2.5" '+(cn.dash?'stroke-dasharray="7 6"':'')+' marker-end="url(#'+mids[cn.c]+')" opacity="0.85"/>';
+      const mx=0.125*a[0]+0.375*c1[0]+0.375*c2[0]+0.125*b[0];
+      const my=0.125*a[1]+0.375*c1[1]+0.375*c2[1]+0.125*b[1];
+      if(cn.label) html+='<text x="'+mx+'" y="'+(my-6)+'" text-anchor="middle">'+cn.label+'</text>';
+    }
+    svg.innerHTML=html;
+  }
+
+  // ---- drag nodes ----
+  let drag=null;
+  document.querySelectorAll('.node').forEach(n=>{
+    n.addEventListener('pointerdown',e=>{
+      drag={n:n,sx:e.clientX,sy:e.clientY,ox:n.offsetLeft,oy:n.offsetTop,moved:false};
+      n.style.zIndex=++zTop;
+      e.stopPropagation();
+    });
+  });
+
+  // ---- pan + pinch ----
+  let pan=null;
+  const pointers=new Map(); let pinch=null;
+  vp.addEventListener('pointerdown',e=>{
+    pointers.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pointers.size===2){
+      const p=[...pointers.values()];
+      pinch={d:Math.hypot(p[0][0]-p[1][0],p[0][1]-p[1][1]),s:s,cx:(p[0][0]+p[1][0])/2,cy:(p[0][1]+p[1][1])/2,px:px,py:py};
+      drag=null;pan=null;return;
+    }
+    if(!drag){ pan={sx:e.clientX,sy:e.clientY,ox:px,oy:py}; vp.classList.add('panning'); }
+    vp.setPointerCapture(e.pointerId);
+  });
+  window.addEventListener('pointermove',e=>{
+    if(pointers.has(e.pointerId)) pointers.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pinch&&pointers.size===2){
+      const p=[...pointers.values()];
+      const d=Math.hypot(p[0][0]-p[1][0],p[0][1]-p[1][1]);
+      const ns=Math.min(1.6,Math.max(0.18,pinch.s*d/pinch.d));
+      px=pinch.cx-(pinch.cx-pinch.px)*(ns/pinch.s); py=pinch.cy-(pinch.cy-pinch.py)*(ns/pinch.s);
+      s=ns; apply(); return;
+    }
+    if(drag){
+      const dx=(e.clientX-drag.sx)/s, dy=(e.clientY-drag.sy)/s;
+      if(!drag.moved && Math.hypot(dx*s,dy*s)>4) drag.moved=true;
+      if(drag.moved){ drag.n.style.left=(drag.ox+dx)+'px'; drag.n.style.top=(drag.oy+dy)+'px'; requestAnimationFrame(draw); }
+    } else if(pan){
+      px=pan.ox+(e.clientX-pan.sx); py=pan.oy+(e.clientY-pan.sy); apply();
+    }
+  });
+  window.addEventListener('pointerup',e=>{
+    pointers.delete(e.pointerId);
+    if(pointers.size<2)pinch=null;
+    drag=null;pan=null;vp.classList.remove('panning');
+  });
+
+  // ---- wheel zoom ----
+  vp.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const f=e.deltaY<0?1.09:0.92;
+    const ns=Math.min(1.6,Math.max(0.18,s*f));
+    px=e.clientX-(e.clientX-px)*(ns/s); py=e.clientY-(e.clientY-py)*(ns/s);
+    s=ns; apply();
+  },{passive:false});
+
+  // ---- buttons ----
+  function fit(){
+    s=Math.min(innerWidth/BW,innerHeight/BH)*0.96;
+    px=(innerWidth-BW*s)/2; py=(innerHeight-BH*s)/2; apply();
+  }
+  document.getElementById('z-in').onclick=()=>{const ns=Math.min(1.6,s*1.25);px=innerWidth/2-(innerWidth/2-px)*(ns/s);py=innerHeight/2-(innerHeight/2-py)*(ns/s);s=ns;apply();};
+  document.getElementById('z-out').onclick=()=>{const ns=Math.max(0.18,s*0.8);px=innerWidth/2-(innerWidth/2-px)*(ns/s);py=innerHeight/2-(innerHeight/2-py)*(ns/s);s=ns;apply();};
+  document.getElementById('z-fit').onclick=fit;
+
+  // ---- tabs ----
+  const p2=document.getElementById('page2'), zoomBox=document.getElementById('zoom');
+  const tF=document.getElementById('tab-flow'), tB=document.getElementById('tab-blocks');
+  function show(which){
+    const flow=which==='flow';
+    vp.style.display=flow?'block':'none';
+    zoomBox.style.display=flow?'flex':'none';
+    p2.style.display=flow?'none':'block';
+    tF.classList.toggle('on',flow); tB.classList.toggle('on',!flow);
+    if(flow){ fit(); draw(); }
+  }
+  tF.onclick=()=>show('flow'); tB.onclick=()=>show('blocks');
+
+  document.querySelectorAll('details').forEach(d=>d.addEventListener('toggle',()=>requestAnimationFrame(draw)));
+  window.addEventListener('resize',()=>{ if(vp.style.display!=='none') fit(); });
+
+  fit(); draw();
+})();
+</script>
+</html>

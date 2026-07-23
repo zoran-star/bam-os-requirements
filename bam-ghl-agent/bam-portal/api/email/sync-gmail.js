@@ -19,6 +19,7 @@ import {
 import { pickGhlToken, ghl } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, interestedStage, nurtureStage } from "../agent/_stage.js";
+import { markReopened } from "../agent/_reopen.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { exitEnrollment } from "../automations.js";
 
@@ -138,8 +139,9 @@ async function inboundSideEffects(client, clientId, contact, bodyText) {
         if (rs && provider === "portal") {
           const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${cid}&status=eq.open&select=id,ghl_opportunity_id,stage_role&limit=1`);
           const opp = Array.isArray(rows) && rows[0];
-          if (opp && (opp.stage_role === "interested" || opp.stage_role === "nurture")) {
+          if (opp && (opp.stage_role === "ghosted" || opp.stage_role === "interested" || opp.stage_role === "nurture")) {
             await moveStage({ clientId, sb, ghl, token: creds.token, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id }, stage: rs, role: "responded", contactId: String(ghlContactId) });
+            await markReopened({ clientId, sb, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id } });
           }
         } else if (rs) {
           const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(ghlContactId), limit: "20" })}`, { token: creds.token });
@@ -154,6 +156,7 @@ async function inboundSideEffects(client, clientId, contact, bodyText) {
             const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
             if (ghostStageIds.has(curStageId)) {
               await moveStage({ clientId, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: opp.id }, stage: rs, role: "responded", contactId: String(ghlContactId) });
+              await markReopened({ clientId, sb, oppRef: { ghlOpportunityId: opp.id } });
             }
           }
         }

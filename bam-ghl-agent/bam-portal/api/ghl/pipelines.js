@@ -495,7 +495,7 @@ async function handler(req, res) {
           await moveStage({
             clientId, provider, shadow, ghl, token, oppRef,
             stage: { pipelineId: is.pipelineId, stageId: is.stageId, stageName: is.stageName || null },
-            role: "interested", contactId, reason: "summer special enroll",
+            role: "ghosted", contactId, reason: "summer special enroll",
           });
         }
       } catch (_) { /* stage move is best-effort */ }

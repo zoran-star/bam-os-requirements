@@ -2,6 +2,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, contactInRespondedStage, scheduledTrialStage, interestedStage, nurtureStage } from "../agent/_stage.js";
+import { markReopened } from "../agent/_reopen.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, memberCareAgentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
@@ -347,8 +348,9 @@ async function handler(req, res) {
             // Same guard: bounce to Responded ONLY from a ghost/nurture stage.
             const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(client.id)}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}&status=eq.open&select=id,ghl_opportunity_id,stage_role&limit=1`);
             const opp = Array.isArray(rows) && rows[0];
-            if (opp && (opp.stage_role === "interested" || opp.stage_role === "nurture")) {
+            if (opp && (opp.stage_role === "ghosted" || opp.stage_role === "interested" || opp.stage_role === "nurture")) {
               await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id }, stage: rs, role: "responded", contactId: String(contactId) });
+              await markReopened({ clientId: client.id, sb, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id } });
             }
           } else if (rs) {
             const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(contactId), limit: "20" })}`, { token: creds.token });
@@ -365,6 +367,7 @@ async function handler(req, res) {
                 // Guard preserved exactly (open opp currently in Interested/Nurture). The
                 // move runs through the provider-aware store; on ghl it is the identical PUT.
                 await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: opp.id }, stage: rs, role: "responded", contactId: String(contactId) });
+                await markReopened({ clientId: client.id, sb, oppRef: { ghlOpportunityId: opp.id } });
               }
             }
           }
