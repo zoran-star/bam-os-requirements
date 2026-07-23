@@ -5,6 +5,7 @@
     { "name": "bam-portal", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "bam-ghl-agent/bam-portal", "run", "dev", "--", "--host", "--port", "5174"], "port": 5174 },
     { "name": "agent-docs", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "5178", "--directory", "bam-ghl-agent/docs"], "port": 5178 },
     { "name": "client-portal-mock", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "5179", "--directory", "bam-ghl-agent/bam-portal/public"], "port": 5179 },
-    { "name": "client-sites", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "5183", "--directory", "/Users/zoransavic/bam-client-sites-worktrees/san-jose"], "port": 5183 }
+    { "name": "client-sites", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "5183", "--directory", "/Users/zoransavic/bam-client-sites-worktrees/san-jose"], "port": 5183 },
+    { "name": "sj-emails", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "5184", "--directory", "/Users/zoransavic/bam-client-sites-worktrees/sj-emails"], "port": 5184 }
   ]
 }
