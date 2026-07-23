@@ -386,11 +386,17 @@ function sanitizeAutomations(incoming, cur = {}) {
   };
 }
 
-// Fire (or queue) the next due SCRIPTED initial-automation step for one proactive
+// Fire (or queue) the next due SCRIPTED initial-automation step for one
 // Scheduled-Trial lead. Returns a short status string for the run summary. The
 // moment a lead replies they become "reactive" and the AI confirm agent owns the
-// thread, so scripted touches stop. Mirrors the AI path's mode/quiet-hours handling.
-async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, item, contactId }) {
+// CONVERSATION, so the timed nudges stop - but the booking receipt still goes
+// (receiptOnly, see the detect loop). Mirrors the AI path's mode/quiet-hours handling.
+//
+// receiptOnly: consider ONLY the transactional "you're booked" step (when:
+// "immediate"). That message is a receipt - date, time, address, calendar links -
+// not a nudge, so a lead who texts us first and then books must still get it
+// (Isabel Murphy, 2026-07-23: booked mid-conversation, received nothing).
+async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, item, contactId, receiptOnly = false }) {
   const nowMs = Date.now();
   const appt = await nextAppointment(token, contactId, { nowMs, clientId: client.id });
   const trialMs = appt && appt.startTime ? new Date(appt.startTime).getTime() : null;
@@ -407,15 +413,29 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     rows = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=kind,status,step_key,trial_at&order=created_at.desc&limit=50`);
   } catch (_) { rows = []; }
   rows = Array.isArray(rows) ? rows : [];
-  if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
+  // A card awaiting a human ✓ holds the timed nudges - but never the receipt. An
+  // unapproved AI draft can sit in Hawkeye for hours, and the family booked NOW.
+  if (!receiptOnly && rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
   const sameTrial = r => r.trial_at == null || (trialMs != null && new Date(r.trial_at).getTime() === trialMs);
   // An AI confirm/handoff/lost card ABOUT THIS TRIAL means they're in a live
-  // exchange - let the AI agent own it; don't cold-script on top of it.
-  if (rows.some(r => ["confirm", "confirm_handoff", "confirm_lost"].includes(r.kind) && sameTrial(r))) return "lead already in conversation";
+  // exchange - let the AI agent own it; don't cold-script on top of it. Only a
+  // card that actually REACHED the lead counts: a canceled/skipped draft was
+  // never sent, and letting one suppress the scripted touches killed the booking
+  // confirmation outright (a lead's own reply cancels pending cards, which then
+  // blocked the receipt forever - Isabel Murphy, 2026-07-23). The receipt itself
+  // is transactional and never yields to a conversation.
+  const liveConvo = r => ["confirm", "confirm_handoff", "confirm_lost"].includes(r.kind)
+    && ["pending", "approved", "sent"].includes(r.status) && sameTrial(r);
+  if (!receiptOnly && rows.some(liveConvo)) return "lead already in conversation";
   const sentKeys = new Set(rows.filter(r => r.kind === "confirm_auto" && ["pending", "approved", "sent", "skipped"].includes(r.status) && sameTrial(r)).map(r => r.step_key));
 
-  const step = nextDueStep(autos, { nowMs, trialMs, sentKeys });
-  if (!step) return "no scripted step due";
+  // receiptOnly narrows the sequence to its "immediate" step and then runs the
+  // SAME due/enabled/already-sent gates, so a past-dated trial still sends nothing.
+  const step = nextDueStep(
+    receiptOnly ? { steps: (autos.steps || []).filter(s => s.when === "immediate") } : autos,
+    { nowMs, trialMs, sentKeys },
+  );
+  if (!step) return receiptOnly ? "booking receipt already sent" : "no scripted step due";
 
   // Resolve EVERYTHING ourselves now (portal-native): appointment tokens here, then
   // the contact/location tokens via the send engine's resolver — so the stored card
@@ -687,6 +707,23 @@ async function detectForClient(client) {
       reasons.push(`${item.name || contactId}: parked for reignition - answering their reply, park kept`);
     }
 
+    // BOOKING RECEIPT (reactive leads). "Your free trial is booked" carries the
+    // date, address and calendar links - it is a receipt for something the family
+    // just did, not an outreach nudge, so it goes out even mid-conversation. A
+    // lead who texts us a question and THEN books used to get nothing at all: the
+    // reactive branch handed the thread to the AI, and the AI card needs a human
+    // ✓ that their own next message cancels (Isabel Murphy, 2026-07-23). Fires at
+    // most once per trial; we then fall through so the AI still answers them.
+    if (reactive && scriptedLive) {
+      try {
+        const r = await fireScriptedStep({ client, token, locationId, mode, autos, cfg, item, contactId, receiptOnly: true });
+        if (r === "sent") autoSent++;
+        else if (r === "deferred") deferred++;
+        else if (r === "queued") drafted++;
+        else reasons.push(`${item.name || contactId}: receipt - ${r}`);
+      } catch (e) { reasons.push(`${item.name || contactId}: receipt - ${e.message}`); }
+    }
+
     // SCRIPTED INITIAL AUTOMATIONS (proactive only). When the academy's sequence is
     // live + approved, the timed scripted touches OWN the proactive path (they
     // replace the AI opener). The instant the lead replies (reactive) the AI confirm
@@ -705,7 +742,11 @@ async function detectForClient(client) {
     try {
       // Dedupe. Reactive: skip if an active card exists or we already answered this
       // inbound. Proactive: skip if ANY confirm card already exists (we've engaged).
-      const existing = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
+      // AI cards only: a scripted confirm_auto row is a receipt, not an answer, so
+      // it must not stand in for one - the booking receipt fired just above stamps
+      // the same last_lead_at, and counting it here would swallow the reply the
+      // lead is actually waiting on.
+      const existing = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&kind=in.(confirm,confirm_handoff,confirm_lost)&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
       const last = Array.isArray(existing) && existing[0];
       if (last && ["pending", "approved"].includes(last.status)) { skipped++; reasons.push(`${item.name || contactId}: already has a ${last.status} card`); continue; }
       // Skip = snooze (Zoran 2026-07-10): a skipped card re-drafts next run.
