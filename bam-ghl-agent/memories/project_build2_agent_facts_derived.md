@@ -54,3 +54,6 @@ Build 2 is the umbrella ("facts render from their sources"). Wiring lives in: Bu
 
 ## Flow
 Plan -> MOCKUP of one fact rendering live from its source (e.g. "program" assembled from offer.data.general_info) -> Zoran confirms -> build. Short + visual. No em dashes.
+
+## Editing-loop UI (US spec workshopped 2026-07-23, Zoran)
+Decisions: button copy = **"Edit the brain"**; brain-health strip = IN vNow (fully-MISSING facts only, not thin ones); wizard-side "powers your agent" pills = OUT for vNow (Claude's call - keep the wizard uncluttered mid-SJ-onboarding, fast-follow later); social_proof excluded from health strip (stays BAM-managed until Build 5, then websites tie-in). US-5 staff-edit permission = OWNER TOGGLE, spec pending Zoran confirmation (default ON = staff can edit, stored ghl_kpi_config.staff_can_edit_brain, enforced in agent-train API for staff writes to lessons/examples/fallback sections; owner-only toggle in Train Agent view; staff side shows view-only lock when off). Build (US-1..4) delegated to an Opus subagent on branch claude/bam-v2-engineering-build-fc4f9d.
