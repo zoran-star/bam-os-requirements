@@ -12,17 +12,25 @@ import crypto from "node:crypto";
 //   GET /api/agency-connect?code=&state=   → callback: store company token,
 //                                                 then mint a token for every
 //                                                 sub-account, render results
-//   GET /api/agency-connect?action=mint&key=<CRON_SECRET>  → re-mint later
+//   GET /api/agency-connect?action=mint&key=<CRON_SECRET>            → re-mint all
+//   GET /api/agency-connect?action=mint&scope=stale&key=<CRON_SECRET> → re-mint only
+//                                                 tokens at or near expiry (hourly cron)
 //
 // Marketplace app must have Distribution = Agency (or Agency + Sub-Account) and
 // this redirect URL registered: https://portal.byanymeansbusiness.com/api/agency-connect
+//
+// The minting/refresh mechanics live in ./ghl/_agency.js so the sync hot path can
+// re-mint a token on demand without importing this HTTP handler.
+
+import {
+  sb, agencyCreds, assertCompanyToken, tokenClaims, getAgencyToken,
+  mintAll, alertOnMintResults, slackAlert, reconnectHint,
+} from "./ghl/_agency.js";
 
 export const maxDuration = 60;
 
 const GHL_AUTHORIZE_URL = "https://marketplace.gohighlevel.com/oauth/chooselocation";
 const GHL_TOKEN_URL     = "https://services.leadconnectorhq.com/oauth/token";
-const GHL_LOC_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/locationToken";
-const V2_VERSION        = "2021-07-28";
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
@@ -51,16 +59,6 @@ const SCOPES = [
 ].join(" ");
 
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-
-async function sb(path, init = {}) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...init,
-    headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", ...(init.headers || {}) },
-  });
-  if (!r.ok) throw new Error(`Supabase ${r.status}: ${(await r.text()).slice(0, 200)}`);
-  const t = await r.text();
-  return t ? JSON.parse(t) : null;
-}
 
 function getOrigin(req) {
   if (process.env.PORTAL_URL) return process.env.PORTAL_URL.replace(/\/+$/, "");
@@ -100,11 +98,12 @@ function page(title, body) {
 }
 
 async function exchangeCode(code, redirect) {
+  const { clientId, clientSecret } = agencyCreds();
   const r = await fetch(GHL_TOKEN_URL, {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(),
-      client_secret: (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim(),
+      client_id: clientId,
+      client_secret: clientSecret,
       grant_type: "authorization_code", code, user_type: "Company", redirect_uri: redirect,
     }),
   });
@@ -113,62 +112,29 @@ async function exchangeCode(code, redirect) {
   return j; // access_token, refresh_token, expires_in, companyId, userType
 }
 
-async function getAgencyToken() {
-  const rows = await sb(`ghl_agency_tokens?select=*&order=updated_at.desc&limit=1`);
-  const t = rows && rows[0];
-  if (!t) return null;
-  const exp = t.expires_at ? new Date(t.expires_at).getTime() : 0;
-  if (exp && exp - Date.now() <= 60_000 && t.refresh_token) {
-    try {
-      const r = await fetch(GHL_TOKEN_URL, {
-        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(),
-          client_secret: (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim(),
-          grant_type: "refresh_token", refresh_token: t.refresh_token, user_type: "Company",
-        }),
-      });
-      const j = await r.json();
-      if (r.ok && j.access_token) {
-        const expiresAt = j.expires_in ? new Date(Date.now() + Number(j.expires_in) * 1000).toISOString() : null;
-        await sb(`ghl_agency_tokens?company_id=eq.${encodeURIComponent(t.company_id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ access_token: j.access_token, refresh_token: j.refresh_token || t.refresh_token, expires_at: expiresAt, updated_at: new Date().toISOString() }) });
-        return { ...t, access_token: j.access_token };
-      }
-    } catch (_) {}
+// Store the agency token, but ONLY if it really is a Company token.
+//
+// GHL returns a companyId even when the app was installed against a single
+// sub-account, so "companyId came back" is not proof of an agency install. We
+// learned this the hard way: a Location token sat in ghl_agency_tokens and every
+// nightly re-mint failed 33/33 with a 200 OK for weeks, which silently expired
+// half the academies one at a time.
+async function storeAgencyToken(tok) {
+  const companyId = tok.companyId || tok.company_id || null;
+  if (!companyId) {
+    throw new Error("No companyId in the OAuth response. Authorize at the AGENCY level (Distribution = Agency), not a single location.");
   }
-  return t;
-}
-
-async function mintLocationToken(agencyToken, companyId, locationId) {
-  const r = await fetch(GHL_LOC_TOKEN_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${agencyToken}`, Version: V2_VERSION, Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ companyId, locationId }),
+  assertCompanyToken(tok.access_token); // throws with a fix-it message
+  const expiresAt = tok.expires_in ? new Date(Date.now() + Number(tok.expires_in) * 1000).toISOString() : null;
+  await sb(`ghl_agency_tokens?on_conflict=company_id`, {
+    method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({
+      company_id: companyId, access_token: tok.access_token,
+      refresh_token: tok.refresh_token || null, expires_at: expiresAt,
+      updated_at: new Date().toISOString(),
+    }),
   });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.access_token) throw new Error((j && (j.message || j.error)) || `locationToken ${r.status}`);
-  return j; // access_token, refresh_token, expires_in
-}
-
-// Mint + store a location token for every academy that has a GHL location id.
-async function mintAll(companyId, agencyToken) {
-  const clients = await sb(`clients?ghl_location_id=not.is.null&select=id,business_name,ghl_location_id&order=business_name.asc`);
-  const queue = [...(clients || [])];
-  const results = [];
-  const worker = async () => {
-    while (queue.length) {
-      const c = queue.shift();
-      try {
-        const tok = await mintLocationToken(agencyToken, companyId, c.ghl_location_id);
-        const expiresAt = new Date(Date.now() + (Number(tok.expires_in) || 86400) * 1000).toISOString();
-        await sb(`clients?id=eq.${c.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_access_token: tok.access_token, ghl_refresh_token: tok.refresh_token || null, ghl_token_expires_at: expiresAt, ghl_connect_status: "connected", ghl_connected_at: new Date().toISOString() }) });
-        results.push({ name: c.business_name, ok: true });
-      } catch (e) { results.push({ name: c.business_name, ok: false, err: String(e.message || e).slice(0, 140) }); }
-    }
-  };
-  await Promise.all(Array.from({ length: 5 }, worker));
-  results.sort((a, b) => (a.ok === b.ok ? String(a.name).localeCompare(String(b.name)) : a.ok ? 1 : -1));
-  return results;
+  return companyId;
 }
 
 function resultsPage(companyId, results) {
@@ -185,11 +151,9 @@ function resultsPage(companyId, results) {
 // token, mints a location token for every academy, and returns the results HTML.
 export async function agencyConnectFromCode(code, redirect) {
   const tok = await exchangeCode(code, redirect);
-  const companyId = tok.companyId || tok.company_id || null;
-  if (!companyId) throw new Error("No companyId in the OAuth response — make sure you authorized at the AGENCY level (Distribution = Agency & Sub-Account), not a single location.");
-  const expiresAt = tok.expires_in ? new Date(Date.now() + Number(tok.expires_in) * 1000).toISOString() : null;
-  await sb(`ghl_agency_tokens?on_conflict=company_id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ company_id: companyId, access_token: tok.access_token, refresh_token: tok.refresh_token || null, expires_at: expiresAt, updated_at: new Date().toISOString() }) });
+  const companyId = await storeAgencyToken(tok);
   const results = await mintAll(companyId, tok.access_token);
+  await alertOnMintResults(results, { scope: "all" });
   return { companyId, results, html: resultsPage(companyId, results) };
 }
 
@@ -200,7 +164,7 @@ async function handler(req, res) {
   // 1) Kick off the agency consent.
   if (action === "start") {
     const state = signState({ k: "agency", exp: Date.now() + 15 * 60 * 1000 });
-    const params = new URLSearchParams({ client_id: (process.env.GHL_OAUTH_CLIENT_ID || "").trim(), redirect_uri: redirectUri(req), scope: SCOPES, state });
+    const params = new URLSearchParams({ client_id: agencyCreds().clientId, redirect_uri: redirectUri(req), scope: SCOPES, state });
     res.writeHead(302, { Location: `${GHL_AUTHORIZE_URL}?${params.toString()}` });
     return res.end();
   }
@@ -213,10 +177,31 @@ async function handler(req, res) {
     const fromQuery  = (req.query.key || "").toString();
     const provided   = fromHeader || fromQuery;
     if (!expected || provided !== expected) return res.status(401).json({ error: "unauthorized" });
+
+    const scope = (req.query.scope || "all").toString() === "stale" ? "stale" : "all";
     const t = await getAgencyToken();
-    if (!t) return res.status(400).json({ error: "no agency token — authorize first via ?action=start" });
-    const results = await mintAll(t.company_id, t.access_token);
-    return res.status(200).json({ ok: true, company_id: t.company_id, connected: results.filter(r => r.ok).length, total: results.length, results });
+    if (!t) {
+      await slackAlert(`:rotating_light: GHL re-mint skipped: no agency token stored. Every academy stops syncing within 24h. Connect: ${reconnectHint()}`);
+      return res.status(400).json({ error: "no agency token - authorize first via ?action=start" });
+    }
+    // Fail loudly rather than burning 30+ doomed mints and answering 200 OK.
+    if (t.badAuthClass) {
+      await slackAlert(
+        `:rotating_light: The stored GHL agency token is a *${t.badAuthClass}* token, not a Company token, ` +
+        `so it cannot mint sub-account tokens. Every academy stops syncing as its own token expires. ` +
+        `Reconnect at the AGENCY level: ${reconnectHint()}`,
+      );
+      return res.status(409).json({
+        error: `stored agency token has authClass=${t.badAuthClass}, expected Company`,
+        fix: reconnectHint(),
+      });
+    }
+
+    const results = await mintAll(t.company_id, t.access_token, { scope });
+    await alertOnMintResults(results, { scope });
+    const connected = results.filter(r => r.ok).length;
+    console.log(`[agency-connect:mint] scope=${scope} connected=${connected}/${results.length}`);
+    return res.status(200).json({ ok: true, scope, company_id: t.company_id, connected, total: results.length, results });
   }
 
   // 2) OAuth callback → store company token → mint all.
@@ -227,18 +212,35 @@ async function handler(req, res) {
     if (req.query.state) { try { verifyState(req.query.state); } catch (_) { /* foreign/absent state (install-link flow) — allow */ } }
     try {
       const tok = await exchangeCode(req.query.code, redirectUri(req));
-      const companyId = tok.companyId || tok.company_id || null;
-      if (!companyId) throw new Error("No companyId in the OAuth response — make sure the app installed at the AGENCY level (Distribution = Agency), not a single location.");
-      const expiresAt = tok.expires_in ? new Date(Date.now() + Number(tok.expires_in) * 1000).toISOString() : null;
-      await sb(`ghl_agency_tokens?on_conflict=company_id`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ company_id: companyId, access_token: tok.access_token, refresh_token: tok.refresh_token || null, expires_at: expiresAt, updated_at: new Date().toISOString() }) });
+      const companyId = await storeAgencyToken(tok);
       const results = await mintAll(companyId, tok.access_token);
+      await alertOnMintResults(results, { scope: "all" });
       return res.status(200).send(resultsPage(companyId, results));
     } catch (e) {
       return res.status(500).send(page("Couldn't connect", `<p>${esc(e.message || String(e))}</p>`));
     }
   }
 
-  return res.status(200).send(page("BAM · GHL Agency Connect", `<p>Start the agency connection by opening <b>?action=start</b>.</p>`));
+  // Landing page doubles as a health check, so "is the agency token OK?" is one
+  // click instead of a DB query.
+  const t = await getAgencyToken().catch(() => null);
+  const creds = agencyCreds();
+  let status;
+  if (!t) {
+    status = `<p>❌ <b>No agency token stored.</b> Nothing can mint sub-account tokens.</p>`;
+  } else if (t.badAuthClass) {
+    status = `<p>❌ <b>Broken.</b> The stored token is a <b>${esc(t.badAuthClass)}</b> token, not a Company token,
+      so <b>/oauth/locationToken</b> rejects it and no academy can be re-minted. Reconnect below and pick the
+      <b>agency</b>, not a single sub-account.</p>`;
+  } else {
+    const claims = tokenClaims(t.access_token) || {};
+    status = `<p>✅ <b>Healthy.</b> Company <b>${esc(t.company_id)}</b>, authClass <b>${esc(claims.authClass || "Company")}</b>,
+      expires <span class="muted">${esc(t.expires_at || "unknown")}</span>.</p>`;
+  }
+  return res.status(200).send(page("BAM · GHL Agency Connect", `${status}
+    <p class="muted">OAuth app: <b>${esc(creds.clientId.split("-")[0] || "not configured")}</b>
+      ${creds.dedicated ? "(dedicated agency app)" : "(shared sub-account app - this app must have Distribution = Agency to mint location tokens)"}</p>
+    <p style="margin-top:18px">Connect or reconnect: <a href="?action=start" style="color:#E8C547">?action=start</a></p>`));
 }
 
 export default withSentryApiRoute(handler);

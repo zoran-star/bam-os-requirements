@@ -146,7 +146,7 @@ async function handler(req, res) {
     const filter = one
       ? `id=eq.${encodeURIComponent(one)}`
       : `pipeline_provider=eq.portal&pipeline_ghl_mirror=is.true`;
-    const clients = await sb(`clients?${filter}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,pipeline_provider,pipeline_ghl_mirror`);
+    const clients = await sb(`clients?${filter}&select=id,business_name,ghl_location_id,ghl_company_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,pipeline_provider,pipeline_ghl_mirror`);
     const results = [];
     for (const c of (clients || [])) {
       if (c.pipeline_provider !== "portal" || !c.pipeline_ghl_mirror) { results.push({ client_id: c.id, skip: "not portal+mirror" }); continue; }

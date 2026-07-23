@@ -18,10 +18,10 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { timingSafeEqual } from "node:crypto";
 import { bulkUpsertPortalContacts } from "../_contacts.js";
 
+import { pickGhlToken } from "./_core.js";
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const GHL_V2        = "https://services.leadconnectorhq.com";
-const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
 const V2_VERSION    = "2021-07-28";
 
 const HARD_DEADLINE_MS = 270_000;
@@ -48,59 +48,6 @@ async function sb(path, opts = {}) {
 }
 
 // ── GHL token plumbing (same shape as inbox.js / send-message.js) ──
-async function refreshGhlToken(client) {
-  const cid = process.env.GHL_CLIENT_ID;
-  const cs  = process.env.GHL_CLIENT_SECRET;
-  if (!cid || !cs || !client.ghl_refresh_token) return null;
-  const r = await fetch(GHL_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: cid, client_secret: cs,
-      grant_type: "refresh_token",
-      refresh_token: client.ghl_refresh_token,
-    }).toString(),
-  });
-  const tok = await r.json().catch(() => null);
-  if (!r.ok || !tok?.access_token) return null;
-  const expiresAt = new Date(Date.now() + (Number(tok.expires_in) || 86400) * 1000).toISOString();
-  await sb(`clients?id=eq.${client.id}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({
-      ghl_access_token:     tok.access_token,
-      ghl_refresh_token:    tok.refresh_token || client.ghl_refresh_token,
-      ghl_token_expires_at: expiresAt,
-    }),
-  }).catch(() => {});
-  return { token: tok.access_token, locationId: tok.locationId || client.ghl_location_id };
-}
-
-async function pickGhlToken(client) {
-  if (client.ghl_access_token) {
-    const expiresAt = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
-    if (expiresAt - Date.now() <= 60_000 && client.ghl_refresh_token) {
-      const refreshed = await refreshGhlToken(client);
-      if (refreshed) return refreshed;
-    }
-    return { token: client.ghl_access_token, locationId: client.ghl_location_id };
-  }
-  if (process.env.GHL_LOCATIONS_JSON) {
-    let locs;
-    try { locs = JSON.parse(process.env.GHL_LOCATIONS_JSON); } catch (_) { locs = []; }
-    if (Array.isArray(locs)) {
-      const entry =
-        locs.find(l => l.locationId && l.locationId === client.ghl_location_id) ||
-        locs.find(l => l.name && client.business_name && l.name.toLowerCase() === client.business_name.toLowerCase());
-      if (entry && (entry.apiKeyV2 || entry.apiKey)) {
-        return { token: entry.apiKeyV2 || entry.apiKey, locationId: entry.locationId || client.ghl_location_id };
-      }
-    }
-  }
-  const token = process.env.GHL_API_KEY || process.env.GHL_AGENCY_TOKEN || null;
-  return token ? { token, locationId: client.ghl_location_id } : null;
-}
-
 // ── GHL fetch w/ 429 backoff ──
 async function ghlFetchWithBackoff(path, token) {
   let attempt = 0;
@@ -299,7 +246,7 @@ async function handler(req, res) {
   // All academies with a usable GHL connection
   const clientsList = await sb(
     `clients?or=(ghl_access_token.not.is.null,ghl_location_id.not.is.null)` +
-    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_contacts_last_synced_at,v15_access,v15_config,contact_provider`
+    `&select=id,business_name,ghl_location_id,ghl_company_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_contacts_last_synced_at,v15_access,v15_config,contact_provider`
   ).catch(() => []);
 
   if (!Array.isArray(clientsList) || clientsList.length === 0) {

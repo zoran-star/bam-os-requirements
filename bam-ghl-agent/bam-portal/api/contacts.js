@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { contactsReadTable, contactProvider, mergePortalContactTags } from "./_contacts.js";
+import { pickGhlToken } from "./ghl/_core.js";
 // V1.5 Contacts tab API.
 //
 //   GET  /api/contacts?client_id=&q=&tag=          search the synced mirror (fast)
@@ -12,7 +13,6 @@ import { contactsReadTable, contactProvider, mergePortalContactTags } from "./_c
 // JWT — staff or client_users membership for the academy.
 
 const GHL_V2 = "https://services.leadconnectorhq.com";
-const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
 const V2_VERSION = "2021-07-28";
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -59,34 +59,6 @@ async function ghl(method, path, { token, body } = {}) {
   if (!res.ok) { const e = new Error((json && (json.message || json.error)) || `GHL ${res.status}`); e.status = res.status; throw e; }
   return json;
 }
-async function refreshGhlToken(client) {
-  const clientId = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
-  const clientSecret = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
-  if (!clientId || !clientSecret || !client.ghl_refresh_token) throw new Error("GHL refresh not configured");
-  const r = await fetch(GHL_TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "refresh_token", refresh_token: client.ghl_refresh_token, user_type: "Location" }) });
-  const tok = await r.json();
-  if (!r.ok || !tok?.access_token) throw new Error(tok?.error_description || "GHL token refresh failed");
-  await sb(`clients?id=eq.${client.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_access_token: tok.access_token, ghl_refresh_token: tok.refresh_token || client.ghl_refresh_token, ghl_token_expires_at: new Date(Date.now() + (Number(tok.expires_in) || 86400) * 1000).toISOString() }) });
-  return { token: tok.access_token, locationId: tok.locationId || client.ghl_location_id };
-}
-async function pickGhlToken(client) {
-  if (client.ghl_access_token) {
-    const exp = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
-    if (exp - Date.now() <= 60_000 && client.ghl_refresh_token) { try { return await refreshGhlToken(client); } catch (_) {} }
-    return { token: client.ghl_access_token, locationId: client.ghl_location_id };
-  }
-  if (process.env.GHL_LOCATIONS_JSON) {
-    let locs; try { locs = JSON.parse(process.env.GHL_LOCATIONS_JSON); } catch (_) { locs = []; }
-    if (Array.isArray(locs)) {
-      const entry = locs.find(l => l.locationId === client.ghl_location_id) || locs.find(l => l.name && client.business_name && l.name.toLowerCase() === client.business_name.toLowerCase());
-      if (entry && (entry.apiKeyV2 || entry.apiKey)) return { token: entry.apiKeyV2 || entry.apiKey, locationId: entry.locationId || client.ghl_location_id };
-    }
-  }
-  const token = process.env.GHL_API_KEY || process.env.GHL_AGENCY_TOKEN || null;
-  return token ? { token, locationId: client.ghl_location_id } : null;
-}
-
 // Does a GHL custom-field name look like an athlete's name field?
 // athlete/player/child/etc + a name token (name / first / last / full).
 function looksLikeAthleteName(name) {

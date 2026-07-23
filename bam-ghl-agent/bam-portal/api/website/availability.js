@@ -12,6 +12,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 
+import { RENEW_WINDOW_MS } from "../ghl/_agency.js";
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
 
@@ -156,7 +157,10 @@ export async function getClientGhlToken(client) {
     throw new Error("academy not connected to GHL (no OAuth token or Private Integration key)");
   }
   const exp = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
-  if (exp - Date.now() <= 60_000 && client.ghl_refresh_token) {
+  // Renew hours ahead, not seconds. A 60s window gave exactly one attempt per
+  // 24h cycle, so one transient failure left the academy cold until a human
+  // stepped in. Note this returns a bare token string, unlike ghl/_core.js.
+  if (exp - Date.now() <= RENEW_WINDOW_MS && client.ghl_refresh_token) {
     return await refreshGhlToken(client);
   }
   return client.ghl_access_token;
