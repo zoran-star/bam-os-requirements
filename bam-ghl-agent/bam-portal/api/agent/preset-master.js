@@ -5,12 +5,15 @@
 // questions straight FROM that master, keyed by the preset stamped on the
 // academy's offer (offers.data.sales.preset_key) - no per-academy edge rows.
 //
-// Rollout is staged (memories/project_sales_systems_plug_and_play.md):
-//   SHADOW (now)  resolveEdge still serves the DB row, but also asks the master
-//                 and logs any difference ([preset-shadow] lines). Zero behavior
-//                 change - the logs prove the flip is safe / catch live drift.
-//   FLIP (next)   resolveEdge serves the master first, DB only as fallback.
-//   CLEANUP       stage_transitions retired (Phase 3).
+// Rollout (memories/project_sales_systems_plug_and_play.md):
+//   SHADOW   shipped 2026-07-23 - proved master == DB (GTA + San Jose 23/23).
+//   FLIP     LIVE since 2026-07-23 (Zoran: "flip now, Elijah is the guardrail
+//            through Hawkeye"): resolveEdge serves the MASTER first; the DB row
+//            only wins as a tier-2 pause (enabled=false) or as the fallback when
+//            there's no stamp / no master edge. shadowCompareEdge now runs in
+//            reverse - it logs when the DB has drifted from the master.
+//            Emergency off: env PRESET_EDGE_SOURCE=db (+ redeploy), or revert.
+//   CLEANUP  stage_transitions retired (Phase 3).
 //
 // Academy PAUSE state (an edge toggled off in focus mode) is tier-2 operational
 // control, NOT structure - it stays per-academy and wins over the master at

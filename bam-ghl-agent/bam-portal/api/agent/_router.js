@@ -22,7 +22,7 @@
 // { allowTerminal:true } to enable it. See project_sales_focus_mode.md.
 
 import { sbRest, resolveStage, moveStage, setStatus, findOpenOpp } from "./_store.js";
-import { shadowCompareEdge } from "./preset-master.js";
+import { resolvePresetKey, masterEdge, shadowCompareEdge } from "./preset-master.js";
 import { ghl as ghlDefault } from "../ghl/_core.js";
 
 // Read the single transition edge for (clientId, fromRole, trigger) on the
@@ -52,9 +52,29 @@ export async function resolveEdge(clientId, fromRole, trigger, offerId) {
       `&select=trigger,to_kind,to_stage_role,to_terminal,enabled&order=enabled.desc,sort_order.asc&limit=1`
     );
     const edge = (Array.isArray(rows) && rows[0]) || null;
-    // Phase 1 SHADOW: ask the preset MASTER the same question and log any
-    // difference. Fire-and-forget - never awaited, never affects the answer.
-    shadowCompareEdge({ clientId, fromRole, trigger, dbEdge: edge }).catch(() => {});
+
+    // ── Phase 1 FLIP (Zoran, 2026-07-23): the MASTER answers first ──────────
+    // Tier-1 structure is read from the code master (preset-master.js), keyed by
+    // the offer's preset stamp. The DB row still matters two ways:
+    //   PAUSE  an academy's enabled=false row is tier-2 operational control - it
+    //          wins over the master (the route stays off).
+    //   FALLBACK  no stamp / unknown preset / no master edge for this
+    //          (from,trigger) -> serve the DB row exactly as before the flip.
+    // The shadow now runs in REVERSE: it logs when the DB disagrees with the
+    // master ([preset-shadow] lines = stale copies / drift tripwire), still
+    // fire-and-forget. Emergency off: set PRESET_EDGE_SOURCE=db (env) to serve
+    // the DB again without a code change (needs a redeploy), or git revert.
+    if (process.env.PRESET_EDGE_SOURCE !== "db") {
+      try {
+        const presetKey = await resolvePresetKey(clientId);
+        const m = presetKey ? masterEdge(presetKey, fromRole, trigger) : null;
+        if (m) {
+          if (edge && edge.enabled === false) return edge; // academy paused this route - respect it
+          shadowCompareEdge({ clientId, fromRole, trigger, dbEdge: edge }).catch(() => {});
+          return m;
+        }
+      } catch (_) { /* master hiccup -> DB fallback below, exactly pre-flip behavior */ }
+    }
     return edge;
   } catch (_) {
     return null;
