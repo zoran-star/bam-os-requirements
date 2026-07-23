@@ -156,9 +156,9 @@ export function renderPolicies(data) {
   return lines.join("\n");
 }
 
-// selling_points <- offer.data.value. Exported for sync-agent; NOT wired into
-// derivedFactOverrides yet - GTA's stored bullets are richer than its offer
-// value, and pinning the selling-points home is Build 3 (Zoran's call).
+// selling_points <- offer.data.value (the canonical home - Build 3 resolved,
+// Zoran 2026-07-23: GTA's curated bullets were moved INTO its offer value, so
+// every academy's differentiators now live where the owner edits them).
 export function renderSellingPoints(data) {
   const v = (data && data.value) || {};
   const parts = [];
@@ -200,11 +200,12 @@ export async function derivedFactOverrides(clientId, sbFn) {
     if (!data) return {};
     const out = {};
     const set = (key, body) => { if (body) out[key] = body; };
-    set("program",       renderProgram(data));
-    set("schedule",      renderSchedule(data, locations));
-    set("pricing",       renderPricing(data));
-    set("policies",      renderPolicies(data));
-    set("business_info", renderBusinessInfo(client, data, locations));
+    set("program",        renderProgram(data));
+    set("schedule",       renderSchedule(data, locations));
+    set("pricing",        renderPricing(data));
+    set("policies",       renderPolicies(data));
+    set("business_info",  renderBusinessInfo(client, data, locations));
+    set("selling_points", renderSellingPoints(data));
     return out;
   } catch (_) {
     return {};

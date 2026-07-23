@@ -8,7 +8,8 @@
 - Wizard: 2 new Training-offer questions - `coach_ratio` (general_info step, text) + `group_size` per class (schedule block_builder, text). GTA coach_ratio backfilled ("At least 2 coaches per session").
 - NOT rendered by design: private training / adult classes / camps (future offer types; agent = not-currently-offered + flag interest).
 - **DRIFT SURFACED, needs Zoran:** GTA ages - stored override said "6 and up", offer says "9-17" (now the agent says 9-17; if 6 is right, fix the offer age range). GTA offer description = "Regular training" (weak; now agent-visible - improve in the offer editor).
-- Still open in Build 2: schedule/pricing/policies/business_info renderers; config view "tied to your offer" + click-through (editing loop); selling_points home (Build 3); coaches from staff (Build 4); social_proof (Build 5).
+- **2026-07-23 later (PR #1567): schedule/pricing/policies/business_info renderers SHIPPED.** Promoted sync-agent's builders into fact-render.js; sync-agent imports the same fns (one source of truth, stored text = sparse fallback only). Upgrades: schedule resolves location ids -> names + 12h times; pricing includes whats_included + excludes archived; loader fetches offer+client+locations parallel w/ 60s cache. Verified on real SJ prod data.
+- Still open in Build 2: config view "tied to your offer" + click-through (editing loop); selling_points read-time (= Build 3: GTA's stored bullets richer than offer.value - Zoran decides content home); coaches from staff (Build 4); social_proof/Google (Build 5); qualification_config from preset+offer values; pricing transparency MODE -> preset-level (structural, later).
 
 ## Principle
 An agent fact (the per-academy sections sales agents read) is a VIEW onto structured data we already store - never free text typed into the agent. A fact lives once in its real home; the agent renders it from there. Edit the offer -> agent updates. No drift, no double entry.
