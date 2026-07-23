@@ -166,6 +166,9 @@ async function handler(req, res) {
         clientId: client.id, contactId: ghlContactId,
         sendError: "lead replied",
         reigniteReason: "lead replied before the reignition date",
+        // Same rule as the GHL spine: the closing cadence pauses, it doesn't die
+        // (Zoran 2026-07-23). Hawkeye's "send nothing" resumes it.
+        pauseClosing: true,
       });
     } catch (e) { console.error("twilio inbound draft-cancel:", e.message); }
 

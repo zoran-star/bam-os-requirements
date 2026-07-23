@@ -299,6 +299,10 @@ async function handler(req, res) {
         clientId: client.id, contactId,
         sendError: "lead replied",
         reigniteReason: "lead replied before the reignition date",
+        // Closing only: PAUSE the cadence instead of killing it. "Thank you" is
+        // not a conversation - if staff answer with nothing in Hawkeye, the plan
+        // picks up where it left off (Zoran 2026-07-23).
+        pauseClosing: true,
       });
     }
   } catch (e) { console.error("ghl inbound-webhook draft-cancel error:", e.message); }

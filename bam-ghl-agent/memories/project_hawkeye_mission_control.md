@@ -500,6 +500,37 @@ showed_up null + outcome` makes the lost + unqualified branches fire without att
 reusing the showed-up-not-a-fit close paths (lost->nurture, unqualified via
 `post_trial_not_fit` edge). V2/V1.5 only. Not yet prod-verified with a live GTA card.
 
+## "Send nothing" + pause-don't-kill the cadence (2026-07-23, CLOSING agent only)
+Zoran (Meg Pappas card): a lead who replies "Thank you" to the post-trial info had her
+ENTIRE scheduled follow-up plan + any parked reignition hard-CANCELED by the inbound
+sweep (`api/agent/_cancel-outbound.js`), before a human ever opened the card - and the
+deck refused to commit an empty box ("Message is empty"). Two-part fix:
+
+**1. Empty box = "send nothing"** (closing reply cards only). The agent can hand over an
+empty draft on purpose (new `no_reply_needed` flag on `propose_reply` + trailer guidance;
+detector cards it with `draft_message: ''`), and ANY reviewer can just delete all the text.
+UI: `_hk2NoReply()` / `_hk2SyncGoLabel()` flip the primary button to **Send nothing**;
+placeholder "Empty = send nothing" + caption "· empty = send nothing"; confirm posts the
+new `confirm-no-reply` action instead of `send`. Teach-why stays REQUIRED only when a
+human blanked a filled draft (that's an edit) - not when the agent proposed empty. The
+lesson rides along with `ai_drafted` = killed draft, `you_sent` = null.
+
+**2. Pause, don't kill.** New status `paused` on `agent_closing_replies` (+ `paused_from`
+remembering pending/approved) and on `agent_reignitions` (migration
+`20260723213000_closing_pause_on_reply.sql`). On a lead reply, only PLAN rows
+(`step_key like followup*`) pause - non-plan cards still cancel (they answer an older
+message, AND the one-active-per-contact unique index buckets step_key-null rows together,
+so thawing one would collide). Wired into all four reply spines: GHL + Twilio webhooks
+(`pauseClosing: true`), Gmail sync + Resend inbound (exported `pauseClosingPlan`), plus
+the detector's own reactive sweep. `confirm-no-reply` -> `resumeClosingOutbound()` puts
+rows back on their original dates (overdue steps slide out a day each, quiet-hours aware)
++ `resumeReignitions`. A real reply -> `finalizePausedClosing()` cancels them (agent
+re-plans). Terminal moves + the stage prune sweep paused rows too. Toast reports what
+survived: "Nothing sent - 2 follow-ups + the reignition still scheduled".
+
+Tier-1 shared behavior (auto-propagates, no per-academy config) - see
+[[project_sales_systems_plug_and_play]].
+
 ## See also
 [[project_sales_focus_mode]] (focus mode + engines model + router, what's already live) ·
 [[project_sales_crew_model]] (the crew) · [[project_sales_crew_guardrails]] (solid vs dashed

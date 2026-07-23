@@ -22,6 +22,7 @@ import { markReopened } from "../agent/_reopen.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { ghl } from "../ghl/_core.js";
 import { exitEnrollment } from "../automations.js";
+import { pauseClosingPlan } from "../agent/_cancel-outbound.js";
 
 export const config = { api: { bodyParser: false } };
 
@@ -158,6 +159,9 @@ async function handler(req, res) {
     // Lead replied → cancel pending/approved drafts.
     try {
       const patch = { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied (email)", updated_at: occurred }) };
+      // Closing plan PAUSES rather than dies (Zoran 2026-07-23) - same rule as the
+      // SMS spines. Runs first so the sweep below only clears non-plan cards.
+      await pauseClosingPlan(clientId, ghlContactId, "lead replied (email)");
       await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
       await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
       await sb(`agent_confirm_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
