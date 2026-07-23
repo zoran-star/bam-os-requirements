@@ -21,7 +21,8 @@ Rules:
 
 | ID | Candidate data point | Disposition | V2 UI placement | Source academy | Source lesson quote(s) | Status | Notion link | Decided |
 |---|---|---|---|---|---|---|---|---|
-| _none yet_ | | | | | | | | |
+| IC-001 | Areas served / catchment (how far athletes travel, which towns) | onboarding-question | BB card Locations (per-location "areas served" field); feeds selling_points/business_info render + website SEO | BAM GTA | "athletes travel from over 40 minutes... areas served should just be a question in the onboarding... good for SEO for the website and the agent" | accepted (data + renderer done via offer value; dedicated UI field pending) | - | 2026-07-23 |
+| IC-002 | Sibling policy (can siblings join the same session? age exceptions?) | onboarding-question | Offer setup > policy block (`policy.sibling_policy`, text input); rendered by `renderPolicies` | BAM GTA | "don't worry about asking for the second athlete, they can just join (for bam gta only)"; "with siblings we would let a younger athlete in (only bam gta)" | accepted (renderer + GTA data done; wizard question pending) | - | 2026-07-23 |
 <!-- /consolidate-lessons appends rows to the END of this table (delete the "_none yet_" placeholder row on the first real append). Keep rows sorted by ID. -->
 
 Dispositions: `onboarding-question` · `brain-section-default` · `config-default` ·
