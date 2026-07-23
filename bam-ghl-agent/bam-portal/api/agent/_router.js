@@ -22,6 +22,7 @@
 // { allowTerminal:true } to enable it. See project_sales_focus_mode.md.
 
 import { sbRest, resolveStage, moveStage, setStatus, findOpenOpp } from "./_store.js";
+import { shadowCompareEdge } from "./preset-master.js";
 import { ghl as ghlDefault } from "../ghl/_core.js";
 
 // Read the single transition edge for (clientId, fromRole, trigger) on the
@@ -50,7 +51,11 @@ export async function resolveEdge(clientId, fromRole, trigger, offerId) {
       `&pipeline_id=is.null` + offerClause +
       `&select=trigger,to_kind,to_stage_role,to_terminal,enabled&order=enabled.desc,sort_order.asc&limit=1`
     );
-    return (Array.isArray(rows) && rows[0]) || null;
+    const edge = (Array.isArray(rows) && rows[0]) || null;
+    // Phase 1 SHADOW: ask the preset MASTER the same question and log any
+    // difference. Fire-and-forget - never awaited, never affects the answer.
+    shadowCompareEdge({ clientId, fromRole, trigger, dbEdge: edge }).catch(() => {});
+    return edge;
   } catch (_) {
     return null;
   }
