@@ -675,15 +675,16 @@ async function detectForClient(client) {
     const reactive = item.last_direction === "inbound";
 
     // 🔥 Parked "later" leads: no proactive touches (silence is the plan). A lead
-    // who texted back re-engaged early - clear the park (belt + suspenders with
-    // the inbound webhook's cancel) and work them normally.
+    // who texted back gets ANSWERED, but the park STANDS (Zoran 2026-07-23) - a
+    // routine reply must not erase a deliberate "circle back on this date", or the
+    // next cron re-queues the follow-ups the park replaced. Terminal moves and the
+    // park's own fire date are what clear it.
     // reactive (inbound-last) alone is NOT proof of a new reply: a silently-parked
-    // lead stays inbound-last on their original "later" text. Only cancel when a
-    // fresh inbound landed AFTER the park (else keep it - silence is the plan).
+    // lead stays inbound-last on their original "later" text, so with no fresh
+    // inbound after the park we skip them entirely.
     if (reignSet.has(String(contactId))) {
       if (!reactive || !repliedAfterPark(reignMap.get(String(contactId)), item.last_at)) { skipped++; reasons.push(`${item.name || contactId}: parked for reignition`); continue; }
-      await cancelReignitions(client.id, contactId, "lead replied before the reignition date");
-      reignSet.delete(String(contactId));
+      reasons.push(`${item.name || contactId}: parked for reignition - answering their reply, park kept`);
     }
 
     // SCRIPTED INITIAL AUTOMATIONS (proactive only). When the academy's sequence is

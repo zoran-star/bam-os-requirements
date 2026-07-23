@@ -42,7 +42,7 @@ import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
-import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition } from "./agent/_reignite.js";
+import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition, hasScheduledReignition } from "./agent/_reignite.js";
 import { reconcileLiveMembers } from "./agent/_reconcile-members.js";
 import { liveMemberContactIds } from "./agent/_live-members.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -457,6 +457,13 @@ async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, ite
   strat = strat || closingFollowupStrategy(client);
   if (!item.last_at) return "no thread to follow up on";
 
+  // 🔥 HARD GATE (Zoran 2026-07-23): a scheduled reignition IS this lead's next
+  // follow-up. Never stack a multi-message follow-up plan on top of a park - the
+  // "reignite later" cancels the plan out. The detector loop already skips parked
+  // leads before it gets here; this is the single guard that holds no matter which
+  // path calls the plan drafter.
+  if (await hasScheduledReignition(clientId, contactId)) return "parked for reignition - the scheduled follow-up is the plan";
+
   let rows = [];
   try {
     rows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id,kind,step_key,status,sent_at,created_at,last_lead_at,followup_not_before,created_by&order=created_at.desc&limit=50`);
@@ -730,16 +737,19 @@ async function detectForClient(client) {
 
     const reactive = item.last_direction === "inbound";
 
-    // 🔥 Parked "later" leads: no proactive touches (silence is the plan). A lead
-    // who texted back re-engaged early - clear the park (belt + suspenders with
-    // the inbound webhook's cancel) and work them normally.
+    // 🔥 Parked "later" leads: no PROACTIVE touches (silence is the plan) - and
+    // that includes the multi-message follow-up plan below, which the park replaces.
+    // A lead who texted back still gets ANSWERED (never leave a real reply hanging),
+    // but the park itself STANDS (Zoran 2026-07-23): cancelling it on a reply let
+    // the next cron queue the very follow-up plan the park existed to prevent. Only
+    // a terminal move (enroll / lost / unqualified / paying member / leaving the
+    // stage / mute) or the park firing on its date clears it.
     // reactive (inbound-last) alone is NOT proof of a new reply: a silently-parked
-    // lead stays inbound-last on their original "later" text. Only cancel when a
-    // fresh inbound landed AFTER the park (else keep it - silence is the plan).
+    // lead stays inbound-last on their original "later" text, so with no fresh
+    // inbound after the park we skip them entirely.
     if (reignSet.has(String(contactId))) {
       if (!reactive || !repliedAfterPark(reignMap.get(String(contactId)), item.last_at)) { skipped++; reasons.push(`${item.name || contactId}: parked for reignition`); continue; }
-      await cancelReignitions(client.id, contactId, "lead replied before the reignition date");
-      reignSet.delete(String(contactId));
+      reasons.push(`${item.name || contactId}: parked for reignition - answering their reply, park kept`);
     }
 
     if (reactive) {
