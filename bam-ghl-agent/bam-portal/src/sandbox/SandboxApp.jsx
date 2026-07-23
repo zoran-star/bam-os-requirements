@@ -349,17 +349,32 @@ const GROUPS = [
 
 function BrainEditor({ agent = "booking" }) {
   const [sections, setSections] = useState(null);
+  const [health, setHealth] = useState(null);
   const [err, setErr] = useState("");
   useEffect(() => { setSections(null); load(); }, [agent]);
-  async function load() { try { const d = await api("sections", { agent }); setSections(d.sections || []); } catch (e) { setErr(e.message); } }
+  async function load() { try { const d = await api("sections", { agent }); setSections(d.sections || []); setHealth(d.brain_health || null); } catch (e) { setErr(e.message); } }
   if (err) return <div style={{ flex: 1, padding: 24, color: tk.red }}>⚠ {err}</div>;
   if (!sections) return <div style={{ flex: 1, padding: 24, color: tk.textSub, fontSize: 14 }}>Loading the brain…</div>;
   const editedCount = sections.filter(s => !s.is_default).length;
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
       <div style={{ maxWidth: 780, margin: "0 auto" }}>
+        {health && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 10, padding: "9px 13px", marginBottom: 16 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 700 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 99, background: "#6EA8D8" }} />
+              {health.live} of {health.total} facts live
+            </span>
+            {health.missing && health.missing.length > 0 && (
+              <>
+                <span style={{ width: 1, height: 16, background: tk.border }} />
+                <span style={{ fontSize: 12, color: tk.textMute }}>Missing: {health.missing.map(m => m.label).join(", ")}</span>
+              </>
+            )}
+          </div>
+        )}
         <div style={{ fontSize: 13, color: tk.textSub, marginBottom: 20, lineHeight: 1.6 }}>
-          Edit any section — saved changes hit the very next sandbox message. <span style={{ color: tk.accent }}>✏️ edited</span> marks sections you've customized{editedCount ? ` (${editedCount} so far)` : ""}.
+          Edit any section. Saved changes hit the very next sandbox message. <span style={{ color: tk.accent }}>✏️ edited</span> marks sections you've customized{editedCount ? ` (${editedCount} so far)` : ""}. <span style={{ color: "#6EA8D8" }}>Live from offer</span> sections are generated straight from the academy's offer, locations, and team.
         </div>
         {GROUPS.map(g => (
           <div key={g.key} style={{ marginBottom: 26 }}>
@@ -380,6 +395,30 @@ function SectionCard({ s, reload }) {
   const dirty = body !== s.body;
   async function save() { setSaving(true); try { await api("update-section", { key: s.key, body }); await reload(); } finally { setSaving(false); } }
   async function reset() { setSaving(true); try { await api("reset-section", { key: s.key }); setBody(s.default_body); await reload(); } finally { setSaving(false); } }
+  // Derived facts are rendered live from the offer/locations/team - display-only
+  // here (edited at the source, not in the brain). Show where they come from.
+  if (s.scope === "derived") {
+    const srcLabel = s.key === "social_proof"
+      ? "Managed by BAM until the Google Reviews build"
+      : (s.source && s.source.label) || "";
+    return (
+      <div style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+        <div onClick={() => setOpen(o => !o)} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flexWrap: "wrap" }}>
+          <span style={{ display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", color: tk.textMute, fontSize: 11 }}>▶</span>
+          <span style={{ fontSize: 13.5, fontWeight: 600 }}>{s.label}</span>
+          <span style={{ fontSize: 10, color: "#6EA8D8", border: "1px solid #6EA8D8", borderRadius: 99, padding: "1px 8px" }}>Live from offer</span>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 11, color: tk.textMute }}>{open ? "hide" : "view"}</span>
+        </div>
+        {open && (
+          <div style={{ padding: "0 14px 14px" }}>
+            {srcLabel && <div style={{ fontSize: 11.5, color: "#6EA8D8", marginBottom: 8 }}>{srcLabel}</div>}
+            <div style={{ whiteSpace: "pre-wrap", fontSize: 13, color: tk.textSub, lineHeight: 1.55, background: tk.surfaceEl, border: `1px solid ${tk.border}`, borderRadius: 8, padding: "10px 12px" }}>{s.body}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div style={{ background: tk.surface, border: `1px solid ${dirty ? tk.accentBorder : tk.border}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
       <div onClick={() => setOpen(o => !o)} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>

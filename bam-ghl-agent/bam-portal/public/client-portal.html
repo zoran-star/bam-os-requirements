@@ -25364,6 +25364,15 @@ function closeBlueprint() {
   const item = Array.from(document.querySelectorAll('.nav-item')).find(n => (n.getAttribute('onclick') || '').includes("'" + back + "'"));
   if (item) item.classList.add('active');
   try { syncMobileNav(back); } catch (_) {}
+  // Returning from an "Edit the brain" jump: re-render the Knowledge tab so the
+  // (now freshly-fetched) derived facts reflect the offer/locations/team edit.
+  try {
+    if (typeof _TA !== 'undefined' && _TA._factJumped) {
+      _TA._factJumped = false;
+      const tav = document.getElementById('view-train-agent');
+      if (tav && tav.classList.contains('active') && _TA.tab === 'knowledge') _taRenderKnowledge();
+    }
+  } catch (_) {}
 }
 async function openBlueprintView() { _bbRenderFromHash(); }
 
@@ -26499,14 +26508,14 @@ async function _bbStaffRefreshList() {
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
   let { data, error } = await _sb.from('client_users')
-    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members, title, bio')
+    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members, can_train_agent, title, bio')
     .eq('client_id', CLIENT_ID)
     .eq('status', 'active')
     .eq('hide_from_team', false);
   if (error) {
     // Migration-safe fallback: can_enroll_members / title / bio may not exist yet.
     ({ data, error } = await _sb.from('client_users')
-      .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages')
+      .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_train_agent')
       .eq('client_id', CLIENT_ID)
       .eq('status', 'active')
       .eq('hide_from_team', false));
@@ -26581,6 +26590,9 @@ async function _bbStaffRefreshList() {
     const canManageStages = iAmOwner && !isOwner && relevantTabs.some(t => t.key === 'pipelines');
     // KPI-category picker only when the KPIs tab is available.
     const canManageKpis = iAmOwner && !isOwner && relevantTabs.some(t => t.key === 'kpis');
+    // "Can edit the agent's brain" grant: owner-managed, members only (the owner
+    // always has access via the role bypass in api/agent-train.js).
+    const canManageTrain = iAmOwner && !isOwner;
     const canPreview = iAmOwner && !isOwner;
     _BB_STAGE_PERMS[r.id] = Array.isArray(r.allowed_stages) ? r.allowed_stages : null;
     _BB_STAFF_META[r.id] = {
@@ -26660,11 +26672,23 @@ async function _bbStaffRefreshList() {
         <span id="staff-invite-status-${r.id}" style="display:block;font-size:11px;color:var(--text-mute);margin-top:6px"></span>
       </div>`;
 
-    // Access (members only): tab / stage / KPI grants + returning-client enroll.
-    const accessZone = !(canManageTabs || canManageStages) ? '' : `
+    // "Can edit the agent's brain" toggle (members only). Wired to the existing
+    // client_users.can_train_agent boolean; ON reveals the Train Agent nav for
+    // that teammate on their next load. Matches the tab-access checkbox pattern.
+    const trainHtml = !canManageTrain ? '' : `
+      <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;margin-top:6px">
+        <input type="checkbox" ${r.can_train_agent === true ? 'checked' : ''} onchange="_bbStaffTrainAgentSave('${r.id}', this.checked)" style="margin-top:2px">
+        <span>
+          <span style="display:block;font-size:13px;color:var(--text);font-weight:600">Can edit the agent's brain</span>
+          <span style="display:block;font-size:11px;color:var(--text-mute);margin-top:2px">Teach lessons, test the agent and use Edit the brain</span>
+          <span id="staff-train-status-${r.id}" style="display:block;font-size:11px;color:var(--text-mute);margin-top:3px"></span>
+        </span>
+      </label>`;
+    // Access (members only): tab / stage / KPI grants + agent-brain access.
+    const accessZone = !(canManageTabs || canManageStages || canManageTrain) ? '' : `
       <div style="${ZONE}">
         <div style="${ZLAB}">${ic('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>')}Access · starts with nothing until you grant it</div>
-        ${tabsHtml}${stagesHtml}
+        ${tabsHtml}${stagesHtml}${trainHtml}
       </div>`;
 
     // Notifications (owner-manage, CRM/V2 tiers): which events text this person.
@@ -26731,6 +26755,28 @@ function _bbStaffNotifPillsHtml(personId, hasPhone) {
     const on = Array.isArray(prefs[ev.key]) && prefs[ev.key].includes(personId);
     return `<button onclick="_bbNotifToggle('${ev.key}','${personId}')" title="${_bbEscapeAttr(ev.hint)}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${on ? 'var(--gold,#D4B65C)' : 'var(--border-med)'};background:${on ? 'var(--gold,#D4B65C)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'}${!hasPhone && !on ? ';opacity:.55' : ''}">${escapeHTML(ev.label)}</button>`;
   }).join('');
+}
+
+// Owner toggles a teammate's "Can edit the agent's brain" grant. Same
+// owner-gated set-staff-tabs action; boolean field on client_users.can_train_agent.
+// ON reveals the Train Agent nav for that person on their next load.
+async function _bbStaffTrainAgentSave(memberId, checked) {
+  const statusEl = document.getElementById('staff-train-status-' + memberId);
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/clients?action=set-staff-tabs', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, member_id: memberId, can_train_agent: checked === true }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    _bbStaffMetaSet(memberId, 'can_train_agent', checked === true);
+    if (statusEl) { statusEl.textContent = 'Saved. Takes effect on their next visit.'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2500); }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '' + e.message;
+  }
 }
 
 // Owner toggles a teammate's Returning Client Enroll grant (Members tab).
@@ -28564,23 +28610,97 @@ async function _taForget(id) {
 }
 
 // ── Knowledge (local brain: location + offer facts) ────────────────────────
+// Map a derived-fact `jump` target onto the portal's real navigation. The offer
+// steps deep-link into the Business Blueprint offers wizard at the exact section
+// the fact renders from; locations/team open their Blueprint cards. Anything we
+// can't resolve is simply not offered a button (see _taRenderKnowledge).
+function _factJumpTo(jump) {
+  if (!jump) return;
+  // Coming back to the brain view should reflect the edit immediately, not up to
+  // 60s later - flag a fresh re-fetch + a re-render on Blueprint close.
+  _TA._factFresh = true; _TA._factJumped = true;
+  const offerId = _TA._trainingOfferId || null;
+  const openBP = () => { try { if (typeof openBlueprint === 'function') openBlueprint(); } catch (_) {} };
+  const goOffer = (section) => {
+    openBP();
+    setTimeout(() => { try {
+      const stepN = (typeof _obfStepForSection === 'function') ? _obfStepForSection(section) : 1;
+      if (offerId) _bbNavigate('offers', offerId, { step: String(stepN) });
+      else _bbNavigate('offers');
+    } catch (_) {} }, 120);
+  };
+  const goCard = (card) => { openBP(); setTimeout(() => { try { _bbNavigate(card); } catch (_) {} }, 120); };
+  if (jump.indexOf('offer:') === 0) {
+    let section = jump.slice(6);
+    if (section.indexOf('+') >= 0) section = section.split('+')[0];   // qualification: general_info + locations -> land on general_info
+    goOffer(section);
+  } else if (jump === 'locations') { goCard('locations'); }
+  else if (jump === 'team') { goCard('staff'); }
+}
+
 async function _taRenderKnowledge() {
   const p = document.getElementById('ta-panel'); if (!p) return;
   p.innerHTML = `
-    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.5">Your academy's facts power every reply - edit one and the agent uses it next time. Sections marked <b style="color:#D4B65C">Global</b> are shared across <b>all</b> academies (edit carefully); <b><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></b> are managed by BAM.</p>
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.5">Your academy's facts power every reply - edit one and the agent uses it next time. Sections marked <b style="color:#6EA8D8">Live</b> are generated straight from your offer, locations, and team, so you edit them at the source. Sections marked <b style="color:#D4B65C">Global</b> are shared across <b>all</b> academies (edit carefully); <b><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></b> are managed by BAM.</p>
     <div id="ta-section-list"><div class="req-empty"><span class="req-spin"></span>Loading…</div></div>`;
   try {
-    const res = await _taApi('sections', {});
+    // fresh re-fetch after an "Edit the brain" round trip (flag set by _factJumpTo)
+    const fresh = !!_TA._factFresh; _TA._factFresh = false;
+    const res = await _taApi('sections', fresh ? { fresh: true } : {});
+    _TA._trainingOfferId = res.training_offer_id || null;
     const sections = (res.sections || []);
-    const editable = sections.filter(s => s.editable);
-    const locked = sections.filter(s => !s.editable);
+    const derived  = sections.filter(s => s.scope === 'derived');
+    const editable = sections.filter(s => s.scope !== 'derived' && s.editable);
+    const locked   = sections.filter(s => s.scope !== 'derived' && !s.editable);
     const host = document.getElementById('ta-section-list'); if (!host) return;
+
+    // ── Brain health strip: N of 8 facts live + chips for any fully-missing fact ──
+    const bh = res.brain_health || null;
+    let stripHtml = '';
+    if (bh) {
+      const chips = (bh.missing || []).map(m => m.jump
+        ? `<button onclick="_factJumpTo('${m.jump}')" style="background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:99px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">${escapeHTML(m.label)}</button>`
+        : `<span style="border:1px solid var(--border);color:var(--text-mute);border-radius:99px;padding:3px 10px;font-size:11.5px">${escapeHTML(m.label)}</span>`
+      ).join('');
+      stripHtml = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:14px">
+        <span style="display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--text)">
+          <span style="width:8px;height:8px;border-radius:99px;background:#6EA8D8;box-shadow:0 0 0 3px rgba(110,168,216,.16)"></span>
+          ${bh.live} of ${bh.total} facts live
+        </span>
+        ${chips ? `<span style="width:1px;height:16px;background:var(--border)"></span><span style="font-size:12px;color:var(--text-mute)">Missing:</span>${chips}` : ''}
+      </div>`;
+    }
+
+    // ── Live-from-offer (derived) sections: read-only + source line + Edit the brain ──
+    const derivedHtml = derived.length ? `<div style="font-size:12px;color:var(--text-mute);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin:2px 0 8px">Live from your offer</div>` +
+      derived.map(s => {
+        const open = !!_TA.openSections[s.key];
+        const isSocial = s.key === 'social_proof';
+        const src = s.source || null;
+        const srcLabel = isSocial ? 'Managed by BAM until the Google Reviews build' : (src && src.label ? src.label : '');
+        const canJump = !isSocial && src && src.jump;
+        const jumpBtn = canJump ? `<button onclick="event.stopPropagation();_factJumpTo('${src.jump}')" style="${_TA_BTN}">Edit the brain</button>` : '';
+        return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
+        <button onclick="_taToggleSec('${s.key}')" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:none;border:none;color:var(--text);padding:14px 16px;cursor:pointer;font-family:inherit;text-align:left">
+          <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}</span><span style="color:#6EA8D8;font-size:10.5px;font-family:monospace;border:1px solid #6EA8D8;border-radius:99px;padding:1px 7px">LIVE · from your offer</span></span>
+          <span id="ta-chev-${s.key}" style="color:var(--text-mute);font-size:11px;transition:transform .15s;transform:rotate(${open ? 90 : 0}deg)">▶</span>
+        </button>
+        <div id="ta-sec-body-${s.key}" style="display:${open ? 'block' : 'none'};padding:0 16px 14px">
+          ${srcLabel ? `<div style="font-size:11.5px;color:#6EA8D8;background:rgba(110,168,216,.08);border:1px solid rgba(110,168,216,.3);border-radius:8px;padding:7px 10px;margin-bottom:8px;line-height:1.45">${escapeHTML(srcLabel)}</div>` : ''}
+          <div style="white-space:pre-wrap;font-size:13.5px;color:var(--text-sub);line-height:1.55;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px">${escapeHTML(s.body)}</div>
+          ${jumpBtn ? `<div style="margin-top:10px">${jumpBtn}</div>` : ''}
+        </div>
+      </div>`;
+      }).join('') : '';
+
+    // ── Editable (local + global-editable) sections ──
     let html = editable.map(s => {
       const open = !!_TA.openSections[s.key];
       return `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
         <button onclick="_taToggleSec('${s.key}')" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:none;border:none;color:var(--text);padding:14px 16px;cursor:pointer;font-family:inherit;text-align:left">
-          <span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}${s.scope === 'global' ? ' <span style="color:#D4B65C;font-size:10.5px;font-family:monospace;border:1px solid #D4B65C;border-radius:99px;padding:1px 7px">GLOBAL · all academies</span>' : s.scope === 'derived' ? ' <span style="color:#6EA8D8;font-size:10.5px;font-family:monospace;border:1px solid #6EA8D8;border-radius:99px;padding:1px 7px">LIVE · from your offer</span>' : (s.is_default ? '' : ' <span style="color:var(--gold);font-size:11px;font-family:monospace">edited</span>')}</span>
+          <span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}${s.scope === 'global' ? ' <span style="color:#D4B65C;font-size:10.5px;font-family:monospace;border:1px solid #D4B65C;border-radius:99px;padding:1px 7px">GLOBAL · all academies</span>' : (s.is_default ? '' : ' <span style="color:var(--gold);font-size:11px;font-family:monospace">edited</span>')}</span>
           <span id="ta-chev-${s.key}" style="color:var(--text-mute);font-size:11px;transition:transform .15s;transform:rotate(${open ? 90 : 0}deg)">▶</span>
         </button>
         <div id="ta-sec-body-${s.key}" style="display:${open ? 'block' : 'none'};padding:0 16px 14px">
@@ -28606,7 +28726,8 @@ async function _taRenderKnowledge() {
     const autosSlot = hasAutos
       ? `<div id="confirm-autos-card"><div class="req-empty"><span class="req-spin"></span>Loading automations…</div></div>`
       : '';
-    host.innerHTML = autosSlot + (html || `<div class="bb-empty">No editable sections.</div>`);
+    const listBody = derivedHtml + html;
+    host.innerHTML = stripHtml + autosSlot + (listBody || `<div class="bb-empty">No sections yet.</div>`);
     if (hasAutos) _confirmAutosLoad(_TA.target);
   } catch (e) {
     const host = document.getElementById('ta-section-list'); if (host) host.innerHTML = `<div class="bb-empty">Couldn't load - ${escapeHTML(e.message)}</div>`;
@@ -39233,9 +39354,7 @@ function _hk2Confirm() {
       // the reason this action exists (Zoran 2026-07-23).
       const resp = chk(await _apxPost(ep, 'confirm-no-reply', { ready_id: r.id, contact_id: r.ghl_contact_id, contact_name: r.contact_name || null, adjusted: !!before }));
       const kept = (resp && resp.resumed) || 0;
-      const park = (resp && resp.reignition_resumed) || 0;
-      const bits = [kept ? `${kept} follow-up${kept === 1 ? '' : 's'}` : '', park ? 'the reignition' : ''].filter(Boolean).join(' + ');
-      _apxToast(bits ? `Nothing sent - ${bits} still scheduled` : 'Nothing sent - card cleared', true);
+      _apxToast(kept ? `Nothing sent - ${kept} follow-up${kept === 1 ? '' : 's'} still scheduled` : 'Nothing sent - card cleared', true);
     } else {
       // reply
       let resp;

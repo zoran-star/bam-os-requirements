@@ -42,7 +42,7 @@ import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
-import { normalizeReigniteAt, scheduleReignition, cancelReignitions, pauseReignitions, resumeReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition } from "./agent/_reignite.js";
+import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition, hasScheduledReignition } from "./agent/_reignite.js";
 import { reconcileLiveMembers } from "./agent/_reconcile-members.js";
 import { liveMemberContactIds } from "./agent/_live-members.js";
 import { resolveAgentActor } from "./agent/_auth.js";
@@ -461,6 +461,13 @@ async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, ite
   strat = strat || closingFollowupStrategy(client);
   if (!item.last_at) return "no thread to follow up on";
 
+  // 🔥 HARD GATE (Zoran 2026-07-23): a scheduled reignition IS this lead's next
+  // follow-up. Never stack a multi-message follow-up plan on top of a park - the
+  // "reignite later" cancels the plan out. The detector loop already skips parked
+  // leads before it gets here; this is the single guard that holds no matter which
+  // path calls the plan drafter.
+  if (await hasScheduledReignition(clientId, contactId)) return "parked for reignition - the scheduled follow-up is the plan";
+
   let rows = [];
   try {
     rows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id,kind,step_key,status,sent_at,created_at,last_lead_at,followup_not_before,created_by&order=created_at.desc&limit=50`);
@@ -568,20 +575,21 @@ async function clearClosingCards(clientId, contactId, reason) {
 }
 
 // A real message went out to this lead, so the cadence their reply had FROZEN is
-// stale - the agent re-plans from the new thread. Retire the paused rows + park.
+// stale - the agent re-plans from the new thread. Retire the paused rows.
+// A parked reignition is NOT touched here: a park stands until a terminal move or
+// its own date (PR #1575) - answering someone is not a reason to erase it.
 async function finalizePausedClosing(clientId, contactId, reason) {
   try {
     await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.paused`,
       { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", paused_from: null, send_error: reason, updated_at: new Date().toISOString() }) });
   } catch (_) {}
-  try { await cancelReignitions(clientId, contactId, reason, { statuses: ["paused"] }); } catch (_) {}
 }
 
 // ── "Send nothing" resume (Zoran 2026-07-23) ──────────────────────────────────
 // The whole point of pausing instead of cancelling: staff answered the lead's
-// courtesy reply with NOTHING, so everything that was already on the calendar for
-// them goes back exactly as it was - same messages, same dates, same approved /
-// still-needs-approval state.
+// courtesy reply with NOTHING, so the plan that was already on the calendar goes
+// back exactly as it was - same messages, same dates, same approved /
+// still-needs-approval state. (Parks need no resume: a reply never cancels one.)
 //
 // The one adjustment: a step whose day came and went while the plan sat paused
 // would fire the instant it resumes (a "did you see my message?" seconds after
@@ -610,9 +618,7 @@ async function resumeClosingOutbound(clientId, contactId, client) {
       } catch (e) { console.error("[agent-closing] resume row failed (soft):", row.id, e.message); }
     }
   } catch (e) { console.error("[agent-closing] resume paused failed (soft):", e.message); }
-  let reignition = 0;
-  try { reignition = await resumeReignitions(clientId, contactId, { agent: "closing" }); } catch (_) {}
-  return { resumed, reignition_resumed: reignition };
+  return { resumed };
 }
 
 // ── Detector: draft post-trial conversions for Done-Trial leads ──
@@ -788,19 +794,19 @@ async function detectForClient(client) {
 
     const reactive = item.last_direction === "inbound";
 
-    // 🔥 Parked "later" leads: no proactive touches (silence is the plan). A lead
-    // who texted back re-engaged early - clear the park (belt + suspenders with
-    // the inbound webhook's cancel) and work them normally.
+    // 🔥 Parked "later" leads: no PROACTIVE touches (silence is the plan) - and
+    // that includes the multi-message follow-up plan below, which the park replaces.
+    // A lead who texted back still gets ANSWERED (never leave a real reply hanging),
+    // but the park itself STANDS (Zoran 2026-07-23): cancelling it on a reply let
+    // the next cron queue the very follow-up plan the park existed to prevent. Only
+    // a terminal move (enroll / lost / unqualified / paying member / leaving the
+    // stage / mute) or the park firing on its date clears it.
     // reactive (inbound-last) alone is NOT proof of a new reply: a silently-parked
-    // lead stays inbound-last on their original "later" text. Only cancel when a
-    // fresh inbound landed AFTER the park (else keep it - silence is the plan).
+    // lead stays inbound-last on their original "later" text, so with no fresh
+    // inbound after the park we skip them entirely.
     if (reignSet.has(String(contactId))) {
       if (!reactive || !repliedAfterPark(reignMap.get(String(contactId)), item.last_at)) { skipped++; reasons.push(`${item.name || contactId}: parked for reignition`); continue; }
-      // PAUSE, not cancel (Zoran 2026-07-23): a "thanks!" before the park date
-      // shouldn't erase the date. "Send nothing" in Hawkeye restores it; a real
-      // reply or a terminal move retires it.
-      await pauseReignitions(client.id, contactId, "lead replied before the reignition date", { agent: "closing" });
-      reignSet.delete(String(contactId));
+      reasons.push(`${item.name || contactId}: parked for reignition - answering their reply, park kept`);
     }
 
     if (reactive) {

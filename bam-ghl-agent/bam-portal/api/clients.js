@@ -1812,8 +1812,14 @@ async function handler(req, res) {
           if ("can_enroll_members" in teamBody) {
             patch.can_enroll_members = teamBody.can_enroll_members === true;
           }
-          if (!("allowed_tabs" in patch) && !("allowed_stages" in patch) && !("allowed_kpis" in patch) && !("can_enroll_members" in patch)) {
-            return res.status(400).json({ error: "provide allowed_tabs, allowed_stages, allowed_kpis, and/or can_enroll_members" });
+          // Opt-in grant: teammate may edit the agent's brain (Train Agent nav:
+          // teach lessons, test the agent, Edit the brain). Boolean, owner-managed;
+          // the owner always can (role bypass in api/agent-train.js resolveTrainer).
+          if ("can_train_agent" in teamBody) {
+            patch.can_train_agent = teamBody.can_train_agent === true;
+          }
+          if (!("allowed_tabs" in patch) && !("allowed_stages" in patch) && !("allowed_kpis" in patch) && !("can_enroll_members" in patch) && !("can_train_agent" in patch)) {
+            return res.status(400).json({ error: "provide allowed_tabs, allowed_stages, allowed_kpis, can_enroll_members, and/or can_train_agent" });
           }
           // Target must belong to THIS client and not be the owner.
           const targetRows = await supabaseSelect(

@@ -210,19 +210,51 @@ export function renderSellingPoints(data) {
   return parts.length ? parts.join("\n\n") : null;
 }
 
+// ── source map: where each derived fact is edited (the "Edit the brain" jump) ─
+// Every derived section is a VIEW onto a source the academy already owns. This
+// map tells the UI (client + staff portals) the plain-words source of each fact
+// and a machine `jump` target the client portal turns into a real deep link into
+// the Business Blueprint. Keys here ARE the 8 derivable facts (social_proof is
+// deliberately excluded - it is not rendered until the Google Reviews build).
+export const FACT_SOURCES = {
+  program:              { label: "Rendered from: Offer - General info step",               jump: "offer:general_info" },
+  schedule:             { label: "Rendered from: Offer - Schedule step",                   jump: "offer:schedule" },
+  pricing:              { label: "Rendered from: Offer - Pricing step",                    jump: "offer:pricing" },
+  policies:             { label: "Rendered from: Offer - Policy step",                     jump: "offer:policy" },
+  selling_points:       { label: "Rendered from: Offer - Value step",                      jump: "offer:value" },
+  business_info:        { label: "Rendered from: your Locations",                          jump: "locations" },
+  qualification_config: { label: "Rendered from: Offer - General info and your Locations", jump: "offer:general_info+locations" },
+  coaches:              { label: "Rendered from: your Team",                               jump: "team" },
+};
+// The 8 fact keys we try to render live (order = the UI's canonical order). Used
+// for the "N of 8 facts live" brain-health strip. social_proof is NOT one of them.
+export const FACT_KEYS = Object.keys(FACT_SOURCES);
+
 // ── loader: which rendered facts does this academy get? ──────────────────────
 // Reads the academy's Training offer + client record + saved locations (60s
 // cache - "edit the offer, the agent knows it" stays effectively immediate
 // without three DB reads per prompt build). Returns a partial overrides map;
 // empty object on any failure - rendering must never break an agent.
+//
+// opts.fresh === true forces a cache-miss refetch (the "Edit the brain" round
+// trip: the client edits the offer, comes back, and must see the change now, not
+// up to 60s later). All existing 2-arg callers are unaffected (opts defaults {}).
 const TTL_MS = 60 * 1000;
-const factCache = new Map(); // clientId -> { src: {data, client, locations}, at }
+const factCache = new Map(); // clientId -> { src: {data, client, locations, staff}, at }
 
-export async function derivedFactOverrides(clientId, sbFn) {
+// Drop one academy's cached source (or all, with no arg) so the next read is
+// live. Exposed for callers that mutate an offer/locations/staff and want the
+// agents to reflect it immediately without waiting out the TTL.
+export function bustFactCache(clientId) {
+  if (clientId) factCache.delete(clientId);
+  else factCache.clear();
+}
+
+export async function derivedFactOverrides(clientId, sbFn, opts = {}) {
   try {
     if (!clientId || typeof sbFn !== "function") return {};
     let hit = factCache.get(clientId);
-    if (!hit || Date.now() - hit.at > TTL_MS) {
+    if (!hit || Date.now() - hit.at > TTL_MS || opts.fresh === true) {
       const enc = encodeURIComponent(clientId);
       const [offerRows, clientRows, locationRows, staffRows] = await Promise.all([
         sbFn(`offers?client_id=eq.${enc}&type=eq.training&select=data&order=sort_order.asc&limit=1`).catch(() => []),

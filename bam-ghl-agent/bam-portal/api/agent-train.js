@@ -26,7 +26,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides, loadGlobalSections, isGlobalSection, canEditGlobalBrain, setGlobalSection, deleteGlobalSection } from "./agent/_sections.js";
-import { derivedFactOverrides } from "./agent/fact-render.js";
+import { derivedFactOverrides, FACT_SOURCES, FACT_KEYS } from "./agent/fact-render.js";
 
 // Which agent is being trained: booking | confirm | closing. Defaults to booking.
 const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
@@ -282,11 +282,20 @@ async function handler(req, res) {
 
     if (b.action === "sections") {
       const agent = pickAgent(b.agent);
+      // fresh:true (body or ?fresh=true) forces the derived-fact cache to refetch -
+      // the "Edit the brain" round trip: the owner edits their offer, comes back,
+      // and must see the new live fact now, not up to 60s later.
+      const wantFresh = b.fresh === true || b.fresh === "true" ||
+        (req.query && String(req.query.fresh) === "true");
+      const enc = encodeURIComponent(clientId);
       // Two override sources: the GLOBAL brain (shared) and this academy's OWN.
-      const [globalMap, clientRows, derived] = await Promise.all([
+      // Plus the Training offer id, so the FE can deep-link "Edit the brain" to the
+      // exact offer + wizard step a derived fact is rendered from.
+      const [globalMap, clientRows, derived, offerIdRows] = await Promise.all([
         loadGlobalSections(),
-        sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
-        derivedFactOverrides(clientId, sb),   // rendered facts - what the agent ACTUALLY reads
+        sb(`agent_prompt_sections?client_id=eq.${enc}&select=section_key,body`).catch(() => []),
+        derivedFactOverrides(clientId, sb, { fresh: wantFresh }),   // rendered facts - what the agent ACTUALLY reads
+        sb(`offers?client_id=eq.${enc}&type=eq.training&select=id&order=sort_order.asc&limit=1`).catch(() => []),
       ]);
       const clientMap = {};
       for (const r of (Array.isArray(clientRows) ? clientRows : [])) clientMap[r.section_key] = r.body;
@@ -298,12 +307,14 @@ async function handler(req, res) {
           // Rendered fact sections (Build 2): show the LIVE rendered body - the
           // stored/default text would lie about what the agent reads - and lock
           // editing here: the academy edits the SOURCE (offer / locations), not
-          // the text. scope "derived" badges it in the UI.
+          // the text. scope "derived" badges it in the UI; source tells the owner
+          // where to edit it and gives the FE the "Edit the brain" jump target.
           if (derived[s.key] != null) {
             return {
               key: s.key, label: s.label, group: s.layer,
               body: derived[s.key], default_body: s.body,
               is_default: true, scope: "derived", editable: false,
+              source: FACT_SOURCES[s.key] || null,
             };
           }
           const glob = isGlobalSection(s.key);
@@ -317,7 +328,15 @@ async function handler(req, res) {
             editable: glob ? canGlobal : true,                         // local = always editable; global = only a global editor
           };
         });
-      return res.status(200).json({ agent, sections, can_edit_global: canGlobal });
+      // Brain health: of the 8 derivable facts, how many are live vs fully missing
+      // (renderer returned null - the offer/locations/team are too sparse). "Thin"
+      // facts that DID render are counted live; only absent keys are missing.
+      const missing = FACT_KEYS
+        .filter(k => derived[k] == null)
+        .map(k => ({ key: k, label: (bySection.get(k) || {}).label || k, jump: (FACT_SOURCES[k] || {}).jump || null }));
+      const brain_health = { live: FACT_KEYS.length - missing.length, total: 8, missing };
+      const training_offer_id = (Array.isArray(offerIdRows) && offerIdRows[0] && offerIdRows[0].id) || null;
+      return res.status(200).json({ agent, sections, can_edit_global: canGlobal, brain_health, training_offer_id });
     }
 
     if (b.action === "update-section") {

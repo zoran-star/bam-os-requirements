@@ -57,61 +57,16 @@ export async function scheduleReignition({ clientId, contactId, contactName, age
 // Auto-cancel a contact's scheduled reignition (real reply / booked / enrolled /
 // lost / unqualified / ghosted / left the stage). Best-effort: returns how many
 // rows were canceled, 0 on error - callers never block on this.
-export async function cancelReignitions(clientId, contactId, reason, { statuses = ["scheduled", "paused"] } = {}) {
+export async function cancelReignitions(clientId, contactId, reason) {
   if (!clientId || !contactId) return 0;
   try {
-    // PAUSED parks die here too by default: a terminal event (enrolled / lost /
-    // unqualified / a real reply going out) must clear a park that a lead's reply
-    // had merely frozen, or it would thaw itself back onto the calendar later.
-    // Callers that just paused a park pass statuses:['scheduled'] so this sweep
-    // clears the OTHER agents' parks without undoing their own freeze.
-    const rows = await sb(`agent_reignitions?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(${statuses.join(",")})`, {
+    const rows = await sb(`agent_reignitions?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.scheduled`, {
       method: "PATCH", headers: { Prefer: "return=representation" },
       body: JSON.stringify({ status: "canceled", cancel_reason: String(reason || "").slice(0, 200) || null, updated_at: new Date().toISOString() }),
     });
     return Array.isArray(rows) ? rows.length : 0;
   } catch (e) {
     console.error("[_reignite] cancelReignitions failed (soft):", e.message);
-    return 0;
-  }
-}
-
-// FREEZE instead of kill (Zoran 2026-07-23, closing agent only). A lead replying
-// before their reignition date used to cancel the park outright - but "thank you"
-// is not a re-engagement, and the park was the plan. Pausing keeps it recoverable:
-// Hawkeye's "send nothing" resumes it; any real reply or terminal move cancels it
-// for good (cancelReignitions above sweeps paused rows too).
-export async function pauseReignitions(clientId, contactId, reason, { agent = null } = {}) {
-  if (!clientId || !contactId) return 0;
-  try {
-    const agentFilter = agent ? `&agent=eq.${encodeURIComponent(agent)}` : "";
-    const rows = await sb(`agent_reignitions?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.scheduled${agentFilter}`, {
-      method: "PATCH", headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ status: "paused", cancel_reason: String(reason || "").slice(0, 200) || null, updated_at: new Date().toISOString() }),
-    });
-    return Array.isArray(rows) ? rows.length : 0;
-  } catch (e) {
-    console.error("[_reignite] pauseReignitions failed (soft):", e.message);
-    return 0;
-  }
-}
-
-// Thaw a paused park back onto the calendar ("send nothing" in Hawkeye). Skipped
-// when a NEWER park was scheduled in the meantime - the unique
-// one-scheduled-per-contact index would reject it, and the newer one is the truth.
-export async function resumeReignitions(clientId, contactId, { agent = null } = {}) {
-  if (!clientId || !contactId) return 0;
-  try {
-    const live = await sb(`agent_reignitions?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.scheduled&select=id&limit=1`);
-    if (Array.isArray(live) && live.length) return 0;
-    const agentFilter = agent ? `&agent=eq.${encodeURIComponent(agent)}` : "";
-    const rows = await sb(`agent_reignitions?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.paused${agentFilter}`, {
-      method: "PATCH", headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ status: "scheduled", cancel_reason: null, updated_at: new Date().toISOString() }),
-    });
-    return Array.isArray(rows) ? rows.length : 0;
-  } catch (e) {
-    console.error("[_reignite] resumeReignitions failed (soft):", e.message);
     return 0;
   }
 }
@@ -130,6 +85,23 @@ export async function reigniteContactIdSet(clientId) {
     console.error("[_reignite] reigniteContactIdSet failed (failing open):", e.message);
   }
   return set;
+}
+
+// Does ONE contact have a scheduled park right now? The follow-up-plan drafter
+// calls this as a hard gate: a scheduled reignition IS the next follow-up, so no
+// agent may queue a multi-message follow-up plan on top of it (Zoran 2026-07-23 -
+// Mike Sandhu got a 2-message plan while a Jul 28 park was meant to be standing).
+// Fails CLOSED (true) on a DB error: when we cannot prove the lead is unparked,
+// the safe move is to draft nothing rather than double up on them.
+export async function hasScheduledReignition(clientId, contactId) {
+  if (!clientId || !contactId) return false;
+  try {
+    const rows = await sb(`agent_reignitions?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.scheduled&select=id&limit=1`);
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (e) {
+    console.error("[_reignite] hasScheduledReignition failed (failing closed):", e.message);
+    return true;
+  }
 }
 
 // Like reigniteContactIdSet, but carries each park's created_at so a detector can

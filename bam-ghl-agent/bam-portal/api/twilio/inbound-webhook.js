@@ -165,9 +165,9 @@ async function handler(req, res) {
       await cancelAllSalesOutbound({
         clientId: client.id, contactId: ghlContactId,
         sendError: "lead replied",
-        reigniteReason: "lead replied before the reignition date",
-        // Same rule as the GHL spine: the closing cadence pauses, it doesn't die
-        // (Zoran 2026-07-23). Hawkeye's "send nothing" resumes it.
+        // Same as the GHL reply path: cancel the cards, keep the park, and
+        // PAUSE (not kill) the closing follow-up plan.
+        keepReignition: true,
         pauseClosing: true,
       });
     } catch (e) { console.error("twilio inbound draft-cancel:", e.message); }

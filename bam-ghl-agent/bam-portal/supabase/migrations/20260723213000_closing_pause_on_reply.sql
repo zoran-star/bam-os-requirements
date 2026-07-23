@@ -1,12 +1,15 @@
 -- "Send nothing" + pause-don't-kill (Zoran 2026-07-23)
 --
 -- The problem this fixes: a lead who replies "Thank you" to our post-trial info
--- had their ENTIRE scheduled follow-up plan (and any parked reignition) hard
--- CANCELED by the inbound sweep, before a human ever saw the card. A courtesy
--- reply is not a conversation - killing a cadence over it silently drops the lead.
+-- had their ENTIRE scheduled follow-up plan hard CANCELED by the inbound sweep,
+-- before a human ever saw the card. A courtesy reply is not a conversation -
+-- killing a cadence over it silently drops the lead.
+--
+-- (Sibling fix, PR #1575: a parked reignition now survives a reply outright, so
+-- parks need no pause/resume - only the follow-up PLAN does.)
 --
 -- New model, CLOSING AGENT ONLY (booking/confirm keep the old hard cancel):
---   inbound reply  -> the closing plan + closing reignition go to 'paused'
+--   inbound reply  -> the closing follow-up plan goes to 'paused'
 --                     (nothing can auto-fire while a human is deciding)
 --   staff sends a real reply  -> paused rows finalize to 'canceled' (agent re-plans)
 --   staff sends NOTHING (empty message box = "send nothing")
@@ -32,12 +35,3 @@ alter table public.agent_closing_replies
 
 comment on column public.agent_closing_replies.paused_from is
   'When status=paused: the status this row was in before a lead reply paused it (pending|approved). A resume ("send nothing" in Hawkeye) puts it back exactly there.';
-
-alter table public.agent_reignitions
-  drop constraint if exists agent_reignitions_status_check;
-alter table public.agent_reignitions
-  add constraint agent_reignitions_status_check
-  check (status in ('scheduled','carded','done','canceled','paused'));
-
-comment on column public.agent_reignitions.status is
-  'scheduled = waiting for its date · paused = a lead reply froze it while a human decides (closing agent only; resumes on "send nothing") · carded = fired into Hawkeye · done · canceled.';
