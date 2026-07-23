@@ -13,6 +13,7 @@
 // academy's own overrides on top (local facts win). Until a global override exists
 // the merge is byte-identical to the old behavior (defaults + per-client overrides).
 import { SECTIONS } from "./prompt-structure.js";
+import { derivedFactOverrides } from "./fact-render.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -52,15 +53,20 @@ export async function loadGlobalSections() {
 }
 
 // Final per-section overrides for an academy's agent: GLOBAL brain first, then the
-// academy's OWN overrides on top. Key sets are disjoint in practice (global =
-// general/goal, local = location/offer), so this is a clean union with local winning.
+// academy's OWN overrides on top, then RENDERED facts on top of those. Key sets:
+// global = general/goal, local = location/offer (clean union, local wins), and a
+// rendered fact (fact-render.js, e.g. `program` derived live from the Training
+// offer) beats the stored text - the stored row is only the fallback for when the
+// offer is too sparse to render (Build 2: facts are derived, never typed).
 export async function loadMergedOverrides(clientId) {
-  const [globalMap, clientRows] = await Promise.all([
+  const [globalMap, clientRows, derived] = await Promise.all([
     loadGlobalSections(),
     sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
+    derivedFactOverrides(clientId, sb),
   ]);
   const overrides = { ...globalMap };
   for (const r of (Array.isArray(clientRows) ? clientRows : [])) overrides[r.section_key] = r.body;
+  Object.assign(overrides, derived);
   return overrides;
 }
 

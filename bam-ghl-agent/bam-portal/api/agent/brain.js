@@ -11,17 +11,22 @@
 // second copy, or the live bot will silently drift from what staff preview.
 
 import { assemblePrompt } from "./prompt-structure.js";
+import { derivedFactOverrides } from "./fact-render.js";
 
 // Fetch the on-screen brain's per-academy state: section overrides + active
 // lessons + approved examples. `sb` is the caller's Supabase REST helper.
+// Rendered facts (fact-render.js) win over stored section text here exactly as
+// they do in _sections.loadMergedOverrides - previews must match live agents.
 export async function loadBrainConfig(sb, clientId, agent = "booking") {
-  const [lessons, ovRows, exRows] = await Promise.all([
+  const [lessons, ovRows, exRows, derived] = await Promise.all([
     sb(`agent_lessons?or=(client_id.eq.${clientId},and(client_id.is.null,scope.eq.general))&agent=eq.${agent}&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
     sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
     sb(`agent_examples?client_id=eq.${clientId}&agent=eq.${agent}&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
+    derivedFactOverrides(clientId, sb),
   ]);
   const overrides = {};
   for (const r of (Array.isArray(ovRows) ? ovRows : [])) overrides[r.section_key] = r.body;
+  Object.assign(overrides, derived);
   return {
     lessons:  Array.isArray(lessons) ? lessons : [],
     overrides,

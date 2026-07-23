@@ -1,6 +1,14 @@
 # Build 2: agent facts are DERIVED views, not typed text
 
-**Zoran's spec, pasted 2026-07-22 (BAM V2 engineering session, San Jose onboarding).** Status: PLANNING - mockup one fact ("program" from the offer), Zoran confirms, then build.
+**Zoran's spec, pasted 2026-07-22 (BAM V2 engineering session, San Jose onboarding).** Status: **FIRST FACT SHIPPED 2026-07-23** - `program` renders live from the Training offer.
+
+## Shipped 2026-07-23 (program fact)
+- `api/agent/fact-render.js`: pure `renderProgram(offers.data)` (age_range, gender, skill_level, description, structure, per-class group_size w/ capacity fallback, coach_ratio) + `derivedFactOverrides(clientId, sb)` (60s offer cache; returns {} on any failure). Returns null when <3 lines -> stored text stays as fallback (sparse-offer safety).
+- Precedence everywhere: **rendered fact > stored agent_prompt_sections text > hardcoded default.** Wired in BOTH `_sections.loadMergedOverrides` (approvals/confirm/closing/sandbox) and `brain.loadBrainConfig` (previews) - live == preview guaranteed.
+- Wizard: 2 new Training-offer questions - `coach_ratio` (general_info step, text) + `group_size` per class (schedule block_builder, text). GTA coach_ratio backfilled ("At least 2 coaches per session").
+- NOT rendered by design: private training / adult classes / camps (future offer types; agent = not-currently-offered + flag interest).
+- **DRIFT SURFACED, needs Zoran:** GTA ages - stored override said "6 and up", offer says "9-17" (now the agent says 9-17; if 6 is right, fix the offer age range). GTA offer description = "Regular training" (weak; now agent-visible - improve in the offer editor).
+- Still open in Build 2: schedule/pricing/policies/business_info renderers; config view "tied to your offer" + click-through (editing loop); selling_points home (Build 3); coaches from staff (Build 4); social_proof (Build 5).
 
 ## Principle
 An agent fact (the per-academy sections sales agents read) is a VIEW onto structured data we already store - never free text typed into the agent. A fact lives once in its real home; the agent renders it from there. Edit the offer -> agent updates. No drift, no double entry.
