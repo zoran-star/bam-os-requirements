@@ -111,6 +111,7 @@ function closingTrailer(strat) {
   `'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human. ` +
   `If the lead is READY to enroll, set 'recommend_enroll' = true with a short 'enroll_note' (which plan/frequency they want, if known) and put a warm message in 'reply' — the academy's sign-up link is appended to your message and a human approves before it sends. ` +
   `If your closing_lost criteria say the good-fit attendee won't enroll, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms enroll/lost before anything changes. ` +
+  `NOTHING TO SEND: if their message is a pure courtesy close that needs no answer - a bare "thank you", "ok", "sounds good", "got it", "will do" AFTER we already sent everything they need (the info, the link, the times) - set 'no_reply_needed' = true, leave 'reply' EMPTY, and say why in 'reasoning'. Do NOT invent a filler reply just to have the last word: an unnecessary text after we already gave them the link makes us look pushy, and anything already scheduled for them keeps running. If their message asks a question, raises an objection, or moves the decision at all, it is NOT this - write the reply. ` +
   `OPT-OUT: if the lead asks you to STOP contacting them in any phrasing ("stop talking to me", "leave me alone", "don't contact me", "remove me", "stop texting"), set 'recommend_unqualified' = true with 'unqualified_reason' "Opted out" and leave 'reply' EMPTY - send NOTHING, not even a goodbye. This is NOT recommend_lost (Lost routes to nurture texts) and NOT an escalation. A human confirms; approving removes them from the pipeline entirely. ` +
   `Silence alone is NEVER a lost signal: quiet leads are handled by the follow-up loop, which recommends Lost automatically after ${n} unanswered follow-up${n === 1 ? "" : "s"}. Reserve 'recommend_lost' for an explicit no (too expensive, chose another program, not interested). ` +
   `Follow-up timing: your follow-up schedule is preplanned (see your follow-up timing guidance). But if the lead names a specific date or timeframe for their decision ("we'll decide after the weekend", "after the 15th", "once report cards are out"), set 'followup_on' (YYYY-MM-DD) to the day right after it so we don't nag them before they said they'd know. ` +
@@ -130,6 +131,7 @@ const REPLY_TOOL = {
       summary:          { type: "string", description: "A 2-3 sentence plain-English summary for a human reviewer — who the lead is, their trial, and where the enrollment stands." },
       reasoning:        { type: "string", description: "Short (1-2 sentences) why / current state." },
       confidence:       { type: "number", description: "0..1 confidence this is the right message." },
+      no_reply_needed:  { type: "boolean", description: "True when their message is a pure courtesy close that needs no answer at all - a bare 'thank you' / 'ok' / 'got it' after we already sent the info and the link. Leave 'reply' empty; a human confirms, nothing is texted, and anything already scheduled for this lead keeps running. NOT for questions, objections, or anything that moves the decision." },
       escalate:         { type: "boolean", description: "True if guardrails say to hand to a human instead of replying." },
       escalate_reason:  { type: "string", description: "If escalate: why." },
       recommend_enroll: { type: "boolean", description: "True if the lead is ready to enroll and should be sent the sign-up link (a human confirms and sends it)." },
@@ -343,6 +345,8 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     confidence: typeof out.confidence === "number" ? out.confidence : null,
     escalate: !!out.escalate,
     escalate_reason: out.escalate_reason || null,
+    // "Their message needs no answer" - an empty draft ON PURPOSE, not a failure.
+    no_reply_needed: !!out.no_reply_needed,
     recommend_enroll: !!out.recommend_enroll,
     enroll_note: out.enroll_note || null,
     recommend_lost: !!out.recommend_lost,
@@ -469,7 +473,10 @@ async function maybeFollowUpOrNurture({ client, token, locationId, dts, cfg, ite
     rows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=id,kind,step_key,status,sent_at,created_at,last_lead_at,followup_not_before,created_by&order=created_at.desc&limit=50`);
   } catch (_) { rows = []; }
   rows = Array.isArray(rows) ? rows : [];
-  if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
+  // 'paused' counts as active: a frozen plan is still THE plan for this lead
+  // (it un-freezes on "send nothing"). Drafting a second one over it would
+  // double-text them the day both resume.
+  if (rows.some(r => ["pending", "approved", "paused"].includes(r.status))) return "already has an active card";
 
   // The lead named a decision date ("we'll know after the 15th") - the plan
   // still cards NOW, but its schedule anchors at that date, not the cadence.
@@ -558,11 +565,60 @@ async function findOpenOpp(clientId, token, locationId, contactId) {
 }
 
 // Cancel a contact's open closing cards (after enroll / lost / leaving the stage).
+// PAUSED rows are swept too: a frozen cadence must not survive a terminal move
+// and thaw itself back later (Zoran 2026-07-23).
 async function clearClosingCards(clientId, contactId, reason) {
   try {
-    await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)`,
-      { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: reason, updated_at: new Date().toISOString() }) });
+    await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved,paused)`,
+      { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", paused_from: null, send_error: reason, updated_at: new Date().toISOString() }) });
   } catch (_) {}
+}
+
+// A real message went out to this lead, so the cadence their reply had FROZEN is
+// stale - the agent re-plans from the new thread. Retire the paused rows.
+// A parked reignition is NOT touched here: a park stands until a terminal move or
+// its own date (PR #1575) - answering someone is not a reason to erase it.
+async function finalizePausedClosing(clientId, contactId, reason) {
+  try {
+    await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.paused`,
+      { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", paused_from: null, send_error: reason, updated_at: new Date().toISOString() }) });
+  } catch (_) {}
+}
+
+// ── "Send nothing" resume (Zoran 2026-07-23) ──────────────────────────────────
+// The whole point of pausing instead of cancelling: staff answered the lead's
+// courtesy reply with NOTHING, so the plan that was already on the calendar goes
+// back exactly as it was - same messages, same dates, same approved /
+// still-needs-approval state. (Parks need no resume: a reply never cancels one.)
+//
+// The one adjustment: a step whose day came and went while the plan sat paused
+// would fire the instant it resumes (a "did you see my message?" seconds after
+// they texted us). Those overdue steps slide out a day each, in order, and land
+// inside the academy's send window.
+async function resumeClosingOutbound(clientId, contactId, client) {
+  let resumed = 0;
+  try {
+    const rows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.paused&select=id,paused_from,send_after&order=send_after.asc.nullsfirst`);
+    let overdue = 0;
+    for (const row of (Array.isArray(rows) ? rows : [])) {
+      const patch = {
+        status: row.paused_from === "approved" ? "approved" : "pending",
+        paused_from: null, send_error: null, updated_at: new Date().toISOString(),
+      };
+      if (row.send_after && new Date(row.send_after).getTime() <= Date.now()) {
+        overdue++;
+        patch.send_after = nextSendableTime(new Date(Date.now() + overdue * DAY_MS), quietTz(client)).toISOString();
+      }
+      // Per-row try: one row that can't come back (e.g. a newer card already
+      // holds its one-active slot) must not strand the rest of the plan.
+      try {
+        await sb(`agent_closing_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`,
+          { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+        resumed++;
+      } catch (e) { console.error("[agent-closing] resume row failed (soft):", row.id, e.message); }
+    }
+  } catch (e) { console.error("[agent-closing] resume paused failed (soft):", e.message); }
+  return { resumed };
 }
 
 // ── Detector: draft post-trial conversions for Done-Trial leads ──
@@ -595,14 +651,15 @@ async function detectForClient(client) {
   // set is non-empty - an empty/blipped set must never permanently kill a park.
   const stageSetTrusted = idsTrusted !== false && doneIds.size > 0;
 
-  // Prune: cancel pending closing cards whose lead has LEFT the Done-Trial stage
-  // (enrolled, lost…). Scoped to THIS agent's table only.
+  // Prune: cancel pending (and paused) closing cards whose lead has LEFT the
+  // Done-Trial stage (enrolled, lost…). Scoped to THIS agent's table only. A
+  // paused plan for a lead who already left must never thaw back to life.
   let pruned = 0;
   try {
-    const pend = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=eq.pending&select=id,ghl_contact_id`);
+    const pend = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=in.(pending,paused)&select=id,ghl_contact_id`);
     for (const row of (Array.isArray(pend) ? pend : [])) {
       if (row.ghl_contact_id && !doneIds.has(row.ghl_contact_id)) {
-        await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "left Done-Trial stage", updated_at: new Date().toISOString() }) });
+        await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", paused_from: null, send_error: "left Done-Trial stage", updated_at: new Date().toISOString() }) });
         pruned++;
       }
     }
@@ -753,19 +810,26 @@ async function detectForClient(client) {
     }
 
     if (reactive) {
-      // A reply cancels whatever plan was scheduled AND any stale reply/enroll/
-      // lost card drafted for an OLDER inbound: those made the dedup below skip
-      // this lead every run, so the fresh message never got an answer and the
+      // A reply freezes whatever plan was scheduled AND cancels any stale reply/
+      // enroll/lost card drafted for an OLDER inbound: those made the dedup below
+      // skip this lead every run, so the fresh message never got an answer and the
       // DETECT_CAP slot was burned for nothing. The card already drafted for
       // THIS inbound (same last_lead_at) survives, so re-runs don't churn it.
+      //
+      // PLAN rows PAUSE, they don't cancel (Zoran 2026-07-23) - same rule as the
+      // inbound webhook, since this is the fallback path when a webhook is missed.
+      // "Send nothing" in Hawkeye puts them back; a real reply retires them.
       try {
-        const live = await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id,step_key,last_lead_at`);
+        const live = await sb(`agent_closing_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id,status,step_key,last_lead_at`);
         const inbMs = item.last_at ? new Date(item.last_at).getTime() : null;
         for (const row of (Array.isArray(live) ? live : [])) {
           const isPlan = String(row.step_key || "").startsWith("followup");
           const sameInbound = row.last_lead_at && inbMs != null && new Date(row.last_lead_at).getTime() === inbMs;
           if (!isPlan && sameInbound) continue;   // already drafted for THIS message
-          await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: isPlan ? "lead replied - plan canceled" : "lead replied - re-drafting", updated_at: new Date().toISOString() }) });
+          const patch = isPlan
+            ? { status: "paused", paused_from: row.status, send_error: "lead replied - plan paused", updated_at: new Date().toISOString() }
+            : { status: "canceled", send_error: "lead replied - re-drafting", updated_at: new Date().toISOString() };
+          await sb(`agent_closing_replies?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
         }
       } catch (_) {}
     }
@@ -892,6 +956,22 @@ async function detectForClient(client) {
 
     // Escalation: no message to send, but a human should see it.
     if (d.error || !d.reply || !String(d.reply).trim()) {
+      // "Nothing to send" (Zoran 2026-07-23): the lead signed off with a bare
+      // thank-you. Card it with an EMPTY message box - in Hawkeye an empty box on
+      // a closing reply card IS the "send nothing" action, and confirming it
+      // resumes the follow-up plan / park their reply paused. Checked before
+      // escalate: a courtesy close is a decision, not a hand-off.
+      if (d.no_reply_needed && !d.escalate) {
+        try {
+          await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+            ...baseRow, kind: "closing", draft_message: "",
+            reasoning: d.reasoning || "Their message needs no answer - nothing to send.",
+            status: "pending", created_by: "detector",
+          }]) });
+          drafted++;
+        } catch (e) { skipped++; reasons.push(`${item.name || contactId}: no-reply-insert failed — ${e.message}`); }
+        continue;
+      }
       if (d.escalate) {
         escalated++;
         try {
@@ -1130,15 +1210,60 @@ async function handler(req, res) {
           if (b.ready_id) await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(held) });
           else await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ ...held, created_by: staffEmail }]) });
         } catch (e) { return res.status(500).json({ error: `couldn't schedule: ${e.message}` }); }
+        // A real reply is committed (it sends in the morning) - the cadence their
+        // inbound froze is stale now. Retire it; the agent re-plans from the new thread.
+        await finalizePausedClosing(clientId, b.contact_id, "replaced by a live reply");
         return res.status(200).json({ ok: true, sent: false, deferred: true, send_after: sendAfter });
       }
       try { await sendReplyViaGhl(token, b.contact_id, String(b.reply), clientId); }
       catch (e) { return res.status(e.status || 502).json({ error: `GHL send: ${e.message}` }); }
+      await finalizePausedClosing(clientId, b.contact_id, "replaced by a live reply");
       try { await logApproval({ client_id: clientId, ghl_contact_id: b.contact_id, ghl_conversation_id: b.conversation_id || null, contact_name: b.contact_name || null, final_reply: b.reply, reasoning: b.reasoning || null, confidence: typeof b.confidence === "number" ? b.confidence : null, adjusted: !!b.adjusted, status: "sent", created_by: staffEmail }); } catch (_) {}
       if (b.ready_id) {
         try { await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
       return res.status(200).json({ ok: true, sent: true });
+    }
+
+    // ── SEND NOTHING (Zoran 2026-07-23) ────────────────────────────────────────
+    // The lead's message needed no answer (a bare "thank you" after we already
+    // sent the info + the sign-up link). Clearing the box in Hawkeye is the
+    // gesture; this is what it commits:
+    //   1. nothing is texted - no GHL/Twilio call happens on this path at all
+    //   2. the card closes as 'canceled' (NOT 'skipped', which means snooze and
+    //      would re-draft the same card on the next detector run)
+    //   3. everything their reply PAUSED comes back on its original dates
+    //
+    // That third line is the whole feature: before this, a courtesy reply killed
+    // the lead's entire scheduled cadence and nobody noticed.
+    if (b.action === "confirm-no-reply") {
+      let row = null, contactId = b.contact_id || null;
+      if (b.ready_id) {
+        [row] = await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=*`);
+        if (!row) return res.status(404).json({ error: "not found" });
+        contactId = row.ghl_contact_id;
+      }
+      if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
+      if (row && !["pending", "approved"].includes(row.status)) return res.status(409).json({ error: `already ${row.status}` });
+      if (row) {
+        await sb(`agent_closing_replies?id=eq.${encodeURIComponent(row.id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({
+          status: "canceled", send_error: "no reply needed - nothing sent",
+          approved_by: staffEmail, approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }) });
+      }
+      // No stage guard here on purpose: not sending anything is safe from any
+      // stage, and a lead who moved on shouldn't leave a stuck card behind.
+      const restored = await resumeClosingOutbound(clientId, contactId, client);
+      try {
+        await logApproval({
+          client_id: clientId, ghl_contact_id: contactId, ghl_conversation_id: (row && row.ghl_conversation_id) || null,
+          contact_name: (row && row.contact_name) || b.contact_name || null,
+          final_reply: "", reasoning: (row && row.reasoning) || null,
+          confidence: row && typeof row.confidence === "number" ? row.confidence : null,
+          adjusted: !!b.adjusted, status: "no_reply", created_by: staffEmail,
+        });
+      } catch (_) { /* audit only */ }
+      return res.status(200).json({ ok: true, sent: false, no_reply: true, ...restored });
     }
 
     // Fire an already-drafted/approved follow-up RIGHT NOW instead of waiting for

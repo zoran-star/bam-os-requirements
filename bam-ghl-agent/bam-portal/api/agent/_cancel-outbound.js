@@ -44,6 +44,36 @@ const QUEUES = ["agent_followups", "agent_ready_replies", "agent_confirm_replies
 // they were pulled); `reigniteReason` defaults to it. Returns a per-queue result map;
 // never throws.
 //
+// Freeze a contact's scheduled CLOSING follow-up plan (step_key followup_N) so a
+// reply doesn't destroy it. Call this BEFORE a pending/approved cancel sweep: the
+// plan rows move out of those statuses, so the sweep only clears the non-plan
+// cards. Exported for the reply paths that do their own inline sweep (the email
+// spines). Best-effort - never throws.
+export async function pauseClosingPlan(clientId, contactId, reason = "lead replied") {
+  if (!clientId || !contactId) return 0;
+  const base = `agent_closing_replies?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}`;
+  let n = 0;
+  for (const from of ["pending", "approved"]) {
+    try {
+      const rows = await sb(`${base}&status=eq.${from}&step_key=like.followup*`, {
+        method: "PATCH", headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ status: "paused", paused_from: from, send_error: reason, updated_at: new Date().toISOString() }),
+      });
+      n += Array.isArray(rows) ? rows.length : 0;
+    } catch (e) { console.error("[_cancel-outbound] pauseClosingPlan failed (soft):", e.message); }
+  }
+  return n;
+}
+
+// `pauseClosing` (Zoran 2026-07-23, the REPLY callers pass true): the closing
+// follow-up PLAN is PAUSED rather than canceled. A lead who answers "Thank you"
+// after our post-trial info used to lose their whole scheduled cadence before a
+// human saw the card. Paused rows still can't auto-fire (every reader filters on
+// pending/approved), but Hawkeye's "send nothing" puts them straight back, and a
+// real reply / terminal move finalizes them to canceled. Same spirit as
+// keepReignition below - a reply is not a reason to erase a planned cadence.
+// CONVERSION (Stripe) never pauses - a paying member's cadence must die.
+//
 // `keepReignition` (Zoran 2026-07-23): the REPLY callers pass true. A park is a
 // deliberate "circle back on this date" decision - a routine logistics reply
 // ("he can't make Tuesday, see you Thursday") must not silently delete it. It
@@ -53,7 +83,7 @@ const QUEUES = ["agent_followups", "agent_ready_replies", "agent_confirm_replies
 // the proactive engines off the lead until its date. CONVERSION callers (Stripe
 // signup, live-member reconcile) still cancel it - a paying member must never get
 // a parked re-engagement.
-export async function cancelAllSalesOutbound({ clientId, contactId, sendError = "lead converted", reigniteReason = null, keepReignition = false } = {}) {
+export async function cancelAllSalesOutbound({ clientId, contactId, sendError = "lead converted", reigniteReason = null, keepReignition = false, pauseClosing = false } = {}) {
   if (!clientId || !contactId) return { skipped: "missing clientId/contactId" };
   const cid = encodeURIComponent(String(contactId));
   const patch = {
@@ -62,6 +92,16 @@ export async function cancelAllSalesOutbound({ clientId, contactId, sendError = 
     body: JSON.stringify({ status: "canceled", send_error: sendError, updated_at: new Date().toISOString() }),
   };
   const result = {};
+  // Freeze the closing PLAN first so the cancel sweep below can't reach it. Only
+  // plan rows (step_key followup_N) pause: a live single card - a drafted reply,
+  // an enroll/lost proposal - is answering an OLDER message, so a fresh inbound
+  // makes it stale and it still cancels. Keeping those out of the paused set also
+  // keeps the resume safe: the one-active-per-contact unique index buckets
+  // step_key-null rows together, so thawing an old draft would collide with the
+  // new card.
+  if (pauseClosing) {
+    result.closing_plan_paused = await pauseClosingPlan(clientId, contactId, sendError);
+  }
   for (const t of QUEUES) {
     try {
       await sb(`${t}?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);

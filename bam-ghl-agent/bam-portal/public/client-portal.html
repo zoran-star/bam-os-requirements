@@ -38778,12 +38778,19 @@ function _hk2CardHtml(r, pos, total, isTop) {
     // above (right-aligned, dashed gold = "yours, not sent yet"); tapping it
     // turns it into a live field. Rest caption carries the per-kind nuance the
     // old form label used to (sign-up link embedded, locked-in message).
+    // Closing only: an empty box means "send nothing", so say so instead of
+    // leaving a blank void that reads like a broken card (Zoran 2026-07-23).
+    const canNoReply = _HK2.agent === 'closing' && r._kind === 'reply';
     const draftCap = r._kind === 'enroll' ? 'Draft · sign-up link included · tap to edit'
       : r._kind === 'reignite_due' ? 'Locked-in message · tap to edit before it sends'
+      : canNoReply ? 'Draft · tap to edit · empty = send nothing'
       : 'Draft · tap to edit';
+    // Short on purpose: a longer line clips mid-sentence on a phone, and the
+    // caption underneath already states the rule.
+    const draftPh = canNoReply ? ' placeholder="Empty = send nothing"' : '';
     body = `${_hk2ThreadHtml(r, isTop)}${reigBanner}${proposal}
       <div class="hk2-draftwrap">
-        <textarea class="hk2-draft hk2-draft-bubble"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+        <textarea class="hk2-draft hk2-draft-bubble"${id.draft}${draftPh} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
         <div class="hk2-draftcap"><span class="rest">${_HK2_PENCIL}${draftCap}</span><span class="edit">${_HK2_CARET}Editing · changes save automatically</span></div>
       </div>
       ${r._kind === 'enroll' ? '<div class="hk2-note">The opportunity is marked won automatically when they pay on the link.</div>' : ''}`;
@@ -39005,6 +39012,9 @@ function _hk2Render(opts) {
   const top = _hk2Top();
   // Only Book-it cards have live pickers. Proposal cards show the slot read-only.
   if (top && top._kind === 'book') _hk2EnsureBookOpts();
+  // The agent can hand over an EMPTY closing draft on purpose ("nothing to
+  // send") - the button has to say so before anyone touches the box.
+  _hk2SyncGoLabel();
   _hk2HydrateThread();   // fill the conversation preview if this card carried none
   _hkAutosizeDrafts('#pl-hawkeye');
   // A NEW card on top (deck open, approve/skip advance, tab switch) starts in
@@ -39090,11 +39100,27 @@ function _hk2Edited(isSlot) {
     _HK2.edited = true;
     const t = document.getElementById('hk2-teach'); if (t) t.style.display = '';
   }
-  if (!_HK2.touched) {
-    _HK2.touched = true;
-    const go = document.getElementById('hk2-go'); if (go) go.textContent = _HK2_KIND[r._kind].goEdit;
-  }
+  if (!_HK2.touched) _HK2.touched = true;
+  _hk2SyncGoLabel();
   _hk2SyncMoveLabels();
+}
+// ── "Send nothing" (Zoran 2026-07-23, CLOSING agent only) ────────────────────
+// An EMPTY message box on a closing reply card IS the action: the lead said
+// "thank you" and needs no answer. Clear the box (or let the agent hand you an
+// empty one) and the primary button becomes "Send nothing" - confirming texts
+// them nothing AND puts back the follow-up plan / reignition their reply paused.
+function _hk2NoReply(r) {
+  if (!r || _HK2.agent !== 'closing' || r._kind !== 'reply') return false;
+  const d = document.getElementById('hk2-draft');
+  return !String(d ? d.value : (r.draft_message || '')).trim();
+}
+// One place decides the primary button's label: "Send nothing" on an empty
+// closing draft, otherwise the kind's normal / edited label.
+function _hk2SyncGoLabel() {
+  const r = _hk2Top(); if (!r) return;
+  const go = document.getElementById('hk2-go'); if (!go) return;
+  go.textContent = _hk2NoReply(r) ? 'Send nothing'
+    : (_HK2.touched ? _HK2_KIND[r._kind].goEdit : _HK2_KIND[r._kind].go);
 }
 function _hk2ToggleOther(btn) {
   const pnl = document.getElementById('hk2-other'); if (pnl) pnl.classList.toggle('open');
@@ -39174,7 +39200,10 @@ function _hk2Confirm() {
   const before = r.draft_message || '';
   const k = r._kind;
   const writeMode = k === 'ghost' && r._writeMode;
-  if ((k === 'reply' || k === 'enroll' || k === 'reignite_due' || writeMode) && !reply) { _apxToast('Message is empty', false); r._hk2Busy = false; return; }
+  // An empty box on a CLOSING reply card is not a mistake - it's "send nothing"
+  // (Zoran 2026-07-23). Every other kind still refuses to commit an empty message.
+  const noReply = agent === 'closing' && k === 'reply' && !reply;
+  if (!noReply && (k === 'reply' || k === 'enroll' || k === 'reignite_due' || writeMode) && !reply) { _apxToast('Message is empty', false); r._hk2Busy = false; return; }
   // Capture every input NOW - the deck advances to the next card immediately,
   // which tears down this card's DOM before the deferred API call runs.
   const calEl = document.getElementById('hk2-cal'), slotEl = document.getElementById('hk2-slot');
@@ -39249,7 +39278,7 @@ function _hk2Confirm() {
   }
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   let undone = false;
-  _hawkDefer({ cardId: 'hk2-topcard', label: writeMode ? 'Send message' : _HK2_KIND[k].go, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
+  _hawkDefer({ cardId: 'hk2-topcard', label: noReply ? 'Send nothing' : writeMode ? 'Send message' : _HK2_KIND[k].go, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
     if (k === 'book') {
       const resp = chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: calV, slot_at: slotV, reply, athlete_name: athV }));
       _apxToast(resp && resp.confirmation_sent ? 'Booked + confirmation sent - Confirm takes over' : 'Booked - handed to Confirm', true);
@@ -39319,6 +39348,13 @@ function _hk2Confirm() {
       const res = await fetch('/api/agent-closing', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve-plan', client_id: CLIENT_ID, contact_id: r.ghl_contact_id, edits }) });
       const j = await _safeJson(res); if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
       _apxToast(`Follow-up schedule locked in - ${j.scheduled} message(s)`, true);
+    } else if (noReply) {
+      // Nothing goes out. The card closes and everything their reply PAUSED (the
+      // follow-up plan, a parked reignition) goes back on its original dates -
+      // the reason this action exists (Zoran 2026-07-23).
+      const resp = chk(await _apxPost(ep, 'confirm-no-reply', { ready_id: r.id, contact_id: r.ghl_contact_id, contact_name: r.contact_name || null, adjusted: !!before }));
+      const kept = (resp && resp.resumed) || 0;
+      _apxToast(kept ? `Nothing sent - ${kept} follow-up${kept === 1 ? '' : 's'} still scheduled` : 'Nothing sent - card cleared', true);
     } else {
       // reply
       let resp;
