@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { PRESETS, buildPresetRows } from "../agent/presets.js";
 
 // Sales-machine readiness for one offer (Gap #2 / DETAIL "what's left" view).
 //
@@ -203,7 +204,12 @@ async function handler(req, res) {
       ok: true,
       offer_id: offerId,
       pipeline_stages: count(stages),
-      transitions: count(edges),
+      // Phase 3: edges are runtime-read from the code master, not copy-stamped -
+      // a stamped academy reports the MASTER's edge count (new academies have
+      // zero rows by design). DB row count remains the un-stamped fallback.
+      transitions: (sales.preset_key && PRESETS[sales.preset_key])
+        ? buildPresetRows(sales.preset_key, clientId, null).transitionRows.length
+        : count(edges),
       automations: (Array.isArray(autos) ? autos : []).map(a => ({ key: a.automation_key, approved: !!a.approved })),
       agent_sections: count(agentSecs),
       sales_fields: count(salesDefs),

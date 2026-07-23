@@ -11,12 +11,16 @@ import { applyPreset, buildPresetRows, PRESETS, presetContents } from "../agent/
 //         workers, contents }  (dry-run, no writes; `contents` is the manifest
 //         summary the UI renders its chips from - agents, automations, forms,
 //         calendars - so the front end never hardcodes what a preset brings)
+//   GET  /api/offers/apply-preset?action=graph&client_id=
+//     → { ok, preset, stages, edges }  (the MASTER flow graph this academy runs,
+//        resolved from its offer stamp - what the config view renders since the
+//        Phase 3 cleanup; per-academy pause state is overlaid client-side)
 //   POST /api/offers/apply-preset   body { client_id, offer_id, preset, force? }
 //     → { ok, preset, stages, transitions, stamp }
-//        (writes pipeline_stages + stage_transitions, then stamps
-//         offer.data.sales.{preset_key,preset_version,preset_applied_at} so
-//         setup-status and re-stamps are traceable)
-//        409 { error, needs_force } when the offer already has conflicting edges.
+//        (Phase 3: writes ONLY the pipeline_stages identity anchors + the offer
+//         stamp offer.data.sales.{preset_key,preset_version,preset_applied_at};
+//         edges are runtime-read from the master, never copy-stamped. `force`
+//         is accepted and ignored - the 409/needs_force flow is gone.)
 //
 // Auth: Supabase JWT — BAM staff (any academy) or a client_users member of client_id.
 
@@ -89,6 +93,27 @@ async function handler(req, res) {
     const clientId = q.client_id || b.client_id;
     const offerId = q.offer_id || b.offer_id;
     const presetKey = q.preset || b.preset || "free_trial";
+
+    // The master flow graph this academy runs (Phase 3: the config view renders
+    // from HERE, not from per-academy stage_transitions rows). Preset resolved
+    // from the offer stamp; falls back to free_trial when un-stamped so a
+    // mid-onboarding academy still sees the flow it is about to get.
+    if (action === "graph") {
+      if (!clientId) return res.status(400).json({ error: "client_id required" });
+      const { isStaff, clientIds } = await resolveUser(req);
+      if (!isStaff && !clientIds.includes(clientId)) return res.status(403).json({ error: "not authorized for this academy" });
+      let key = "free_trial";
+      try {
+        const rows = await sb(`offers?client_id=eq.${enc(clientId)}&select=data&limit=10`);
+        for (const r of rows || []) {
+          const k = r && r.data && r.data.sales && r.data.sales.preset_key;
+          if (k && PRESETS[k]) { key = k; break; }
+        }
+      } catch (_) { /* fall back to free_trial */ }
+      const { stageRows, transitionRows } = buildPresetRows(key, clientId, null);
+      return res.status(200).json({ ok: true, preset: key, stages: stageRows, edges: transitionRows });
+    }
+
     if (!clientId || !offerId) return res.status(400).json({ error: "client_id and offer_id required" });
     if (!PRESETS[presetKey]) return res.status(400).json({ error: `unknown preset '${presetKey}'` });
 
