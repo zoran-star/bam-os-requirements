@@ -5,10 +5,6 @@
 -- still emits the old 'interested' role, so a manual call would reintroduce it.
 -- Re-point it at 'ghosted' so the whole DB is consistent. Same constraint name
 -- (stage_transitions_edge_uniq) as the offer_id migration preserved.
---
--- NOTE (2026-07-23): reconstructed from the live database - applied to prod via
--- MCP on 2026-07-21 but never committed. Body verbatim from
--- supabase_migrations.schema_migrations.
 create or replace function public.seed_default_stage_transitions(p_client_id uuid) returns void as $$
 begin
   insert into public.stage_transitions

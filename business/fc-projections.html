@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FullControl - Revenue Projections</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #141414;
+    --panel-2: #1c1c1c;
+    --border: rgba(255,255,255,0.08);
+    --border-bright: rgba(255,255,255,0.16);
+    --text: #e8e6e1;
+    --text-muted: #8a8882;
+    --text-dim: #5a5854;
+    --accent: #ff4d2e;
+    --gold: #d4a857;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: 'Neue Haas Grotesk', 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+  header { padding: 56px 0 36px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, rgba(212,168,87,0.05), transparent 70%); }
+  .kicker { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); font-weight: 500; margin-bottom: 14px; }
+  h1 { font-size: clamp(34px, 7vw, 54px); font-weight: 700; letter-spacing: -0.025em; line-height: 1.0; margin: 0 0 14px; }
+  .sub { font-size: 16px; color: var(--text-muted); line-height: 1.55; margin: 0 0 24px; max-width: 620px; font-weight: 300; }
+  .meta { display: flex; gap: 28px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-dim); letter-spacing: 0.06em; text-transform: uppercase; flex-wrap: wrap; }
+  .meta strong { display: block; color: var(--text); font-size: 13px; text-transform: none; letter-spacing: 0.02em; margin-top: 3px; font-weight: 500; }
+  section { padding: 44px 0; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); font-weight: 500; margin: 0 0 22px; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 16px; }
+  .tile .lbl { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+  .tile .num { font-size: clamp(22px, 4.5vw, 34px); font-weight: 700; letter-spacing: -0.02em; color: var(--gold); line-height: 1; }
+  .tile .sub2 { font-size: 12px; color: var(--text-muted); margin-top: 7px; }
+  .chartbox { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px 14px 10px; position: relative; }
+  .tip { position: absolute; pointer-events: none; background: var(--panel-2); border: 1px solid var(--border-bright); border-radius: 7px; padding: 7px 10px; font-size: 12px; line-height: 1.5; display: none; white-space: nowrap; z-index: 5; }
+  .tip b { color: var(--gold); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--border-bright); }
+  td { padding: 11px 12px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+  td:first-child { color: var(--text); font-weight: 500; }
+  tr.hl td { color: var(--text); background: rgba(212,168,87,0.06); }
+  tr.hl td:first-child { color: var(--gold); }
+  .num-cell { font-variant-numeric: tabular-nums; }
+  .dials { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .dial { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .dial .d-lbl { font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 7px; }
+  .dial .d-val { font-size: 17px; font-weight: 600; }
+  .dial .d-note { font-size: 12px; color: var(--text-muted); margin-top: 5px; line-height: 1.45; }
+  .foot { padding: 28px 0 60px; font-size: 12px; color: var(--text-dim); line-height: 1.7; }
+  @media (max-width: 560px) { .tiles { grid-template-columns: 1fr; } .scrollx { overflow-x: auto; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="kicker">FullControl</div>
+    <h1>Revenue projections</h1>
+    <p class="sub">A 24-month working model built from the live tier pricing and a capacity-based growth ramp. Conservative on purpose: every input is something we can defend out loud.</p>
+    <div class="meta">
+      <div>Prepared <strong>July 2026</strong></div>
+      <div>Status <strong>Working model</strong></div>
+      <div>Basis <strong>Live product pricing</strong></div>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Where the model lands</h2>
+    <div class="tiles">
+      <div class="tile"><div class="lbl">Month 12</div><div class="num">$63K</div><div class="sub2">MRR &middot; 111 accounts &middot; $759K ARR</div></div>
+      <div class="tile"><div class="lbl">Month 18</div><div class="num">$113K</div><div class="sub2">MRR &middot; 193 accounts &middot; $1.4M ARR</div></div>
+      <div class="tile"><div class="lbl">Month 24</div><div class="num">$169K</div><div class="sub2">MRR &middot; 285 accounts &middot; $2.0M ARR</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Monthly recurring revenue, months 1-24</h2>
+    <div class="chartbox">
+      <svg id="chart" viewBox="0 0 840 340" width="100%" role="img" aria-label="MRR growth from launch to $169K over 24 months"></svg>
+      <div class="tip" id="tip"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The model in one glance</h2>
+    <div class="dials">
+      <div class="dial"><div class="d-lbl">Founding cohort</div><div class="d-val">25 @ $399/mo</div><div class="d-note">Onboarded inside a 90-day founding window from the warm network.</div></div>
+      <div class="dial"><div class="d-lbl">Growth ramp</div><div class="d-val">8 &rarr; 25 new/mo</div><div class="d-note">New accounts per month rise by one each month, capped at onboarding capacity.</div></div>
+      <div class="dial"><div class="d-lbl">Blended revenue</div><div class="d-val">$600 / account</div><div class="d-note">From the tier mix below, after discounts and annual deals.</div></div>
+      <div class="dial"><div class="d-lbl">Churn</div><div class="d-val">4% monthly</div><div class="d-note">Applied to every cohort from month one. No expansion revenue assumed.</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Pricing tiers and expected mix</h2>
+    <div class="scrollx">
+      <table>
+        <tr><th>Tier</th><th>Price</th><th>Mix</th><th>What it is</th></tr>
+        <tr><td>FC Core</td><td class="num-cell">$499/mo</td><td class="num-cell">75%</td><td>Run the academy: portal, billing, inbox, booking agent, marketing dashboard, mobile app</td></tr>
+        <tr><td>FC Growth</td><td class="num-cell">$899-999/mo</td><td class="num-cell">20%</td><td>Core plus the full AI sales crew, automations, and the self-learning agent brain</td></tr>
+        <tr><td>FC Scale</td><td class="num-cell">$1,499+/mo</td><td class="num-cell">5%</td><td>Multi-location, team permissions, advanced analytics, priority support</td></tr>
+        <tr><td>Founding 25</td><td class="num-cell">$399/mo</td><td class="num-cell">First 25</td><td>Growth-tier value at a grandfathered founding price</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Milestones</h2>
+    <div class="scrollx">
+      <table>
+        <tr><th>Month</th><th>Accounts</th><th>MRR</th><th>ARR run rate</th><th>Marker</th></tr>
+        <tr><td>3</td><td class="num-cell">25</td><td class="num-cell">$10K</td><td class="num-cell">$115K</td><td>Founding window closes</td></tr>
+        <tr><td>6</td><td class="num-cell">47</td><td class="num-cell">$24K</td><td class="num-cell">$289K</td><td>Public acquisition ramping</td></tr>
+        <tr class="hl"><td>9</td><td class="num-cell">76</td><td class="num-cell">$42K</td><td class="num-cell">$505K</td><td>Seed-ready MRR band ($40-50K)</td></tr>
+        <tr><td>12</td><td class="num-cell">111</td><td class="num-cell">$63K</td><td class="num-cell">$759K</td><td>One year in</td></tr>
+        <tr><td>18</td><td class="num-cell">193</td><td class="num-cell">$113K</td><td class="num-cell">$1.4M</td><td>Ramp at full capacity</td></tr>
+        <tr><td>24</td><td class="num-cell">285</td><td class="num-cell">$169K</td><td class="num-cell">$2.0M</td><td>Two years in</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div class="wrap foot">
+  Excludes BAM Business partner-tier revenue (base retainer plus growth share), which sits on top of these numbers. All figures are a working model, not a commitment, and will be revised as live data replaces assumptions.
+</div>
+
+<script>
+(function () {
+  var DATA = [[1,8,3300],[2,16,6500],[3,24,9600],[4,31,14000],[5,39,18800],[6,47,24100],[7,56,29700],[8,66,35700],[9,76,42100],[10,87,48800],[11,99,55900],[12,111,63200],[13,124,70900],[14,137,78900],[15,150,87100],[16,164,95600],[17,179,104400],[18,193,113400],[19,209,122700],[20,224,132200],[21,240,141900],[22,256,151200],[23,271,160200],[24,285,168800]];
+  var W = 840, H = 340, PL = 56, PR = 20, PT = 24, PB = 34;
+  var maxY = 180000;
+  var x = function (m) { return PL + (m - 1) / 23 * (W - PL - PR); };
+  var y = function (v) { return PT + (1 - v / maxY) * (H - PT - PB); };
+  var svg = document.getElementById('chart');
+  var NS = 'http://www.w3.org/2000/svg';
+  function el(t, a) { var e = document.createElementNS(NS, t); for (var k in a) e.setAttribute(k, a[k]); svg.appendChild(e); return e; }
+  // recessive grid + y labels
+  [0, 45000, 90000, 135000, 180000].forEach(function (v) {
+    el('line', { x1: PL, x2: W - PR, y1: y(v), y2: y(v), stroke: 'rgba(255,255,255,0.06)', 'stroke-width': 1 });
+    var t = el('text', { x: PL - 8, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 11, fill: '#5a5854' });
+    t.textContent = v === 0 ? '0' : '$' + (v / 1000) + 'K';
+  });
+  [3, 6, 9, 12, 15, 18, 21, 24].forEach(function (m) {
+    var t = el('text', { x: x(m), y: H - 12, 'text-anchor': 'middle', 'font-size': 11, fill: '#5a5854' });
+    t.textContent = 'M' + m;
+  });
+  // area + line
+  var pts = DATA.map(function (d) { return x(d[0]) + ',' + y(d[2]); }).join(' ');
+  el('polygon', { points: x(1) + ',' + y(0) + ' ' + pts + ' ' + x(24) + ',' + y(0), fill: 'rgba(212,168,87,0.10)' });
+  el('polyline', { points: pts, fill: 'none', stroke: '#d4a857', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+  // milestone dots + selective direct labels
+  [[3, '$10K', -14], [9, '$42K', -12], [18, '$113K', -12], [24, '$169K', -12]].forEach(function (ms) {
+    var d = DATA[ms[0] - 1];
+    el('circle', { cx: x(d[0]), cy: y(d[2]), r: 4, fill: '#d4a857', stroke: '#141414', 'stroke-width': 2 });
+    var t = el('text', { x: x(d[0]) + (ms[0] === 24 ? -6 : 0), y: y(d[2]) + ms[2], 'text-anchor': ms[0] === 24 ? 'end' : 'middle', 'font-size': 12, 'font-weight': 600, fill: '#e8e6e1' });
+    t.textContent = ms[1];
+  });
+  // hover crosshair + tooltip
+  var cross = el('line', { y1: PT, y2: H - PB, stroke: 'rgba(255,255,255,0.18)', 'stroke-width': 1, visibility: 'hidden' });
+  var dot = el('circle', { r: 5, fill: '#d4a857', stroke: '#0a0a0a', 'stroke-width': 2, visibility: 'hidden' });
+  var tip = document.getElementById('tip');
+  var box = document.querySelector('.chartbox');
+  function onMove(evt) {
+    var r = svg.getBoundingClientRect();
+    var px = (evt.touches ? evt.touches[0].clientX : evt.clientX) - r.left;
+    var m = Math.round(((px / r.width * W) - PL) / (W - PL - PR) * 23 + 1);
+    m = Math.max(1, Math.min(24, m));
+    var d = DATA[m - 1];
+    cross.setAttribute('x1', x(m)); cross.setAttribute('x2', x(m)); cross.setAttribute('visibility', 'visible');
+    dot.setAttribute('cx', x(m)); dot.setAttribute('cy', y(d[2])); dot.setAttribute('visibility', 'visible');
+    tip.style.display = 'block';
+    tip.innerHTML = 'Month ' + m + '<br><b>$' + Math.round(d[2] / 100) / 10 + 'K MRR</b> &middot; ' + d[1] + ' accounts';
+    var bx = box.getBoundingClientRect();
+    var left = x(m) / W * r.width + (r.left - bx.left);
+    tip.style.left = Math.min(bx.width - 150, Math.max(6, left + 12)) + 'px';
+    tip.style.top = (y(d[2]) / H * r.height + (r.top - bx.top) - 14) + 'px';
+  }
+  function onLeave() { cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); tip.style.display = 'none'; }
+  svg.addEventListener('mousemove', onMove);
+  svg.addEventListener('touchmove', onMove, { passive: true });
+  svg.addEventListener('mouseleave', onLeave);
+  svg.addEventListener('touchend', onLeave);
+})();
+</script>
+</body>
+</html>

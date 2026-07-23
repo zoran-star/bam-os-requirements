@@ -11,11 +11,6 @@
 -- clients.ghl_kpi_config.portal_entry_routing.*_stage) intentionally KEEP
 -- 'interested' - they mirror the actual GHL sub-account stage name and are bridged
 -- to the new role by the ROLE_MATCHERS /interest|ghost/ regex (api/agent/_store.js).
---
--- NOTE (2026-07-23): this file was reconstructed from the live database. It was
--- applied to prod via MCP on 2026-07-21 but the .sql was never committed, so
--- local replay drifted from prod. Body is verbatim from
--- supabase_migrations.schema_migrations.
 
 update public.pipeline_stages
    set role  = 'ghosted',
