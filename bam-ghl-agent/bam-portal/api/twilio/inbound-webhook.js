@@ -15,6 +15,7 @@ import crypto from "node:crypto";
 import { pickGhlToken, sendSms, ghl } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
 import { respondedStage, contactInRespondedStage, interestedStage, nurtureStage, isRealInbound } from "../agent/_stage.js";
+import { markReopened } from "../agent/_reopen.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, memberCareAgentMode, modeIsOn } from "../agent/_mode.js";
 import { exitEnrollment } from "../automations.js";
@@ -203,8 +204,9 @@ async function handler(req, res) {
             // nurture stage (same guard, read from the store where the true stage lives).
             const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(client.id)}&ghl_contact_id=eq.${encodeURIComponent(String(ghlContactId))}&status=eq.open&select=id,ghl_opportunity_id,stage_role&limit=1`);
             const opp = Array.isArray(rows) && rows[0];
-            if (opp && (opp.stage_role === "interested" || opp.stage_role === "nurture")) {
+            if (opp && (opp.stage_role === "ghosted" || opp.stage_role === "interested" || opp.stage_role === "nurture")) {
               await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id }, stage: rs, role: "responded", contactId: String(ghlContactId) });
+              await markReopened({ clientId: client.id, sb, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id } });
             }
           } else if (rs) {
             const d = await ghl("GET", `/opportunities/search?${new URLSearchParams({ location_id: creds.locationId, contact_id: String(ghlContactId), limit: "20" })}`, { token: creds.token });
@@ -219,6 +221,7 @@ async function handler(req, res) {
               const ghostStageIds = new Set([is && is.stageId, ns && ns.stageId].filter(Boolean));
               if (ghostStageIds.has(curStageId)) {
                 await moveStage({ clientId: client.id, sb, ghl, token: creds.token, oppRef: { ghlOpportunityId: opp.id }, stage: rs, role: "responded", contactId: String(ghlContactId) });
+                await markReopened({ clientId: client.id, sb, oppRef: { ghlOpportunityId: opp.id } });
               }
             }
           }

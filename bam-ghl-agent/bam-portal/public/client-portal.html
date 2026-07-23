@@ -37986,7 +37986,7 @@ function _plStageBot(name) {
 // leaving its role. Rows live in `stage_transitions` (client-scoped RLS), the
 // standard flow is seeded per academy, and academies can author their own via
 // the Exit editor in focus mode. Enums:
-//   stage_role      = responded | interested | scheduled_trial | done_trial | nurture
+//   stage_role      = responded | ghosted | scheduled_trial | done_trial | nurture
 //   trigger         = base library (below)
 //   destination     = a role (to_kind='stage') OR a terminal member/unqualified/human.
 let _PL_EDGES = null;        // cached edge rows for CLIENT_ID
@@ -37996,7 +37996,7 @@ let _PL_EDGE_FORM = null;    // {mode:'add'|'edit', role, id?} — the open inli
 function _plStageRole(name) {
   const b = _plStageBot(name);
   if (!b) return null;
-  return ({ booking: 'responded', confirm: 'scheduled_trial', closing: 'done_trial', ghosted: 'interested', nurture: 'nurture' })[b.key] || null;
+  return ({ booking: 'responded', confirm: 'scheduled_trial', closing: 'done_trial', ghosted: 'ghosted', nurture: 'nurture' })[b.key] || null;
 }
 // Human-readable trigger labels (order = the library shown in the destination picker).
 const _EDGE_TRIGGERS = {
@@ -38017,9 +38017,9 @@ const _EDGE_TRIGGERS = {
   complaint_offtopic:  'Complaint / off-topic',
   ghosted_ran_out:     'Nudges ran out',
 };
-const _EDGE_ROLE_LABEL = { responded: 'Responded', interested: 'Ghosted', scheduled_trial: 'Scheduled Trial', done_trial: 'Done Trial', nurture: 'Nurture' };
+const _EDGE_ROLE_LABEL = { responded: 'Responded', ghosted: 'Ghosted', interested: 'Ghosted', scheduled_trial: 'Scheduled Trial', done_trial: 'Done Trial', nurture: 'Nurture' };
 const _EDGE_TERMINAL_LABEL = { member: 'Member', unqualified: 'Unqualified', human: 'Human takeover' };
-const _EDGE_ROLE_ICON = { responded: 'phone', interested: 'ghost', scheduled_trial: 'calendar', done_trial: 'target', nurture: 'heart' };
+const _EDGE_ROLE_ICON = { responded: 'phone', ghosted: 'ghost', interested: 'ghost', scheduled_trial: 'calendar', done_trial: 'target', nurture: 'heart' };
 const _EDGE_TERMINAL_ICON = { member: 'award', unqualified: 'ban', human: 'alert' };
 // A destination's label + icon, whether it's a role or a terminal.
 function _edgeDestLabel(e) { return e.to_kind === 'terminal' ? (_EDGE_TERMINAL_LABEL[e.to_terminal] || e.to_terminal) : (_EDGE_ROLE_LABEL[e.to_stage_role] || e.to_stage_role); }
@@ -39511,7 +39511,7 @@ function _plRenderOverview() {
 // (terminal) stages get NO pill; unmapped custom stages keep their pipeline
 // position after the known ones.
 function _plo2Order(stages) {
-  const ORD = { nurture: 0, interested: 1, responded: 2, scheduled_trial: 3, done_trial: 4 };
+  const ORD = { nurture: 0, ghosted: 1, interested: 1, responded: 2, scheduled_trial: 3, done_trial: 4 };
   return stages
     .filter(s => { const b = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null; return !(b && b.kind === 'terminal'); })
     .map((s, i) => { const r = _plStageRole(s.name); return { s, k: (r && ORD[r] != null) ? ORD[r] : 10 + i }; })
