@@ -26503,14 +26503,14 @@ async function _bbStaffRefreshList() {
   // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
   // so the invite/revoke modals (which read those globals) keep working.
   let { data, error } = await _sb.from('client_users')
-    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members, title, bio')
+    .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_enroll_members, can_train_agent, title, bio')
     .eq('client_id', CLIENT_ID)
     .eq('status', 'active')
     .eq('hide_from_team', false);
   if (error) {
     // Migration-safe fallback: can_enroll_members / title / bio may not exist yet.
     ({ data, error } = await _sb.from('client_users')
-      .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages')
+      .select('id, name, email, phone, role, user_id, allowed_tabs, allowed_stages, can_train_agent')
       .eq('client_id', CLIENT_ID)
       .eq('status', 'active')
       .eq('hide_from_team', false));
@@ -26585,6 +26585,9 @@ async function _bbStaffRefreshList() {
     const canManageStages = iAmOwner && !isOwner && relevantTabs.some(t => t.key === 'pipelines');
     // KPI-category picker only when the KPIs tab is available.
     const canManageKpis = iAmOwner && !isOwner && relevantTabs.some(t => t.key === 'kpis');
+    // "Can edit the agent's brain" grant: owner-managed, members only (the owner
+    // always has access via the role bypass in api/agent-train.js).
+    const canManageTrain = iAmOwner && !isOwner;
     const canPreview = iAmOwner && !isOwner;
     _BB_STAGE_PERMS[r.id] = Array.isArray(r.allowed_stages) ? r.allowed_stages : null;
     _BB_STAFF_META[r.id] = {
@@ -26664,11 +26667,23 @@ async function _bbStaffRefreshList() {
         <span id="staff-invite-status-${r.id}" style="display:block;font-size:11px;color:var(--text-mute);margin-top:6px"></span>
       </div>`;
 
-    // Access (members only): tab / stage / KPI grants + returning-client enroll.
-    const accessZone = !(canManageTabs || canManageStages) ? '' : `
+    // "Can edit the agent's brain" toggle (members only). Wired to the existing
+    // client_users.can_train_agent boolean; ON reveals the Train Agent nav for
+    // that teammate on their next load. Matches the tab-access checkbox pattern.
+    const trainHtml = !canManageTrain ? '' : `
+      <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;margin-top:6px">
+        <input type="checkbox" ${r.can_train_agent === true ? 'checked' : ''} onchange="_bbStaffTrainAgentSave('${r.id}', this.checked)" style="margin-top:2px">
+        <span>
+          <span style="display:block;font-size:13px;color:var(--text);font-weight:600">Can edit the agent's brain</span>
+          <span style="display:block;font-size:11px;color:var(--text-mute);margin-top:2px">Teach lessons, test the agent and use Edit the brain</span>
+          <span id="staff-train-status-${r.id}" style="display:block;font-size:11px;color:var(--text-mute);margin-top:3px"></span>
+        </span>
+      </label>`;
+    // Access (members only): tab / stage / KPI grants + agent-brain access.
+    const accessZone = !(canManageTabs || canManageStages || canManageTrain) ? '' : `
       <div style="${ZONE}">
         <div style="${ZLAB}">${ic('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>')}Access · starts with nothing until you grant it</div>
-        ${tabsHtml}${stagesHtml}
+        ${tabsHtml}${stagesHtml}${trainHtml}
       </div>`;
 
     // Notifications (owner-manage, CRM/V2 tiers): which events text this person.
@@ -26735,6 +26750,28 @@ function _bbStaffNotifPillsHtml(personId, hasPhone) {
     const on = Array.isArray(prefs[ev.key]) && prefs[ev.key].includes(personId);
     return `<button onclick="_bbNotifToggle('${ev.key}','${personId}')" title="${_bbEscapeAttr(ev.hint)}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;border:1px solid ${on ? 'var(--gold,#D4B65C)' : 'var(--border-med)'};background:${on ? 'var(--gold,#D4B65C)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'}${!hasPhone && !on ? ';opacity:.55' : ''}">${escapeHTML(ev.label)}</button>`;
   }).join('');
+}
+
+// Owner toggles a teammate's "Can edit the agent's brain" grant. Same
+// owner-gated set-staff-tabs action; boolean field on client_users.can_train_agent.
+// ON reveals the Train Agent nav for that person on their next load.
+async function _bbStaffTrainAgentSave(memberId, checked) {
+  const statusEl = document.getElementById('staff-train-status-' + memberId);
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/clients?action=set-staff-tabs', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, member_id: memberId, can_train_agent: checked === true }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    _bbStaffMetaSet(memberId, 'can_train_agent', checked === true);
+    if (statusEl) { statusEl.textContent = 'Saved. Takes effect on their next visit.'; setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2500); }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '' + e.message;
+  }
 }
 
 // Owner toggles a teammate's Returning Client Enroll grant (Members tab).
