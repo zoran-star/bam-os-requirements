@@ -1,5 +1,33 @@
 # Sales systems are SHARED + plug-and-play (GUARDRAIL)
 
+## ✅ THE CONTROL DIAL - who owns what (COMPLETE, Zoran 2026-07-23)
+Three tiers. Tier 1 is the only thing Build 1 / Phase 1 has to serve via runtime-read.
+
+**🔒 TIER 1 - BAM MASTER (locked, auto-propagates to every academy)**
+- Pipeline stages + edges; which automations exist and where they hook into the flow
+- Agent behavior AND **agent tone/voice - ONE voice for every academy** (Zoran went stricter than the proposed "voice is a per-academy fact": tone is craft, it is not academy-configurable)
+- **Agent persistence** (how hard it pushes in-conversation) - craft, tuned by Hawkeye lessons so improvements benefit everyone
+- **Qualification framework LOCKED AT 3** (location / athlete age / program fit). No academy-added 4th criterion - it drives the Unqualified dead-end and keeps close rates comparable. A genuine 4th gets added for EVERYONE. NOTE: GTA's "near Oakville" is the VALUE of the location criterion, not a 4th criterion.
+- **CORE lead-form fields** (name, phone, athlete, age, location) - the agent + qualifications depend on them, so an academy cannot delete them
+- **CORE post-trial form fields** (showed up / good fit / trainer / notes) - they feed the KPI
+- KPI definitions; guardrails (off-topic -> human, every stage has an engine)
+
+**🎨 TIER 2 - SEEDED THEN ACADEMY-OWNED (BAM tailors at onboarding, academy then owns it; master edits do NOT retro-propagate, only new academies get the new seed)**
+- Automation SEQUENCES: message copy, branded emails, timing, number of steps (the real volume dial: 3 ghosted texts, 3 nurture emails)
+- EXTRA lead-form questions on top of the core (GTA already has 2: "near Oakville?", start-timeline) - agent is told about extras generically
+- EXTRA post-trial form questions
+- Automation ON/OFF + sequence approval; agent lessons/training (already academy-bucketed)
+- Hawkeye trust level (approve-each vs auto-send) - future feature, per academy, trust builds over time
+
+**📄 TIER 3 - FACTS + SETTINGS (derived live from the academy's own records)**
+- Schedule, pricing, policies, program, coaches, selling points, business info
+- Qualification VALUES (which city, which age range) - the values, never the framework
+- Quiet hours / send window (timezone alone forces per-academy; BAM sets a default)
+- Who gets the "new chat to approve" notification
+
+**⚪ STATE (never touched by propagation):** contacts, opportunities, threads, bookings, drip positions, KPI numbers.
+
+
 **⚠ REFINED 2026-07-23 (Zoran) - THREE TIERS, not two.** Automation SEQUENCES (message copy, branded emails, timing, steps) are NOT shared structure: BAM tailors the initial drip per academy at onboarding, then the ACADEMY owns it (edits today via support tickets for emails - self-serve sequence editing = future build). Master edits to sequences do NOT retro-propagate (only new academies get the new seed); academy edits never touch the master. The current create-only-if-missing seeder is CORRECT for this tier. Tier model: (1) BAM MASTER locked + auto-propagating = stages/edges + which automations exist & where they hook + agent behavior + qualifications framework + KPI defs; (2) SEEDED-THEN-ACADEMY-OWNED = automation sequences/content; (3) FACTS derived live; (+ STATE untouched). This SHRINKS Build 1: only tier 1 needs runtime-read/auto-propagation. The 2026-07-22 framing below ("automation steps are structure, close the edit hatches") is superseded on that point - step-builder CRUD is a legit academy surface, not a fork hatch.
 
 **Decided 2026-07-22 (Zoran).** A sales system's TIER-1 STRUCTURE is shared across every academy on a preset and must stay plug-and-play. An academy NEVER forks the structure.
