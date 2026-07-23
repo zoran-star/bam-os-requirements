@@ -9,6 +9,21 @@ core_commit_reviewed: unavailable
 phases_done: [1, 2, "3a", 4]
 ---
 
+## 2026-07-23 — THE ENTITY WAVE (supersedes Decision #3 below; runtime-read replaces copy-stamping)
+
+**Zoran's control-dial model (2026-07-23) - three ownership tiers:**
+1. **BAM MASTER (tier 1, locked, auto-propagates):** stages + edges, automation hooks, agent behavior AND voice (one voice for all academies), persistence, qualification framework (locked at 3: location / age / program fit - academy city+age are VALUES), core lead-form + post-trial fields, KPI definitions, guardrails.
+2. **SEEDED-THEN-ACADEMY-OWNED (tier 2):** automation sequences (copy/timing/steps), extra form + post-trial questions, ON/OFF + approvals, lessons, future Hawkeye trust level. Master edits do NOT retro-propagate here - only new academies get the new seed. **This supersedes Decision #3's "automations + training only" phrasing: sequences are academy-owned CONTENT, not shared structure.**
+3. **FACTS (tier 3, derived live):** schedule/pricing/policies/program/coaches/selling points/business info + quiet hours + notify-who, pulled from the academy's records at read time (Build 2).
+
+**Architecture decision: tier-1 structure moves to RUNTIME-READ from the code master** (Path B) - per-academy `stage_transitions` copies retire (Phase 3); `pipeline_stages` rows survive only as identity anchors (opportunities FK them).
+
+**Shipped so far:**
+- **Phase 0 (2026-07-23, PRs #1560/#1561):** `interested`→`ghosted` role cutover finished code-side (authors new, tolerates legacy; `ROLE_MATCHERS` gained the `ghosted` key; GHL name mirrors untouched) + prod data cleanup (migration `20260723143000`, zero `interested` rows remain). Lost-mark gap fixed: `cc_qualified_trials` is latest-outcome-wins (migration `20260723134812`) + new `api/agent/_reopen.js markReopened()` at all 8 nurture/ghost reply-bounce sites, so a returning lead counts pending, not lost.
+- **Phase 1 step 1 SHADOW (2026-07-23, PR #1562):** `api/agent/preset-master.js` (offer-stamp preset resolution + compiled master edges) wired fire-and-forget into `resolveEdge`; logs `[preset-shadow]` divergence, serves DB unchanged. Offline full diff vs prod: GTA 23/23 exact, San Jose 23/23 exact, DETAIL 0/23 (no edge rows - runs hardcoded fallbacks; the flip hands it a real graph). Next: FLIP (master-first, DB fallback, tier-2 pause overrides win), then board/config-view rendering, then Phase 3 cleanup (also retire `seed_default_stage_transitions` + apply-preset copy-stamping).
+
+Core parity still UNREVIEWED - `fc-core-srvc` remains inaccessible from the `zoran-star` account (open loop: Luka to grant access).
+
 ## Phase 4 SHIPPED (2026-07-10) — template-scoped training
 
 Lessons were ALREADY template-scoped by the Phase 2 design: `agent_lessons.agent`
