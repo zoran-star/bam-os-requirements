@@ -53,109 +53,19 @@ async function resolveUser(req) {
   return { isStaff, clientIds };
 }
 
-const money = (v) => { const n = Number(String(v).replace(/[^0-9.]/g, "")); return isFinite(n) && n > 0 ? `$${n}` : null; };
-const arr = (x) => Array.isArray(x) ? x : (x ? [x] : []);
-
-// ── FACT section generators (offer.data + client → agent prompt text) ──
-// Each returns a string, or null when the offer has nothing to say for it (so we
-// never blank out a section the offer doesn't cover).
-function genBusinessInfo(client, data, locations) {
-  const lines = [client.business_name || "The academy"];
-  // Locations with directions ("doors on the front, to the left") - what the
-  // agent quotes to parents asking where to go. Falls back to the client address.
-  const locs = Array.isArray(locations) ? locations : [];
-  if (locs.length) {
-    for (const l of locs) {
-      const bits = [l.title, l.address].filter(Boolean).join(" - ");
-      if (bits) lines.push(`Location: ${bits}${l.notes ? ` (${String(l.notes).trim()})` : ""}`);
-    }
-  } else if (client.address) lines.push(`Location: ${client.address}`);
-  // Trial booking link from the live website domain (the fact leads get texted).
-  const domain = client.website_setup && client.website_setup.domain;
-  if (domain) lines.push(`Free trial booking link: https://${domain}/free-trial`);
-  const link = (data.sales && data.sales.signup_url) || "";
-  if (link) lines.push(`Sign-up link: ${link}`);
-  return lines.length ? lines.join("\n") : null;
-}
-function genProgram(data) {
-  const g = data.general_info || {};
-  const lines = [];
-  if (g.age_range) lines.push(`Ages: ${g.age_range}`);
-  if (g.skill_level) lines.push(`Skill levels: ${g.skill_level}`);
-  const gender = arr(g.gender).join(", ");
-  if (gender) lines.push(`Gender: ${gender}`);
-  if (g.capacity) lines.push(`Group size: up to ${g.capacity} per session`);
-  return lines.length ? lines.join("\n") : null;
-}
-function genSchedule(data) {
-  const classes = arr(data.schedule && data.schedule.classes);
-  const lines = [];
-  for (const c of classes) {
-    const times = arr(c.weekly_times).map(wt => `${arr(wt.days).join("/")} ${wt.start || ""}-${wt.end || ""}`.trim()).filter(Boolean).join("; ");
-    const name = c.title || c.age || "Class";
-    if (times) lines.push(`${name}: ${times}`);
-  }
-  const yr = data.schedule && data.schedule.year_round;
-  if (yr) lines.push(String(yr).toLowerCase().includes("season") ? "Runs seasonally." : "Runs year-round.");
-  return lines.length ? lines.join("\n") : null;
-}
-function genPricing(data) {
-  const offerings = arr(data.pricing && data.pricing.pricing_offerings);
-  if (!offerings.length) return null;
-  const monthlies = offerings.map(o => Number(String(o.price || "").replace(/[^0-9.]/g, ""))).filter(n => isFinite(n) && n > 0);
-  const lo = monthlies.length ? Math.min(...monthlies) : null;
-  const hi = monthlies.length ? Math.max(...monthlies) : null;
-  const range = (lo && hi) ? (lo === hi ? `$${lo} per month` : `$${lo} to $${hi} per month`) : null;
-  const out = ["Transparency mode: RANGE", ""];
-  if (range) out.push(`When the lead asks about pricing, share the range (${range}) and say full details are covered at the trial.`, "");
-  out.push("Full pricing (internal reference only, do not share unless transparency mode changes to EXACT):");
-  for (const o of offerings) {
-    const m = money(o.price);
-    const commits = arr(o.commitments).map(c => `${c.length} ${money(c.price) || ""}`.trim()).filter(Boolean).join(" | ");
-    out.push(`- ${o.title || "Plan"}${o.billing_cycle ? ` (${o.billing_cycle})` : ""}: ${m ? m + "/mo" : ""}${commits ? " | " + commits : ""}`.replace(/:\s*\|/, ":"));
-  }
-  return out.join("\n");
-}
-function genSellingPoints(data) {
-  const v = data.value || {};
-  const parts = [];
-  if (v.what_makes_different) parts.push(String(v.what_makes_different).trim());
-  if (v.program_structure) parts.push(`Program structure: ${String(v.program_structure).trim()}`);
-  return parts.length ? parts.join("\n\n") : null;
-}
-function genPolicies(data) {
-  const p = data.policy || {};
-  if (!Object.keys(p).length) return null;
-  const lines = [];
-  const amt = Number(p.cancel_notice_amount);
-  if (p.cancellation === "Notice required" && amt > 0) {
-    const unit = p.cancel_notice_unit === "hours" ? "hours" : "days";
-    lines.push(`Cancellation: ${amt} ${amt === 1 ? unit.replace(/s$/, "") : unit} written notice required.`);
-  } else lines.push("Cancellation: members can cancel anytime.");
-  if (p.pause_allowed === "Yes") {
-    const mn = Number(p.pause_min_days), mx = Number(p.pause_max_days), per = Number(p.pause_per_year);
-    const len = (mn > 0 && mx > 0 && mn < mx) ? `${mn} to ${mx} days at a time` : (mx > 0 ? `up to ${mx} days at a time` : "flexible length");
-    const freq = per === 1 ? ", once per year" : per === 2 ? ", twice per year" : per > 0 ? `, ${per} times per year` : "";
-    lines.push(`Pause: memberships can be paused (${len}${freq}).`);
-  } else if (p.pause_allowed === "No") lines.push("Pause: memberships cannot be paused.");
-  const rw = Number(p.refund_window_days);
-  lines.push((p.refund_policy === "Refundable within a window" && rw > 0)
-    ? `Refunds: refundable within ${rw} days of purchase, otherwise non-refundable.`
-    : "Refunds: fees already charged are non-refundable except where required by law.");
-  if (p.makeup_policy && String(p.makeup_policy).trim()) lines.push(`Makeup/reschedule: ${String(p.makeup_policy).trim()}`);
-  if (p.parent_watching) lines.push(`Parents watching: ${p.parent_watching}.`);
-  if (p.under_18) lines.push(`Under-18s: ${p.under_18}.`);
-  if (p.holiday_schedule) lines.push(`Holidays: ${p.holiday_schedule}.`);
-  return lines.join("\n");
-}
+// ── FACT builders now live in api/agent/fact-render.js (Build 2) ─────────────
+// The SAME renderers run at READ time inside every agent's prompt build
+// (derivedFactOverrides), so this sync endpoint is now just a preview surface +
+// a writer of fallback text for sparse offers. One source of truth, no drift.
+import { renderBusinessInfo, renderProgram, renderSchedule, renderPricing, renderSellingPoints, renderPolicies } from "../agent/fact-render.js";
 
 const SECTIONS = [
-  { key: "business_info",  label: "Business info",  gen: (c, d, l) => genBusinessInfo(c, d, l) },
-  { key: "program",        label: "Program",        gen: (c, d) => genProgram(d) },
-  { key: "schedule",       label: "Schedule",       gen: (c, d) => genSchedule(d) },
-  { key: "pricing",        label: "Pricing",        gen: (c, d) => genPricing(d) },
-  { key: "selling_points", label: "Selling points", gen: (c, d) => genSellingPoints(d) },
-  { key: "policies",       label: "Policies",       gen: (c, d) => genPolicies(d) },
+  { key: "business_info",  label: "Business info",  gen: (c, d, l) => renderBusinessInfo(c, d, l) },
+  { key: "program",        label: "Program",        gen: (c, d) => renderProgram(d) },
+  { key: "schedule",       label: "Schedule",       gen: (c, d, l) => renderSchedule(d, l) },
+  { key: "pricing",        label: "Pricing",        gen: (c, d) => renderPricing(d) },
+  { key: "selling_points", label: "Selling points", gen: (c, d) => renderSellingPoints(d) },
+  { key: "policies",       label: "Policies",       gen: (c, d) => renderPolicies(d) },
 ];
 
 function generateSections(client, data, locations) {
@@ -180,7 +90,7 @@ async function handler(req, res) {
     if (!offer) return res.status(404).json({ error: "offer not found for this academy" });
     const [clientRows, locationRows] = await Promise.all([
       sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_name,address,website_setup&limit=1`),
-      sb(`locations?client_id=eq.${encodeURIComponent(clientId)}&select=title,address,notes&order=sort_order.asc&limit=10`),
+      sb(`locations?client_id=eq.${encodeURIComponent(clientId)}&select=id,title,address,notes&order=sort_order.asc&limit=10`),
     ]);
     const client = (Array.isArray(clientRows) && clientRows[0]) || {};
 
