@@ -54,4 +54,9 @@ Most "note for assembly" items already shipped in PR #1548 (verified). NEW addit
 - Open backlog items surfaced (not in the 6 builds yet): filtering agent for non-lead inbound (IG/email/SMS -> lead-detect + spam, future); rethink whether initial automations are still needed alongside the booking agent; client-facing naming/simplification pass (Rosano's point); closing-agent objections + sales strategies knowledge (Zoran+Mike sit-down in Miami); VERIFY age+location questions actually collected on the free-trial form; contact-page website editor can't annotate sections (separate bug).
 - Onboarding-flow notes (separate track): Twilio texting/calling think-through for first clients; ads tri-mode choice (we-run / they-run pick Meta campaign tied to preset + marketing focus-mode setup / no-ads = no marketing section).
 
+## Board feedback 2026-07-22 (Zoran, on the FigJam entity board)
+- **Onboarding data points are NOT part of the sales system** - they belong to the MEMBER-MANAGEMENT system preset, which gets its own confirm session later. Removed the OB data-points box from the sales board.
+- **Contact page form joins the sales preset ONLY when it's the academy's only offer** (matches transcript; encode as a conditional entry source).
+- Sales board must show FULL detail (agent knowledge, all data stored at every point) via dropdowns; pipeline stages get a visual frame; qualifications card with where each criterion is collected (free-trial form up front, agents reading/asking in messages, trainer post-trial form).
+
 Related: [[project_sales_crew_model]], [[project_offer_tie_in]], [[project_entry_point_routing]]. Key files: `api/agent/presets.js`, `api/agent/prompt-structure.js`, `api/offers/apply-preset.js`, `api/offers/sync-agent.js`, `api/automations.js`, `api/form-intro-automations.js`, `api/offers/setup-status.js`.
