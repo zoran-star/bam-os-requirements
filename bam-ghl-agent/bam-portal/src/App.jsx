@@ -83,6 +83,9 @@ export default function BAMPortal() {
   const [activeClients, setActiveClients] = useState([]);
   const [actionItems, setActionItems] = useState([]);
   const [toast, setToast] = useState(null);
+  // Bumped when the CURRENT page's nav item is re-clicked - keys the view
+  // container so the page remounts fresh (back to its root list/state).
+  const [viewEpoch, setViewEpoch] = useState(0);
   const [tasks, setTasks] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [financialAlerts, setFinancialAlerts] = useState({ failedPayments: [], pastDueInvoices: [], upcomingRenewals: [], expiringCards: [] });
@@ -257,6 +260,10 @@ export default function BAMPortal() {
     }
     setClientsInitialId(clientId || null);
     setClientsOpenId(clientId || null);
+    // Re-clicking the page you're already on = "take me back to the start of
+    // this section": the URL above was already reset to just ?p=, so a remount
+    // re-reads it clean and the view opens at its root.
+    if (next === nav && !clientId) setViewEpoch(e => e + 1);
     setNav(next);
     if (isMobile) setSidebarOpen(false);
   };
@@ -859,7 +866,7 @@ export default function BAMPortal() {
 
             {/* Lazy-loaded views below. Suspense fallback is a tiny spinner so
                 the page doesn't blank out while the chunk downloads. */}
-            <Suspense fallback={<div style={{ padding: 24, color: tk.textMute, fontSize: 13 }}>Loading…</div>}>
+            <Suspense key={viewEpoch} fallback={<div style={{ padding: 24, color: tk.textMute, fontSize: 13 }}>Loading…</div>}>
               {/* CLIENTS — combined view (list + per-client detail with tabs). */}
               {nav === "clients" && (
                 <ClientsCombinedView
