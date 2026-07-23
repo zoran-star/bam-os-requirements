@@ -13,20 +13,30 @@ Source of truth: the Notion page [Pricing & GTM Strategy](https://app.notion.com
 
 **Mix assumption after founding:** ~75% Core / ~20% Growth / ~5% Scale = **blended ~$650 ARPU**
 
-**Growth model (3 dials only - adds/mo, churn, blended ARPU):**
+**OFFICIAL base model (locked 2026-07-23 by Cole): capacity ramp, not flat adds.**
+3 dials only - adds/mo, churn, blended ARPU:
 - Founding 25 @ $399 fill inside the 90-day window (months 1-3)
-- Then a steady rate of net-new accounts/mo at blended $650
+- Ramped adds from month 4: start **8/mo, +1 each month, capped at 25/mo** (cap = onboarding capacity)
+- Blended ARPU **$600** (list mix is ~$650; $600 after discounts + annual deals)
 - Churn 4%/mo on all cohorts
 
-| Adds/mo | Month 6 | Month 12 | Month 18 | Month 24 |
+| Month | Accounts | MRR | ARR run rate | Marker |
 |---|---|---|---|---|
-| 10 | 50 accts / $27K MRR | 93 / $57K | 127 / $80K | 154 / $98K |
-| **15 (Cole's base)** | **64 / $37K** | **132 / $82K** | **185 / $117K ($1.4M ARR)** | **226 / $144K ($1.7M ARR)** |
-| 20 | 79 / $46K | 170 / $106K | 242 / $154K | 298 / $191K |
+| 3 | 25 | $10K | $115K | Founding window closes |
+| 6 | 47 | $24K | $289K | |
+| 9 | 76 | $42K | $505K | Seed-ready MRR band ($40-50K) |
+| 12 | 111 | $63K | $759K | |
+| 18 | 193 | $113K | $1.4M | Ramp at full capacity |
+| 24 | 285 | $169K | $2.0M | |
+
+Why ramp instead of flat 15/mo or %-MoM compounding: flat overstates the early months (nobody closes 15/mo on day one) and a raw % growth rate compounds into an indefensible hockey stick. The ramp ties growth to a real, defensible constraint (onboarding capacity) and gives a stronger exit velocity than flat ($169K vs $144K MRR at month 24).
+
+Shareable outputs:
+- One-pager: `business/fc-projections.html`, live at `/projections` (repo-root vercel.json rewrite)
+- Barebones PDF: generated on request (tiers + assumptions + milestones), not stored in repo
 
 Notes:
-- "Comfortable seed" bar ($40-50K MRR) is crossed around **month 7-8** at 15 adds/mo.
-- A constant adds rate plateaus at adds ÷ churn (15/mo ⇒ ~375 accounts / ~$240K MRR ceiling). Long-run growth requires the adds rate itself to climb.
+- A constant 25/mo cap plateaus at adds ÷ churn = ~625 accounts long-run; irrelevant inside the 24-month window.
 - BAM Business growth-share revenue is NOT in these numbers (uncapped upside on top).
 
 ## Future pricing ideas (parking lot)
