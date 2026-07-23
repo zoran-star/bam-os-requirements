@@ -184,6 +184,9 @@
   .chunk .ct { font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 7px; }
   .chunk .cw { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .cdotw { width: 7px; height: 7px; border-radius: 50%; background: var(--wait); flex: none; }
+  .cdotr { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); flex: none; box-shadow: 0 0 0 3px var(--gold-soft); }
+  .chunk.ready { border-color: var(--gold); background: var(--surface); }
+  .chunk .rdy { font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); margin-left: auto; }
 
   .foot { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--faint); font-size: 12.5px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .foot .legend { display: flex; gap: 16px; flex-wrap: wrap; }
@@ -240,7 +243,7 @@
       <p class="cdesc">Elijah works the 5-section wizard in his portal (Academy &middot; Brand &middot; Wired &middot; Offer &middot; Launch). BAM already pre-filled Academy, Brand, and the Offer skeleton from their website - Lij's remaining work is pricing, policies, EIN, coaches, and Stripe.</p>
       <ul class="steps">
         <li><span class="mk ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></span><span><span class="stxt"><b>Academy</b> &mdash; legal name, EIN, address, time zone</span><div class="smeta">Legal name, phone, address, TZ prefilled &middot; EIN + primary email to confirm</div></span><span class="trig">EIN + legal name feed A2P texting + agreement</span></li>
-        <li><span class="mk ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></span><span><span class="stxt"><b>Brand</b> &mdash; identity, story, "Submit brief"</span><div class="smeta">Brand cloned from BAM GTA (shared By Any Means look) &middot; story/brief still from Lij</div></span><span class="trig">Submitting the brief fires the Branding deck</span></li>
+        <li><span class="mk ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></span><span><span class="stxt"><b>Brand</b> &mdash; identity, story, "Submit brief"</span><div class="smeta">Look cloned from GTA &middot; story + proof written in GTA's voice with San Jose facts &middot; brief submitted</div></span><span class="trig">Deck chunk fired &middot; awaiting owner confirm</span></li>
         <li><span class="mk no"></span><span><span class="stxt"><b>Wired</b> &mdash; connect Stripe, texting choice, contacts source</span><div class="smeta">Stripe not connected &middot; contacts already live in GHL</div></span><span class="trig">Stripe unlocks pricing + members</span></li>
         <li><span class="mk ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M20 6 9 17l-5-5"/></svg></span><span><span class="stxt"><b>Offer</b> &mdash; define, schedule, pricing, policy</span><div class="smeta">3 programs + schedule + pricing (3 tiers &times; 3 commitments) + policy (cloned from GTA)</div></span><span class="trig">Makeups, holidays, parent-watching still blank</span></li>
         <li><span class="mk no"></span><span><span class="stxt"><b>Launch</b> &mdash; review build board, sign off</span><div class="smeta">Opens once build chunks are moving</div></span></li>
@@ -254,16 +257,16 @@
     <div class="card">
       <div class="chead">
         <h2 class="ctitle">We build the site + systems</h2>
-        <div class="badges"><span class="badge bam">BAM team</span><span class="status wait">Waiting on 2</span></div>
+        <div class="badges"><span class="badge bam">BAM team</span><span class="status now">3 ready to build</span></div>
       </div>
       <p class="cdesc">Owner inputs trip six build chunks. Each fires a Slack ping to San Jose's channel with the runbook to use (run in the <b>bam-client-sites</b> repo). Deck published cascades core + templates.</p>
       <div class="chunks">
-        <div class="chunk"><div class="ct"><span class="cdotw"></span>Branding deck</div><div class="cw">brief submitted + story &rarr; <span class="run">/branding-deck</span></div></div>
+        <div class="chunk ready"><div class="ct"><span class="cdotr"></span>Branding deck<span class="rdy">Ready</span></div><div class="cw">brief + story in (GTA voice, San Jose facts) &rarr; <span class="run">/branding-deck</span></div></div>
         <div class="chunk"><div class="ct"><span class="cdotw"></span>Core site pages</div><div class="cw">after deck published &rarr; <span class="run">/site-build --phase core</span></div></div>
         <div class="chunk"><div class="ct"><span class="cdotw"></span>Email templates</div><div class="cw">after deck published &rarr; <span class="run">/email-templates</span></div></div>
-        <div class="chunk"><div class="ct"><span class="cdotw"></span>Sales funnel + emails</div><div class="cw">sales preset applied &rarr; <span class="run">/site-build --phase sales</span></div></div>
-        <div class="chunk"><div class="ct"><span class="cdotw"></span>Onboarding funnel</div><div class="cw">prices + policy + fields &rarr; <span class="run">/site-build --phase onboarding</span></div></div>
-        <div class="chunk"><div class="ct"><span class="cdotw"></span>Branded agreement</div><div class="cw">policy + legal name &rarr; <span class="run">/agreement</span></div></div>
+        <div class="chunk ready"><div class="ct"><span class="cdotr"></span>Sales funnel + emails<span class="rdy">Ready</span></div><div class="cw">preset applied + stamped &rarr; <span class="run">/site-build --phase sales</span></div></div>
+        <div class="chunk"><div class="ct"><span class="cdotw"></span>Onboarding funnel</div><div class="cw">needs Stripe prices + onboarding fields &rarr; <span class="run">/site-build --phase onboarding</span></div></div>
+        <div class="chunk ready"><div class="ct"><span class="cdotr"></span>Branded agreement<span class="rdy">Ready</span></div><div class="cw">policy + legal name in &rarr; <span class="run">/agreement</span></div></div>
       </div>
     </div>
   </div>
