@@ -156,6 +156,28 @@ export function renderPolicies(data) {
   return lines.join("\n");
 }
 
+// coaches <- the academy's own STAFF records (client_users with a title or bio),
+// NOT a typed claim. This kills the hardcoded default ("certified by By Any
+// Means, played at the college or professional level") that was leaking a
+// GTA-specific, and for other academies FALSE, credential claim onto every
+// agent. When no coach profiles are filled in yet (e.g. San Jose today), it
+// emits a NEUTRAL instruction so the agent makes NO invented claims - it never
+// falls through to that leaky default.
+export function renderCoaches(staff) {
+  const rows = arr(staff).filter((s) => s && (String(s.title || "").trim() || String(s.bio || "").trim()));
+  if (!rows.length) {
+    return "Coach profiles for this academy are not filled in yet. Speak to the quality of coaching in general terms and invite the lead to meet the coaches at their trial. Do NOT invent specific credentials, certifications, playing history, or coach names.";
+  }
+  // Owners/head first, then the rest, in the order given.
+  rows.sort((a, b) => (b.role === "owner" ? 1 : 0) - (a.role === "owner" ? 1 : 0));
+  const lines = rows.map((s) => {
+    const head = [s.name, String(s.title || "").trim()].filter(Boolean).join(" - ");
+    const bio = String(s.bio || "").trim();
+    return `- ${head}${bio ? `: ${bio}` : ""}`;
+  });
+  return "Our coaches (share naturally when relevant, do not dump the whole list):\n" + lines.join("\n");
+}
+
 // qualification_config <- the preset's 3 locked criteria (the FRAMEWORK, tier 1)
 // filled with this academy's VALUES: its locations, its age range, its skill
 // levels. Kills the hardcoded "near Oakville/GTA" default leaking to other
@@ -202,22 +224,24 @@ export async function derivedFactOverrides(clientId, sbFn) {
     let hit = factCache.get(clientId);
     if (!hit || Date.now() - hit.at > TTL_MS) {
       const enc = encodeURIComponent(clientId);
-      const [offerRows, clientRows, locationRows] = await Promise.all([
+      const [offerRows, clientRows, locationRows, staffRows] = await Promise.all([
         sbFn(`offers?client_id=eq.${enc}&type=eq.training&select=data&order=sort_order.asc&limit=1`).catch(() => []),
         sbFn(`clients?id=eq.${enc}&select=business_name,address,website_setup&limit=1`).catch(() => []),
         sbFn(`locations?client_id=eq.${enc}&select=id,title,address,notes&order=sort_order.asc&limit=10`).catch(() => []),
+        sbFn(`client_users?client_id=eq.${enc}&status=eq.active&select=name,role,title,bio&limit=50`).catch(() => []),
       ]);
       hit = {
         src: {
           data:      (Array.isArray(offerRows) && offerRows[0] && offerRows[0].data) || null,
           client:    (Array.isArray(clientRows) && clientRows[0]) || null,
           locations: Array.isArray(locationRows) ? locationRows : [],
+          staff:     Array.isArray(staffRows) ? staffRows : [],
         },
         at: Date.now(),
       };
       factCache.set(clientId, hit);
     }
-    const { data, client, locations } = hit.src;
+    const { data, client, locations, staff } = hit.src;
     if (!data) return {};
     const out = {};
     const set = (key, body) => { if (body) out[key] = body; };
@@ -228,6 +252,7 @@ export async function derivedFactOverrides(clientId, sbFn) {
     set("business_info",  renderBusinessInfo(client, data, locations));
     set("selling_points", renderSellingPoints(data));
     set("qualification_config", renderQualification(data, client, locations));
+    set("coaches",        renderCoaches(staff));
     return out;
   } catch (_) {
     return {};
