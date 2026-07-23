@@ -28575,7 +28575,7 @@ async function _taRenderKnowledge() {
       return `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
         <button onclick="_taToggleSec('${s.key}')" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:none;border:none;color:var(--text);padding:14px 16px;cursor:pointer;font-family:inherit;text-align:left">
-          <span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}${s.scope === 'global' ? ' <span style="color:#D4B65C;font-size:10.5px;font-family:monospace;border:1px solid #D4B65C;border-radius:99px;padding:1px 7px">GLOBAL · all academies</span>' : (s.is_default ? '' : ' <span style="color:var(--gold);font-size:11px;font-family:monospace">edited</span>')}</span>
+          <span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}${s.scope === 'global' ? ' <span style="color:#D4B65C;font-size:10.5px;font-family:monospace;border:1px solid #D4B65C;border-radius:99px;padding:1px 7px">GLOBAL · all academies</span>' : s.scope === 'derived' ? ' <span style="color:#6EA8D8;font-size:10.5px;font-family:monospace;border:1px solid #6EA8D8;border-radius:99px;padding:1px 7px">LIVE · from your offer</span>' : (s.is_default ? '' : ' <span style="color:var(--gold);font-size:11px;font-family:monospace">edited</span>')}</span>
           <span id="ta-chev-${s.key}" style="color:var(--text-mute);font-size:11px;transition:transform .15s;transform:rotate(${open ? 90 : 0}deg)">▶</span>
         </button>
         <div id="ta-sec-body-${s.key}" style="display:${open ? 'block' : 'none'};padding:0 16px 14px">
