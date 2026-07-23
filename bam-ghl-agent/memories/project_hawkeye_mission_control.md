@@ -524,9 +524,9 @@ so thawing one would collide). Wired into all four reply spines: GHL + Twilio we
 (`pauseClosing: true`), Gmail sync + Resend inbound (exported `pauseClosingPlan`), plus
 the detector's own reactive sweep. `confirm-no-reply` -> `resumeClosingOutbound()` puts
 rows back on their original dates (overdue steps slide out a day each, quiet-hours aware)
-+ `resumeReignitions`. A real reply -> `finalizePausedClosing()` cancels them (agent
-re-plans). Terminal moves + the stage prune sweep paused rows too. Toast reports what
-survived: "Nothing sent - 2 follow-ups + the reignition still scheduled".
+A real reply -> `finalizePausedClosing()` cancels them (agent re-plans); the park is NOT
+touched - answering someone never erases a park. Terminal moves + the stage prune sweep
+paused rows too. Toast reports what survived: "Nothing sent - 2 follow-ups still scheduled".
 
 Tier-1 shared behavior (auto-propagates, no per-academy config) - see
 [[project_sales_systems_plug_and_play]].
