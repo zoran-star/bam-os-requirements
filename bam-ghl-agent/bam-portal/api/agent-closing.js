@@ -660,14 +660,17 @@ async function detectForClient(client) {
   // the front every run and eating all 10 cap slots, re-starving the quiet tail.)
   let _cardByContact = new Map();
   try {
-    const _live = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=in.(pending,approved)&select=ghl_contact_id,last_lead_at,created_at&order=created_at.desc`);
+    const _live = await sb(`agent_closing_replies?client_id=eq.${client.id}&status=in.(pending,approved,dismissed)&select=ghl_contact_id,last_lead_at,created_at,status&order=created_at.desc`);
     for (const r of (Array.isArray(_live) ? _live : [])) { const cid = String(r.ghl_contact_id || ""); if (cid && !_cardByContact.has(cid)) _cardByContact.set(cid, r); }
   } catch (_) {}
   queue = queue
     .filter(q => {
       const card = _cardByContact.get(String(q.contact_id || ""));
       if (!card) return true;                                                  // no live card -> needs one
-      if ((q.last_direction || "") !== "inbound") return false;                // proactive + carded -> already queued
+      // A DISMISSED card = a human chose "send nothing" for that inbound. It blocks
+      // re-drafting the SAME inbound (timestamp match below) but never blocks a new
+      // inbound or a future proactive follow-up.
+      if ((q.last_direction || "") !== "inbound") return card.status === "dismissed"; // proactive + live card -> already queued
       const answered = card.last_lead_at && q.last_at && new Date(card.last_lead_at).getTime() === new Date(q.last_at).getTime();
       return !answered;                                                        // reactive: keep only a NEW inbound
     })
@@ -1012,6 +1015,12 @@ async function handler(req, res) {
       await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
+    if (b.action === "dismiss-ready") {
+      // "Send nothing": terminal no-reply decision for this card (vs skip = snooze).
+      if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
+      await sb(`agent_closing_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "dismissed", updated_at: new Date().toISOString() }) });
+      return res.status(200).json({ ok: true });
+    }
 
     // NOTE: the "automations-get"/"automations-set" editor actions are gone with the
     // scripted sequence (Zoran 2026-07-08) - Done Trial has no preplanned automations.
@@ -1342,7 +1351,12 @@ async function handler(req, res) {
         try { await setStatus({ clientId, ghl, token, oppRef, status: "lost", contactId, reason }); }
         catch (e) { return res.status(e.status || 502).json({ error: `mark lost: ${e.message}` }); }
       }
-      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
+      // reason = the taxonomy pick; reason_detail = the lead's own words or staff detail.
+      const reasonDetail = (b.reason_detail && String(b.reason_detail).trim().slice(0, 500)) || null;
+      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason, reason_detail: reasonDetail }]) }); } catch (_) {}
+      if (reasonDetail) {
+        try { await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, ghl_contact_id: String(contactId), active: true, note: `Lost reason (${reason}) - their words: "${reasonDetail}"`, created_by: "lost-reason" }]) }); } catch (_) {}
+      }
       if (b.ready_id) {
         // 'sent' only when the goodbye actually went out; a bare move is 'canceled'
         // (fake sent_at rows poisoned the draft-vs-sent training data). A REQUESTED

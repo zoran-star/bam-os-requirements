@@ -878,10 +878,24 @@ async function detectForClient(client) {
       for (const contactId of rebookCandidates) {
         if (rebookOpeners >= OPENER_CAP) break;
         // Dedupe: if a card is already waiting (pending/approved), leave it be.
-        let active;
-        try { active = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id&limit=1`); }
+        // ALSO block when a recent card was already actioned (sent/scheduled/
+        // dismissed within 14 days) - the TARA duplicate: staff sent the rebook
+        // opener, a fresh "Entry: Rebook" note re-triggered the pass, and the
+        // scripted opener re-emitted the byte-identical text because only
+        // pending/approved blocked. An already-sent recent touch means the
+        // conversation is live; the reply engine owns it from here.
+        let recent;
+        try { recent = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,created_at&limit=3`); }
         catch (e) { reasons.push(`rebook ${contactId}: dedup error - ${e.message}`); continue; }
-        if (Array.isArray(active) && active.length) continue;
+        const rows14 = (Array.isArray(recent) ? recent : []);
+        if (rows14.some(x => ["pending", "approved"].includes(x.status))) continue;
+        const RECENT_MS = 14 * 24 * 3600000;
+        if (rows14.some(x => ["sent", "scheduled", "dismissed"].includes(x.status) && x.created_at && (Date.now() - new Date(x.created_at).getTime()) < RECENT_MS)) {
+          // Consume the trigger note anyway - it is stale (the touch already went out).
+          try { await sb(`agent_contact_notes?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&active=eq.true&note=ilike.${encodeURIComponent("Entry: Rebook")}*`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ active: false }) }); } catch (_) {}
+          reasons.push(`rebook ${contactId}: recent card already actioned - trigger note consumed`);
+          continue;
+        }
         let nm = null;
         try { const c = await sb(`${await contactsReadTable(client.id)}?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
         const firstName = nm ? String(nm).trim().split(/\s+/)[0] : null;
@@ -1094,6 +1108,16 @@ async function handler(req, res) {
       if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
       // Scope the patch to this academy so an actor can't skip another's row.
       await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
+      return res.status(200).json({ ok: true });
+    }
+    if (b.action === "dismiss-ready") {
+      // "Send nothing": a human decided this inbound needs NO reply. Unlike skip
+      // (= snooze; the detector re-drafts the same inbound next run), dismissed is
+      // TERMINAL for this inbound: the detector's timestamp-match dedupe treats a
+      // non-skipped row as an answer, so the same message is never re-drafted. A
+      // NEW inbound from the lead still gets a fresh card.
+      if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
+      await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "dismissed", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
     // 🔥 Scheduled reignitions (all 3 agents' parks): feeds the deck badge chips,
@@ -1380,7 +1404,14 @@ async function handler(req, res) {
         try { await setStatus({ clientId, ghl, token, oppRef, status: "lost", contactId, reason }); }
         catch (e) { return res.status(e.status || 502).json({ error: `mark lost: ${e.message}` }); }
       }
-      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
+      // reason = the taxonomy pick; reason_detail = the lead's own words (the deck
+      // passes their last inbound) or staff-typed detail. Structured lost-reason
+      // data for KPIs + the nurture bounce-back context.
+      const reasonDetail = (b.reason_detail && String(b.reason_detail).trim().slice(0, 500)) || null;
+      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason, reason_detail: reasonDetail }]) }); } catch (_) {}
+      if (reasonDetail) {
+        try { await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, ghl_contact_id: String(contactId), active: true, note: `Lost reason (${reason}) - their words: "${reasonDetail}"`, created_by: "lost-reason" }]) }); } catch (_) {}
+      }
       // Clear ALL of this lead's queued cards (replies + follow-ups) - they're done in Responded now.
       // Truthful bookkeeping: only the acted-on row where a goodbye actually went out is
       // 'sent'; every other swept card is 'canceled' (nothing was texted). Stamping the
