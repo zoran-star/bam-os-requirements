@@ -1,6 +1,8 @@
 # Sales systems are SHARED + plug-and-play (GUARDRAIL)
 
-**Decided 2026-07-22 (Zoran).** A sales system's STRUCTURE is shared across every academy on a preset and must stay plug-and-play. An academy NEVER forks the structure.
+**⚠ REFINED 2026-07-23 (Zoran) - THREE TIERS, not two.** Automation SEQUENCES (message copy, branded emails, timing, steps) are NOT shared structure: BAM tailors the initial drip per academy at onboarding, then the ACADEMY owns it (edits today via support tickets for emails - self-serve sequence editing = future build). Master edits to sequences do NOT retro-propagate (only new academies get the new seed); academy edits never touch the master. The current create-only-if-missing seeder is CORRECT for this tier. Tier model: (1) BAM MASTER locked + auto-propagating = stages/edges + which automations exist & where they hook + agent behavior + qualifications framework + KPI defs; (2) SEEDED-THEN-ACADEMY-OWNED = automation sequences/content; (3) FACTS derived live; (+ STATE untouched). This SHRINKS Build 1: only tier 1 needs runtime-read/auto-propagation. The 2026-07-22 framing below ("automation steps are structure, close the edit hatches") is superseded on that point - step-builder CRUD is a legit academy surface, not a fork hatch.
+
+**Decided 2026-07-22 (Zoran).** A sales system's TIER-1 STRUCTURE is shared across every academy on a preset and must stay plug-and-play. An academy NEVER forks the structure.
 
 ## What is "structure" (shared, never forked)
 - Pipeline stages + edges (`pipeline_stages`, `stage_transitions`)
@@ -72,3 +74,12 @@ Most "note for assembly" items already shipped in PR #1548 (verified). NEW addit
 - Sales board must show FULL detail (agent knowledge, all data stored at every point) via dropdowns; pipeline stages get a visual frame; qualifications card with where each criterion is collected (free-trial form up front, agents reading/asking in messages, trainer post-trial form).
 
 Related: [[project_sales_crew_model]], [[project_offer_tie_in]], [[project_entry_point_routing]]. Key files: `api/agent/presets.js`, `api/agent/prompt-structure.js`, `api/offers/apply-preset.js`, `api/offers/sync-agent.js`, `api/automations.js`, `api/form-intro-automations.js`, `api/offers/setup-status.js`.
+
+## Shared board deployment (2026-07-23)
+Public shareable URL: **https://bam-sales-system-board.vercel.app** (Vercel project `bam-sales-system-board`, scope `zoran-stars-projects`). Source of truth = `bam-ghl-agent/docs/sales-preset-entity-map.html`; the deploy folder `bam-ghl-agent/docs/sales-system-board/` holds a COPY as `index.html` + a `vercel.json` (noindex header).
+**NOT git-linked on purpose** - pushes to main do NOT build it, so it never competes for the team's build slot. To update after editing the map:
+```
+cp bam-ghl-agent/docs/sales-preset-entity-map.html bam-ghl-agent/docs/sales-system-board/index.html
+cd bam-ghl-agent/docs/sales-system-board && vercel deploy --prod --yes --scope zoran-stars-projects
+```
+Link is PUBLIC (no auth) but noindex'd. Contains internal figures (GTA close rate, academy names) - fine for staff/partners, not for the open web.
