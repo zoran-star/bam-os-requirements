@@ -60,6 +60,23 @@ Most "note for assembly" items already shipped in PR #1548 (verified). NEW addit
 ## ⚠ BUILD CHECK (Zoran 2026-07-22): un-mark Lost when Nurture bounces back
 **VERIFIED 2026-07-22 (Phase 0). Actual model:** nurture opps keep opportunities.status='open' (all 28 GTA nurture leads are open - agents/bounce NOT blocked; my isOpenOpp worry was wrong). "Lost" = KPI mark: `pipeline_outcomes` append rows; cc-sales-kpis counts outcome 'lost' OR 'nurture' as lost ("nurture = marked lost", Zoran 2026-07-15); "won beats lost if they buy later". **THE GAP:** the nurture->responded reply bounce (ghl/twilio/resend/email inbound webhooks) writes NO outcome row, so a returned lead still counts LOST in close rate until they actually buy. FIX: on bounce, append a pipeline_outcomes 'reopened' (or 'responded') row + make cc_qualified_trials latest-outcome-wins so returned leads count PENDING, not lost.
 
+## Phase 0 EXECUTED 2026-07-23 (branch claude/bam-v2-engineering-build-fc4f9d)
+CODE + MIGRATIONS DONE + pushed. Rename done as a zero-downtime cut: code AUTHORS `ghosted`, still TOLERATES `interested` on reads (ROLE_MATCHERS keeps both keys; `interestedStage` re-exported as an alias of `ghostedStage`; the 4 bounce guards and the client-portal ORD/_EDGE_ROLE_* maps accept both). GHL-name mirrors (ghl_stage_name, entry_points.stage_name, ghl_kpi_config) deliberately NOT renamed. Lost-mark fixed via new `api/agent/_reopen.js markReopened()` at all 8 bounce sites + migration 20260723090000 making cc_qualified_trials latest-outcome-wins (APPLIED to prod; GTA unchanged at 4 won/9 lost/5 pending = no retroactive shift). Two prod-only rename migrations exported to supabase/migrations/.
+
+**⛔ DATA CLEANUP IS DEPLOY-GATED - DO NOT RUN BEFORE THE CODE IS LIVE.** Prod still runs code that authors `interested`, so renaming rows now just re-drifts (that is exactly how these orphans appeared) and could duplicate a stage row for San Jose mid-import. Run IMMEDIATELY AFTER merge+deploy, in this order (GTA delete FIRST - otherwise the global rename collides with GTA's existing `ghosted` row on the (client_id, role) unique):
+```sql
+-- 1. GTA orphan: 0 opps, 0 edges, same ghl_stage_id as its real `ghosted` row = pure duplicate
+delete from pipeline_stages where id = 'ae156f7c-3606-40ec-b59c-e975f8f3d397';
+-- 2. everyone else (San Jose): same body as migration 20260721150552
+update pipeline_stages  set role='ghosted', label=coalesce(label,'Ghosted') where role='interested';
+update opportunities    set stage_role='ghosted' where stage_role='interested';
+update stage_transitions set from_stage_role='ghosted' where from_stage_role='interested';
+update stage_transitions set to_stage_role='ghosted'   where to_stage_role='interested';
+```
+Then verify: `select role, count(*) from pipeline_stages group by 1` shows no `interested`.
+NOTE: San Jose is mid-import and moving fast (0 -> 65 opportunities during this session); re-check counts before running.
+DEFERRED, not done: GTA stage POSITIONS (nurture=0/ghosted=1/responded=2/... vs preset responded=0..nurture=4). Left alone on purpose - the frontend `_plo2Order` ORD map drives pill order, not the DB position, so changing it now is churn; Phase 1 makes the master the canonical source of position.
+
 ## Phase 0 findings (2026-07-22, investigation done, fixes pending Zoran review)
 1. **Role split-brain confirmed but fail-safes hold.** Prod rows/edges = `ghosted`; code = `interested` (~12 call sites: presets.js, _stage.js:95, automations.js 307/312/337/669, agent-approvals 1634-5, ghl/pipelines 485/498, inbound-webhook 350 guard, twilio mirror, miami-lead 142, admin/pipeline-cutover 54). routeTransition(fromRole 'interested') misses the prod edge -> callers fall back to HARDCODED moves (behavior-identical for GTA); GHL-provider paths resolve stages via GHL label regex /interest|ghost/i -> GTA works today by fallback. Portal-provider academies (Detail) WOULD break (webhook guard `stage_role==='interested'` never matches renamed rows). Fix = code rename sweep interested->ghosted (keep accepting both in read guards during transition), delete GTA orphan `interested` stage row (0 opps, null label), re-stamp GTA (idempotent, fixes stale positions: prod has nurture=0/ghosted=1 vs preset responded=0..nurture=4).
 2. **Prod-only migrations missing from repo:** 20260721150552_rename_interested_stage_to_ghosted + 20260721150754_sync_seed_default_stage_transitions_ghosted (applied via MCP, files never committed). Export into supabase/migrations/ for local-replay integrity.
