@@ -136,3 +136,13 @@ cp bam-ghl-agent/docs/sales-preset-entity-map.html bam-ghl-agent/docs/sales-syst
 cd bam-ghl-agent/docs/sales-system-board && vercel deploy --prod --yes --scope zoran-stars-projects
 ```
 Link is PUBLIC (no auth) but noindex'd. Contains internal figures (GTA close rate, academy names) - fine for staff/partners, not for the open web.
+
+## Master-control audit (2026-07-23, pre-San-Jose handoff, PR #1571)
+Scan verdict: tier wiring correct EXCEPT two catches, both fixed:
+1. `qualification_config` had a hardcoded "near Oakville/GTA" default leaking to every non-GTA academy (sync-agent never generated it) -> now rendered live: preset's 3 locked criteria + the academy's locations/age-range/skill values (`renderQualification`). 7 fact sections now render live.
+2. Brain view showed STALE stored text for rendered sections and silently no-opped edits -> sections list overlays the live rendered body (scope `derived`, locked, "LIVE - from your offer" badge); update/reset reject rendered keys pointing at the Blueprint.
+FLAGGED, not fixed (known gaps, acceptable):
+- Stage LABELS/POSITIONS live in the anchor rows (copy at apply time) - a master rename needs a re-apply per academy until the board reads labels from the master.
+- Lead-form CORE fields live per-site in bam-client-sites templates - master control by convention, not enforcement.
+- Pricing transparency MODE is per-offer data; per Zoran it belongs on the preset (structural move, later).
+- Quiet hours = env vars (BAM-global), not yet a per-academy tier-3 setting.
