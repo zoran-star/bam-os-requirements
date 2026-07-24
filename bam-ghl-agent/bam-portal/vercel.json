@@ -5,6 +5,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/agency-connect?action=mint&scope=stale",
+      "schedule": "20 * * * *"
+    },
+    {
       "path": "/api/stripe/reconcile-activations",
       "schedule": "*/10 * * * *"
     },
