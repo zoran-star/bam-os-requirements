@@ -62,6 +62,38 @@ export function masterEdge(presetKey, fromRole, trigger) {
   return t ? { trigger: t.trigger, to_kind: t.to_kind, to_stage_role: t.to_stage_role, to_terminal: t.to_terminal, enabled: true } : null;
 }
 
+// ── the master's DISPLAY NAME for a stage role ───────────────────────────────
+// BAM's preset NAMES the stages (Booking / Ghosted / Confirm / Closing /
+// Nurture) and every academy's board shows those names, whatever their own GHL
+// sub-account happens to call the stage. Display only - nothing is ever renamed
+// inside an academy's GHL account, and the academy's real stage name stays on
+// the board payload for everything that keys off it.
+// Returns null when there is no preset / no stage for that role, so the caller
+// falls back to today's exact behaviour.
+const ROLE_ALIASES = { interested: "ghosted" };   // legacy role key, same stage
+const labelCache = new Map();                     // presetKey -> { role: label }
+
+export function masterStageLabels(presetKey) {
+  if (!presetKey || !PRESETS[presetKey]) return null;
+  let idx = labelCache.get(presetKey);
+  if (!idx) {
+    idx = {};
+    for (const s of (PRESETS[presetKey].stages || [])) {
+      if (s && s.role && s.label) idx[s.role] = s.label;
+    }
+    for (const [alias, canon] of Object.entries(ROLE_ALIASES)) {
+      if (idx[canon] && !idx[alias]) idx[alias] = idx[canon];
+    }
+    labelCache.set(presetKey, idx);
+  }
+  return idx;
+}
+
+export function masterStageLabel(presetKey, role) {
+  const idx = masterStageLabels(presetKey);
+  return (idx && role && idx[role]) || null;
+}
+
 // ── shadow comparison (log-only, deduped, never throws) ──────────────────────
 const seen = new Set(); // one log line per (client, from, trigger) per process
 

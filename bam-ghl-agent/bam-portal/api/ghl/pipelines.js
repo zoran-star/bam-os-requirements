@@ -1,7 +1,8 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { isAutomationLive, enrollContact } from "../automations.js";
 import { nurtureStage, interestedStage } from "../agent/_stage.js";
-import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard, findOpenOpp, setStatus, moveStage, oppMatchClause } from "../agent/_store.js";
+import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard, findOpenOpp, setStatus, moveStage, oppMatchClause, ROLE_MATCHERS } from "../agent/_store.js";
+import { resolvePresetKey, masterStageLabels } from "../agent/preset-master.js";
 import { pickGhlToken } from "./_core.js";
 // Vercel Serverless Function — Per-academy GHL Pipelines (kanban + moves)
 //
@@ -29,6 +30,19 @@ const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABA
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
 function nowIso() { return new Date().toISOString(); }
+
+// Which pipeline ROLE is this GHL stage? Uses the SAME ROLE_MATCHERS the stage
+// finders and the shadow backfill use, so a stage resolves to the same role
+// everywhere. The legacy `interested` alias is skipped so the canonical
+// `ghosted` always wins. A custom academy stage matches nothing -> null, and
+// keeps behaving exactly as it does today.
+function roleForStageName(name) {
+  for (const [role, match] of Object.entries(ROLE_MATCHERS)) {
+    if (role === "interested") continue;
+    try { if (match({ name: name || "" })) return role; } catch (_) { /* skip */ }
+  }
+  return null;
+}
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -129,7 +143,7 @@ async function loadAcademyAndToken(clientId, ctx, res) {
   }
   const rows = await sb(
     `clients?id=eq.${clientId}` +
-    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,pipeline_shadow,pipeline_provider,booking_provider` +
+    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,pipeline_shadow,pipeline_provider,booking_provider,v2_access` +
     `&limit=1`
   );
   const client = Array.isArray(rows) && rows[0];
@@ -768,6 +782,45 @@ async function handler(req, res) {
       }
     }
   } catch (_) { /* non-fatal — cards just show parent-only */ }
+
+  // ── 6. Stage ROLE + master DISPLAY NAME (Zoran 2026-07-24) ─────────────────
+  // BAM's master preset names the stages - Booking, Ghosted, Confirm, Closing,
+  // Nurture - and every academy's board shows THOSE names, whatever their own
+  // GHL sub-account calls the stage. Two fields ride along on each stage:
+  //
+  //   role         what the stage IS. From the registry on a provider='portal'
+  //                academy (buildPortalBoard sets it), else matched off the GHL
+  //                stage name here. The UI reads this instead of guessing the
+  //                engine from the name.
+  //   displayName  the master's name for that role. Display ONLY.
+  //
+  // `name` is deliberately left as the academy's OWN stage name: entry-point
+  // routing (entry_points.stage_name), the expectsTrial flag, the stage pickers
+  // and the V1.5 views all key off it, and nothing is ever renamed inside an
+  // academy's GHL account. No role, or a role the master has no stage for, means
+  // no displayName - that stage renders exactly as it does today.
+  // V1 / V1.5 academies are untouched: no preset stamp and no v2_access means no
+  // labels at all.
+  try {
+    for (const p of enriched) {
+      for (const st of (p.stages || [])) {
+        if (!st.role) st.role = roleForStageName(st.name);
+      }
+    }
+    // Preset stamped on the academy's offer wins. A V2 academy that predates the
+    // stamp still runs today's live model, so fall back to free_trial for them
+    // (and only them) rather than leaving their board on legacy GHL wording.
+    const presetKey = (await resolvePresetKey(clientId)) || (client.v2_access ? "free_trial" : null);
+    const labels = presetKey ? masterStageLabels(presetKey) : null;
+    if (labels) {
+      for (const p of enriched) {
+        for (const st of (p.stages || [])) {
+          const lab = st.role ? labels[st.role] : null;
+          if (lab) st.displayName = lab;
+        }
+      }
+    }
+  } catch (_) { /* display layer only - never break the board over a label */ }
 
   const payload = { pipelines: enriched, trainers: trainerOptions, location_id: locationId, totals: {
     pipelines: enriched.length,
