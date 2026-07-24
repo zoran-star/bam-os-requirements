@@ -10,6 +10,21 @@ first (`scan`) so you consolidate where the rot actually is, and every apply run
 is logged to a `consolidation_runs` KPI table (timestamped) so the loop is
 measurable over time.
 
+## The control dial (read FIRST - master vs academy)
+
+Since 2026-07-23 the sales system runs on the shared master-preset model
+(`memories/project_sales_systems_plug_and_play.md`). Every lesson you route must
+land on the right tier:
+
+| Tier | Who owns it | Where a lesson about it goes |
+|---|---|---|
+| **1 MASTER** (locked, auto-propagates) | BAM: stages/edges, agent behavior, TONE and persistence ("one voice for every academy" - Zoran), qualification framework | Shared: a **general lesson** (client_id NULL), or - for absolute one-voice rules taught repeatedly - a **code edit to the shared brain** (`api/agent/prompt-structure.js`, general layer; ships via PR, propagates on deploy). A lesson that implies changing structure (stages, edges, Hawkeye actions, automations hooks) is a **master preset change or product ticket**, never a lesson. |
+| **2 SEEDED-THEN-ACADEMY** | Academy: automation sequences, extra form Qs, lessons/training | An **academy lesson** (client_id = academy) - but ONLY behavioral steer that is genuinely local. Tone corrections are NEVER academy lessons (tone is tier 1). |
+| **3 FACTS** (derived live) | Academy's own records | **Fix the SOURCE, not the agent.** 8 of 9 fact sections render LIVE via `api/agent/fact-render.js` (`program`, `schedule`, `pricing`, `policies`, `business_info`, `selling_points`, `coaches`, `qualification_config`) from the offer (`offers.data.*`), client record, locations, and staff records. A stored `agent_prompt_sections` upsert on those keys is IGNORED at runtime (rendered > stored > default) and the Train Agent API rejects the edit. Route the fact to its real home (Blueprint / offer editor / Team section). Only `social_proof` still takes stored section text (until Build 5 Google reviews). |
+
+A tone/persistence correction taught at ONE academy is master craft by
+definition - route it general (or to shared-brain code), never academy.
+
 ## The preset model (read before classifying)
 
 Today's agents implement exactly TWO presets: the **training offer** and the
@@ -51,18 +66,22 @@ When you promote a general lesson in Step 5, **state its blast radius**: name th
 template and which presets currently reuse it. The apply script validates every
 lesson's `agent` against the registry's template keys, so a typo is rejected.
 
-## The four routing buckets
+## The six routing buckets
 
 | Bucket | Test | Where it goes |
 |---|---|---|
-| **Brain fact** | The lesson states an academy FACT (price, schedule, coach, policy, capacity, address) | Update the matching fact section (`business_info`, `schedule`, `coaches`, `social_proof`, `selling_points`, `program`, `pricing`, `policies`, `qualification_config`) via Train Agent > Knowledge or an `agent_prompt_sections` upsert. Do NOT keep it as a lesson. Archive the source row. |
-| **Academy lesson** | Behavioral steer that only makes sense for THIS academy | `client_id = academy`, `scope = 'academy'` |
-| **General lesson** | Sales craft that helps every academy running this preset | `client_id = NULL`, `scope = 'general'`, preset-tagged |
-| **Drop** | Stale, contradicted, or already covered by brain sections / an existing general lesson | Archive only |
+| **Fact -> source** (tier 3) | The lesson states an academy FACT (price, schedule, coach, policy, capacity, address, areas served) | Fix the REAL HOME the renderer reads: `offers.data.*` (program/schedule/pricing/policies/selling points), the client record + locations (business_info, qualification values), staff records (coaches). NOT an `agent_prompt_sections` upsert - rendered sections ignore stored text and the API rejects the edit. Exception: `social_proof` still takes stored section text. Archive the source row. |
+| **Master craft -> code** (tier 1) | An absolute one-voice rule taught repeatedly (e.g. "no emojis", "don't reply to bare acknowledgments") | Edit the shared brain in `api/agent/prompt-structure.js` (usually the `tone` section - rides EVERY agent, every preset, every academy). Ship via PR. Archive the source rows once merged. Highest blast radius: Zoran must approve the exact wording. |
+| **General lesson** (tier 1) | Sales craft that helps every academy running this preset, but is situational (not an absolute rule) | `client_id = NULL`, `scope = 'general'`, preset-tagged |
+| **Academy lesson** (tier 2) | Behavioral steer that only makes sense for THIS academy (a local play, a local operating preference). NOT tone (tier 1), NOT a fact (tier 3) | `client_id = academy`, `scope = 'academy'` |
+| **Structure / product flag** | The lesson implies changing the pipeline, edges, Hawkeye actions, automations, or reports a bug / feature idea | Not a lesson. Flag to Zoran: master preset change (auto-propagates), product backlog item, or bug. Archive the row. |
+| **Drop** | Stale, contradicted, contact-specific (belongs in `agent_contact_notes`), or already covered by rendered facts / shared brain / an existing general lesson | Archive only |
 
-Why brain facts must not stay lessons: lessons are injected with "they OVERRIDE
-the guidance above", so a stale fact-lesson beats a corrected brain section forever.
-Facts live in sections; lessons carry behavior.
+Why facts must not stay lessons: lessons are injected with "they OVERRIDE the
+guidance above", so a stale fact-lesson beats a corrected live-rendered fact
+forever. Facts live in their sources; lessons carry behavior. Contact-specific
+teachings ("Meg is away this weekend", "we gave him 2 free weeks") belong in
+that contact's `agent_contact_notes`, never in the lesson pile.
 
 ## Prerequisites
 
@@ -140,9 +159,13 @@ For EACH agent, work through that agent's lessons:
    rule staff didn't teach. If 3+ lessons are all about tone/structure, consider
    whether ONE before/after example (agent_examples) would teach it better than
    more rules - flag that to Zoran instead of writing a mega-lesson.
-3. **Route** each merged lesson into one of the four buckets above. For general
+3. **Route** each merged lesson into one of the six buckets above. For general
    lessons decide the preset tag: mentions trials, booking a trial, post-trial
-   enrollment = `free_trial`; pure texting craft = `universal`.
+   enrollment = `free_trial`; pure texting craft = `universal`. Consolidate
+   **each agent separately** - a lesson never moves between agents; if the same
+   craft was taught on two agents, decide whether it is an absolute one-voice
+   rule (-> shared brain code, covers all agents at once) or write it per
+   template.
 4. **Track lineage**: for every merged lesson keep the list of raw source ids it
    folded in - the plan carries them as `source_ids`.
 5. **Drop** anything stale or contradicted by a newer lesson.
@@ -172,9 +195,12 @@ Disposition is one of five:
    front -> row in the Notion Onboarding Data Points DB
    (`49be4ce65ada4d45b736070e11452edb`) AND a real question in the V2 UI (see
    below).
-2. **Brain section default** - the fact belongs in one of the 9 fact sections;
-   improve that section's default/template wording so the Knowledge tab prompts
-   every new academy for it.
+2. **Missing source field** - the fact belongs in a rendered fact section but
+   its SOURCE has no field for it (e.g. "areas served" has no offer/client
+   home). Add the field to the source (offer wizard question, client record,
+   Team section) AND extend the matching renderer in
+   `api/agent/fact-render.js` to include it. (Stored section wording only
+   still applies to `social_proof`.)
 3. **Config default** - a timer / threshold / cadence setting (root CLAUDE.md
    "configuration settings" rule) -> also an Onboarding Data Points row + a V2
    Settings control.
@@ -274,9 +300,11 @@ prompts next to their replacements. Recovery:
 - NEVER use `--force` after a failed archive - it re-inserts every lesson as a
   duplicate.
 
-Apply the brain-fact section updates now too (Knowledge tab or
-`agent_prompt_sections` upsert), and archive those source lessons via
-`archive_ids` in the same plan.
+Apply the fact-source updates now too: edit the offer (`offers.data.*`), client
+record, locations, or staff rows that the renderers read (Supabase MCP or the
+Blueprint UI). Only `social_proof` still goes through an
+`agent_prompt_sections` upsert. Master-craft code edits go in a PR in the same
+session. Archive all source lessons via `archive_ids` in the same plan.
 
 ## Step 7 - Record AND build the intake candidates
 
@@ -332,6 +360,10 @@ whether a full pass is worth it.
   `api/agent/brain.js`. They load
   `or=(client_id.eq.<academy>,and(client_id.is.null,scope.eq.general))` filtered
   by `agent`, so this storage model is what actually feeds the prompts.
+- **Fact precedence at runtime**: rendered fact (`fact-render.js`) > stored
+  `agent_prompt_sections` text > hardcoded default. So a fact fix ONLY takes
+  effect if you edit the source the renderer reads. If a rendered section
+  looks wrong, the offer/client/staff data is wrong - fix it there.
 - **Preset tags** live in `context.preset` on general rows. The readers do not
   filter on them yet (only one preset exists); when preset #2 ships, the tag is
   how we split the shared brain without re-reading every lesson.

@@ -386,11 +386,17 @@ function sanitizeAutomations(incoming, cur = {}) {
   };
 }
 
-// Fire (or queue) the next due SCRIPTED initial-automation step for one proactive
+// Fire (or queue) the next due SCRIPTED initial-automation step for one
 // Scheduled-Trial lead. Returns a short status string for the run summary. The
 // moment a lead replies they become "reactive" and the AI confirm agent owns the
-// thread, so scripted touches stop. Mirrors the AI path's mode/quiet-hours handling.
-async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, item, contactId }) {
+// CONVERSATION, so the timed nudges stop - but the booking receipt still goes
+// (receiptOnly, see the detect loop). Mirrors the AI path's mode/quiet-hours handling.
+//
+// receiptOnly: consider ONLY the transactional "you're booked" step (when:
+// "immediate"). That message is a receipt - date, time, address, calendar links -
+// not a nudge, so a lead who texts us first and then books must still get it
+// (Isabel Murphy, 2026-07-23: booked mid-conversation, received nothing).
+async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, item, contactId, receiptOnly = false }) {
   const nowMs = Date.now();
   const appt = await nextAppointment(token, contactId, { nowMs, clientId: client.id });
   const trialMs = appt && appt.startTime ? new Date(appt.startTime).getTime() : null;
@@ -407,15 +413,29 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     rows = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=kind,status,step_key,trial_at&order=created_at.desc&limit=50`);
   } catch (_) { rows = []; }
   rows = Array.isArray(rows) ? rows : [];
-  if (rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
+  // A card awaiting a human ✓ holds the timed nudges - but never the receipt. An
+  // unapproved AI draft can sit in Hawkeye for hours, and the family booked NOW.
+  if (!receiptOnly && rows.some(r => ["pending", "approved"].includes(r.status))) return "already has an active card";
   const sameTrial = r => r.trial_at == null || (trialMs != null && new Date(r.trial_at).getTime() === trialMs);
   // An AI confirm/handoff/lost card ABOUT THIS TRIAL means they're in a live
-  // exchange - let the AI agent own it; don't cold-script on top of it.
-  if (rows.some(r => ["confirm", "confirm_handoff", "confirm_lost"].includes(r.kind) && sameTrial(r))) return "lead already in conversation";
+  // exchange - let the AI agent own it; don't cold-script on top of it. Only a
+  // card that actually REACHED the lead counts: a canceled/skipped draft was
+  // never sent, and letting one suppress the scripted touches killed the booking
+  // confirmation outright (a lead's own reply cancels pending cards, which then
+  // blocked the receipt forever - Isabel Murphy, 2026-07-23). The receipt itself
+  // is transactional and never yields to a conversation.
+  const liveConvo = r => ["confirm", "confirm_handoff", "confirm_lost"].includes(r.kind)
+    && ["pending", "approved", "sent"].includes(r.status) && sameTrial(r);
+  if (!receiptOnly && rows.some(liveConvo)) return "lead already in conversation";
   const sentKeys = new Set(rows.filter(r => r.kind === "confirm_auto" && ["pending", "approved", "sent", "skipped"].includes(r.status) && sameTrial(r)).map(r => r.step_key));
 
-  const step = nextDueStep(autos, { nowMs, trialMs, sentKeys });
-  if (!step) return "no scripted step due";
+  // receiptOnly narrows the sequence to its "immediate" step and then runs the
+  // SAME due/enabled/already-sent gates, so a past-dated trial still sends nothing.
+  const step = nextDueStep(
+    receiptOnly ? { steps: (autos.steps || []).filter(s => s.when === "immediate") } : autos,
+    { nowMs, trialMs, sentKeys },
+  );
+  if (!step) return receiptOnly ? "booking receipt already sent" : "no scripted step due";
 
   // Resolve EVERYTHING ourselves now (portal-native): appointment tokens here, then
   // the contact/location tokens via the send engine's resolver — so the stored card
@@ -675,15 +695,33 @@ async function detectForClient(client) {
     const reactive = item.last_direction === "inbound";
 
     // 🔥 Parked "later" leads: no proactive touches (silence is the plan). A lead
-    // who texted back re-engaged early - clear the park (belt + suspenders with
-    // the inbound webhook's cancel) and work them normally.
+    // who texted back gets ANSWERED, but the park STANDS (Zoran 2026-07-23) - a
+    // routine reply must not erase a deliberate "circle back on this date", or the
+    // next cron re-queues the follow-ups the park replaced. Terminal moves and the
+    // park's own fire date are what clear it.
     // reactive (inbound-last) alone is NOT proof of a new reply: a silently-parked
-    // lead stays inbound-last on their original "later" text. Only cancel when a
-    // fresh inbound landed AFTER the park (else keep it - silence is the plan).
+    // lead stays inbound-last on their original "later" text, so with no fresh
+    // inbound after the park we skip them entirely.
     if (reignSet.has(String(contactId))) {
       if (!reactive || !repliedAfterPark(reignMap.get(String(contactId)), item.last_at)) { skipped++; reasons.push(`${item.name || contactId}: parked for reignition`); continue; }
-      await cancelReignitions(client.id, contactId, "lead replied before the reignition date");
-      reignSet.delete(String(contactId));
+      reasons.push(`${item.name || contactId}: parked for reignition - answering their reply, park kept`);
+    }
+
+    // BOOKING RECEIPT (reactive leads). "Your free trial is booked" carries the
+    // date, address and calendar links - it is a receipt for something the family
+    // just did, not an outreach nudge, so it goes out even mid-conversation. A
+    // lead who texts us a question and THEN books used to get nothing at all: the
+    // reactive branch handed the thread to the AI, and the AI card needs a human
+    // ✓ that their own next message cancels (Isabel Murphy, 2026-07-23). Fires at
+    // most once per trial; we then fall through so the AI still answers them.
+    if (reactive && scriptedLive) {
+      try {
+        const r = await fireScriptedStep({ client, token, locationId, mode, autos, cfg, item, contactId, receiptOnly: true });
+        if (r === "sent") autoSent++;
+        else if (r === "deferred") deferred++;
+        else if (r === "queued") drafted++;
+        else reasons.push(`${item.name || contactId}: receipt - ${r}`);
+      } catch (e) { reasons.push(`${item.name || contactId}: receipt - ${e.message}`); }
     }
 
     // SCRIPTED INITIAL AUTOMATIONS (proactive only). When the academy's sequence is
@@ -704,7 +742,11 @@ async function detectForClient(client) {
     try {
       // Dedupe. Reactive: skip if an active card exists or we already answered this
       // inbound. Proactive: skip if ANY confirm card already exists (we've engaged).
-      const existing = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
+      // AI cards only: a scripted confirm_auto row is a receipt, not an answer, so
+      // it must not stand in for one - the booking receipt fired just above stamps
+      // the same last_lead_at, and counting it here would swallow the reply the
+      // lead is actually waiting on.
+      const existing = await sb(`agent_confirm_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&kind=in.(confirm,confirm_handoff,confirm_lost)&order=created_at.desc&select=id,status,last_lead_at&limit=1`);
       const last = Array.isArray(existing) && existing[0];
       if (last && ["pending", "approved"].includes(last.status)) { skipped++; reasons.push(`${item.name || contactId}: already has a ${last.status} card`); continue; }
       // Skip = snooze (Zoran 2026-07-10): a skipped card re-drafts next run.
@@ -1064,6 +1106,12 @@ async function handler(req, res) {
       await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "skipped", updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
+    if (b.action === "dismiss-ready") {
+      // "Send nothing": terminal no-reply decision for this card (vs skip = snooze).
+      if (!b.ready_id) return res.status(400).json({ error: "ready_id required" });
+      await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "dismissed", updated_at: new Date().toISOString() }) });
+      return res.status(200).json({ ok: true });
+    }
 
     // Initial-automations editor (the scripted first-touch sequence) — read.
     if (b.action === "automations-get") {
@@ -1403,7 +1451,12 @@ async function handler(req, res) {
         try { await setStatus({ clientId, ghl, token, oppRef, status: "lost", contactId, reason }); }
         catch (e) { return res.status(e.status || 502).json({ error: `mark lost: ${e.message}` }); }
       }
-      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason }]) }); } catch (_) {}
+      // reason = the taxonomy pick; reason_detail = the lead's own words or staff detail.
+      const reasonDetail = (b.reason_detail && String(b.reason_detail).trim().slice(0, 500)) || null;
+      try { await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: routedToNurture ? "nurture" : "lost", reason, reason_detail: reasonDetail }]) }); } catch (_) {}
+      if (reasonDetail) {
+        try { await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, ghl_contact_id: String(contactId), active: true, note: `Lost reason (${reason}) - their words: "${reasonDetail}"`, created_by: "lost-reason" }]) }); } catch (_) {}
+      }
       if (b.ready_id) {
         // 'sent' only when the goodbye actually went out; a bare move is 'canceled'
         // (fake sent_at rows poisoned the draft-vs-sent training data). A REQUESTED

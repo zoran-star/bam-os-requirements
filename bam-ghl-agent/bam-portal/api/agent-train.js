@@ -197,6 +197,7 @@ const CLASSIFY_TOOL = {
     properties: {
       global: { type: "boolean", description: "True ONLY if the lesson is general sales-craft that would apply to ANY basketball academy (tone, persuasion, conversation style, objection handling, booking technique). False if it is specific to THIS academy (its pricing, schedule, location, coaches, programs, policies, or any local fact)." },
       reason: { type: "string", description: "One short sentence explaining the call." },
+      lead_fact: { type: "string", description: "OPTIONAL. If the lesson contains a durable fact about THIS SPECIFIC lead/family (their stated timeline, situation, preferences, a deal or play the team extended to them, who to address), extract it as ONE short third-person sentence the agent should remember about this contact. Omit entirely when the lesson is pure craft or an academy fact - most lessons have no lead fact." },
     },
     required: ["global", "reason"],
   },
@@ -207,14 +208,14 @@ async function classifyLesson(lessonText) {
   try {
     const data = await anthropic({
       model: ANTHROPIC_MODEL, max_tokens: 256,
-      system: "You decide whether a lesson taught to a single basketball academy's AI booking agent is LOCAL (specific to that one academy — its pricing, schedule, location, coaches, programs, policies, local facts) or GLOBAL sales-craft (general persuasion, tone, conversation style, objection handling, booking technique that would help ANY academy). Be conservative: only mark global=true when the lesson is clearly generic sales-craft with no academy-specific fact in it.",
+      system: "You decide whether a lesson taught to a single basketball academy's AI booking agent is LOCAL (specific to that one academy — its pricing, schedule, location, coaches, programs, policies, local facts) or GLOBAL sales-craft (general persuasion, tone, conversation style, objection handling, booking technique that would help ANY academy). Be conservative: only mark global=true when the lesson is clearly generic sales-craft with no academy-specific fact in it. SEPARATELY: if the lesson mentions a durable fact about the specific lead being discussed (their stated timeline, family situation, a deal or play the team gave them, preferences, who to address), extract that as lead_fact - one short third-person sentence. Most lessons have none; omit lead_fact then.",
       tools: [CLASSIFY_TOOL], tool_choice: { type: "tool", name: "classify_lesson" },
       messages: [{ role: "user", content: `Lesson:\n"${lessonText}"` }],
     });
     const tool = (data.content || []).find(b => b.type === "tool_use" && b.name === "classify_lesson");
-    if (tool?.input) return { global: !!tool.input.global, reason: String(tool.input.reason || "") };
+    if (tool?.input) return { global: !!tool.input.global, reason: String(tool.input.reason || ""), leadFact: String(tool.input.lead_fact || "").trim() || null };
   } catch (e) { /* fall through to local */ }
-  return { global: false, reason: "could not classify — kept local" };
+  return { global: false, reason: "could not classify — kept local", leadFact: null };
 }
 
 async function handler(req, res) {
@@ -254,7 +255,21 @@ async function handler(req, res) {
           created_by: ctx.user.email || "client-trainer",
         }]),
       });
-      return res.status(200).json({ ok: true, lesson: row, proposed_global: cls.global, reason: cls.reason });
+      // Lead-learnings mining (Zoran 2026-07-23): when the teach-why carries a
+      // fact about THIS lead (their timeline, a play we extended, who to address),
+      // ALSO write it to agent_contact_notes so every future draft for this
+      // contact sees it via <contact_memory>. Best-effort - never blocks the teach.
+      let leadNote = null;
+      if (cls.leadFact && b.context && b.context.contact_id) {
+        try {
+          const [nrow] = await sb(`agent_contact_notes`, {
+            method: "POST", headers: { Prefer: "return=representation" },
+            body: JSON.stringify([{ client_id: clientId, ghl_contact_id: String(b.context.contact_id), active: true, note: `Lead learning (from a Hawkeye teach): ${cls.leadFact}`, created_by: "lead-learning" }]),
+          });
+          leadNote = nrow || true;
+        } catch (_) { /* note is a bonus; the lesson already saved */ }
+      }
+      return res.status(200).json({ ok: true, lesson: row, proposed_global: cls.global, reason: cls.reason, lead_note: !!leadNote });
     }
 
     if (b.action === "save-example") {

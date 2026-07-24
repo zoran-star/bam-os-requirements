@@ -263,3 +263,35 @@ Fixed (V2-only, detect loads v2_access clients):
 - "never nag twice" is now scoped per trial via `trial_at` (>= lastPast blocks),
   so a lead who rebooks and no-shows AGAIN gets a fresh, correctly-dated nag;
   dateless legacy cards still block forever.
+
+## 2026-07-23 - the booking confirmation is a RECEIPT (PR #1579)
+
+Isabel Murphy booked a 7pm GTA trial and got NOTHING - no confirm SMS, no email,
+no calendar links. The booking itself was perfect (trial_bookings row, capacity
+taken, card moved to scheduled trial). 3 of the last 20 GTA bookings hit this.
+
+Chain: she texted a question at 21:00 -> `reactive` (last msg inbound) -> the
+detector's `if (!reactive && scriptedLive)` branch SKIPPED the scripted receipt
+and handed the thread to the AI -> AI card queued for a human ✓ (hawkeye) -> she
+texted again 76s later -> the global "lead replied" sweep CANCELED the card ->
+and `fireScriptedStep`'s "lead already in conversation" guard counted that
+CANCELED card, so the receipt was blocked for that trial forever. Both doors shut.
+
+**The model now: the "you're booked" step (`when: "immediate"`) is TRANSACTIONAL.**
+It is a receipt for something the family just did (date, address, calendar links),
+not outreach, so conversation state never gates it. The timed nudges (`same_day`)
+are still proactive-only - the AI owns a live conversation.
+- `fireScriptedStep({ receiptOnly: true })` narrows the sequence to the immediate
+  step, then runs the SAME due/enabled/sentKeys gates (past trials send nothing).
+- Reactive leads fire the receipt, then FALL THROUGH so the AI still answers them.
+- "lead already in conversation" + "already has an active card" now count only
+  cards that REACHED the lead (pending/approved/sent). Canceled/skipped drafts no
+  longer suppress scripted touches - this also un-sticks the `same_day` reminder.
+- The AI dedup query is scoped to `kind=in.(confirm,confirm_handoff,confirm_lost)`
+  so the receipt's `last_lead_at` stamp can't be mistaken for "already answered
+  this inbound" and swallow the reply the lead is waiting on.
+
+⚠️ Related visibility trap: GTA is `booking_provider='portal'`, so a website
+booking creates NO GHL appointment. It shows in the portal Calendar (attendees on
+the slot) and on the pipeline card - never in the GHL calendar. "I can't see the
+booking" is usually someone looking at GHL.

@@ -292,6 +292,14 @@ async function handler(req, res) {
     // opens, so the lead is texted exactly once.
     if (contactId) {
       try {
+        // Idempotency (TARA duplicate-card fix): a re-submitted post-trial form
+        // must not stack a SECOND "Entry: Rebook" trigger note - that re-fires
+        // the rebook pass after the first opener already went out. One active
+        // trigger at a time; the context notes ride only with a fresh trigger.
+        const dupe = await sb(`agent_contact_notes?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}&active=eq.true&note=ilike.${encodeURIComponent("Entry: Rebook")}*&select=id&limit=1`);
+        if (Array.isArray(dupe) && dupe.length) {
+          console.log("rebook trigger already active - not stacking another");
+        } else {
         // The persistent context note + optional coach steer come FIRST (loadContactMemory
         // reads active notes as the team's guidance the draft must honor), and the
         // "Entry: Rebook" trigger note comes LAST so the rebook pass fires exactly once.
@@ -302,6 +310,7 @@ async function handler(req, res) {
         if (rebookSeed) noteRows.push({ client_id: clientId, ghl_contact_id: String(contactId), active: true, note: `The coach drafted a rebook opener to work from - send it or adapt it to fit the conversation: "${rebookSeed}"`, created_by: "post-trial-noshow" });
         noteRows.push({ client_id: clientId, ghl_contact_id: String(contactId), active: true, note: "Entry: Rebook needed - no-show", created_by: "post-trial-noshow" });
         await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(noteRows) });
+        }
       } catch (e) { console.error("no-show rebook notes failed (non-fatal):", e.message); }
     }
     result.missed_trial = "retired";

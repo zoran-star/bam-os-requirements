@@ -1846,6 +1846,11 @@ if (window.__MOCK__) (() => {
     padding: 28px;
     box-shadow: var(--shadow-lg);
     animation: modalIn 0.3s var(--es);
+    /* Tall modals (e.g. Input assets) must scroll internally on short
+       laptop viewports - centered flex + fixed backdrop otherwise clips
+       both ends with no way to reach the submit button. */
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
   }
   @keyframes modalIn {
     from { opacity: 0; transform: translateY(12px) scale(0.98); }
@@ -7800,6 +7805,19 @@ if (window.__MOCK__) (() => {
         Store
       </div>
 
+      <!-- Live Pages: the academy's own website, as published right now.
+           Revealed by _revealLivePagesTab() for V1 + V1.5 only. -->
+      <div class="nav-item" id="nav-livepages" style="display:none" onclick="switchView('livepages', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <path d="M8 21h8"/>
+            <path d="M12 17v4"/>
+          </svg>
+        </span>
+        Live Pages
+      </div>
+
       <div id="nav-v15cal" class="nav-item" data-feature="v15" style="display:none" onclick="switchView('v15cal', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -12420,6 +12438,18 @@ Then the call to action."]</div>
       </div>
     </div>
 
+    <div class="view" id="view-livepages">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Live Pages</span>
+          <div class="topbar-title">Live Pages</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="livepages-content"></div>
+      </div>
+    </div>
+
     <!-- Calendars moved OUT of .main to a focus-mode overlay (below, just after
          .main), mirroring the Calendar / Inbox / Blueprint / Settings overlays.
          It keeps id="view-v15cal" so every #view-v15cal CSS rule + JS render
@@ -14750,6 +14780,127 @@ function _v15kStoreHtml(s) {
     <div id="${id}" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${_v15kStoreList(s.items)}</div>
   </div>`;
 }
+// ── Live Pages tab ──
+// The academy's own website pages, straight from their live sitemap, for fast
+// review + monitoring + raising a ticket against a specific page.
+// V1 + V1.5 ONLY - V2 academies never see this tab (they are not seeded with a
+// site, and the V2 gate below is belt-and-braces so it stays true).
+let _LP_DATA = null;
+let _LP_DEVICE = 'web';
+let _LP_CURRENT = null;
+
+async function _revealLivePagesTab() {
+  try {
+    if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) return;
+    if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true) return;  // never for V2
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/live-pages?client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.enabled) return;
+    _LP_DATA = j;
+    const nav = document.getElementById('nav-livepages');
+    if (nav) nav.style.display = '';
+  } catch (_) {}
+}
+
+function _lpRenderPreview() {
+  const host = document.getElementById('lp-preview');
+  if (!host || !_LP_CURRENT) return;
+  const mobile = _LP_DEVICE === 'mobile';
+  // Desktop renders at full width then scales down, so the preview shows the
+  // real desktop layout rather than a squeezed narrow one.
+  const scale = mobile ? 1 : 0.5;
+  host.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <div style="min-width:0">
+        <div style="font-weight:700;font-size:15px;color:var(--text)">${_bbEscapeHtml(_LP_CURRENT.label)}</div>
+        <a href="${_bbEscapeHtml(_LP_CURRENT.url)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted);word-break:break-all">${_bbEscapeHtml(_LP_CURRENT.url)}</a>
+      </div>
+      <div style="display:flex;gap:8px;flex:none;flex-wrap:wrap">
+        <button class="btn-ghost" onclick="_lpSetDevice('web')" style="${_LP_DEVICE === 'web' ? 'border-color:var(--gold);color:var(--gold)' : ''}">Web</button>
+        <button class="btn-ghost" onclick="_lpSetDevice('mobile')" style="${_LP_DEVICE === 'mobile' ? 'border-color:var(--gold);color:var(--gold)' : ''}">Mobile</button>
+        <a class="btn-ghost" href="${_bbEscapeHtml(_LP_CURRENT.url)}" target="_blank" rel="noopener">Open</a>
+        <button class="btn-ghost" onclick="_lpReport()">Report an issue</button>
+      </div>
+    </div>
+    <div style="background:#000;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;justify-content:center">
+      <div style="width:${mobile ? '390px' : '100%'};max-width:100%;height:${mobile ? 720 : 640}px;overflow:hidden">
+        <iframe src="${_bbEscapeHtml(_LP_CURRENT.url)}" title="Preview of ${_bbEscapeHtml(_LP_CURRENT.label)}" loading="lazy"
+          style="width:${mobile ? '390px' : Math.round(100 / scale) + '%'};height:${mobile ? 720 : Math.round(640 / scale)}px;border:0;transform:scale(${scale});transform-origin:top left;background:#fff"></iframe>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin:10px 0 0">Some pages block being shown inside a frame. If this stays blank, use Open.</p>`;
+}
+
+function _lpSetDevice(d) { _LP_DEVICE = d; _lpRenderPreview(); }
+
+function _lpOpen(path) {
+  const page = ((_LP_DATA && _LP_DATA.pages) || []).find(p => p.path === path);
+  if (!page) return;
+  _LP_CURRENT = page;
+  document.querySelectorAll('[data-lp-path]').forEach(el => {
+    el.style.borderColor = el.getAttribute('data-lp-path') === path ? 'var(--gold)' : 'var(--line)';
+  });
+  _lpRenderPreview();
+  const pv = document.getElementById('lp-preview');
+  if (pv && pv.scrollIntoView) pv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Raise a ticket about the page being previewed. Opens the normal Error intake
+// and drops the URL into the first "where" field so staff know the page.
+function _lpReport() {
+  if (!_LP_CURRENT) return;
+  const url = _LP_CURRENT.url;
+  try { if (typeof openIntake === 'function') openIntake('error'); } catch (_) { return; }
+  setTimeout(() => {
+    const f = [...document.querySelectorAll('input, textarea')]
+      .find(el => /where/i.test(el.placeholder || '') || /where/i.test(el.getAttribute('name') || ''));
+    if (f && !f.value) {
+      f.value = url;
+      f.dispatchEvent(new Event('input', { bubbles: true }));
+      f.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }, 350);
+}
+
+async function openLivePagesView() {
+  const host = document.getElementById('livepages-content');
+  if (!host || typeof CLIENT_ID === 'undefined') return;
+  host.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span> Loading your pages…</div>';
+  try {
+    if (!_LP_DATA) {
+      const token = await _mreqAuthToken();
+      const r = await fetch(`/api/live-pages?client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+      _LP_DATA = r.ok ? await r.json() : null;
+    }
+    const pages = (_LP_DATA && _LP_DATA.pages) || [];
+    if (!pages.length) {
+      host.innerHTML = '<div class="req-empty" style="padding:20px 0">No live pages found for your site yet.</div>';
+      return;
+    }
+    const cards = pages.map(p => `
+      <button data-lp-path="${_bbEscapeHtml(p.path)}" onclick="_lpOpen('${_bbEscapeHtml(p.path).replace(/'/g, "\\'")}')"
+        style="text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;cursor:pointer;font:inherit;color:inherit">
+        <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">${_bbEscapeHtml(p.label)}</div>
+        <div style="font-size:12px;color:var(--muted);word-break:break-all">${_bbEscapeHtml(p.path)}</div>
+      </button>`).join('');
+    host.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;font-size:15px;color:var(--text)">Your live website</div>
+          <a href="${_bbEscapeHtml(_LP_DATA.site_url)}" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--muted)">${_bbEscapeHtml(_LP_DATA.site_url)}</a>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">${pages.length} page${pages.length === 1 ? '' : 's'} live</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:22px">${cards}</div>
+      <div id="lp-preview"></div>`;
+    _lpOpen(pages[0].path);
+  } catch (e) {
+    host.innerHTML = '<div class="req-empty" style="padding:20px 0">Could not load your pages.</div>';
+  }
+}
+
 // ── Store tab (merch order management) ──
 // Revealed only for clients with a store configured (section=store -> enabled).
 // Lists recent orders with fulfillment detail; orders also feed New Order in GHL.
@@ -14781,30 +14932,204 @@ async function openStoreView() {
     host.innerHTML = `<div class="req-empty" style="padding:20px 0;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`;
   }
 }
+// Money in the store manager is always whole cents on the wire and dollars in
+// the input, so a price never round-trips through a float.
+function _storeMoney(cents) {
+  if (typeof cents !== 'number') return '-';
+  return '$' + (cents / 100).toFixed(2);
+}
+
 function _storeInvHtml(inv) {
   const products = (inv && inv.products) || [];
-  if (!products.length) return '';
-  const oosCount = products.reduce((n, p) => n + p.colorways.filter(c => !c.in_stock).length, 0);
-  const rows = products.map(p => {
+  if (!products.length) {
+    // The store is configured but its catalog could not be read. Say so rather
+    // than rendering an empty panel that looks like "you have no products".
+    return (inv && inv.store_base_url && inv.store_reachable === false)
+      ? `<div style="margin-bottom:26px"><div style="font-size:12px;color:var(--text-mute)">Your store is not answering right now, so its products can't be listed. Orders below are unaffected.</div></div>`
+      : '';
+  }
+  const live = products.filter(p => !p.removed);
+  const hidden = products.filter(p => p.removed);
+  const oosCount = live.reduce((n, p) => n + p.colorways.filter(c => !c.in_stock).length, 0);
+
+  const card = (p) => {
     const cws = p.colorways.map(c => {
       const vk = `${p.slug}__${c.key}`;
+      // Quantity is optional: leave it blank to just use the In stock / Sold out
+      // toggle. Setting it to 0 marks the variant sold out on the live store.
+      const qv = (c.qty === null || typeof c.qty === 'undefined') ? '' : c.qty;
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;font-size:12.5px">
         <span style="color:var(--text)">${escapeHTML(c.label)}</span>
-        <button id="inv-${escapeHTML(vk)}" onclick="_storeToggleStock('${vk}', ${c.in_stock ? 'false' : 'true'}, this)"
-          style="border:1px solid var(--border-med);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:${c.in_stock ? 'transparent' : 'rgba(201,135,31,0.14)'};color:${c.in_stock ? 'var(--text-mute)' : '#c9871f'}">${c.in_stock ? 'In stock' : 'Sold out'}</button>
+        <span style="display:flex;align-items:center;gap:8px;flex:none">
+          <input id="qty-${escapeHTML(vk)}" type="number" min="0" step="1" value="${qv}" placeholder="qty"
+            onchange="_storeSetQty('${vk}', this.value, this)"
+            title="Stock count. Blank = not tracked. 0 = sold out."
+            style="width:64px;text-align:center;border:1px solid var(--border-med);border-radius:6px;padding:3px 6px;font-size:12px;background:transparent;color:var(--text)">
+          <button id="inv-${escapeHTML(vk)}" onclick="_storeToggleStock('${vk}', ${c.in_stock ? 'false' : 'true'}, this)"
+            style="border:1px solid var(--border-med);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:${c.in_stock ? 'transparent' : 'rgba(201,135,31,0.14)'};color:${c.in_stock ? 'var(--text-mute)' : '#c9871f'}">${c.in_stock ? 'In stock' : 'Sold out'}</button>
+        </span>
       </div>`;
     }).join('');
+
+    const dollars = typeof p.price_cents === 'number' ? (p.price_cents / 100).toFixed(2) : '';
+    const edited = p.price_edited
+      ? `<button onclick="_storeClearPrice('${p.slug}')" title="Put the price back to ${escapeHTML(_storeMoney(p.base_price_cents))}"
+           style="border:0;background:none;padding:0;font-size:11px;color:var(--gold);cursor:pointer;text-decoration:underline">was ${escapeHTML(_storeMoney(p.base_price_cents))}, reset</button>`
+      : '';
+
     return `<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
-      <div style="font-weight:700;font-size:13.5px;color:var(--text);margin-bottom:4px">${escapeHTML(p.name)}</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div style="font-weight:700;font-size:13.5px;color:var(--text)">${escapeHTML(p.name)}${p.added_in_portal ? ' <span style="font-size:10px;font-weight:700;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:1px 7px;vertical-align:middle">Added by you</span>' : ''}</div>
+          <div style="margin-top:2px">${edited}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex:none">
+          <span style="font-size:12px;color:var(--text-mute)">$</span>
+          <input type="number" min="0" step="0.01" value="${dollars}" placeholder="price"
+            onchange="_storeSetPrice('${p.slug}', this.value, this)"
+            title="What a customer pays. Changing it changes the live store and what Stripe charges."
+            style="width:82px;text-align:right;border:1px solid var(--border-med);border-radius:6px;padding:3px 6px;font-size:12px;background:transparent;color:var(--text)">
+          <button onclick="_storeRemoveProduct('${p.slug}', ${p.added_in_portal ? 'true' : 'false'}, this)"
+            title="${p.added_in_portal ? 'Delete this product' : 'Take this off the store. You can put it back.'}"
+            style="border:1px solid var(--border-med);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-mute)">${p.added_in_portal ? 'Delete' : 'Hide'}</button>
+        </div>
+      </div>
       ${cws}
     </div>`;
-  }).join('');
+  };
+
+  const hiddenHtml = hidden.length ? `
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin:16px 0 6px">Hidden from the store</div>
+    ${hidden.map(p => `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px dashed var(--border-med);border-radius:10px;padding:10px 14px;margin-bottom:8px">
+      <span style="font-size:13px;color:var(--text-mute)">${escapeHTML(p.name)}</span>
+      <button onclick="_storeRestoreProduct('${p.slug}', this)"
+        style="border:1px solid var(--gold);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--gold)">Put back</button>
+    </div>`).join('')}` : '';
+
   return `<div style="margin-bottom:26px">
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Inventory${oosCount ? ` · ${oosCount} sold out` : ''}</div>
-    <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">Tap a colorway to toggle stock. Sold-out colorways can't be purchased on the store.</div>
-    ${rows}
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute)">Products${oosCount ? ` · ${oosCount} sold out` : ''}</div>
+      <button onclick="_storeAddForm()" style="border:1px solid var(--gold);border-radius:999px;padding:4px 14px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--gold)">Add a product</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">Set a price, a stock count, or take a product off the store. Changes go live on your store right away.</div>
+    <div id="store-addform"></div>
+    ${live.map(card).join('')}
+    ${hiddenHtml}
   </div>`;
 }
+
+// Every catalog edit goes through one call, then re-renders from the server's
+// response so what is on screen is what the store will actually serve.
+async function _storeCatalogAction(body, el) {
+  const prev = el ? el.textContent : '';
+  if (el) { el.disabled = true; if (el.tagName === 'BUTTON') el.textContent = '…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/store/inventory?client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(Object.assign({ client_id: CLIENT_ID }, body)),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    await openStoreView();
+    return true;
+  } catch (e) {
+    if (el) { el.disabled = false; if (el.tagName === 'BUTTON') el.textContent = prev || 'Error'; }
+    alert("Couldn't save that: " + (e.message || e));
+    return false;
+  }
+}
+
+function _storeSetPrice(slug, raw, input) {
+  const val = String(raw == null ? '' : raw).trim();
+  if (val === '') { alert('Enter a price, or use Hide to take the product off the store.'); return; }
+  const dollars = Number(val);
+  if (!Number.isFinite(dollars) || dollars < 0) { alert('Enter a price like 35 or 35.00.'); return; }
+  const price_cents = Math.round(dollars * 100);
+  _storeCatalogAction({ action: 'set_price', slug, price_cents }, input);
+}
+
+function _storeClearPrice(slug) { _storeCatalogAction({ action: 'clear_price', slug }); }
+
+function _storeRemoveProduct(slug, added, btn) {
+  const msg = added
+    ? 'Delete this product? It comes off your store and this cannot be undone from here.'
+    : 'Take this off your store? Nobody can buy it until you put it back.';
+  if (!confirm(msg)) return;
+  _storeCatalogAction({ action: 'remove_product', slug }, btn);
+}
+
+function _storeRestoreProduct(slug, btn) { _storeCatalogAction({ action: 'restore_product', slug }, btn); }
+
+// Add-product form. Kept to the few fields a store actually needs to sell
+// something: a name, a price, and at least one colorway with an image.
+function _storeAddForm() {
+  const host = document.getElementById('store-addform');
+  if (!host) return;
+  if (host.innerHTML.trim()) { host.innerHTML = ''; return; }
+  const f = (id, label, ph, type) => `<label style="display:block;margin-bottom:8px">
+      <span style="display:block;font-size:11px;color:var(--text-mute);margin-bottom:3px">${label}</span>
+      <input id="${id}" type="${type || 'text'}" placeholder="${ph}" ${type === 'number' ? 'min="0" step="0.01"' : ''}
+        style="width:100%;border:1px solid var(--border-med);border-radius:6px;padding:6px 8px;font-size:12.5px;background:transparent;color:var(--text)">
+    </label>`;
+  host.innerHTML = `<div style="border:1px solid var(--gold);border-radius:10px;padding:14px;margin-bottom:10px">
+    <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:10px">New product</div>
+    ${f('sa-name', 'Product name', 'Elevate Hoodie')}
+    ${f('sa-price', 'Price', '65.00', 'number')}
+    ${f('sa-color', 'Colorway name', 'Black')}
+    ${f('sa-image', 'Image link (https)', 'https://...')}
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button onclick="_storeAddSubmit(this)" style="border:1px solid var(--gold);border-radius:999px;padding:5px 16px;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--gold);color:#1a1a1a">Add to store</button>
+      <button onclick="_storeAddForm()" style="border:1px solid var(--border-med);border-radius:999px;padding:5px 16px;font-size:11.5px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-mute)">Cancel</button>
+    </div>
+  </div>`;
+}
+
+function _storeAddSubmit(btn) {
+  const v = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
+  const name = v('sa-name'), color = v('sa-color'), image = v('sa-image');
+  const dollars = Number(v('sa-price'));
+  if (!name) { alert('Give the product a name.'); return; }
+  if (!Number.isFinite(dollars) || dollars <= 0) { alert('Give the product a price, like 65.00.'); return; }
+  if (!color) { alert('Give the colorway a name, like Black.'); return; }
+  if (image && !/^https:\/\//i.test(image)) { alert('The image link needs to start with https://'); return; }
+  _storeCatalogAction({
+    action: 'add_product',
+    product: { name, priceCents: Math.round(dollars * 100), colorways: [{ label: color, images: image ? [image] : [] }] },
+  }, btn);
+}
+// Set a stock count. Blank clears it back to untracked; 0 marks the variant
+// sold out, which the live store already honours through out_of_stock.
+async function _storeSetQty(variantKey, raw, input) {
+  const val = String(raw == null ? '' : raw).trim();
+  const qty = val === '' ? '' : Math.max(0, Math.floor(Number(val)));
+  if (val !== '' && !Number.isFinite(qty)) { alert('Enter a whole number, or leave it blank.'); return; }
+  if (input) input.disabled = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/store/inventory?client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, variant_key: variantKey, qty }),
+    });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (input) { input.disabled = false; input.value = (j.qty === null || typeof j.qty === 'undefined') ? '' : j.qty; }
+    // Keep the In stock / Sold out pill honest about what the store now shows.
+    const btn = document.getElementById('inv-' + variantKey);
+    if (btn) {
+      const inStock = !!j.in_stock;
+      btn.textContent = inStock ? 'In stock' : 'Sold out';
+      btn.style.background = inStock ? 'transparent' : 'rgba(201,135,31,0.14)';
+      btn.style.color = inStock ? 'var(--text-mute)' : '#c9871f';
+      btn.setAttribute('onclick', `_storeToggleStock('${variantKey}', ${inStock ? 'false' : 'true'}, this)`);
+    }
+  } catch (e) {
+    if (input) input.disabled = false;
+    alert("Couldn't update the count: " + (e.message || e));
+  }
+}
+
 async function _storeToggleStock(variantKey, nextInStock, btn) {
   const target = (nextInStock === true || nextInStock === 'true');
   const prev = btn ? btn.textContent : '';
@@ -20080,6 +20405,7 @@ function switchView(name, el) {
 
   if (name === 'v15kpis') openV15Kpis();
   if (name === 'store') openStoreView();
+  if (name === 'livepages') openLivePagesView();
   if (name === 'v15cal') openV15Cal();
 
   // When entering Action Items, load the list
@@ -23902,7 +24228,8 @@ function applyV15NavState(v15) {
   applyV15ContactsPlacement();   // V1.5: Contacts moves to a button in the Inbox
   applyTabPermissions(); // re-subtract per-staff tab perms after the tier re-gate
   applyTalkToBamNav();
-  try { _revealStoreTab(); } catch (_) {}  // show Store tab only for clients with a store
+  try { _revealStoreTab(); } catch (_) {}
+  try { _revealLivePagesTab(); } catch (_) {}  // Live Pages: V1 + V1.5 with a site  // show Store tab only for clients with a store
 }
 
 // V1.5 groups Systems + Marketing under an expandable "Support" accordion.
@@ -38655,6 +38982,10 @@ function _hk2Moves(r) {
   } else {
     if (k !== 'lost') m.push([_hk2MoveLabel('lost', hasMsg), 'lost']);
   }
+  // "Send nothing" (Zoran, taught repeatedly via Hawkeye): the inbound needs NO
+  // reply (bare ack, reaction, already handled). Terminal for THIS inbound - the
+  // detector will not re-draft it (unlike Skip = snooze). Optional teach-why rides.
+  if (k === 'reply') m.push(['Send nothing', 'dismiss']);
   // 🔥 Any card can park the lead for a later date instead ("yes, but later").
   if (k !== 'reignite') m.push(['Reignite later', 'reignite']);
   if ((k === 'reignite' || k === 'book') && r._origKind) m.unshift(['Back to the card', 'unreignite']);
@@ -38817,12 +39148,19 @@ function _hk2CardHtml(r, pos, total, isTop) {
     // above (right-aligned, dashed gold = "yours, not sent yet"); tapping it
     // turns it into a live field. Rest caption carries the per-kind nuance the
     // old form label used to (sign-up link embedded, locked-in message).
+    // Closing only: an empty box means "send nothing", so say so instead of
+    // leaving a blank void that reads like a broken card (Zoran 2026-07-23).
+    const canNoReply = _HK2.agent === 'closing' && r._kind === 'reply';
     const draftCap = r._kind === 'enroll' ? 'Draft · sign-up link included · tap to edit'
       : r._kind === 'reignite_due' ? 'Locked-in message · tap to edit before it sends'
+      : canNoReply ? 'Draft · tap to edit · empty = send nothing'
       : 'Draft · tap to edit';
+    // Short on purpose: a longer line clips mid-sentence on a phone, and the
+    // caption underneath already states the rule.
+    const draftPh = canNoReply ? ' placeholder="Empty = send nothing"' : '';
     body = `${_hk2ThreadHtml(r, isTop)}${reigBanner}${proposal}
       <div class="hk2-draftwrap">
-        <textarea class="hk2-draft hk2-draft-bubble"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
+        <textarea class="hk2-draft hk2-draft-bubble"${id.draft}${draftPh} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
         <div class="hk2-draftcap"><span class="rest">${_HK2_PENCIL}${draftCap}</span><span class="edit">${_HK2_CARET}Editing · changes save automatically</span></div>
       </div>
       ${r._kind === 'enroll' ? '<div class="hk2-note">The opportunity is marked won automatically when they pay on the link.</div>' : ''}`;
@@ -39044,6 +39382,9 @@ function _hk2Render(opts) {
   const top = _hk2Top();
   // Only Book-it cards have live pickers. Proposal cards show the slot read-only.
   if (top && top._kind === 'book') _hk2EnsureBookOpts();
+  // The agent can hand over an EMPTY closing draft on purpose ("nothing to
+  // send") - the button has to say so before anyone touches the box.
+  _hk2SyncGoLabel();
   _hk2HydrateThread();   // fill the conversation preview if this card carried none
   _hkAutosizeDrafts('#pl-hawkeye');
   // A NEW card on top (deck open, approve/skip advance, tab switch) starts in
@@ -39129,11 +39470,27 @@ function _hk2Edited(isSlot) {
     _HK2.edited = true;
     const t = document.getElementById('hk2-teach'); if (t) t.style.display = '';
   }
-  if (!_HK2.touched) {
-    _HK2.touched = true;
-    const go = document.getElementById('hk2-go'); if (go) go.textContent = _HK2_KIND[r._kind].goEdit;
-  }
+  if (!_HK2.touched) _HK2.touched = true;
+  _hk2SyncGoLabel();
   _hk2SyncMoveLabels();
+}
+// ── "Send nothing" (Zoran 2026-07-23, CLOSING agent only) ────────────────────
+// An EMPTY message box on a closing reply card IS the action: the lead said
+// "thank you" and needs no answer. Clear the box (or let the agent hand you an
+// empty one) and the primary button becomes "Send nothing" - confirming texts
+// them nothing AND puts back the follow-up plan / reignition their reply paused.
+function _hk2NoReply(r) {
+  if (!r || _HK2.agent !== 'closing' || r._kind !== 'reply') return false;
+  const d = document.getElementById('hk2-draft');
+  return !String(d ? d.value : (r.draft_message || '')).trim();
+}
+// One place decides the primary button's label: "Send nothing" on an empty
+// closing draft, otherwise the kind's normal / edited label.
+function _hk2SyncGoLabel() {
+  const r = _hk2Top(); if (!r) return;
+  const go = document.getElementById('hk2-go'); if (!go) return;
+  go.textContent = _hk2NoReply(r) ? 'Send nothing'
+    : (_HK2.touched ? _HK2_KIND[r._kind].goEdit : _HK2_KIND[r._kind].go);
 }
 function _hk2ToggleOther(btn) {
   const pnl = document.getElementById('hk2-other'); if (pnl) pnl.classList.toggle('open');
@@ -39145,7 +39502,9 @@ async function _hk2Teach(r, lesson, before, after, agent) {
     // agent = the CARD's tab captured at click time. Reading _HK2.agent here
     // instead saved lessons to the WRONG agent whenever the deck auto-jumped
     // tabs (resolve fires at 480ms, this call up to 6s later on the undo flush).
-    await _apxPost('/api/agent-train', 'teach', { agent: agent || _HK2.agent, lesson, kind: 'fix', context: { source: 'hawkeye-deck', contact: r.contact_name || null, ai_drafted: before || null, you_sent: after || null } });
+    // contact_id rides along so the backend can mine LEAD-SPECIFIC facts out of
+    // the teach-why into agent_contact_notes (the "lead learnings" loop).
+    await _apxPost('/api/agent-train', 'teach', { agent: agent || _HK2.agent, lesson, kind: 'fix', context: { source: 'hawkeye-deck', contact: r.contact_name || null, contact_id: r.ghl_contact_id || null, ai_drafted: before || null, you_sent: after || null } });
   } catch (_) {
     // The action already landed - never block on the lesson. But a silently
     // dropped lesson kills the training loop, so at least SAY it failed.
@@ -39213,7 +39572,10 @@ function _hk2Confirm() {
   const before = r.draft_message || '';
   const k = r._kind;
   const writeMode = k === 'ghost' && r._writeMode;
-  if ((k === 'reply' || k === 'enroll' || k === 'reignite_due' || writeMode) && !reply) { _apxToast('Message is empty', false); r._hk2Busy = false; return; }
+  // An empty box on a CLOSING reply card is not a mistake - it's "send nothing"
+  // (Zoran 2026-07-23). Every other kind still refuses to commit an empty message.
+  const noReply = agent === 'closing' && k === 'reply' && !reply;
+  if (!noReply && (k === 'reply' || k === 'enroll' || k === 'reignite_due' || writeMode) && !reply) { _apxToast('Message is empty', false); r._hk2Busy = false; return; }
   // Capture every input NOW - the deck advances to the next card immediately,
   // which tears down this card's DOM before the deferred API call runs.
   const calEl = document.getElementById('hk2-cal'), slotEl = document.getElementById('hk2-slot');
@@ -39288,7 +39650,7 @@ function _hk2Confirm() {
   }
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   let undone = false;
-  _hawkDefer({ cardId: 'hk2-topcard', label: writeMode ? 'Send message' : _HK2_KIND[k].go, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
+  _hawkDefer({ cardId: 'hk2-topcard', label: noReply ? 'Send nothing' : writeMode ? 'Send message' : _HK2_KIND[k].go, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
     if (k === 'book') {
       const resp = chk(await _apxPost(ep, 'confirm-book', { ready_id: r.id, calendar_id: calV, slot_at: slotV, reply, athlete_name: athV }));
       _apxToast(resp && resp.confirmation_sent ? 'Booked + confirmation sent - Confirm takes over' : 'Booked - handed to Confirm', true);
@@ -39309,7 +39671,9 @@ function _hk2Confirm() {
       chk(await _apxPost(ep, 'confirm-enroll', { ready_id: r.id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, enroll_note: r.enroll_note }));
       _apxToast('Sent - won lands when they pay', true);
     } else if (k === 'lost') {
-      chk(await _apxPost(ep, 'confirm-lost', { ready_id: r.id, reply, lost_reason: r.lost_reason || 'Other' }));
+      // reason_detail = the lead's own last words - structured lost-reason data
+      // (pipeline_outcomes.reason_detail + a contact note for the bounce-back).
+      chk(await _apxPost(ep, 'confirm-lost', { ready_id: r.id, reply, lost_reason: r.lost_reason || 'Other', reason_detail: r.last_message || null }));
       _apxToast('Marked lost - Nurture takes over', true);
     } else if (k === 'unqualified') {
       // Opt-out approve: same close as the "Mark unqualified" move - NO reply is
@@ -39358,6 +39722,13 @@ function _hk2Confirm() {
       const res = await fetch('/api/agent-closing', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve-plan', client_id: CLIENT_ID, contact_id: r.ghl_contact_id, edits }) });
       const j = await _safeJson(res); if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
       _apxToast(`Follow-up schedule locked in - ${j.scheduled} message(s)`, true);
+    } else if (noReply) {
+      // Nothing goes out. The card closes and everything their reply PAUSED (the
+      // follow-up plan, a parked reignition) goes back on its original dates -
+      // the reason this action exists (Zoran 2026-07-23).
+      const resp = chk(await _apxPost(ep, 'confirm-no-reply', { ready_id: r.id, contact_id: r.ghl_contact_id, contact_name: r.contact_name || null, adjusted: !!before }));
+      const kept = (resp && resp.resumed) || 0;
+      _apxToast(kept ? `Nothing sent - ${kept} follow-up${kept === 1 ? '' : 's'} still scheduled` : 'Nothing sent - card cleared', true);
     } else {
       // reply
       let resp;
@@ -39383,7 +39754,7 @@ function _hk2Move(op, btn) {
   // Lost/Unqualified are two-tap (Zoran 2026-07-10): the first tap arms the
   // button ("Confirm: ...") and reveals an OPTIONAL teach-why box, so a lesson
   // can ride along with the close. The second tap commits + saves the lesson.
-  if ((op === 'lost' || op === 'unq') && r._moveArm !== op) {
+  if ((op === 'lost' || op === 'unq' || op === 'dismiss') && r._moveArm !== op) {
     const pnl = document.getElementById('hk2-other');
     if (pnl && pnl.querySelectorAll) pnl.querySelectorAll('.hk2-x[data-orig]').forEach(b => { b.textContent = b.dataset.orig; });
     r._moveArm = op;
@@ -39409,7 +39780,7 @@ function _hk2Move(op, btn) {
   // tears this DOM down. Nurture/Unqualified send the box when it has text (the
   // button label said so); an empty box keeps the move silent.
   const teachEl = document.getElementById('hk2-teach');
-  const lesson = (op === 'lost' || op === 'unq') && teachEl ? teachEl.value.trim() : '';
+  const lesson = (op === 'lost' || op === 'unq' || op === 'dismiss') && teachEl ? teachEl.value.trim() : '';
   // Only capture the box as a goodbye on kinds whose move LABEL discloses the send
   // (the same allow-list _hk2Moves uses for hasMsg). A book/reignite/reignite_due
   // card has a PREFILLED box but silent-labeled moves - capturing it would text the
@@ -39418,6 +39789,7 @@ function _hk2Move(op, btn) {
   const reply = ((op === 'lost' || op === 'unq') && canSendOnMove) ? (((document.getElementById('hk2-draft') || {}).value) || '').trim() : '';
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   const label = op === 'ghost' ? 'Sent to Ghosted' : op === 'handoff' ? 'Handed to Booking'
+    : op === 'dismiss' ? 'Send nothing'
     : op === 'lost' ? (reply ? 'Sent + Nurture' : 'Marked lost') : (reply ? 'Sent + Unqualified' : 'Unqualified');
   // Honest toast: the close is the primary action and it succeeded, but if a
   // goodbye was requested and the backend reports it did NOT send, say so - never
@@ -39428,7 +39800,10 @@ function _hk2Move(op, btn) {
   };
   let undone = false;
   _hawkDefer({ cardId: 'hk2-topcard', label, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
-    if (op === 'ghost') {
+    if (op === 'dismiss') {
+      chk(await _apxPost(ep, 'dismiss-ready', { ready_id: readyId }));
+      _apxToast(lesson ? 'Dismissed + taught - nothing sent' : 'Dismissed - nothing sent', true);
+    } else if (op === 'ghost') {
       chk(await _apxPost(ep, 'confirm-ghost', { ready_id: readyId }));
       try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
       _apxToast('Sent to Ghosted', true);
@@ -39436,13 +39811,13 @@ function _hk2Move(op, btn) {
       chk(await _apxPost(ep, 'confirm-handoff', { ready_id: readyId, reply: '', handoff_note: r.handoff_note || 'Needs a new time - rebook.' }));
       _apxToast('Handed back to Booking', true);
     } else if (op === 'lost') {
-      const resp = chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply, lost_reason: r.lost_reason || 'Other' }));
+      const resp = chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply, lost_reason: r.lost_reason || 'Other', reason_detail: r.last_message || null }));
       goodbyeToast(resp, reply ? 'Message sent + moved to Nurture' : (lesson ? 'Marked lost + taught' : 'Marked lost - Nurture takes over'));
     } else {
       const resp = chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: readyId, reply }));
       goodbyeToast(resp, reply ? 'Message sent + marked unqualified' : (lesson ? 'Marked unqualified + taught' : 'Marked unqualified'));
     }
-    if (lesson) await _hk2Teach(r, lesson, r.draft_message || null, reply || (op === 'lost' ? '(marked lost)' : '(marked unqualified)'), agent);
+    if (lesson) await _hk2Teach(r, lesson, r.draft_message || null, reply || (op === 'dismiss' ? '(sent nothing)' : op === 'lost' ? '(marked lost)' : '(marked unqualified)'), agent);
   } });
   // Advance the deck right after the fly-out beat - don't wait for the 6s flush.
   setTimeout(() => { if (!undone) _hk2Resolve(r, agent); }, 480);

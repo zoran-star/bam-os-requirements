@@ -47,10 +47,15 @@ export async function bounceCancelledTrialToRebook({ clientId, contactId, trialB
     // team's guidance), the "Entry:" trigger note LAST so the rebook pass fires
     // exactly once. Mirrors api/ghl/post-trial.js's no-show handshake.
     try {
-      await sbRest(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([
-        { client_id: clientId, ghl_contact_id: String(contactId), active: true, note: `Rebook needed (cancelled booking): ${context}`, created_by: source || "calendar-cancel" },
-        { client_id: clientId, ghl_contact_id: String(contactId), active: true, note: "Entry: Rebook needed - cancelled booking", created_by: source || "calendar-cancel" },
-      ]) });
+      // Idempotency (TARA duplicate-card fix): never stack a second active
+      // "Entry: Rebook" trigger - one live trigger per contact at a time.
+      const dupe = await sbRest(`agent_contact_notes?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(String(contactId))}&active=eq.true&note=ilike.${encodeURIComponent("Entry: Rebook")}*&select=id&limit=1`);
+      if (!(Array.isArray(dupe) && dupe.length)) {
+        await sbRest(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([
+          { client_id: clientId, ghl_contact_id: String(contactId), active: true, note: `Rebook needed (cancelled booking): ${context}`, created_by: source || "calendar-cancel" },
+          { client_id: clientId, ghl_contact_id: String(contactId), active: true, note: "Entry: Rebook needed - cancelled booking", created_by: source || "calendar-cancel" },
+        ]) });
+      }
     } catch (_) { /* notes are best-effort too - still attempt the bounce */ }
     // Bounce Scheduled-Trial -> Responded per the authored flow (cancel_booking
     // edge); on no edge run the hardcoded Responded move (mirrors cant_make_it).

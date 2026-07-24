@@ -165,7 +165,10 @@ async function handler(req, res) {
       await cancelAllSalesOutbound({
         clientId: client.id, contactId: ghlContactId,
         sendError: "lead replied",
-        reigniteReason: "lead replied before the reignition date",
+        // Same as the GHL reply path: cancel the cards, keep the park, and
+        // PAUSE (not kill) the closing follow-up plan.
+        keepReignition: true,
+        pauseClosing: true,
       });
     } catch (e) { console.error("twilio inbound draft-cancel:", e.message); }
 

@@ -22,6 +22,7 @@ import { respondedStage, interestedStage, nurtureStage } from "../agent/_stage.j
 import { markReopened } from "../agent/_reopen.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { exitEnrollment } from "../automations.js";
+import { pauseClosingPlan } from "../agent/_cancel-outbound.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -122,6 +123,9 @@ async function inboundSideEffects(client, clientId, contact, bodyText) {
   // Lead replied by email -> cancel pending/approved agent drafts.
   try {
     const patch = { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", send_error: "lead replied (email)", updated_at: occurred }) };
+    // Closing plan PAUSES rather than dies (Zoran 2026-07-23) - same rule as the
+    // SMS spines. Runs first so the sweep below only clears non-plan cards.
+    await pauseClosingPlan(clientId, ghlContactId, "lead replied (email)");
     await sb(`agent_followups?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
     await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);
     await sb(`agent_confirm_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${cid}&status=in.(pending,approved)`, patch);

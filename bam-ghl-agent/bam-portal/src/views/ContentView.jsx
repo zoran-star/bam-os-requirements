@@ -1220,6 +1220,19 @@ function CmVideoThumb({ url, tk }) {
     </div>
   );
 }
+// Height-animated show/hide (grid-rows 0fr->1fr) - smooth instead of jumpy.
+function SmoothCollapse({ open, children }) {
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateRows: open ? "1fr" : "0fr",
+      transition: "grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
+    }}>
+      <div style={{ overflow: "hidden", minHeight: 0 }}>{children}</div>
+    </div>
+  );
+}
+
 function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState(null);   // null = not fetched yet
@@ -1231,6 +1244,9 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
   const [dlNote, setDlNote] = useState("");       // "Downloading 12/78…" progress
   const [preview, setPreview] = useState(null);   // file being viewed in the lightbox
   const _cmAnchorRef = useRef(null);              // shift-select range anchor (flat index)
+  // Which folder groups are expanded. null = default (first group only) -
+  // clients with a long history shouldn't dump every batch open at once.
+  const [openGroups, setOpenGroups] = useState(null);
 
   async function toggle() {
     const next = !open;
@@ -1268,6 +1284,13 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
     if (!byFolder.has(key)) { byFolder.set(key, []); groups.push(key); }
     byFolder.get(key).push(f);
   }
+
+  const openSet = openGroups ?? new Set(groups.slice(0, 1));
+  const toggleGroupOpen = (g) => setOpenGroups(() => {
+    const n = new Set(openSet);
+    n.has(g) ? n.delete(g) : n.add(g);
+    return n;
+  });
 
   const dateStr = (iso) => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 
@@ -1382,25 +1405,38 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
           )}
           {groups.map(g => (
             <div key={g} style={{ marginBottom: 14 }}>
-              <label style={{
-                display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none",
-                fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: tk.textMute, margin: "8px 0 8px",
-              }}>
-                <input
-                  type="checkbox"
-                  checked={byFolder.get(g).every(f => selected.has(f.url))}
-                  ref={el => {
-                    if (!el) return;
-                    const gf = byFolder.get(g);
-                    const some = gf.some(f => selected.has(f.url));
-                    el.indeterminate = some && !gf.every(f => selected.has(f.url));
-                  }}
-                  onChange={() => toggleGroup(g)}
-                  title={`Select all in ${g}`}
-                  style={{ width: 14, height: 14, accentColor: tk.accent, cursor: "pointer", margin: 0 }}
-                />
+              <div
+                role="button"
+                aria-expanded={openSet.has(g)}
+                onClick={() => toggleGroupOpen(g)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none",
+                  fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: tk.textMute, margin: "8px 0 8px",
+                }}
+              >
+                <label onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={byFolder.get(g).every(f => selected.has(f.url))}
+                    ref={el => {
+                      if (!el) return;
+                      const gf = byFolder.get(g);
+                      const some = gf.some(f => selected.has(f.url));
+                      el.indeterminate = some && !gf.every(f => selected.has(f.url));
+                    }}
+                    onChange={() => toggleGroup(g)}
+                    title={`Select all in ${g}`}
+                    style={{ width: 14, height: 14, accentColor: tk.accent, cursor: "pointer", margin: 0 }}
+                  />
+                </label>
+                <span style={{
+                  display: "inline-block", fontSize: 9,
+                  transform: openSet.has(g) ? "rotate(90deg)" : "none",
+                  transition: "transform 0.2s ease",
+                }}>▶</span>
                 {g} <span style={{ fontWeight: 500 }}>({byFolder.get(g).length})</span>
-              </label>
+              </div>
+              <SmoothCollapse open={openSet.has(g)}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
                 {byFolder.get(g).map((f, i) => (
                   <div key={f.url + i} style={{ position: "relative" }}>
@@ -1448,6 +1484,7 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
                   </div>
                 ))}
               </div>
+              </SmoothCollapse>
             </div>
           ))}
         </div>

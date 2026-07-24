@@ -2,6 +2,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { timingSafeEqual } from "node:crypto";
 import { contactsReadTable } from "./_contacts.js";
 import { maybeSendSmsViaProvider } from "./messaging/provider.js";
+import { pickGhlToken } from "./ghl/_core.js";
 // V1.5 mass send — queued, throttled, DND-respecting bulk SMS/email to a
 // tag-filtered audience (GHL bulk rules: skip DND, pace the sends).
 //
@@ -12,7 +13,6 @@ import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 //   GET  /api/mass-send?action=work                 worker (cron) — drains a batch
 
 const GHL_V2 = "https://services.leadconnectorhq.com";
-const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
 const V2_VERSION = "2021-07-28";
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -55,25 +55,6 @@ async function ghl(method, path, { token, body } = {}) {
   if (!res.ok) { const e = new Error((json && (json.message || json.error)) || `GHL ${res.status}`); e.status = res.status; throw e; }
   return json;
 }
-async function refreshGhlToken(client) {
-  const cid = (process.env.GHL_OAUTH_CLIENT_ID || "").trim(), cs = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
-  if (!cid || !cs || !client.ghl_refresh_token) throw new Error("GHL refresh not configured");
-  const r = await fetch(GHL_TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: cid, client_secret: cs, grant_type: "refresh_token", refresh_token: client.ghl_refresh_token, user_type: "Location" }) });
-  const tok = await r.json();
-  if (!r.ok || !tok?.access_token) throw new Error(tok?.error_description || "GHL token refresh failed");
-  await sb(`clients?id=eq.${client.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_access_token: tok.access_token, ghl_refresh_token: tok.refresh_token || client.ghl_refresh_token, ghl_token_expires_at: new Date(Date.now() + (Number(tok.expires_in) || 86400) * 1000).toISOString() }) });
-  return { token: tok.access_token, locationId: tok.locationId || client.ghl_location_id };
-}
-async function pickGhlToken(client) {
-  if (client.ghl_access_token) {
-    const exp = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
-    if (exp - Date.now() <= 60_000 && client.ghl_refresh_token) { try { return await refreshGhlToken(client); } catch (_) {} }
-    return { token: client.ghl_access_token, locationId: client.ghl_location_id };
-  }
-  const token = process.env.GHL_API_KEY || process.env.GHL_AGENCY_TOKEN || null;
-  return token ? { token, locationId: client.ghl_location_id } : null;
-}
-
 // ── Worker: drain one job's pending recipients (cron) ──
 async function runWorker(res) {
   const jobs = await sb(`mass_send_jobs?status=in.(queued,sending)&order=created_at.asc&limit=1`);

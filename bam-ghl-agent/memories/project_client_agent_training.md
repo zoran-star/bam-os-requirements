@@ -2,6 +2,23 @@
 
 Two related changes to the BAM GTA booking agent, both V2/agent-only (zero V1 impact).
 
+## ⭐ SKILL UPGRADED TO THE CONTROL-DIAL MODEL + GTA RUN #1 (2026-07-23)
+`/consolidate-lessons` rewritten for the master-preset model: 4 buckets -> **6**
+(fact -> SOURCE not section text since 8/9 sections render live via
+fact-render.js; NEW master-craft -> shared-brain CODE bucket for one-voice rules;
+NEW structure/product-flag bucket; contact-specific teachings -> agent_contact_notes).
+Tone corrections are NEVER academy lessons (tier 1, one voice - Zoran).
+First run under it (GTA, 45 raw: booking 11 / confirm 5 / closing 29): 9 general
++ 1 GTA academy (downsell stopgap) lessons written, 3 one-voice rules baked into
+the shared `tone` section CODE (no emojis / no reply to bare acks / proper-case
+names), 2 fact fixes to offer sources (policy.sibling_policy - new renderer line -
++ travel-proof selling point), IC-001/IC-002 in the intake ledger, 45 archived,
+consolidation_runs row 1088d9e3. Downsell = future sales-system ADD-ON:
+spec + user stories in `docs/sales-addon-downsell-spec.md` (add-ons = master-authored
+optional modules, per-academy enablement, values from the offer). 4 product flags
+(send-nothing Hawkeye action, duplicate-card bug, lead-learnings mining, structured
+lost reasons) built/triaged same session.
+
 ## ⭐ TRAINING LOOP AUDIT + PRESET MODEL (2026-07-10, later session)
 Zoran's framing (authoritative): today's agents implement ONLY the **training
 offer + free trial sales system presets**; more presets come later for academies

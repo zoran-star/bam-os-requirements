@@ -87,6 +87,23 @@ export async function reigniteContactIdSet(clientId) {
   return set;
 }
 
+// Does ONE contact have a scheduled park right now? The follow-up-plan drafter
+// calls this as a hard gate: a scheduled reignition IS the next follow-up, so no
+// agent may queue a multi-message follow-up plan on top of it (Zoran 2026-07-23 -
+// Mike Sandhu got a 2-message plan while a Jul 28 park was meant to be standing).
+// Fails CLOSED (true) on a DB error: when we cannot prove the lead is unparked,
+// the safe move is to draft nothing rather than double up on them.
+export async function hasScheduledReignition(clientId, contactId) {
+  if (!clientId || !contactId) return false;
+  try {
+    const rows = await sb(`agent_reignitions?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.scheduled&select=id&limit=1`);
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (e) {
+    console.error("[_reignite] hasScheduledReignition failed (failing closed):", e.message);
+    return true;
+  }
+}
+
 // Like reigniteContactIdSet, but carries each park's created_at so a detector can
 // tell a GENUINE new reply (inbound AFTER the park) from a lead who is simply
 // still inbound-last because their park was silent (no ack) or the ack send failed.

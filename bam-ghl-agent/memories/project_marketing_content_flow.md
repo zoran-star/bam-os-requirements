@@ -288,3 +288,18 @@ MarketingView.jsx only rendered the "Final creatives" grid for replace/add
 types, never for campaign-create. Rule: every marketing ticket type that can
 receive finals must render `t.files`. Also remember: the revision round-trip
 REPLACES `files` wholesale (by design - new version supersedes).
+
+## Staff UX polish (2026-07-23, Cam)
+- **Nav re-click = section reset**: clicking the sidebar item for the CURRENT
+  page bumps `viewEpoch` in App.jsx which keys the views' `<Suspense>` - full
+  remount + goNav's clean `?p=` URL means the page reopens at its root. Works
+  for every nav item, not just Marketing.
+- **Client media groups collapse**: folder groups in `ClientMediaLibrary` are
+  collapsible; DEFAULT = only the first (newest) group open (`openGroups`
+  state, null = default). Chevron rotates; header click toggles, checkbox
+  still selects (stopPropagation).
+- **Smooth expand/collapse**: `SmoothCollapse` (grid-rows 0fr->1fr, 0.28s) in
+  ContentView for React collapses + global `interpolate-size: allow-keywords`
+  and `::details-content` height transition in `src/index.css` so every
+  native `<details>` (Brand, file folders) animates in Chromium. Non-Chromium
+  keeps the instant toggle.
