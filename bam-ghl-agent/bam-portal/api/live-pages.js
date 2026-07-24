@@ -15,6 +15,42 @@ import { withSentryApiRoute } from "./_sentry.js";
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
+const VERCEL_TOKEN = (process.env.VERCEL_TOKEN || "").trim();
+const VERCEL_TEAM_ID = (process.env.VERCEL_TEAM_ID || "").trim();
+
+// Which domain the site is ACTUALLY on right now. Sites start on
+// <project>.vercel.app and move to a custom domain when they go live, so the
+// base URL is resolved from Vercel on request rather than frozen at seed time -
+// the tab follows a launch on its own, with no re-seed.
+// Cached per warm lambda; falls back to the seeded URL if Vercel is unreachable.
+const _domCache = new Map();
+const DOMAIN_TTL_MS = 5 * 60 * 1000;
+
+async function liveBaseUrl(slug, seededUrl) {
+  if (!slug || !VERCEL_TOKEN) return seededUrl;
+  const hit = _domCache.get(slug);
+  if (hit && Date.now() - hit.at < DOMAIN_TTL_MS) return hit.url;
+  try {
+    const team = VERCEL_TEAM_ID ? `?teamId=${encodeURIComponent(VERCEL_TEAM_ID)}` : "";
+    const h = { Authorization: `Bearer ${VERCEL_TOKEN}` };
+    const pr = await fetch(`https://api.vercel.com/v9/projects${team}${team ? "&" : "?"}limit=100`, { headers: h });
+    if (!pr.ok) return seededUrl;
+    const { projects = [] } = await pr.json();
+    const proj = projects.find(p => (p.rootDirectory || "") === `clients/${slug}`);
+    if (!proj) return seededUrl;
+    const dr = await fetch(`https://api.vercel.com/v9/projects/${proj.id}/domains${team}`, { headers: h });
+    if (!dr.ok) return seededUrl;
+    const { domains = [] } = await dr.json();
+    // A verified custom domain wins the moment it is attached; .vercel.app is the fallback.
+    const custom = domains.find(d => !d.name.endsWith(".vercel.app") && d.verified && !d.redirect);
+    const va = domains.find(d => d.name.endsWith(".vercel.app"));
+    const url = custom ? `https://${custom.name}` : va ? `https://${va.name}` : seededUrl;
+    _domCache.set(slug, { url, at: Date.now() });
+    return url;
+  } catch {
+    return seededUrl;
+  }
+}
 
 async function sb(path, init = {}) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -95,8 +131,12 @@ async function handler(req, res) {
 
     const cfg = (client.ghl_kpi_config && typeof client.ghl_kpi_config === "object") ? client.ghl_kpi_config : {};
     const site = cfg.site && typeof cfg.site === "object" ? cfg.site : null;
-    const siteUrl = site && typeof site.url === "string" ? site.url.trim() : "";
-    if (!siteUrl) return res.status(200).json({ enabled: false, site_url: null, pages: [] });
+    const seededUrl = site && typeof site.url === "string" ? site.url.trim() : "";
+    if (!seededUrl) return res.status(200).json({ enabled: false, site_url: null, pages: [] });
+
+    // Resolve the domain the site is on TODAY, so a launch onto a custom domain
+    // is picked up without re-seeding.
+    const siteUrl = (await liveBaseUrl(site.slug, seededUrl)).replace(/\/+$/, "");
 
     // The seeded list is the full picture: it was built by probing every path
     // the site defines (vercel.json rewrites, sitemap, and the page files
@@ -109,9 +149,12 @@ async function handler(req, res) {
     // Still read the live sitemap so anything published since the last seed
     // shows up on its own. Seeded entries win on label/order.
     const live = (await pagesFromSitemap(siteUrl)) || [];
+    // Rebuild every URL from the CURRENT base, so the seeded paths follow the
+    // site onto its new domain instead of pointing at the old .vercel.app one.
+    const abs = (p) => `${siteUrl}${p === "/" ? "" : p}`;
     const byPath = new Map();
-    for (const p of seeded) byPath.set(p.path, { path: p.path, url: p.url, label: p.label || labelFor(p.path) });
-    for (const p of live) if (!byPath.has(p.path)) byPath.set(p.path, p);
+    for (const p of seeded) byPath.set(p.path, { path: p.path, url: abs(p.path), label: p.label || labelFor(p.path) });
+    for (const p of live) if (!byPath.has(p.path)) byPath.set(p.path, { path: p.path, url: abs(p.path), label: p.label });
 
     let pages = [...byPath.values()];
     if (!pages.length) pages = [{ path: "/", url: siteUrl, label: "Home" }];
