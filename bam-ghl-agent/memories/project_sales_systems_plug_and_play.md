@@ -146,3 +146,34 @@ FLAGGED, not fixed (known gaps, acceptable):
 - Lead-form CORE fields live per-site in bam-client-sites templates - master control by convention, not enforcement.
 - Pricing transparency MODE is per-offer data; per Zoran it belongs on the preset (structural move, later).
 - Quiet hours = env vars (BAM-global), not yet a per-academy tier-3 setting.
+
+## Stage NAMES now come from the master (2026-07-24)
+Closes the first "FLAGGED, not fixed" gap above for LABELS (positions still live in the rows).
+The board + focus/config view show the MASTER's stage names on every academy - Booking / Ghosted /
+Confirm / Closing / Nurture (`PRESETS.free_trial.stages[].label`) - instead of each sub-account's
+legacy GHL wording (GTA "Responded / Interested / Scheduled trial / Done trial", DETAIL
+"Responded / Ghosted / Schedule Trial / Done Trial", San Jose live-GHL names).
+
+**Display only. Nothing is renamed inside anyone's GHL account and nothing is written to the DB.**
+
+How it works (all in `api/ghl/pipelines.js`, the single board shaper):
+- Each stage in the board payload now carries `role` + `displayName` on top of `name`.
+- `role`: from `pipeline_stages.role` on a `provider='portal'` academy (`buildPortalBoard` in
+  `api/agent/_store.js`), else matched off the GHL stage name with the SAME `ROLE_MATCHERS`
+  the agents use (the legacy `interested` key is skipped so canonical `ghosted` wins).
+- `displayName`: `masterStageLabels(presetKey)` in `api/agent/preset-master.js`.
+  presetKey = the offer stamp (`resolvePresetKey`), falling back to `free_trial` for a
+  `v2_access` academy that predates the stamp. No stamp + no v2_access = no labels, so V1/V1.5
+  academies are byte-identical.
+- `name` deliberately stays the academy's OWN stage name - `entry_points.stage_name` routing, the
+  `expectsTrial` flag, the entry-point wizard's stage `<option value>` and several `/respond/i`
+  style checks all key off it. Never swap `name` for the master label.
+
+**The front-end blocker this had to fix first:** `client-portal.html` identified a stage by
+PATTERN-MATCHING ITS NAME (`_plStageBot`), so "Booking" would have failed `/respond/` and rendered
+as "Manual - no agent or automation runs here". Now `_plBotFor(stage)` / `_plRoleOf(stage)` read
+`stage.role` FIRST and only fall back to the name regex. Terminal stages (Member / Unqualified)
+have no registry role, so the name regex is still what catches them - keep it.
+Display goes through `_plStageLabel(stage)` = `displayName || name`.
+
+Pill ORDER is untouched (`_plo2Order`'s ORD map, role-keyed, Nurture first - Zoran 2026-07-09).

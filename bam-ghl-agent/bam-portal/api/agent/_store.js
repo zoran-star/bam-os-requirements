@@ -424,6 +424,11 @@ export async function buildPortalBoard(clientId) {
     pipeMap.get(pid).stages.push({
       id: s.ghl_stage_id || s.id,
       name: s.ghl_stage_name || s.label || s.role,
+      // The registry KNOWS what each stage is for. Carrying the role on the board
+      // payload lets the UI stop guessing the engine from the stage's name (which
+      // reads differently on every academy). Display name is stamped on top of
+      // this in pipelines.js, the single board shaper.
+      role: s.role || null,
       position: s.position,
     });
   }

@@ -15775,7 +15775,7 @@ async function openV15Inbox() {
       // contactId, normalized phone, lowercased email - so a filter never drops
       // a conversation just because one id doesn't line up across GHL endpoints.
       for (const p of _V15IB.pipelines) {
-        const stageName = {}; for (const s of (p.stages || [])) stageName[s.id] = s.name;
+        const stageName = {}; for (const s of (p.stages || [])) stageName[s.id] = _plStageLabel(s);
         for (const o of (p.opportunities || [])) {
           // Only LIVE opportunities count - a won/lost/abandoned lead isn't
           // "in" the pipeline anymore, so the pipeline filter should skip them.
@@ -16039,7 +16039,7 @@ function _v15ibRenderAll() {
   }).join('');
   const pipeOpts = `<option value="">All pipelines</option>` + _V15IB.pipelines.map(p => `<option value="${escapeHTML(p.id)}" ${_V15IB.fPipeline === p.id ? 'selected' : ''}>${escapeHTML(p.name)}</option>`).join('');
   const curPipe = _V15IB.pipelines.find(p => p.id === _V15IB.fPipeline);
-  const stageOpts = curPipe ? `<option value="">All stages</option>` + (curPipe.stages || []).map(s => `<option value="${escapeHTML(s.id)}" ${_V15IB.fStage === s.id ? 'selected' : ''}>${escapeHTML(s.name)}</option>`).join('') : '';
+  const stageOpts = curPipe ? `<option value="">All stages</option>` + (curPipe.stages || []).map(s => `<option value="${escapeHTML(s.id)}" ${_V15IB.fStage === s.id ? 'selected' : ''}>${escapeHTML(_plStageLabel(s))}</option>`).join('') : '';
   const hasActiveFilters = _V15IB.fChannels.length > 0 || _V15IB.fPipeline;
 
   // Needs-reply count for progress indicator
@@ -26917,7 +26917,7 @@ async function _bbStaffStagesLoad(memberId) {
       ${stages.map(s => {
         const on = allowAll || allowed.includes(s.id);
         return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-          <input type="checkbox" data-stageid="${escapeHTML(s.id)}" data-pipe="${escapeHTML(p.id)}" ${on ? 'checked' : ''} onchange="_bbStaffStagesSave('${memberId}')"> ${escapeHTML(s.name)}</label>`;
+          <input type="checkbox" data-stageid="${escapeHTML(s.id)}" data-pipe="${escapeHTML(p.id)}" ${on ? 'checked' : ''} onchange="_bbStaffStagesSave('${memberId}')"> ${escapeHTML(_plStageLabel(s))}</label>`;
       }).join('')}
       </div>`;
     }).join('') +
@@ -38085,21 +38085,65 @@ function _plIcon(name, size) {
   };
   return `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;vertical-align:-2px">${P[name] || ''}</svg>`;
 }
+// The engine catalogue, keyed by bot key. ONE definition so the name matcher and
+// the role matcher below can never drift apart. Callers get a copy.
+const _PL_BOT_DEFS = {
+  booking:     { color: '#5A8FB8', kind: 'agent',      key: 'booking',     icon: 'phone',  tag: 'Booking' },
+  confirm:     { color: '#3DBE8B', kind: 'agent',      key: 'confirm',     icon: 'check',  tag: 'Confirm' },
+  closing:     { color: '#B084E8', kind: 'agent',      key: 'closing',     icon: 'target', tag: 'Closing' },
+  ghosted:     { color: '#D4B65C', kind: 'automation', key: 'ghosted',     icon: 'ghost',  tag: 'Ghosted' },
+  nurture:     { color: '#3B6FD4', kind: 'automation', key: 'nurture',     icon: 'heart',  tag: 'Nurture' },
+  member:      { color: '#EC4899', kind: 'terminal',   key: 'member',      icon: 'award',  tag: 'Member' },
+  unqualified: { color: '#FB923C', kind: 'terminal',   key: 'unqualified', icon: 'ban',    tag: 'Unqualified' },
+};
+const _plBotDef = (k) => (_PL_BOT_DEFS[k] ? { ..._PL_BOT_DEFS[k] } : null);
 // Colour-code a pipeline stage header by the bot/automation that OWNS it (the
 // sales-crew model scheme). Agent stages glow solid; automation stages get a
 // dashed outline. Terminal stages (Member / Unqualified) get a solid accent, no
 // glow. Returns { color, kind, key, icon, tag } or null. `icon` is a _plIcon key
 // (design system: SVG, not emoji); `tag` is the plain-text name. V2 only.
+// NAME-based fallback only - prefer _plBotFor(stage), which reads the role.
 function _plStageBot(name) {
   const n = String(name || '').toLowerCase();
-  if (/respond/.test(n))                                     return { color: '#5A8FB8', kind: 'agent',      key: 'booking',     icon: 'phone',  tag: 'Booking' };
-  if (/(schedul|book)/.test(n) && /trial/.test(n))           return { color: '#3DBE8B', kind: 'agent',      key: 'confirm',     icon: 'check',  tag: 'Confirm' };
-  if (/trial/.test(n) && /(done|complete|attend)/.test(n))   return { color: '#B084E8', kind: 'agent',      key: 'closing',     icon: 'target', tag: 'Closing' };
-  if (/interest|ghost/.test(n))                              return { color: '#D4B65C', kind: 'automation', key: 'ghosted',     icon: 'ghost',  tag: 'Ghosted' };
-  if (/nurtur/.test(n))                                      return { color: '#3B6FD4', kind: 'automation', key: 'nurture',     icon: 'heart',  tag: 'Nurture' };
-  if (/member|liveclient|enrolled|\bwon\b/.test(n))          return { color: '#EC4899', kind: 'terminal',   key: 'member',      icon: 'award',  tag: 'Member' };
-  if (/unqualif/.test(n))                                    return { color: '#FB923C', kind: 'terminal',   key: 'unqualified', icon: 'ban',    tag: 'Unqualified' };
+  if (/respond/.test(n))                                     return _plBotDef('booking');
+  if (/(schedul|book)/.test(n) && /trial/.test(n))           return _plBotDef('confirm');
+  if (/trial/.test(n) && /(done|complete|attend)/.test(n))   return _plBotDef('closing');
+  if (/interest|ghost/.test(n))                              return _plBotDef('ghosted');
+  if (/nurtur/.test(n))                                      return _plBotDef('nurture');
+  if (/member|liveclient|enrolled|\bwon\b/.test(n))          return _plBotDef('member');
+  if (/unqualif/.test(n))                                    return _plBotDef('unqualified');
   return null;
+}
+// ── Stage ROLE is the primary signal, the name regex is only the fallback ────
+// The board API now stamps `role` on every stage it can identify (from the
+// pipeline_stages registry, or matched off the GHL stage name server-side with
+// the same matchers the agents use). That is what a stage IS, independent of
+// what an academy happens to have named it - so the engine, the flow graph and
+// the pill order all read the role first and only fall back to the old
+// name-guessing when a stage carries no role (custom academy stages, and the
+// terminal Member / Unqualified stages, which have no registry role at all).
+const _PL_ROLE_BOT  = { responded: 'booking', scheduled_trial: 'confirm', done_trial: 'closing', ghosted: 'ghosted', interested: 'ghosted', nurture: 'nurture' };
+// `interested` is the legacy role key for the same stage the master calls Ghosted.
+const _PL_ROLE_CANON = { responded: 'responded', scheduled_trial: 'scheduled_trial', done_trial: 'done_trial', ghosted: 'ghosted', interested: 'ghosted', nurture: 'nurture' };
+function _plBotForRole(role) { return _plBotDef(_PL_ROLE_BOT[role]); }
+// The engine that owns a stage OBJECT. Role first, stage name as the fallback.
+function _plBotFor(stage) {
+  if (!stage) return null;
+  return (stage.role ? _plBotForRole(stage.role) : null) || _plStageBot(stage.name);
+}
+// The transition role of a stage OBJECT. Role first, stage name as the fallback.
+function _plRoleOf(stage) {
+  if (!stage) return null;
+  return (stage.role ? (_PL_ROLE_CANON[stage.role] || null) : null) || _plStageRole(stage.name);
+}
+// What we CALL this stage on screen. BAM's master preset names the stages
+// (Booking / Ghosted / Confirm / Closing / Nurture) and every academy sees those
+// names; the board API stamps them on as `displayName`. Nothing is renamed
+// inside an academy's GHL account - `stage.name` stays their own wording and is
+// still what routing, entry points and the stage pickers key off.
+function _plStageLabel(stage) {
+  if (!stage) return '';
+  return _plCap(stage.displayName || stage.name || '');
 }
 
 // ── Stage-transition edges (the Sales-Crew flow graph) ─────────────────────
@@ -38198,7 +38242,7 @@ function _plStageEdges(role) {
 // "configure on source" jump from an entry chip).
 function _plStageIdForRole(role, stages) {
   if (!role || !Array.isArray(stages)) return null;
-  const s = stages.find(x => _plStageRole(x.name) === role);
+  const s = stages.find(x => _plRoleOf(x) === role);
   return s ? s.id : null;
 }
 
@@ -38450,7 +38494,7 @@ function _hk2Back() {
 function _hk2Gear(a) {
   try {
     const p = _plActivePipeline(); if (!p) return;
-    const st = (p.stages || []).find(x => _plStageRole(x.name) === _HK2_META[a].role);
+    const st = (p.stages || []).find(x => _plRoleOf(x) === _HK2_META[a].role);
     if (st) _plOpenFocus(st.id);
   } catch (_) {}
 }
@@ -39439,7 +39483,7 @@ function _plActivePipeline() {
 //  hawk   = agent drafts waiting in Hawkeye for this stage's agent
 function _plStageSignals(stage, opps) {
   let errors = 0, hawk = 0;
-  const bot = (typeof _plStageBot === 'function') ? _plStageBot(stage.name) : null;
+  const bot = (typeof _plBotFor === 'function') ? _plBotFor(stage) : null;
   const isAgent = bot && bot.kind === 'agent';
   for (const o of opps) {
     const cid = String(o.contactId || '');
@@ -39650,8 +39694,8 @@ function _plRenderOverview() {
 function _plo2Order(stages) {
   const ORD = { nurture: 0, ghosted: 1, interested: 1, responded: 2, scheduled_trial: 3, done_trial: 4 };
   return stages
-    .filter(s => { const b = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null; return !(b && b.kind === 'terminal'); })
-    .map((s, i) => { const r = _plStageRole(s.name); return { s, k: (r && ORD[r] != null) ? ORD[r] : 10 + i }; })
+    .filter(s => { const b = (typeof _plBotFor === 'function') ? _plBotFor(s) : null; return !(b && b.kind === 'terminal'); })
+    .map((s, i) => { const r = _plRoleOf(s); return { s, k: (r && ORD[r] != null) ? ORD[r] : 10 + i }; })
     .sort((a, b) => a.k - b.k)
     .map(x => x.s);
 }
@@ -39666,7 +39710,7 @@ function _plo2Pills(stages, nav) {
   const arrow = '<div class="plo2-arr"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>';
   const html = stages.map((s2, i) => {
     const opps = s2.opportunities || [];
-    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s2.name) : null;
+    const bot = (typeof _plBotFor === 'function') ? _plBotFor(s2) : null;
     const kind = bot ? bot.kind : 'human';
     const sig = _plStageSignals(s2, opps);
     if (kind === 'agent') hawk += sig.hawk;
@@ -39680,7 +39724,7 @@ function _plo2Pills(stages, nav) {
       ? `<div class="plo2-up"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></div>
          <span class="plo2-cfg" title="Configure this stage" onclick="event.stopPropagation();${cfg}('${escapeHTML(s2.id)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="21" y1="6" x2="7" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/><circle cx="4.5" cy="6" r="1.7"/><circle cx="19.5" cy="12" r="1.7"/><circle cx="4.5" cy="18" r="1.7"/></svg></span>`
       : `<div class="plo2-l">
-           <div class="nm">${escapeHTML(_plCap(s2.name))}</div>
+           <div class="nm">${escapeHTML(_plStageLabel(s2))}</div>
            <div class="eng">${escapeHTML(eng)}</div>
            <div class="cnt">${opps.length} card${opps.length === 1 ? '' : 's'}</div>
          </div>${need}`;
@@ -39709,7 +39753,7 @@ function _plo2Cascade(stage, nav) {
   const cardFn = (nav && nav.card) || '_plOpenCard';
   const moreFn = (nav && nav.more) || '_plo2ShowAll';
   const opps = stage.opportunities || [];
-  const bot = (typeof _plStageBot === 'function') ? _plStageBot(stage.name) : null;
+  const bot = (typeof _plBotFor === 'function') ? _plBotFor(stage) : null;
   const kind = bot ? bot.kind : 'human';
   const engTag = kind === 'agent' ? 'AGENT ENGINE' : kind === 'automation' ? 'AUTOMATION ENGINE' : kind === 'terminal' ? 'TERMINAL' : 'HUMAN ENGINE';
   const NEED_TXT = {
@@ -39782,7 +39826,7 @@ function _plo2Cascade(stage, nav) {
              : kind === 'automation' ? 'the automation runs this stage - tap a lead for the drawer'
              : 'you run this stage - tap a lead for the drawer';
   return `<div class="plo2-panel">
-    <div class="plo2-phead">${escapeHTML(_plCap(stage.name))}
+    <div class="plo2-phead">${escapeHTML(_plStageLabel(stage))}
       <span class="plo2-eng">${engTag}</span></div>
     <div class="plo2-rows">${rows || '<div class="plo2-none">No cards here yet.</div>'}${more}</div>
     <div class="plo2-hint">${hint}</div>
@@ -39798,7 +39842,7 @@ function _ploStripCells(stages, nav) {
   const hawkClick = (nav && nav.hawk) || '_plEngineHawk';
   return stages.map((s, i) => {
     const opps = s.opportunities || [];
-    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
+    const bot = (typeof _plBotFor === 'function') ? _plBotFor(s) : null;
     const kind = bot ? bot.kind : 'human';
     const engLab = (bot && bot.kind === 'terminal') ? bot.tag
                  : bot ? `${bot.tag} ${bot.kind}` : 'Manual';
@@ -39810,7 +39854,7 @@ function _ploStripCells(stages, nav) {
     if (!pills && !(nav && nav.hideClear)) pills = '<span class="plo-clear">all clear</span>';
     const conn = i < stages.length - 1 ? `<div class="plo-conn">${_plIcon('chevR', 16)}</div>` : '';
     return `<div class="plo-stage" onclick="${stageClick}('${escapeHTML(s.id)}')">`
-      + `<div class="plo-toprow"><span class="plo-name">${escapeHTML(_plCap(s.name))}</span>`
+      + `<div class="plo-toprow"><span class="plo-name">${escapeHTML(_plStageLabel(s))}</span>`
       + `<button class="plo-gear" title="Configure this stage" onclick="event.stopPropagation();${gearClick}('${escapeHTML(s.id)}')">${_plIcon('sliders', 14)}</button></div>`
       + `<div class="plo-eng">${_ploEngIcon(engIcon)}<span>${escapeHTML(engLab)}</span></div>`
       + `<div class="plo-count">${opps.length}<small>cards</small></div>`
@@ -39884,7 +39928,7 @@ function _ccStuckCards() {
   if (typeof _PL_MEMBERS_LOADED === 'undefined' || !_PL_MEMBERS_LOADED) return [];
   const now = Date.now(), IDLE = _CC_STUCK_IDLE_DAYS * 86400000, out = [];
   for (const s of stages) {
-    const bot = (typeof _plStageBot === 'function') ? _plStageBot(s.name) : null;
+    const bot = (typeof _plBotFor === 'function') ? _plBotFor(s) : null;
     if (bot && bot.kind === 'terminal') continue;                 // Member / Unqualified / Won = done
     for (const o of (s.opportunities || [])) {
       if (String(o.status || 'open').toLowerCase() !== 'open') continue;
@@ -39911,7 +39955,7 @@ function _ccStuckCards() {
                  : (o.updatedAt ? new Date(o.updatedAt).getTime()
                  : (o.lastStageChangeAt ? new Date(o.lastStageChangeAt).getTime() : 0));
       if (last && (now - last) < IDLE) continue;                  // still inside a normal cadence window
-      out.push({ id: o.id, name: (o.contact && o.contact.name) || o.name || 'Lead', stage: _plCap(s.name), custom: !bot, idleDays: last ? Math.floor((now - last) / 86400000) : null });
+      out.push({ id: o.id, name: (o.contact && o.contact.name) || o.name || 'Lead', stage: _plStageLabel(s), custom: !bot, idleDays: last ? Math.floor((now - last) / 86400000) : null });
     }
   }
   return out.sort((a, b) => (b.idleDays || 0) - (a.idleDays || 0));
@@ -40011,13 +40055,13 @@ function _plOpenFocus(stageId) {
 }
 function _plRenderFocus(stage, stages, idx) {
   const host = document.getElementById('pl-focus'); if (!host) return;
-  const bot = (typeof _plStageBot === 'function') ? _plStageBot(stage.name) : null;
+  const bot = (typeof _plBotFor === 'function') ? _plBotFor(stage) : null;
   const kind = bot ? bot.kind : 'human';
   const engLab = bot ? (bot.kind === 'terminal' ? bot.tag : `${bot.tag} ${bot.kind}`) : 'Manual';
   const engIcon = kind === 'agent' ? 'cpu' : kind === 'automation' ? 'gear' : kind === 'terminal' ? 'target' : 'user';
   // Entry/Exit are driven by the real stage_transitions edges (the Sales-Crew
   // flow graph). Load lazily on first open, then re-render.
-  const role = _plStageRole(stage.name);
+  const role = _plRoleOf(stage);
   if (role && !Array.isArray(_PL_EDGES) && !_plEdgesLoading) {
     _plEdgesLoading = true;
     _plEdgesEnsure().then(() => { _plEdgesLoading = false; _plFocusRerender(); }).catch(() => { _plEdgesLoading = false; });
@@ -40040,7 +40084,7 @@ function _plRenderFocus(stage, stages, idx) {
       <button class="plf-back" onclick="_plSVCollapse()">${_plIcon('collapse', 12)} Overview</button>
       <span class="plf-pill">${_ploEngIcon(engIcon)} ${escapeHTML(engLab)}</span>
     </div>
-    <div class="plf-name">${escapeHTML(_plCap(stage.name))}</div>
+    <div class="plf-name">${escapeHTML(_plStageLabel(stage))}</div>
     ${entrySec}
     <div class="plf-sec"><div class="plf-lab">Engine</div>${engineBody}</div>
     ${exitSec}`;
@@ -40192,7 +40236,7 @@ function _renderPipelineBoard() {
   _PL_DUPS = new Map();
   if (_plV2) {
     const openOpps = []; for (const arr of byStage.values()) for (const o of arr) openOpps.push(o);
-    const stageNm = (sid) => { const st = visibleStages.find(x => x.id === sid); return st ? st.name : ''; };
+    const stageNm = (sid) => { const st = visibleStages.find(x => x.id === sid); return st ? _plStageLabel(st) : ''; };
     const ph = (o) => String((o.contact && o.contact.phone) || '').replace(/\D/g, '').slice(-10);
     const at = (o) => String(o.athlete || '').trim().toLowerCase().replace(/\s+/g, ' ');
     const groups = new Map();
@@ -40335,7 +40379,7 @@ function _renderPipelineBoard() {
     return `<div class="pl-entry-wrap">${chips}<div class="pl-entry-arrow">&darr;</div></div>`;
   };
   const _plEngineCellInner = (s) => {
-    const sb = _plStageBot(s.name);
+    const sb = _plBotFor(s);
     if (!sb) return '';
     const editBtn = sb.kind !== 'terminal'
       ? `<button class="pl-eng-btn" title="Edit ${escapeHTML(sb.tag)} in the Train tab" onclick="_plEngineEdit('${sb.key}')">${_plIcon('pencil', 13)}</button>` : '';
@@ -40431,7 +40475,7 @@ function _renderPipelineBoard() {
     const hawkBtn = (_plV2 && _hawk)
       ? `<button onclick="${_hawk.fn}" title="Open this agent's Hawkeye approval queue" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:transparent;color:${_hawk.c};border:1px solid ${_hawk.c};border-radius:8px;padding:9px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">${_plIcon('eye', 13)} Hawkeye</button>`
       : '';
-    const _sb = _plV2 ? _plStageBot(s.name) : null;
+    const _sb = _plV2 ? _plBotFor(s) : null;
     let _colStyle = '';
     if (_sb) {
       _colStyle = _sb.kind === 'automation'
@@ -40445,7 +40489,7 @@ function _renderPipelineBoard() {
            ondrop="_plDrop(event,'${escapeHTML(s.id)}','${escapeHTML(p.id)}')">
         <div class="pl-col-header">
           <span style="display:inline-flex;align-items:center;gap:6px;min-width:0;flex:1">
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(s.name)}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(_plStageLabel(s))}</span>
           </span>
           <span class="pl-col-count">${opps.length}</span>
         </div>
@@ -40482,7 +40526,7 @@ function _renderPipelineBoard() {
   // when agent mode is on, so a manual re-scan button is redundant. _plScanNow stays
   // for those automatic paths.
   // Single-stage: the one stage's bot drives the "Configure" button target.
-  const _soloBot = (_PL_STAGE_ONLY && visibleStages.length === 1 && _plV2) ? _plStageBot(visibleStages[0].name) : null;
+  const _soloBot = (_PL_STAGE_ONLY && visibleStages.length === 1 && _plV2) ? _plBotFor(visibleStages[0]) : null;
   // Single-stage hides the engine band entirely (the Configure button replaces it).
   const _bandCollapsed = _PL_STAGE_ONLY ? true : _plBandCollapsed;
   const _btnStyle = "display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--text-sub);border:1px solid var(--border);border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap";
@@ -57903,7 +57947,7 @@ async function _ccSalesLoad() {
       const feed = document.getElementById('cc-sal-feed');
       if (feed) {
         const stageName = {};
-        (pl.stages || []).forEach(s => { stageName[s.id] = s.name; });
+        (pl.stages || []).forEach(s => { stageName[s.id] = _plStageLabel(s); });
         const moves = (pl.opportunities || [])
           .filter(o => o.lastStageChangeAt || o.updatedAt)
           .sort((a, b) => new Date(b.lastStageChangeAt || b.updatedAt) - new Date(a.lastStageChangeAt || a.updatedAt))
