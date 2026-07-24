@@ -30,15 +30,23 @@ async function liveBaseUrl(slug, seededUrl) {
   if (!slug || !VERCEL_TOKEN) return seededUrl;
   const hit = _domCache.get(slug);
   if (hit && Date.now() - hit.at < DOMAIN_TTL_MS) return hit.url;
+  // Hard 3s budget: this is a nicety (following a launch onto a new domain),
+  // never a reason for the tab to hang or fail to appear.
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 3000);
   try {
     const team = VERCEL_TEAM_ID ? `?teamId=${encodeURIComponent(VERCEL_TEAM_ID)}` : "";
-    const h = { Authorization: `Bearer ${VERCEL_TOKEN}` };
-    const pr = await fetch(`https://api.vercel.com/v9/projects${team}${team ? "&" : "?"}limit=100`, { headers: h });
+    const h = { Authorization: `Bearer ${VERCEL_TOKEN}`, signal: ctl.signal };
+    const pr = await fetch(`https://api.vercel.com/v9/projects${team}${team ? "&" : "?"}limit=100`, { headers: { Authorization: h.Authorization }, signal: ctl.signal });
     if (!pr.ok) return seededUrl;
     const { projects = [] } = await pr.json();
-    const proj = projects.find(p => (p.rootDirectory || "") === `clients/${slug}`);
+    // Most client sites build from clients/<slug> in the monorepo. A few (the
+    // Elevate store) are their own project with no rootDirectory, so fall back
+    // to matching the project name.
+    const proj = projects.find(p => (p.rootDirectory || "") === `clients/${slug}`)
+      || projects.find(p => p.name === slug);
     if (!proj) return seededUrl;
-    const dr = await fetch(`https://api.vercel.com/v9/projects/${proj.id}/domains${team}`, { headers: h });
+    const dr = await fetch(`https://api.vercel.com/v9/projects/${proj.id}/domains${team}`, { headers: { Authorization: h.Authorization }, signal: ctl.signal });
     if (!dr.ok) return seededUrl;
     const { domains = [] } = await dr.json();
     // A verified custom domain wins the moment it is attached; .vercel.app is the fallback.
@@ -49,6 +57,8 @@ async function liveBaseUrl(slug, seededUrl) {
     return url;
   } catch {
     return seededUrl;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -148,7 +158,10 @@ async function handler(req, res) {
 
     // Still read the live sitemap so anything published since the last seed
     // shows up on its own. Seeded entries win on label/order.
-    const live = (await pagesFromSitemap(siteUrl)) || [];
+    // Only pay for a sitemap read when nothing is seeded. With a seeded list the
+    // tab must render fast - a 6s sitemap wait on every open is what made it
+    // look like the tab was missing.
+    const live = seeded.length ? [] : ((await pagesFromSitemap(siteUrl)) || []);
     // Rebuild every URL from the CURRENT base, so the seeded paths follow the
     // site onto its new domain instead of pointing at the old .vercel.app one.
     const abs = (p) => `${siteUrl}${p === "/" ? "" : p}`;
