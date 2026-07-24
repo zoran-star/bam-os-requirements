@@ -496,7 +496,9 @@ async function handler(req, res) {
     // by its portal key (captures brand-new wizard questions with no ghl id).
     try {
       if (intake && Object.keys(intake).length) {
-        const contactId = await resolveOrMintPortalContact(clientId, { email: parentEmail, phone: parentPhone, name: parentName });
+        // athlete_name is what lets the phone (household) match tell "the other
+        // parent of the same kid" from "a sibling on the same number".
+        const contactId = await resolveOrMintPortalContact(clientId, { email: parentEmail, phone: parentPhone, name: parentName, athlete_name: athleteName });
         if (contactId) await writePortalFieldValues(clientId, contactId, null, intake);
       }
     } catch { /* non-fatal - the member + payment are already saved */ }

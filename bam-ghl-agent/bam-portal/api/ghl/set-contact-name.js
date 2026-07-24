@@ -9,6 +9,7 @@
 // Auth: Supabase JWT - staff, or a client_users member of client_id.
 
 import { withSentryApiRoute } from "../_sentry.js";
+import { phone10 } from "../_contacts.js";
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -53,6 +54,10 @@ async function handler(req, res) {
   const phone = b.phone || null;
   if (!name) return res.status(400).json({ error: "name required" });
   if (!contactId && !phone) return res.status(400).json({ error: "contact_id or phone required" });
+  // A partial number is not identity - and an empty phone10 filter below would
+  // match every contact with no phone at all, so never let one through.
+  const p10 = contactId ? null : phone10(phone);
+  if (!contactId && !p10) return res.status(400).json({ error: "a full phone number is required" });
 
   const parts = name.split(/\s+/);
   const first = parts[0] || null;
@@ -61,10 +66,14 @@ async function handler(req, res) {
   const patch = { name, first_name: first, last_name: last, updated_at: new Date().toISOString() };
 
   try {
-    // Prefer matching by ghl_contact_id; fall back to phone.
+    // Prefer matching by ghl_contact_id; fall back to the NORMALIZED phone. An
+    // exact compare on the raw string missed any contact stored in a different
+    // shape (E.164 from the GHL sync vs bare digits from a form) and the miss
+    // fell through to the insert below - minting a duplicate contact just because
+    // someone renamed a thread.
     const filter = contactId
       ? `contacts?client_id=eq.${cid}&ghl_contact_id=eq.${encodeURIComponent(contactId)}`
-      : `contacts?client_id=eq.${cid}&phone=eq.${encodeURIComponent(phone)}`;
+      : `contacts?client_id=eq.${cid}&phone10=eq.${encodeURIComponent(p10)}`;
     const existing = await sb(`${filter}&select=id&limit=1`).catch(() => []);
     if (Array.isArray(existing) && existing[0]) {
       await sb(`${filter}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });

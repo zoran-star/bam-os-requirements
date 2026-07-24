@@ -1,6 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
-import { resolveOrMintPortalContact } from "../_contacts.js";
+import { resolveOrMintPortalContact, phone10 } from "../_contacts.js";
 export const maxDuration = 60; // Stripe search + customer + sub writes
 
 // Vercel Serverless Function - Returning Client Enroll (Members V2)
@@ -394,8 +394,11 @@ async function actionSignupFields(res, { clientId, body }) {
     const r = await sb(`contacts?client_id=eq.${cid}&email=eq.${encodeURIComponent(email)}&select=id&limit=1`).catch(() => []);
     contactId = (r && r[0] && r[0].id) || null;
   }
-  if (!contactId && phone) {
-    const r = await sb(`contacts?client_id=eq.${cid}&phone=eq.${encodeURIComponent(phone)}&select=id&limit=1`).catch(() => []);
+  // Normalized phone (contacts.phone is E.164 from the GHL sync but bare digits
+  // from a web form) - an exact compare here just meant no prefill.
+  const p10 = phone10(phone);
+  if (!contactId && p10) {
+    const r = await sb(`contacts?client_id=eq.${cid}&phone10=eq.${encodeURIComponent(p10)}&select=id&limit=1`).catch(() => []);
     contactId = (r && r[0] && r[0].id) || null;
   }
   let vmap = new Map();
