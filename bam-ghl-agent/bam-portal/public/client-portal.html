@@ -14939,10 +14939,19 @@ function _storeInvHtml(inv) {
   const rows = products.map(p => {
     const cws = p.colorways.map(c => {
       const vk = `${p.slug}__${c.key}`;
+      // Quantity is optional: leave it blank to just use the In stock / Sold out
+      // toggle. Setting it to 0 marks the variant sold out on the live store.
+      const qv = (c.qty === null || typeof c.qty === 'undefined') ? '' : c.qty;
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;font-size:12.5px">
         <span style="color:var(--text)">${escapeHTML(c.label)}</span>
-        <button id="inv-${escapeHTML(vk)}" onclick="_storeToggleStock('${vk}', ${c.in_stock ? 'false' : 'true'}, this)"
-          style="border:1px solid var(--border-med);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:${c.in_stock ? 'transparent' : 'rgba(201,135,31,0.14)'};color:${c.in_stock ? 'var(--text-mute)' : '#c9871f'}">${c.in_stock ? 'In stock' : 'Sold out'}</button>
+        <span style="display:flex;align-items:center;gap:8px;flex:none">
+          <input id="qty-${escapeHTML(vk)}" type="number" min="0" step="1" value="${qv}" placeholder="qty"
+            onchange="_storeSetQty('${vk}', this.value, this)"
+            title="Stock count. Blank = not tracked. 0 = sold out."
+            style="width:64px;text-align:center;border:1px solid var(--border-med);border-radius:6px;padding:3px 6px;font-size:12px;background:transparent;color:var(--text)">
+          <button id="inv-${escapeHTML(vk)}" onclick="_storeToggleStock('${vk}', ${c.in_stock ? 'false' : 'true'}, this)"
+            style="border:1px solid var(--border-med);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:${c.in_stock ? 'transparent' : 'rgba(201,135,31,0.14)'};color:${c.in_stock ? 'var(--text-mute)' : '#c9871f'}">${c.in_stock ? 'In stock' : 'Sold out'}</button>
+        </span>
       </div>`;
     }).join('');
     return `<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
@@ -14956,6 +14965,37 @@ function _storeInvHtml(inv) {
     ${rows}
   </div>`;
 }
+// Set a stock count. Blank clears it back to untracked; 0 marks the variant
+// sold out, which the live store already honours through out_of_stock.
+async function _storeSetQty(variantKey, raw, input) {
+  const val = String(raw == null ? '' : raw).trim();
+  const qty = val === '' ? '' : Math.max(0, Math.floor(Number(val)));
+  if (val !== '' && !Number.isFinite(qty)) { alert('Enter a whole number, or leave it blank.'); return; }
+  if (input) input.disabled = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/store/inventory?client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, variant_key: variantKey, qty }),
+    });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (input) { input.disabled = false; input.value = (j.qty === null || typeof j.qty === 'undefined') ? '' : j.qty; }
+    // Keep the In stock / Sold out pill honest about what the store now shows.
+    const btn = document.getElementById('inv-' + variantKey);
+    if (btn) {
+      const inStock = !!j.in_stock;
+      btn.textContent = inStock ? 'In stock' : 'Sold out';
+      btn.style.background = inStock ? 'transparent' : 'rgba(201,135,31,0.14)';
+      btn.style.color = inStock ? 'var(--text-mute)' : '#c9871f';
+      btn.setAttribute('onclick', `_storeToggleStock('${variantKey}', ${inStock ? 'false' : 'true'}, this)`);
+    }
+  } catch (e) {
+    if (input) input.disabled = false;
+    alert("Couldn't update the count: " + (e.message || e));
+  }
+}
+
 async function _storeToggleStock(variantKey, nextInStock, btn) {
   const target = (nextInStock === true || nextInStock === 'true');
   const prev = btn ? btn.textContent : '';
