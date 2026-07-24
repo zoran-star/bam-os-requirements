@@ -7805,6 +7805,19 @@ if (window.__MOCK__) (() => {
         Store
       </div>
 
+      <!-- Live Pages: the academy's own website, as published right now.
+           Revealed by _revealLivePagesTab() for V1 + V1.5 only. -->
+      <div class="nav-item" id="nav-livepages" style="display:none" onclick="switchView('livepages', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <path d="M8 21h8"/>
+            <path d="M12 17v4"/>
+          </svg>
+        </span>
+        Live Pages
+      </div>
+
       <div id="nav-v15cal" class="nav-item" data-feature="v15" style="display:none" onclick="switchView('v15cal', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -12425,6 +12438,18 @@ Then the call to action."]</div>
       </div>
     </div>
 
+    <div class="view" id="view-livepages">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Live Pages</span>
+          <div class="topbar-title">Live Pages</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="livepages-content"></div>
+      </div>
+    </div>
+
     <!-- Calendars moved OUT of .main to a focus-mode overlay (below, just after
          .main), mirroring the Calendar / Inbox / Blueprint / Settings overlays.
          It keeps id="view-v15cal" so every #view-v15cal CSS rule + JS render
@@ -14755,6 +14780,127 @@ function _v15kStoreHtml(s) {
     <div id="${id}" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${_v15kStoreList(s.items)}</div>
   </div>`;
 }
+// ── Live Pages tab ──
+// The academy's own website pages, straight from their live sitemap, for fast
+// review + monitoring + raising a ticket against a specific page.
+// V1 + V1.5 ONLY - V2 academies never see this tab (they are not seeded with a
+// site, and the V2 gate below is belt-and-braces so it stays true).
+let _LP_DATA = null;
+let _LP_DEVICE = 'web';
+let _LP_CURRENT = null;
+
+async function _revealLivePagesTab() {
+  try {
+    if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) return;
+    if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true) return;  // never for V2
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/live-pages?client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.enabled) return;
+    _LP_DATA = j;
+    const nav = document.getElementById('nav-livepages');
+    if (nav) nav.style.display = '';
+  } catch (_) {}
+}
+
+function _lpRenderPreview() {
+  const host = document.getElementById('lp-preview');
+  if (!host || !_LP_CURRENT) return;
+  const mobile = _LP_DEVICE === 'mobile';
+  // Desktop renders at full width then scales down, so the preview shows the
+  // real desktop layout rather than a squeezed narrow one.
+  const scale = mobile ? 1 : 0.5;
+  host.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <div style="min-width:0">
+        <div style="font-weight:700;font-size:15px;color:var(--text)">${_bbEscapeHtml(_LP_CURRENT.label)}</div>
+        <a href="${_bbEscapeHtml(_LP_CURRENT.url)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted);word-break:break-all">${_bbEscapeHtml(_LP_CURRENT.url)}</a>
+      </div>
+      <div style="display:flex;gap:8px;flex:none;flex-wrap:wrap">
+        <button class="btn-ghost" onclick="_lpSetDevice('web')" style="${_LP_DEVICE === 'web' ? 'border-color:var(--gold);color:var(--gold)' : ''}">Web</button>
+        <button class="btn-ghost" onclick="_lpSetDevice('mobile')" style="${_LP_DEVICE === 'mobile' ? 'border-color:var(--gold);color:var(--gold)' : ''}">Mobile</button>
+        <a class="btn-ghost" href="${_bbEscapeHtml(_LP_CURRENT.url)}" target="_blank" rel="noopener">Open</a>
+        <button class="btn-ghost" onclick="_lpReport()">Report an issue</button>
+      </div>
+    </div>
+    <div style="background:#000;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;justify-content:center">
+      <div style="width:${mobile ? '390px' : '100%'};max-width:100%;height:${mobile ? 720 : 640}px;overflow:hidden">
+        <iframe src="${_bbEscapeHtml(_LP_CURRENT.url)}" title="Preview of ${_bbEscapeHtml(_LP_CURRENT.label)}" loading="lazy"
+          style="width:${mobile ? '390px' : Math.round(100 / scale) + '%'};height:${mobile ? 720 : Math.round(640 / scale)}px;border:0;transform:scale(${scale});transform-origin:top left;background:#fff"></iframe>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin:10px 0 0">Some pages block being shown inside a frame. If this stays blank, use Open.</p>`;
+}
+
+function _lpSetDevice(d) { _LP_DEVICE = d; _lpRenderPreview(); }
+
+function _lpOpen(path) {
+  const page = ((_LP_DATA && _LP_DATA.pages) || []).find(p => p.path === path);
+  if (!page) return;
+  _LP_CURRENT = page;
+  document.querySelectorAll('[data-lp-path]').forEach(el => {
+    el.style.borderColor = el.getAttribute('data-lp-path') === path ? 'var(--gold)' : 'var(--line)';
+  });
+  _lpRenderPreview();
+  const pv = document.getElementById('lp-preview');
+  if (pv && pv.scrollIntoView) pv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Raise a ticket about the page being previewed. Opens the normal Error intake
+// and drops the URL into the first "where" field so staff know the page.
+function _lpReport() {
+  if (!_LP_CURRENT) return;
+  const url = _LP_CURRENT.url;
+  try { if (typeof openIntake === 'function') openIntake('error'); } catch (_) { return; }
+  setTimeout(() => {
+    const f = [...document.querySelectorAll('input, textarea')]
+      .find(el => /where/i.test(el.placeholder || '') || /where/i.test(el.getAttribute('name') || ''));
+    if (f && !f.value) {
+      f.value = url;
+      f.dispatchEvent(new Event('input', { bubbles: true }));
+      f.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }, 350);
+}
+
+async function openLivePagesView() {
+  const host = document.getElementById('livepages-content');
+  if (!host || typeof CLIENT_ID === 'undefined') return;
+  host.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span> Loading your pages…</div>';
+  try {
+    if (!_LP_DATA) {
+      const token = await _mreqAuthToken();
+      const r = await fetch(`/api/live-pages?client_id=${encodeURIComponent(CLIENT_ID)}`, { headers: { Authorization: 'Bearer ' + token } });
+      _LP_DATA = r.ok ? await r.json() : null;
+    }
+    const pages = (_LP_DATA && _LP_DATA.pages) || [];
+    if (!pages.length) {
+      host.innerHTML = '<div class="req-empty" style="padding:20px 0">No live pages found for your site yet.</div>';
+      return;
+    }
+    const cards = pages.map(p => `
+      <button data-lp-path="${_bbEscapeHtml(p.path)}" onclick="_lpOpen('${_bbEscapeHtml(p.path).replace(/'/g, "\\'")}')"
+        style="text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;cursor:pointer;font:inherit;color:inherit">
+        <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">${_bbEscapeHtml(p.label)}</div>
+        <div style="font-size:12px;color:var(--muted);word-break:break-all">${_bbEscapeHtml(p.path)}</div>
+      </button>`).join('');
+    host.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;font-size:15px;color:var(--text)">Your live website</div>
+          <a href="${_bbEscapeHtml(_LP_DATA.site_url)}" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--muted)">${_bbEscapeHtml(_LP_DATA.site_url)}</a>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">${pages.length} page${pages.length === 1 ? '' : 's'} live</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:22px">${cards}</div>
+      <div id="lp-preview"></div>`;
+    _lpOpen(pages[0].path);
+  } catch (e) {
+    host.innerHTML = '<div class="req-empty" style="padding:20px 0">Could not load your pages.</div>';
+  }
+}
+
 // ── Store tab (merch order management) ──
 // Revealed only for clients with a store configured (section=store -> enabled).
 // Lists recent orders with fulfillment detail; orders also feed New Order in GHL.
@@ -14793,10 +14939,19 @@ function _storeInvHtml(inv) {
   const rows = products.map(p => {
     const cws = p.colorways.map(c => {
       const vk = `${p.slug}__${c.key}`;
+      // Quantity is optional: leave it blank to just use the In stock / Sold out
+      // toggle. Setting it to 0 marks the variant sold out on the live store.
+      const qv = (c.qty === null || typeof c.qty === 'undefined') ? '' : c.qty;
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;font-size:12.5px">
         <span style="color:var(--text)">${escapeHTML(c.label)}</span>
-        <button id="inv-${escapeHTML(vk)}" onclick="_storeToggleStock('${vk}', ${c.in_stock ? 'false' : 'true'}, this)"
-          style="border:1px solid var(--border-med);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:${c.in_stock ? 'transparent' : 'rgba(201,135,31,0.14)'};color:${c.in_stock ? 'var(--text-mute)' : '#c9871f'}">${c.in_stock ? 'In stock' : 'Sold out'}</button>
+        <span style="display:flex;align-items:center;gap:8px;flex:none">
+          <input id="qty-${escapeHTML(vk)}" type="number" min="0" step="1" value="${qv}" placeholder="qty"
+            onchange="_storeSetQty('${vk}', this.value, this)"
+            title="Stock count. Blank = not tracked. 0 = sold out."
+            style="width:64px;text-align:center;border:1px solid var(--border-med);border-radius:6px;padding:3px 6px;font-size:12px;background:transparent;color:var(--text)">
+          <button id="inv-${escapeHTML(vk)}" onclick="_storeToggleStock('${vk}', ${c.in_stock ? 'false' : 'true'}, this)"
+            style="border:1px solid var(--border-med);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:${c.in_stock ? 'transparent' : 'rgba(201,135,31,0.14)'};color:${c.in_stock ? 'var(--text-mute)' : '#c9871f'}">${c.in_stock ? 'In stock' : 'Sold out'}</button>
+        </span>
       </div>`;
     }).join('');
     return `<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
@@ -14810,6 +14965,37 @@ function _storeInvHtml(inv) {
     ${rows}
   </div>`;
 }
+// Set a stock count. Blank clears it back to untracked; 0 marks the variant
+// sold out, which the live store already honours through out_of_stock.
+async function _storeSetQty(variantKey, raw, input) {
+  const val = String(raw == null ? '' : raw).trim();
+  const qty = val === '' ? '' : Math.max(0, Math.floor(Number(val)));
+  if (val !== '' && !Number.isFinite(qty)) { alert('Enter a whole number, or leave it blank.'); return; }
+  if (input) input.disabled = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/store/inventory?client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, variant_key: variantKey, qty }),
+    });
+    const j = await _safeJson(r); if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (input) { input.disabled = false; input.value = (j.qty === null || typeof j.qty === 'undefined') ? '' : j.qty; }
+    // Keep the In stock / Sold out pill honest about what the store now shows.
+    const btn = document.getElementById('inv-' + variantKey);
+    if (btn) {
+      const inStock = !!j.in_stock;
+      btn.textContent = inStock ? 'In stock' : 'Sold out';
+      btn.style.background = inStock ? 'transparent' : 'rgba(201,135,31,0.14)';
+      btn.style.color = inStock ? 'var(--text-mute)' : '#c9871f';
+      btn.setAttribute('onclick', `_storeToggleStock('${variantKey}', ${inStock ? 'false' : 'true'}, this)`);
+    }
+  } catch (e) {
+    if (input) input.disabled = false;
+    alert("Couldn't update the count: " + (e.message || e));
+  }
+}
+
 async function _storeToggleStock(variantKey, nextInStock, btn) {
   const target = (nextInStock === true || nextInStock === 'true');
   const prev = btn ? btn.textContent : '';
@@ -20085,6 +20271,7 @@ function switchView(name, el) {
 
   if (name === 'v15kpis') openV15Kpis();
   if (name === 'store') openStoreView();
+  if (name === 'livepages') openLivePagesView();
   if (name === 'v15cal') openV15Cal();
 
   // When entering Action Items, load the list
@@ -23907,7 +24094,8 @@ function applyV15NavState(v15) {
   applyV15ContactsPlacement();   // V1.5: Contacts moves to a button in the Inbox
   applyTabPermissions(); // re-subtract per-staff tab perms after the tier re-gate
   applyTalkToBamNav();
-  try { _revealStoreTab(); } catch (_) {}  // show Store tab only for clients with a store
+  try { _revealStoreTab(); } catch (_) {}
+  try { _revealLivePagesTab(); } catch (_) {}  // Live Pages: V1 + V1.5 with a site  // show Store tab only for clients with a store
 }
 
 // V1.5 groups Systems + Marketing under an expandable "Support" accordion.

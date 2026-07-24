@@ -41,7 +41,17 @@ async function loadClient(clientId) {
   return rows?.[0] || null;
 }
 const invMap = (client) => (client && client.ghl_kpi_config && client.ghl_kpi_config.store_inventory) || {};
-const outOfStockList = (map) => Object.entries(map || {}).filter(([, v]) => v === false).map(([k]) => k);
+
+// A variant's stock is stored as either:
+//   number  -> real quantity (0 = sold out)
+//   false   -> out of stock, no count (the original binary flag)
+//   absent  -> in stock, no count (default)
+// Quantities were added on top of the binary flag rather than replacing it, so
+// the live store keeps working unchanged: it only reads out_of_stock, and a
+// count of 0 lands in that list exactly like the old `false` did.
+const isOut = (v) => v === false || (typeof v === "number" && v <= 0);
+const outOfStockList = (map) => Object.entries(map || {}).filter(([, v]) => isOut(v)).map(([k]) => k);
+const qtyOf = (v) => (typeof v === "number" ? v : null);
 
 async function handler(req, res) {
   try {
@@ -68,13 +78,29 @@ async function handler(req, res) {
 
     if (req.method === "POST") {
       const b = (req.body && typeof req.body === "object") ? req.body : {};
-      if (!b.variant_key || typeof b.in_stock === "undefined") return res.status(400).json({ error: "variant_key and in_stock required" });
+      if (!b.variant_key) return res.status(400).json({ error: "variant_key required" });
       const nextMap = { ...map };
-      if (b.in_stock) delete nextMap[b.variant_key]; // in stock = default, keep the map lean
-      else nextMap[b.variant_key] = false;
+
+      if (typeof b.qty !== "undefined") {
+        // Setting a count. "" / null clears back to untracked (in stock).
+        if (b.qty === "" || b.qty === null) {
+          delete nextMap[b.variant_key];
+        } else {
+          const n = Math.max(0, Math.floor(Number(b.qty)));
+          if (!Number.isFinite(n)) return res.status(400).json({ error: "qty must be a number" });
+          nextMap[b.variant_key] = n;   // 0 lands in out_of_stock, which the store already honours
+        }
+      } else if (typeof b.in_stock !== "undefined") {
+        // Original binary toggle, still supported.
+        if (b.in_stock) delete nextMap[b.variant_key];
+        else nextMap[b.variant_key] = false;
+      } else {
+        return res.status(400).json({ error: "qty or in_stock required" });
+      }
+
       const nextCfg = { ...cfg, store_inventory: nextMap };
       await sb(`clients?id=eq.${encodeURIComponent(clientId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_kpi_config: nextCfg }) });
-      return res.status(200).json({ ok: true, out_of_stock: outOfStockList(nextMap) });
+      return res.status(200).json({ ok: true, variant_key: b.variant_key, qty: qtyOf(nextMap[b.variant_key]), in_stock: !isOut(nextMap[b.variant_key]), out_of_stock: outOfStockList(nextMap) });
     }
 
     if (req.method !== "GET") return res.status(405).json({ error: "GET or POST" });
@@ -89,10 +115,15 @@ async function handler(req, res) {
           const j = await r.json();
           products = (j.products || []).map(p => ({
             slug: p.slug, name: p.name, category: p.category || null,
-            colorways: (p.colorways || []).map(c => ({
-              key: c.key, label: c.label, image: c.image || null,
-              in_stock: c.baseInStock !== false && map[`${p.slug}__${c.key}`] !== false,
-            })),
+            colorways: (p.colorways || []).map(c => {
+              const v = map[`${p.slug}__${c.key}`];
+              return {
+                key: c.key, label: c.label, image: c.image || null,
+                variant_key: `${p.slug}__${c.key}`,
+                qty: qtyOf(v),                                    // null = untracked
+                in_stock: c.baseInStock !== false && !isOut(v),
+              };
+            }),
           }));
         }
       } catch (_) {}
