@@ -98,9 +98,24 @@ async function handler(req, res) {
     const siteUrl = site && typeof site.url === "string" ? site.url.trim() : "";
     if (!siteUrl) return res.status(200).json({ enabled: false, site_url: null, pages: [] });
 
-    // Sitemap is the good path. If a site has none, still give them the
-    // homepage so the tab is useful rather than empty.
-    const pages = (await pagesFromSitemap(siteUrl)) || [{ path: "/", url: siteUrl, label: "Home" }];
+    // The seeded list is the full picture: it was built by probing every path
+    // the site defines (vercel.json rewrites, sitemap, and the page files
+    // themselves) and keeping only the ones that actually returned a page.
+    // A sitemap alone misses a lot - most of these sites do not publish one.
+    const seeded = Array.isArray(site.pages)
+      ? site.pages.filter(p => p && typeof p.path === "string" && typeof p.url === "string")
+      : [];
+
+    // Still read the live sitemap so anything published since the last seed
+    // shows up on its own. Seeded entries win on label/order.
+    const live = (await pagesFromSitemap(siteUrl)) || [];
+    const byPath = new Map();
+    for (const p of seeded) byPath.set(p.path, { path: p.path, url: p.url, label: p.label || labelFor(p.path) });
+    for (const p of live) if (!byPath.has(p.path)) byPath.set(p.path, p);
+
+    let pages = [...byPath.values()];
+    if (!pages.length) pages = [{ path: "/", url: siteUrl, label: "Home" }];
+    pages.sort((a, b) => (a.label === "Home" ? -1 : b.label === "Home" ? 1 : a.label.localeCompare(b.label)));
 
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({ enabled: true, site_url: siteUrl, pages });
