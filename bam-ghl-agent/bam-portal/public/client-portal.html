@@ -11956,6 +11956,22 @@ Then the call to action."]</div>
         font-size:13px; color:var(--text-sub); line-height:1.55;
       }
 
+      /* "Powers your sales agent" marker. Deliberately NOT scoped to
+         #view-blueprint: the same offer wizard also mounts inside
+         #obf-overlay (a body child), and the badge has to show in both.
+         Same blue as the brain view's "LIVE - from your offer" badge so
+         the two ends of the editing loop read as one thing. */
+      .bb-agent-badge-row { margin:0 0 16px; }
+      .bb-agent-badge {
+        display:inline-flex; align-items:center; gap:6px;
+        font-size:10.5px; font-family:var(--font-mono, monospace);
+        color:#6EA8D8; border:1px solid #6EA8D8; border-radius:999px;
+        padding:2px 9px; white-space:nowrap; cursor:help;
+      }
+      .bb-agent-badge .bb-agent-badge-dot {
+        width:6px; height:6px; border-radius:99px; background:#6EA8D8; flex:none;
+      }
+
       /* Field rendering inside wizard */
       #view-blueprint .bb-field { margin-bottom:18px; }
       #view-blueprint .bb-field-label {
@@ -25578,6 +25594,46 @@ const _bbSectionLabels = {
 const _bbTeamSections = ['general','per_team'];
 const _bbTeamSectionLabels = { general:'General', per_team:'Per team' };
 
+// ── "Powers your sales agent" markers ─────────────────────────────────
+// The other end of the editing loop: the brain view says "Rendered from:
+// Offer - Schedule step", this tells the owner, while they are filling the
+// offer in, that these answers ARE what the agent tells parents.
+// SECTION-level on purpose (a badge per input would clutter the wizard).
+//
+// ONLY sections that actually feed a rendered agent fact are listed.
+// Source of truth = derivedFactOverrides() / FACT_SOURCES in
+// api/agent/fact-render.js. If a renderer starts or stops reading a
+// section, change this map in the same commit:
+//   general_info -> program + qualification_config
+//   schedule     -> schedule + program (per-class group size)
+//   value        -> selling_points
+//   pricing      -> pricing
+//   policy       -> policies
+// sales + onboarding feed nothing the agent reads, so they stay unmarked.
+const _bbAgentSectionTips = {
+  general_info: 'Your agent reads this when a parent asks who the program is for.',
+  schedule:     'Your agent reads this when a parent asks about days and times.',
+  value:        'Your agent reads this when a parent asks what makes you different.',
+  pricing:      'Your agent reads this when a parent asks about pricing.',
+  policy:       'Your agent reads this when a parent asks about cancelling, pausing or refunds.',
+};
+
+// Rendered as its own row above the fields, NOT inside .bb-wizard-step-head -
+// the onboarding flow hides that header (#obf-overlay #obf-bb-host), and the
+// badge has to show there too, which is where a new academy fills its offer in.
+// Gated on the training offer: derivedFactOverrides only reads type=training,
+// so no other offer type may claim to power the agent.
+function _bbAgentBadge(offer, sectionId) {
+  if (!offer || offer.type !== 'training') return '';
+  const tip = _bbAgentSectionTips[sectionId];
+  if (!tip) return '';
+  return `<div class="bb-agent-badge-row">
+      <span class="bb-agent-badge" title="${_bbEscapeAttr(tip)}">
+        <span class="bb-agent-badge-dot"></span>Powers your sales agent
+      </span>
+    </div>`;
+}
+
 const _bbCards = [
   { id:'general',   label:'General',   desc:'Business basics: name, address, EIN, phone, email' },
   { id:'staff',     label:'Staff',     desc:'People who work at the academy (also portal teammates)' },
@@ -29692,6 +29748,7 @@ function _bbRenderWizardBody() {
         <div class="bb-wizard-step-name">${_bbEscapeHtml(currentSection.label)}</div>
         <div class="bb-wizard-step-sub">Step ${stepIdx} of ${sections.length}</div>
       </div>
+      ${_bbAgentBadge(offer, currentSection.id)}
       <div id="bb-step-fields">${_bbRenderStepFields(offer, currentSection.id)}</div>
     </div>
     <div class="bb-wizard-foot">
