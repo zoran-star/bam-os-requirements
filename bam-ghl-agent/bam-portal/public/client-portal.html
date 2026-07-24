@@ -38616,6 +38616,10 @@ function _hk2Moves(r) {
   } else {
     if (k !== 'lost') m.push([_hk2MoveLabel('lost', hasMsg), 'lost']);
   }
+  // "Send nothing" (Zoran, taught repeatedly via Hawkeye): the inbound needs NO
+  // reply (bare ack, reaction, already handled). Terminal for THIS inbound - the
+  // detector will not re-draft it (unlike Skip = snooze). Optional teach-why rides.
+  if (k === 'reply') m.push(['Send nothing', 'dismiss']);
   // 🔥 Any card can park the lead for a later date instead ("yes, but later").
   if (k !== 'reignite') m.push(['Reignite later', 'reignite']);
   if ((k === 'reignite' || k === 'book') && r._origKind) m.unshift(['Back to the card', 'unreignite']);
@@ -39132,7 +39136,9 @@ async function _hk2Teach(r, lesson, before, after, agent) {
     // agent = the CARD's tab captured at click time. Reading _HK2.agent here
     // instead saved lessons to the WRONG agent whenever the deck auto-jumped
     // tabs (resolve fires at 480ms, this call up to 6s later on the undo flush).
-    await _apxPost('/api/agent-train', 'teach', { agent: agent || _HK2.agent, lesson, kind: 'fix', context: { source: 'hawkeye-deck', contact: r.contact_name || null, ai_drafted: before || null, you_sent: after || null } });
+    // contact_id rides along so the backend can mine LEAD-SPECIFIC facts out of
+    // the teach-why into agent_contact_notes (the "lead learnings" loop).
+    await _apxPost('/api/agent-train', 'teach', { agent: agent || _HK2.agent, lesson, kind: 'fix', context: { source: 'hawkeye-deck', contact: r.contact_name || null, contact_id: r.ghl_contact_id || null, ai_drafted: before || null, you_sent: after || null } });
   } catch (_) {
     // The action already landed - never block on the lesson. But a silently
     // dropped lesson kills the training loop, so at least SAY it failed.
@@ -39299,7 +39305,9 @@ function _hk2Confirm() {
       chk(await _apxPost(ep, 'confirm-enroll', { ready_id: r.id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, enroll_note: r.enroll_note }));
       _apxToast('Sent - won lands when they pay', true);
     } else if (k === 'lost') {
-      chk(await _apxPost(ep, 'confirm-lost', { ready_id: r.id, reply, lost_reason: r.lost_reason || 'Other' }));
+      // reason_detail = the lead's own last words - structured lost-reason data
+      // (pipeline_outcomes.reason_detail + a contact note for the bounce-back).
+      chk(await _apxPost(ep, 'confirm-lost', { ready_id: r.id, reply, lost_reason: r.lost_reason || 'Other', reason_detail: r.last_message || null }));
       _apxToast('Marked lost - Nurture takes over', true);
     } else if (k === 'unqualified') {
       // Opt-out approve: same close as the "Mark unqualified" move - NO reply is
@@ -39380,7 +39388,7 @@ function _hk2Move(op, btn) {
   // Lost/Unqualified are two-tap (Zoran 2026-07-10): the first tap arms the
   // button ("Confirm: ...") and reveals an OPTIONAL teach-why box, so a lesson
   // can ride along with the close. The second tap commits + saves the lesson.
-  if ((op === 'lost' || op === 'unq') && r._moveArm !== op) {
+  if ((op === 'lost' || op === 'unq' || op === 'dismiss') && r._moveArm !== op) {
     const pnl = document.getElementById('hk2-other');
     if (pnl && pnl.querySelectorAll) pnl.querySelectorAll('.hk2-x[data-orig]').forEach(b => { b.textContent = b.dataset.orig; });
     r._moveArm = op;
@@ -39406,7 +39414,7 @@ function _hk2Move(op, btn) {
   // tears this DOM down. Nurture/Unqualified send the box when it has text (the
   // button label said so); an empty box keeps the move silent.
   const teachEl = document.getElementById('hk2-teach');
-  const lesson = (op === 'lost' || op === 'unq') && teachEl ? teachEl.value.trim() : '';
+  const lesson = (op === 'lost' || op === 'unq' || op === 'dismiss') && teachEl ? teachEl.value.trim() : '';
   // Only capture the box as a goodbye on kinds whose move LABEL discloses the send
   // (the same allow-list _hk2Moves uses for hasMsg). A book/reignite/reignite_due
   // card has a PREFILLED box but silent-labeled moves - capturing it would text the
@@ -39415,6 +39423,7 @@ function _hk2Move(op, btn) {
   const reply = ((op === 'lost' || op === 'unq') && canSendOnMove) ? (((document.getElementById('hk2-draft') || {}).value) || '').trim() : '';
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   const label = op === 'ghost' ? 'Sent to Ghosted' : op === 'handoff' ? 'Handed to Booking'
+    : op === 'dismiss' ? 'Send nothing'
     : op === 'lost' ? (reply ? 'Sent + Nurture' : 'Marked lost') : (reply ? 'Sent + Unqualified' : 'Unqualified');
   // Honest toast: the close is the primary action and it succeeded, but if a
   // goodbye was requested and the backend reports it did NOT send, say so - never
@@ -39425,7 +39434,10 @@ function _hk2Move(op, btn) {
   };
   let undone = false;
   _hawkDefer({ cardId: 'hk2-topcard', label, restore: () => { undone = true; r._hk2Busy = false; _hk2Unresolve(agent, r); }, run: async () => {
-    if (op === 'ghost') {
+    if (op === 'dismiss') {
+      chk(await _apxPost(ep, 'dismiss-ready', { ready_id: readyId }));
+      _apxToast(lesson ? 'Dismissed + taught - nothing sent' : 'Dismissed - nothing sent', true);
+    } else if (op === 'ghost') {
       chk(await _apxPost(ep, 'confirm-ghost', { ready_id: readyId }));
       try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
       _apxToast('Sent to Ghosted', true);
@@ -39433,13 +39445,13 @@ function _hk2Move(op, btn) {
       chk(await _apxPost(ep, 'confirm-handoff', { ready_id: readyId, reply: '', handoff_note: r.handoff_note || 'Needs a new time - rebook.' }));
       _apxToast('Handed back to Booking', true);
     } else if (op === 'lost') {
-      const resp = chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply, lost_reason: r.lost_reason || 'Other' }));
+      const resp = chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply, lost_reason: r.lost_reason || 'Other', reason_detail: r.last_message || null }));
       goodbyeToast(resp, reply ? 'Message sent + moved to Nurture' : (lesson ? 'Marked lost + taught' : 'Marked lost - Nurture takes over'));
     } else {
       const resp = chk(await _apxPost(ep, 'confirm-abandoned', { ready_id: readyId, reply }));
       goodbyeToast(resp, reply ? 'Message sent + marked unqualified' : (lesson ? 'Marked unqualified + taught' : 'Marked unqualified'));
     }
-    if (lesson) await _hk2Teach(r, lesson, r.draft_message || null, reply || (op === 'lost' ? '(marked lost)' : '(marked unqualified)'), agent);
+    if (lesson) await _hk2Teach(r, lesson, r.draft_message || null, reply || (op === 'dismiss' ? '(sent nothing)' : op === 'lost' ? '(marked lost)' : '(marked unqualified)'), agent);
   } });
   // Advance the deck right after the fly-out beat - don't wait for the 6s flush.
   setTimeout(() => { if (!undone) _hk2Resolve(r, agent); }, 480);

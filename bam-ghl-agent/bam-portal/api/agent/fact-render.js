@@ -150,6 +150,7 @@ export function renderPolicies(data) {
     ? `Refunds: refundable within ${rw} days of purchase, otherwise non-refundable.`
     : "Refunds: fees already charged are non-refundable except where required by law.");
   if (p.makeup_policy && String(p.makeup_policy).trim()) lines.push(`Makeup/reschedule: ${String(p.makeup_policy).trim()}`);
+  if (p.sibling_policy && String(p.sibling_policy).trim()) lines.push(`Siblings: ${String(p.sibling_policy).trim()}`);
   if (p.parent_watching) lines.push(`Parents watching: ${p.parent_watching}.`);
   if (p.under_18) lines.push(`Under-18s: ${p.under_18}.`);
   if (p.holiday_schedule) lines.push(`Holidays: ${p.holiday_schedule}.`);
