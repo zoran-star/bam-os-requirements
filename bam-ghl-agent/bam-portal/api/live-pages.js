@@ -36,7 +36,11 @@ async function liveBaseUrl(slug, seededUrl) {
     const pr = await fetch(`https://api.vercel.com/v9/projects${team}${team ? "&" : "?"}limit=100`, { headers: h });
     if (!pr.ok) return seededUrl;
     const { projects = [] } = await pr.json();
-    const proj = projects.find(p => (p.rootDirectory || "") === `clients/${slug}`);
+    // Most client sites build from clients/<slug> in the monorepo. A few (the
+    // Elevate store) are their own project with no rootDirectory, so fall back
+    // to matching the project name.
+    const proj = projects.find(p => (p.rootDirectory || "") === `clients/${slug}`)
+      || projects.find(p => p.name === slug);
     if (!proj) return seededUrl;
     const dr = await fetch(`https://api.vercel.com/v9/projects/${proj.id}/domains${team}`, { headers: h });
     if (!dr.ok) return seededUrl;
