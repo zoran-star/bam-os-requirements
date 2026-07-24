@@ -14932,11 +14932,27 @@ async function openStoreView() {
     host.innerHTML = `<div class="req-empty" style="padding:20px 0;color:#9a3b2f">${escapeHTML(e.message || String(e))}</div>`;
   }
 }
+// Money in the store manager is always whole cents on the wire and dollars in
+// the input, so a price never round-trips through a float.
+function _storeMoney(cents) {
+  if (typeof cents !== 'number') return '-';
+  return '$' + (cents / 100).toFixed(2);
+}
+
 function _storeInvHtml(inv) {
   const products = (inv && inv.products) || [];
-  if (!products.length) return '';
-  const oosCount = products.reduce((n, p) => n + p.colorways.filter(c => !c.in_stock).length, 0);
-  const rows = products.map(p => {
+  if (!products.length) {
+    // The store is configured but its catalog could not be read. Say so rather
+    // than rendering an empty panel that looks like "you have no products".
+    return (inv && inv.store_base_url && inv.store_reachable === false)
+      ? `<div style="margin-bottom:26px"><div style="font-size:12px;color:var(--text-mute)">Your store is not answering right now, so its products can't be listed. Orders below are unaffected.</div></div>`
+      : '';
+  }
+  const live = products.filter(p => !p.removed);
+  const hidden = products.filter(p => p.removed);
+  const oosCount = live.reduce((n, p) => n + p.colorways.filter(c => !c.in_stock).length, 0);
+
+  const card = (p) => {
     const cws = p.colorways.map(c => {
       const vk = `${p.slug}__${c.key}`;
       // Quantity is optional: leave it blank to just use the In stock / Sold out
@@ -14954,16 +14970,134 @@ function _storeInvHtml(inv) {
         </span>
       </div>`;
     }).join('');
+
+    const dollars = typeof p.price_cents === 'number' ? (p.price_cents / 100).toFixed(2) : '';
+    const edited = p.price_edited
+      ? `<button onclick="_storeClearPrice('${p.slug}')" title="Put the price back to ${escapeHTML(_storeMoney(p.base_price_cents))}"
+           style="border:0;background:none;padding:0;font-size:11px;color:var(--gold);cursor:pointer;text-decoration:underline">was ${escapeHTML(_storeMoney(p.base_price_cents))}, reset</button>`
+      : '';
+
     return `<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">
-      <div style="font-weight:700;font-size:13.5px;color:var(--text);margin-bottom:4px">${escapeHTML(p.name)}</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div style="font-weight:700;font-size:13.5px;color:var(--text)">${escapeHTML(p.name)}${p.added_in_portal ? ' <span style="font-size:10px;font-weight:700;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:1px 7px;vertical-align:middle">Added by you</span>' : ''}</div>
+          <div style="margin-top:2px">${edited}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex:none">
+          <span style="font-size:12px;color:var(--text-mute)">$</span>
+          <input type="number" min="0" step="0.01" value="${dollars}" placeholder="price"
+            onchange="_storeSetPrice('${p.slug}', this.value, this)"
+            title="What a customer pays. Changing it changes the live store and what Stripe charges."
+            style="width:82px;text-align:right;border:1px solid var(--border-med);border-radius:6px;padding:3px 6px;font-size:12px;background:transparent;color:var(--text)">
+          <button onclick="_storeRemoveProduct('${p.slug}', ${p.added_in_portal ? 'true' : 'false'}, this)"
+            title="${p.added_in_portal ? 'Delete this product' : 'Take this off the store. You can put it back.'}"
+            style="border:1px solid var(--border-med);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-mute)">${p.added_in_portal ? 'Delete' : 'Hide'}</button>
+        </div>
+      </div>
       ${cws}
     </div>`;
-  }).join('');
+  };
+
+  const hiddenHtml = hidden.length ? `
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin:16px 0 6px">Hidden from the store</div>
+    ${hidden.map(p => `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px dashed var(--border-med);border-radius:10px;padding:10px 14px;margin-bottom:8px">
+      <span style="font-size:13px;color:var(--text-mute)">${escapeHTML(p.name)}</span>
+      <button onclick="_storeRestoreProduct('${p.slug}', this)"
+        style="border:1px solid var(--gold);border-radius:999px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--gold)">Put back</button>
+    </div>`).join('')}` : '';
+
   return `<div style="margin-bottom:26px">
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:6px">Inventory${oosCount ? ` · ${oosCount} sold out` : ''}</div>
-    <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">Tap a colorway to toggle stock. Sold-out colorways can't be purchased on the store.</div>
-    ${rows}
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute)">Products${oosCount ? ` · ${oosCount} sold out` : ''}</div>
+      <button onclick="_storeAddForm()" style="border:1px solid var(--gold);border-radius:999px;padding:4px 14px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--gold)">Add a product</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">Set a price, a stock count, or take a product off the store. Changes go live on your store right away.</div>
+    <div id="store-addform"></div>
+    ${live.map(card).join('')}
+    ${hiddenHtml}
   </div>`;
+}
+
+// Every catalog edit goes through one call, then re-renders from the server's
+// response so what is on screen is what the store will actually serve.
+async function _storeCatalogAction(body, el) {
+  const prev = el ? el.textContent : '';
+  if (el) { el.disabled = true; if (el.tagName === 'BUTTON') el.textContent = '…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/store/inventory?client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(Object.assign({ client_id: CLIENT_ID }, body)),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    await openStoreView();
+    return true;
+  } catch (e) {
+    if (el) { el.disabled = false; if (el.tagName === 'BUTTON') el.textContent = prev || 'Error'; }
+    alert("Couldn't save that: " + (e.message || e));
+    return false;
+  }
+}
+
+function _storeSetPrice(slug, raw, input) {
+  const val = String(raw == null ? '' : raw).trim();
+  if (val === '') { alert('Enter a price, or use Hide to take the product off the store.'); return; }
+  const dollars = Number(val);
+  if (!Number.isFinite(dollars) || dollars < 0) { alert('Enter a price like 35 or 35.00.'); return; }
+  const price_cents = Math.round(dollars * 100);
+  _storeCatalogAction({ action: 'set_price', slug, price_cents }, input);
+}
+
+function _storeClearPrice(slug) { _storeCatalogAction({ action: 'clear_price', slug }); }
+
+function _storeRemoveProduct(slug, added, btn) {
+  const msg = added
+    ? 'Delete this product? It comes off your store and this cannot be undone from here.'
+    : 'Take this off your store? Nobody can buy it until you put it back.';
+  if (!confirm(msg)) return;
+  _storeCatalogAction({ action: 'remove_product', slug }, btn);
+}
+
+function _storeRestoreProduct(slug, btn) { _storeCatalogAction({ action: 'restore_product', slug }, btn); }
+
+// Add-product form. Kept to the few fields a store actually needs to sell
+// something: a name, a price, and at least one colorway with an image.
+function _storeAddForm() {
+  const host = document.getElementById('store-addform');
+  if (!host) return;
+  if (host.innerHTML.trim()) { host.innerHTML = ''; return; }
+  const f = (id, label, ph, type) => `<label style="display:block;margin-bottom:8px">
+      <span style="display:block;font-size:11px;color:var(--text-mute);margin-bottom:3px">${label}</span>
+      <input id="${id}" type="${type || 'text'}" placeholder="${ph}" ${type === 'number' ? 'min="0" step="0.01"' : ''}
+        style="width:100%;border:1px solid var(--border-med);border-radius:6px;padding:6px 8px;font-size:12.5px;background:transparent;color:var(--text)">
+    </label>`;
+  host.innerHTML = `<div style="border:1px solid var(--gold);border-radius:10px;padding:14px;margin-bottom:10px">
+    <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:10px">New product</div>
+    ${f('sa-name', 'Product name', 'Elevate Hoodie')}
+    ${f('sa-price', 'Price', '65.00', 'number')}
+    ${f('sa-color', 'Colorway name', 'Black')}
+    ${f('sa-image', 'Image link (https)', 'https://...')}
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button onclick="_storeAddSubmit(this)" style="border:1px solid var(--gold);border-radius:999px;padding:5px 16px;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--gold);color:#1a1a1a">Add to store</button>
+      <button onclick="_storeAddForm()" style="border:1px solid var(--border-med);border-radius:999px;padding:5px 16px;font-size:11.5px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-mute)">Cancel</button>
+    </div>
+  </div>`;
+}
+
+function _storeAddSubmit(btn) {
+  const v = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
+  const name = v('sa-name'), color = v('sa-color'), image = v('sa-image');
+  const dollars = Number(v('sa-price'));
+  if (!name) { alert('Give the product a name.'); return; }
+  if (!Number.isFinite(dollars) || dollars <= 0) { alert('Give the product a price, like 65.00.'); return; }
+  if (!color) { alert('Give the colorway a name, like Black.'); return; }
+  if (image && !/^https:\/\//i.test(image)) { alert('The image link needs to start with https://'); return; }
+  _storeCatalogAction({
+    action: 'add_product',
+    product: { name, priceCents: Math.round(dollars * 100), colorways: [{ label: color, images: image ? [image] : [] }] },
+  }, btn);
 }
 // Set a stock count. Blank clears it back to untracked; 0 marks the variant
 // sold out, which the live store already honours through out_of_stock.
