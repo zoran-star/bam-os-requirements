@@ -32253,8 +32253,14 @@ function _bbRenderCustomQuestions(offer, sectionId) {
   if (core === undefined) _bbLoadCoreFields(offer.client_id);
 
   // Always-asked = base contact fields + academy core custom fields. Locked
-  // (gold, no remove) - captured on every offer for this academy.
-  const alwaysChips = ['Name', 'Email', 'Phone']
+  // (gold, no remove) - captured on every offer for this academy. The intake
+  // (onboarding) form also always collects emergency contact - required for
+  // every academy on the shared preset (matches REQUIRED_INTAKE_LABELS in
+  // api/website/offer.js).
+  const alwaysBase = sectionId === 'onboarding'
+    ? ['Parent name', 'Email', 'Phone', 'Emergency contact name', 'Emergency contact phone']
+    : ['Name', 'Email', 'Phone'];
+  const alwaysChips = alwaysBase
     .concat(Array.isArray(core) ? core.map(f => f.label) : [])
     .map(l => `<span class="bb-choice selected" style="cursor:default" title="Always collected - can't remove">${escapeHTML(l)}</span>`)
     .join('');

@@ -97,6 +97,15 @@ const TRAINING_INTAKE_DEFAULTS = [
   "Parent name", "Phone", "Email", "Emergency contact name", "Emergency contact phone",
 ];
 
+// Intake labels that are ALWAYS required, for every academy on the shared
+// sales-system preset (lowercased). Emergency contact added 2026-07-24 -
+// required on every enroll/onboarding form, not per academy. Keep in sync
+// with REQUIRED_INTAKE_LABELS in ../website/offer.js.
+const REQUIRED_INTAKE_LABELS = new Set([
+  "parent name", "email", "phone",
+  "emergency contact name", "emergency contact phone",
+]);
+
 function fieldKey(label: string): string {
   return String(label).toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
@@ -146,7 +155,7 @@ function buildIntakeFields(offer: OfferRow): IntakeField[] {
 
   return labels.map((label, index) => {
     const field = inferField(label);
-    if (/^(parent name|email|phone)$/i.test(label)) field.required = true;
+    if (REQUIRED_INTAKE_LABELS.has(label.toLowerCase())) field.required = true;
     return { ...field, key: `${field.key}__${index}` };
   });
 }
