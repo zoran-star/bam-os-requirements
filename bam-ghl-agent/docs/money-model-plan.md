@@ -152,6 +152,48 @@ explained and pending his sign-off.
 | 12 | DETAIL Miami: agent fact reads only the FIRST training offer, so a fee on another offer is invisible to the agent | LOW | Already an open item; becomes part of the multi-offer fact build, not this one. |
 | 13 | Wizard complexity creep: explicit per-option choices add clicks for non-technical owners | LOW | Unset = charges nothing, ever. The wizard nags visually but never assumes a charge. |
 
+## Logic scan (2026-07-24, pre-build)
+
+Walked the whole model end to end for contradictions. The spine holds: the
+T -> S -> C dependency order is real, GTA's migration math reproduces the live
+catalog to the cent ($200 -> $226.00, $279 -> $315.27, $753 -> $850.89), the fee
+riding checkout enrollments makes per-athlete and fee-on-re-enrollment fall out
+automatically, and the disclosure modes stay coherent with the fee line (RANGE
+does not volunteer the fee but answers it accurately when asked). Five wrinkles
+found; resolutions below are part of the build spec.
+
+1. TAXABLE DEFAULT vs "nothing assumed". Fees are explicit per option, but
+   taxable defaults to YES once a template exists. Resolved as consistent:
+   SETTING the template is the explicit opt-in ("I charge tax"); per-price
+   taxable-yes is the consequence, and flipping one off is the exception for
+   exempt items. An academy with no template has nothing defaulted anywhere.
+
+2. FEE ATTACHES TO ENROLLMENT EVENTS ONLY. The fee rides checkout-created
+   subscriptions (website + onboarding flows). It must NEVER ride admin
+   subscription surgery: staff plan changes, cancel-and-recreate fixes,
+   commitment reverts, pause/resume. Without this rule, a staff rebuild of a
+   member's subscription would silently re-charge the fee.
+
+3. COUPON applies_to MUST EQUAL THE FULL CHECKED SET. A product-restricted
+   coupon attached per-line to the fee would no-op if the fee's product is not
+   in its applies_to list. Rule: the owner's checklist compiles to
+   applies_to = every checked product, recurring AND fee; checkout then attaches
+   the discount to the fee line only when the fee is checked. One list, one
+   truth, no cascade dependence.
+
+4. FEE ROWS NEED A CARVE-OUT IN THE ROUTABLE INVARIANT (confirmed in code).
+   Today routable = sellable = quotable. A `Plan|signup_fee` row is quotable and
+   rider-chargeable but must never be standalone-sellable, and renderPricing's
+   termOf() would currently garble it into a fake term ("signup_fee: $40" as if
+   it were a plan length). Build S must (a) exclude fee rows from standalone
+   sale and the enroll purchasable list, and (b) teach renderPricing to render
+   them as the one-time fee line instead of a term.
+
+5. DEAD-FEE STATE. An owner can type a fee amount and set zero options to
+   "charge" - the fee then exists but never charges anywhere. Legal by design
+   (nothing assumed), but the wizard should show a soft warning so it is a
+   choice, not an oversight.
+
 ## Ground rules carried over
 
 - An agent must never state a number that is not what the parent is charged.
