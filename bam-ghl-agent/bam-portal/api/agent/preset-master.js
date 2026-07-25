@@ -19,7 +19,8 @@
 // control, NOT structure - it stays per-academy and wins over the master at
 // flip time. Shadow treats enabled=false rows as expected, not divergence.
 
-import { PRESETS, buildPresetRows } from "./presets.js";
+import { PRESETS, buildPresetRows, templateForRuntime, disclosureForTemplate } from "./presets.js";
+import { PRICING_DISCLOSURE } from "./prompt-structure.js";
 import { sbRest } from "./_store.js";
 
 // ── which preset does this academy run? ──────────────────────────────────────
@@ -42,6 +43,44 @@ export async function resolvePresetKey(clientId, { sb = sbRest } = {}) {
   } catch (_) { /* fail null - master reads must never break a live caller */ }
   keyCache.set(clientId, { key, at: Date.now() });
   return key;
+}
+
+// ── Build 3: which named agent TEMPLATE is this academy running? ─────────────
+// The prompt builders know only the RUNTIME ("booking" / "confirm" / "closing"),
+// because that is what picks a behaviour in prompt-structure.js. This joins the
+// two: academy -> its stamped preset -> the stage whose agent engine runs on that
+// runtime -> the template name. Nothing could do that before, so nothing could
+// look up a per-template value.
+//
+// Phase 4's lesson scoping needs exactly this join too (agent_lessons buckets are
+// keyed by AGENT_TEMPLATES[...].lessonKey, not by runtime), so it is shared
+// groundwork rather than cost carried by pricing disclosure alone.
+export async function resolveAgentTemplate(clientId, runtime, { sb = sbRest } = {}) {
+  if (!runtime) return null;
+  const key = await resolvePresetKey(clientId, { sb });
+  return templateForRuntime(key, runtime);
+}
+
+// ── Build 4: the pricing-disclosure section body for this academy's agent ─────
+// Returns a partial overrides map ({} on anything unexpected) shaped like
+// fact-render's derivedFactOverrides, so the prompt builders merge it the same
+// way. An academy with no preset stamped resolves to no template, which lands on
+// DEFAULT_DISCLOSURE ("range") - identical to the section's own default, so a
+// half-onboarded academy behaves exactly as it does today.
+//
+// This is tier 1: the value comes from code (AGENT_TEMPLATES) and is applied LAST
+// by the callers, so it beats a stored per-academy row. That is deliberate. An
+// academy must not be able to widen its own agent's disclosure by editing a
+// section, and BAM changing the mode must not be silently shadowed by an old
+// stored override. Change the policy in presets.js, not in the database.
+export async function resolveDisclosureOverride(clientId, runtime, { sb = sbRest } = {}) {
+  try {
+    const template = await resolveAgentTemplate(clientId, runtime, { sb });
+    const body = PRICING_DISCLOSURE[disclosureForTemplate(template)];
+    return body ? { pricing_disclosure: body } : {};
+  } catch (_) {
+    return {}; // never break a prompt build over a policy lookup
+  }
 }
 
 // ── the master's answer for one (fromRole, trigger) ──────────────────────────

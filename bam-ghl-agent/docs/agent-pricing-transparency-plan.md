@@ -1,6 +1,6 @@
 # Agent pricing: live prices + disclosure on the agent template
 
-Agreed with Zoran 2026-07-24. Design doc, not yet built.
+Agreed with Zoran 2026-07-24. Builds 1-5 shipped the same day; Build 6 is open.
 
 ## Why
 
@@ -110,17 +110,46 @@ numbers, and flag it to the admin.
 
 ## Build order
 
-| # | Build | Effect | Risk |
-|---|---|---|---|
-| 1 | `renderPricing` reads routable `offer_prices` | Stops the live mis-quote | Low |
-| 2 | Neutral master default, GTA's prices deleted | Closes the Shig Hoops leak | Low |
-| 3 | `clientId + runtime -> template` resolver | Missing plumbing | Med |
-| 4 | `disclosure` on `AGENT_TEMPLATES` + master text | The architecture fix | Low |
-| 5 | Render `discount_codes`, commitment `after`, `discount_notes` | Agent stops being told to cite data it never got | Low |
-| 6 | Read-only mode in the brain view, GLOBAL badge | Staff and owners can see the policy | Low |
+| # | Build | Effect | Risk | Status |
+|---|---|---|---|---|
+| 1 | `renderPricing` reads routable `offer_prices` | Stops the live mis-quote | Low | **shipped** |
+| 2 | Neutral master default, GTA's prices deleted | Closes the Shig Hoops leak | Low | **shipped** |
+| 3 | `clientId + runtime -> template` resolver | Missing plumbing | Med | **shipped** |
+| 4 | `disclosure` on `AGENT_TEMPLATES` + master text | The architecture fix | Low | **shipped** |
+| 5 | Render `discount_codes`, commitment `after`, `discount_notes` | Agent stops being told to cite data it never got | Low | **shipped with 1** |
+| 6 | Read-only mode in the brain view, GLOBAL badge | Staff and owners can see the policy | Low | open |
 
-Builds 1 and 2 ship independently and fix the money bug. Anything that reaches
-the master hits BAM GTA, BAM San Jose, and DETAIL Miami at once, by design.
+Anything that reaches the master hits BAM GTA, BAM San Jose, and DETAIL Miami at
+once, by design.
+
+### What shipped 2026-07-24
+
+**Builds 1 + 2** (commit `a21bdb5`). `renderPricing(data, prices)` takes the
+routable + active `offer_prices` rows for the numbers and reads the offer only for
+copy, what's included, commitment `after`, `discount_notes` and `discount_codes` -
+which is Build 5, so it came along for free. Empty catalog means the agent quotes
+nothing and flags the admin; a failed read returns null and falls back. The
+hardcoded `pricing` default became the shared `PRICING_NOT_CONFIGURED` constant.
+
+**Builds 3 + 4** (commit below). Build 3 added `templateForRuntime` (presets.js,
+pure) plus `resolveAgentTemplate` and `resolveDisclosureOverride`
+(preset-master.js, async). Build 4 added `disclosure` to every `AGENT_TEMPLATES`
+entry, the three `PRICING_DISCLOSURE` bodies, and a `pricing_disclosure` section
+wired into all three agents' instruction order. All six prompt-build call sites now
+pass the runtime they already knew. Every `free_trial` template ships `range`, so
+no academy changed behaviour. `core_behavior` item 4 no longer hardcodes RANGE: it
+points at the disclosure rule and keeps only the never-invent-a-number rule, which
+applies in all three modes.
+
+**How to change the policy:** edit `disclosure` on the template in
+`api/agent/presets.js`. It goes live for every academy on that template at the next
+prompt build. It is applied AFTER stored overrides on purpose, so an academy cannot
+widen its own agent's disclosure, and a stale stored row cannot shadow a BAM change.
+
+**Ambiguity note:** `discovery_trial` runs two `booking`-runtime templates
+(`call_booking` then `trial_booking`). `templateForRuntime` returns the earliest by
+board position, which is the stage a lead reaches first. A caller that needs a
+specific stage's template should pass the template rather than re-derive it.
 
 ## Rules for the build
 

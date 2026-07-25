@@ -73,8 +73,8 @@ async function activeLessons(clientId, agent = "booking") {
 
 // Prompt-section overrides → { section_key: body }: the shared BAM global brain
 // (general/goal) merged UNDER this academy's own (location/offer) overrides.
-async function sectionOverrides(clientId) {
-  try { return await loadMergedOverrides(clientId); }
+async function sectionOverrides(clientId, agent) {
+  try { return await loadMergedOverrides(clientId, agent); }
   catch (_) { return {}; }
 }
 
@@ -129,7 +129,7 @@ async function handleChat(messages, clientId, leadContext, res, agent = "booking
   // exclusion predates the agent filter on lessons - it would preview a brain
   // missing the confirm lessons that DO ride the live confirm prompt.)
   const [lessons, overrides, examples] = await Promise.all([
-    activeLessons(clientId, agent), sectionOverrides(clientId), savedExamples(clientId, agent),
+    activeLessons(clientId, agent), sectionOverrides(clientId, agent), savedExamples(clientId, agent),
   ]);
   const system = buildAgentSystem({ lessons, overrides, examples, leadContext, trailer: SANDBOX_TRAILER, agent });
 
@@ -266,7 +266,7 @@ async function handler(req, res) {
     // it (shared facts + that agent's behavior), in prompt order.
     if (action === "sections") {
       const agent = pickAgent(b.agent);
-      const ov = await sectionOverrides(clientId);
+      const ov = await sectionOverrides(clientId, agent);
       const bySection = new Map(SECTIONS.map(s => [s.key, s]));
       const sections = sectionKeysForAgent(agent)
         .map(k => bySection.get(k))

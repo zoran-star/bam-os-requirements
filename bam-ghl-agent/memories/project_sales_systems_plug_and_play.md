@@ -144,7 +144,7 @@ Scan verdict: tier wiring correct EXCEPT two catches, both fixed:
 FLAGGED, not fixed (known gaps, acceptable):
 - Stage LABELS/POSITIONS live in the anchor rows (copy at apply time) - a master rename needs a re-apply per academy until the board reads labels from the master.
 - Lead-form CORE fields live per-site in bam-client-sites templates - master control by convention, not enforcement.
-- Pricing transparency MODE: re-scoped 2026-07-24 to the AGENT TEMPLATE (`AGENT_TEMPLATES` in api/agent/presets.js), not the preset, so a template reused in another sales system carries its disclosure policy along. Needs a `clientId + runtime -> template` resolver that does not exist yet. The pricing FACT is now numbers only (from routable `offer_prices`); disclosure lives in the shared `core_behavior`. See docs/agent-pricing-transparency-plan.md.
+- Pricing transparency MODE: SHIPPED 2026-07-24 on the AGENT TEMPLATE (`AGENT_TEMPLATES[...].disclosure` in api/agent/presets.js), not the preset, so a template reused in another sales system carries its policy along. Modes `range`/`exact`/`withhold`; all free_trial templates ship `range` (= today's behaviour). The pricing FACT is numbers only (routable `offer_prices`); the POLICY is the new `pricing_disclosure` master section, resolved per academy via `resolveDisclosureOverride` and applied AFTER stored overrides so an academy cannot widen its own agent's disclosure. Build 3's `templateForRuntime` join (academy -> preset -> stage -> template) is also what Phase 4 lesson-scoping needs. See docs/agent-pricing-transparency-plan.md.
 - Quiet hours = env vars (BAM-global), not yet a per-academy tier-3 setting.
 
 ## Stage NAMES now come from the master (2026-07-24)

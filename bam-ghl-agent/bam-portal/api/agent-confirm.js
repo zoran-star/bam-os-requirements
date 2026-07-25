@@ -95,7 +95,7 @@ async function loadClient(clientId) {
 // wrong behavior into a confirmation chat).
 async function loadConfig(clientId) {
   const [overrides, lessonRows, exRows] = await Promise.all([
-    loadMergedOverrides(clientId),   // global brain (general/goal) + this academy's own (location/offer)
+    loadMergedOverrides(clientId, "confirm"),   // global brain (general/goal) + this academy's own (location/offer) + its template's disclosure policy
     sb(`agent_lessons?or=(client_id.eq.${clientId},and(client_id.is.null,scope.eq.general))&agent=eq.confirm&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
     sb(`agent_examples?client_id=eq.${clientId}&agent=eq.confirm&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
   ]);

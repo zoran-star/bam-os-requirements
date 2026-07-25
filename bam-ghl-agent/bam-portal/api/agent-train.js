@@ -105,9 +105,10 @@ async function activeLessons(clientId, agent = "booking") {
     return Array.isArray(rows) ? rows : [];
   } catch (_) { return []; }
 }
-async function sectionOverrides(clientId) {
-  // Merged: shared BAM global brain (general/goal) UNDER this academy's own (location/offer).
-  try { return await loadMergedOverrides(clientId); }
+async function sectionOverrides(clientId, agent) {
+  // Merged: shared BAM global brain (general/goal) UNDER this academy's own (location/offer),
+  // then the agent template's pricing-disclosure policy on top.
+  try { return await loadMergedOverrides(clientId, agent); }
   catch (_) { return {}; }
 }
 async function savedExamples(clientId, agent = "booking") {
@@ -159,7 +160,7 @@ async function handleChat(messages, clientId, leadContext, res, agent = "booking
   // confirm/closing preview and vice versa.
   const [lessons, overrides, examples] = await Promise.all([
     activeLessons(clientId, agent),
-    sectionOverrides(clientId),
+    sectionOverrides(clientId, agent),
     savedExamples(clientId, agent),
   ]);
   const system = buildSystem(lessons, overrides, examples, leadContext, agent);

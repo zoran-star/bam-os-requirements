@@ -276,7 +276,7 @@ export async function draftMemberCareForMember(client, member, opts = {}) {
   const [pauseRows, lessons, overrides] = await Promise.all([
     sb(`cancellations?member_id=eq.${member.id}&type=eq.pause&completed_at=is.null&select=pause_start,pause_end&order=created_at.desc&limit=1`).catch(() => []),
     sb(`agent_lessons?or=(client_id.eq.${client.id},and(client_id.is.null,scope.eq.general))&agent=eq.member_care&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
-    loadMergedOverrides(client.id).catch(() => ({})),
+    loadMergedOverrides(client.id, "member_care").catch(() => ({})),
   ]);
   const currentPause = Array.isArray(pauseRows) && pauseRows[0] ? pauseRows[0] : null;
   const allowed = allowedActionsFor(member, currentPause);
