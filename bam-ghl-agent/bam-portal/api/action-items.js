@@ -216,6 +216,104 @@ function dueLabel(d) {
   return ` · due ${d}`;
 }
 
+// ── SM Onboarding Call Sequence (Mike / BAM spec, 2026-07-25) ──────────────
+// 7 structured Scaling Manager calls that run for every newly activated client.
+// Each call is its own onboarding action item (the generic "Book a call with
+// your Scaling Manager" step stays as-is). STRICT ORDER: call N can only be
+// marked done once call N-1 is done. The SM enters structured per-topic data
+// (saved to onboarding_calls, one row per client per call) and marks the call
+// complete by hand - no Fathom / post-call-flow integration. Clients see the
+// call progress on their checklist but can't toggle or edit anything.
+const SM_CALL_CALIBRATION = "What do you currently have in place for this?";
+const SM_CALLS = [
+  { key: "sm_call_1", step: 1, title: "Call 1: APVO and Offers",
+    topics: "Avatar, positioning, value, offer structure",
+    fields: [
+      { key: "avatar", label: "Avatar" },
+      { key: "positioning", label: "Positioning" },
+      { key: "value_proposition", label: "Value proposition" },
+      { key: "offer_structure", label: "Offer structure" },
+    ] },
+  { key: "sm_call_2", step: 2, title: "Call 2: Media and Sales Funnels",
+    topics: "Ads to record, VSL, pre-trial videos, funnel build",
+    fields: [
+      { key: "ads_to_record", label: "Ads to record" },
+      { key: "vsl_status", label: "VSL status" },
+      { key: "pre_trial_videos", label: "Pre-trial videos" },
+      { key: "funnel_build_notes", label: "Funnel build notes" },
+    ] },
+  { key: "sm_call_3", step: 3, title: "Call 3: Referral Program",
+    topics: "Referral/affiliate structure and mechanics",
+    fields: [
+      { key: "referral_structure", label: "Referral structure" },
+      { key: "affiliate_mechanics", label: "Affiliate mechanics" },
+    ] },
+  { key: "sm_call_4", step: 4, title: "Call 4: Organic Strategy",
+    topics: "3 content buckets: Education, Entertainment, Conversion",
+    fields: [
+      { key: "content_bucket_education", label: "Content bucket: Education" },
+      { key: "content_bucket_entertainment", label: "Content bucket: Entertainment" },
+      { key: "content_bucket_conversion", label: "Content bucket: Conversion" },
+    ] },
+  { key: "sm_call_5", step: 5, title: "Call 5: Sales Process",
+    topics: "Discovery call, sales motion, objections, script",
+    fields: [
+      { key: "discovery_call_notes", label: "Discovery call notes" },
+      { key: "sales_motion", label: "Sales motion" },
+      { key: "objections", label: "Objections" },
+      { key: "script", label: "Script" },
+    ] },
+  { key: "sm_call_6", step: 6, title: "Call 6: Systems and Ads Review",
+    topics: "Review of systems and ad performance",
+    fields: [
+      { key: "systems_review_notes", label: "Systems review notes" },
+      { key: "ad_performance_review", label: "Ad performance review" },
+    ] },
+  { key: "sm_call_7", step: 7, title: "Call 7: Athlete Onboarding and Retention",
+    topics: "Welcome package, results tracking/showcase, check-in cadence, cancellation process",
+    fields: [
+      { key: "welcome_package", label: "Welcome package" },
+      { key: "results_tracking_setup", label: "Results tracking setup" },
+      { key: "check_in_cadence", label: "Check-in cadence" },
+      { key: "cancellation_process", label: "Cancellation process" },
+    ] },
+];
+const SM_CALL_BY_KEY = Object.fromEntries(SM_CALLS.map(c => [c.key, c]));
+function smCallDescription(c) {
+  return `${c.topics}. Every call opens with: "${SM_CALL_CALIBRATION}"`;
+}
+
+// One row per client per call in onboarding_calls → map by call_key.
+// Degrades to {} if the table doesn't exist yet (migration not applied) so a
+// code deploy ahead of the SQL can never break the checklist - the call steps
+// just render as pending until the migration lands.
+async function loadOnboardingCalls(clientId) {
+  try {
+    const rows = await sb(
+      `onboarding_calls?client_id=eq.${clientId}&select=id,call_key,step_number,data,completed_at,completed_by_name`
+    );
+    const byKey = {};
+    (rows || []).forEach(r => { byKey[r.call_key] = r; });
+    return byKey;
+  } catch (e) {
+    console.error("loadOnboardingCalls failed (migration applied?):", e?.message || e);
+    return {};
+  }
+}
+
+// Upsert the client's onboarding_calls row for one call (source of truth for
+// call completion + structured data). `patch` merges over the existing row.
+async function upsertOnboardingCall(clientId, call, patch) {
+  const rows = await sb(`onboarding_calls?on_conflict=client_id,call_key`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify({
+      client_id: clientId, call_key: call.key, step_number: call.step, ...patch,
+    }),
+  });
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
 // ── Onboarding steps (system-seeded action items) ─────────────────────────
 // A row's onboarding_key marks it as a fixed onboarding step. Each step maps to
 // a timestamp column on the clients row (`col`):
@@ -236,9 +334,17 @@ const ONBOARDING_STEPS = [
   { key: "kpis",           title: "Fill out your KPIs",                  sort: 9, col: "kpi_marked_done_at",            writable: true },
   { key: "offers",         title: "Set up your Offers",                  sort: 10, col: "offers_marked_done_at",       writable: true },
   { key: "book_call",      title: "Book a call with your Scaling Manager", sort: 11, col: "call_booked_at",            writable: true },
+  // ── SM Onboarding Call Sequence (7 calls, strict order) — sm_call steps are
+  // backed by onboarding_calls rows (not a clients column). Client-visible,
+  // staff-toggle-only; call N unlocks when call N-1 is done. Gated off V1
+  // (tier "v2v15") per the hard rule - all newly activated clients are V2. ──
+  ...SM_CALLS.map(c => ({
+    key: c.key, title: c.title, sort: 11 + c.step, sm_call: c.step,
+    tier: "v2v15", staff_toggle_only: true,
+  })),
   // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
   // Sits right AFTER the SM call — the build gets scoped on that call.
-  { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 12, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
+  { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 19, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
   // ── Systems build tracker (3 steps) — DERIVED from the systems onboarding
   // ticket (clients.systems_onboarding_ticket_id), never hand-toggled. Their
   // state mirrors the ticket's status (see loadSystemsTrackerState):
@@ -247,24 +353,24 @@ const ONBOARDING_STEPS = [
   //   systems team revisions → post-review work (done when ticket = done)
   // "For review by client" is the actionable one: it lights up the moment the
   // first draft is sent and deep-links into the ticket's approve/feedback block.
-  { key: "sys_build_draft",   title: "Systems team building first draft", sort: 13, ticket_derived: true },
-  { key: "sys_client_review", title: "For review by client",              sort: 14, ticket_derived: true },
-  { key: "sys_revisions",     title: "Systems team revisions",            sort: 15, ticket_derived: true },
-  { key: "book_call_cam",  title: "Book a call with Cam (marketing)",    sort: 16, col: "cam_call_booked_at",          writable: true },
+  { key: "sys_build_draft",   title: "Systems team building first draft", sort: 20, ticket_derived: true },
+  { key: "sys_client_review", title: "For review by client",              sort: 21, ticket_derived: true },
+  { key: "sys_revisions",     title: "Systems team revisions",            sort: 22, ticket_derived: true },
+  { key: "book_call_cam",  title: "Book a call with Cam (marketing)",    sort: 23, col: "cam_call_booked_at",          writable: true },
   // Self-serve marketing setup — replaces the old "Book a call with Ximena"
   // and "Submit your raw content" steps. Client connects their ad account via
   // the Leadsie share link, then launches campaigns in the Marketing tab
   // (each campaign collects budget + assets via the new-campaign wizard).
-  { key: "connect_ads",    title: "Connect your ad account",             sort: 17, col: "ads_connected_at",            writable: true },
-  { key: "add_campaign",   title: "Add a new campaign",                  sort: 18, col: "content_submitted_at",        writable: true },
+  { key: "connect_ads",    title: "Connect your ad account",             sort: 24, col: "ads_connected_at",            writable: true },
+  { key: "add_campaign",   title: "Add a new campaign",                  sort: 25, col: "content_submitted_at",        writable: true },
   // Staff-only gate. Flipping it UNLOCKS the client's "Book review call" step.
-  { key: "ready_for_review", title: "Ready for review call?",           sort: 19, col: "ready_for_review_at",         writable: true, staff_only: true },
+  { key: "ready_for_review", title: "Ready for review call?",           sort: 26, col: "ready_for_review_at",         writable: true, staff_only: true },
   // Client step — locked (greyed) until ready_for_review is done.
-  { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 20, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
+  { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 27, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
   // ── V1.5-only steps (tier:"v15") — only seeded for V1.5 academies; V2/V1
   // never see them. They get tier-gated in syncOnboardingItems. ──
-  { key: "v15_athlete_map", title: "Map your athlete-name field", sort: 21, col: "athlete_map_done_at", writable: true, tier: "v15" },
-  { key: "v15_kpi_setup",   title: "Connect your KPIs",           sort: 22, col: "kpi_setup_done_at",   writable: true, tier: "v15" },
+  { key: "v15_athlete_map", title: "Map your athlete-name field", sort: 28, col: "athlete_map_done_at", writable: true, tier: "v15" },
+  { key: "v15_kpi_setup",   title: "Connect your KPIs",           sort: 29, col: "kpi_setup_done_at",   writable: true, tier: "v15" },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
 // Only steps backed by a clients column — ticket-derived steps have no `col`.
@@ -275,16 +381,25 @@ const ONBOARDING_TICKET_DERIVED = new Set(ONBOARDING_STEPS.filter(s => s.ticket_
 // (the Stripe / GHL connect callback writing their column) or from the systems
 // ticket. Sent to the UIs as `auto_only` so the checkbox renders read-only.
 const ONBOARDING_AUTO_ONLY = new Set(
-  ONBOARDING_STEPS.filter(s => s.ticket_derived || !s.writable).map(s => s.key)
+  ONBOARDING_STEPS.filter(s => s.ticket_derived || (!s.writable && !s.sm_call)).map(s => s.key)
 );
 const ONBOARDING_TIER_KEYS = new Set(ONBOARDING_STEPS.filter(s => s.tier).map(s => s.key));
+// Steps clients can SEE but only staff can toggle / fill (the SM call sequence).
+const ONBOARDING_STAFF_TOGGLE_ONLY = new Set(ONBOARDING_STEPS.filter(s => s.staff_toggle_only).map(s => s.key));
 // Which steps apply to a client of a given tier (no `tier` = all tiers).
-function onboardingStepsForTier(isV15) {
-  return ONBOARDING_STEPS.filter(s => !s.tier || (s.tier === "v15" && isV15));
+//   tier "v15"   → V1.5 academies only
+//   tier "v2v15" → V2 or V1.5 academies (everything except legacy V1)
+function onboardingStepsForTier({ isV15, isV2 }) {
+  return ONBOARDING_STEPS.filter(s => {
+    if (!s.tier) return true;
+    if (s.tier === "v15") return isV15;
+    if (s.tier === "v2v15") return isV2 || isV15;
+    return false;
+  });
 }
 
 async function loadClientSignals(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS},v15_access,stripe_connect_account_id`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS},v15_access,v2_access,stripe_connect_account_id`);
   return (Array.isArray(rows) && rows[0]) || {};
 }
 
@@ -356,14 +471,17 @@ async function loadSystemsTrackerState(clientId) {
 
 // Idempotently ensure all onboarding steps exist for this client, then
 // reconcile each against its clients-row column. Safe to call on every GET.
-async function syncOnboardingItems(clientId, tracker) {
+async function syncOnboardingItems(clientId, tracker, calls) {
   let signals = await loadClientSignals(clientId);
   // Tick Stripe the moment the connected account can really charge (and not before).
   signals = await backfillStripeWhenChargeable(clientId, signals);
   const isV15 = signals.v15_access === true;
-  const steps = onboardingStepsForTier(isV15);
+  const isV2 = signals.v2_access === true;
+  const steps = onboardingStepsForTier({ isV15, isV2 });
   // Ticket-derived steps mirror the systems onboarding ticket (load once).
   if (steps.some(s => s.ticket_derived) && !tracker) tracker = await loadSystemsTrackerState(clientId);
+  // SM call steps mirror their onboarding_calls row (load once).
+  if (steps.some(s => s.sm_call) && !calls) calls = await loadOnboardingCalls(clientId);
   const applicableKeys = new Set(steps.map(s => s.key));
   const existing = await sb(
     `action_items?client_id=eq.${clientId}&onboarding_key=not.is.null&select=id,onboarding_key,completed_at,onboarding_overridden,sort_order`
@@ -381,11 +499,14 @@ async function syncOnboardingItems(clientId, tracker) {
 
   for (const step of steps) {
     // Done-timestamp source: a clients column for normal steps, the systems
-    // ticket for ticket-derived steps.
+    // ticket for ticket-derived steps, the onboarding_calls row for SM calls.
     const colVal = step.ticket_derived
       ? ((tracker && tracker.done[step.key]) || null)
-      : (signals[step.col] || null); // timestamp or null
+      : step.sm_call
+        ? ((calls && calls[step.key] && calls[step.key].completed_at) || null)
+        : (signals[step.col] || null); // timestamp or null
     const row = byKey[step.key];
+    const smCall = step.sm_call ? SM_CALL_BY_KEY[step.key] : null;
 
     if (!row) {
       // Seed missing step (idempotent via on_conflict). completed_at derived
@@ -395,6 +516,7 @@ async function syncOnboardingItems(clientId, tracker) {
         headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
         body: JSON.stringify({
           client_id: clientId, title: step.title, onboarding_key: step.key,
+          description: smCall ? smCallDescription(smCall) : undefined,
           sort_order: step.sort, created_by_name: "Onboarding", created_by_role: "staff",
           completed_at: colVal,
         }),
@@ -491,7 +613,8 @@ async function handler(req, res) {
 
       // Seed missing onboarding steps + reconcile auto ones before listing.
       const tracker = await loadSystemsTrackerState(clientId);
-      await syncOnboardingItems(clientId, tracker);
+      const calls = await loadOnboardingCalls(clientId);
+      await syncOnboardingItems(clientId, tracker, calls);
 
       const items = await sb(
         `action_items?client_id=eq.${clientId}&select=*` +
@@ -511,6 +634,27 @@ async function handler(req, res) {
         // read-only so a client can't mark "Connect Stripe" done without connecting.
         if (it.onboarding_key && ONBOARDING_AUTO_ONLY.has(it.onboarding_key)) {
           it.auto_only = true;
+        }
+        // SM call sequence: decorate with the call registry (fields/topics/
+        // calibration prompt), the structured data entered so far, and the lock
+        // state - call N stays locked until call N-1 is done (strict order).
+        const smCall = it.onboarding_key ? SM_CALL_BY_KEY[it.onboarding_key] : null;
+        if (smCall) {
+          const row = calls[smCall.key] || null;
+          it.call_step = smCall.step;
+          it.call_topics = smCall.topics;
+          it.call_fields = smCall.fields;
+          it.calibration_prompt = SM_CALL_CALIBRATION;
+          it.call_data = (row && row.data) || {};
+          it.staff_toggle_only = true;
+          if (smCall.step > 1) {
+            const prev = SM_CALLS[smCall.step - 2];
+            const prevDone = !!(calls[prev.key] && calls[prev.key].completed_at);
+            if (!prevDone && !it.completed_at) {
+              it.call_locked = true;
+              it.call_waiting_on = prev.title;
+            }
+          }
         }
       }
       // Staff-only onboarding steps (e.g. trigger_buildout) are hidden from clients.
@@ -601,10 +745,31 @@ async function handler(req, res) {
       // them is the real connect callback writing their column. Letting a human tick
       // them (which used to set onboarding_overridden and freeze the reconcile) made
       // the portal show clients as payment-ready when they could not charge a card.
-      if (obStep && !obStep.writable && !obStep.ticket_derived && "completed" in b) {
+      if (obStep && !obStep.writable && !obStep.ticket_derived && !obStep.sm_call && "completed" in b) {
         return res.status(400).json({
           error: "this step completes on its own once the account is actually connected",
         });
+      }
+
+      // ── SM call sequence steps ──────────────────────────────────────────
+      // Clients see call progress but only staff (the SM) can toggle a call
+      // done or edit its structured data. Strict order: call N can only be
+      // completed once call N-1 is done.
+      const smCall = obStep && obStep.sm_call ? SM_CALL_BY_KEY[obStep.key] : null;
+      if (smCall && !ctx.isStaff && ("completed" in b || "call_data" in b)) {
+        return res.status(403).json({ error: "your Scaling Manager updates this step on your call" });
+      }
+      const callsMap = smCall ? await loadOnboardingCalls(existing.client_id) : null;
+      if (smCall && b.completed === true && smCall.step > 1) {
+        const prev = SM_CALLS[smCall.step - 2];
+        const prevDone = !!(callsMap[prev.key] && callsMap[prev.key].completed_at);
+        if (!prevDone) {
+          return res.status(400).json({
+            error: `The onboarding calls run in order - mark "${prev.title}" done first.`,
+            code: "call_sequence_locked",
+            waiting_on: prev.title,
+          });
+        }
       }
 
       const patch = {};
@@ -664,16 +829,55 @@ async function handler(req, res) {
         }
       }
 
-      if (Object.keys(patch).length === 0) {
+      // SM call: persist completion + structured data to onboarding_calls (the
+      // source of truth these steps reconcile against). Data is merged per
+      // field and validated against the call's registry in SM_CALLS.
+      let callRow = smCall ? (callsMap[smCall.key] || null) : null;
+      if (smCall && ("call_data" in b || "completed" in b)) {
+        const callPatch = {};
+        if ("call_data" in b) {
+          if (!b.call_data || typeof b.call_data !== "object" || Array.isArray(b.call_data)) {
+            return res.status(400).json({ error: "call_data must be an object" });
+          }
+          const allowed = new Set(smCall.fields.map(f => f.key));
+          const unknown = Object.keys(b.call_data).filter(k => !allowed.has(k));
+          if (unknown.length) {
+            return res.status(400).json({ error: `unknown call fields: ${unknown.join(", ")}` });
+          }
+          const merged = { ...((callRow && callRow.data) || {}) };
+          for (const [k, v] of Object.entries(b.call_data)) {
+            merged[k] = v == null ? "" : String(v);
+          }
+          callPatch.data = merged;
+        }
+        if ("completed" in b) {
+          callPatch.completed_at = b.completed ? (patch.completed_at || new Date().toISOString()) : null;
+          callPatch.completed_by_name = b.completed ? ctx.displayName : null;
+        }
+        callRow = await upsertOnboardingCall(existing.client_id, smCall, callPatch);
+      }
+
+      if (Object.keys(patch).length === 0 && !(smCall && "call_data" in b)) {
         return res.status(400).json({ error: "no fields to update" });
       }
 
-      const rows = await sb(`action_items?id=eq.${id}`, {
-        method: "PATCH",
-        headers: { Prefer: "return=representation" },
-        body: JSON.stringify(patch),
-      });
-      const item = Array.isArray(rows) ? rows[0] : rows;
+      let item = existing;
+      if (Object.keys(patch).length) {
+        const rows = await sb(`action_items?id=eq.${id}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify(patch),
+        });
+        item = Array.isArray(rows) ? rows[0] : rows;
+      }
+      // Echo the call decorations back so the UIs can update in place.
+      if (smCall) {
+        item.call_step = smCall.step;
+        item.call_fields = smCall.fields;
+        item.calibration_prompt = SM_CALL_CALIBRATION;
+        item.call_data = (callRow && callRow.data) || {};
+        item.staff_toggle_only = true;
+      }
 
       // Writable onboarding step → write its canonical clients column too, so
       // the BB "mark done" buttons + onboarding tracker reflect the same state.

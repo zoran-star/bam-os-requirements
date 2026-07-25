@@ -4,17 +4,31 @@ Shipped 2026-06-01. A shared per-client to-do list. Same rows shown on both
 sides: the academy team in the client portal and BAM staff on the client's
 staff-portal page. Any field on any row is editable by anyone who can see it.
 
-> ## 📍 ONBOARDING STATE — read first (updated 2026-06-09)
+> ## 📍 ONBOARDING STATE — read first (updated 2026-07-25)
 >
-> **The client onboarding flow IS the Action Items "Onboarding" checklist — 17 fixed steps.** Everything ships to `main` (auto-deploys). Live step order (authoritative = `action_items.sort_order`):
+> **The client onboarding flow IS the Action Items "Onboarding" checklist.** Everything ships to `main` (auto-deploys). Live step order (authoritative = `action_items.sort_order`):
 >
 > ```
 > 1 slack · 2 connect_stripe* · 3 create_ghl · 4 connect_ghl*
 > 5 general_info · 6 staff · 7 locations · 8 brand · 9 kpis · 10 offers
-> 11 book_call(SM) · 12 trigger_buildout🔒
-> 13 sys_build_draft⚙ · 14 sys_client_review⚙★ · 15 sys_revisions⚙   ← NEW 2026-06-23
-> 16 book_call_cam · 17 connect_ads · 18 add_campaign
-> 19 ready_for_review🔒 · 20 book_review_call   (+ v15: 21 athlete_map · 22 kpi_setup)
+> 11 book_call(SM)
+> 12-18 sm_call_1..7 📞 (V1.5/V2 only)   ← NEW 2026-07-25, Mike's 7-call sequence
+> 19 trigger_buildout🔒
+> 20 sys_build_draft⚙ · 21 sys_client_review⚙★ · 22 sys_revisions⚙
+> 23 book_call_cam · 24 connect_ads · 25 add_campaign
+> 26 ready_for_review🔒 · 27 book_review_call   (+ v15: 28 athlete_map · 29 kpi_setup)
+>
+> 📞 SM Onboarding Call Sequence (2026-07-25, Mike's spec): 7 structured SM
+>   calls (APVO/Offers · Media/Funnels · Referral · Organic · Sales Process ·
+>   Systems+Ads Review · Athlete Onboarding/Retention). STRICT order - call N
+>   unlocks when N-1 is done (API-enforced, code call_sequence_locked).
+>   Client-VISIBLE but staff-toggle-ONLY. Structured per-topic data lives in
+>   the `onboarding_calls` table (one row per client per call, data jsonb,
+>   registry SM_CALLS in api/action-items.js); staff edit it in the client's
+>   Action Items tab (expandable per-call editor, PATCH {id, call_data}).
+>   Gated tier:"v2v15" so legacy V1 checklists are untouched. Calibration
+>   prompt on every call: "What do you currently have in place for this?"
+>   NOT counted in ONBOARDING_STEP_COLS (roster bar = core steps only).
 >   (*auto from a connect signal · 🔒 = staff-only, hidden from clients ·
 >    ⚙ = ticket-derived, mirrors the systems onboarding ticket, not hand-toggleable ·
 >    ★ = lights up gold when it's the client's turn)

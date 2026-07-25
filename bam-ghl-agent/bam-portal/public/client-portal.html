@@ -35488,6 +35488,7 @@ const _AI_SYS_TRACKER_KEYS = ['sys_build_draft', 'sys_client_review', 'sys_revis
 
 function _aiOnbHTML(it) {
   if (_AI_SYS_TRACKER_KEYS.includes(it.onboarding_key)) return _aiSysStopHTML(it);
+  if (it.call_step) return _aiCallStopHTML(it);
   const cfg = ONB_UI[it.onboarding_key] || {};
   const isDone = !!it.completed_at;
   // book_review_call is locked (greyed, non-interactive) until staff flip the
@@ -35580,6 +35581,39 @@ function _aiSysStopHTML(it) {
     <div class="ai-stop-body">
       <div class="ai-stop-title">${escapeHTML(it.title)}</div>
       <div class="ai-stop-meta">${chip}${cta}</div>
+    </div>
+  </div>`;
+}
+
+// Render one of the 7 SM onboarding-call stops (the structured call sequence).
+// The calls run in STRICT ORDER and are completed by the Scaling Manager on
+// the call itself - the circle is read-only for clients. Status pills:
+//   ✓ Done          - the SM marked the call complete
+//   In progress     - this is the next call up (previous one is done)
+//   Waiting on Call N-1 - locked until the previous call is marked done
+function _aiCallStopHTML(it) {
+  const isDone = !!it.completed_at;
+  const locked = !!it.call_locked && !isDone;
+  const topics = it.call_topics ? `<span class="ai-stop-hint">${escapeHTML(it.call_topics)}</span>` : '';
+  if (locked) {
+    const prev = (it.call_waiting_on || '').split(':')[0] || 'the previous call';
+    return `<div class="ai-stop locked">
+      <div class="ai-stop-rail"><span class="ai-stop-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><div class="ai-stop-line"></div></div>
+      <div class="ai-stop-body">
+        <div class="ai-stop-title">${escapeHTML(it.title)}</div>
+        <div class="ai-stop-meta"><span class="ai-chip">Waiting on ${escapeHTML(prev)}</span>${topics}</div>
+      </div>
+    </div>`;
+  }
+  const chip = isDone
+    ? `<span class="ai-chip" style="color:var(--green)">✓ Done</span>`
+    : `<span class="ai-chip" style="color:var(--amber)">In progress</span>`;
+  const circle = `<span class="ai-stop-circle${isDone ? ' on' : ''}" style="cursor:default" aria-disabled="true" title="${isDone ? 'Completed by your Scaling Manager' : 'Your Scaling Manager marks this done on your call'}">${isDone ? _AI_CHECK_ICON : ''}</span>`;
+  return `<div class="ai-stop${isDone ? ' done' : ''}">
+    <div class="ai-stop-rail">${circle}<div class="ai-stop-line"></div></div>
+    <div class="ai-stop-body">
+      <div class="ai-stop-title">${escapeHTML(it.title)}</div>
+      <div class="ai-stop-meta">${chip}${isDone ? '' : topics}</div>
     </div>
   </div>`;
 }

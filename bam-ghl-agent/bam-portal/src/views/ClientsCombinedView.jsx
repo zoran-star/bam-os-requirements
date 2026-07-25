@@ -532,6 +532,9 @@ function clientStatusPct(client) {
 // Each maps to a timestamp column on the client row, so the bar counts the SAME
 // steps the action-items checklist (Onboarding tab) shows and the two always
 // agree. V1.5 academies get two extra steps; everyone else has 17.
+// NOTE: the 7 SM onboarding calls (sm_call_1..7) are NOT counted here - they
+// live in the onboarding_calls table, not on a clients column, so this roster
+// bar tracks the core setup steps only.
 const ONBOARDING_STEP_COLS = [
   "slack_join_done_at", "stripe_connect_connected_at", "ghl_signup_done_at", "ghl_connected_at",
   "general_marked_done_at", "staff_marked_done_at", "locations_marked_done_at", "brand_marked_done_at",
@@ -2834,6 +2837,11 @@ function ActionItemsTab({ client, tokens, session }) {
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
   const [edit, setEdit] = useState({ title: "", description: "", assignee_id: "", due_date: "" });
+  // SM onboarding-call sequence: which call's structured-notes editor is open,
+  // and the unsaved per-field edits (keyed by action item id).
+  const [callOpenId, setCallOpenId] = useState(null);
+  const [callEdits, setCallEdits] = useState({});
+  const [callSaving, setCallSaving] = useState(false);
 
   const tok = session?.access_token;
 
@@ -2952,10 +2960,82 @@ function ActionItemsTab({ client, tokens, session }) {
     );
   }
 
+  async function saveCallData(it) {
+    const edits = callEdits[it.id];
+    if (!edits || !Object.keys(edits).length) { setCallOpenId(null); return; }
+    setCallSaving(true);
+    try {
+      await api("PATCH", { id: it.id, call_data: edits });
+      setCallEdits(prev => { const n = { ...prev }; delete n[it.id]; return n; });
+      setCallOpenId(null);
+      load();
+    } catch (e) { alert(e.message); }
+    finally { setCallSaving(false); }
+  }
+
+  // SM onboarding-call row (the 7-call sequence, Mike's spec). Strict order:
+  // call N unlocks once call N-1 is done (the API enforces it too). Expanding
+  // a call shows the calibration prompt + one textarea per topic; the data is
+  // saved to the client profile (onboarding_calls), not a freeform notes box.
+  function callRow(it) {
+    const isDone = !!it.completed_at;
+    const locked = !!it.call_locked && !isDone;
+    const isOpen = callOpenId === it.id;
+    const fields = it.call_fields || [];
+    const edits = callEdits[it.id] || {};
+    const chipLabel = isDone ? "✓ Done"
+      : locked ? `Waiting on ${(it.call_waiting_on || "").split(":")[0] || "previous call"}`
+      : "In progress";
+    const chipExtra = isDone ? { color: t.green, borderColor: `${t.green}55` }
+      : locked ? {} : { color: t.amber, borderColor: `${t.amber}55` };
+    return (
+      <div key={it.id} style={{ background: t.surfaceEl, border: `1px solid ${isOpen ? t.accent : t.border}`, borderRadius: 8, marginBottom: 8, opacity: locked ? 0.6 : 1 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 14px" }}>
+          <input type="checkbox" checked={isDone}
+            onChange={() => { if (!locked) toggle(it); }}
+            disabled={locked}
+            title={locked ? "The calls run in order - finish the previous call first" : "Mark this call done"}
+            style={{ width: 18, height: 18, marginTop: 2, cursor: locked ? "default" : "pointer", accentColor: t.accent }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: t.text, textDecoration: isDone ? "line-through" : "none" }}>{it.title}</div>
+            {it.call_topics && <div style={{ fontSize: 12, color: t.textMute, marginTop: 3, lineHeight: 1.45 }}>{it.call_topics}</div>}
+          </div>
+          <span style={{ ..._aiChipStyle(t), ...chipExtra }}>{chipLabel}</span>
+          <button onClick={() => setCallOpenId(isOpen ? null : it.id)} style={_aiIconBtn(t)} title={isOpen ? "Close call notes" : "Open call notes"}>{isOpen ? "▴" : "▾"}</button>
+        </div>
+        {isOpen && (
+          <div style={{ padding: "0 14px 14px 44px" }}>
+            {it.calibration_prompt && (
+              <div style={{ fontSize: 12, color: t.accent, fontWeight: 600, marginBottom: 10 }}>
+                Open with: "{it.calibration_prompt}"
+              </div>
+            )}
+            {fields.map(f => (
+              <div key={f.key} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: t.textMute, marginBottom: 4 }}>{f.label}</div>
+                <textarea rows={2}
+                  value={edits[f.key] !== undefined ? edits[f.key] : ((it.call_data || {})[f.key] || "")}
+                  onChange={e => setCallEdits(prev => ({ ...prev, [it.id]: { ...(prev[it.id] || {}), [f.key]: e.target.value } }))}
+                  style={{ ...inputStyle, resize: "vertical" }} />
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => { setCallEdits(prev => { const n = { ...prev }; delete n[it.id]; return n; }); setCallOpenId(null); }}
+                style={{ padding: "7px 14px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => saveCallData(it)} disabled={callSaving}
+                style={{ padding: "7px 14px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{callSaving ? "Saving…" : "Save call data"}</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Onboarding step row — every step is check/uncheck-able by staff or academy.
   // AUTO steps (Stripe/GHL connect) also self-complete from the signal until
   // someone overrides them by hand.
   function onbRow(it) {
+    if (it.call_step) return callRow(it);
     const auto = _AI_ONB_AUTO.has(it.onboarding_key);
     const derived = ONBOARDING_DERIVED_KEYS.has(it.onboarding_key);
     const isDone = !!it.completed_at;

@@ -16,6 +16,7 @@ import SettingsView from './views/SettingsView';
 // Each becomes its own JS chunk Vite ships on demand.
 const CalendarView         = lazy(() => import('./views/CalendarView'));
 const FinancialsView       = lazy(() => import('./views/FinancialsView'));
+const CommissionsView      = lazy(() => import('./views/CommissionsView'));
 const UnifiedTasksView     = lazy(() => import('./views/UnifiedTasksView'));
 const KnowledgeBaseView    = lazy(() => import('./views/KnowledgeBaseView'));
 const CommunicationView    = lazy(() => import('./views/CommunicationView'));
@@ -184,6 +185,9 @@ export default function BAMPortal() {
   const canSeeStripeLink = me && (me.role === "admin" || me.role === "scaling_manager");
   const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor" || me.role === "content_executor");
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
+  // Commissions: admin sees all clients; an SM sees only their own assigned
+  // clients' figures (scoping enforced server-side in api/commissions.js).
+  const canSeeCommissions = me && (me.role === "admin" || me.role === "scaling_manager");
   // Resources: admins + the content/marketing team (they upload + manage the
   // library). Writes are enforced server-side by RLS is_resource_editor().
   const canSeeResources = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
@@ -279,13 +283,13 @@ export default function BAMPortal() {
       "website-v2": canSeeSystems,
       team: canSeeTeam, resources: canSeeResources, feedback: canSeeFeedback,
       financials: canSeeFinancials, ourads: canSeeOurAds, customfields: canSeeCustomFields,
-      stripelink: canSeeStripeLink,
+      stripelink: canSeeStripeLink, commissions: canSeeCommissions,
     };
     if (nav === "dashboard" || (Object.prototype.hasOwnProperty.call(gated, nav) && !gated[nav])) {
       // Content executors live in the Content tab — land them there, not Inbox.
       setNav(me.role === "content_executor" ? "content" : "inbox");
     }
-  }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials, canSeeOurAds, canSeeCustomFields, canSeeStripeLink]);
+  }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials, canSeeOurAds, canSeeCustomFields, canSeeStripeLink, canSeeCommissions]);
 
   // (Legacy ?nav= deep-links are honored by the nav initializer above and
   // folded into ?p= by the URL-sync effect — no separate consumer needed.)
@@ -499,6 +503,7 @@ export default function BAMPortal() {
     calendar: ["Calendar", "Your schedule"],
     knowledge: ["Knowledge Base", "SOPs & Solutions"],
     financials: ["Financials", "BAM internal finances"],
+    commissions: ["Commissions", "BAM payment & SM commission calculator"],
     communication: ["Communication", "Slack channels & messages"],
     systems: ["Systems", "Ticket delegation & execution"],
     "website-v2": ["Website V2", "V2 rail website change sandbox"],
@@ -524,6 +529,7 @@ export default function BAMPortal() {
     calendar: IconCalendar,
     knowledge: IconKnowledge,
     financials: IconFinancials,
+    commissions: IconFinancials,
     channel: IconFinancials,
     communication: IconMessage,
     systems: IconTasks,
@@ -561,6 +567,7 @@ export default function BAMPortal() {
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
         ...(canSeeCustomFields ? [{ label: "Custom Fields", key: "customfields" }] : []),
         ...(canSeeStripeLink ? [{ label: "Stripe Link-Up", key: "stripelink" }] : []),
+        ...(canSeeCommissions ? [{ label: "Commissions", key: "commissions" }] : []),
         ...(canSeeResources ? [{ label: "Resources", key: "resources" }] : []),
         ...(canSeeOurAds ? [{ label: "Our Ads", key: "ourads" }] : []),
         ...(canSeeFeedback ? [{ label: "Feedback", key: "feedback" }] : []),
@@ -902,6 +909,7 @@ export default function BAMPortal() {
               {nav === "calendar" && <CalendarView tokens={tk} dark={dark} />}
               {nav === "knowledge" && <KnowledgeBaseView tokens={tk} dark={dark} />}
               {nav === "financials" && canSeeFinancials && <FinancialsView tokens={tk} dark={dark} />}
+              {nav === "commissions" && canSeeCommissions && <CommissionsView tokens={tk} dark={dark} session={session} me={me} />}
               {nav === "communication" && <CommunicationView tokens={tk} dark={dark} />}
               {nav === "systems" && canSeeSystems && <SystemsView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "marketing" && canSeeMarketing && <MarketingView tokens={tk} dark={dark} me={me} session={session} />}
