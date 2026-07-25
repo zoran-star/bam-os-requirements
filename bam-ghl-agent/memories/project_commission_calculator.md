@@ -25,7 +25,7 @@ sm_comm = $250 + 25% x fee                (ONLY when growth > 0)
 - `api/commissions.js`: overview/cycles (admin all, SM own) · save-settings (admin, baseline lock) · run-cycle (admin manual/preview/`gross_override` for failed pulls) · `cron-cycles` (daily 12:00 UTC - closes cycles whose renewal anniversary is today-ET, pulls gross from the academy's connected Stripe account, snapshots, creates the Stripe invoice) · `cron-reports` (daily 12:30 UTC).
 - **Invoice**: platform `STRIPE_SECRET_KEY` + `clients.stripe_customer_id`, invoiceitems + finalized `send_invoice` invoice, due = 5 business days (Agreement §2), footer references the $50/day late fee after 3-day grace (NOT automated - manual). `auto_advance:false`; Anna+Cole collect manually.
 - **Reports** (growth clients only, decoupled from invoicing): 2 windows/month = 3 business days (Mon-Fri ET) before the 1st and before the 15th. Batch rule: renewal 1st-15th -> "fifteenth" batch; 16th-EOM -> "first" (of next month). PDF (`api/_lib/commission-pdf.js`, pdf-lib) emailed via Resend to `COMMISSION_REPORT_EMAILS` (default Anna acallon@gmail.com + Cole cole@byanymeansbball.com); `report_sent_at` stamped. SM payout is manual - the report is the calc record.
-- **Pull failure** = never silent: cycle stored `revenue_pull_status='failed'`, NO invoice, email alert to `COMMISSION_ALERT_EMAILS` (⚠️ default only Cole - **Mike's address must be set in Vercel env**). Admin fixes + re-runs with `gross_override`.
+- **Pull failure** = never silent: cycle stored `revenue_pull_status='failed'`, NO invoice, email alert to `COMMISSION_ALERT_EMAILS` (default mike@byanymeansbusiness.com + cole@byanymeansbball.com since 2026-07-25). Admin fixes + re-runs with `gross_override`.
 - `api/_email.js` `sendEmail()` gained optional `attachments` (base64 passthrough to Resend).
 - Frontend: `src/views/CommissionsView.jsx`, nav key `commissions`, `canSeeCommissions` = admin | scaling_manager.
 
@@ -34,4 +34,4 @@ sm_comm = $250 + 25% x fee                (ONLY when growth > 0)
 - GHL revenue source is a stub - selecting it fails the pull (alert path) until a GHL payments integration is wired.
 - Client needs `stripe_customer_id` (platform) or invoicing errors -> stored as `invoice_status='error'` + alert.
 - `STRIPE_SECRET_KEY` needs WRITE scope for invoiceitems/invoices (env README said read-only restricted key).
-- Env vars to set in Vercel: `COMMISSION_ALERT_EMAILS` (Mike+Cole), optionally `COMMISSION_REPORT_EMAILS`.
+- Env vars (optional overrides only, defaults are correct per spec): `COMMISSION_ALERT_EMAILS`, `COMMISSION_REPORT_EMAILS`.
