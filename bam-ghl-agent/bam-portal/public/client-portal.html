@@ -38273,7 +38273,7 @@ async function _plSetStatus(oppId, status, reason) {
 function _plToast(msg) {
   clearTimeout(_plUndoTimer);
   document.getElementById('pl-undo-toast')?.remove();
-  document.body.insertAdjacentHTML('beforeend', `<div id="pl-undo-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9200;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);box-shadow:0 8px 30px rgba(0,0,0,.45)">${escapeHTML(msg)}</div>`);
+  document.body.insertAdjacentHTML('beforeend', `<div id="pl-undo-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10400;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);box-shadow:0 8px 30px rgba(0,0,0,.45)">${escapeHTML(msg)}</div>`);
   _plUndoTimer = setTimeout(() => document.getElementById('pl-undo-toast')?.remove(), 4000);
 }
 
@@ -38382,7 +38382,7 @@ function _plShowUndo(action, label) {
   _plUndoState = action;
   clearTimeout(_plUndoTimer);
   document.getElementById('pl-undo-toast')?.remove();
-  document.body.insertAdjacentHTML('beforeend', `<div id="pl-undo-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9200;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,.45)">
+  document.body.insertAdjacentHTML('beforeend', `<div id="pl-undo-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10400;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,.45)">
     <span style="font-size:13px;color:var(--text)">${escapeHTML(label)}</span>
     <button onclick="_plUndo()" style="background:none;border:none;color:var(--gold);font-weight:700;font-size:13px;cursor:pointer">Undo</button>
   </div>`);
@@ -48590,8 +48590,8 @@ async function _memberCareDoAction(cardId) {
     const result = await _memberAction(c.member_id, c.action, c.action_body || {});
     await _memberCarePost({ action: 'mark-action-done', id: c.id });
     if ((c.action === 'payment-link' || c.action === 'card-setup-link') && result && result.url) {
-      try { await navigator.clipboard.writeText(result.url); if (typeof _plToast === 'function') _plToast('Link copied to clipboard'); }
-      catch (_) { alert('Link ready: ' + result.url); }
+      // Same send modal as the drawer button: write the message or just copy.
+      _openPaymentLinkModal(c.member_id, result);
     }
     if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
   } catch (e) {
@@ -49177,10 +49177,12 @@ async function magentConfirm() {
   try {
     const result = await _memberAction(p.member_id, p.action, p.body || {});
     _MAGENT.busy = false;
-    // payment-link / card-setup-link return a URL rather than a state change.
+    // payment-link / card-setup-link return a URL rather than a state change -
+    // open the send modal so staff can write the message or just copy the link.
     let done = 'Done. ' + (p.summary || (p.action + ' applied.'));
     if ((p.action === 'payment-link' || p.action === 'card-setup-link') && result && result.url) {
-      done = 'Link ready: ' + result.url;
+      done = 'Link ready - write the message or copy the link.';
+      _openPaymentLinkModal(p.member_id, result);
     }
     _MAGENT.history.push({ role: 'assistant', text: done });
     magentRender();
@@ -49996,19 +49998,110 @@ async function _setupBillingCreate() {
   } catch (e) { alert("Couldn't create the subscription: " + _sorterErr(e)); }
 }
 
-// Right-side modal: shows the Stripe portal URL + pre-formatted SMS/email
-// the staff can edit, then sends it. The send endpoint is provider-aware:
-// SMS routes through Twilio and Email through Resend for academies off GHL,
-// and through GHL for academies still on it. Buttons gate on per-channel
-// readiness (data.messaging), not on GHL specifically.
+// Payment / card link modal: shows the Stripe link, a message the staff can
+// edit with the link pinned to the BOTTOM, and per-channel send buttons. The
+// send endpoint is provider-aware: SMS routes through Twilio and Email through
+// Resend for academies off GHL, and through GHL for academies still on it.
+// Buttons gate on per-channel readiness (data.messaging), not on GHL.
+//
+// LAYERING: the member drawer sits at z 8900/8950 (10055/10060 elevated) and the
+// members focus chat at 9999. This modal therefore lives on document.body at
+// z 10300+. It used to render at z 81 inside #member-modal-host, which meant it
+// opened UNDERNEATH the drawer's full-screen backdrop - the button looked dead.
+let _PL = { memberId: null, url: '', parent: {}, channel: 'sms', smsReady: false, emailReady: false };
+
 function _openPaymentLinkModal(memberId, data) {
-  const host = document.getElementById('member-modal-host') || document.body;
-  const url       = data.url || '';
-  const parent    = data.parent || {};
-  const ghl       = data.ghl    || { ready: false };
-  const messaging = data.messaging || null;
-  const suggested = data.suggested || {};
-  // Native share sheet (app builds with the Share plugin)
+  _closePaymentLinkModal();
+  const d         = data || {};
+  const url       = d.url || '';
+  const parent    = d.parent || {};
+  const ghl       = d.ghl    || { ready: false };
+  const messaging = d.messaging || null;
+  const suggested = d.suggested || {};
+
+  // Per-channel send readiness. Falls back to the legacy GHL flag for older
+  // response shapes. A channel also needs the parent's phone / email on file.
+  const hasPhone   = !!parent.phone;
+  const hasEmail   = !!parent.email;
+  const smsReady   = (messaging ? !!messaging.sms_ready   : !!ghl.ready) && hasPhone;
+  const emailReady = (messaging ? !!messaging.email_ready : !!ghl.ready) && hasEmail;
+
+  // The message body is the suggested copy WITHOUT the URL - the link is pinned
+  // to the bottom of whatever the staff types, so it can never get deleted.
+  let body = String(suggested.sms_text || '');
+  if (url) body = body.split(url).join('');
+  body = body.replace(/[ \t]+\n/g, '\n').trim();
+  if (!body) body = "Here's the link to update your card on file:";
+  const subject = suggested.email_subject || 'Update your card on file';
+
+  _PL = { memberId, url, parent, channel: smsReady ? 'sms' : (emailReady ? 'email' : 'sms'), smsReady, emailReady };
+
+  const reasons = [];
+  if (!hasPhone) reasons.push('No parent phone on file.');
+  else if (!smsReady) reasons.push('SMS is not set up for this academy yet.');
+  if (!hasEmail) reasons.push('No parent email on file.');
+  else if (!emailReady) reasons.push('Email is not set up for this academy yet.');
+
+  const lbl = 'font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px';
+  const fld = 'width:100%;background:var(--bg,#0e0e11);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font:inherit;font-size:13px;outline:none;box-sizing:border-box';
+  const tab = (on) => 'flex:1;padding:8px 10px;border-radius:8px;border:1px solid ' + (on ? 'var(--gold,#D4B65C)' : 'var(--border)') +
+    ';background:' + (on ? 'rgba(212,182,92,0.13)' : 'transparent') + ';color:' + (on ? 'var(--gold,#D4B65C)' : 'var(--text-sub,#aaa)') +
+    ';font:inherit;font-size:12.5px;font-weight:700;cursor:pointer';
+
+  const wrap = document.createElement('div');
+  wrap.id = 'pl-modal';
+  wrap.innerHTML = `
+    <div id="pl-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10300" onclick="_closePaymentLinkModal()"></div>
+    <div id="pl-modal-card" role="dialog" aria-modal="true" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 32px);overflow:auto;background:var(--surface,#16161a);border:1px solid var(--border);border-radius:14px;z-index:10301;padding:20px;color:var(--text)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px">
+        <div>
+          <div style="font-size:17px;font-weight:800">Payment link</div>
+          <div style="font-size:12px;color:var(--text-mute);margin-top:3px">${escapeHTML(parent.name || 'Parent')} · ${escapeHTML(parent.phone || '-')} · ${escapeHTML(parent.email || '-')}</div>
+        </div>
+        <button onclick="_closePaymentLinkModal()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;line-height:1;padding:0 6px">×</button>
+      </div>
+
+      <!-- Just the link -->
+      <div style="${lbl}">The link</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-bottom:18px">
+        <input id="pl-url" readonly value="${escapeHTML(url)}" style="${fld};flex:1 1 220px;width:auto;font-family:'DM Mono','JetBrains Mono',ui-monospace,monospace;font-size:12px">
+        <button onclick="_plCopyUrl()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit;font-weight:700;font-size:12.5px;flex:0 0 auto">Copy</button>
+        <a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;font-weight:700;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;flex:0 0 auto">Open ↗</a>
+      </div>
+
+      <!-- Or send it with a message -->
+      <div style="${lbl}">Send it with a message</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button id="pl-tab-sms"   onclick="_plChannel('sms')"   style="${tab(_PL.channel === 'sms')}">Text</button>
+        <button id="pl-tab-email" onclick="_plChannel('email')" style="${tab(_PL.channel === 'email')}">Email</button>
+      </div>
+
+      <div id="pl-subject-row" style="margin-bottom:8px;display:${_PL.channel === 'email' ? 'block' : 'none'}">
+        <input id="pl-email-subject" value="${escapeHTML(subject)}" placeholder="Subject" style="${fld}">
+      </div>
+
+      <textarea id="pl-body" rows="4" placeholder="Type your message..." style="${fld};resize:vertical;line-height:1.5">${escapeHTML(body)}</textarea>
+
+      <!-- The link is always appended to the bottom of the message -->
+      <div style="display:flex;align-items:center;gap:8px;background:var(--bg,#0e0e11);border:1px dashed var(--border);border-top:none;border-radius:0 0 8px 8px;padding:8px 11px;margin-top:-5px;margin-bottom:12px">
+        <span style="font-size:11px;font-weight:700;color:var(--gold,#D4B65C);flex:0 0 auto">Link added below</span>
+        <span style="font-size:11px;color:var(--text-mute);font-family:'DM Mono',ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${escapeHTML(url)}</span>
+      </div>
+
+      <button id="pl-send-btn" onclick="_plSend()" style="width:100%;padding:11px 12px;border-radius:8px;font:inherit;font-weight:800;font-size:13.5px;border:1px solid var(--border);margin-bottom:12px">Send</button>
+
+      ${reasons.length ? `<div style="background:rgba(154,59,47,0.08);border:1px solid rgba(154,59,47,0.4);border-radius:8px;padding:10px 12px;margin-bottom:12px"><div style="font-size:12px;color:#c47a6a;font-weight:700;margin-bottom:4px">Why a send button is off</div><div style="font-size:12px;color:var(--text-mute);line-height:1.5">${reasons.map(r => '• ' + escapeHTML(r)).join('<br>')}</div></div>` : ''}
+
+      <div id="pl-status" style="font-size:13px;min-height:18px"></div>
+    </div>`;
+  document.body.appendChild(wrap);
+  _plPaintSendBtn();
+
+  // Esc closes.
+  _PL.onKey = (e) => { if (e.key === 'Escape') _closePaymentLinkModal(); };
+  document.addEventListener('keydown', _PL.onKey);
+
+  // Native share sheet (app builds with the Share plugin).
   setTimeout(() => {
     try {
       const Cap = window.Capacitor;
@@ -50019,84 +50112,85 @@ function _openPaymentLinkModal(memberId, data) {
       b.type = 'button';
       b.className = 'pl-nat-share';
       b.textContent = 'Share link...';
-      b.style.cssText = 'margin-top:10px;width:100%;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;padding:10px;font:inherit;font-size:13px;font-weight:700;color:var(--text);cursor:pointer';
+      b.style.cssText = 'margin-top:10px;width:100%;background:var(--surface);border:1px solid var(--border-med,var(--border));border-radius:8px;padding:10px;font:inherit;font-size:13px;font-weight:700;color:var(--text);cursor:pointer';
       b.onclick = () => { try { Cap.Plugins.Share.share({ title: 'Payment link', url: url }); } catch (_) {} };
       card.appendChild(b);
     } catch (_) {}
   }, 120);
-  const sms       = suggested.sms_text       || `Update your card: ${url}`;
-  const emailSub  = suggested.email_subject  || 'Update your card on file';
-  const emailHtml = suggested.email_html     || `<p>Update your card: <a href="${url}">${url}</a></p>`;
-
-  // Precondition logic - drives which buttons are enabled. Per-channel send
-  // readiness comes from the backend (Twilio/Resend OR GHL). Fall back to the
-  // legacy GHL flag if an older response shape has no messaging block.
-  const hasPhone = !!parent.phone;
-  const hasEmail = !!parent.email;
-  const smsReady   = messaging ? !!messaging.sms_ready   : !!ghl.ready;
-  const emailReady = messaging ? !!messaging.email_ready : !!ghl.ready;
-
-  // Status pills (small reasons line so staff sees WHY a button might be off)
-  const reasons = [];
-  if (!hasPhone) reasons.push('No parent phone on file.');
-  else if (!smsReady) reasons.push('SMS is not set up for this academy yet.');
-  if (!hasEmail) reasons.push('No parent email on file.');
-  else if (!emailReady) reasons.push('Email is not set up for this academy yet.');
-
-  const wrap = document.createElement('div');
-  wrap.id = 'pl-modal';
-  wrap.innerHTML = `
-    <div id="pl-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:80" onclick="_closePaymentLinkModal()"></div>
-    <div id="pl-modal-card" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:540px;max-width:calc(100vw - 28px);max-height:calc(100vh - 28px);overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;z-index:81;padding:22px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px">
-        <div>
-          <div style="font-size:18px;font-weight:700">Payment link</div>
-          <div style="font-size:12px;color:var(--text-mute);margin-top:3px">${escapeHTML(parent.name || 'Parent')} · ${escapeHTML(parent.phone || '-')} · ${escapeHTML(parent.email || '-')}</div>
-        </div>
-        <button onclick="_closePaymentLinkModal()" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;line-height:1;padding:0 6px">×</button>
-      </div>
-
-      <!-- URL row + copy button -->
-      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Stripe portal URL</div>
-      <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:18px">
-        <input id="pl-url" readonly value="${escapeHTML(url)}" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;outline:none">
-        <button onclick="_plCopyUrl()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:4px;cursor:pointer;font-weight:600;font-size:13px">Copy</button>
-        <a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:4px;cursor:pointer;font-weight:600;font-size:13px;text-decoration:none;display:inline-flex;align-items:center">Open ↗</a>
-      </div>
-
-      <!-- SMS panel -->
-      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">SMS preview</div>
-      <textarea id="pl-sms" rows="3" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;resize:vertical;margin-bottom:8px">${escapeHTML(sms)}</textarea>
-      <button id="pl-sms-btn" onclick="_plSend('SMS','${memberId}')" ${(!smsReady || !hasPhone) ? 'disabled' : ''} style="width:100%;background:${(smsReady && hasPhone) ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${(smsReady && hasPhone) ? '#0B0B0D' : 'var(--text-mute)'};border:1px solid var(--border);padding:10px 12px;font-weight:700;border-radius:4px;cursor:${(smsReady && hasPhone) ? 'pointer' : 'not-allowed'};font-size:13px;font-family:inherit;margin-bottom:18px">Send SMS</button>
-
-      <!-- Email panel -->
-      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Email preview</div>
-      <input id="pl-email-subject" value="${escapeHTML(emailSub)}" placeholder="Subject" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;margin-bottom:6px">
-      <textarea id="pl-email-body" rows="3" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;resize:vertical;margin-bottom:8px">${escapeHTML(sms)}</textarea>
-      <button id="pl-email-btn" onclick="_plSend('Email','${memberId}')" ${(!emailReady || !hasEmail) ? 'disabled' : ''} style="width:100%;background:transparent;color:${(emailReady && hasEmail) ? 'var(--text)' : 'var(--text-mute)'};border:1px solid var(--border);padding:10px 12px;font-weight:700;border-radius:4px;cursor:${(emailReady && hasEmail) ? 'pointer' : 'not-allowed'};font-size:13px;font-family:inherit;margin-bottom:14px">Send Email</button>
-
-      ${reasons.length ? `<div style="background:rgba(154,59,47,0.08);border:1px solid rgba(154,59,47,0.4);border-radius:6px;padding:10px 12px;margin-bottom:14px"><div style="font-size:12px;color:#c47a6a;font-weight:600;margin-bottom:4px">Why some buttons are off</div><div style="font-size:12px;color:var(--text-mute);line-height:1.5">${reasons.map(r => '• ' + escapeHTML(r)).join('<br>')}</div></div>` : ''}
-
-      <div id="pl-status" style="font-size:13px;min-height:18px"></div>
-    </div>
-  `;
-  host.appendChild(wrap);
 }
 
 function _closePaymentLinkModal() {
+  try { if (_PL && _PL.onKey) document.removeEventListener('keydown', _PL.onKey); } catch (_) {}
+  if (_PL) _PL.onKey = null;
   const m = document.getElementById('pl-modal');
   if (m) m.remove();
+}
+
+// Switch between the text and email composer (same body, email adds a subject).
+function _plChannel(ch) {
+  _PL.channel = (ch === 'email') ? 'email' : 'sms';
+  const on  = 'var(--gold,#D4B65C)';
+  const set = (el, active) => {
+    if (!el) return;
+    el.style.borderColor = active ? on : 'var(--border)';
+    el.style.background  = active ? 'rgba(212,182,92,0.13)' : 'transparent';
+    el.style.color       = active ? on : 'var(--text-sub,#aaa)';
+  };
+  set(document.getElementById('pl-tab-sms'),   _PL.channel === 'sms');
+  set(document.getElementById('pl-tab-email'), _PL.channel === 'email');
+  const row = document.getElementById('pl-subject-row');
+  if (row) row.style.display = _PL.channel === 'email' ? 'block' : 'none';
+  _plStatus('');
+  _plPaintSendBtn();
+}
+
+// Send button reflects the active channel's readiness.
+function _plPaintSendBtn() {
+  const btn = document.getElementById('pl-send-btn');
+  if (!btn) return;
+  const isSms = _PL.channel === 'sms';
+  const ready = isSms ? _PL.smsReady : _PL.emailReady;
+  btn.disabled = !ready;
+  btn.textContent = isSms
+    ? 'Send text to ' + ((_PL.parent && _PL.parent.name) ? String(_PL.parent.name).split(/\s+/)[0] : 'parent')
+    : 'Send email to ' + ((_PL.parent && _PL.parent.name) ? String(_PL.parent.name).split(/\s+/)[0] : 'parent');
+  btn.style.background = ready ? 'var(--gold,#D4B65C)' : 'var(--border)';
+  btn.style.color      = ready ? '#0B0B0D' : 'var(--text-mute)';
+  btn.style.cursor     = ready ? 'pointer' : 'not-allowed';
+}
+
+// What actually gets sent: the typed message with the link on its own line at
+// the bottom (unless the staff already pasted it into the body).
+function _plComposed() {
+  const ta = document.getElementById('pl-body');
+  const body = (ta ? ta.value : '').trim();
+  const url = _PL.url || '';
+  if (!url) return body;
+  if (body.includes(url)) return body;
+  return body ? body + '\n\n' + url : url;
+}
+
+function _plComposedHtml() {
+  const ta = document.getElementById('pl-body');
+  const body = (ta ? ta.value : '').trim();
+  const url = _PL.url || '';
+  const paras = body
+    ? body.split(/\n{2,}/).map(p => '<p>' + escapeHTML(p).replace(/\n/g, '<br>') + '</p>').join('')
+    : '';
+  if (!url || body.includes(url)) return paras;
+  return paras + `<p><a href="${escapeHTML(url)}">${escapeHTML(url)}</a></p>`;
 }
 
 function _plCopyUrl() {
   const input = document.getElementById('pl-url');
   if (!input) return;
-  input.select();
+  const val = input.value;
+  try { input.select(); } catch (_) {}
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(input.value).then(() => _plStatus('Copied to clipboard.', 'ok'));
+    navigator.clipboard.writeText(val).then(() => _plStatus('Link copied to clipboard.', 'ok')).catch(() => _plStatus('Copy failed - select the link and copy it.', 'err'));
   } else {
-    document.execCommand('copy');
-    _plStatus('Copied.', 'ok');
+    try { document.execCommand('copy'); _plStatus('Link copied.', 'ok'); }
+    catch (_) { _plStatus('Copy failed - select the link and copy it.', 'err'); }
   }
 }
 
@@ -50105,25 +50199,35 @@ function _plStatus(msg, kind) {
   if (!el) return;
   const color = kind === 'err' ? '#c47a6a' : (kind === 'ok' ? '#7eb98c' : 'var(--text-mute)');
   el.style.color = color;
-  el.textContent = msg;
+  el.textContent = msg || '';
 }
 
-async function _plSend(type, memberId) {
+async function _plSend() {
+  const memberId = _PL.memberId;
+  const isSms = _PL.channel === 'sms';
+  const type = isSms ? 'SMS' : 'Email';
   if (!_sendGuard('plSend-' + type + '-' + memberId)) return;
   if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) {
-    _plStatus('No client_id in scope - refresh and try again.', 'err'); return;
+    _plStatus('No academy in scope - refresh and try again.', 'err'); return;
   }
-  const parentRow = _MEMBERS_ALL.find(m => m.id === memberId) || {};
-  const isSms = type === 'SMS';
-  const message = (isSms
-    ? document.getElementById('pl-sms')
-    : document.getElementById('pl-email-body')).value.trim();
-  const subject = isSms ? null : document.getElementById('pl-email-subject').value.trim();
-  if (!message) { _plStatus('Message body is empty.', 'err'); return; }
+  if (isSms ? !_PL.smsReady : !_PL.emailReady) return;
+
+  const message = _plComposed();
+  const subjEl  = document.getElementById('pl-email-subject');
+  const subject = isSms ? null : (subjEl ? subjEl.value.trim() : '');
+  if (!message) { _plStatus('Message is empty.', 'err'); return; }
   if (!isSms && !subject) { _plStatus('Email needs a subject.', 'err'); return; }
 
-  _plStatus(`Sending ${type}…`);
-  const btn = document.getElementById(isSms ? 'pl-sms-btn' : 'pl-email-btn');
+  // Parent contact details come from the payment-link response (captured when
+  // the modal opened) - the roster array may not be loaded on every surface.
+  const roster = (typeof _MEMBERS_ALL !== 'undefined' && Array.isArray(_MEMBERS_ALL))
+    ? (_MEMBERS_ALL.find(m => m.id === memberId) || {}) : {};
+  const phone = _PL.parent.phone || roster.parent_phone || null;
+  const email = _PL.parent.email || roster.parent_email || null;
+  const name  = _PL.parent.name  || roster.parent_name  || null;
+
+  _plStatus('Sending ' + (isSms ? 'text' : 'email') + '...');
+  const btn = document.getElementById('pl-send-btn');
   if (btn) btn.disabled = true;
 
   try {
@@ -50133,17 +50237,18 @@ async function _plSend(type, memberId) {
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_id:     CLIENT_ID,
-        contact_phone: parentRow.parent_phone || null,
-        contact_email: parentRow.parent_email || null,
-        contact_name:  parentRow.parent_name  || null,
+        contact_phone: phone,
+        contact_email: email,
+        contact_name:  name,
         type,
         message,
         subject: subject || undefined,
+        html: isSms ? undefined : _plComposedHtml(),
       }),
     });
     const json = await _safeJson(res);
-    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status) + (json.hint ? ' - ' + json.hint : ''));
-    _plStatus(`✓ ${type} sent to ${parentRow.parent_name || 'parent'}.`, 'ok');
+    if (!res.ok) throw new Error((json.error || ('HTTP ' + res.status)) + (json.hint ? ' - ' + json.hint : ''));
+    _plStatus('Sent to ' + (name || 'parent') + '.', 'ok');
   } catch (e) {
     _plStatus('Failed: ' + e.message, 'err');
     if (btn) btn.disabled = false;
