@@ -346,6 +346,11 @@ async function handler(req, res) {
     //    connected account). Stripe is the final gate at payment. ──
     const couponCode = normCode(body.coupon_code || body.coupon);
     let promo = null, discountInfo = null, couponError = null;
+    // Build C: is the LIVE Stripe coupon actually product-restricted? The
+    // portal's applies_to list is only a declaration; Stripe enforces nothing
+    // until the code is (re)created with applies_to[products]. Read from the
+    // live object so we never trust config over what Stripe will really do.
+    let liveCouponRestricted = false;
     if (couponCode && !testMode) {
       try {
         const list = await stripeFetch(`/promotion_codes?code=${encodeURIComponent(couponCode)}&limit=1&expand[]=data.promotion.coupon`, { stripeAccount });
@@ -356,6 +361,8 @@ async function handler(req, res) {
         else if (pc.max_redemptions && (pc.times_redeemed || 0) >= pc.max_redemptions) couponError = "This code is fully redeemed";
         else {
           const cp = couponFromPromo(pc);
+          const at = cp && cp.applies_to;
+          liveCouponRestricted = !!(at && Array.isArray(at.products) && at.products.length);
           const def = cp.percent_off != null
             ? { kind: "Percent off", value: cp.percent_off }
             : { kind: "Dollar off", value: (cp.amount_off || 0) / 100 };
@@ -380,6 +387,18 @@ async function handler(req, res) {
         const def = defs.find(d => d && normCode(d.code) === couponCode);
         feeIsDiscountable = def ? couponCoversKey(def, `${planText}|signup_fee`) : true;
       } catch (_) { feeIsDiscountable = false; }
+
+      // THE ENFORCEMENT GAP. If the config says this code must NOT touch the
+      // fee, but the live Stripe coupon carries no product restriction, then
+      // Stripe will discount every line on the first invoice, the fee
+      // included, and nothing we do at the line level prevents it. Rather than
+      // charge a number the config contradicts, drop the fee from this
+      // enrollment and say so loudly. Recreating the code in the portal (which
+      // mints a restricted coupon) closes it permanently.
+      if (!feeIsDiscountable && !liveCouponRestricted) {
+        console.warn(`[signup-fee] dropped for ${planText}: code ${couponCode} is unrestricted in Stripe, so it would also discount the fee. Recreate the code with an "applies to" list.`);
+        signupFee = null;
+      }
     }
 
     // ── Idempotency: reuse an existing member + in-flight sub ──

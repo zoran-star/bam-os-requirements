@@ -150,6 +150,24 @@ Safe failures, both deliberate:
     Stripe coupons are immutable). Parents already subscribed keep the discount
     they signed up with.
 
+THE ENFORCEMENT GAP, closed 2026-07-25. The portal's applies_to list is only a
+DECLARATION: Stripe enforces nothing until the code is recreated with
+applies_to[products]. So a ticked list could pass the fee gate while the live
+coupon was still unrestricted and would happily discount the fee. Checkout now
+reads the LIVE coupon (`applies_to.products`) and, if the config says a code
+must not touch the fee while Stripe says otherwise, DROPS the fee from that
+enrollment and logs why. Under-charging is recoverable and visible; silently
+discounting a fee is neither.
+
+BAM GTA PREFILL (2026-07-25, at Zoran's request). 2SIBLING's applies_to was
+prefilled with GTA's three live routable prices (Steady|monthly, Summer
+Unlimited|monthly, Summer Unlimited|3_months). Behaviour-neutral: those three
+ARE everything GTA sells, so ticking them equals unrestricted. GTA has no
+sign-up fee, so nothing is excluded today, but the list now correctly excludes
+one if it is ever added. NOTE: the live Stripe coupon is untouched and still
+unrestricted; recreating the code from the portal is what makes Stripe enforce
+the list, and until then the fee stays off for GTA by the guard above.
+
 RISK 4 GATE NARROWED. The sign-up fee is no longer blocked by "this academy has
 codes". It is blocked only by an UNRESTRICTED code, which would still discount
 every first-invoice line including the fee. A code that declares its
