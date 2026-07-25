@@ -43,7 +43,7 @@ PER PRICE (offering / commitment)
 
 PER OFFERING (one-time)
   sign-up fee         { amount (pre-tax), taxable?: yes/no, per: athlete }
-  on commitments      waived by default, per-commitment "charge it too" toggle
+  on options          explicit charge/waive choice per option, owner-set, nothing assumed
 
 PER COUPON
   applies to          checklist: each sellable price + each fee, individually
@@ -56,7 +56,8 @@ it through the pricing fact, which keeps quoting only what checkout charges.
 ## Build T: templatize tax
 
 - `clients.tax_config` (or equivalent): label + percent, set once in the
-  Blueprint. Empty = no tax, which is most US academies.
+  Blueprint, for ANY academy and ANY sales tax (HST, a US state sales tax,
+  anything with a name and a rate). Empty = no tax.
 - Prices and commitments get `taxable: yes/no` (default yes when a template
   exists) instead of free-text `added_fees` strings.
 - `_fees.js` stays THE one place money math lives; it reads the template instead
@@ -75,10 +76,11 @@ it through the pricing fact, which keeps quoting only what checkout charges.
   semantics stated in the hint. Per athlete is exact-fit for checkout: one
   enrollment = one athlete, so two siblings = two checkouts = two fees, no
   special casing.
-- Commitments: WAIVED BY DEFAULT, per-commitment toggle to charge it too.
-  Recommendation (accepted direction): the fee attaches to the enrollment event,
-  and commitments are the incentive to skip it - San Jose's exact model, and the
-  only real-world example we have.
+- Charge or waive is an EXPLICIT owner choice on every option (Zoran 2026-07-24:
+  "not by default, i want to set it"). Nothing is assumed: an option with no
+  choice made charges nothing extra, so a legacy or half-configured offer can
+  never surprise a parent. Waiving on commitments (San Jose's model) is the
+  classic nudge toward the longer term, but it is the owner's call per option.
 - Charged as an `add_invoice_items` one-time line on the FIRST invoice - the
   exact mechanism checkout already uses for future-start billing. Never on
   renewals. Carries its own Stripe product so Build C can target it.
@@ -96,12 +98,15 @@ it through the pricing fact, which keeps quoting only what checkout charges.
 
 ## Build C: coupon applicability
 
-- Each discount code gets an applies-to checklist: every sellable price
+- Discount codes are the ACADEMY OWNER'S, not BAM's. Each code the owner creates gets an applies-to checklist: every sellable price
   (Steady monthly, Summer Unlimited monthly, SU 3-months, ...) plus each fee
   (sign-up fee), individually checkable.
-- Stripe mechanics: coupons target products (`applies_to[products]`); every
-  offer_price already has a Stripe product and the fee line gets its own, so
-  the checklist maps 1:1 onto what Stripe can enforce. No invoice surgery.
+- Stripe mechanics: coupons target products (`applies_to[products]`), and the fee
+  line gets its own product so it can be targeted or skipped. CAVEAT (verified
+  2026-07-24): prices can SHARE a product - DETAIL Miami has 9 active prices on 6
+  products - so per-price checkboxes are only enforceable where products are
+  distinct. Where they are shared, the checklist groups those prices as one line
+  (honest UI), or the build splits products at migration. GTA is 1:1 today.
 - Migration: GTA's 2SIBLING (50% off, every payment) maps to "applies to all
   current prices", which is byte-identical to its behaviour today.
 - The agent's discount line then renders what the code actually covers, so
@@ -116,6 +121,24 @@ it through the pricing fact, which keeps quoting only what checkout charges.
 4. Coupon editor: the applies-to checklist.
 5. Agent pricing fact: rendered output for a San Jose-shaped academy with the
    $40 configured.
+
+## Risk register (scanned 2026-07-24)
+
+| # | Risk | Level | Answer |
+|---|---|---|---|
+| 1 | Prices SHARE Stripe products (Miami: 9 prices, 6 products), so per-price coupon checkboxes cannot always be enforced per price | HIGH | Checklist groups shared-product prices into one honest line, or migration splits products. Verify product uniqueness per academy before enabling C there. GTA is 1:1. |
+| 2 | Stripe coupons are immutable: editing an applies-to list means a NEW coupon + re-pointing the promotion code, without touching subscriptions already carrying the old coupon (live 2SIBLING families) | HIGH | Build C treats applicability edits as create-new + swap-code; active subscription discounts are attached objects and stay untouched. Test with a live-sub clone first. |
+| 3 | Tax rate change mid-life: editing the template does NOT change existing Stripe prices, so renewals keep billing old amounts while the template claims otherwise - the typed-vs-charged gap reborn | HIGH | A template edit for an academy with live prices triggers an explicit re-price flow (new rows, old archived), never a silent recompute. Until re-priced, surfaces keep reading the catalog, which stays the truth. |
+| 4 | Fee enabled while owner coupons exist, before Build C ships: sub-level codes silently discount the fee | MED | Hard gate: no fee is enabled for an academy with active discount codes until C is live for them. |
+| 5 | Enroll card UI lives in bam-client-sites (separate repo): the API can expose a fee the site does not render, so the parent first meets it at the pay summary | MED | Per-academy enable checklist includes the site deploy. Fee invisible on the card = fee not enabled. |
+| 6 | GTA migration mis-flags a price (taxable yes/no wrong) and a computed all-in drifts from the catalog | MED | Migration changes compute paths only; offer_prices amounts do not move. A drift check compares computed vs catalog per price and blocks enabling on mismatch. |
+| 7 | Returning member re-enrolls: fee again or not? Undecided, and the agent will be asked | MED | Business decision needed before any academy enables a fee. Until decided, the agent's fact says the fee applies at enrollment and nothing about returns. |
+| 8 | Refund-window cancellation: is the fee refundable? Policy section and fee line could disagree | MED | Decide with #7; render the answer into the policies fact so agent and PDF agree. |
+| 9 | Fee line + future-start anchored billing + coupon all on one first invoice (three interacting mechanisms) | MED | Test-mode matrix before enabling anywhere: fee x {immediate, future-start} x {no code, percent code, amount code}. |
+| 10 | An academy needs TWO tax rates (GST+PST split, tax-exempt programs) | LOW | One-rate template is v1 scope by design. Flag when a real academy needs more; do not pre-build. |
+| 11 | Checkout retry double-charges the fee | LOW | Subscription creation is idempotency-keyed and the fee rides that same call. Covered by the #9 matrix. |
+| 12 | DETAIL Miami: agent fact reads only the FIRST training offer, so a fee on another offer is invisible to the agent | LOW | Already an open item; becomes part of the multi-offer fact build, not this one. |
+| 13 | Wizard complexity creep: explicit per-option choices add clicks for non-technical owners | LOW | Unset = charges nothing, ever. The wizard nags visually but never assumes a charge. |
 
 ## Ground rules carried over
 
