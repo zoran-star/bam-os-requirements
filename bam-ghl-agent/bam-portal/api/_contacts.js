@@ -25,6 +25,34 @@ function clean(fields) {
   return out;
 }
 
+// Last 10 digits of a phone, or "" - the shape contacts.phone10 (a generated
+// column) holds, so a lookup matches regardless of how the source formatted the
+// number. contacts.phone itself is stored in whatever shape its source used:
+// E.164 from the GHL sync ("+16044424595"), bare digits from a website form
+// ("6044424595"), human-formatted from a typed field ("(604) 442-4595"). Exact
+// string compares across those shapes silently miss and mint duplicate people.
+// Only a FULL 10 digits counts - a partial number is not identity.
+export function phone10(raw) {
+  const d = String(raw || "").replace(/\D/g, "");
+  return d.length >= 10 ? d.slice(-10) : "";
+}
+
+const nameKey = (raw) => String(raw || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+// Identity fields a weaker (phone) match must not overwrite - it may be a second
+// person on the same household number, and their name/email/athlete is not a
+// correction of the record already there. Everything else (custom fields, first/
+// last, stripe ids) still merges normally: those are additive detail, not identity.
+const IDENTITY = ["name", "email", "phone", "athlete_name"];
+function fillBlanks(fields, row) {
+  const out = { ...fields };
+  for (const k of IDENTITY) {
+    const have = row && row[k];
+    if (have != null && String(have).trim() !== "") delete out[k];
+  }
+  return out;
+}
+
 async function post(path, body, prefer) {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     method: "POST",
@@ -73,8 +101,8 @@ async function withAthleteName(clientId, fields) {
 }
 
 // PORTAL-NATIVE contact creation (Stage 4 of contacts-off-GHL). Finds the person
-// in the portal store by email (preferred) or phone; if found, merge-updates the
-// row (never clobbering good data) and returns its ghl_contact_id - which for a
+// in the portal store by email (preferred) or normalized phone; if found,
+// merge-updates the row (never clobbering good data) and returns its ghl_contact_id - which for a
 // legacy contact is the real GHL id, keeping every historical join intact. If not
 // found, MINTS a new contact: a fresh uuid used as BOTH contacts.id and
 // contacts.ghl_contact_id, so the minted id flows through the system-wide join key
@@ -87,24 +115,43 @@ export async function resolveOrMintPortalContact(clientId, fields = {}) {
     fields = await withAthleteName(clientId, fields);
     const email = (fields.email || "").trim().toLowerCase() || null;
     const phone = (fields.phone || "").trim() || null;
-    if (!email && !phone) return null;
+    const p10 = phone10(phone);
+    if (!email && !p10) return null;
 
     // 1. Find an existing person (email beats phone - phones get shared).
+    const SELECT = "id,ghl_contact_id,tags,name,email,phone,athlete_name";
     let row = null;
+    let viaPhone = false;
     if (email) {
-      const r = await get(`contacts?client_id=eq.${encodeURIComponent(clientId)}&email=eq.${encodeURIComponent(email)}&select=id,ghl_contact_id,tags&limit=1`);
+      const r = await get(`contacts?client_id=eq.${encodeURIComponent(clientId)}&email=eq.${encodeURIComponent(email)}&select=${SELECT}&limit=1`);
       row = (Array.isArray(r) && r[0]) || null;
     }
-    if (!row && phone) {
-      const r = await get(`contacts?client_id=eq.${encodeURIComponent(clientId)}&phone=eq.${encodeURIComponent(phone)}&select=id,ghl_contact_id,tags&limit=1`);
-      row = (Array.isArray(r) && r[0]) || null;
+    if (!row && p10) {
+      // Match on the normalized phone, not the raw string (see phone10 above).
+      // A phone is a HOUSEHOLD, not a person: mum and dad share it, so do two
+      // siblings. Accept the match unless both sides name an athlete and they
+      // DISAGREE - that is the one shape where merging would fuse two different
+      // kids' records. Same rule the reconcile sweep uses for dup contacts.
+      const r = await get(`contacts?client_id=eq.${encodeURIComponent(clientId)}&phone10=eq.${encodeURIComponent(p10)}&select=${SELECT}&order=date_added.asc.nullslast&limit=10`);
+      const mine = nameKey(fields.athlete_name);
+      const hit = (Array.isArray(r) ? r : []).find((c) => {
+        const theirs = nameKey(c.athlete_name);
+        return !mine || !theirs || mine === theirs;
+      });
+      if (hit) { row = hit; viaPhone = true; }
     }
 
     const { tags, ...rest } = fields;
     if (row) {
       // Merge-update: clean() drops empties so sparse forms never null a name;
       // tags union case-insensitively with what the contact already has.
-      const patchBody = { ...clean({ ...rest, email }), updated_at: new Date().toISOString() };
+      // A PHONE match is the weaker signal - it says "same household", not
+      // "same person" - so it only ever FILLS BLANKS. Without that, the second
+      // parent to enrol would rename the contact and overwrite the email of the
+      // one who has been in the thread all along (Gbolonyo: Ama's checkout would
+      // have relabelled Mawumefa's record mid-conversation).
+      const merged = viaPhone ? fillBlanks({ ...rest, email }, row) : { ...rest, email };
+      const patchBody = { ...clean(merged), updated_at: new Date().toISOString() };
       const have = Array.isArray(row.tags) ? row.tags.map(String) : [];
       const hset = new Set(have.map((t) => t.toLowerCase()));
       const add = (Array.isArray(tags) ? tags : []).map((t) => String(t || "").trim()).filter((t) => t && !hset.has(t.toLowerCase()));

@@ -79,23 +79,33 @@ export async function reconcileLiveMembers(clientId) {
     const opps = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&status=eq.open&stage_role=in.(${roleList})&select=id,ghl_contact_id,contact_id,contact_phone,athlete_name`);
     if (!Array.isArray(opps) || !opps.length) return { ok: true, scanned: live.length, closed: [] };
 
-    // Backfill opp emails from their portal contact (dup-contact match uses phone+athlete,
-    // but email is a strong 1:1 signal when present). One batched read, fail-soft.
+    // Backfill opp emails AND athlete names from their portal contact. Email is a
+    // strong 1:1 signal when present; the athlete name is what makes the phone match
+    // safe, and most opps carry it only on the CONTACT, not on the opp row itself
+    // (Gbolonyo Jul 24: 5 of GTA's 7 open agent-stage opps had a null opp
+    // athlete_name with the name sitting right there on the linked contact, so the
+    // phone+athlete arm never fired and a signed-up parent kept her closing plan).
+    // One batched read, fail-soft.
     const cids = [...new Set(opps.map(o => o.contact_id).filter(Boolean))];
     const emailByCid = new Map();
+    const athleteByCid = new Map();
     if (cids.length) {
       try {
         const inList = cids.map(id => `"${id}"`).join(",");
-        const crows = await sb(`contacts?client_id=eq.${encodeURIComponent(clientId)}&id=in.(${inList})&select=id,email`);
-        for (const c of (Array.isArray(crows) ? crows : [])) { const em = emailNorm(c.email); if (em) emailByCid.set(String(c.id), em); }
-      } catch (_) { /* email match is a bonus - never block the sweep on it */ }
+        const crows = await sb(`contacts?client_id=eq.${encodeURIComponent(clientId)}&id=in.(${inList})&select=id,email,athlete_name`);
+        for (const c of (Array.isArray(crows) ? crows : [])) {
+          const em = emailNorm(c.email); if (em) emailByCid.set(String(c.id), em);
+          const an = nameNorm(c.athlete_name); if (an) athleteByCid.set(String(c.id), an);
+        }
+      } catch (_) { /* contact backfill is a bonus - never block the sweep on it */ }
     }
 
     const isMemberOpp = (o) => {
       if (o.ghl_contact_id && memGcid.has(String(o.ghl_contact_id))) return "contact_id";
       if (o.contact_id && memCid.has(String(o.contact_id))) return "portal_contact";
       const em = emailByCid.get(String(o.contact_id)); if (em && memEmail.has(em)) return "email";
-      const ph = phone10(o.contact_phone), an = nameNorm(o.athlete_name);
+      const ph = phone10(o.contact_phone);
+      const an = nameNorm(o.athlete_name) || athleteByCid.get(String(o.contact_id)) || "";
       if (ph && an && memPhoneAthlete.get(ph)?.has(an)) return "phone+athlete";
       return null;
     };
