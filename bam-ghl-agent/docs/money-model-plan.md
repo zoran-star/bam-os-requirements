@@ -98,9 +98,11 @@ it through the pricing fact, which keeps quoting only what checkout charges.
 
 ## Build C: coupon applicability
 
-- Discount codes are the ACADEMY OWNER'S, not BAM's. Each code the owner creates gets an applies-to checklist: every sellable price
-  (Steady monthly, Summer Unlimited monthly, SU 3-months, ...) plus each fee
-  (sign-up fee), individually checkable.
+- Discount codes are the ACADEMY OWNER'S, not BAM's. Each code the owner creates
+  gets an applies-to checklist scoped to LIVE prices only (Zoran 2026-07-24):
+  rows that are active + routable in the portal AND live in Stripe. Archived,
+  inactive, or unroutable prices never appear on the checklist, so a code can
+  never be attached to something that cannot be sold.
 - Stripe mechanics: coupons target products (`applies_to[products]`), and the fee
   line gets its own product so it can be targeted or skipped. CAVEAT (verified
   2026-07-24): prices can SHARE a product - DETAIL Miami has 9 active prices on 6
@@ -124,16 +126,20 @@ it through the pricing fact, which keeps quoting only what checkout charges.
 
 ## Risk register (scanned 2026-07-24)
 
+Zoran reviewed 2026-07-24: mitigations 2-6 approved as written; #1 accepted with
+the live-prices-only scoping; #7 and #8 decided (see rows); #9's test matrix
+explained and pending his sign-off.
+
 | # | Risk | Level | Answer |
 |---|---|---|---|
-| 1 | Prices SHARE Stripe products (Miami: 9 prices, 6 products), so per-price coupon checkboxes cannot always be enforced per price | HIGH | Checklist groups shared-product prices into one honest line, or migration splits products. Verify product uniqueness per academy before enabling C there. GTA is 1:1. |
+| 1 | Prices SHARE Stripe products (Miami: 9 prices, 6 products), so per-price coupon checkboxes cannot always be enforced per price | HIGH | ACCEPTED + scoped (Zoran 2026-07-24): the checklist lists LIVE prices only (active + routable + live in Stripe); shared-product prices within that set are grouped into one honest line, or migration splits products. Verify product uniqueness per academy before enabling C there. GTA is 1:1. |
 | 2 | Stripe coupons are immutable: editing an applies-to list means a NEW coupon + re-pointing the promotion code, without touching subscriptions already carrying the old coupon (live 2SIBLING families) | HIGH | Build C treats applicability edits as create-new + swap-code; active subscription discounts are attached objects and stay untouched. Test with a live-sub clone first. |
 | 3 | Tax rate change mid-life: editing the template does NOT change existing Stripe prices, so renewals keep billing old amounts while the template claims otherwise - the typed-vs-charged gap reborn | HIGH | A template edit for an academy with live prices triggers an explicit re-price flow (new rows, old archived), never a silent recompute. Until re-priced, surfaces keep reading the catalog, which stays the truth. |
 | 4 | Fee enabled while owner coupons exist, before Build C ships: sub-level codes silently discount the fee | MED | Hard gate: no fee is enabled for an academy with active discount codes until C is live for them. |
 | 5 | Enroll card UI lives in bam-client-sites (separate repo): the API can expose a fee the site does not render, so the parent first meets it at the pay summary | MED | Per-academy enable checklist includes the site deploy. Fee invisible on the card = fee not enabled. |
 | 6 | GTA migration mis-flags a price (taxable yes/no wrong) and a computed all-in drifts from the catalog | MED | Migration changes compute paths only; offer_prices amounts do not move. A drift check compares computed vs catalog per price and blocks enabling on mismatch. |
-| 7 | Returning member re-enrolls: fee again or not? Undecided, and the agent will be asked | MED | Business decision needed before any academy enables a fee. Until decided, the agent's fact says the fee applies at enrollment and nothing about returns. |
-| 8 | Refund-window cancellation: is the fee refundable? Policy section and fee line could disagree | MED | Decide with #7; render the answer into the policies fact so agent and PDF agree. |
+| 7 | Returning member re-enrolls: fee again or not? | DECIDED | Zoran 2026-07-24: YES, the fee is charged again on re-enrollment. Every enrollment event carries the fee where configured; the agent's fact can say so plainly. |
+| 8 | Refund-window cancellation: is the fee refundable? | DECIDED | Zoran 2026-07-24: YES, the fee is refundable inside the academy's refund window, same as the plan payment. Rendered into the policies fact so agent and agreement PDF agree. |
 | 9 | Fee line + future-start anchored billing + coupon all on one first invoice (three interacting mechanisms) | MED | Test-mode matrix before enabling anywhere: fee x {immediate, future-start} x {no code, percent code, amount code}. |
 | 10 | An academy needs TWO tax rates (GST+PST split, tax-exempt programs) | LOW | One-rate template is v1 scope by design. Flag when a real academy needs more; do not pre-build. |
 | 11 | Checkout retry double-charges the fee | LOW | Subscription creation is idempotency-keyed and the fee rides that same call. Covered by the #9 matrix. |
