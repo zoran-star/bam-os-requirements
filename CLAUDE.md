@@ -20,7 +20,7 @@ Each folder has its own CLAUDE.md + memories/ that load when you `cd` in. **If Z
 | FullControl prototype (UI/features reference) | `prototype/` |
 | BAM GTA staff + parent apps | `prototype/bam-gta-phase1/` |
 | Investor pages, decks, business planning | `business/` |
-| AI sales agent prompts | `sales-conversation-agents/` |
+| AI sales agent prompt (the "brain") | `bam-ghl-agent/bam-portal/api/agent/prompt-structure.js` (behavior) + `fact-render.js` (per-academy facts). `sales-conversation-agents/` is design notes only |
 | Brand guide, shared front-end resources | `front-end/` |
 | Market research survey | `market-research/` |
 | Notion business requirements | repo root |

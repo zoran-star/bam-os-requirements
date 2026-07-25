@@ -1,5 +1,8 @@
 // SINGLE SOURCE OF TRUTH for the live sales-agent "brain" (read by api/agent-sandbox.js
-// and the GHL responder). Mirrors sales-conversation-agents/conversation-ai-booking-agent.txt.
+// and the GHL responder). THE prompt lives here and only here: the generated .txt
+// exports under sales-conversation-agents/ were deleted 2026-07-24 (they were a
+// leftover from assembling each academy's agent by hand for GoHighLevel). To read a
+// real academy's live prompt, use the brain view in either portal.
 //
 // ARCHITECTURE - facts vs behavior (so one edit propagates + every academy reuses it):
 //   • BEHAVIOR sections (layer "general") are ACADEMY-AGNOSTIC. They contain NO literal
