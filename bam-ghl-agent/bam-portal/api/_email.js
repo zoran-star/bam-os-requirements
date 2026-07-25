@@ -57,7 +57,9 @@ async function logEmailEvent({ clientId, email, providerId, type, payload }) {
 
 // Send one email through Resend. Returns { id } on success, { skipped } if the
 // recipient is suppressed, and THROWS on a Resend error (so callers can react).
-export async function sendEmail({ to, subject, html, text, from, replyTo, tags, clientId } = {}) {
+// attachments (optional): [{ filename, content }] where content is base64 -
+// passed straight through to Resend (used by the commission report mailer).
+export async function sendEmail({ to, subject, html, text, from, replyTo, tags, clientId, attachments } = {}) {
   if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY not configured");
   const recipient = normEmail(to);
   if (!recipient) throw new Error("sendEmail: 'to' is required");
@@ -77,6 +79,7 @@ export async function sendEmail({ to, subject, html, text, from, replyTo, tags, 
     ...(text ? { text } : {}),
     ...(replyTo ? { reply_to: replyTo } : {}),
     ...(Array.isArray(tags) && tags.length ? { tags } : {}),
+    ...(Array.isArray(attachments) && attachments.length ? { attachments } : {}),
   };
 
   const res = await fetch("https://api.resend.com/emails", {
