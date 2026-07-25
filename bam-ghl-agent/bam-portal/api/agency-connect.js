@@ -66,11 +66,17 @@ function getOrigin(req) {
   if (/localhost|127\.0\.0\.1/.test(origin)) return origin.replace(/\/+$/, "");
   return "https://portal.byanymeansbusiness.com";
 }
-// The FC marketplace app only allows ONE redirect URL and it's already set to
-// /api/messaging/connect — so the agency OAuth round-trips through THAT (it
-// detects the agency-signed state and hands back here). Avoids needing to add a
-// second redirect URL on a published app.
+// The old shared FC app allowed ONE redirect URL, set to /api/messaging/connect,
+// so the agency OAuth used to round-trip through THAT. Kept for backward compat
+// with any install still pointed there.
 function redirectUri(req) { return `${getOrigin(req)}/api/messaging/connect`; }
+
+// The dedicated agency app (FC2) points its redirect straight at THIS endpoint,
+// which handles its own ?code callback below. Using our own URL means the
+// GHL "Install link" works on a draft app - no marketplace publish needed - and
+// the authorize redirect matches the token-exchange redirect exactly (GHL rejects
+// any mismatch). Both must resolve to the same string, so they share this helper.
+function selfRedirectUri(req) { return `${getOrigin(req)}/api/agency-connect`; }
 
 function stateSecret() { return process.env.GHL_OAUTH_STATE_SECRET || SUPABASE_SERVICE_KEY; }
 function signState(payload) {
@@ -164,7 +170,7 @@ async function handler(req, res) {
   // 1) Kick off the agency consent.
   if (action === "start") {
     const state = signState({ k: "agency", exp: Date.now() + 15 * 60 * 1000 });
-    const params = new URLSearchParams({ client_id: agencyCreds().clientId, redirect_uri: redirectUri(req), scope: SCOPES, state });
+    const params = new URLSearchParams({ client_id: agencyCreds().clientId, redirect_uri: selfRedirectUri(req), scope: SCOPES, state });
     res.writeHead(302, { Location: `${GHL_AUTHORIZE_URL}?${params.toString()}` });
     return res.end();
   }
@@ -211,7 +217,9 @@ async function handler(req, res) {
     // hard-require it — this is a one-time owner-initiated agency install.
     if (req.query.state) { try { verifyState(req.query.state); } catch (_) { /* foreign/absent state (install-link flow) — allow */ } }
     try {
-      const tok = await exchangeCode(req.query.code, redirectUri(req));
+      // This callback lands here only when the redirect was /api/agency-connect,
+      // so the exchange must present that same URL (GHL rejects a mismatch).
+      const tok = await exchangeCode(req.query.code, selfRedirectUri(req));
       const companyId = await storeAgencyToken(tok);
       const results = await mintAll(companyId, tok.access_token);
       await alertOnMintResults(results, { scope: "all" });
