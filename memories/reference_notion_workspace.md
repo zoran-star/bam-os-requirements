@@ -73,6 +73,12 @@ Set Status "Open" plus a Priority. **Only Zoran designates CRLF - never assign i
 ## Gotcha
 
 Large pages time out over Notion MCP. Fall back to the direct API via a Node script
-(`@notionhq/client`, token in `whiteboard/.env.production`).
+(`@notionhq/client`).
+
+**Where the NOTION_TOKEN lives:** `whiteboard/.env.production` in the **main
+checkout only** (gitignored, so worktrees don't have it). The `whiteboard/` folder
+was retired 2026-07-25, but git never tracked that file so it survived the removal
+and is now the only thing left in the folder. Worth relocating somewhere less odd
+if you ever touch it.
 
 Related: [[feedback-data-vs-features]], [[project-prd-rework]]
