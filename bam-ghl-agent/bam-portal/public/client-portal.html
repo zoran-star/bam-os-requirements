@@ -26265,8 +26265,68 @@ function _bbRenderGeneralCard(panel, meta) {
          It's a system setting, not business identity. Edited at Settings >
          Time zone; still persisted to clients.time_zone via the same RPC. -->
 
+    <!-- Sales tax TEMPLATE (Build T of the money model, docs/money-model-plan.md).
+         Set once; every price/fee then flips taxable yes/no in the offer wizard.
+         tax_config is NOT in CLIENT_SELECT_COLS (same as brand_data), so the
+         values hydrate async below. -->
+    <div class="bb-field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+      <div class="bb-field-label">Sales tax</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px">
+          <input id="bb-gen-tax_label" type="text" class="bb-input" placeholder="e.g. HST, Sales tax" oninput="_bbGenTaxChanged()" />
+          <div class="bb-field-hint">What the tax is called</div>
+        </div>
+        <div style="width:110px">
+          <input id="bb-gen-tax_pct" type="number" min="0" max="40" step="0.01" class="bb-input" placeholder="0" oninput="_bbGenTaxChanged()" />
+          <div class="bb-field-hint">Rate %</div>
+        </div>
+      </div>
+      <div class="bb-field-hint" id="bb-gen-tax-note">Leave empty if you charge no sales tax. Prices are then charged exactly as entered.</div>
+    </div>
+
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
   `;
+  _bbGenHydrateTax();
+}
+
+// tax_config hydrates async (not in CLIENT_SELECT_COLS - same pattern as
+// brand_data). The preview line restates what a taxable price will charge, and
+// warns that a rate CHANGE does not move already-created Stripe prices (risk 3
+// of the money-model plan: re-price through Price Match, never silently).
+async function _bbGenHydrateTax() {
+  try {
+    const { data } = await _sb.from('clients').select('tax_config').eq('id', CLIENT_ID).maybeSingle();
+    const t = (data && data.tax_config) || null;
+    const l = document.getElementById('bb-gen-tax_label'), r = document.getElementById('bb-gen-tax_pct');
+    if (l && t && t.label) l.value = t.label;
+    if (r && t && t.pct != null) r.value = t.pct;
+    _bbGenTaxNote();
+  } catch (_) { /* leave placeholders */ }
+}
+function _bbGenTaxNote() {
+  const note = document.getElementById('bb-gen-tax-note'); if (!note) return;
+  const pct = parseFloat(document.getElementById('bb-gen-tax_pct')?.value);
+  const name = (document.getElementById('bb-gen-tax_label')?.value || '').trim();
+  if (isFinite(pct) && pct > 0) {
+    const allin = Math.round(10000 * (1 + pct / 100)) / 100;
+    note.innerHTML = 'A $100.00 taxable price charges <b>$' + allin.toFixed(2) + '</b>. New prices count as taxable unless you pick No on them. Changing the rate later does <b>not</b> change prices already created in Stripe - re-price them through your pricing setup.';
+  } else {
+    note.textContent = 'Leave empty if you charge no sales tax. Prices are then charged exactly as entered.';
+  }
+}
+let _bbGenTaxSaveTimer = null;
+function _bbGenTaxChanged() {
+  _bbGenTaxNote();
+  // Own debounce timer: _bbBasicsScheduleSave shares ONE timer, so scheduling
+  // tax through it could swallow a basics patch typed <600ms earlier.
+  if (_bbGenTaxSaveTimer) clearTimeout(_bbGenTaxSaveTimer);
+  _bbGenTaxSaveTimer = setTimeout(() => _bbSaveClientBasics(_bbGenTaxPatch()), 600);
+}
+function _bbGenTaxPatch() {
+    const pct = parseFloat(document.getElementById('bb-gen-tax_pct')?.value);
+    const label = (document.getElementById('bb-gen-tax_label')?.value || '').trim();
+    // Valid rate -> save the template; anything else -> explicit null clears it.
+    return { tax_config: (isFinite(pct) && pct > 0) ? { label, pct } : null };
 }
 
 // Common time zones (IANA value · friendly label). "" = not set.
@@ -30227,10 +30287,9 @@ const _bbStdPricing = [
       { key:'billing_cycle_other', type:'text', label:'Billing cycle - specify', required:true,
         dep:{ key:'billing_cycle', equals:'Other' },
         hint:'e.g. "every 6 weeks", "per term"' },
-      { key:'added_fees', type:'text', label:'Added fees',
-        hint:'Percentage or dollar amount on top of the pre-tax price. e.g. "+13% HST" or "$25"' },
-      { key:'added_fees_description', type:'text', label:'Added fees - description',
-        hint:'What the added fees cover (e.g. "Ontario sales tax", "admin / processing")' },
+      { key:'taxable', type:'check_one', label:'Taxable?',
+        options:['Yes','No'],
+        hint:'Uses your academy tax setting (Blueprint > General > Sales tax). With a tax set, unanswered counts as Yes; pick No for a tax-exempt price. No tax set = nothing is ever added.' },
       { key:'commitments', type:'block_builder', label:'Commitments',
         dep:{ key:'type', equals:'Membership' },
         hint:'Optional discounted longer-term commitments (e.g. 3-month, 6-month, annual) that the client can choose instead of the default billing cycle.',
@@ -30241,10 +30300,9 @@ const _bbStdPricing = [
             hint:'What\'s included for this commitment - same as the base price unless it changes (extra sessions, bonus gear, locked-in rate, etc.).' },
           { key:'price', type:'currency', label:'Price (pre-tax)', required:true,
             hint:'Headline number before added fees' },
-          { key:'added_fees', type:'text', label:'Added fees',
-            hint:'Percentage or dollar amount on top. e.g. "+13% HST" or "$25"' },
-          { key:'added_fees_description', type:'text', label:'Added fees - description',
-            hint:'What the added fees cover' },
+          { key:'taxable', type:'check_one', label:'Taxable?',
+            options:['Yes','No'],
+            hint:'Defaults to the plan\'s answer when unset. Uses your academy tax setting.' },
           { key:'discount_notes', type:'textarea', label:'Notes on the discount',
             hint:'Optional. e.g. "$20/mo off the regular monthly rate" or "Total of $750 vs $900 paid monthly"' },
           { key:'after', type:'check_one', label:'What happens after the commitment?', required:true,

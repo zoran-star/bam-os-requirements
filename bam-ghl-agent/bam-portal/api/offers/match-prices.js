@@ -1,6 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
-import { parseFee, applyFee, feeLabel } from "../_fees.js";
+import { applyFee, feeLabel, resolveFee } from "../_fees.js";
 // Reads ALL live Stripe subs/products/charges (paginated) + an AI call — the
 // default ~10s function timeout is not enough, which surfaces as "Failed to
 // fetch" on the client. Give it headroom.
@@ -254,11 +254,18 @@ function _termFromLength(s) {
 
 // Build the match TARGETS from what the academy filled out in their Offers →
 // Pricing section (data.pricing.pricing_offerings). Each Membership offering →
-// a monthly target + one per commitment, with base + all-in amounts. All-in =
-// base + the academy's own "added fees" (per offering / per commitment); no fee
-// typed = all-in equals base. Nothing is added automatically.
+// a monthly target + one per commitment, with base + all-in amounts.
+//
+// All-in = base + resolveFee (_fees.js, Build T): the academy TAX TEMPLATE
+// (clients.tax_config) with per-row taxable yes/no, falling back to the legacy
+// free-text "added fees" strings for academies with no template. Nothing is
+// added automatically for an academy with neither.
 async function buildOfferTargets(clientId) {
-  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,type,data`) || [];
+  const [offers, taxRows] = await Promise.all([
+    sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,type,data`).then(r => r || []),
+    sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=tax_config&limit=1`).catch(() => []),
+  ]);
+  const taxConfig = (Array.isArray(taxRows) && taxRows[0] && taxRows[0].tax_config) || null;
   const targets = [];
   const cents = n => Math.round(n * 100);
   for (const o of offers) {
@@ -270,7 +277,7 @@ async function buildOfferTargets(clientId) {
       if (!title) continue;
       const base = parseFloat(off.price);
       if (!isNaN(base)) {
-        const fee = parseFee(off.added_fees);
+        const fee = resolveFee({ taxConfig, taxable: off.taxable, legacyText: off.added_fees });
         targets.push({ key: `${title}|monthly`, offer_id: o.id, offering: title, term: "monthly",
           base_cents: cents(base), allin_cents: applyFee(cents(base), fee), fee_label: feeLabel(fee),
           label: `${title} · Monthly` });
@@ -279,7 +286,7 @@ async function buildOfferTargets(clientId) {
         const term = _termFromLength(c.length);
         const cb = parseFloat(c.price);
         if (term && !isNaN(cb)) {
-          const fee = parseFee(c.added_fees);
+          const fee = resolveFee({ taxConfig, taxable: c.taxable != null ? c.taxable : off.taxable, legacyText: c.added_fees });
           targets.push({ key: `${title}|${term}`, offer_id: o.id, offering: title, term,
             base_cents: cents(cb), allin_cents: applyFee(cents(cb), fee), fee_label: feeLabel(fee),
             label: `${title} · ${term.replace("_", " ")}` });
