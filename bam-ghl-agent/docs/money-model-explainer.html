@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Money model - how it works</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Nunito:wght@800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#131416; --surface:#1B1D1F; --surface-el:#232629;
+    --border:rgba(255,255,255,.08); --border-med:rgba(255,255,255,.12); --border-str:rgba(255,255,255,.16);
+    --text:#F0EDE8; --text-sub:#B9B5AE; --text-mute:#7A776F;
+    --gold:#D4B65C; --on-gold:#131416; --gold-sheen:rgba(212,182,92,.06);
+    --green:#5BBF7B; --amber:#D9A441; --red:#D96C6C; --blue:#6EA8D8;
+    --r-xs:6px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:999px;
+    --font-ui:'Plus Jakarta Sans',system-ui,sans-serif; --font-num:'Nunito',sans-serif; --font-mono:'DM Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:13px;line-height:1.55;padding:28px 18px 80px}
+  .wrap{max-width:860px;margin:0 auto}
+  h1{font-family:var(--font-num);font-weight:900;font-size:26px;margin:0 0 4px}
+  .sub{color:var(--text-mute);font-size:13px;margin:0 0 28px}
+  h2{font-size:16px;font-weight:700;margin:34px 0 10px;display:flex;align-items:center;gap:10px}
+  h2 .n{font-family:var(--font-mono);font-size:11px;color:var(--gold);border:1px solid var(--gold);border-radius:var(--r-full);padding:1px 9px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 20px;margin-bottom:14px}
+  .mono{font-family:var(--font-mono);font-size:11.5px;line-height:1.7;background:var(--bg);border:1px solid var(--border-med);border-radius:var(--r-md);padding:14px 16px;white-space:pre;overflow-x:auto;color:var(--text-sub)}
+  .mono b{color:var(--gold);font-weight:500}
+  .mono .g{color:var(--green)} .mono .b{color:var(--blue)} .mono .a{color:var(--amber)}
+  .story{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--gold);border-radius:var(--r-md);padding:13px 16px;margin-bottom:10px}
+  .story .who{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--gold);margin:0 0 3px}
+  .story p{margin:0}
+  .story .so{color:var(--text-mute);font-size:12px;margin-top:3px}
+  .story.done{border-left-color:var(--green)}
+  .story.done .who{color:var(--green)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);text-align:left;padding:6px 10px;border-bottom:1px solid var(--border-str)}
+  td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  td:first-child{font-family:var(--font-mono);font-size:11.5px;color:var(--gold);white-space:nowrap}
+  .pill{display:inline-block;font-family:var(--font-mono);font-size:10px;border-radius:var(--r-full);padding:1px 8px;border:1px solid var(--border-med);color:var(--text-mute)}
+  .pill.t1{color:var(--gold);border-color:var(--gold)}
+  .pill.t3{color:var(--blue);border-color:var(--blue)}
+  .callout{font-size:12.5px;color:var(--gold);background:var(--gold-sheen);border:1px solid rgba(212,182,92,.3);border-radius:var(--r-md);padding:11px 14px;margin:14px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>How the money model works</h1>
+  <p class="sub">Companion to money-model-plan.md and the mockups page. What gets built, who it serves, and how every piece of data connects. Infrastructure only: no academy is changed until each one is switched on deliberately.</p>
+
+  <!-- ── the one rule ── -->
+  <div class="callout"><b>The one rule everything hangs off:</b> a parent is never told a number that is not what their card gets charged. Plan prices already work this way (shipped 2026-07-24). This plan extends the same guarantee to tax, one-time fees, and discounts.</div>
+
+  <!-- ── 1 · big picture ── -->
+  <h2><span class="n">1</span>The three builds, in order</h2>
+  <div class="mono">
+<b>BUILD T · TAX TEMPLATE</b>          set once per academy: "HST, 13%" or nothing
+   |                            every price and fee just flips taxable yes/no
+   |                            retires the free-text fees box (the $40 trap)
+   v
+<b>BUILD S · SIGN-UP FEE</b>           one-time, per athlete, pre-tax + own taxable flag
+   |                            commitments waive it by default, toggle to charge
+   |                            charged once on the first invoice, never renewals
+   v
+<b>BUILD C · COUPON APPLICABILITY</b>  each code picks the prices AND fees it touches
+                                unchecked lines are never discounted</div>
+  <p style="color:var(--text-mute);font-size:12px">The order is strict. The fee's taxable flag points at T's template; building S first would create a second free-text box that T would then have to migrate. C needs the fee to exist as its own Stripe product before a coupon can target or skip it.</p>
+
+  <!-- ── 2 · data model ── -->
+  <h2><span class="n">2</span>Where each piece of data lives</h2>
+  <div class="card" style="padding:12px 14px">
+    <table>
+      <tr><th>Data</th><th>Home</th><th>Owner</th></tr>
+      <tr><td>tax template</td><td>the academy record, set once in the Blueprint</td><td><span class="pill t3">academy value</span></td></tr>
+      <tr><td>plan price</td><td>the offer's pricing step (exists today)</td><td><span class="pill t3">academy value</span></td></tr>
+      <tr><td>taxable yes/no</td><td>each price and each fee, next to its amount</td><td><span class="pill t3">academy value</span></td></tr>
+      <tr><td>sign-up fee</td><td>the offer's pricing step, per plan</td><td><span class="pill t3">academy value</span></td></tr>
+      <tr><td>fee on commitments</td><td>per-commitment toggle, default waived</td><td><span class="pill t3">academy value</span></td></tr>
+      <tr><td>coupon applies-to</td><td>each discount code's checklist</td><td><span class="pill t3">academy value</span></td></tr>
+      <tr><td>sellable prices</td><td>offer_prices, the catalog checkout charges from</td><td><span class="pill t1">system</span></td></tr>
+      <tr><td>the money math</td><td>ONE shared function every surface calls</td><td><span class="pill t1">BAM master</span></td></tr>
+      <tr><td>disclosure policy</td><td>the agent template (shipped 2026-07-24)</td><td><span class="pill t1">BAM master</span></td></tr>
+    </table>
+  </div>
+  <p style="color:var(--text-mute);font-size:12px">Plug-n-play discipline: the fields, the math, and the surfaces are master structure, identical for every academy on the free-trial sales system. Only the values differ per academy. No academy ever gets a structural fork.</p>
+
+  <!-- ── 3 · flow ── -->
+  <h2><span class="n">3</span>How the data ties together</h2>
+  <div class="mono">
+ACADEMY sets           OFFER holds              ONE money function computes
+tax template  ───────> plan $175 (taxable? no)     all-in amounts
+"none"                 fee  $40  (taxable? no)          |
+                       commitments: waived              |
+                                                        v
+                 ┌──────────────────┬───────────────────┬──────────────────┐
+                 v                  v                   v                  v
+           <span class="b">ENROLL CARD</span>        <span class="b">CHECKOUT</span>            <span class="b">STRIPE CHARGE</span>      <span class="b">AGENT FACT</span>
+           "+ $40 one-time    Due today $215      first invoice:      "starting costs
+            sign-up fee"      then $175/4wk        plan line $175      $215, then $175
+                                                   fee line  $40      every 4 weeks"
+                                                  renewals: $175
+                                                        ^
+                              COUPON checklist ─────────┘
+                              only checked lines get discounted</div>
+  <p style="color:var(--text-mute);font-size:12px">Four surfaces, one source. The enroll card, the checkout summary, the Stripe invoice, and the agent's brain all read the same fields through the same function, so they cannot disagree. Change the fee in the wizard and all four update together, the agent within about a minute.</p>
+
+  <!-- ── 4 · user stories ── -->
+  <h2><span class="n">4</span>User stories</h2>
+
+  <div class="story">
+    <p class="who">Academy owner, onboarding</p>
+    <p>As an owner in Ontario, I set "HST, 13%" once, so every taxable price I ever create charges the right total without me typing tax math again.</p>
+    <p class="so">Build T. Today "13% HST" is retyped on every plan and every commitment, as free text.</p>
+  </div>
+
+  <div class="story">
+    <p class="who">Academy owner, pricing</p>
+    <p>As an owner with a $40 sign-up fee, I want a real one-time fee field, so the fee cannot accidentally become a recurring charge.</p>
+    <p class="so">Build S. The only lookalike field today repeats on every payment: $40 typed there bills 13 times a year.</p>
+  </div>
+
+  <div class="story">
+    <p class="who">Academy owner, strategy</p>
+    <p>As an owner, I want commitments to waive the fee by default, so the fee itself nudges parents toward the 3 or 6 month option.</p>
+    <p class="so">Build S. San Jose's exact model, systemized: waived unless the owner flips a per-commitment toggle.</p>
+  </div>
+
+  <div class="story">
+    <p class="who">Parent, enrolling</p>
+    <p>As a parent, I see "due today $215, then $175 every 4 weeks" before I enter my card, so the first charge never surprises me.</p>
+    <p class="so">Builds T + S. The mis-quote gap between what was said and what was billed is the original sin this whole effort fixes.</p>
+  </div>
+
+  <div class="story">
+    <p class="who">Parent, two kids</p>
+    <p>As a parent enrolling two athletes, each enrollment carries its own fee, so the per-athlete rule needs no special handling.</p>
+    <p class="so">Confirmed per athlete. One enrollment = one athlete in checkout already, so siblings = two checkouts = two fees, automatically.</p>
+  </div>
+
+  <div class="story">
+    <p class="who">BAM, setting a coupon</p>
+    <p>As BAM, when I create a discount code I tick exactly which prices and which fees it touches, so a 50% code never silently halves a fee it was not meant to.</p>
+    <p class="so">Build C. Today a coupon hits every line on the invoice with no way to say otherwise.</p>
+  </div>
+
+  <div class="story done">
+    <p class="who">Sales agent (already live)</p>
+    <p>As the booking agent, I quote from the same fields checkout charges, so "what does it cost to start" gets the fee-inclusive answer, per my disclosure policy.</p>
+    <p class="so">The agent side shipped 2026-07-24. Builds T + S extend what flows into its pricing fact; nothing about the agent changes again.</p>
+  </div>
+
+  <div class="story">
+    <p class="who">BAM, rollout</p>
+    <p>As BAM, I switch each academy on deliberately, so shipping the infrastructure changes nobody's charges on day one.</p>
+    <p class="so">Rollout rule. GTA migrates its typed "13% HST" to the template with amounts unchanged; San Jose gets its $40 entered only when its price catalog is seeded and checked.</p>
+  </div>
+
+  <!-- ── 5 · safety ── -->
+  <h2><span class="n">5</span>What cannot go wrong by design</h2>
+  <div class="card">
+    <table>
+      <tr><th>Risk</th><th>Why it is closed</th></tr>
+      <tr><td>fee bills forever</td><td>The one-time fee is an invoice line on the first payment only, never part of the recurring price. The free-text box that made this possible retires with Build T.</td></tr>
+      <tr><td>agent says the wrong total</td><td>The agent's fact renders through the same money function as the charge. No routable price, no quote: it stays silent and flags admin.</td></tr>
+      <tr><td>coupon over-discounts</td><td>Codes only touch checked lines, enforced by Stripe itself (product targeting), not by copy.</td></tr>
+      <tr><td>academy forks the structure</td><td>Fields and math are BAM master. An academy can change its values, never the shape. Reusing the sales system in a new preset carries everything along.</td></tr>
+      <tr><td>ship day changes charges</td><td>Nothing applies until an academy is switched on. GTA's migration is amount-identical; San Jose starts from zero.</td></tr>
+    </table>
+  </div>
+
+  <p style="color:var(--text-mute);font-size:12px;margin-top:26px">Plan: docs/money-model-plan.md · Mockups: docs/money-model-mockups.html · Shipped foundation: docs/agent-pricing-transparency-plan.md</p>
+</div>
+</body>
+</html>
