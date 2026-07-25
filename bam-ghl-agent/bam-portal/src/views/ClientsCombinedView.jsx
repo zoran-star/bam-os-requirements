@@ -433,6 +433,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
 
   const tabs = [
     { id: "onboarding",   label: "Onboarding" },
+    { id: "profile",      label: "Profile" },
     { id: "overview",     label: "Overview" },
     { id: "messages",     label: "Messages" },
     { id: "setup",        label: "Setup" },
@@ -489,6 +490,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       </div>
 
       {tab === "onboarding" && <OnboardingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} setTab={setTab} />}
+      {tab === "profile" && <ClientProfileTab client={client} tokens={t} session={session} setTab={setTab} />}
       {tab === "overview" && <OverviewTab client={client} staffMap={staffMap} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "messages" && <MessagesTab client={client} tokens={t} session={session} me={me} />}
       {tab === "setup" && <SetupTab client={client} staff={staff} tokens={t} role={role} session={session} onChanged={onChanged} onBack={onBack} />}
@@ -2822,6 +2824,154 @@ function _aiIconBtn(t) {
     background: "transparent", border: `1px solid ${t.border}`, borderRadius: 7,
     width: 30, height: 30, cursor: "pointer", color: t.textMute, fontSize: 13,
   };
+}
+
+// ─── CLIENT PROFILE tab ─────────────────────────────────────────────────────
+// Mike's "Client Profile (Consolidated View)" spec (2026-07-25): one page per
+// client centralizing what the 7 onboarding calls captured, organized by call
+// topic, so nobody digs through completed action items to answer "what's this
+// client's offer structure". NOT a copy: it reads + writes the SAME
+// onboarding_calls records the call action items use (PATCH {id, call_data}),
+// and data shows here the moment it's entered on a call - done or not.
+// Topics that already have a real home in the portal link out instead of
+// duplicating storage (Offers -> client Blueprint / systems ticket snapshot;
+// funnels + ads -> Systems / Marketing tabs).
+const _PROFILE_LINKOUTS = {
+  sm_call_1: {
+    note: "Offers themselves live in the client's Business Blueprint (client portal); the systems onboarding ticket carries the full offers snapshot.",
+    actions: [{ label: "Open Systems", tab: "systems" }],
+  },
+  sm_call_2: {
+    note: "The funnel/website build is tracked on the systems ticket; ad creative and campaigns live in Marketing.",
+    actions: [{ label: "Open Systems", tab: "systems" }, { label: "Open Marketing", tab: "marketing" }],
+  },
+  sm_call_6: {
+    actions: [{ label: "Open Systems", tab: "systems" }, { label: "Open Marketing", tab: "marketing" }],
+  },
+};
+
+function ClientProfileTab({ client, tokens, session, setTab }) {
+  const t = tokens;
+  const [calls, setCalls] = useState(null);
+  const [err, setErr] = useState(null);
+  const [editKey, setEditKey] = useState(null);
+  const [edits, setEdits] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const tok = session?.access_token;
+  async function load() {
+    setErr(null);
+    try {
+      const res = await fetch(`/api/action-items?client_id=${client.id}`, { headers: { Authorization: `Bearer ${tok}` } });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      setCalls((j.items || []).filter(i => i.call_step).sort((a, b) => a.call_step - b.call_step));
+    } catch (e) { setErr(e.message); setCalls([]); }
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [client.id]);
+
+  async function save(it) {
+    if (!Object.keys(edits).length) { setEditKey(null); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/action-items`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ id: it.id, call_data: edits }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      setEditKey(null); setEdits({});
+      load();
+    } catch (e) { alert(e.message); }
+    finally { setSaving(false); }
+  }
+
+  if (err) return <div style={{ color: "#e08b7e", padding: "8px 0" }}>{err}</div>;
+  if (!calls) return <div style={{ color: t.textMute, fontSize: 13, padding: "8px 0" }}>Loading profile…</div>;
+  if (!calls.length) return <div style={{ color: t.textMute, fontSize: 13, padding: "8px 0" }}>No onboarding-call data for this academy (the 7-call sequence runs on V1.5/V2 clients).</div>;
+
+  const doneCount = calls.filter(c => c.completed_at).length;
+  const label = { fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: t.textMute, marginBottom: 3 };
+  const inputStyle = { width: "100%", padding: "9px 11px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical" };
+
+  return (
+    <div style={{ maxWidth: 780 }}>
+      <div style={{ fontSize: 12, color: t.textMute, marginBottom: 16, lineHeight: 1.5 }}>
+        Everything captured on the 7 onboarding calls, in one place - {doneCount}/7 calls done.
+        Edits here update the same record the call checklist uses. Visible to the client too (read-only, "Business Profile").
+      </div>
+      {calls.map(it => {
+        const isEditing = editKey === it.onboarding_key;
+        const fields = it.call_fields || [];
+        const data = it.call_data || {};
+        const hasData = fields.some(f => (data[f.key] || "").trim());
+        const lk = _PROFILE_LINKOUTS[it.onboarding_key];
+        const chip = it.completed_at
+          ? { text: `Call ${it.call_step} · Done`, color: t.green }
+          : it.call_locked
+            ? { text: `Call ${it.call_step} · Waiting on ${(it.call_waiting_on || "").split(":")[0] || "previous call"}`, color: t.textMute }
+            : { text: `Call ${it.call_step} · In progress`, color: t.amber };
+        return (
+          <div key={it.id} style={{ background: t.surfaceEl, border: `1px solid ${isEditing ? t.accent : t.border}`, borderRadius: 12, padding: "16px 18px", marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: t.text, flex: 1 }}>{it.profile_section || it.title}</div>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, background: `${chip.color}22`, color: chip.color, whiteSpace: "nowrap" }}>{chip.text}</span>
+              {!isEditing && (
+                <button onClick={() => { setEditKey(it.onboarding_key); setEdits({}); }}
+                  style={{ padding: "5px 12px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Edit</button>
+              )}
+            </div>
+            {lk && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12, padding: "9px 12px", background: `${t.accent}0d`, border: `1px solid ${t.accent}44`, borderRadius: 8 }}>
+                {lk.note && <div style={{ flex: "1 1 260px", fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>{lk.note}</div>}
+                {(lk.actions || []).map(a => (
+                  <button key={a.tab} onClick={() => setTab(a.tab)}
+                    style={{ padding: "5px 12px", background: "transparent", color: t.accent, border: `1px solid ${t.accent}66`, borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>{a.label} →</button>
+                ))}
+              </div>
+            )}
+            {!isEditing && !hasData && (
+              <div style={{ fontSize: 13, color: t.textMute, fontStyle: "italic" }}>
+                Nothing captured yet - filled in on {it.title}.
+              </div>
+            )}
+            {!isEditing && hasData && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px 20px" }}>
+                {fields.map(f => (
+                  <div key={f.key}>
+                    <div style={label}>{f.label}</div>
+                    <div style={{ fontSize: 13, color: (data[f.key] || "").trim() ? t.text : t.textMute, whiteSpace: "pre-wrap", lineHeight: 1.55 }}>
+                      {(data[f.key] || "").trim() || "-"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {isEditing && (
+              <div>
+                {fields.map(f => (
+                  <div key={f.key} style={{ marginBottom: 10 }}>
+                    <div style={label}>{f.label}</div>
+                    <textarea rows={2}
+                      value={edits[f.key] !== undefined ? edits[f.key] : (data[f.key] || "")}
+                      onChange={e => setEdits(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      style={inputStyle} />
+                  </div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <button onClick={() => { setEditKey(null); setEdits({}); }}
+                    style={{ padding: "7px 14px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={() => save(it)} disabled={saving}
+                    style={{ padding: "7px 14px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function ActionItemsTab({ client, tokens, session }) {

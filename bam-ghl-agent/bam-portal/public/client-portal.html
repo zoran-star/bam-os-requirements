@@ -7839,6 +7839,20 @@ if (window.__MOCK__) (() => {
         <span class="nav-badge" id="action-items-badge" style="display:none;background:var(--accent);color:#0B0B0D;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:auto"></span>
       </div>
 
+      <!-- Business Profile: read view of everything captured on the 7 SM
+           onboarding calls (Mike's Client Profile spec). Hidden until the
+           account actually has call items (V1.5/V2) - revealed by
+           fetchAndRenderActionItems. -->
+      <div class="nav-item" id="nav-business-profile" style="display:none" onclick="switchView('business-profile', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </span>
+        Business Profile
+      </div>
+
       <div class="nav-item" data-feature="blueprint" onclick="switchView('blueprint', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -12493,6 +12507,26 @@ Then the call to action."]</div>
           <path d="M12 5v14M5 12h14"/>
         </svg>
       </button>
+    </div>
+
+    <!-- Business Profile: everything captured on the 7 SM onboarding calls,
+         organized by topic. Read-only for clients - your Scaling Manager
+         fills it in on the calls; sections that live elsewhere link out. -->
+    <div class="view" id="view-business-profile">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Business Profile</span>
+          <div class="topbar-title">Business Profile</div>
+        </div>
+      </div>
+      <div class="content">
+        <p style="color:var(--text-mute);font-size:13px;margin:0 0 18px;max-width:560px;line-height:1.5">
+          Everything you and your Scaling Manager map out on your onboarding calls - your avatar, offer, referral program, content strategy, sales process and retention plan - all in one place.
+        </p>
+        <div id="business-profile-list">
+          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div>
+        </div>
+      </div>
     </div>
 
     <!-- #view-settings moved OUT of .main (focus overlay, just after .main) so it
@@ -20426,6 +20460,7 @@ function switchView(name, el) {
 
   // When entering Action Items, load the list
   if (name === 'action-items') fetchAndRenderActionItems();
+  if (name === 'business-profile') fetchAndRenderBusinessProfile();
 
   // When entering Business Blueprint, render based on hash route
   if (name === 'blueprint') openBlueprintView();
@@ -23846,7 +23881,7 @@ const _PERMISSIONABLE_TABS = [
   { key: 'calendar',  label: 'Calendar',           icon: '', views: ['calendar', 'v15cal'] },
   { key: 'contacts',  label: 'Contacts',           icon: '', views: ['contacts'] },
   { key: 'kpis',      label: 'KPIs',               icon: '', views: ['v15kpis'] },
-  { key: 'action_items', label: 'Action Items',    icon: '', views: ['action-items'] },
+  { key: 'action_items', label: 'Action Items',    icon: '', views: ['action-items', 'business-profile'] },
   { key: 'systems',   label: 'Systems',            icon: '', views: ['systems'] },
 ];
 // KPI dashboard sections a teammate can be limited to (v15kpis view).
@@ -35274,6 +35309,12 @@ async function fetchAndRenderActionItems() {
     _AI_REVIEW_READY = !!json.review_ready;
     _renderActionItems();
     _updateActionItemsBadge();
+    // Reveal the Business Profile nav once this account has SM call items
+    // (V1.5/V2 only - V1 accounts never get them, so the nav stays hidden).
+    try {
+      const bpNav = document.getElementById('nav-business-profile');
+      if (bpNav) bpNav.style.display = _AI_ITEMS.some(i => i.call_step) ? '' : 'none';
+    } catch (_) {}
     // V2: load member-import status so the onboarding panel can render the
     // Member Import strip (it lives here now, not on the Members roster).
     if (typeof V2_ACCESS !== 'undefined' && V2_ACCESS && !(typeof isNativeApp === 'function' && isNativeApp())) {
@@ -35583,6 +35624,69 @@ function _aiSysStopHTML(it) {
       <div class="ai-stop-meta">${chip}${cta}</div>
     </div>
   </div>`;
+}
+
+// ── Business Profile view (Mike's Client Profile spec, 2026-07-25) ─────────
+// Read-only client-side view of everything captured on the 7 SM onboarding
+// calls, organized by topic. Sources the SAME items/decorations as the Action
+// Items checklist (call_data on each sm_call item) - data appears here the
+// moment the SM enters it on a call, done or not. Topics that already have a
+// home in the portal link out (Offers -> Blueprint; funnels/ads -> Systems /
+// Marketing) instead of duplicating anything.
+const _BP_PROFILE_LINKS = {
+  sm_call_1: [{ label: 'Open your Offers', fn: "_aiOpenBB('offers')" }],
+  sm_call_2: [{ label: 'Open Systems', fn: "switchView('systems')" }],
+  sm_call_6: [{ label: 'Open Systems', fn: "switchView('systems')" }, { label: 'Open Marketing', fn: "switchView('marketing')" }],
+};
+
+async function fetchAndRenderBusinessProfile() {
+  const container = document.getElementById('business-profile-list');
+  if (!container) return;
+  if (!_AI_ITEMS.some(i => i.call_step)) {
+    try { await fetchAndRenderActionItems(); } catch (_) {}
+  }
+  const calls = _AI_ITEMS.filter(i => i.call_step).sort((a, b) => a.call_step - b.call_step);
+  if (!calls.length) {
+    container.innerHTML = '<div class="req-empty" style="padding:20px 0">Nothing here yet - your Scaling Manager fills this in on your onboarding calls.</div>';
+    return;
+  }
+  container.innerHTML = calls.map(_bpProfileSectionHTML).join('');
+}
+
+function _bpProfileSectionHTML(it) {
+  const isDone = !!it.completed_at;
+  const locked = !!it.call_locked && !isDone;
+  const fields = it.call_fields || [];
+  const data = it.call_data || {};
+  const hasData = fields.some(f => String(data[f.key] || '').trim());
+  const chip = isDone
+    ? '<span class="ai-chip" style="color:var(--green)">✓ Call ' + it.call_step + ' done</span>'
+    : (locked
+      ? '<span class="ai-chip">Coming up - Call ' + it.call_step + '</span>'
+      : '<span class="ai-chip" style="color:var(--amber)">Call ' + it.call_step + ' in progress</span>');
+  const links = (_BP_PROFILE_LINKS[it.onboarding_key] || []).map(l =>
+    '<button class="ai-onb-cta" onclick="' + l.fn + '">' + escapeHTML(l.label) + ' →</button>'
+  ).join('');
+  let body;
+  if (hasData) {
+    body = fields.map(f => {
+      const v = String(data[f.key] || '').trim();
+      return '<div style="margin-bottom:10px">' +
+        '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute);margin-bottom:3px">' + escapeHTML(f.label) + '</div>' +
+        '<div style="font-size:13px;line-height:1.55;white-space:pre-wrap;color:' + (v ? 'var(--text)' : 'var(--text-mute)') + '">' + (v ? escapeHTML(v) : '-') + '</div>' +
+      '</div>';
+    }).join('');
+  } else {
+    body = '<div style="font-size:13px;color:var(--text-mute);font-style:italic">' +
+      (locked ? 'This gets mapped out on ' + escapeHTML(it.title) + ' with your Scaling Manager.'
+              : 'Nothing captured yet - covered on ' + escapeHTML(it.title) + '.') + '</div>';
+  }
+  return '<div class="ai-section" style="margin-bottom:14px"><div style="padding:16px 18px">' +
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">' +
+      '<div style="font-size:15px;font-weight:700;flex:1;min-width:160px">' + escapeHTML(it.profile_section || it.title) + '</div>' +
+      chip + links +
+    '</div>' + body +
+  '</div></div>';
 }
 
 // Render one of the 7 SM onboarding-call stops (the structured call sequence).

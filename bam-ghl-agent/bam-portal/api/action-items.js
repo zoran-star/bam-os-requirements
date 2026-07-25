@@ -224,9 +224,15 @@ function dueLabel(d) {
 // (saved to onboarding_calls, one row per client per call) and marks the call
 // complete by hand - no Fathom / post-call-flow integration. Clients see the
 // call progress on their checklist but can't toggle or edit anything.
+// profile_section: the section name this call's data appears under on the
+// Client Profile page (staff tab + client "Business Profile" view) - the
+// profile is a READ/EDIT VIEW over these same onboarding_calls records
+// (single source of truth), visible as soon as data is entered on a call,
+// done or not.
 const SM_CALL_CALIBRATION = "What do you currently have in place for this?";
 const SM_CALLS = [
   { key: "sm_call_1", step: 1, title: "Call 1: APVO and Offers",
+    profile_section: "Avatar & Offer",
     topics: "Avatar, positioning, value, offer structure",
     fields: [
       { key: "avatar", label: "Avatar" },
@@ -235,6 +241,7 @@ const SM_CALLS = [
       { key: "offer_structure", label: "Offer structure" },
     ] },
   { key: "sm_call_2", step: 2, title: "Call 2: Media and Sales Funnels",
+    profile_section: "Media & Funnels",
     topics: "Ads to record, VSL, pre-trial videos, funnel build",
     fields: [
       { key: "ads_to_record", label: "Ads to record" },
@@ -243,12 +250,14 @@ const SM_CALLS = [
       { key: "funnel_build_notes", label: "Funnel build notes" },
     ] },
   { key: "sm_call_3", step: 3, title: "Call 3: Referral Program",
+    profile_section: "Referral Program",
     topics: "Referral/affiliate structure and mechanics",
     fields: [
       { key: "referral_structure", label: "Referral structure" },
       { key: "affiliate_mechanics", label: "Affiliate mechanics" },
     ] },
   { key: "sm_call_4", step: 4, title: "Call 4: Organic Strategy",
+    profile_section: "Organic Strategy",
     topics: "3 content buckets: Education, Entertainment, Conversion",
     fields: [
       { key: "content_bucket_education", label: "Content bucket: Education" },
@@ -256,6 +265,7 @@ const SM_CALLS = [
       { key: "content_bucket_conversion", label: "Content bucket: Conversion" },
     ] },
   { key: "sm_call_5", step: 5, title: "Call 5: Sales Process",
+    profile_section: "Sales Process",
     topics: "Discovery call, sales motion, objections, script",
     fields: [
       { key: "discovery_call_notes", label: "Discovery call notes" },
@@ -264,12 +274,14 @@ const SM_CALLS = [
       { key: "script", label: "Script" },
     ] },
   { key: "sm_call_6", step: 6, title: "Call 6: Systems and Ads Review",
+    profile_section: "Systems & Ads",
     topics: "Review of systems and ad performance",
     fields: [
       { key: "systems_review_notes", label: "Systems review notes" },
       { key: "ad_performance_review", label: "Ad performance review" },
     ] },
   { key: "sm_call_7", step: 7, title: "Call 7: Athlete Onboarding and Retention",
+    profile_section: "Athlete Onboarding & Retention",
     topics: "Welcome package, results tracking/showcase, check-in cadence, cancellation process",
     fields: [
       { key: "welcome_package", label: "Welcome package" },
@@ -644,6 +656,7 @@ async function handler(req, res) {
           it.call_step = smCall.step;
           it.call_topics = smCall.topics;
           it.call_fields = smCall.fields;
+          it.profile_section = smCall.profile_section;
           it.calibration_prompt = SM_CALL_CALIBRATION;
           it.call_data = (row && row.data) || {};
           it.staff_toggle_only = true;
@@ -874,6 +887,7 @@ async function handler(req, res) {
       if (smCall) {
         item.call_step = smCall.step;
         item.call_fields = smCall.fields;
+        item.profile_section = smCall.profile_section;
         item.calibration_prompt = SM_CALL_CALIBRATION;
         item.call_data = (callRow && callRow.data) || {};
         item.staff_toggle_only = true;
