@@ -39,7 +39,9 @@ import { PRICING_NOT_CONFIGURED } from "./fact-render.js";
 // Which of these three an agent gets is declared on its TEMPLATE
 // (AGENT_TEMPLATES[...].disclosure in presets.js) and resolved per academy at
 // prompt-build time, so the policy travels with the template into any preset that
-// reuses it. `range` is what every free_trial template ships with, which is the
+// reuses it. free_trial ties: trial_booking + trial_confirm = range (pre-trial,
+// details belong at the trial); closing = exact (post-trial, its whole job is
+// naming the right plan and price). Range for the pre-trial agents is the
 // behaviour every academy already had.
 //
 // None of these three restate "never invent a number" - that lives once, in
@@ -55,7 +57,7 @@ export const PRICING_DISCLOSURE = {
   exact: [
     "Pricing disclosure: EXACT.",
     "",
-    "When the lead asks about price, give them the real plan prices from your pricing section, worded exactly as written there. Being straight about cost builds trust and filters out bad fits early instead of at the trial.",
+    "When the lead asks about price, give them the real plan prices from your pricing section, worded exactly as written there. Being straight about cost builds trust and moves the decision forward.",
     "Name the one or two plans that fit how often they want to train. Do not recite the whole list: a menu is harder to say yes to than a recommendation.",
     "Do not volunteer added fees, discount codes, or commitment terms. If they ask about one directly, answer accurately from your pricing section.",
   ].join("\n"),

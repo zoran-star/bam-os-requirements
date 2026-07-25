@@ -71,8 +71,12 @@ alone.
 | `exact` | Share the actual plan prices when asked. |
 | `withhold` | Share no numbers. All pricing is covered at the trial. |
 
-`free_trial`'s templates start at `range`, which is today's behavior. No academy
-changes on day one.
+Per-agent ties in `free_trial` (Zoran 2026-07-24): `trial_booking` and
+`trial_confirm` = **range** (pre-trial, details belong at the trial - today's
+behavior unchanged). `closing` = **exact**: it runs AFTER the trial, "details at
+the trial" is incoherent there, and its flow points the parent at the specific
+plan that fits plus the sign-up link. This is a deliberate live behavior change
+for the closing agents of all three academies.
 
 ### Missing numbers
 

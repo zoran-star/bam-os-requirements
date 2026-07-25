@@ -67,7 +67,10 @@ export const DEFAULT_DISCLOSURE = "range";
 export const AGENT_TEMPLATES = {
   trial_booking: { runtime: "booking", lessonKey: "booking", disclosure: "range", mission: "Book the lead into a free trial session." },
   trial_confirm: { runtime: "confirm", lessonKey: "confirm", disclosure: "range", mission: "Confirm a booked trial and make sure they show up." },
-  closing:       { runtime: "closing", lessonKey: "closing", disclosure: "range", mission: "Convert a good-fit trial attendee into an enrolled member." },
+  // closing runs AFTER the trial: "details at the trial" is incoherent there, and
+  // its flow points the parent at the specific plan that fits + the sign-up link.
+  // exact is the correct disclosure for that job (Zoran 2026-07-24).
+  closing:       { runtime: "closing", lessonKey: "closing", disclosure: "exact", mission: "Convert a good-fit trial attendee into an enrolled member." },
   // Preset #2 additions - new missions, existing runtimes. Prompt sections to be
   // authored when discovery_trial ships (Phase 2 only DECLARES them).
   call_booking:  { runtime: "booking", lessonKey: "call_booking", disclosure: "range", mission: "Book the lead into a discovery call (not a trial yet)." },

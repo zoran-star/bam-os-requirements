@@ -140,6 +140,7 @@
           <p class="hint">The fee can be taxed independently of the plan.</p>
         </div>
       </div>
+      <div class="note" style="margin-top:10px">Behind the scenes this creates its own price row tied to this plan: <span class="money">1 Training/Week|signup_fee</span>, one-time, with its own Stripe product. Checkout selling any <span class="money">1 Training/Week</span> option finds it by that shared plan name; coupons can target or skip it by product.</div>
 
       <div class="divider"></div>
 
@@ -189,15 +190,22 @@
     <span class="mock-tag">Mockup 4 · Build C</span>
     <h2>Coupon editor: what does this code apply to?</h2>
     <p class="why">Every sellable price and every fee is its own checkbox. Today a coupon silently hits every line on the invoice; after this, you choose. GTA's 2SIBLING migrates with all current prices checked, which is exactly its behavior today.</p>
-    <div class="card" style="max-width:460px">
+    <div class="card" style="max-width:520px">
       <p class="mini-cap">Code: 2SIBLING · 50% off · every payment</p>
       <p class="lbl">Applies to</p>
-      <div class="check"><span class="box on"></span><span>Steady, every 4 weeks <span class="money" style="color:var(--text-mute)">$226.00</span></span></div>
-      <div class="check"><span class="box on"></span><span>Summer Unlimited, every 4 weeks <span class="money" style="color:var(--text-mute)">$315.27</span></span></div>
-      <div class="check"><span class="box on"></span><span>Summer Unlimited, 3 months <span class="money" style="color:var(--text-mute)">$850.89</span></span></div>
-      <div class="check"><span class="box"></span><span>Sign-up fee <span class="badge mute">one time</span></span></div>
-      <div class="note">Unchecked lines are never discounted, even when they share an invoice with a discounted plan.</div>
+
+      <p class="mini-cap" style="margin:10px 0 6px">Plan: Steady</p>
+      <div class="check"><span class="box on"></span><span>Every 4 weeks <span class="money" style="color:var(--text-mute)">$226.00</span></span></div>
+      <div class="check" style="margin-left:26px;border-style:dashed"><span class="box"></span><span>Sign-up fee <span class="money" style="color:var(--text-mute)">$45.20</span> <span class="badge mute">one time</span><br><span style="font-size:11px;color:var(--text-mute)">Part of Steady. Charged only on the every-4-weeks option; commitments waive it.</span></span></div>
+
+      <p class="mini-cap" style="margin:12px 0 6px">Plan: Summer Unlimited</p>
+      <div class="check"><span class="box on"></span><span>Every 4 weeks <span class="money" style="color:var(--text-mute)">$315.27</span></span></div>
+      <div class="check"><span class="box on"></span><span>3 months <span class="money" style="color:var(--text-mute)">$850.89</span></span></div>
+      <div class="check" style="opacity:.55"><span style="font-size:11px;color:var(--text-mute)">No sign-up fee on this plan, so there is nothing extra to check.</span></div>
+
+      <div class="note">The fee is nested under its plan because that is how it is stored: it is a price row of the SAME plan (<span class="money">Steady|signup_fee</span>), not a separate product floating on its own. A fee checkbox only appears under plans that have one. Unchecked lines are never discounted, even on a shared invoice.</div>
     </div>
+    <p class="hint" style="max-width:520px">Sign-up fee shown as a hypothetical here: GTA has no fee configured today. The nesting is the point.</p>
   </div>
 
   <!-- ─────────────────── 5 · Agent pricing fact ─────────────────── -->
