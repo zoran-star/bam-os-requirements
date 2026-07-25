@@ -50122,8 +50122,37 @@ function _openPaymentLinkModal(memberId, data) {
 function _closePaymentLinkModal() {
   try { if (_PL && _PL.onKey) document.removeEventListener('keydown', _PL.onKey); } catch (_) {}
   if (_PL) _PL.onKey = null;
+  try { if (_PL && _PL.doneTimer) clearTimeout(_PL.doneTimer); } catch (_) {}
+  if (_PL) _PL.doneTimer = null;
   const m = document.getElementById('pl-modal');
   if (m) m.remove();
+}
+
+// Freeze the composer while the send is in flight, so nothing gets edited
+// half-way through and the modal reads as busy.
+function _plLockCard(locked) {
+  ['pl-body', 'pl-email-subject', 'pl-tab-sms', 'pl-tab-email'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.disabled = !!locked;
+    el.style.opacity = locked ? '0.55' : '';
+    el.style.pointerEvents = locked ? 'none' : '';
+  });
+}
+
+// The whole card becomes a checkmark once it's out the door, then closes itself.
+function _plShowSent(channelLabel, name) {
+  const card = document.getElementById('pl-modal-card');
+  if (!card) return;
+  card.style.animation = 'mmPop .25s ease-out';
+  card.innerHTML = `
+    <div style="text-align:center;padding:24px 8px 20px">
+      <div class="mm-check" style="margin-bottom:14px"><svg viewBox="0 0 52 52" width="62" height="62"><circle class="mm-check-c" cx="26" cy="26" r="24"/><path class="mm-check-k" d="M15 27 l7.5 7.5 L38 18"/></svg></div>
+      <div style="font-size:17px;font-weight:800;color:var(--text);margin-bottom:5px">${escapeHTML(channelLabel)} sent</div>
+      <div style="font-size:13px;color:var(--text-mute);line-height:1.5;margin-bottom:20px">${escapeHTML(name || 'They')} ${name ? 'has' : 'have'} the payment link.</div>
+      <button onclick="_closePaymentLinkModal()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:8px;padding:10px 26px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">Done</button>
+    </div>`;
+  _PL.doneTimer = setTimeout(() => _closePaymentLinkModal(), 2800);
 }
 
 // Switch between the text and email composer (same body, email adds a subject).
@@ -50226,9 +50255,15 @@ async function _plSend() {
   const email = _PL.parent.email || roster.parent_email || null;
   const name  = _PL.parent.name  || roster.parent_name  || null;
 
-  _plStatus('Sending ' + (isSms ? 'text' : 'email') + '...');
+  // Busy state: spinner in the button, composer frozen.
+  _plStatus('');
   const btn = document.getElementById('pl-send-btn');
-  if (btn) btn.disabled = true;
+  const btnLabel = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="apx-btn-spin" style="margin-right:9px"></span>Sending ' + (isSms ? 'text' : 'email') + '...';
+  }
+  _plLockCard(true);
 
   try {
     const token = await _mreqAuthToken();
@@ -50248,10 +50283,12 @@ async function _plSend() {
     });
     const json = await _safeJson(res);
     if (!res.ok) throw new Error((json.error || ('HTTP ' + res.status)) + (json.hint ? ' - ' + json.hint : ''));
-    _plStatus('Sent to ' + (name || 'parent') + '.', 'ok');
+    // Job done: the card becomes a checkmark, then closes itself.
+    _plShowSent(isSms ? 'Text' : 'Email', name);
   } catch (e) {
+    _plLockCard(false);
+    if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
     _plStatus('Failed: ' + e.message, 'err');
-    if (btn) btn.disabled = false;
   }
 }
 
