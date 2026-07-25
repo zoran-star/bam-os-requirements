@@ -350,9 +350,13 @@ const ONBOARDING_STEPS = [
   // backed by onboarding_calls rows (not a clients column). Client-visible,
   // staff-toggle-only; call N unlocks when call N-1 is done. Gated off V1
   // (tier "v2v15") per the hard rule - all newly activated clients are V2. ──
+  // Tier "program": only clients ON the scaling program - i.e. a payment
+  // model has been set in the Commissions tab (Cole's call, 2026-07-25).
+  // Setting payment terms is the one switch that turns the call sequence
+  // (and the Business Profile page) on for a client; V1 stays excluded.
   ...SM_CALLS.map(c => ({
     key: c.key, title: c.title, sort: 11 + c.step, sm_call: c.step,
-    tier: "v2v15", staff_toggle_only: true,
+    tier: "program", staff_toggle_only: true,
   })),
   // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
   // Sits right AFTER the SM call — the build gets scoped on that call.
@@ -399,20 +403,35 @@ const ONBOARDING_TIER_KEYS = new Set(ONBOARDING_STEPS.filter(s => s.tier).map(s 
 // Steps clients can SEE but only staff can toggle / fill (the SM call sequence).
 const ONBOARDING_STAFF_TOGGLE_ONLY = new Set(ONBOARDING_STEPS.filter(s => s.staff_toggle_only).map(s => s.key));
 // Which steps apply to a client of a given tier (no `tier` = all tiers).
-//   tier "v15"   → V1.5 academies only
-//   tier "v2v15" → V2 or V1.5 academies (everything except legacy V1)
-function onboardingStepsForTier({ isV15, isV2 }) {
+//   tier "v15"     → V1.5 academies only
+//   tier "v2v15"   → V2 or V1.5 academies (everything except legacy V1)
+//   tier "program" → on the scaling program: payment_model set (Commissions
+//                    tab) AND not legacy V1. Removing the payment model
+//                    removes the call items again (their onboarding_calls
+//                    data survives and comes back if re-enabled).
+function onboardingStepsForTier({ isV15, isV2, onProgram }) {
   return ONBOARDING_STEPS.filter(s => {
     if (!s.tier) return true;
     if (s.tier === "v15") return isV15;
     if (s.tier === "v2v15") return isV2 || isV15;
+    if (s.tier === "program") return (isV2 || isV15) && onProgram;
     return false;
   });
 }
 
 async function loadClientSignals(clientId) {
   const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS},v15_access,v2_access,stripe_connect_account_id`);
-  return (Array.isArray(rows) && rows[0]) || {};
+  const signals = (Array.isArray(rows) && rows[0]) || {};
+  // payment_model gates the SM call sequence ("program" tier). The column
+  // ships with the commission migration - queried separately and tolerated
+  // missing so a code deploy ahead of the SQL can't break the checklist.
+  try {
+    const p = await sb(`clients?id=eq.${clientId}&select=payment_model`);
+    signals.payment_model = (Array.isArray(p) && p[0] && p[0].payment_model) || null;
+  } catch (_) {
+    signals.payment_model = null;
+  }
+  return signals;
 }
 
 // An academy can finish the Stripe OAuth handshake while their account still
@@ -489,7 +508,8 @@ async function syncOnboardingItems(clientId, tracker, calls) {
   signals = await backfillStripeWhenChargeable(clientId, signals);
   const isV15 = signals.v15_access === true;
   const isV2 = signals.v2_access === true;
-  const steps = onboardingStepsForTier({ isV15, isV2 });
+  const onProgram = !!signals.payment_model;
+  const steps = onboardingStepsForTier({ isV15, isV2, onProgram });
   // Ticket-derived steps mirror the systems onboarding ticket (load once).
   if (steps.some(s => s.ticket_derived) && !tracker) tracker = await loadSystemsTrackerState(clientId);
   // SM call steps mirror their onboarding_calls row (load once).

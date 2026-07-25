@@ -26,8 +26,12 @@ staff-portal page. Any field on any row is editable by anyone who can see it.
 >   the `onboarding_calls` table (one row per client per call, data jsonb,
 >   registry SM_CALLS in api/action-items.js); staff edit it in the client's
 >   Action Items tab (expandable per-call editor, PATCH {id, call_data}).
->   Gated tier:"v2v15" so legacy V1 checklists are untouched. Calibration
->   prompt on every call: "What do you currently have in place for this?"
+>   Gated tier:"program" (Cole's call 2026-07-25): the calls appear ONLY for
+>   clients with clients.payment_model set (Commissions tab) AND non-V1 -
+>   setting payment terms is the one switch that turns the sequence + the
+>   Business Profile nav on; clearing the model removes the items again
+>   (onboarding_calls data survives). Calibration prompt on every call:
+>   "What do you currently have in place for this?"
 >   NOT counted in ONBOARDING_STEP_COLS (roster bar = core steps only).
 >
 > 👤 Client Profile / Business Profile (2026-07-25, Mike's companion spec):
