@@ -155,6 +155,37 @@ function lengthMatchesTerm(length, term) {
   if (term === "6_months") return /(^|[^0-9])6\s*month/.test(s) || /24\s*week/.test(s);
   return false;
 }
+// Does the option the parent picked actually charge this plan's sign-up fee?
+// Charge/waive is an explicit owner choice per option (Zoran: "not by default,
+// i want to set it"), so anything unanswered returns false and nothing extra is
+// billed. Reads the offer, never the browser.
+async function signupFeeAppliesTo({ clientId, offerId, planText, term }) {
+  const rows = await sb(
+    `offers?id=eq.${encodeURIComponent(offerId)}&client_id=eq.${encodeURIComponent(clientId)}&select=data&limit=1`
+  );
+  const data = Array.isArray(rows) && rows[0] && rows[0].data;
+  const offerings = (data && data.pricing && data.pricing.pricing_offerings) || [];
+  const off = offerings.find((o) => o && String(o.title || "").trim() === String(planText || "").trim());
+  if (!off) return false;
+  const amt = parseFloat(off.signup_fee);
+  if (!(amt > 0)) return false;
+  const charge = (v) => String(v || "").toLowerCase() === "charge";
+  if (term === "4_weeks") return charge(off.signup_fee_on_base);
+  const c = (off.commitments || []).find((x) => x && intervalFor(_termKeyFromLength(x.length)) && _termKeyFromLength(x.length) === term);
+  return !!c && charge(c.signup_fee_charge);
+}
+
+// Free-text commitment length -> the term key used in offer_price_key.
+// Mirrors termFromLength in api/website/offer.js and api/agent/fact-render.js.
+function _termKeyFromLength(length) {
+  const l = String(length || "").toLowerCase();
+  const m = l.match(/(\d+)\s*month/);
+  if (m) { const n = +m[1]; if (n >= 6) return "6_months"; if (n >= 3) return "3_months"; }
+  if (/24\s*week/.test(l)) return "6_months";
+  if (/12\s*week/.test(l)) return "3_months";
+  return null;
+}
+
 async function resolveCommitmentRevert({ clientId, offerId, planText, term }) {
   if (!COMMITMENT_TERMS.has(term)) return null;
   // 1) Confirm the offer's commitment for this plan+term reverts to monthly.
@@ -276,6 +307,38 @@ async function handler(req, res) {
     const resolvedPriceKey = priceKey || price.source_offer_price_key || "";
     const term = price.billing_interval || "4_weeks";
     const planText = resolvedPriceKey.split("|")[0] || price.title;
+
+    // ── One-time SIGN-UP FEE (Build S) ───────────────────────────────────
+    // Resolved SERVER-SIDE from the catalog, exactly like the plan price: a
+    // `<plan>|signup_fee` row, and only when the chosen option is marked
+    // "Charge" in the offer. Never trusts anything the browser sent.
+    //
+    // Guards, in order of how badly each would hurt:
+    //   1. A fee is NEVER sellable alone - refuse a checkout whose selected
+    //      price IS the fee row.
+    //   2. It rides ENROLLMENT ONLY. This endpoint is the enrollment path; the
+    //      reuse branches above return before here, so a retry on an existing
+    //      in-flight subscription cannot re-add it, and no admin/plan-change
+    //      path touches this code at all (logic scan #2).
+    //   3. Explicit per-option choice. Unanswered = not charged.
+    if (String(resolvedPriceKey).split("|")[1] === "signup_fee") {
+      return res.status(400).json({ error: "a sign-up fee cannot be purchased on its own" });
+    }
+    let signupFee = null;
+    if (!testMode) {
+      try {
+        const chargesFee = await signupFeeAppliesTo({ clientId, offerId, planText, term });
+        if (chargesFee) {
+          const feeRows = await sb(
+            `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_id=eq.${encodeURIComponent(offerId)}` +
+            `&source_offer_price_key=eq.${encodeURIComponent(planText + "|signup_fee")}` +
+            `&is_active=eq.true&is_routable=eq.true&limit=1&select=${typedSelect}`
+          );
+          const f = Array.isArray(feeRows) && feeRows[0];
+          if (f && f.stripe_price_id && f.amount_cents > 0) signupFee = f;
+        }
+      } catch (_) { signupFee = null; }  // never block an enrollment over the fee lookup
+    }
 
     // ── Optional coupon: validate the promo code + run the $1-floor / percent
     //    guardrail against the SERVER-SIDE plan price. Never trusts a client
@@ -444,6 +507,18 @@ async function handler(req, res) {
           "add_invoice_items[0][price_data][product]": firstPeriod.product,
           "add_invoice_items[0][price_data][unit_amount]": firstPeriod.amount,
         } : {}),
+        // Build S: the one-time sign-up fee, as its own first-invoice line.
+        // Index 1 when a future start already used index 0, else index 0 - the
+        // two coexist by design (Stripe's add_invoice_items is a list, and a
+        // one-time charge on the first invoice is Stripe's own documented
+        // pattern for signup fees). It rides its OWN Stripe price, so it has a
+        // distinct product that Build C's coupon checklist can target or skip.
+        // Renewal invoices never include it.
+        ...(signupFee ? {
+          [`add_invoice_items[${recurringStart ? 1 : 0}][price]`]: signupFee.stripe_price_id,
+          "metadata[signup_fee_cents]": signupFee.amount_cents,
+          "metadata[signup_fee_price]": signupFee.stripe_price_id,
+        } : {}),
       },
     });
     const clientSecret = piSecretFromSub(sub);
@@ -508,6 +583,10 @@ async function handler(req, res) {
       client_secret: clientSecret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
       amount_cents: price.amount_cents, currency: price.currency || "cad", agreement_saved: agreementSaved,
       discount: discountInfo, coupon_error: couponError, start_date: startDate, first_recurring_date: renewsIso,
+      // Build S: what the parent is charged TODAY vs every cycle after, so the
+      // funnel can itemize it before they confirm instead of after.
+      signup_fee_cents: signupFee ? signupFee.amount_cents : null,
+      due_today_cents: (price.amount_cents || 0) + (signupFee ? signupFee.amount_cents : 0),
     });
   } catch (e) {
     return res.status(e.stripeStatus || e.status || 500).json({ error: e.message || String(e) });

@@ -71,6 +71,30 @@ it through the pricing fact, which keeps quoting only what checkout charges.
 
 ## Build S: sign-up fee infrastructure
 
+**SHIPPED 2026-07-25, and INERT: zero academies have a fee configured, zero
+`|signup_fee` rows exist in `pricing_catalog` or `offer_prices`.** Verified by
+query at ship time. Nothing charges until an owner types an amount and marks an
+option "Charge".
+
+How it is tied to prices (Zoran's question, 2026-07-24): the fee is a REAL
+catalog row of the same plan, keyed `<plan>|signup_fee` with term `one_time`.
+It therefore flows through the exact pipeline every price already uses
+(match-prices target -> create-price Stripe price -> pricing_catalog ->
+offers-sync -> offer_prices) and gets its OWN Stripe product, which is what
+lets Build C target or skip it. The plan-name half of the key IS the tie.
+
+Carve-outs, because a fee row is quotable and rider-chargeable but never
+standalone-sellable (logic scan #4):
+  - `api/website/offer.js` filters fee rows out of `purchasable` and exposes
+    them separately as `signup_fees` + a per-card `signup_fee_cents`.
+  - `api/website/checkout.js` refuses a checkout whose selected price IS a fee
+    row, and resolves the rider server-side from the offer.
+  - `renderPricing` splits fee rows out of the plan/term grouping (they would
+    otherwise render as a fake commitment length), states them as their own
+    line with the real starting total, and returns PRICING_NOT_CONFIGURED if
+    fee rows are all that exist.
+
+
 - New offering-level field group in the wizard's Pricing step:
   amount (pre-tax), taxable yes/no (uses the academy template), and per-athlete
   semantics stated in the hint. Per athlete is exact-fit for checkout: one
@@ -141,7 +165,7 @@ explained and pending his sign-off.
 | 1 | Prices SHARE Stripe products (Miami: 9 prices, 6 products), so per-price coupon checkboxes cannot always be enforced per price | HIGH | ACCEPTED + scoped (Zoran 2026-07-24): the checklist lists LIVE prices only (active + routable + live in Stripe); shared-product prices within that set are grouped into one honest line, or migration splits products. Verify product uniqueness per academy before enabling C there. GTA is 1:1. |
 | 2 | Stripe coupons are immutable: editing an applies-to list means a NEW coupon + re-pointing the promotion code, without touching subscriptions already carrying the old coupon (live 2SIBLING families) | HIGH | Build C treats applicability edits as create-new + swap-code; active subscription discounts are attached objects and stay untouched. Test with a live-sub clone first. |
 | 3 | Tax rate change mid-life: editing the template does NOT change existing Stripe prices, so renewals keep billing old amounts while the template claims otherwise - the typed-vs-charged gap reborn | HIGH | A template edit for an academy with live prices triggers an explicit re-price flow (new rows, old archived), never a silent recompute. Until re-priced, surfaces keep reading the catalog, which stays the truth. |
-| 4 | Fee enabled while owner coupons exist, before Build C ships: sub-level codes silently discount the fee | MED | Hard gate: no fee is enabled for an academy with active discount codes until C is live for them. |
+| 4 | Fee enabled while owner coupons exist, before Build C ships: sub-level codes silently discount the fee | MED, ENFORCED IN CODE | `match-prices.js` refuses to mint the `|signup_fee` target for any academy whose offer has discount codes, and logs why. So the fee cannot reach Stripe for a coupon-carrying academy until C ships. The wizard hint says so too. |
 | 5 | Enroll card UI lives in bam-client-sites (separate repo): the API can expose a fee the site does not render, so the parent first meets it at the pay summary | MED | Per-academy enable checklist includes the site deploy. Fee invisible on the card = fee not enabled. |
 | 6 | GTA migration mis-flags a price (taxable yes/no wrong) and a computed all-in drifts from the catalog | MED | Migration changes compute paths only; offer_prices amounts do not move. A drift check compares computed vs catalog per price and blocks enabling on mismatch. |
 | 7 | Returning member re-enrolls: fee again or not? | DECIDED | Zoran 2026-07-24: YES, the fee is charged again on re-enrollment. Every enrollment event carries the fee where configured; the agent's fact can say so plainly. |

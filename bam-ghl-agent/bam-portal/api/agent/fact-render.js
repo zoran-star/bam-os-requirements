@@ -139,6 +139,7 @@ export const PRICING_NOT_CONFIGURED = [
 
 // offer_prices.billing_interval -> how a human says it.
 const INTERVAL_LABEL = { "4_weeks": "every 4 weeks", "3_months": "3 months prepaid", "6_months": "6 months prepaid" };
+const TERM_WORDS = { "3_months": "3 month", "6_months": "6 month" };
 // Cents -> "$226" / "$315.27". Exact always; trailing ".00" dropped because that
 // is how a coach texting a parent writes it.
 const fromCents = (c) => {
@@ -176,13 +177,19 @@ export function renderPricing(data, prices) {
 
   // Group in query order (sort_order) so the agent lists plans the way the
   // academy ordered them.
+  // Build S: a `<plan>|signup_fee` row is a one-time rider, NOT a plan term.
+  // Left in the term list it would render as a fake commitment length
+  // ("signup_fee: $40"), so it is split out here and stated as its own line.
   const plans = new Map();
+  const feeByPlan = new Map();
   for (const r of rows) {
     const title = planOf(r);
+    if (termOf(r) === "signup_fee") { feeByPlan.set(title, r); continue; }
     if (!plans.has(title)) plans.set(title, { title, monthly: null, terms: [] });
     const p = plans.get(title);
     if (termOf(r) === "monthly") p.monthly = r; else p.terms.push(r);
   }
+  if (!plans.size) return PRICING_NOT_CONFIGURED;   // fee rows alone are not sellable
 
   const currencies = [...new Set(rows.map((r) => String(r.currency || "").toUpperCase()).filter(Boolean))];
   const cur = currencies.length === 1 ? ` in ${currencies[0]}` : "";
@@ -190,7 +197,7 @@ export function renderPricing(data, prices) {
 
   // The band a RANGE-mode answer draws on: recurring plans only. Both ends exact
   // - rounding the top down would understate what a parent pays.
-  const recurring = rows.filter((r) => termOf(r) === "monthly").map((r) => Number(r.amount_cents));
+  const recurring = rows.filter((r) => termOf(r) === "monthly").map((r) => Number(r.amount_cents));  // fee rows excluded by termOf
   if (recurring.length) {
     const lo = fromCents(Math.min(...recurring)), hi = fromCents(Math.max(...recurring));
     out.push("", lo === hi ? `Every plan is ${lo} every 4 weeks.` : `Range: ${lo} to ${hi} every 4 weeks.`);
@@ -204,6 +211,22 @@ export function renderPricing(data, prices) {
     const o = offeringFor(p.title);
     const base = p.monthly ? `${fromCents(p.monthly.amount_cents)} ${INTERVAL_LABEL[p.monthly.billing_interval] || "every 4 weeks"}` : "prepaid terms only";
     out.push(`- ${p.title}: ${base}.${o.whats_included ? ` ${sentence(o.whats_included)}` : ""}`);
+    // The fee is charged once per athlete at enrollment, and only on the
+    // options the academy marked "Charge". Say the real starting total so
+    // "what does it cost to start" is answered with the number they pay.
+    const feeRow = feeByPlan.get(p.title);
+    if (feeRow) {
+      const chargedOnBase = String(o.signup_fee_on_base || "").toLowerCase() === "charge";
+      const waived = arr(o.commitments)
+        .filter((c) => c && String(c.signup_fee_charge || "").toLowerCase() !== "charge" && termFromLength(c.length))
+        .map((c) => TERM_WORDS[termFromLength(c.length)]).filter(Boolean);
+      const bits = [`    One-time sign-up fee: ${fromCents(feeRow.amount_cents)} per athlete, charged once when they enroll`];
+      if (chargedOnBase && p.monthly) {
+        bits.push(`. Starting on the ${INTERVAL_LABEL[p.monthly.billing_interval] || "every 4 weeks"} option costs ${fromCents(Number(p.monthly.amount_cents) + Number(feeRow.amount_cents))} on the first payment, then ${fromCents(p.monthly.amount_cents)}`);
+      }
+      if (waived.length) bits.push(`. No sign-up fee on the ${waived.join(" or ")} option${waived.length > 1 ? "s" : ""}`);
+      out.push(bits.join("") + ".");
+    }
     for (const t of p.terms) {
       const term = termOf(t);
       const c = arr(o.commitments).find((x) => x && termFromLength(x.length) === term) || {};

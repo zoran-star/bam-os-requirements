@@ -26088,6 +26088,7 @@ function _bbValOfferEmpty(v) {
 function _bbValOfferDepOk(scope, dep) {
   if (!dep) return true;
   const v = scope[dep.key];
+  if (dep.notEmpty) return String(v == null ? '' : v).trim() !== '';
   if (v == null) return false;
   const want = Array.isArray(dep.equals) ? dep.equals : [dep.equals];
   return Array.isArray(v) ? v.some(x => want.includes(x)) : want.includes(v);
@@ -30290,6 +30291,21 @@ const _bbStdPricing = [
       { key:'taxable', type:'check_one', label:'Taxable?',
         options:['Yes','No'],
         hint:'Uses your academy tax setting (Blueprint > General > Sales tax). With a tax set, unanswered counts as Yes; pick No for a tax-exempt price. No tax set = nothing is ever added.' },
+      // ── One-time sign-up fee (Build S of the money model) ──────────────
+      // A fee charged ONCE when an athlete enrolls, never on renewals. It is
+      // PER ATHLETE: one enrollment is one athlete, so two siblings signing up
+      // means two checkouts and two fees. Charge-or-waive is an explicit choice
+      // on every option (dep-gated below); nothing is assumed, so an option you
+      // never answer charges nothing extra.
+      { key:'signup_fee', type:'currency', label:'One-time sign-up fee (pre-tax)',
+        dep:{ key:'type', equals:'Membership' },
+        hint:'Leave empty if you do not charge one. Charged once per athlete at enrollment, never on renewals. Pick which options actually charge it below.' },
+      { key:'signup_fee_taxable', type:'check_one', label:'Is the sign-up fee taxable?',
+        options:['Yes','No'], dep:{ key:'signup_fee', notEmpty:true },
+        hint:'Taxed independently of the plan, using your academy tax setting.' },
+      { key:'signup_fee_on_base', type:'check_one', label:'Charge it on the base billing option?',
+        options:['Charge','Waive'], dep:{ key:'signup_fee', notEmpty:true },
+        hint:'The recurring option above (e.g. every 4 weeks). Unanswered = not charged. If you waive it everywhere, the fee is never charged at all (logic scan #5: legal, but probably not what you meant). Note: while you have discount codes set up, the sign-up fee stays inactive until code-by-code discount rules ship.' },
       { key:'commitments', type:'block_builder', label:'Commitments',
         dep:{ key:'type', equals:'Membership' },
         hint:'Optional discounted longer-term commitments (e.g. 3-month, 6-month, annual) that the client can choose instead of the default billing cycle.',
@@ -30303,6 +30319,9 @@ const _bbStdPricing = [
           { key:'taxable', type:'check_one', label:'Taxable?',
             options:['Yes','No'],
             hint:'Defaults to the plan\'s answer when unset. Uses your academy tax setting.' },
+          { key:'signup_fee_charge', type:'check_one', label:'Charge the sign-up fee on this commitment?',
+            options:['Charge','Waive'],
+            hint:'Only applies if the plan has a sign-up fee. Unanswered = not charged. Waiving here is the classic nudge toward committing.' },
           { key:'discount_notes', type:'textarea', label:'Notes on the discount',
             hint:'Optional. e.g. "$20/mo off the regular monthly rate" or "Total of $750 vs $900 paid monthly"' },
           { key:'after', type:'check_one', label:'What happens after the commitment?', required:true,
@@ -30952,6 +30971,9 @@ function _bbIsDepVisible(field, sectionId) {
   if (!field.dep) return true;
   const sec = ((_bbState.offer.data || {})[sectionId]) || {};
   const v = sec[field.dep.key];
+  // dep { notEmpty:true } = show once the parent field has any value (used by
+  // the sign-up fee group, which only makes sense after an amount is typed).
+  if (field.dep.notEmpty) return String(v == null ? '' : v).trim() !== '';
   if (v == null) return false;
   const want = Array.isArray(field.dep.equals) ? field.dep.equals : [field.dep.equals];
   if (Array.isArray(v)) return v.some(x => want.includes(x));
@@ -30964,9 +30986,10 @@ function _bbRenderField(field, sectionId) {
   const val = _bbGetVal(field, sectionId);
   const reqMark = field.required ? '<span class="bb-field-req">*</span>' : '';
   const hint = field.hint ? `<div class="bb-field-hint">${_bbEscapeHtml(field.hint)}</div>` : '';
-  const depBadge = field.dep
-    ? `<span class="bb-dep-badge">↳ if ${_bbEscapeHtml(field.dep.key)} = ${_bbEscapeHtml(Array.isArray(field.dep.equals) ? field.dep.equals.join(' / ') : field.dep.equals)}</span>`
-    : '';
+  const depBadge = !field.dep ? ''
+    : field.dep.notEmpty
+      ? `<span class="bb-dep-badge">↳ if ${_bbEscapeHtml(field.dep.key)} is set</span>`
+      : `<span class="bb-dep-badge">↳ if ${_bbEscapeHtml(field.dep.key)} = ${_bbEscapeHtml(Array.isArray(field.dep.equals) ? field.dep.equals.join(' / ') : field.dep.equals)}</span>`;
 
   const onInputHandler = field.key === '__title__'
     ? `_bbUpdateTitle(this.value)`
@@ -31318,6 +31341,7 @@ function _bbRenderField(field, sectionId) {
 function _bbIsSubDepVisible(sf, row) {
   if (!sf.dep) return true;
   const v = row[sf.dep.key];
+  if (sf.dep.notEmpty) return String(v == null ? '' : v).trim() !== '';
   if (v == null) return false;
   const want = Array.isArray(sf.dep.equals) ? sf.dep.equals : [sf.dep.equals];
   if (Array.isArray(v)) return v.some(x => want.includes(x));

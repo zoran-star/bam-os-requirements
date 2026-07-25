@@ -252,6 +252,21 @@ function _termFromLength(s) {
   return null;
 }
 
+// Does ANY option of this plan actually charge the sign-up fee? Charge/waive is
+// an explicit owner choice per option (Zoran: "not by default, i want to set
+// it"), so an unanswered option charges nothing. Used to decide whether the fee
+// is worth a catalog row at all.
+// Any discount code configured on this offer? See the RISK 4 gate below.
+function hasLiveDiscountCodes(offer) {
+  const codes = (offer.data && offer.data.pricing && offer.data.pricing.discount_codes) || [];
+  return codes.some(c => c && String(c.code || "").trim() && !c.archived);
+}
+
+function signupFeeChargedAnywhere(off) {
+  if (String(off.signup_fee_on_base || "").toLowerCase() === "charge") return true;
+  return (off.commitments || []).some(c => String((c && c.signup_fee_charge) || "").toLowerCase() === "charge");
+}
+
 // Build the match TARGETS from what the academy filled out in their Offers →
 // Pricing section (data.pricing.pricing_offerings). Each Membership offering →
 // a monthly target + one per commitment, with base + all-in amounts.
@@ -291,6 +306,31 @@ async function buildOfferTargets(clientId) {
             base_cents: cents(cb), allin_cents: applyFee(cents(cb), fee), fee_label: feeLabel(fee),
             label: `${title} · ${term.replace("_", " ")}` });
         }
+      }
+
+      // ── One-time SIGN-UP FEE (Build S) ────────────────────────────────
+      // A single `<title>|signup_fee` target per plan, with its OWN taxable
+      // flag. It is a real catalog row so it gets its own Stripe product,
+      // which is what lets a coupon target or skip it (Build C) and what
+      // checkout attaches as a one-time line at enrollment.
+      //
+      // It is minted only when the plan HAS a fee amount AND at least one
+      // option actually charges it. Charge/waive is explicit per option
+      // (nothing assumed), so a fee nobody charges never reaches Stripe -
+      // that is the "dead fee" state, legal but inert.
+      // RISK 4 GATE (money-model plan): until Build C ships coupon
+      // applicability, a subscription-level discount code hits EVERY line on
+      // the first invoice, the fee included. An academy with live codes would
+      // therefore silently half-price its own sign-up fee. Refuse to mint the
+      // fee row for those academies rather than charge a wrong number.
+      const feeAmt = parseFloat(off.signup_fee);
+      if (!isNaN(feeAmt) && feeAmt > 0 && signupFeeChargedAnywhere(off) && hasLiveDiscountCodes(o)) {
+        console.warn(`[signup-fee] skipped for offer ${o.id} (${title}): academy has discount codes and coupon applicability (Build C) is not live yet`);
+      } else if (!isNaN(feeAmt) && feeAmt > 0 && signupFeeChargedAnywhere(off)) {
+        const feeTax = resolveFee({ taxConfig, taxable: off.signup_fee_taxable, legacyText: null });
+        targets.push({ key: `${title}|signup_fee`, offer_id: o.id, offering: title, term: "signup_fee",
+          base_cents: cents(feeAmt), allin_cents: applyFee(cents(feeAmt), feeTax), fee_label: feeLabel(feeTax),
+          label: `${title} · Sign-up fee (one time)` });
       }
     }
   }
@@ -340,6 +380,7 @@ async function handler(req, res) {
         const t = term ? term.trim().toLowerCase() : "";
         if (t === "monthly" || t === "4_weeks") return "4_weeks";
         if (t === "3_months" || t === "6_months" || t === "one_time") return t;
+        if (t === "signup_fee") return "one_time";   // Build S: the fee is a one-time price
         return null;
       };
       const results = [];
