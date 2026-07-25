@@ -103,12 +103,18 @@ it through the pricing fact, which keeps quoting only what checkout charges.
   rows that are active + routable in the portal AND live in Stripe. Archived,
   inactive, or unroutable prices never appear on the checklist, so a code can
   never be attached to something that cannot be sold.
-- Stripe mechanics: coupons target products (`applies_to[products]`), and the fee
-  line gets its own product so it can be targeted or skipped. CAVEAT (verified
-  2026-07-24): prices can SHARE a product - DETAIL Miami has 9 active prices on 6
-  products - so per-price checkboxes are only enforceable where products are
-  distinct. Where they are shared, the checklist groups those prices as one line
-  (honest UI), or the build splits products at migration. GTA is 1:1 today.
+- Stripe mechanics (docs read 2026-07-24): TWO native enforcement tools.
+  (a) `applies_to[products]` on the coupon restricts the discount to matching
+  recurring lines. CAVEAT: prices can SHARE a product - DETAIL Miami has 9
+  active prices on 6 products - so per-price checkboxes are only enforceable
+  where products are distinct; shared-product prices group into one honest
+  checklist line, or migration splits products. GTA is 1:1 today.
+  (b) `add_invoice_items[i][discounts]` attaches a discount to ONE one-time
+  line directly. Checkout therefore never relies on cascade behavior for the
+  fee: if the owner's checklist covers the fee, checkout attaches the discount
+  to the fee line itself; if not, the fee line simply carries none. This is
+  deterministic and removes the only documented-silent interaction (whether
+  applies_to reaches invoice-item lines) from the critical path.
 - Migration: GTA's 2SIBLING (50% off, every payment) maps to "applies to all
   current prices", which is byte-identical to its behaviour today.
 - The agent's discount line then renders what the code actually covers, so
@@ -140,7 +146,7 @@ explained and pending his sign-off.
 | 6 | GTA migration mis-flags a price (taxable yes/no wrong) and a computed all-in drifts from the catalog | MED | Migration changes compute paths only; offer_prices amounts do not move. A drift check compares computed vs catalog per price and blocks enabling on mismatch. |
 | 7 | Returning member re-enrolls: fee again or not? | DECIDED | Zoran 2026-07-24: YES, the fee is charged again on re-enrollment. Every enrollment event carries the fee where configured; the agent's fact can say so plainly. |
 | 8 | Refund-window cancellation: is the fee refundable? | DECIDED | Zoran 2026-07-24: YES, the fee is refundable inside the academy's refund window, same as the plan payment. Rendered into the policies fact so agent and agreement PDF agree. |
-| 9 | Fee line + future-start anchored billing + coupon all on one first invoice (three interacting mechanisms) | MED | Test-mode matrix before enabling anywhere: fee x {immediate, future-start} x {no code, percent code, amount code}. |
+| 9 | Fee line + future-start anchored billing + coupon all on one first invoice (three interacting mechanisms) | MED, DOWNGRADED | Stripe docs read 2026-07-24: every piece is documented-supported. A one-time fee on the first invoice is Stripe's own recommended pattern; `add_invoice_items` is an array (fee + prepaid-period lines coexist); per-line discounts (`add_invoice_items[i][discounts]`) make coupon behavior on the fee deterministic instead of cascade-dependent. Our checkout also already verified with test clocks that an unrestricted sub-level coupon DOES hit one-time lines, which is exactly why Build C must scope. The test matrix stays as a confirmation pass before any academy enables a fee, but it is now confirmation, not exploration. |
 | 10 | An academy needs TWO tax rates (GST+PST split, tax-exempt programs) | LOW | One-rate template is v1 scope by design. Flag when a real academy needs more; do not pre-build. |
 | 11 | Checkout retry double-charges the fee | LOW | Subscription creation is idempotency-keyed and the fee rides that same call. Covered by the #9 matrix. |
 | 12 | DETAIL Miami: agent fact reads only the FIRST training offer, so a fee on another offer is invisible to the agent | LOW | Already an open item; becomes part of the multi-offer fact build, not this one. |
