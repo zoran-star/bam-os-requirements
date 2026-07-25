@@ -31,9 +31,12 @@ Other folders in this repo each deploy to their own Vercel project:
 |---|---|---|
 | `prototype/` | `fullcontrol-prototype` | `fullcontrol-prototype-six.vercel.app` |
 | `market-research/` | `full-control-survey` | `full-control-survey.vercel.app` |
-| `whiteboard/` | `whiteboard` | `whiteboard-beta-indol.vercel.app` |
 | `bam-ghl-agent/bam-portal/` | `bam-portal` | branch previews only seen so far |
 | repo root | `bam-os-requirements` | (the one this folder serves through) |
+
+**Retired 2026-07-25:** the `whiteboard/` folder was removed from the repo. Its
+Vercel project (`whiteboard`, `whiteboard-beta-indol.vercel.app`) still exists and
+must be deleted by hand in the Vercel dashboard.
 
 ## Gotcha: free-tier deploy cap
 Vercel free tier limits to **100 deployments per day** across the org. PR #8 (April 23 2026) hit this:

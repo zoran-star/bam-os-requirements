@@ -11,7 +11,7 @@ Decided 2026-07-12 (Zoran): the repo has exactly **two** canonical design system
 - `prototype/bam-gta-phase1/bam-gta-staff/src/styles/theme.css`
 - `prototype/bam-gta-phase1/bam-gta-parent/src/styles/theme.css` (minimal subset)
 - `bam-ghl-agent/bam-gta-staff/src/styles/theme.css` (intentional own branding, see `bam-ghl-agent/CLAUDE.md` scope exceptions)
-- `whiteboard/src/styles/theme.css`, `market-research/src/index.css` (standalone tools)
+- `market-research/src/index.css` (standalone tool)
 
 **No design system for V1 or V1.5**, deliberate (Zoran's call).
 

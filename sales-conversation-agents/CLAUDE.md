@@ -54,8 +54,8 @@ Responded ──booking agent──► Scheduled Trial ──confirm agent──
 ```
 
 ## Planned agents
-- Closing AI — post-trial conversion nudges (being designed in SES-025)
-- Rebooking AI — re-engages no-shows (being designed in SES-026)
+- Closing AI — post-trial conversion nudges (not yet designed)
+- Rebooking AI — re-engages no-shows (not yet designed)
 - More to be created
 
 ## How to create a new location instance

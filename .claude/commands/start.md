@@ -35,11 +35,10 @@ Where do you want to work?
 
   1. prototype/                  — <status hint from prototype/memories/MEMORY.md>
   2. bam-ghl-agent/              — <status hint from bam-ghl-agent/memories/MEMORY.md>
-  3. whiteboard/                 — planning tool
-  4. business/                   — investor + planning materials
-  5. market-research/            — survey (mostly maintenance mode)
-  6. sales-conversation-agents/  — AI sales agent prompts
-  7. (root)                      — Notion business requirements / cross-project work
+  3. business/                   — investor + planning materials
+  4. market-research/            — survey (mostly maintenance mode)
+  5. sales-conversation-agents/  — AI sales agent prompts
+  6. (root)                      — Notion business requirements / cross-project work
   
   + new project — run /setup-project-memory <name>
 ```

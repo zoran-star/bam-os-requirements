@@ -15,8 +15,11 @@ approved values are kept so nothing needs re-drafting.**
   this backfill fills them so the future onboarding wizard can say what breaks
   when a step is skipped.
 - Write via Notion API PATCH `/v1/pages/{id}` with token from
-  `whiteboard/.env.production` (NOTION_TOKEN; main checkout, gitignored -
+  `whiteboard/.env.production` (NOTION_TOKEN; main checkout only, gitignored -
   worktrees don't have it). Notion auto-creates new select options.
+  **Note:** the `whiteboard/` folder was retired 2026-07-25, but this gitignored
+  file survives in the main checkout since git never tracked it. It is the only
+  remaining thing in that folder. See [[reference-notion-workspace]].
 
 ## The approved values (write exactly these)
 
