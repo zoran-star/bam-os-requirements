@@ -1,13 +1,13 @@
 // THE single place the sales agent's system prompt is assembled.
 //
-// Every agent path — sandbox preview, live approval-queue replies, scheduled
-// follow-ups, and the trainer chat — MUST build its system prompt here so the
+// Every agent path (sandbox preview, live approval-queue replies, scheduled
+// follow-ups, and the trainer chat) MUST build its system prompt here so the
 // bot is ALWAYS exactly the on-screen brain (prompt-structure.js sections +
 // per-academy agent_prompt_sections overrides) plus its trainer lessons and
 // approved examples, and nothing else. The only per-mode difference is the
 // `trailer` (e.g. the sandbox tool instruction or the live-booking note).
 //
-// If you need to change how the prompt is built, change it HERE — never fork a
+// If you need to change how the prompt is built, change it HERE, never fork a
 // second copy, or the live bot will silently drift from what staff preview.
 
 import { assemblePrompt } from "./prompt-structure.js";
@@ -49,14 +49,14 @@ export function buildAgentSystem({ lessons = [], overrides = {}, examples = [], 
 
   if (Array.isArray(examples) && examples.length) {
     sys += `\n\n<trainer_examples>\n` +
-      `These are your trainer's APPROVED example exchanges. They define the exact tone, length, and style to use — follow them over any examples above:\n` +
+      `These are your trainer's APPROVED example exchanges. They define the exact tone, length, and style to use: follow them over any examples above:\n` +
       examples.map(e => `Lead: "${e.parent_text}"\nYou: "${e.agent_text}"`).join("\n\n") +
       `\n</trainer_examples>`;
   }
 
   if (leadContext && String(leadContext).trim()) {
     sys += `\n\n<lead_context>\n` +
-      `What you already know about this lead (from the form they submitted). Use it to qualify and personalize — do NOT re-ask for info you already have here:\n` +
+      `What you already know about this lead (from the form they submitted). Use it to qualify and personalize. Do NOT re-ask for info you already have here:\n` +
       String(leadContext).trim() +
       `\n</lead_context>`;
   }

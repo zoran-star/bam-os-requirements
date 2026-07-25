@@ -15,7 +15,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 //        are touched; anything else keeps its current override/default. User-
 //        triggered so the live agent never changes silently.
 //
-// Auth: Supabase JWT — BAM staff (any academy) or a client_users member of client_id.
+// Auth: Supabase JWT - BAM staff (any academy) or a client_users member of client_id.
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
