@@ -27887,6 +27887,35 @@ async function _bbCouponPillClick(el) {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     const failed = (json.results || []).find(x => x.error);
     if (failed) throw new Error(failed.error);
+
+    // Build C: the code is already live but Stripe is not enforcing the
+    // "applies to" list. A coupon's limits are immutable in Stripe, so the
+    // only way to apply them is to re-issue the code. Confirm explicitly,
+    // because it swaps the code parents type.
+    const stale = (json.results || []).find(x => x.needs_reissue);
+    if (stale) {
+      const go = await _mmModal({
+        icon: '', title: 'Update what ' + code + ' applies to?',
+        body: escapeHTML(stale.message) +
+          '<br><br>Stripe cannot change these limits on an existing code, so we create a fresh one with the same name. ' +
+          '<b>Parents already subscribed keep the discount they signed up with.</b>',
+        okLabel: 'Update in Stripe',
+      });
+      if (!go) { _bbApplyCouponPills(); return; }
+      el.textContent = '● updating…';
+      const r2 = await fetch('/api/offers/create-discount', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ client_id: _aiClientId(), codes: [def], reissue: true }),
+      });
+      const j2 = await _safeJson(r2);
+      if (!r2.ok) throw new Error(j2.error || ('HTTP ' + r2.status));
+      const f2 = (j2.results || []).find(x => x.error);
+      if (f2) throw new Error(f2.error);
+      await _bbLoadCouponHealth(true);
+      _plToast(code + ' updated. Stripe now applies it only to what you ticked.');
+      return;
+    }
+
     await _bbLoadCouponHealth(true);
     _plToast(code + ' is now live in Stripe.');
   } catch (e) {

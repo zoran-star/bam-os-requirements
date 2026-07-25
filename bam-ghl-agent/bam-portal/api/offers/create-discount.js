@@ -200,7 +200,68 @@ async function handler(req, res) {
       if (!code) { results.push({ code: c.code, error: "empty code" }); continue; }
       if (live.has(code)) {
         const pc = live.get(code);
-        results.push({ code, created: false, exists: true, promotion_code_id: pc.id });
+        // Build C: a live code already exists. Its coupon's applies_to is
+        // IMMUTABLE - Stripe only lets you edit a coupon's name/metadata
+        // ("other coupon details are, by design, not editable"), so the
+        // portal's applies_to list can never reach Stripe by updating.
+        // Compare what Stripe actually enforces against what the owner wants:
+        //   same        -> nothing to do
+        //   different   -> report needs_reissue, or perform the swap when the
+        //                  caller explicitly asked for it
+        const wantKeys = couponAppliesToKeys(c);
+        const wantResolved = await productIdsForKeys(clientId, wantKeys);
+        if (wantResolved && wantResolved.error) { results.push({ code, error: wantResolved.error }); continue; }
+        const want = [...(wantResolved || [])].sort();
+        const liveCoupon = couponFromPromo(pc) || {};
+        const haveList = (liveCoupon.applies_to && liveCoupon.applies_to.products) || [];
+        const have = [...haveList].sort();
+        const same = want.length === have.length && want.every((x, i) => x === have[i]);
+        if (same) {
+          results.push({ code, created: false, exists: true, promotion_code_id: pc.id, applicability: "in_sync" });
+          continue;
+        }
+        if (!body.reissue) {
+          results.push({
+            code, created: false, exists: true, promotion_code_id: pc.id,
+            needs_reissue: true,
+            live_products: have.length, wanted_products: want.length,
+            message: want.length
+              ? "This code is live in Stripe without the 'applies to' limits you set. Stripe cannot edit them on an existing code, so it has to be re-issued. Parents already subscribed keep the discount they signed up with."
+              : "This code is limited in Stripe but your 'applies to' list is now empty (applies to everything). Re-issue to match.",
+          });
+          continue;
+        }
+        // ── Explicit re-issue ────────────────────────────────────────────
+        // New coupon carrying the wanted restriction, then swap the customer
+        // facing string onto it: deactivate the old promotion code and mint a
+        // new one with the same code. Deactivating only stops FUTURE
+        // redemptions - "it doesn't remove the discount from any subscription
+        // or invoice that already has it" - so live members are untouched.
+        const rcheck = validateCouponDef(c);
+        if (!rcheck.ok) { results.push({ code, error: rcheck.error }); continue; }
+        try {
+          const newCoupon = await stripeFetch(`/coupons`, {
+            method: "POST", stripeAccount: acct,
+            idempotencyKey: `sorter-coupon-reissue-${clientId}-${code}-${want.join(",").slice(0, 60)}`.slice(0, 200),
+            body: stripeCouponBody(rcheck.coupon, want.length ? want : null),
+          });
+          await stripeFetch(`/promotion_codes/${pc.id}`, {
+            method: "POST", stripeAccount: acct, body: { active: "false" },
+          });
+          const newPc = await stripeFetch(`/promotion_codes`, {
+            method: "POST", stripeAccount: acct,
+            idempotencyKey: `sorter-promo-reissue-${clientId}-${code}-${newCoupon.id}`.slice(0, 200),
+            body: stripePromoBody(rcheck.coupon, newCoupon.id),
+          });
+          results.push({
+            code, created: true, reissued: true,
+            promotion_code_id: newPc.id, coupon_id: newCoupon.id,
+            replaced_promotion_code_id: pc.id,
+            applies_to_products: want.length || null,
+          });
+        } catch (e) {
+          results.push({ code, error: `re-issue failed: ${e.message || String(e)}` });
+        }
         continue;
       }
       // Guardrails: rejects 0/100% and bad shapes before anything hits Stripe.

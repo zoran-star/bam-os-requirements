@@ -168,6 +168,27 @@ one if it is ever added. NOTE: the live Stripe coupon is untouched and still
 unrestricted; recreating the code from the portal is what makes Stripe enforce
 the list, and until then the fee stays off for GTA by the guard above.
 
+RE-ISSUE PATH (2026-07-25). Verified in the Stripe docs: a coupon's
+`applies_to` cannot be edited after creation ("other coupon details are, by
+design, not editable" - only name/metadata/currency_options are updatable), and
+a promotion code cannot be repointed at a different coupon. So the portal's
+list can NEVER reach Stripe by updating; the code has to be re-issued.
+
+Before this, clicking the Stripe pill on an already-live code returned
+"exists" and did nothing, which made Build C unreachable for any code that was
+already in Stripe. Now create-discount compares the LIVE coupon's
+`applies_to.products` against the owner's resolved list and:
+  - in sync     -> reports `applicability: "in_sync"`, does nothing
+  - different   -> reports `needs_reissue` with a plain-words message
+  - `reissue:true` -> creates a NEW coupon carrying the restriction,
+    deactivates the old promotion code, and mints a new one with the same
+    customer-facing string.
+
+Safe by Stripe's own rule: deactivating a promotion code stops future
+redemptions only, and "doesn't remove the discount from any subscription or
+invoice that already has it", so live members keep the discount they signed up
+with. The pill asks for explicit confirmation and says so.
+
 RISK 4 GATE NARROWED. The sign-up fee is no longer blocked by "this academy has
 codes". It is blocked only by an UNRESTRICTED code, which would still discount
 every first-invoice line including the fee. A code that declares its
