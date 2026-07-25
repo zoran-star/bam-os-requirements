@@ -122,6 +122,40 @@ standalone-sellable (logic scan #4):
 
 ## Build C: coupon applicability
 
+**SHIPPED 2026-07-25, behaviour-neutral on ship.** Exactly one discount code
+exists system-wide (GTA's 2SIBLING) and it has no `applies_to`, so it stays
+unrestricted, which is byte-identical to how it behaved before. Verified by
+query at ship time.
+
+Semantics: an EMPTY or missing `applies_to` means "applies to everything" (the
+pre-Build-C behaviour, so nothing migrates). A non-empty list means only those
+keys, ever.
+
+Two enforcement paths, both native:
+  - RECURRING lines: the owner's ticked keys compile to their prices' Stripe
+    PRODUCT ids and go on the coupon as `applies_to[products]`, which Stripe
+    enforces itself. Product ids are deduped, so shared-product prices (DETAIL
+    Miami: 9 prices, 6 products) collapse honestly.
+  - The SIGN-UP FEE line: checkout attaches the promotion code to that invoice
+    item directly (`add_invoice_items[i][discounts]`) when, and only when, the
+    checklist covers `<plan>|signup_fee`. No reliance on cascade behaviour.
+
+Safe failures, both deliberate:
+  - Ticked keys that resolve to NO live routable price -> the code is refused
+    with a clear message, never created as unrestricted (which would be the
+    opposite of what the owner asked for).
+  - An unreadable code definition at checkout -> the fee is NOT discounted.
+  - Changing the checklist changes the coupon's idempotency fingerprint, so a
+    NEW Stripe coupon is minted rather than an old one silently reused (risk 2:
+    Stripe coupons are immutable). Parents already subscribed keep the discount
+    they signed up with.
+
+RISK 4 GATE NARROWED. The sign-up fee is no longer blocked by "this academy has
+codes". It is blocked only by an UNRESTRICTED code, which would still discount
+every first-invoice line including the fee. A code that declares its
+applicability is safe. GTA therefore stays gated until 2SIBLING gets a list.
+
+
 - Discount codes are the ACADEMY OWNER'S, not BAM's. Each code the owner creates
   gets an applies-to checklist scoped to LIVE prices only (Zoran 2026-07-24):
   rows that are active + routable in the portal AND live in Stripe. Archived,

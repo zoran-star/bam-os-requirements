@@ -30252,6 +30252,10 @@ const _bbDiscountCodesField = {
     { key:'duration_months', type:'number', label:'How many months?', required:true,
       dep:{ key:'duration', equals:'A set number of months' },
       hint:'The discount applies for this many billing months, then full price.' },
+    { key:'applies_to', type:'check_many', label:'What does this code apply to?',
+      optionsFrom:'offer_price_keys',
+      emptyHint:'Add your prices above first, then come back and pick which ones this code discounts.',
+      hint:'Tick nothing = the code applies to everything (how codes worked before). Tick specific prices and it only ever discounts those, including whether it touches a sign-up fee. Changing this later creates a fresh code in Stripe; parents already subscribed keep the discount they signed up with.' },
     { key:'expires_at', type:'date', label:'Expires on (optional)',
       hint:'Leave blank for no expiry. After this date the code stops working.' },
     { key:'max_redemptions', type:'number', label:'Max total uses (optional)',
@@ -30305,7 +30309,7 @@ const _bbStdPricing = [
         hint:'Taxed independently of the plan, using your academy tax setting.' },
       { key:'signup_fee_on_base', type:'check_one', label:'Charge it on the base billing option?',
         options:['Charge','Waive'], dep:{ key:'signup_fee', notEmpty:true },
-        hint:'The recurring option above (e.g. every 4 weeks). Unanswered = not charged. If you waive it everywhere, the fee is never charged at all (logic scan #5: legal, but probably not what you meant). Note: while you have discount codes set up, the sign-up fee stays inactive until code-by-code discount rules ship.' },
+        hint:'The recurring option above (e.g. every 4 weeks). Unanswered = not charged. If you waive it everywhere, the fee is never charged at all, which is legal but probably not what you meant. Note: if any of your discount codes has no "applies to" list, the fee stays inactive, because that code would discount it too. Set what each code applies to first.' },
       { key:'commitments', type:'block_builder', label:'Commitments',
         dep:{ key:'type', equals:'Membership' },
         hint:'Optional discounted longer-term commitments (e.g. 3-month, 6-month, annual) that the client can choose instead of the default billing cycle.',
@@ -30980,6 +30984,41 @@ function _bbIsDepVisible(field, sectionId) {
   return want.includes(v);
 }
 
+// Build C: option generators for check_many fields whose choices come from the
+// academy's own data rather than the config. Keyed by a field's `optionsFrom`.
+const _BB_DYNAMIC_OPTIONS = {
+  // Every price a code could apply to, as `<plan>|<term>` keys - the SAME keys
+  // the catalog uses - plus each plan's one-time sign-up fee as its own line.
+  // Read from the offer being edited, so it works before Price Match has run;
+  // the server re-checks each key against LIVE routable prices at create time
+  // and refuses the code if none of them resolve.
+  offer_price_keys(sectionId) {
+    const pricing = ((_bbState.offer.data || {})[sectionId]) || {};
+    const out = [];
+    for (const o of (pricing.pricing_offerings || [])) {
+      if (!o || o.archived || String(o.type || '').toLowerCase() !== 'membership') continue;
+      const title = String(o.title || '').trim();
+      if (!title) continue;
+      if (o.price) out.push({ value: `${title}|monthly`, label: `${title} · every 4 weeks` });
+      for (const c of (o.commitments || [])) {
+        const t = _bbTermFromLength(c && c.length);
+        if (t && c.price) out.push({ value: `${title}|${t}`, label: `${title} · ${t.replace('_', ' ')}` });
+      }
+      if (o.signup_fee) out.push({ value: `${title}|signup_fee`, label: `${title} · sign-up fee (one time)` });
+    }
+    return out;
+  },
+};
+// Mirrors termFromLength on the server (offer.js / fact-render.js / checkout.js).
+function _bbTermFromLength(length) {
+  const l = String(length || '').toLowerCase();
+  const m = l.match(/(\d+)\s*month/);
+  if (m) { const n = +m[1]; if (n >= 6) return '6_months'; if (n >= 3) return '3_months'; }
+  if (/24\s*week/.test(l)) return '6_months';
+  if (/12\s*week/.test(l)) return '3_months';
+  return null;
+}
+
 function _bbRenderField(field, sectionId) {
   if (!_bbIsDepVisible(field, sectionId)) return '';
 
@@ -31024,9 +31063,17 @@ function _bbRenderField(field, sectionId) {
       break;
     case 'check_many': {
       const arr = Array.isArray(val) ? val : [];
-      body = `<div class="bb-choice-row">${(field.options || []).map(opt => `
-        <button type="button" class="bb-choice ${arr.includes(opt) ? 'selected' : ''}" onclick="_bbToggleMany('${sectionId}','${field.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
-      `).join('')}</div>`;
+      // optionsFrom = a named generator for options the config can't hardcode
+      // because they come from the academy's own data (Build C's price list).
+      // Each entry is { value, label }; a plain string stays a plain string.
+      const many = field.optionsFrom
+        ? (_BB_DYNAMIC_OPTIONS[field.optionsFrom] || (() => []))(sectionId)
+        : (field.options || []).map(o => ({ value: o, label: o }));
+      body = many.length
+        ? `<div class="bb-choice-row">${many.map(o => `
+        <button type="button" class="bb-choice ${arr.includes(o.value) ? 'selected' : ''}" onclick="_bbToggleMany('${sectionId}','${field.key}','${_bbEscapeAttr(o.value)}')">${_bbEscapeHtml(o.label)}</button>
+      `).join('')}</div>`
+        : `<div class="bb-field-hint">${_bbEscapeHtml(field.emptyHint || 'Nothing to choose from yet.')}</div>`;
       break;
     }
     case 'check_many_defaults': {

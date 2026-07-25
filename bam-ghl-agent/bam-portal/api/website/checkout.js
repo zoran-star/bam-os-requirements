@@ -28,7 +28,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { renderAgreementPdf, uploadAgreementPdf, buildClauses } from "../_lib/agreement-pdf.js";
-import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
+import { applyDiscountToCents, normCode, couponFromPromo, couponCoversKey } from "../_coupon-guardrails.js";
 import { resolveOrMintPortalContact, writePortalFieldValues } from "../_contacts.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
@@ -366,6 +366,22 @@ async function handler(req, res) {
       } catch { couponError = "Could not check that code"; }
     }
 
+    // Build C: does the entered code cover the SIGN-UP FEE line? Placed after
+    // the coupon block because it needs the resolved couponCode. An
+    // unrestricted code (nothing ticked) covers everything, which is how every
+    // code behaved before Build C; an unknown/unreadable definition means we do
+    // NOT discount the fee, because over-charging a fee is recoverable and
+    // silently under-charging it is not visible to anyone.
+    let feeIsDiscountable = false;
+    if (signupFee && promo) {
+      try {
+        const cRows = await sb(`offers?id=eq.${encodeURIComponent(offerId)}&client_id=eq.${encodeURIComponent(clientId)}&select=data&limit=1`);
+        const defs = ((Array.isArray(cRows) && cRows[0] && cRows[0].data && cRows[0].data.pricing && cRows[0].data.pricing.discount_codes) || []);
+        const def = defs.find(d => d && normCode(d.code) === couponCode);
+        feeIsDiscountable = def ? couponCoversKey(def, `${planText}|signup_fee`) : true;
+      } catch (_) { feeIsDiscountable = false; }
+    }
+
     // ── Idempotency: reuse an existing member + in-flight sub ──
     const existingRows = await sb(
       `members?client_id=eq.${encodeURIComponent(clientId)}&parent_email=eq.${encodeURIComponent(parentEmail)}` +
@@ -518,6 +534,16 @@ async function handler(req, res) {
           [`add_invoice_items[${recurringStart ? 1 : 0}][price]`]: signupFee.stripe_price_id,
           "metadata[signup_fee_cents]": signupFee.amount_cents,
           "metadata[signup_fee_price]": signupFee.stripe_price_id,
+          // Build C: the fee line's discount is an EXPLICIT decision, never a
+          // cascade. Stripe lets a discount ride one invoice item directly
+          // (add_invoice_items[i][discounts]), so when the owner's checklist
+          // covers the fee we attach the promo to the fee line ourselves; when
+          // it does not, the line simply carries none. That removes the only
+          // documented-silent interaction (whether a subscription-level coupon
+          // reaches invoice-item lines) from the money path entirely.
+          ...(promo && feeIsDiscountable ? {
+            [`add_invoice_items[${recurringStart ? 1 : 0}][discounts][0][promotion_code]`]: promo.id,
+          } : {}),
         } : {}),
       },
     });

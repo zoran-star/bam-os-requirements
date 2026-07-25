@@ -98,6 +98,10 @@ Also: `dep: { notEmpty: true }` is a new field-config shape (show once the paren
 
 **RISK 4 GATE:** `match-prices.js` refuses to mint the fee target for an academy that has discount codes, because until Build C ships a sub-level coupon discounts every invoice line including the fee. GTA (2SIBLING) is therefore gated out by design.
 
+**2026-07-25 (Build C of the money model): COUPON APPLICABILITY.** Discount codes gain `applies_to` (check_many of `<plan>|<term>` keys, including `<plan>|signup_fee`). EMPTY/missing = applies to everything, so every pre-existing code is unchanged (only 2SIBLING exists, and it is unrestricted). Non-empty = only those keys. Enforcement: recurring lines via `applies_to[products]` on the Stripe coupon (keys -> live routable `offer_prices` -> deduped `stripe_product_id`s); the sign-up fee line via `add_invoice_items[i][discounts]` attached explicitly in checkout, never cascade. Helpers `couponAppliesToKeys` / `couponCoversKey` in `api/_coupon-guardrails.js`; `stripeCouponBody(def, productIds)` now takes product ids. Changing the checklist changes the coupon idempotency key, so a NEW Stripe coupon is minted (coupons are immutable); live subscriptions keep theirs. If ticked keys resolve to no live price, creation is REFUSED rather than silently unrestricted.
+
+New wizard capability: `check_many` supports `optionsFrom` (a named generator in `_BB_DYNAMIC_OPTIONS`) for options that come from the academy's own data. First generator: `offer_price_keys`, derived from the offer being edited.
+
 **Still to build:** a Nurture automation default; and the agent-facts sections the offer doesn't cover (coach ratio, group sizes, pricing transparency mode, geo-qualification, social proof) still need a dedicated agent-facts interview.
 
 ## Team is special

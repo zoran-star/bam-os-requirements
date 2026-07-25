@@ -256,10 +256,16 @@ function _termFromLength(s) {
 // an explicit owner choice per option (Zoran: "not by default, i want to set
 // it"), so an unanswered option charges nothing. Used to decide whether the fee
 // is worth a catalog row at all.
-// Any discount code configured on this offer? See the RISK 4 gate below.
-function hasLiveDiscountCodes(offer) {
+// RISK 4 GATE, narrowed once Build C shipped. The danger was never "this
+// academy has codes"; it was a code that could silently discount the sign-up
+// fee. With applicability live, a code that declares what it applies to is
+// safe: it either lists the fee key (deliberate) or it does not (excluded).
+// Only an UNRESTRICTED code is still dangerous, because Stripe applies it to
+// every line on the first invoice, the fee included.
+function hasUnrestrictedDiscountCodes(offer) {
   const codes = (offer.data && offer.data.pricing && offer.data.pricing.discount_codes) || [];
-  return codes.some(c => c && String(c.code || "").trim() && !c.archived);
+  return codes.some(c => c && String(c.code || "").trim() && !c.archived
+    && !(Array.isArray(c.applies_to) && c.applies_to.filter(Boolean).length));
 }
 
 function signupFeeChargedAnywhere(off) {
@@ -318,14 +324,13 @@ async function buildOfferTargets(clientId) {
       // option actually charges it. Charge/waive is explicit per option
       // (nothing assumed), so a fee nobody charges never reaches Stripe -
       // that is the "dead fee" state, legal but inert.
-      // RISK 4 GATE (money-model plan): until Build C ships coupon
-      // applicability, a subscription-level discount code hits EVERY line on
-      // the first invoice, the fee included. An academy with live codes would
-      // therefore silently half-price its own sign-up fee. Refuse to mint the
-      // fee row for those academies rather than charge a wrong number.
+      // RISK 4 GATE (money-model plan), narrowed by Build C. An UNRESTRICTED
+      // code still discounts every line on the first invoice, the fee
+      // included, so the fee stays off for those academies. A code that
+      // declares its applies_to list is safe and does not block the fee.
       const feeAmt = parseFloat(off.signup_fee);
-      if (!isNaN(feeAmt) && feeAmt > 0 && signupFeeChargedAnywhere(off) && hasLiveDiscountCodes(o)) {
-        console.warn(`[signup-fee] skipped for offer ${o.id} (${title}): academy has discount codes and coupon applicability (Build C) is not live yet`);
+      if (!isNaN(feeAmt) && feeAmt > 0 && signupFeeChargedAnywhere(off) && hasUnrestrictedDiscountCodes(o)) {
+        console.warn(`[signup-fee] skipped for offer ${o.id} (${title}): this academy has a discount code with no "applies to" list, which would also discount the fee. Set what each code applies to first.`);
       } else if (!isNaN(feeAmt) && feeAmt > 0 && signupFeeChargedAnywhere(off)) {
         const feeTax = resolveFee({ taxConfig, taxable: off.signup_fee_taxable, legacyText: null });
         targets.push({ key: `${title}|signup_fee`, offer_id: o.id, offering: title, term: "signup_fee",

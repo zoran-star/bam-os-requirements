@@ -1,5 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
-import { validateCouponDef, stripeCouponBody, stripePromoBody, couponFromPromo } from "../_coupon-guardrails.js";
+import { validateCouponDef, stripeCouponBody, stripePromoBody, couponFromPromo, couponAppliesToKeys } from "../_coupon-guardrails.js";
 export const maxDuration = 60; // Stripe coupon + promo-code creation per row
 // Vercel Serverless Function — Price Match → create discount codes in Stripe.
 //
@@ -102,6 +102,37 @@ async function liveCodes(stripeAccount) {
   return map;
 }
 
+// Build C: the owner's checked price keys -> the Stripe PRODUCT ids a coupon
+// should be restricted to. Scoped to LIVE prices only (Zoran 2026-07-24):
+// active + routable in the portal AND carrying a Stripe product. A key that no
+// longer resolves is dropped, so a code can never be attached to something
+// that cannot be sold.
+//
+// Returns null when the code is unrestricted (applies to everything), which is
+// how every pre-Build-C code behaves.
+//
+// CAVEAT, verified live: prices can SHARE a product (DETAIL Miami has 9 active
+// prices on 6 products). Stripe restricts by product, so ticking one price of a
+// shared product also covers its siblings. The checklist groups those into one
+// line so the UI never promises finer control than Stripe can enforce.
+async function productIdsForKeys(clientId, keys) {
+  if (!Array.isArray(keys) || !keys.length) return null;
+  const rows = await sb(
+    `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}` +
+    `&is_active=eq.true&is_routable=eq.true&select=source_offer_price_key,stripe_product_id`
+  ).catch(() => []);
+  const byKey = new Map((Array.isArray(rows) ? rows : [])
+    .filter(r => r && r.stripe_product_id)
+    .map(r => [String(r.source_offer_price_key || ""), r.stripe_product_id]));
+  const ids = keys.map(k => byKey.get(String(k))).filter(Boolean);
+  // SAFE FAILURE: the owner restricted this code, but none of the ticked keys
+  // resolve to a live sellable price. Returning null here would mean
+  // "applies to everything", the exact opposite of what they asked for, so the
+  // caller refuses to create the code instead.
+  if (!ids.length) return { error: "none of the selected prices are live yet - run Price Match first, or untick them to let the code apply to everything" };
+  return [...new Set(ids)];
+}
+
 async function clientAccount(clientId) {
   const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=stripe_connect_account_id&limit=1`);
   const acct = Array.isArray(rows) && rows[0] && rows[0].stripe_connect_account_id;
@@ -178,10 +209,19 @@ async function handler(req, res) {
       const def = check.coupon;
       try {
         // Coupon = the discount math (percent/dollar + how long it lasts).
+        // Build C: restrict to the products behind the owner's checked prices.
+        // The idempotency key includes an applicability fingerprint so changing
+        // the checklist mints a NEW coupon instead of silently reusing the old
+        // one (Stripe coupons are immutable - risk 2 of the money-model plan).
+        const applyKeys = couponAppliesToKeys(c);
+        const resolved = await productIdsForKeys(clientId, applyKeys);
+        if (resolved && resolved.error) { results.push({ code, error: resolved.error }); continue; }
+        const productIds = resolved;
+        const applyTag = productIds ? productIds.slice().sort().join(",").slice(0, 40) : "all";
         const coupon = await stripeFetch(`/coupons`, {
           method: "POST", stripeAccount: acct,
-          idempotencyKey: `sorter-coupon-${clientId}-${code}-${def.duration}-${def.duration_months || 0}-${isPercent(c.kind) ? "p" : "d"}-${def.value}`.slice(0, 200),
-          body: stripeCouponBody(def),
+          idempotencyKey: `sorter-coupon-${clientId}-${code}-${def.duration}-${def.duration_months || 0}-${isPercent(c.kind) ? "p" : "d"}-${def.value}-${applyTag}`.slice(0, 200),
+          body: stripeCouponBody(def, productIds),
         });
         // Promotion Code = the customer-facing string + limits (expiry, max uses,
         // once-per-customer) pointing at the coupon.
@@ -190,7 +230,7 @@ async function handler(req, res) {
           idempotencyKey: `sorter-promo-${clientId}-${code}`.slice(0, 200),
           body: stripePromoBody(def, coupon.id),
         });
-        results.push({ code, created: true, promotion_code_id: pc.id, coupon_id: coupon.id });
+        results.push({ code, created: true, promotion_code_id: pc.id, coupon_id: coupon.id, applies_to_products: productIds ? productIds.length : null });
       } catch (e) {
         results.push({ code, error: e.message || String(e) });
       }
