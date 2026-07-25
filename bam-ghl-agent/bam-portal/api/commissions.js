@@ -50,9 +50,8 @@ const STRIPE_API = "https://api.stripe.com/v1";
 // Report recipients (Growth Percentage clients only): Anna + Cole per spec.
 const REPORT_EMAILS = (process.env.COMMISSION_REPORT_EMAILS || "acallon@gmail.com,cole@byanymeansbball.com")
   .split(",").map(s => s.trim()).filter(Boolean);
-// Revenue-pull failure alerts go to Mike + Cole per spec. Mike's address must
-// be set via env (COMMISSION_ALERT_EMAILS="mike@...,cole@byanymeansbball.com").
-const ALERT_EMAILS = (process.env.COMMISSION_ALERT_EMAILS || "cole@byanymeansbball.com")
+// Revenue-pull failure alerts go to Mike + Cole per spec (override via env).
+const ALERT_EMAILS = (process.env.COMMISSION_ALERT_EMAILS || "mike@byanymeansbusiness.com,cole@byanymeansbball.com")
   .split(",").map(s => s.trim()).filter(Boolean);
 
 async function sb(path, init = {}) {
