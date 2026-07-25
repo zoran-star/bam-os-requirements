@@ -1,6 +1,6 @@
 # Agent pricing: live prices + disclosure on the agent template
 
-Agreed with Zoran 2026-07-24. Builds 1-5 shipped the same day; Build 6 is open.
+Agreed with Zoran 2026-07-24. All six builds shipped the same day.
 
 ## Why
 
@@ -117,7 +117,7 @@ numbers, and flag it to the admin.
 | 3 | `clientId + runtime -> template` resolver | Missing plumbing | Med | **shipped** |
 | 4 | `disclosure` on `AGENT_TEMPLATES` + master text | The architecture fix | Low | **shipped** |
 | 5 | Render `discount_codes`, commitment `after`, `discount_notes` | Agent stops being told to cite data it never got | Low | **shipped with 1** |
-| 6 | Read-only mode in the brain view, GLOBAL badge | Staff and owners can see the policy | Low | open |
+| 6 | Read-only mode in the brain view | Staff and owners can see the policy | Low | **shipped** |
 
 Anything that reaches the master hits BAM GTA, BAM San Jose, and DETAIL Miami at
 once, by design.
@@ -145,6 +145,22 @@ applies in all three modes.
 `api/agent/presets.js`. It goes live for every academy on that template at the next
 prompt build. It is applied AFTER stored overrides on purpose, so an academy cannot
 widen its own agent's disclosure, and a stale stored row cannot shadow a BAM change.
+
+**Build 6.** `pricing_disclosure` comes back from both brain endpoints with
+`scope: "policy"`, `editable: false`, the live resolved body, and a `policy`
+object naming the mode and the template. Both portals render it as a locked card:
+a gold mode badge (RANGE / EXACT / WITHHOLD), a "set by BAM" badge, and a line
+saying which agent template it is set on.
+
+Read-only for EVERYONE, including BAM staff and the global-editor academy. Since
+the policy is applied after stored overrides, an edit here would save a row that
+is then ignored, so an editable box would be a lie. Change it in `presets.js`.
+
+Fixed in passing: `api/agent-sandbox.js` returned no `scope` at all, so the STAFF
+brain editor rendered derived facts as editable textareas. `SandboxApp.jsx` had
+the read-only branch already written, but it could never fire. Staff edits to a
+derived fact appeared to save and were then ignored at prompt-build time. The
+sandbox endpoint now returns the same scope/source/editable shape as agent-train.
 
 **Ambiguity note:** `discovery_trial` runs two `booking`-runtime templates
 (`call_booking` then `trial_booking`). `templateForRuntime` returns the earliest by

@@ -29019,7 +29019,7 @@ function _factJumpTo(jump) {
 async function _taRenderKnowledge() {
   const p = document.getElementById('ta-panel'); if (!p) return;
   p.innerHTML = `
-    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.5">Your academy's facts power every reply - edit one and the agent uses it next time. Sections marked <b style="color:#6EA8D8">Live</b> are generated straight from your offer, locations, and team, so you edit them at the source. Sections marked <b style="color:#D4B65C">Global</b> are shared across <b>all</b> academies (edit carefully); <b><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></b> are managed by BAM.</p>
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.5">Your academy's facts power every reply - edit one and the agent uses it next time. Sections marked <b style="color:#6EA8D8">Live</b> are generated straight from your offer, locations, and team, so you edit them at the source. Sections marked <b style="color:var(--gold,#D4B65C)">Policy</b> are sales rules BAM sets for every academy, so they are read only. Sections marked <b style="color:#D4B65C">Global</b> are shared across <b>all</b> academies (edit carefully); <b><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></b> are managed by BAM.</p>
     <div id="ta-section-list"><div class="req-empty"><span class="req-spin"></span>Loading…</div></div>`;
   try {
     // fresh re-fetch after an "Edit the brain" round trip (flag set by _factJumpTo)
@@ -29028,8 +29028,9 @@ async function _taRenderKnowledge() {
     _TA._trainingOfferId = res.training_offer_id || null;
     const sections = (res.sections || []);
     const derived  = sections.filter(s => s.scope === 'derived');
-    const editable = sections.filter(s => s.scope !== 'derived' && s.editable);
-    const locked   = sections.filter(s => s.scope !== 'derived' && !s.editable);
+    const policy   = sections.filter(s => s.scope === 'policy');
+    const editable = sections.filter(s => s.scope !== 'derived' && s.scope !== 'policy' && s.editable);
+    const locked   = sections.filter(s => s.scope !== 'derived' && s.scope !== 'policy' && !s.editable);
     const host = document.getElementById('ta-section-list'); if (!host) return;
 
     // ── Brain health strip: N of 8 facts live + chips for any fully-missing fact ──
@@ -29072,6 +29073,32 @@ async function _taRenderKnowledge() {
       </div>`;
       }).join('') : '';
 
+    // ── Policy sections (Build 6): read-only for EVERYONE, including BAM staff and
+    // the global-editor academy. The mode is declared on the agent template in code,
+    // and it is applied after stored overrides, so an edit here would save and then
+    // be ignored. Showing it locked with the active mode is the honest UI.
+    const policyHtml = policy.length ? `<div style="font-size:12px;color:var(--text-mute);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin:2px 0 8px">Sales policy, set by BAM</div>` +
+      policy.map(s => {
+        const open = !!_TA.openSections[s.key];
+        const mode = (s.policy && s.policy.mode) ? String(s.policy.mode).toUpperCase() : '';
+        const srcLabel = (s.source && s.source.label) || '';
+        return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
+        <button onclick="_taToggleSec('${s.key}')" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:none;border:none;color:var(--text);padding:14px 16px;cursor:pointer;font-family:inherit;text-align:left">
+          <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}</span>
+            ${mode ? `<span style="color:var(--gold,#D4B65C);font-size:10.5px;font-family:monospace;border:1px solid var(--gold,#D4B65C);border-radius:99px;padding:1px 7px">${escapeHTML(mode)}</span>` : ''}
+            <span style="color:var(--text-mute);font-size:10.5px;font-family:monospace;border:1px solid var(--border);border-radius:99px;padding:1px 7px">SET BY BAM</span>
+          </span>
+          <span id="ta-chev-${s.key}" style="color:var(--text-mute);font-size:11px;transition:transform .15s;transform:rotate(${open ? 90 : 0}deg)">▶</span>
+        </button>
+        <div id="ta-sec-body-${s.key}" style="display:${open ? 'block' : 'none'};padding:0 16px 14px">
+          ${srcLabel ? `<div style="font-size:11.5px;color:var(--gold,#D4B65C);background:rgba(212,182,92,.08);border:1px solid rgba(212,182,92,.33);border-radius:8px;padding:7px 10px;margin-bottom:8px;line-height:1.45">${escapeHTML(srcLabel)}</div>` : ''}
+          <div style="white-space:pre-wrap;font-size:13.5px;color:var(--text-sub);line-height:1.55;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px">${escapeHTML(s.body)}</div>
+        </div>
+      </div>`;
+      }).join('') : '';
+
     // ── Editable (local + global-editable) sections ──
     let html = editable.map(s => {
       const open = !!_TA.openSections[s.key];
@@ -29104,7 +29131,7 @@ async function _taRenderKnowledge() {
     const autosSlot = hasAutos
       ? `<div id="confirm-autos-card"><div class="req-empty"><span class="req-spin"></span>Loading automations…</div></div>`
       : '';
-    const listBody = derivedHtml + html;
+    const listBody = derivedHtml + policyHtml + html;
     host.innerHTML = stripHtml + autosSlot + (listBody || `<div class="bb-empty">No sections yet.</div>`);
     if (hasAutos) _confirmAutosLoad(_TA.target);
   } catch (e) {

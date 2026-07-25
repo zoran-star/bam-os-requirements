@@ -16,6 +16,10 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
+import { derivedFactOverrides, FACT_SOURCES } from "./agent/fact-render.js";
+import { PRICING_DISCLOSURE } from "./agent/prompt-structure.js";
+import { resolveAgentTemplate } from "./agent/preset-master.js";
+import { AGENT_TEMPLATES, disclosureForTemplate } from "./agent/presets.js";
 
 // Which agent is being trained/previewed. Defaults to the booking agent.
 const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
@@ -266,19 +270,54 @@ async function handler(req, res) {
     // it (shared facts + that agent's behavior), in prompt order.
     if (action === "sections") {
       const agent = pickAgent(b.agent);
-      const ov = await sectionOverrides(clientId, agent);
+      // scope/editable mirror api/agent-train.js so the STAFF brain editor tells the
+      // same truth as the owner's. Without them every section rendered as an editable
+      // textarea here, including derived facts and the disclosure policy - both of
+      // which are ignored at prompt-build time, so a staff edit looked saved and did
+      // nothing (SandboxApp already had the read-only branch; it never fired).
+      const [ov, derived, policyTemplate] = await Promise.all([
+        sectionOverrides(clientId, agent),
+        derivedFactOverrides(clientId, sb).catch(() => ({})),
+        resolveAgentTemplate(clientId, agent, { sb }).catch(() => null),
+      ]);
       const bySection = new Map(SECTIONS.map(s => [s.key, s]));
       const sections = sectionKeysForAgent(agent)
         .map(k => bySection.get(k))
         .filter(Boolean)
-        .map(s => ({
-          key:          s.key,
-          label:        s.label,
-          group:        s.layer,
-          body:         ov[s.key] != null ? ov[s.key] : s.body,  // current (override or default)
-          default_body: s.body,
-          is_default:   ov[s.key] == null,
-        }));
+        .map(s => {
+          if (s.key === "pricing_disclosure") {
+            const mode = disclosureForTemplate(policyTemplate);
+            return {
+              key: s.key, label: s.label, group: s.layer,
+              body: PRICING_DISCLOSURE[mode] || s.body, default_body: s.body,
+              is_default: true, scope: "policy", editable: false,
+              policy: { mode, template: policyTemplate || null, mission: (AGENT_TEMPLATES[policyTemplate] || {}).mission || "" },
+              source: {
+                label: policyTemplate
+                  ? `Set by BAM on the ${policyTemplate} agent, and shared by every academy running it. Change it in api/agent/presets.js.`
+                  : "Set by BAM. No sales system is stamped on this academy yet, so its agents use the default policy.",
+              },
+            };
+          }
+          if (derived[s.key] != null) {
+            return {
+              key: s.key, label: s.label, group: s.layer,
+              body: derived[s.key], default_body: s.body,
+              is_default: true, scope: "derived", editable: false,
+              source: FACT_SOURCES[s.key] || null,
+            };
+          }
+          return {
+            key:          s.key,
+            label:        s.label,
+            group:        s.layer,
+            body:         ov[s.key] != null ? ov[s.key] : s.body,  // current (override or default)
+            default_body: s.body,
+            is_default:   ov[s.key] == null,
+            scope:        "editable",
+            editable:     true,
+          };
+        });
       return res.status(200).json({ agent, sections });
     }
 
