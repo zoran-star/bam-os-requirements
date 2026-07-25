@@ -284,13 +284,21 @@ function smCallDescription(c) {
 }
 
 // One row per client per call in onboarding_calls → map by call_key.
+// Degrades to {} if the table doesn't exist yet (migration not applied) so a
+// code deploy ahead of the SQL can never break the checklist - the call steps
+// just render as pending until the migration lands.
 async function loadOnboardingCalls(clientId) {
-  const rows = await sb(
-    `onboarding_calls?client_id=eq.${clientId}&select=id,call_key,step_number,data,completed_at,completed_by_name`
-  );
-  const byKey = {};
-  (rows || []).forEach(r => { byKey[r.call_key] = r; });
-  return byKey;
+  try {
+    const rows = await sb(
+      `onboarding_calls?client_id=eq.${clientId}&select=id,call_key,step_number,data,completed_at,completed_by_name`
+    );
+    const byKey = {};
+    (rows || []).forEach(r => { byKey[r.call_key] = r; });
+    return byKey;
+  } catch (e) {
+    console.error("loadOnboardingCalls failed (migration applied?):", e?.message || e);
+    return {};
+  }
 }
 
 // Upsert the client's onboarding_calls row for one call (source of truth for
