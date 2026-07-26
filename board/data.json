@@ -1,6 +1,6 @@
 {
   "updated": "2026-07-26 \u00b7 late night",
-  "headline": "TZ fix SHIPPED (PR #1602). SJ launches on the PORTAL SPINE, big-bang. Phone/A2P is the longest pole: it starts at Lij's EIN.",
+  "headline": "PR #1601 MERGED. SJ drips seeding now. From-address build planning. Phone room + ask-list are your moves.",
   "yourMoves": [
     {
       "urgency": "now",
@@ -13,13 +13,6 @@
       "title": "Send Lij the ask-list - EIN FIRST",
       "detail": "EIN now gates the A2P clock, which gates launch. Biggest lever in the project",
       "where": "draft in MISTER_ORCHESTRATOR"
-    },
-    {
-      "urgency": "now",
-      "title": "Review PR #1601 - kills the GTA leak in every drip",
-      "detail": "Unblocks SJ template seeding + from-address build",
-      "where": "github",
-      "link": "https://github.com/zoran-star/bam-os-requirements/pull/1601"
     },
     {
       "urgency": "now",
@@ -49,8 +42,8 @@
     }
   ],
   "pipeline": {
-    "build": "Timezone fix -> SHIPPED. Next build: from-address (after #1601)",
-    "queueRef": "queue #4 done, #3 next",
+    "build": "From-address fix",
+    "queueRef": "queue #3",
     "stages": [
       {
         "name": "Scout",
@@ -58,28 +51,28 @@
       },
       {
         "name": "Plan",
-        "state": "done"
+        "state": "active",
+        "note": "Fable planning"
       },
       {
         "name": "Gate 1 \u00b7 you",
-        "state": "done"
+        "state": "pending"
       },
       {
         "name": "Build",
-        "state": "done"
+        "state": "pending"
       },
       {
         "name": "Test",
-        "state": "done"
+        "state": "pending"
       },
       {
         "name": "Gate 2 \u00b7 you",
-        "state": "done"
+        "state": "pending"
       },
       {
         "name": "Ship",
-        "state": "done",
-        "note": "PR #1602"
+        "state": "pending"
       }
     ]
   },
@@ -136,21 +129,21 @@
       "id": 1,
       "title": "GTA identity fallback in outbound sends",
       "severity": "blocker",
-      "status": "owned elsewhere",
+      "status": "MERGED #1601",
       "owner": "PR #1601"
     },
     {
       "id": 2,
       "title": "coach Zoran + Oakville merge tokens",
       "severity": "blocker",
-      "status": "owned elsewhere",
+      "status": "MERGED #1601",
       "owner": "PR #1601"
     },
     {
       "id": 3,
       "title": "Emails send FROM BAM Toronto",
       "severity": "blocker",
-      "status": "ours, after #1601",
+      "status": "planning now",
       "owner": "us"
     },
     {
@@ -213,14 +206,14 @@
       "id": 7,
       "title": "Drip copy divergence + no auto-seed",
       "severity": "friction",
-      "status": "owned elsewhere",
+      "status": "MERGED #1601",
       "owner": "PR #1601"
     },
     {
       "id": 8,
       "title": "GTA-baked designed email templates",
       "severity": "friction",
-      "status": "owned elsewhere",
+      "status": "MERGED #1601",
       "owner": "PR #1601"
     },
     {
@@ -334,25 +327,25 @@
       "name": "Scout",
       "model": "Fable",
       "status": "done",
-      "detail": "13 findings, 1 sweep"
+      "detail": "13 findings"
     },
     {
       "name": "Planner",
       "model": "Fable",
-      "status": "done",
-      "detail": "tz plan approved + shipped"
+      "status": "running",
+      "detail": "from-address plan (queue #3)"
     },
     {
       "name": "Builder",
       "model": "Opus",
-      "status": "done",
-      "detail": "tz build shipped as PR #1602"
+      "status": "idle",
+      "detail": "tz shipped; next after gate 1"
     },
     {
       "name": "Tester",
       "model": "Opus",
-      "status": "done",
-      "detail": "zero bounces + gate 2"
+      "status": "idle",
+      "detail": "SJ drip leak-check queued post-seed"
     }
   ],
   "sessions": [
