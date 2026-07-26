@@ -96,6 +96,10 @@ Append to the shared context block:
 
 ---
 
+## Rooms: where Zoran's interactive loops live (decided 2026-07-26)
+
+The orchestrator chat never hosts a long back-and-forth loop. When a build needs Zoran's workshop (gate 1) or his hands-on test (gate 2), the orchestrator spawns a DISPOSABLE ROOM: a pre-briefed chat chip (via spawn_task) named "Design: <build>" or "Test: <build>". Zoran clicks it, works the loop there, the room reports its outcome back to the orchestrator session, and Zoran archives it. Rooms carry full context in their spawn prompt (plan file path, queue item, decisions already locked); the queue file stays the single memory. One build in flight = 1-2 rooms open, ever. Background agents (scout, builder, tester) stay invisible inside the orchestrator session.
+
 ## Gate 2 outcomes
 
 Zoran runs the script and says one of:
