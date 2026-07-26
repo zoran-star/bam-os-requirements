@@ -661,5 +661,51 @@
       "state": "unknown",
       "one": "Not one of mine. Tell me what it is and I will map it"
     }
-  ]
+  ],
+  "journey": {
+    "title": "BAM San Jose \u00b7 road to launch",
+    "note": "Big-bang launch: everything switches on the same day, after you review it all with Lij.",
+    "steps": [
+      {
+        "name": "Academy set up",
+        "state": "done",
+        "detail": "Offers, pricing, brand, policy, 536 contacts syncing"
+      },
+      {
+        "name": "Sales system clean",
+        "state": "done",
+        "detail": "All 6 GTA leaks dead, drips seeded, prices honest"
+      },
+      {
+        "name": "Email live",
+        "state": "active",
+        "detail": "3 DNS records into Squarespace, then it verifies itself"
+      },
+      {
+        "name": "Lij's materials",
+        "state": "next",
+        "detail": "Stripe, coaches, photos, testimonials, gym address"
+      },
+      {
+        "name": "Website published",
+        "state": "next",
+        "detail": "Goes live only once everything else is ready"
+      },
+      {
+        "name": "Lawyer sign-off",
+        "state": "waiting",
+        "detail": "Agreement approved, draft banner comes off"
+      },
+      {
+        "name": "LAUNCH DAY",
+        "state": "waiting",
+        "detail": "Flip the switch list: automations, drips, agents, payments"
+      },
+      {
+        "name": "Phone to Twilio",
+        "state": "later",
+        "detail": "Weeks after launch. Runs on GHL until then"
+      }
+    ]
+  }
 }

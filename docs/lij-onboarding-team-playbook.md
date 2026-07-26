@@ -106,6 +106,14 @@ Zoran's visual tracker lives at `board/index.html`, fed entirely by `board/data.
 
 **Start it with `scripts/mission-board.sh`, NOT preview_start.** The preview-managed server dies whenever the tooling or session restarts, which stranded Zoran twice. The script runs a detached `nohup` server that survives restarts, and is idempotent (safe to run any time). `scripts/mission-board.sh status` checks it, `stop` kills it. **Orchestrator duty: every time the queue, pipeline stage, agents, or Zoran's to-dos change, update `board/data.json` in the same breath as the queue file.** The board auto-refreshes every 5s.
 
+## Rooms report live to the board
+
+Every spawned room MUST keep its own status file so Zoran sees progress WHILE he is talking to it, instead of waiting for the room to finish. Add this block to every room spawn prompt:
+
+> **Keep the mission board live.** You own one file: `board/rooms/<slug>.json` in the orchestrator worktree (`/Users/zoransavic/bam-os-requirements/.claude/worktrees/agent-teams-access-6ba23e`). Write it when you start, whenever you start waiting on Zoran, whenever you get blocked, and when you finish. Shape: `{"slug":"<slug>","chat":"<exact sidebar chat name>","state":"red|white|blue|orange|done","one":"<one plain line, no em dashes>","blockedBy":"<only when orange>","at":"<ISO UTC>"}`. States: `red` = Zoran must do something on his computer, `white` = you are actively working, `blue` = you need his input in the chat, `orange` = blocked (say by what), `done` = finished. Also add your slug to `board/rooms/index.json` if it is not already there. Do NOT touch `board/data.json`; that belongs to the orchestrator.
+
+The board polls `rooms/index.json` every 5s, overlays each room's state/one-liner onto its chat card, and shows a green `● live · Nm ago` marker so Zoran can tell a self-reported status from an orchestrator-written one. One file per room means two rooms can never clobber each other. The orchestrator prunes stale files when a room is archived.
+
 ## HARD RULE: never send a build to gate 2 undeployed
 
 Learned twice, the expensive way (tz build, then from-address). A test room CANNOT run Zoran's hands-on script against uncommitted worktree edits: production is still running the old code, so every step either passes for the wrong reason or actively causes the bug the build exists to prevent.

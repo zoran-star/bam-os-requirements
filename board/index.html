@@ -62,6 +62,32 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .err{margin:0 32px 18px;padding:12px 16px;border:1px solid var(--red);border-left-width:4px;background:rgba(224,85,69,.07);color:var(--red);font-size:13px}
 .err b{display:block;font-family:var(--disp);font-size:17px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
 
+/* journey strip */
+.journey{display:flex;gap:0;overflow-x:auto;padding-bottom:6px}
+.jstep{
+  flex:1 1 0;min-width:132px;position:relative;padding:0 8px;text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+}
+.jstep .jbulb{
+  width:30px;height:30px;border-radius:50%;border:2px solid var(--line);background:var(--panel2);
+  display:flex;align-items:center;justify-content:center;font-size:13px;position:relative;z-index:2;flex:0 0 30px;
+}
+.jstep:not(:last-child)::after{
+  content:"";position:absolute;top:14px;left:calc(50% + 17px);right:calc(-50% + 17px);height:2px;background:var(--line);z-index:1;
+}
+.jstep .jname{font-family:var(--disp);font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:.03em;line-height:1.1;color:var(--mut)}
+.jstep .jdet{font-size:10px;color:var(--mut);line-height:1.4}
+.jstep.done .jbulb{border-color:var(--green);background:#14231a;color:var(--green)}
+.jstep.done:not(:last-child)::after{background:var(--green)}
+.jstep.done .jname{color:var(--bone)}
+.jstep.active .jbulb{border-color:var(--gold);background:var(--gold);color:var(--ink);animation:glow 1.8s infinite}
+.jstep.active .jname{color:var(--gold)} .jstep.active .jdet{color:var(--bone)}
+.jstep.next .jbulb{border-color:var(--gold-dim)}
+.jstep.next .jname{color:var(--bone)}
+.jstep.waiting .jbulb,.jstep.later .jbulb{border-style:dashed}
+.jstep.later{opacity:.55}
+.jnote{margin-top:10px;font-size:12px;color:var(--mut);font-style:italic}
+
 /* chats grid */
 .legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .lg{font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border:1px solid var(--line);color:var(--mut)}
@@ -77,6 +103,7 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .chat h4{font-family:var(--disp);font-weight:700;font-size:19px;line-height:1.1;text-transform:uppercase;letter-spacing:.03em;padding-right:26px}
 .chat .stateword{font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:600}
 .chat p{font-size:13px;color:var(--bone);line-height:1.55}
+.livedot{margin-left:8px;font-size:9px;letter-spacing:.08em;color:var(--green);text-transform:none}
 .btags{display:flex;flex-wrap:wrap;gap:6px}
 .btag{
   font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);
@@ -243,6 +270,11 @@ footer{margin:40px 32px 0;padding-top:14px;border-top:1px solid var(--line);font
 </header>
 <main>
   <div id="banner"></div>
+  <section id="journeySec">
+    <h2 id="journeyTitle">Road to launch</h2>
+    <div class="journey" id="journey"></div>
+    <div class="jnote" id="journeyNote"></div>
+  </section>
   <section>
     <h2>Chats</h2>
     <div class="legend">
@@ -339,19 +371,46 @@ function buildTags(c, d){
   }).join("") + `</div>`;
 }
 
+function ago(iso){
+  if(!iso) return "";
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if(s < 90) return "just now";
+  if(s < 3600) return Math.round(s/60) + "m ago";
+  if(s < 86400) return Math.round(s/3600) + "h ago";
+  return Math.round(s/86400) + "d ago";
+}
+
 function render(d){
   const arch = readArch();
-  const live = (d.chatMap || []).filter(c => !arch[c.name]);
+  const rooms = window._rooms || {};
+  const live = (d.chatMap || []).filter(c => !arch[c.name]).map(c => {
+    const r = rooms[c.sidebar || c.name];
+    if(!r) return c;
+    return {...c, state: r.state || c.state, one: r.one || c.one,
+            blockedBy: r.blockedBy || c.blockedBy, liveAt: r.at};
+  });
   $("chats").innerHTML = live.map(c => `
     <div class="chat ${esc(c.state)}">
       <button class="x" data-arc="${esc(c.name)}" title="Archive off the board">✕</button>
       <h4>${esc(c.sidebar || c.name)}</h4>
-      <div class="stateword">${STATEWORD[c.state] || esc(c.state)}</div>
+      <div class="stateword">${STATEWORD[c.state] || esc(c.state)}${c.liveAt ? `<span class="livedot" title="reported by the room itself">● live · ${esc(ago(c.liveAt))}</span>` : ""}</div>
       ${buildTags(c, d)}
       <p>${esc(c.one)}</p>
       ${c.blockedBy ? `<div class="blocked">⏳ blocked by: ${esc(c.blockedBy)}</div>` : ""}
     </div>`).join("");
   renderUndo();
+
+  if(d.journey){
+    $("journeyTitle").textContent = d.journey.title;
+    $("journeyNote").textContent = d.journey.note || "";
+    const MARK = {done:"✓", active:"●", next:"", waiting:"", later:""};
+    $("journey").innerHTML = d.journey.steps.map(s => `
+      <div class="jstep ${esc(s.state)}">
+        <div class="jbulb">${MARK[s.state] || ""}</div>
+        <div class="jname">${esc(s.name)}</div>
+        <div class="jdet">${esc(s.detail)}</div>
+      </div>`).join("");
+  } else { $("journeySec").style.display = "none"; }
 
   $("updated").textContent = "updated " + d.updated;
   $("updates").innerHTML = d.recentUpdates.map(u => `<div>${esc(u)}</div>`).join("");
@@ -452,11 +511,30 @@ document.addEventListener("click", e => {
   render(window._data);
 });
 
+async function loadRooms(){
+  const out = {};
+  try{
+    const idx = await fetch("rooms/index.json?t=" + Date.now());
+    if(!idx.ok) return out;
+    const slugs = await idx.json();
+    await Promise.all(slugs.map(async s => {
+      try{
+        const r = await fetch(`rooms/${s}.json?t=` + Date.now());
+        if(!r.ok) return;
+        const j = await r.json();
+        if(j && j.chat) out[j.chat] = j;
+      }catch(e){}
+    }));
+  }catch(e){}
+  return out;
+}
+
 async function load(){
   try{
     const r = await fetch("data.json?t=" + Date.now());
     if(!r.ok) throw new Error("HTTP " + r.status);
     const d = await r.json();
+    window._rooms = await loadRooms();
     window._data = d;
     render(d);
     $("banner").innerHTML = "";
