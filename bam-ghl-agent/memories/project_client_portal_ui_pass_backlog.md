@@ -1,6 +1,6 @@
 # Client portal: parked items for future sessions (2026-07-16)
 
-Parked by Zoran during the mobile styling session. **These belong in Notion Open Loops but both local Notion tokens 401'd** (whiteboard `.env.production` NOTION_TOKEN + bam-portal `.env.local` NOTION_API_KEY, and this session's Notion MCP had no write tools). Move them there when Notion access is back - and refresh those tokens, the whiteboard one powers push-requirements.mjs / session tooling.
+Parked by Zoran during the mobile styling session. **These belong in Notion Open Loops but both local Notion tokens 401'd** (whiteboard `.env.production` NOTION_TOKEN + bam-portal `.env.local` NOTION_API_KEY, and this session's Notion MCP had no write tools). Move them there when Notion access is back - and refresh those tokens. (The `whiteboard/` folder itself was retired 2026-07-25; only its gitignored `.env.production` survives in the main checkout, and it is still the NOTION_TOKEN source.)
 
 ## 1. Top banners: extend triggers + overdue escalation (future session, Medium)
 The two top-of-portal banners are rendered client-side on boot from ticket states - nothing "sends" them:

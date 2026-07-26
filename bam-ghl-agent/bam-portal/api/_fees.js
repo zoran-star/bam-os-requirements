@@ -1,12 +1,14 @@
-// Parse an academy's free-text "added fees" (offer wizard, per offering + per
-// commitment) into a structured fee, and apply it to a pre-tax base price.
+// THE one place money math lives (shared by match-prices.js for target
+// building / drift and create-price.js for the actual charge).
 //
-// This replaces the old hardcoded 13% Ontario HST: nothing is added unless the
-// academy typed a fee. US academies who type nothing charge the base price;
-// a CA academy who types "+13% HST" gets it applied. Shared by match-prices.js
-// (target building / drift) and create-price.js (the actual charge) so the
-// money math lives in ONE place.
+// Build T of the money model (docs/money-model-plan.md, 2026-07-24): tax is a
+// TEMPLATE on the academy (clients.tax_config = { label, pct }), and each
+// price/commitment row carries taxable yes/no instead of retyping "13% HST"
+// as free text. resolveFee() below is the precedence rule every caller uses.
 //
+// The legacy free-text parser stays for rows that predate the template: an
+// academy with typed "13% HST" strings and no tax_config behaves exactly as
+// before until it is migrated. parseFee formats:
 //   "+13% HST" / "13% HST" / "13%"  -> { kind:'percent', pct:13, label:'13% HST' }
 //   "$25" / "25" / "$25 admin"      -> { kind:'flat', cents:2500, label:'$25 admin' }
 //   "" / null / "HST" (no number)   -> null  (no fee applied)
@@ -34,6 +36,35 @@ export function parseFee(raw) {
   }
 
   return null;
+}
+
+// Academy tax template (clients.tax_config { label, pct }) -> a percent fee,
+// or null when there is no usable template. Same shape parseFee returns, so
+// applyFee/feeLabel work unchanged.
+export function taxFee(taxConfig) {
+  const pct = Number(taxConfig && taxConfig.pct);
+  if (!isFinite(pct) || pct <= 0) return null;
+  const name = String((taxConfig && taxConfig.label) || "").trim();
+  const num = Number.isInteger(pct) ? String(pct) : String(pct);
+  return { kind: "percent", pct, label: name ? `${num}% ${name}` : `${num}%` };
+}
+
+// THE precedence rule (logic scan #1: setting the template IS the explicit
+// opt-in; per-row taxable then defaults to yes, "No" is the per-row exemption):
+//
+//   template set  + row taxable "No"/false  -> null (exempt row)
+//   template set  + anything else           -> the template's percent
+//   no template                             -> legacy free-text parseFee(text)
+//
+// So an academy with no template keeps its typed strings working exactly as
+// before, and an academy WITH a template never depends on free text again.
+export function resolveFee({ taxConfig, taxable, legacyText } = {}) {
+  const t = taxFee(taxConfig);
+  if (t) {
+    const v = String(taxable == null ? "" : taxable).trim().toLowerCase();
+    return (v === "no" || v === "false") ? null : t;
+  }
+  return parseFee(legacyText);
 }
 
 // base (cents) + fee -> all-in (cents). No fee -> base unchanged.

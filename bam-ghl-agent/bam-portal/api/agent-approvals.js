@@ -81,7 +81,7 @@ async function loadClient(clientId) {
 async function loadConfig(clientId) {
   const [lessons, overrides, exRows] = await Promise.all([
     sb(`agent_lessons?or=(client_id.eq.${clientId},and(client_id.is.null,scope.eq.general))&agent=eq.booking&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
-    loadMergedOverrides(clientId),   // global brain (general/goal) + this academy's own (location/offer)
+    loadMergedOverrides(clientId, "booking"),   // global brain (general/goal) + this academy's own (location/offer) + its template's disclosure policy
     sb(`agent_examples?client_id=eq.${clientId}&agent=eq.booking&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
   ]);
   return { lessons: Array.isArray(lessons) ? lessons : [], overrides, examples: Array.isArray(exRows) ? exRows : [] };

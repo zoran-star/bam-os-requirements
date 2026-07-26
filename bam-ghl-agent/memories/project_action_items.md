@@ -12,7 +12,7 @@ staff-portal page. Any field on any row is editable by anyone who can see it.
 > 1 slack · 2 connect_stripe* · 3 create_ghl · 4 connect_ghl*
 > 5 general_info · 6 staff · 7 locations · 8 brand · 9 kpis · 10 offers
 > 11 book_call(SM)
-> 12-18 sm_call_1..7 📞 (V1.5/V2 only)   ← NEW 2026-07-25, Mike's 7-call sequence
+> 12-18 sm_call_1..7 📞🔒 (staff-only)   ← NEW 2026-07-25, Mike's 7-call sequence
 > 19 trigger_buildout🔒
 > 20 sys_build_draft⚙ · 21 sys_client_review⚙★ · 22 sys_revisions⚙
 > 23 book_call_cam · 24 connect_ads · 25 add_campaign
@@ -22,13 +22,33 @@ staff-portal page. Any field on any row is editable by anyone who can see it.
 >   calls (APVO/Offers · Media/Funnels · Referral · Organic · Sales Process ·
 >   Systems+Ads Review · Athlete Onboarding/Retention). STRICT order - call N
 >   unlocks when N-1 is done (API-enforced, code call_sequence_locked).
->   Client-VISIBLE but staff-toggle-ONLY. Structured per-topic data lives in
+>   STAFF-ONLY (Zoran 2026-07-26, PR #1596: whole scaling program invisible
+>   client-side; staff_only flag like trigger_buildout - was briefly specced
+>   client-visible). Structured per-topic data lives in
 >   the `onboarding_calls` table (one row per client per call, data jsonb,
 >   registry SM_CALLS in api/action-items.js); staff edit it in the client's
 >   Action Items tab (expandable per-call editor, PATCH {id, call_data}).
->   Gated tier:"v2v15" so legacy V1 checklists are untouched. Calibration
->   prompt on every call: "What do you currently have in place for this?"
+>   Gated tier:"program" (Cole's call 2026-07-25): the calls appear ONLY for
+>   clients with clients.payment_model set (Commissions tab) AND non-V1 -
+>   setting payment terms is the one switch that turns the sequence + the
+>   staff Profile tab content on; clearing the model removes the items again
+>   (onboarding_calls data survives). Calibration prompt on every call:
+>   "What do you currently have in place for this?"
 >   NOT counted in ONBOARDING_STEP_COLS (roster bar = core steps only).
+>
+> 👤 Client Profile (2026-07-25 Mike's spec; STAFF-ONLY per Zoran 2026-07-26):
+>   the call data is ALSO surfaced as a consolidated per-client page so it is
+>   not buried in done checklist items. Staff: "Profile" tab in ClientDetail
+>   (ClientProfileTab - sections by profile_section, inline edit via the same
+>   PATCH {id, call_data}, link-outs to Systems/Marketing tabs). The client-
+>   side "Business Profile" nav view was CUT before merge (PR #1596) - there
+>   is NO client-side surface for the scaling program; do not re-add one
+>   without Zoran's sign-off. SINGLE SOURCE OF TRUTH = onboarding_calls -
+>   the profile is a view over the same records, shows data before a call is
+>   marked done. Section names come from SM_CALLS[].profile_section (API
+>   decoration). No new storage was added for it (per the spec's
+>   centralize-don't-duplicate rule). Staff guide (public URL, noindex):
+>   portal.byanymeansbusiness.com/guides/scaling-program.html
 >   (*auto from a connect signal · 🔒 = staff-only, hidden from clients ·
 >    ⚙ = ticket-derived, mirrors the systems onboarding ticket, not hand-toggleable ·
 >    ★ = lights up gold when it's the client's turn)

@@ -374,7 +374,7 @@ function BrainEditor({ agent = "booking" }) {
           </div>
         )}
         <div style={{ fontSize: 13, color: tk.textSub, marginBottom: 20, lineHeight: 1.6 }}>
-          Edit any section. Saved changes hit the very next sandbox message. <span style={{ color: tk.accent }}>✏️ edited</span> marks sections you've customized{editedCount ? ` (${editedCount} so far)` : ""}. <span style={{ color: "#6EA8D8" }}>Live from offer</span> sections are generated straight from the academy's offer, locations, and team.
+          Edit any section. Saved changes hit the very next sandbox message. <span style={{ color: tk.accent }}>✏️ edited</span> marks sections you've customized{editedCount ? ` (${editedCount} so far)` : ""}. <span style={{ color: "#6EA8D8" }}>Live from offer</span> sections are generated straight from the academy's offer, locations, and team. <span style={{ color: tk.accent }}>Set by BAM</span> sections are shared sales policy and are read only here.
         </div>
         {GROUPS.map(g => (
           <div key={g.key} style={{ marginBottom: 26 }}>
@@ -397,6 +397,36 @@ function SectionCard({ s, reload }) {
   async function reset() { setSaving(true); try { await api("reset-section", { key: s.key }); setBody(s.default_body); await reload(); } finally { setSaving(false); } }
   // Derived facts are rendered live from the offer/locations/team - display-only
   // here (edited at the source, not in the brain). Show where they come from.
+  // Pricing disclosure (Build 6): tier-1 policy declared on the agent template in
+  // api/agent/presets.js. Read-only for everyone, staff included: it is applied
+  // after stored overrides, so an edit here would save and then be ignored.
+  if (s.scope === "policy") {
+    const mode = (s.policy && s.policy.mode) ? String(s.policy.mode).toUpperCase() : "";
+    // Second axis (2026-07-26): how a price is SHAPED when it is given. Read-only
+    // for the same reason the mode is - it is declared on the agent template in
+    // api/agent/presets.js and applied after any stored row.
+    const breakdown = (s.policy && s.policy.breakdown) ? String(s.policy.breakdown).replace("_", " ").toUpperCase() : "";
+    const srcLabel = (s.source && s.source.label) || "";
+    return (
+      <div style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
+        <div onClick={() => setOpen(o => !o)} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flexWrap: "wrap" }}>
+          <span style={{ display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", color: tk.textMute, fontSize: 11 }}>▶</span>
+          <span style={{ fontSize: 13.5, fontWeight: 600 }}>{s.label}</span>
+          {mode && <span style={{ fontSize: 10, color: tk.accent, border: `1px solid ${tk.accentBorder}`, borderRadius: 99, padding: "1px 8px" }}>{mode}</span>}
+          {breakdown && <span style={{ fontSize: 10, color: tk.accent, border: `1px solid ${tk.accentBorder}`, borderRadius: 99, padding: "1px 8px" }}>{breakdown}</span>}
+          <span style={{ fontSize: 10, color: tk.textMute, border: `1px solid ${tk.border}`, borderRadius: 99, padding: "1px 8px" }}>set by BAM</span>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 11, color: tk.textMute }}>{open ? "hide" : "view"}</span>
+        </div>
+        {open && (
+          <div style={{ padding: "0 14px 14px" }}>
+            {srcLabel && <div style={{ fontSize: 11.5, color: tk.accent, marginBottom: 8 }}>{srcLabel}</div>}
+            <div style={{ whiteSpace: "pre-wrap", fontSize: 13, color: tk.textSub, lineHeight: 1.55, background: tk.surfaceEl, border: `1px solid ${tk.border}`, borderRadius: 8, padding: "10px 12px" }}>{s.body}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
   if (s.scope === "derived") {
     const srcLabel = s.key === "social_proof"
       ? "Managed by BAM until the Google Reviews build"

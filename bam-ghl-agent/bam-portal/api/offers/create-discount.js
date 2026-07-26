@@ -1,5 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
-import { validateCouponDef, stripeCouponBody, stripePromoBody, couponFromPromo } from "../_coupon-guardrails.js";
+import { validateCouponDef, stripeCouponBody, stripePromoBody, couponFromPromo, couponAppliesToKeys } from "../_coupon-guardrails.js";
 export const maxDuration = 60; // Stripe coupon + promo-code creation per row
 // Vercel Serverless Function — Price Match → create discount codes in Stripe.
 //
@@ -102,6 +102,37 @@ async function liveCodes(stripeAccount) {
   return map;
 }
 
+// Build C: the owner's checked price keys -> the Stripe PRODUCT ids a coupon
+// should be restricted to. Scoped to LIVE prices only (Zoran 2026-07-24):
+// active + routable in the portal AND carrying a Stripe product. A key that no
+// longer resolves is dropped, so a code can never be attached to something
+// that cannot be sold.
+//
+// Returns null when the code is unrestricted (applies to everything), which is
+// how every pre-Build-C code behaves.
+//
+// CAVEAT, verified live: prices can SHARE a product (DETAIL Miami has 9 active
+// prices on 6 products). Stripe restricts by product, so ticking one price of a
+// shared product also covers its siblings. The checklist groups those into one
+// line so the UI never promises finer control than Stripe can enforce.
+async function productIdsForKeys(clientId, keys) {
+  if (!Array.isArray(keys) || !keys.length) return null;
+  const rows = await sb(
+    `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}` +
+    `&is_active=eq.true&is_routable=eq.true&select=source_offer_price_key,stripe_product_id`
+  ).catch(() => []);
+  const byKey = new Map((Array.isArray(rows) ? rows : [])
+    .filter(r => r && r.stripe_product_id)
+    .map(r => [String(r.source_offer_price_key || ""), r.stripe_product_id]));
+  const ids = keys.map(k => byKey.get(String(k))).filter(Boolean);
+  // SAFE FAILURE: the owner restricted this code, but none of the ticked keys
+  // resolve to a live sellable price. Returning null here would mean
+  // "applies to everything", the exact opposite of what they asked for, so the
+  // caller refuses to create the code instead.
+  if (!ids.length) return { error: "none of the selected prices are live yet - run Price Match first, or untick them to let the code apply to everything" };
+  return [...new Set(ids)];
+}
+
 async function clientAccount(clientId) {
   const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=stripe_connect_account_id&limit=1`);
   const acct = Array.isArray(rows) && rows[0] && rows[0].stripe_connect_account_id;
@@ -169,7 +200,68 @@ async function handler(req, res) {
       if (!code) { results.push({ code: c.code, error: "empty code" }); continue; }
       if (live.has(code)) {
         const pc = live.get(code);
-        results.push({ code, created: false, exists: true, promotion_code_id: pc.id });
+        // Build C: a live code already exists. Its coupon's applies_to is
+        // IMMUTABLE - Stripe only lets you edit a coupon's name/metadata
+        // ("other coupon details are, by design, not editable"), so the
+        // portal's applies_to list can never reach Stripe by updating.
+        // Compare what Stripe actually enforces against what the owner wants:
+        //   same        -> nothing to do
+        //   different   -> report needs_reissue, or perform the swap when the
+        //                  caller explicitly asked for it
+        const wantKeys = couponAppliesToKeys(c);
+        const wantResolved = await productIdsForKeys(clientId, wantKeys);
+        if (wantResolved && wantResolved.error) { results.push({ code, error: wantResolved.error }); continue; }
+        const want = [...(wantResolved || [])].sort();
+        const liveCoupon = couponFromPromo(pc) || {};
+        const haveList = (liveCoupon.applies_to && liveCoupon.applies_to.products) || [];
+        const have = [...haveList].sort();
+        const same = want.length === have.length && want.every((x, i) => x === have[i]);
+        if (same) {
+          results.push({ code, created: false, exists: true, promotion_code_id: pc.id, applicability: "in_sync" });
+          continue;
+        }
+        if (!body.reissue) {
+          results.push({
+            code, created: false, exists: true, promotion_code_id: pc.id,
+            needs_reissue: true,
+            live_products: have.length, wanted_products: want.length,
+            message: want.length
+              ? "This code is live in Stripe without the 'applies to' limits you set. Stripe cannot edit them on an existing code, so it has to be re-issued. Parents already subscribed keep the discount they signed up with."
+              : "This code is limited in Stripe but your 'applies to' list is now empty (applies to everything). Re-issue to match.",
+          });
+          continue;
+        }
+        // ── Explicit re-issue ────────────────────────────────────────────
+        // New coupon carrying the wanted restriction, then swap the customer
+        // facing string onto it: deactivate the old promotion code and mint a
+        // new one with the same code. Deactivating only stops FUTURE
+        // redemptions - "it doesn't remove the discount from any subscription
+        // or invoice that already has it" - so live members are untouched.
+        const rcheck = validateCouponDef(c);
+        if (!rcheck.ok) { results.push({ code, error: rcheck.error }); continue; }
+        try {
+          const newCoupon = await stripeFetch(`/coupons`, {
+            method: "POST", stripeAccount: acct,
+            idempotencyKey: `sorter-coupon-reissue-${clientId}-${code}-${want.join(",").slice(0, 60)}`.slice(0, 200),
+            body: stripeCouponBody(rcheck.coupon, want.length ? want : null),
+          });
+          await stripeFetch(`/promotion_codes/${pc.id}`, {
+            method: "POST", stripeAccount: acct, body: { active: "false" },
+          });
+          const newPc = await stripeFetch(`/promotion_codes`, {
+            method: "POST", stripeAccount: acct,
+            idempotencyKey: `sorter-promo-reissue-${clientId}-${code}-${newCoupon.id}`.slice(0, 200),
+            body: stripePromoBody(rcheck.coupon, newCoupon.id),
+          });
+          results.push({
+            code, created: true, reissued: true,
+            promotion_code_id: newPc.id, coupon_id: newCoupon.id,
+            replaced_promotion_code_id: pc.id,
+            applies_to_products: want.length || null,
+          });
+        } catch (e) {
+          results.push({ code, error: `re-issue failed: ${e.message || String(e)}` });
+        }
         continue;
       }
       // Guardrails: rejects 0/100% and bad shapes before anything hits Stripe.
@@ -178,10 +270,19 @@ async function handler(req, res) {
       const def = check.coupon;
       try {
         // Coupon = the discount math (percent/dollar + how long it lasts).
+        // Build C: restrict to the products behind the owner's checked prices.
+        // The idempotency key includes an applicability fingerprint so changing
+        // the checklist mints a NEW coupon instead of silently reusing the old
+        // one (Stripe coupons are immutable - risk 2 of the money-model plan).
+        const applyKeys = couponAppliesToKeys(c);
+        const resolved = await productIdsForKeys(clientId, applyKeys);
+        if (resolved && resolved.error) { results.push({ code, error: resolved.error }); continue; }
+        const productIds = resolved;
+        const applyTag = productIds ? productIds.slice().sort().join(",").slice(0, 40) : "all";
         const coupon = await stripeFetch(`/coupons`, {
           method: "POST", stripeAccount: acct,
-          idempotencyKey: `sorter-coupon-${clientId}-${code}-${def.duration}-${def.duration_months || 0}-${isPercent(c.kind) ? "p" : "d"}-${def.value}`.slice(0, 200),
-          body: stripeCouponBody(def),
+          idempotencyKey: `sorter-coupon-${clientId}-${code}-${def.duration}-${def.duration_months || 0}-${isPercent(c.kind) ? "p" : "d"}-${def.value}-${applyTag}`.slice(0, 200),
+          body: stripeCouponBody(def, productIds),
         });
         // Promotion Code = the customer-facing string + limits (expiry, max uses,
         // once-per-customer) pointing at the coupon.
@@ -190,7 +291,7 @@ async function handler(req, res) {
           idempotencyKey: `sorter-promo-${clientId}-${code}`.slice(0, 200),
           body: stripePromoBody(def, coupon.id),
         });
-        results.push({ code, created: true, promotion_code_id: pc.id, coupon_id: coupon.id });
+        results.push({ code, created: true, promotion_code_id: pc.id, coupon_id: coupon.id, applies_to_products: productIds ? productIds.length : null });
       } catch (e) {
         results.push({ code, error: e.message || String(e) });
       }

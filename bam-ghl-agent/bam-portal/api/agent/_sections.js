@@ -14,6 +14,7 @@
 // the merge is byte-identical to the old behavior (defaults + per-client overrides).
 import { SECTIONS } from "./prompt-structure.js";
 import { derivedFactOverrides } from "./fact-render.js";
+import { resolveDisclosureOverride } from "./preset-master.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -58,15 +59,23 @@ export async function loadGlobalSections() {
 // rendered fact (fact-render.js, e.g. `program` derived live from the Training
 // offer) beats the stored text - the stored row is only the fallback for when the
 // offer is too sparse to render (Build 2: facts are derived, never typed).
-export async function loadMergedOverrides(clientId) {
-  const [globalMap, clientRows, derived] = await Promise.all([
+// `agent` is the RUNTIME the caller is about to build ("booking"/"confirm"/
+// "closing"). Passing it resolves that academy's agent TEMPLATE and applies the
+// template's pricing-disclosure policy (Build 3+4). Omitting it leaves the
+// section on its shipped default (range), which is what a caller with no agent
+// context should get.
+export async function loadMergedOverrides(clientId, agent) {
+  const [globalMap, clientRows, derived, disclosure] = await Promise.all([
     loadGlobalSections(),
     sb(`agent_prompt_sections?client_id=eq.${clientId}&select=section_key,body`).catch(() => []),
     derivedFactOverrides(clientId, sb),
+    agent ? resolveDisclosureOverride(clientId, agent, { sb }) : Promise.resolve({}),
   ]);
   const overrides = { ...globalMap };
   for (const r of (Array.isArray(clientRows) ? clientRows : [])) overrides[r.section_key] = r.body;
   Object.assign(overrides, derived);
+  // Last: tier-1 policy from code beats any stored row (see resolveDisclosureOverride).
+  Object.assign(overrides, disclosure);
   return overrides;
 }
 

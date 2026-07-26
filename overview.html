@@ -280,7 +280,6 @@
   <p>AI-native operating system for basketball academies. Built for acquisition ($5M–$15M+). Every folder, every project, every connection — in one place.</p>
   <div class="quick-links">
     <a class="quick-link" style="color:var(--blue);border-color:var(--blue-border);background:var(--blue-bg)" href="https://fullcontrol-prototype-six.vercel.app" target="_blank">🖥 Prototype</a>
-    <a class="quick-link" style="color:var(--purple);border-color:var(--purple-border);background:var(--purple-bg)" href="https://whiteboard-beta-indol.vercel.app" target="_blank">🗂 Whiteboard</a>
     <a class="quick-link" style="color:var(--green);border-color:var(--green-border);background:var(--green-bg)" href="https://full-control-survey.vercel.app" target="_blank">📋 Market Survey</a>
     <a class="quick-link" style="color:var(--gray);border-color:var(--gray-border);background:var(--gray-bg)" href="https://github.com/zoran-star/bam-os-requirements" target="_blank">⌥ GitHub</a>
   </div>
@@ -346,17 +345,16 @@ Runs on http://localhost:5173
 - src/styles/ — CSS modules per component/page
 - src/hooks/ — custom React hooks (useBannerCanvas, useCountUp, useTypewriter)
 - src/context/ — LocationContext (multi-location support)
-- sessions/ — HTML review session files from whiteboard planning sessions
+- sessions/ — archived HTML review pages from the retired whiteboard tool (historical reference only)
 
 ## Key rules
 - Prototype and Notion must stay in sync. If you change the prototype, update Notion. If Notion changes, check if the prototype needs updating.
-- Don't add features beyond what's been agreed in whiteboard sessions or confirmed by Zoran.
+- Don't add features beyond what Zoran has confirmed.
 - Use CSS modules — no inline styles, no Tailwind.
 - All new pages go in src/pages/, all shared UI in src/components/.
 
 ## Connects to
 - Notion — business requirements live there; prototype is the living implementation
-- whiteboard/ — planning sessions drive what gets built here
 - bam-gta-phase1/ — the GTA apps are location-specific implementations of this prototype</textarea>
           <div class="claude-actions">
             <button class="claude-btn claude-btn-copy" onclick="copyClaude('claude-text-prototype', this)">Copy to clipboard</button>
@@ -367,81 +365,6 @@ Runs on http://localhost:5173
         <div class="notes-label">Session Notes</div>
         <textarea class="notes-area" id="notes-prototype" placeholder="Notes about the prototype — status, what's next, blockers..."></textarea>
         <button class="copy-btn" onclick="copyNotes('notes-prototype', this)">Copy notes</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- WHITEBOARD -->
-<div class="card c-purple" id="card-whiteboard">
-  <div class="card-header" onclick="toggle('card-whiteboard')">
-    <div class="card-emoji">🗂</div>
-    <div class="card-meta">
-      <div class="card-title">Requirements Whiteboard</div>
-      <div class="card-path">whiteboard/</div>
-    </div>
-    <div class="card-right">
-      <span class="badge badge-tool">Tool</span>
-      <span class="badge badge-live">● Live</span>
-      <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
-    </div>
-  </div>
-  <div class="card-body">
-    <div class="card-body-inner">
-      <p class="desc">Standalone planning tool for running structured review sessions across any project. The tool lives here — session output files live in each project's own folder. Uses Notion as its backend.</p>
-      <div class="tags">
-        <span class="tag tag-purple">React / Vite</span>
-        <span class="tag tag-purple">Notion API</span>
-        <span class="tag tag-purple">whiteboard-beta-indol.vercel.app</span>
-      </div>
-      <div class="sub-items">
-        <div class="sub-item"><div class="sub-item-title">api/sessions.js</div><div class="sub-item-desc">Read/write session cards from Notion Sessions DB</div></div>
-        <div class="sub-item"><div class="sub-item-title">api/backlog.js</div><div class="sub-item-desc">Write backlog items to Notion Backlog DB</div></div>
-        <div class="sub-item"><div class="sub-item-title">Session files</div><div class="sub-item-desc">Live in each project folder — e.g. FullControl sessions → prototype/sessions/</div></div>
-      </div>
-      <div class="claude-section" id="claude-whiteboard">
-        <div class="claude-header" onclick="toggleClaude('claude-whiteboard')">
-          <div class="claude-header-left">
-            <span class="claude-pill">CLAUDE.md</span>
-            <span class="claude-title">Proposed contents for whiteboard/CLAUDE.md</span>
-          </div>
-          <svg class="claude-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
-        </div>
-        <div class="claude-body">
-          <div class="claude-note">Workshop this — edit directly, then copy and paste into whiteboard/CLAUDE.md</div>
-          <textarea class="claude-textarea" id="claude-text-whiteboard"># Requirements Whiteboard
-
-Standalone planning tool for running structured review sessions across any FullControl project. Uses Notion as its backend. Auto-deploys to whiteboard-beta-indol.vercel.app.
-
-## How to run
-cd whiteboard && npm install && npm run dev
-
-## Key rule
-The whiteboard tool lives here. Session output files (HTML review pages) live in each project's own folder — not in whiteboard/. Example: FullControl product sessions → prototype/sessions/
-
-## Notion databases
-- Sessions DB: 4e5492be5027427cbbc8994bcd73905c
-- Backlog DB: 39c1f40a005c4c9ba50b0c7fe47b45bd
-- Onboarding Data Points DB: 49be4ce65ada4d45b736070e11452edb
-
-## API routes
-- api/sessions.js — read/write session cards to/from Notion
-- api/backlog.js — write proposed changes to Backlog DB
-
-## Session export flow
-User clicks "Export for AI" → copies markdown → paste into Claude Code → Claude runs the 6-step processing flow (parse, discuss, confirm, execute, mark complete, next steps). See root CLAUDE.md for the full protocol.
-
-## Credentials
-.env.production contains NOTION_TOKEN — gitignored, never commit. Ask Zoran if you need it.</textarea>
-          <div class="claude-actions">
-            <button class="claude-btn claude-btn-copy" onclick="copyClaude('claude-text-whiteboard', this)">Copy to clipboard</button>
-          </div>
-        </div>
-      </div>
-      <div class="notes-wrap">
-        <div class="notes-label">Session Notes</div>
-        <textarea class="notes-area" id="notes-whiteboard" placeholder="Notes about the whiteboard — current sessions in review, process changes..."></textarea>
-        <button class="copy-btn" onclick="copyNotes('notes-whiteboard', this)">Copy notes</button>
       </div>
     </div>
   </div>

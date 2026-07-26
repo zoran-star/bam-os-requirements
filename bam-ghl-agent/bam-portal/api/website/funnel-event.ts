@@ -10,6 +10,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { createRuntimeSupabaseClient } from "../_runtime/supabase.js";
+import { sendMetaEvent, requestContext, fbcFromClick } from "../_meta-capi.js";
 import type { RuntimeApiRequest, RuntimeApiResponse } from "../runtime/_types.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
@@ -58,6 +59,24 @@ async function getAllowedOrigins(): Promise<Set<string>> {
   }
   originsCache = { set, at: Date.now() };
   return set;
+}
+
+// The client's Conversions API config, cached on the same clock as the offer
+// lookup - every page view hits this and it changes about never.
+let capiCache: Map<string, { meta_capi: unknown } | null> = new Map();
+let capiCacheAt = 0;
+async function capiClient(clientId: string): Promise<{ meta_capi: unknown } | null> {
+  if (Date.now() - capiCacheAt > OFFER_TTL_MS) { capiCache = new Map(); capiCacheAt = Date.now(); }
+  if (capiCache.has(clientId)) return capiCache.get(clientId) ?? null;
+  let row: { meta_capi: unknown } | null = null;
+  try {
+    const rows = await sbReq<Array<{ meta_capi: unknown }>>(
+      `clients?id=eq.${encodeURIComponent(clientId)}&select=meta_capi&limit=1`,
+    );
+    row = rows?.[0] ?? null;
+  } catch { /* analytics is best-effort */ }
+  capiCache.set(clientId, row);
+  return row;
 }
 
 async function offerForFunnel(clientId: string, funnel: string): Promise<string | null> {
@@ -127,6 +146,32 @@ async function handler(req: RuntimeApiRequest, res: RuntimeApiResponse) {
       meta: cleanObject(body.meta, 2000),
     });
     if (error) throw new Error(error.message);
+
+    // Server-side copy of the page view. The browser pixel already fired one
+    // with this same event_id, so Meta dedupes the pair - but when the pixel is
+    // blocked (a large share of mobile ad traffic) this is the only copy that
+    // arrives, which is the whole point. Best-effort: a Meta failure must never
+    // turn into a failed beacon.
+    if (step === "page_view") {
+      try {
+        const client = await capiClient(clientId);
+        if (client) {
+          const utm = (cleanObject(body.utm, 2000) || {}) as Record<string, unknown>;
+          const path = cleanString(body.url, 300) || "/";
+          await sendMetaEvent(client, {
+            eventName: "PageView",
+            eventId: cleanString(body.event_id, 80) || undefined,
+            eventSourceUrl: origin ? origin.replace(/\/+$/, "") + (path.startsWith("/") ? path : "/" + path) : undefined,
+            ...requestContext(req),
+            fbc: fbcFromClick(cleanString(body.fbc, 200), typeof utm.fbclid === "string" ? utm.fbclid : null),
+            fbp: cleanString(body.fbp, 200) || undefined,
+          });
+        }
+      } catch (e) {
+        console.error("[funnel-event] capi", e instanceof Error ? e.message : e);
+      }
+    }
+
     return res.status(200).json({ ok: true });
   } catch (e) {
     console.error("[funnel-event]", e instanceof Error ? e.message : e);

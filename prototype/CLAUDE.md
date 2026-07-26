@@ -28,11 +28,11 @@ Run `/memory-audit` periodically. Memory drift wastes context.
 - src/styles/ — CSS modules per component/page
 - src/hooks/ — custom React hooks (useBannerCanvas, useCountUp, useTypewriter)
 - src/context/ — LocationContext (multi-location support)
-- sessions/ — HTML review session files from whiteboard planning sessions
+- sessions/ — archived HTML review pages from the retired whiteboard planning tool (historical reference only)
 
 ## Key rules
 - Prototype and Notion must stay in sync. If you change the prototype, update Notion. If Notion changes, check if the prototype needs updating.
-- Don't add features beyond what's been agreed in whiteboard sessions or confirmed by a human.
+- Don't add features beyond what a human has confirmed.
 - Use CSS modules — no inline styles, no Tailwind.
 - **Design system (this prototype):** [`src/styles/theme.css`](src/styles/theme.css): canonical tokens for the FullControl reference prototype (gold `#C8A84E`, Plus Jakarta Sans + DM Mono). This prototype is the REFERENCE implementation, **not** the live product. The live V2 product that BAM GTA runs on uses a separate system at [`bam-ghl-agent/bam-portal/design-system/tokens.css`](../bam-ghl-agent/bam-portal/design-system/tokens.css) (gold `#D4B65C`). Never mix the two. Full map: repo-root CLAUDE.md "Design systems".
 - Editorial/brand reference (marketing surfaces only): [`front-end/fullcontrol-brand.md`](../front-end/fullcontrol-brand.md).
@@ -40,5 +40,4 @@ Run `/memory-audit` periodically. Memory drift wastes context.
 
 ## Connects to
 - Notion — business requirements live there; prototype is the living implementation
-- whiteboard/ — planning sessions drive what gets built here
 - bam-gta-phase1/ — the GTA apps are location-specific implementations of this prototype

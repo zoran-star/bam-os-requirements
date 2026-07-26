@@ -16,6 +16,7 @@
 // that location is present in GHL_LOCATIONS_JSON.
 
 import { withSentryApiRoute } from "../_sentry.js";
+import { sendMetaEvent, requestContext, fbcFromClick } from "../_meta-capi.js";
 import { getClientGhlToken } from "./availability.js";
 import { enrollContact, exitEnrollment } from "../automations.js";
 import { createOpp, moveStage, findOpenOpp, pipelineFlags, ROLE_MATCHERS } from "../agent/_store.js";
@@ -423,7 +424,7 @@ async function handler(req, res) {
   let client;
   try {
     const rows = await sbReq(
-      `clients?id=eq.${client_id}&select=id,ghl_location_id,ghl_kpi_config,booking_provider,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
+      `clients?id=eq.${client_id}&select=id,ghl_location_id,ghl_kpi_config,booking_provider,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,meta_capi&limit=1`
     );
     client = rows?.[0];
   } catch (e) { return res.status(500).json({ error: e.message }); }
@@ -448,6 +449,31 @@ async function handler(req, res) {
     leadId = rows?.[0]?.id;
   } catch (e) {
     return res.status(500).json({ error: `submission failed: ${e.message}` });
+  }
+
+  // 1b. Tell Meta, server side. The browser fired a Lead pixel with this same
+  // event_id, so Meta dedupes the pair; when the pixel is blocked this is the
+  // only copy that lands. Sent here rather than at the return statements so it
+  // happens on every success path. Best-effort, and deliberately not awaited
+  // into the response contract: a Meta outage must never fail a real lead.
+  try {
+    const [firstName, ...restName] = String(name || "").trim().split(/\s+/);
+    await sendMetaEvent(client, {
+      eventName: "Lead",
+      eventId: typeof b.event_id === "string" ? b.event_id.slice(0, 80) : undefined,
+      eventSourceUrl: source_url || undefined,
+      ...requestContext(req),
+      fbc: fbcFromClick(
+        typeof b.fbc === "string" ? b.fbc.slice(0, 200) : null,
+        typeof fields?.utm?.fbclid === "string" ? fields.utm.fbclid : null,
+      ),
+      fbp: typeof b.fbp === "string" ? b.fbp.slice(0, 200) : undefined,
+      email, phone,
+      firstName, lastName: restName.join(" "),
+      customData: { content_name: form_type },
+    });
+  } catch (e) {
+    console.error("[leads] capi", e instanceof Error ? e.message : e);
   }
 
   // 2. Deliver — sync to the client's GHL when configured.

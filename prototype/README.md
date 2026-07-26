@@ -14,10 +14,9 @@ A fully validated, feature-complete prototype that covers every domain of the Fu
 
 ## Core blockers
 - Prototype and Notion requirements must stay in sync — drift between the two creates confusion
-- Features should only be added after whiteboard session review and human confirmation
+- Features should only be added after human confirmation
 
 ## How it connects to other projects
-- **whiteboard/** — planning sessions drive what gets built here
 - **bam-gta-phase1/** — the GTA staff and parent apps are location-specific implementations of this prototype
 - **fc-internal-content-engine/** — the Content page in this prototype is the UI layer for the content engine
 - **Notion** — business requirements live in Notion; this prototype is the living implementation
