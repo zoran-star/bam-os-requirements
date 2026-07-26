@@ -1,14 +1,14 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "Found: new academies get a weaker onboarding than GTA, using emails that already exist",
     "Scaling program shipped staff-only, PRs 1596 + 1609 merged, staff guide live",
     "Twilio TrustHub chat is back in the list with its 6 action items",
     "New: click any chat card to see the human-only actions blocking it",
-    "SJ email blocker diagnosed: Amazon retry timer only, every record is correct and Gmail is safe",
-    "SJ email go-live paused at the Amazon step, its chat is reporting back with the reason"
+    "SJ email blocker diagnosed: Amazon retry timer only, every record is correct and Gmail is safe"
   ],
   "orchestrator": {
-    "focus": "SJ email is blocked at the Amazon step, so Lij's ask-list is now the front of the queue. Next builds ready: agent brain fallback (#5) and AI booking times (#22).",
+    "focus": "Preset parity is the new front: a full read-only audit is running and a planning room is open on the two-way sync fix. SJ email is on Amazon's timer.",
     "needs": [
       "Send Lij his ask-list, it is now the biggest unblock",
       "Try the price breakdown when the test chip appears",
@@ -590,6 +590,27 @@
       "severity": "friction",
       "status": "adopted",
       "owner": "us"
+    },
+    {
+      "id": 53,
+      "title": "Preset onboarding is 3 steps vs GTA's 8 (assets already exist)",
+      "severity": "blocker",
+      "status": "planning room",
+      "owner": "us"
+    },
+    {
+      "id": 54,
+      "title": "Divergence checker only points one way, master can silently lag",
+      "severity": "blocker",
+      "status": "planning room",
+      "owner": "us"
+    },
+    {
+      "id": 55,
+      "title": "Real parent quotes must never auto-propagate between academies",
+      "severity": "blocker",
+      "status": "planning room",
+      "owner": "us"
     }
   ],
   "chatMap": [
@@ -608,6 +629,12 @@
       "sidebar": "SJ MESSAGE WORKSHOP",
       "state": "blue",
       "one": "Renders all 13 SJ messages on localhost:4600 so you can read them like a parent would, then workshop the copy"
+    },
+    {
+      "name": "Plan: two-way preset sync",
+      "sidebar": "Plan: two-way preset sync",
+      "state": "blue",
+      "one": "Fixes the reason the preset silently fell behind GTA, plus a guard so real parent quotes can never auto-propagate"
     },
     {
       "name": "SJ EMAIL GO-LIVE",
