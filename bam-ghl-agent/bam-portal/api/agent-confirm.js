@@ -45,7 +45,7 @@ import {
   nextDueStep, resolveApptTokens, addressFromOverrides,
 } from "./agent/confirm-automations.js";
 import { sendOn } from "./_send.js";
-import { resolveMergeVars, locFor } from "./email-shells.js";
+import { resolveMergeVars, locFor, clientVars } from "./email-shells.js";
 import { confirmAgentMode, modeIsOn, shouldAutoSend, shouldAutoSendScripted } from "./agent/_mode.js";
 import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
@@ -84,7 +84,7 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,address,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,booking_provider,time_zone&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,owner_name,email,address,website_setup,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,booking_provider,time_zone&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
@@ -450,7 +450,9 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     const pn = (tb && tb[0] && tb[0].parent_name) || item.name || null;
     if (pn) parentFirst = String(pn).trim().split(/\s+/)[0];
   } catch (_) { if (item && item.name) parentFirst = String(item.name).trim().split(/\s+/)[0]; }
-  const vars = { first_name: parentFirst || info.firstName, full_name: info.fullName };
+  // clientVars: academy identity from the client row, so location tokens resolve
+  // to this academy's own values (or empty) - never the LOCATIONS-map fallback.
+  const vars = { first_name: parentFirst || info.firstName, full_name: info.fullName, ...clientVars(client) };
   const apptCtx = {
     startMs: trialMs,
     endMs: appt && appt.endTime ? new Date(appt.endTime).getTime() : null,
@@ -461,13 +463,13 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     location: (appt && appt.address) || (await offerLocationAddress(client.id, contactId)) || addressFromOverrides(cfg && cfg.overrides) || String(client.address || "").trim(),
     title: (appt && appt.title) || "Free Trial",
   };
-  const resolve = (tpl) => resolveMergeVars(resolveApptTokens(tpl, apptCtx), locFor(client.id), vars);
+  const resolve = (tpl) => resolveMergeVars(resolveApptTokens(tpl, apptCtx), locFor(client.id, vars), vars);
   const message = resolve(step.template);
   if (!message || !message.trim()) return "rendered template empty";
 
   const wantsEmail = !!step.email && !!info.email;
   const emailBody = wantsEmail ? message : null;
-  const emailSubject = wantsEmail ? resolveMergeVars(step.email_subject || "Your free trial is booked!", locFor(client.id), vars) : null;
+  const emailSubject = wantsEmail ? resolveMergeVars(step.email_subject || "Your free trial is booked!", locFor(client.id, vars), vars) : null;
   // Fire the confirmation email (rides the same touch). Tokens already resolved, so
   // vars is empty here. Non-fatal: a failed email never blocks the SMS.
   const sendScriptedEmail = async () => {

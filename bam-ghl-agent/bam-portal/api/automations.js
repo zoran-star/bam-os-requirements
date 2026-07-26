@@ -19,13 +19,14 @@ import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_
 import { routeTransition } from "./agent/_router.js";
 import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
-import { renderEmail } from "./email-shells.js";
+import { renderEmail, clientVars } from "./email-shells.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { isMuted } from "./agent/_mutes.js";
 import { markUnqualified } from "./agent/_tags.js";
 import { resolveAgentActor } from "./agent/_auth.js";
-import { FORM_INTRO_DEFAULTS, GHOSTED_DEFAULT, NURTURE_DEFAULT, ONBOARDING_DEFAULT } from "./form-intro-automations.js";
+import { FORM_INTRO_DEFAULTS } from "./form-intro-automations.js";
 import { presetAutomationKeys } from "./agent/presets.js";
+import { seedAutomations } from "./agent/seed-automations.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -57,7 +58,7 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,time_zone,website_setup,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,owner_name,email,address,time_zone,website_setup,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
@@ -495,16 +496,14 @@ async function runWork(res) {
         } catch (_) { /* leave blank */ }
       }
 
-      // {{location.name}} / {{location.website}} resolve from the REAL client row,
-      // not the hardcoded LOCATIONS map (which falls back to GTA for unknown
-      // academies - a new academy must never send GTA's name or site).
-      const location_name = (client && client.business_name) || "";
-      const wsDomain = client && client.website_setup && client.website_setup.domain;
-      const location_website = wsDomain ? `https://${wsDomain}` : "";
+      // {{location.*}} / {{location_owner.first_name}} resolve from the REAL
+      // client row (clientVars), never the hardcoded LOCATIONS map - a new
+      // academy must never send another academy's name, site, or owner. Unknown
+      // values render EMPTY (the resolver drops the affected line).
       const result = await sendOn({
         channel: step.channel, clientId: job.client_id, contactId: job.contact_id,
         toEmail: info.email, toPhone: info.phone, subject: step.subject, body: step.body, ghlToken: token,
-        vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session, location_name, location_website },
+        vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session, ...clientVars(client) },
       });
 
       if (result && result.sent) { await finish({ status: "sent", sent_at: new Date().toISOString() }); sent++; await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "step_sent", payload: { step_id: job.step_id, channel: step.channel } }); }
@@ -709,11 +708,14 @@ async function handler(req, res) {
     // SAME renderEmail the sender uses (template:<key> refs resolved, brand frame,
     // GHL merge tokens) so the preview matches the real send. Sample contact tokens.
     if (b.action === "preview-email") {
+      // Load the client so the preview renders with the academy's OWN identity
+      // (name / site / owner), exactly like the real send path.
+      const client = await loadClient(clientId).catch(() => null);
       const html = renderEmail({
         clientId,
         subject: b.subject || "",
         body: b.body || "",
-        vars: { first_name: "Alex", athlete: "Jordan" },
+        vars: { first_name: "Alex", athlete: "Jordan", ...clientVars(client) },
       });
       return res.status(200).json({ html, subject: b.subject || "" });
     }
@@ -771,42 +773,20 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, automation: { ...auto, steps: await loadSteps(auto.id) } });
     }
 
-    // Seed the preset's BASELINE automations in one call (Gap #2, phase 2C): the
-    // three form-intro first-touches + the multi-step 👻 Ghosted drip. Same
-    // idempotent + edit-safe rule as seed-form-intro (create only if missing; add
-    // steps only when the automation has zero). All dormant (approved:false).
+    // Seed the preset's BASELINE automations in one call (Gap #2, phase 2C).
+    // The actual seeding is the SHARED seeder (api/agent/seed-automations.js) -
+    // the same one applyPreset now fires automatically on preset apply - so
+    // "canonical" can never mean two different things. Idempotent + edit-safe
+    // (create only if missing; add steps only when zero). Dormant seeds.
+    // Preset-driven (station model): pass b.preset (e.g. 'free_trial') and the
+    // seed list comes from the preset manifest itself - stage engines + form
+    // intros + exit actions. Explicit b.keys still wins; no preset = all defaults.
     if (b.action === "seed-preset-automations") {
-      const DEFS = { ...FORM_INTRO_DEFAULTS, ghosted: GHOSTED_DEFAULT, nurture: NURTURE_DEFAULT, onboarding: ONBOARDING_DEFAULT };
-      // Preset-driven (station model): pass b.preset (e.g. 'free_trial') and the
-      // seed list comes from the preset manifest itself - stage engines + form
-      // intros + exit actions. Explicit b.keys still wins; no preset = all DEFS.
       const manifestKeys = b.preset ? presetAutomationKeys(String(b.preset)) : null;
-      const keys = (Array.isArray(b.keys) && b.keys.length) ? b.keys.filter(k => DEFS[k])
-        : (Array.isArray(manifestKeys) && manifestKeys.length) ? manifestKeys.filter(k => DEFS[k])
-        : Object.keys(DEFS);
-      const results = [];
-      for (const key of keys) {
-        const def = DEFS[key];
-        let autos = await sb(`automations?client_id=eq.${clientId}&automation_key=eq.${encodeURIComponent(key)}&select=*&limit=1`);
-        let auto = Array.isArray(autos) && autos[0];
-        let created = false;
-        if (!auto) {
-          const ins = await sb(`automations?on_conflict=client_id,automation_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-            body: JSON.stringify([{ client_id: clientId, automation_key: key, name: def.name, enabled: !!def.enabled, approved: !!def.approved, offer_id: b.offer_id || null, updated_at: new Date().toISOString() }]) });
-          auto = Array.isArray(ins) && ins[0];
-          created = true;
-        }
-        if (!auto) { results.push({ key, ok: false }); continue; }
-        const existing = await loadSteps(auto.id);
-        if (!existing.length) {
-          const steps = def.steps || (def.step ? [def.step] : []);
-          if (steps.length) {
-            await sb(`automation_steps`, { method: "POST", headers: { Prefer: "return=minimal" },
-              body: JSON.stringify(steps.map((s, i) => ({ automation_id: auto.id, position: s.position != null ? s.position : i, wait_amount: s.wait_amount, wait_unit: s.wait_unit, channel: s.channel, subject: s.subject ?? null, body: s.body, enabled: true, updated_at: new Date().toISOString() }))) });
-          }
-        }
-        results.push({ key, name: def.name, created, steps: (await loadSteps(auto.id)).length });
-      }
+      const keys = (Array.isArray(b.keys) && b.keys.length) ? b.keys
+        : (Array.isArray(manifestKeys) && manifestKeys.length) ? manifestKeys
+        : null;
+      const results = await seedAutomations({ clientId, offerId: b.offer_id || null, keys, sb });
       return res.status(200).json({ ok: true, results });
     }
 
