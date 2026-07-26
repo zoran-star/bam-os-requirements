@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BAM · Mission Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0d0c0a; --panel:#161411; --panel2:#1d1a16; --line:#2c2822;
+  --gold:#D4B65C; --gold-dim:#8a7635; --bone:#efe9db; --mut:#8f8776;
+  --red:#e05545; --green:#5fae6e; --amber:#d99a3d; --blue:#6f9fd8;
+  --disp:'Big Shoulders Display',sans-serif; --mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--ink)}
+body{
+  font-family:var(--mono); color:var(--bone); min-height:100vh; padding:0 0 80px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.006) 3px 4px),
+    radial-gradient(1200px 500px at 70% -10%, rgba(212,182,92,.07), transparent 60%),
+    var(--ink);
+}
+a{color:var(--gold);text-decoration:none;border-bottom:1px dotted var(--gold-dim)}
+a:hover{border-bottom-style:solid}
+
+/* header */
+header{
+  display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  padding:28px 32px 18px; border-bottom:2px solid var(--gold);
+}
+.brand h1{
+  font-family:var(--disp); font-weight:900; font-size:clamp(34px,5vw,58px);
+  letter-spacing:.01em; line-height:.9; text-transform:uppercase; color:var(--bone);
+}
+.brand h1 em{font-style:normal;color:var(--gold)}
+.brand .sub{margin-top:6px;font-size:12px;color:var(--mut);letter-spacing:.14em;text-transform:uppercase}
+.meta{text-align:right;font-size:12px;color:var(--mut)}
+.meta .live{display:inline-flex;align-items:center;gap:7px;color:var(--green)}
+.meta .dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.headline{
+  margin:0 32px; padding:12px 16px; border-left:4px solid var(--gold);
+  background:linear-gradient(90deg, rgba(212,182,92,.10), transparent 70%);
+  font-size:14px; color:var(--bone); margin-top:18px;
+}
+
+/* layout */
+main{padding:22px 32px; display:flex; flex-direction:column; gap:26px; max-width:1500px; margin:0 auto}
+section>h2{
+  font-family:var(--disp); font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+  font-size:22px; color:var(--gold); margin-bottom:12px; display:flex; align-items:center; gap:12px;
+}
+section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* your moves */
+.moves{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.move{background:var(--panel);border:1px solid var(--line);border-left-width:4px;padding:13px 15px;position:relative}
+.move .tag{font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600}
+.move h3{font-family:var(--disp);font-weight:700;font-size:19px;line-height:1.1;margin:6px 0 5px;text-transform:uppercase;letter-spacing:.02em}
+.move p{font-size:12px;color:var(--mut);line-height:1.5}
+.move .where{margin-top:8px;font-size:11px;color:var(--gold-dim)}
+.move.now{border-left-color:var(--red)} .move.now .tag{color:var(--red)}
+.move.soon{border-left-color:var(--amber)} .move.soon .tag{color:var(--amber)}
+.move.waiting{border-left-color:var(--blue);opacity:.75} .move.waiting .tag{color:var(--blue)}
+.move.now::before{content:"";position:absolute;inset:0;pointer-events:none;border:1px solid rgba(224,85,69,.0);animation:ring 2.4s infinite}
+@keyframes ring{0%,100%{border-color:rgba(224,85,69,0)}50%{border-color:rgba(224,85,69,.45)}}
+
+/* pipeline */
+.pipe-wrap{background:var(--panel);border:1px solid var(--line);padding:18px 20px;overflow-x:auto}
+.pipe-title{font-size:12px;color:var(--mut);margin-bottom:14px;letter-spacing:.1em;text-transform:uppercase}
+.pipe-title b{color:var(--bone)}
+.pipe{display:flex;align-items:flex-start;min-width:720px}
+.stage{flex:1;text-align:center;position:relative;padding-top:4px}
+.stage .bulb{
+  width:26px;height:26px;border-radius:50%;margin:0 auto;border:2px solid var(--line);
+  background:var(--panel2);display:flex;align-items:center;justify-content:center;
+  font-size:13px;position:relative;z-index:2;
+}
+.stage:not(:last-child)::after{
+  content:"";position:absolute;top:16px;left:calc(50% + 15px);right:calc(-50% + 15px);
+  height:2px;background:var(--line);z-index:1;
+}
+.stage.done .bulb{border-color:var(--gold-dim);background:#241f14;color:var(--gold)}
+.stage.done:not(:last-child)::after{background:var(--gold-dim)}
+.stage.active .bulb{border-color:var(--gold);background:var(--gold);color:var(--ink);box-shadow:0 0 18px rgba(212,182,92,.45);animation:glow 1.8s infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 18px rgba(212,182,92,.45)}50%{box-shadow:0 0 30px rgba(212,182,92,.8)}}
+.stage .nm{margin-top:9px;font-family:var(--disp);font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
+.stage.done .nm{color:var(--bone)} .stage.active .nm{color:var(--gold)}
+.stage .nt{font-size:10px;color:var(--mut);margin-top:3px;padding:0 6px;line-height:1.4}
+.stage.active .nt{color:var(--gold)}
+
+/* lanes */
+.lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.lane{background:var(--panel);border:1px solid var(--line);padding:14px 15px}
+.lane h3{font-family:var(--disp);font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.03em;display:flex;justify-content:space-between;align-items:center}
+.lane .st{font-size:9px;letter-spacing:.16em;padding:3px 8px;border:1px solid}
+.lane.blocked .st{color:var(--red);border-color:var(--red)}
+.lane.moving .st{color:var(--green);border-color:var(--green)}
+.lane ul{list-style:none;margin-top:10px}
+.lane li{font-size:12px;color:var(--bone);padding:5px 0 5px 14px;border-top:1px dashed var(--line);position:relative}
+.lane li::before{content:"▸";position:absolute;left:0;color:var(--gold-dim);font-size:10px}
+.lane .note{margin-top:9px;font-size:11px;color:var(--mut);font-style:italic}
+
+/* queue board */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.col{background:var(--panel);border:1px solid var(--line)}
+.col header{border:none;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+.col h3{font-family:var(--disp);font-weight:700;font-size:18px;letter-spacing:.06em;text-transform:uppercase}
+.col .count{font-size:11px;color:var(--ink);padding:2px 8px;font-weight:600}
+.col.blocker h3{color:var(--red)} .col.blocker .count{background:var(--red)}
+.col.friction h3{color:var(--amber)} .col.friction .count{background:var(--amber)}
+.col.general h3{color:var(--blue)} .col.general .count{background:var(--blue)}
+.col.scale h3{color:var(--mut)} .col.scale .count{background:var(--mut)}
+.card{padding:9px 14px;border-bottom:1px dashed var(--line);display:flex;gap:10px;align-items:baseline}
+.card:last-child{border-bottom:none}
+.card .id{font-size:10px;color:var(--gold-dim);min-width:22px}
+.card .t{font-size:12px;line-height:1.4;flex:1}
+.card .s{font-size:9px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:var(--mut)}
+.card .s.hot{color:var(--gold);font-weight:600}
+.card .s.own{color:var(--blue)}
+.card.dim{opacity:.55}
+
+/* strips */
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.chip{background:var(--panel);border:1px solid var(--line);padding:11px 13px}
+.chip .top{display:flex;justify-content:space-between;align-items:baseline}
+.chip h4{font-family:var(--disp);font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.04em}
+.chip .mdl{font-size:9px;letter-spacing:.14em;color:var(--gold-dim);text-transform:uppercase}
+.chip p{font-size:11px;color:var(--mut);margin-top:5px;line-height:1.45}
+.chip .status{display:inline-block;margin-top:7px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;padding:2px 7px;border:1px solid var(--line);color:var(--mut)}
+.chip .status.done{color:var(--green);border-color:var(--green)}
+.chip .status.idle{color:var(--amber);border-color:var(--amber)}
+.chip .status.running{color:var(--gold);border-color:var(--gold);animation:pulse 1.6s infinite}
+.chip .status.visit{color:var(--red);border-color:var(--red)}
+.chip .status.here{color:var(--gold);border-color:var(--gold)}
+footer{margin:40px 32px 0;padding-top:14px;border-top:1px solid var(--line);font-size:10px;color:var(--mut);letter-spacing:.1em;text-transform:uppercase}
+.err{margin:40px;color:var(--red);font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Mission <em>Board</em></h1>
+    <div class="sub">San Jose onboarding · By Any Means</div>
+  </div>
+  <div class="meta">
+    <div class="live"><span class="dot"></span>auto-refresh 5s</div>
+    <div id="updated" style="margin-top:6px"></div>
+  </div>
+</header>
+<div class="headline" id="headline"></div>
+<main>
+  <section>
+    <h2>Your moves</h2>
+    <div class="moves" id="moves"></div>
+  </section>
+  <section>
+    <h2>Build pipeline</h2>
+    <div class="pipe-wrap">
+      <div class="pipe-title" id="pipeTitle"></div>
+      <div class="pipe" id="pipe"></div>
+    </div>
+  </section>
+  <section>
+    <h2>Go-live lanes</h2>
+    <div class="lanes" id="lanes"></div>
+  </section>
+  <section>
+    <h2>The queue</h2>
+    <div class="cols" id="queue"></div>
+  </section>
+  <section>
+    <h2>Agents</h2>
+    <div class="strip" id="agents"></div>
+  </section>
+  <section>
+    <h2>Session map</h2>
+    <div class="strip" id="sessions"></div>
+  </section>
+</main>
+<footer>Source of truth: docs/lij-onboarding-build-queue.md · board fed by board/data.json · updated by Mister Orchestrator</footer>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function render(d){
+  $("updated").textContent = "updated " + d.updated;
+  $("headline").textContent = d.headline;
+
+  $("moves").innerHTML = d.yourMoves.map(m => `
+    <div class="move ${esc(m.urgency)}">
+      <span class="tag">${esc(m.urgency)}</span>
+      <h3>${esc(m.title)}</h3>
+      <p>${esc(m.detail)}</p>
+      <div class="where">${m.link ? `<a href="${esc(m.link)}" target="_blank">${esc(m.where)}</a>` : "→ " + esc(m.where)}</div>
+    </div>`).join("");
+
+  $("pipeTitle").innerHTML = `Current build: <b>${esc(d.pipeline.build)}</b> · ${esc(d.pipeline.queueRef)}`;
+  $("pipe").innerHTML = d.pipeline.stages.map(s => `
+    <div class="stage ${esc(s.state)}">
+      <div class="bulb">${s.state === "done" ? "✓" : s.state === "active" ? "●" : ""}</div>
+      <div class="nm">${esc(s.name)}</div>
+      ${s.note ? `<div class="nt">${esc(s.note)}</div>` : ""}
+    </div>`).join("");
+
+  $("lanes").innerHTML = d.lanes.map(l => `
+    <div class="lane ${esc(l.state)}">
+      <h3>${esc(l.name)} <span class="st">${esc(l.state)}</span></h3>
+      <ul>${l.items.map(i => `<li>${esc(i)}</li>`).join("")}</ul>
+      <div class="note">${esc(l.note)}</div>
+    </div>`).join("");
+
+  const sevs = [["blocker","Blockers"],["friction","Friction"],["general","General"],["scale","Scale · parked"]];
+  $("queue").innerHTML = sevs.map(([k, label]) => {
+    const items = d.queue.filter(q => q.severity === k);
+    return `
+    <div class="col ${k}">
+      <header><h3>${label}</h3><span class="count">${items.length}</span></header>
+      ${items.map(q => {
+        const hot = /gate|ours/i.test(q.status);
+        const own = /owned|#16|session/i.test(q.status + q.owner);
+        const dim = /parked|backlog/i.test(q.status);
+        return `<div class="card${dim ? " dim" : ""}">
+          <span class="id">#${q.id}</span>
+          <span class="t">${esc(q.title)}</span>
+          <span class="s${hot ? " hot" : own ? " own" : ""}">${esc(q.status)}</span>
+        </div>`;
+      }).join("")}
+    </div>`;
+  }).join("");
+
+  $("agents").innerHTML = d.agents.map(a => `
+    <div class="chip">
+      <div class="top"><h4>${esc(a.name)}</h4><span class="mdl">${esc(a.model)}</span></div>
+      <p>${esc(a.detail)}</p>
+      <span class="status ${esc(a.status)}">${esc(a.status)}</span>
+    </div>`).join("");
+
+  $("sessions").innerHTML = d.sessions.map(s => {
+    const cls = /VISIT/.test(s.visit) ? "visit" : /here/.test(s.visit) ? "here" : "";
+    return `
+    <div class="chip">
+      <div class="top"><h4>${esc(s.name)}</h4></div>
+      <p>${esc(s.role)}</p>
+      <span class="status ${cls}">${esc(s.visit)}</span>
+    </div>`;
+  }).join("");
+}
+
+async function load(){
+  try{
+    const r = await fetch("data.json?t=" + Date.now());
+    render(await r.json());
+  }catch(e){
+    document.querySelector("main").insertAdjacentHTML("afterbegin", `<div class="err">Could not load board/data.json - is the server running from the repo root?</div>`);
+  }
+}
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

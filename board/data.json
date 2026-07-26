@@ -1,0 +1,74 @@
+{
+  "updated": "2026-07-26 · evening",
+  "headline": "Timezone fix is at YOUR gate. PR #1601 is the big unlock.",
+  "yourMoves": [
+    { "urgency": "now", "title": "Click the chip: Test timezone fix (gate 2)", "detail": "10 guided steps, ~10 min. Ships blocker #4", "where": "chip in sidebar" },
+    { "urgency": "now", "title": "Review PR #1601 - kills the GTA leak in every drip", "detail": "Unblocks SJ template seeding, our from-address build, and the leak-check", "where": "github.com/zoran-star/bam-os-requirements/pull/1601", "link": "https://github.com/zoran-star/bam-os-requirements/pull/1601" },
+    { "urgency": "now", "title": "Send Lij the ask-list", "detail": "Drafted + safe to send. His 8 items take days, start his clock", "where": "draft in MISTER_ORCHESTRATOR" },
+    { "urgency": "soon", "title": "Finish the FC2 app config", "detail": "14 academies token-cold. SJ goes cold at next expiry", "where": "BUILD GHL TOKENS chat" },
+    { "urgency": "soon", "title": "Review PR #1587 - money model", "detail": "Green + waiting. Unlocks queue items 5 and 22", "where": "github", "link": "https://github.com/zoran-star/bam-os-requirements/pull/1587" },
+    { "urgency": "waiting", "title": "Lawyer sign-off on the SJ agreement", "detail": "Then remove draft banner + the 6 counsel notes", "where": "external" },
+    { "urgency": "waiting", "title": "Confirm byanymeanssanjose.com is registered", "detail": "Set in the client row, never verified. Blocks any sends", "where": "registrar" }
+  ],
+  "pipeline": {
+    "build": "Timezone fix",
+    "queueRef": "queue #4",
+    "stages": [
+      { "name": "Scout", "state": "done" },
+      { "name": "Plan", "state": "done" },
+      { "name": "Gate 1 · you", "state": "done" },
+      { "name": "Build", "state": "done" },
+      { "name": "Test", "state": "done", "note": "1 bounce, fixed, re-proven" },
+      { "name": "Gate 2 · you", "state": "active", "note": "test room chip is live" },
+      { "name": "Ship", "state": "pending" }
+    ]
+  },
+  "lanes": [
+    { "name": "Lij", "state": "blocked", "items": ["Stripe connect", "EIN", "Coach bios", "Photos", "Group size", "Member count", "Testimonials", "Gym address"], "note": "all waiting on the ask-list" },
+    { "name": "Lawyer", "state": "blocked", "items": ["Agreement sign-off", "Draft banner removal"], "note": "blocks signatures, not setup" },
+    { "name": "Other sessions", "state": "moving", "items": ["#1601 preset rebuild - up for review", "Agreement engine - built, unmerged", "GHL tokens - mid-flight with you", "#1587 money model - green"], "note": "hands off their files" },
+    { "name": "Our lane", "state": "moving", "items": ["Item 4 tz fix - AT GATE 2", "Item 3 from-address - after #1601", "Item 6+14 funnel form - after #116", "Item 23 quiet-hours leaks - half ours"], "note": "one build in flight at a time" }
+  ],
+  "queue": [
+    { "id": 1, "title": "GTA identity fallback in outbound sends", "severity": "blocker", "status": "owned elsewhere", "owner": "PR #1601" },
+    { "id": 2, "title": "coach Zoran + Oakville merge tokens", "severity": "blocker", "status": "owned elsewhere", "owner": "PR #1601" },
+    { "id": 3, "title": "Emails send FROM BAM Toronto", "severity": "blocker", "status": "ours, after #1601", "owner": "us" },
+    { "id": 4, "title": "Toronto timezone on confirmations", "severity": "blocker", "status": "AT GATE 2", "owner": "us" },
+    { "id": 5, "title": "Agent brain GTA fallback", "severity": "blocker", "status": "parked til #1587", "owner": "us" },
+    { "id": 6, "title": "Funnel form is a GTA copy", "severity": "blocker", "status": "parked til #116", "owner": "us" },
+    { "id": 16, "title": "Signed-agreement assembly", "severity": "blocker", "status": "verify owner", "owner": "agreement session" },
+    { "id": 22, "title": "AI books trials in Toronto time", "severity": "blocker", "status": "blocked on #1587", "owner": "coordinate" },
+    { "id": 23, "title": "Quiet-hours no-arg leaks (6am PT texts)", "severity": "blocker", "status": "queued, half ours", "owner": "split" },
+    { "id": 7, "title": "Drip copy divergence + no auto-seed", "severity": "friction", "status": "owned elsewhere", "owner": "PR #1601" },
+    { "id": 8, "title": "GTA-baked designed email templates", "severity": "friction", "status": "owned elsewhere", "owner": "PR #1601" },
+    { "id": 9, "title": "Legal PDF GTA fallback", "severity": "friction", "status": "owned elsewhere", "owner": "agreement session" },
+    { "id": 10, "title": "Quiet-hours null default", "severity": "friction", "status": "queued", "owner": "us" },
+    { "id": 14, "title": "DOB / grade / school missing from funnel", "severity": "friction", "status": "queued", "owner": "us" },
+    { "id": 17, "title": "Emergency contact required in preset", "severity": "friction", "status": "coordinate", "owner": "us" },
+    { "id": 21, "title": "BAM NY half-seed re-seed", "severity": "friction", "status": "PARKED - SJ first", "owner": "later" },
+    { "id": 24, "title": "Agent prompt em-dash sweep", "severity": "friction", "status": "queued", "owner": "us" },
+    { "id": 20, "title": "Slack team notification channels", "severity": "general", "status": "queued", "owner": "us" },
+    { "id": 11, "title": "GTA default client_id in 5 endpoints", "severity": "scale", "status": "backlog", "owner": "later" },
+    { "id": 12, "title": "members/intake.js GTA-wired", "severity": "scale", "status": "backlog", "owner": "later" },
+    { "id": 13, "title": "Stage positions per-academy", "severity": "scale", "status": "backlog", "owner": "later" },
+    { "id": 15, "title": "Remove legacy clause fallbacks later", "severity": "scale", "status": "backlog", "owner": "later" },
+    { "id": 18, "title": "GHL import reconcile gate", "severity": "scale", "status": "backlog", "owner": "later" },
+    { "id": 19, "title": "CLI preset_key stamp", "severity": "scale", "status": "backlog", "owner": "later" }
+  ],
+  "agents": [
+    { "name": "Scout", "model": "Fable", "status": "done", "detail": "13 findings, 1 sweep" },
+    { "name": "Planner", "model": "Fable", "status": "done", "detail": "tz plan v2 approved" },
+    { "name": "Builder", "model": "Opus", "status": "idle", "detail": "awaiting your gate-2 verdict" },
+    { "name": "Tester", "model": "Opus", "status": "done", "detail": "zero bounces outstanding" }
+  ],
+  "sessions": [
+    { "name": "MISTER_ORCHESTRATOR", "role": "this board's brain - queue, triage, routing", "visit": "you are here" },
+    { "name": "BUILD GHL TOKENS", "role": "FC2 app config, token warmth", "visit": "VISIT - finish config" },
+    { "name": "BAM V2 preset seeding", "role": "PR #1601", "visit": "just review the PR" },
+    { "name": "SIGN UP FEE", "role": "PR #1587", "visit": "just review the PR" },
+    { "name": "Enrollment agreement", "role": "agreement engine, publish step", "visit": "after lawyer" },
+    { "name": "Client Profile", "role": "Cole's SQL then PR #1596", "visit": "when ready, in that chat" },
+    { "name": "GTA loading rate", "role": "Vercel toggle + CAPI token", "visit": "not SJ-blocking" },
+    { "name": "SAN JOSE ONBOARDING", "role": "absorbed into orchestrator", "visit": "archive-ready" }
+  ]
+}
