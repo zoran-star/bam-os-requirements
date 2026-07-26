@@ -16,11 +16,14 @@ import { applyPreset, buildPresetRows, PRESETS, presetContents } from "../agent/
 //        resolved from its offer stamp - what the config view renders since the
 //        Phase 3 cleanup; per-academy pause state is overlaid client-side)
 //   POST /api/offers/apply-preset   body { client_id, offer_id, preset, force? }
-//     → { ok, preset, stages, transitions, stamp }
+//     → { ok, preset, stages, transitions, automations, stamp }
 //        (Phase 3: writes ONLY the pipeline_stages identity anchors + the offer
 //         stamp offer.data.sales.{preset_key,preset_version,preset_applied_at};
 //         edges are runtime-read from the master, never copy-stamped. `force`
-//         is accepted and ignored - the 409/needs_force flow is gone.)
+//         is accepted and ignored - the 409/needs_force flow is gone. Since
+//         2026-07-25 applying ALSO seeds the preset's automations from the
+//         canonical defaults - idempotent + edit-safe; `automations` reports
+//         [{key, created, steps}].)
 //
 // Auth: Supabase JWT — BAM staff (any academy) or a client_users member of client_id.
 
@@ -156,7 +159,7 @@ async function handler(req, res) {
           });
         } catch (_) { /* stamp is best-effort - the pipeline rows are already in */ }
 
-        return res.status(200).json({ ok: true, preset: presetKey, stages: r.stages, transitions: r.transitions, stamp });
+        return res.status(200).json({ ok: true, preset: presetKey, stages: r.stages, transitions: r.transitions, automations: r.automations || [], stamp });
       } catch (e) {
         const msg = e.message || String(e);
         const needsForce = /force:\s*true|Re-run with force|nondeterministic/.test(msg);

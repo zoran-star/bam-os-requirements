@@ -30,7 +30,7 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
     // Wrap the step's text in the academy's branded shell so every automation
     // email is on-brand (the step body carries only the message copy). Subject
     // can carry merge tokens too, so resolve it against the same vars.
-    const subj = resolveMergeVars(String(subject || ""), locFor(clientId), vars || {});
+    const subj = resolveMergeVars(String(subject || ""), locFor(clientId, vars), vars || {});
     const html = renderEmail({ clientId, subject: subj, body: text, vars });
     const r = await sendEmail({ to: toEmail, subject: subj, html, clientId });
     if (r && r.skipped) return { skipped: r.skipped };
@@ -39,7 +39,7 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
 
   if (channel === "sms") {
     if (!contactId && !toPhone) return { skipped: "no contact for sms" };
-    const message = resolveMergeVars(text, locFor(clientId), vars || {});
+    const message = resolveMergeVars(text, locFor(clientId, vars), vars || {});
     // Provider gate: Twilio academies send via Twilio + own-store; else GHL.
     const g = await maybeSendSmsViaProvider(clientId, { ghlContactId: contactId, toPhone, body: message, sentBy: "automation" });
     if (g.handled) { if (!g.ok) throw new Error(g.error); return { sent: true, via: "twilio", id: g.sid }; }

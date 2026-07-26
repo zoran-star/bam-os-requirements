@@ -43,6 +43,7 @@
 //         docs/core-handoff/pipeline-presets.md
 
 import { sbRest } from "./_store.js";
+import { seedAutomations } from "./seed-automations.js";
 
 // ── Agent templates ──────────────────────────────────────────────────────────
 // runtime  = which existing agent behaviour drives it (prompt-structure.js AGENT_SPECS).
@@ -421,6 +422,7 @@ export async function applyPreset({ clientId, offerId, presetKey, dryRun = false
       const dest = t.to_kind === "stage" ? t.to_stage_role : `@${t.to_terminal}`;
       log(`   edge   ${String(t.from_stage_role || "(entry)").padEnd(22)} --${t.trigger}--> ${dest}`);
     }
+    log(`[dry-run] would seed automations (idempotent, edit-safe): ${presetAutomationKeys(presetKey).join(", ")}`);
     return { dryRun: true, stages: stageRows.length, transitions: transitionRows.length, stageRows, transitionRows };
   }
 
@@ -432,6 +434,20 @@ export async function applyPreset({ clientId, offerId, presetKey, dryRun = false
     body: JSON.stringify(stageRows),
   });
 
+  // Seed the preset's automations from the canonical defaults IN THE SAME STEP
+  // (2026-07-25): applying a preset without its drips left academies with stages
+  // but zero automations (San Jose sat like that for two days). Idempotent +
+  // edit-safe (create only if missing, steps only when zero), so a re-stamp
+  // never touches copy an academy already edited. Non-fatal on failure - the
+  // stage anchors are in; a retry or the portal's seed action recovers.
+  let automations = [];
+  try {
+    automations = await seedAutomations({ clientId, offerId, keys: presetAutomationKeys(presetKey), sb });
+    log(`preset '${presetKey}' automations seeded: ${automations.map((a) => `${a.key}${a.created ? " (new)" : ""}=${a.steps ?? "?"} steps`).join(", ")}`);
+  } catch (e) {
+    log(`preset '${presetKey}' automation seed FAILED (recover via seed-preset-automations): ${e.message || e}`);
+  }
+
   log(`preset '${presetKey}' applied → ${stageRows.length} stage anchors for client ${clientId} offer ${offerId || "(none)"}; ${transitionRows.length} edges served live from the master`);
-  return { dryRun: false, stages: stageRows.length, transitions: transitionRows.length };
+  return { dryRun: false, stages: stageRows.length, transitions: transitionRows.length, automations };
 }
