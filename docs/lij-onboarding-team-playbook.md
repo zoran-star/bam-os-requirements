@@ -104,6 +104,12 @@ The orchestrator chat never hosts a long back-and-forth loop. When a build needs
 
 Zoran's visual tracker lives at `board/index.html`, fed entirely by `board/data.json`, served by the `mission-board` entry in `.claude/launch.json` (port 4599). **Orchestrator duty: every time the queue, pipeline stage, agents, or Zoran's to-dos change, update `board/data.json` in the same breath as the queue file.** The board auto-refreshes every 5s.
 
+## HARD RULE: never send a build to gate 2 undeployed
+
+Learned twice, the expensive way (tz build, then from-address). A test room CANNOT run Zoran's hands-on script against uncommitted worktree edits: production is still running the old code, so every step either passes for the wrong reason or actively causes the bug the build exists to prevent.
+
+**Before spawning a gate-2 test room, the orchestrator MUST:** commit the builder's work, push the branch, open the PR, and confirm a Vercel preview URL exists. Commit the test script too, or it dies with the worktree. Give the room the preview URL. If a preview genuinely cannot exist, say so in the spawn prompt and instruct a paper test explicitly, rather than letting the room discover the problem.
+
 ## Gate 2 outcomes
 
 Zoran runs the script and says one of:

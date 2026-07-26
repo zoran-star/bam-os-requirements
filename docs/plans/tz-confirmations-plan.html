@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trial Confirmations: Right Timezone for Every Academy</title>
+<style>
+  :root {
+    --ink: #1d2433;
+    --sub: #5a6478;
+    --line: #e4e7ee;
+    --bad: #c0392b;
+    --bad-bg: #fdf0ee;
+    --good: #1e7d4f;
+    --good-bg: #eefaf3;
+    --gold: #C8A84E;
+    --card: #ffffff;
+    --bg: #f6f7fa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--ink);
+    line-height: 1.45; padding: 32px 16px 64px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 26px; margin-bottom: 6px; }
+  .tagline { color: var(--sub); margin-bottom: 26px; font-size: 15px; }
+  h2 { font-size: 18px; margin: 38px 0 14px; display: flex; align-items: center; gap: 8px; }
+  h2 .num {
+    background: var(--gold); color: #fff; border-radius: 999px;
+    width: 26px; height: 26px; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 14px; flex: 0 0 auto;
+  }
+  .plain {
+    background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--gold);
+    border-radius: 12px; padding: 18px 20px; font-size: 16px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+  .phone {
+    background: var(--card); border: 1px solid var(--line); border-radius: 26px;
+    padding: 14px 12px 18px; box-shadow: 0 4px 14px rgba(20,28,50,.06);
+  }
+  .phone .top { text-align: center; font-size: 12px; color: var(--sub); padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 12px; margin-bottom: 10px; }
+  .badge.bad { color: var(--bad); background: var(--bad-bg); }
+  .badge.good { color: var(--good); background: var(--good-bg); }
+  .bubble {
+    background: #e9ebf0; border-radius: 16px 16px 16px 4px;
+    padding: 12px 14px; font-size: 13.5px; white-space: pre-line; color: #222;
+  }
+  .bubble .hl-bad { background: var(--bad-bg); color: var(--bad); font-weight: 700; padding: 0 3px; border-radius: 4px; }
+  .bubble .hl-good { background: var(--good-bg); color: var(--good); font-weight: 700; padding: 0 3px; border-radius: 4px; }
+  .caption { text-align: center; font-size: 12px; color: var(--sub); margin-top: 8px; }
+
+  .email {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    margin-top: 16px; overflow: hidden;
+  }
+  .email .head { padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .email .head b { display: block; font-size: 14px; }
+  .email .body { padding: 12px 14px; font-size: 13px; color: #333; white-space: pre-line; }
+
+  .also {
+    margin-top: 18px; background: #fff8e8; border: 1px solid #f0e2b6; border-radius: 10px;
+    padding: 12px 16px; font-size: 14px;
+  }
+
+  .flow { display: flex; flex-direction: column; gap: 0; margin-top: 4px; }
+  .fnode {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; font-size: 14.5px;
+  }
+  .fnode b { font-size: 15px; }
+  .arrowrow { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 0; }
+  .arrow { text-align: center; color: var(--sub); font-size: 20px; padding: 6px 0; }
+  .fnode.yes { border-left: 4px solid var(--good); }
+  .fnode.no { border-left: 4px solid var(--gold); }
+  .fnode .lbl { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .06em; border-radius: 4px; padding: 2px 8px; margin-bottom: 6px; }
+  .fnode.yes .lbl { background: var(--good-bg); color: var(--good); }
+  .fnode.no .lbl { background: #fff3d6; color: #8a6d1d; }
+  .why {
+    margin-top: 14px; font-size: 14px; background: var(--card);
+    border: 1px dashed var(--line); border-radius: 10px; padding: 12px 16px; color: var(--sub);
+  }
+  .why b { color: var(--ink); }
+
+  details {
+    margin-top: 40px; background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  }
+  summary {
+    cursor: pointer; padding: 16px 20px; font-weight: 700; font-size: 15px;
+    list-style: none; display: flex; align-items: center; gap: 10px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary .chev { transition: transform .15s; color: var(--sub); }
+  details[open] summary .chev { transform: rotate(90deg); }
+  .spec { padding: 0 20px 22px; font-size: 14px; }
+  .spec h3 { font-size: 14px; margin: 20px 0 8px; text-transform: uppercase; letter-spacing: .05em; color: var(--sub); }
+  .spec table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .spec th, .spec td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .spec th { color: var(--sub); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .spec code { background: #eef0f5; border-radius: 4px; padding: 1px 6px; font-size: 12.5px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .spec ul { padding-left: 20px; }
+  .spec li { margin: 6px 0; }
+  .donot { background: var(--bad-bg); border-radius: 8px; padding: 10px 14px; }
+  .check { background: var(--good-bg); border-radius: 8px; padding: 2px 14px 10px; }
+  .check ol { padding-left: 20px; }
+  .check li { margin: 8px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Trial confirmations: right time for every academy</h1>
+  <div class="tagline">Lij onboarding, queue item 4 &middot; plan for approval</div>
+
+  <!-- 1. Plain English -->
+  <div class="plain">
+    When a parent books a free trial, the confirmation text and email currently show the
+    session time in <b>Toronto time, no matter where the academy is</b>. A San Jose parent
+    booking a 5pm trial gets a message saying 8pm. This fix makes every confirmation show
+    the time in <b>that academy's own timezone</b>, and the "good to go for today?"
+    morning check-in will also fire at 9am local instead of 6am California time.
+  </div>
+
+  <!-- 2. Before / after -->
+  <h2><span class="num">1</span>What the San Jose parent receives</h2>
+  <div class="grid">
+    <div>
+      <div class="phone">
+        <div class="top">SMS &middot; today</div>
+        <span class="badge bad">BEFORE - wrong</span>
+        <div class="bubble">Your free trial is booked! Here are some important details:
+
+Date &amp; Time: <span class="hl-bad">Fri, Jul 31 at 8:00 PM</span>
+
+Location: 1234 Blossom Hill Rd, San Jose, CA
+
+Please bring a basketball if you have one. Prepare to be challenged, so come ready to work! ...</div>
+      </div>
+      <div class="caption">Trial is at 5:00 PM in San Jose. Text says 8:00 PM (Toronto time). Parent shows up 3 hours late or calls confused.</div>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="top">SMS &middot; after the fix</div>
+        <span class="badge good">AFTER - correct</span>
+        <div class="bubble">Your free trial is booked! Here are some important details:
+
+Date &amp; Time: <span class="hl-good">Fri, Jul 31 at 5:00 PM</span>
+
+Location: 1234 Blossom Hill Rd, San Jose, CA
+
+Please bring a basketball if you have one. Prepare to be challenged, so come ready to work! ...</div>
+      </div>
+      <div class="caption">Same booking, rendered in the academy's timezone. Toronto academies keep seeing exactly what they see today.</div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:4px;">
+    <div class="email">
+      <div class="head"><b>Your free trial is booked! &#127936;</b>From: BAM San Jose</div>
+      <div class="body">Date &amp; Time: <span style="color:var(--bad);font-weight:700;">Fri, Jul 31 at 8:00 PM</span>
+Location: 1234 Blossom Hill Rd, San Jose, CA
+Apple / Google calendar links...</div>
+    </div>
+    <div class="email">
+      <div class="head"><b>Your free trial is booked! &#127936;</b>From: BAM San Jose</div>
+      <div class="body">Date &amp; Time: <span style="color:var(--good);font-weight:700;">Fri, Jul 31 at 5:00 PM</span>
+Location: 1234 Blossom Hill Rd, San Jose, CA
+Apple / Google calendar links...</div>
+    </div>
+  </div>
+
+  <div class="also">
+    <b>Bonus fix, same change:</b> the same-day "are we good to go?" check-in is timed by
+    the same hardcoded clock. Today it would hit a San Jose phone at <b>6:00 AM</b>. After
+    the fix it fires at 9:00 AM local. Calendar links (Apple / Google) are already stored
+    in universal time and stay correct on their own; they do not change.
+  </div>
+
+  <!-- 3. Timezone decision flow -->
+  <h2><span class="num">2</span>How it decides the timezone</h2>
+  <div class="flow">
+    <div class="fnode" style="text-align:center;"><b>Academy row: is <code style="background:#eef0f5;border-radius:4px;padding:1px 6px;">time_zone</code> set?</b><br>
+    <span style="color:var(--sub);font-size:13px;">(San Jose gets "America/Los_Angeles" saved during onboarding - a per-academy fact, no code fork)</span></div>
+    <div class="arrowrow">
+      <div class="arrow">&darr; yes</div>
+      <div class="arrow">&darr; no, or the value is invalid</div>
+    </div>
+    <div class="arrowrow">
+      <div class="fnode yes"><span class="lbl">USE IT</span><br>All confirmation times and the 9am check-in run on the academy's own clock. Any real timezone works (US, Canada, overseas).</div>
+      <div class="fnode no"><span class="lbl">FALL BACK TO TORONTO + SEND + TELL THE OWNER</span><br>The receipt still goes out, in Toronto time. Then the academy owner gets a one-time heads-up text (max once per day, never silent):
+        <div class="bubble" style="margin-top:10px;font-size:12.5px;border-radius:12px;">Heads up: your academy's timezone is not set, so booking texts show Toronto time. Fix it in Settings &gt; Time zone in your portal.</div>
+        <div style="font-size:12px;color:var(--sub);margin-top:6px;">Sent over the existing owner-SMS notifier (same channel as "new booking" and "ticket completed" texts). One tap to fix, then it never fires again.</div>
+      </div>
+    </div>
+  </div>
+  <div class="why">
+    <b>Why fall back instead of holding the message:</b> a booking receipt is transactional
+    and must always send, and every academy with a blank timezone today actually IS
+    Toronto, so falling back is always correct right now. (Making timezone a required
+    onboarding fact is queue item 10, not this build.)
+    <br><br>
+    <b>Why the owner gets the heads-up (not BAM staff):</b> the timezone field lives in the
+    owner's own portal Settings (they set it themselves), so the owner is the one person
+    who can fix it in one tap.
+  </div>
+
+  <!-- 4. Build spec -->
+  <details>
+    <summary><span class="chev">&#9656;</span>Build spec for the Builder (open only if you want the detail)</summary>
+    <div class="spec">
+
+      <h3>Files to touch (2 + 1 tiny migration, all unclaimed)</h3>
+      <table>
+        <tr><th>File</th><th>Change</th></tr>
+        <tr>
+          <td><code>bam-ghl-agent/bam-portal/api/agent/confirm-automations.js</code></td>
+          <td>
+            Remove the module-level <code>const TZ = "America/Toronto"</code> as the active value.
+            Every function that formats or gates on local time takes a tz parameter:
+            <code>tzDateStr</code>, <code>dayDiffInTz</code>, <code>tzHour</code>,
+            <code>stepIsDue(step, nowMs, trialMs, tz)</code>, <code>nextDueStep(autos, { nowMs, trialMs, sentKeys, tz })</code>,
+            <code>fmtFull</code>, <code>fmtTime</code>, <code>fmtDate</code>, and
+            <code>resolveApptTokens(template, ctx)</code> reads <code>ctx.tz</code>.
+            Each parameter defaults to <code>"America/Toronto"</code> so any caller that
+            does not pass tz behaves byte-for-byte as today.
+            Add a tiny exported <code>resolveClientTz(client)</code>: start from
+            <code>quietTz(client)</code> (import from <code>./_quiet.js</code>), then validate the
+            string with a <code>try { new Intl.DateTimeFormat("en-US", { timeZone: tz }) }</code>;
+            on throw, return <code>"America/Toronto"</code>. This is the fail-safe: an unset
+            OR garbage <code>clients.time_zone</code> can never crash or blank out the receipt
+            (the fmt* catch blocks return "" and the dangling-label stripper would silently
+            delete the Date &amp; Time line - the validator prevents ever reaching that).
+          </td>
+        </tr>
+        <tr>
+          <td><code>bam-ghl-agent/bam-portal/api/agent-confirm.js</code></td>
+          <td>
+            The client row already selects <code>time_zone</code> (lines ~87 and ~953) and the file
+            already imports <code>quietTz</code>. Compute <code>const tz = resolveClientTz(client)</code>
+            once per contact run and thread it into: the <code>nextDueStep(...)</code> call (~line 434),
+            <code>apptCtx</code> (~line 454, as <code>tz</code>), and <code>fmtTrial(iso, tz)</code>
+            (~line 198, currently uses the file-level <code>const TZ</code> at line 63; this string is
+            fed to the AI drafter, which quotes it to parents, so it must be local too).
+            Delete the now-unused file-level <code>const TZ</code> at line 63 if nothing else reads it.
+            <br><br>
+            <b>Timezone-missing guardrail (same file):</b> when <code>resolveClientTz</code> had to
+            fall back (NULL or invalid <code>time_zone</code>), fire the owner heads-up via the
+            EXISTING notifier: <code>notifyOwners(client.id, "settings_alert", msg)</code> from
+            <code>api/_notify-owners.js</code> (owners always receive every event, so no prefs UI
+            work is needed). Dedupe once per 24h per academy: skip if
+            <code>clients.tz_alert_at</code> is within 24h; otherwise PATCH the stamp FIRST, then
+            send (stamp-then-send so two overlapping cron runs cannot double-text). Add
+            <code>tz_alert_at</code> to the two client selects (~lines 87 and 953). Non-throwing,
+            never blocks the receipt. Message copy (no em dash): "Heads up: your academy's timezone
+            is not set, so booking texts show Toronto time. Fix it in Settings &gt; Time zone in
+            your portal."
+          </td>
+        </tr>
+        <tr>
+          <td><code>bam-ghl-agent/bam-portal/supabase/migrations/&lt;ts&gt;_clients_tz_alert_at.sql</code></td>
+          <td>
+            <code>alter table public.clients add column if not exists tz_alert_at timestamptz;</code>
+            plus a comment. Mirrors the shipped <code>ghl_token_error_at</code> guardrail-column
+            precedent (2026-07-23 migration). No backfill needed; NULL means "never alerted".
+          </td>
+        </tr>
+      </table>
+
+      <h3>Exact behaviour</h3>
+      <ul>
+        <li><code>{{appointment.start_time}}</code>, <code>only_start_time</code>, <code>only_start_date</code> render in <code>resolveClientTz(client)</code>.</li>
+        <li><code>morning_of</code> due-check (<code>send_hour</code>, default 9) and <code>day_before</code> day-diff evaluate against the academy's local calendar, same tz.</li>
+        <li>NULL / empty / invalid <code>clients.time_zone</code>: send anyway in America/Toronto (matches quietTz behaviour everywhere else), then text the owner the timezone-missing heads-up, max once per 24h per academy.</li>
+        <li>Guardrail recipient: the academy OWNER (they own the Settings field that fixes it); channel is the existing <code>notifyOwners</code> owner-SMS, no new channel invented.</li>
+        <li>Rollout step (ops, not code): before merge, backfill <code>time_zone</code> for existing academies (GTA = "America/Toronto", San Jose = "America/Los_Angeles") so nobody gets a pointless nag on day one.</li>
+        <li>Shared code, zero forks: no academy names, no per-academy branches. San Jose is fixed purely by setting its <code>clients.time_zone = "America/Los_Angeles"</code> row value (one-line ops step at rollout, belongs to the onboarding checklist).</li>
+      </ul>
+
+      <h3>Must NOT change</h3>
+      <div class="donot">
+        <ul>
+          <li><code>buildGoogleCalUrl</code> / <code>buildIcalUrl</code> / <code>dtUtc</code>: they emit UTC instants and are timezone-correct already. Do not touch.</li>
+          <li>Template copy, step order, quiet-hours logic, <code>_quiet.js</code> itself (its Toronto default is queue item 10's territory; we only import from it).</li>
+          <li>Owned files (other in-flight sessions): <code>api/automations.js</code>, <code>api/email-shells.js</code>, <code>api/form-intro-automations.js</code>, <code>api/email-templates/*</code>, <code>api/agent/presets.js</code>, <code>api/offers/apply-preset.js</code>, <code>api/_email.js</code>, <code>api/_send.js</code>, <code>api/agent/fact-render.js</code>, <code>api/agent/prompt-structure.js</code>, <code>api/website/*</code>. The fix needs none of them.</li>
+          <li>Toronto academies' output: with tz resolved to America/Toronto, every rendered string must be identical to today's.</li>
+        </ul>
+      </div>
+
+      <h3>Edge cases</h3>
+      <ul>
+        <li><b>DST:</b> IANA zone via <code>Intl</code> handles it automatically; verify a date on each side of a DST switch (check #4).</li>
+        <li><b>NULL tz:</b> falls back to Toronto and still sends (check #5).</li>
+        <li><b>Invalid tz string</b> (typo like "America/San_Jose"): validator falls back to Toronto instead of the fmt* catch silently deleting the Date &amp; Time line.</li>
+        <li><b>Non-US zone:</b> any valid IANA name (e.g. "Europe/London") just works; nothing assumes North America.</li>
+        <li><b>Midnight straddle:</b> a 9pm PT booking is "tomorrow" in Toronto; day_before / morning_of must use the academy-local date (they do once tz is threaded through <code>dayDiffInTz</code>).</li>
+        <li><b>Alert race:</b> two cron runs hitting the same academy in the same minute - the 24h check reads <code>tz_alert_at</code> and the stamp is PATCHed before <code>notifyOwners</code> fires, so a double-text needs a sub-second overlap (acceptable; the notifier itself is best-effort).</li>
+        <li><b>Alert failure:</b> <code>notifyOwners</code> is non-throwing; a failed heads-up never blocks or delays the parent's receipt.</li>
+      </ul>
+
+      <h3>Tester checks</h3>
+      <div class="check">
+        <ol>
+          <li><b>SJ render:</b> <code>resolveApptTokens</code> with <code>startMs = Date.parse("2026-08-01T00:00:00Z")</code> and <code>tz: "America/Los_Angeles"</code> renders "Fri, Jul 31 at 5:00 PM" / "5:00 PM" / "Friday, July 31, 2026".</li>
+          <li><b>Toronto regression:</b> same instant with tz omitted AND with <code>tz: "America/Toronto"</code> both render "Fri, Jul 31 at 8:00 PM", byte-identical to current main.</li>
+          <li><b>Morning-of gating:</b> on trial day, <code>stepIsDue(morning_of, now = 13:00 UTC)</code> is true for Toronto (9am ET) and false for LA (6am PT); becomes true for LA at 16:00 UTC.</li>
+          <li><b>DST:</b> a trial at <code>2026-11-01T21:00:00Z</code> (after fall-back) renders 4:00 PM ET / 1:00 PM PT; a late-October date renders one hour different as expected.</li>
+          <li><b>Fail-safe:</b> client rows with <code>time_zone</code> NULL and <code>time_zone = "not/a_zone"</code> both render Toronto times, no crash, Date &amp; Time line present.</li>
+          <li><b>Calendar links untouched:</b> the Google Calendar <code>dates=</code> UTC string and the /api/ical URL are identical before vs after the change for the same booking.</li>
+          <li><b>Guardrail fires:</b> booking receipt for a client with <code>time_zone</code> NULL and <code>tz_alert_at</code> NULL sends the parent receipt AND one owner SMS via <code>notifyOwners(..., "settings_alert", ...)</code>, and <code>clients.tz_alert_at</code> is stamped to now.</li>
+          <li><b>Guardrail dedupes:</b> a second booking for the same academy later the same day sends the parent receipt but NO second owner SMS (<code>tz_alert_at</code> under 24h old); a client with <code>time_zone</code> set never triggers the alert at all.</li>
+        </ol>
+      </div>
+
+      <h3>Adjacent, found but NOT in this build</h3>
+      <ul>
+        <li><code>api/agent-approvals.js</code> lines ~294/364: hardcodes <code>timezone: "America/Toronto"</code> into the AI booking/opener context (the AI quotes slot times to parents). Unclaimed file, same pattern, recommend a small follow-up ticket.</li>
+        <li><code>api/agent/booking.js</code>: <code>timezone = "America/Toronto"</code> default params; two callers in agent-approvals.js omit the arg. Same follow-up.</li>
+        <li><code>_quiet.js</code> Toronto default when tz is NULL: queue item 10, untouched here.</li>
+        <li>Already correct (fallback pattern, no change needed): <code>api/website/availability.js</code>, <code>api/website/calendars.js</code>, <code>api/ghl/calendars-v15.js</code>, <code>api/agent-config.js</code>, <code>api/automations.js</code> (owned anyway).</li>
+      </ul>
+
+    </div>
+  </details>
+
+</div>
+</body>
+</html>

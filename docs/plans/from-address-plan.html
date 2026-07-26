@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automation Emails: Every Academy Sends As Itself</title>
+<style>
+  :root {
+    --ink: #1d2433;
+    --sub: #5a6478;
+    --line: #e4e7ee;
+    --bad: #c0392b;
+    --bad-bg: #fdf0ee;
+    --good: #1e7d4f;
+    --good-bg: #eefaf3;
+    --hold: #a06a00;
+    --hold-bg: #fbf3e0;
+    --gold: #C8A84E;
+    --card: #ffffff;
+    --bg: #f6f7fa;
+    --code-bg: #f0f2f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--ink);
+    line-height: 1.45; padding: 32px 16px 64px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 26px; margin-bottom: 6px; }
+  .tagline { color: var(--sub); margin-bottom: 26px; font-size: 15px; }
+  h2 { font-size: 18px; margin: 38px 0 14px; display: flex; align-items: center; gap: 8px; }
+  h2 .num {
+    background: var(--gold); color: #fff; border-radius: 999px;
+    width: 26px; height: 26px; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 14px; flex: 0 0 auto;
+  }
+  .plain {
+    background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--gold);
+    border-radius: 12px; padding: 18px 20px; font-size: 16px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+  .badge { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 12px; margin-bottom: 10px; }
+  .badge.bad { color: var(--bad); background: var(--bad-bg); }
+  .badge.good { color: var(--good); background: var(--good-bg); }
+  .badge.hold { color: var(--hold); background: var(--hold-bg); }
+
+  .email {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden; box-shadow: 0 4px 14px rgba(20,28,50,.06);
+  }
+  .email .hdr { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .email .subj { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+  .email .fromline { font-size: 13.5px; }
+  .email .fromline .label { color: var(--sub); }
+  .email .from-bad { background: var(--bad-bg); color: var(--bad); font-weight: 700; padding: 1px 5px; border-radius: 5px; }
+  .email .from-good { background: var(--good-bg); color: var(--good); font-weight: 700; padding: 1px 5px; border-radius: 5px; }
+  .email .body { padding: 14px 16px; font-size: 13.5px; color: #444; }
+  .caption { text-align: center; font-size: 12px; color: var(--sub); margin-top: 8px; }
+
+  .holdstrip {
+    margin-top: 20px; background: var(--hold-bg); border: 1px solid #e6cf9a;
+    border-radius: 12px; padding: 14px 18px; font-size: 14.5px; display: flex; gap: 12px; align-items: flex-start;
+  }
+  .holdstrip .icon { font-size: 20px; line-height: 1.2; }
+  .holdstrip strong { color: var(--hold); }
+  .sms {
+    background: #e9ebf0; border-radius: 16px 16px 16px 4px;
+    padding: 10px 12px; font-size: 13px; color: #222; margin-top: 8px; max-width: 420px;
+  }
+
+  .flow { display: flex; flex-direction: column; gap: 0; align-items: center; margin-top: 10px; }
+  .node {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 16px; font-size: 13.5px; text-align: center; max-width: 460px; width: 100%;
+    box-shadow: 0 2px 8px rgba(20,28,50,.05);
+  }
+  .node.q { border-color: var(--gold); font-weight: 700; }
+  .node.out-good { background: var(--good-bg); border-color: var(--good); }
+  .node.out-hold { background: var(--hold-bg); border-color: #d8b45f; }
+  .node .sm { display: block; font-weight: 400; font-size: 12px; color: var(--sub); margin-top: 3px; }
+  .arrow { color: var(--sub); font-size: 16px; padding: 4px 0; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 720px; }
+  .split .col { display: flex; flex-direction: column; align-items: center; }
+  .lbl { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin: 4px 0; }
+  .lbl.yes { color: var(--good); background: var(--good-bg); }
+  .lbl.no { color: var(--bad); background: var(--bad-bg); }
+  @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+
+  code { background: var(--code-bg); border-radius: 5px; padding: 1px 6px; font-size: 12.5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  details {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 0; margin-top: 14px; overflow: hidden;
+  }
+  summary {
+    cursor: pointer; font-weight: 700; font-size: 15px; padding: 14px 18px;
+    list-style: none; display: flex; align-items: center; gap: 8px;
+  }
+  summary::before { content: "▸"; color: var(--gold); transition: transform .15s; }
+  details[open] summary::before { transform: rotate(90deg); }
+  details .inner { padding: 4px 18px 18px; border-top: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 12px 0; }
+  th { text-align: left; color: var(--sub); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px; border-bottom: 2px solid var(--line); }
+  td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child { white-space: nowrap; }
+  ul { margin: 8px 0 8px 20px; font-size: 14px; }
+  li { margin-bottom: 6px; }
+  .ok { color: var(--good); font-weight: 700; }
+  .warn { color: var(--bad); font-weight: 700; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; background: var(--good-bg); color: var(--good); }
+  .pill.gray { background: var(--code-bg); color: var(--sub); }
+  .pill.hold { background: var(--hold-bg); color: var(--hold); }
+  .launch {
+    margin-top: 18px; background: var(--card); border: 1px solid var(--line);
+    border-left: 4px solid var(--good); border-radius: 12px; padding: 14px 18px; font-size: 14.5px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Automation Emails: Every Academy Sends As Itself</h1>
+  <p class="tagline">Queue item 3 &middot; San Jose onboarding &middot; files that change: <code>api/_send.js</code> + <code>api/automations.js</code> &middot; email channel ONLY, SMS steps untouched</p>
+
+  <h2><span class="num">1</span>What changes for a person</h2>
+  <div class="plain">
+    Today every automated email (lead nurture, trial confirmations, ghosted follow-ups) from ANY academy
+    lands in the parent's inbox as <strong>"BAM Toronto &lt;info@byanymeanstoronto.ca&gt;"</strong>.
+    A San Jose parent who signed up with Lij's academy gets mail from a Toronto gym they have never heard of.
+    After this build there is one hard rule: <strong>an automation email only sends when the academy's own
+    sending domain is set and verified</strong>. Then the parent sees "BAM San Jose &lt;info@byanymeanssanjose.com&gt;".
+    No domain yet? The email is HELD, nothing generic goes out in its place, and the academy owner gets a
+    heads-up text so it is never silent. GTA parents notice nothing: their emails stay byte-identical.
+    Automation SMS is not touched by any of this.
+  </div>
+
+  <h2><span class="num">2</span>What a San Jose parent sees</h2>
+  <div class="grid">
+    <div>
+      <span class="badge bad">BEFORE</span>
+      <div class="email">
+        <div class="hdr">
+          <div class="subj">Your free trial is booked!</div>
+          <div class="fromline"><span class="label">From:</span> <span class="from-bad">BAM Toronto &lt;info@byanymeanstoronto.ca&gt;</span></div>
+          <div class="fromline"><span class="label">To:</span> maria@gmail.com</div>
+        </div>
+        <div class="body">Hey Maria! Jordan's trial session is locked in...</div>
+      </div>
+      <p class="caption">Who is BAM Toronto? Straight to spam.</p>
+    </div>
+    <div>
+      <span class="badge good">AFTER (email_domain set)</span>
+      <div class="email">
+        <div class="hdr">
+          <div class="subj">Your free trial is booked!</div>
+          <div class="fromline"><span class="label">From:</span> <span class="from-good">BAM San Jose &lt;info@byanymeanssanjose.com&gt;</span></div>
+          <div class="fromline"><span class="label">To:</span> maria@gmail.com</div>
+        </div>
+        <div class="body">Hey Maria! Jordan's trial session is locked in...</div>
+      </div>
+      <p class="caption">Own name, own domain. Display name derives from business_name at runtime, no fork.</p>
+    </div>
+  </div>
+
+  <div class="holdstrip">
+    <div class="icon">&#9208;&#65039;</div>
+    <div>
+      <strong>No domain set yet? The email HOLDS.</strong> The parent gets nothing wrong-branded, the job stays
+      queued (not failed, no retries burned), and Lij gets this text at most once per 24h:
+      <div class="sms">Heads up: your automation emails are on hold because your academy's sending domain is not set up yet. Ping BAM staff to finish email setup, then held emails go out on their own.</div>
+    </div>
+  </div>
+
+  <h2><span class="num">3</span>How the from is chosen</h2>
+  <div class="flow">
+    <div class="node">Automation wants to email a lead<span class="sm">sendOn(channel: email) in api/_send.js &middot; SMS branch skips all of this</span></div>
+    <div class="arrow">&#9660;</div>
+    <div class="node q">Is clients.email_domain set AND verified in Resend?<span class="sm">verified = domain shows "verified" in Resend's domain list (cheap API check, cached 5 min); an unverified domain holds instead of 403-ing</span></div>
+    <div class="arrow">&#9660;</div>
+    <div class="split">
+      <div class="col">
+        <span class="lbl yes">YES (GTA today, SJ at launch)</span>
+        <div class="node q" style="font-weight:400">Is <code>info@domain</code> the same address as the legacy default?</div>
+        <div class="arrow">&#9660;</div>
+        <div class="node out-good">YES &rarr; keep the legacy string verbatim<span class="sm">"BAM Toronto &lt;info@byanymeanstoronto.ca&gt;" byte-identical, no extra headers</span></div>
+        <div class="arrow">&#9660;</div>
+        <div class="node out-good">NO &rarr; business_name &lt;info@domain&gt;<span class="sm">"BAM San Jose &lt;info@byanymeanssanjose.com&gt;"</span></div>
+      </div>
+      <div class="col">
+        <span class="lbl no">NO / NULL (every other academy today)</span>
+        <div class="node out-hold">HOLD: the email does NOT send<span class="sm">no fallback, never reaches Resend, nothing generic goes out in its place</span></div>
+        <div class="arrow">&#9660;</div>
+        <div class="node out-hold">Job stays queued, no retries burned<span class="sm">status pending + last_error "held: sending domain not set", re-checked hourly</span></div>
+        <div class="arrow">&#9660;</div>
+        <div class="node out-hold">Notify owner, deduped once per 24h<span class="sm">owner-SMS notifier, stamp-then-send (tz-guardrail precedent, except here the message is held, not sent)</span></div>
+        <div class="arrow">&#9660;</div>
+        <div class="node out-good">Domain gets set &rarr; held emails release on their own<span class="sm">next hourly re-check sends them with the academy's real from</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="launch">
+    <strong>San Jose launch switch list, add one line:</strong> set <code>clients.email_domain = byanymeanssanjose.com</code>
+    once Resend shows the domain Verified. SJ's automations seed dormant, so nothing holds before launch day;
+    without this switch, launch-day emails hold and Lij gets the heads-up text.
+  </div>
+
+  <h2><span class="num">4</span>Build spec</h2>
+
+  <details>
+    <summary>The code change (two files)</summary>
+    <div class="inner">
+      <table>
+        <tr><th>File</th><th>Change</th></tr>
+        <tr><td><code>api/_send.js</code></td><td>Add a cached resolver <code>fromFor(clientId, vars)</code> (mirrors <code>resolveEmail</code> in email-provider.js: 30s client cache, service-role fetch of <code>clients.email_domain, business_name</code>) plus a 5 min cached Resend <code>GET /domains</code> list to confirm the domain is verified. Email branch of <code>sendOn</code>: domain set + verified &rarr; pass <code>from</code> into <code>sendEmail</code>; otherwise return <code>{ held: "sending domain not set" }</code> WITHOUT calling <code>sendEmail</code>, and fire the deduped owner notification from here (so EVERY caller gets never-silent behavior, including the agent one-offs). SMS branch untouched.</td></tr>
+        <tr><td><code>api/automations.js</code></td><td>Engine handles the new <code>held</code> result explicitly: <code>finish({ status: "pending", run_after: now + 1h, last_error: "held: sending domain not set" })</code> with <strong>no attempts increment</strong> and <strong>no advance</strong>. Without this branch a held email would land in the generic skipped bucket and be silently lost, the exact trap the blank-domain empty-SMS case was criticized for. Once email_domain is set, the next hourly pass sends the held jobs in order.</td></tr>
+        <tr><td><code>api/_email.js</code></td><td><span class="pill gray">UNTOUCHED</span> <code>sendEmail</code> already accepts <code>from</code>; <code>DEFAULT_FROM</code> is now only ever reached by legacy direct callers (commission report), never by automations.</td></tr>
+      </table>
+      <p style="font-size:14px"><strong>Display name:</strong> <code>vars.location_name</code> (business_name via clientVars, already passed by the worker) &rarr; fetched <code>business_name</code> backstop. <strong>GTA byte-identity:</strong> if the computed address equals the address inside <code>DEFAULT_FROM</code>, return <code>DEFAULT_FROM</code> verbatim. That domain-match rule (no client-id hardcode) is what keeps GTA exact: GTA's business_name is "BAM GTA", not "BAM Toronto", so name-from-business_name alone would break byte-identity.</p>
+      <p style="font-size:14px"><strong>Owner notification:</strong> owner-SMS notifier (same channel as "new booking" texts), deduped to once per client per 24h via an <code>email_events</code> row <code>type = "domain_hold_notice"</code>: stamp the row FIRST, then send (tz-guardrail semantics; a crash between the two can only under-notify for one cycle, never spam). Difference from the tz guardrail, stated on purpose: there the message still went out with a fallback value; here the message is held, and goes out correct later.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Blast radius (DB-verified) + every affected call site</summary>
+    <div class="inner">
+      <p style="font-size:14px"><strong>Rollout mutes zero academies:</strong> checked in the live DB, ONLY BAM GTA has live approved email automation steps today, and GTA's <code>email_domain</code> IS set (byanymeanstoronto.ca, Resend-verified). Every other academy's email steps are dormant, so the hold changes nothing for anyone on day one. SJ just needs its launch-switch line above.</p>
+      <table>
+        <tr><th>Caller</th><th>What it sends</th><th>Edit?</th></tr>
+        <tr><td><code>automations.js:503</code></td><td>Drip / nurture engine emails</td><td><span class="pill hold">Small held-branch edit</span> (queue semantics only)</td></tr>
+        <tr><td><code>agent-confirm.js:477, 1203</code></td><td>Trial confirmation emails</td><td><span class="pill">Gets guardrail free via sendOn</span> (file claimed by PR #1587, NOT edited); a held one-off confirmation does not retry, but the owner notification still fires from _send.js</td></tr>
+        <tr><td><code>agent-approvals.js:1565</code></td><td>Approved trial-booked email</td><td><span class="pill">Gets guardrail free</span> (same held behavior as above)</td></tr>
+        <tr><td><code>commissions.js:40</code> (sendEmail direct)</td><td>Staff commission report</td><td><span class="pill gray">Unchanged, staff-facing</span></td></tr>
+        <tr><td><code>messaging/email-provider.js</code> (sendEmail direct)</td><td>Human 1:1 lane, already per-academy</td><td><span class="pill gray">Unchanged, off-limits</span></td></tr>
+        <tr><td><code>clients.js:738, 889</code> (raw Resend fetch)</td><td>Auth invite / password reset</td><td><span class="pill gray">Unchanged ("BAM Business")</span></td></tr>
+      </table>
+      <p style="font-size:14px">No other person-facing sender changes. All SMS paths (engine SMS steps, Twilio provider gate, GHL sends) untouched.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Edge cases</summary>
+    <div class="inner">
+      <ul>
+        <li><strong>NULL email_domain</strong>: HOLD, never a fallback send. Job visible as pending with <code>last_error "held: sending domain not set"</code>, owner texted once per 24h, auto-release when the domain is set. Zoran's rule: no neutral fallback, no silent send.</li>
+        <li><strong>Domain set but not verified in Resend</strong>: treated the same as unset, HOLD. The cached Resend domain-list check catches it BEFORE the send, so it never burns retries on 403s and never fails as a generic error.</li>
+        <li><strong>GTA byte-identical</strong>: DB-verified, GTA has <code>email_domain = byanymeanstoronto.ca</code> (verified in Resend), so the domain-match rule returns the exact legacy string "BAM Toronto &lt;info@byanymeanstoronto.ca&gt;". Zero header drift, and the hold branch is unreachable for GTA.</li>
+        <li><strong>Resolver DB blip / Resend list fetch blip</strong>: HOLD for that pass (fail CLOSED, matching the new rule; the old fail-open-to-Toronto behavior is exactly the leak). The job re-checks on the next hourly pass, so a transient blip delays by at most an hour and never mis-brands. The hold notice only fires when the DOMAIN is missing/unverified, not on a transient fetch error, so owners are not pinged over a blip.</li>
+        <li><strong>Shared system, no fork</strong>: everything derives from the client row at runtime. Future nicety (not this build): a <code>clients.email_from_name</code> runtime fact if an academy ever wants a custom display name.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>Tester checks (5)</summary>
+    <div class="inner">
+      <ul>
+        <li><strong>Held email never reaches Resend</strong>: trigger an email step for a test client with NULL email_domain; assert no Resend API send happened, the job is pending (not failed, not skipped) with <code>last_error "held: sending domain not set"</code>, and attempts did NOT increment across two engine passes.</li>
+        <li><strong>Notification fires once</strong>: same setup, run the engine several times inside 24h; the owner gets exactly one hold text, and an <code>email_events</code> row <code>type domain_hold_notice</code> exists with the stamp written before the send.</li>
+        <li><strong>GTA unchanged</strong>: trigger a GTA automation email; From header is exactly <code>BAM Toronto &lt;info@byanymeanstoronto.ca&gt;</code>, no new headers, delivered as today.</li>
+        <li><strong>SJ releases after the switch</strong>: with held SJ jobs queued, set <code>email_domain = byanymeanssanjose.com</code> (Resend-verified); next pass sends them with From <code>BAM San Jose &lt;info@byanymeanssanjose.com&gt;</code> and the hold notices stop.</li>
+        <li><strong>SMS untouched</strong>: an SMS step for a NULL-domain client still sends normally, and commission report + auth invite/reset emails send byte-identical to today.</li>
+      </ul>
+    </div>
+  </details>
+
+</div>
+</body>
+</html>
