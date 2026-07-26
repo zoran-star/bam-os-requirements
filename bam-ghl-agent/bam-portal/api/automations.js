@@ -241,7 +241,7 @@ async function runWork(res) {
   const stepsCache  = new Map();   // automationId -> steps[]
   const contactCache = new Map();  // contactId -> {email,phone,firstName,fullName}
   const calCache    = new Map();   // clientId -> first calendar entry-point key | null
-  let sent = 0, deferred = 0, advanced = 0, completed = 0, failed = 0, canceled = 0, lost = 0, nurtureLost = 0, ghostedLost = 0, formToGhosted = 0;
+  let sent = 0, deferred = 0, advanced = 0, completed = 0, failed = 0, canceled = 0, lost = 0, nurtureLost = 0, ghostedLost = 0, formToGhosted = 0, held = 0;
 
   // RECLAIM stuck claims: a worker that crashed or timed out between claiming a
   // job ('sending') and finishing it left the job in 'sending' FOREVER - the
@@ -506,6 +506,18 @@ async function runWork(res) {
         vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session, ...clientVars(client) },
       });
 
+      // HELD (email only): the academy has no verified sending domain, so nothing
+      // went out and nothing generic went out in its place. Re-queue the job as-is -
+      // still pending, NO attempts increment (a hold is not a failure), and do NOT
+      // advance, so the step keeps its place in the sequence. The moment
+      // clients.email_domain is set, the next hourly pass sends it for real. Without
+      // this branch a hold would fall into the skipped bucket below and be silently
+      // lost, which is exactly what the guardrail exists to prevent.
+      if (result && result.held) {
+        await finish({ status: "pending", run_after: new Date(Date.now() + 3600000).toISOString(), last_error: `held: ${result.held}`.slice(0, 300) });
+        held++; continue;
+      }
+
       if (result && result.sent) { await finish({ status: "sent", sent_at: new Date().toISOString() }); sent++; await logEvent({ clientId: job.client_id, contactId: job.contact_id, automationId: job.automation_id, type: "step_sent", payload: { step_id: job.step_id, channel: step.channel } }); }
       else { await finish({ status: "skipped", last_error: (result && result.skipped) || "skipped" }); }
 
@@ -518,7 +530,7 @@ async function runWork(res) {
       else { await finish({ status: "pending", attempts, last_error: String(e.message || e).slice(0, 300), run_after: nextSendableTime(new Date(Date.now() + RETRY_BACKOFF_MS), quietTz(client)).toISOString() }); }
     }
   }
-  return res.status(200).json({ ok: true, picked: jobs.length, sent, deferred, advanced, completed, failed, canceled, nurture_lost: nurtureLost, ghosted_lost: ghostedLost, form_to_ghosted: formToGhosted, lost_race: lost });
+  return res.status(200).json({ ok: true, picked: jobs.length, sent, deferred, held, advanced, completed, failed, canceled, nurture_lost: nurtureLost, ghosted_lost: ghostedLost, form_to_ghosted: formToGhosted, lost_race: lost });
 }
 
 // Newest message timestamp (ms) + its DIRECTION for a contact — the SAME idle signal
