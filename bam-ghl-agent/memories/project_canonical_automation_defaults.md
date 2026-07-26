@@ -18,4 +18,6 @@ Defaults = the single canonical proven copy. Generally-good academy edits get PR
 - GTA's `business_name` is "BAM GTA" and it has NO `website_setup.domain` - GTA rides its own LOCATIONS entry in email-shells.js; every other academy rides `clientVars`.
 - `{{location.name}}` renders `clients.business_name` (e.g. "BAM San Jose") - keep business_name parent-presentable.
 - Seeder is edit-safe via "zero steps" check: re-seeding an academy whose steps were deleted re-installs canonical; re-seeding an edited academy does nothing.
-- San Jose post-merge step: re-run apply-preset (or `seed-preset-automations`) once to seed its drips; leave `approved:false` until Lij goes live.
+- San Jose: DONE 2026-07-26 - PR #1601 merged, apply-preset re-run, all 6 drips seeded dormant (approved:false until Lij goes live), divergence check = all MATCH.
+- BAM NY has ghosted/nurture rows with ZERO steps (broken half-seed). Re-seed is PARKED by Zoran until San Jose is fully live - do not fix yet.
+- Vercel prod env gotcha bit again 2026-07-26: SUPABASE_SERVICE_KEY and VITE_SUPABASE_URL are stored WITH literal \n sequences - strip them before using pulled values locally.
