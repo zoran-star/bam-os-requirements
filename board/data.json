@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "Message workshop room spinning up: all 13 SJ messages rendered for review",
     "Dead whiteboard Vercel project deleted, PR checks go green again",
     "Price breakdown SHIPPED (#1606): agents now quote price, tax and fees on separate lines",
     "SJ email has its own chat now, Gmail confirmed safe (records sit on the send subdomain)",
-    "All 6 GTA identity leaks from the original sweep: shipped and dead",
-    "Found: bam-portal cancels every PR preview build, which breaks future gate-2 tests"
+    "All 6 GTA identity leaks from the original sweep: shipped and dead"
   ],
   "orchestrator": {
     "focus": "Price + tax + fees breakdown is at YOUR gate (PR #1606, tested 11/11). After your pass: agent brain fallback (#5) and AI booking times (#22).",
@@ -588,6 +588,12 @@
         "t-breakdown",
         "t-email"
       ]
+    },
+    {
+      "name": "SJ MESSAGE WORKSHOP",
+      "sidebar": "SJ MESSAGE WORKSHOP",
+      "state": "blue",
+      "one": "Renders all 13 SJ messages on localhost:4600 so you can read them like a parent would, then workshop the copy"
     },
     {
       "name": "SJ EMAIL GO-LIVE",
