@@ -1,6 +1,6 @@
 {
-  "updated": "2026-07-26 \u00b7 late night",
-  "headline": "SJ drips: CLEAN, zero GTA leaks in 26 renders. One trap before approve: nurture-3 quotes GTA parents as San Jose parents.",
+  "updated": "2026-07-27 \u00b7 morning",
+  "headline": "From-address build IN FLIGHT with Zoran's domain-or-hold guardrail. SJ drips leak-checked clean. Phone room + ask-list still your moves.",
   "yourMoves": [
     {
       "urgency": "now",
@@ -51,16 +51,17 @@
       },
       {
         "name": "Plan",
-        "state": "active",
-        "note": "Fable planning"
+        "state": "done",
+        "note": "v2 hold guardrail"
       },
       {
         "name": "Gate 1 \u00b7 you",
-        "state": "pending"
+        "state": "done"
       },
       {
         "name": "Build",
-        "state": "pending"
+        "state": "active",
+        "note": "Opus building"
       },
       {
         "name": "Test",
@@ -143,7 +144,7 @@
       "id": 3,
       "title": "Emails send FROM BAM Toronto",
       "severity": "blocker",
-      "status": "planning now",
+      "status": "building",
       "owner": "us"
     },
     {
@@ -325,7 +326,7 @@
       "id": 29,
       "title": "Nurture-3 re-attributes GTA testimonials to SJ",
       "severity": "blocker",
-      "status": "needs your call",
+      "status": "HELD for SJ (step off)",
       "owner": "us"
     },
     {
@@ -353,20 +354,20 @@
     {
       "name": "Planner",
       "model": "Fable",
-      "status": "running",
-      "detail": "from-address plan (queue #3)"
+      "status": "done",
+      "detail": "from-address v2 approved"
     },
     {
       "name": "Builder",
       "model": "Opus",
-      "status": "idle",
-      "detail": "tz shipped; next after gate 1"
+      "status": "running",
+      "detail": "from-address + hold guardrail"
     },
     {
       "name": "Tester",
       "model": "Opus",
-      "status": "idle",
-      "detail": "SJ drip leak-check queued post-seed"
+      "status": "done",
+      "detail": "SJ leak-check: clean, 26 renders"
     }
   ],
   "sessions": [
