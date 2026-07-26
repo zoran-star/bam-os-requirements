@@ -77,6 +77,12 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .chat h4{font-family:var(--disp);font-weight:700;font-size:19px;line-height:1.1;text-transform:uppercase;letter-spacing:.03em;padding-right:26px}
 .chat .stateword{font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:600}
 .chat p{font-size:13px;color:var(--bone);line-height:1.55}
+.btags{display:flex;flex-wrap:wrap;gap:6px}
+.btag{
+  font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);
+  background:var(--panel2);border:1px solid var(--gold-dim);padding:3px 9px;line-height:1.4;
+}
+.btag b{color:var(--bone);font-weight:600}
 .chat .blocked{font-size:12px;color:var(--amber);line-height:1.5;border-top:1px dashed var(--amber);padding-top:6px;margin-top:auto}
 .chat.red{border-color:var(--red)} .chat.red .stateword{color:var(--red)}
 .chat.blue{border-color:var(--blue)} .chat.blue .stateword{color:var(--blue)}
@@ -321,6 +327,18 @@ function renderUndo(){
     (n ? `<button class="undoBtn all" data-restoreall="1">restore all ${n} archived</button>` : "");
 }
 
+function buildTags(c, d){
+  if(!c.builds || !c.builds.length) return "";
+  return `<div class="btags">` + c.builds.map(id => {
+    const t = (d.buildTasks || []).find(b => b.id === id);
+    if(!t) return "";
+    const active = t.pipeline.find(s => s.state === "active");
+    const doneAll = !active && t.pipeline.every(s => s.state === "done");
+    const stage = active ? active.name : (doneAll ? "shipped" : "queued");
+    return `<span class="btag">⚙ ${esc(t.short || t.title)} · <b>${esc(stage)}</b></span>`;
+  }).join("") + `</div>`;
+}
+
 function render(d){
   const arch = readArch();
   const live = (d.chatMap || []).filter(c => !arch[c.name]);
@@ -329,6 +347,7 @@ function render(d){
       <button class="x" data-arc="${esc(c.name)}" title="Archive off the board">✕</button>
       <h4>${esc(c.sidebar || c.name)}</h4>
       <div class="stateword">${STATEWORD[c.state] || esc(c.state)}</div>
+      ${buildTags(c, d)}
       <p>${esc(c.one)}</p>
       ${c.blockedBy ? `<div class="blocked">⏳ blocked by: ${esc(c.blockedBy)}</div>` : ""}
     </div>`).join("");

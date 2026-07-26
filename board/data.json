@@ -60,7 +60,8 @@
         "who": "you",
         "what": "Click the test chip when it appears and walk the 10 steps"
       },
-      "checklist": null
+      "checklist": null,
+      "short": "price breakdown"
     },
     {
       "id": "t-email",
@@ -130,7 +131,8 @@
             "t": "Tell me 'records added'. I trigger verification and set SJ's email domain from here, you are done"
           }
         ]
-      }
+      },
+      "short": "SJ email"
     }
   ],
   "humanTasks": [
@@ -578,13 +580,20 @@
       "name": "MISTER_ORCHESTRATOR",
       "sidebar": "MISTER_ORCHESTRATOR",
       "state": "blue",
-      "one": "Two things wait on your word here: 'records added', and the ship order for the pricing PR"
+      "one": "Two things wait on your word here: 'records added', and the ship order for the pricing PR",
+      "builds": [
+        "t-breakdown",
+        "t-email"
+      ]
     },
     {
       "name": "Test: price breakdown",
       "sidebar": "Test: price + tax + fees breakdown (gate 2)",
       "state": "blue",
-      "one": "Open it and walk the 10 pricing steps, your verdict flows back to HQ"
+      "one": "Open it and walk the 10 pricing steps, your verdict flows back to HQ",
+      "builds": [
+        "t-breakdown"
+      ]
     },
     {
       "name": "Client Profile",
