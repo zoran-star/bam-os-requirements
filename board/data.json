@@ -98,37 +98,36 @@
           "state": "active"
         }
       ],
-      "status": "Code shipped and merged. All SJ email holds, correctly, until the domain verifies.",
+      "status": "Domain already created in Resend for you via API. Just 3 records into Squarespace, then I verify from here.",
       "next": {
         "who": "you",
-        "what": "Tick the Resend steps below, then tell me and I flip the switch"
+        "what": "Add the 3 DNS records below in Squarespace, then say 'records added'"
       },
       "checklist": {
         "id": "resend",
         "steps": [
           {
             "id": "r1",
-            "t": "Open resend.com/domains and click Add Domain"
+            "t": "Squarespace: Domains, byanymeanssanjose.com, DNS settings"
           },
           {
             "id": "r2",
-            "t": "Enter byanymeanssanjose.com, pick the region closest to San Jose"
+            "t": "Add TXT record. Host: resend._domainkey. Value: the long DKIM key (copy button)",
+            "copy": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDGgsx+n57yQRIjUMouaC7z14hJXC/Xq0nRsutU2GuoCV+ompCzYBCvHtEbL9/glpBbzqBkA7Rd1CNC9i0JQg5eg3L/Hcvi/EfFKVzE2ski4hHRZW/YDXvYbnjDQFlooQU3p+GW4asrd+wkAG0y0Dhrj8ObUMDCwoTYmmytmuwDTQIDAQAB"
           },
           {
             "id": "r3",
-            "t": "Copy the DKIM, SPF and DMARC records Resend shows you"
+            "t": "Add MX record. Host: send. Priority: 10. Value: feedback-smtp.us-east-1.amazonses.com",
+            "copy": "feedback-smtp.us-east-1.amazonses.com"
           },
           {
             "id": "r4",
-            "t": "Add all three as DNS records at the domain registrar"
+            "t": "Add TXT record. Host: send. Value: v=spf1 include:amazonses.com ~all",
+            "copy": "v=spf1 include:amazonses.com ~all"
           },
           {
             "id": "r5",
-            "t": "Back in Resend, click Verify (DNS can take up to an hour)"
-          },
-          {
-            "id": "r6",
-            "t": "Status reads Verified, tell me, I set SJ's email domain"
+            "t": "Tell me 'records added'. I trigger verification and set SJ's email domain from here, you are done"
           }
         ]
       }
@@ -423,7 +422,7 @@
       "id": 42,
       "title": "Resend domain verification",
       "severity": "blocker",
-      "status": "on your checklist",
+      "status": "3 records into Squarespace",
       "owner": "Zoran"
     },
     {
@@ -563,6 +562,13 @@
       "id": 46,
       "title": "Onboarding intake step for per-academy A2P data",
       "severity": "scale",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 47,
+      "title": "Portal 'Connect email domain' button (Resend API + records shown in-portal, per academy)",
+      "severity": "friction",
       "status": "queued",
       "owner": "us"
     }

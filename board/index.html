@@ -130,6 +130,13 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 }
 .chat .sidebar-name:hover{border-style:solid;background:#241f14}
 .chat .sidebar-name.copied{color:var(--green);border-color:var(--green)}
+.copychip{
+  font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--gold);background:none;border:1px solid var(--gold-dim);padding:1px 7px;
+  cursor:pointer;margin-left:6px;vertical-align:middle;
+}
+.copychip:hover{border-color:var(--gold);background:#241f14}
+.copychip.copied{color:var(--green);border-color:var(--green)}
 
 /* lanes */
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
@@ -232,7 +239,7 @@ function checklistHtml(cl){
   const done = cl.steps.filter(s => state[s.id]).length;
   return `<div class="cl ${done === cl.steps.length ? "full" : ""}" data-cl="${esc(cl.id)}">
     <div class="prog">MY CHECKLIST · ${done}/${cl.steps.length}${done === cl.steps.length ? " DONE" : ""}</div>
-    ${cl.steps.map(s => `<label><input type="checkbox" data-id="${esc(s.id)}"${state[s.id] ? " checked" : ""}><span>${esc(s.t)}</span></label>`).join("")}
+    ${cl.steps.map(s => `<label><input type="checkbox" data-id="${esc(s.id)}"${state[s.id] ? " checked" : ""}><span>${esc(s.t)}${s.copy ? ` <button class="copychip" data-copyval="${esc(s.copy)}">copy value</button>` : ""}</span></label>`).join("")}
   </div>`;
 }
 
@@ -312,6 +319,15 @@ document.addEventListener("change", e => {
   if(window._data) render(window._data);
 });
 document.addEventListener("click", e => {
+  const chip = e.target.closest(".copychip");
+  if(chip){
+    e.preventDefault();
+    navigator.clipboard.writeText(chip.dataset.copyval).then(() => {
+      chip.classList.add("copied"); chip.textContent = "✓ copied";
+      setTimeout(() => { chip.classList.remove("copied"); chip.textContent = "copy value"; }, 1500);
+    });
+    return;
+  }
   const copy = e.target.closest(".sidebar-name");
   if(copy){
     navigator.clipboard.writeText(copy.dataset.copy).then(() => {
