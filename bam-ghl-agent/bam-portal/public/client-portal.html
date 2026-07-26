@@ -63175,9 +63175,14 @@ function _mmRenderMetaFocus(d) {
 // leak is painted red, with its fix chip attached. No overlapping ratio pills.
 // Shared soft-pill style for the between-step metadata chips (time / load).
 const MM_PILL = 'font-family:var(--mm-ff);font-size:11px;color:var(--text-mute);display:inline-flex;align-items:center;gap:3px;background:var(--surface-el);padding:2px 9px;border-radius:999px';
-// Page-load speed chip for the clicked -> loaded connector. Headline = median
-// full-load seconds (all traffic); tooltip discloses the per-source split plus
-// LCP / TTFB and the sample size.
+// Page-speed chip for the clicked -> loaded connector.
+//
+// Headline = median TIME TO SOMETHING ON SCREEN (load.basis === 'render'). It
+// used to headline navigation.loadEventEnd, which on a client-rendered page
+// fires while the screen is still blank: BAM GTA's chip read ~1.0s while real
+// content took several seconds, so the number reassured us about the exact
+// problem we were hunting. Older pages whose beacon does not send render_ms yet
+// fall back to load, and the tooltip says so rather than quietly mixing them.
 function _mmLoadChip(load) {
   const secs = (ms) => { const s = ms / 1000; return (s < 10 ? s.toFixed(1) : String(Math.round(s))) + 's'; };
   const order = ['meta', 'internal', 'direct', 'search', 'referral', 'other'];
@@ -63187,7 +63192,14 @@ function _mmLoadChip(load) {
   const extra = [];
   if (load.lcp_ms != null) extra.push('LCP ' + secs(load.lcp_ms));
   if (load.ttfb_ms != null) extra.push('TTFB ' + secs(load.ttfb_ms));
-  const tip = ('median page load ' + secs(load.median_ms) + ' over ' + load.n + ' visit' + (load.n === 1 ? '' : 's')
+  const isRender = load.basis === 'render';
+  // When the app takes a long time to boot after the HTML is done, that gap is
+  // the actionable number - surface it instead of burying it.
+  if (isRender && load.load_ms != null && load.render_ms != null && load.render_ms - load.load_ms > 500) {
+    extra.push('app boot +' + secs(load.render_ms - load.load_ms) + ' after the page arrived');
+  }
+  const tip = ('median time to ' + (isRender ? 'something on screen ' : 'page load (HTML only, not the app) ')
+    + secs(load.median_ms) + ' over ' + load.n + ' visit' + (load.n === 1 ? '' : 's')
     + (parts.length ? ' - ' + parts.join(', ') : '')
     + (extra.length ? ' | ' + extra.join(' · ') : '')).replace(/"/g, '&quot;');
   return '<span style="' + MM_PILL + '" title="' + tip + '">&#9201; ~' + secs(load.median_ms) + '</span>';
