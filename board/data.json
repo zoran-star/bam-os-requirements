@@ -99,10 +99,10 @@
           "state": "active"
         }
       ],
-      "status": "Domain already created in Resend for you via API. Just 3 records into Squarespace, then I verify from here.",
+      "status": "Owned by its own chat now. Domain already created in Resend; Gmail stays safe because every record sits on the send subdomain, never the root.",
       "next": {
         "who": "you",
-        "what": "Add the 3 DNS records below in Squarespace, then say 'records added'"
+        "what": "Open the SJ EMAIL GO-LIVE chat, it walks the 3 records and finishes the rest"
       },
       "checklist": {
         "id": "resend",
@@ -583,6 +583,15 @@
       "one": "Two things wait on your word here: 'records added', and the ship order for the pricing PR",
       "builds": [
         "t-breakdown",
+        "t-email"
+      ]
+    },
+    {
+      "name": "SJ EMAIL GO-LIVE",
+      "sidebar": "SJ EMAIL GO-LIVE",
+      "state": "blue",
+      "one": "Owns SJ email end to end: 3 records into Squarespace, then it verifies and flips the domain for you",
+      "builds": [
         "t-email"
       ]
     },
