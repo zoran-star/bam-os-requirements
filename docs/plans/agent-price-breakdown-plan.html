@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent price breakdown - plan</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Nunito:wght@800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#131416; --surface:#1B1D1F; --surface-el:#232629;
+    --border:rgba(255,255,255,.08); --border-med:rgba(255,255,255,.12); --border-str:rgba(255,255,255,.16);
+    --text:#F0EDE8; --text-sub:#B9B5AE; --text-mute:#7A776F;
+    --gold:#D4B65C; --on-gold:#131416; --gold-sheen:rgba(212,182,92,.06);
+    --green:#5BBF7B; --amber:#D9A441; --red:#D96C6C; --blue:#6EA8D8;
+    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:999px;
+    --font-ui:'Plus Jakarta Sans',system-ui,sans-serif; --font-num:'Nunito',sans-serif; --font-mono:'DM Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:13px;line-height:1.55;padding:28px 18px 90px}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-family:var(--font-num);font-weight:900;font-size:27px;margin:0 0 4px}
+  .sub{color:var(--text-mute);font-size:13px;margin:0 0 8px}
+  h2{font-family:var(--font-num);font-weight:900;font-size:18px;margin:44px 0 4px;padding-top:22px;border-top:1px solid var(--border)}
+  h2 .n{color:var(--gold);font-family:var(--font-mono);font-size:13px;font-weight:500;margin-right:8px}
+  .lede{color:var(--text-sub);font-size:13px;margin:0 0 20px;max-width:66ch}
+  .mock{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;margin:0 0 16px}
+  .mock-tag{display:inline-block;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);border:1px solid var(--gold);border-radius:var(--r-full);padding:2px 10px;margin-bottom:10px}
+  .mock-tag.mute{color:var(--text-mute);border-color:var(--border-str)}
+  .mock-tag.green{color:var(--green);border-color:var(--green)}
+  .badge{display:inline-block;font-family:var(--font-mono);font-size:10px;border-radius:var(--r-full);padding:1px 8px}
+  .badge.gold{color:var(--gold);border:1px solid var(--gold)}
+  .badge.green{color:var(--green);border:1px solid var(--green)}
+  .badge.red{color:var(--red);border:1px solid var(--red)}
+  .badge.mute{color:var(--text-mute);border:1px solid var(--border-med)}
+  .badge.blue{color:var(--blue);border:1px solid var(--blue)}
+  /* chat */
+  .chat{display:flex;flex-direction:column;gap:9px}
+  .bub{max-width:78%;padding:10px 13px;border-radius:16px;font-size:13px;white-space:pre-wrap;line-height:1.5}
+  .them{align-self:flex-start;background:var(--surface-el);border:1px solid var(--border);border-bottom-left-radius:5px;color:var(--text-sub)}
+  .us{align-self:flex-end;background:var(--gold);color:var(--on-gold);border-bottom-right-radius:5px;font-weight:500}
+  .us .rcpt{font-family:var(--font-mono);font-size:12.5px;display:block;margin:7px 0;line-height:1.75}
+  .us .rcpt b{font-weight:700}
+  .gap{text-align:center;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mute);padding:4px 0}
+  .cap{font-size:11.5px;color:var(--text-mute);margin:12px 0 0;padding-top:10px;border-top:1px solid var(--border)}
+  .cap b{color:var(--text-sub);font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.split{grid-template-columns:1fr}}
+  .mono-block{font-family:var(--font-mono);font-size:11.5px;line-height:1.65;background:var(--bg);border:1px solid var(--border-med);border-radius:var(--r-md);padding:13px 15px;white-space:pre-wrap;color:var(--text-sub);overflow-x:auto}
+  .mono-block .hl{color:var(--gold)}
+  .mono-block .dim{color:var(--text-mute)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin:0 0 8px}
+  th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);font-weight:700;padding:0 10px 7px;border-bottom:1px solid var(--border-med)}
+  td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-sub)}
+  td:first-child{color:var(--text);font-weight:600}
+  .money{font-family:var(--font-mono)}
+  .scroll{overflow-x:auto}
+  .note{font-size:12px;color:var(--gold);background:var(--gold-sheen);border:1px solid rgba(212,182,92,.3);border-radius:var(--r-sm);padding:10px 13px;margin:14px 0 0;line-height:1.55}
+  .note.red{color:var(--red);background:rgba(217,108,108,.06);border-color:rgba(217,108,108,.3)}
+  .note.green{color:var(--green);background:rgba(91,191,123,.06);border-color:rgba(91,191,123,.3)}
+  .note b{font-weight:700}
+  /* flow */
+  .flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:0;align-items:center;margin:6px 0 0}
+  @media(max-width:720px){.flow{grid-template-columns:1fr;gap:6px}.flow .arw{transform:rotate(90deg);padding:0}}
+  .node{background:var(--surface-el);border:1px solid var(--border-med);border-radius:var(--r-md);padding:12px 13px;min-height:96px}
+  .node.gold{border-color:var(--gold)}
+  .node .src{font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:5px}
+  .node .val{font-family:var(--font-num);font-weight:900;font-size:19px;margin:2px 0}
+  .node .what{font-size:11.5px;color:var(--text-sub)}
+  .arw{color:var(--text-mute);font-size:17px;padding:0 12px;text-align:center}
+  ol,ul{margin:0 0 8px;padding-left:20px;color:var(--text-sub)}
+  li{margin-bottom:6px}
+  li b{color:var(--text);font-weight:700}
+  code{font-family:var(--font-mono);font-size:11.5px;background:var(--surface-el);border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--gold)}
+  details{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:0;margin:14px 0}
+  summary{cursor:pointer;padding:15px 18px;font-family:var(--font-num);font-weight:900;font-size:15px;list-style:none;display:flex;align-items:center;gap:9px}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"+";color:var(--gold);font-family:var(--font-mono);font-size:16px;font-weight:400}
+  details[open] summary::before{content:"-"}
+  .det-body{padding:0 18px 18px}
+  .det-body h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--gold);margin:20px 0 8px;font-weight:700}
+  .det-body h3:first-child{margin-top:0}
+  .stack{display:flex;flex-direction:column;gap:10px}
+  .kv{display:flex;gap:10px;font-size:12.5px;padding:8px 11px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm)}
+  .kv .k{font-family:var(--font-mono);color:var(--gold);flex:none;min-width:52px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Agent price breakdown</h1>
+<p class="sub">Core price, tax, and one-time fees as separate lines. Owned by the sales preset, not by any academy.
+<span class="badge gold">PLAN</span> <span class="badge mute">2026-07-26</span> <span class="badge red">blocked on PR #1587</span></p>
+
+<p class="lede">Today the live agent says <b>"$200 to $279 per month"</b> and never mentions tax. A parent hears 200 and is billed 226.
+PR #1587 swings the other way and quotes <b>$226</b> as one number. This is the third option: the agent knows all three parts and says them as separate lines.
+Zoran approved the wording below on 2026-07-26.</p>
+
+<!-- ═══════════════════════════════ 1 ═══════════════════════════════ -->
+<h2><span class="n">01</span>The words</h2>
+<p class="lede">All numbers below are the real live values, verified by query against <code>offer_prices</code> on 2026-07-26, except where marked illustrative.</p>
+
+<div class="mock">
+  <span class="mock-tag">BAM GTA &middot; closing agent &middot; disclosure EXACT</span>
+  <div class="chat">
+    <div class="bub them">how much is the summer one?</div>
+    <div class="bub us">Summer Unlimited, here's the full breakdown:<span class="rcpt">Plan: $279.00
+HST (13%): $36.27
+<b>Total: $315.27 every 4 weeks</b></span>That $315.27 is the amount that comes out, nothing else added.</div>
+  </div>
+  <p class="cap"><b>Approved shape: stacked receipt.</b> Three lines, total last and bolded. Works in SMS and email, and a parent skimming cannot come away with only the small number.</p>
+</div>
+
+<div class="mock">
+  <span class="mock-tag">BAM GTA &middot; booking agent &middot; disclosure RANGE</span>
+  <div class="chat">
+    <div class="bub them">what's it run per month?</div>
+    <div class="bub us">Plans run $226.00 to $315.27 every 4 weeks, HST included. That's the real out-the-door number.
+
+We go through which one fits at the trial. Want me to grab you a spot Thursday?</div>
+    <div class="gap">&mdash; if they push &mdash;</div>
+    <div class="bub them">is that before or after tax?</div>
+    <div class="bub us">After. So the Summer Unlimited one:<span class="rcpt">Plan: $279.00
+HST (13%): $36.27
+<b>Total: $315.27 every 4 weeks</b></span></div>
+  </div>
+  <p class="cap"><b>Approved: the range stays one all-in band.</b> No pre-tax band in a first-touch text. The agent still holds all three numbers, so the follow-up is answered instantly and exactly. RANGE governs what it volunteers, never what it knows.</p>
+</div>
+
+<div class="mock">
+  <span class="mock-tag">BAM SAN JOSE &middot; no tax, $40 sign-up fee per athlete</span>
+  <div class="chat">
+    <div class="bub them">what does the monthly cost?</div>
+    <div class="bub us">Here's the full picture:<span class="rcpt">Plan: $150.00 every 4 weeks
+Sign-up fee: $40.00 one time, per athlete
+<b>First payment: $190.00, then $150.00</b></span>That sign-up fee is waived if you go 3 or 6 months up front.</div>
+  </div>
+  <p class="cap"><b>Approved: a sign-up fee is always named with the price, in every disclosure mode.</b> A one-time charge that moves the first payment by 27% is part of the price, not a footnote. The waiver becomes the nudge to the longer term.
+  <br><br><b>Note the missing tax line.</b> California, no <code>tax_config</code>, so there is no tax line at all. The agent never says "no tax" - that is a claim about the law we do not own. Absent config produces silence, not a statement.
+  <br><br>SJ plan amounts here are <b>illustrative</b>: their <code>offer_prices</code> catalog is empty today, so the live agent quotes nothing at all until it is seeded.</p>
+</div>
+
+<div class="mock">
+  <span class="mock-tag mute">ILLUSTRATIVE ACADEMY &middot; 8.25% sales tax AND a $50 taxable fee</span>
+  <div class="chat">
+    <div class="bub them">what's the twice a week one, all in?</div>
+    <div class="bub us">Here's every piece of it:<span class="rcpt">Plan: $200.00
+Sales tax (8.25%): $16.50
+Sign-up fee: $50.00 one time, per athlete
+Sales tax on the fee: $4.13
+<b>First payment: $270.63</b>
+<b>Then: $216.50 every 4 weeks</b></span>The sign-up fee is once per athlete, never on renewals.</div>
+  </div>
+  <p class="cap">The hardest case, and it still reads cleanly because every line is one fact. <b>Nothing here is academy-specific code</b> - the same renderer produced all four mockups on this page, from four different data shapes.</p>
+</div>
+
+<!-- ═══════════════════════════════ 2 ═══════════════════════════════ -->
+<h2><span class="n">02</span>Where each line comes from</h2>
+<p class="lede">Three numbers, three different owners. Nothing is parsed out of a string, and nothing is divided.</p>
+
+<div class="mock">
+  <div class="flow">
+    <div class="node">
+      <div class="src">offers.data &middot; owner typed</div>
+      <div class="val money">$279.00</div>
+      <div class="what"><b>Plan</b><br>The base the academy owner entered in the wizard. Already used by <code>match-prices</code> to build the Stripe price.</div>
+    </div>
+    <div class="arw">&minus;</div>
+    <div class="node gold">
+      <div class="src">offer_prices &middot; what Stripe charges</div>
+      <div class="val money">$315.27</div>
+      <div class="what"><b>Total</b><br>The catalog amount. Never derived, never recomputed. This is the money that leaves the account.</div>
+    </div>
+    <div class="arw">=</div>
+    <div class="node">
+      <div class="src">derived by subtraction</div>
+      <div class="val money">$36.27</div>
+      <div class="what"><b>Tax</b><br>Total minus plan. Labelled from <code>clients.tax_config</code> ("HST", 13).</div>
+    </div>
+  </div>
+  <div class="note green"><b>Tax is a subtraction, not a division.</b> <code>31527 - 27900 = 3627</code>, integer cents. The three lines therefore <b>always</b> sum to the exact amount charged. There is no rounding risk to flag, because no rounding happens.</div>
+</div>
+
+<div class="mock">
+  <span class="mock-tag green">THE HONESTY GATE</span>
+  <p class="lede" style="margin-bottom:12px">Before printing a breakdown, the renderer re-runs the same math that built the Stripe price:
+  <code>applyFee(base, resolveFee({taxConfig, taxable, legacyText}))</code>. If that does not equal the catalog amount to the cent, <b>the breakdown is not printed at all</b> - the agent states the total and nothing else.</p>
+  <div class="scroll"><table>
+    <tr><th>GTA live row</th><th>base typed</th><th>computed all-in</th><th>catalog amount</th><th></th></tr>
+    <tr><td>Steady | monthly</td><td class="money">20000</td><td class="money">22600</td><td class="money">22600</td><td><span class="badge green">reconciles</span></td></tr>
+    <tr><td>Summer Unlimited | monthly</td><td class="money">27900</td><td class="money">31527</td><td class="money">31527</td><td><span class="badge green">reconciles</span></td></tr>
+    <tr><td>Summer Unlimited | 3_months</td><td class="money">75300</td><td class="money">85089</td><td class="money">85089</td><td><span class="badge green">reconciles</span></td></tr>
+  </table></div>
+  <div class="note">All three verified live 2026-07-26. A mismatch means the owner edited a base without re-pricing, or a <code>taxable</code> flag is wrong. Both are exactly the drift this whole workstream exists to catch (money-model risk #3 and #6), and both produce <b>silence plus an admin flag</b> rather than a plausible wrong line.</div>
+</div>
+
+<div class="mock">
+  <span class="mock-tag mute">WHY NOT JUST DIVIDE THE TOTAL BY 1.13</span>
+  <ol>
+    <li><b>It assumes the fee was a percent.</b> A flat fee, or a percent plus a flat, divides wrong and cannot be detected.</li>
+    <li><b>It invents a number nobody typed.</b> The owner entered 279. Division gives 278.99999999999994 and needs a round, so the "plan price" the agent quotes becomes a machine-derived figure rather than the academy's own.</li>
+    <li><b>It can never fail.</b> Division always produces an answer, so a mis-flagged row would silently emit a confident fake tax line. Reconciliation is the only version that can refuse.</li>
+    <li><b>It duplicates logic.</b> Reconciliation runs the identical <code>_fees.js</code> call that <code>match-prices.js</code> used to create the Stripe price, so the agent's breakdown and the actual charge cannot disagree by construction.</li>
+  </ol>
+  <div class="note red"><b>Recommendation: no schema change.</b> Do NOT add <code>base_cents</code> to <code>offer_prices</code>. It would be a second copy of a number that already lives in the offer, and copies drift - which is the precise fault that created this workstream (a typed "13% HST" string drifting from the catalog). Offer = the owner's input. Catalog = Stripe's truth. Tax = the difference. Three things, no fourth.</div>
+</div>
+
+<!-- ═══════════════════════════════ 3 ═══════════════════════════════ -->
+<h2><span class="n">03</span>Preset ownership: zero code for academy #5</h2>
+<p class="lede">This extends the mechanism PR #1587 already built (Builds 3-4). It does not invent a parallel one.</p>
+
+<div class="mock">
+  <div class="split">
+    <div>
+      <p class="mini-cap" style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin:0 0 8px">SHIPPED IN #1587</p>
+      <div class="mono-block"><span class="dim">api/agent/presets.js</span>
+
+AGENT_TEMPLATES = {
+  trial_booking: {
+    runtime:    "booking",
+    <span class="hl">disclosure: "range",</span>
+  },
+  closing: {
+    runtime:    "closing",
+    <span class="hl">disclosure: "exact",</span>
+  },
+}</div>
+    </div>
+    <div>
+      <p class="mini-cap" style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin:0 0 8px">THIS BUILD ADDS ONE SIBLING</p>
+      <div class="mono-block"><span class="dim">api/agent/presets.js</span>
+
+AGENT_TEMPLATES = {
+  trial_booking: {
+    runtime:    "booking",
+    disclosure: "range",
+    <span class="hl">breakdown:  "itemized",</span>
+  },
+  closing: {
+    runtime:    "closing",
+    disclosure: "exact",
+    <span class="hl">breakdown:  "itemized",</span>
+  },
+}</div>
+    </div>
+  </div>
+  <p class="cap">One property, on the <b>template</b>, next to the one that already governs pricing speech. A template reused in a second sales system carries its breakdown policy along, exactly as <code>disclosure</code>, <code>lessonKey</code> and <code>mission</code> already travel with it. This was Zoran's call on 2026-07-24 and it holds unchanged.</p>
+</div>
+
+<div class="mock">
+  <span class="mock-tag">HOW A NEW ACADEMY INHERITS IT</span>
+  <div class="stack">
+    <div class="kv"><span class="k">1</span><span>Academy #5 onboards and is assigned the <code>free_trial</code> preset. No new fields, no wizard question, no config row.</span></div>
+    <div class="kv"><span class="k">2</span><span><code>resolvePresetKey(clientId)</code> then <code>templateForRuntime()</code> resolves its agent to <code>trial_booking</code>. Both already exist, shipped in #1587 Build 3.</span></div>
+    <div class="kv"><span class="k">3</span><span><code>breakdownForTemplate()</code> reads <code>"itemized"</code> off that template and the master instruction goes into the prompt. <b>Zero code written for academy #5.</b></span></div>
+    <div class="kv"><span class="k">4</span><span>Its own numbers come from its own <code>offer_prices</code> and its own <code>tax_config</code>. If it has no tax template, the tax line simply does not exist for it.</span></div>
+  </div>
+  <div class="note"><b>A master edit propagates the same way.</b> Change <code>breakdown</code> to <code>"total_only"</code> on one line in <code>presets.js</code> and GTA, San Jose, and DETAIL Miami all revert on their next prompt build, with no academy row touched anywhere. That reversibility is tester check #6.</div>
+</div>
+
+<div class="mock">
+  <span class="mock-tag mute">THE TIER SPLIT, UNCHANGED FROM #1587</span>
+  <div class="scroll"><table>
+    <tr><th>Tier</th><th>What lives there</th><th>Who owns it</th></tr>
+    <tr><td>1 &middot; master</td><td>The instruction to itemize, and the rule that a sign-up fee is always named. Lives in the three <code>PRICING_DISCLOSURE</code> bodies.</td><td>BAM. Shared, propagates.</td></tr>
+    <tr><td>3 &middot; academy</td><td>The numbers. Rendered <code>&lt;pricing&gt;</code> fact: plan, tax label and rate, tax amount, fee, total.</td><td>The academy's own records.</td></tr>
+  </table></div>
+  <p class="cap">The rendered fact is <b>byte-identical in all three disclosure modes</b>, exactly as #1587 established. The agent always holds every component, because it needs them to answer "is that before or after tax" correctly. The mode governs only what it volunteers.</p>
+  <div class="scroll"><table style="margin-top:14px">
+    <tr><th>disclosure</th><th>breakdown</th><th>behaviour</th></tr>
+    <tr><td>range</td><td>itemized</td><td>All-in band up front. Itemize a specific plan when asked. <b>Always name a sign-up fee.</b></td></tr>
+    <tr><td>exact</td><td>itemized</td><td>Itemize the one or two recommended plans up front.</td></tr>
+    <tr><td>withhold</td><td>any</td><td>No numbers at all. <b>withhold wins</b>, breakdown is moot.</td></tr>
+  </table></div>
+</div>
+
+<!-- ═══════════════════════════════ 4 ═══════════════════════════════ -->
+<h2><span class="n">04</span>Degradation: silence beats a wrong number</h2>
+<p class="lede">Every state below is reachable with data that exists today. The default in every ambiguous case is to say less.</p>
+
+<div class="mock">
+  <div class="scroll"><table>
+    <tr><th style="min-width:210px">State</th><th>What the agent says</th><th>Who</th></tr>
+    <tr><td>tax_config set, base reconciles</td><td>Full breakout: Plan / Tax / <b>Total</b></td><td><span class="badge gold">GTA</span></td></tr>
+    <tr><td><b>No tax_config</b></td><td>Total only. No tax line, and never the words "no tax".</td><td><span class="badge blue">San Jose</span> <span class="badge blue">Miami</span></td></tr>
+    <tr><td>tax_config set, no matching base in the offer</td><td>Total only. No breakout, no flag - a catalog row can legitimately outlive its offering.</td><td><span class="badge mute">any</span></td></tr>
+    <tr><td><b>Reconciliation fails</b> (computed all-in &ne; catalog)</td><td>Total only, <b>plus an admin flag</b>. Never a guessed tax line.</td><td><span class="badge red">drift</span></td></tr>
+    <tr><td>Row is <code>taxable: "No"</code> under a template</td><td>Total only for that row. It IS the base, so no $0.00 tax line.</td><td><span class="badge mute">any</span></td></tr>
+    <tr><td><b>Empty catalog</b></td><td><code>PRICING_NOT_CONFIGURED</code>, unchanged from #1587: quotes nothing, flags the admin.</td><td><span class="badge blue">San Jose today</span></td></tr>
+    <tr><td>Price read failed (null)</td><td>Falls back to the stored or default section, unchanged from #1587.</td><td><span class="badge mute">transient</span></td></tr>
+    <tr><td>Fee configured, zero options set to "Charge"</td><td>Fee never mentioned. It charges nothing, so it is not a price.</td><td><span class="badge mute">dead-fee</span></td></tr>
+    <tr><td>withhold mode</td><td>No numbers at all.</td><td><span class="badge mute">any</span></td></tr>
+    <tr><td><b>Tax-exclusive jurisdiction</b></td><td colspan="2">Out of scope, deliberately. Our catalog is tax-inclusive by construction: <code>offer_prices.amount_cents</code> IS the charge, so the total is always known at quote time. If an academy ever needs Stripe Tax computing at checkout, the total is <b>not</b> knowable when the agent speaks, and that academy must go total-only with an explicit "tax is added at checkout" line. Flagged, not pre-built (mirrors money-model risk #10).</td></tr>
+  </table></div>
+  <div class="note red"><b>The one rule underneath all of it.</b> An agent that declines to break a price out is better than one that breaks it out wrong. Every failure path above lands on the number we know is charged.</div>
+</div>
+
+<!-- ═══════════════════════════════ 5 ═══════════════════════════════ -->
+<h2><span class="n">05</span>Sequencing</h2>
+
+<div class="mock">
+  <div class="note red" style="margin-top:0"><b>Hard dependency: PR #1587 is UNMERGED and currently CONFLICTED.</b> This build edits <code>renderPricing</code>, <code>AGENT_TEMPLATES</code>, <code>PRICING_DISCLOSURE</code>, and <code>preset-master.js</code>. Every one of those exists only on <code>claude/agent-pricing-transparency-7ec8f2</code>. Starting before it lands means writing against files whose shape is still in conflict, and then merging two conflicted branches instead of one.</div>
+  <div class="stack" style="margin-top:14px">
+    <div class="kv"><span class="k">A</span><span>Resolve conflicts and merge <b>PR #1587</b>. <b>Not this room's job</b> and not this build's job.</span></div>
+    <div class="kv"><span class="k">B</span><span>This build branches off main once #1587 has landed.</span></div>
+    <div class="kv"><span class="k">C</span><span>The <b>fee</b> half is downstream of money-model Build S, which shipped 2026-07-25 and is <b>inert</b> - zero academies have a fee configured. So the fee lines are testable only against a scratch config until San Jose's $40 is actually entered.</span></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ SPEC ═══════════════════════════════ -->
+<details>
+<summary>Build spec: files, behaviour, edge cases, tester checks</summary>
+<div class="det-body">
+
+  <h3>Files</h3>
+  <div class="scroll"><table>
+    <tr><th style="min-width:200px">File</th><th>Change</th></tr>
+    <tr><td><code>api/agent/fact-render.js</code><br><span style="font-weight:400;color:var(--text-mute)">derivedFactOverrides</span></td><td>Add <code>tax_config</code> to the <code>clients?select=</code> list and pass it through <code>hit.src</code>. <b>Without this the entire build is inert</b> - the renderer cannot see the tax template today.</td></tr>
+    <tr><td><code>api/agent/fact-render.js</code><br><span style="font-weight:400;color:var(--text-mute)">renderPricing</span></td><td><b>Signature change</b> to <code>renderPricing(data, prices, taxConfig)</code>. For each row, look up the owner-typed base by splitting <code>source_offer_price_key</code> into plan + term and matching the offering (or its commitment by <code>termFromLength</code>). Reconcile with <code>applyFee(base, resolveFee(...))</code>. On an exact match emit the component lines; otherwise emit the total alone.</td></tr>
+    <tr><td><code>api/agent/presets.js</code></td><td>Add <code>breakdown</code> to every <code>AGENT_TEMPLATES</code> entry (all <code>"itemized"</code>), plus <code>BREAKDOWN_MODES</code>, <code>DEFAULT_BREAKDOWN</code>, and <code>breakdownForTemplate()</code> mirroring <code>disclosureForTemplate()</code> exactly.</td></tr>
+    <tr><td><code>api/agent/prompt-structure.js</code></td><td>Extend the three <code>PRICING_DISCLOSURE</code> bodies with the itemize rule and the always-name-a-sign-up-fee rule. The <code>withhold</code> body gains an explicit line that breakdown does not apply.</td></tr>
+    <tr><td><code>api/agent/preset-master.js</code></td><td><code>resolveAgentTemplate</code> already returns the template. Extend the resolved policy object to carry <code>breakdown</code> alongside <code>disclosure</code>. Applied after stored overrides, same as <code>disclosure</code>, so an academy cannot widen its own.</td></tr>
+    <tr><td>Brain view, both portals</td><td>The locked <code>pricing_disclosure</code> card gains a second badge: <b>ITEMIZED</b> / <b>TOTAL ONLY</b>. Read-only for everyone including BAM staff, identical treatment to the mode badge.</td></tr>
+  </table></div>
+  <div class="note green"><b>No migration. No schema change. Nothing added to the offer wizard.</b> Every value this build needs is already stored.</div>
+
+  <h3>Rendered fact, BAM GTA, real numbers</h3>
+  <div class="mono-block">These are the exact amounts charged at checkout in CAD. Never quote a price
+that is not listed here. Each plan lists its parts; the TOTAL line is the
+amount that leaves the parent's account.
+
+Range: $226.00 to $315.27 every 4 weeks, HST included.
+
+- Steady: $226.00 every 4 weeks. 1 training/wk.
+    Plan $200.00 + HST 13% $26.00 = TOTAL $226.00 every 4 weeks.
+- Summer Unlimited: $315.27 every 4 weeks. Unlimited credits to train.
+    Plan $279.00 + HST 13% $36.27 = TOTAL $315.27 every 4 weeks.
+    3 months prepaid: Plan $753.00 + HST 13% $97.89 = TOTAL $850.89,
+      then goes back to monthly.
+      Includes: 10% discount to unlimited credits.
+
+Discount codes:
+- 2SIBLING: 50% off, applies to every payment.</div>
+
+  <h3>Rendered fact, an academy with no tax template</h3>
+  <div class="mono-block">These are the exact amounts charged at checkout in USD. Never quote a price
+that is not listed here.
+
+Range: $150.00 to $220.00 every 4 weeks.
+
+- 1x/week: $150.00 every 4 weeks.
+    One-time sign-up fee: $40.00 per athlete, charged once when they enroll.
+      First payment $190.00, then $150.00.
+      No sign-up fee on the 3 month or 6 month option.</div>
+  <p style="color:var(--text-mute);font-size:11.5px;margin:8px 0 0">No tax line, no "tax included" phrase, no claim about tax either way. The header sentence drops "tax included where it applies" when there is no template.</p>
+
+  <h3>Edge cases</h3>
+  <ul>
+    <li><b>Commitment base lookup.</b> A commitment's base lives on <code>offering.commitments[].price</code>, matched via <code>termFromLength(c.length)</code>. GTA's Summer Unlimited 3-month is typed as <code>"3 Months"</code> and resolves to <code>3_months</code>. A commitment whose <code>length</code> does not parse yields no base, so that row falls to total-only. Correct: an unparseable length is not a number to guess with.</li>
+    <li><b>Per-row taxable precedence.</b> A commitment's own <code>taxable</code> wins over the offering's, then the offering's, matching <code>match-prices.js</code> line for line. Any divergence here is precisely what reconciliation catches.</li>
+    <li><b>Legacy free-text rows.</b> An academy with typed <code>added_fees</code> and no <code>tax_config</code> goes through <code>parseFee</code> via <code>resolveFee</code>, so it still reconciles and still itemizes, using the parsed label. No academy is required to migrate before it benefits.</li>
+    <li><b>Zero tax amount.</b> If total minus base is 0, print no tax line rather than <code>$0.00</code>. Same for a fee of 0.</li>
+    <li><b>Negative difference.</b> If total is <i>below</i> base, reconciliation fails by definition. Total-only, admin flag. This is the shape a stale base takes after a price cut.</li>
+    <li><b>Fee rows.</b> Already split out of the term grouping by #1587's <code>termOf(r) === "signup_fee"</code> branch. This build itemizes the fee's own tax the same way, using <code>signup_fee_taxable</code>.</li>
+    <li><b>Multi-currency.</b> The header's currency phrase already suppresses itself when rows disagree. Unchanged.</li>
+    <li><b>DETAIL Miami's 9 offers.</b> The renderer still reads only the first training offer. Pre-existing, out of scope, tracked in the money-model plan.</li>
+    <li><b>The stale GTA note.</b> GTA's saved <code>$185 to $565</code> pricing row stays inert - rendered facts outrank stored rows. Worth deleting in passing, but not a dependency.</li>
+  </ul>
+
+  <h3>Tester checks</h3>
+  <ol>
+    <li><b>GTA closing agent</b>, ask "how much is summer unlimited". Expect three lines: 279.00 / 36.27 / 315.27. Confirm the total equals <code>offer_prices.amount_cents = 31527</code> exactly.</li>
+    <li><b>GTA booking agent</b>, ask "what's it per month". Expect the all-in band <code>$226.00 to $315.27</code> and <b>no</b> pre-tax band. Then ask "is that before tax" and expect the full breakout.</li>
+    <li><b>San Jose today.</b> Expect <code>PRICING_NOT_CONFIGURED</code>: quotes nothing, flags the admin. Unchanged from #1587.</li>
+    <li><b>Null GTA's tax_config</b> in a scratch read. Expect <code>$226.00</code> with no tax line, and confirm the reply never contains the phrase "no tax".</li>
+    <li><b>Break reconciliation</b>: set GTA's Steady base to 205 in a scratch offer. Expect total-only <code>$226.00</code>, <b>no</b> invented <code>$21.00</code> tax line, and an admin flag.</li>
+    <li><b>Plug-and-play proof</b>: flip <code>breakdown</code> to <code>"total_only"</code> on <code>closing</code> in <code>presets.js</code>. Expect GTA <b>and</b> Miami <b>and</b> San Jose to all revert to one-number quotes on the next prompt build, with zero academy rows touched.</li>
+  </ol>
+
+  <h3>Ground rules carried over</h3>
+  <ul>
+    <li>The agent must never state a number that is not what the parent is charged.</li>
+    <li>Money math lives in one shared function (<code>_fees.js</code>); every surface reads it.</li>
+    <li>Structure to the master for everyone; values in the academy's own records. No per-academy structural fork, ever.</li>
+    <li>V1 academies unaffected.</li>
+    <li>No em dash anywhere person-facing, including prompt text the agent will speak.</li>
+  </ul>
+
+</div>
+</details>
+
+<p style="color:var(--text-mute);font-size:11.5px;margin-top:34px">Planned with Zoran 2026-07-26. Extends <code>docs/agent-pricing-transparency-plan.md</code> and <code>docs/money-model-plan.md</code>.</p>
+
+</div>
+</body>
+</html>
