@@ -55,9 +55,9 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
   background:var(--panel);border:1px solid var(--line);padding:6px 12px;cursor:pointer;line-height:1.3;
 }
 .wchip:hover{border-color:var(--gold-dim)}
-.wchip .pin{font-size:11px;opacity:.25}
-.wchip.pinned{border-color:var(--gold-dim)}
-.wchip.pinned .pin{opacity:1}
+.wchip.armed{border-color:var(--red);color:var(--red)}
+.wchip.restore{color:var(--mut);border-style:dashed}
+.wchip.restore:hover{color:var(--green);border-color:var(--green)}
 .wchip.hq{border-color:var(--gold);color:var(--gold);font-weight:600}
 .wchip.visit{border-color:var(--red)}
 .wchip .dotv{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
@@ -262,16 +262,19 @@ function checklistHtml(cl){
   </div>`;
 }
 
-const PINK = "bamBoardPins";
-const readPins = () => { try { return JSON.parse(localStorage.getItem(PINK) || "{}"); } catch(e){ return {}; } };
-const isPinned = c => { const o = readPins(); return c.name in o ? !!o[c.name] : !!c.pinned; };
+const ARCK = "bamBoardArchived";
+const readArch = () => { try { return JSON.parse(localStorage.getItem(ARCK) || "{}"); } catch(e){ return {}; } };
+const writeArch = (name, on) => { const s = readArch(); if(on) s[name] = 1; else delete s[name]; localStorage.setItem(ARCK, JSON.stringify(s)); };
 
 function render(d){
-  const working = (d.chatMap || []).filter(c => c.working);
-  $("workbar").innerHTML = working.length ? `<span class="lbl">Working in</span>` + working.map(c => `
-    <span class="wchip ${esc(c.tag)} ${isPinned(c) ? "pinned" : ""}" data-pin="${esc(c.name)}" title="Click to toggle the pin marker">
-      <span class="dotv"></span>${esc(c.sidebar || c.name)}<span class="pin">📌</span>
-    </span>`).join("") : "";
+  const arch = readArch();
+  const live = (d.chatMap || []).filter(c => !arch[c.name]);
+  const archCount = (d.chatMap || []).length - live.length;
+  $("workbar").innerHTML = `<span class="lbl">Chats</span>` + live.map(c => `
+    <span class="wchip ${esc(c.tag)}" data-arc="${esc(c.name)}" title="Click twice to archive it off the board">
+      <span class="dotv"></span>${esc(c.sidebar || c.name)}
+    </span>`).join("") +
+    (archCount ? `<span class="wchip restore" data-restore="1" title="Bring archived chats back">${archCount} archived · restore</span>` : "");
 
   $("updated").textContent = "updated " + d.updated;
   $("updates").innerHTML = d.recentUpdates.map(u => `<div>${esc(u)}</div>`).join("");
@@ -309,7 +312,7 @@ function render(d){
   }).join("");
 
   const TAGS = {hq:"HQ · you are here", active:"ACTIVE ROOM", visit:"GO THERE", keep:"KEEP · later", archive:"ARCHIVE NOW", unknown:"WHAT IS THIS?"};
-  $("chats").innerHTML = (d.chatMap || []).map(c => `
+  $("chats").innerHTML = live.map(c => `
     <div class="chat ${esc(c.tag)}">
       <div class="row"><h4>${esc(c.name)}</h4><span class="tag">${TAGS[c.tag] || esc(c.tag)}</span></div>
       <div class="sidebar-name" data-copy="${esc(c.sidebar || c.name)}" title="Click to copy">📌 ${esc(c.sidebar || c.name)}</div>
@@ -348,13 +351,19 @@ document.addEventListener("change", e => {
   if(window._data) render(window._data);
 });
 document.addEventListener("click", e => {
-  const wc = e.target.closest(".wchip");
+  const rs = e.target.closest("[data-restore]");
+  if(rs){ localStorage.setItem(ARCK, "{}"); render(window._data); return; }
+  const wc = e.target.closest(".wchip[data-arc]");
   if(wc){
-    const pins = readPins();
-    const cur = window._data.chatMap.find(c => c.name === wc.dataset.pin);
-    pins[wc.dataset.pin] = !(cur ? isPinned(cur) : false);
-    localStorage.setItem(PINK, JSON.stringify(pins));
-    render(window._data);
+    if(wc.classList.contains("armed")){
+      writeArch(wc.dataset.arc, true);
+      render(window._data);
+    } else {
+      wc.classList.add("armed");
+      wc.dataset.label = wc.textContent.trim();
+      wc.innerHTML = `<span class="dotv"></span>archive "${esc(wc.dataset.arc)}"? click again`;
+      setTimeout(() => { if(window._data) render(window._data); }, 3000);
+    }
     return;
   }
   const chip = e.target.closest(".copychip");
