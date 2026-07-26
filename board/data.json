@@ -1,6 +1,6 @@
 {
   "updated": "2026-07-27",
-  "headline": "Price-breakdown spec is DONE and unblocked (#1587 merged). Ready to build on your word.",
+  "headline": "Item 3 SHIPPED (#1604 merged): all 6 GTA identity leaks are dead. Price breakdown now building.",
   "yourMoves": [
     {
       "urgency": "now",
@@ -58,8 +58,8 @@
     }
   ],
   "pipeline": {
-    "build": "From-address fix",
-    "queueRef": "queue #3",
+    "build": "Agent price breakdown (price / tax / fees on separate lines)",
+    "queueRef": "queue #34",
     "stages": [
       {
         "name": "Scout",
@@ -68,7 +68,7 @@
       {
         "name": "Plan",
         "state": "done",
-        "note": "v2 hold guardrail"
+        "note": "room, 3 decisions"
       },
       {
         "name": "Gate 1 \u00b7 you",
@@ -135,10 +135,11 @@
       "name": "Our lane",
       "state": "moving",
       "items": [
-        "#4 tz fix SHIPPED (PR #1602)",
-        "#28 phone plan - room spawned",
-        "#27 spine migration - to plan",
-        "#3 from-address - after #1601"
+        "#4 tz fix SHIPPED",
+        "#3 from-address SHIPPED",
+        "#34 breakdown BUILDING",
+        "#5 + #22 unblocked, queued",
+        "#23 quiet-hours leaks queued"
       ],
       "note": "big-bang launch: item 25 is the switch list"
     },
@@ -173,7 +174,7 @@
       "id": 3,
       "title": "Emails send FROM BAM Toronto",
       "severity": "blocker",
-      "status": "PR #1604, awaiting gate 2",
+      "status": "SHIPPED #1604",
       "owner": "us"
     },
     {
@@ -376,7 +377,7 @@
       "id": 34,
       "title": "Agents state price, tax and fees as separate lines",
       "severity": "blocker",
-      "status": "spec done, ready to build",
+      "status": "building",
       "owner": "us"
     },
     {
@@ -433,19 +434,19 @@
       "name": "Planner",
       "model": "Fable",
       "status": "done",
-      "detail": "from-address v2 approved"
+      "detail": "3 specs delivered"
     },
     {
       "name": "Builder",
       "model": "Opus",
       "status": "running",
-      "detail": "from-address + hold guardrail"
+      "detail": "price breakdown, 6 files"
     },
     {
       "name": "Tester",
       "model": "Opus",
-      "status": "done",
-      "detail": "SJ leak-check: clean, 26 renders"
+      "status": "idle",
+      "detail": "2 builds verified, 0 escaped bugs"
     }
   ],
   "sessions": [
