@@ -36,9 +36,21 @@ Client sites shipped `@babel/standalone` (3.1 MB) from unpkg and compiled JSX in
 
 The beacon now also sends **`render_ms`**, stamped when the page component first commits. `api/marketing.js` `loadPerf` headlines `render_ms` when it has 3+ samples and reports `basis: 'render' | 'load'`; `_mmLoadChip` says which one it is and surfaces the `render - load` gap as "app boot +Xs" when it exceeds 500 ms. **Never headline `load_ms` again for a client-rendered page.**
 
+## GTA's live Meta config (verified 2026-07-26 via the Marketing API)
+
+Ad account `act_945289010672617` has two pixels attached: `1142940663626761` ("CRM BAM Toronto", never fired) and **`1692167884521071`** ("Form Fills BAM Toronto", the live one). The single ACTIVE ad set optimises `OFFSITE_CONVERSIONS` on `1692167884521071` with **`custom_event_type: SCHEDULE`**.
+
+Two things this exposed:
+
+1. **Nothing fired `Schedule`.** `submitLead` only fired `Lead`. Meta's 28-day counts: 1402 PageView, 61 Lead, **4 Schedule**, 9 Purchase - against the ~50/week Meta wants to leave the learning phase. Fixed: `submitLead` now fires `Schedule` when `data.appointment === 'booked'`, with its own `schedule_event_id`, and `leads.js` replays it through CAPI on `appointmentStatus === "booked"`. **If you change the booking flow, keep that gate.**
+2. **Pixel `854357739640091`** ("bam toronto 1") was firing from the site but is on neither the ad account nor any ad set - a pure mirror (1405 PageView / 62 Lead). Removed 2026-07-26, since `fbq` fetches a config per id serially and holds PageView until all land (~300 ms). Its owner could not be read with the staff token's permissions; if custom audiences somewhere go quiet, this is why.
+
+**How to query this yourself:** the staff Meta token is in `staff_meta_tokens` (most-recently-updated row wins, see [[project_meta_token_selection_gotcha]]). Useful edges: `/{act}/adspixels`, `/{campaign}/adsets?fields=promoted_object`, `/{pixel}/stats?aggregation=event`. Ownership fields (`owner_ad_account`, `owner_business`) need broader permissions than the current token has.
+
+⚠️ Gotcha: `bam-portal/.env.local` stores `VITE_SUPABASE_URL` with a literal `\n` inside the quotes, so naive `source .env.local` or `cut` parsing yields a bad hostname. Strip `\n` when parsing. See [[feedback_vercel_env_no_newline]].
+
 ## Known follow-ups
 
-- Each extra pixel id costs ~300 ms before PageView fires (fbq fetches a config per id, serially). GTA runs two - worth confirming both are still needed.
 - `by-any-means` summer-academy + virtual-academy each load React dev builds + Babel (4.3 MB) for `*-tweaks.jsx` files that are not in the repo.
 - Only `bam-gta` is on the new compile pipeline; `by-any-means` and `detail-miami` still deploy the old way.
 
