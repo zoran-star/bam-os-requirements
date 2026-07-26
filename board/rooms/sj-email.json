@@ -1,8 +1,8 @@
 {
   "slug": "sj-email",
   "chat": "SJ EMAIL GO-LIVE",
-  "state": "blue",
-  "one": "Room is open and waiting on you to add the 3 DNS records in Squarespace",
-  "blockedBy": null,
-  "at": "2026-07-26T18:30:00Z"
+  "state": "orange",
+  "one": "SJ email go-live is on hold. Nothing is broken: every SJ email correctly holds until the domain verifies",
+  "blockedBy": "the Amazon side of the Resend setup. Asked that chat for the exact reason and to ping the moment it clears",
+  "at": "2026-07-26T21:15:00Z"
 }

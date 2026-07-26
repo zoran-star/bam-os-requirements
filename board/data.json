@@ -1,17 +1,17 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "SJ email go-live paused at the Amazon step, its chat is reporting back with the reason",
     "Message workshop room spinning up: all 13 SJ messages rendered for review",
     "Dead whiteboard Vercel project deleted, PR checks go green again",
     "Price breakdown SHIPPED (#1606): agents now quote price, tax and fees on separate lines",
-    "SJ email has its own chat now, Gmail confirmed safe (records sit on the send subdomain)",
-    "All 6 GTA identity leaks from the original sweep: shipped and dead"
+    "SJ email has its own chat now, Gmail confirmed safe (records sit on the send subdomain)"
   ],
   "orchestrator": {
-    "focus": "Price + tax + fees breakdown is at YOUR gate (PR #1606, tested 11/11). After your pass: agent brain fallback (#5) and AI booking times (#22).",
+    "focus": "SJ email is blocked at the Amazon step, so Lij's ask-list is now the front of the queue. Next builds ready: agent brain fallback (#5) and AI booking times (#22).",
     "needs": [
+      "Send Lij his ask-list, it is now the biggest unblock",
       "Try the price breakdown when the test chip appears",
-      "Verify byanymeanssanjose.com in Resend (steps on the email task card)",
       "Monday: pull the IRS CP 575 letter, it starts the TrustHub clock",
       "Send Lij his ask-list",
       "GHL card stays ON HOLD until I give the go",
@@ -66,8 +66,8 @@
     {
       "id": "t-email",
       "title": "San Jose email goes fully live",
-      "phase": "your move",
-      "phaseTone": "you",
+      "phase": "blocked",
+      "phaseTone": "work",
       "why": "Every automation email now sends as BAM San Jose, never Toronto. Your guardrail is doing its job: nothing SENDS until the sending domain is verified. This checklist is the last step between SJ and working email.",
       "pipeline": [
         {
@@ -96,13 +96,13 @@
         },
         {
           "name": "you: verify domain",
-          "state": "active"
+          "state": "pending"
         }
       ],
-      "status": "Owned by its own chat now. Domain already created in Resend; Gmail stays safe because every record sits on the send subdomain, never the root.",
+      "status": "On hold at the Amazon step. Nothing is broken meanwhile: every SJ email correctly HOLDS until the domain verifies, which is the guardrail doing its job.",
       "next": {
-        "who": "you",
-        "what": "Open the SJ EMAIL GO-LIVE chat, it walks the 3 records and finishes the rest"
+        "who": "agents",
+        "what": "SJ EMAIL GO-LIVE is sending me the exact blocker and will ping the moment it clears"
       },
       "checklist": {
         "id": "resend",
@@ -411,9 +411,9 @@
     },
     {
       "id": 42,
-      "title": "Resend domain verification",
+      "title": "Resend domain verification (blocked at the Amazon step)",
       "severity": "blocker",
-      "status": "3 records into Squarespace",
+      "status": "blocked",
       "owner": "Zoran"
     },
     {
@@ -598,11 +598,12 @@
     {
       "name": "SJ EMAIL GO-LIVE",
       "sidebar": "SJ EMAIL GO-LIVE",
-      "state": "blue",
-      "one": "Owns SJ email end to end: 3 records into Squarespace, then it verifies and flips the domain for you",
+      "state": "orange",
+      "one": "Owns SJ email end to end. Paused while the Amazon side of the Resend setup gets sorted",
       "builds": [
         "t-email"
-      ]
+      ],
+      "blockedBy": "the Amazon stuff on the Resend records. That chat is telling me the exact reason and will ping me when it clears"
     },
     {
       "name": "Test: price breakdown",
@@ -684,13 +685,13 @@
       },
       {
         "name": "Email live",
-        "state": "active",
-        "detail": "3 DNS records into Squarespace, then it verifies itself"
+        "state": "waiting",
+        "detail": "On hold at the Amazon step, being sorted in its own chat"
       },
       {
         "name": "Lij's materials",
-        "state": "next",
-        "detail": "Stripe, coaches, photos, testimonials, gym address"
+        "state": "active",
+        "detail": "Now the front of the queue: send him the ask-list"
       },
       {
         "name": "Website published",
