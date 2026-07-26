@@ -1,11 +1,11 @@
 {
-  "updated": "2026-07-26 \u00b7 evening",
+  "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
-    "Price breakdown PASSED all 11 adversarial checks, now PR #1606 with a preview",
+    "Price breakdown SHIPPED (#1606): agents now quote price, tax and fees on separate lines",
+    "SJ email has its own chat now, Gmail confirmed safe (records sit on the send subdomain)",
     "All 6 GTA identity leaks from the original sweep: shipped and dead",
-    "Blank-domain drip safety merged (#1605), preset session closed and handed files back",
-    "SJ token healthy tonight but fragile until the FC2 fix",
-    "TrustHub correction: only 3 free submissions, so submit once, from the CP 575"
+    "Found: bam-portal cancels every PR preview build, which breaks future gate-2 tests",
+    "TrustHub: only 3 free submissions, so submit once, from the CP 575"
   ],
   "orchestrator": {
     "focus": "Price + tax + fees breakdown is at YOUR gate (PR #1606, tested 11/11). After your pass: agent brain fallback (#5) and AI booking times (#22).",
@@ -20,11 +20,11 @@
   },
   "buildTasks": [
     {
-      "id": "t-breakdown",
-      "title": "Agents quote price, tax and fees on separate lines",
-      "phase": "your move",
-      "phaseTone": "you",
-      "why": "A parent hears the exact amount their card gets charged, tax broken out, so nobody feels tricked at checkout. Lives on the shared preset: one master switch covers GTA, San Jose and every future academy.",
+      "id": "t-brain",
+      "title": "Agent stops quoting GTA's reviews and address",
+      "phase": "next up",
+      "phaseTone": "work",
+      "why": "An academy with missing data currently inherits GTA's Google reviews, Oakville address and old prices. San Jose is fine today because its offer is filled in, but the hole is open for every future academy.",
       "pipeline": [
         {
           "name": "scout",
@@ -32,36 +32,36 @@
         },
         {
           "name": "plan",
-          "state": "done"
+          "state": "pending"
         },
         {
           "name": "you: workshop",
-          "state": "done"
+          "state": "pending"
         },
         {
           "name": "build",
-          "state": "done"
+          "state": "pending"
         },
         {
-          "name": "test 11/11",
-          "state": "done"
+          "name": "test",
+          "state": "pending"
         },
         {
           "name": "you: try it",
-          "state": "active"
+          "state": "pending"
         },
         {
           "name": "ship",
           "state": "pending"
         }
       ],
-      "status": "Tested clean: zero fake tax lines possible, rounding exact to the cent, one master switch proven across every academy. PR #1606 has a live preview.",
+      "status": "Unblocked now that #1587 and #1606 are merged. Queue items 5 and 22 are the next two builds.",
       "next": {
-        "who": "you",
-        "what": "Click the test chip when it appears and walk the 10 steps"
+        "who": "agents",
+        "what": "I spawn the planner when you give the word"
       },
       "checklist": null,
-      "short": "price breakdown"
+      "short": "agent brain"
     },
     {
       "id": "t-email",
@@ -282,6 +282,10 @@
         {
           "id": "q3",
           "t": "Lawyer sign-off on the SJ agreement, then the draft banner comes off"
+        },
+        {
+          "id": "q4",
+          "t": "Delete 2 dead Vercel projects: whiteboard and epic-easley-b6fc80 (CLI cannot, needs the dashboard)"
         }
       ]
     }
@@ -390,13 +394,6 @@
       "title": "Portal-spine migration: flip 5 rails off GHL",
       "severity": "blocker",
       "status": "needs its own plan",
-      "owner": "us"
-    },
-    {
-      "id": 34,
-      "title": "Price + tax + fees breakdown",
-      "severity": "blocker",
-      "status": "PR #1606, your gate",
       "owner": "us"
     },
     {
@@ -573,6 +570,27 @@
       "severity": "friction",
       "status": "queued",
       "owner": "us"
+    },
+    {
+      "id": 48,
+      "title": "bam-portal cancels every PR preview build",
+      "severity": "friction",
+      "status": "blocks gate-2 pattern",
+      "owner": "us"
+    },
+    {
+      "id": 49,
+      "title": "Delete dead Vercel projects (whiteboard + epic-easley)",
+      "severity": "friction",
+      "status": "your dashboard",
+      "owner": "Zoran"
+    },
+    {
+      "id": 50,
+      "title": "Sign-up-fee rendering unproven until SJ's $40 is entered",
+      "severity": "friction",
+      "status": "launch-day check",
+      "owner": "us"
     }
   ],
   "chatMap": [
@@ -598,11 +616,9 @@
     {
       "name": "Test: price breakdown",
       "sidebar": "Test: price + tax + fees breakdown (gate 2)",
-      "state": "blue",
-      "one": "Open it and walk the 10 pricing steps, your verdict flows back to HQ",
-      "builds": [
-        "t-breakdown"
-      ]
+      "state": "done",
+      "one": "Verdict delivered, PR #1606 merged. Archive it",
+      "builds": []
     },
     {
       "name": "Client Profile",
