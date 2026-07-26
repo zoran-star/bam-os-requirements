@@ -1,7 +1,13 @@
 {
   "updated": "2026-07-27",
-  "headline": "PHONE NO LONGER GATES LAUNCH. SJ launches on GHL transport, Twilio flips later. Ask-list revised: EIN demoted.",
+  "headline": "ALL FOUR PRs MERGED. GTA's agent now quotes tax-inclusive truth. Items 5 + 22 unblocked. Three chips waiting for you.",
   "yourMoves": [
+    {
+      "urgency": "now",
+      "title": "Click the chip: Test from-address (gate 2)",
+      "detail": "10 min hands-on. Machine test passed 86/86 incl. cross-tenant cache hunt",
+      "where": "chip in sidebar"
+    },
     {
       "urgency": "now",
       "title": "Click the chip: fix BAM's TrustHub profile",
@@ -27,30 +33,22 @@
       "where": "draft in MISTER_ORCHESTRATOR"
     },
     {
-      "urgency": "now",
-      "title": "Merge-review PR #1602 - the tz fix you just shipped",
-      "detail": "Paper-tested 6/6, migration + backfill already done",
-      "where": "github",
-      "link": "https://github.com/zoran-star/bam-os-requirements/pull/1602"
-    },
-    {
       "urgency": "soon",
       "title": "Finish the FC2 app config",
       "detail": "SJ GHL token expires within hours. Matters until spine cutover",
       "where": "BUILD GHL TOKENS chat"
     },
     {
-      "urgency": "soon",
-      "title": "Review PR #1587 - money model",
-      "detail": "Unlocks queue items 5 and 22",
-      "where": "github",
-      "link": "https://github.com/zoran-star/bam-os-requirements/pull/1587"
-    },
-    {
       "urgency": "waiting",
       "title": "Lawyer sign-off on the SJ agreement",
       "detail": "Then draft banner comes off",
       "where": "external"
+    },
+    {
+      "urgency": "soon",
+      "title": "Delete the dead whiteboard Vercel project",
+      "detail": "It reddens the checks on every single PR now",
+      "where": "vercel dashboard"
     }
   ],
   "pipeline": {
@@ -118,10 +116,12 @@
       "name": "Other sessions",
       "state": "moving",
       "items": [
-        "#1601 preset rebuild - review",
-        "Agreement engine - unmerged",
-        "GHL tokens - token expires in hours",
-        "#1587 money model - green"
+        "#1601 MERGED",
+        "#1587 MERGED",
+        "#1602 MERGED",
+        "#1603 MERGED",
+        "Agreement engine - still unmerged",
+        "GHL tokens - mid-flight"
       ],
       "note": "hands off their files"
     },
@@ -156,7 +156,7 @@
       "id": 3,
       "title": "Emails send FROM BAM Toronto",
       "severity": "blocker",
-      "status": "building",
+      "status": "at gate 2",
       "owner": "us"
     },
     {
@@ -170,7 +170,7 @@
       "id": 5,
       "title": "Agent brain GTA fallback",
       "severity": "blocker",
-      "status": "parked til #1587",
+      "status": "UNBLOCKED, queued",
       "owner": "us"
     },
     {
@@ -205,7 +205,7 @@
       "id": 22,
       "title": "AI books trials in Toronto time",
       "severity": "blocker",
-      "status": "blocked on #1587",
+      "status": "UNBLOCKED, queued",
       "owner": "coordinate"
     },
     {
