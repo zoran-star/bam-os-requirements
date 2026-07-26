@@ -26,85 +26,104 @@ body{
 a{color:var(--gold);text-decoration:none;border-bottom:1px dotted var(--gold-dim)}
 a:hover{border-bottom-style:solid}
 
-/* header */
 header{
   display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;
   padding:28px 32px 18px; border-bottom:2px solid var(--gold);
 }
-.brand h1{
-  font-family:var(--disp); font-weight:900; font-size:clamp(34px,5vw,58px);
-  letter-spacing:.01em; line-height:.9; text-transform:uppercase; color:var(--bone);
-}
+.brand h1{font-family:var(--disp);font-weight:900;font-size:clamp(34px,5vw,58px);letter-spacing:.01em;line-height:.9;text-transform:uppercase}
 .brand h1 em{font-style:normal;color:var(--gold)}
 .brand .sub{margin-top:6px;font-size:12px;color:var(--mut);letter-spacing:.14em;text-transform:uppercase}
 .meta{text-align:right;font-size:12px;color:var(--mut)}
 .meta .live{display:inline-flex;align-items:center;gap:7px;color:var(--green)}
 .meta .dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.6s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
-.headline{
-  margin:0 32px; padding:12px 16px; border-left:4px solid var(--gold);
-  background:linear-gradient(90deg, rgba(212,182,92,.10), transparent 70%);
-  font-size:14px; color:var(--bone); margin-top:18px;
-}
 
-/* layout */
-main{padding:22px 32px; display:flex; flex-direction:column; gap:26px; max-width:1500px; margin:0 auto}
+main{padding:22px 32px;display:flex;flex-direction:column;gap:28px;max-width:1500px;margin:0 auto}
 section>h2{
-  font-family:var(--disp); font-weight:700; text-transform:uppercase; letter-spacing:.06em;
-  font-size:22px; color:var(--gold); margin-bottom:12px; display:flex; align-items:center; gap:12px;
+  font-family:var(--disp);font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  font-size:22px;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:12px;
 }
 section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
+.err{margin:0 32px 18px;padding:12px 16px;border:1px solid var(--red);border-left-width:4px;background:rgba(224,85,69,.07);color:var(--red);font-size:13px}
+.err b{display:block;font-family:var(--disp);font-size:17px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
 
-/* your moves */
-.moves{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
-.move{background:var(--panel);border:1px solid var(--line);border-left-width:4px;padding:13px 15px;position:relative}
-.move .tag{font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600}
-.move h3{font-family:var(--disp);font-weight:700;font-size:19px;line-height:1.1;margin:6px 0 5px;text-transform:uppercase;letter-spacing:.02em}
-.move p{font-size:12px;color:var(--mut);line-height:1.5}
-.move .where{margin-top:8px;font-size:11px;color:var(--gold-dim)}
-.move.now{border-left-color:var(--red)} .move.now .tag{color:var(--red)}
-.move.soon{border-left-color:var(--amber)} .move.soon .tag{color:var(--amber)}
-.move.waiting{border-left-color:var(--blue);opacity:.75} .move.waiting .tag{color:var(--blue)}
-.move.now::before{content:"";position:absolute;inset:0;pointer-events:none;border:1px solid rgba(224,85,69,.0);animation:ring 2.4s infinite}
-@keyframes ring{0%,100%{border-color:rgba(224,85,69,0)}50%{border-color:rgba(224,85,69,.45)}}
+/* recent updates ticker */
+.updates{display:flex;flex-direction:column;gap:5px}
+.updates div{font-size:12px;color:var(--mut);padding-left:16px;position:relative;line-height:1.5}
+.updates div::before{content:"▸";position:absolute;left:0;color:var(--gold-dim)}
+.updates div:first-child{color:var(--bone)}
+.updates div:first-child::before{color:var(--gold)}
 
-/* pipeline */
-.pipe-wrap{background:var(--panel);border:1px solid var(--line);padding:18px 20px;overflow-x:auto}
-.pipe-title{font-size:12px;color:var(--mut);margin-bottom:14px;letter-spacing:.1em;text-transform:uppercase}
-.pipe-title b{color:var(--bone)}
-.pipe{display:flex;align-items:flex-start;min-width:720px}
-.stage{flex:1;text-align:center;position:relative;padding-top:4px}
-.stage .bulb{
-  width:26px;height:26px;border-radius:50%;margin:0 auto;border:2px solid var(--line);
-  background:var(--panel2);display:flex;align-items:center;justify-content:center;
-  font-size:13px;position:relative;z-index:2;
-}
-.stage:not(:last-child)::after{
-  content:"";position:absolute;top:16px;left:calc(50% + 15px);right:calc(-50% + 15px);
-  height:2px;background:var(--line);z-index:1;
-}
+/* orchestrator */
+.orch{border:1px solid var(--gold);border-radius:2px;padding:18px 20px;background:linear-gradient(90deg, rgba(212,182,92,.08), transparent 55%)}
+.orch h2{font-family:var(--disp);font-weight:900;font-size:26px;text-transform:uppercase;letter-spacing:.04em;color:var(--gold)}
+.orch .focus{margin-top:8px;font-size:13px;line-height:1.6}
+.orch .needsHead{margin-top:12px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:600}
+.orch ul{list-style:none;margin-top:6px;display:flex;flex-direction:column;gap:4px}
+.orch li{font-size:12px;color:var(--bone);padding-left:16px;position:relative;line-height:1.5}
+.orch li::before{content:"→";position:absolute;left:0;color:var(--red)}
+
+/* task cards */
+.tasks{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px}
+.task{background:var(--panel);border:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.task.you{border-color:var(--gold)}
+.task .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.task h3{font-family:var(--disp);font-weight:700;font-size:21px;line-height:1.05;text-transform:uppercase;letter-spacing:.02em}
+.task .phase{font-size:9px;letter-spacing:.16em;text-transform:uppercase;padding:3px 9px;border:1px solid;white-space:nowrap;margin-top:3px}
+.task .phase.you{color:var(--ink);background:var(--gold);border-color:var(--gold);font-weight:600;animation:pulse 2s infinite}
+.task .phase.work{color:var(--blue);border-color:var(--blue)}
+.task .why{font-size:12px;color:var(--mut);line-height:1.6;border-left:2px solid var(--gold-dim);padding-left:10px}
+.pipe{display:flex;align-items:flex-start}
+.stage{flex:1;text-align:center;position:relative;min-width:0}
+.stage .bulb{width:18px;height:18px;border-radius:50%;margin:0 auto;border:2px solid var(--line);background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:9px;position:relative;z-index:2}
+.stage:not(:last-child)::after{content:"";position:absolute;top:11px;left:calc(50% + 11px);right:calc(-50% + 11px);height:2px;background:var(--line);z-index:1}
 .stage.done .bulb{border-color:var(--gold-dim);background:#241f14;color:var(--gold)}
 .stage.done:not(:last-child)::after{background:var(--gold-dim)}
-.stage.active .bulb{border-color:var(--gold);background:var(--gold);color:var(--ink);box-shadow:0 0 18px rgba(212,182,92,.45);animation:glow 1.8s infinite}
-@keyframes glow{0%,100%{box-shadow:0 0 18px rgba(212,182,92,.45)}50%{box-shadow:0 0 30px rgba(212,182,92,.8)}}
-.stage .nm{margin-top:9px;font-family:var(--disp);font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
-.stage.done .nm{color:var(--bone)} .stage.active .nm{color:var(--gold)}
-.stage .nt{font-size:10px;color:var(--mut);margin-top:3px;padding:0 6px;line-height:1.4}
-.stage.active .nt{color:var(--gold)}
+.stage.active .bulb{border-color:var(--gold);background:var(--gold);color:var(--ink);box-shadow:0 0 14px rgba(212,182,92,.5);animation:glow 1.8s infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 14px rgba(212,182,92,.5)}50%{box-shadow:0 0 24px rgba(212,182,92,.85)}}
+.stage .nm{margin-top:6px;font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);line-height:1.3;padding:0 2px}
+.stage.done .nm{color:var(--bone)} .stage.active .nm{color:var(--gold);font-weight:600}
+.task .status{font-size:12px;color:var(--bone);line-height:1.55}
+.task .next{display:flex;gap:10px;align-items:baseline;background:var(--panel2);border:1px solid var(--line);padding:9px 12px}
+.task .next .who{font-size:9px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;white-space:nowrap}
+.task .next .who.you{color:var(--gold)} .task .next .who.agents{color:var(--blue)}
+.task .next .what{font-size:12px;line-height:1.5}
+.task .cl{border-top:1px dashed var(--line);padding-top:8px}
+
+/* checklists */
+.cl label{display:flex;gap:10px;align-items:flex-start;padding:6px 0;cursor:pointer;font-size:12px;line-height:1.45}
+.cl label:hover{color:var(--gold)}
+.cl input{appearance:none;width:15px;height:15px;flex:0 0 15px;margin-top:2px;border:1px solid var(--mut);background:var(--panel2);cursor:pointer;position:relative}
+.cl input:checked{background:var(--gold);border-color:var(--gold)}
+.cl input:checked::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink);font-size:11px;font-weight:600}
+.cl input:checked + span{color:var(--mut);text-decoration:line-through}
+.cl .prog{font-size:10px;color:var(--mut);letter-spacing:.1em}
+.cl.full .prog{color:var(--green)}
+
+.humans{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}
+.hcard{background:var(--panel);border:1px solid var(--line);padding:14px 16px}
+.hcard.full{border-color:var(--green)}
+.hcard.held{opacity:.65;border-style:dashed}
+.hcard h3{font-family:var(--disp);font-weight:700;font-size:19px;text-transform:uppercase;letter-spacing:.03em;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.hcard .why{font-size:11px;color:var(--mut);margin:6px 0 8px;line-height:1.55;font-style:italic}
+.hcard .hold{font-size:10px;color:var(--amber);border:1px solid var(--amber);padding:5px 9px;margin-bottom:8px;line-height:1.5}
+.hcard label{border-top:1px dashed var(--line)}
+.hcard .reset{margin-top:9px;font-size:10px;color:var(--mut);background:none;border:1px solid var(--line);padding:3px 9px;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono)}
+.hcard .reset:hover{color:var(--gold);border-color:var(--gold)}
 
 /* lanes */
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .lane{background:var(--panel);border:1px solid var(--line);padding:14px 15px}
-.lane h3{font-family:var(--disp);font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.03em;display:flex;justify-content:space-between;align-items:center}
+.lane h3{font-family:var(--disp);font-weight:700;font-size:19px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .lane .st{font-size:9px;letter-spacing:.16em;padding:3px 8px;border:1px solid}
 .lane.blocked .st{color:var(--red);border-color:var(--red)}
 .lane.moving .st{color:var(--green);border-color:var(--green)}
-.lane ul{list-style:none;margin-top:10px}
-.lane li{font-size:12px;color:var(--bone);padding:5px 0 5px 14px;border-top:1px dashed var(--line);position:relative}
+.lane ul{list-style:none;margin-top:9px}
+.lane li{font-size:12px;padding:5px 0 5px 14px;border-top:1px dashed var(--line);position:relative}
 .lane li::before{content:"▸";position:absolute;left:0;color:var(--gold-dim);font-size:10px}
-.lane .note{margin-top:9px;font-size:11px;color:var(--mut);font-style:italic}
+.lane .note{margin-top:8px;font-size:11px;color:var(--mut);font-style:italic}
 
-/* queue board */
+/* queue */
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
 .col{background:var(--panel);border:1px solid var(--line)}
 .col header{border:none;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
@@ -120,42 +139,8 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .card .t{font-size:12px;line-height:1.4;flex:1}
 .card .s{font-size:9px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:var(--mut)}
 .card .s.hot{color:var(--gold);font-weight:600}
-.card .s.own{color:var(--blue)}
 .card.dim{opacity:.55}
-
-/* strips */
-.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
-.chip{background:var(--panel);border:1px solid var(--line);padding:11px 13px}
-.chip .top{display:flex;justify-content:space-between;align-items:baseline}
-.chip h4{font-family:var(--disp);font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.04em}
-.chip .mdl{font-size:9px;letter-spacing:.14em;color:var(--gold-dim);text-transform:uppercase}
-.chip p{font-size:11px;color:var(--mut);margin-top:5px;line-height:1.45}
-.chip .status{display:inline-block;margin-top:7px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;padding:2px 7px;border:1px solid var(--line);color:var(--mut)}
-.chip .status.done{color:var(--green);border-color:var(--green)}
-.chip .status.idle{color:var(--amber);border-color:var(--amber)}
-.chip .status.running{color:var(--gold);border-color:var(--gold);animation:pulse 1.6s infinite}
-.chip .status.visit{color:var(--red);border-color:var(--red)}
-.chip .status.here{color:var(--gold);border-color:var(--gold)}
 footer{margin:40px 32px 0;padding-top:14px;border-top:1px solid var(--line);font-size:10px;color:var(--mut);letter-spacing:.1em;text-transform:uppercase}
-.err{margin:0 0 18px;padding:12px 16px;border:1px solid var(--red);border-left-width:4px;background:rgba(224,85,69,.07);color:var(--red);font-size:13px}
-.err b{display:block;font-family:var(--disp);font-size:17px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
-
-/* checklists */
-.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
-.cl{background:var(--panel);border:1px solid var(--line);padding:14px 16px}
-.cl.allDone{border-color:var(--green)}
-.cl h3{font-family:var(--disp);font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.03em;display:flex;justify-content:space-between;align-items:center;gap:10px}
-.cl .prog{font-size:11px;color:var(--mut);white-space:nowrap;font-weight:400}
-.cl.allDone .prog{color:var(--green)}
-.cl .why{font-size:11px;color:var(--mut);margin:6px 0 10px;line-height:1.5;font-style:italic}
-.cl label{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px dashed var(--line);cursor:pointer;font-size:13px;line-height:1.45}
-.cl label:hover{color:var(--gold)}
-.cl input{appearance:none;width:16px;height:16px;flex:0 0 16px;margin-top:2px;border:1px solid var(--mut);background:var(--panel2);cursor:pointer;position:relative}
-.cl input:checked{background:var(--gold);border-color:var(--gold)}
-.cl input:checked::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink);font-size:12px;font-weight:600}
-.cl input:checked + span{color:var(--mut);text-decoration:line-through}
-.cl .reset{margin-top:10px;font-size:10px;color:var(--mut);background:none;border:1px solid var(--line);padding:3px 9px;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono)}
-.cl .reset:hover{color:var(--gold);border-color:var(--gold)}
 </style>
 </head>
 <body>
@@ -169,23 +154,27 @@ footer{margin:40px 32px 0;padding-top:14px;border-top:1px solid var(--line);font
     <div id="updated" style="margin-top:6px"></div>
   </div>
 </header>
-<div class="headline" id="headline"></div>
 <main>
   <div id="banner"></div>
   <section>
-    <h2>Your moves</h2>
-    <div class="moves" id="moves"></div>
+    <h2>Recent updates</h2>
+    <div class="updates" id="updates"></div>
   </section>
   <section>
-    <h2>Your checklist</h2>
-    <div class="checks" id="checks"></div>
+    <div class="orch">
+      <h2>Mister Orchestrator</h2>
+      <div class="focus" id="orchFocus"></div>
+      <div class="needsHead">What it needs from you</div>
+      <ul id="orchNeeds"></ul>
+    </div>
   </section>
   <section>
     <h2>Build pipeline</h2>
-    <div class="pipe-wrap">
-      <div class="pipe-title" id="pipeTitle"></div>
-      <div class="pipe" id="pipe"></div>
-    </div>
+    <div class="tasks" id="tasks"></div>
+  </section>
+  <section>
+    <h2>Other human tasks</h2>
+    <div class="humans" id="humans"></div>
   </section>
   <section>
     <h2>Go-live lanes</h2>
@@ -195,39 +184,69 @@ footer{margin:40px 32px 0;padding-top:14px;border-top:1px solid var(--line);font
     <h2>The queue</h2>
     <div class="cols" id="queue"></div>
   </section>
-  <section>
-    <h2>Agents</h2>
-    <div class="strip" id="agents"></div>
-  </section>
-  <section>
-    <h2>Session map</h2>
-    <div class="strip" id="sessions"></div>
-  </section>
 </main>
-<footer>Source of truth: docs/lij-onboarding-build-queue.md · board fed by board/data.json · updated by Mister Orchestrator</footer>
+<footer>Source of truth: docs/lij-onboarding-build-queue.md · fed by board/data.json · updated by Mister Orchestrator</footer>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-function render(d){
-  $("updated").textContent = "updated " + d.updated;
-  $("headline").textContent = d.headline;
+const CK = "bamBoardChecks";
+const readChecks = () => { try { return JSON.parse(localStorage.getItem(CK) || "{}"); } catch(e){ return {}; } };
+const writeCheck = (id, on) => { const s = readChecks(); if(on) s[id] = 1; else delete s[id]; localStorage.setItem(CK, JSON.stringify(s)); };
 
-  $("moves").innerHTML = d.yourMoves.map(m => `
-    <div class="move ${esc(m.urgency)}">
-      <span class="tag">${esc(m.urgency)}</span>
-      <h3>${esc(m.title)}</h3>
-      <p>${esc(m.detail)}</p>
-      <div class="where">${m.link ? `<a href="${esc(m.link)}" target="_blank">${esc(m.where)}</a>` : "→ " + esc(m.where)}</div>
-    </div>`).join("");
-
-  $("pipeTitle").innerHTML = `Current build: <b>${esc(d.pipeline.build)}</b> · ${esc(d.pipeline.queueRef)}`;
-  $("pipe").innerHTML = d.pipeline.stages.map(s => `
+function pipeHtml(stages){
+  return `<div class="pipe">` + stages.map(s => `
     <div class="stage ${esc(s.state)}">
       <div class="bulb">${s.state === "done" ? "✓" : s.state === "active" ? "●" : ""}</div>
       <div class="nm">${esc(s.name)}</div>
-      ${s.note ? `<div class="nt">${esc(s.note)}</div>` : ""}
+    </div>`).join("") + `</div>`;
+}
+
+function checklistHtml(cl){
+  if(!cl) return "";
+  const state = readChecks();
+  const done = cl.steps.filter(s => state[s.id]).length;
+  return `<div class="cl ${done === cl.steps.length ? "full" : ""}" data-cl="${esc(cl.id)}">
+    <div class="prog">MY CHECKLIST · ${done}/${cl.steps.length}${done === cl.steps.length ? " DONE" : ""}</div>
+    ${cl.steps.map(s => `<label><input type="checkbox" data-id="${esc(s.id)}"${state[s.id] ? " checked" : ""}><span>${esc(s.t)}</span></label>`).join("")}
+  </div>`;
+}
+
+function render(d){
+  $("updated").textContent = "updated " + d.updated;
+  $("updates").innerHTML = d.recentUpdates.map(u => `<div>${esc(u)}</div>`).join("");
+  $("orchFocus").textContent = d.orchestrator.focus;
+  $("orchNeeds").innerHTML = d.orchestrator.needs.map(n => `<li>${esc(n)}</li>`).join("");
+
+  $("tasks").innerHTML = d.buildTasks.map(t => `
+    <div class="task ${t.phaseTone === "you" ? "you" : ""}">
+      <div class="top">
+        <h3>${esc(t.title)}</h3>
+        <span class="phase ${esc(t.phaseTone)}">${esc(t.phase)}</span>
+      </div>
+      <div class="why">${esc(t.why)}</div>
+      ${pipeHtml(t.pipeline)}
+      <div class="status">${esc(t.status)}</div>
+      <div class="next">
+        <span class="who ${esc(t.next.who)}">${t.next.who === "you" ? "YOUR NEXT STEP" : "AGENTS"}</span>
+        <span class="what">${esc(t.next.what)}</span>
+      </div>
+      ${checklistHtml(t.checklist)}
     </div>`).join("");
+
+  const state = readChecks();
+  $("humans").innerHTML = d.humanTasks.map(h => {
+    const done = h.steps.filter(s => state[s.id]).length;
+    return `<div class="hcard ${done === h.steps.length ? "full" : ""} ${h.held ? "held" : ""}">
+      <h3>${esc(h.title)} <span class="prog cl">${done}/${h.steps.length}</span></h3>
+      <div class="why">${esc(h.why)}</div>
+      ${h.held ? `<div class="hold">⏸ ${esc(h.heldWhy)}</div>` : ""}
+      <div class="cl" data-cl="${esc(h.id)}">
+        ${h.steps.map(s => `<label><input type="checkbox" data-id="${esc(s.id)}"${state[s.id] ? " checked" : ""}><span>${esc(s.t)}</span></label>`).join("")}
+      </div>
+      <button class="reset" data-reset="${esc(h.id)}">clear</button>
+    </div>`;
+  }).join("");
 
   $("lanes").innerHTML = d.lanes.map(l => `
     <div class="lane ${esc(l.state)}">
@@ -239,54 +258,17 @@ function render(d){
   const sevs = [["blocker","Blockers"],["friction","Friction"],["general","General"],["scale","Scale · parked"]];
   $("queue").innerHTML = sevs.map(([k, label]) => {
     const items = d.queue.filter(q => q.severity === k);
-    return `
-    <div class="col ${k}">
+    return `<div class="col ${k}">
       <header><h3>${label}</h3><span class="count">${items.length}</span></header>
       ${items.map(q => {
-        const hot = /gate|ours/i.test(q.status);
-        const own = /owned|#16|session/i.test(q.status + q.owner);
-        const dim = /parked|backlog/i.test(q.status);
+        const hot = /gate|next up|your/i.test(q.status);
+        const dim = /parked|backlog|held/i.test(q.status);
         return `<div class="card${dim ? " dim" : ""}">
           <span class="id">#${q.id}</span>
           <span class="t">${esc(q.title)}</span>
-          <span class="s${hot ? " hot" : own ? " own" : ""}">${esc(q.status)}</span>
+          <span class="s${hot ? " hot" : ""}">${esc(q.status)}</span>
         </div>`;
       }).join("")}
-    </div>`;
-  }).join("");
-
-  $("agents").innerHTML = d.agents.map(a => `
-    <div class="chip">
-      <div class="top"><h4>${esc(a.name)}</h4><span class="mdl">${esc(a.model)}</span></div>
-      <p>${esc(a.detail)}</p>
-      <span class="status ${esc(a.status)}">${esc(a.status)}</span>
-    </div>`).join("");
-
-  $("sessions").innerHTML = d.sessions.map(s => {
-    const cls = /VISIT/.test(s.visit) ? "visit" : /here/.test(s.visit) ? "here" : "";
-    return `
-    <div class="chip">
-      <div class="top"><h4>${esc(s.name)}</h4></div>
-      <p>${esc(s.role)}</p>
-      <span class="status ${cls}">${esc(s.visit)}</span>
-    </div>`;
-  }).join("");
-}
-
-const CK = "bamBoardChecks";
-const readChecks = () => { try { return JSON.parse(localStorage.getItem(CK) || "{}"); } catch(e){ return {}; } };
-const writeCheck = (id, on) => { const s = readChecks(); if(on) s[id] = 1; else delete s[id]; localStorage.setItem(CK, JSON.stringify(s)); };
-
-function renderChecks(lists){
-  if(!lists || !lists.length){ $("checks").innerHTML = ""; return; }
-  const state = readChecks();
-  $("checks").innerHTML = lists.map(l => {
-    const done = l.steps.filter(s => state[s.id]).length;
-    return `<div class="cl${done === l.steps.length ? " allDone" : ""}" data-cl="${esc(l.id)}">
-      <h3>${esc(l.title)} <span class="prog">${done}/${l.steps.length}${done === l.steps.length ? " done" : ""}</span></h3>
-      <div class="why">${esc(l.why)}</div>
-      ${l.steps.map(s => `<label><input type="checkbox" data-id="${esc(s.id)}"${state[s.id] ? " checked" : ""}><span>${esc(s.t)}</span></label>`).join("")}
-      <button class="reset" data-reset="${esc(l.id)}">clear</button>
     </div>`;
   }).join("");
 }
@@ -295,31 +277,26 @@ document.addEventListener("change", e => {
   const cb = e.target.closest('.cl input[type="checkbox"]');
   if(!cb) return;
   writeCheck(cb.dataset.id, cb.checked);
-  if(window._lists) renderChecks(window._lists);
+  if(window._data) render(window._data);
 });
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-reset]");
-  if(!b || !window._lists) return;
-  const l = window._lists.find(x => x.id === b.dataset.reset);
+  if(!b || !window._data) return;
+  const l = window._data.humanTasks.find(x => x.id === b.dataset.reset);
   if(l) l.steps.forEach(s => writeCheck(s.id, false));
-  renderChecks(window._lists);
+  render(window._data);
 });
-
-function showError(msg){
-  $("banner").innerHTML = `<div class="err"><b>Board is stale</b>${esc(msg)}</div>`;
-}
 
 async function load(){
   try{
     const r = await fetch("data.json?t=" + Date.now());
     if(!r.ok) throw new Error("HTTP " + r.status);
     const d = await r.json();
-    window._lists = d.checklists || [];
+    window._data = d;
     render(d);
-    renderChecks(window._lists);
     $("banner").innerHTML = "";
   }catch(e){
-    showError("Cannot reach data.json (" + e.message + "). The local server has probably stopped. Ask Mister Orchestrator to restart the mission-board server, then this message clears itself.");
+    $("banner").innerHTML = `<div class="err"><b>Board is stale</b>Cannot reach data.json (${esc(e.message)}). The local server has probably stopped. Ask Mister Orchestrator to restart it; this clears itself when it is back.</div>`;
   }
 }
 load();
