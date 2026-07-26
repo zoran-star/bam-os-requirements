@@ -111,6 +111,20 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .hcard .reset{margin-top:9px;font-size:10px;color:var(--mut);background:none;border:1px solid var(--line);padding:3px 9px;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono)}
 .hcard .reset:hover{color:var(--gold);border-color:var(--gold)}
 
+/* chat map */
+.chats{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.chat{background:var(--panel);border:1px solid var(--line);padding:11px 13px;display:flex;flex-direction:column;gap:5px}
+.chat .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.chat h4{font-family:var(--disp);font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.03em}
+.chat p{font-size:11px;color:var(--mut);line-height:1.5}
+.chat .tag{font-size:9px;letter-spacing:.14em;text-transform:uppercase;padding:2px 8px;border:1px solid;white-space:nowrap;font-weight:600}
+.chat.hq{border-color:var(--gold)} .chat.hq .tag{color:var(--ink);background:var(--gold);border-color:var(--gold)}
+.chat.active .tag{color:var(--gold);border-color:var(--gold)}
+.chat.visit .tag{color:var(--red);border-color:var(--red)}
+.chat.keep .tag{color:var(--blue);border-color:var(--blue)}
+.chat.archive{opacity:.6} .chat.archive .tag{color:var(--green);border-color:var(--green)}
+.chat.unknown .tag{color:var(--mut);border-color:var(--mut)}
+
 /* lanes */
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .lane{background:var(--panel);border:1px solid var(--line);padding:14px 15px}
@@ -175,6 +189,10 @@ footer{margin:40px 32px 0;padding-top:14px;border-top:1px solid var(--line);font
   <section>
     <h2>Other human tasks</h2>
     <div class="humans" id="humans"></div>
+  </section>
+  <section>
+    <h2>Chat map · who does what</h2>
+    <div class="chats" id="chats"></div>
   </section>
   <section>
     <h2>Go-live lanes</h2>
@@ -247,6 +265,13 @@ function render(d){
       <button class="reset" data-reset="${esc(h.id)}">clear</button>
     </div>`;
   }).join("");
+
+  const TAGS = {hq:"HQ · you are here", active:"ACTIVE ROOM", visit:"GO THERE", keep:"KEEP · later", archive:"ARCHIVE NOW", unknown:"WHAT IS THIS?"};
+  $("chats").innerHTML = (d.chatMap || []).map(c => `
+    <div class="chat ${esc(c.tag)}">
+      <div class="row"><h4>${esc(c.name)}</h4><span class="tag">${TAGS[c.tag] || esc(c.tag)}</span></div>
+      <p>${esc(c.what)}</p>
+    </div>`).join("");
 
   $("lanes").innerHTML = d.lanes.map(l => `
     <div class="lane ${esc(l.state)}">

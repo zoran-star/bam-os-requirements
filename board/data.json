@@ -1,5 +1,5 @@
 {
-  "updated": "2026-07-26 · evening",
+  "updated": "2026-07-26 \u00b7 evening",
   "recentUpdates": [
     "Price breakdown PASSED all 11 adversarial checks, now PR #1606 with a preview",
     "All 6 GTA identity leaks from the original sweep: shipped and dead",
@@ -14,7 +14,8 @@
       "Verify byanymeanssanjose.com in Resend (steps on the email task card)",
       "Monday: pull the IRS CP 575 letter, it starts the TrustHub clock",
       "Send Lij his ask-list",
-      "GHL card stays ON HOLD until I give the go"
+      "GHL card stays ON HOLD until I give the go",
+      "Archive the 4 chats tagged ARCHIVE in the chat map below, your sidebar drops to 7"
     ]
   },
   "buildTasks": [
@@ -25,16 +26,40 @@
       "phaseTone": "you",
       "why": "A parent hears the exact amount their card gets charged, tax broken out, so nobody feels tricked at checkout. Lives on the shared preset: one master switch covers GTA, San Jose and every future academy.",
       "pipeline": [
-        {"name": "scout", "state": "done"},
-        {"name": "plan", "state": "done"},
-        {"name": "you: workshop", "state": "done"},
-        {"name": "build", "state": "done"},
-        {"name": "test 11/11", "state": "done"},
-        {"name": "you: try it", "state": "active"},
-        {"name": "ship", "state": "pending"}
+        {
+          "name": "scout",
+          "state": "done"
+        },
+        {
+          "name": "plan",
+          "state": "done"
+        },
+        {
+          "name": "you: workshop",
+          "state": "done"
+        },
+        {
+          "name": "build",
+          "state": "done"
+        },
+        {
+          "name": "test 11/11",
+          "state": "done"
+        },
+        {
+          "name": "you: try it",
+          "state": "active"
+        },
+        {
+          "name": "ship",
+          "state": "pending"
+        }
       ],
       "status": "Tested clean: zero fake tax lines possible, rounding exact to the cent, one master switch proven across every academy. PR #1606 has a live preview.",
-      "next": {"who": "you", "what": "Click the test chip when it appears and walk the 10 steps"},
+      "next": {
+        "who": "you",
+        "what": "Click the test chip when it appears and walk the 10 steps"
+      },
       "checklist": null
     },
     {
@@ -44,25 +69,67 @@
       "phaseTone": "you",
       "why": "Every automation email now sends as BAM San Jose, never Toronto. Your guardrail is doing its job: nothing SENDS until the sending domain is verified. This checklist is the last step between SJ and working email.",
       "pipeline": [
-        {"name": "scout", "state": "done"},
-        {"name": "plan", "state": "done"},
-        {"name": "you: guardrail", "state": "done"},
-        {"name": "build", "state": "done"},
-        {"name": "test 86/86", "state": "done"},
-        {"name": "ship #1604", "state": "done"},
-        {"name": "you: verify domain", "state": "active"}
+        {
+          "name": "scout",
+          "state": "done"
+        },
+        {
+          "name": "plan",
+          "state": "done"
+        },
+        {
+          "name": "you: guardrail",
+          "state": "done"
+        },
+        {
+          "name": "build",
+          "state": "done"
+        },
+        {
+          "name": "test 86/86",
+          "state": "done"
+        },
+        {
+          "name": "ship #1604",
+          "state": "done"
+        },
+        {
+          "name": "you: verify domain",
+          "state": "active"
+        }
       ],
       "status": "Code shipped and merged. All SJ email holds, correctly, until the domain verifies.",
-      "next": {"who": "you", "what": "Tick the Resend steps below, then tell me and I flip the switch"},
+      "next": {
+        "who": "you",
+        "what": "Tick the Resend steps below, then tell me and I flip the switch"
+      },
       "checklist": {
         "id": "resend",
         "steps": [
-          {"id": "r1", "t": "Open resend.com/domains and click Add Domain"},
-          {"id": "r2", "t": "Enter byanymeanssanjose.com, pick the region closest to San Jose"},
-          {"id": "r3", "t": "Copy the DKIM, SPF and DMARC records Resend shows you"},
-          {"id": "r4", "t": "Add all three as DNS records at the domain registrar"},
-          {"id": "r5", "t": "Back in Resend, click Verify (DNS can take up to an hour)"},
-          {"id": "r6", "t": "Status reads Verified, tell me, I set SJ's email domain"}
+          {
+            "id": "r1",
+            "t": "Open resend.com/domains and click Add Domain"
+          },
+          {
+            "id": "r2",
+            "t": "Enter byanymeanssanjose.com, pick the region closest to San Jose"
+          },
+          {
+            "id": "r3",
+            "t": "Copy the DKIM, SPF and DMARC records Resend shows you"
+          },
+          {
+            "id": "r4",
+            "t": "Add all three as DNS records at the domain registrar"
+          },
+          {
+            "id": "r5",
+            "t": "Back in Resend, click Verify (DNS can take up to an hour)"
+          },
+          {
+            "id": "r6",
+            "t": "Status reads Verified, tell me, I set SJ's email domain"
+          }
         ]
       }
     }
@@ -74,16 +141,46 @@
       "why": "Unlocks phone numbers for every academy AFTER San Jose. Only 3 free submissions exist, so this is copy-from-the-document work, not trial and error. Not urgent for SJ: everything runs on GHL meanwhile.",
       "held": false,
       "steps": [
-        {"id": "t1", "t": "MON: find the IRS CP 575 for FullControl, save as PDF. If lost, phone the IRS for a 147C and tell me immediately"},
-        {"id": "t2", "t": "MON: transcribe 4 fields exactly: legal name (no abbreviations, no DBA), EIN as 00-0000000, business type, registered address"},
-        {"id": "t3", "t": "MON: check the EIN issue date, top-right of the letter"},
-        {"id": "t4", "t": "MON: create a rep email on the FullControl domain (gmail and info@ fail)"},
-        {"id": "t5", "t": "MON: rep details: real name, title, position, phone as +1XXXXXXXXXX"},
-        {"id": "t6", "t": "MON-WED: FullControl site live: custom domain, legal name AND logo visible, not parked. The real long pole"},
-        {"id": "t7", "t": "THU: create the Twilio account, upgrade off trial, add billing"},
-        {"id": "t8", "t": "THU: submit with the CP 575 open on screen. ISV/Reseller/Partner, vertical EDUCATION, address via autocomplete"},
-        {"id": "t9", "t": "SAT: read the result. Approved = send me the SIDs"},
-        {"id": "t10", "t": "Only if rejected: file the $10 appeal with the CP 575 PDF, 5-7 business days"}
+        {
+          "id": "t1",
+          "t": "MON: find the IRS CP 575 for FullControl, save as PDF. If lost, phone the IRS for a 147C and tell me immediately"
+        },
+        {
+          "id": "t2",
+          "t": "MON: transcribe 4 fields exactly: legal name (no abbreviations, no DBA), EIN as 00-0000000, business type, registered address"
+        },
+        {
+          "id": "t3",
+          "t": "MON: check the EIN issue date, top-right of the letter"
+        },
+        {
+          "id": "t4",
+          "t": "MON: create a rep email on the FullControl domain (gmail and info@ fail)"
+        },
+        {
+          "id": "t5",
+          "t": "MON: rep details: real name, title, position, phone as +1XXXXXXXXXX"
+        },
+        {
+          "id": "t6",
+          "t": "MON-WED: FullControl site live: custom domain, legal name AND logo visible, not parked. The real long pole"
+        },
+        {
+          "id": "t7",
+          "t": "THU: create the Twilio account, upgrade off trial, add billing"
+        },
+        {
+          "id": "t8",
+          "t": "THU: submit with the CP 575 open on screen. ISV/Reseller/Partner, vertical EDUCATION, address via autocomplete"
+        },
+        {
+          "id": "t9",
+          "t": "SAT: read the result. Approved = send me the SIDs"
+        },
+        {
+          "id": "t10",
+          "t": "Only if rejected: file the $10 appeal with the CP 575 PDF, 5-7 business days"
+        }
       ]
     },
     {
@@ -93,13 +190,34 @@
       "held": true,
       "heldWhy": "ON HOLD: waiting to confirm whether GHL offers the Agency AND Sub-Account option. If not, these steps change. I will tell you the moment it resolves.",
       "steps": [
-        {"id": "g1", "t": "Uninstall FC2 first (dots menu). GHL locks the settings while installed"},
-        {"id": "g2", "t": "Set distribution to Agency AND Sub-Account"},
-        {"id": "g3", "t": "Add the mint scopes: oauth.write + oauth.readonly, plus contacts, conversations, opportunities, calendars, locations, users, custom fields, tags"},
-        {"id": "g4", "t": "Remove the junk scopes: adPublishing, saas, snapshots, twilioaccount, phone numbers"},
-        {"id": "g5", "t": "Confirm redirect includes portal.byanymeansbusiness.com/api/agency-connect, save"},
-        {"id": "g6", "t": "Run the install link, pick the AGENCY on the consent screen, expect a pass/fail table"},
-        {"id": "g7", "t": "Open /api/agency-connect: should read Healthy, Company token"}
+        {
+          "id": "g1",
+          "t": "Uninstall FC2 first (dots menu). GHL locks the settings while installed"
+        },
+        {
+          "id": "g2",
+          "t": "Set distribution to Agency AND Sub-Account"
+        },
+        {
+          "id": "g3",
+          "t": "Add the mint scopes: oauth.write + oauth.readonly, plus contacts, conversations, opportunities, calendars, locations, users, custom fields, tags"
+        },
+        {
+          "id": "g4",
+          "t": "Remove the junk scopes: adPublishing, saas, snapshots, twilioaccount, phone numbers"
+        },
+        {
+          "id": "g5",
+          "t": "Confirm redirect includes portal.byanymeansbusiness.com/api/agency-connect, save"
+        },
+        {
+          "id": "g6",
+          "t": "Run the install link, pick the AGENCY on the consent screen, expect a pass/fail table"
+        },
+        {
+          "id": "g7",
+          "t": "Open /api/agency-connect: should read Healthy, Company token"
+        }
       ]
     },
     {
@@ -108,15 +226,42 @@
       "why": "His side takes days and nothing on it is blocked by us. The sooner it goes, the sooner coaches, photos and Stripe stop being the long pole.",
       "held": false,
       "steps": [
-        {"id": "l1", "t": "Stripe connect link"},
-        {"id": "l2", "t": "Gym address, member count, group size and coach ratio"},
-        {"id": "l3", "t": "Coach names, titles, short bios (feeds the AI)"},
-        {"id": "l4", "t": "5-10 training photos"},
-        {"id": "l5", "t": "Google Business link + 2-3 quotable parents"},
-        {"id": "l6", "t": "Privacy policy + terms content for his site"},
-        {"id": "l7", "t": "He creates his own Twilio account (30 min)"},
-        {"id": "l8", "t": "Opt-in wording + 2 sample text messages"},
-        {"id": "l9", "t": "Warn him: one-time texting gap on cutover day, weeks after launch"}
+        {
+          "id": "l1",
+          "t": "Stripe connect link"
+        },
+        {
+          "id": "l2",
+          "t": "Gym address, member count, group size and coach ratio"
+        },
+        {
+          "id": "l3",
+          "t": "Coach names, titles, short bios (feeds the AI)"
+        },
+        {
+          "id": "l4",
+          "t": "5-10 training photos"
+        },
+        {
+          "id": "l5",
+          "t": "Google Business link + 2-3 quotable parents"
+        },
+        {
+          "id": "l6",
+          "t": "Privacy policy + terms content for his site"
+        },
+        {
+          "id": "l7",
+          "t": "He creates his own Twilio account (30 min)"
+        },
+        {
+          "id": "l8",
+          "t": "Opt-in wording + 2 sample text messages"
+        },
+        {
+          "id": "l9",
+          "t": "Warn him: one-time texting gap on cutover day, weeks after launch"
+        }
       ]
     },
     {
@@ -125,51 +270,358 @@
       "why": "Small things that unblock or de-noise.",
       "held": false,
       "steps": [
-        {"id": "q1", "t": "Delete the dead whiteboard Vercel project (reddens every PR)"},
-        {"id": "q2", "t": "Run Cole's SQL, THEN merge PR 1596 (order matters)"},
-        {"id": "q3", "t": "Lawyer sign-off on the SJ agreement, then the draft banner comes off"}
+        {
+          "id": "q1",
+          "t": "Delete the dead whiteboard Vercel project (reddens every PR)"
+        },
+        {
+          "id": "q2",
+          "t": "Run Cole's SQL, THEN merge PR 1596 (order matters)"
+        },
+        {
+          "id": "q3",
+          "t": "Lawyer sign-off on the SJ agreement, then the draft banner comes off"
+        }
       ]
     }
   ],
   "lanes": [
-    {"name": "Lij", "state": "blocked", "items": ["Stripe connect", "Coach bios + photos", "Group size + member count", "Testimonials + Google link", "Privacy + terms content", "His Twilio account"], "note": "all waiting on the ask-list"},
-    {"name": "Launch switch list", "state": "blocked", "items": ["Approve confirm automations", "Enable drips + re-enable nurture 3", "Publish website", "Verify domain + set email_domain", "Owner phones set", "Seed price catalog + $40 fee"], "note": "flipped together on launch day, item 25"},
-    {"name": "Other sessions", "state": "moving", "items": ["Agreement engine, unmerged", "GHL tokens, mid-flight", "Client profile, waiting on Cole's SQL"], "note": "everything else closed and handed back"},
-    {"name": "Twilio track", "state": "moving", "items": ["Thu: submit TrustHub profile", "Sat: result", "Fallback: $10 appeal, ~08-12", "SJ unaffected, runs on GHL"], "note": "de-risking, never preempts SJ"}
+    {
+      "name": "Lij",
+      "state": "blocked",
+      "items": [
+        "Stripe connect",
+        "Coach bios + photos",
+        "Group size + member count",
+        "Testimonials + Google link",
+        "Privacy + terms content",
+        "His Twilio account"
+      ],
+      "note": "all waiting on the ask-list"
+    },
+    {
+      "name": "Launch switch list",
+      "state": "blocked",
+      "items": [
+        "Approve confirm automations",
+        "Enable drips + re-enable nurture 3",
+        "Publish website",
+        "Verify domain + set email_domain",
+        "Owner phones set",
+        "Seed price catalog + $40 fee"
+      ],
+      "note": "flipped together on launch day, item 25"
+    },
+    {
+      "name": "Other sessions",
+      "state": "moving",
+      "items": [
+        "Agreement engine, unmerged",
+        "GHL tokens, mid-flight",
+        "Client profile, waiting on Cole's SQL"
+      ],
+      "note": "everything else closed and handed back"
+    },
+    {
+      "name": "Twilio track",
+      "state": "moving",
+      "items": [
+        "Thu: submit TrustHub profile",
+        "Sat: result",
+        "Fallback: $10 appeal, ~08-12",
+        "SJ unaffected, runs on GHL"
+      ],
+      "note": "de-risking, never preempts SJ"
+    }
   ],
   "queue": [
-    {"id": 5, "title": "Agent brain GTA fallback (social proof)", "severity": "blocker", "status": "unblocked, next up", "owner": "us"},
-    {"id": 22, "title": "AI books trials in Toronto time", "severity": "blocker", "status": "unblocked, queued", "owner": "us"},
-    {"id": 23, "title": "Quiet-hours no-arg leaks (6am PT texts)", "severity": "blocker", "status": "queued", "owner": "us"},
-    {"id": 6, "title": "Funnel form is a GTA copy", "severity": "blocker", "status": "parked til #116", "owner": "us"},
-    {"id": 16, "title": "Signed-agreement assembly", "severity": "blocker", "status": "verify owner", "owner": "agreement session"},
-    {"id": 25, "title": "SJ go-live switch list", "severity": "blocker", "status": "launch day", "owner": "us"},
-    {"id": 26, "title": "GHL token warmth (FC2 fix)", "severity": "blocker", "status": "on your checklist, HELD", "owner": "Zoran"},
-    {"id": 27, "title": "Portal-spine migration: flip 5 rails off GHL", "severity": "blocker", "status": "needs its own plan", "owner": "us"},
-    {"id": 34, "title": "Price + tax + fees breakdown", "severity": "blocker", "status": "PR #1606, your gate", "owner": "us"},
-    {"id": 35, "title": "register-a2p.js missing privacy/terms URLs", "severity": "blocker", "status": "queued", "owner": "us"},
-    {"id": 36, "title": "Connect-existing-Twilio path (SJ uses it)", "severity": "blocker", "status": "post-launch tail", "owner": "us"},
-    {"id": 39, "title": "No phones on SJ users (guardrails silent)", "severity": "blocker", "status": "Lij's set, rest at launch", "owner": "us"},
-    {"id": 42, "title": "Resend domain verification", "severity": "blocker", "status": "on your checklist", "owner": "Zoran"},
-    {"id": 43, "title": "FullControl website live (Twilio gate)", "severity": "blocker", "status": "by Wednesday", "owner": "Zoran"},
-    {"id": 10, "title": "Quiet-hours null default", "severity": "friction", "status": "queued", "owner": "us"},
-    {"id": 14, "title": "DOB / grade / school missing from funnel", "severity": "friction", "status": "queued", "owner": "us"},
-    {"id": 17, "title": "Emergency contact required in preset", "severity": "friction", "status": "queued", "owner": "us"},
-    {"id": 21, "title": "BAM NY half-seed re-seed", "severity": "friction", "status": "PARKED, SJ first", "owner": "later"},
-    {"id": 24, "title": "Agent prompt em-dash sweep", "severity": "friction", "status": "queued", "owner": "us"},
-    {"id": 29, "title": "Nurture-3 held for SJ (real testimonials)", "severity": "friction", "status": "held on purpose", "owner": "us"},
-    {"id": 33, "title": "GTA stale $185-565 stored pricing note", "severity": "friction", "status": "queued", "owner": "us"},
-    {"id": 40, "title": "Lij email mismatch (login-linked, change carefully)", "severity": "friction", "status": "needs safe change", "owner": "us"},
-    {"id": 44, "title": "FullControl privacy + terms pages", "severity": "friction", "status": "queued", "owner": "us"},
-    {"id": 45, "title": "Post-approval Twilio env swap (gate E)", "severity": "friction", "status": "after TrustHub", "owner": "us"},
-    {"id": 20, "title": "Slack team notification channels", "severity": "general", "status": "queued", "owner": "us"},
-    {"id": 11, "title": "GTA default client_id in 5 endpoints", "severity": "scale", "status": "backlog", "owner": "later"},
-    {"id": 12, "title": "members/intake.js GTA-wired", "severity": "scale", "status": "backlog", "owner": "later"},
-    {"id": 13, "title": "Stage positions per-academy", "severity": "scale", "status": "backlog", "owner": "later"},
-    {"id": 15, "title": "Remove legacy clause fallbacks later", "severity": "scale", "status": "backlog", "owner": "later"},
-    {"id": 18, "title": "GHL import reconcile gate", "severity": "scale", "status": "backlog", "owner": "later"},
-    {"id": 19, "title": "CLI preset_key stamp", "severity": "scale", "status": "backlog", "owner": "later"},
-    {"id": 31, "title": "GTA runs on LOCATIONS hardcode, not data", "severity": "scale", "status": "backlog", "owner": "later"},
-    {"id": 46, "title": "Onboarding intake step for per-academy A2P data", "severity": "scale", "status": "queued", "owner": "us"}
+    {
+      "id": 5,
+      "title": "Agent brain GTA fallback (social proof)",
+      "severity": "blocker",
+      "status": "unblocked, next up",
+      "owner": "us"
+    },
+    {
+      "id": 22,
+      "title": "AI books trials in Toronto time",
+      "severity": "blocker",
+      "status": "unblocked, queued",
+      "owner": "us"
+    },
+    {
+      "id": 23,
+      "title": "Quiet-hours no-arg leaks (6am PT texts)",
+      "severity": "blocker",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 6,
+      "title": "Funnel form is a GTA copy",
+      "severity": "blocker",
+      "status": "parked til #116",
+      "owner": "us"
+    },
+    {
+      "id": 16,
+      "title": "Signed-agreement assembly",
+      "severity": "blocker",
+      "status": "verify owner",
+      "owner": "agreement session"
+    },
+    {
+      "id": 25,
+      "title": "SJ go-live switch list",
+      "severity": "blocker",
+      "status": "launch day",
+      "owner": "us"
+    },
+    {
+      "id": 26,
+      "title": "GHL token warmth (FC2 fix)",
+      "severity": "blocker",
+      "status": "on your checklist, HELD",
+      "owner": "Zoran"
+    },
+    {
+      "id": 27,
+      "title": "Portal-spine migration: flip 5 rails off GHL",
+      "severity": "blocker",
+      "status": "needs its own plan",
+      "owner": "us"
+    },
+    {
+      "id": 34,
+      "title": "Price + tax + fees breakdown",
+      "severity": "blocker",
+      "status": "PR #1606, your gate",
+      "owner": "us"
+    },
+    {
+      "id": 35,
+      "title": "register-a2p.js missing privacy/terms URLs",
+      "severity": "blocker",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 36,
+      "title": "Connect-existing-Twilio path (SJ uses it)",
+      "severity": "blocker",
+      "status": "post-launch tail",
+      "owner": "us"
+    },
+    {
+      "id": 39,
+      "title": "No phones on SJ users (guardrails silent)",
+      "severity": "blocker",
+      "status": "Lij's set, rest at launch",
+      "owner": "us"
+    },
+    {
+      "id": 42,
+      "title": "Resend domain verification",
+      "severity": "blocker",
+      "status": "on your checklist",
+      "owner": "Zoran"
+    },
+    {
+      "id": 43,
+      "title": "FullControl website live (Twilio gate)",
+      "severity": "blocker",
+      "status": "by Wednesday",
+      "owner": "Zoran"
+    },
+    {
+      "id": 10,
+      "title": "Quiet-hours null default",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 14,
+      "title": "DOB / grade / school missing from funnel",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 17,
+      "title": "Emergency contact required in preset",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 21,
+      "title": "BAM NY half-seed re-seed",
+      "severity": "friction",
+      "status": "PARKED, SJ first",
+      "owner": "later"
+    },
+    {
+      "id": 24,
+      "title": "Agent prompt em-dash sweep",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 29,
+      "title": "Nurture-3 held for SJ (real testimonials)",
+      "severity": "friction",
+      "status": "held on purpose",
+      "owner": "us"
+    },
+    {
+      "id": 33,
+      "title": "GTA stale $185-565 stored pricing note",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 40,
+      "title": "Lij email mismatch (login-linked, change carefully)",
+      "severity": "friction",
+      "status": "needs safe change",
+      "owner": "us"
+    },
+    {
+      "id": 44,
+      "title": "FullControl privacy + terms pages",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 45,
+      "title": "Post-approval Twilio env swap (gate E)",
+      "severity": "friction",
+      "status": "after TrustHub",
+      "owner": "us"
+    },
+    {
+      "id": 20,
+      "title": "Slack team notification channels",
+      "severity": "general",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 11,
+      "title": "GTA default client_id in 5 endpoints",
+      "severity": "scale",
+      "status": "backlog",
+      "owner": "later"
+    },
+    {
+      "id": 12,
+      "title": "members/intake.js GTA-wired",
+      "severity": "scale",
+      "status": "backlog",
+      "owner": "later"
+    },
+    {
+      "id": 13,
+      "title": "Stage positions per-academy",
+      "severity": "scale",
+      "status": "backlog",
+      "owner": "later"
+    },
+    {
+      "id": 15,
+      "title": "Remove legacy clause fallbacks later",
+      "severity": "scale",
+      "status": "backlog",
+      "owner": "later"
+    },
+    {
+      "id": 18,
+      "title": "GHL import reconcile gate",
+      "severity": "scale",
+      "status": "backlog",
+      "owner": "later"
+    },
+    {
+      "id": 19,
+      "title": "CLI preset_key stamp",
+      "severity": "scale",
+      "status": "backlog",
+      "owner": "later"
+    },
+    {
+      "id": 31,
+      "title": "GTA runs on LOCATIONS hardcode, not data",
+      "severity": "scale",
+      "status": "backlog",
+      "owner": "later"
+    },
+    {
+      "id": 46,
+      "title": "Onboarding intake step for per-academy A2P data",
+      "severity": "scale",
+      "status": "queued",
+      "owner": "us"
+    }
+  ],
+  "chatMap": [
+    {
+      "name": "MISTER_ORCHESTRATOR",
+      "tag": "hq",
+      "what": "This one. The brain. Queue, routing, every build. When in doubt, say it here"
+    },
+    {
+      "name": "Test: price + tax + fees breakdown",
+      "tag": "active",
+      "what": "Your gate-2 room for the pricing receipt. Finish the 10 steps, give a verdict, then archive it"
+    },
+    {
+      "name": "BUILD GHL TOKENS",
+      "tag": "visit",
+      "what": "You are mid-task there: screenshot FC2's distribution options so the unknown resolves and your held card unfreezes"
+    },
+    {
+      "name": "Client Profile (Mike's spec)",
+      "tag": "visit",
+      "what": "Only when you want the walkthrough: it guides Cole's SQL then PR 1596, in that order. Zero SJ impact"
+    },
+    {
+      "name": "Enrollment agreement population",
+      "tag": "keep",
+      "what": "Owns the unmerged agreement engine. Visit after lawyer sign-off to publish the terms docs. Do not archive"
+    },
+    {
+      "name": "BAM GTA free trial loading rate",
+      "tag": "keep",
+      "what": "Waiting on you: Vercel toggle + CAPI token, then its 2 PRs merge. GTA-specific, not SJ"
+    },
+    {
+      "name": "SIGN UP FEE",
+      "tag": "archive",
+      "what": "Done. #1587 merged. Nothing left inside"
+    },
+    {
+      "name": "SET UP TWILIO BITCH",
+      "tag": "archive",
+      "what": "TrustHub room, reported back, plan is on your checklist. Done"
+    },
+    {
+      "name": "Plan: San Jose phone + Twilio A2P",
+      "tag": "archive",
+      "what": "Phone room, decisions captured in the queue. Done"
+    },
+    {
+      "name": "BAM V2 preset automation seeding",
+      "tag": "archive",
+      "what": "Closed itself, #1605 merged, files handed back. Done"
+    },
+    {
+      "name": "Vercel deployment guide for Ant",
+      "tag": "unknown",
+      "what": "Not one of mine. Tell me what it is and I will map it, or archive if stale"
+    }
   ]
 }
