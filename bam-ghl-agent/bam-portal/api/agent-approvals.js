@@ -1131,6 +1131,27 @@ async function handler(req, res) {
       await sb(`agent_reignitions?id=eq.${encodeURIComponent(b.reignition_id)}&client_id=eq.${clientId}&status=eq.scheduled`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "canceled", cancel_reason: `canceled in the portal by ${staffEmail || "staff"}`, updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
+    // Edit a scheduled park from the contact drawer: new message text and/or a new
+    // fire date. Only rows still 'scheduled' for THIS academy are touchable, and
+    // the date runs through the same future-window validation as a fresh park.
+    if (b.action === "update-reignition") {
+      if (!b.reignition_id) return res.status(400).json({ error: "reignition_id required" });
+      const patch = { updated_at: new Date().toISOString() };
+      if (b.message !== undefined) {
+        const msg = String(b.message || "").trim();
+        if (!msg) return res.status(400).json({ error: "message can't be empty" });
+        patch.message = msg;
+      }
+      if (b.reignite_at !== undefined) {
+        const at = normalizeReigniteAt(b.reignite_at);
+        if (!at) return res.status(400).json({ error: "date must be in the future (within 18 months)" });
+        patch.reignite_at = at;
+      }
+      if (!patch.message && !patch.reignite_at) return res.status(400).json({ error: "nothing to update" });
+      const rows = await sb(`agent_reignitions?id=eq.${encodeURIComponent(b.reignition_id)}&client_id=eq.${clientId}&status=eq.scheduled`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch) });
+      if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: "no scheduled reignition with that id" });
+      return res.status(200).json({ ok: true, reignition: rows[0] });
+    }
     // Booking initial-automations editor (per-entry scripted openers) - read.
     if (b.action === "booking-automations-get") {
       const client = await loadClient(clientId);
