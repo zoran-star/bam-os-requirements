@@ -96,7 +96,7 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 
 | What | From session | Order matters? |
 |---|---|---|
-| Run Cole's SQL in Supabase (clients.payment_model + commission tables), THEN merge PR #1596 | Client Profile | YES: SQL first or the 7 call steps vanish for every client |
+| Run Cole's commissions SQL | Client Profile | **Order no longer matters.** PR #1596 merged 2026-07-26 (commit d0b48bd) plus #1609. Zoran made the whole scaling program STAFF-ONLY: `sm_call_1..7` carry `staff_only:true`, all client-side Business Profile UI removed, `client-portal.html` restored to main. Staff guide live at portal.byanymeansbusiness.com/guides/scaling-program.html. The SQL is the only remaining step and that session owns running it, so nobody double-applies |
 | Publish the 3 agreement terms docs via `scripts/publish-agreement.mjs` BEFORE any academy site deploys new enroll code | Enrollment agreement | YES: deploy-before-publish = checkout 409s |
 | SJ agreement carries a draft banner that prints into the PDF; remove when counsel signs off | Enrollment agreement | blocks Lij taking real signatures |
 | Delete the dead `whiteboard` Vercel project; relocate NOTION_TOKEN out of `whiteboard/.env.production` | Context engineering | no |
