@@ -576,91 +576,71 @@
   "chatMap": [
     {
       "name": "MISTER_ORCHESTRATOR",
-      "tag": "hq",
-      "what": "This one. The brain. Queue, routing, every build. When in doubt, say it here",
       "sidebar": "MISTER_ORCHESTRATOR",
-      "working": true,
-      "pinned": true
+      "state": "blue",
+      "one": "Two things wait on your word here: 'records added', and the ship order for the pricing PR"
     },
     {
-      "name": "Test: price + tax + fees breakdown",
-      "tag": "active",
-      "what": "Your gate-2 room for the pricing receipt. Finish the 10 steps, give a verdict, then archive it",
+      "name": "Test: price breakdown",
       "sidebar": "Test: price + tax + fees breakdown (gate 2)",
-      "working": true,
-      "pinned": false
+      "state": "blue",
+      "one": "Open it and walk the 10 pricing steps, your verdict flows back to HQ"
     },
     {
-      "name": "BUILD GHL TOKENS",
-      "tag": "visit",
-      "what": "You are mid-task there: screenshot FC2's distribution options so the unknown resolves and your held card unfreezes",
-      "sidebar": "BUILD GHL TOKENS",
-      "working": true,
-      "pinned": true
-    },
-    {
-      "name": "Client Profile (Mike's spec)",
-      "tag": "visit",
-      "what": "Only when you want the walkthrough: it guides Cole's SQL then PR 1596, in that order. Zero SJ impact",
+      "name": "Client Profile",
       "sidebar": "Client Profile: consolidated view over the 7 onboarding calls (Mike's spec)",
-      "working": true,
-      "pinned": false
-    },
-    {
-      "name": "Enrollment agreement population",
-      "tag": "keep",
-      "what": "Owns the unmerged agreement engine. Visit after lawyer sign-off to publish the terms docs. Do not archive",
-      "sidebar": "Enrollment agreement population and storage",
-      "working": true,
-      "pinned": true
+      "state": "blue",
+      "one": "Visit when ready: it walks you through Cole's SQL, then merging PR 1596, in that order"
     },
     {
       "name": "BAM GTA free trial loading rate",
-      "tag": "keep",
-      "what": "Waiting on you: Vercel toggle + CAPI token, then its 2 PRs merge. GTA-specific, not SJ",
       "sidebar": "BAM GTA free trial loading rate",
-      "working": true,
-      "pinned": true
+      "state": "red",
+      "one": "On your computer: flip the Vercel toggle + paste the Meta CAPI token, then its 2 PRs merge"
+    },
+    {
+      "name": "BUILD GHL TOKENS",
+      "sidebar": "BUILD GHL TOKENS",
+      "state": "orange",
+      "one": "The FC2 fix for 14 cold academies, held before you start",
+      "blockedBy": "confirming whether GHL offers the Agency AND Sub-Account option; that chat resolves it, then this turns red"
+    },
+    {
+      "name": "Enrollment agreement",
+      "sidebar": "Enrollment agreement population and storage",
+      "state": "orange",
+      "one": "Owns the agreement engine, publish step comes after sign-off",
+      "blockedBy": "lawyer sign-off on the SJ agreement"
     },
     {
       "name": "SIGN UP FEE",
-      "tag": "archive",
-      "what": "Done. #1587 merged. Nothing left inside",
       "sidebar": "SIGN UP FEE",
-      "working": false,
-      "pinned": true
+      "state": "done",
+      "one": "Merged as #1587. Nothing left inside, archive it"
     },
     {
       "name": "SET UP TWILIO BITCH",
-      "tag": "archive",
-      "what": "TrustHub room, reported back, plan is on your checklist. Done",
       "sidebar": "SET UP TWILIO BITCH",
-      "working": false,
-      "pinned": false
+      "state": "done",
+      "one": "TrustHub plan delivered to your checklist. Archive it"
     },
     {
       "name": "Plan: San Jose phone + Twilio A2P",
-      "tag": "archive",
-      "what": "Phone room, decisions captured in the queue. Done",
       "sidebar": "Plan: San Jose phone + Twilio A2P",
-      "working": false,
-      "pinned": false
+      "state": "done",
+      "one": "Phone decisions captured in the queue. Archive it"
     },
     {
       "name": "BAM V2 preset automation seeding",
-      "tag": "archive",
-      "what": "Closed itself, #1605 merged, files handed back. Done",
       "sidebar": "BAM V2 preset automation seeding",
-      "working": false,
-      "pinned": false
+      "state": "done",
+      "one": "Closed itself, files handed back. Archive it"
     },
     {
       "name": "Vercel deployment guide for Ant",
-      "tag": "unknown",
-      "what": "Not one of mine. Tell me what it is and I will map it, or archive if stale",
       "sidebar": "Vercel deployment guide for Ant",
-      "working": false,
-      "pinned": false
+      "state": "unknown",
+      "one": "Not one of mine. Tell me what it is and I will map it"
     }
   ]
 }
