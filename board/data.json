@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "Corrected a scout's blocker claim: SJ's nurture emails are clean, onboarding templates are not",
     "Found: new academies get a weaker onboarding than GTA, using emails that already exist",
     "Scaling program shipped staff-only, PRs 1596 + 1609 merged, staff guide live",
     "Twilio TrustHub chat is back in the list with its 6 action items",
-    "New: click any chat card to see the human-only actions blocking it",
-    "SJ email blocker diagnosed: Amazon retry timer only, every record is correct and Gmail is safe"
+    "New: click any chat card to see the human-only actions blocking it"
   ],
   "orchestrator": {
     "focus": "Preset parity is the new front: a full read-only audit is running and a planning room is open on the two-way sync fix. SJ email is on Amazon's timer.",
@@ -334,9 +334,9 @@
   "queue": [
     {
       "id": 5,
-      "title": "Agent brain GTA fallback (social proof)",
+      "title": "Agent brain GTA fallback (pricing fixed, 3 bodies remain: see #59)",
       "severity": "blocker",
-      "status": "unblocked, next up",
+      "status": "narrowed, see #59",
       "owner": "us"
     },
     {
@@ -610,6 +610,20 @@
       "title": "Real parent quotes must never auto-propagate between academies",
       "severity": "blocker",
       "status": "planning room",
+      "owner": "us"
+    },
+    {
+      "id": 58,
+      "title": "Tokenize onboarding-emails.js before any promotion (gates #53)",
+      "severity": "blocker",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 59,
+      "title": "Agent default sections still claim to BE BAM GTA (address, coaches, Oakville)",
+      "severity": "blocker",
+      "status": "queued",
       "owner": "us"
     }
   ],
