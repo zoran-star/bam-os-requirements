@@ -48843,14 +48843,63 @@ function _mcCareFind(cardId) {
   return c ? { c, i: _MEMBER_INBOX, scan: false } : null;
 }
 
+// What this family agreed to: which version of the agreement they signed, and
+// the opt-in choices they made. A declined photo/video release is shown loudly
+// because marketing has to honor it.
+let _memberAgreementCache = null;
+
 async function _loadMemberDocs(memberId, clientId) {
   const sec = document.getElementById('member-docs-section');
   if (!sec || !_sb || !memberId) return;
-  const { data, error } = await _sb.from('member_files')
-    .select('*').eq('member_id', memberId).order('created_at', { ascending: false });
-  if (error) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load documents.</div>`; return; }
-  _memberDocsCache = data || [];
+  const [files, agree] = await Promise.all([
+    _sb.from('member_files').select('*').eq('member_id', memberId).order('created_at', { ascending: false }),
+    _sb.from('member_agreements')
+      .select('version_id,doc_id,signed_at,consents,version_matched')
+      .eq('member_id', memberId).order('signed_at', { ascending: false }).limit(1),
+  ]);
+  if (files.error) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load documents.</div>`; return; }
+  _memberDocsCache = files.data || [];
+  // The table may not exist yet on an un-migrated environment; degrade quietly.
+  _memberAgreementCache = (!agree.error && agree.data && agree.data[0]) || null;
   await _renderMemberDocs(memberId, clientId);
+}
+
+// Renders the signed-agreement summary above the document list.
+function _memberAgreementSummaryHtml() {
+  const a = _memberAgreementCache;
+  if (!a) return '';
+  const pill = (text, tone) => {
+    const c = tone === 'warn' ? 'var(--gold,#D4B65C)' : 'var(--text-sub)';
+    const bd = tone === 'warn' ? 'var(--gold,#D4B65C)' : 'var(--border)';
+    return `<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid ${bd};border-radius:999px;font-size:11px;color:${c};white-space:nowrap">${text}</span>`;
+  };
+  const consents = a.consents || {};
+  const bits = [];
+
+  const media = consents.media_release;
+  if (media === 'deny') bits.push(pill('Photo / video: NOT allowed', 'warn'));
+  else if (media === 'allow') bits.push(pill('Photo / video: allowed'));
+
+  // Any other consent the academy's agreement defines, shown generically so a
+  // new opt-in needs no portal change.
+  Object.keys(consents).forEach(k => {
+    if (k === 'media_release') return;
+    const label = k.replace(/_/g, ' ').replace(/^./, s => s.toUpperCase());
+    bits.push(pill(`${escapeHTML(label)}: ${escapeHTML(String(consents[k]))}`));
+  });
+
+  const ver = a.version_id && a.version_id !== 'legacy-unversioned'
+    ? `version ${escapeHTML(a.version_id.slice(0, 12))}`
+    : 'version not recorded (signed before agreement versioning)';
+  const mismatch = a.version_matched === false
+    ? pill('Version could not be verified', 'warn') : '';
+
+  return `<div style="margin-bottom:10px;padding:9px 11px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+      <div style="font-size:11px;color:var(--text-mute);margin-bottom:${bits.length ? '7px' : '0'}">
+        Agreement signed ${a.signed_at ? escapeHTML(a.signed_at.slice(0, 10)) : '-'} &middot; ${ver}
+      </div>
+      ${bits.length || mismatch ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${bits.join('')}${mismatch}</div>` : ''}
+    </div>`;
 }
 
 async function _renderMemberDocs(memberId, clientId) {
@@ -48875,7 +48924,7 @@ async function _renderMemberDocs(memberId, clientId) {
   } else {
     listHtml = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">No documents yet.</div>`;
   }
-  sec.innerHTML = `${listHtml}
+  sec.innerHTML = `${_memberAgreementSummaryHtml()}${listHtml}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <select id="member-doc-kind" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font:inherit;font-size:12px;cursor:pointer">
         ${Object.entries(_MEMBER_DOC_KINDS).map(([k,l]) => `<option value="${k}">${l}</option>`).join('')}

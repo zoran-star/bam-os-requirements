@@ -566,6 +566,34 @@ async function handler(req, res) {
             if (m.offer_id) m.offer = { id: m.offer_id, title: offers.get(m.offer_id) || null };
           }
         }
+
+        // Consent the family gave in their signed enrollment agreement. Attached
+        // to every roster row so any surface that reaches for a member - member
+        // card, marketing, content - can honor it without a second lookup.
+        //
+        // media_allowed is false ONLY when a parent explicitly declined, so a
+        // member with no recorded choice is never treated as having opted out.
+        // Non-fatal: an environment without the agreements migration just gets
+        // no consent block.
+        try {
+          const consentRows = await sb(
+            `member_consents?member_id=in.(${memberList.map(m => m.id).join(",")})` +
+            `&select=member_id,consents,media_release,media_allowed,signed_at,version_id`
+          );
+          const byMember = new Map(
+            (Array.isArray(consentRows) ? consentRows : []).map(r => [r.member_id, r])
+          );
+          for (const m of memberList) {
+            const c = byMember.get(m.id);
+            m.consents = c ? {
+              all: c.consents || {},
+              media_release: c.media_release || null,
+              media_allowed: c.media_allowed !== false,
+              signed_at: c.signed_at || null,
+              agreement_version_id: c.version_id || null,
+            } : null;
+          }
+        } catch { /* agreements not migrated here - roster works without it */ }
       }
 
       const targetClient = targetClientId ? await loadClientRow(targetClientId) : null;

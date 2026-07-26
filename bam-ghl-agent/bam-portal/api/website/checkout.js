@@ -27,7 +27,8 @@
 // api/stripe/webhook.js on invoice.paid; this endpoint only sets things up.
 
 import { withSentryApiRoute } from "../_sentry.js";
-import { renderAgreementPdf, uploadAgreementPdf, buildClauses } from "../_lib/agreement-pdf.js";
+import { renderAgreementPdf, uploadAgreementPdf, uploadSignaturePng, buildClauses } from "../_lib/agreement-pdf.js";
+import { requiredConsentKeys } from "../_lib/agreement-version.js";
 import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
 import { resolveOrMintPortalContact, writePortalFieldValues } from "../_contacts.js";
 
@@ -241,6 +242,42 @@ async function handler(req, res) {
 
     const testMode = isTestMode();
 
+    // ── The agreement they signed ──
+    // Resolved BEFORE anything is charged, so a document we cannot identify
+    // stops the enrollment instead of taking money and filing the wrong terms.
+    //
+    // agreement.version_id is sent by funnels running the terms-document engine.
+    // Older deployed funnels do not send it; those fall through to the legacy
+    // clause rendering (see maybeAttachAgreement) so live academies keep working
+    // until their site redeploys.
+    let signedDoc = null;
+    if (agreement.version_id) {
+      const docRows = await sb(
+        `agreement_documents?client_id=eq.${encodeURIComponent(clientId)}` +
+        `&version_id=eq.${encodeURIComponent(agreement.version_id)}` +
+        `&select=id,doc_id,version_id,revision,terms&limit=1`
+      );
+      signedDoc = Array.isArray(docRows) && docRows[0];
+      if (!signedDoc) {
+        // The site is serving wording that was never published, so we have no
+        // trustworthy copy of what this parent just read. Do not charge.
+        return res.status(409).json({
+          error: "This agreement was updated. Please refresh the page and read it again before signing.",
+          code: "agreement_version_not_published",
+        });
+      }
+      // Every opt-in the document marks required has to have an answer.
+      const picks = (agreement.consents && typeof agreement.consents === "object") ? agreement.consents : {};
+      const missing = requiredConsentKeys(signedDoc.terms).filter((k) => !picks[k]);
+      if (missing.length) {
+        return res.status(400).json({
+          error: "Please answer every choice in the agreement before signing.",
+          code: "agreement_consent_missing",
+          missing,
+        });
+      }
+    }
+
     // ── Academy must exist + be Stripe-connected ──
     const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,email,stripe_connect_account_id&limit=1`);
     const client = Array.isArray(clientRows) && clientRows[0];
@@ -327,7 +364,7 @@ async function handler(req, res) {
           }
           const secret = piSecretFromSub(sub);
           if (secret) {
-            await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId, offerId });
+            await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId, offerId, signedDoc });
             return res.status(200).json({
               ok: true, reused: true, member_id: member.id, subscription_id: sub.id, customer_id: sub.customer,
               client_secret: secret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
@@ -474,7 +511,7 @@ async function handler(req, res) {
     }
 
     // ── Signed agreement PDF (best-effort: never block the payment setup) ──
-    const agreementSaved = await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId, offerId });
+    const agreementSaved = await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId, offerId, signedDoc });
 
     // Audit (non-fatal) — also stashes the step-1 intake answers.
     try {
@@ -516,15 +553,27 @@ async function handler(req, res) {
 
 // Render + store the signed PDF and link it on the member. Returns true on
 // success; never throws (the payment flow must not depend on it).
-async function maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId, offerId }) {
+// Assemble and file the signed agreement: the terms the parent actually read,
+// their filled-in data, their opt-in choices, the signature, the date and the
+// version id - as one PDF plus a member_agreements row.
+//
+// `signedDoc` is the published terms document matching the version the browser
+// displayed (resolved in the handler, before any charge). When it is null the
+// funnel is an older deployment that does not send a version; we fall back to
+// the legacy clause rendering so live academies keep working, and the record is
+// marked so those enrollments are identifiable.
+async function maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId, offerId, signedDoc }) {
   if (!member || !member.id) return false;
   if (member.agreement_pdf_path) return true; // already signed/stored
   try {
-    // If the offer has a Policy section filled in, generate the clauses from
-    // its hard rules (pause / cancellation / refund). No policy set -> pass no
-    // clauses, so renderAgreementPdf keeps the legacy wording unchanged.
+    const signedAt = agreement.signed_at || nowIso();
+    const consents = (agreement.consents && typeof agreement.consents === "object") ? agreement.consents : {};
+    const filled = (agreement.filled && typeof agreement.filled === "object") ? agreement.filled : {};
+
+    // LEGACY ONLY: no published terms means an old funnel. Build the clauses the
+    // way we used to, from the offer's Policy section when it has one.
     let clauses = null;
-    if (offerId) {
+    if (!signedDoc && offerId) {
       try {
         const offerRows = await sb(`offers?id=eq.${encodeURIComponent(offerId)}&select=data&limit=1`);
         const policy = Array.isArray(offerRows) && offerRows[0] && offerRows[0].data && offerRows[0].data.policy;
@@ -537,15 +586,28 @@ async function maybeAttachAgreement({ member, client, parentName, athleteName, p
         }
       } catch { /* non-fatal - fall back to legacy clauses */ }
     }
+
     const bytes = await renderAgreementPdf({
       academyName: client.business_name || "By Any Means",
       parentName, athleteName, planLabel: planText,
       priceText: `${money(price.amount_cents, price.currency)} ${TERM_NOUN[term] || ""}`.trim(),
       signaturePngDataUrl: agreement.signature,
-      signedAtIso: agreement.signed_at || nowIso(),
+      signedAtIso: signedAt,
+      terms: signedDoc ? signedDoc.terms : null,
+      filled: signedDoc ? filled : null,
+      consents: signedDoc ? consents : null,
+      versionId: signedDoc ? signedDoc.version_id : null,
       clauses,
     });
     const { path, size } = await uploadAgreementPdf({ sbUrl: SB_URL, sbKey: SB_KEY, clientId, memberId: member.id, bytes });
+
+    // Keep the drawn signature as its own file too, so it survives independently
+    // of the rendered document.
+    let signaturePath = null;
+    try {
+      signaturePath = await uploadSignaturePng({ sbUrl: SB_URL, sbKey: SB_KEY, clientId, memberId: member.id, dataUrl: agreement.signature });
+    } catch { /* non-fatal - the signature is embedded in the PDF as well */ }
+
     // Record it as a member document (kind 'waiver') so it lists in the staff
     // member popup alongside any manual uploads, with a signed date.
     await sb(`member_files`, {
@@ -554,10 +616,38 @@ async function maybeAttachAgreement({ member, client, parentName, athleteName, p
         member_id: member.id, client_id: clientId, kind: "waiver",
         filename: "enrollment-agreement.pdf", storage_path: path,
         mime_type: "application/pdf", size_bytes: size,
-        signed_at: agreement.signed_at || nowIso(),
-        metadata: { source: "website-enrollment" },
+        signed_at: signedAt,
+        metadata: {
+          source: "website-enrollment",
+          agreement_version_id: signedDoc ? signedDoc.version_id : null,
+          consents,
+        },
       }]),
     });
+
+    // The signed record itself: which version, the choices, the filled data.
+    try {
+      await sb(`member_agreements`, {
+        method: "POST", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify([{
+          member_id: member.id,
+          client_id: clientId,
+          agreement_document_id: signedDoc ? signedDoc.id : null,
+          doc_id: signedDoc ? signedDoc.doc_id : null,
+          // Legacy funnels have no version; mark them so they are findable.
+          version_id: signedDoc ? signedDoc.version_id : "legacy-unversioned",
+          signed_at: signedAt,
+          signature_path: signaturePath,
+          pdf_path: path,
+          consents,
+          filled,
+          client_version_id: agreement.version_id || null,
+          version_matched: signedDoc ? true : null,
+          source: "website-enrollment",
+        }]),
+      });
+    } catch { /* non-fatal - the PDF + member_files row are already stored */ }
+
     // Denormalized flag on the member (also gates re-generation on retries).
     await sb(`members?id=eq.${member.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ agreement_pdf_path: path, updated_at: nowIso() }) });
     member.agreement_pdf_path = path;
