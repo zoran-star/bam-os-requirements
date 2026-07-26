@@ -15,7 +15,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 //        are touched; anything else keeps its current override/default. User-
 //        triggered so the live agent never changes silently.
 //
-// Auth: Supabase JWT — BAM staff (any academy) or a client_users member of client_id.
+// Auth: Supabase JWT - BAM staff (any academy) or a client_users member of client_id.
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -63,13 +63,15 @@ const SECTIONS = [
   { key: "business_info",  label: "Business info",  gen: (c, d, l) => renderBusinessInfo(c, d, l) },
   { key: "program",        label: "Program",        gen: (c, d) => renderProgram(d) },
   { key: "schedule",       label: "Schedule",       gen: (c, d, l) => renderSchedule(d, l) },
-  { key: "pricing",        label: "Pricing",        gen: (c, d) => renderPricing(d) },
+  // pricing takes the sellable offer_prices rows, never the offer's own price
+  // fields - see renderPricing in api/agent/fact-render.js for why.
+  { key: "pricing",        label: "Pricing",        gen: (c, d, l, p) => renderPricing(d, p) },
   { key: "selling_points", label: "Selling points", gen: (c, d) => renderSellingPoints(d) },
   { key: "policies",       label: "Policies",       gen: (c, d) => renderPolicies(d) },
 ];
 
-function generateSections(client, data, locations) {
-  return SECTIONS.map(s => ({ key: s.key, label: s.label, body: s.gen(client, data, locations) }))
+function generateSections(client, data, locations, prices) {
+  return SECTIONS.map(s => ({ key: s.key, label: s.label, body: s.gen(client, data, locations, prices) }))
     .filter(s => s.body && s.body.trim());
 }
 
@@ -88,13 +90,19 @@ async function handler(req, res) {
     const offerRows = await sb(`offers?id=eq.${encodeURIComponent(offerId)}&client_id=eq.${encodeURIComponent(clientId)}&select=id,data&limit=1`);
     const offer = Array.isArray(offerRows) && offerRows[0];
     if (!offer) return res.status(404).json({ error: "offer not found for this academy" });
-    const [clientRows, locationRows] = await Promise.all([
+    const [clientRows, locationRows, priceRows] = await Promise.all([
       sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_name,address,website_setup&limit=1`),
       sb(`locations?client_id=eq.${encodeURIComponent(clientId)}&select=id,title,address,notes&order=sort_order.asc&limit=10`),
+      // The sellable set for THIS offer: exactly what api/website/checkout.js
+      // will charge. null on failure so renderPricing falls back instead of
+      // asserting "no prices configured" on a transient error.
+      sb(`offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_id=eq.${encodeURIComponent(offer.id)}` +
+         `&is_routable=eq.true&is_active=eq.true&order=sort_order.asc` +
+         `&select=title,amount_cents,currency,billing_interval,source_offer_price_key`).catch(() => null),
     ]);
     const client = (Array.isArray(clientRows) && clientRows[0]) || {};
 
-    const sections = generateSections(client, offer.data || {}, locationRows || []);
+    const sections = generateSections(client, offer.data || {}, locationRows || [], Array.isArray(priceRows) ? priceRows : null);
 
     if (action === "preview") return res.status(200).json({ ok: true, sections });
 

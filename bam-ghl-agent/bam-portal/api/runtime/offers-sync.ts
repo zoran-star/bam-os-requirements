@@ -161,6 +161,7 @@ export function billingIntervalOf(row: Pick<CatalogRow, "offer_price_key" | "int
   if (term === "3_months") return "3_months";
   if (term === "6_months") return "6_months";
   if (term === "one_time") return "one_time";
+  if (term === "signup_fee") return "one_time";   // Build S: sign-up fee row
   return row.interval;
 }
 

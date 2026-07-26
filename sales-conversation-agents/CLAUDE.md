@@ -32,16 +32,14 @@ source of truth per academy) and differ only in BEHAVIOR. Pick the agent in
 `assemblePrompt(overrides, agent)` / `buildAgentSystem({ ..., agent })`.
 
 **1. Booking agent** — Training pipeline → **Responded** stage. Gets a lead to book a free trial.
-- conversation-ai-booking-agent.txt — master template ({{PLACEHOLDER}} facts)
-- conversation-ai-booking-agent-bam-gta.txt — BAM GTA instance (facts filled)
+- Sections (keys as-is): role, tone, core_behavior, qualification, objection_handling,
+  conversation_flow, followup_*, lost_criteria, booking_*, examples.
 - Live: `api/agent-approvals.js` (+ `agent_ready_replies` queue).
 
 **2. Confirm agent** — Training pipeline → **Scheduled Trial** stage. Confirms an
 already-booked lead is coming, helps them get there, and on "can't make it" HANDS
 OFF to the booking agent to rebook (writes a context note + bounces the opportunity
 back to Responded — the booking agent reads that note via contact_memory).
-- conversation-ai-confirm-agent.txt — master template ({{PLACEHOLDER}} facts)
-- conversation-ai-confirm-agent-bam-gta.txt — BAM GTA instance
 - Live: `api/agent-confirm.js` (+ `agent_confirm_replies` queue, own cron, gated
   behind `clients.ghl_kpi_config.confirm_agent_mode` — default **off**).
 - Sections (keys `confirm_*`): role, core_behavior, flow, logistics, handoff,
@@ -58,14 +56,25 @@ Responded ──booking agent──► Scheduled Trial ──confirm agent──
 - Rebooking AI — re-engages no-shows (not yet designed)
 - More to be created
 
-## How to create a new location instance
-1. Copy conversation-ai-booking-agent.txt
-2. Name it conversation-ai-booking-agent-{location-slug}.txt
-3. Replace all {{PLACEHOLDER}} variables with location-specific values
-4. Placeholder values come from the Onboarding Data Points DB in Notion (ID: 49be4ce65ada4d45b736070e11452edb)
+## How a new academy gets an agent
+Nothing is copied. There are no per-academy prompt files. BEHAVIOR is shared by every
+academy from `prompt-structure.js`, and the academy's FACTS render live from its own
+records (offer, locations, staff, and routable `offer_prices` for money) via
+`fact-render.js`. Fill in the academy's offer and the agent knows it within ~60s.
 
 ## Key rule
-The master template is the source of truth for agent behaviour. Location instances should only differ in their placeholder values — not in logic, tone guidelines, or guardrails. If the logic needs to change, update the master template first.
+Behavior is BAM's and shared: change it once in `prompt-structure.js` and every academy
+gets it. Facts are the academy's and never typed into the agent. Never fork one academy's
+structure. See `bam-ghl-agent/memories/project_sales_systems_plug_and_play.md`.
+
+## Deleted 2026-07-24: the .txt exports
+The four generated `conversation-ai-*.txt` files and `scripts/generate-from-brain.mjs` are
+gone. They came from the era of hand-filling `{{PLACEHOLDER}}` values and pasting the
+result into GoHighLevel's Conversation AI. Nothing read them at runtime, and the file
+labelled "BAM GTA instance" never read BAM GTA - it printed the shared defaults, which
+only looked correct while those defaults still contained GTA's own prices (the same bug
+that had Shig Hoops quoting GTA's ladder). To read an academy's real current prompt, open
+the brain view in the client or staff portal. Do not recreate these files.
 
 ## Architecture — facts vs behavior (no duplicate sources)
 The live agent "brain" runs from **`bam-portal/api/agent/prompt-structure.js`** (read by `api/agent-sandbox.js` + the GHL responder), with per-academy overrides in the `agent_prompt_sections` Supabase table.
