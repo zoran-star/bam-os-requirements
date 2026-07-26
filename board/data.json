@@ -9,6 +9,12 @@
       "where": "resend dashboard"
     },
     {
+      "urgency": "now",
+      "title": "Fix the FC2 app + run agency connect",
+      "detail": "14 academies token-cold. SJ launches on GHL so this gates the launch itself",
+      "where": "BUILD GHL TOKENS chat, steps on your checklist"
+    },
+    {
       "urgency": "soon",
       "title": "Mon: pull the IRS CP 575 for FullControl",
       "detail": "Exact legal name + EIN come off THIS letter, not a W2/W9. If lost, a 147C takes extra time",
@@ -520,6 +526,41 @@
         {
           "id": "r6",
           "t": "Status reads Verified, then tell Mister Orchestrator so the SJ email domain gets set"
+        }
+      ]
+    },
+    {
+      "id": "ghl",
+      "title": "GHL tokens: fix the FC2 app",
+      "why": "Academy GHL tokens expire every 24h and 14 of ~30 are already cold. The stored 'agency' token is really a LOCATION token, so it cannot mint sub-account tokens. San Jose launches ON GHL, so this is load-bearing for the launch itself.",
+      "steps": [
+        {
+          "id": "g1",
+          "t": "In the GHL marketplace, UNINSTALL the FC2 app first (top-right dots menu). GHL locks the distribution field while an install is active"
+        },
+        {
+          "id": "g2",
+          "t": "Set distribution to Agency AND Sub-Account, not Agency-only. That is what unlocks the mint scopes"
+        },
+        {
+          "id": "g3",
+          "t": "Add scopes: oauth.write and oauth.readonly (these are the mint ones), plus contacts, conversations, conversations/message, opportunities, calendars, calendars/events, locations, users, customFields and tags read+write"
+        },
+        {
+          "id": "g4",
+          "t": "Remove the junk scopes it shipped with: adPublishing, saas, snapshots, twilioaccount, documents_contracts, phonenumbers, numberpools"
+        },
+        {
+          "id": "g5",
+          "t": "Check the redirect URL includes portal.byanymeansbusiness.com/api/agency-connect, then save"
+        },
+        {
+          "id": "g6",
+          "t": "Open FC2's install link and run the connect. On the consent screen pick the AGENCY, not a single sub-account. You should land on a pass/fail table of academies minted"
+        },
+        {
+          "id": "g7",
+          "t": "Open portal.byanymeansbusiness.com/api/agency-connect - it should now read Healthy, Company token"
         }
       ]
     },
