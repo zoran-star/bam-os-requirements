@@ -1,61 +1,56 @@
 {
-  "updated": "2026-07-26 \u00b7 night",
-  "headline": "Paper test PASSED all 6 checks. Say 'ship it' and the tz fix lands. SJ launch state now mapped in full.",
+  "updated": "2026-07-26 \u00b7 late night",
+  "headline": "TZ fix SHIPPED (PR #1602). SJ launches on the PORTAL SPINE, big-bang. Phone/A2P is the longest pole: it starts at Lij's EIN.",
   "yourMoves": [
     {
       "urgency": "now",
-      "title": "Say the word: ship the timezone fix",
-      "detail": "Gate 2 paper test passed 6/6. Migration applied. Code waits uncommitted",
-      "where": "tell Mister Orchestrator"
+      "title": "Click the chip: Plan SJ phone + Twilio",
+      "detail": "Verify Rosano's research, pick number custody. The 10-15 day A2P clock hangs on this",
+      "where": "chip in sidebar"
     },
     {
       "urgency": "now",
-      "title": "Answer the SJ launch questions",
-      "detail": "GHL vs portal spine, definition of done, website timing",
-      "where": "popup in MISTER_ORCHESTRATOR"
+      "title": "Send Lij the ask-list - EIN FIRST",
+      "detail": "EIN now gates the A2P clock, which gates launch. Biggest lever in the project",
+      "where": "draft in MISTER_ORCHESTRATOR"
     },
     {
       "urgency": "now",
       "title": "Review PR #1601 - kills the GTA leak in every drip",
-      "detail": "Unblocks SJ template seeding, from-address build, leak-check",
+      "detail": "Unblocks SJ template seeding + from-address build",
       "where": "github",
       "link": "https://github.com/zoran-star/bam-os-requirements/pull/1601"
     },
     {
       "urgency": "now",
-      "title": "Send Lij the ask-list",
-      "detail": "Drafted + safe. His 8 items take days",
-      "where": "draft in MISTER_ORCHESTRATOR"
+      "title": "Merge-review PR #1602 - the tz fix you just shipped",
+      "detail": "Paper-tested 6/6, migration + backfill already done",
+      "where": "github",
+      "link": "https://github.com/zoran-star/bam-os-requirements/pull/1602"
     },
     {
       "urgency": "soon",
       "title": "Finish the FC2 app config",
-      "detail": "SJ's GHL token expires TOMORROW 07:24 UTC. Refresh must fire",
+      "detail": "SJ GHL token expires within hours. Matters until spine cutover",
       "where": "BUILD GHL TOKENS chat"
     },
     {
       "urgency": "soon",
       "title": "Review PR #1587 - money model",
-      "detail": "Green + waiting. Unlocks queue items 5 and 22",
+      "detail": "Unlocks queue items 5 and 22",
       "where": "github",
       "link": "https://github.com/zoran-star/bam-os-requirements/pull/1587"
     },
     {
       "urgency": "waiting",
       "title": "Lawyer sign-off on the SJ agreement",
-      "detail": "Then remove draft banner + counsel notes",
+      "detail": "Then draft banner comes off",
       "where": "external"
-    },
-    {
-      "urgency": "waiting",
-      "title": "Stripe connect for SJ",
-      "detail": "not_connected: zero payments possible until Lij does this",
-      "where": "Lij's lane"
     }
   ],
   "pipeline": {
-    "build": "Timezone fix",
-    "queueRef": "queue #4",
+    "build": "Timezone fix -> SHIPPED. Next build: from-address (after #1601)",
+    "queueRef": "queue #4 done, #3 next",
     "stages": [
       {
         "name": "Scout",
@@ -79,13 +74,12 @@
       },
       {
         "name": "Gate 2 \u00b7 you",
-        "state": "done",
-        "note": "paper test 6/6"
+        "state": "done"
       },
       {
         "name": "Ship",
-        "state": "active",
-        "note": "say 'ship it'"
+        "state": "done",
+        "note": "PR #1602"
       }
     ]
   },
@@ -94,8 +88,8 @@
       "name": "Lij",
       "state": "blocked",
       "items": [
+        "EIN - GATES THE A2P CLOCK",
         "Stripe connect",
-        "EIN",
         "Coach bios",
         "Photos",
         "Group size",
@@ -103,7 +97,7 @@
         "Testimonials",
         "Gym address"
       ],
-      "note": "all waiting on the ask-list"
+      "note": "ask-list not sent yet"
     },
     {
       "name": "Lawyer",
@@ -118,9 +112,9 @@
       "name": "Other sessions",
       "state": "moving",
       "items": [
-        "#1601 preset rebuild - up for review",
-        "Agreement engine - built, unmerged",
-        "GHL tokens - mid-flight with you",
+        "#1601 preset rebuild - review",
+        "Agreement engine - unmerged",
+        "GHL tokens - token expires in hours",
         "#1587 money model - green"
       ],
       "note": "hands off their files"
@@ -129,12 +123,12 @@
       "name": "Our lane",
       "state": "moving",
       "items": [
-        "Item 4 tz fix - AT GATE 2",
-        "Item 3 from-address - after #1601",
-        "Item 6+14 funnel form - after #116",
-        "Item 23 quiet-hours leaks - half ours"
+        "#4 tz fix SHIPPED (PR #1602)",
+        "#28 phone plan - room spawned",
+        "#27 spine migration - to plan",
+        "#3 from-address - after #1601"
       ],
-      "note": "one build in flight at a time"
+      "note": "big-bang launch: item 25 is the switch list"
     }
   ],
   "queue": [
@@ -163,7 +157,7 @@
       "id": 4,
       "title": "Toronto timezone on confirmations",
       "severity": "blocker",
-      "status": "gate 2 PASSED, say ship",
+      "status": "SHIPPED PR #1602",
       "owner": "us"
     },
     {
@@ -178,6 +172,20 @@
       "title": "Funnel form is a GTA copy",
       "severity": "blocker",
       "status": "parked til #116",
+      "owner": "us"
+    },
+    {
+      "id": 27,
+      "title": "Portal-spine migration: flip all 5 rails off GHL",
+      "severity": "blocker",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 28,
+      "title": "SJ phone: Twilio A2P plan then build",
+      "severity": "blocker",
+      "status": "planning room",
       "owner": "us"
     },
     {
@@ -332,19 +340,19 @@
       "name": "Planner",
       "model": "Fable",
       "status": "done",
-      "detail": "tz plan v2 approved"
+      "detail": "tz plan approved + shipped"
     },
     {
       "name": "Builder",
       "model": "Opus",
-      "status": "idle",
-      "detail": "awaiting ship order"
+      "status": "done",
+      "detail": "tz build shipped as PR #1602"
     },
     {
       "name": "Tester",
       "model": "Opus",
       "status": "done",
-      "detail": "zero bounces + gate 2 paper test"
+      "detail": "zero bounces + gate 2"
     }
   ],
   "sessions": [
@@ -387,6 +395,11 @@
       "name": "SAN JOSE ONBOARDING",
       "role": "absorbed into orchestrator",
       "visit": "archived into orchestrator"
+    },
+    {
+      "name": "Plan: SJ phone + Twilio",
+      "role": "disposable planning room - Rosano's research + phone decision",
+      "visit": "VISIT - chip waiting"
     }
   ]
 }

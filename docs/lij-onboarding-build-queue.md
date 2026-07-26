@@ -132,7 +132,19 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 | 25 | GO-LIVE SWITCH LIST for SJ: approve confirm_initial_automations + enable drips (after #1601 seed) + publish website + Stripe connect + verify domain | BLOCKER at launch | checklist | Each dormant-by-design thing must be flipped ON launch day; owner = orchestrator to walk Zoran through it |
 | 26 | Verify SJ GHL token refresh actually fires before 2026-07-27 07:24 UTC expiry | BLOCKER | watch | Meta-token precedent: tokens have quietly died before. GHL TOKENS session owns the machinery |
 
-**Timezone build (item 4) gate-2 result:** paper test PASSED all 6 checks (SJ PT render, blank tz fallback + single owner alert, invalid tz safe, GTA byte-identical, morning-of correct both zones). Migration `20260726090000` APPLIED to prod. Code still uncommitted in worktree `agent-aba9284fbf79708c3`. Awaiting Zoran's ship verdict in words.
+**Timezone build (item 4): SHIPPED as [PR #1602](https://github.com/zoran-star/bam-os-requirements/pull/1602)** (2026-07-26). Migration applied, 33 null-tz clients backfilled to America/Toronto. Awaiting merge review.
+
+## LAUNCH STRATEGY (Zoran's decisions, 2026-07-26 - do not re-litigate)
+
+1. **San Jose launches ON THE PORTAL SPINE**, not GHL. Rails flip is now on the launch critical path.
+2. **Phone is the undecided piece**: planning room spawned to verify Rosano's research (`bam-ghl-agent/docs/twilio-a2p-ghl-migration.md`) and decide. Critical-path fact: A2P Campaign approval = 10-15 days and needs Lij's EIN, so the phone likely gates the launch date. **EIN just became the most urgent item on Lij's ask-list.**
+3. **Finish line = EVERYTHING on, including AI agents.**
+4. **Big-bang launch**: website publishes and everything switches on at once, only after Zoran reviews all of it with Lij and all builds land. Item 25 is the switch list for that day.
+
+| # | Item | Severity | Status | Notes |
+|---|---|---|---|---|
+| 27 | SJ portal-spine migration: flip all 5 rails off GHL (contact/email/booking/messaging/pipeline), pipeline shadow -> live, bookings to schedule_slots/trial_bookings | BLOCKER | queued | Calendar-off-GHL machinery exists (PR #1424) + Detail Miami handoff is prior art. Needs its own plan + rooms |
+| 28 | SJ phone: verify Rosano's Twilio doc, decide number custody + sequencing, then the Twilio build (api/twilio/*, client_twilio_numbers schema via align-core-data-model) | BLOCKER | planning room spawned | Longest lead-time item; clock starts at Lij's EIN |
 
 ## Done
 
