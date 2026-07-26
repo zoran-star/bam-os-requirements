@@ -114,6 +114,14 @@ Every spawned room MUST keep its own status file so Zoran sees progress WHILE he
 
 The board polls `rooms/index.json` every 5s, overlays each room's state/one-liner onto its chat card, and shows a green `● live · Nm ago` marker so Zoran can tell a self-reported status from an orchestrator-written one. One file per room means two rooms can never clobber each other. The orchestrator prunes stale files when a room is archived.
 
+## HARD RULE: hand DNS and secret values as plain code blocks, never in a table
+
+Cost an hour on 2026-07-26. A DNS value copied out of a markdown TABLE carried an invisible leading tab, which made an SPF record invalid, which failed an Amazon SES check, which dropped the domain into a backoff retry queue. Nothing was ever actually wrong with the setup.
+
+- Give any value a human will copy (DNS records, tokens, ids) as a plain single-line code block. Never inside a table cell, never with surrounding formatting.
+- `dig` and confirm propagation BEFORE triggering any verification API. One failed trigger costs the provider's backoff penalty, which is far longer than the check itself.
+- Do domain setup during onboarding, about a week before launch, so provider latency never sits on the critical path. A clean first-try domain verifies in 5 to 15 minutes.
+
 ## HARD RULE: never send a build to gate 2 undeployed
 
 Learned twice, the expensive way (tz build, then from-address). A test room CANNOT run Zoran's hands-on script against uncommitted worktree edits: production is still running the old code, so every step either passes for the wrong reason or actively causes the bug the build exists to prevent.

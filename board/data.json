@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "SJ email blocker diagnosed: Amazon retry timer only, every record is correct and Gmail is safe",
     "SJ email go-live paused at the Amazon step, its chat is reporting back with the reason",
     "Message workshop room spinning up: all 13 SJ messages rendered for review",
     "Dead whiteboard Vercel project deleted, PR checks go green again",
-    "Price breakdown SHIPPED (#1606): agents now quote price, tax and fees on separate lines",
-    "SJ email has its own chat now, Gmail confirmed safe (records sit on the send subdomain)"
+    "Price breakdown SHIPPED (#1606): agents now quote price, tax and fees on separate lines"
   ],
   "orchestrator": {
     "focus": "SJ email is blocked at the Amazon step, so Lij's ask-list is now the front of the queue. Next builds ready: agent brain fallback (#5) and AI booking times (#22).",
@@ -99,10 +99,10 @@
           "state": "pending"
         }
       ],
-      "status": "On hold at the Amazon step. Nothing is broken meanwhile: every SJ email correctly HOLDS until the domain verifies, which is the guardrail doing its job.",
+      "status": "DKIM value verified byte-identical against the live nameserver, SPF and MX already verified. Purely waiting on Amazon's retry timer. Lij's Gmail confirmed unharmed.",
       "next": {
         "who": "agents",
-        "what": "SJ EMAIL GO-LIVE is sending me the exact blocker and will ping the moment it clears"
+        "what": "The room polls every 90s, sets the domain itself, and pings me the moment it clears"
       },
       "checklist": {
         "id": "resend",
@@ -576,6 +576,20 @@
       "severity": "friction",
       "status": "launch-day check",
       "owner": "us"
+    },
+    {
+      "id": 51,
+      "title": "Root SPF for Google missing (Lij's Gmail unprotected)",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 52,
+      "title": "DNS handoff process fix: never paste values from tables",
+      "severity": "friction",
+      "status": "adopted",
+      "owner": "us"
     }
   ],
   "chatMap": [
@@ -599,11 +613,11 @@
       "name": "SJ EMAIL GO-LIVE",
       "sidebar": "SJ EMAIL GO-LIVE",
       "state": "orange",
-      "one": "Owns SJ email end to end. Paused while the Amazon side of the Resend setup gets sorted",
+      "one": "Records are all correct and DNS is right worldwide. Waiting on Amazon's re-check timer, nobody has to do anything",
       "builds": [
         "t-email"
       ],
-      "blockedBy": "the Amazon stuff on the Resend records. That chat is telling me the exact reason and will ping me when it clears"
+      "blockedBy": "Amazon SES DKIM re-check backoff. TIME ONLY: not you, not Squarespace, not AWS. The room is polling and will finish it automatically"
     },
     {
       "name": "Test: price breakdown",
