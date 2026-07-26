@@ -1,6 +1,6 @@
 {
   "updated": "2026-07-26 \u00b7 late night",
-  "headline": "PR #1601 MERGED. SJ drips seeding now. From-address build planning. Phone room + ask-list are your moves.",
+  "headline": "SJ drips: CLEAN, zero GTA leaks in 26 renders. One trap before approve: nurture-3 quotes GTA parents as San Jose parents.",
   "yourMoves": [
     {
       "urgency": "now",
@@ -320,6 +320,27 @@
       "severity": "blocker",
       "status": "watch",
       "owner": "GHL tokens"
+    },
+    {
+      "id": 29,
+      "title": "Nurture-3 re-attributes GTA testimonials to SJ",
+      "severity": "blocker",
+      "status": "needs your call",
+      "owner": "us"
+    },
+    {
+      "id": 30,
+      "title": "Blank-domain traps: empty SMS + lost copy",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "preset session"
+    },
+    {
+      "id": 31,
+      "title": "GTA runs on LOCATIONS hardcode, domain not in data",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
     }
   ],
   "agents": [

@@ -145,6 +145,11 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 |---|---|---|---|---|
 | 27 | SJ portal-spine migration: flip all 5 rails off GHL (contact/email/booking/messaging/pipeline), pipeline shadow -> live, bookings to schedule_slots/trial_bookings | BLOCKER | queued | Calendar-off-GHL machinery exists (PR #1424) + Detail Miami handoff is prior art. Needs its own plan + rooms |
 | 28 | SJ phone: verify Rosano's Twilio doc, decide number custody + sequencing, then the Twilio build (api/twilio/*, client_twilio_numbers schema via align-core-data-model) | BLOCKER | planning room spawned | Longest lead-time item; clock starts at Lij's EIN |
+| 29 | SJ nurture-3 quotes GTA's REAL testimonials re-attributed to San Jose ("Parent of Adam, San Jose" = really Adam, Oakville; "Elijah tailors practices" = really Zoran). Credibility + advertising-claims problem; ships the moment approved:true flips | BLOCKER before approve | needs Zoran's call | Options: hold nurture-3 for SJ until Lij's real testimonials arrive (they're on his ask-list), or de-attribute to generic BAM quotes in the master |
+| 30 | Blank-domain render traps (next unwired academy, not SJ): missed_trial#0 renders to EMPTY SMS that silently burns 3 attempts -> failed; ghosted#1 loses its whole value-prop sentence when the lead-in shares the dropped line | FRICTION | queued | Preset session's files (form-intro defaults); route to them. Leak-check 2026-07-26 |
+| 31 | GTA survives on its LOCATIONS hardcode, not data: GTA's website_setup has NO domain, so clientVars returns empty for it. Backfill GTA's domain into the client row, then the LOCATIONS entry can retire | FRICTION | queued | Until then, deleting LOCATIONS kills every GTA link |
+
+**Leak-check result (2026-07-26): 26 SJ renders, ZERO hits on byanymeanstoronto/zoran/oakville/gta.** Identity positive: byanymeanssanjose.com everywhere, Coach Elijah, BAM San Jose branding. One judgment call open: nurture-1's global-camps city list includes "Toronto" alongside Belgrade/Paris/etc (brand-level credentialing, byanymeansbball.com) - intentional per tester, Zoran to confirm. GTA sanity intact on all 13. FROM address still Toronto (item 3, planner working).
 
 ## Done
 
