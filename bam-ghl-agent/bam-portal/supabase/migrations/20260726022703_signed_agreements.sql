@@ -50,7 +50,8 @@ create index if not exists agreement_documents_current_idx
 
 -- Only one current version per (client, doc).
 create or replace function public.agreement_documents_single_current()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = '' as $$
 begin
   if new.is_current then
     update public.agreement_documents
@@ -71,7 +72,8 @@ create trigger trg_agreement_documents_single_current
 -- The published terms are a legal record: block edits to the wording itself.
 -- Republishing means inserting a new row, not rewriting an old one.
 create or replace function public.agreement_documents_immutable()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = '' as $$
 begin
   if new.terms is distinct from old.terms
      or new.version_id is distinct from old.version_id
@@ -120,7 +122,12 @@ create index if not exists member_agreements_consents_idx on public.member_agree
 
 -- ── Convenience: the current consent position per member ───────────────
 -- Latest signed agreement wins, so a re-signed agreement updates the answer.
-create or replace view public.member_consents as
+-- security_invoker: without it a view runs as its OWNER and bypasses the row
+-- level security on member_agreements, letting any authenticated user read
+-- every academy's consent data. Also set by 20260726022844 on the live
+-- project, which was created before this line existed.
+create or replace view public.member_consents
+  with (security_invoker = on) as
 select distinct on (ma.member_id)
   ma.member_id,
   ma.client_id,

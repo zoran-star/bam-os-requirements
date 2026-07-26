@@ -48,6 +48,14 @@ contract. New academy = copy a terms file + an `agreement.html` shell, publish.
 
 `members.agreement_pdf_path` still exists as the denormalized "has signed" flag.
 
+**Applied to the live project 2026-07-26** as migrations `20260726022703_signed_agreements`
++ `20260726022844_signed_agreements_harden`. The harden one matters: a Postgres view
+defaults to SECURITY DEFINER, so `member_consents` initially bypassed RLS on
+`member_agreements` and any authenticated user could read every academy's consent
+data. It now has `security_invoker = on`. **Any new view over an RLS table in this
+project needs that option** - `get_advisors('security')` catches it as
+`security_definer_view`.
+
 ## Consent, and where it is honored
 
 `api/members.js` attaches `m.consents` to every roster row
