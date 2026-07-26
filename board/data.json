@@ -1,6 +1,6 @@
 {
   "updated": "2026-07-27",
-  "headline": "Item 3 SHIPPED (#1604 merged): all 6 GTA identity leaks are dead. Price breakdown now building.",
+  "headline": "#1605 merged, preset session closing and handing its files back. Price breakdown built, now under adversarial test.",
   "yourMoves": [
     {
       "urgency": "now",
@@ -67,8 +67,7 @@
       },
       {
         "name": "Plan",
-        "state": "done",
-        "note": "room, 3 decisions"
+        "state": "done"
       },
       {
         "name": "Gate 1 \u00b7 you",
@@ -76,12 +75,13 @@
       },
       {
         "name": "Build",
-        "state": "active",
-        "note": "Opus building"
+        "state": "done",
+        "note": "9 files"
       },
       {
         "name": "Test",
-        "state": "pending"
+        "state": "active",
+        "note": "hunting division + forks"
       },
       {
         "name": "Gate 2 \u00b7 you",
@@ -363,7 +363,7 @@
       "id": 30,
       "title": "Blank-domain traps: empty SMS + lost copy",
       "severity": "friction",
-      "status": "queued",
+      "status": "FIXED #1605",
       "owner": "preset session"
     },
     {
@@ -377,7 +377,7 @@
       "id": 34,
       "title": "Agents state price, tax and fees as separate lines",
       "severity": "blocker",
-      "status": "building",
+      "status": "built, testing",
       "owner": "us"
     },
     {
@@ -439,14 +439,14 @@
     {
       "name": "Builder",
       "model": "Opus",
-      "status": "running",
-      "detail": "price breakdown, 6 files"
+      "status": "idle",
+      "detail": "breakdown built, 48 self-checks"
     },
     {
       "name": "Tester",
       "model": "Opus",
-      "status": "idle",
-      "detail": "2 builds verified, 0 escaped bugs"
+      "status": "running",
+      "detail": "attacking the breakdown build"
     }
   ],
   "sessions": [
@@ -459,11 +459,6 @@
       "name": "BUILD GHL TOKENS",
       "role": "FC2 app config, token warmth",
       "visit": "VISIT - finish config"
-    },
-    {
-      "name": "BAM V2 preset seeding",
-      "role": "PR #1601",
-      "visit": "just review the PR"
     },
     {
       "name": "SIGN UP FEE",
