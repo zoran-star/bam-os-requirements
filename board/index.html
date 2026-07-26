@@ -124,6 +124,12 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .chat.keep .tag{color:var(--blue);border-color:var(--blue)}
 .chat.archive{opacity:.6} .chat.archive .tag{color:var(--green);border-color:var(--green)}
 .chat.unknown .tag{color:var(--mut);border-color:var(--mut)}
+.chat .sidebar-name{
+  font-size:11px;color:var(--gold);background:var(--panel2);border:1px dashed var(--gold-dim);
+  padding:5px 9px;cursor:pointer;line-height:1.4;word-break:break-word;
+}
+.chat .sidebar-name:hover{border-style:solid;background:#241f14}
+.chat .sidebar-name.copied{color:var(--green);border-color:var(--green)}
 
 /* lanes */
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
@@ -270,6 +276,7 @@ function render(d){
   $("chats").innerHTML = (d.chatMap || []).map(c => `
     <div class="chat ${esc(c.tag)}">
       <div class="row"><h4>${esc(c.name)}</h4><span class="tag">${TAGS[c.tag] || esc(c.tag)}</span></div>
+      <div class="sidebar-name" data-copy="${esc(c.sidebar || c.name)}" title="Click to copy">📌 ${esc(c.sidebar || c.name)}</div>
       <p>${esc(c.what)}</p>
     </div>`).join("");
 
@@ -305,6 +312,16 @@ document.addEventListener("change", e => {
   if(window._data) render(window._data);
 });
 document.addEventListener("click", e => {
+  const copy = e.target.closest(".sidebar-name");
+  if(copy){
+    navigator.clipboard.writeText(copy.dataset.copy).then(() => {
+      copy.classList.add("copied");
+      const orig = copy.textContent;
+      copy.textContent = "✓ copied, paste into the sidebar search";
+      setTimeout(() => { copy.classList.remove("copied"); copy.textContent = orig; }, 1600);
+    });
+    return;
+  }
   const b = e.target.closest("[data-reset]");
   if(!b || !window._data) return;
   const l = window._data.humanTasks.find(x => x.id === b.dataset.reset);
