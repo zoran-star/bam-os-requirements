@@ -1,8 +1,8 @@
 {
   "slug": "sj-email",
   "chat": "SJ EMAIL GO-LIVE",
-  "state": "orange",
-  "one": "All 3 DNS records are in and byte-verified. MX + SPF verified by Resend. Only DKIM left, waiting on Amazon SES's re-check timer. Nobody has to do anything.",
-  "blockedBy": "Amazon SES DKIM re-check backoff. Time only: not Zoran, not Squarespace, not AWS",
-  "at": "2026-07-26T21:12:00Z"
+  "state": "done",
+  "one": "Verified and live. San Jose sends as BAM San Jose, GTA unchanged, Lij's Gmail untouched",
+  "blockedBy": null,
+  "at": "2026-07-27T01:05:00Z"
 }

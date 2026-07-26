@@ -1,14 +1,14 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "SAN JOSE EMAIL IS LIVE: verified, sends as BAM San Jose, Lij's Gmail untouched",
     "Scaling program fully closed: Cole's SQL applied, dormant until Mike sets terms",
     "Corrected a scout's blocker claim: SJ's nurture emails are clean, onboarding templates are not",
     "Found: new academies get a weaker onboarding than GTA, using emails that already exist",
-    "Scaling program shipped staff-only, PRs 1596 + 1609 merged, staff guide live",
-    "Twilio TrustHub chat is back in the list with its 6 action items"
+    "Scaling program shipped staff-only, PRs 1596 + 1609 merged, staff guide live"
   ],
   "orchestrator": {
-    "focus": "Preset parity is the new front: a full read-only audit is running and a planning room is open on the two-way sync fix. SJ email is on Amazon's timer.",
+    "focus": "SJ email is live. Preset parity is the front now: audit done, planning room open on the two-way sync. Lij's ask-list is the biggest unblock you own.",
     "needs": [
       "Send Lij his ask-list, it is now the biggest unblock",
       "Try the price breakdown when the test chip appears",
@@ -66,7 +66,7 @@
     {
       "id": "t-email",
       "title": "San Jose email goes fully live",
-      "phase": "blocked",
+      "phase": "shipped",
       "phaseTone": "work",
       "why": "Every automation email now sends as BAM San Jose, never Toronto. Your guardrail is doing its job: nothing SENDS until the sending domain is verified. This checklist is the last step between SJ and working email.",
       "pipeline": [
@@ -96,13 +96,13 @@
         },
         {
           "name": "you: verify domain",
-          "state": "pending"
+          "state": "done"
         }
       ],
-      "status": "DKIM value verified byte-identical against the live nameserver, SPF and MX already verified. Purely waiting on Amazon's retry timer. Lij's Gmail confirmed unharmed.",
+      "status": "LIVE. Domain verified, email_domain set, and the from-address proved by running the real resolver against prod: San Jose renders BAM San Jose, GTA is byte-identical, an unknown academy still holds. Lij's Gmail re-confirmed untouched.",
       "next": {
         "who": "agents",
-        "what": "The room polls every 90s, sets the domain itself, and pings me the moment it clears"
+        "what": "Nothing. Automations stay dormant until launch day"
       },
       "checklist": {
         "id": "resend",
@@ -406,13 +406,6 @@
       "owner": "us"
     },
     {
-      "id": 42,
-      "title": "Resend domain verification (blocked at the Amazon step)",
-      "severity": "blocker",
-      "status": "blocked",
-      "owner": "Zoran"
-    },
-    {
       "id": 43,
       "title": "FullControl website live (Twilio gate)",
       "severity": "blocker",
@@ -656,12 +649,12 @@
     {
       "name": "SJ EMAIL GO-LIVE",
       "sidebar": "SJ EMAIL GO-LIVE",
-      "state": "orange",
-      "one": "Records are all correct and DNS is right worldwide. Waiting on Amazon's re-check timer, nobody has to do anything",
+      "state": "done",
+      "one": "San Jose email is live and verified. Gmail untouched. Archive it",
       "builds": [
         "t-email"
       ],
-      "blockedBy": "Amazon SES DKIM re-check backoff. TIME ONLY: not you, not Squarespace, not AWS. The room is polling and will finish it automatically"
+      "blockedBy": null
     },
     {
       "name": "Test: price breakdown",
@@ -876,8 +869,8 @@
       },
       {
         "name": "Email live",
-        "state": "waiting",
-        "detail": "On hold at the Amazon step, being sorted in its own chat"
+        "state": "done",
+        "detail": "Verified. Sends as BAM San Jose, Gmail untouched"
       },
       {
         "name": "Lij's materials",

@@ -139,6 +139,8 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 
 **Items 5 and 22 are now UNBLOCKED** (their `api/agent/*` files are no longer held by an unmerged branch).
 
+**SJ EMAIL IS LIVE (2026-07-26 17:58).** Resend domain `byanymeanssanjose.com` verified on all 3 records, `clients.email_domain` set AFTER verification. From-address proved by extracting the real `fromFor` source and running it against live prod: SJ renders `BAM San Jose <info@byanymeanssanjose.com>`, GTA renders the byte-identical legacy string (no header drift for Toronto parents), and an unknown client still holds. No mail sent. SJ automations remain `approved:false` for launch day. Lij's Gmail re-confirmed at the authoritative nameserver: root MX still Google, no root SPF present, no collision with `google._domainkey`. Root cause of the 90-minute delay was the invisible-tab-from-a-table SPF paste, now a hard rule (item 52).
+
 **Timezone build (item 4): SHIPPED as [PR #1602](https://github.com/zoran-star/bam-os-requirements/pull/1602)** (2026-07-26). Migration applied, 33 null-tz clients backfilled to America/Toronto. Awaiting merge review.
 
 ## LAUNCH STRATEGY (Zoran's decisions, 2026-07-26 - do not re-litigate)
