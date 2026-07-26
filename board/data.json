@@ -530,36 +530,52 @@
     },
     {
       "id": "trusthub",
-      "title": "Twilio TrustHub, target Thursday 2026-07-30",
-      "why": "Unblocks phone numbers for every academy after San Jose. Not urgent, everything runs on GHL meanwhile.",
+      "title": "Twilio TrustHub, submit Thu 2026-07-30",
+      "why": "ONLY 3 FREE RESUBMISSIONS EXIST, then it goes to paid support. This is not a guess-and-retry loop: submit once, copying off the CP 575. Not urgent though, every academy runs on GHL meanwhile.",
       "steps": [
         {
           "id": "t1",
-          "t": "Find the IRS CP 575 letter for FullControl (if lost, phone the IRS for a 147C, it adds days)"
+          "t": "MON: find the IRS CP 575 for FullControl. Save it as a PDF. If lost, phone the IRS for a 147C and tell me - that is the only thing that can blow the date"
         },
         {
           "id": "t2",
-          "t": "Copy the legal name off the CP 575 exactly, character for character. NOT off a W2 or W9"
+          "t": "MON: transcribe 4 fields off it exactly - legal name (no abbreviation, no DBA, entity line only), EIN as 00-0000000, business type, official registered address"
         },
         {
           "id": "t3",
-          "t": "Set up an authorised rep email on the FullControl domain (gmail or info@ will fail)"
+          "t": "MON: check the EIN issue date, top-right of the CP 575"
         },
         {
           "id": "t4",
-          "t": "Get the FullControl website live: not parked, not login-gated, names the legal entity"
+          "t": "MON: create an authorised-rep email on the FullControl domain (gmail, outlook and info@ all fail the brand)"
         },
         {
           "id": "t5",
-          "t": "Create the new Twilio account, upgrade off trial, add billing"
+          "t": "MON: confirm rep details - real name, real job title, job position from the dropdown, phone in +1XXXXXXXXXX form"
         },
         {
           "id": "t6",
-          "t": "Submit the profile: EIN as 00-0000000, address via the Console autocomplete, no PO box"
+          "t": "MON to WED: get the FullControl site live. THE REAL LONG POLE. Custom domain, publicly reachable, not parked, not login-gated, legal name AND logo visible"
         },
         {
           "id": "t7",
-          "t": "Wait 48h. If rejected again, open a Twilio ticket with the CP 575 attached"
+          "t": "THU: create the new Twilio master account, upgrade off trial, add billing"
+        },
+        {
+          "id": "t8",
+          "t": "THU: submit the profile with the CP 575 OPEN ON SCREEN. Identity = ISV/Reseller/Partner (not Direct Customer), vertical = EDUCATION, address via the Console autocomplete not typed"
+        },
+        {
+          "id": "t9",
+          "t": "SAT 08-01: read the result. Approved means hand me the SIDs and we are done"
+        },
+        {
+          "id": "t10",
+          "t": "MON 08-03 only if rejected: file the appeal. Support ticket + CP 575 as PDF, request manual vetting. Costs $10, takes 5-7 business days, approved around 08-12"
+        },
+        {
+          "id": "t11",
+          "t": "On approval: hand me the master Account SID, API Key SID, API Key Secret and the approved Profile SID"
         }
       ]
     },
