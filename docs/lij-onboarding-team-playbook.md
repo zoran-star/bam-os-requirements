@@ -102,7 +102,9 @@ The orchestrator chat never hosts a long back-and-forth loop. When a build needs
 
 ## Mission board
 
-Zoran's visual tracker lives at `board/index.html`, fed entirely by `board/data.json`, served by the `mission-board` entry in `.claude/launch.json` (port 4599). **Orchestrator duty: every time the queue, pipeline stage, agents, or Zoran's to-dos change, update `board/data.json` in the same breath as the queue file.** The board auto-refreshes every 5s.
+Zoran's visual tracker lives at `board/index.html`, fed entirely by `board/data.json`.
+
+**Start it with `scripts/mission-board.sh`, NOT preview_start.** The preview-managed server dies whenever the tooling or session restarts, which stranded Zoran twice. The script runs a detached `nohup` server that survives restarts, and is idempotent (safe to run any time). `scripts/mission-board.sh status` checks it, `stop` kills it. **Orchestrator duty: every time the queue, pipeline stage, agents, or Zoran's to-dos change, update `board/data.json` in the same breath as the queue file.** The board auto-refreshes every 5s.
 
 ## HARD RULE: never send a build to gate 2 undeployed
 
