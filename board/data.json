@@ -1,7 +1,13 @@
 {
   "updated": "2026-07-27 \u00b7 morning",
-  "headline": "From-address build IN FLIGHT with Zoran's domain-or-hold guardrail. SJ drips leak-checked clean. Phone room + ask-list still your moves.",
+  "headline": "PR #1587 approved but CONFLICTED, owner rebasing. New build queued: agents break out price + tax + fees on separate lines.",
   "yourMoves": [
+    {
+      "urgency": "now",
+      "title": "Click the chip: Plan price + tax + fees breakdown",
+      "detail": "Workshop the agent's exact words. Preset-owned so every academy inherits it",
+      "where": "chip in sidebar"
+    },
     {
       "urgency": "now",
       "title": "Click the chip: Plan SJ phone + Twilio",
@@ -341,6 +347,13 @@
       "title": "GTA runs on LOCATIONS hardcode, domain not in data",
       "severity": "friction",
       "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 34,
+      "title": "Agents state price, tax and fees as separate lines",
+      "severity": "blocker",
+      "status": "planning room",
       "owner": "us"
     }
   ],
