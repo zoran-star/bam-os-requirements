@@ -1,7 +1,13 @@
 {
-  "updated": "2026-07-27 \u00b7 morning",
-  "headline": "PR #1587 approved but CONFLICTED, owner rebasing. New build queued: agents break out price + tax + fees on separate lines.",
+  "updated": "2026-07-27",
+  "headline": "PHONE NO LONGER GATES LAUNCH. SJ launches on GHL transport, Twilio flips later. Ask-list revised: EIN demoted.",
   "yourMoves": [
+    {
+      "urgency": "now",
+      "title": "Click the chip: fix BAM's TrustHub profile",
+      "detail": "Blocks EVERY future academy's phone. Fresh-EIN risk means starting sooner matters",
+      "where": "chip in sidebar"
+    },
     {
       "urgency": "now",
       "title": "Click the chip: Plan price + tax + fees breakdown",
@@ -88,16 +94,16 @@
       "name": "Lij",
       "state": "blocked",
       "items": [
-        "EIN - GATES THE A2P CLOCK",
         "Stripe connect",
-        "Coach bios",
-        "Photos",
-        "Group size",
-        "Member count",
-        "Testimonials",
+        "Coach bios + photos",
+        "Group size + member count",
+        "Testimonials + Google link",
+        "Privacy policy + terms content",
+        "Create his own Twilio account",
+        "Opt-in language + 2 sample texts",
         "Gym address"
       ],
-      "note": "ask-list not sent yet"
+      "note": "EIN demoted, no longer critical path"
     },
     {
       "name": "Lawyer",
@@ -183,9 +189,9 @@
     },
     {
       "id": 28,
-      "title": "SJ phone: Twilio A2P plan then build",
-      "severity": "blocker",
-      "status": "planning room",
+      "title": "SJ phone: decided, NOT launch-gating",
+      "severity": "friction",
+      "status": "decided",
       "owner": "us"
     },
     {
@@ -352,6 +358,27 @@
     {
       "id": 34,
       "title": "Agents state price, tax and fees as separate lines",
+      "severity": "blocker",
+      "status": "planning room",
+      "owner": "us"
+    },
+    {
+      "id": 35,
+      "title": "register-a2p.js missing privacy/terms URLs - campaigns rejected",
+      "severity": "blocker",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 36,
+      "title": "Wire connect-existing-Twilio-account path (SJ uses it)",
+      "severity": "blocker",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 37,
+      "title": "BAM TrustHub profile rejected - blocks academy #3+ phones",
       "severity": "blocker",
       "status": "planning room",
       "owner": "us"
