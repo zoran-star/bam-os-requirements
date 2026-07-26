@@ -1,12 +1,24 @@
 {
   "updated": "2026-07-27",
-  "headline": "From-address is now a real PR (#1604) with a preview, so gate 2 can actually run. Lij's phone is on file.",
+  "headline": "TrustHub: submit Thu 07-30. The long pole is FullControl's OWN website, not Twilio. Phone stays non-blocking for SJ.",
   "yourMoves": [
     {
       "urgency": "now",
       "title": "Verify byanymeanssanjose.com in Resend",
       "detail": "Until then every SJ email correctly holds, and gate 2 cannot test the release half",
       "where": "resend dashboard"
+    },
+    {
+      "urgency": "soon",
+      "title": "Mon: pull the IRS CP 575 for FullControl",
+      "detail": "Exact legal name + EIN come off THIS letter, not a W2/W9. If lost, a 147C takes extra time",
+      "where": "IRS paperwork"
+    },
+    {
+      "urgency": "soon",
+      "title": "Get the FullControl site live by Wednesday",
+      "detail": "The real long pole. Must name the legal entity, not parked, not login-gated",
+      "where": "your call"
     },
     {
       "urgency": "now",
@@ -135,6 +147,17 @@
         "#3 from-address - after #1601"
       ],
       "note": "big-bang launch: item 25 is the switch list"
+    },
+    {
+      "name": "Twilio track",
+      "state": "moving",
+      "items": [
+        "Thu 07-30 submit profile",
+        "Sat 08-01 result",
+        "Fallback: ticket 08-03, approved ~08-12",
+        "SJ unaffected, runs on GHL"
+      ],
+      "note": "de-risking, must not preempt San Jose"
     }
   ],
   "queue": [
@@ -379,8 +402,8 @@
     {
       "id": 37,
       "title": "BAM TrustHub profile rejected - blocks academy #3+ phones",
-      "severity": "blocker",
-      "status": "planning room",
+      "severity": "friction",
+      "status": "decided, low urgency",
       "owner": "us"
     },
     {
@@ -388,6 +411,20 @@
       "title": "Resend has not verified byanymeanssanjose.com",
       "severity": "blocker",
       "status": "switch list",
+      "owner": "us"
+    },
+    {
+      "id": 43,
+      "title": "FullControl website must be live (Twilio submission gate)",
+      "severity": "blocker",
+      "status": "Zoran, by Wed",
+      "owner": "Zoran"
+    },
+    {
+      "id": 46,
+      "title": "Onboarding intake step for per-academy A2P data",
+      "severity": "scale",
+      "status": "queued",
       "owner": "us"
     }
   ],
