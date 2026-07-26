@@ -29171,6 +29171,10 @@ async function _taRenderKnowledge() {
       policy.map(s => {
         const open = !!_TA.openSections[s.key];
         const mode = (s.policy && s.policy.mode) ? String(s.policy.mode).toUpperCase() : '';
+        // Second axis (2026-07-26): how a price is SHAPED when it is given.
+        // Read-only for the same reason the mode is - declared on the agent
+        // template in api/agent/presets.js, applied after any stored row.
+        const breakdown = (s.policy && s.policy.breakdown) ? String(s.policy.breakdown).replace('_', ' ').toUpperCase() : '';
         const srcLabel = (s.source && s.source.label) || '';
         return `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
@@ -29178,6 +29182,7 @@ async function _taRenderKnowledge() {
           <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}</span>
             ${mode ? `<span style="color:var(--gold,#D4B65C);font-size:10.5px;font-family:monospace;border:1px solid var(--gold,#D4B65C);border-radius:99px;padding:1px 7px">${escapeHTML(mode)}</span>` : ''}
+            ${breakdown ? `<span style="color:var(--gold,#D4B65C);font-size:10.5px;font-family:monospace;border:1px solid var(--gold,#D4B65C);border-radius:99px;padding:1px 7px">${escapeHTML(breakdown)}</span>` : ''}
             <span style="color:var(--text-mute);font-size:10.5px;font-family:monospace;border:1px solid var(--border);border-radius:99px;padding:1px 7px">SET BY BAM</span>
           </span>
           <span id="ta-chev-${s.key}" style="color:var(--text-mute);font-size:11px;transition:transform .15s;transform:rotate(${open ? 90 : 0}deg)">▶</span>

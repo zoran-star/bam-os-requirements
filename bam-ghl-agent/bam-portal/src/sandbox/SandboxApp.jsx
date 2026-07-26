@@ -402,6 +402,10 @@ function SectionCard({ s, reload }) {
   // after stored overrides, so an edit here would save and then be ignored.
   if (s.scope === "policy") {
     const mode = (s.policy && s.policy.mode) ? String(s.policy.mode).toUpperCase() : "";
+    // Second axis (2026-07-26): how a price is SHAPED when it is given. Read-only
+    // for the same reason the mode is - it is declared on the agent template in
+    // api/agent/presets.js and applied after any stored row.
+    const breakdown = (s.policy && s.policy.breakdown) ? String(s.policy.breakdown).replace("_", " ").toUpperCase() : "";
     const srcLabel = (s.source && s.source.label) || "";
     return (
       <div style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 10, marginBottom: 10, overflow: "hidden" }}>
@@ -409,6 +413,7 @@ function SectionCard({ s, reload }) {
           <span style={{ display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", color: tk.textMute, fontSize: 11 }}>▶</span>
           <span style={{ fontSize: 13.5, fontWeight: 600 }}>{s.label}</span>
           {mode && <span style={{ fontSize: 10, color: tk.accent, border: `1px solid ${tk.accentBorder}`, borderRadius: 99, padding: "1px 8px" }}>{mode}</span>}
+          {breakdown && <span style={{ fontSize: 10, color: tk.accent, border: `1px solid ${tk.accentBorder}`, borderRadius: 99, padding: "1px 8px" }}>{breakdown}</span>}
           <span style={{ fontSize: 10, color: tk.textMute, border: `1px solid ${tk.border}`, borderRadius: 99, padding: "1px 8px" }}>set by BAM</span>
           <div style={{ flex: 1 }} />
           <span style={{ fontSize: 11, color: tk.textMute }}>{open ? "hide" : "view"}</span>

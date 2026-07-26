@@ -46,20 +46,67 @@ import { PRICING_NOT_CONFIGURED } from "./fact-render.js";
 //
 // None of these three restate "never invent a number" - that lives once, in
 // core_behavior, and applies in every mode.
+// BREAKDOWN (Zoran 2026-07-26) is the second axis, and the shared blocks below
+// are why it is not a third copy of the pricing rules. A price has three parts a
+// parent cares about: the core price, the tax, and any one-time fee. Quoting
+// only the core price is how a parent hears 200 and gets billed 226; quoting
+// only the total hides what they are paying for. Itemized states all of them, as
+// separate lines, total LAST.
+//
+// The agent HOLDS all three parts in every disclosure mode, because it needs
+// them to answer "is that before or after tax" correctly. The mode governs only
+// what it volunteers.
+const RECEIPT = [
+  "Plan: $279.00",
+  "HST (13%): $36.27",
+  "Total: $315.27 every 4 weeks",
+].join("\n");
+
+const ITEMIZE_RULES = [
+  "Never lead with the total, and never fold the parts into one sentence. A parent skimming a text must not be able to come away holding only the small number, and must not be surprised at checkout.",
+  "Every line comes from your pricing section exactly as written there. Never do your own arithmetic to fill one in, never work backwards from a total, and if a plan there is listed as a total with no parts, give that total on its own and say nothing about tax either way.",
+].join("\n");
+
+// The one added fee that is ALWAYS volunteered, in every mode including range.
+// A one-time charge can move the first payment by a quarter or more, so it is
+// part of the price, not a footnote, and a parent who only meets it at checkout
+// is a lost enrollment. This deliberately overrides the older blanket "do not
+// volunteer added fees" rule, which is why that rule now names only codes and
+// commitment terms.
+const SIGNUP_FEE_RULE = "If a plan has a one-time sign-up fee, name it every single time you give that plan's price, together with what the first payment comes to. Do this even in a short first reply and even when they only asked for a ballpark. Finding out about it at checkout is what loses the enrollment.";
+
+const HOLD_ALL_PARTS = "Whatever you volunteer, you always KNOW the parts. If they ask whether a number is before or after tax, what the tax is, or what a specific plan works out to, answer immediately and exactly from your pricing section.";
+
+const NO_CODES = "Do not volunteer discount codes or commitment terms. If they ask about one directly, answer accurately from your pricing section.";
+
 export const PRICING_DISCLOSURE = {
   range: [
-    "Pricing disclosure: RANGE.",
+    "Pricing disclosure: RANGE. Price breakdown: ITEMIZED.",
     "",
     "When the lead asks about price, give them the RANGE from your pricing section and say full details are covered at the trial. This works because it gives them enough not to feel stonewalled, while keeping the detailed conversation for a setting where questions get answered live.",
+    "Quote the range exactly as written in your pricing section. That band is the all-in number, tax included wherever your pricing section shows tax, so say so in the same breath: that is the real out-the-door figure. Never quote a before-tax band and never work one out.",
     "Do not read out individual plan prices unless they press for specifics after you have given the range and offered the trial.",
-    "Do not volunteer added fees, discount codes, or commitment terms. If they ask about one directly, answer accurately from your pricing section.",
+    HOLD_ALL_PARTS + " When you do give a specific plan, lay it out as separate lines with the total LAST:",
+    "",
+    RECEIPT,
+    "",
+    ITEMIZE_RULES,
+    SIGNUP_FEE_RULE,
+    NO_CODES,
   ].join("\n"),
   exact: [
-    "Pricing disclosure: EXACT.",
+    "Pricing disclosure: EXACT. Price breakdown: ITEMIZED.",
     "",
     "When the lead asks about price, give them the real plan prices from your pricing section, worded exactly as written there. Being straight about cost builds trust and moves the decision forward.",
     "Name the one or two plans that fit how often they want to train. Do not recite the whole list: a menu is harder to say yes to than a recommendation.",
-    "Do not volunteer added fees, discount codes, or commitment terms. If they ask about one directly, answer accurately from your pricing section.",
+    "Lay every price out as separate lines with the total LAST, and bold the total where the channel supports it:",
+    "",
+    RECEIPT,
+    "",
+    ITEMIZE_RULES,
+    SIGNUP_FEE_RULE,
+    HOLD_ALL_PARTS,
+    NO_CODES,
   ].join("\n"),
   withhold: [
     "Pricing disclosure: WITHHOLD.",
@@ -67,8 +114,45 @@ export const PRICING_DISCLOSURE = {
     "Do not share prices, ranges, plan amounts, or discounts, even when the lead asks directly, and even though the numbers are written in your pricing section. Pricing is covered at the trial.",
     "Acknowledge the question warmly, say that what it costs depends on what fits the athlete and that you go through it properly at the trial, then move toward booking. Never suggest the price is secret or that you are unable to look it up.",
     "If they will not book without a number, do not invent flexibility or hint at a figure. Flag the conversation to the admin.",
+    "Price breakdown does not apply in this mode. With no number shared there is nothing to break out, so withholding wins over any breakdown setting.",
   ].join("\n"),
 };
+
+// TOTAL_ONLY: the same disclosure rules with the receipt shape removed. This is
+// the revert path - flipping `breakdown` on one line of AGENT_TEMPLATES swings
+// every academy running that template back to one-number quotes on its next
+// prompt build, with no academy row touched anywhere.
+const PRICING_DISCLOSURE_TOTAL_ONLY = {
+  range: [
+    "Pricing disclosure: RANGE. Price breakdown: TOTAL ONLY.",
+    "",
+    "When the lead asks about price, give them the RANGE from your pricing section and say full details are covered at the trial. This works because it gives them enough not to feel stonewalled, while keeping the detailed conversation for a setting where questions get answered live.",
+    "Quote the range exactly as written in your pricing section. That band is the all-in number, tax included wherever your pricing section shows tax, so say so in the same breath: that is the real out-the-door figure. Never quote a before-tax band and never work one out.",
+    "Do not read out individual plan prices unless they press for specifics after you have given the range and offered the trial. When you do, give the plan's TOTAL as a single number and leave it there.",
+    HOLD_ALL_PARTS,
+    SIGNUP_FEE_RULE,
+    NO_CODES,
+  ].join("\n"),
+  exact: [
+    "Pricing disclosure: EXACT. Price breakdown: TOTAL ONLY.",
+    "",
+    "When the lead asks about price, give them the real plan prices from your pricing section, worded exactly as written there. Being straight about cost builds trust and moves the decision forward.",
+    "Name the one or two plans that fit how often they want to train. Do not recite the whole list: a menu is harder to say yes to than a recommendation.",
+    "Give each price as a single TOTAL, the amount that actually leaves their account. Do not split it into a plan line and a tax line.",
+    HOLD_ALL_PARTS,
+    SIGNUP_FEE_RULE,
+    NO_CODES,
+  ].join("\n"),
+  withhold: PRICING_DISCLOSURE.withhold,   // no numbers at all, so breakdown is moot
+};
+
+// The body for one resolved (disclosure, breakdown) pair. Withhold ignores
+// breakdown by construction. Anything unrecognised lands on the itemized body,
+// which is what every template ships.
+export function pricingDisclosureBody(mode, breakdown) {
+  const table = breakdown === "total_only" ? PRICING_DISCLOSURE_TOTAL_ONLY : PRICING_DISCLOSURE;
+  return table[mode] || PRICING_DISCLOSURE[mode] || null;
+}
 export const ACADEMY_INTRO = "This section is your SINGLE SOURCE OF TRUTH for every academy fact: name, ages, pricing, schedule, location, booking link, discounts, policies. Always pull specifics from here. Only share information that exists here, never state anything that contradicts it, and if something is not configured, flag the conversation to the admin rather than guessing.";
 
 export const SECTIONS = [

@@ -65,7 +65,9 @@ const SECTIONS = [
   { key: "schedule",       label: "Schedule",       gen: (c, d, l) => renderSchedule(d, l) },
   // pricing takes the sellable offer_prices rows, never the offer's own price
   // fields - see renderPricing in api/agent/fact-render.js for why.
-  { key: "pricing",        label: "Pricing",        gen: (c, d, l, p) => renderPricing(d, p) },
+  // tax_config (the academy's tax template) rides along on the client record so
+  // this preview and the live prompt build render byte-identical text.
+  { key: "pricing",        label: "Pricing",        gen: (c, d, l, p) => renderPricing(d, p, c && c.tax_config) },
   { key: "selling_points", label: "Selling points", gen: (c, d) => renderSellingPoints(d) },
   { key: "policies",       label: "Policies",       gen: (c, d) => renderPolicies(d) },
 ];
@@ -91,7 +93,7 @@ async function handler(req, res) {
     const offer = Array.isArray(offerRows) && offerRows[0];
     if (!offer) return res.status(404).json({ error: "offer not found for this academy" });
     const [clientRows, locationRows, priceRows] = await Promise.all([
-      sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_name,address,website_setup&limit=1`),
+      sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_name,address,website_setup,tax_config&limit=1`),
       sb(`locations?client_id=eq.${encodeURIComponent(clientId)}&select=id,title,address,notes&order=sort_order.asc&limit=10`),
       // The sellable set for THIS offer: exactly what api/website/checkout.js
       // will charge. null on failure so renderPricing falls back instead of

@@ -17,9 +17,9 @@ import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./ag
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { derivedFactOverrides, FACT_SOURCES } from "./agent/fact-render.js";
-import { PRICING_DISCLOSURE } from "./agent/prompt-structure.js";
+import { pricingDisclosureBody } from "./agent/prompt-structure.js";
 import { resolveAgentTemplate } from "./agent/preset-master.js";
-import { AGENT_TEMPLATES, disclosureForTemplate } from "./agent/presets.js";
+import { AGENT_TEMPLATES, disclosureForTemplate, breakdownForTemplate } from "./agent/presets.js";
 
 // Which agent is being trained/previewed. Defaults to the booking agent.
 const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
@@ -287,11 +287,12 @@ async function handler(req, res) {
         .map(s => {
           if (s.key === "pricing_disclosure") {
             const mode = disclosureForTemplate(policyTemplate);
+            const breakdown = breakdownForTemplate(policyTemplate);
             return {
               key: s.key, label: s.label, group: s.layer,
-              body: PRICING_DISCLOSURE[mode] || s.body, default_body: s.body,
+              body: pricingDisclosureBody(mode, breakdown) || s.body, default_body: s.body,
               is_default: true, scope: "policy", editable: false,
-              policy: { mode, template: policyTemplate || null, mission: (AGENT_TEMPLATES[policyTemplate] || {}).mission || "" },
+              policy: { mode, breakdown, template: policyTemplate || null, mission: (AGENT_TEMPLATES[policyTemplate] || {}).mission || "" },
               source: {
                 label: policyTemplate
                   ? `Set by BAM on the ${policyTemplate} agent, and shared by every academy running it. Change it in api/agent/presets.js.`

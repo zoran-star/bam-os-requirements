@@ -19,8 +19,8 @@
 // control, NOT structure - it stays per-academy and wins over the master at
 // flip time. Shadow treats enabled=false rows as expected, not divergence.
 
-import { PRESETS, buildPresetRows, templateForRuntime, disclosureForTemplate } from "./presets.js";
-import { PRICING_DISCLOSURE } from "./prompt-structure.js";
+import { PRESETS, buildPresetRows, templateForRuntime, disclosureForTemplate, breakdownForTemplate } from "./presets.js";
+import { pricingDisclosureBody } from "./prompt-structure.js";
 import { sbRest } from "./_store.js";
 
 // ── which preset does this academy run? ──────────────────────────────────────
@@ -73,10 +73,21 @@ export async function resolveAgentTemplate(clientId, runtime, { sb = sbRest } = 
 // academy must not be able to widen its own agent's disclosure by editing a
 // section, and BAM changing the mode must not be silently shadowed by an old
 // stored override. Change the policy in presets.js, not in the database.
+// The full resolved pricing POLICY for this academy's agent: which template is
+// on shift, and both axes it declares. Breakdown rides alongside disclosure and
+// is resolved the same way, from the same template, applied at the same point -
+// so an academy can no more widen its own breakdown than its own disclosure.
+// Exported because the brain views in both portals badge these two values.
+export async function resolvePricingPolicy(clientId, runtime, { sb = sbRest } = {}) {
+  const template = await resolveAgentTemplate(clientId, runtime, { sb });
+  const disclosure = disclosureForTemplate(template);
+  const breakdown = breakdownForTemplate(template);
+  return { template, disclosure, breakdown, body: pricingDisclosureBody(disclosure, breakdown) };
+}
+
 export async function resolveDisclosureOverride(clientId, runtime, { sb = sbRest } = {}) {
   try {
-    const template = await resolveAgentTemplate(clientId, runtime, { sb });
-    const body = PRICING_DISCLOSURE[disclosureForTemplate(template)];
+    const { body } = await resolvePricingPolicy(clientId, runtime, { sb });
     return body ? { pricing_disclosure: body } : {};
   } catch (_) {
     return {}; // never break a prompt build over a policy lookup
