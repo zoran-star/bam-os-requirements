@@ -78,13 +78,17 @@ re-rendering old agreements. Nothing new should call them.
 
 ## Published (2026-07-26, Zoran approved)
 
-All three are live in `agreement_documents`, `is_current`, revision 2026-07-26:
+All three are live in `agreement_documents` and `is_current`:
 
-| Academy | version_id (first 12) |
-|---|---|
-| BAM San Jose | `24c77188c773` |
-| BAM GTA | `b301553b1b48` |
-| DETAIL Miami | `e2e2d0a4370f` |
+| Academy | current version | revision |
+|---|---|---|
+| BAM San Jose | `b0f1e3d6e5e5` | 2026-07-26b |
+| BAM GTA | `b301553b1b48` | 2026-07-26 |
+| DETAIL Miami | `e2e2d0a4370f` | 2026-07-26 |
+
+San Jose's first published version `24c77188c773` is retired (`is_current` false)
+but still readable - the first real proof the versioning works: editing the
+agreement did NOT rewrite what an earlier signature pointed at.
 
 Two wording decisions landed at the same time:
 - San Jose's **draft / not-for-signature** notice, the pending-attorney hold, and
@@ -103,12 +107,40 @@ Two wording decisions landed at the same time:
   strip whitespace. See [[feedback_vercel_env_no_newline]].
 - Adding an intake question is enough to fill an agreement field: the shared
   `window.bamAgreementIntakeFill` maps slugified intake keys (`date_of_birth`)
-  onto terms field keys (`athlete_dob`) via `BAM_INTAKE_ALIASES`. San Jose's
-  DOB / grade / school still print blank until those questions are added to the
-  offer's intake - that is a wizard config action, no code.
+  onto terms field keys (`athlete_dob`) via `BAM_INTAKE_ALIASES`. No code change,
+  any academy.
 - San Jose's removed hold notice named three Auto-Renewal Law features that are
   **still unbuilt**: an annual renewal reminder, a separate auto-renewal consent
   at checkout, and an online click-to-cancel button. Removing the notice hid the
   reminder, not the obligation.
+
+## Open: San Jose asks for AGE, not date of birth
+
+**Decision 2026-07-26 (Zoran, option A).** San Jose's section 2 was drafted like
+a paper intake form. It asked for date of birth, grade and school; the funnel
+collects none of them, so all three printed as blank lines on every filed PDF.
+
+- **Grade and school were removed from the contract.** They prove nothing about
+  the agreement - placement data, not terms. If San Jose wants them, they belong
+  in the offer's intake questions.
+- **Date of birth was swapped for age**, which the funnel already collects. A
+  signed San Jose agreement now has zero blank fill-in lines.
+
+**The trade-off, on the record: age is a weaker legal record than a birth date.**
+Age drifts. "Was this athlete a minor on the date they signed?" is answerable
+years later only from a DOB, and being a minor is the whole basis for a guardian
+signing - it also drives the image-consent rule (Civ. Code 3344) and under-13
+privacy (COPPA). We accepted this knowingly to avoid adding a question.
+
+**If it ever matters** (a dispute, or counsel asks), the fix is small:
+1. Add a "Date of birth" question to the San Jose offer's intake in the wizard.
+2. In `clients/bam-san-jose/agreement.terms.json` section 2, change the
+   `athlete_age` field back to `{ "key": "athlete_dob", "label": "Date of birth" }`.
+3. Republish. `BAM_INTAKE_ALIASES` already maps `date_of_birth` -> `athlete_dob`,
+   so no code change is needed.
+
+GTA and Miami still ask for `athlete_age` too, and never asked for DOB.
+
+See [[reference_california_youth_membership_law]].
 
 Related: [[project_website_enrollment_funnel]], [[project_member_documents]].
