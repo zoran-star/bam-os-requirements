@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "Scaling program fully closed: Cole's SQL applied, dormant until Mike sets terms",
     "Corrected a scout's blocker claim: SJ's nurture emails are clean, onboarding templates are not",
     "Found: new academies get a weaker onboarding than GTA, using emails that already exist",
     "Scaling program shipped staff-only, PRs 1596 + 1609 merged, staff guide live",
-    "Twilio TrustHub chat is back in the list with its 6 action items",
-    "New: click any chat card to see the human-only actions blocking it"
+    "Twilio TrustHub chat is back in the list with its 6 action items"
   ],
   "orchestrator": {
     "focus": "Preset parity is the new front: a full read-only audit is running and a planning room is open on the two-way sync fix. SJ email is on Amazon's timer.",
@@ -274,10 +274,6 @@
         {
           "id": "q3",
           "t": "Lawyer sign-off on the SJ agreement, then the draft banner comes off"
-        },
-        {
-          "id": "q5",
-          "t": "Tell the Client Profile chat to run Cole's commissions SQL (order no longer matters, PR 1596 is merged)"
         }
       ]
     }
@@ -625,6 +621,13 @@
       "severity": "blocker",
       "status": "queued",
       "owner": "us"
+    },
+    {
+      "id": 60,
+      "title": "onboarding_calls has a client-read RLS policy vs staff-only decision",
+      "severity": "friction",
+      "status": "your call",
+      "owner": "Zoran"
     }
   ],
   "chatMap": [
@@ -670,24 +673,9 @@
     {
       "name": "Client Profile",
       "sidebar": "Client Profile: consolidated view over the 7 onboarding calls (Mike's spec)",
-      "state": "blue",
-      "one": "Scaling program shipped STAFF-ONLY, PRs merged. One thing left: tell it to run Cole's commissions SQL",
-      "actions": [
-        {
-          "id": "cole-sql",
-          "title": "Give the word to run Cole's commissions SQL",
-          "why": "The Commissions tab, the payment_model column and the whole 7-call sequence are merged but INERT until this SQL runs. Nothing works until then.",
-          "whyHuman": "It is your call whether to switch the scaling program on. That session and Cole own the actual run, so nobody double-applies it.",
-          "steps": [
-            "Open the Client Profile chat",
-            "Tell it to run Cole's commissions SQL",
-            "It applies it and confirms"
-          ],
-          "code": null,
-          "verify": "The Commissions tab appears staff-side and the 7 call steps show for clients who have a payment model set.",
-          "never": "Do not run it yourself from another chat. That session owns it so it cannot be applied twice."
-        }
-      ]
+      "state": "done",
+      "one": "Scaling program fully shipped: SQL applied, APIs live, staff guide up. Dormant until Mike sets terms. Archive it",
+      "actions": []
     },
     {
       "name": "SET UP TWILIO BITCH",
