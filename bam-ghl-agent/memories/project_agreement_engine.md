@@ -76,15 +76,39 @@ redeployed) still works: `maybeAttachAgreement` falls back to the legacy
 'legacy-unversioned'`. Those two functions exist ONLY for that and for
 re-rendering old agreements. Nothing new should call them.
 
+## Published (2026-07-26, Zoran approved)
+
+All three are live in `agreement_documents`, `is_current`, revision 2026-07-26:
+
+| Academy | version_id (first 12) |
+|---|---|
+| BAM San Jose | `24c77188c773` |
+| BAM GTA | `b301553b1b48` |
+| DETAIL Miami | `e2e2d0a4370f` |
+
+Two wording decisions landed at the same time:
+- San Jose's **draft / not-for-signature** notice, the pending-attorney hold, and
+  the 6 internal legal-research notes were removed. The document a parent signs
+  now contains only terms. Zoran approved this; treat the agreement as approved
+  for signature.
+- **GTA and Miami media release is now an opt-in**, matching San Jose. It was a
+  blanket grant the parent could not decline. All three now have a required
+  `media_release` consent, so no parent can sign without answering it.
+
 ## Watch out
 
-- GTA and Miami keep their **mandatory** media-release grant (clause 5), not an
-  opt-in. Only San Jose has a real `consent` block. Changing GTA/Miami wording is
-  a business decision, not a code one.
-- San Jose's terms still carry a **draft / not-for-signature** notice, and it
-  renders into the PDF. Remove it in the terms file once counsel signs off.
-- The San Jose document asks for DOB / grade / school; the enroll funnel does not
-  collect them, so they print as blank lines. Fix by adding them to the intake,
-  not by deleting them from the agreement.
+- **`vercel env pull` values contain literal newlines** (the known no-newline
+  gotcha). The service key reads as "Invalid API key" until stripped, and
+  `.env.local`'s `SUPABASE_SERVICE_KEY` is STALE - it 401s. Pull from Vercel and
+  strip whitespace. See [[feedback_vercel_env_no_newline]].
+- Adding an intake question is enough to fill an agreement field: the shared
+  `window.bamAgreementIntakeFill` maps slugified intake keys (`date_of_birth`)
+  onto terms field keys (`athlete_dob`) via `BAM_INTAKE_ALIASES`. San Jose's
+  DOB / grade / school still print blank until those questions are added to the
+  offer's intake - that is a wizard config action, no code.
+- San Jose's removed hold notice named three Auto-Renewal Law features that are
+  **still unbuilt**: an annual renewal reminder, a separate auto-renewal consent
+  at checkout, and an online click-to-cancel button. Removing the notice hid the
+  reminder, not the obligation.
 
 Related: [[project_website_enrollment_funnel]], [[project_member_documents]].
