@@ -2,7 +2,7 @@
   "slug": "sj-email",
   "chat": "SJ EMAIL GO-LIVE",
   "state": "orange",
-  "one": "SJ email go-live is on hold. Nothing is broken: every SJ email correctly holds until the domain verifies",
-  "blockedBy": "the Amazon side of the Resend setup. Asked that chat for the exact reason and to ping the moment it clears",
-  "at": "2026-07-26T21:15:00Z"
+  "one": "All 3 DNS records are in and byte-verified. MX + SPF verified by Resend. Only DKIM left, waiting on Amazon SES's re-check timer. Nobody has to do anything.",
+  "blockedBy": "Amazon SES DKIM re-check backoff. Time only: not Zoran, not Squarespace, not AWS",
+  "at": "2026-07-26T21:12:00Z"
 }

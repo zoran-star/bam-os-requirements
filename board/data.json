@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "Twilio TrustHub chat is back in the list with its 6 action items",
+    "New: click any chat card to see the human-only actions blocking it",
     "SJ email blocker diagnosed: Amazon retry timer only, every record is correct and Gmail is safe",
     "SJ email go-live paused at the Amazon step, its chat is reporting back with the reason",
-    "Message workshop room spinning up: all 13 SJ messages rendered for review",
-    "Dead whiteboard Vercel project deleted, PR checks go green again",
-    "Price breakdown SHIPPED (#1606): agents now quote price, tax and fees on separate lines"
+    "Message workshop room spinning up: all 13 SJ messages rendered for review"
   ],
   "orchestrator": {
     "focus": "SJ email is blocked at the Amazon step, so Lij's ask-list is now the front of the queue. Next builds ready: agent brain fallback (#5) and AI booking times (#22).",
@@ -633,17 +633,155 @@
       "one": "Visit when ready: it walks you through Cole's SQL, then merging PR 1596, in that order"
     },
     {
+      "name": "SET UP TWILIO BITCH",
+      "sidebar": "SET UP TWILIO BITCH",
+      "state": "red",
+      "one": "The TrustHub submission. Unlocks phone numbers for every academy after San Jose. Target Thursday",
+      "actions": [
+        {
+          "id": "th-cp575",
+          "title": "Find the IRS CP 575 letter for FullControl",
+          "why": "Every field on the Twilio form is copied character for character off this one letter. It is the single source of truth, and getting a field wrong burns one of only 3 free submissions.",
+          "whyHuman": "It is your business paperwork, in your email or with your accountant.",
+          "steps": [
+            "Search your email, your accountant, and the company formation documents",
+            "Save it as a PDF, you will need the file itself if the submission gets rejected",
+            "If it is gone, phone the IRS and request a 147C replacement, then tell me immediately because it adds unknown days",
+            "Note the EIN issue date from the top right of the letter"
+          ],
+          "code": null,
+          "verify": "You have a PDF of the CP 575 open on screen showing legal name, EIN and address.",
+          "never": "Do not copy the legal name off a W2 or W9. Their formatting differs and a mismatch is its own rejection."
+        },
+        {
+          "id": "th-rep",
+          "title": "Set up the authorised rep email and details",
+          "why": "A free or generic email address is a documented cause of brand rejection. The rep's email domain has to match the business.",
+          "whyHuman": "Needs your email admin access.",
+          "steps": [
+            "Create or confirm an email address on the FullControl domain",
+            "Not gmail, not outlook, and not a shared address like info@",
+            "Have ready: your real name, real job title, the job position from Twilio's dropdown (CEO, Director, and so on)",
+            "Have your phone in the +1XXXXXXXXXX format"
+          ],
+          "code": null,
+          "verify": "You can send and receive from the FullControl-domain address.",
+          "never": null
+        },
+        {
+          "id": "th-site",
+          "title": "Get the FullControl website live",
+          "why": "This is the real long pole, not Twilio. A parked page or a bare landing page is exactly what triggers rejection error 18601.",
+          "whyHuman": "Your call on scope and content.",
+          "steps": [
+            "Point it at a custom FullControl domain, not a vercel.app or similar",
+            "Make sure it is publicly reachable: not parked, not password protected, no redirect elsewhere",
+            "The legal business name AND the logo must be visible on the page",
+            "Privacy policy and terms are NOT needed for this step, they come later at campaign time"
+          ],
+          "code": null,
+          "verify": "Open the site in a private browsing window. It loads, and you can see the legal entity name and logo without logging in.",
+          "never": null
+        },
+        {
+          "id": "th-submit",
+          "title": "Create the Twilio account and submit the profile",
+          "why": "This starts the clock. A clean submission comes back within 48 hours.",
+          "whyHuman": "Account creation, billing and the legal attestation are all yours.",
+          "steps": [
+            "Sign up for the new Twilio account, upgrade off trial, add a billing method",
+            "Open the Primary Business Profile form with your CP 575 PDF open beside it",
+            "Business identity: pick ISV / Reseller / Partner, NOT Direct Customer",
+            "Vertical: EDUCATION",
+            "Enter the address using the Console autocomplete rather than typing it, so it matches USPS records",
+            "Copy each field off the CP 575 exactly, then submit"
+          ],
+          "code": null,
+          "verify": "Twilio shows the profile as submitted or pending review. Check back Saturday.",
+          "never": "Never use a DUNS number for a US entity, and never abbreviate the legal name or add a DBA. You only get 3 free submissions."
+        },
+        {
+          "id": "th-appeal",
+          "title": "Only if rejected: file the appeal",
+          "why": "Twilio explicitly names newly issued tax IDs as a valid appeal reason, which is our exact situation since the EIN is roughly 60 to 90 days old.",
+          "whyHuman": "Requires your Twilio support login and payment.",
+          "steps": [
+            "Open a Twilio Support ticket referencing the profile SID",
+            "Attach the CP 575 as a PDF",
+            "Ask for the submission to be appealed to manual vetting",
+            "Pay the $10 fee"
+          ],
+          "code": null,
+          "verify": "Approval typically lands 5 to 7 business days later, around August 12.",
+          "never": null
+        },
+        {
+          "id": "th-handoff",
+          "title": "On approval: hand me the four values",
+          "why": "One of them, the primary profile SID, is the single flag that un-gates the whole automated phone chain in the portal.",
+          "whyHuman": "They live in your Twilio console.",
+          "steps": [
+            "From the new Twilio account, copy the master Account SID",
+            "Create an API key and copy the API Key SID and the API Key Secret",
+            "Copy the approved Primary Profile SID",
+            "Send them to me and I will set them on Vercel and smoke test the chain"
+          ],
+          "code": null,
+          "verify": "I confirm the env vars are set on both production and preview and one academy passes a smoke test.",
+          "never": "Do not paste the API Key Secret into a public place. Send it in the chat only when you are ready for me to set it."
+        }
+      ]
+    },
+    {
       "name": "BAM GTA free trial loading rate",
       "sidebar": "BAM GTA free trial loading rate",
       "state": "red",
-      "one": "On your computer: flip the Vercel toggle + paste the Meta CAPI token, then its 2 PRs merge"
+      "one": "Server-side Meta tracking is built and deployed but inert until you generate one token",
+      "actions": [
+        {
+          "id": "meta-capi-token",
+          "title": "Generate the Meta Conversions API token for BAM GTA",
+          "why": "The server-side tracking is fully built, merged and deployed, but it does nothing until this token exists. It recovers the ad-blocked half of GTA's conversions: roughly 60% of ad traffic is currently invisible to Meta.",
+          "whyHuman": "Needs your Meta login, and a live access token must never be pasted into a chat transcript.",
+          "steps": [
+            "Go to business.facebook.com/events_manager2",
+            "Pick the data source: Form Fills BAM Toronto (1692167884521071)",
+            "Settings, then the Conversions API section",
+            "Click Generate access token, and copy it",
+            "Open the Supabase SQL editor for project jnojmfmpnsfmtqmwhopz",
+            "Run the SQL below, pasting your token where the placeholder is"
+          ],
+          "code": "update clients\nset meta_capi = '{\"pixels\":[{\"id\":\"1692167884521071\",\"token\":\"PASTE_TOKEN_HERE\"}]}'::jsonb\nwhere id = '39875f07-0a4b-4429-a201-2249bc1f24df';",
+          "verify": "In Events Manager, open that pixel and check Test Events. You should see server-side events arriving, and PageView plus Lead counts should stop being browser-only.",
+          "never": "Never paste the token into a chat, including this board. It only ever goes into the Supabase SQL editor."
+        }
+      ]
     },
     {
       "name": "BUILD GHL TOKENS",
       "sidebar": "BUILD GHL TOKENS",
       "state": "orange",
       "one": "The FC2 fix for 14 cold academies, held before you start",
-      "blockedBy": "confirming whether GHL offers the Agency AND Sub-Account option; that chat resolves it, then this turns red"
+      "blockedBy": "confirming whether GHL offers the Agency AND Sub-Account option; that chat resolves it, then this turns red",
+      "actions": [
+        {
+          "id": "fc2-app-fix",
+          "title": "Reconfigure the FC2 app, then run agency connect",
+          "why": "14 academies have cold GHL tokens, and San Jose launches on GHL texting. It currently survives on a single-use refresh token: one lost response kills it with no recovery.",
+          "whyHuman": "Needs your GHL marketplace access and an OAuth consent only you can give.",
+          "steps": [
+            "Uninstall FC2 first, GHL locks the settings while an install is active",
+            "Set distribution to Agency AND Sub-Account",
+            "Add the mint scopes: oauth.write and oauth.readonly, plus contacts, conversations, opportunities, calendars, locations, users, custom fields and tags",
+            "Remove the junk scopes: adPublishing, saas, snapshots, twilioaccount, phone numbers",
+            "Check the redirect URL includes portal.byanymeansbusiness.com/api/agency-connect, then save",
+            "Run the install link and pick the AGENCY on the consent screen, not a sub-account"
+          ],
+          "code": null,
+          "verify": "Open portal.byanymeansbusiness.com/api/agency-connect. It should read Healthy, Company token.",
+          "never": "HOLD until that chat confirms whether GHL offers the Agency AND Sub-Account option. If it does not, these steps change."
+        }
+      ]
     },
     {
       "name": "Enrollment agreement",
@@ -657,12 +795,6 @@
       "sidebar": "SIGN UP FEE",
       "state": "done",
       "one": "Merged as #1587. Nothing left inside, archive it"
-    },
-    {
-      "name": "SET UP TWILIO BITCH",
-      "sidebar": "SET UP TWILIO BITCH",
-      "state": "done",
-      "one": "TrustHub plan delivered to your checklist. Archive it"
     },
     {
       "name": "Plan: San Jose phone + Twilio A2P",

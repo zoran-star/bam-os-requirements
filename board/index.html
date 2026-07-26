@@ -104,6 +104,51 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .chat .stateword{font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:600}
 .chat p{font-size:13px;color:var(--bone);line-height:1.55}
 .livedot{margin-left:8px;font-size:9px;letter-spacing:.08em;color:var(--green);text-transform:none}
+.chat.hasActions{cursor:pointer}
+.chat.hasActions:hover{background:var(--panel2)}
+.actionBadge{
+  align-self:flex-start;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;
+  color:var(--ink);background:var(--red);padding:3px 10px;
+}
+.actionBadge.allDone{background:var(--green)}
+
+/* human action modal */
+.modalWrap{
+  position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.72);
+  display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;
+}
+.modalWrap.open{display:flex}
+.modal{
+  background:var(--panel);border:2px solid var(--gold);max-width:720px;width:100%;
+  padding:26px 28px;display:flex;flex-direction:column;gap:16px;position:relative;
+}
+.modal h3{font-family:var(--disp);font-weight:900;font-size:26px;text-transform:uppercase;letter-spacing:.03em;color:var(--gold);padding-right:34px}
+.modal .sub{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);margin-top:-10px}
+.modal .close{position:absolute;top:14px;right:16px;width:28px;height:28px;border:1px solid var(--line);background:var(--panel2);color:var(--mut);cursor:pointer;font-family:var(--mono);font-size:14px}
+.modal .close:hover{color:var(--red);border-color:var(--red)}
+.ai{border:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.ai.done{border-color:var(--green);opacity:.65}
+.ai h4{font-family:var(--disp);font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.02em;line-height:1.1}
+.ai .lbl{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-dim);font-weight:600}
+.ai .why{font-size:13px;color:var(--bone);line-height:1.6}
+.ai .whyHuman{font-size:12px;color:var(--mut);line-height:1.5;font-style:italic}
+.ai ol{margin:0 0 0 18px;display:flex;flex-direction:column;gap:5px}
+.ai li{font-size:13px;line-height:1.5}
+.ai pre{
+  background:var(--panel2);border:1px solid var(--line);padding:12px 14px;overflow-x:auto;
+  font-size:12px;line-height:1.55;color:var(--bone);white-space:pre;position:relative;
+}
+.ai .codeRow{position:relative}
+.ai .codeCopy{position:absolute;top:8px;right:8px}
+.ai .verify{font-size:12px;color:var(--green);line-height:1.55;border-left:2px solid var(--green);padding-left:10px}
+.ai .never{font-size:12px;color:var(--red);line-height:1.55;border-left:2px solid var(--red);padding-left:10px}
+.ai .markRow{display:flex;gap:10px;align-items:center;border-top:1px dashed var(--line);padding-top:10px}
+.ai .markBtn{
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--gold);background:none;border:1px solid var(--gold-dim);padding:7px 16px;cursor:pointer;
+}
+.ai .markBtn:hover{border-color:var(--gold);background:#241f14}
+.ai.done .markBtn{color:var(--green);border-color:var(--green)}
 .btags{display:flex;flex-wrap:wrap;gap:6px}
 .btag{
   font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);
@@ -316,6 +361,9 @@ footer{margin:40px 32px 0;padding-top:14px;border-top:1px solid var(--line);font
     <div class="cols" id="queue"></div>
   </section>
 </main>
+<div class="modalWrap" id="modalWrap">
+  <div class="modal" id="modal"></div>
+</div>
 <footer>Source of truth: docs/lij-onboarding-build-queue.md · fed by board/data.json · updated by Mister Orchestrator</footer>
 <button class="themeBtn" id="themeBtn">☀ light</button>
 <script>
@@ -371,6 +419,40 @@ function buildTags(c, d){
   }).join("") + `</div>`;
 }
 
+function actionBadge(c){
+  const n = (c.actions || []).length;
+  if(!n) return "";
+  const state = readChecks();
+  const open = c.actions.filter(a => !state["ai:" + a.id]).length;
+  return open
+    ? `<div class="actionBadge">⚠ ${open} thing${open>1?"s":""} only you can do · click</div>`
+    : `<div class="actionBadge allDone">✓ your actions done · click</div>`;
+}
+
+function openModal(c){
+  const state = readChecks();
+  $("modal").innerHTML = `
+    <button class="close" data-closemodal="1">✕</button>
+    <h3>${esc(c.sidebar || c.name)}</h3>
+    <div class="sub">Human action items · things no agent can do</div>
+    ${c.actions.map(a => {
+      const done = !!state["ai:" + a.id];
+      return `<div class="ai ${done ? "done" : ""}">
+        <h4>${esc(a.title)}</h4>
+        <div><span class="lbl">Why it matters</span><div class="why">${esc(a.why)}</div></div>
+        ${a.whyHuman ? `<div class="whyHuman">Only you can do this: ${esc(a.whyHuman)}</div>` : ""}
+        <div><span class="lbl">Steps</span><ol>${a.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol></div>
+        ${a.code ? `<div class="codeRow"><button class="copychip codeCopy" data-copyval="${esc(a.code)}">copy</button><pre>${esc(a.code)}</pre></div>` : ""}
+        ${a.verify ? `<div><span class="lbl">Done when</span><div class="verify">${esc(a.verify)}</div></div>` : ""}
+        ${a.never ? `<div class="never">${esc(a.never)}</div>` : ""}
+        <div class="markRow">
+          <button class="markBtn" data-mark="${esc(a.id)}">${done ? "✓ done, click to undo" : "mark done"}</button>
+        </div>
+      </div>`;
+    }).join("")}`;
+  $("modalWrap").classList.add("open");
+}
+
 function ago(iso){
   if(!iso) return "";
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -390,10 +472,11 @@ function render(d){
             blockedBy: r.blockedBy || c.blockedBy, liveAt: r.at};
   });
   $("chats").innerHTML = live.map(c => `
-    <div class="chat ${esc(c.state)}">
+    <div class="chat ${esc(c.state)} ${(c.actions||[]).length ? "hasActions" : ""}" ${(c.actions||[]).length ? `data-open="${esc(c.name)}"` : ""}>
       <button class="x" data-arc="${esc(c.name)}" title="Archive off the board">✕</button>
       <h4>${esc(c.sidebar || c.name)}</h4>
       <div class="stateword">${STATEWORD[c.state] || esc(c.state)}${c.liveAt ? `<span class="livedot" title="reported by the room itself">● live · ${esc(ago(c.liveAt))}</span>` : ""}</div>
+      ${actionBadge(c)}
       ${buildTags(c, d)}
       <p>${esc(c.one)}</p>
       ${c.blockedBy ? `<div class="blocked">⏳ blocked by: ${esc(c.blockedBy)}</div>` : ""}
@@ -485,6 +568,24 @@ document.addEventListener("click", e => {
   if(ra){ localStorage.setItem(ARCK, "{}"); lastArchived = null; render(window._data); return; }
   const xb = e.target.closest(".chat .x");
   if(xb){ writeArch(xb.dataset.arc, true); lastArchived = xb.dataset.arc; render(window._data); return; }
+  if(e.target.closest("[data-closemodal]") || e.target.id === "modalWrap"){
+    $("modalWrap").classList.remove("open"); return;
+  }
+  const mk = e.target.closest("[data-mark]");
+  if(mk){
+    const k = "ai:" + mk.dataset.mark;
+    writeCheck(k, !readChecks()[k]);
+    const cur = window._modalChat;
+    render(window._data);
+    if(cur) openModal(window._data.chatMap.find(c => c.name === cur) || cur);
+    return;
+  }
+  const oc = e.target.closest(".chat[data-open]");
+  if(oc){
+    const c = (window._data.chatMap || []).find(x => x.name === oc.dataset.open);
+    if(c){ window._modalChat = c.name; openModal(c); }
+    return;
+  }
   const chip = e.target.closest(".copychip");
   if(chip){
     e.preventDefault();
@@ -553,6 +654,9 @@ $("themeBtn").addEventListener("click", () => {
   applyTheme(next);
 });
 applyTheme(localStorage.getItem(TH) || "dark");
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape") $("modalWrap").classList.remove("open");
+});
 
 load();
 setInterval(load, 5000);
