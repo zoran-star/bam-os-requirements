@@ -47,6 +47,24 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .err{margin:0 32px 18px;padding:12px 16px;border:1px solid var(--red);border-left-width:4px;background:rgba(224,85,69,.07);color:var(--red);font-size:13px}
 .err b{display:block;font-family:var(--disp);font-size:17px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
 
+/* working-chats bar */
+.workbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.workbar .lbl{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--mut);margin-right:4px}
+.wchip{
+  display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--bone);
+  background:var(--panel);border:1px solid var(--line);padding:6px 12px;cursor:pointer;line-height:1.3;
+}
+.wchip:hover{border-color:var(--gold-dim)}
+.wchip .pin{font-size:11px;opacity:.25}
+.wchip.pinned{border-color:var(--gold-dim)}
+.wchip.pinned .pin{opacity:1}
+.wchip.hq{border-color:var(--gold);color:var(--gold);font-weight:600}
+.wchip.visit{border-color:var(--red)}
+.wchip .dotv{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
+.wchip.hq .dotv,.wchip.active .dotv{background:var(--gold)}
+.wchip.visit .dotv{background:var(--red)}
+.wchip.keep .dotv{background:var(--blue)}
+
 /* recent updates ticker */
 .updates{display:flex;flex-direction:column;gap:5px}
 .updates div{font-size:12px;color:var(--mut);padding-left:16px;position:relative;line-height:1.5}
@@ -183,6 +201,7 @@ footer{margin:40px 32px 0;padding-top:14px;border-top:1px solid var(--line);font
 </header>
 <main>
   <div id="banner"></div>
+  <div class="workbar" id="workbar"></div>
   <section>
     <h2>Recent updates</h2>
     <div class="updates" id="updates"></div>
@@ -243,7 +262,17 @@ function checklistHtml(cl){
   </div>`;
 }
 
+const PINK = "bamBoardPins";
+const readPins = () => { try { return JSON.parse(localStorage.getItem(PINK) || "{}"); } catch(e){ return {}; } };
+const isPinned = c => { const o = readPins(); return c.name in o ? !!o[c.name] : !!c.pinned; };
+
 function render(d){
+  const working = (d.chatMap || []).filter(c => c.working);
+  $("workbar").innerHTML = working.length ? `<span class="lbl">Working in</span>` + working.map(c => `
+    <span class="wchip ${esc(c.tag)} ${isPinned(c) ? "pinned" : ""}" data-pin="${esc(c.name)}" title="Click to toggle the pin marker">
+      <span class="dotv"></span>${esc(c.sidebar || c.name)}<span class="pin">📌</span>
+    </span>`).join("") : "";
+
   $("updated").textContent = "updated " + d.updated;
   $("updates").innerHTML = d.recentUpdates.map(u => `<div>${esc(u)}</div>`).join("");
   $("orchFocus").textContent = d.orchestrator.focus;
@@ -319,6 +348,15 @@ document.addEventListener("change", e => {
   if(window._data) render(window._data);
 });
 document.addEventListener("click", e => {
+  const wc = e.target.closest(".wchip");
+  if(wc){
+    const pins = readPins();
+    const cur = window._data.chatMap.find(c => c.name === wc.dataset.pin);
+    pins[wc.dataset.pin] = !(cur ? isPinned(cur) : false);
+    localStorage.setItem(PINK, JSON.stringify(pins));
+    render(window._data);
+    return;
+  }
   const chip = e.target.closest(".copychip");
   if(chip){
     e.preventDefault();
