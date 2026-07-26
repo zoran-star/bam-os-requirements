@@ -26,9 +26,27 @@ staff-portal page. Any field on any row is editable by anyone who can see it.
 >   the `onboarding_calls` table (one row per client per call, data jsonb,
 >   registry SM_CALLS in api/action-items.js); staff edit it in the client's
 >   Action Items tab (expandable per-call editor, PATCH {id, call_data}).
->   Gated tier:"v2v15" so legacy V1 checklists are untouched. Calibration
->   prompt on every call: "What do you currently have in place for this?"
+>   Gated tier:"program" (Cole's call 2026-07-25): the calls appear ONLY for
+>   clients with clients.payment_model set (Commissions tab) AND non-V1 -
+>   setting payment terms is the one switch that turns the sequence + the
+>   Business Profile nav on; clearing the model removes the items again
+>   (onboarding_calls data survives). Calibration prompt on every call:
+>   "What do you currently have in place for this?"
 >   NOT counted in ONBOARDING_STEP_COLS (roster bar = core steps only).
+>
+> 👤 Client Profile / Business Profile (2026-07-25, Mike's companion spec):
+>   the call data is ALSO surfaced as a consolidated per-client page so it is
+>   not buried in done checklist items. Staff: "Profile" tab in ClientDetail
+>   (ClientProfileTab - sections by profile_section, inline edit via the same
+>   PATCH {id, call_data}, link-outs to Systems/Marketing tabs). Client:
+>   "Business Profile" nav view in client-portal.html (read-only,
+>   fetchAndRenderBusinessProfile, nav hidden unless the account has call
+>   items; permission rides the action_items tab key; link-outs to Blueprint
+>   Offers / Systems / Marketing). SINGLE SOURCE OF TRUTH = onboarding_calls -
+>   the profile is a view over the same records, shows data before a call is
+>   marked done. Section names come from SM_CALLS[].profile_section (API
+>   decoration). No new storage was added for it (per the spec's
+>   centralize-don't-duplicate rule).
 >   (*auto from a connect signal · 🔒 = staff-only, hidden from clients ·
 >    ⚙ = ticket-derived, mirrors the systems onboarding ticket, not hand-toggleable ·
 >    ★ = lights up gold when it's the client's turn)
