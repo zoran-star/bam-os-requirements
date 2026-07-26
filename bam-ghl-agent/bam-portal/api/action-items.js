@@ -225,10 +225,10 @@ function dueLabel(d) {
 // complete by hand - no Fathom / post-call-flow integration. Clients see the
 // call progress on their checklist but can't toggle or edit anything.
 // profile_section: the section name this call's data appears under on the
-// Client Profile page (staff tab + client "Business Profile" view) - the
-// profile is a READ/EDIT VIEW over these same onboarding_calls records
-// (single source of truth), visible as soon as data is entered on a call,
-// done or not.
+// staff Client Profile tab (STAFF-ONLY - no client-side surface, Zoran
+// 2026-07-26) - the profile is a READ/EDIT VIEW over these same
+// onboarding_calls records (single source of truth), visible as soon as
+// data is entered on a call, done or not.
 const SM_CALL_CALIBRATION = "What do you currently have in place for this?";
 const SM_CALLS = [
   { key: "sm_call_1", step: 1, title: "Call 1: APVO and Offers",
@@ -347,16 +347,17 @@ const ONBOARDING_STEPS = [
   { key: "offers",         title: "Set up your Offers",                  sort: 10, col: "offers_marked_done_at",       writable: true },
   { key: "book_call",      title: "Book a call with your Scaling Manager", sort: 11, col: "call_booked_at",            writable: true },
   // ── SM Onboarding Call Sequence (7 calls, strict order) — sm_call steps are
-  // backed by onboarding_calls rows (not a clients column). Client-visible,
-  // staff-toggle-only; call N unlocks when call N-1 is done. Gated off V1
-  // (tier "v2v15") per the hard rule - all newly activated clients are V2. ──
+  // backed by onboarding_calls rows (not a clients column). STAFF-ONLY
+  // (Zoran, 2026-07-26: the whole scaling program is invisible client-side) -
+  // hidden from clients like trigger_buildout; the SM works the sequence from
+  // the staff Onboarding tab and call N unlocks when call N-1 is done.
   // Tier "program": only clients ON the scaling program - i.e. a payment
   // model has been set in the Commissions tab (Cole's call, 2026-07-25).
   // Setting payment terms is the one switch that turns the call sequence
-  // (and the Business Profile page) on for a client; V1 stays excluded.
+  // (and the staff Profile tab content) on for a client; V1 stays excluded.
   ...SM_CALLS.map(c => ({
     key: c.key, title: c.title, sort: 11 + c.step, sm_call: c.step,
-    tier: "program", staff_toggle_only: true,
+    tier: "program", staff_toggle_only: true, staff_only: true,
   })),
   // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
   // Sits right AFTER the SM call — the build gets scoped on that call.

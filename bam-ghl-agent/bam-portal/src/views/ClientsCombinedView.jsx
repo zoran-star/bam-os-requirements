@@ -2899,7 +2899,7 @@ function ClientProfileTab({ client, tokens, session, setTab }) {
     <div style={{ maxWidth: 780 }}>
       <div style={{ fontSize: 12, color: t.textMute, marginBottom: 16, lineHeight: 1.5 }}>
         Everything captured on the 7 onboarding calls, in one place - {doneCount}/7 calls done.
-        Edits here update the same record the call checklist uses. Visible to the client too (read-only, "Business Profile").
+        Edits here update the same record the call checklist uses. Staff only - clients never see this.
       </div>
       {calls.map(it => {
         const isEditing = editKey === it.onboarding_key;

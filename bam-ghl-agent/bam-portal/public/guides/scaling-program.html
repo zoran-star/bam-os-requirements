@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Scaling Program - Staff Guide</title>
+<style>
+  :root {
+    --bg:#131416; --surface:#1B1D1F; --surface-el:#232629;
+    --border:rgba(255,255,255,0.08); --border-med:rgba(255,255,255,0.12);
+    --text:#F0EDE8; --text-sub:#A5A19A; --text-mute:#6E6B63;
+    --gold:#D4B65C; --gold-ghost:rgba(212,182,92,0.10); --gold-border:rgba(212,182,92,0.25);
+    --on-gold:#131416;
+    --green:#4CC76A; --green-soft:rgba(76,199,106,0.12);
+    --amber:#F0B84A; --amber-soft:rgba(240,184,74,0.12);
+    --red:#F07060; --red-soft:rgba(240,112,96,0.12);
+    --blue:#5A8FB8; --blue-soft:rgba(90,143,184,0.12);
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); margin:0; padding:36px 20px 80px;
+    font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.55; }
+  .wrap { max-width:760px; margin:0 auto; }
+  .kicker { font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; }
+  h1 { font-size:26px; margin:0 0 6px; letter-spacing:-.01em; }
+  .lede { color:var(--text-sub); font-size:14px; margin:0 0 8px; max-width:60ch; }
+  .staffchip { display:inline-block; font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; background:var(--blue-soft); color:var(--blue); margin-bottom:30px; }
+  h2 { font-size:17px; margin:38px 0 12px; display:flex; align-items:center; gap:10px; }
+  h2 .n { flex:none; width:24px; height:24px; border-radius:50%; background:var(--gold); color:var(--on-gold); font-size:13px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; }
+  p { font-size:13.5px; color:var(--text-sub); max-width:64ch; }
+  b, strong { color:var(--text); }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin:14px 0; }
+  .steps { margin:0; padding-left:0; list-style:none; counter-reset:s; }
+  .steps li { counter-increment:s; position:relative; padding:8px 0 8px 34px; font-size:13.5px; color:var(--text-sub); border-bottom:1px dashed var(--border); }
+  .steps li:last-child { border-bottom:none; }
+  .steps li::before { content:counter(s); position:absolute; left:0; top:8px; width:22px; height:22px; border-radius:50%; background:var(--surface-el); border:1px solid var(--border-med); color:var(--gold); font-size:11.5px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th { text-align:left; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-mute); padding:8px 10px; border-bottom:1px solid var(--border-med); }
+  td { padding:9px 10px; border-bottom:1px solid var(--border); color:var(--text-sub); vertical-align:top; }
+  td:first-child { color:var(--text); font-weight:600; white-space:nowrap; }
+  .tbl { overflow-x:auto; }
+  .formula { background:var(--surface-el); border:1px solid var(--border); border-radius:8px; padding:12px 16px; font-family:"DM Mono",ui-monospace,monospace; font-size:12.5px; color:var(--text); white-space:pre; overflow-x:auto; margin:12px 0; }
+  .warn { background:var(--amber-soft); border:1px solid var(--amber); border-left-width:3px; border-radius:8px; padding:11px 14px; font-size:13px; color:var(--text-sub); margin:12px 0; }
+  .good { background:var(--green-soft); border:1px solid var(--green); border-left-width:3px; border-radius:8px; padding:11px 14px; font-size:13px; color:var(--text-sub); margin:12px 0; }
+  .faq dt { font-size:13.5px; font-weight:700; margin-top:16px; }
+  .faq dd { margin:4px 0 0; font-size:13px; color:var(--text-sub); max-width:64ch; }
+  .foot { margin-top:48px; padding-top:16px; border-top:1px solid var(--border); font-size:11.5px; color:var(--text-mute); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">BAM Staff Guide</div>
+  <h1>The Scaling Program</h1>
+  <p class="lede">How a client gets on the program, how the 7 calls work, where the notes live, and how the money runs each month.</p>
+  <span class="staffchip">Staff only - nothing in this system is visible to clients</span>
+
+  <h2><span class="n">1</span>Put a client on the program</h2>
+  <div class="card">
+    <ol class="steps">
+      <li>Open <b>Commissions</b> in the staff portal sidebar (admin only for edits).</li>
+      <li>Find the academy - unconfigured ones say <b>"not configured"</b>.</li>
+      <li>Click the row to expand the terms form.</li>
+      <li>Pick the model: <b>Flat Retainer</b> (fixed monthly fee) or <b>Growth %</b> (base retainer + share of growth).</li>
+      <li>For Growth %: enter base retainer, growth share %, revenue baseline, renewal date, revenue source, and confirm the Scaling Manager.</li>
+      <li>Hit <b>Save terms</b>. That save IS the switch - the client is now on the program.</li>
+    </ol>
+  </div>
+  <div class="warn"><b>The baseline locks for 9 months</b> the moment you save it. Changing it inside the window forces an explicit override and re-locks for another 9. Only re-enter it on agreement renewal.</div>
+
+  <h2><span class="n">2</span>Work the 7 calls</h2>
+  <p>Once terms are saved, the call sequence appears on the client's <b>Onboarding tab</b> (staff portal &gt; Clients &gt; pick the client). Calls run in strict order - Call 3 stays locked until Call 2 is marked complete. Only the SM ticks them.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Call</th><th>What you capture</th></tr></thead>
+    <tbody>
+      <tr><td>1. APVO and Offers</td><td>Avatar, positioning, value, offer structure</td></tr>
+      <tr><td>2. Media and Sales Funnels</td><td>Ads to record, VSL, pre-trial videos, funnel build notes</td></tr>
+      <tr><td>3. Referral Program</td><td>Referral structure, affiliate mechanics</td></tr>
+      <tr><td>4. Organic Strategy</td><td>Content buckets: Education, Entertainment, Conversion</td></tr>
+      <tr><td>5. Sales Process</td><td>Discovery call notes, sales motion, objections, script</td></tr>
+      <tr><td>6. Systems and Ads Review</td><td>Systems review notes, ad performance review</td></tr>
+      <tr><td>7. Athlete Onboarding and Retention</td><td>Welcome package, results tracking, check-in cadence, cancellation process</td></tr>
+    </tbody>
+  </table></div>
+  <p>Every call opens with the same calibration question: <b>"What do you currently have in place for this?"</b> Type the answers into the call's fields during the call - that typing IS the documentation.</p>
+
+  <h2><span class="n">3</span>The Profile tab</h2>
+  <p>Each client has a <b>Profile</b> tab next to Onboarding. It shows everything from the 7 calls on one page, grouped by topic, so nobody digs through completed checklist items to answer "what's this client's offer structure".</p>
+  <div class="card">
+    <ol class="steps">
+      <li>It is the <b>same record</b> as the call fields - not a copy. Edit in either place, both update.</li>
+      <li>Notes appear here the moment they are typed, even before the call is ticked done.</li>
+      <li>Topics with a real home elsewhere link out: Offers to the Business Blueprint snapshot, funnels and ads to Systems / Marketing.</li>
+    </ol>
+  </div>
+  <div class="good"><b>Discipline note:</b> the Profile page is only as good as what gets typed on the call. Empty fields on the call = empty profile.</div>
+
+  <h2><span class="n">4</span>The money each month</h2>
+  <p>Each program client runs on their own cycle, anchored to their renewal date (not the 1st). At cycle close the portal pulls the month's gross revenue from the academy's connected Stripe and computes:</p>
+  <div class="formula">growth       = max(0, gross revenue - baseline)
+BAM fee      = growth share % x growth
+BAM invoice  = base retainer + BAM fee     (flat model: just the flat amount)
+SM payout    = $250 + 25% x BAM fee        (only in months with growth)</div>
+  <div class="tbl"><table>
+    <thead><tr><th>Automatic</th><th>Manual</th></tr></thead>
+    <tbody>
+      <tr><td>Revenue pull from Stripe</td><td>All payment terms (Commissions tab, admin)</td></tr>
+      <tr><td>Growth / fee / payout math</td><td>Baseline entry and renewal-time re-entry</td></tr>
+      <tr><td>Stripe invoice, created and finalized</td><td>Fixing a failed revenue pull</td></tr>
+      <tr><td>Batched reports to Anna + Cole (before the 1st and 15th)</td><td>-</td></tr>
+    </tbody>
+  </table></div>
+  <div class="warn"><b>If a revenue pull fails</b> (no Stripe connected, API error), no invoice is generated and Mike + Cole get an email alert. Fix the integration or run the cycle manually from the Commissions page before the report window.</div>
+
+  <h2><span class="n">5</span>Quick answers</h2>
+  <dl class="faq">
+    <dt>What does the client see?</dt>
+    <dd>Nothing. No checklist items, no profile page, no commission info. The only client-visible artifact is the normal Stripe invoice when it is sent.</dd>
+    <dt>Who can do what?</dt>
+    <dd>Admin: set terms, see every client. Scaling Manager: see own clients and their cycles, edit call notes, cannot touch payment terms. Everyone else: no Commissions tab at all.</dd>
+    <dt>How do I take a client OFF the program?</dt>
+    <dd>Clear their payment model in the Commissions tab. Call steps and profile content disappear from staff views; the notes stay in the database and come back if re-enabled.</dd>
+    <dt>Refunds?</dt>
+    <dd>The pull counts raw gross charges. Refunds and chargebacks are NOT netted out - flag disputes to Mike before the cycle closes if they are material.</dd>
+    <dt>Which clients can go on the program?</dt>
+    <dd>V2 and V1.5 academies. Legacy V1 accounts are excluded by rule.</dd>
+  </dl>
+
+  <div class="foot">Scaling Program staff guide - updated 2026-07-26. Questions: Cole (build) or Mike (program).</div>
+</div>
+</body>
+</html>
