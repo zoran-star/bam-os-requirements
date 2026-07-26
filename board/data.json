@@ -532,7 +532,7 @@
     {
       "id": "ghl",
       "title": "GHL tokens: fix the FC2 app",
-      "why": "Academy GHL tokens expire every 24h and 14 of ~30 are already cold. The stored 'agency' token is really a LOCATION token, so it cannot mint sub-account tokens. San Jose launches ON GHL, so this is load-bearing for the launch itself.",
+      "why": "San Jose is SAFE tonight (token self-renews ~6h before expiry) but FRAGILE: it survives on a single-use refresh token, so one lost network response kills it with no recovery. That is exactly what killed the other 14 academies. Fixing FC2 removes that single point of failure. WAIT for the go-ahead: whether GHL even offers the Agency AND Sub-Account option is still being confirmed.",
       "steps": [
         {
           "id": "g1",
