@@ -153,6 +153,47 @@ function cityFromAddress(address) {
 // fallbacks so a missing name never sends as a raw {{token}}). Tolerates spaces inside
 // the braces. Only touches these known tokens - the shell placeholders (UPPERCASE) are
 // left for the caller to fill.
+// Remove every reference to a website we do not have, at the SMALLEST unit that
+// still reads correctly - so an academy with no domain yet sends a shorter
+// message, never a broken one and never an empty one.
+//
+//   line that is a BARE LINK ("{{location.website}}/free-trial")
+//       -> drop the line, plus a lead-in line above it ending in ":"
+//          ("feel free to book in using this link:" must not dangle).
+//   link INSIDE a sentence ("Here's the calendar: {{location.website}}/x")
+//       -> drop only that SENTENCE, keep the rest of the line.
+//
+// Why sentence-level (2026-07-26): dropping the whole line took the message with
+// it. missed_trial is a single line, so a domain-less academy rendered "" - and
+// an empty body reached the SMS provider, got rejected, and burned all 3 retry
+// attempts silently. Ghosted step 2 lost its entire value proposition the same
+// way. Sentence-level keeps both messages intact and sending.
+const WEBSITE_TOKEN = /\{\{\s*location\.website\s*\}\}/;
+function dropWebsiteMentions(text) {
+  const lines = String(text).split("\n");
+  const out = [];
+  for (const line of lines) {
+    if (!WEBSITE_TOKEN.test(line)) { out.push(line); continue; }
+    // A bare link line: the whole line is the token plus its path, no prose.
+    const bareLink = /^\s*\S*\{\{\s*location\.website\s*\}\}\S*\s*$/.test(line);
+    let kept = "";
+    if (!bareLink) {
+      kept = line
+        .split(/(?<=[.!?])\s+/)
+        .filter((sentence) => !WEBSITE_TOKEN.test(sentence))
+        .join(" ")
+        .trim();
+    }
+    if (kept) { out.push(kept); continue; }
+    // Nothing survives on this line: drop it, and drop a dangling lead-in
+    // ("Here's the link:") immediately above it.
+    let j = out.length - 1;
+    while (j >= 0 && !out[j].trim()) j--;
+    if (j >= 0 && /:\s*$/.test(out[j])) out.splice(j, out.length - j);
+  }
+  return out.join("\n");
+}
+
 export function resolveMergeVars(html, L, vars = {}) {
   // Athlete first name for casual copy ("Hey Jordan!"). Prefer an explicit
   // athlete_first; else take the first token of the resolved athlete full name.
@@ -178,13 +219,12 @@ export function resolveMergeVars(html, L, vars = {}) {
     "next_session": vars.next_session || "",
   };
   let out = html;
-  // A blank {{location.website}} drops its whole LINE (mirrors the dangling-line
-  // cleanup in confirm-automations.resolveApptTokens): "here's the link:" with
-  // no domain is a broken message. Also swallows a lead-in line ending with ":"
-  // right above the link ("feel free to book in using this link:" must not point
-  // at nothing). Runs before substitution, on text lines only.
-  if (!map["location.website"]) {
-    out = out.replace(/(^[^\n]*:[ \t]*\n+)?^.*\{\{\s*location\.website\s*\}\}.*$\n?/gm, "");
+  // A blank {{location.website}} must not leave a link pointing at nothing, but
+  // it must ALSO not silently delete the message around it. Runs before
+  // substitution, on plain-text bodies only (a full HTML document is skipped -
+  // its links are shell placeholders, handled by dropEmptyShellLinks).
+  if (!map["location.website"] && !/^\s*<(?:!doctype|html)/i.test(out)) {
+    out = dropWebsiteMentions(out);
   }
   for (const [k, val] of Object.entries(map)) {
     const token = "\\{\\{\\s*" + k.replace(/\./g, "\\.") + "\\s*\\}\\}";

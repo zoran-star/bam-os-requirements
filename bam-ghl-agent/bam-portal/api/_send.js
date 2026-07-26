@@ -154,6 +154,18 @@ async function noticeHeldOnce(clientId) {
 // out AS THE ACADEMY (see the guardrail above - the engine re-queues those without
 // burning an attempt), and THROWS on a hard failure so the worker can retry /
 // record the error.
+// A step body that resolves to nothing once merge fields are filled. Reported as
+// a SKIP (the engine advances past it) rather than a failure, because there is
+// no message to send and no retry that could change that.
+const EMPTY_AFTER_MERGE = "empty after merge fields resolved";
+
+// Does this body render to nothing? Only meaningful for plain copy - a
+// "template:<key>" ref resolves to a whole designed email and never empties out.
+function isEmptyAfterMerge(text, clientId, vars) {
+  if (/^\s*template:[\w/-]+\s*$/.test(text)) return false;
+  return !resolveMergeVars(text, locFor(clientId, vars), vars || {}).trim();
+}
+
 export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, subject, body, ghlToken, vars } = {}) {
   const text = String(body || "").trim();
   if (!text) throw new Error("sendOn: empty body");
@@ -171,6 +183,7 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
     // email is on-brand (the step body carries only the message copy). Subject
     // can carry merge tokens too, so resolve it against the same vars.
     const subj = resolveMergeVars(String(subject || ""), locFor(clientId, vars), vars || {});
+    if (isEmptyAfterMerge(text, clientId, vars)) return { skipped: EMPTY_AFTER_MERGE };
     const html = renderEmail({ clientId, subject: subj, body: text, vars });
     const r = await sendEmail({ to: toEmail, subject: subj, html, from: sender.from, clientId });
     if (r && r.skipped) return { skipped: r.skipped };
@@ -180,6 +193,11 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
   if (channel === "sms") {
     if (!contactId && !toPhone) return { skipped: "no contact for sms" };
     const message = resolveMergeVars(text, locFor(clientId, vars), vars || {});
+    // A step whose copy resolved to NOTHING (every sentence it had depended on a
+    // merge field this academy has not filled in yet) is a no-op, not a failure:
+    // skip it so the engine advances the sequence instead of handing an empty
+    // body to the provider, eating a rejection, and burning all 3 retries.
+    if (!message.trim()) return { skipped: EMPTY_AFTER_MERGE };
     // Provider gate: Twilio academies send via Twilio + own-store; else GHL.
     const g = await maybeSendSmsViaProvider(clientId, { ghlContactId: contactId, toPhone, body: message, sentBy: "automation" });
     if (g.handled) { if (!g.ok) throw new Error(g.error); return { sent: true, via: "twilio", id: g.sid }; }
