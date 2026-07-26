@@ -130,8 +130,10 @@ for Responded-stage contacts (PR #511). Shareable HTML guide at
 `/agent-training-guide.html` (PR #508, updated #515).
 
 ## Training rollout (Zoran's 5 steps)
-1. Draft the shared system prompt together (seed: sales-conversation-agents/
-   conversation-ai-booking-agent-bam-gta.txt, versioned).
+1. Draft the shared system prompt together (now lives in code:
+   bam-portal/api/agent/prompt-structure.js. The original seed file,
+   sales-conversation-agents/conversation-ai-booking-agent-bam-gta.txt, was deleted
+   2026-07-24 - step 1 is done and the prompt is versioned in git.)
 2. Sandbox: Zoran texts it as a fake parent; corrections → first lessons.
 3. Live for GTA: agent self-rates confidence; unsure → escalation queue
    (Slack ping + portal queue; final UI spot TBD). Zoran's answer + "why"

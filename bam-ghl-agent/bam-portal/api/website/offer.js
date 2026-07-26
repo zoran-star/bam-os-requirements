@@ -222,6 +222,8 @@ function buildPricing(offer, catalogRows) {
         currency: row ? (row.currency || "cad") : null,
         plan: row ? row.canonical_plan : null,
         interval: row ? row.interval : null,
+        // Build S: null when this plan has no fee OR this option waives it.
+        signup_fee_cents: (planFee && opt.feeCharged) ? planFee.amount_cents : null,
       });
     }
   }
@@ -302,13 +304,19 @@ async function handler(req, res) {
     // Typed runtime rows: the authoritative "what can checkout sell" list
     // (offer tie-in step E). Frontends can send purchasable[].offer_price_id
     // to /api/website/checkout instead of the legacy offer_price_key.
-    let purchasable = [];
+    let purchasable = [], signupFees = [];
     try {
       purchasable = (await sbReq(
         `offer_prices?tenant_id=eq.${encodeURIComponent(client_id)}&source_offer_id=eq.${offer.id}` +
         `&is_routable=eq.true&is_active=eq.true&order=sort_order.asc` +
         `&select=id,title,amount_cents,currency,billing_interval,source_offer_price_key`
       )) || [];
+      // Build S: a `<plan>|signup_fee` row is a one-time RIDER on an enrollment,
+      // never something a parent can buy on its own. Keep it out of the
+      // purchasable list (checkout attaches it as an invoice line instead) and
+      // expose it separately so the plan cards can say "+ $X one-time".
+      signupFees = purchasable.filter((p) => String(p.source_offer_price_key || "").split("|")[1] === "signup_fee");
+      purchasable = purchasable.filter((p) => String(p.source_offer_price_key || "").split("|")[1] !== "signup_fee");
     } catch { /* additive block - never breaks the offer page */ }
 
     // Trial block: everything the FREE TRIAL funnel page needs, sourced from

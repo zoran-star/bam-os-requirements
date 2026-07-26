@@ -20,7 +20,6 @@ Build FullControl into the go-to operating system for sports and fitness busines
 ## Sub-projects
 - **prototype/** — FullControl product prototype (React/Vite, live on Vercel)
   - **prototype/bam-gta-phase1/** — first live deployment at BAM Basketball GTA (staff app, parent app, GHL docs)
-- **whiteboard/** — requirements planning tool (React/Vite, live on Vercel)
 - **market-research/** — market data survey (scrapped, to be reworked)
 - **fc-internal-content-engine/** — AI content generation pipeline
 - **sales-conversation-agents/** — AI sales agent system prompts

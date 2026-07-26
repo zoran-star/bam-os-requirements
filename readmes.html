@@ -210,7 +210,6 @@ Build FullControl into the go-to operating system for basketball academies, then
 
 ## Sub-projects
 - **prototype/** — FullControl product prototype (React/Vite, live on Vercel)
-- **whiteboard/** — requirements planning tool (React/Vite, live on Vercel)
 - **market-research/** — market data survey (scrapped, to be reworked)
 - **bam-gta-phase1/** — first live deployment at BAM Basketball GTA
 - **fc-internal-content-engine/** — AI content generation pipeline
@@ -218,7 +217,7 @@ Build FullControl into the go-to operating system for basketball academies, then
 - **business/** — investor deck, business plan, and planning materials
 
 ## How it all connects
-The prototype is the product vision. The whiteboard drives decisions about what gets built. BAM GTA Phase 1 is the first real-world implementation. The sales agents automate the funnel. The content engine handles marketing. The business materials tell the acquisition story.</textarea>
+The prototype is the product vision. BAM GTA Phase 1 is the first real-world implementation. The sales agents automate the funnel. The content engine handles marketing. The business materials tell the acquisition story.</textarea>
     <div class="card-actions">
       <button class="btn btn-copy" onclick="copy('rm-root', this)">Copy README</button>
     </div>
@@ -256,55 +255,14 @@ A fully validated, feature-complete prototype that covers every domain of the Fu
 
 ## Core blockers
 - Prototype and Notion requirements must stay in sync — drift between the two creates confusion
-- Features should only be added after whiteboard session review and human confirmation
+- Features should only be added after human confirmation
 
 ## How it connects to other projects
-- **whiteboard/** — planning sessions drive what gets built here
 - **bam-gta-phase1/** — the GTA staff and parent apps are location-specific implementations of this prototype
 - **fc-internal-content-engine/** — the Content page in this prototype is the UI layer for the content engine
 - **Notion** — business requirements live in Notion; this prototype is the living implementation</textarea>
     <div class="card-actions">
       <button class="btn btn-copy" onclick="copy('rm-prototype', this)">Copy README</button>
-    </div>
-  </div>
-</div>
-
-<!-- WHITEBOARD -->
-<div class="card c-purple" id="r-whiteboard">
-  <div class="card-header" onclick="toggle('r-whiteboard')">
-    <div class="card-emoji">🗂</div>
-    <div class="card-meta">
-      <div class="card-title">Requirements Whiteboard</div>
-      <div class="card-path">whiteboard/</div>
-    </div>
-    <div class="card-right">
-      <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
-    </div>
-  </div>
-  <div class="card-body">
-    <textarea class="readme-textarea" id="rm-whiteboard"># Requirements Whiteboard
-
-## What it's for
-A standalone planning tool for running structured product review sessions. Items get approved, rejected, or given feedback — then exported to Claude Code for execution. The tool is project-agnostic; it can run sessions for any FullControl sub-project.
-
-## Who's working on it
-Zoran (product owner), Cole (requirements)
-
-## Current status
-Live and in active use. Sessions are being run regularly for the FullControl prototype and onboarding design.
-
-## End goal
-Every product decision in FullControl is traceable to a whiteboard session — a full history of what was approved, rejected, and why.
-
-## Core blockers
-None currently.
-
-## How it connects to other projects
-- **Notion** — session data, backlog items, and onboarding data points all live in Notion databases
-- **prototype/sessions/** — HTML session output files from FullControl reviews live there, not here
-- Every other project — this tool is used to plan changes to all of them</textarea>
-    <div class="card-actions">
-      <button class="btn btn-copy" onclick="copy('rm-whiteboard', this)">Copy README</button>
     </div>
   </div>
 </div>
@@ -457,7 +415,7 @@ System prompts and building materials for the AI sales agents that run inside Fu
 Zoran
 
 ## Current status
-Booking agent is live for BAM GTA. Closing AI (post-trial conversion) and Rebooking AI (no-show re-engagement) are currently being designed in whiteboard sessions SES-025 and SES-026.
+Booking agent is live for BAM GTA. Closing AI (post-trial conversion) and Rebooking AI (no-show re-engagement) are still to be designed.
 
 ## End goal
 Fully autonomous lead-to-member conversion with no human involvement required. Every stage of the sales funnel — first contact, trial booking, post-trial follow-up, re-engagement — handled by an AI agent.

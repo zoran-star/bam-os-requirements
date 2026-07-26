@@ -43,6 +43,7 @@
 //         docs/core-handoff/pipeline-presets.md
 
 import { sbRest } from "./_store.js";
+import { seedAutomations } from "./seed-automations.js";
 
 // ── Agent templates ──────────────────────────────────────────────────────────
 // runtime  = which existing agent behaviour drives it (prompt-structure.js AGENT_SPECS).
@@ -51,19 +52,72 @@ import { sbRest } from "./_store.js";
 //            keep today's keys ('booking'/'confirm'/'closing') so existing lessons
 //            keep applying; new templates get their own bucket so a call-booking
 //            correction never bleeds into trial-booking (Phase 4 enforces this).
+// disclosure= how openly this agent may discuss price: "range" | "exact" |
+//            "withhold" (the bodies live in prompt-structure.js
+//            PRICING_DISCLOSURE). It sits on the TEMPLATE, not the preset, so a
+//            template reused in another sales system carries its policy along -
+//            Zoran's call, 2026-07-24. It is BAM master (tier 1): ONE value that
+//            propagates to every academy running that template, never a
+//            per-academy field and never an offer-wizard question. Changing it
+//            means editing this file, and the change is live for every academy on
+//            the next prompt build. See docs/agent-pricing-transparency-plan.md.
+export const DISCLOSURE_MODES = ["range", "exact", "withhold"];
+export const DEFAULT_DISCLOSURE = "range";
+
 export const AGENT_TEMPLATES = {
-  trial_booking: { runtime: "booking", lessonKey: "booking", mission: "Book the lead into a free trial session." },
-  trial_confirm: { runtime: "confirm", lessonKey: "confirm", mission: "Confirm a booked trial and make sure they show up." },
-  closing:       { runtime: "closing", lessonKey: "closing", mission: "Convert a good-fit trial attendee into an enrolled member." },
+  trial_booking: { runtime: "booking", lessonKey: "booking", disclosure: "range", mission: "Book the lead into a free trial session." },
+  trial_confirm: { runtime: "confirm", lessonKey: "confirm", disclosure: "range", mission: "Confirm a booked trial and make sure they show up." },
+  // closing runs AFTER the trial: "details at the trial" is incoherent there, and
+  // its flow points the parent at the specific plan that fits + the sign-up link.
+  // exact is the correct disclosure for that job (Zoran 2026-07-24).
+  closing:       { runtime: "closing", lessonKey: "closing", disclosure: "exact", mission: "Convert a good-fit trial attendee into an enrolled member." },
   // Preset #2 additions - new missions, existing runtimes. Prompt sections to be
   // authored when discovery_trial ships (Phase 2 only DECLARES them).
-  call_booking:  { runtime: "booking", lessonKey: "call_booking", mission: "Book the lead into a discovery call (not a trial yet)." },
-  call_confirm:  { runtime: "confirm", lessonKey: "call_confirm", mission: "Confirm a booked discovery call and make sure they attend it." },
+  call_booking:  { runtime: "booking", lessonKey: "call_booking", disclosure: "range", mission: "Book the lead into a discovery call (not a trial yet)." },
+  call_confirm:  { runtime: "confirm", lessonKey: "call_confirm", disclosure: "range", mission: "Confirm a booked discovery call and make sure they attend it." },
   // Member Care is NOT a pipeline-station agent: it iterates the MEMBERS roster
   // (api/agent-member-care.js), so it never appears as a stage engine. Declared
   // here so its lesson bucket + mission live in the same registry as its siblings.
-  member_care:   { runtime: "member_care", lessonKey: "member_care", mission: "Watch member conversations; propose billing actions, replies, and staff to-dos for approval." },
+  // disclosure "exact" because it talks to people who ALREADY pay a known amount
+  // about their own billing - quoting them a range would be nonsense. Inert today:
+  // member_care is not in AGENT_SPECS, so it gets no pricing_disclosure section.
+  member_care:   { runtime: "member_care", lessonKey: "member_care", disclosure: "exact", mission: "Watch member conversations; propose billing actions, replies, and staff to-dos for approval." },
 };
+
+// ── Build 3: which named TEMPLATE is this preset's <runtime> agent? ───────────
+// The prompt builders only know the RUNTIME ("booking" / "confirm" / "closing")
+// because that is what selects a behaviour in prompt-structure.js. Nothing knew
+// WHICH named template was on shift, so nothing could look up a per-template
+// value. This closes that gap: walk the preset's stages for the agent engine
+// whose template runs on this runtime.
+//
+// Ambiguity is a real possibility by design (discovery_trial runs BOTH
+// call_booking and trial_booking, two "booking" templates in one preset), so the
+// stage walk returns the FIRST in board position order, which is the stage a lead
+// actually reaches first. Callers that need a specific stage's template should
+// pass the template through rather than re-derive it from the runtime.
+//
+// Falls back to a unique registry match when the preset has no such stage. That
+// is what resolves member_care, which is never a stage engine.
+export function templateForRuntime(presetKey, runtime) {
+  if (!runtime) return null;
+  const p = PRESETS[presetKey];
+  if (p) {
+    const stages = [...(p.stages || [])].sort((a, b) => (a.position || 0) - (b.position || 0));
+    for (const s of stages) {
+      const t = s && s.engine && s.engine.kind === "agent" && s.engine.template;
+      if (t && AGENT_TEMPLATES[t] && AGENT_TEMPLATES[t].runtime === runtime) return t;
+    }
+  }
+  const matches = Object.keys(AGENT_TEMPLATES).filter((k) => AGENT_TEMPLATES[k].runtime === runtime);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+// The disclosure mode for a resolved template, always a valid mode.
+export function disclosureForTemplate(template) {
+  const m = template && AGENT_TEMPLATES[template] && AGENT_TEMPLATES[template].disclosure;
+  return DISCLOSURE_MODES.includes(m) ? m : DEFAULT_DISCLOSURE;
+}
 
 // ── Station-model shorthands ─────────────────────────────────────────────────
 // Engines (who works a stage).
@@ -421,6 +475,7 @@ export async function applyPreset({ clientId, offerId, presetKey, dryRun = false
       const dest = t.to_kind === "stage" ? t.to_stage_role : `@${t.to_terminal}`;
       log(`   edge   ${String(t.from_stage_role || "(entry)").padEnd(22)} --${t.trigger}--> ${dest}`);
     }
+    log(`[dry-run] would seed automations (idempotent, edit-safe): ${presetAutomationKeys(presetKey).join(", ")}`);
     return { dryRun: true, stages: stageRows.length, transitions: transitionRows.length, stageRows, transitionRows };
   }
 
@@ -432,6 +487,20 @@ export async function applyPreset({ clientId, offerId, presetKey, dryRun = false
     body: JSON.stringify(stageRows),
   });
 
+  // Seed the preset's automations from the canonical defaults IN THE SAME STEP
+  // (2026-07-25): applying a preset without its drips left academies with stages
+  // but zero automations (San Jose sat like that for two days). Idempotent +
+  // edit-safe (create only if missing, steps only when zero), so a re-stamp
+  // never touches copy an academy already edited. Non-fatal on failure - the
+  // stage anchors are in; a retry or the portal's seed action recovers.
+  let automations = [];
+  try {
+    automations = await seedAutomations({ clientId, offerId, keys: presetAutomationKeys(presetKey), sb });
+    log(`preset '${presetKey}' automations seeded: ${automations.map((a) => `${a.key}${a.created ? " (new)" : ""}=${a.steps ?? "?"} steps`).join(", ")}`);
+  } catch (e) {
+    log(`preset '${presetKey}' automation seed FAILED (recover via seed-preset-automations): ${e.message || e}`);
+  }
+
   log(`preset '${presetKey}' applied → ${stageRows.length} stage anchors for client ${clientId} offer ${offerId || "(none)"}; ${transitionRows.length} edges served live from the master`);
-  return { dryRun: false, stages: stageRows.length, transitions: transitionRows.length };
+  return { dryRun: false, stages: stageRows.length, transitions: transitionRows.length, automations };
 }

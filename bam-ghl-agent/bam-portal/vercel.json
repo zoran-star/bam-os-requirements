@@ -119,6 +119,14 @@
     {
       "path": "/api/twilio/usage-sync?report=1",
       "schedule": "0 13 1 * *"
+    },
+    {
+      "path": "/api/commissions?action=cron-cycles",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/commissions?action=cron-reports",
+      "schedule": "30 12 * * *"
     }
   ],
   "headers": [

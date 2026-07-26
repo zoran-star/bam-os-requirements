@@ -7,7 +7,7 @@ System prompts and building materials for the AI sales agents that run inside Fu
 Zoran
 
 ## Current status
-Booking agent is being built for BAM GTA. Closing AI (post-trial conversion) and Rebooking AI (no-show re-engagement) are currently being designed in whiteboard sessions SES-025 and SES-026. Zoran is figuring out a way to get the training data of all of the best sales academies that BAM Business works with to train the agent. Still in early stage of development. Zoran and Danny have aligned on training process.
+Booking agent is being built for BAM GTA. Closing AI (post-trial conversion) and Rebooking AI (no-show re-engagement) are still to be designed. Zoran is figuring out a way to get the training data of all of the best sales academies that BAM Business works with to train the agent. Still in early stage of development. Zoran and Danny have aligned on training process.
 
 ## End goal
 Fully autonomous lead-to-member conversion with no human involvement required in FC. Every stage of the sales funnel — first contact, trial booking, post-trial follow-up, re-engagement — handled by an AI agent.

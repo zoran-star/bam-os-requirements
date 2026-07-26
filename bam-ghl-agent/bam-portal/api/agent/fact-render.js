@@ -106,25 +106,156 @@ export function renderSchedule(data, locations) {
   return lines.length ? lines.join("\n") : null;
 }
 
-// pricing <- offer.data.pricing.pricing_offerings. Transparency mode stays
-// RANGE for every academy for now (per Zoran it is really PRESET-level - moving
-// it onto the shared preset is a later structural change).
-export function renderPricing(data) {
-  const offerings = arr(data && data.pricing && data.pricing.pricing_offerings).filter((o) => o && o.archived !== true);
-  if (!offerings.length) return null;
-  const monthlies = offerings.map((o) => Number(String(o.price || "").replace(/[^0-9.]/g, ""))).filter((n) => isFinite(n) && n > 0);
-  const lo = monthlies.length ? Math.min(...monthlies) : null;
-  const hi = monthlies.length ? Math.max(...monthlies) : null;
-  const range = (lo && hi) ? (lo === hi ? `$${lo} per month` : `$${lo} to $${hi} per month`) : null;
-  const out = ["Transparency mode: RANGE", ""];
-  if (range) out.push(`When the lead asks about pricing, share the range (${range}) and say full details are covered at the trial.`, "");
-  out.push("Full pricing (internal reference only, do not share unless transparency mode changes to EXACT):");
-  for (const o of offerings) {
-    const m = money(o.price);
-    const commits = arr(o.commitments).map((c) => `${c.length} ${money(c.price) || ""}`.trim()).filter(Boolean).join(" | ");
-    out.push(`- ${o.title || "Plan"}${o.billing_cycle ? ` (${o.billing_cycle})` : ""}: ${m ? m + "/mo" : ""}${commits ? " | " + commits : ""}`.replace(/:\s*\|/, ":"));
-    if (o.whats_included) out.push(`  Includes: ${String(o.whats_included).trim()}`);
+// ── pricing ──────────────────────────────────────────────────────────────────
+// The numbers come from the academy's ROUTABLE, ACTIVE `offer_prices` rows -
+// what api/website/checkout.js can actually sell - NOT from
+// offers.data.pricing. That distinction is the whole point: the offer stores
+// PRE-TAX amounts next to a free-text `added_fees` note, while offer_prices
+// stores the exact total Stripe bills. Until 2026-07-24 this renderer read the
+// offer, so BAM GTA's live agent quoted $200 and $279 for plans that charge
+// $226.00 and $315.27. An agent naming a number the parent is not charged is
+// the worst failure mode in this whole system, worse than one that declines to
+// quote, so the offer's own price fields are deliberately never read here.
+//
+// The offer is still read for everything money is NOT: plan copy, what's
+// included, what a commitment does when it ends, discount codes.
+//
+// `prices` = offer_prices rows for THIS training offer, pre-filtered to
+// is_routable AND is_active (routable requires a confirmed entitlement rule, so
+// it is exactly the sellable set). Three cases, on purpose:
+//   [] (fetched, none)  -> tell the agent to quote NOTHING and flag the admin.
+//                          Deliberate: an academy mid-onboarding stays silent on
+//                          money until its catalog is seeded (Zoran 2026-07-24).
+//   undefined (unknown) -> return null, fall back to stored/default text.
+//   rows                -> render them.
+//
+// Disclosure mode is NOT here. How openly the agent may discuss these numbers is
+// tier-1 sales craft carried by the agent template; this renderer only states
+// the academy's facts. See docs/agent-pricing-transparency-plan.md.
+export const PRICING_NOT_CONFIGURED = [
+  "No sellable prices are configured for this academy yet.",
+  "Do not quote any price, range, plan, or discount, and do not estimate one. Tell the lead you will get them exact numbers, and flag the conversation to the admin.",
+].join("\n");
+
+// offer_prices.billing_interval -> how a human says it.
+const INTERVAL_LABEL = { "4_weeks": "every 4 weeks", "3_months": "3 months prepaid", "6_months": "6 months prepaid" };
+const TERM_WORDS = { "3_months": "3 month", "6_months": "6 month" };
+// Cents -> "$226" / "$315.27". Exact always; trailing ".00" dropped because that
+// is how a coach texting a parent writes it.
+const fromCents = (c) => {
+  const n = Number(c);
+  if (!isFinite(n)) return null;
+  const s = (n / 100).toFixed(2);
+  return `$${s.endsWith(".00") ? s.slice(0, -3) : s}`;
+};
+// Mirrors termFromLength in api/website/offer.js: a commitment's free-text
+// length ("3 Months (12 Weeks)", "24 Weeks") -> the term key in offer_price_key.
+const termFromLength = (length) => {
+  const l = String(length || "").toLowerCase();
+  const m = l.match(/(\d+)\s*month/);
+  if (m) { const n = +m[1]; if (n >= 6) return "6_months"; if (n >= 3) return "3_months"; }
+  if (/24\s*week/.test(l)) return "6_months";
+  if (/12\s*week/.test(l)) return "3_months";
+  return null;
+};
+
+export function renderPricing(data, prices) {
+  if (!Array.isArray(prices)) return null; // caller does not know - fall back
+  const rows = prices.filter((p) =>
+    p && p.is_routable !== false && p.is_active !== false && isFinite(Number(p.amount_cents)) && Number(p.amount_cents) > 0);
+  if (!rows.length) return PRICING_NOT_CONFIGURED;
+
+  // "Summer Unlimited|3_months" -> plan title + term. The title half IS the
+  // offering title, which is also what the parent sees on the enrollment card,
+  // so the agent and the website name the same plan the same way (offer_prices
+  // .title is an internal label and can differ, e.g. GTA's "1/Wk - Monthly").
+  const planOf = (r) => String(r.source_offer_price_key || "").split("|")[0].trim() || String(r.title || "Plan").trim();
+  const termOf = (r) => String(r.source_offer_price_key || "").split("|")[1] || (r.billing_interval === "4_weeks" ? "monthly" : r.billing_interval) || "monthly";
+
+  const offerings = arr(data && data.pricing && data.pricing.pricing_offerings);
+  const offeringFor = (title) => offerings.find((o) => o && String(o.title || "").trim().toLowerCase() === title.toLowerCase()) || {};
+
+  // Group in query order (sort_order) so the agent lists plans the way the
+  // academy ordered them.
+  // Build S: a `<plan>|signup_fee` row is a one-time rider, NOT a plan term.
+  // Left in the term list it would render as a fake commitment length
+  // ("signup_fee: $40"), so it is split out here and stated as its own line.
+  const plans = new Map();
+  const feeByPlan = new Map();
+  for (const r of rows) {
+    const title = planOf(r);
+    if (termOf(r) === "signup_fee") { feeByPlan.set(title, r); continue; }
+    if (!plans.has(title)) plans.set(title, { title, monthly: null, terms: [] });
+    const p = plans.get(title);
+    if (termOf(r) === "monthly") p.monthly = r; else p.terms.push(r);
   }
+  if (!plans.size) return PRICING_NOT_CONFIGURED;   // fee rows alone are not sellable
+
+  const currencies = [...new Set(rows.map((r) => String(r.currency || "").toUpperCase()).filter(Boolean))];
+  const cur = currencies.length === 1 ? ` in ${currencies[0]}` : "";
+  const out = [`These are the exact amounts charged at checkout${cur}, tax included where it applies. Never quote a price that is not listed here.`];
+
+  // The band a RANGE-mode answer draws on: recurring plans only. Both ends exact
+  // - rounding the top down would understate what a parent pays.
+  const recurring = rows.filter((r) => termOf(r) === "monthly").map((r) => Number(r.amount_cents));  // fee rows excluded by termOf
+  if (recurring.length) {
+    const lo = fromCents(Math.min(...recurring)), hi = fromCents(Math.max(...recurring));
+    out.push("", lo === hi ? `Every plan is ${lo} every 4 weeks.` : `Range: ${lo} to ${hi} every 4 weeks.`);
+  }
+
+  out.push("");
+  let sawNotes = false;
+  // Owner-typed copy rarely ends in a full stop; the agent reads this as prose.
+  const sentence = (s) => { const t = String(s || "").trim(); return t && !/[.!?]$/.test(t) ? `${t}.` : t; };
+  for (const p of plans.values()) {
+    const o = offeringFor(p.title);
+    const base = p.monthly ? `${fromCents(p.monthly.amount_cents)} ${INTERVAL_LABEL[p.monthly.billing_interval] || "every 4 weeks"}` : "prepaid terms only";
+    out.push(`- ${p.title}: ${base}.${o.whats_included ? ` ${sentence(o.whats_included)}` : ""}`);
+    // The fee is charged once per athlete at enrollment, and only on the
+    // options the academy marked "Charge". Say the real starting total so
+    // "what does it cost to start" is answered with the number they pay.
+    const feeRow = feeByPlan.get(p.title);
+    if (feeRow) {
+      const chargedOnBase = String(o.signup_fee_on_base || "").toLowerCase() === "charge";
+      const waived = arr(o.commitments)
+        .filter((c) => c && String(c.signup_fee_charge || "").toLowerCase() !== "charge" && termFromLength(c.length))
+        .map((c) => TERM_WORDS[termFromLength(c.length)]).filter(Boolean);
+      const bits = [`    One-time sign-up fee: ${fromCents(feeRow.amount_cents)} per athlete, charged once when they enroll`];
+      if (chargedOnBase && p.monthly) {
+        bits.push(`. Starting on the ${INTERVAL_LABEL[p.monthly.billing_interval] || "every 4 weeks"} option costs ${fromCents(Number(p.monthly.amount_cents) + Number(feeRow.amount_cents))} on the first payment, then ${fromCents(p.monthly.amount_cents)}`);
+      }
+      if (waived.length) bits.push(`. No sign-up fee on the ${waived.join(" or ")} option${waived.length > 1 ? "s" : ""}`);
+      out.push(bits.join("") + ".");
+    }
+    for (const t of p.terms) {
+      const term = termOf(t);
+      const c = arr(o.commitments).find((x) => x && termFromLength(x.length) === term) || {};
+      const after = c.after === "Other" ? String(c.after_other || "").trim() : String(c.after || "").trim();
+      const label = INTERVAL_LABEL[t.billing_interval] || term.replace("_", " ");
+      out.push(`    ${label}: ${fromCents(t.amount_cents)}${after ? `, then ${after.charAt(0).toLowerCase() + after.slice(1)}` : ""}.`);
+      if (c.whats_included) out.push(`      Includes: ${sentence(c.whats_included)}`);
+      if (c.discount_notes) { out.push(`      Note: ${sentence(c.discount_notes)}`); sawNotes = true; }
+    }
+  }
+
+  // Discount codes were in offers.data all along and never rendered, while the
+  // shared objection-handling text told the agent to "highlight any discounts
+  // listed in your pricing config" - pointing at data it had never been given.
+  const codes = arr(data && data.pricing && data.pricing.discount_codes).filter((d) => d && String(d.code || "").trim());
+  if (codes.length) {
+    out.push("", "Discount codes:");
+    for (const d of codes) {
+      const amount = String(d.kind || "").toLowerCase().includes("percent") ? `${d.value}% off` : `${money(d.value) || d.value} off`;
+      const bits = [amount, d.duration ? `applies to ${String(d.duration).toLowerCase()}` : null,
+        String(d.once_per_customer || "").toLowerCase() === "yes" ? "one use per customer" : null].filter(Boolean);
+      out.push(`- ${String(d.code).trim()}: ${bits.join(", ")}.`);
+    }
+  }
+
+  // Owner-typed notes can carry their own arithmetic and go stale against the
+  // catalog. The charged amounts win, and the agent is told so explicitly.
+  if (sawNotes) out.push("", "If a note above disagrees with a plan amount, the plan amount is what gets charged.");
+
   return out.join("\n");
 }
 
@@ -257,30 +388,38 @@ export async function derivedFactOverrides(clientId, sbFn, opts = {}) {
     let hit = factCache.get(clientId);
     if (!hit || Date.now() - hit.at > TTL_MS || opts.fresh === true) {
       const enc = encodeURIComponent(clientId);
-      const [offerRows, clientRows, locationRows, staffRows] = await Promise.all([
-        sbFn(`offers?client_id=eq.${enc}&type=eq.training&select=data&order=sort_order.asc&limit=1`).catch(() => []),
+      // offer_prices is fetched for the whole tenant (routable + active only,
+      // a handful of rows) and narrowed to the training offer below, so all
+      // five reads stay in ONE parallel batch instead of chaining on offer.id.
+      const [offerRows, clientRows, locationRows, staffRows, priceRows] = await Promise.all([
+        sbFn(`offers?client_id=eq.${enc}&type=eq.training&select=id,data&order=sort_order.asc&limit=1`).catch(() => []),
         sbFn(`clients?id=eq.${enc}&select=business_name,address,website_setup&limit=1`).catch(() => []),
         sbFn(`locations?client_id=eq.${enc}&select=id,title,address,notes&order=sort_order.asc&limit=10`).catch(() => []),
         sbFn(`client_users?client_id=eq.${enc}&status=eq.active&select=name,role,title,bio&limit=50`).catch(() => []),
+        sbFn(`offer_prices?tenant_id=eq.${enc}&is_routable=eq.true&is_active=eq.true&order=sort_order.asc&select=title,amount_cents,currency,billing_interval,source_offer_id,source_offer_price_key`).catch(() => null),
       ]);
+      const offer = (Array.isArray(offerRows) && offerRows[0]) || null;
       hit = {
         src: {
-          data:      (Array.isArray(offerRows) && offerRows[0] && offerRows[0].data) || null,
+          data:      (offer && offer.data) || null,
           client:    (Array.isArray(clientRows) && clientRows[0]) || null,
           locations: Array.isArray(locationRows) ? locationRows : [],
           staff:     Array.isArray(staffRows) ? staffRows : [],
+          // null (the read failed) stays null so renderPricing falls back rather
+          // than asserting "no prices configured" on a transient error.
+          prices:    Array.isArray(priceRows) && offer ? priceRows.filter((p) => p && p.source_offer_id === offer.id) : null,
         },
         at: Date.now(),
       };
       factCache.set(clientId, hit);
     }
-    const { data, client, locations, staff } = hit.src;
+    const { data, client, locations, staff, prices } = hit.src;
     if (!data) return {};
     const out = {};
     const set = (key, body) => { if (body) out[key] = body; };
     set("program",        renderProgram(data));
     set("schedule",       renderSchedule(data, locations));
-    set("pricing",        renderPricing(data));
+    set("pricing",        renderPricing(data, prices));
     set("policies",       renderPolicies(data));
     set("business_info",  renderBusinessInfo(client, data, locations));
     set("selling_points", renderSellingPoints(data));

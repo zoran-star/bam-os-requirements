@@ -116,6 +116,9 @@ function termToInterval(term) {
   const t = String(term || "").toLowerCase();
   if (t === "3_months") return { interval: "3_months", recurring: { interval: "month", interval_count: 3 } };
   if (t === "6_months") return { interval: "6_months", recurring: { interval: "month", interval_count: 6 } };
+  // Build S: a sign-up fee is a ONE-TIME price (no recurring block at all), so
+  // it can only ever be billed as an invoice line, never as a subscription.
+  if (t === "one_time" || t === "signup_fee") return { interval: "one_time", recurring: null };
   return { interval: "4_weeks", recurring: { interval: "week", interval_count: 4 } }; // monthly / 4_weeks
 }
 
@@ -238,12 +241,14 @@ async function runApply(req, res, ctx, body, clientId) {
     const amount = Math.round(Number(c.unit_amount_cents));
     if (!Number.isFinite(amount) || amount <= 0) { created.push({ key, error: "invalid unit_amount_cents" }); continue; }
     const currency = String(c.currency || acctCurrency).toLowerCase();
+    const termIv = termToInterval(c.term);
     const recurring = (c.recurring && c.recurring.interval)
       ? c.recurring
-      : termToInterval(c.term).recurring;
+      : termIv.recurring;   // null for a one-time price (sign-up fee)
     // Best-effort catalog interval label from the recurring shape.
     let interval = "4_weeks";
-    if (recurring.interval === "month" && recurring.interval_count === 3) interval = "3_months";
+    if (!recurring) interval = "one_time";
+    else if (recurring.interval === "month" && recurring.interval_count === 3) interval = "3_months";
     else if (recurring.interval === "month" && recurring.interval_count === 6) interval = "6_months";
     const priceName = (c.product_name || (key ? String(key).replace("|", " · ") : "FullControl price")).toString();
 
@@ -255,8 +260,9 @@ async function runApply(req, res, ctx, body, clientId) {
       body: {
         currency,
         unit_amount: amount,
-        "recurring[interval]": recurring.interval,
-        "recurring[interval_count]": recurring.interval_count,
+        // One-time prices carry NO recurring block (stripeFetch drops nulls).
+        "recurring[interval]": recurring ? recurring.interval : null,
+        "recurring[interval_count]": recurring ? recurring.interval_count : null,
         "product_data[name]": priceName,
         "metadata[source]": "fullcontrol-sorter",
         "metadata[offer_price_key]": key || undefined,

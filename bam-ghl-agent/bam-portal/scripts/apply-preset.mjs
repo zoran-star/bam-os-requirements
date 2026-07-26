@@ -60,7 +60,8 @@ if (dryRun && !hasEnv) {
 
 try {
   const res = await applyPreset({ clientId, offerId: offerId || null, presetKey, dryRun, force });
-  console.log(res.dryRun ? "\n(dry run — nothing written)" : `\nDone: ${res.stages} stages + ${res.transitions} edges.`);
+  const seeded = (res.automations || []).map((a) => `${a.key}${a.created ? "*" : ""}`).join(", ");
+  console.log(res.dryRun ? "\n(dry run - nothing written)" : `\nDone: ${res.stages} stages + ${res.transitions} edges. Automations seeded (* = new): ${seeded || "(none)"}`);
 } catch (e) {
   console.error(`apply-preset failed: ${e.message}`);
   process.exit(1);

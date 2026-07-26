@@ -74,8 +74,12 @@ const FRAME = `<!DOCTYPE html>
 </table>
 </body></html>`;
 
-// Per-location strings. Same design, each location's own identity. GTA is the base
-// every new BAM location inherits until it gets its own entry (keyed by client_id).
+// Per-location strings. Same design, each location's own identity, keyed by
+// client_id. An academy WITHOUT an entry here gets its identity derived from
+// RUNTIME vars (the client row) via locFromVars - identity fields fail to EMPTY,
+// never to another academy's config. (The old `|| LOCATIONS[GTA_ID]` fallback
+// leaked GTA's site + owner into every unwired academy's sends - San Jose would
+// have texted "byanymeanstoronto.ca" and signed "coach Zoran", 2026-07-25.)
 const LOCATIONS = {
   // BAM GTA
   "39875f07-0a4b-4429-a201-2249bc1f24df": {
@@ -91,8 +95,58 @@ const LOCATIONS = {
     ownerFirst: "Zoran",
   },
 };
-const GTA_ID = "39875f07-0a4b-4429-a201-2249bc1f24df";
-export function locFor(clientId) { return LOCATIONS[clientId] || LOCATIONS[GTA_ID]; }
+
+// Build a location config from runtime vars (see clientVars below). Everything
+// unknown is EMPTY: the shell drops empty links/lines instead of borrowing
+// another academy's identity.
+function locFromVars(vars = {}) {
+  const name = String(vars.location_name || "");
+  const site = String(vars.location_website || "");
+  // "BAM San Jose" / "By Any Means San Jose" -> gold wordmark suffix "SAN JOSE";
+  // a name without the brand prefix keeps the plain "BY ANY MEANS" wordmark.
+  const stripped = name.replace(/^\s*(?:by\s+any\s+means|bam)\s+/i, "");
+  return {
+    suffix: stripped !== name ? stripped.toUpperCase() : "",
+    locationTag: vars.location_city ? String(vars.location_city).toUpperCase() : "",
+    full: name,
+    tagline: "",
+    siteUrl: site,
+    siteLabel: site.replace(/^https?:\/\//i, ""),
+    email: String(vars.location_email || ""),
+    instagram: "",
+    city: String(vars.location_city || ""),
+    ownerFirst: String(vars.location_owner || ""),
+  };
+}
+
+export function locFor(clientId, vars) { return LOCATIONS[clientId] || locFromVars(vars); }
+
+// The runtime identity vars for a clients row - the academy facts the resolver
+// trusts. Callers that have the client row loaded (the automations worker, the
+// confirm agent, previews) spread this into `vars` so every send renders the
+// academy's OWN name / site / owner, or nothing at all.
+export function clientVars(client) {
+  const c = client || {};
+  const domain = c.website_setup && c.website_setup.domain;
+  return {
+    location_name: c.business_name || "",
+    location_website: domain ? `https://${domain}` : "",
+    location_owner: c.owner_name ? String(c.owner_name).trim().split(/\s+/)[0] : "",
+    location_email: c.email || "",
+    location_city: cityFromAddress(c.address),
+  };
+}
+
+// Best-effort city from a street address ("1051 W San Fernando St, San Jose, CA
+// 95126" -> "San Jose"). Second-to-last comma part, rejected if it carries a
+// digit (street lines / postal codes). Empty when unsure - an empty city just
+// drops its token, which beats a wrong one.
+function cityFromAddress(address) {
+  const parts = String(address || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 2) return "";
+  const cand = parts[parts.length - 2];
+  return /\d/.test(cand) ? "" : cand;
+}
 
 // Resolve GHL-style merge tokens (the ones our imported emails carry) to real values:
 // location tokens from the academy config, contact tokens from `vars` (with friendly
@@ -112,22 +166,34 @@ export function resolveMergeVars(html, L, vars = {}) {
     "contact.athlete_full_name": vars.athlete || "your athlete",
     "contact.athlete_first_name": _athFirst || "your athlete",
     "contact.athletes_first_name": _athFirst || "your athlete",
-    // vars overrides first: locFor() falls back to GTA's config for academies not
-    // in the LOCATIONS map, so callers (the automations worker) pass the REAL
-    // academy name/site via vars to keep GTA's identity out of other academies' sends.
+    // vars overrides first: for an academy without its own LOCATIONS entry, L is
+    // already derived from these same vars (locFromVars), so identity can only
+    // ever be the academy's own values - or EMPTY. Never another academy's.
     "location.city": vars.location_city || L.city || "",
     "location.name": vars.location_name || L.full || "",
     "location.website": vars.location_website || L.siteUrl || "",
-    "location_owner.first_name": L.ownerFirst || "",
+    "location_owner.first_name": vars.location_owner || L.ownerFirst || "",
     // Filled at send time by the worker (e.g. "Our next session is Tue 6pm. ").
     // Empty string when no slot is known so the sentence just drops out.
     "next_session": vars.next_session || "",
   };
   let out = html;
-  for (const [k, val] of Object.entries(map)) {
-    out = out.replace(new RegExp("\\{\\{\\s*" + k.replace(/\./g, "\\.") + "\\s*\\}\\}", "g"), val);
+  // A blank {{location.website}} drops its whole LINE (mirrors the dangling-line
+  // cleanup in confirm-automations.resolveApptTokens): "here's the link:" with
+  // no domain is a broken message. Also swallows a lead-in line ending with ":"
+  // right above the link ("feel free to book in using this link:" must not point
+  // at nothing). Runs before substitution, on text lines only.
+  if (!map["location.website"]) {
+    out = out.replace(/(^[^\n]*:[ \t]*\n+)?^.*\{\{\s*location\.website\s*\}\}.*$\n?/gm, "");
   }
-  return out;
+  for (const [k, val] of Object.entries(map)) {
+    const token = "\\{\\{\\s*" + k.replace(/\./g, "\\.") + "\\s*\\}\\}";
+    if (val) out = out.replace(new RegExp(token, "g"), val);
+    // Empty token: swallow one leading space with it ("coach {{location_owner.
+    // first_name}} from" -> "coach from") so no double space is left behind.
+    else out = out.replace(new RegExp("[^\\S\\n]?" + token, "g"), "");
+  }
+  return out.replace(/\n{3,}/g, "\n\n");
 }
 
 // Dark-mode LOCK. Email clients (Gmail's mobile app especially) auto-"dark mode" a
@@ -175,39 +241,63 @@ function bodyToHtml(body) {
   }).join("");
 }
 
+// Fill the shell identity placeholders (UPPERCASE) in a frame or a full designed
+// template - both carry the same placeholder set since the templates were
+// tokenized (2026-07-25, the canonical no-hardcode build).
+function fillShell(html, L, { pre, unsub }) {
+  return html
+    .replace(/\{\{PREHEADER\}\}/g, pre)
+    .replace(/\{\{WORDMARK_SUFFIX\}\}/g, L.suffix)
+    .replace(/\{\{LOCATION_TAG\}\}/g, L.locationTag)
+    .replace(/\{\{TAGLINE\}\}/g, L.tagline)
+    .replace(/\{\{SITE_URL\}\}/g, L.siteUrl)
+    .replace(/\{\{SITE_LABEL\}\}/g, L.siteLabel)
+    .replace(/\{\{SUPPORT_EMAIL\}\}/g, L.email)
+    .replace(/\{\{INSTAGRAM_URL\}\}/g, L.instagram)
+    .replace(/\{\{ACADEMY_FULL\}\}/g, L.full)
+    .replace(/\{\{UNSUBSCRIBE\}\}/g, unsub);
+}
+
+// An academy with identity fields still empty (no domain / support email /
+// instagram on file) must ship NO broken or borrowed links: drop empty footer
+// anchors (with their dot separators) and any CTA table whose button href came
+// out site-relative (the domain was blank).
+function dropEmptyShellLinks(html) {
+  const SEP = '<span[^>]*>&nbsp;&nbsp;&middot;&nbsp;&nbsp;<\\/span>\\s*';
+  const A = '<a href="(?:mailto:)?"[^>]*>(?:(?!<\\/a>)[\\s\\S])*?<\\/a>';
+  html = html.replace(new RegExp('\\s*' + SEP + A, "g"), "");
+  html = html.replace(new RegExp(A + '\\s*' + SEP, "g"), "");
+  html = html.replace(new RegExp(A, "g"), "");
+  html = html.replace(/<table[^>]*>(?:(?!<table)(?!<\/table>)[\s\S])*?<a href="\/[^"]*"(?:(?!<table)[\s\S])*?<\/table>/g, "");
+  return html;
+}
+
 // Render a full branded email: drop the step body into the academy's shell - OR,
 // if the body is already a FULL designed email (a complete HTML document, e.g.
 // exported from Claude Design), send it AS-IS and only fill its placeholders (it
 // has its own frame; wrapping it again would double the header/footer).
-//   renderEmail({ clientId, subject, body, preheader?, unsubscribeUrl? }) -> html
+//   renderEmail({ clientId, subject, body, preheader?, unsubscribeUrl?, vars? }) -> html
 export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars } = {}) {
-  const L = locFor(clientId);
+  const L = locFor(clientId, vars);
   const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
-  const unsub = unsubscribeUrl || `mailto:${L.email}?subject=Unsubscribe`;
+  const unsub = unsubscribeUrl || (L.email ? `mailto:${L.email}?subject=Unsubscribe` : "");
   // A step body can be a short "template:<key>" reference to a vendored designed
   // email (api/email-templates/) so the DB holds a tiny ref, not 12KB of HTML.
   let raw = String(body || "");
   const tref = raw.match(/^\s*template:([\w/-]+)\s*$/);
   if (tref && TEMPLATES[tref[1]]) raw = TEMPLATES[tref[1]];
+  // Resolve merge tokens BEFORE building markup: a resolved URL line becomes the
+  // gold CTA in bodyToHtml, and an EMPTY {{location.website}} drops its line
+  // while it is still a text line (inside markup it would be too late).
+  raw = resolveMergeVars(raw, L, vars);
   let html;
   if (/^\s*<(?:!doctype|html)/i.test(raw)) {
-    html = raw.replace(/\{\{UNSUBSCRIBE\}\}/g, unsub).replace(/\{\{PREHEADER\}\}/g, pre);
+    html = fillShell(raw, L, { pre, unsub });
   } else {
-    html = FRAME
-      .replace(/\{\{CONTENT\}\}/g, bodyToHtml(body))
-      .replace(/\{\{PREHEADER\}\}/g, pre)
-      .replace(/\{\{WORDMARK_SUFFIX\}\}/g, L.suffix)
-      .replace(/\{\{LOCATION_TAG\}\}/g, L.locationTag)
-      .replace(/\{\{TAGLINE\}\}/g, L.tagline)
-      .replace(/\{\{SITE_URL\}\}/g, L.siteUrl)
-      .replace(/\{\{SITE_LABEL\}\}/g, L.siteLabel)
-      .replace(/\{\{SUPPORT_EMAIL\}\}/g, L.email)
-      .replace(/\{\{INSTAGRAM_URL\}\}/g, L.instagram)
-      .replace(/\{\{ACADEMY_FULL\}\}/g, L.full)
-      .replace(/\{\{UNSUBSCRIBE\}\}/g, unsub);
+    html = fillShell(FRAME.replace(/\{\{CONTENT\}\}/g, bodyToHtml(raw)), L, { pre, unsub });
   }
   // Emails are LIGHT now (white body, black header/footer) so they render the same
   // in light + dark mode everywhere - no dark-mode lock needed (and signaling dark
   // on a light email would be wrong). applyDarkLock is kept for reference only.
-  return resolveMergeVars(html, L, vars);
+  return dropEmptyShellLinks(resolveMergeVars(html, L, vars));
 }

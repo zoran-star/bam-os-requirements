@@ -26088,6 +26088,7 @@ function _bbValOfferEmpty(v) {
 function _bbValOfferDepOk(scope, dep) {
   if (!dep) return true;
   const v = scope[dep.key];
+  if (dep.notEmpty) return String(v == null ? '' : v).trim() !== '';
   if (v == null) return false;
   const want = Array.isArray(dep.equals) ? dep.equals : [dep.equals];
   return Array.isArray(v) ? v.some(x => want.includes(x)) : want.includes(v);
@@ -26265,8 +26266,68 @@ function _bbRenderGeneralCard(panel, meta) {
          It's a system setting, not business identity. Edited at Settings >
          Time zone; still persisted to clients.time_zone via the same RPC. -->
 
+    <!-- Sales tax TEMPLATE (Build T of the money model, docs/money-model-plan.md).
+         Set once; every price/fee then flips taxable yes/no in the offer wizard.
+         tax_config is NOT in CLIENT_SELECT_COLS (same as brand_data), so the
+         values hydrate async below. -->
+    <div class="bb-field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+      <div class="bb-field-label">Sales tax</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px">
+          <input id="bb-gen-tax_label" type="text" class="bb-input" placeholder="e.g. HST, Sales tax" oninput="_bbGenTaxChanged()" />
+          <div class="bb-field-hint">What the tax is called</div>
+        </div>
+        <div style="width:110px">
+          <input id="bb-gen-tax_pct" type="number" min="0" max="40" step="0.01" class="bb-input" placeholder="0" oninput="_bbGenTaxChanged()" />
+          <div class="bb-field-hint">Rate %</div>
+        </div>
+      </div>
+      <div class="bb-field-hint" id="bb-gen-tax-note">Leave empty if you charge no sales tax. Prices are then charged exactly as entered.</div>
+    </div>
+
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
   `;
+  _bbGenHydrateTax();
+}
+
+// tax_config hydrates async (not in CLIENT_SELECT_COLS - same pattern as
+// brand_data). The preview line restates what a taxable price will charge, and
+// warns that a rate CHANGE does not move already-created Stripe prices (risk 3
+// of the money-model plan: re-price through Price Match, never silently).
+async function _bbGenHydrateTax() {
+  try {
+    const { data } = await _sb.from('clients').select('tax_config').eq('id', CLIENT_ID).maybeSingle();
+    const t = (data && data.tax_config) || null;
+    const l = document.getElementById('bb-gen-tax_label'), r = document.getElementById('bb-gen-tax_pct');
+    if (l && t && t.label) l.value = t.label;
+    if (r && t && t.pct != null) r.value = t.pct;
+    _bbGenTaxNote();
+  } catch (_) { /* leave placeholders */ }
+}
+function _bbGenTaxNote() {
+  const note = document.getElementById('bb-gen-tax-note'); if (!note) return;
+  const pct = parseFloat(document.getElementById('bb-gen-tax_pct')?.value);
+  const name = (document.getElementById('bb-gen-tax_label')?.value || '').trim();
+  if (isFinite(pct) && pct > 0) {
+    const allin = Math.round(10000 * (1 + pct / 100)) / 100;
+    note.innerHTML = 'A $100.00 taxable price charges <b>$' + allin.toFixed(2) + '</b>. New prices count as taxable unless you pick No on them. Changing the rate later does <b>not</b> change prices already created in Stripe - re-price them through your pricing setup.';
+  } else {
+    note.textContent = 'Leave empty if you charge no sales tax. Prices are then charged exactly as entered.';
+  }
+}
+let _bbGenTaxSaveTimer = null;
+function _bbGenTaxChanged() {
+  _bbGenTaxNote();
+  // Own debounce timer: _bbBasicsScheduleSave shares ONE timer, so scheduling
+  // tax through it could swallow a basics patch typed <600ms earlier.
+  if (_bbGenTaxSaveTimer) clearTimeout(_bbGenTaxSaveTimer);
+  _bbGenTaxSaveTimer = setTimeout(() => _bbSaveClientBasics(_bbGenTaxPatch()), 600);
+}
+function _bbGenTaxPatch() {
+    const pct = parseFloat(document.getElementById('bb-gen-tax_pct')?.value);
+    const label = (document.getElementById('bb-gen-tax_label')?.value || '').trim();
+    // Valid rate -> save the template; anything else -> explicit null clears it.
+    return { tax_config: (isFinite(pct) && pct > 0) ? { label, pct } : null };
 }
 
 // Common time zones (IANA value · friendly label). "" = not set.
@@ -27826,6 +27887,35 @@ async function _bbCouponPillClick(el) {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     const failed = (json.results || []).find(x => x.error);
     if (failed) throw new Error(failed.error);
+
+    // Build C: the code is already live but Stripe is not enforcing the
+    // "applies to" list. A coupon's limits are immutable in Stripe, so the
+    // only way to apply them is to re-issue the code. Confirm explicitly,
+    // because it swaps the code parents type.
+    const stale = (json.results || []).find(x => x.needs_reissue);
+    if (stale) {
+      const go = await _mmModal({
+        icon: '', title: 'Update what ' + code + ' applies to?',
+        body: escapeHTML(stale.message) +
+          '<br><br>Stripe cannot change these limits on an existing code, so we create a fresh one with the same name. ' +
+          '<b>Parents already subscribed keep the discount they signed up with.</b>',
+        okLabel: 'Update in Stripe',
+      });
+      if (!go) { _bbApplyCouponPills(); return; }
+      el.textContent = '● updating…';
+      const r2 = await fetch('/api/offers/create-discount', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ client_id: _aiClientId(), codes: [def], reissue: true }),
+      });
+      const j2 = await _safeJson(r2);
+      if (!r2.ok) throw new Error(j2.error || ('HTTP ' + r2.status));
+      const f2 = (j2.results || []).find(x => x.error);
+      if (f2) throw new Error(f2.error);
+      await _bbLoadCouponHealth(true);
+      _plToast(code + ' updated. Stripe now applies it only to what you ticked.');
+      return;
+    }
+
     await _bbLoadCouponHealth(true);
     _plToast(code + ' is now live in Stripe.');
   } catch (e) {
@@ -29019,7 +29109,7 @@ function _factJumpTo(jump) {
 async function _taRenderKnowledge() {
   const p = document.getElementById('ta-panel'); if (!p) return;
   p.innerHTML = `
-    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.5">Your academy's facts power every reply - edit one and the agent uses it next time. Sections marked <b style="color:#6EA8D8">Live</b> are generated straight from your offer, locations, and team, so you edit them at the source. Sections marked <b style="color:#D4B65C">Global</b> are shared across <b>all</b> academies (edit carefully); <b><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></b> are managed by BAM.</p>
+    <p style="color:var(--text-mute);font-size:12.5px;margin:0 0 14px;line-height:1.5">Your academy's facts power every reply - edit one and the agent uses it next time. Sections marked <b style="color:#6EA8D8">Live</b> are generated straight from your offer, locations, and team, so you edit them at the source. Sections marked <b style="color:var(--gold,#D4B65C)">Policy</b> are sales rules BAM sets for every academy, so they are read only. Sections marked <b style="color:#D4B65C">Global</b> are shared across <b>all</b> academies (edit carefully); <b><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></b> are managed by BAM.</p>
     <div id="ta-section-list"><div class="req-empty"><span class="req-spin"></span>Loading…</div></div>`;
   try {
     // fresh re-fetch after an "Edit the brain" round trip (flag set by _factJumpTo)
@@ -29028,8 +29118,9 @@ async function _taRenderKnowledge() {
     _TA._trainingOfferId = res.training_offer_id || null;
     const sections = (res.sections || []);
     const derived  = sections.filter(s => s.scope === 'derived');
-    const editable = sections.filter(s => s.scope !== 'derived' && s.editable);
-    const locked   = sections.filter(s => s.scope !== 'derived' && !s.editable);
+    const policy   = sections.filter(s => s.scope === 'policy');
+    const editable = sections.filter(s => s.scope !== 'derived' && s.scope !== 'policy' && s.editable);
+    const locked   = sections.filter(s => s.scope !== 'derived' && s.scope !== 'policy' && !s.editable);
     const host = document.getElementById('ta-section-list'); if (!host) return;
 
     // ── Brain health strip: N of 8 facts live + chips for any fully-missing fact ──
@@ -29072,6 +29163,32 @@ async function _taRenderKnowledge() {
       </div>`;
       }).join('') : '';
 
+    // ── Policy sections (Build 6): read-only for EVERYONE, including BAM staff and
+    // the global-editor academy. The mode is declared on the agent template in code,
+    // and it is applied after stored overrides, so an edit here would save and then
+    // be ignored. Showing it locked with the active mode is the honest UI.
+    const policyHtml = policy.length ? `<div style="font-size:12px;color:var(--text-mute);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;margin:2px 0 8px">Sales policy, set by BAM</div>` +
+      policy.map(s => {
+        const open = !!_TA.openSections[s.key];
+        const mode = (s.policy && s.policy.mode) ? String(s.policy.mode).toUpperCase() : '';
+        const srcLabel = (s.source && s.source.label) || '';
+        return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
+        <button onclick="_taToggleSec('${s.key}')" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:none;border:none;color:var(--text);padding:14px 16px;cursor:pointer;font-family:inherit;text-align:left">
+          <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:14px">${escapeHTML(s.label)}</span>
+            ${mode ? `<span style="color:var(--gold,#D4B65C);font-size:10.5px;font-family:monospace;border:1px solid var(--gold,#D4B65C);border-radius:99px;padding:1px 7px">${escapeHTML(mode)}</span>` : ''}
+            <span style="color:var(--text-mute);font-size:10.5px;font-family:monospace;border:1px solid var(--border);border-radius:99px;padding:1px 7px">SET BY BAM</span>
+          </span>
+          <span id="ta-chev-${s.key}" style="color:var(--text-mute);font-size:11px;transition:transform .15s;transform:rotate(${open ? 90 : 0}deg)">▶</span>
+        </button>
+        <div id="ta-sec-body-${s.key}" style="display:${open ? 'block' : 'none'};padding:0 16px 14px">
+          ${srcLabel ? `<div style="font-size:11.5px;color:var(--gold,#D4B65C);background:rgba(212,182,92,.08);border:1px solid rgba(212,182,92,.33);border-radius:8px;padding:7px 10px;margin-bottom:8px;line-height:1.45">${escapeHTML(srcLabel)}</div>` : ''}
+          <div style="white-space:pre-wrap;font-size:13.5px;color:var(--text-sub);line-height:1.55;background:var(--surface-el,#222);border:1px solid var(--border);border-radius:10px;padding:10px 12px">${escapeHTML(s.body)}</div>
+        </div>
+      </div>`;
+      }).join('') : '';
+
     // ── Editable (local + global-editable) sections ──
     let html = editable.map(s => {
       const open = !!_TA.openSections[s.key];
@@ -29104,7 +29221,7 @@ async function _taRenderKnowledge() {
     const autosSlot = hasAutos
       ? `<div id="confirm-autos-card"><div class="req-empty"><span class="req-spin"></span>Loading automations…</div></div>`
       : '';
-    const listBody = derivedHtml + html;
+    const listBody = derivedHtml + policyHtml + html;
     host.innerHTML = stripHtml + autosSlot + (listBody || `<div class="bb-empty">No sections yet.</div>`);
     if (hasAutos) _confirmAutosLoad(_TA.target);
   } catch (e) {
@@ -30164,6 +30281,10 @@ const _bbDiscountCodesField = {
     { key:'duration_months', type:'number', label:'How many months?', required:true,
       dep:{ key:'duration', equals:'A set number of months' },
       hint:'The discount applies for this many billing months, then full price.' },
+    { key:'applies_to', type:'check_many', label:'What does this code apply to?',
+      optionsFrom:'offer_price_keys',
+      emptyHint:'Add your prices above first, then come back and pick which ones this code discounts.',
+      hint:'Tick nothing = the code applies to everything (how codes worked before). Tick specific prices and it only ever discounts those, including whether it touches a sign-up fee. Changing this later creates a fresh code in Stripe; parents already subscribed keep the discount they signed up with.' },
     { key:'expires_at', type:'date', label:'Expires on (optional)',
       hint:'Leave blank for no expiry. After this date the code stops working.' },
     { key:'max_redemptions', type:'number', label:'Max total uses (optional)',
@@ -30200,10 +30321,24 @@ const _bbStdPricing = [
       { key:'billing_cycle_other', type:'text', label:'Billing cycle - specify', required:true,
         dep:{ key:'billing_cycle', equals:'Other' },
         hint:'e.g. "every 6 weeks", "per term"' },
-      { key:'added_fees', type:'text', label:'Added fees',
-        hint:'Percentage or dollar amount on top of the pre-tax price. e.g. "+13% HST" or "$25"' },
-      { key:'added_fees_description', type:'text', label:'Added fees - description',
-        hint:'What the added fees cover (e.g. "Ontario sales tax", "admin / processing")' },
+      { key:'taxable', type:'check_one', label:'Taxable?',
+        options:['Yes','No'],
+        hint:'Uses your academy tax setting (Blueprint > General > Sales tax). With a tax set, unanswered counts as Yes; pick No for a tax-exempt price. No tax set = nothing is ever added.' },
+      // ── One-time sign-up fee (Build S of the money model) ──────────────
+      // A fee charged ONCE when an athlete enrolls, never on renewals. It is
+      // PER ATHLETE: one enrollment is one athlete, so two siblings signing up
+      // means two checkouts and two fees. Charge-or-waive is an explicit choice
+      // on every option (dep-gated below); nothing is assumed, so an option you
+      // never answer charges nothing extra.
+      { key:'signup_fee', type:'currency', label:'One-time sign-up fee (pre-tax)',
+        dep:{ key:'type', equals:'Membership' },
+        hint:'Leave empty if you do not charge one. Charged once per athlete at enrollment, never on renewals. Pick which options actually charge it below.' },
+      { key:'signup_fee_taxable', type:'check_one', label:'Is the sign-up fee taxable?',
+        options:['Yes','No'], dep:{ key:'signup_fee', notEmpty:true },
+        hint:'Taxed independently of the plan, using your academy tax setting.' },
+      { key:'signup_fee_on_base', type:'check_one', label:'Charge it on the base billing option?',
+        options:['Charge','Waive'], dep:{ key:'signup_fee', notEmpty:true },
+        hint:'The recurring option above (e.g. every 4 weeks). Unanswered = not charged. If you waive it everywhere, the fee is never charged at all, which is legal but probably not what you meant. Note: if any of your discount codes has no "applies to" list, the fee stays inactive, because that code would discount it too. Set what each code applies to first.' },
       { key:'commitments', type:'block_builder', label:'Commitments',
         dep:{ key:'type', equals:'Membership' },
         hint:'Optional discounted longer-term commitments (e.g. 3-month, 6-month, annual) that the client can choose instead of the default billing cycle.',
@@ -30214,10 +30349,12 @@ const _bbStdPricing = [
             hint:'What\'s included for this commitment - same as the base price unless it changes (extra sessions, bonus gear, locked-in rate, etc.).' },
           { key:'price', type:'currency', label:'Price (pre-tax)', required:true,
             hint:'Headline number before added fees' },
-          { key:'added_fees', type:'text', label:'Added fees',
-            hint:'Percentage or dollar amount on top. e.g. "+13% HST" or "$25"' },
-          { key:'added_fees_description', type:'text', label:'Added fees - description',
-            hint:'What the added fees cover' },
+          { key:'taxable', type:'check_one', label:'Taxable?',
+            options:['Yes','No'],
+            hint:'Defaults to the plan\'s answer when unset. Uses your academy tax setting.' },
+          { key:'signup_fee_charge', type:'check_one', label:'Charge the sign-up fee on this commitment?',
+            options:['Charge','Waive'],
+            hint:'Only applies if the plan has a sign-up fee. Unanswered = not charged. Waiving here is the classic nudge toward committing.' },
           { key:'discount_notes', type:'textarea', label:'Notes on the discount',
             hint:'Optional. e.g. "$20/mo off the regular monthly rate" or "Total of $750 vs $900 paid monthly"' },
           { key:'after', type:'check_one', label:'What happens after the commitment?', required:true,
@@ -30867,10 +31004,48 @@ function _bbIsDepVisible(field, sectionId) {
   if (!field.dep) return true;
   const sec = ((_bbState.offer.data || {})[sectionId]) || {};
   const v = sec[field.dep.key];
+  // dep { notEmpty:true } = show once the parent field has any value (used by
+  // the sign-up fee group, which only makes sense after an amount is typed).
+  if (field.dep.notEmpty) return String(v == null ? '' : v).trim() !== '';
   if (v == null) return false;
   const want = Array.isArray(field.dep.equals) ? field.dep.equals : [field.dep.equals];
   if (Array.isArray(v)) return v.some(x => want.includes(x));
   return want.includes(v);
+}
+
+// Build C: option generators for check_many fields whose choices come from the
+// academy's own data rather than the config. Keyed by a field's `optionsFrom`.
+const _BB_DYNAMIC_OPTIONS = {
+  // Every price a code could apply to, as `<plan>|<term>` keys - the SAME keys
+  // the catalog uses - plus each plan's one-time sign-up fee as its own line.
+  // Read from the offer being edited, so it works before Price Match has run;
+  // the server re-checks each key against LIVE routable prices at create time
+  // and refuses the code if none of them resolve.
+  offer_price_keys(sectionId) {
+    const pricing = ((_bbState.offer.data || {})[sectionId]) || {};
+    const out = [];
+    for (const o of (pricing.pricing_offerings || [])) {
+      if (!o || o.archived || String(o.type || '').toLowerCase() !== 'membership') continue;
+      const title = String(o.title || '').trim();
+      if (!title) continue;
+      if (o.price) out.push({ value: `${title}|monthly`, label: `${title} · every 4 weeks` });
+      for (const c of (o.commitments || [])) {
+        const t = _bbTermFromLength(c && c.length);
+        if (t && c.price) out.push({ value: `${title}|${t}`, label: `${title} · ${t.replace('_', ' ')}` });
+      }
+      if (o.signup_fee) out.push({ value: `${title}|signup_fee`, label: `${title} · sign-up fee (one time)` });
+    }
+    return out;
+  },
+};
+// Mirrors termFromLength on the server (offer.js / fact-render.js / checkout.js).
+function _bbTermFromLength(length) {
+  const l = String(length || '').toLowerCase();
+  const m = l.match(/(\d+)\s*month/);
+  if (m) { const n = +m[1]; if (n >= 6) return '6_months'; if (n >= 3) return '3_months'; }
+  if (/24\s*week/.test(l)) return '6_months';
+  if (/12\s*week/.test(l)) return '3_months';
+  return null;
 }
 
 function _bbRenderField(field, sectionId) {
@@ -30879,9 +31054,10 @@ function _bbRenderField(field, sectionId) {
   const val = _bbGetVal(field, sectionId);
   const reqMark = field.required ? '<span class="bb-field-req">*</span>' : '';
   const hint = field.hint ? `<div class="bb-field-hint">${_bbEscapeHtml(field.hint)}</div>` : '';
-  const depBadge = field.dep
-    ? `<span class="bb-dep-badge">↳ if ${_bbEscapeHtml(field.dep.key)} = ${_bbEscapeHtml(Array.isArray(field.dep.equals) ? field.dep.equals.join(' / ') : field.dep.equals)}</span>`
-    : '';
+  const depBadge = !field.dep ? ''
+    : field.dep.notEmpty
+      ? `<span class="bb-dep-badge">↳ if ${_bbEscapeHtml(field.dep.key)} is set</span>`
+      : `<span class="bb-dep-badge">↳ if ${_bbEscapeHtml(field.dep.key)} = ${_bbEscapeHtml(Array.isArray(field.dep.equals) ? field.dep.equals.join(' / ') : field.dep.equals)}</span>`;
 
   const onInputHandler = field.key === '__title__'
     ? `_bbUpdateTitle(this.value)`
@@ -30916,9 +31092,17 @@ function _bbRenderField(field, sectionId) {
       break;
     case 'check_many': {
       const arr = Array.isArray(val) ? val : [];
-      body = `<div class="bb-choice-row">${(field.options || []).map(opt => `
-        <button type="button" class="bb-choice ${arr.includes(opt) ? 'selected' : ''}" onclick="_bbToggleMany('${sectionId}','${field.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
-      `).join('')}</div>`;
+      // optionsFrom = a named generator for options the config can't hardcode
+      // because they come from the academy's own data (Build C's price list).
+      // Each entry is { value, label }; a plain string stays a plain string.
+      const many = field.optionsFrom
+        ? (_BB_DYNAMIC_OPTIONS[field.optionsFrom] || (() => []))(sectionId)
+        : (field.options || []).map(o => ({ value: o, label: o }));
+      body = many.length
+        ? `<div class="bb-choice-row">${many.map(o => `
+        <button type="button" class="bb-choice ${arr.includes(o.value) ? 'selected' : ''}" onclick="_bbToggleMany('${sectionId}','${field.key}','${_bbEscapeAttr(o.value)}')">${_bbEscapeHtml(o.label)}</button>
+      `).join('')}</div>`
+        : `<div class="bb-field-hint">${_bbEscapeHtml(field.emptyHint || 'Nothing to choose from yet.')}</div>`;
       break;
     }
     case 'check_many_defaults': {
@@ -31233,6 +31417,7 @@ function _bbRenderField(field, sectionId) {
 function _bbIsSubDepVisible(sf, row) {
   if (!sf.dep) return true;
   const v = row[sf.dep.key];
+  if (sf.dep.notEmpty) return String(v == null ? '' : v).trim() !== '';
   if (v == null) return false;
   const want = Array.isArray(sf.dep.equals) ? sf.dep.equals : [sf.dep.equals];
   if (Array.isArray(v)) return v.some(x => want.includes(x));
@@ -35488,6 +35673,7 @@ const _AI_SYS_TRACKER_KEYS = ['sys_build_draft', 'sys_client_review', 'sys_revis
 
 function _aiOnbHTML(it) {
   if (_AI_SYS_TRACKER_KEYS.includes(it.onboarding_key)) return _aiSysStopHTML(it);
+  if (it.call_step) return _aiCallStopHTML(it);
   const cfg = ONB_UI[it.onboarding_key] || {};
   const isDone = !!it.completed_at;
   // book_review_call is locked (greyed, non-interactive) until staff flip the
@@ -35580,6 +35766,39 @@ function _aiSysStopHTML(it) {
     <div class="ai-stop-body">
       <div class="ai-stop-title">${escapeHTML(it.title)}</div>
       <div class="ai-stop-meta">${chip}${cta}</div>
+    </div>
+  </div>`;
+}
+
+// Render one of the 7 SM onboarding-call stops (the structured call sequence).
+// The calls run in STRICT ORDER and are completed by the Scaling Manager on
+// the call itself - the circle is read-only for clients. Status pills:
+//   ✓ Done          - the SM marked the call complete
+//   In progress     - this is the next call up (previous one is done)
+//   Waiting on Call N-1 - locked until the previous call is marked done
+function _aiCallStopHTML(it) {
+  const isDone = !!it.completed_at;
+  const locked = !!it.call_locked && !isDone;
+  const topics = it.call_topics ? `<span class="ai-stop-hint">${escapeHTML(it.call_topics)}</span>` : '';
+  if (locked) {
+    const prev = (it.call_waiting_on || '').split(':')[0] || 'the previous call';
+    return `<div class="ai-stop locked">
+      <div class="ai-stop-rail"><span class="ai-stop-circle"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><div class="ai-stop-line"></div></div>
+      <div class="ai-stop-body">
+        <div class="ai-stop-title">${escapeHTML(it.title)}</div>
+        <div class="ai-stop-meta"><span class="ai-chip">Waiting on ${escapeHTML(prev)}</span>${topics}</div>
+      </div>
+    </div>`;
+  }
+  const chip = isDone
+    ? `<span class="ai-chip" style="color:var(--green)">✓ Done</span>`
+    : `<span class="ai-chip" style="color:var(--amber)">In progress</span>`;
+  const circle = `<span class="ai-stop-circle${isDone ? ' on' : ''}" style="cursor:default" aria-disabled="true" title="${isDone ? 'Completed by your Scaling Manager' : 'Your Scaling Manager marks this done on your call'}">${isDone ? _AI_CHECK_ICON : ''}</span>`;
+  return `<div class="ai-stop${isDone ? ' done' : ''}">
+    <div class="ai-stop-rail">${circle}<div class="ai-stop-line"></div></div>
+    <div class="ai-stop-body">
+      <div class="ai-stop-title">${escapeHTML(it.title)}</div>
+      <div class="ai-stop-meta">${chip}${isDone ? '' : topics}</div>
     </div>
   </div>`;
 }
@@ -38239,7 +38458,7 @@ async function _plSetStatus(oppId, status, reason) {
 function _plToast(msg) {
   clearTimeout(_plUndoTimer);
   document.getElementById('pl-undo-toast')?.remove();
-  document.body.insertAdjacentHTML('beforeend', `<div id="pl-undo-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9200;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);box-shadow:0 8px 30px rgba(0,0,0,.45)">${escapeHTML(msg)}</div>`);
+  document.body.insertAdjacentHTML('beforeend', `<div id="pl-undo-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10400;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);box-shadow:0 8px 30px rgba(0,0,0,.45)">${escapeHTML(msg)}</div>`);
   _plUndoTimer = setTimeout(() => document.getElementById('pl-undo-toast')?.remove(), 4000);
 }
 
@@ -38348,7 +38567,7 @@ function _plShowUndo(action, label) {
   _plUndoState = action;
   clearTimeout(_plUndoTimer);
   document.getElementById('pl-undo-toast')?.remove();
-  document.body.insertAdjacentHTML('beforeend', `<div id="pl-undo-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9200;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,.45)">
+  document.body.insertAdjacentHTML('beforeend', `<div id="pl-undo-toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10400;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:16px;box-shadow:0 8px 30px rgba(0,0,0,.45)">
     <span style="font-size:13px;color:var(--text)">${escapeHTML(label)}</span>
     <button onclick="_plUndo()" style="background:none;border:none;color:var(--gold);font-weight:700;font-size:13px;cursor:pointer">Undo</button>
   </div>`);
@@ -48556,8 +48775,8 @@ async function _memberCareDoAction(cardId) {
     const result = await _memberAction(c.member_id, c.action, c.action_body || {});
     await _memberCarePost({ action: 'mark-action-done', id: c.id });
     if ((c.action === 'payment-link' || c.action === 'card-setup-link') && result && result.url) {
-      try { await navigator.clipboard.writeText(result.url); if (typeof _plToast === 'function') _plToast('Link copied to clipboard'); }
-      catch (_) { alert('Link ready: ' + result.url); }
+      // Same send modal as the drawer button: write the message or just copy.
+      _openPaymentLinkModal(c.member_id, result);
     }
     if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
   } catch (e) {
@@ -49143,10 +49362,12 @@ async function magentConfirm() {
   try {
     const result = await _memberAction(p.member_id, p.action, p.body || {});
     _MAGENT.busy = false;
-    // payment-link / card-setup-link return a URL rather than a state change.
+    // payment-link / card-setup-link return a URL rather than a state change -
+    // open the send modal so staff can write the message or just copy the link.
     let done = 'Done. ' + (p.summary || (p.action + ' applied.'));
     if ((p.action === 'payment-link' || p.action === 'card-setup-link') && result && result.url) {
-      done = 'Link ready: ' + result.url;
+      done = 'Link ready - write the message or copy the link.';
+      _openPaymentLinkModal(p.member_id, result);
     }
     _MAGENT.history.push({ role: 'assistant', text: done });
     magentRender();
@@ -49962,19 +50183,110 @@ async function _setupBillingCreate() {
   } catch (e) { alert("Couldn't create the subscription: " + _sorterErr(e)); }
 }
 
-// Right-side modal: shows the Stripe portal URL + pre-formatted SMS/email
-// the staff can edit, then sends it. The send endpoint is provider-aware:
-// SMS routes through Twilio and Email through Resend for academies off GHL,
-// and through GHL for academies still on it. Buttons gate on per-channel
-// readiness (data.messaging), not on GHL specifically.
+// Payment / card link modal: shows the Stripe link, a message the staff can
+// edit with the link pinned to the BOTTOM, and per-channel send buttons. The
+// send endpoint is provider-aware: SMS routes through Twilio and Email through
+// Resend for academies off GHL, and through GHL for academies still on it.
+// Buttons gate on per-channel readiness (data.messaging), not on GHL.
+//
+// LAYERING: the member drawer sits at z 8900/8950 (10055/10060 elevated) and the
+// members focus chat at 9999. This modal therefore lives on document.body at
+// z 10300+. It used to render at z 81 inside #member-modal-host, which meant it
+// opened UNDERNEATH the drawer's full-screen backdrop - the button looked dead.
+let _PL = { memberId: null, url: '', parent: {}, channel: 'sms', smsReady: false, emailReady: false };
+
 function _openPaymentLinkModal(memberId, data) {
-  const host = document.getElementById('member-modal-host') || document.body;
-  const url       = data.url || '';
-  const parent    = data.parent || {};
-  const ghl       = data.ghl    || { ready: false };
-  const messaging = data.messaging || null;
-  const suggested = data.suggested || {};
-  // Native share sheet (app builds with the Share plugin)
+  _closePaymentLinkModal();
+  const d         = data || {};
+  const url       = d.url || '';
+  const parent    = d.parent || {};
+  const ghl       = d.ghl    || { ready: false };
+  const messaging = d.messaging || null;
+  const suggested = d.suggested || {};
+
+  // Per-channel send readiness. Falls back to the legacy GHL flag for older
+  // response shapes. A channel also needs the parent's phone / email on file.
+  const hasPhone   = !!parent.phone;
+  const hasEmail   = !!parent.email;
+  const smsReady   = (messaging ? !!messaging.sms_ready   : !!ghl.ready) && hasPhone;
+  const emailReady = (messaging ? !!messaging.email_ready : !!ghl.ready) && hasEmail;
+
+  // The message body is the suggested copy WITHOUT the URL - the link is pinned
+  // to the bottom of whatever the staff types, so it can never get deleted.
+  let body = String(suggested.sms_text || '');
+  if (url) body = body.split(url).join('');
+  body = body.replace(/[ \t]+\n/g, '\n').trim();
+  if (!body) body = "Here's the link to update your card on file:";
+  const subject = suggested.email_subject || 'Update your card on file';
+
+  _PL = { memberId, url, parent, channel: smsReady ? 'sms' : (emailReady ? 'email' : 'sms'), smsReady, emailReady };
+
+  const reasons = [];
+  if (!hasPhone) reasons.push('No parent phone on file.');
+  else if (!smsReady) reasons.push('SMS is not set up for this academy yet.');
+  if (!hasEmail) reasons.push('No parent email on file.');
+  else if (!emailReady) reasons.push('Email is not set up for this academy yet.');
+
+  const lbl = 'font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px';
+  const fld = 'width:100%;background:var(--bg,#0e0e11);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font:inherit;font-size:13px;outline:none;box-sizing:border-box';
+  const tab = (on) => 'flex:1;padding:8px 10px;border-radius:8px;border:1px solid ' + (on ? 'var(--gold,#D4B65C)' : 'var(--border)') +
+    ';background:' + (on ? 'rgba(212,182,92,0.13)' : 'transparent') + ';color:' + (on ? 'var(--gold,#D4B65C)' : 'var(--text-sub,#aaa)') +
+    ';font:inherit;font-size:12.5px;font-weight:700;cursor:pointer';
+
+  const wrap = document.createElement('div');
+  wrap.id = 'pl-modal';
+  wrap.innerHTML = `
+    <div id="pl-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10300" onclick="_closePaymentLinkModal()"></div>
+    <div id="pl-modal-card" role="dialog" aria-modal="true" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 32px);overflow:auto;background:var(--surface,#16161a);border:1px solid var(--border);border-radius:14px;z-index:10301;padding:20px;color:var(--text)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px">
+        <div>
+          <div style="font-size:17px;font-weight:800">Payment link</div>
+          <div style="font-size:12px;color:var(--text-mute);margin-top:3px">${escapeHTML(parent.name || 'Parent')} · ${escapeHTML(parent.phone || '-')} · ${escapeHTML(parent.email || '-')}</div>
+        </div>
+        <button onclick="_closePaymentLinkModal()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;line-height:1;padding:0 6px">×</button>
+      </div>
+
+      <!-- Just the link -->
+      <div style="${lbl}">The link</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-bottom:18px">
+        <input id="pl-url" readonly value="${escapeHTML(url)}" style="${fld};flex:1 1 220px;width:auto;font-family:'DM Mono','JetBrains Mono',ui-monospace,monospace;font-size:12px">
+        <button onclick="_plCopyUrl()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit;font-weight:700;font-size:12.5px;flex:0 0 auto">Copy</button>
+        <a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;font-weight:700;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;flex:0 0 auto">Open ↗</a>
+      </div>
+
+      <!-- Or send it with a message -->
+      <div style="${lbl}">Send it with a message</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button id="pl-tab-sms"   onclick="_plChannel('sms')"   style="${tab(_PL.channel === 'sms')}">Text</button>
+        <button id="pl-tab-email" onclick="_plChannel('email')" style="${tab(_PL.channel === 'email')}">Email</button>
+      </div>
+
+      <div id="pl-subject-row" style="margin-bottom:8px;display:${_PL.channel === 'email' ? 'block' : 'none'}">
+        <input id="pl-email-subject" value="${escapeHTML(subject)}" placeholder="Subject" style="${fld}">
+      </div>
+
+      <textarea id="pl-body" rows="4" placeholder="Type your message..." style="${fld};resize:vertical;line-height:1.5">${escapeHTML(body)}</textarea>
+
+      <!-- The link is always appended to the bottom of the message -->
+      <div style="display:flex;align-items:center;gap:8px;background:var(--bg,#0e0e11);border:1px dashed var(--border);border-top:none;border-radius:0 0 8px 8px;padding:8px 11px;margin-top:-5px;margin-bottom:12px">
+        <span style="font-size:11px;font-weight:700;color:var(--gold,#D4B65C);flex:0 0 auto">Link added below</span>
+        <span style="font-size:11px;color:var(--text-mute);font-family:'DM Mono',ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${escapeHTML(url)}</span>
+      </div>
+
+      <button id="pl-send-btn" onclick="_plSend()" style="width:100%;padding:11px 12px;border-radius:8px;font:inherit;font-weight:800;font-size:13.5px;border:1px solid var(--border);margin-bottom:12px">Send</button>
+
+      ${reasons.length ? `<div style="background:rgba(154,59,47,0.08);border:1px solid rgba(154,59,47,0.4);border-radius:8px;padding:10px 12px;margin-bottom:12px"><div style="font-size:12px;color:#c47a6a;font-weight:700;margin-bottom:4px">Why a send button is off</div><div style="font-size:12px;color:var(--text-mute);line-height:1.5">${reasons.map(r => '• ' + escapeHTML(r)).join('<br>')}</div></div>` : ''}
+
+      <div id="pl-status" style="font-size:13px;min-height:18px"></div>
+    </div>`;
+  document.body.appendChild(wrap);
+  _plPaintSendBtn();
+
+  // Esc closes.
+  _PL.onKey = (e) => { if (e.key === 'Escape') _closePaymentLinkModal(); };
+  document.addEventListener('keydown', _PL.onKey);
+
+  // Native share sheet (app builds with the Share plugin).
   setTimeout(() => {
     try {
       const Cap = window.Capacitor;
@@ -49985,84 +50297,114 @@ function _openPaymentLinkModal(memberId, data) {
       b.type = 'button';
       b.className = 'pl-nat-share';
       b.textContent = 'Share link...';
-      b.style.cssText = 'margin-top:10px;width:100%;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;padding:10px;font:inherit;font-size:13px;font-weight:700;color:var(--text);cursor:pointer';
+      b.style.cssText = 'margin-top:10px;width:100%;background:var(--surface);border:1px solid var(--border-med,var(--border));border-radius:8px;padding:10px;font:inherit;font-size:13px;font-weight:700;color:var(--text);cursor:pointer';
       b.onclick = () => { try { Cap.Plugins.Share.share({ title: 'Payment link', url: url }); } catch (_) {} };
       card.appendChild(b);
     } catch (_) {}
   }, 120);
-  const sms       = suggested.sms_text       || `Update your card: ${url}`;
-  const emailSub  = suggested.email_subject  || 'Update your card on file';
-  const emailHtml = suggested.email_html     || `<p>Update your card: <a href="${url}">${url}</a></p>`;
-
-  // Precondition logic - drives which buttons are enabled. Per-channel send
-  // readiness comes from the backend (Twilio/Resend OR GHL). Fall back to the
-  // legacy GHL flag if an older response shape has no messaging block.
-  const hasPhone = !!parent.phone;
-  const hasEmail = !!parent.email;
-  const smsReady   = messaging ? !!messaging.sms_ready   : !!ghl.ready;
-  const emailReady = messaging ? !!messaging.email_ready : !!ghl.ready;
-
-  // Status pills (small reasons line so staff sees WHY a button might be off)
-  const reasons = [];
-  if (!hasPhone) reasons.push('No parent phone on file.');
-  else if (!smsReady) reasons.push('SMS is not set up for this academy yet.');
-  if (!hasEmail) reasons.push('No parent email on file.');
-  else if (!emailReady) reasons.push('Email is not set up for this academy yet.');
-
-  const wrap = document.createElement('div');
-  wrap.id = 'pl-modal';
-  wrap.innerHTML = `
-    <div id="pl-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:80" onclick="_closePaymentLinkModal()"></div>
-    <div id="pl-modal-card" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:540px;max-width:calc(100vw - 28px);max-height:calc(100vh - 28px);overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;z-index:81;padding:22px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px">
-        <div>
-          <div style="font-size:18px;font-weight:700">Payment link</div>
-          <div style="font-size:12px;color:var(--text-mute);margin-top:3px">${escapeHTML(parent.name || 'Parent')} · ${escapeHTML(parent.phone || '-')} · ${escapeHTML(parent.email || '-')}</div>
-        </div>
-        <button onclick="_closePaymentLinkModal()" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;line-height:1;padding:0 6px">×</button>
-      </div>
-
-      <!-- URL row + copy button -->
-      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Stripe portal URL</div>
-      <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:18px">
-        <input id="pl-url" readonly value="${escapeHTML(url)}" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;outline:none">
-        <button onclick="_plCopyUrl()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:4px;cursor:pointer;font-weight:600;font-size:13px">Copy</button>
-        <a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:4px;cursor:pointer;font-weight:600;font-size:13px;text-decoration:none;display:inline-flex;align-items:center">Open ↗</a>
-      </div>
-
-      <!-- SMS panel -->
-      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">SMS preview</div>
-      <textarea id="pl-sms" rows="3" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;resize:vertical;margin-bottom:8px">${escapeHTML(sms)}</textarea>
-      <button id="pl-sms-btn" onclick="_plSend('SMS','${memberId}')" ${(!smsReady || !hasPhone) ? 'disabled' : ''} style="width:100%;background:${(smsReady && hasPhone) ? 'var(--gold,#D4B65C)' : 'var(--border)'};color:${(smsReady && hasPhone) ? '#0B0B0D' : 'var(--text-mute)'};border:1px solid var(--border);padding:10px 12px;font-weight:700;border-radius:4px;cursor:${(smsReady && hasPhone) ? 'pointer' : 'not-allowed'};font-size:13px;font-family:inherit;margin-bottom:18px">Send SMS</button>
-
-      <!-- Email panel -->
-      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Email preview</div>
-      <input id="pl-email-subject" value="${escapeHTML(emailSub)}" placeholder="Subject" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;margin-bottom:6px">
-      <textarea id="pl-email-body" rows="3" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;resize:vertical;margin-bottom:8px">${escapeHTML(sms)}</textarea>
-      <button id="pl-email-btn" onclick="_plSend('Email','${memberId}')" ${(!emailReady || !hasEmail) ? 'disabled' : ''} style="width:100%;background:transparent;color:${(emailReady && hasEmail) ? 'var(--text)' : 'var(--text-mute)'};border:1px solid var(--border);padding:10px 12px;font-weight:700;border-radius:4px;cursor:${(emailReady && hasEmail) ? 'pointer' : 'not-allowed'};font-size:13px;font-family:inherit;margin-bottom:14px">Send Email</button>
-
-      ${reasons.length ? `<div style="background:rgba(154,59,47,0.08);border:1px solid rgba(154,59,47,0.4);border-radius:6px;padding:10px 12px;margin-bottom:14px"><div style="font-size:12px;color:#c47a6a;font-weight:600;margin-bottom:4px">Why some buttons are off</div><div style="font-size:12px;color:var(--text-mute);line-height:1.5">${reasons.map(r => '• ' + escapeHTML(r)).join('<br>')}</div></div>` : ''}
-
-      <div id="pl-status" style="font-size:13px;min-height:18px"></div>
-    </div>
-  `;
-  host.appendChild(wrap);
 }
 
 function _closePaymentLinkModal() {
+  try { if (_PL && _PL.onKey) document.removeEventListener('keydown', _PL.onKey); } catch (_) {}
+  if (_PL) _PL.onKey = null;
+  try { if (_PL && _PL.doneTimer) clearTimeout(_PL.doneTimer); } catch (_) {}
+  if (_PL) _PL.doneTimer = null;
   const m = document.getElementById('pl-modal');
   if (m) m.remove();
+}
+
+// Freeze the composer while the send is in flight, so nothing gets edited
+// half-way through and the modal reads as busy.
+function _plLockCard(locked) {
+  ['pl-body', 'pl-email-subject', 'pl-tab-sms', 'pl-tab-email'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.disabled = !!locked;
+    el.style.opacity = locked ? '0.55' : '';
+    el.style.pointerEvents = locked ? 'none' : '';
+  });
+}
+
+// The whole card becomes a checkmark once it's out the door, then closes itself.
+function _plShowSent(channelLabel, name) {
+  const card = document.getElementById('pl-modal-card');
+  if (!card) return;
+  card.style.animation = 'mmPop .25s ease-out';
+  card.innerHTML = `
+    <div style="text-align:center;padding:24px 8px 20px">
+      <div class="mm-check" style="margin-bottom:14px"><svg viewBox="0 0 52 52" width="62" height="62"><circle class="mm-check-c" cx="26" cy="26" r="24"/><path class="mm-check-k" d="M15 27 l7.5 7.5 L38 18"/></svg></div>
+      <div style="font-size:17px;font-weight:800;color:var(--text);margin-bottom:5px">${escapeHTML(channelLabel)} sent</div>
+      <div style="font-size:13px;color:var(--text-mute);line-height:1.5;margin-bottom:20px">${escapeHTML(name || 'They')} ${name ? 'has' : 'have'} the payment link.</div>
+      <button onclick="_closePaymentLinkModal()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;border-radius:8px;padding:10px 26px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">Done</button>
+    </div>`;
+  _PL.doneTimer = setTimeout(() => _closePaymentLinkModal(), 2800);
+}
+
+// Switch between the text and email composer (same body, email adds a subject).
+function _plChannel(ch) {
+  _PL.channel = (ch === 'email') ? 'email' : 'sms';
+  const on  = 'var(--gold,#D4B65C)';
+  const set = (el, active) => {
+    if (!el) return;
+    el.style.borderColor = active ? on : 'var(--border)';
+    el.style.background  = active ? 'rgba(212,182,92,0.13)' : 'transparent';
+    el.style.color       = active ? on : 'var(--text-sub,#aaa)';
+  };
+  set(document.getElementById('pl-tab-sms'),   _PL.channel === 'sms');
+  set(document.getElementById('pl-tab-email'), _PL.channel === 'email');
+  const row = document.getElementById('pl-subject-row');
+  if (row) row.style.display = _PL.channel === 'email' ? 'block' : 'none';
+  _plStatus('');
+  _plPaintSendBtn();
+}
+
+// Send button reflects the active channel's readiness.
+function _plPaintSendBtn() {
+  const btn = document.getElementById('pl-send-btn');
+  if (!btn) return;
+  const isSms = _PL.channel === 'sms';
+  const ready = isSms ? _PL.smsReady : _PL.emailReady;
+  btn.disabled = !ready;
+  btn.textContent = isSms
+    ? 'Send text to ' + ((_PL.parent && _PL.parent.name) ? String(_PL.parent.name).split(/\s+/)[0] : 'parent')
+    : 'Send email to ' + ((_PL.parent && _PL.parent.name) ? String(_PL.parent.name).split(/\s+/)[0] : 'parent');
+  btn.style.background = ready ? 'var(--gold,#D4B65C)' : 'var(--border)';
+  btn.style.color      = ready ? '#0B0B0D' : 'var(--text-mute)';
+  btn.style.cursor     = ready ? 'pointer' : 'not-allowed';
+}
+
+// What actually gets sent: the typed message with the link on its own line at
+// the bottom (unless the staff already pasted it into the body).
+function _plComposed() {
+  const ta = document.getElementById('pl-body');
+  const body = (ta ? ta.value : '').trim();
+  const url = _PL.url || '';
+  if (!url) return body;
+  if (body.includes(url)) return body;
+  return body ? body + '\n\n' + url : url;
+}
+
+function _plComposedHtml() {
+  const ta = document.getElementById('pl-body');
+  const body = (ta ? ta.value : '').trim();
+  const url = _PL.url || '';
+  const paras = body
+    ? body.split(/\n{2,}/).map(p => '<p>' + escapeHTML(p).replace(/\n/g, '<br>') + '</p>').join('')
+    : '';
+  if (!url || body.includes(url)) return paras;
+  return paras + `<p><a href="${escapeHTML(url)}">${escapeHTML(url)}</a></p>`;
 }
 
 function _plCopyUrl() {
   const input = document.getElementById('pl-url');
   if (!input) return;
-  input.select();
+  const val = input.value;
+  try { input.select(); } catch (_) {}
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(input.value).then(() => _plStatus('Copied to clipboard.', 'ok'));
+    navigator.clipboard.writeText(val).then(() => _plStatus('Link copied to clipboard.', 'ok')).catch(() => _plStatus('Copy failed - select the link and copy it.', 'err'));
   } else {
-    document.execCommand('copy');
-    _plStatus('Copied.', 'ok');
+    try { document.execCommand('copy'); _plStatus('Link copied.', 'ok'); }
+    catch (_) { _plStatus('Copy failed - select the link and copy it.', 'err'); }
   }
 }
 
@@ -50071,26 +50413,42 @@ function _plStatus(msg, kind) {
   if (!el) return;
   const color = kind === 'err' ? '#c47a6a' : (kind === 'ok' ? '#7eb98c' : 'var(--text-mute)');
   el.style.color = color;
-  el.textContent = msg;
+  el.textContent = msg || '';
 }
 
-async function _plSend(type, memberId) {
+async function _plSend() {
+  const memberId = _PL.memberId;
+  const isSms = _PL.channel === 'sms';
+  const type = isSms ? 'SMS' : 'Email';
   if (!_sendGuard('plSend-' + type + '-' + memberId)) return;
   if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) {
-    _plStatus('No client_id in scope - refresh and try again.', 'err'); return;
+    _plStatus('No academy in scope - refresh and try again.', 'err'); return;
   }
-  const parentRow = _MEMBERS_ALL.find(m => m.id === memberId) || {};
-  const isSms = type === 'SMS';
-  const message = (isSms
-    ? document.getElementById('pl-sms')
-    : document.getElementById('pl-email-body')).value.trim();
-  const subject = isSms ? null : document.getElementById('pl-email-subject').value.trim();
-  if (!message) { _plStatus('Message body is empty.', 'err'); return; }
+  if (isSms ? !_PL.smsReady : !_PL.emailReady) return;
+
+  const message = _plComposed();
+  const subjEl  = document.getElementById('pl-email-subject');
+  const subject = isSms ? null : (subjEl ? subjEl.value.trim() : '');
+  if (!message) { _plStatus('Message is empty.', 'err'); return; }
   if (!isSms && !subject) { _plStatus('Email needs a subject.', 'err'); return; }
 
-  _plStatus(`Sending ${type}…`);
-  const btn = document.getElementById(isSms ? 'pl-sms-btn' : 'pl-email-btn');
-  if (btn) btn.disabled = true;
+  // Parent contact details come from the payment-link response (captured when
+  // the modal opened) - the roster array may not be loaded on every surface.
+  const roster = (typeof _MEMBERS_ALL !== 'undefined' && Array.isArray(_MEMBERS_ALL))
+    ? (_MEMBERS_ALL.find(m => m.id === memberId) || {}) : {};
+  const phone = _PL.parent.phone || roster.parent_phone || null;
+  const email = _PL.parent.email || roster.parent_email || null;
+  const name  = _PL.parent.name  || roster.parent_name  || null;
+
+  // Busy state: spinner in the button, composer frozen.
+  _plStatus('');
+  const btn = document.getElementById('pl-send-btn');
+  const btnLabel = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="apx-btn-spin" style="margin-right:9px"></span>Sending ' + (isSms ? 'text' : 'email') + '...';
+  }
+  _plLockCard(true);
 
   try {
     const token = await _mreqAuthToken();
@@ -50099,20 +50457,23 @@ async function _plSend(type, memberId) {
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_id:     CLIENT_ID,
-        contact_phone: parentRow.parent_phone || null,
-        contact_email: parentRow.parent_email || null,
-        contact_name:  parentRow.parent_name  || null,
+        contact_phone: phone,
+        contact_email: email,
+        contact_name:  name,
         type,
         message,
         subject: subject || undefined,
+        html: isSms ? undefined : _plComposedHtml(),
       }),
     });
     const json = await _safeJson(res);
-    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status) + (json.hint ? ' - ' + json.hint : ''));
-    _plStatus(`✓ ${type} sent to ${parentRow.parent_name || 'parent'}.`, 'ok');
+    if (!res.ok) throw new Error((json.error || ('HTTP ' + res.status)) + (json.hint ? ' - ' + json.hint : ''));
+    // Job done: the card becomes a checkmark, then closes itself.
+    _plShowSent(isSms ? 'Text' : 'Email', name);
   } catch (e) {
+    _plLockCard(false);
+    if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
     _plStatus('Failed: ' + e.message, 'err');
-    if (btn) btn.disabled = false;
   }
 }
 
