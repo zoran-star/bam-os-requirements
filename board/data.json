@@ -33,18 +33,6 @@
       "where": "chip in sidebar"
     },
     {
-      "urgency": "now",
-      "title": "Click the chip: Plan SJ phone + Twilio",
-      "detail": "Verify Rosano's research, pick number custody. The 10-15 day A2P clock hangs on this",
-      "where": "chip in sidebar"
-    },
-    {
-      "urgency": "now",
-      "title": "Send Lij the ask-list - EIN FIRST",
-      "detail": "EIN now gates the A2P clock, which gates launch. Biggest lever in the project",
-      "where": "draft in MISTER_ORCHESTRATOR"
-    },
-    {
       "urgency": "soon",
       "title": "Finish the FC2 app config",
       "detail": "SJ GHL token expires within hours. Matters until spine cutover",
@@ -61,6 +49,12 @@
       "title": "Delete the dead whiteboard Vercel project",
       "detail": "It reddens the checks on every single PR now",
       "where": "vercel dashboard"
+    },
+    {
+      "urgency": "now",
+      "title": "Send Lij the ask-list",
+      "detail": "Revised: EIN demoted, Twilio account + privacy/terms added. Full steps in your checklist below",
+      "where": "draft in MISTER_ORCHESTRATOR"
     }
   ],
   "pipeline": {
@@ -499,6 +493,136 @@
       "name": "Plan: SJ phone + Twilio",
       "role": "disposable planning room - Rosano's research + phone decision",
       "visit": "VISIT - chip waiting"
+    }
+  ],
+  "checklists": [
+    {
+      "id": "resend",
+      "title": "Verify byanymeanssanjose.com in Resend",
+      "why": "Until this is done every San Jose email correctly HOLDS and never sends. It also blocks the release half of the from-address test.",
+      "steps": [
+        {
+          "id": "r1",
+          "t": "Open resend.com/domains and click Add Domain"
+        },
+        {
+          "id": "r2",
+          "t": "Enter byanymeanssanjose.com, pick the region closest to San Jose"
+        },
+        {
+          "id": "r3",
+          "t": "Copy the DKIM, SPF and DMARC records Resend shows you"
+        },
+        {
+          "id": "r4",
+          "t": "Add all three as DNS records at the domain registrar"
+        },
+        {
+          "id": "r5",
+          "t": "Back in Resend, click Verify (DNS can take up to an hour)"
+        },
+        {
+          "id": "r6",
+          "t": "Status reads Verified, then tell Mister Orchestrator so the SJ email domain gets set"
+        }
+      ]
+    },
+    {
+      "id": "trusthub",
+      "title": "Twilio TrustHub, target Thursday 2026-07-30",
+      "why": "Unblocks phone numbers for every academy after San Jose. Not urgent, everything runs on GHL meanwhile.",
+      "steps": [
+        {
+          "id": "t1",
+          "t": "Find the IRS CP 575 letter for FullControl (if lost, phone the IRS for a 147C, it adds days)"
+        },
+        {
+          "id": "t2",
+          "t": "Copy the legal name off the CP 575 exactly, character for character. NOT off a W2 or W9"
+        },
+        {
+          "id": "t3",
+          "t": "Set up an authorised rep email on the FullControl domain (gmail or info@ will fail)"
+        },
+        {
+          "id": "t4",
+          "t": "Get the FullControl website live: not parked, not login-gated, names the legal entity"
+        },
+        {
+          "id": "t5",
+          "t": "Create the new Twilio account, upgrade off trial, add billing"
+        },
+        {
+          "id": "t6",
+          "t": "Submit the profile: EIN as 00-0000000, address via the Console autocomplete, no PO box"
+        },
+        {
+          "id": "t7",
+          "t": "Wait 48h. If rejected again, open a Twilio ticket with the CP 575 attached"
+        }
+      ]
+    },
+    {
+      "id": "lij",
+      "title": "Send Lij his ask-list",
+      "why": "His side takes days. Nothing here is blocked by us.",
+      "steps": [
+        {
+          "id": "l1",
+          "t": "Stripe connect link"
+        },
+        {
+          "id": "l2",
+          "t": "Gym address + member count + group size and coach ratio"
+        },
+        {
+          "id": "l3",
+          "t": "Coach names, titles and short bios (this is what the AI uses)"
+        },
+        {
+          "id": "l4",
+          "t": "5 to 10 training photos"
+        },
+        {
+          "id": "l5",
+          "t": "Google Business link + 2 or 3 parents happy to be quoted"
+        },
+        {
+          "id": "l6",
+          "t": "Privacy policy and terms content for his site"
+        },
+        {
+          "id": "l7",
+          "t": "Ask him to create his own Twilio account"
+        },
+        {
+          "id": "l8",
+          "t": "Opt-in wording plus 2 sample text messages"
+        },
+        {
+          "id": "l9",
+          "t": "Warn him about the one-time texting gap on cutover day, weeks after launch"
+        }
+      ]
+    },
+    {
+      "id": "quick",
+      "title": "Quick wins",
+      "why": "Small, unblock or de-noise things.",
+      "steps": [
+        {
+          "id": "q1",
+          "t": "Delete the dead whiteboard Vercel project (it reddens every PR)"
+        },
+        {
+          "id": "q2",
+          "t": "Confirm Lij's canonical email before anyone changes his login record"
+        },
+        {
+          "id": "q3",
+          "t": "Run Cole's SQL, THEN merge PR 1596 (order matters)"
+        }
+      ]
     }
   ]
 }
