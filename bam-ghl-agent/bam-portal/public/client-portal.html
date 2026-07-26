@@ -52773,10 +52773,16 @@ async function wizardSubmitFinal(skipped) {
       c.files.forEach(f => { f._folder = folderName; });
       const uploaded = hasFiles ? await _mreqUploadFiles(c.files, _onUpload) : [];
       if (validDrive) uploaded.push({ ..._buildAssetLinkEntry(c.driveLink), folder: folderName });
+      // Type resolution order: uploaded files are ground truth; a link-only
+      // block keeps the type its guide-card angle declared (Drive links carry
+      // no mime, so deriving from files mislabeled video creatives as
+      // graphics); last resort sniffs the name/link for video hints.
+      const declaredType = (c.angle || c.guide_card_id) && (c.type === 'video' || c.type === 'graphic') ? c.type : null;
+      const sniffedType = /video|reel|vsl|\.mov\b|\.mp4\b|\.m4v\b|\.webm\b/i.test((c.name || '') + ' ' + (c.driveLink || '')) ? 'video' : null;
       creativesPayload.push({
         local_id: c.id,
         folder: folderName,
-        type: _deriveAssetType(c.files),
+        type: c.files.length ? _deriveAssetType(c.files) : (declaredType || sniffedType || 'graphic'),
         notes: c.notes || '',
         raw_files: uploaded,
         angle: c.angle || null,
