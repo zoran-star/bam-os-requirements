@@ -73,18 +73,22 @@ The old rejected profile and the old master account are abandoned, not repaired.
 This is counterintuitive so here is the reasoning.
 
 The EIN is inside the 30 to 90 day propagation window, so a straight submit may fail. The instinct is
-to wait a month. **Do not.** A rejection costs nothing and is the required first step of the fallback:
+to wait a month. **Do not.** A rejection is cheap and is the required first step of the fallback:
 
-- No fee to submit or resubmit
-- No documented resubmission limit
-- Nothing to upload
+- No fee to submit the profile
+- Nothing to upload at profile stage
 - You edit and resubmit the same profile
 - Review is up to 48 hours
 
-And critically: **Twilio support needs a failed submission to act on before they will manually verify
-against the CP 575.** So the "wasted" attempt is not wasted. It is the ticket that opens the manual path.
+And critically: **the appeal path requires a failed submission to appeal against.** So the "wasted"
+attempt is not wasted. It is what opens the manual vetting route.
 
-Waiting 30 days has a real cost and no benefit.
+**Correction to an earlier draft of this plan:** resubmission is not unlimited. Twilio documents
+**three free resubmissions**, after which you must contact Support. That limit is documented at the
+*brand* stage rather than the primary profile, but treat three as the working budget at every stage.
+Consequence: do not use attempts as a guessing game. Get the CP 575 in hand and submit once, correctly.
+
+Waiting 30 days still has a real cost and no benefit.
 
 ### 4. Privacy Policy and Terms are NOT needed for this submission
 
@@ -135,18 +139,18 @@ and do not use a W2 or W9, whose name formatting often differs from the CP 575.
 | # | Item | Rule |
 |---|---|---|
 | A1 | CP 575 letter in hand | If lost, request a **147C** replacement from the IRS by phone. Adds lead time. |
-| A2 | Legal business name | Exactly as on the CP 575. Character for character, including suffixes like INC or LLC. |
+| A2 | Legal business name | Exactly as on the CP 575, character for character. **Never abbreviate. No DBA or trade name.** `LLC` vs `L.L.C.` is its own rejection cause. Submit the entity line only, not member or officer names printed on the letter. |
 | A3 | EIN | Formatted `00-0000000`, dashes included. **Never a DUNS number** for a US entity. |
 | A4 | Business type | Corporation / LLC / Partnership / Non-profit, matching the registration. |
-| A5 | Physical address | Matches tax records. **No PO box.** |
+| A5 | Physical address | The **official registered address**, not a branch or mailing location. Matches tax records, **no PO box**, and must be **USPS-deliverable** since Twilio validates against the USPS database. |
 | A6 | EIN issue date noted | Drives which timeline branch you are on. |
 
 ### Gate B: web presence (build)
 
 | # | Item | Rule |
 |---|---|---|
-| B1 | Live FullControl site | Reachable, not parked, not login-gated, no redirect to an unrelated domain. |
-| B2 | Legal entity named on the site | Twilio checks the name-to-site relationship. Footer is fine. |
+| B1 | Live FullControl site | Reachable, not parked, not login-gated, no redirect to an unrelated domain. On **FullControl's own custom domain**, not a site-builder subdomain. |
+| B2 | Legal entity named and branded on the site | Business name plus logo visible, with enough public information to identify the company. Twilio checks the name-to-site association; a bare landing page with no company identity is what fires error 18601. Footer placement is fine. |
 | B3 | Privacy Policy URL | Not needed Thursday. Needed later for every academy campaign. Must include a no-sharing statement and must not be login-gated. |
 | B4 | Terms of Service URL | Same: campaign-time requirement, since 2026-06-30. |
 
@@ -180,16 +184,69 @@ and do not use a W2 or W9, whose name formatting often differs from the CP 575.
 
 ---
 
-## Fallback: manual verification
+## Tips to maximize approval odds
+
+From a 2026-07-26 scan of Twilio's own docs plus practitioner sources (GoHighLevel's ISV support
+portal, SignalWire, Close, and several 2026 registration guides). Reddit itself is not crawlable, so
+"forum" coverage here comes from ISV support portals and practitioner guides instead.
+
+**Read the stage column.** Some rules bite at the Primary Profile (what we submit Thursday), others
+only at the per-academy Brand and Campaign stages later. Both are listed because the same EIN and
+legal-name lookup underlies all of them.
+
+| # | Tip | Stage |
+|---|---|---|
+| T1 | **Never abbreviate the legal name, and never use a DBA or trade name.** "LLC" vs "L.L.C." vs a missing "LLC" is a documented rejection cause on its own. | Profile + Brand |
+| T2 | **Submit only the business entity line from the CP 575.** Do not include member or officer names that appear on the letter. | Profile + Brand |
+| T3 | **Use the official registered company address, not a branch or mailing location.** Twilio validates addresses against the **USPS database**, so it must be USPS-deliverable and in USPS standard format. Use the Console autocomplete. | Profile + Brand |
+| T4 | **The website must be clearly branded**: business name and logo visible, enough public information to identify the company. A bare landing page with no company identity is what triggers error 18601. | Profile + Brand |
+| T5 | **Use a custom domain.** If the site sits on a third-party builder, put it on FullControl's own domain rather than a `*.webflow.io` style subdomain, or make the branding unmistakable. | Profile + Brand |
+| T6 | **Business email on the company domain**, e.g. `hi@yourdomain.com`. Free (gmail, outlook), personal, and distribution addresses are documented brand-failure causes. | Profile + Brand |
+| T7 | **Register the minimum number of brands per EIN.** Reusing one EIN across multiple brands is a documented rejection cause. FullControl's EIN should appear on exactly one brand. | Brand |
+| T8 | **Consistency is scored, not just pass or fail.** Mismatches across name, address, website and Twilio account details lower your **Trust Score**, which determines message throughput and deliverability. A sloppy approval still costs you daily send volume. | Brand |
+| T9 | **Attach the CP 575 as a PDF** when appealing. Practitioner guides report that supplying it "removes the guesswork and significantly improves first-time approval." | Appeal |
+| T10 | **Write a specific campaign description** later. Vague descriptions that do not explain the campaign's actual purpose are the single most cited campaign rejection cause. | Campaign |
+| T11 | **Education vertical is clean.** The prohibited list (lending, debt relief, crypto, gambling, sweepstakes, stock alerts, lead-gen marketing) does not touch us. One less risk. | Campaign |
+
+### On EIN age, the sources disagree and that is fine
+
+| Source | Claim |
+|---|---|
+| Twilio | Newly issued tax IDs take **30 to 90 days** to propagate |
+| GoHighLevel (ISV) | TCR may reject EINs **under 45 days** old |
+| Practitioner guides | EIN must be at least **15 days** old |
+| GoHighLevel best practices | Wait **30 to 90 days** from issuance before reapplying |
+
+FullControl's EIN is roughly 60 to 90 days old, which clears every stated minimum and sits at the
+optimistic end of the propagation window. **This strengthens the case for submitting Thursday** rather
+than waiting. We are past the hard floors and only exposed to the soft tail of propagation, and the
+appeal exists precisely for that tail.
+
+### The single highest-leverage action
+
+Everything above reduces to one thing: **have the CP 575 open on screen while filling the form and
+copy each field off it.** T1, T2, T3 and the original 18602 rejection are all the same failure, which
+is typing business details from memory instead of from the source document.
+
+---
+
+## Fallback: appeal to manual vetting
 
 Trigger: the Thursday submission comes back 18602 again.
 
+Twilio documents a specific escalation for exactly our situation, described as "your information
+matches tax records but still fails." That is the fresh-EIN case verbatim.
+
 | | |
 |---|---|
-| **How** | Open a Twilio Support ticket referencing the profile SID and attach the complete EIN letter (CP 575, or 147C if that is what you have). TrustHub correspondence runs through `trusthub-verify@twilio.com`, which replaced `verifymyaccount@twilio.com` on 2024-11-01. |
+| **What it is** | An **appeal**, which routes the submission to **manual vetting by Twilio's ecosystem partner** instead of the automated database lookup. |
+| **How** | Open a Twilio Support ticket referencing the profile SID and attach the complete EIN letter as a **PDF** (CP 575, or 147C if that is what you have). TrustHub correspondence runs through `trusthub-verify@twilio.com`, which replaced `verifymyaccount@twilio.com` on 2024-11-01. |
 | **Lead time** | Roughly 5 to 7 business days. |
-| **Cost** | None. |
-| **Why it works** | It bypasses the automated third-party database lookup entirely and verifies against the IRS document directly, which is exactly the failure mode a fresh EIN causes. |
+| **Cost** | **$10** for the appeal-based manual vetting, separate from standard submission charges. Documented at the brand stage; budget for it either way. |
+| **Why it works** | It bypasses the automated third-party lookup and verifies against the IRS document directly, which is exactly the failure mode a newly issued EIN causes. |
+
+Twilio explicitly names newly issued tax IDs as a valid appeal reason: they "may not yet have
+propagated to the databases that Twilio and our ecosystem partners use for vetting purposes."
 
 ---
 
@@ -212,3 +269,10 @@ intake step for this rather than chasing it per academy.
 - [Customer Profiles (rejection and resubmit behaviour)](https://www.twilio.com/docs/trust-hub/trusthub-rest-api/customer-profiles)
 - [Error 18601, name to website association](https://www.twilio.com/docs/api/errors/18601)
 - [TrustHub email address change](https://www.twilio.com/en-us/changelog/TrustHub-email-address-change)
+- [Troubleshooting A2P 10DLC Standard/LVS brands](https://www.twilio.com/docs/messaging/compliance/a2p-10dlc/troubleshooting-a2p-brands/troubleshooting-and-rectifying-a2p-standardlvs-brands) (3 free resubmissions, $10 appeal to manual vetting, newly issued tax IDs named as a valid appeal reason)
+- [GoHighLevel: A2P 10DLC brand approval best practices](https://help.gohighlevel.com/en/support/solutions/articles/155000000508) (no abbreviations, no DBA, entity line only, registered address not branch, Trust Score)
+- [GoHighLevel: campaign rejection reasons and resolutions](https://help.gohighlevel.com/support/solutions/articles/155000004746) (minimum brands per EIN, business email not free/personal, EIN under 45 days)
+- [Twilio Help: why was my A2P 10DLC campaign registration rejected](https://help.twilio.com/articles/15778026827291-Why-Was-My-A2P-10DLC-Campaign-Registration-Rejected-)
+- [Twilio: troubleshooting Sole Proprietor brand registration failures](https://www.twilio.com/docs/messaging/compliance/a2p-10dlc/troubleshooting-a2p-brands/troubleshooting-sole-proprietor-brand-registration-failures)
+- [SignalWire: campaign vetting tips for TCR](https://signalwire.com/blogs/industry/campaign-vetting-tips-for-tcr)
+- [Close: what to do when A2P SMS registration is rejected](https://help.close.com/docs/a2p-sms-registration-rejected)
