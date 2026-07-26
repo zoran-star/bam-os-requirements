@@ -1,6 +1,6 @@
 {
   "updated": "2026-07-27",
-  "headline": "TrustHub: submit Thu 07-30. The long pole is FullControl's OWN website, not Twilio. Phone stays non-blocking for SJ.",
+  "headline": "Price-breakdown spec is DONE and unblocked (#1587 merged). Ready to build on your word.",
   "yourMoves": [
     {
       "urgency": "now",
@@ -376,7 +376,7 @@
       "id": 34,
       "title": "Agents state price, tax and fees as separate lines",
       "severity": "blocker",
-      "status": "planning room",
+      "status": "spec done, ready to build",
       "owner": "us"
     },
     {
