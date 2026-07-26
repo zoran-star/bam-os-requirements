@@ -16,6 +16,10 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
+import { derivedFactOverrides, FACT_SOURCES } from "./agent/fact-render.js";
+import { pricingDisclosureBody } from "./agent/prompt-structure.js";
+import { resolveAgentTemplate } from "./agent/preset-master.js";
+import { AGENT_TEMPLATES, disclosureForTemplate, breakdownForTemplate } from "./agent/presets.js";
 
 // Which agent is being trained/previewed. Defaults to the booking agent.
 const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
@@ -73,8 +77,8 @@ async function activeLessons(clientId, agent = "booking") {
 
 // Prompt-section overrides → { section_key: body }: the shared BAM global brain
 // (general/goal) merged UNDER this academy's own (location/offer) overrides.
-async function sectionOverrides(clientId) {
-  try { return await loadMergedOverrides(clientId); }
+async function sectionOverrides(clientId, agent) {
+  try { return await loadMergedOverrides(clientId, agent); }
   catch (_) { return {}; }
 }
 
@@ -129,7 +133,7 @@ async function handleChat(messages, clientId, leadContext, res, agent = "booking
   // exclusion predates the agent filter on lessons - it would preview a brain
   // missing the confirm lessons that DO ride the live confirm prompt.)
   const [lessons, overrides, examples] = await Promise.all([
-    activeLessons(clientId, agent), sectionOverrides(clientId), savedExamples(clientId, agent),
+    activeLessons(clientId, agent), sectionOverrides(clientId, agent), savedExamples(clientId, agent),
   ]);
   const system = buildAgentSystem({ lessons, overrides, examples, leadContext, trailer: SANDBOX_TRAILER, agent });
 
@@ -266,19 +270,55 @@ async function handler(req, res) {
     // it (shared facts + that agent's behavior), in prompt order.
     if (action === "sections") {
       const agent = pickAgent(b.agent);
-      const ov = await sectionOverrides(clientId);
+      // scope/editable mirror api/agent-train.js so the STAFF brain editor tells the
+      // same truth as the owner's. Without them every section rendered as an editable
+      // textarea here, including derived facts and the disclosure policy - both of
+      // which are ignored at prompt-build time, so a staff edit looked saved and did
+      // nothing (SandboxApp already had the read-only branch; it never fired).
+      const [ov, derived, policyTemplate] = await Promise.all([
+        sectionOverrides(clientId, agent),
+        derivedFactOverrides(clientId, sb).catch(() => ({})),
+        resolveAgentTemplate(clientId, agent, { sb }).catch(() => null),
+      ]);
       const bySection = new Map(SECTIONS.map(s => [s.key, s]));
       const sections = sectionKeysForAgent(agent)
         .map(k => bySection.get(k))
         .filter(Boolean)
-        .map(s => ({
-          key:          s.key,
-          label:        s.label,
-          group:        s.layer,
-          body:         ov[s.key] != null ? ov[s.key] : s.body,  // current (override or default)
-          default_body: s.body,
-          is_default:   ov[s.key] == null,
-        }));
+        .map(s => {
+          if (s.key === "pricing_disclosure") {
+            const mode = disclosureForTemplate(policyTemplate);
+            const breakdown = breakdownForTemplate(policyTemplate);
+            return {
+              key: s.key, label: s.label, group: s.layer,
+              body: pricingDisclosureBody(mode, breakdown) || s.body, default_body: s.body,
+              is_default: true, scope: "policy", editable: false,
+              policy: { mode, breakdown, template: policyTemplate || null, mission: (AGENT_TEMPLATES[policyTemplate] || {}).mission || "" },
+              source: {
+                label: policyTemplate
+                  ? `Set by BAM on the ${policyTemplate} agent, and shared by every academy running it. Change it in api/agent/presets.js.`
+                  : "Set by BAM. No sales system is stamped on this academy yet, so its agents use the default policy.",
+              },
+            };
+          }
+          if (derived[s.key] != null) {
+            return {
+              key: s.key, label: s.label, group: s.layer,
+              body: derived[s.key], default_body: s.body,
+              is_default: true, scope: "derived", editable: false,
+              source: FACT_SOURCES[s.key] || null,
+            };
+          }
+          return {
+            key:          s.key,
+            label:        s.label,
+            group:        s.layer,
+            body:         ov[s.key] != null ? ov[s.key] : s.body,  // current (override or default)
+            default_body: s.body,
+            is_default:   ov[s.key] == null,
+            scope:        "editable",
+            editable:     true,
+          };
+        });
       return res.status(200).json({ agent, sections });
     }
 

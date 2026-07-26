@@ -128,14 +128,46 @@ function isExpired(raw, nowMs) {
 }
 
 // Build the Stripe Coupon create body from a validated coupon definition.
-function stripeCouponBody(raw) {
+//
+// Build C (applicability): when the owner has ticked specific prices, the coupon
+// is restricted to those prices' Stripe PRODUCTS via applies_to[products], which
+// Stripe enforces natively - "if you configure a coupon to apply to specific
+// products and a subscription doesn't have any applicable products, no discount
+// is applied". An empty/absent product list means the code applies to everything,
+// which is exactly how every code behaved before this build.
+//
+// `productIds` is resolved by the caller from the owner's checked prices, so this
+// stays a pure body builder.
+function stripeCouponBody(raw, productIds) {
   const c = normalizeCoupon(raw);
   const body = { duration: c.duration, name: `${c.code} (${isPercent(c.kind) ? c.value + "% off" : "$" + c.value + " off"})` };
   if (isPercent(c.kind)) body.percent_off = c.value;
   else { body.amount_off = Math.round(c.value * 100); body.currency = COUPON_CURRENCY; }
   if (c.duration === "repeating" && c.duration_months) body.duration_in_months = c.duration_months;
   body["metadata[source]"] = "fullcontrol-sorter";
+  const ids = [...new Set((productIds || []).filter(Boolean))];
+  ids.forEach((pid, i) => { body[`applies_to[products][${i}]`] = pid; });
   return body;
+}
+
+// Which offer_price rows has the owner ticked for this code?
+//
+// Semantics, deliberately: an EMPTY / missing applies_to means "everything",
+// so every code written before Build C keeps its current behaviour untouched.
+// A non-empty list means only those keys, and nothing else, ever.
+function couponAppliesToKeys(raw = {}) {
+  const v = raw.applies_to;
+  if (!Array.isArray(v)) return null;              // null = applies to everything
+  const keys = v.map(k => String(k || "").trim()).filter(Boolean);
+  return keys.length ? keys : null;
+}
+
+// Does this code cover a given offer_price_key? Used by checkout to decide
+// whether the sign-up fee line carries the discount.
+function couponCoversKey(raw, offerPriceKey) {
+  const keys = couponAppliesToKeys(raw);
+  if (!keys) return true;                          // unrestricted code
+  return keys.includes(String(offerPriceKey || ""));
 }
 
 // Build the Stripe Promotion Code create body (holds the customer-facing limits:
@@ -180,5 +212,7 @@ export {
   isExpired,
   stripeCouponBody,
   stripePromoBody,
+  couponAppliesToKeys,
+  couponCoversKey,
   couponFromPromo,
 };

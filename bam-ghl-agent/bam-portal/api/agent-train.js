@@ -27,6 +27,9 @@ import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./ag
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides, loadGlobalSections, isGlobalSection, canEditGlobalBrain, setGlobalSection, deleteGlobalSection } from "./agent/_sections.js";
 import { derivedFactOverrides, FACT_SOURCES, FACT_KEYS } from "./agent/fact-render.js";
+import { pricingDisclosureBody } from "./agent/prompt-structure.js";
+import { resolveAgentTemplate } from "./agent/preset-master.js";
+import { AGENT_TEMPLATES, disclosureForTemplate, breakdownForTemplate } from "./agent/presets.js";
 
 // Which agent is being trained: booking | confirm | closing. Defaults to booking.
 const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
@@ -105,9 +108,10 @@ async function activeLessons(clientId, agent = "booking") {
     return Array.isArray(rows) ? rows : [];
   } catch (_) { return []; }
 }
-async function sectionOverrides(clientId) {
-  // Merged: shared BAM global brain (general/goal) UNDER this academy's own (location/offer).
-  try { return await loadMergedOverrides(clientId); }
+async function sectionOverrides(clientId, agent) {
+  // Merged: shared BAM global brain (general/goal) UNDER this academy's own (location/offer),
+  // then the agent template's pricing-disclosure policy on top.
+  try { return await loadMergedOverrides(clientId, agent); }
   catch (_) { return {}; }
 }
 async function savedExamples(clientId, agent = "booking") {
@@ -159,7 +163,7 @@ async function handleChat(messages, clientId, leadContext, res, agent = "booking
   // confirm/closing preview and vice versa.
   const [lessons, overrides, examples] = await Promise.all([
     activeLessons(clientId, agent),
-    sectionOverrides(clientId),
+    sectionOverrides(clientId, agent),
     savedExamples(clientId, agent),
   ]);
   const system = buildSystem(lessons, overrides, examples, leadContext, agent);
@@ -306,11 +310,12 @@ async function handler(req, res) {
       // Two override sources: the GLOBAL brain (shared) and this academy's OWN.
       // Plus the Training offer id, so the FE can deep-link "Edit the brain" to the
       // exact offer + wizard step a derived fact is rendered from.
-      const [globalMap, clientRows, derived, offerIdRows] = await Promise.all([
+      const [globalMap, clientRows, derived, offerIdRows, policyTemplate] = await Promise.all([
         loadGlobalSections(),
         sb(`agent_prompt_sections?client_id=eq.${enc}&select=section_key,body`).catch(() => []),
         derivedFactOverrides(clientId, sb, { fresh: wantFresh }),   // rendered facts - what the agent ACTUALLY reads
         sb(`offers?client_id=eq.${enc}&type=eq.training&select=id&order=sort_order.asc&limit=1`).catch(() => []),
+        resolveAgentTemplate(clientId, agent, { sb }).catch(() => null),   // which named agent this academy runs
       ]);
       const clientMap = {};
       for (const r of (Array.isArray(clientRows) ? clientRows : [])) clientMap[r.section_key] = r.body;
@@ -319,6 +324,29 @@ async function handler(req, res) {
       const sections = sectionKeysForAgent(agent)
         .map(k => bySection.get(k)).filter(Boolean)
         .map(s => {
+          // Pricing disclosure (Build 6): a tier-1 POLICY, not a fact and not an
+          // editable section. The body shown is the one the agent actually gets,
+          // chosen by the academy's agent TEMPLATE, and it is read-only for
+          // EVERYONE including BAM staff and the global-editor academy. Editing it
+          // here would write a row that resolveDisclosureOverride then ignores, so
+          // the honest UI is a locked card that names the mode and where it is set.
+          if (s.key === "pricing_disclosure") {
+            const mode = disclosureForTemplate(policyTemplate);
+            const breakdown = breakdownForTemplate(policyTemplate);
+            const mission = (AGENT_TEMPLATES[policyTemplate] || {}).mission || "";
+            return {
+              key: s.key, label: s.label, group: s.layer,
+              body: pricingDisclosureBody(mode, breakdown) || s.body,
+              default_body: s.body,
+              is_default: true, scope: "policy", editable: false,
+              policy: { mode, breakdown, template: policyTemplate || null, mission },
+              source: {
+                label: policyTemplate
+                  ? `Set by BAM on the ${policyTemplate} agent, and shared by every academy running it. Not editable per academy.`
+                  : "Set by BAM. This academy has no sales system stamped yet, so its agents use the default policy.",
+              },
+            };
+          }
           // Rendered fact sections (Build 2): show the LIVE rendered body - the
           // stored/default text would lie about what the agent reads - and lock
           // editing here: the academy edits the SOURCE (offer / locations), not

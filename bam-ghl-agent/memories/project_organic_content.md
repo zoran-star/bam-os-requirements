@@ -91,3 +91,12 @@ Clients can now **edit or cancel** an organic request from its "In progress" car
 ## To demo
 Flip the staff "Organic content" toggle on a client → their Marketing tab shows the Ads | Organic split.
 Set credits + "Make content-only" in the client's Marketing setup → client sees a Content-only portal with `🎬 x/N · 🖼 x/N` meters and gets blocked past the cap.
+
+## Gotcha #2: campaign wizard link-only creatives typed as graphic (fixed 2026-07-26)
+Twin Hoops "Direct offer (Video)" block had ONLY a Drive link -> `_deriveAssetType`
+saw no video mime -> creative saved as graphic despite the guide-card angle
+declaring video. Wizard payload now resolves type: uploaded files win; else the
+guide-card block's declared `c.type`; else a name/link sniff (video|reel|vsl|
+.mov|.mp4...); else graphic. The Add-creative modal path already had the manual
+toggle and is unaffected. Rule: NEVER type a creative purely from file mimes
+when link entries (text/uri-list) are involved.

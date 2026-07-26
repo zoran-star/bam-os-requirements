@@ -3913,7 +3913,18 @@ async function handleMetaMachine(req, res) {
   // Page-load performance samples from the page_view beacon's meta blob. Kept as
   // a per-session best (fastest) value so a session that fires twice (load +
   // pagehide) counts once. Bucketed by traffic source so the portal can slice it.
-  const loadBySession = new Map(); // session_id -> {load,lcp,ttfb,source}
+  //
+  // TWO different numbers, and the difference matters (2026-07-25):
+  //   load_ms   = navigation.loadEventEnd. On a client-rendered page this fires
+  //               while the screen is still BLANK - it covers the HTML and its
+  //               script tags, not booting the app. On BAM GTA it read ~230 ms
+  //               while real content appeared around 1.9 s, so the chip built on
+  //               it was badly understating how slow the page felt.
+  //   render_ms = stamped when the page component first commits, i.e. when
+  //               something actually appeared. This is what we headline.
+  // Both are kept: their gap IS the app-boot cost, which is the thing worth
+  // fixing when it is large.
+  const loadBySession = new Map(); // session_id -> {load,render,lcp,ttfb,source}
   for (const row of (Array.isArray(funnelRows) ? funnelRows : [])) {
     const sid = row.session_id || "";
     (sess[row.step] = sess[row.step] || new Set()).add(sid);
@@ -3930,8 +3941,10 @@ async function handleMetaMachine(req, res) {
       if (Number.isFinite(load) && load > 0 && load < 60000) {   // drop absurd/idle outliers
         const prev = loadBySession.get(sid);
         if (!prev || load < prev.load) {
+          const render = Number(pm.render_ms);
           loadBySession.set(sid, {
             load,
+            render: (Number.isFinite(render) && render > 0 && render < 60000) ? render : null,
             lcp: (Number.isFinite(Number(pm.lcp_ms)) && Number(pm.lcp_ms) > 0) ? Number(pm.lcp_ms) : null,
             ttfb: (Number.isFinite(Number(pm.ttfb_ms)) && Number(pm.ttfb_ms) > 0) ? Number(pm.ttfb_ms) : null,
             source: String(pm.source || "other"),
@@ -3986,15 +3999,25 @@ async function handleMetaMachine(req, res) {
   const loadPerf = (() => {
     const rows = [...loadBySession.values()];
     if (!rows.length) return null;
+    // Headline the honest number. render_ms only exists on pages whose beacon
+    // was updated to send it, so fall back to load_ms and SAY which one it is -
+    // a chip that silently mixes the two would be the bug all over again.
+    const renders = rows.map((r) => r.render).filter((v) => v != null);
+    const basis = renders.length >= 3 ? "render" : "load";
+    const pick = (r) => (basis === "render" ? r.render : r.load);
+    const usable = rows.filter((r) => pick(r) != null);
     const bySrc = {};
-    for (const r of rows) (bySrc[r.source] = bySrc[r.source] || []).push(r.load);
+    for (const r of usable) (bySrc[r.source] = bySrc[r.source] || []).push(pick(r));
     const by_source = {};
     for (const k of Object.keys(bySrc)) by_source[k] = { median_ms: _median(bySrc[k]), n: bySrc[k].length };
     return {
-      median_ms: _median(rows.map((r) => r.load)),
+      median_ms: _median(usable.map(pick)),
+      basis,                                   // 'render' = time to something on screen
+      render_ms: renders.length ? _median(renders) : null,
+      load_ms: _median(rows.map((r) => r.load)),
       lcp_ms: _median(rows.map((r) => r.lcp).filter((v) => v != null)),
       ttfb_ms: _median(rows.map((r) => r.ttfb).filter((v) => v != null)),
-      n: rows.length,
+      n: usable.length,
       by_source,
     };
   })();

@@ -18,8 +18,32 @@
 //
 // HARD RULE: never an em dash in any template (person-facing copy). Hyphens only.
 
-const TZ = "America/Toronto";
+import { quietTz } from "./_quiet.js";
+
+// Fallback only. Every timing/formatting helper below takes a tz argument that
+// defaults to this, so a caller that passes nothing behaves exactly as before.
+// The LIVE value comes from the academy's own row (clients.time_zone) via
+// resolveClientTz(client) - no academy is hardcoded anywhere.
+const DEFAULT_TZ = "America/Toronto";
 const PORTAL_BASE = process.env.PORTAL_BASE_URL || "https://portal.byanymeansbusiness.com";
+
+// A usable IANA zone string, or the Toronto fallback. Anything unusable (empty,
+// null, a typo like "America/San_Jose") is caught HERE rather than downstream:
+// the fmt* helpers below swallow a bad zone and return "", and the dangling-label
+// stripper would then silently delete the whole "Date & Time:" line from a
+// booking receipt. Validating up front means that can never happen.
+function validTz(tz) {
+  const s = typeof tz === "string" ? tz.trim() : "";
+  if (!s) return DEFAULT_TZ;
+  try { new Intl.DateTimeFormat("en-US", { timeZone: s }); return s; }
+  catch { return DEFAULT_TZ; }
+}
+
+// The academy's timezone for everything in this file: clients.time_zone when it
+// is set and valid, else America/Toronto. Same source of truth as quiet hours.
+export function resolveClientTz(client) {
+  return validTz(quietTz(client));
+}
 
 // The shipped defaults (BAM GTA copy). Per-academy overrides live in
 // clients.ghl_kpi_config.confirm_initial_automations (enabled + per-step copy only;
@@ -104,60 +128,62 @@ export function automationsLive(autos) {
 }
 
 // ── timing ──
-function tzDateStr(ms) {
-  return new Date(ms).toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD
+function tzDateStr(ms, tz = DEFAULT_TZ) {
+  return new Date(ms).toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD
 }
-function dayDiffInTz(nowMs, trialMs) {
-  const a = Date.parse(tzDateStr(nowMs) + "T00:00:00Z");
-  const b = Date.parse(tzDateStr(trialMs) + "T00:00:00Z");
+function dayDiffInTz(nowMs, trialMs, tz = DEFAULT_TZ) {
+  const a = Date.parse(tzDateStr(nowMs, tz) + "T00:00:00Z");
+  const b = Date.parse(tzDateStr(trialMs, tz) + "T00:00:00Z");
   return Math.round((b - a) / 86400000);
 }
 // Hour-of-day (0-23) in the academy timezone.
-function tzHour(ms) {
-  const s = new Date(ms).toLocaleString("en-US", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" });
+function tzHour(ms, tz = DEFAULT_TZ) {
+  const s = new Date(ms).toLocaleString("en-US", { timeZone: tz, hour: "2-digit", hourCycle: "h23" });
   const m = s.match(/\d{1,2}/);
   return m ? Number(m[0]) : 0;
 }
-export function stepIsDue(step, nowMs, trialMs) {
+export function stepIsDue(step, nowMs, trialMs, tz = DEFAULT_TZ) {
   const when = step && step.when;
   if (!trialMs) return when === "immediate";
-  const diff = dayDiffInTz(nowMs, trialMs);
+  const zone = validTz(tz);
+  const diff = dayDiffInTz(nowMs, trialMs, zone);
   if (diff < 0) return false;
   if (when === "immediate") return true;
   if (when === "day_before") return diff === 1;
   if (when === "morning_of") {
     // Same day, but hold until the configured local hour (default 9am), and only
     // while the trial itself is still ahead. The cron fires it on its first run
-    // at/after that hour.
+    // at/after that hour. "Local" is the ACADEMY's clock, so a 9am check-in goes
+    // out at 9am Pacific for a Pacific academy, not 9am Eastern.
     const sendHour = Number.isFinite(step && step.send_hour) ? step.send_hour : 9;
-    return diff === 0 && tzHour(nowMs) >= sendHour && nowMs < trialMs;
+    return diff === 0 && tzHour(nowMs, zone) >= sendHour && nowMs < trialMs;
   }
   return false;
 }
-export function nextDueStep(autos, { nowMs, trialMs, sentKeys }) {
+export function nextDueStep(autos, { nowMs, trialMs, sentKeys, tz = DEFAULT_TZ }) {
   const handled = sentKeys instanceof Set ? sentKeys : new Set(sentKeys || []);
   for (const step of (autos.steps || [])) {
     if (!step.enabled) continue;
     if (handled.has(step.key)) continue;
-    if (stepIsDue(step, nowMs, trialMs)) return step;
+    if (stepIsDue(step, nowMs, trialMs, tz)) return step;
   }
   return null;
 }
 
 // ── appointment token rendering (portal-native) ──
-function fmtFull(ms) {
+function fmtFull(ms, tz = DEFAULT_TZ) {
   try {
-    const d = new Date(ms).toLocaleDateString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric" });
-    const t = new Date(ms).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
+    const d = new Date(ms).toLocaleDateString("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" });
+    const t = new Date(ms).toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
     return `${d} at ${t}`;
   } catch { return ""; }
 }
-function fmtTime(ms) {
-  try { return new Date(ms).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" }); }
+function fmtTime(ms, tz = DEFAULT_TZ) {
+  try { return new Date(ms).toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }); }
   catch { return ""; }
 }
-function fmtDate(ms) {
-  try { return new Date(ms).toLocaleDateString("en-US", { timeZone: TZ, weekday: "long", month: "long", day: "numeric", year: "numeric" }); }
+function fmtDate(ms, tz = DEFAULT_TZ) {
+  try { return new Date(ms).toLocaleDateString("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric", year: "numeric" }); }
   catch { return ""; }
 }
 function dtUtc(ms) {
@@ -181,13 +207,15 @@ export function buildIcalUrl({ startMs, endMs, title, location }) {
 
 // Replace the {{appointment.*}} tokens with values WE resolve. Leaves
 // {{contact.*}} / {{location.*}} for the send engine. ctx: { startMs, endMs,
-// location, title }.
+// location, title, tz }. ctx.tz is the academy's zone (resolveClientTz); omit it
+// and the times render in America/Toronto exactly as they always have.
 export function resolveApptTokens(template, ctx = {}) {
   const cal = { startMs: ctx.startMs, endMs: ctx.endMs, title: ctx.title || "Free Trial", location: ctx.location || "" };
+  const tz = validTz(ctx.tz);
   const map = {
-    "appointment.start_time": ctx.startMs ? fmtFull(ctx.startMs) : "",
-    "appointment.only_start_time": ctx.startMs ? fmtTime(ctx.startMs) : "",
-    "appointment.only_start_date": ctx.startMs ? fmtDate(ctx.startMs) : "",
+    "appointment.start_time": ctx.startMs ? fmtFull(ctx.startMs, tz) : "",
+    "appointment.only_start_time": ctx.startMs ? fmtTime(ctx.startMs, tz) : "",
+    "appointment.only_start_date": ctx.startMs ? fmtDate(ctx.startMs, tz) : "",
     "appointment.meeting_location": ctx.location || "",
     "appointment.add_to_google_calendar": ctx.startMs ? buildGoogleCalUrl(cal) : "",
     "appointment.add_to_ical_outlook": ctx.startMs ? buildIcalUrl(cal) : "",

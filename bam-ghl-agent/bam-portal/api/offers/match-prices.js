@@ -1,6 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
-import { parseFee, applyFee, feeLabel } from "../_fees.js";
+import { applyFee, feeLabel, resolveFee } from "../_fees.js";
 // Reads ALL live Stripe subs/products/charges (paginated) + an AI call — the
 // default ~10s function timeout is not enough, which surfaces as "Failed to
 // fetch" on the client. Give it headroom.
@@ -252,13 +252,41 @@ function _termFromLength(s) {
   return null;
 }
 
+// Does ANY option of this plan actually charge the sign-up fee? Charge/waive is
+// an explicit owner choice per option (Zoran: "not by default, i want to set
+// it"), so an unanswered option charges nothing. Used to decide whether the fee
+// is worth a catalog row at all.
+// RISK 4 GATE, narrowed once Build C shipped. The danger was never "this
+// academy has codes"; it was a code that could silently discount the sign-up
+// fee. With applicability live, a code that declares what it applies to is
+// safe: it either lists the fee key (deliberate) or it does not (excluded).
+// Only an UNRESTRICTED code is still dangerous, because Stripe applies it to
+// every line on the first invoice, the fee included.
+function hasUnrestrictedDiscountCodes(offer) {
+  const codes = (offer.data && offer.data.pricing && offer.data.pricing.discount_codes) || [];
+  return codes.some(c => c && String(c.code || "").trim() && !c.archived
+    && !(Array.isArray(c.applies_to) && c.applies_to.filter(Boolean).length));
+}
+
+function signupFeeChargedAnywhere(off) {
+  if (String(off.signup_fee_on_base || "").toLowerCase() === "charge") return true;
+  return (off.commitments || []).some(c => String((c && c.signup_fee_charge) || "").toLowerCase() === "charge");
+}
+
 // Build the match TARGETS from what the academy filled out in their Offers →
 // Pricing section (data.pricing.pricing_offerings). Each Membership offering →
-// a monthly target + one per commitment, with base + all-in amounts. All-in =
-// base + the academy's own "added fees" (per offering / per commitment); no fee
-// typed = all-in equals base. Nothing is added automatically.
+// a monthly target + one per commitment, with base + all-in amounts.
+//
+// All-in = base + resolveFee (_fees.js, Build T): the academy TAX TEMPLATE
+// (clients.tax_config) with per-row taxable yes/no, falling back to the legacy
+// free-text "added fees" strings for academies with no template. Nothing is
+// added automatically for an academy with neither.
 async function buildOfferTargets(clientId) {
-  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,type,data`) || [];
+  const [offers, taxRows] = await Promise.all([
+    sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,type,data`).then(r => r || []),
+    sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=tax_config&limit=1`).catch(() => []),
+  ]);
+  const taxConfig = (Array.isArray(taxRows) && taxRows[0] && taxRows[0].tax_config) || null;
   const targets = [];
   const cents = n => Math.round(n * 100);
   for (const o of offers) {
@@ -270,7 +298,7 @@ async function buildOfferTargets(clientId) {
       if (!title) continue;
       const base = parseFloat(off.price);
       if (!isNaN(base)) {
-        const fee = parseFee(off.added_fees);
+        const fee = resolveFee({ taxConfig, taxable: off.taxable, legacyText: off.added_fees });
         targets.push({ key: `${title}|monthly`, offer_id: o.id, offering: title, term: "monthly",
           base_cents: cents(base), allin_cents: applyFee(cents(base), fee), fee_label: feeLabel(fee),
           label: `${title} · Monthly` });
@@ -279,11 +307,35 @@ async function buildOfferTargets(clientId) {
         const term = _termFromLength(c.length);
         const cb = parseFloat(c.price);
         if (term && !isNaN(cb)) {
-          const fee = parseFee(c.added_fees);
+          const fee = resolveFee({ taxConfig, taxable: c.taxable != null ? c.taxable : off.taxable, legacyText: c.added_fees });
           targets.push({ key: `${title}|${term}`, offer_id: o.id, offering: title, term,
             base_cents: cents(cb), allin_cents: applyFee(cents(cb), fee), fee_label: feeLabel(fee),
             label: `${title} · ${term.replace("_", " ")}` });
         }
+      }
+
+      // ── One-time SIGN-UP FEE (Build S) ────────────────────────────────
+      // A single `<title>|signup_fee` target per plan, with its OWN taxable
+      // flag. It is a real catalog row so it gets its own Stripe product,
+      // which is what lets a coupon target or skip it (Build C) and what
+      // checkout attaches as a one-time line at enrollment.
+      //
+      // It is minted only when the plan HAS a fee amount AND at least one
+      // option actually charges it. Charge/waive is explicit per option
+      // (nothing assumed), so a fee nobody charges never reaches Stripe -
+      // that is the "dead fee" state, legal but inert.
+      // RISK 4 GATE (money-model plan), narrowed by Build C. An UNRESTRICTED
+      // code still discounts every line on the first invoice, the fee
+      // included, so the fee stays off for those academies. A code that
+      // declares its applies_to list is safe and does not block the fee.
+      const feeAmt = parseFloat(off.signup_fee);
+      if (!isNaN(feeAmt) && feeAmt > 0 && signupFeeChargedAnywhere(off) && hasUnrestrictedDiscountCodes(o)) {
+        console.warn(`[signup-fee] skipped for offer ${o.id} (${title}): this academy has a discount code with no "applies to" list, which would also discount the fee. Set what each code applies to first.`);
+      } else if (!isNaN(feeAmt) && feeAmt > 0 && signupFeeChargedAnywhere(off)) {
+        const feeTax = resolveFee({ taxConfig, taxable: off.signup_fee_taxable, legacyText: null });
+        targets.push({ key: `${title}|signup_fee`, offer_id: o.id, offering: title, term: "signup_fee",
+          base_cents: cents(feeAmt), allin_cents: applyFee(cents(feeAmt), feeTax), fee_label: feeLabel(feeTax),
+          label: `${title} · Sign-up fee (one time)` });
       }
     }
   }
@@ -333,6 +385,7 @@ async function handler(req, res) {
         const t = term ? term.trim().toLowerCase() : "";
         if (t === "monthly" || t === "4_weeks") return "4_weeks";
         if (t === "3_months" || t === "6_months" || t === "one_time") return t;
+        if (t === "signup_fee") return "one_time";   // Build S: the fee is a one-time price
         return null;
       };
       const results = [];

@@ -123,7 +123,7 @@ The CLOSING agent (Done-Trial stage) now has its own scripted post-trial sequenc
 - Optional: instant SMS notify when a Scheduled-Trial lead replies (booking has this for
   Responded; confirm relies on the 15-min cron).
 
-Spec mirrors: `sales-conversation-agents/conversation-ai-confirm-agent{,-bam-gta}.txt`
+Spec lives in code: the `confirm_*` sections in `bam-portal/api/agent/prompt-structure.js`. (The old `sales-conversation-agents/conversation-ai-confirm-agent{,-bam-gta}.txt` exports were deleted 2026-07-24.)
 (generated from the brain). See `[[project_client_agent_training]]` + `[[project_automation_agent_roadmap]]`.
 
 ## Gotchas found in the 2026-07-01 live audit (all fixed)

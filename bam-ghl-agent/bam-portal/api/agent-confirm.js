@@ -42,10 +42,11 @@ import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_
 import { routeTransition } from "./agent/_router.js";
 import {
   DEFAULT_CONFIRM_AUTOMATIONS, getConfirmAutomations, automationsLive,
-  nextDueStep, resolveApptTokens, addressFromOverrides,
+  nextDueStep, resolveApptTokens, addressFromOverrides, resolveClientTz,
 } from "./agent/confirm-automations.js";
+import { notifyOwners } from "./_notify-owners.js";
 import { sendOn } from "./_send.js";
-import { resolveMergeVars, locFor } from "./email-shells.js";
+import { resolveMergeVars, locFor, clientVars } from "./email-shells.js";
 import { confirmAgentMode, modeIsOn, shouldAutoSend, shouldAutoSendScripted } from "./agent/_mode.js";
 import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
@@ -60,7 +61,6 @@ const ANTHROPIC_KEY        = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL      = "claude-sonnet-4-6";
 const DEFAULT_CLIENT_ID    = "39875f07-0a4b-4429-a201-2249bc1f24df"; // BAM GTA
 const DETECT_CAP           = 10;   // max confirm cards drafted per academy per run
-const TZ                   = "America/Toronto";
 // Proactive opener window: only reach out first when the booked trial is within
 // this many days (and not already passed) — sooner than that is redundant with the
 // booking chat that just happened. Reactive replies (they message us) are unbounded.
@@ -84,7 +84,7 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,address,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,booking_provider,time_zone&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,owner_name,email,address,website_setup,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,booking_provider,time_zone&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
@@ -95,7 +95,7 @@ async function loadClient(clientId) {
 // wrong behavior into a confirmation chat).
 async function loadConfig(clientId) {
   const [overrides, lessonRows, exRows] = await Promise.all([
-    loadMergedOverrides(clientId),   // global brain (general/goal) + this academy's own (location/offer)
+    loadMergedOverrides(clientId, "confirm"),   // global brain (general/goal) + this academy's own (location/offer) + its template's disclosure policy
     sb(`agent_lessons?or=(client_id.eq.${clientId},and(client_id.is.null,scope.eq.general))&agent=eq.confirm&active=eq.true&select=lesson,kind&order=created_at.asc`).catch(() => []),
     sb(`agent_examples?client_id=eq.${clientId}&agent=eq.confirm&select=parent_text,agent_text&order=created_at.asc`).catch(() => []),
   ]);
@@ -194,18 +194,21 @@ async function threadMessages(token, conversationId) {
   return msgs.map(m => ({ role: m.direction === "outbound" ? "agent" : "parent", text: m.text, date: m.date }));
 }
 
-// "Sat, Jun 28 at 11:30 AM" in the academy timezone.
-function fmtTrial(iso) {
+// "Sat, Jun 28 at 11:30 AM" in the academy timezone. The AI drafter quotes this
+// string straight back to the parent, so it has to be the ACADEMY's clock; pass
+// resolveClientTz(client). Falls back to Toronto when a caller has no client row.
+function fmtTrial(iso, tz = "America/Toronto") {
   try {
-    return new Date(iso).toLocaleString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    return new Date(iso).toLocaleString("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   } catch (_) { return iso; }
 }
 
 // Draft the confirm agent's next message for one Scheduled-Trial-stage contact.
 // Returns the structured proposal, or { error } / { skip } (skip = nothing to do
 // right now, e.g. a proactive opener whose trial isn't near yet). `opts`:
-//   { sts, conversationId, skipStageGuard, lastDirection, nowMs }
+//   { sts, conversationId, skipStageGuard, lastDirection, nowMs, tz }
 async function draftForContact(token, locationId, clientId, contactId, cfg, opts = {}) {
+  const tz = resolveClientTz({ time_zone: opts.tz });   // academy clock for every trial time we quote
   const sts = opts.sts || await scheduledTrialStage(token, locationId, { clientId, sb });
   if (!sts) return { error: "No Scheduled-Trial stage found in the Training Pipeline." };
   if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, sts, { clientId, sb, role: "scheduled_trial" }))) {
@@ -241,11 +244,11 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     if (!appt) return { skip: "no upcoming appointment to confirm" };
     const dMs = new Date(appt.startTime).getTime() - nowMs;
     if (!(dMs > 0 && dMs <= PROACTIVE_WINDOW_DAYS * 86400000)) return { skip: "trial not in proactive window yet" };
-    seed = `[No new message from the lead. Their free trial is booked for ${fmtTrial(appt.startTime)}. Send a short, friendly opening text to confirm they're still planning to come.]`;
+    seed = `[No new message from the lead. Their free trial is booked for ${fmtTrial(appt.startTime, tz)}. Send a short, friendly opening text to confirm they're still planning to come.]`;
   }
 
   const apptBlock = appt
-    ? `\n\n<booked_trial>\nThis lead's booked trial (confirm THIS slot — never invent one): ${fmtTrial(appt.startTime)}. If they ask to change it, that's a handoff, not a reschedule you make yourself.\n</booked_trial>`
+    ? `\n\n<booked_trial>\nThis lead's booked trial (confirm THIS slot — never invent one): ${fmtTrial(appt.startTime, tz)}. If they ask to change it, that's a handoff, not a reschedule you make yourself.\n</booked_trial>`
     : `\n\n<booked_trial>\nWe don't have the exact booked time on hand. Refer to "your booked trial" and, if you need the specifics, ask them to confirm the day and time.\n</booked_trial>`;
 
   const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId }) + apptBlock;
@@ -386,6 +389,53 @@ function sanitizeAutomations(incoming, cur = {}) {
   };
 }
 
+// ── timezone-missing guardrail ──────────────────────────────────────────────
+// An academy with no clients.time_zone still gets its booking receipt (it is
+// transactional and must always send), rendered in Toronto time. The OWNER gets
+// a one-line heads-up so they can fix it themselves in Settings, at most once
+// per 24h per academy. Deduped through clients.tz_alert_at, which is stamped
+// BEFORE the text fires so two overlapping cron runs cannot double-notify.
+// Everything here is best-effort and never throws. It is awaited AFTER the
+// parent's receipt has gone out: it can never delay the receipt, and it can
+// never be killed by a serverless freeze with the 24h stamp already burned.
+const TZ_ALERT_COOLDOWN_MS = 24 * 3600000;
+const TZ_ALERT_MESSAGE =
+  "Heads up: your academy's timezone is not set, so booking texts show Toronto time. Fix it in Settings > Time zone in your portal.";
+
+async function alertMissingTimezone(client) {
+  try {
+    if (!client || !client.id) return;
+    // Same run, same academy (the detector loops many contacts): one alert only.
+    // Claimed SYNCHRONOUSLY, before the first await - set it any later and two
+    // concurrent calls both read false and the owner gets texted twice.
+    if (client._tz_alerted) return;
+    client._tz_alerted = true;
+    // Read the stamp on its own so the column can be missing (migration not yet
+    // applied) without taking the main client SELECT - and the send - down with
+    // it: the request 400s, we bail, the parent's receipt goes out regardless.
+    let lastMs = 0;
+    try {
+      const rows = await sb(`clients?id=eq.${client.id}&select=tz_alert_at&limit=1`);
+      const v = Array.isArray(rows) && rows[0] ? rows[0].tz_alert_at : null;
+      lastMs = v ? Date.parse(v) : 0;
+    } catch (_) { return; }
+    if (Number.isFinite(lastMs) && lastMs > 0 && Date.now() - lastMs < TZ_ALERT_COOLDOWN_MS) return;
+    // Stamp first, then send.
+    try {
+      await sb(`clients?id=eq.${client.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ tz_alert_at: new Date().toISOString() }),
+      });
+    } catch (_) { return; }
+    const r = await notifyOwners(client.id, "settings_alert", TZ_ALERT_MESSAGE);
+    // Nobody actually got it (no owner phone on file): give the stamp back, so a
+    // recipient-less academy is not silently muted for the next 24h.
+    if (!r || !r.sent) {
+      try { await sb(`clients?id=eq.${client.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ tz_alert_at: null }) }); } catch (_) {}
+    }
+  } catch (_) { /* best-effort */ }
+}
+
 // Fire (or queue) the next due SCRIPTED initial-automation step for one
 // Scheduled-Trial lead. Returns a short status string for the run summary. The
 // moment a lead replies they become "reactive" and the AI confirm agent owns the
@@ -431,9 +481,12 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
 
   // receiptOnly narrows the sequence to its "immediate" step and then runs the
   // SAME due/enabled/already-sent gates, so a past-dated trial still sends nothing.
+  // The academy's own clock: it decides what the receipt SAYS ("7:00 PM") and
+  // when the morning-of check-in is due (9am local to THEM, not to Toronto).
+  const tz = resolveClientTz(client);
   const step = nextDueStep(
     receiptOnly ? { steps: (autos.steps || []).filter(s => s.when === "immediate") } : autos,
-    { nowMs, trialMs, sentKeys },
+    { nowMs, trialMs, sentKeys, tz },
   );
   if (!step) return receiptOnly ? "booking receipt already sent" : "no scripted step due";
 
@@ -450,7 +503,9 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     const pn = (tb && tb[0] && tb[0].parent_name) || item.name || null;
     if (pn) parentFirst = String(pn).trim().split(/\s+/)[0];
   } catch (_) { if (item && item.name) parentFirst = String(item.name).trim().split(/\s+/)[0]; }
-  const vars = { first_name: parentFirst || info.firstName, full_name: info.fullName };
+  // clientVars: academy identity from the client row, so location tokens resolve
+  // to this academy's own values (or empty) - never the LOCATIONS-map fallback.
+  const vars = { first_name: parentFirst || info.firstName, full_name: info.fullName, ...clientVars(client) };
   const apptCtx = {
     startMs: trialMs,
     endMs: appt && appt.endTime ? new Date(appt.endTime).getTime() : null,
@@ -460,14 +515,20 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     // line -> the academy's required BB General address (clients.address).
     location: (appt && appt.address) || (await offerLocationAddress(client.id, contactId)) || addressFromOverrides(cfg && cfg.overrides) || String(client.address || "").trim(),
     title: (appt && appt.title) || "Free Trial",
+    tz,
   };
-  const resolve = (tpl) => resolveMergeVars(resolveApptTokens(tpl, apptCtx), locFor(client.id), vars);
+  const resolve = (tpl) => resolveMergeVars(resolveApptTokens(tpl, apptCtx), locFor(client.id, vars), vars);
   const message = resolve(step.template);
   if (!message || !message.trim()) return "rendered template empty";
+  // Times just rendered in the Toronto fallback because this academy's row has no
+  // usable time_zone: send anyway, then nudge the owner (once a day, max). Always
+  // AFTER the parent's touch is out - never before it, never unawaited.
+  const tzFellBack = tz !== String((client && client.time_zone) || "").trim();
+  const alertTzIfNeeded = async () => { if (tzFellBack) await alertMissingTimezone(client); };
 
   const wantsEmail = !!step.email && !!info.email;
   const emailBody = wantsEmail ? message : null;
-  const emailSubject = wantsEmail ? resolveMergeVars(step.email_subject || "Your free trial is booked!", locFor(client.id), vars) : null;
+  const emailSubject = wantsEmail ? resolveMergeVars(step.email_subject || "Your free trial is booked!", locFor(client.id, vars), vars) : null;
   // Fire the confirmation email (rides the same touch). Tokens already resolved, so
   // vars is empty here. Non-fatal: a failed email never blocks the SMS.
   const sendScriptedEmail = async () => {
@@ -493,6 +554,7 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
     await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
       ...baseRow, status: "approved", send_after: nextSendableTime(new Date(), quietTz(client)).toISOString(), created_by: "self-drive",
     }]) });
+    await alertTzIfNeeded();
     return "deferred";
   }
   if (auto) {
@@ -502,12 +564,14 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
       ...baseRow, status: "sent", auto_sent: true, sent_at: new Date().toISOString(), created_by: "self-drive",
     }]) });
     await logApproval({ client_id: client.id, ghl_contact_id: contactId, contact_name: item.name || null, final_reply: message, reasoning: baseRow.reasoning, confidence: 1, adjusted: false, status: "sent", created_by: "confirm-auto" });
+    await alertTzIfNeeded();
     return "sent";
   }
   // Hawkeye: queue the SMS for a one-tap ✓; the email goes out WITH it on approval.
   await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
     ...baseRow, status: "pending", created_by: "detector",
   }]) });
+  await alertTzIfNeeded();
   return "queued";
 }
 
@@ -755,7 +819,7 @@ async function detectForClient(client) {
     } catch (e) { reasons.push(`${item.name || contactId}: dedup error — ${e.message}`); }
 
     let d;
-    try { d = await draftForContact(token, locationId, client.id, contactId, cfg, { sts, conversationId: item.conversation_id, skipStageGuard: true, lastDirection: item.last_direction }); }
+    try { d = await draftForContact(token, locationId, client.id, contactId, cfg, { sts, conversationId: item.conversation_id, skipStageGuard: true, lastDirection: item.last_direction, tz: client.time_zone }); }
     catch (e) { skipped++; reasons.push(`${item.name || contactId}: draft threw — ${e.message}`); continue; }
     // d.error (e.g. "no conversation for contact" on a bare queue item) must skip
     // like d.skip - otherwise a half-empty card row gets built from undefineds.
@@ -923,7 +987,7 @@ async function detectForClient(client) {
       // keyed by opportunity_id). Best-effort: a missing opp still queues the nag.
       let oppId = null;
       try { const _r = await findOpenOpp(client.id, token, locationId, contactId); oppId = _r && (_r.ghlOpportunityId || _r.id) || null; } catch (_) {}
-      const trialWhen = fmtTrial(lastPast.startIso);
+      const trialWhen = fmtTrial(lastPast.startIso, resolveClientTz(client));
       const instruction = `Trial on ${trialWhen} has passed with no review logged. Did they show up? Log the result (showed up / no-show / good fit) using the post-trial form for this lead${oppId ? ` (opportunity ${oppId})` : ""}.`;
       try {
         await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
@@ -1160,7 +1224,7 @@ async function handler(req, res) {
       if (!b.contact_id) return res.status(400).json({ error: "contact_id required" });
       if (await isMuted(clientId, b.contact_id, "confirm")) return res.status(200).json({ error: "muted", muted: true });
       const cfg = await loadConfig(clientId);
-      const d = await draftForContact(token, locationId, clientId, b.contact_id, cfg);
+      const d = await draftForContact(token, locationId, clientId, b.contact_id, cfg, { tz: client.time_zone });
       if (d.error) return res.status(200).json({ error: d.error });
       if (d.skip) return res.status(200).json({ skip: d.skip });
       return res.status(200).json(d);
