@@ -300,8 +300,17 @@ scattered autonomy/config entry points. KEEPS: inline drawer suggestion on lead 
   _hk2ReigniteMode; Back to the card undoes; plan cards ride rows[0].id),
   reignite_due = reply card + gold "Reignition day" bar, _PL_REIGN map loaded in
   _plLoadNeedsAction (list-reignitions), cascade rows show "reignite Sep 1 ·
-  parked until then", contact drawer gets a gold chip + Cancel
-  (_cdReigniteChip), stuck list exempts parked leads. NOT prod-verified yet.
+  parked until then", stuck list exempts parked leads. NOT prod-verified yet.
+  2026-07-26 UPGRADE: the drawer chip became a full SCHEDULED-MESSAGE CARD -
+  shared renderer _rgCardHtml (+ _rgSave/_rgRemove/_rgEditToggle/_rgEnsureMap)
+  shows the pre-written message + reason + fire date with Edit (textarea + date
+  picker) and Remove, rendered in BOTH the Contacts drawer (_cdReigniteChip
+  kept its name) and the pipeline lead drawer (#pl-d-reignite slot +
+  _plReigniteSlot, V2-gated). New `update-reignition` action in agent-approvals
+  (PATCH message/reignite_at, scheduled rows only, normalizeReigniteAt guard).
+  SAME COMMIT: #pl-drawer is no longer a right-side slide-in - it's a centered
+  focus-mode card like the Contacts modal (fade+scale via the same .open class;
+  full-screen on mobile). Open/close JS untouched.
 - 🔥 CLOSING FOLLOW-UPS ALWAYS SCHEDULED + CONFIGURABLE (2026-07-11, Zoran: Done-Trial
   cards had NO follow-up action showing). TWO bugs found: (1) the plan insert 409'd on
   `agent_closing_replies_one_active_per_contact` - it was unique on (client_id,
