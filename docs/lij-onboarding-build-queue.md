@@ -113,6 +113,27 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 
 **San Jose runtime values already captured:** owner "Elijah De Guzman", domain byanymeanssanjose.com (confirm registration before sends).
 
+## SJ launch state (DB-verified 2026-07-26 by the gate-2 test room)
+
+| Fact | Value |
+|---|---|
+| Client | BAM San Jose `5576acf0`, active, v2_access, tz America/Los_Angeles ✓ |
+| Rails | ALL FIVE still GHL (contact/email/booking/messaging/pipeline); not on portal spine; 0 schedule_slots / 0 trial_bookings by design |
+| Contacts | 536 synced, last sync today ✓ |
+| GHL token | valid but expires 2026-07-27 07:24 UTC (TOMORROW) - confirm refresh fires |
+| Stripe | not_connected (no payments possible) |
+| Website | staging only (bam-client-sites.vercel.app/clients/bam-san-jose); domain NOT published; onboarding chunk "waiting" |
+| Checklist | done: staff/brand/offers/locations/kpi/general/ghl_signup/slack · NOT done: meta_ads, athlete_map |
+| **Gotcha** | `confirm_initial_automations` NULL → SJ sends ZERO trial confirmations even once live, until approved. Dormant-by-design today, but it becomes a "confirmations are broken" mystery at launch if forgotten |
+| Data correction | GTA's stored time_zone is **America/New_York**, not America/Toronto (same clock; fix docs/scripts that assert otherwise) |
+
+| # | Item | Severity | Status | Notes |
+|---|---|---|---|---|
+| 25 | GO-LIVE SWITCH LIST for SJ: approve confirm_initial_automations + enable drips (after #1601 seed) + publish website + Stripe connect + verify domain | BLOCKER at launch | checklist | Each dormant-by-design thing must be flipped ON launch day; owner = orchestrator to walk Zoran through it |
+| 26 | Verify SJ GHL token refresh actually fires before 2026-07-27 07:24 UTC expiry | BLOCKER | watch | Meta-token precedent: tokens have quietly died before. GHL TOKENS session owns the machinery |
+
+**Timezone build (item 4) gate-2 result:** paper test PASSED all 6 checks (SJ PT render, blank tz fallback + single owner alert, invalid tz safe, GTA byte-identical, morning-of correct both zones). Migration `20260726090000` APPLIED to prod. Code still uncommitted in worktree `agent-aba9284fbf79708c3`. Awaiting Zoran's ship verdict in words.
+
 ## Done
 
 _nothing yet_
