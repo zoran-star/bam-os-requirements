@@ -45,6 +45,76 @@
   .faq dt { font-size:13.5px; font-weight:700; margin-top:16px; }
   .faq dd { margin:4px 0 0; font-size:13px; color:var(--text-sub); max-width:64ch; }
   .foot { margin-top:48px; padding-top:16px; border-top:1px solid var(--border); font-size:11.5px; color:var(--text-mute); }
+
+  /* ── screen mockups ─────────────────────────────────────────── */
+  .shot { margin:18px 0 8px; }
+  .shot-cap { font-size:11.5px; color:var(--text-mute); margin-bottom:8px; font-style:italic; }
+  .frame { background:var(--surface); border:1px solid var(--border-med); border-radius:14px; overflow:hidden; box-shadow:0 10px 28px rgba(0,0,0,.28); }
+  .chrome { display:flex; align-items:center; gap:7px; padding:9px 14px; border-bottom:1px solid var(--border); background:var(--surface-el); }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--border-med); }
+  .chrome .url { font-family:"DM Mono",ui-monospace,monospace; font-size:10.5px; color:var(--text-mute); margin-left:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .stage { padding:16px 18px 20px; }
+  .tabs { display:flex; gap:3px; border-bottom:1px solid var(--border); margin-bottom:16px; overflow-x:auto; }
+  .tab { padding:7px 12px; font-size:12px; color:var(--text-mute); border-bottom:2px solid transparent; white-space:nowrap; }
+  .tab.on { color:var(--gold); border-bottom-color:var(--gold); font-weight:700; }
+  .chip { font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:999px; white-space:nowrap; display:inline-block; }
+  .chip.done { background:var(--green-soft); color:var(--green); }
+  .chip.prog { background:var(--amber-soft); color:var(--amber); }
+  .chip.wait { background:rgba(255,255,255,.05); color:var(--text-mute); }
+  .chip.staff { background:var(--blue-soft); color:var(--blue); }
+  .chip.growth { background:var(--gold-ghost); color:var(--gold); }
+  .chip.flat { background:var(--blue-soft); color:var(--blue); }
+  .chip.none { background:rgba(255,255,255,.05); color:var(--text-mute); }
+  .btn { display:inline-block; padding:5px 12px; border-radius:8px; font-size:11.5px; border:1px solid var(--border-med); background:transparent; color:var(--text-sub); font-weight:600; }
+  .btn.gold { background:var(--gold); color:var(--on-gold); border-color:var(--gold); font-weight:700; }
+  .btn.link { color:var(--gold); border-color:var(--gold-border); }
+  .mk-tbl { overflow-x:auto; border:1px solid var(--border); border-radius:10px; }
+  .mk-tbl table { min-width:600px; font-variant-numeric:tabular-nums; }
+  .mk-tbl th { background:var(--surface-el); border-bottom:none; padding:8px 11px; }
+  .mk-tbl td { padding:9px 11px; border-top:1px solid var(--border); border-bottom:none; }
+  .mk-tbl tr.hot td { background:var(--gold-ghost); }
+  .sec { background:var(--surface-el); border:1px solid var(--border); border-radius:10px; padding:13px 15px; margin-bottom:11px; }
+  .sec-head { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:9px; }
+  .sec-title { font-size:13.5px; font-weight:700; flex:1; min-width:140px; color:var(--text); }
+  .fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:10px 18px; }
+  .f-label { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-mute); margin-bottom:2px; }
+  .f-val { font-size:12.5px; line-height:1.5; color:var(--text); }
+  .f-val.empty { color:var(--text-mute); }
+  .linkout { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:11px; padding:8px 11px; background:var(--gold-ghost); border:1px solid var(--gold-border); border-radius:8px; }
+  .linkout .note { flex:1 1 220px; font-size:11.5px; color:var(--text-sub); }
+  .empty-note { font-size:12.5px; color:var(--text-mute); font-style:italic; }
+  .call { display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--border); }
+  .call:last-child { border-bottom:none; }
+  .ring { flex:none; width:24px; height:24px; border-radius:50%; border:2px solid var(--border-med); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:var(--text-mute); margin-top:1px; }
+  .ring.done { background:var(--green); border-color:var(--green); color:#0B0B0D; }
+  .ring.live { border-color:var(--amber); color:var(--amber); }
+  .call-body { flex:1; min-width:0; }
+  .call-title { font-size:13px; font-weight:700; color:var(--text); }
+  .call-topics { font-size:11.5px; color:var(--text-mute); margin-top:1px; }
+  .call-open { margin-top:10px; background:var(--surface-el); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .calib { font-size:11.5px; color:var(--gold); font-weight:600; margin-bottom:9px; }
+  .call-actions { display:flex; gap:8px; margin-top:11px; align-items:center; flex-wrap:wrap; }
+  .call-hint { font-size:11px; color:var(--text-mute); }
+  .exp { background:var(--surface-el); border-top:1px solid var(--border); padding:14px 16px; display:flex; gap:22px; flex-wrap:wrap; }
+  .exp h4 { margin:0 0 9px; font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--text-mute); }
+  .exp .col { flex:1 1 250px; }
+  .frow { display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-bottom:1px dashed var(--border); font-size:12px; }
+  .frow .k { color:var(--text-sub); } .frow .v { font-weight:600; text-align:right; color:var(--text); }
+  .lockline { font-size:11px; color:var(--amber); margin-top:7px; }
+  .cycle { display:flex; justify-content:space-between; gap:9px; padding:7px 0; border-bottom:1px dashed var(--border); font-size:12px; align-items:center; color:var(--text-sub); }
+  .money { font-family:"DM Mono",ui-monospace,monospace; color:var(--text); }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:14px; }
+  .stat { background:var(--surface-el); border:1px solid var(--border); border-radius:10px; padding:10px 13px; }
+  .stat .n { font-weight:800; font-size:19px; font-variant-numeric:tabular-nums; color:var(--text); }
+  .stat .l { font-size:10px; color:var(--text-mute); letter-spacing:.05em; text-transform:uppercase; font-weight:700; margin-top:1px; }
+  .flow { display:flex; align-items:stretch; gap:8px; flex-wrap:wrap; margin:16px 0 8px; }
+  .flow-step { flex:1 1 150px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; position:relative; }
+  .flow-step .t { font-size:12px; font-weight:700; color:var(--text); margin-bottom:3px; }
+  .flow-step .d { font-size:11.5px; color:var(--text-mute); line-height:1.45; }
+  .flow-step .badge { position:absolute; top:-8px; right:10px; font-size:9.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; padding:2px 7px; border-radius:999px; }
+  .flow-step .badge.auto { background:var(--green); color:#0B0B0D; }
+  .flow-step .badge.man { background:var(--amber); color:#0B0B0D; }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
 </style>
 </head>
 <body>
@@ -65,6 +135,56 @@
       <li>Hit <b>Save terms</b>. That save IS the switch - the client is now on the program.</li>
     </ol>
   </div>
+  <div class="shot">
+    <div class="shot-cap">Commissions tab - click a row to open its terms form and cycle history.</div>
+    <div class="frame">
+      <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">staff.byanymeansbusiness.com / commissions</span></div>
+      <div class="stage">
+        <div class="stats">
+          <div class="stat"><div class="n">4</div><div class="l">On the program</div></div>
+          <div class="stat"><div class="n">3</div><div class="l">Growth model</div></div>
+          <div class="stat"><div class="n money" style="font-size:17px">$4,318</div><div class="l">Last cycle total</div></div>
+          <div class="stat"><div class="n">Aug 12</div><div class="l">Next report</div></div>
+        </div>
+        <div class="mk-tbl">
+          <table>
+            <thead><tr><th>Client</th><th>Model</th><th>Terms</th><th>Renewal</th><th>SM</th><th>Last cycle</th></tr></thead>
+            <tbody>
+              <tr class="hot">
+                <td style="font-weight:600;color:var(--text)">Rise Above Basketball</td>
+                <td><span class="chip growth">Growth %</span></td>
+                <td>$599 base · 10% over <span class="money">$18,000</span></td>
+                <td>25th</td><td>Mike</td><td>Jul 25 · <span class="money">$1,499</span></td>
+              </tr>
+              <tr><td colspan="6" style="padding:0">
+                <div class="exp">
+                  <div class="col">
+                    <h4>Payment terms (admin only)</h4>
+                    <div class="frow"><span class="k">Payment model</span><span class="v">Growth percentage</span></div>
+                    <div class="frow"><span class="k">Base retainer</span><span class="v money">$599</span></div>
+                    <div class="frow"><span class="k">Growth share</span><span class="v">10%</span></div>
+                    <div class="frow"><span class="k">Revenue baseline</span><span class="v money">$18,000</span></div>
+                    <div class="frow"><span class="k">Revenue source</span><span class="v">Connected Stripe</span></div>
+                    <div class="frow"><span class="k">Scaling Manager</span><span class="v">Mike</span></div>
+                    <div class="lockline">Baseline locked until Apr 26, 2027 (9-month lock)</div>
+                    <div class="call-actions"><span class="btn gold">Save terms</span><span class="call-hint">Saving = client is on the program</span></div>
+                  </div>
+                  <div class="col">
+                    <h4>Cycle history</h4>
+                    <div class="cycle"><span>Jul 25 · gross <span class="money">$27,000</span></span><span>BAM <b class="money">$1,499</b> · SM <span class="money">$475</span></span><span class="chip done">paid</span></div>
+                    <div class="cycle"><span>Jun 25 · gross <span class="money">$21,400</span></span><span>BAM <b class="money">$939</b> · SM <span class="money">$335</span></span><span class="chip done">paid</span></div>
+                    <div class="cycle"><span>May 25 · gross <span class="money">$17,200</span></span><span>BAM <b class="money">$599</b> · SM <span class="money">$0</span></span><span class="chip wait">no growth</span></div>
+                  </div>
+                </div>
+              </td></tr>
+              <tr><td style="font-weight:600;color:var(--text)">Northside Hoops</td><td><span class="chip flat">Flat Retainer</span></td><td><span class="money">$1,500</span> / month</td><td>3rd</td><td>Mike</td><td>Jul 3 · <span class="money">$1,500</span></td></tr>
+              <tr><td style="font-weight:600;color:var(--text)">Prime Time Training</td><td><span class="chip none">not configured</span></td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="warn"><b>The baseline locks for 9 months</b> the moment you save it. Changing it inside the window forces an explicit override and re-locks for another 9. Only re-enter it on agreement renewal.</div>
 
   <h2><span class="n">2</span>Work the 7 calls</h2>
@@ -81,6 +201,56 @@
       <tr><td>7. Athlete Onboarding and Retention</td><td>Welcome package, results tracking, check-in cadence, cancellation process</td></tr>
     </tbody>
   </table></div>
+  <div class="shot">
+    <div class="shot-cap">Onboarding tab - the open call expands into its fields. Later calls stay locked.</div>
+    <div class="frame">
+      <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">staff.byanymeansbusiness.com / clients / rise-above</span></div>
+      <div class="stage">
+        <div class="tabs"><span class="tab on">Onboarding</span><span class="tab">Profile</span><span class="tab">Overview</span><span class="tab">Messages</span><span class="tab">Setup</span></div>
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px;flex-wrap:wrap">
+          <div style="font-size:12.5px;font-weight:700;color:var(--text)">Scaling Manager call sequence</div>
+          <span class="chip staff">Staff only</span>
+          <span style="font-size:11px;color:var(--text-mute)">Strict order</span>
+        </div>
+        <div class="call">
+          <div class="ring done">&#10003;</div>
+          <div class="call-body">
+            <div class="call-title">Call 1: APVO and Offers</div>
+            <div class="call-topics">Avatar, positioning, value, offer structure · completed Jul 18 by Mike</div>
+          </div>
+        </div>
+        <div class="call">
+          <div class="ring live">2</div>
+          <div class="call-body">
+            <div class="call-title">Call 2: Media and Sales Funnels</div>
+            <div class="call-topics">Ads to record, VSL, pre-trial videos, funnel build</div>
+            <div class="call-open">
+              <div class="calib">"What do you currently have in place for this?"</div>
+              <div class="fields">
+                <div><div class="f-label">Ads to record</div><div class="f-val">3 hooks: parent testimonial, coach mic'd up...</div></div>
+                <div><div class="f-label">VSL</div><div class="f-val">90s founder VSL, script drafted on call</div></div>
+                <div><div class="f-label">Pre-trial videos</div><div class="f-val empty">-</div></div>
+                <div><div class="f-label">Funnel build notes</div><div class="f-val empty">-</div></div>
+              </div>
+              <div class="call-actions">
+                <span class="btn gold">Mark Call 2 complete</span>
+                <span class="call-hint">Unlocks Call 3 · notes flow into the Profile tab</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="call" style="opacity:.5">
+          <div class="ring">3</div>
+          <div class="call-body"><div class="call-title">Call 3: Referral Program</div><div class="call-topics">Locked until Call 2 is complete</div></div>
+        </div>
+        <div class="call" style="opacity:.5">
+          <div class="ring">4</div>
+          <div class="call-body"><div class="call-title">Call 4: Organic Strategy</div><div class="call-topics">Locked</div></div>
+        </div>
+        <div style="text-align:center;font-size:11px;color:var(--text-mute);padding-top:7px">Calls 5-7 locked</div>
+      </div>
+    </div>
+  </div>
   <p>Every call opens with the same calibration question: <b>"What do you currently have in place for this?"</b> Type the answers into the call's fields during the call - that typing IS the documentation.</p>
 
   <h2><span class="n">3</span>The Profile tab</h2>
@@ -92,6 +262,52 @@
       <li>Topics with a real home elsewhere link out: Offers to the Business Blueprint snapshot, funnels and ads to Systems / Marketing.</li>
     </ol>
   </div>
+  <div class="shot">
+    <div class="shot-cap">Profile tab - one section per call, inline Edit on each, link-outs where the topic already has a home.</div>
+    <div class="frame">
+      <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">staff.byanymeansbusiness.com / clients / rise-above</span></div>
+      <div class="stage">
+        <div class="tabs"><span class="tab">Onboarding</span><span class="tab on">Profile</span><span class="tab">Overview</span><span class="tab">Messages</span><span class="tab">Setup</span></div>
+        <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:14px">
+          Everything captured on the 7 onboarding calls, in one place - 2/7 calls done. <b style="color:var(--blue)">Staff only - clients never see this.</b>
+        </div>
+        <div class="sec">
+          <div class="sec-head">
+            <div class="sec-title">Avatar &amp; Offer</div>
+            <span class="chip done">Call 1 · Done</span><span class="btn">Edit</span>
+          </div>
+          <div class="linkout">
+            <div class="note">Offers themselves live in the client's Business Blueprint; the systems ticket carries the full snapshot.</div>
+            <span class="btn link">Open Systems &rarr;</span>
+          </div>
+          <div class="fields">
+            <div><div class="f-label">Avatar</div><div class="f-val">Parents of 12-16yo competitive players within 25 min of the facility.</div></div>
+            <div><div class="f-label">Positioning</div><div class="f-val">The only academy with a guaranteed skills-progression report every 8 weeks.</div></div>
+            <div><div class="f-label">Value</div><div class="f-val">Measured improvement, not babysitting. Video breakdowns + rep counts.</div></div>
+            <div><div class="f-label">Offer structure</div><div class="f-val">Core monthly $249 &gt; Elite $399 &gt; Summer intensive upsell.</div></div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sec-head">
+            <div class="sec-title">Media &amp; Funnels</div>
+            <span class="chip prog">Call 2 · In progress</span><span class="btn">Edit</span>
+          </div>
+          <div class="fields">
+            <div><div class="f-label">Ads to record</div><div class="f-val">3 hooks: parent testimonial, coach mic'd up, before/after handle drill</div></div>
+            <div><div class="f-label">VSL</div><div class="f-val">90s founder VSL, script drafted on call, Mike to review</div></div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sec-head">
+            <div class="sec-title">Referral Program</div>
+            <span class="chip wait">Call 3 · Waiting on Call 2</span><span class="btn">Edit</span>
+          </div>
+          <div class="empty-note">Nothing captured yet - filled in on Call 3: Referral Program.</div>
+        </div>
+        <div style="text-align:center;font-size:11px;color:var(--text-mute);padding-top:2px">+ Organic Strategy · Sales Process · Systems &amp; Ads · Athlete Onboarding &amp; Retention</div>
+      </div>
+    </div>
+  </div>
   <div class="good"><b>Discipline note:</b> the Profile page is only as good as what gets typed on the call. Empty fields on the call = empty profile.</div>
 
   <h2><span class="n">4</span>The money each month</h2>
@@ -100,6 +316,15 @@
 BAM fee      = growth share % x growth
 BAM invoice  = base retainer + BAM fee     (flat model: just the flat amount)
 SM payout    = $250 + 25% x BAM fee        (only in months with growth)</div>
+  <div class="shot">
+    <div class="shot-cap">What happens at cycle close. Green = the portal does it, amber = a person does it.</div>
+    <div class="flow">
+      <div class="flow-step"><span class="badge man">you</span><div class="t">Terms saved</div><div class="d">Model, baseline, share % and renewal date set once in Commissions.</div></div>
+      <div class="flow-step"><span class="badge auto">auto</span><div class="t">Revenue pulled</div><div class="d">On the renewal date, gross charges summed from their connected Stripe.</div></div>
+      <div class="flow-step"><span class="badge auto">auto</span><div class="t">Math run</div><div class="d">Growth, BAM fee, invoice total and the SM payout computed.</div></div>
+      <div class="flow-step"><span class="badge auto">auto</span><div class="t">Invoice + report</div><div class="d">Stripe invoice finalized; payout report batched to Anna + Cole.</div></div>
+    </div>
+  </div>
   <div class="tbl"><table>
     <thead><tr><th>Automatic</th><th>Manual</th></tr></thead>
     <tbody>
