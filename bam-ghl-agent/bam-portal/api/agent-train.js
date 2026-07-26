@@ -27,9 +27,9 @@ import { assemblePrompt, SECTIONS, AGENT_SPECS, sectionKeysForAgent } from "./ag
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides, loadGlobalSections, isGlobalSection, canEditGlobalBrain, setGlobalSection, deleteGlobalSection } from "./agent/_sections.js";
 import { derivedFactOverrides, FACT_SOURCES, FACT_KEYS } from "./agent/fact-render.js";
-import { PRICING_DISCLOSURE } from "./agent/prompt-structure.js";
+import { pricingDisclosureBody } from "./agent/prompt-structure.js";
 import { resolveAgentTemplate } from "./agent/preset-master.js";
-import { AGENT_TEMPLATES, disclosureForTemplate } from "./agent/presets.js";
+import { AGENT_TEMPLATES, disclosureForTemplate, breakdownForTemplate } from "./agent/presets.js";
 
 // Which agent is being trained: booking | confirm | closing. Defaults to booking.
 const pickAgent = (a) => (a && AGENT_SPECS[a]) ? a : "booking";
@@ -332,13 +332,14 @@ async function handler(req, res) {
           // the honest UI is a locked card that names the mode and where it is set.
           if (s.key === "pricing_disclosure") {
             const mode = disclosureForTemplate(policyTemplate);
+            const breakdown = breakdownForTemplate(policyTemplate);
             const mission = (AGENT_TEMPLATES[policyTemplate] || {}).mission || "";
             return {
               key: s.key, label: s.label, group: s.layer,
-              body: PRICING_DISCLOSURE[mode] || s.body,
+              body: pricingDisclosureBody(mode, breakdown) || s.body,
               default_body: s.body,
               is_default: true, scope: "policy", editable: false,
-              policy: { mode, template: policyTemplate || null, mission },
+              policy: { mode, breakdown, template: policyTemplate || null, mission },
               source: {
                 label: policyTemplate
                   ? `Set by BAM on the ${policyTemplate} agent, and shared by every academy running it. Not editable per academy.`

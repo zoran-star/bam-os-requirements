@@ -61,27 +61,39 @@ import { seedAutomations } from "./seed-automations.js";
 //            per-academy field and never an offer-wizard question. Changing it
 //            means editing this file, and the change is live for every academy on
 //            the next prompt build. See docs/agent-pricing-transparency-plan.md.
+// breakdown = whether this agent states a price as its PARTS or as one number:
+//            "itemized" | "total_only" (Zoran 2026-07-26). It sits beside
+//            disclosure, on the TEMPLATE, for the same reason and with the same
+//            propagation. The two are independent axes and must not be
+//            conflated: DISCLOSURE governs how much the agent volunteers,
+//            BREAKDOWN governs the SHAPE of whatever it does say. A range-mode
+//            agent still holds the core price, the tax, and the total for every
+//            plan - it needs all three to answer "is that before or after tax"
+//            correctly - it simply leads with the all-in band. Range governs what
+//            it volunteers, never what it knows.
 export const DISCLOSURE_MODES = ["range", "exact", "withhold"];
 export const DEFAULT_DISCLOSURE = "range";
+export const BREAKDOWN_MODES = ["itemized", "total_only"];
+export const DEFAULT_BREAKDOWN = "itemized";
 
 export const AGENT_TEMPLATES = {
-  trial_booking: { runtime: "booking", lessonKey: "booking", disclosure: "range", mission: "Book the lead into a free trial session." },
-  trial_confirm: { runtime: "confirm", lessonKey: "confirm", disclosure: "range", mission: "Confirm a booked trial and make sure they show up." },
+  trial_booking: { runtime: "booking", lessonKey: "booking", disclosure: "range", breakdown: "itemized", mission: "Book the lead into a free trial session." },
+  trial_confirm: { runtime: "confirm", lessonKey: "confirm", disclosure: "range", breakdown: "itemized", mission: "Confirm a booked trial and make sure they show up." },
   // closing runs AFTER the trial: "details at the trial" is incoherent there, and
   // its flow points the parent at the specific plan that fits + the sign-up link.
   // exact is the correct disclosure for that job (Zoran 2026-07-24).
-  closing:       { runtime: "closing", lessonKey: "closing", disclosure: "exact", mission: "Convert a good-fit trial attendee into an enrolled member." },
+  closing:       { runtime: "closing", lessonKey: "closing", disclosure: "exact", breakdown: "itemized", mission: "Convert a good-fit trial attendee into an enrolled member." },
   // Preset #2 additions - new missions, existing runtimes. Prompt sections to be
   // authored when discovery_trial ships (Phase 2 only DECLARES them).
-  call_booking:  { runtime: "booking", lessonKey: "call_booking", disclosure: "range", mission: "Book the lead into a discovery call (not a trial yet)." },
-  call_confirm:  { runtime: "confirm", lessonKey: "call_confirm", disclosure: "range", mission: "Confirm a booked discovery call and make sure they attend it." },
+  call_booking:  { runtime: "booking", lessonKey: "call_booking", disclosure: "range", breakdown: "itemized", mission: "Book the lead into a discovery call (not a trial yet)." },
+  call_confirm:  { runtime: "confirm", lessonKey: "call_confirm", disclosure: "range", breakdown: "itemized", mission: "Confirm a booked discovery call and make sure they attend it." },
   // Member Care is NOT a pipeline-station agent: it iterates the MEMBERS roster
   // (api/agent-member-care.js), so it never appears as a stage engine. Declared
   // here so its lesson bucket + mission live in the same registry as its siblings.
   // disclosure "exact" because it talks to people who ALREADY pay a known amount
   // about their own billing - quoting them a range would be nonsense. Inert today:
   // member_care is not in AGENT_SPECS, so it gets no pricing_disclosure section.
-  member_care:   { runtime: "member_care", lessonKey: "member_care", disclosure: "exact", mission: "Watch member conversations; propose billing actions, replies, and staff to-dos for approval." },
+  member_care:   { runtime: "member_care", lessonKey: "member_care", disclosure: "exact", breakdown: "itemized", mission: "Watch member conversations; propose billing actions, replies, and staff to-dos for approval." },
 };
 
 // ── Build 3: which named TEMPLATE is this preset's <runtime> agent? ───────────
@@ -117,6 +129,16 @@ export function templateForRuntime(presetKey, runtime) {
 export function disclosureForTemplate(template) {
   const m = template && AGENT_TEMPLATES[template] && AGENT_TEMPLATES[template].disclosure;
   return DISCLOSURE_MODES.includes(m) ? m : DEFAULT_DISCLOSURE;
+}
+
+// The breakdown mode for a resolved template, always a valid mode. Mirrors
+// disclosureForTemplate exactly, which is the point: academy #5 inherits this
+// through resolvePresetKey -> templateForRuntime -> breakdownForTemplate with
+// zero code and zero rows of its own, and flipping one line above reverts every
+// academy on its next prompt build.
+export function breakdownForTemplate(template) {
+  const m = template && AGENT_TEMPLATES[template] && AGENT_TEMPLATES[template].breakdown;
+  return BREAKDOWN_MODES.includes(m) ? m : DEFAULT_BREAKDOWN;
 }
 
 // ── Station-model shorthands ─────────────────────────────────────────────────
