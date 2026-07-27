@@ -625,13 +625,15 @@
       "builds": [
         "t-breakdown",
         "t-email"
-      ]
+      ],
+      "column": null
     },
     {
       "name": "Plan: testimonial guardrails",
       "sidebar": "Plan: testimonial guardrails",
       "state": "done",
-      "one": "Decided. Quote-free variant is the only build, folded into the sync chat. Archive it"
+      "one": "Decided. Quote-free variant is the only build, folded into the sync chat. Archive it",
+      "column": "done"
     },
     {
       "name": "Plan: two-way preset sync",
@@ -640,7 +642,8 @@
       "one": "Built you a map of all 8 GTA automations, annotated with what each academy must supply. You author the master from it",
       "builds": [
         "t-convergence"
-      ]
+      ],
+      "column": "preset"
     },
     {
       "name": "SET UP TWILIO BITCH",
@@ -740,7 +743,8 @@
           "verify": "I confirm the env vars are set on both production and preview and one academy passes a smoke test.",
           "never": "Do not paste the API Key Secret into a public place. Send it in the chat only when you are ready for me to set it."
         }
-      ]
+      ],
+      "column": "infra"
     },
     {
       "name": "BAM GTA free trial loading rate",
@@ -765,7 +769,8 @@
           "verify": "In Events Manager, open that pixel and check Test Events. You should see server-side events arriving, and PageView plus Lead counts should stop being browser-only.",
           "never": "Never paste the token into a chat, including this board. It only ever goes into the Supabase SQL editor."
         }
-      ]
+      ],
+      "column": "infra"
     },
     {
       "name": "BUILD GHL TOKENS",
@@ -791,38 +796,23 @@
           "verify": "Open portal.byanymeansbusiness.com/api/agency-connect. It should read Healthy, Company token.",
           "never": "HOLD until that chat confirms whether GHL offers the Agency AND Sub-Account option. If it does not, these steps change."
         }
-      ]
+      ],
+      "column": "infra"
     },
     {
       "name": "Enrollment agreement",
       "sidebar": "Enrollment agreement population and storage",
       "state": "orange",
       "one": "Owns the agreement engine, publish step comes after sign-off",
-      "blockedBy": "lawyer sign-off on the SJ agreement"
-    },
-    {
-      "name": "SIGN UP FEE",
-      "sidebar": "SIGN UP FEE",
-      "state": "done",
-      "one": "Merged as #1587. Nothing left inside, archive it"
-    },
-    {
-      "name": "Plan: San Jose phone + Twilio A2P",
-      "sidebar": "Plan: San Jose phone + Twilio A2P",
-      "state": "done",
-      "one": "Phone decisions captured in the queue. Archive it"
-    },
-    {
-      "name": "BAM V2 preset automation seeding",
-      "sidebar": "BAM V2 preset automation seeding",
-      "state": "done",
-      "one": "Closed itself, files handed back. Archive it"
+      "blockedBy": "lawyer sign-off on the SJ agreement",
+      "column": "sj"
     },
     {
       "name": "Vercel deployment guide for Ant",
       "sidebar": "Vercel deployment guide for Ant",
       "state": "unknown",
-      "one": "Not one of mine. Tell me what it is and I will map it"
+      "one": "Not one of mine. Tell me what it is and I will map it",
+      "column": "done"
     }
   ],
   "journey": {
@@ -870,5 +860,27 @@
         "detail": "Weeks after launch. Runs on GHL until then"
       }
     ]
-  }
+  },
+  "columns": [
+    {
+      "id": "sj",
+      "title": "Get San Jose live",
+      "goal": "Everything that has to be true before Lij can take his first real lead"
+    },
+    {
+      "id": "preset",
+      "title": "Make the preset plug-and-play",
+      "goal": "So academy #4 gets GTA's whole system on day one without hand-writing anything"
+    },
+    {
+      "id": "infra",
+      "title": "Unblock phone + tracking",
+      "goal": "Long-lead infrastructure that gates every academy, not just San Jose"
+    },
+    {
+      "id": "done",
+      "title": "Done, safe to archive",
+      "goal": "Reported back, nothing left inside"
+    }
+  ]
 }

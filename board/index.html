@@ -88,6 +88,36 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .jstep.later{opacity:.55}
 .jnote{margin-top:10px;font-size:12px;color:var(--mut);font-style:italic}
 
+/* kanban */
+.kanban{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;align-items:start}
+.kcol{border:1px solid var(--line);background:rgba(0,0,0,.14);padding:12px;display:flex;flex-direction:column;gap:10px;min-height:150px}
+.kcol.over{border-color:var(--gold);background:rgba(212,182,92,.06)}
+.kcol .khead{border-bottom:1px solid var(--line);padding-bottom:8px}
+.kcol h3{font-family:var(--disp);font-weight:900;font-size:19px;text-transform:uppercase;letter-spacing:.03em;color:var(--gold);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.kcol h3 .kn{font-family:var(--mono);font-size:11px;font-weight:400;color:var(--mut)}
+.kcol .kgoal{font-size:11px;color:var(--mut);line-height:1.5;margin-top:5px;font-style:italic}
+.kcol .kdrop{border:1px dashed var(--line);color:var(--mut);font-size:11px;text-align:center;padding:14px 8px;letter-spacing:.06em;text-transform:uppercase}
+
+/* HQ card, pinned full width */
+.hq{
+  border:2px solid var(--gold);background:linear-gradient(90deg, rgba(212,182,92,.09), transparent 60%);
+  padding:18px 20px;margin-bottom:16px;display:flex;flex-direction:column;gap:10px;position:relative;
+}
+.hq h3{font-family:var(--disp);font-weight:900;font-size:26px;text-transform:uppercase;letter-spacing:.03em;color:var(--gold)}
+.hq .hqstate{font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:var(--blue)}
+.hq .hqone{font-size:13px;line-height:1.6}
+.hq .hqcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:4px}
+.hq .lbl2{font-size:9px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--gold-dim);margin-bottom:5px}
+.hq .needsHead2{color:var(--red)}
+.hq ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.hq li{font-size:12px;padding-left:16px;position:relative;line-height:1.5}
+.hq li::before{content:"→";position:absolute;left:0;color:var(--red)}
+.hq .focus2{font-size:12px;color:var(--bone);line-height:1.6}
+
+.chat[draggable="true"]{cursor:grab}
+.chat.dragging{opacity:.4;cursor:grabbing}
+.lg.drag{border-style:dashed;color:var(--gold-dim);border-color:var(--gold-dim)}
+
 /* chats grid */
 .legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .lg{font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border:1px solid var(--line);color:var(--mut)}
@@ -328,21 +358,15 @@ footer{margin:40px 32px 0;padding-top:14px;border-top:1px solid var(--line);font
       <span class="lg blue">blue · your input in claude code</span>
       <span class="lg orange">orange · blocked, reason in the box</span>
       <span class="lg gray">gray · done, click ✕ to archive</span>
+      <span class="lg drag">drag any card to reorder or move columns</span>
     </div>
-    <div class="chats" id="chats"></div>
+    <div id="hqSlot"></div>
+    <div class="kanban" id="kanban"></div>
     <div id="undoRow"></div>
   </section>
   <section>
     <h2>Recent updates</h2>
     <div class="updates" id="updates"></div>
-  </section>
-  <section>
-    <div class="orch">
-      <h2>Mister Orchestrator</h2>
-      <div class="focus" id="orchFocus"></div>
-      <div class="needsHead">What it needs from you</div>
-      <ul id="orchNeeds"></ul>
-    </div>
   </section>
   <section>
     <h2>Build pipeline</h2>
@@ -419,6 +443,52 @@ function buildTags(c, d){
   }).join("") + `</div>`;
 }
 
+let dragName = null;
+function persistLayout(){
+  const lay = {};
+  document.querySelectorAll(".kcol").forEach(col => {
+    [...col.querySelectorAll(".chat")].forEach((card, i) => {
+      lay[card.dataset.name] = { col: col.dataset.col, ord: i };
+    });
+  });
+  writeLay(lay);
+}
+function wireDrag(){
+  document.querySelectorAll(".chat[draggable]").forEach(card => {
+    card.addEventListener("dragstart", e => {
+      dragName = card.dataset.name;
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", dragName); } catch(err){}
+    });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      document.querySelectorAll(".kcol.over").forEach(k => k.classList.remove("over"));
+      persistLayout();
+      dragName = null;
+    });
+  });
+  document.querySelectorAll(".kcol").forEach(col => {
+    col.addEventListener("dragover", e => {
+      e.preventDefault();
+      col.classList.add("over");
+      const dragging = document.querySelector(".chat.dragging");
+      if(!dragging) return;
+      const after = [...col.querySelectorAll(".chat:not(.dragging)")].find(c => {
+        const r = c.getBoundingClientRect();
+        return e.clientY < r.top + r.height / 2;
+      });
+      const drop = col.querySelector(".kdrop");
+      if(drop) drop.remove();
+      if(after) col.insertBefore(dragging, after); else col.appendChild(dragging);
+    });
+    col.addEventListener("dragleave", e => {
+      if(!col.contains(e.relatedTarget)) col.classList.remove("over");
+    });
+    col.addEventListener("drop", e => { e.preventDefault(); col.classList.remove("over"); persistLayout(); });
+  });
+}
+
 function actionBadge(c){
   const n = (c.actions || []).length;
   if(!n) return "";
@@ -462,17 +532,12 @@ function ago(iso){
   return Math.round(s/86400) + "d ago";
 }
 
-function render(d){
-  const arch = readArch();
-  const rooms = window._rooms || {};
-  const live = (d.chatMap || []).filter(c => !arch[c.name]).map(c => {
-    const r = rooms[c.sidebar || c.name];
-    if(!r) return c;
-    return {...c, state: r.state || c.state, one: r.one || c.one,
-            blockedBy: r.blockedBy || c.blockedBy, liveAt: r.at};
-  });
-  $("chats").innerHTML = live.map(c => `
-    <div class="chat ${esc(c.state)} ${(c.actions||[]).length ? "hasActions" : ""}" ${(c.actions||[]).length ? `data-open="${esc(c.name)}"` : ""}>
+const LAY = "bamBoardLayout";
+const readLay = () => { try { return JSON.parse(localStorage.getItem(LAY) || "{}"); } catch(e){ return {}; } };
+const writeLay = l => localStorage.setItem(LAY, JSON.stringify(l));
+
+function chatCardHtml(c, d){
+  return `<div class="chat ${esc(c.state)} ${(c.actions||[]).length ? "hasActions" : ""}" draggable="true" data-name="${esc(c.name)}" ${(c.actions||[]).length ? `data-open="${esc(c.name)}"` : ""}>
       <button class="x" data-arc="${esc(c.name)}" title="Archive off the board">✕</button>
       <h4>${esc(c.sidebar || c.name)}</h4>
       <div class="stateword">${STATEWORD[c.state] || esc(c.state)}${c.liveAt ? `<span class="livedot" title="reported by the room itself">● live · ${esc(ago(c.liveAt))}</span>` : ""}</div>
@@ -480,7 +545,46 @@ function render(d){
       ${buildTags(c, d)}
       <p>${esc(c.one)}</p>
       ${c.blockedBy ? `<div class="blocked">⏳ blocked by: ${esc(c.blockedBy)}</div>` : ""}
-    </div>`).join("");
+    </div>`;
+}
+
+function render(d){
+  const arch = readArch();
+  const rooms = window._rooms || {};
+  const lay = readLay();
+  const live = (d.chatMap || []).filter(c => !arch[c.name]).map(c => {
+    const r = rooms[c.sidebar || c.name];
+    const base = r ? {...c, state: r.state || c.state, one: r.one || c.one,
+            blockedBy: r.blockedBy || c.blockedBy, liveAt: r.at} : {...c};
+    if(lay[c.name]) { base.column = lay[c.name].col; base._ord = lay[c.name].ord; }
+    return base;
+  });
+
+  const hq = live.find(c => c.name === "MISTER_ORCHESTRATOR");
+  $("hqSlot").innerHTML = hq ? `
+    <div class="hq">
+      <h3>${esc(hq.sidebar || hq.name)}</h3>
+      <div class="hqstate">${STATEWORD[hq.state] || esc(hq.state)}</div>
+      <div class="hqone">${esc(hq.one)}</div>
+      ${buildTags(hq, d)}
+      <div class="hqcols">
+        <div><div class="lbl2">What it is focused on</div><div class="focus2">${esc(d.orchestrator.focus)}</div></div>
+        <div><div class="lbl2 needsHead2">What it needs from you</div><ul>${d.orchestrator.needs.map(n => `<li>${esc(n)}</li>`).join("")}</ul></div>
+      </div>
+    </div>` : "";
+
+  $("kanban").innerHTML = (d.columns || []).map(col => {
+    const items = live.filter(c => c.name !== "MISTER_ORCHESTRATOR" && c.column === col.id)
+                      .sort((a,b) => (a._ord ?? 999) - (b._ord ?? 999));
+    return `<div class="kcol" data-col="${esc(col.id)}">
+      <div class="khead">
+        <h3>${esc(col.title)}<span class="kn">${items.length}</span></h3>
+        <div class="kgoal">${esc(col.goal)}</div>
+      </div>
+      ${items.length ? items.map(c => chatCardHtml(c, d)).join("") : `<div class="kdrop">drop a chat here</div>`}
+    </div>`;
+  }).join("");
+  wireDrag();
   renderUndo();
 
   if(d.journey){
@@ -497,8 +601,6 @@ function render(d){
 
   $("updated").textContent = "updated " + d.updated;
   $("updates").innerHTML = d.recentUpdates.map(u => `<div>${esc(u)}</div>`).join("");
-  $("orchFocus").textContent = d.orchestrator.focus;
-  $("orchNeeds").innerHTML = d.orchestrator.needs.map(n => `<li>${esc(n)}</li>`).join("");
 
   $("tasks").innerHTML = d.buildTasks.map(t => `
     <div class="task ${t.phaseTone === "you" ? "you" : ""}">
