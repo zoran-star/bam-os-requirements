@@ -102,14 +102,20 @@ async function handler(req, res) {
     // Whether the owner wants a public team page, read from
     // brand_data.wants_about_page.
     //
-    // HEADS UP (audited 2026-07-27, brand_data reshape): nothing writes this
-    // key. There is no Blueprint > Staff toggle in the portal, no writer
-    // anywhere in the repo, and zero of the 11 clients with brand_data have the
-    // key stored. So `wap` is always undefined and this block is inert today.
-    // Left in place deliberately rather than deleted: it fails OPEN in the safe
-    // direction (team page shows whenever there are coaches), and it is the
-    // read half of a toggle someone still intends to build. Either build the
-    // writer or delete both halves - do not leave it half-wired.
+    // DEAD BRANCH - do not go looking for the UI that sets this, there isn't
+    // one. Audited 2026-07-27 while mapping every reader and writer of
+    // clients.brand_data: NOTHING writes wants_about_page. There is no
+    // Blueprint > Staff toggle, no writer anywhere in the repo (grep returns
+    // only this file), and zero of the 11 clients that have brand_data have
+    // the key stored. `wap` is therefore always undefined and neither branch
+    // below ever runs.
+    //
+    // EFFECTIVE BEHAVIOUR TODAY: the team page shows whenever the academy has
+    // at least one coach, full stop.
+    //
+    // Kept rather than deleted because it fails open in the safe direction and
+    // is the read half of a toggle that was never built. Behaviour deliberately
+    // unchanged by the brand_data reshape.
     let show_team_page = coaches.length > 0;
     try {
       const cr = await sbReq(`clients?id=eq.${encodeURIComponent(client_id)}&select=brand_data`);
