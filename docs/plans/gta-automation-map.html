@@ -287,6 +287,11 @@ const DATA = [
       notes:[
         N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Designed per academy during onboarding.","Designed in onboarding","no"),
       ]},
+    { wait:"+7 days", ch:"email", subj:"What families are saying about us", tpl:"onboarding-testimonials", mail:"onboarding-testimonials",
+      els:[{k:"s",t:"Quotes, to be wired to real testimonials"},{k:"s",t:"Attribution line"},{k:"p",t:"Logo, top left"},{k:"s",t:"City and footer"}],
+      notes:[
+        N("s","The whole email","<b>Gets fully connected to the academy's own testimonials</b>, same as the nurture one. Templated until that connection is built in a separate chat.","Blocked on the testimonial connection","need"),
+      ]},
     { wait:"+7 days", ch:"email", subj:"Quick favour?", tpl:"onboarding-review", mail:"onboarding-review",
       els:[{k:"c",t:"Header + footer hardcoded to GTA"},{k:"p",t:"The warm ask, entirely generic"},{k:"s",t:"GTA's own Google review link"}],
       notes:[
