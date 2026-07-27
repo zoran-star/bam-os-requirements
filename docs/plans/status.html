@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Automation templating - where we are</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#D4B65C;--bg:#0C0C0D;--card:#141416;--card2:#1A1A1D;--line:#2A2A2E;
+    --tx:#EDEDEF;--tx2:#A8A8B0;--tx3:#6E6E78;
+    --red:#E5674E;--green:#5FBF8A;--blue:#5B9DD9;--amber:#E0A33C;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:960px;margin:0 auto;padding:40px 20px 90px}
+  h1{font-size:clamp(26px,4.4vw,38px);line-height:1.12;letter-spacing:-.02em;margin:0 0 8px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:16px;margin:0 0 30px;max-width:64ch}
+  h2{font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:48px 0 14px;font-weight:700}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:20px 22px}
+  .grid{display:grid;gap:13px}
+  @media(min-width:780px){.g2{grid-template-columns:1fr 1fr}}
+  .scroll{overflow-x:auto}
+  pre{font-family:var(--mono);font-size:12.5px;line-height:1.62;color:var(--tx2);margin:0;white-space:pre}
+  table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:520px}
+  td{padding:11px 13px;border-bottom:1px solid var(--line);color:var(--tx2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.y{width:34px;text-align:center;font-size:16px}
+  td.k{color:var(--tx);font-weight:600}
+  .big{font-size:44px;font-weight:800;line-height:1;letter-spacing:-.02em}
+  .lbl{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:700;margin-bottom:8px}
+  .warn{background:rgba(229,103,78,.08);border:1px solid rgba(229,103,78,.3);border-radius:13px;padding:17px 19px}
+  .warn b{color:var(--red);display:block;margin-bottom:4px;font-size:15px}
+  .warn p{margin:0;color:var(--tx2);font-size:14px}
+  .rule{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:13px;padding:17px 19px}
+  .rule b{color:var(--tx);display:block;margin-bottom:4px;font-size:15px}
+  .rule p{margin:0;color:var(--tx2);font-size:14px}
+  .ok{background:rgba(95,191,138,.08);border:1px solid rgba(95,191,138,.28);border-radius:13px;padding:17px 19px}
+  .ok b{color:var(--green);display:block;margin-bottom:4px;font-size:15px}
+  .ok p{margin:0;color:var(--tx2);font-size:14px}
+  .step{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:none}
+  .step .n{flex:none;width:26px;height:26px;border-radius:999px;background:var(--gold);color:var(--bg);
+    font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
+  .step .t{font-size:15px;font-weight:700;color:var(--tx);margin-bottom:2px}
+  .step .d{font-size:14px;color:var(--tx2)}
+  .step .who{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--tx3);margin-top:4px}
+  .step .who.h{color:var(--gold)}
+  .chat{background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-top:12px}
+  .chat .who2{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:800;color:var(--blue);margin-bottom:5px}
+  .chat .who2.s{color:var(--gold)}
+  .chat p{margin:0 0 12px;font-size:13.5px;color:var(--tx2)}
+  .chat .q{color:var(--tx);border-left:2px solid var(--gold);padding-left:11px;font-style:italic}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Templating the automations: <span>where we are</span>.</h1>
+  <p class="sub">Built today, plus what is left and roughly what it costs each time you onboard an academy.</p>
+
+  <!-- ── DONE ── -->
+  <h2>Built and proven today</h2>
+  <div class="card scroll">
+    <table><tbody>
+      <tr><td class="y">✅</td><td class="k">Every message labelled</td><td>"Copies to everyone" or "yours alone", decided when it is written. Plus a test that renders the email and fails the build if anything GTA-specific is in something marked copyable.</td></tr>
+      <tr><td class="y">✅</td><td class="k">3 emails off GTA's letterhead</td><td>They had your logo, Oakville and your domain baked into the frame. San Jose's parents would have received GTA-branded emails.</td></tr>
+      <tr><td class="y">✅</td><td class="k">A live bug fixed</td><td>Editing a message's wording silently switched it back on. San Jose's testimonials email was one click from turning itself on and sending Toronto families' quotes.</td></tr>
+      <tr><td class="y">✅</td><td class="k">GTA locked</td><td>All 10 of your messages snapshotted. Any change to what a parent reads now fails the build unless someone deliberately allows it.</td></tr>
+      <tr><td class="y">✅</td><td class="k">Your 2 lines restored</td><td>Online programs and bring-a-friend are back for GTA, and absent for everyone else.</td></tr>
+      <tr><td class="y">✅</td><td class="k">"Enquired about" fixed</td><td>3 emails told paying members they had "enquired about" you. Now they say "joined".</td></tr>
+    </tbody></table>
+  </div>
+
+  <div class="warn" style="margin-top:14px">
+    <b>Honest caveat: none of it is deployed</b>
+    <p>All of the above is built, tested and pushed to a branch. It is NOT live. Production still runs the old code. The only thing that has actually changed in your live system today is one dead automation deleted, which had never sent a message.</p>
+  </div>
+
+  <!-- ── LEFT ── -->
+  <h2>What is left before the automations are fully templated</h2>
+  <div class="card scroll">
+    <table><tbody>
+      <tr><td class="y">⏳</td><td class="k">The name parents see</td><td>A field for "By Any Means Basketball" as distinct from your internal "BAM GTA". <b style="color:var(--red)">Blocked, and not on you.</b> Another chat built it; it is not merged yet.</td></tr>
+      <tr><td class="y">⏳</td><td class="k">GTA's sales messages templated</td><td>Waiting on the above. Doing it first would make your texts read "It's coach from BAM GTA".</td></tr>
+      <tr><td class="y">○</td><td class="k">The master's welcome sequence</td><td>Goes from 3 plain texts to the full 7-step sequence. Ready to build now.</td></tr>
+      <tr><td class="y">○</td><td class="k">Two approval steps</td><td>So an owner actually approves their messages before anything sends. The wizard already promises this and the step does not exist.</td></tr>
+      <tr><td class="y">○</td><td class="k">San Jose seeded</td><td>The proof it all works. Rendered before and after, and diffed.</td></tr>
+      <tr><td class="y">○</td><td class="k">Deploy</td><td>Merge, review, ship.</td></tr>
+    </tbody></table>
+  </div>
+
+  <!-- ── SKILLS ── -->
+  <h2>The skills, and what a staff member actually does</h2>
+  <p class="sub" style="margin-bottom:16px">Two skills, both run by internal BAM staff. The academy owner never sees them; they just answer the onboarding questions as they already do.</p>
+
+  <div class="card">
+    <div class="step"><div class="n">1</div><div>
+      <div class="t">The skill reads everything the academy already told us</div>
+      <div class="d">Their story, why they are different, their proof, their programme, their schedule, their coaches. All of it is already sitting in onboarding. Nothing reads it today.</div>
+      <div class="who">automatic</div></div></div>
+
+    <div class="step"><div class="n">2</div><div>
+      <div class="t">It builds everything it can without asking</div>
+      <div class="d">All the sales follow-ups, the schedule text, the venue, the welcome frame. Roughly four fifths of the system, with zero questions asked.</div>
+      <div class="who">automatic</div></div></div>
+
+    <div class="step"><div class="n">3</div><div>
+      <div class="t">It writes the remaining emails out as plain text in the chat</div>
+      <div class="d">Not code, not a design. The actual words, with the angle it chose, quoting back which of the owner's own phrases it used, and saying plainly what it refused to claim.</div>
+      <div class="who h">staff reads</div>
+      <div class="chat">
+        <div class="who2">Skill</div>
+        <p><b style="color:var(--tx)">Why our way is different.</b> My angle: your own line "we coach with a plan, not just drills" already implies the alternative, so I said it out loud.</p>
+        <p class="q">A lot of parents come to us frustrated. Their kid has been training, but they are not seeing the progress they expected...<br><br>Twelve players a session, at least two coaches on the floor. Every athlete gets seen.</p>
+        <p style="margin-top:12px;color:var(--tx3)"><b>Drew from:</b> their why-us verbatim, plus capacity 12 and coach ratio from their offer. Both facts in their record, so stated as facts.<br><b>Did not claim:</b> the European coaching background. Not in their record anywhere.</p>
+      </div>
+      <div class="chat" style="margin-top:9px">
+        <div class="who2 s">Staff</div>
+        <p>Add it, that's real. Otherwise approved.</p>
+      </div>
+    </div></div>
+
+    <div class="step"><div class="n">4</div><div>
+      <div class="t">It builds and renders every message exactly as a parent gets it</div>
+      <div class="d">One page, a switcher across the automations, real emails rather than descriptions. Plus a list of what did NOT render and why, which is the one thing you cannot see by reading the email.</div>
+      <div class="who h">staff reviews, sends notes back</div></div></div>
+
+    <div class="step"><div class="n">5</div><div>
+      <div class="t">It installs everything switched off</div>
+      <div class="d">Nothing can send until the academy approves it in their own wizard.</div>
+      <div class="who">automatic</div></div></div>
+  </div>
+
+  <!-- ── COST ── -->
+  <h2>What it costs each time, honestly</h2>
+  <div class="grid g2">
+    <div class="card">
+      <div class="lbl">Emails a human has to judge</div>
+      <div class="big" style="color:var(--gold)">3</div>
+      <p style="margin:10px 0 0;color:var(--tx2);font-size:14px">Per academy, every academy. This is a recurring cost, not a one-time build. The skill drafts all three from what the owner already wrote, so nobody starts from a blank page, but somebody still has to read and approve them.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">Staff time per academy</div>
+      <div class="big" style="color:var(--gold)">~40 min</div>
+      <p style="margin:10px 0 0;color:var(--tx2);font-size:14px">Rough and honest. The drafting is instant. The time is a person reading 3 emails properly, deciding, then reviewing about 13 rendered messages before approving. Faster once staff have done two or three.</p>
+    </div>
+  </div>
+
+  <div class="rule" style="margin-top:14px">
+    <b>Why it is 3 and not zero</b>
+    <p>Those emails argue why an academy is worth choosing. That argument is genuinely different for each one, and the version that copies safely is the version that says nothing specific. The rest of the system, roughly four fifths of it, does copy with no human involved.</p>
+  </div>
+
+  <!-- ── YOU ── -->
+  <h2>What is left for you</h2>
+  <div class="grid g2">
+    <div class="ok">
+      <b>Almost nothing</b>
+      <p>Confirm the name parents should see for GTA, which is "By Any Means Basketball" unless you say otherwise. Then decide whether you or staff approve the drafted copy for each new academy.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">Everything else</div>
+      <p style="margin:0;color:var(--tx2);font-size:14px">Is us. Most of the things labelled "waiting on you" today were decisions, not work, and you have made all of them. The remaining blocker is another chat's build landing, not anything on your desk.</p>
+    </div>
+  </div>
+
+  <h2>The one next action</h2>
+  <div class="card" style="border-color:rgba(212,182,92,.45)">
+    <p style="margin:0;font-size:16px;color:var(--tx)">Nothing from you. The next move is the name field landing from the other chat, and I am watching for it automatically. When it lands: GTA gets templated, the welcome sequence gets promoted, then San Jose gets the full system and a separate agent checks it actually took.</p>
+  </div>
+
+</div>
+</body>
+</html>
