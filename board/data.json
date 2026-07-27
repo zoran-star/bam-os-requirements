@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "Empty testimonials now DROPS the email entirely, which takes Google reviews off the critical path",
     "TESTIMONIAL CONNECTION now owns the Google reviews build; mockup coming",
     "Zoran confirmed the plan: building now. Foundation builder running",
     "Item 1 applied to prod: 10 academies' website domains backfilled, GTA included",
-    "Big change: 5 designed emails are AUTHORED PER ACADEMY, not copied. Onboarding left the sales preset",
-    "Verified: GTA's brand copy claims Friday training. GTA has never trained on a Friday"
+    "Big change: 5 designed emails are AUTHORED PER ACADEMY, not copied. Onboarding left the sales preset"
   ],
   "orchestrator": {
     "focus": "Preset convergence is the whole game now. The sync chat owns the standard AND seeding San Jose through it. It is building you a mockup of the user stories first; nothing gets built until you confirm it.",
@@ -258,6 +258,13 @@
     }
   ],
   "queue": [
+    {
+      "id": "7-cred",
+      "title": "DECIDE: read-only key in CI vs Vercel cron for the drift checker",
+      "severity": "blocker",
+      "status": "YOUR CALL",
+      "owner": "Zoran"
+    },
     {
       "id": "2-5",
       "title": "Data foundation: parent-facing name, testimonials table, 2 links",
