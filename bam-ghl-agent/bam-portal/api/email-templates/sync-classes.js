@@ -52,31 +52,42 @@ export const UNDECLARED_TEMPLATE_SYNC_CLASS = "attributed";
 
 // Every key in TEMPLATES (nurture-emails.js) + ONBOARDING_TEMPLATES
 // (onboarding-emails.js). Verified against the live exports by the test.
+//
+// THESE ARE DECISIONS, NOT INFERENCES. Zoran worked the classification through
+// on 27 Jul 2026 and it is authoritative. Do not "correct" an entry here from
+// reading the template's current HTML - the copy changes, the decision about
+// whether that content belongs to one academy does not.
 export const TEMPLATE_SYNC_CLASS = Object.freeze({
   // ── Lead nurture ────────────────────────────────────────────────────────
-  // Global brand story / method / scarcity. Fully tokenized, no real person's
-  // words, no academy literals.
-  "nurture-1": "shared",
-  "nurture-2": "shared",
-  "nurture-4": "shared",
+  // 1 and 2 are AUTHORED PER ACADEMY (each academy's own story and its own
+  // account of how it trains), even though the design is tokenized and would
+  // render fine anywhere. Rendering safely is not the test; authorship is.
+  "nurture-1": "local",
+  "nurture-2": "local",
   // REAL PARENT + ATHLETE QUOTES ("Parent of Adam, {{location.city}}"). The
   // quotes are real and were given to ONE academy; {{location.city}} silently
   // re-attributes them to whichever academy sends. Never copy.
   "nurture-3": "attributed",
+  // Generic scarcity / last-call copy. Belongs to no one.
+  "nurture-4": "shared",
 
   // ── Onboarding welcome sequence ─────────────────────────────────────────
-  // These three are written around ONE academy: hardcoded "BY ANY MEANS GTA" /
-  // "OAKVILLE · GTA" header, that academy's WhatsApp invite, coach phone
-  // number, online-programs URL and Google review link. Not testimonials, but
-  // copying them would send GTA's phone number from another academy.
-  "onboarding-welcome": "local",
+  // SHARED ONLY BECAUSE THE FRAME IS TOKENIZED. These two are being re-shelled
+  // onto the tokenized shell (wordmark, location tag, domain and Instagram all
+  // come from the sending academy), which is what makes them safe to copy.
+  // If you reintroduce ANY hardcoded academy identity here - a domain, a phone
+  // number, a WhatsApp invite, a review link, a city - you must change this
+  // class to 'local' in the same commit. Nothing else will catch it.
+  "onboarding-welcome": "shared",
+  "onboarding-review": "shared",
+  // Academy-specific: how THIS academy wants its members to train.
   "onboarding-training": "local",
-  "onboarding-review": "local",
   // Onboarding copies of the nurture designs (free-trial CTA stripped). Same
-  // content, so the same class as their source.
-  "onboarding-story": "shared",
-  "onboarding-era": "shared",
-  "onboarding-testimonials": "attributed", // stripFreeTrial(nurture-3) - same real quotes
+  // content as nurture-1 / nurture-2, so they MUST carry the same class - one
+  // copy marked looser than the other leaks exactly what the other blocks.
+  "onboarding-story": "local", // = stripFreeTrial(nurture-1)
+  "onboarding-era": "local",   // = stripFreeTrial(nurture-2)
+  "onboarding-testimonials": "attributed", // = stripFreeTrial(nurture-3), same real quotes
 });
 
 // The declared class of a template key, or the fail-closed class for a key we
