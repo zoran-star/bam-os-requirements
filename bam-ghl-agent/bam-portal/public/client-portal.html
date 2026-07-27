@@ -59068,22 +59068,97 @@ async function _ccLoadTrialsCount() {
 }
 // The full list of today's trials inside the KPI card (Zoran's wireframe):
 // one row per trial - time + athlete (parent in the sub position if no athlete).
+// Tapping a row pops their contact card (Zoran 2026-07-27) - the rows are kept
+// in _CC_TRIALS so the click handler has the booking without a refetch.
+let _CC_TRIALS = [];
+let _CC_TRIALS_TZ = 'America/Toronto';
 function _ccRenderTrialsList(trials, tz) {
   const listEl = document.getElementById('cc-sal-trials-list');
   const sub = document.getElementById('cc-sal-next');
   if (sub) sub.textContent = '';
   if (!listEl) return;
-  if (!trials || !trials.length) { listEl.innerHTML = ''; return; }
-  const rows = trials
-    .filter(t => t.start)
-    .sort((a, b) => new Date(a.start) - new Date(b.start))
-    .map(t => {
-      let time = '';
-      try { time = new Date(t.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'America/Toronto' }); } catch (_) {}
-      const nm = _ccCapName(String(t.athlete || t.contactName || 'Trial').split(' ').slice(0, 2).join(' '));
-      return `<div class="cc-sal-li"><span class="t">${escapeHTML(time)}</span><span class="n">${escapeHTML(nm)}</span></div>`;
-    }).join('');
-  listEl.innerHTML = rows;
+  _CC_TRIALS_TZ = tz || 'America/Toronto';
+  _CC_TRIALS = (trials || []).filter(t => t.start).sort((a, b) => new Date(a.start) - new Date(b.start));
+  if (!_CC_TRIALS.length) { listEl.innerHTML = ''; return; }
+  listEl.innerHTML = _CC_TRIALS.map((t, i) => {
+    const nm = _ccCapName(String(t.athlete || t.contactName || 'Trial').split(' ').slice(0, 2).join(' '));
+    return `<div class="cc-sal-li click" onclick="event.stopPropagation();_ccOpenTrialCard(${i})" title="Open their contact card">`
+      + `<span class="t">${escapeHTML(_ccTrialTime(t))}</span><span class="n">${escapeHTML(nm)}</span></div>`;
+  }).join('');
+}
+function _ccTrialTime(t) {
+  try { return new Date(t.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: _CC_TRIALS_TZ }); } catch (_) { return ''; }
+}
+
+// Tap a trial -> their contact card pops up. Same shell the pipeline lead card
+// uses (#pl-drawer), so it centres as a modal on desktop and goes full-screen
+// on mobile with no extra CSS. If the lead is on the sales board we open the
+// FULL lead card (messages, journey, actions); otherwise we fall back to a
+// read-only card built from the booking + the contacts mirror.
+async function _ccOpenTrialCard(i) {
+  const t = _CC_TRIALS[i];
+  if (!t) return;
+  const cid = String(t.contactId || '');
+  if (cid && typeof _PL_DATA !== 'undefined' && _PL_DATA) {
+    const opps = ((_PL_DATA.pipelines) || []).reduce((a, p) => a.concat(p.opportunities || []), []);
+    const hit = opps.find(o => String(o.contactId || '') === cid && String(o.status || 'open').toLowerCase() === 'open')
+             || opps.find(o => String(o.contactId || '') === cid);
+    if (hit) { try { _plOpenCard(hit.id); return; } catch (_) { /* fall through to the read-only card */ } }
+  }
+  _ccTrialCard(t);
+}
+function _ccTrialCard(t) {
+  const drawer = document.getElementById('pl-drawer');
+  const overlay = document.getElementById('pl-drawer-overlay');
+  if (!drawer || !overlay) return;
+  const time = _ccTrialTime(t);
+  const nm = _ccCapName(String(t.athlete || t.contactName || 'Trial').split(' ').slice(0, 2).join(' '));
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+  drawer.innerHTML = `
+    <div class="pl-d-header">
+      <div>
+        <div class="pl-d-title">${escapeHTML(nm)}</div>
+        <div class="pl-d-sub">Trial today${time ? ' · ' + escapeHTML(time) : ''}${t.status ? ' · ' + escapeHTML(t.status) : ''}</div>
+      </div>
+      <button class="pc-d-close" onclick="closePipelineDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:22px;padding:4px 10px">×</button>
+    </div>
+    <div class="pl-d-section">
+      <div class="pl-d-row"><div class="lbl2">Athlete</div><div>${escapeHTML(t.athlete || '-')}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Parent</div><div>${escapeHTML(t.parent || t.contactName || '-')}</div></div>
+      ${t.age ? `<div class="pl-d-row"><div class="lbl2">Age</div><div>${escapeHTML(String(t.age))}</div></div>` : ''}
+      ${t.group ? `<div class="pl-d-row"><div class="lbl2">Group</div><div>${escapeHTML(t.group)}</div></div>` : ''}
+    </div>
+    <div class="pl-d-section" id="cc-trial-contact">
+      <div class="lbl">Contact</div>
+      ${t.contactId
+        ? `<div style="font-size:13px;color:var(--text-mute)"><span class="req-spin"></span> Loading…</div>`
+        : `<div style="font-size:13px;color:var(--text-mute)">No contact linked to this booking.</div>`}
+    </div>`;
+  if (t.contactId) _ccTrialCardContact(t.contactId);
+}
+async function _ccTrialCardContact(cid) {
+  const host = document.getElementById('cc-trial-contact');
+  if (!host) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/calendars-v15?action=contact&client_id=${encodeURIComponent(CLIENT_ID)}&id=${encodeURIComponent(cid)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const c = j.contact || {};
+    if (!document.getElementById('cc-trial-contact')) return;   // card closed while loading
+    const cf = (c.customFields || []).filter(f => f.value != null && f.value !== '');
+    const tags = (c.tags || []).map(x => `<span style="font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:2px 8px;margin:0 4px 4px 0;display:inline-block">${escapeHTML(x)}</span>`).join('');
+    host.innerHTML = `<div class="lbl">Contact</div>
+      <div class="pl-d-row"><div class="lbl2">Phone</div><div>${c.phone ? `<a href="tel:${escapeHTML(c.phone)}" style="color:var(--accent)">${escapeHTML(c.phone)}</a>` : '-'}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Email</div><div>${c.email ? `<a href="mailto:${escapeHTML(c.email)}" style="color:var(--accent)">${escapeHTML(c.email)}</a>` : '-'}</div></div>
+      ${c.source ? `<div class="pl-d-row"><div class="lbl2">Source</div><div>${escapeHTML(c.source)}</div></div>` : ''}
+      ${c.dnd ? `<div style="font-size:11.5px;color:#c9871f;margin:6px 0">Do-not-contact is ON</div>` : ''}
+      ${tags ? `<div style="margin-top:10px">${tags}</div>` : ''}
+      ${cf.length ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">${cf.map(f => `<div class="pl-d-row"><div class="lbl2">${escapeHTML(f.name || 'Field')}</div><div>${escapeHTML(String(f.value))}</div></div>`).join('')}</div>` : ''}`;
+  } catch (e) {
+    if (host.isConnected) host.innerHTML = `<div class="lbl">Contact</div><div style="font-size:13px;color:var(--text-mute)">Couldn't load the contact - ${escapeHTML(e.message || String(e))}</div>`;
+  }
 }
 // "Trials today: 0" is a dead number - show the next booked trial instead.
 async function _ccNextTrial() {
