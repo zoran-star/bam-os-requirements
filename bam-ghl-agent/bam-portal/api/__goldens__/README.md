@@ -23,7 +23,13 @@ tell at a glance which kind you are looking at.
 
 The **words** goldens were generated from `origin/main` at `477a604` - GTA's output as
 it was in production on 27 Jul 2026, before the automation-templating wave. They are
-the production truth and should stay that way.
+the production truth and only move on a deliberate, owner-approved copy change.
+
+One such change so far: on 27 Jul 2026 the footer reason on `onboarding-story`,
+`-era` and `-testimonials` went from "you enquired about" to "you joined". Those three
+go to people who have already paid, so the lead-nurture sentence was untrue of them.
+Three words goldens and the same three markup goldens moved by one line each; the four
+`nurture-*` goldens are byte-identical, because "enquired" is still correct for a lead.
 
 The **markup** goldens were re-blessed once on 27 Jul 2026, for the shell move
 (`e677243`: onboarding-welcome / -training / -review stopped carrying their own copy of

@@ -51,6 +51,32 @@ function stripFreeTrial(html) {
     .replace(/\s*<p[^>]*>[^<]*free trial[^<]*<\/p>/gi, "");
 }
 
+// Same audience problem as MEMBER_FOOT, one layer further out. The nurture designs
+// still carry their own inline copy of the frame, with the shell's DEFAULT reason
+// ("you enquired about ...") baked into it - correct for a lead, untrue of a member.
+// welcome / training / review pick their reason by calling shellFoot(); these three
+// cannot, because they inherit a rendered frame rather than build one. So swap that
+// one sentence for the shell's OTHER reason. Both sides are FOOTER_REASON constants
+// from _shell.js, so this reuses the existing parameter - it is not a fourth footer,
+// and the nurture templates themselves are untouched and keep saying "enquired".
+//
+// It throws rather than no-ops if the sentence is not found exactly once: if the
+// nurture frame is ever re-shelled or reworded, this must fail loudly at import
+// instead of silently telling a paying member they enquired about us.
+function memberFooterReason(html, key) {
+  const parts = String(html).split(FOOTER_REASON.enquired);
+  if (parts.length !== 2) {
+    throw new Error(
+      `onboarding-emails: expected exactly one FOOTER_REASON.enquired in ${key}, found ${parts.length - 1}`,
+    );
+  }
+  return parts.join(FOOTER_REASON.joined);
+}
+
+// stripFreeTrial + the member footer reason: the two things that turn a lead-nurture
+// design into its onboarding copy.
+const forMembers = (key) => memberFooterReason(stripFreeTrial(NURTURE[key]), key);
+
 const EYEBROW = (label) => `
       <tr><td style="padding:50px 36px 8px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px;"><tr>
@@ -212,7 +238,7 @@ export const ONBOARDING_TEMPLATES = {
   // Onboarding-only copies of the nurture designs, with the free-trial CTA removed
   // (paying members, not leads). The onboarding automation points its brand-story /
   // "new era" / testimonials steps at these keys instead of nurture-1/2/3.
-  "onboarding-story":        stripFreeTrial(NURTURE["nurture-1"]),
-  "onboarding-era":          stripFreeTrial(NURTURE["nurture-2"]),
-  "onboarding-testimonials": stripFreeTrial(NURTURE["nurture-3"]),
+  "onboarding-story":        forMembers("nurture-1"),
+  "onboarding-era":          forMembers("nurture-2"),
+  "onboarding-testimonials": forMembers("nurture-3"),
 };
