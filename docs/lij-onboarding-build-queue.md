@@ -167,6 +167,17 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 | 45 | **Post-approval env swap (gate E):** `TWILIO_MASTER_ACCOUNT_SID`, `TWILIO_MASTER_API_KEY_SID`, `TWILIO_MASTER_API_KEY_SECRET` on Vercel prod AND preview (use `printf`, never `echo`), then set `TWILIO_PRIMARY_PROFILE_SID` to the approved SID - that flag un-gates the whole A2P chain. Verify `TWILIO_A2P_POLICY_SID` on first live run. Smoke test the subaccount chain on one academy | BLOCKER after approval | queued | |
 | 46 | **Build an onboarding intake step for academy A2P data.** Every academy needs its OWN Secondary Profile + brand under its OWN EIN (one ISV brand cannot cover unrelated businesses). Each owner must supply legal name, EIN, CP 575-accurate details, live site, privacy policy, terms, and a rep on their own domain. Collect it at onboarding rather than chasing per academy | SCALE, high value | queued | Exactly the plug-and-play pattern Zoran wants |
 
+## THE AUTOMATIONS DIRECTIVE (Zoran, 2026-07-26, locked - supersedes open questions)
+
+"The free trial sales system preset should have a DEFAULT PRESET OF AUTOMATIONS in the preset pipelines similar to BAM GTA's, just more templatized. When I onboard new academies onto that sales system preset, they get the SAME automations, templatized to them."
+
+What this settles:
+1. **GTA is the reference implementation.** The master defaults = GTA's live automation system with identity templatized (name, owner, city, domain, links as tokens). Not a separately-authored lighter version.
+2. The two-way sync room's design question ("is GTA the reference or is the master authored?") is ANSWERED; it now plans the CONVERGENCE (one build wave to GTA-parity templatized) plus the mechanism that keeps it there.
+3. Items 53 (onboarding 8 steps), the nurture default (4 designed emails, not 3 SMS), 56 (GTA's 4 hardcoded sales steps come UP to token parity), and 57 (orphans get a preset-or-exception ruling) all fold under this directive.
+4. The exception class stands: attributed content (real parents' quotes, testimonials) NEVER auto-propagates (#55). Identity is always a runtime fact.
+5. Copy review default: improvements Zoran requests go to the MASTER unless identity or an explicit, recorded divergence.
+
 ## PRICE-BREAKDOWN DECISIONS (Zoran, 2026-07-26, do not re-litigate)
 
 1. **Shape = stacked receipt**, total LAST and bolded, never total-first, never a sentence:

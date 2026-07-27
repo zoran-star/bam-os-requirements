@@ -1,14 +1,14 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "Directive locked: new academies get GTA's automations, templatized. All chats aligned",
     "Third false blocker killed; found a real one the audit missed: one Google link shared by every academy",
     "Killed a second false blocker: the email identity fallback was already fixed and shipped",
     "SAN JOSE EMAIL IS LIVE: verified, sends as BAM San Jose, Lij's Gmail untouched",
-    "Scaling program fully closed: Cole's SQL applied, dormant until Mike sets terms",
-    "Corrected a scout's blocker claim: SJ's nurture emails are clean, onboarding templates are not"
+    "Scaling program fully closed: Cole's SQL applied, dormant until Mike sets terms"
   ],
   "orchestrator": {
-    "focus": "SJ email is live. Preset parity is the front now: audit done, planning room open on the two-way sync. Lij's ask-list is the biggest unblock you own.",
+    "focus": "ZORAN'S DIRECTIVE LOCKED: the preset ships GTA's automations, templatized, to every new academy. The sync room plans the convergence; all preset chats aligned on it.",
     "needs": [
       "Send Lij his ask-list, it is now the biggest unblock",
       "Try the price breakdown when the test chip appears",
