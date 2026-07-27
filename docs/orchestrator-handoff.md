@@ -44,7 +44,7 @@ San Jose is not the point. San Jose is the thing that *exposes* what is not yet 
 
 ---
 
-## 4. The six house rules
+## 4. The seven house rules
 
 Each was learned expensively. Carry them into every spawn prompt.
 
@@ -54,6 +54,7 @@ Each was learned expensively. Carry them into every spawn prompt.
 4. **Trace overrides, do not grep literals.** A GTA literal in a file is not evidence it reaches output. Ask: does anything override this on the path to output, and does that override fail OPEN or CLOSED?
 5. **Say what you did not verify.**
 6. **If the proof is not in the repo, the fix is not finished.** Committed test, plain `node`, no new deps, no network, no DB, **with a negative control** (an env flag that reverts one fix and shows the suite catching it). A suite that only ever passes tells you nothing.
+7. **A test fixture that drifts from production passes for the wrong reason.** Distinct from rule 2: everything is deployed and green, but the test is measuring a world that no longer exists. Proven on 2026-07-27 - a golden-snapshot lock guarding "GTA never changes" used a hardcoded client fixture with no `public_name`, so when that column landed in production the lock rendered the pre-change reality, compared it to goldens of that same dead reality, and reported green. **It was worse than no test, because it was trusted and quoted as evidence.** Fix shape: the fixture reads the SAME shared snapshot production reads, plus an assertion that fails loudly if the fixture loses a field production has. Applies to any room holding golden files or fixtures.
 
 **Two more that are really rules 3 and 4 applied:**
 - **Hand DNS and secret values as plain code blocks, never in a table.** A tab copied out of a markdown table cell invalidated an SPF record and cost 90 minutes of Amazon backoff.
