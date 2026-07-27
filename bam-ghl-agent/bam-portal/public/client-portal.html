@@ -26456,11 +26456,79 @@ function _bbGenOtherChanged() {
   });
 }
 
+// ─── BB BRAND / KPI HYDRATION ───────────────────────────────────────────
+// brand_data and kpi_data are deliberately NOT in CLIENT_SELECT_COLS, so the
+// cached CLIENT_ROWS row carries neither. The Brand and KPI cards therefore
+// rendered blank, and their change handlers posted that blank object straight
+// back over the stored one. update_client_basics cannot defend against it:
+// it uses COALESCE(p_patch->'brand_data', brand_data), and an empty OBJECT is
+// not NULL, so the empty object wins and every stored key is wiped.
+//
+// Read the column on demand instead (same shape as _bbLoadSitePages below),
+// cache it on the CLIENT_ROWS row, and refuse to save until that read lands.
+// The flags hold the CLIENT_ID they were hydrated FOR, not a bare boolean, so
+// switching clients re-locks the card instead of inheriting a stale unlock.
+let _BB_BRAND_LOADED_FOR = null;
+let _BB_KPIS_LOADED_FOR  = null;
+
+async function _bbLoadClientJsonCol(col) {
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+  if (c && c[col]) return c[col];                 // already hydrated this session
+  try {
+    if (_sb && CLIENT_ID) {
+      const { data, error } = await _sb.from('clients').select(col).eq('id', CLIENT_ID).maybeSingle();
+      if (error) return null;
+      const val = (data && data[col]) || {};      // {} = stored NULL, still a valid read
+      if (c) c[col] = val;
+      return val;
+    }
+  } catch (_) {}
+  return null;   // read failed - callers must stay locked rather than save blanks
+}
+
+// Fill inputs that the render left empty. A field that is already non-empty was
+// either typed by the user during the fetch or painted from a warm cache, so
+// leave it alone: hydration must never clobber a keystroke.
+function _bbFillIfBlank(id, val) {
+  const el = document.getElementById(id);
+  if (!el || el.value) return;
+  el.value = (val == null) ? '' : val;
+}
+
+async function _bbBrandHydrate() {
+  const bd = await _bbLoadClientJsonCol('brand_data');
+  if (!bd) return;                                              // read failed: stay locked
+  if (!document.getElementById('bb-brand-color_primary')) return; // navigated away mid-fetch
+  _BB_BRAND_TEXT_FIELDS.forEach(k => _bbFillIfBlank('bb-brand-' + k, bd[k]));
+  // website_status is a button row, not an input - repaint its selected state.
+  const ws = bd.website_status || '';
+  document.querySelectorAll('#bb-brand-status-row .bb-choice').forEach(b => {
+    b.classList.toggle('selected', b.getAttribute('data-opt') === ws);
+  });
+  _BB_BRAND_LOADED_FOR = CLIENT_ID;
+}
+
+async function _bbKpisHydrate() {
+  const kd = await _bbLoadClientJsonCol('kpi_data');
+  if (!kd) return;
+  if (!document.getElementById('bb-kpi-' + _BB_KPI_IDS[0])) return;
+  _BB_KPI_IDS.forEach(id => _bbFillIfBlank('bb-kpi-' + id, kd[id]));
+  _BB_KPIS_LOADED_FOR = CLIENT_ID;
+}
+
 // ─── BB BRAND CARD ──────────────────────────────────────────────────────
 // All brand data lives in clients.brand_data jsonb. Same auto-save
 // pattern as General. Includes a Mark-done CTA at the bottom that
 // flips brand_marked_done_at via the mark_onboarding_section RPC.
+const _BB_BRAND_TEXT_FIELDS = [
+  'color_primary', 'color_secondary', 'color_accent',
+  'font_display', 'font_body',
+  'logo_dark_url', 'logo_light_url', 'icon_url',
+  'website_url', 'domain', 'references', 'stats', 'notes',
+  'story', 'why_us', 'dream_athletes', 'proof',
+];
 function _bbRenderBrandCard(panel, meta) {
+  _BB_BRAND_LOADED_FOR = null;   // lock saves until this render's hydrate lands
   const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
   const bd = c.brand_data || {};
   const adsApproval = c.ads_content_approval_required === true;
@@ -26551,8 +26619,8 @@ function _bbRenderBrandCard(panel, meta) {
 
     <div class="bb-field">
       <div class="bb-field-label">Current website status</div>
-      <div class="bb-choice-row">${statusOpts.map(opt => `
-        <button type="button" class="bb-choice ${websiteStatus === opt ? 'selected' : ''}" onclick="_bbBrandSetWebsiteStatus('${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+      <div class="bb-choice-row" id="bb-brand-status-row">${statusOpts.map(opt => `
+        <button type="button" class="bb-choice ${websiteStatus === opt ? 'selected' : ''}" data-opt="${_bbEscapeAttr(opt)}" onclick="_bbBrandSetWebsiteStatus('${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
       `).join('')}</div>
     </div>
 
@@ -26626,6 +26694,7 @@ function _bbRenderBrandCard(panel, meta) {
   const _wp = document.getElementById('bb-website-pages');
   if (_wp) _bbRenderWebsitePages(_wp);
   _bbRenderBrandBoard();
+  _bbBrandHydrate();   // brand_data is not in CLIENT_SELECT_COLS - fill in async
 }
 
 // ── Brand board block (Blueprint > Brand, sign-off redesign #1) ──
@@ -26762,6 +26831,10 @@ async function _bbToggleAdsApproval() {
 
 function _bbBrandChanged() {
   _bbBasicsScheduleSave(() => {
+    // Checked here (at fire time, 600ms later) rather than on the keystroke, so
+    // a hydrate that lands mid-debounce still lets the edit through. Returning
+    // a falsy patch makes _bbBasicsScheduleSave skip the save entirely.
+    if (_BB_BRAND_LOADED_FOR !== CLIENT_ID) return null;
     const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
     const cur = (c && c.brand_data) || {};
     const next = { ...cur,
@@ -26789,6 +26862,10 @@ function _bbBrandChanged() {
 }
 
 async function _bbBrandSetWebsiteStatus(opt) {
+  // Same trap as _bbBrandChanged: clicking a status button before brand_data
+  // has loaded would post {website_status} alone and wipe the other 18 keys.
+  const bd = await _bbLoadClientJsonCol('brand_data');
+  if (!bd) { alert("Couldn't load your brand details. Reload and try again."); return; }
   const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
   const cur = (c && c.brand_data) || {};
   const next = (cur.website_status === opt) ? '' : opt;
@@ -26829,6 +26906,7 @@ const _BB_KPI_GROUPS = [
 const _BB_KPI_IDS = [..._BB_KPI_GROUPS.flatMap(([, fs]) => fs.map(f => f[0])), 'avg_monthly_expenses', 'expenses_breakdown'];
 
 function _bbRenderKpisCard(panel, meta) {
+  _BB_KPIS_LOADED_FOR = null;   // lock saves until this render's hydrate lands
   const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
   const kd = c.kpi_data || {};
   const vk = (k) => _bbEscapeHtml(kd[k] == null ? '' : kd[k]);
@@ -26871,10 +26949,12 @@ function _bbRenderKpisCard(panel, meta) {
 
     ${_bbMarkDoneCta('kpis', 'KPIs')}
   `;
+  _bbKpisHydrate();   // kpi_data is not in CLIENT_SELECT_COLS - fill in async
 }
 
 function _bbKpisChanged() {
   _bbBasicsScheduleSave(() => {
+    if (_BB_KPIS_LOADED_FOR !== CLIENT_ID) return null;   // see _bbBrandChanged
     const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
     const cur = (c && c.kpi_data) || {};
     const next = { ...cur };
