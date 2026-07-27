@@ -190,6 +190,21 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 
 **INTERIM: do not edit the Business Basics card until this is fixed.** Pre-existing, not introduced by the foundation build; that build added a hydration guard so its own new `public_name` field cannot repeat the pattern.
 
+## ⛔ ITEMS B AND C ARE CANCELLED (Zoran, 2026-07-27)
+
+"We don't need that weekly check since our goal is to set up the sales system in a way where it's either the preset or custom stuff that gets edited."
+
+**A structural fix replacing a detective one, and it is the stronger of the two.** If `sync_class` makes every row explicitly preset-owned or academy-owned at WRITE time, and owners have no free-text override, the drift class cannot silently form. The weekly check was always a workaround for an ambiguous boundary; removing the ambiguity is better than detecting its consequences.
+
+**Deleted:** item B (override-tracing reverse check), item C (weekly GitHub Action + "Preset drift" issue), **the CI credentials decision** (he had chosen a read-only key in Actions secrets; now moot, nobody provisions that role), and **the seven-day governance window question** (evaporates with the check).
+
+**NOT deleted, and now more load-bearing:**
+1. **`sync_class` is now the ONLY mechanism**, not belt-and-braces beside a safety net. The strictest-wins rule (`attributed > local > shared`, template beats step) IS the enforcement.
+2. **Item G matters MORE.** GTA is currently drifted (4 hardcoded sales steps, 2 orphan sequences). The structural model only holds once GTA actually IS the clean reference, so cleaning it is what makes the model true on day one rather than housekeeping.
+3. **The override-tracing METHOD survives as design guidance**, not as a build item: "does anything override this value on the path to output, and does that override fail open or closed" is exactly what a builder needs when wiring blocks and resolvers.
+
+**⚠️ HONEST RESIDUAL:** the structural model assumes nobody edits GTA's rows as a special case any more. The weekly issue would have caught that; nothing does now. Fine while GTA's rows ARE the preset, but **a genuine GTA one-off must be marked `local` at the moment it is written or it silently becomes everyone's.**
+
 ## THE 13 ANSWERS (AUTOMATION TEMPLATING, 2026-07-27). These are the builder contract.
 
 **MARKING.** (1) Template vs step conflict: **THE STRICTEST WINS**, `attributed > local > shared`. A step marked `shared` pointing at an `attributed` template resolves `attributed`. Reason: the marking protects content, content lives in the template, and a step-level loosening would let someone un-protect real people's words by editing a row they thought was about timing. (2) Column DEFAULT `'shared'`, **no backfill needed** for the ~46 existing academies: resolution reads the template first and the column is only an override, so absent means inherit. (3) `attributed` means BOTH, at different layers: **the CONTENT never travels; the STEP still seeds so the sequence keeps its shape, but `enabled:false`.**
