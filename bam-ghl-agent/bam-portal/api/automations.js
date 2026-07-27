@@ -58,7 +58,10 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,owner_name,email,address,time_zone,website_setup,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  // public_name / community_group_* / google_review_url are the parent-facing
+  // facts clientVars() renders from - without them every message silently falls
+  // back to the internal name and drops its group + review links.
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,public_name,owner_name,email,address,time_zone,website_setup,community_group_url,community_group_platform,google_review_url,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 

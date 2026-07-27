@@ -3,11 +3,103 @@ domain: pipeline-presets
 review_state: ready-for-review
 prototype_status: partial
 core_parity: not-reviewed
-last_reviewed: "2026-07-10"
+last_reviewed: "2026-07-27"
 prototype_commit: working-tree
 core_commit_reviewed: unavailable
 phases_done: [1, 2, "3a", 4]
 ---
+
+## 2026-07-27 — TIER-3 FACTS: parent-facing identity + the testimonials table (schema written, NOT applied)
+
+The photocopyable-vs-custom audit of GTA's sales system found the remaining gaps are
+almost all **tier-3 FACTS we never collect**, not structure. This build adds them.
+Migration `bam-portal/supabase/migrations/20260727140000_academy_public_facts_and_testimonials.sql`
+is written and **unapplied** (a human applies migrations). All additive.
+
+| New | Shape | Why it is a fact, not a fork |
+|---|---|---|
+| `clients.public_name` | text, nullable | `business_name` is the INTERNAL label ("BAM GTA") and it is what `{{location.name}}` rendered, so parents read our own shorthand. `clientVars` now prefers `public_name` and **falls back to `business_name`**, so unset academies are byte-identical to before (proved: 24/24 template renders unchanged). |
+| `clients.community_group_url` + `community_group_platform` | text; platform CHECKed to a normalized key set (`whatsapp`/`facebook`/`discord`/`telegram`/`other`) | Every academy has some parent group; only the platform differs. Platform is stored as a **key**, never a display label - the word ("Join the WhatsApp group") is rendered in code, so no academy can inherit another's wording. |
+| `clients.google_review_url` | text, nullable | The review-ask CTA has nowhere to point without it. |
+| `public.testimonials` | `id`, `client_id → clients(id)`, `quote`, `author`, `source` (`manual`/`google`), `rating` (1-5, null for manual), `starred`, `external_id`, `review_created_at`, `synced_at`, `created_at`, `updated_at` | An academy's OWN parent quotes AND its synced Google reviews - **one table, not two**. Feeds the testimonials emails now and the free-trial page cards later. Write access is split by `source` (below). |
+
+**Curation is rating-first, and the write path is split by `source`.** Render order is
+`(client_id, starred desc, rating desc nulls last, review_created_at desc)`: starred first,
+then highest rating down, then most recent review. `review_created_at` is when the PARENT
+left the review, distinct from `created_at` (when we wrote the row) - without it a first
+sync stamps every historical review as arriving today, and the cards show review dates.
+`synced_at` lets a later sweep reconcile upstream edits and deletions. The below-4 display
+cutoff and the aggregate header ("4.9 average, 87 reviews") are reader-side rules computed
+from `rating`; low ratings stay visible on the owner's own card, so it is a rendering rule,
+not a visibility one.
+
+**An academy cannot write its own Google reviews.** Manual rows are fully academy-owned
+(create/edit/delete). Google rows are service-role written and read-only to the academy
+**except toggling `starred`**. The academy-facing policies are deliberately separate from
+the staff ones rather than folded into one `is_staff() OR ...` expression: Postgres ORs
+permissive policies anyway, but split, `testimonials_academy_insert` PINS `source =
+'manual'` in its own `WITH CHECK` where it cannot be misread, and
+`testimonials_academy_delete` pins it the same way. A client that posts `source='google'`
+is refused by the database regardless of what it sends - the trust boundary matters
+because the application is precisely what we do not trust here. The column-level half
+cannot be a policy (a policy sees the old row or the new one, never both), so a
+`before insert or update` guard trigger (`testimonials_guard_source`, deliberately NOT
+`security definer` so it can see the real `current_user`) enforces that only `starred`
+changes on a synced row and that a manual row can never be relabelled `source='google'`.
+Without this split the table would ship a supported path to manufacture social proof -
+the exact failure it exists to prevent.
+
+**A typed quote carries no review evidence, and that is enforced, not documented.**
+Pinning `source` alone only locked the LABEL: an academy could still insert
+`source='manual'` with `rating=5`, a forged `external_id` and an invented review date,
+and land in an aggregate as a fabricated 5.0 - which is the substance of the failure this
+table exists to prevent, just differently badged. The guard trigger now refuses `rating`,
+`external_id`, `review_created_at` and `synced_at` from a non-staff caller on a manual
+row, on INSERT (must be null) and on UPDATE (must be unchanged, so a staff-seeded value
+survives an academy editing the quote text around it). Trigger-level rather than a CHECK
+constraint, so staff and service_role can still seed. **No reader aggregate ships before
+this lands.**
+
+**No `SECURITY DEFINER` function may ever write `testimonials`.** The guard trusts
+`current_user`; inside a SECURITY DEFINER function owned by postgres that IS postgres, so
+the caller bypasses both the trigger and RLS. This repo writes SECURITY DEFINER RPCs as a
+habit (`update_client_basics`, in this same migration), so the constraint is recorded at
+the function header. Academy sessions reach this table through RLS only; any future
+helper must be SECURITY INVOKER or re-verify the real caller's identity itself.
+
+**Two empty states, never collapsed.** Zero rows means we never asked the academy for
+testimonials (onboarding step incomplete); rows-but-none-starred means they answered and
+chose to feature none (step done). Both suppress the testimonials email, but the
+onboarding completion detector must distinguish them, so no view/helper/RPC may return
+the same empty result for both. `count(*), count(*) filter (where starred)` over the
+academy's rows is the query; `testimonials_client_id_idx` serves it, and `starred` is
+readable per academy via the SELECT policy.
+
+**Governing rule, enforced at the render layer (`api/email-shells.js`): no fact, no output.**
+`dropWebsiteMentions` was generalized to `dropEmptyLinkMentions` over *every* link token
+(website, community link, review link): an empty link drops its sentence, or its whole
+line plus a lead-in ending in `:`. `dropEmptyShellLinks` gained a rule that removes an
+entire gold CTA **table** when its href resolved empty, so a missing fact yields no
+button rather than a labelless gold box. Nothing renders a placeholder, an empty anchor,
+or a dangling label.
+
+**`testimonials` is seeded for NOBODY, deliberately.** Not GTA, and above all not San Jose.
+Presetting a new academy with quotes is how one academy previously shipped another's
+testimonials with the names swapped and an invented 5.0 rating. Empty is the correct
+state: zero rows means the quote block and the testimonials email do not render at all.
+Note it is unrelated to `onboarding_feedback.testimonial`, which is the academy OWNER
+reviewing BAM's onboarding - opposite direction, do not join them.
+
+**Guardrails honoured:** additive only; tenant linkage (`client_id`) on the new table;
+`created_at` + `updated_at` with a touch trigger; provider id preserved (`external_id`,
+partial-unique per `(client_id, source, external_id)`) so a Google re-sync updates rather
+than duplicates; `author` is display attribution only, never an identifier.
+
+**Core parity: STILL UNREVIEWED.** `fc-core-srvc` remains unreachable - both
+`git clone` and `gh repo clone Full-Control/fc-core-srvc` fail to resolve for this
+account (2026-07-27). `public_name` and `testimonials` are the two concepts core will
+need to own (Academy display name; a social-proof/testimonial model in the marketing or
+content domain). Same open loop as everywhere else in this file: Luka to grant access.
 
 ## 2026-07-23 — THE ENTITY WAVE (supersedes Decision #3 below; runtime-read replaces copy-stamping)
 
