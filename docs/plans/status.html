@@ -3,284 +3,290 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Automation templating - where we are</title>
+<title>Plug and play: the path there</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#FAF9F6;--card:#FFFFFF;--card2:#F3F1EB;--line:#E4E0D6;--line2:#D6D1C4;
+    --bg:#FAF9F6;--card:#FFFFFF;--card2:#F3F1EB;--line:#E4E0D6;
     --tx:#1A1917;--tx2:#54514A;--tx3:#8A857B;
-    --gold:#9A7A22;--goldbg:#FBF3DC;
-    --green:#2A7A4E;--greenbg:#E8F4EC;
-    --red:#B23A22;--redbg:#FBECE8;
-    --blue:#255F92;--bluebg:#E9F1F8;
-    --amber:#94660B;--amberbg:#FCF2DF;
+    --gold:#9A7A22;--goldbg:#FBF3DC;--goldln:#E5D097;
+    --green:#2A7A4E;--greenbg:#E8F4EC;--greenln:#B7DCC4;
+    --red:#B23A22;--redbg:#FBECE8;--redln:#EFC9BE;
+    --blue:#255F92;--bluebg:#E9F1F8;--blueln:#C2D9EB;
+    --grey:#8A857B;--greybg:#F1EFE9;
     --ui:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:1000px;margin:0 auto;padding:44px 20px 100px}
+  .wrap{max-width:1060px;margin:0 auto;padding:44px 20px 100px}
   h1{font-size:clamp(27px,4.4vw,40px);line-height:1.1;letter-spacing:-.025em;margin:0 0 9px;font-weight:800}
   h1 span{color:var(--gold)}
-  .sub{color:var(--tx2);font-size:16.5px;margin:0 0 26px;max-width:66ch}
+  .sub{color:var(--tx2);font-size:16.5px;margin:0 0 24px;max-width:68ch}
   h2{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--gold);margin:52px 0 6px;font-weight:800}
-  .h2sub{color:var(--tx3);font-size:14px;margin:0 0 15px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;
-    box-shadow:0 1px 2px rgba(26,25,23,.04)}
-  .grid{display:grid;gap:13px}
-  @media(min-width:800px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
-  .scroll{overflow-x:auto}
-  table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:560px}
+  .h2sub{color:var(--tx3);font-size:14px;margin:0 0 16px;max-width:70ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:0 1px 2px rgba(26,25,23,.04)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .m{font-family:var(--mono);font-size:13px}
+
+  /* goal bar */
+  .goal{background:var(--goldbg);border:1px solid var(--goldln);border-radius:14px;padding:18px 22px;margin-bottom:6px}
+  .goal .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:6px}
+  .goal p{margin:0;font-size:17px;color:var(--tx);font-weight:600;line-height:1.45}
+
+  /* FLOW */
+  .flow{display:flex;gap:0;align-items:stretch;min-width:920px}
+  .stage{flex:1;position:relative;padding-right:26px}
+  .stage:last-child{padding-right:0}
+  .stage:not(:last-child):after{content:"";position:absolute;right:7px;top:42px;width:12px;height:12px;
+    border-top:2px solid var(--line);border-right:2px solid var(--line);transform:rotate(45deg)}
+  .sbox{border-radius:13px;padding:15px 16px;height:100%;border:1px solid var(--line);background:var(--card)}
+  .sbox.done{background:var(--greenbg);border-color:var(--greenln)}
+  .sbox.now{background:var(--goldbg);border-color:var(--goldln)}
+  .sbox.next{background:var(--card)}
+  .sbox.goal{background:var(--bluebg);border-color:var(--blueln)}
+  .sbox .st{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;margin-bottom:7px}
+  .done .st{color:var(--green)}.now .st{color:var(--gold)}.next .st{color:var(--tx3)}.goal .st{color:var(--blue)}
+  .sbox .t{font-size:15px;font-weight:800;color:var(--tx);line-height:1.25;margin-bottom:7px}
+  .sbox .d{font-size:13px;color:var(--tx2);margin-bottom:10px}
+  .sbox .cnt{font-family:var(--mono);font-size:12px;color:var(--tx3);border-top:1px solid rgba(0,0,0,.07);padding-top:8px}
+  .sbox .cnt b{font-size:15px;color:var(--tx)}
+
+  /* meter */
+  .meter{display:flex;height:26px;border-radius:7px;overflow:hidden;border:1px solid var(--line);margin:6px 0 4px}
+  .meter i{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
+  .mk{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--tx2);margin-top:7px}
+  .mk span{display:flex;align-items:center;gap:6px}
+  .mk i{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+  /* dep table */
+  table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:600px}
   td{padding:13px 12px;border-bottom:1px solid var(--line);color:var(--tx2);vertical-align:top}
   tr:last-child td{border-bottom:none}
-  td.i{width:30px;text-align:center;font-size:15px;padding-top:14px}
-  td.k{color:var(--tx);font-weight:700;width:186px}
-  .was{color:var(--tx3);font-size:13px;display:block;margin-top:5px}
-  .was b{color:var(--red);font-weight:600}
-  .now{color:var(--green);font-weight:600}
-  .tag{display:inline-block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;
-    padding:2px 8px;border-radius:5px;margin-left:6px;vertical-align:1px}
+  td.i{width:28px;text-align:center;font-size:15px}
+  td.k{color:var(--tx);font-weight:700;width:200px}
+  .tag{display:inline-block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;
+    padding:2px 7px;border-radius:5px;margin-left:6px;vertical-align:1px}
   .t-you{background:var(--redbg);color:var(--red)}
   .t-us{background:var(--bluebg);color:var(--blue)}
-  .t-other{background:var(--amberbg);color:var(--amber)}
-  .t-live{background:var(--greenbg);color:var(--green)}
-  .strip{display:flex;flex-wrap:wrap;gap:11px;margin-bottom:26px}
-  .pill{flex:1;min-width:210px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-  .pill .l{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:800;margin-bottom:6px}
-  .pill .v{font-size:17px;font-weight:800;color:var(--tx);line-height:1.3}
-  .pill .d{font-size:12.5px;color:var(--tx2);margin-top:4px}
+  .t-now{background:var(--goldbg);color:var(--gold)}
+  .t-done{background:var(--greenbg);color:var(--green)}
+  .was{color:var(--tx3);font-size:13px;display:block;margin-top:5px}
+
   .note{border-radius:12px;padding:16px 18px}
   .note b{display:block;margin-bottom:4px;font-size:15px}
   .note p{margin:0;font-size:14px;color:var(--tx2)}
   .note+.note{margin-top:11px}
-  .n-warn{background:var(--redbg);border:1px solid #F0CFC5}.n-warn b{color:var(--red)}
-  .n-ok{background:var(--greenbg);border:1px solid #C6E2D0}.n-ok b{color:var(--green)}
-  .n-gold{background:var(--goldbg);border:1px solid #EBDDAE}.n-gold b{color:var(--gold)}
-  .n-blue{background:var(--bluebg);border:1px solid #C9DDEC}.n-blue b{color:var(--blue)}
-  .step{display:flex;gap:14px;padding:15px 0;border-bottom:1px solid var(--line)}
-  .step:last-child{border-bottom:none}
-  .step .n{flex:none;width:25px;height:25px;border-radius:999px;background:var(--gold);color:#fff;
-    font-weight:800;font-size:12.5px;display:flex;align-items:center;justify-content:center}
-  .step .t{font-size:15.5px;font-weight:700;color:var(--tx);margin-bottom:3px}
-  .step .d{font-size:14px;color:var(--tx2)}
-  .step .who{display:inline-block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;
-    color:var(--tx3);margin-top:6px;background:var(--card2);padding:2px 8px;border-radius:5px}
-  .step .who.h{background:var(--goldbg);color:var(--gold)}
-  .chat{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:13px 15px;margin-top:11px}
-  .chat .w{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:800;color:var(--blue);margin-bottom:5px}
-  .chat .w.s{color:var(--gold)}
-  .chat p{margin:0 0 10px;font-size:13.5px;color:var(--tx2)}
-  .chat p:last-child{margin-bottom:0}
-  .chat .q{color:var(--tx);border-left:2px solid var(--gold);padding-left:11px;font-style:italic}
-  .big{font-size:42px;font-weight:800;line-height:1;letter-spacing:-.02em;color:var(--gold)}
+  .n-warn{background:var(--redbg);border:1px solid var(--redln)}.n-warn b{color:var(--red)}
+  .n-gold{background:var(--goldbg);border:1px solid var(--goldln)}.n-gold b{color:var(--gold)}
+  .n-blue{background:var(--bluebg);border:1px solid var(--blueln)}.n-blue b{color:var(--blue)}
+  .n-ok{background:var(--greenbg);border:1px solid var(--greenln)}.n-ok b{color:var(--green)}
+  .grid{display:grid;gap:13px}
+  @media(min-width:800px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+  .big{font-size:40px;font-weight:800;line-height:1;letter-spacing:-.02em;color:var(--gold)}
   .lbl{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:800;margin-bottom:7px}
   a{color:var(--blue);font-weight:600}
-  .m{font-family:var(--mono);font-size:13px}
+  /* chain */
+  .chain{display:flex;flex-direction:column;gap:0;min-width:640px}
+  .link{display:flex;gap:14px;align-items:flex-start;padding:0}
+  .link .rail{flex:none;width:26px;display:flex;flex-direction:column;align-items:center}
+  .link .dot{width:15px;height:15px;border-radius:999px;border:3px solid var(--line);background:var(--card);margin-top:16px}
+  .link.done .dot{background:var(--green);border-color:var(--green)}
+  .link.now .dot{background:var(--gold);border-color:var(--gold)}
+  .link .bar{flex:1;width:3px;background:var(--line);min-height:22px}
+  .link:last-child .bar{display:none}
+  .link .body{flex:1;padding:12px 0 14px}
+  .link .t{font-size:15.5px;font-weight:800;color:var(--tx)}
+  .link .d{font-size:13.5px;color:var(--tx2);margin-top:3px}
+  .link .unlock{font-size:12.5px;color:var(--gold);font-weight:700;margin-top:5px}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <h1>Templating the automations: <span>where we are</span>.</h1>
-  <p class="sub">Everything built today, what is left, what the skills actually do, and honestly what it costs each time you onboard an academy.</p>
+  <h1>Plug and play: <span>the path there</span>.</h1>
+  <p class="sub">Everything the free-trial sales system needs before it copies itself onto a new academy, and what each step actually unlocks.</p>
 
-  <div class="strip">
-    <div class="pill"><div class="l">Built today</div><div class="v">7 things</div><div class="d">All tested, none deployed</div></div>
-    <div class="pill"><div class="l">Waiting on you</div><div class="v">2 merges</div><div class="d">Both ready, links below</div></div>
-    <div class="pill"><div class="l">Running right now</div><div class="v">1 build</div><div class="d">The welcome sequence</div></div>
-    <div class="pill"><div class="l">Left after that</div><div class="v">4 steps</div><div class="d">Then San Jose goes live</div></div>
+  <div class="goal">
+    <div class="l">The goal</div>
+    <p>Apply the preset and everything copies over. Onboarding feeds it. The skills handle the human-judgement parts.</p>
   </div>
 
-  <!-- ══ DONE ══ -->
-  <h2>Built and proven today</h2>
-  <p class="h2sub">Each of these was tested by making it fail on purpose first, so the test proves something rather than decorating it.</p>
+  <!-- ══ FLOWCHART ══ -->
+  <h2>The dependency flow</h2>
+  <p class="h2sub">Left to right. Each stage unlocks the next, and the counter shows how many of the 17 preset messages actually copy to a new academy at that point.</p>
   <div class="card scroll">
-    <table><tbody>
-      <tr><td class="i">✅</td><td class="k">Every message labelled</td><td>
-        Each message is now "copies to everyone" or "yours alone", decided at the moment it is written rather than caught later.
-        <span class="was">Plus a test that <b>renders the actual email</b> and fails the build if anything GTA-specific appears in something marked copyable. Strings can be misread; a rendered email cannot.</span></td></tr>
+    <div class="flow">
 
-      <tr><td class="i">✅</td><td class="k">3 emails off your letterhead</td><td>
-        Your welcome, training and review emails had your logo, "Oakville" and your domain typed into their frame. They now use the shared frame that fills in per academy.
-        <span class="was">Before: <b>San Jose's parents would have received emails with your logo on them.</b></span></td></tr>
+      <div class="stage"><div class="sbox done">
+        <div class="st">✓ Done today</div>
+        <div class="t">Safety rails</div>
+        <div class="d">Every message labelled. A test that renders the email and blocks a leak. Your messages locked so nothing changes by accident.</div>
+        <div class="cnt"><b>8</b> of 17 copy</div>
+      </div></div>
 
-      <tr><td class="i">✅</td><td class="k">A live bug fixed</td><td>
-        Editing a message's wording silently switched it back on.
-        <span class="was">San Jose's testimonials email was <b>one click from turning itself on</b> and sending Toronto families' quotes as San Jose's own. Pre-existing, nothing to do with this work, found by a tester whose only job was to break things.</span></td></tr>
+      <div class="stage"><div class="sbox done">
+        <div class="st">✓ Just landed</div>
+        <div class="t">The name field</div>
+        <div class="d">"By Any Means Basketball" now exists separately from your internal "BAM GTA". Two of your emails already read better because of it.</div>
+        <div class="cnt"><b>8</b> of 17 copy</div>
+      </div></div>
 
-      <tr><td class="i">✅</td><td class="k">Your messages locked</td><td>
-        All 10 of GTA's messages snapshotted word for word. Any change to what a parent reads now fails the build unless someone deliberately allows it.
-        <span class="was">This is how I could answer "did GTA's emails change?" in thirty seconds instead of guessing.</span></td></tr>
+      <div class="stage"><div class="sbox now">
+        <div class="st">◐ Next, unblocked</div>
+        <div class="t">Template the words</div>
+        <div class="d">Your phone, gym address, schedule and coach handles come out of the email text and become blanks that fill per academy.</div>
+        <div class="cnt"><b>13</b> of 17 copy</div>
+      </div></div>
 
-      <tr><td class="i">✅</td><td class="k">Your 2 lines restored</td><td>
-        Online programs and bring-a-friend are back for GTA, and absent for everyone else. They render only when an academy has those things.
-        <span class="was">Your call, and it is what "yours alone" was always supposed to mean.</span></td></tr>
+      <div class="stage"><div class="sbox next">
+        <div class="st">○ Then</div>
+        <div class="t">The two skills</div>
+        <div class="d">Staff run them during onboarding. They draft the 2 remaining emails from what the owner already wrote, and staff approves.</div>
+        <div class="cnt"><b>17</b> of 17 ready</div>
+      </div></div>
 
-      <tr><td class="i">✅</td><td class="k">"Enquired about" fixed</td><td>
-        Three emails told paying members they had "enquired about" you. They now say "joined".
-        <span class="was">Lead emails still correctly say "enquired about". Verified that only those three sentences moved and nothing else.</span></td></tr>
+      <div class="stage"><div class="sbox goal">
+        <div class="st">◎ Goal</div>
+        <div class="t">San Jose live</div>
+        <div class="d">Seeded through the same path any new academy uses, then checked by a separate agent to prove it took.</div>
+        <div class="cnt">plug and play</div>
+      </div></div>
 
-      <tr><td class="i">✅</td><td class="k">A dead automation deleted</td><td>
-        A duplicate follow-up that had <b>never sent a single message</b> in its life. Backed up first, so it is recoverable.
-        <span class="was">The only thing that has actually changed in your live system today.</span></td></tr>
-    </tbody></table>
-  </div>
-
-  <div class="note n-warn" style="margin-top:13px">
-    <b>The honest caveat</b>
-    <p>None of the above is deployed. It is built, tested and pushed to a branch. <b>Production still runs the old code.</b> Nothing changes for any academy until the merges below happen and we ship.</p>
-  </div>
-
-  <!-- ══ YOU ══ -->
-  <h2>The two things waiting on you</h2>
-  <p class="h2sub">Both are built and reviewed. They are held for you because one creates a new table with a permissions boundary, which nobody should merge unilaterally.</p>
-  <div class="grid g2">
-    <div class="card">
-      <div class="lbl">Merge first</div>
-      <div style="font-size:17px;font-weight:800;margin-bottom:7px"><a href="https://github.com/zoran-star/bam-os-requirements/pull/1616" target="_blank" rel="noopener">PR #1616</a> the data-loss fix</div>
-      <p style="margin:0;color:var(--tx2);font-size:14px">Opening your Brand or KPI screen and saving was <b style="color:var(--red)">wiping 18 of 19 stored values</b>, including your website pages. It affected 11 academies. Scores 24/24 on an independent test that scores 9/15 against your current live code.</p>
-    </div>
-    <div class="card">
-      <div class="lbl">Merge second</div>
-      <div style="font-size:17px;font-weight:800;margin-bottom:7px"><a href="https://github.com/zoran-star/bam-os-requirements/pull/1617" target="_blank" rel="noopener">PR #1617</a> the name field and more</div>
-      <p style="margin:0;color:var(--tx2);font-size:14px">The name parents see, the testimonials table, the community group and review link fields. After merging, the migration gets applied and GTA's name gets set to "By Any Means Basketball".</p>
     </div>
   </div>
-  <div class="note n-gold" style="margin-top:13px">
-    <b>Why the order matters</b>
-    <p>#1617 changes how your academy's name is resolved. If GTA's parent-facing name is not set before that goes live, your texts start reading <span class="m">"It's coach from BAM GTA"</span> instead of "By Any Means Basketball". Merge, apply, set the name, then we template.</p>
+
+  <!-- ══ METER ══ -->
+  <h2>What "copies over" means right now</h2>
+  <p class="h2sub">17 messages in the free-trial preset. Today a new academy gets 8 of them working.</p>
+  <div class="card">
+    <div class="lbl">Today</div>
+    <div class="meter">
+      <i style="width:47%;background:#2A7A4E">8 copy</i>
+      <i style="width:53%;background:#C9A227">9 blocked</i>
+    </div>
+    <p style="margin:4px 0 18px;color:var(--tx2);font-size:13.5px">The 9 are blocked because they still contain <b>your</b> phone number, gym address, schedule and coach handles in the words. Correctly blocked, but blocked.</p>
+
+    <div class="lbl">After templating the words</div>
+    <div class="meter">
+      <i style="width:76%;background:#2A7A4E">13 copy</i>
+      <i style="width:24%;background:#C9A227">4</i>
+    </div>
+    <p style="margin:4px 0 18px;color:var(--tx2);font-size:13.5px">The single biggest jump, and it is unblocked right now.</p>
+
+    <div class="lbl">After the skills</div>
+    <div class="meter">
+      <i style="width:88%;background:#2A7A4E">15 copy</i>
+      <i style="width:12%;background:#255F92">2 written</i>
+    </div>
+    <p style="margin:4px 0 0;color:var(--tx2);font-size:13.5px">The last 2 are written per academy on purpose. They argue why that academy is worth choosing, and the version that copies safely is the version that says nothing specific.</p>
+
+    <div class="mk">
+      <span><i style="background:#2A7A4E"></i> copies with nobody involved</span>
+      <span><i style="background:#C9A227"></i> blocked, contains your details</span>
+      <span><i style="background:#255F92"></i> written per academy, by design</span>
+    </div>
   </div>
 
-  <!-- ══ LEFT ══ -->
-  <h2>What is left before the automations are fully templated</h2>
-  <p class="h2sub">Six steps. One is running now, one is yours, the rest are ours.</p>
+  <!-- ══ CHAIN ══ -->
+  <h2>What blocks what</h2>
+  <p class="h2sub">In order. Nothing below can start until the thing above it is done.</p>
   <div class="card scroll">
-    <table><tbody>
-      <tr><td class="i">⏳</td><td class="k">The name parents see<span class="tag t-you">you</span></td><td>
-        Merge #1617, apply the migration, set GTA's value.
-        <span class="was">Unlocks the next two rows. Nothing else is blocked by it.</span></td></tr>
+    <div class="chain">
 
-      <tr><td class="i">◐</td><td class="k">The welcome sequence<span class="tag t-us">running now</span></td><td>
-        The master goes from 3 plain texts to the full 7-step sequence, so a new academy inherits the real thing instead of a stub.
-        <span class="was">Bundled with a fix your question uncovered: messages marked "yours alone" must arrive <b>switched off</b>, or a new academy would send your story as their own.</span></td></tr>
+      <div class="link done"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+        <div class="t">The name parents see</div>
+        <div class="d">Merged, migration applied, GTA's value set to "By Any Means Basketball".</div>
+        <div class="unlock">unlocked everything below</div></div></div>
 
-      <tr><td class="i">○</td><td class="k">Your sales messages templated<span class="tag t-us">us</span></td><td>
-        Swap the typed-in "By Any Means Basketball" and your domain for the blanks that fill themselves.
-        <span class="was">Waits on the name field. Proven byte for byte afterwards so nothing a parent reads changes.</span></td></tr>
+      <div class="link now"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+        <div class="t">Template GTA's sales messages</div>
+        <div class="d">Swap your typed-in name and domain for blanks. Proven byte for byte afterwards so nothing your parents read changes.</div>
+        <div class="unlock">makes GTA genuinely template-derived</div></div></div>
 
-      <tr><td class="i">○</td><td class="k">Two approval steps<span class="tag t-us">us</span></td><td>
-        So an academy owner actually approves their messages before anything can send.
-        <span class="was">The wizard already promises this. The step has never existed.</span></td></tr>
+      <div class="link"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+        <div class="t">Template the email words</div>
+        <div class="d">Phone, gym address, weekly schedule, coach handles. The schedule comes from the academy's real sessions rather than typed text.</div>
+        <div class="unlock">moves 5 messages from blocked to copying</div></div></div>
 
-      <tr><td class="i">○</td><td class="k">San Jose seeded<span class="tag t-us">us</span></td><td>
-        The proof it works. Rendered before, seeded through the same path a brand-new academy uses, rendered after, and diffed.
-        <span class="was">A separate agent then checks it actually took, rather than the one that did it.</span></td></tr>
+      <div class="link"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+        <div class="t">Build the two skills</div>
+        <div class="d">Staff run them during onboarding. They read what the owner entered and draft the remaining emails.</div>
+        <div class="unlock">the last 2 messages, and the whole workflow</div></div></div>
 
-      <tr><td class="i">○</td><td class="k">Deploy<span class="tag t-us">us</span></td><td>
-        Merge, review, ship.
-        <span class="was">Until this happens, everything above is real but invisible.</span></td></tr>
-    </tbody></table>
+      <div class="link"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+        <div class="t">Two approval steps</div>
+        <div class="d">So an owner actually approves their messages before anything sends. The wizard already promises this and the step has never existed.</div>
+        <div class="unlock">can run in parallel with the skills</div></div></div>
+
+      <div class="link"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+        <div class="t">Seed San Jose, then deploy</div>
+        <div class="d">Rendered before, seeded through the same path a new academy uses, rendered after, diffed. A separate agent checks it took.</div>
+        <div class="unlock">the goal</div></div></div>
+
+    </div>
+  </div>
+
+  <div class="note n-warn" style="margin-top:14px">
+    <b>Still true: none of this is deployed</b>
+    <p>Everything built today sits on a branch. Production runs the old code. The only live changes so far are the name field and one dead automation deleted.</p>
   </div>
 
   <!-- ══ SKILLS ══ -->
-  <h2>The skills, step by step</h2>
-  <p class="h2sub">Two skills, both run by internal BAM staff. The academy owner never sees them. They just answer the onboarding questions they already answer today.</p>
-
-  <div class="grid g2" style="margin-bottom:13px">
-    <div class="card">
-      <div class="lbl">Skill A</div>
-      <div style="font-size:16px;font-weight:800;margin-bottom:6px">The sales follow-ups</div>
-      <p style="margin:0;font-size:14px;color:var(--tx2)">Five automations: contact form, trial form, missed trial, ghosted, nurture. Builds four of them with <b>zero questions</b>. Asks about 2 emails.</p>
+  <h2>What the skills do, in the flow</h2>
+  <p class="h2sub">Both run by internal BAM staff during onboarding. The academy owner never sees them.</p>
+  <div class="card scroll">
+    <div class="flow" style="min-width:860px">
+      <div class="stage"><div class="sbox next"><div class="st">1</div>
+        <div class="t">Read</div>
+        <div class="d">Everything the academy already entered: story, why they are different, proof, ages, capacity, coach ratio, schedule, coaches, pricing.</div>
+        <div class="cnt">automatic</div></div></div>
+      <div class="stage"><div class="sbox next"><div class="st">2</div>
+        <div class="t">Build</div>
+        <div class="d">Everything that needs no human. Roughly four fifths of the system, nobody asked anything.</div>
+        <div class="cnt">automatic</div></div></div>
+      <div class="stage"><div class="sbox now"><div class="st">3</div>
+        <div class="t">Propose</div>
+        <div class="d">Writes the remaining emails out as plain words in the chat, quoting back the owner's own phrases and saying what it refused to claim.</div>
+        <div class="cnt">staff decides</div></div></div>
+      <div class="stage"><div class="sbox now"><div class="st">4</div>
+        <div class="t">Review</div>
+        <div class="d">Renders every message exactly as a parent receives it, plus a list of what did NOT render and why.</div>
+        <div class="cnt">staff reviews</div></div></div>
+      <div class="stage"><div class="sbox next"><div class="st">5</div>
+        <div class="t">Install</div>
+        <div class="d">Everything switched off until the academy approves it in their own wizard.</div>
+        <div class="cnt">automatic</div></div></div>
     </div>
-    <div class="card">
-      <div class="lbl">Skill B</div>
-      <div style="font-size:16px;font-weight:800;margin-bottom:6px">The member welcome</div>
-      <p style="margin:0;font-size:14px;color:var(--tx2)">The 7-step sequence a new paying member gets. Builds most of it alone. Asks about <b>1 email</b>, and reuses whatever Skill A already settled.</p>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="step"><div class="n">1</div><div>
-      <div class="t">Reads everything the academy already told us</div>
-      <div class="d">Their story, why they are different, their proof, their programme, ages, capacity, coach ratio, their schedule, their coaches, their pricing. All of it is already sitting in onboarding today. <b>Nothing currently reads it.</b></div>
-      <div class="who">automatic</div></div></div>
-
-    <div class="step"><div class="n">2</div><div>
-      <div class="t">Says what it can and cannot write from</div>
-      <div class="d">One line per email: ready, thin, or empty. Empty means it refuses to write that email rather than inventing something. If an academy has no real proof, it does not manufacture any.</div>
-      <div class="who">automatic</div></div></div>
-
-    <div class="step"><div class="n">3</div><div>
-      <div class="t">Builds everything that needs no human</div>
-      <div class="d">All the sales follow-ups, the schedule message, the venue, the frames, the review ask. Roughly four fifths of the system, with nobody asked anything.</div>
-      <div class="who">automatic</div></div></div>
-
-    <div class="step"><div class="n">4</div><div>
-      <div class="t">Writes the remaining emails out as plain text in the chat</div>
-      <div class="d">Not code, not a design mockup. The actual words, the angle it chose and why, which of the owner's own phrases it used quoted back, and plainly what it refused to claim.</div>
-      <div class="who h">staff reads and decides</div>
-      <div class="chat">
-        <div class="w">Skill</div>
-        <p><b style="color:var(--tx)">Why our way is different.</b> My angle: your own line "we coach with a plan, not just drills" already implies the alternative, so I said it out loud.</p>
-        <p class="q">A lot of parents come to us frustrated. Their kid has been training, but they are not seeing the progress they expected...<br><br>Twelve players a session, at least two coaches on the floor. Every athlete gets seen.</p>
-        <p style="color:var(--tx3);font-size:12.5px"><b>Drew from:</b> their why-us verbatim, plus capacity 12 and coach ratio from their offer. Both are facts in their record, so stated as facts.<br><b>Did not claim:</b> the European coaching background. Not in their record anywhere.</p>
-      </div>
-      <div class="chat" style="margin-top:8px">
-        <div class="w s">Staff</div>
-        <p>Add it, that's real. Otherwise approved.</p>
-      </div>
-    </div></div>
-
-    <div class="step"><div class="n">5</div><div>
-      <div class="t">Renders every message exactly as a parent receives it</div>
-      <div class="d">One page, a switcher across the automations, real emails rather than descriptions. Plus a list of <b>what did not render and why</b>, which is the one thing you cannot see by reading the email. Staff sends notes back by referencing each message's tag.</div>
-      <div class="who h">staff reviews</div></div></div>
-
-    <div class="step"><div class="n">6</div><div>
-      <div class="t">Installs everything switched off</div>
-      <div class="d">Nothing can send until the academy approves it in their own wizard. That approval step is one of the four things still to build.</div>
-      <div class="who">automatic</div></div></div>
   </div>
 
   <!-- ══ COST ══ -->
-  <h2>What each academy costs, honestly</h2>
+  <h2>What each academy costs</h2>
   <div class="grid g3">
-    <div class="card"><div class="lbl">Emails a human judges</div><div class="big">3</div>
+    <div class="card"><div class="lbl">Emails a human judges</div><div class="big">2</div>
       <p style="margin:9px 0 0;color:var(--tx2);font-size:13.5px">Every academy, every time. A recurring cost, not a one-time build.</p></div>
     <div class="card"><div class="lbl">Staff time</div><div class="big">~40 min</div>
-      <p style="margin:9px 0 0;color:var(--tx2);font-size:13.5px">Reading 3 emails properly, then reviewing about 13 rendered messages. Faster after two or three academies.</p></div>
-    <div class="card"><div class="lbl">Built with no questions</div><div class="big">~80%</div>
-      <p style="margin:9px 0 0;color:var(--tx2);font-size:13.5px">The structure, timings, triggers, links, schedule and frames all copy with nobody involved.</p></div>
-  </div>
-  <div class="note n-gold" style="margin-top:13px">
-    <b>Why it is 3 and not 0</b>
-    <p>Those three emails argue why an academy is worth choosing. That argument is genuinely different for each one, and the version that copies safely is the version that says nothing specific. The skill drafts all three from what the owner already wrote, so nobody starts from a blank page, but a person still reads and decides.</p>
+      <p style="margin:9px 0 0;color:var(--tx2);font-size:13.5px">Reading and approving, then reviewing the rendered messages. Faster after two or three.</p></div>
+    <div class="card"><div class="lbl">Copies with no questions</div><div class="big">88%</div>
+      <p style="margin:9px 0 0;color:var(--tx2);font-size:13.5px">Once the words are templated. Structure, timings, triggers, links, schedule and frames.</p></div>
   </div>
 
-  <!-- ══ RISKS ══ -->
+  <!-- ══ WATCHING ══ -->
   <h2>What I am still watching</h2>
   <div class="grid g2">
-    <div class="note n-warn" style="margin:0">
-      <b>Nothing is live yet</b>
-      <p>Seven things built, zero shipped. The longer that gap stays open, the more likely something merges around it and needs rework.</p>
-    </div>
-    <div class="note n-blue" style="margin:0">
-      <b>Three of your emails still carry your details</b>
-      <p>Your phone, gym address, schedule and coach handles are still inside the email text, not just the frame. Marked "yours alone" so they cannot travel, but not yet templated.</p>
-    </div>
-    <div class="note n-blue" style="margin:0">
-      <b>Two academies have data problems found in passing</b>
-      <p>Pro Precision's time zone says Toronto but they are in Australia. Locked In Sports has its website in only one place, which a cleanup would have erased if it had not been caught.</p>
-    </div>
-    <div class="note n-blue" style="margin:0">
-      <b>The testimonials work is parked</b>
-      <p>Deliberately. It attaches to this once this is finished, rather than being built alongside it. The gap is documented so nobody closes it wrongly.</p>
-    </div>
+    <div class="note n-warn" style="margin:0"><b>Nothing is live yet</b>
+      <p>Ten things built, zero shipped. The longer that gap stays open, the more likely something merges around it and needs rework.</p></div>
+    <div class="note n-blue" style="margin:0"><b>The alarm was checking stale details</b>
+      <p>The lock that guards your messages was comparing against a saved copy of your details from before the name field existed. Being fixed now, plus a check so it fails loudly if it drifts again.</p></div>
+    <div class="note n-blue" style="margin:0"><b>Two academies have data problems</b>
+      <p>Pro Precision's time zone says Toronto but they are in Australia. Locked In Sports had its website in only one place, which a cleanup would have erased if it had not been caught.</p></div>
+    <div class="note n-blue" style="margin:0"><b>Testimonials are parked</b>
+      <p>Deliberately. The table exists and is empty. It attaches once this is finished, and the gap is documented so nobody closes it wrongly.</p></div>
   </div>
 
   <!-- ══ NEXT ══ -->
   <h2>The one next action</h2>
-  <div class="card" style="border-color:#E0D3A6;background:var(--goldbg)">
-    <p style="margin:0;font-size:16.5px;color:var(--tx)"><b>Merge <a href="https://github.com/zoran-star/bam-os-requirements/pull/1616" target="_blank" rel="noopener">#1616</a>, then <a href="https://github.com/zoran-star/bam-os-requirements/pull/1617" target="_blank" rel="noopener">#1617</a>.</b> Everything else is queued behind those two. I am watching for them automatically and will pick straight back up: GTA gets templated, the welcome sequence lands, then San Jose gets the full system and a separate agent checks it actually took.</p>
+  <div class="card" style="border-color:var(--goldln);background:var(--goldbg)">
+    <p style="margin:0;font-size:16.5px;color:var(--tx)"><b>Nothing from you.</b> The name field landed, which was the last thing anyone was waiting on. Next is templating your messages and proving byte for byte that nothing your parents read changes, then the words inside the emails, which is the step that moves the most.</p>
   </div>
 
 </div>
