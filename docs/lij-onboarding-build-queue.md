@@ -408,8 +408,19 @@ And his follow-on hard rule: **"GTA's automations must never actually change thr
 
 **⚠️ THIS RULE MUST BE ENFORCED IN THE DATABASE, NOT PROSE.** Verification proved an academy can currently insert `source='manual', rating=5, author='Sarah K.'` with forged `external_id`/`review_created_at`/`synced_at` and produce a 4-row, avg 5.0 aggregate. See the bounce below.
 
-## ✅ DECIDED: `brand_data` ownership (Zoran, 2026-07-27)
-**ONE builder owns both** the #70 hydration fix and the templating wave's `brand_data` cleanup (item 1c), so a single agent owns that column's read path, write path and shape together. Splitting them means two builders reasoning about the same hydration.
+## ✅ DECIDED: `brand_data` ownership (Zoran, 2026-07-27), REFINED after a collision Zoran spotted
+
+**Original ruling:** one builder owns the #70 hydration fix and the templating wave's `brand_data` cleanup (item 1c) together.
+
+**⚠️ ORCHESTRATOR ERROR, corrected:** I passed that ruling to the templating room as "fold #70 into 1c" while the Business Basics builder **had already built #70**. Same work handed to two places.
+
+**Actual state: the read path and the destructive write path are DONE**, inside the Business Basics fix (`client-portal.html`, +186/-42, 32 lines touching `brand_data`/`kpi_data`). It built `_bbHydrateClientCols(cols)` with presence-of-key as the loaded signal, routed both jsonb columns through it, made their savers hard-refuse until loaded, fixed `_bbBrandSetWebsiteStatus` (which wrote the whole object back off an unloaded `{}`), and collapsed `_bbLoadSitePages`' duplicate fetch into the shared loader.
+
+**⚠️ THE WIDER COLLISION:** ContentView's BrandCard and the `kpi_data` readers live in `client-portal.html` - the same file the Business Basics fix is rewriting AND the file the foundation build edits for `public_name`. **Three workstreams converge on one file.**
+
+**Resolution: 1c narrows to the SHAPE change only and lands LAST.** Drop `stats`/`domain`/`website_url`, move `site_pages`/`website_status`/`references`, decide on `proof`, adapt `action-items.js` (separate file, safe) and ContentView's BrandCard. **It must NOT build hydration; it inherits `_bbHydrateClientCols` and extends the column list.** The merged file will already carry two hydration idioms after the foundation lands; a third would be unmanageable. **Merge order: Business Basics fix -> foundation -> 1c.** This still honours the intent, since the second builder inherits a finished read path rather than reasoning about the same hydration twice.
+
+**When 1c does run:** `stats` is not merely stale, it is WRONG. GTA's says "Mon/Wed/Fri evening training" while its live `schedule_slots` are Mon/Tue/Wed/Thu/Sat, so **GTA has never trained on a Friday**, and San Jose's asserts a schedule for an academy with zero slots. Dropping it for derived values is a correctness fix.
 
 ## ORIGINAL, superseded: the hierarchy was open
 Proposed by the reviews chat, put to Zoran, popup dismissed, so **NOT decided and deliberately not propagated.** It matters to the active templating track because it governs which quote leads in the testimonials email:
