@@ -643,8 +643,8 @@
       "column": "done"
     },
     {
-      "name": "Plan: two-way preset sync",
-      "sidebar": "Plan: two-way preset sync",
+      "name": "AUTOMATION TEMPLATING",
+      "sidebar": "AUTOMATION TEMPLATING",
       "state": "white",
       "one": "Plan approved and dispatched. Owns San Jose's seeding once the build lands",
       "builds": [
