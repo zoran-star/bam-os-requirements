@@ -303,3 +303,13 @@ REPLACES `files` wholesale (by design - new version supersedes).
   and `::details-content` height transition in `src/index.css` so every
   native `<details>` (Brand, file folders) animates in Chromium. Non-Chromium
   keeps the instant toggle.
+
+## Storage upload limits (changed 2026-07-27, Cam)
+`ticket-files` bucket `file_size_limit` LIFTED (was 500MB) via SQL on
+storage.buckets - Cam's GWA VSL final exceeded it. Staff finals are now only
+bound by the PROJECT-wide upload cap (dashboard-only, Zoran's Supabase
+account: Settings -> Storage). Client-side upload forms keep their own
+oversize filter, so this loosens staff only. Other buckets unchanged
+(message-attachments 25MB, member-avatars 5MB). If multi-GB finals become
+routine, TUS resumable uploads are the real fix - plain browser uploads
+restart from zero on any network blip.
