@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Testimonial Guardrail - Plan</title>
+<style>
+  :root{
+    --bg:#0e0e10; --card:#17171a; --line:#2a2a30; --ink:#f2f2f0; --dim:#a0a0a8;
+    --gold:#D4B65C; --red:#e0533d; --amber:#e0a13d; --green:#4caf7d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Inter Tight",Segoe UI,sans-serif;
+    padding:32px 20px 80px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.02em}
+  .sub{color:var(--dim);margin:0 0 28px}
+  h2{font-size:19px;margin:38px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:22px 0 8px;color:var(--gold)}
+  .rule{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--gold);
+    padding:14px 18px;margin:0 0 24px;font-size:16px}
+  table{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:13.5px}
+  th{text-align:left;padding:9px 10px;background:#1d1d21;color:var(--dim);
+    font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
+    border-bottom:1px solid var(--line)}
+  td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:hover td{background:#1b1b1f}
+  .pill{display:inline-block;padding:2px 9px;border-radius:2px;font-size:11px;
+    font-weight:700;letter-spacing:.04em;white-space:nowrap}
+  .open{background:rgba(224,83,61,.15);color:var(--red);border:1px solid rgba(224,83,61,.4)}
+  .oneclick{background:rgba(224,161,61,.15);color:var(--amber);border:1px solid rgba(224,161,61,.4)}
+  .closed{background:rgba(76,175,125,.15);color:var(--green);border:1px solid rgba(76,175,125,.4)}
+  .note{background:rgba(160,160,168,.1);color:var(--dim);border:1px solid var(--line)}
+  code{background:#232329;padding:1px 5px;border-radius:2px;font-size:12px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#d8d8d2}
+  .alarm{background:rgba(224,83,61,.08);border:1px solid rgba(224,83,61,.45);
+    border-left:3px solid var(--red);padding:16px 18px;margin:18px 0}
+  .alarm b{color:var(--red)}
+  .quote{font-style:italic;color:var(--dim);font-size:13px;margin:6px 0 0;
+    padding-left:12px;border-left:2px solid var(--line)}
+  ul{margin:6px 0 6px 0;padding-left:20px}
+  li{margin:5px 0}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .box{background:var(--card);border:1px solid var(--line);padding:14px 16px}
+  .box h4{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim)}
+  details{background:var(--card);border:1px solid var(--line);padding:12px 16px;margin:10px 0}
+  summary{cursor:pointer;font-weight:600;color:var(--gold)}
+  .tag{font-size:11px;color:var(--dim)}
+  .decide{background:#1a1a1f;border:1px dashed var(--gold);padding:12px 16px;margin:12px 0}
+  .decide b{color:var(--gold)}
+  @media(max-width:760px){.cols{grid-template-columns:1fr}body{padding:20px 12px 60px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Testimonial Guardrail</h1>
+<p class="sub">Plan room output &middot; 2026-07-27 &middot; status: awaiting Zoran's decisions</p>
+
+<div class="rule">
+  <b>The directive:</b> testimonials cannot be used anywhere unless that academy has Google reviews connected.
+</div>
+
+<div class="box" style="margin-bottom:22px">
+  <h4>Decided 2026-07-27</h4>
+  <table style="margin:0">
+  <tbody>
+  <tr><td style="width:230px"><b>CH3 minors' names</b></td><td><span class="pill note">KEEP</span> Flagged and closed. No build item.</td></tr>
+  <tr><td><b>Nurture email 3</b></td><td><span class="pill closed">QUOTE-FREE VARIANT</span> Drip still sends, quote block drops out until connected.</td></tr>
+  <tr><td><b>"Google review" labels</b></td><td><span class="pill note">LEAVE FOR NOW</span> GTA and Miami free-trial pages stay as they are until Google is actually connected, then the cards get replaced by real synced reviews.</td></tr>
+  <tr><td><b>Agent social proof leak</b></td><td><span class="pill note">LEAVE FOR NOW</span> San Jose and Miami agents keep sending GTA's review link until Build 5 gives each academy its own.</td></tr>
+  <tr><td><b>Build 5 + API access request</b></td><td><span class="pill note">ROUTED</span> Goes to the <b>ORCHESTRATOR</b> chat (worktree <code>bam-v2-engineering-build-fc4f9d</code>, PRs #1560-#1577), the session that wrote and confirmed the spec.</td></tr>
+  </tbody>
+  </table>
+</div>
+
+<div class="alarm">
+  <b>What the trace turned up that is bigger than the directive.</b>
+  Two live free-trial pages do not just show ungated testimonials. They label hardcoded quotes as
+  <b>"Google review"</b>, print five gold stars on each, stamp a review date, and head the section with
+  <b>"5.0 &mdash; Average across Google reviews"</b>. None of it is connected to Google.
+  <div class="quote">DETAIL Miami, <code>clients/detail-miami/detail/freetrial.jsx:532-565</code> &mdash; "Carlos M., Miami Gardens &middot; Google review", Feb 14 2026. Same three-card shape as GTA's, rewritten with Miami names and cities.</div>
+  <p style="margin:10px 0 0">That is a claim about a third-party review platform, not a testimonial.
+  It needs its own ruling ahead of the guardrail design.</p>
+</div>
+
+<h2>The 10 surfaces and their gate state</h2>
+
+<table>
+<thead><tr><th style="width:30px">#</th><th>Surface</th><th>Where</th><th style="width:130px">Gate</th><th>What actually happens</th></tr></thead>
+<tbody>
+<tr>
+  <td>1</td><td><b>Agent social proof</b></td>
+  <td><code>prompt-structure.js:255-259</code></td>
+  <td><span class="pill open">FAILS OPEN</span></td>
+  <td>GTA's Google-reviews shortlink is the shared <code>location</code>-layer default, so <b>every</b> academy's agent sends it. San Jose and Miami included. No fact-renderer exists for it (excluded at <code>fact-render.js:496-509</code>). Only fully live leak.</td>
+</tr>
+<tr>
+  <td>2</td><td><b>Nurture email 3</b></td>
+  <td><code>api/email-templates/nurture-emails.js</code></td>
+  <td><span class="pill oneclick">ONE CLICK</span></td>
+  <td>Real quotes ("Parent of Adam") re-attributed via <code>{{location.city}}</code>. Gated on enabled AND approved, but seeded to every new academy as enabled/unapproved. The routine "approve the drip" click turns on re-attributed GTA quotes with no reviews check.</td>
+</tr>
+<tr>
+  <td>3</td><td><b>Onboarding testimonials email</b></td>
+  <td><code>api/email-templates/onboarding-emails.js</code></td>
+  <td><span class="pill oneclick">ONE CLICK</span></td>
+  <td>Same body, same gate. GTA-only today, same trap on the next academy.</td>
+</tr>
+<tr>
+  <td>4</td><td><b>Cloned client site</b></td>
+  <td><code>clients/bam-gta/gta/components.jsx:174</code><br><code>.../freetrial.jsx:375</code></td>
+  <td><span class="pill open">FAILS OPEN</span></td>
+  <td><b>Corrected from the scout brief:</b> <code>templates/academy-starter</code> has no testimonials at all (clean). The baked quotes live in GTA's own client folder, and the exposure is <b>cloning GTA</b>, which is exactly the convergence plan. Miami proves the clone path already ran once.</td>
+</tr>
+<tr>
+  <td>5</td><td><b>Free-trial shared component</b></td>
+  <td><code>templates/components/free-trial-flow/structure.jsx:431</code></td>
+  <td><span class="pill closed">CLOSED</span> <span class="pill open">rating open</span></td>
+  <td>The item gate is the model to copy: <code>if (!t.items || !t.items.length) return null</code>. But default CONFIG line 74 ships <code>ratingScore:'5.0'</code> + <code>'Average across Google reviews'</code>, and every card prints a <code>Google review</code> source label. One item is enough to publish a fabricated Google aggregate.</td>
+</tr>
+<tr>
+  <td>6</td><td><b>~17 client site folders</b></td>
+  <td><code>bam-client-sites/clients/*</code></td>
+  <td><span class="pill note">MANUAL</span></td>
+  <td>GTA's own quotes to its own audience are fine. San Jose's draft is the norm we want (real quotes, "never invent", unconfirmed names left as "Athlete"). Nothing mechanical enforces it.</td>
+</tr>
+<tr>
+  <td>7</td><td><b>DETAIL Miami</b></td>
+  <td><code>clients/detail-miami/detail/freetrial.jsx</code></td>
+  <td><span class="pill open">FAILS OPEN</span></td>
+  <td>Loads a GHL reputation widget (real review data) <b>and</b> three hardcoded cards labelled "Google review" with stars and dates. Committed to main 2026-06-24 in the auto-deploying repo; several go-live TODOs still open, so confirm publish state before acting.</td>
+</tr>
+<tr>
+  <td>8</td><td><b>CH3 asset file</b></td>
+  <td><code>bam-portal/public/assets/ch3-training.json:26</code></td>
+  <td><span class="pill note">KEEP - RULED</span></td>
+  <td>Testimonials carrying <b>real full names of minors</b> (Gavin Moyer, Timmy Moore, Jaiden Giovannetti, Colton Rose, Aedan Walker) with their high schools, on an unauthenticated public URL. <b>Zoran ruled 2026-07-27: keep as is.</b> Flagged and closed; no build item. Reopen only if a parent objects or CH3 asks.</td>
+</tr>
+<tr>
+  <td>9</td><td><b>Consent link</b></td>
+  <td><code>signed_agreements</code> migration :120</td>
+  <td><span class="pill open">NO LINK</span></td>
+  <td>Photo/video opt-in is captured per member, but nothing ties any testimonial to a consent record. Google reviews sidestep this entirely: a public review is a public statement.</td>
+</tr>
+<tr>
+  <td>10</td><td><b>Investor page quote grid</b></td>
+  <td><code>business/</code></td>
+  <td><span class="pill note">OUT OF SCOPE</span></td>
+  <td>Not product surface. Noted only.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Can we connect Google reviews today? No.</h2>
+<p>Scanned the repo on 2026-07-27. Build 5 is a <b>confirmed spec written three days ago and zero lines of code</b>.</p>
+<table>
+<thead><tr><th>Piece</th><th style="width:110px">State</th><th>Detail</th></tr></thead>
+<tbody>
+<tr><td><code>google_reviews</code> table</td><td><span class="pill open">MISSING</span></td><td>No migration exists. Nothing matching review sync in <code>supabase/migrations</code>.</td></tr>
+<tr><td>Business Profile OAuth</td><td><span class="pill open">MISSING</span></td><td>The only Google OAuth in the portal is <code>api/google-oauth.js</code>, which is <b>per-staff Calendar connect</b>: scopes are <code>calendar.readonly</code> + <code>userinfo.email</code>, tokens land in <code>staff_calendar_tokens</code>. Different flow, different scopes, different table.</td></tr>
+<tr><td>Sync cron</td><td><span class="pill open">MISSING</span></td><td>Not in <code>vercel.json</code>.</td></tr>
+<tr><td>Public feed <code>api/website/reviews.js</code></td><td><span class="pill open">MISSING</span></td><td>Not created.</td></tr>
+<tr><td>Blueprint Reviews card</td><td><span class="pill open">MISSING</span></td><td>Not in <code>client-portal.html</code>.</td></tr>
+<tr><td><code>renderSocialProof()</code> fact</td><td><span class="pill open">MISSING</span></td><td>Still the last hardcoded section; the excluded 9th fact.</td></tr>
+<tr><td>Any stored place id</td><td><span class="pill open">MISSING</span></td><td>Zero place ids anywhere. The only Google artifact in the entire system is GTA's <code>share.google</code> shortlink, hardcoded in the shared agent default.</td></tr>
+<tr><td>Google Cloud project + OAuth creds</td><td><span class="pill closed">EXISTS</span></td><td><code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code> live in prod, with a working login/callback pattern and canonical redirect-URI discipline to copy. Real prior art, but it is the easy half.</td></tr>
+</tbody>
+</table>
+
+<h3>The long pole is Google, not us</h3>
+<p>The handoff doc flags it: the Business Profile API requires <b>our Google Cloud project to be approved by Google</b>,
+an application with a review process measured in days to weeks. Nothing per-academy can sync until that clears.
+Two things gate a connection, and only one of them is code:</p>
+<ul>
+  <li><b>Approval:</b> Business Profile API access for the BAM Cloud project. Zoran-side console task. Start it first; everything else waits on it.</li>
+  <li><b>Ownership:</b> each academy's Google Business Profile must be manageable by an account we can OAuth as, either the owner's Google account or BAM added as a manager on the profile.</li>
+</ul>
+
+<div class="alarm">
+  <b>San Jose cannot be connected, and would not help if it were.</b>
+  San Jose has not launched (site unpublished, per the launch-blockers note), so it has no review history.
+  Even with Build 5 shipped and OAuth complete, a connected academy with zero reviews renders <b>nothing</b>
+  under the recommended predicate. That is the guardrail behaving correctly, not a failure. GTA is the only
+  academy with plausible review inventory today, and its shortlink destination still needs eyes on it to
+  confirm the actual rating and review count.
+</div>
+
+<h2>The predicate</h2>
+<div class="decide">
+  <b>Recommended:</b> a surface may render testimonial or review content only when the academy has
+  a live Google Business Profile connection <b>and</b> at least one synced, displayable review
+  (4 star or better). One shared helper, keyed on per-academy runtime state. Never a per-academy code branch.
+  <br><span class="tag">Open question for Zoran: is the star threshold configurable per academy, or fixed at 4+ for everyone?</span>
+</div>
+<p>Build 5 (<code>bam-ghl-agent/docs/google-reviews-build-handoff.md</code>) is what makes this evaluable:
+per-academy OAuth storing place id, account id and refresh token on the client row, synced
+<code>google_reviews</code> rows, plus a curation ruleset. <b>Build 5 has not shipped, so today no flag
+in the system means "connected."</b></p>
+
+<h2>The interim: one carve-out, everything else waits</h2>
+<p>Neither a full empty-by-default sweep nor an interim boolean was taken. Zoran's call is
+<b>tolerate the existing state, prevent the new one</b>:</p>
+<div class="cols">
+  <div class="box" style="border-left:3px solid var(--green)">
+    <h4>Build now - the forward-looking trap</h4>
+    <p><b>Nurture email 3 quote-free variant.</b> An academy approving its drip is a routine click
+    that would newly switch on re-attributed GTA quotes. That is fresh exposure created by a normal
+    action, so it gets closed before the next academy approves a drip.</p>
+  </div>
+  <div class="box">
+    <h4>Wait for Build 5 - the existing state</h4>
+    <p>The "Google review" labels on GTA and Miami, and the shared agent link reaching San Jose and
+    Miami, stay as they are. They are known and accepted until a real connection can replace them
+    with that academy's own reviews.</p>
+  </div>
+</div>
+<p><b>The through-line:</b> nothing new turns on without a connection; what is already on is
+tolerated until the connection exists to fix it properly. The interim-boolean option was rejected on
+principle, and that principle holds for Build 5: connected must stay a checked fact, never a box a
+person ticks.</p>
+<div class="decide">
+  <b>Consequence to hold in view.</b> Everything except nurture 3 now depends on Build 5, and Build 5
+  depends on a Google approval that has not been applied for. The convergence wave is the pressure:
+  every academy cloned from GTA before Build 5 lands inherits the review-shaped cards, exactly as
+  Miami did. If the wave starts moving before the approval clears, this decision is worth revisiting.
+</div>
+
+<h2>Per-surface behaviour under the guardrail</h2>
+<table>
+<thead><tr><th style="width:30px">#</th><th>Surface</th><th>Unconnected academy</th><th>Connected academy</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Agent social proof</td><td>Section renders empty. Agent says nothing about reviews. GTA's link moves into GTA's own <code>agent_prompt_sections</code> row first, so GTA's converting agent is never silently unarmed.</td><td>Renders that academy's own review link from its connection record.</td></tr>
+<tr><td>2</td><td>Nurture email 3</td><td><b>Ruled: swap to a quote-free variant.</b> The drip still sends on schedule, email 3 goes out with the quote block removed and the rest of the copy intact. Nothing silently vanishes from the sequence.</td><td>Quotes render from synced reviews, attributed to the real reviewer.</td></tr>
+<tr><td>3</td><td>Onboarding testimonials</td><td>Same behaviour as #2.</td><td>Same as #2.</td></tr>
+<tr><td>4/6</td><td>Client sites</td><td>Clone ships <code>items: []</code>, rating block suppressed. The "owner-provided or omit" intent becomes code, not a comment.</td><td>Items populate from curated synced reviews.</td></tr>
+<tr><td>5</td><td>Rating header</td><td>Never renders.</td><td>Renders only from a real aggregate. A hardcoded <code>ratingScore</code> stops being possible.</td></tr>
+<tr><td>7</td><td>DETAIL Miami</td><td>Hardcoded "Google review" cards removed. The GHL reputation widget keeps working; it carries real data.</td><td>Same as #4.</td></tr>
+<tr><td>8</td><td>CH3 file</td><td colspan="2">Its own ruling. Not a reviews question.</td></tr>
+<tr><td>9</td><td>Consent</td><td colspan="2">Testimonials sourced from Google reviews need no consent record. Any non-review testimonial surface must carry one; that is the reason to prefer reviews as the only source.</td></tr>
+</tbody>
+</table>
+
+<h2>Sequencing</h2>
+<ol>
+  <li><b>Now, and the only build item from this room:</b> the nurture email 3 quote-free variant.</li>
+  <li><b>Zoran, in the ORCHESTRATOR chat:</b> apply for Google Business Profile API access. Days to weeks of Google review time, and nothing else can start until it clears. Confirm alongside it who owns each academy's Google Business Profile, since we can only OAuth as an account that manages it.</li>
+  <li><b>Then Build 5:</b> table, sync, OAuth, public feed, Blueprint card, <code>renderSocialProof()</code>, notifications. The predicate becomes evaluable.</li>
+  <li><b>Then the surfaces re-open:</b> the "Google review" cards on GTA and Miami are replaced by real synced reviews, and each academy's agent sends its own link.</li>
+</ol>
+<p><b>Dependency worth stating plainly:</b> the convergence wave templatizes GTA across academies, and
+this guardrail is what makes that safe. Miami is the proof that the clone path already carried GTA's
+review-shaped cards to a second academy. Every academy cloned before Build 5 lands repeats it, which
+is why the API access request is the item that actually needs a date on it.</p>
+
+<h2>Guardrails on the guardrail</h2>
+<ul>
+  <li>Sales systems are shared. One mechanism keyed on per-academy runtime state, never a per-academy fork.</li>
+  <li>Attributed content never auto-propagates between academies (standing rule #55). A review belongs to the academy that earned it.</li>
+  <li>Enforcement checks trace what reaches <b>output</b> and whether gates fail open or closed. Never grep for literals. Three false positives this week came from literal greps, and this trace corrected two scout claims by reading render code.</li>
+</ul>
+
+<details>
+<summary>Build spec (expand)</summary>
+<h3>Shared predicate helper</h3>
+<p>Single exported function, one implementation, consumed by agent prompt rendering, email template
+rendering, and site config generation. Input: client id. Output: <code>{ connected, reviews[], aggregate }</code>.
+Unconnected returns <code>{ connected:false, reviews:[], aggregate:null }</code>, and every consumer treats
+that as "render nothing", never "render defaults".</p>
+<h3>Consumer changes</h3>
+<ul>
+  <li><b>Agent:</b> add a <code>social_proof</code> fact-renderer (the deliberate exclusion at <code>fact-render.js:496-509</code> is what makes the default leak). Renderer returns empty when unconnected.</li>
+  <li><b>Emails:</b> quote-bearing templates gain a quote-free variant selected at render time by the predicate.</li>
+  <li><b>Sites:</b> testimonial config generated from the predicate. Rating block renders only from a real aggregate; no literal <code>ratingScore</code> in any config. The <code>Google review</code> source label may only appear on a row that came from a synced review.</li>
+</ul>
+<h3>Regression check</h3>
+<p>For a fixture academy with no connection, assert that agent output, each email body, and generated
+site config contain zero testimonial content and zero rating claim. Assert on rendered output, not source.</p>
+</details>
+
+</div>
+</body>
+</html>
