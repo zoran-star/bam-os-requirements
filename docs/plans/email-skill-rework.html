@@ -469,6 +469,46 @@
     <p style="margin-top:8px"><b><span class="m">wants_about_page</span> exists in code but not in data.</b> api/website/team.js reads it and neither academy has it stored. A fourth category: fields the code expects that nobody ever set.</p>
   </div>
 
+
+  <h2><span class="n">11</span>The testimonial seam</h2>
+  <p class="lede">The testimonial connection is parked until this build finishes, then it attaches to what was actually built. This is the attachment point, defined now so it is not improvised later.</p>
+
+  <div class="rule">
+    <b>A gap, deliberately, not a stub</b>
+    <p>Nothing here reads or writes the testimonials store. Not even a resolver returning empty. A function that answers "none on file" looks harmless, but it is exactly the thing that gets unpicked, because the real one needs a different shape once google-sourced starred rows exist. A gap at a named position costs less than a stub that has to be undone.</p>
+  </div>
+
+  <div class="card scroll" style="margin-top:15px">
+<pre>
+   WHAT SHIPS NOW                        WHERE THE CONNECTION ATTACHES
+   ──────────────                        ─────────────────────────────
+   ONBOARDING_DEFAULT = 7 steps          insert ONE step between
+     1  welcome SMS                      era (6) and review (8)
+     2  welcome email
+     3  schedule SMS
+     4  how to train
+     5  story                      ◀──   the testimonials step is
+     6  era                              ABSENT, not present-and-disabled
+     7  review
+
+   NURTURE_DEFAULT = 4 steps             nurture-3 already exists and is
+     3  testimonials, held         ◀──   already held disabled per academy.
+                                         The connection changes WHAT FILLS
+                                         it, not whether it is there.
+</pre>
+  </div>
+
+  <div class="rule" style="margin-top:15px">
+    <b>The contract the connection has to satisfy</b>
+    <p>One function answering "which testimonials should this academy's emails show". It honours <span class="m">starred</span>, returns manual and google-sourced rows together, and the drop rule is enforced <b>at seed time, not render time</b>: an academy with no testimonials does not get the step, rather than getting a step that renders to nothing. Enforcing at render time would leave a step that looks live in the portal and silently sends an empty shell.</p>
+  </div>
+
+  <div class="warn" style="margin-top:15px">
+    <b>The seam creates a divergence, and it must be recorded or someone closes it wrongly</b>
+    <p>A 7-step master against GTA's 8-step live sequence means <b>master does not equal GTA on exactly one step, deliberately</b>. Under GTA-as-reference that reads like the master lagging, which is precisely the bug this workstream exists to fix.</p>
+    <p style="margin-top:9px">Without a record, a future session sees the gap, "fixes" it by promoting the testimonials step, and ships GTA's parents to every academy. That is the original failure with extra steps. So it goes in the accepted-divergence record alongside <span class="m">summer_special</span>, and the reason must name the testimonial connection as the thing that closes it.</p>
+  </div>
+
   <p class="foot">Checked against live data and current source on 27 Jul 2026: brand_data is populated for both academies, the missing generator was confirmed across both repos, and the absence of any testimonials store was confirmed against the schema.</p>
 
 </div>
