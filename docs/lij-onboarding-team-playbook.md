@@ -23,6 +23,7 @@ Companion files: [build queue](lij-onboarding-build-queue.md) (what to work on) 
 3. **Verify a claim before acting on it**, especially a scary one. One audit produced four false blockers in a day. Rendered or executed output beats static analysis every time.
 4. **Trace overrides, do not grep literals.** A literal in a source file is not evidence it reaches output. Ask: does anything override this on the path to output, and does that override fail OPEN or CLOSED?
 5. **Say what you did not verify.** A short accurate report beats a long confident one.
+6. **If the proof is not in the repo, the fix is not finished.** Two harnesses built on 2026-07-27 proved real data-loss bugs and were both left in a scratchpad, so the fix shipped and the evidence evaporated. A committed test must run on plain `node` with no new dependencies, no network and no database. **Include a negative control** (an env flag that reverts one fix and shows the suite catching it), because a suite that only ever passes tells you nothing about whether it would notice a regression. Same failure shape as rule 2: the work is real, the durability is not.
 
 **Why this shape:** it keeps deep context where the work is, and keeps Zoran's attention on one track at a time rather than on N chats each reporting mechanics at him.
 

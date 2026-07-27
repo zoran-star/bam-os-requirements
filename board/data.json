@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "New house rule: if the proof is not in the repo, the fix is not finished",
     "Caught a collision: three workstreams editing one file, brand_data work was double-assigned",
     "Verifier caught the fix reintroducing the same bug through its own guard",
     "Decided: tax IDs load only when you open the card, not on every login",
-    "Live one-click path to the Miami failure found: editing copy re-enables a disabled step",
-    "Item G dropped: GTA's automations must never change, only the structure behind them"
+    "Live one-click path to the Miami failure found: editing copy re-enables a disabled step"
   ],
   "orchestrator": {
     "focus": "Chats now own their own builders and testers; I keep the goals, the queue, routing and collisions. One track: automation templating.",
@@ -265,6 +265,13 @@
       "severity": "blocker",
       "status": "fix in flight",
       "owner": "templating"
+    },
+    {
+      "id": 73,
+      "title": "Locked In Sports' only website ref is brand_data.website_url (blocks 1c)",
+      "severity": "blocker",
+      "status": "queued",
+      "owner": "us"
     },
     {
       "id": 72,
@@ -664,6 +671,13 @@
       "severity": "friction",
       "status": "closed by decision",
       "owner": "later"
+    },
+    {
+      "id": 74,
+      "title": "Pro Precision is in Australia with a Toronto timezone",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
     }
   ],
   "chatMap": [
