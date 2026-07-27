@@ -26257,24 +26257,114 @@ async function _bbSectionUnmark(section, btn, label) {
 // Returns success bool. Debounced via _bbBasicsScheduleSave below.
 async function _bbSaveClientBasics(patch) {
   if (!CLIENT_ID || !_sb) return false;
+  patch = _bbDropUnloadedBlobs(patch || {});
+  if (!Object.keys(patch).length) return true;   // nothing left that is safe to write
   const { error } = await _sb.rpc('update_client_basics', {
-    p_client_id: CLIENT_ID, p_patch: patch || {}
+    p_client_id: CLIENT_ID, p_patch: patch
   });
   if (error) {
     console.warn('basics save failed:', error.message);
     return false;
   }
-  // Reflect on the cached CLIENT_ROWS so subsequent renders use the new
-  // values without a full reload.
+  // Reflect on the cached CLIENT_ROWS so subsequent renders use the new values
+  // without a full reload. This also marks those keys as loaded (presence on
+  // the row is the signal - see _bbHydrateClientCols), which is accurate only
+  // because the mirror below copies exactly what the RPC did:
+  //  - jsonb blobs are REPLACED wholesale by the RPC, so assign, never merge:
+  //    a merge would leave keys in the cache that the write just deleted from
+  //    the database, hiding the loss until the next reload.
+  //  - business_name / owner_name / email ignore a blank (COALESCE(NULLIF)),
+  //    so a blank must leave the cached value alone.
+  //  - every other column takes the value as sent, blank meaning NULL.
+  // And it is safe to treat as loaded only because _bbDropUnloadedBlobs above
+  // refuses to write a blob that was never loaded. Keep that invariant.
   const row = (CLIENT_ROWS || []).find(c => c.id === CLIENT_ID);
   if (row) {
-    if (patch.brand_data) row.brand_data = { ...(row.brand_data || {}), ...patch.brand_data };
     Object.keys(patch).forEach(k => {
-      if (k !== 'brand_data') row[k] = patch[k];
+      if (patch[k] === '' && _BB_KEEP_ON_BLANK.includes(k)) return;   // RPC kept the old value
+      row[k] = patch[k] === '' ? null : patch[k];
     });
   }
   _obtScheduleRefresh && _obtScheduleRefresh();
   return true;
+}
+
+// update_client_basics replaces these jsonb columns WHOLESALE, so writing one
+// you never loaded destroys every key you did not happen to have on screen.
+// Enforced here rather than per card: no caller, present or future, can wipe
+// them by forgetting to hydrate first. The only way to get one loaded is
+// _bbHydrateClientCols. (onboarding_setup is merged from the wizard's own
+// fetched state, not from form inputs, so it is not in this list.)
+const _BB_WHOLESALE_COLS = ['brand_data', 'kpi_data'];
+// The three columns the RPC writes with COALESCE(NULLIF(...)): a blank is
+// IGNORED, it never clears them. Everything else takes a blank as NULL.
+const _BB_KEEP_ON_BLANK = ['business_name', 'owner_name', 'email'];
+function _bbDropUnloadedBlobs(patch) {
+  const row = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  _BB_WHOLESALE_COLS.forEach(k => {
+    if (k in patch && !(k in row)) {
+      console.warn('basics save: refusing to write ' + k + ' before it loaded');
+      delete patch[k];
+    }
+  });
+  return patch;
+}
+// ─── CARD-SCOPED COLUMN LOAD ────────────────────────────────────────────
+// Columns a single card needs stay OUT of CLIENT_SELECT_COLS: that query runs
+// at every login for every academy the user can reach, and a federal tax ID has
+// no business sitting in that payload for a card most sessions never open. The
+// card loads them for itself, once, into the cached row.
+//
+// Presence of the key ON THE ROW is the one loaded signal, for every column
+// here - no per-field "loaded" flags to keep in sync, and it is per academy
+// because the row is. _bbGuardBlanks and the jsonb-card guards both read it.
+// Add a card-scoped column to _BB_GEN_COLS and it hydrates, renders and guards
+// itself. (public_name joins that list with the migration that adds it.)
+const _BB_GEN_COLS = ['legal_name', 'address', 'ein', 'phone', 'tax_config'];
+
+const _BB_COL_INFLIGHT = {};   // one request per academy+column set, not per caller
+async function _bbHydrateClientCols(cols) {
+  const cid = CLIENT_ID;
+  const row = (CLIENT_ROWS || []).find(r => r.id === cid);
+  if (!row || !_sb || !cid) return null;
+  const missing = (cols || []).filter(k => !(k in row));
+  if (!missing.length) return row;                 // already loaded for this academy
+  const key = cid + '|' + missing.join(',');
+  try {
+    if (!_BB_COL_INFLIGHT[key]) {
+      // Promise.resolve() SETTLES the query: a PostgREST builder is a lazy
+      // thenable that fires a fresh request on every await, so storing the
+      // builder itself would dedupe nothing.
+      _BB_COL_INFLIGHT[key] = Promise.resolve(_sb.from('clients')
+        .select(missing.join(', ')).eq('id', cid).maybeSingle());
+    }
+    const { data, error } = await _BB_COL_INFLIGHT[key];
+    delete _BB_COL_INFLIGHT[key];
+    if (error || !data) return null;               // still unloaded - guards hold
+    // NEVER overwrite a key that is already there. A save can land while this
+    // is in flight, and this response is older than that save - assigning it
+    // would reset a just-typed legal name or EIN to its pre-save value (or to
+    // NULL), and the next keystroke would then persist that. Whoever knows
+    // first wins; stale data never overwrites fresh.
+    missing.forEach(k => { if (!(k in row)) row[k] = data[k] === undefined ? null : data[k]; });
+  } catch (_) { delete _BB_COL_INFLIGHT[key]; return null; }   // never mark as loaded
+  return row;
+}
+
+// Hydration guard. The cards below render from the cached clients row, so a
+// column that has not loaded YET renders as an empty input - and
+// update_client_basics turns an empty string into NULL, wiping the stored
+// value. Drop any of the named keys that is blank AND absent from the row we
+// rendered from: not loaded means we know nothing about it, so it must not be
+// written. A value the user actually typed still saves, and clearing a LOADED
+// field still clears it.
+function _bbGuardBlanks(patch, keys) {
+  const row = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  (keys || []).forEach(k => {
+    const blank = patch[k] === '' || patch[k] === null || patch[k] === undefined;
+    if (blank && !(k in row)) delete patch[k];
+  });
+  return Object.keys(patch).length ? patch : null;
 }
 let _bbBasicsSaveTimer = null;
 function _bbBasicsScheduleSave(getter) {
@@ -26345,8 +26435,8 @@ function _bbRenderGeneralCard(panel, meta) {
 
     <!-- Sales tax TEMPLATE (Build T of the money model, docs/money-model-plan.md).
          Set once; every price/fee then flips taxable yes/no in the offer wizard.
-         tax_config is NOT in CLIENT_SELECT_COLS (same as brand_data), so the
-         values hydrate async below. -->
+         tax_config rides the same card-scoped load as legal name / address /
+         EIN - see _bbGenHydrate below. -->
     <div class="bb-field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
       <div class="bb-field-label">Sales tax</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -26364,22 +26454,32 @@ function _bbRenderGeneralCard(panel, meta) {
 
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
   `;
-  _bbGenHydrateTax();
+  _bbGenHydrate();
 }
 
-// tax_config hydrates async (not in CLIENT_SELECT_COLS - same pattern as
-// brand_data). The preview line restates what a taxable price will charge, and
-// warns that a rate CHANGE does not move already-created Stripe prices (risk 3
-// of the money-model plan: re-price through Price Match, never silently).
-async function _bbGenHydrateTax() {
-  try {
-    const { data } = await _sb.from('clients').select('tax_config').eq('id', CLIENT_ID).maybeSingle();
-    const t = (data && data.tax_config) || null;
-    const l = document.getElementById('bb-gen-tax_label'), r = document.getElementById('bb-gen-tax_pct');
-    if (l && t && t.label) l.value = t.label;
-    if (r && t && t.pct != null) r.value = t.pct;
-    _bbGenTaxNote();
-  } catch (_) { /* leave placeholders */ }
+// ONE load for every card-scoped column this card shows (_BB_GEN_COLS): legal
+// name, address, EIN, phone and the sales-tax template. The inputs above render
+// from the cached row, which carries these only once this has run - so on a
+// cold open they start blank and get filled in here, and until then
+// _bbGuardBlanks refuses to save them (a blank would NULL a stored value).
+// Fills in place rather than re-rendering, so it cannot eat the cursor, and
+// never overwrites something the user already typed.
+// The tax note restates what a taxable price will charge, and warns that a rate
+// CHANGE does not move already-created Stripe prices (risk 3 of the money-model
+// plan: re-price through Price Match, never silently).
+async function _bbGenHydrate() {
+  const row = await _bbHydrateClientCols(_BB_GEN_COLS);
+  if (!row) { _bbGenTaxNote(); return; }   // load failed: fields stay blank AND unsaveable
+  _BB_GEN_COLS.forEach(k => {
+    if (k === 'tax_config') return;                 // jsonb, handled below
+    const el = document.getElementById('bb-gen-' + k);
+    if (el && !el.value) el.value = row[k] == null ? '' : row[k];
+  });
+  const t = row.tax_config || null;
+  const l = document.getElementById('bb-gen-tax_label'), r = document.getElementById('bb-gen-tax_pct');
+  if (l && !l.value && t && t.label) l.value = t.label;
+  if (r && !r.value && t && t.pct != null) r.value = t.pct;
+  _bbGenTaxNote();
 }
 function _bbGenTaxNote() {
   const note = document.getElementById('bb-gen-tax-note'); if (!note) return;
@@ -26398,13 +26498,20 @@ function _bbGenTaxChanged() {
   // Own debounce timer: _bbBasicsScheduleSave shares ONE timer, so scheduling
   // tax through it could swallow a basics patch typed <600ms earlier.
   if (_bbGenTaxSaveTimer) clearTimeout(_bbGenTaxSaveTimer);
-  _bbGenTaxSaveTimer = setTimeout(() => _bbSaveClientBasics(_bbGenTaxPatch()), 600);
+  _bbGenTaxSaveTimer = setTimeout(() => {
+    const p = _bbGenTaxPatch();
+    if (p) _bbSaveClientBasics(p);
+  }, 600);
 }
 function _bbGenTaxPatch() {
     const pct = parseFloat(document.getElementById('bb-gen-tax_pct')?.value);
     const label = (document.getElementById('bb-gen-tax_label')?.value || '').trim();
     // Valid rate -> save the template; anything else -> explicit null clears it.
-    return { tax_config: (isFinite(pct) && pct > 0) ? { label, pct } : null };
+    // The clear only counts once tax_config has loaded: before that the empty
+    // boxes are "not loaded yet", not "the owner cleared the tax".
+    const row = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+    if (isFinite(pct) && pct > 0) return { tax_config: { label, pct } };
+    return ('tax_config' in row) ? { tax_config: null } : null;
 }
 
 // Common time zones (IANA value · friendly label). "" = not set.
@@ -26422,14 +26529,14 @@ const _BB_TZ_OPTS = [
 ];
 
 function _bbGenChanged() {
-  _bbBasicsScheduleSave(() => ({
+  _bbBasicsScheduleSave(() => _bbGuardBlanks({
     business_name: document.getElementById('bb-gen-business_name')?.value || '',
     legal_name:    document.getElementById('bb-gen-legal_name')?.value || '',
     address:       document.getElementById('bb-gen-address')?.value || '',
     ein:           document.getElementById('bb-gen-ein')?.value || '',
     // time_zone moved to Settings; do NOT read it here (the field is gone, so
     // reading it would save an empty value and wipe the saved zone).
-  }));
+  }, ['business_name', 'legal_name', 'address', 'ein']));
 }
 
 const _ENTITY_PRESETS = ['LLC','Corp','Sole prop','Partnership','Non-profit'];
@@ -26552,7 +26659,7 @@ function _bbRenderBrandCard(panel, meta) {
     <div class="bb-field">
       <div class="bb-field-label">Current website status</div>
       <div class="bb-choice-row">${statusOpts.map(opt => `
-        <button type="button" class="bb-choice ${websiteStatus === opt ? 'selected' : ''}" onclick="_bbBrandSetWebsiteStatus('${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+        <button type="button" class="bb-choice ${websiteStatus === opt ? 'selected' : ''}" data-wstatus="${_bbEscapeAttr(opt)}" onclick="_bbBrandSetWebsiteStatus('${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
       `).join('')}</div>
     </div>
 
@@ -26626,6 +26733,26 @@ function _bbRenderBrandCard(panel, meta) {
   const _wp = document.getElementById('bb-website-pages');
   if (_wp) _bbRenderWebsitePages(_wp);
   _bbRenderBrandBoard();
+  _bbBrandHydrate();
+}
+
+// brand_data is card-scoped (a big jsonb blob, wanted only here). Until it
+// lands the inputs above are empty because nothing has loaded - and
+// _bbBrandChanged posts the WHOLE object, so saving then would replace every
+// stored brand answer with "". So: fill in place once it arrives, and refuse
+// to save until it has (see the guard in _bbBrandChanged).
+async function _bbBrandHydrate() {
+  const row = await _bbHydrateClientCols(['brand_data']);
+  const bd = (row && row.brand_data) || {};
+  Object.keys(bd).forEach(k => {
+    const el = document.getElementById('bb-brand-' + k);
+    if (el && !el.value) el.value = bd[k] == null ? '' : bd[k];
+  });
+  // Website status is a button row, not an input - mark the stored one.
+  const sel = bd.website_status || '';
+  document.querySelectorAll('[data-wstatus]').forEach(b => {
+    b.classList.toggle('selected', !!sel && b.getAttribute('data-wstatus') === sel);
+  });
 }
 
 // ── Brand board block (Blueprint > Brand, sign-off redesign #1) ──
@@ -26686,17 +26813,11 @@ function _bbCollectPages(sitePages) {
   _BB_PAGES = out;
   return out;
 }
-// brand_data is NOT in CLIENT_ROWS (CLIENT_SELECT_COLS omits it), so read the
-// site page inventory straight from the clients row.
+// brand_data is card-scoped (CLIENT_SELECT_COLS omits it), so go through the
+// shared loader - same one call the rest of the Brand card uses.
 async function _bbLoadSitePages() {
-  try {
-    if (_sb && CLIENT_ID) {
-      const { data } = await _sb.from('clients').select('brand_data').eq('id', CLIENT_ID).maybeSingle();
-      const sp = data && data.brand_data && data.brand_data.site_pages;
-      if (Array.isArray(sp)) return sp;
-    }
-  } catch (_) {}
-  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  const row = await _bbHydrateClientCols(['brand_data']);
+  const c = row || (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
   return (c.brand_data && Array.isArray(c.brand_data.site_pages)) ? c.brand_data.site_pages : [];
 }
 async function _bbRenderWebsitePages(host) {
@@ -26763,7 +26884,11 @@ async function _bbToggleAdsApproval() {
 function _bbBrandChanged() {
   _bbBasicsScheduleSave(() => {
     const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
-    const cur = (c && c.brand_data) || {};
+    // Not loaded yet = every input is empty for a reason that has nothing to do
+    // with the owner. Saving now would post a full object of "" and the RPC
+    // replaces brand_data wholesale. Skip; _bbBrandHydrate will fill first.
+    if (!c || !('brand_data' in c)) return null;
+    const cur = c.brand_data || {};
     const next = { ...cur,
       color_primary:   document.getElementById('bb-brand-color_primary')?.value || '',
       color_secondary: document.getElementById('bb-brand-color_secondary')?.value || '',
@@ -26789,8 +26914,10 @@ function _bbBrandChanged() {
 }
 
 async function _bbBrandSetWebsiteStatus(opt) {
-  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
-  const cur = (c && c.brand_data) || {};
+  // Wait for brand_data before touching it - this writes the whole object back.
+  const c = await _bbHydrateClientCols(['brand_data']);
+  if (!c || !('brand_data' in c)) { _plToast && _plToast("Couldn't load your brand answers - try again."); return; }
+  const cur = c.brand_data || {};
   const next = (cur.website_status === opt) ? '' : opt;
   await _bbSaveClientBasics({ brand_data: { ...cur, website_status: next } });
   _bbRenderFromHash();
@@ -26871,12 +26998,27 @@ function _bbRenderKpisCard(panel, meta) {
 
     ${_bbMarkDoneCta('kpis', 'KPIs')}
   `;
+  _bbKpisHydrate();
+}
+
+// kpi_data is card-scoped, same contract as brand_data: fill the inputs once it
+// arrives, and no save until then (_bbKpisChanged posts the whole object).
+async function _bbKpisHydrate() {
+  const row = await _bbHydrateClientCols(['kpi_data']);
+  const kd = (row && row.kpi_data) || {};
+  _BB_KPI_IDS.forEach(id => {
+    const el = document.getElementById('bb-kpi-' + id);
+    if (el && !el.value) el.value = kd[id] == null ? '' : kd[id];
+  });
 }
 
 function _bbKpisChanged() {
   _bbBasicsScheduleSave(() => {
     const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
-    const cur = (c && c.kpi_data) || {};
+    // Same guard as Brand: unloaded means every box is empty for a reason the
+    // owner had nothing to do with, and this save replaces kpi_data wholesale.
+    if (!c || !('kpi_data' in c)) return null;
+    const cur = c.kpi_data || {};
     const next = { ...cur };
     _BB_KPI_IDS.forEach(id => { next[id] = document.getElementById('bb-kpi-' + id)?.value || ''; });
     return { kpi_data: next };
@@ -27058,6 +27200,10 @@ async function _bbStaffRefreshList() {
     _BB_NOTIF_LOADED = true;
   }
   // Clients row = source of the owner's Primary contact (owner_name/email/phone).
+  // phone is card-scoped (not in CLIENT_SELECT_COLS), so load it through the
+  // shared loader BEFORE rendering - same one call the Business Basics card
+  // uses, so whichever card opens first hydrates them all.
+  await _bbHydrateClientCols(_BB_GEN_COLS);
   const cRow = (CLIENT_ROWS || []).find(x => x.id === CLIENT_ID) || {};
   const ov2 = (k) => _bbEscapeAttr(cRow[k] || '');
 
@@ -27521,13 +27667,16 @@ async function _bbStaffKpisSave(memberId) {
 // Owner / primary contact block on the Staff card → clients.owner_name/email/phone.
 function _bbStaffOwnerChanged() {
   _bbBasicsScheduleSave(() => {
-    const patch = {
+    const patch = _bbGuardBlanks({
       owner_name: document.getElementById('bb-owner-name')?.value || '',
       email:      document.getElementById('bb-owner-email')?.value || '',
       phone:      document.getElementById('bb-owner-phone')?.value || '',
-    };
+    }, ['owner_name', 'email', 'phone']);
+    if (!patch) return null;
+    // Mirror only what we are actually saving - mirroring a dropped blank would
+    // put the key on the row and let the NEXT keystroke write it after all.
     const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
-    if (c) { c.owner_name = patch.owner_name; c.email = patch.email; c.phone = patch.phone; }
+    if (c) Object.keys(patch).forEach(k => { c[k] = patch[k]; });
     return patch;
   });
 }
@@ -60671,6 +60820,10 @@ async function boot() {
   // client_users table (owner OR invited teammate); RLS scopes this query
   // to exactly the caller's clients via my_client_ids(). One auth user can
   // belong to multiple clients - the bottom-left switcher lets them flip.
+  // Deliberately NARROW: this runs at every login, for every academy the user
+  // can reach. Columns only a single card needs (legal_name, address, ein,
+  // phone, brand_data, kpi_data, tax_config) are loaded by that card instead -
+  // see _bbHydrateClientCols. Nothing may be SAVED before it has loaded.
   const CLIENT_SELECT_COLS = 'id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access, v15_access, v4_access, organic_content, ads_content_approval_required, onboarding_feedback_requested_at, onboarding_feedback_submitted_at, contact_provider, ghl_location_id';
   const { data: clientRows } = await _sb.from('clients')
     .select(CLIENT_SELECT_COLS)
