@@ -332,6 +332,16 @@ Artifacts, both pushed on `claude/optimistic-leavitt-db0107`:
 
 **PROCESS GATE (Zoran, 2026-07-27):** the sync room must show him a **MOCKUP of the user stories** and get his confirmation BEFORE any build. Sequence is fixed: mockup -> his confirmation -> plan to the orchestrator -> builder subagent -> then seed San Jose in that chat.
 
+## ⏸ SERIALIZED: ONE TRACK AT A TIME (Zoran, 2026-07-27)
+
+Two parallel design processes were overstimulating. **AUTOMATION TEMPLATING runs alone; TESTIMONIAL CONNECTION is parked and surfaces nothing until it finishes.**
+
+Order: templating wave completes -> then the reviews chat reads **what was actually built, not what was planned** -> updates its plan against that reality -> builds the connection and ties it in.
+
+**Templating holds off on testimonial-dependent parts.** The rule stands (empty store = the email does not ship) but the wiring is not built now. **Park blocked items rather than stubbing them**, since a stub that must be unpicked is worse than a gap, and design the seam deliberately as an attachment point for the later build.
+
+**Parking costs nothing**: the empty-store rule already took Google Business Profile work off the critical path, so nothing waits on the reviews chat. Its highest-value output is already banked in the migration (the one-table ruling and all five gaps, including the RLS hole).
+
 ## BUILD 5 / GOOGLE REVIEWS NOW HAS AN OWNER: the **TESTIMONIAL CONNECTION** chat (2026-07-27)
 
 Spec'd twice, never started, and the handoff's own audience line ("a NEW chat building this end to end") was never acted on. That chat now exists. Its sequence, set by Zoran: scan -> visual mockup for him -> **WAIT for the automation templating build** -> verify that build against its plan -> report to the orchestrator -> Zoran confirms -> then read what was actually built and update its plan against reality.

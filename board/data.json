@@ -1,14 +1,14 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "Serialized to one track: templating first, testimonials after. No parallel design",
     "sync_class write path now needs a test: it is a single point of failure with no detection behind it",
     "Templating branch pushed: 36 files, builders can read the plans and the renderer now",
     "Weekly drift check cancelled: the boundary gets enforced at write time instead",
-    "Reviews chat caught 5 gaps in the in-flight migration, incl. RLS that would let academies fabricate reviews",
-    "Found a live data-loss bug: editing Business Basics wipes legal name, address and EIN"
+    "Reviews chat caught 5 gaps in the in-flight migration, incl. RLS that would let academies fabricate reviews"
   ],
   "orchestrator": {
-    "focus": "Preset convergence is the whole game now. The sync chat owns the standard AND seeding San Jose through it. It is building you a mockup of the user stories first; nothing gets built until you confirm it.",
+    "focus": "ONE TRACK: automation templating only. Testimonial connection is parked until it finishes, then it reads what was actually built and ties in.",
     "needs": [
       "Do NOT edit the Business Basics card until #69 is fixed, it silently wipes legal name, address and EIN",
       "Work through the GTA automation map in the sync chat, it is the master spec",
@@ -56,7 +56,7 @@
           "state": "pending"
         }
       ],
-      "status": "Plan final and approved. Item 1 (domain backfill) applied to prod. Foundation builder running on the parent-facing name, testimonials table, community link and review link.",
+      "status": "One track at a time now. Foundation is built and under security review; the templating wave proceeds, testimonial wiring deliberately left as a clean seam for later.",
       "next": {
         "who": "agents",
         "what": "Foundation lands, then I dispatch the next wave. San Jose gets seeded in the sync chat after"
@@ -653,32 +653,17 @@
     {
       "name": "TESTIMONIAL CONNECTION",
       "sidebar": "TESTIMONIAL CONNECTION",
-      "state": "white",
-      "one": "Now owns connecting Google reviews end to end. Scanning, then building you a visual mockup",
+      "state": "orange",
+      "one": "Parked on purpose so you only run one design track at a time. Restarts when templating is done",
       "column": "reviews",
-      "actions": [
-        {
-          "id": "google-api-app",
-          "title": "File the Google Business Profile API application",
-          "why": "Nothing about real reviews works until Google approves the Cloud project, and it has never been applied for. Days to weeks. Every fabricated 5-star card and every borrowed testimonial stays live until this clears.",
-          "whyHuman": "It is a business application against your Google Cloud project, tied to your identity.",
-          "steps": [
-            "Open Google Cloud Console for the existing project (GOOGLE_CLIENT_ID/SECRET are already in prod)",
-            "Request access to the Business Profile APIs",
-            "Submit the business justification, TESTIMONIAL CONNECTION can draft it for you",
-            "Confirm each academy's Google Business Profile is manageable by an account we can OAuth as"
-          ],
-          "code": null,
-          "verify": "Google approves Business Profile API access on the project, and the chat can start syncing an academy's reviews.",
-          "never": "Do not build curation on the Places API as a substitute. It only returns about 5 picked reviews, which makes starring and hiding meaningless."
-        }
-      ]
+      "actions": [],
+      "blockedBy": "waiting for AUTOMATION TEMPLATING to finish, by your call. Nothing is waiting on it, so parking costs nothing"
     },
     {
       "name": "AUTOMATION TEMPLATING",
       "sidebar": "AUTOMATION TEMPLATING",
       "state": "white",
-      "one": "Plan approved and dispatched. Owns San Jose's seeding once the build lands",
+      "one": "The only active track. Building the wave, holding off on anything testimonial-dependent",
       "builds": [
         "t-convergence"
       ],
