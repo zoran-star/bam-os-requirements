@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "Reviews chat caught 5 gaps in the in-flight migration, incl. RLS that would let academies fabricate reviews",
     "Found a live data-loss bug: editing Business Basics wipes legal name, address and EIN",
     "Empty testimonials now DROPS the email entirely, which takes Google reviews off the critical path",
     "TESTIMONIAL CONNECTION now owns the Google reviews build; mockup coming",
-    "Zoran confirmed the plan: building now. Foundation builder running",
-    "Item 1 applied to prod: 10 academies' website domains backfilled, GTA included"
+    "Zoran confirmed the plan: building now. Foundation builder running"
   ],
   "orchestrator": {
     "focus": "Preset convergence is the whole game now. The sync chat owns the standard AND seeding San Jose through it. It is building you a mockup of the user stories first; nothing gets built until you confirm it.",
@@ -259,6 +259,13 @@
     }
   ],
   "queue": [
+    {
+      "id": "early-win",
+      "title": "DECIDE: close the social_proof leak in days using a review-link field, no Google approval needed",
+      "severity": "blocker",
+      "status": "YOUR CALL",
+      "owner": "Zoran"
+    },
     {
       "id": 69,
       "title": "DATA LOSS: editing Business Basics NULLs legal_name, address, ein",
