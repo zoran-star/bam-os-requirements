@@ -8,6 +8,22 @@
 // detached on :4600.
 //
 // Read-only. Nothing here enables, approves, or sends anything.
+//
+// WHY THIS EXISTS, and why rendered output beats grep on this codebase: during the
+// 2026-07-26 preset-parity audit a static literal-grep produced three BLOCKER-severity
+// false positives (a locFor GTA fallback removed on 2026-07-25, and two agent prompt
+// defaults that fact-render.js overrides at runtime). Every one died against rendered
+// output: grep proves "GTA literal present in file", the render proves "not present in
+// what the parent receives". The same pass then found two REAL leaks the grep missed.
+// The rule that fell out of it: a literal in a source file is not evidence of a leak.
+// What matters is whether anything overrides it on the path to output, and whether that
+// override fails OPEN or CLOSED. See docs/automation-message-harness.md.
+//
+// LIMITATION, stated honestly: this is pinned to ONE academy - a CLIENT_ID const plus a
+// committed data snapshot rather than a live read. Parameterising it by client id and
+// reading automation_steps live turns it into a before/after verification surface for
+// any academy a preset change touches. That is the obvious next move, deliberately not
+// done here.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -136,7 +152,7 @@ for (const seq of SEQUENCES) {
           <span class="stepno">Message ${i + 1} of ${steps.length}</span>
           ${held ? `<span class="heldpill">HELD - not sending</span>` : ""}
         </div>
-        ${held ? `<div class="heldnote"><b>Deliberately off.</b> This email quotes real GTA parents re-attributed to San Jose families. It stays disabled until Lij supplies his own testimonials. Shown here for review only.</div>` : ""}
+        ${held ? `<div class="heldnote"><b>Deliberately off.</b> This email quotes real GTA parents re-attributed to San Jose families via {{location.city}}. Zoran's ruling (2026-07-27): the durable fix is a QUOTE-FREE VARIANT, so the drip still sends on schedule and the quote block drops out until that academy has Google reviews connected. Disabled here until that variant exists. <code>onboarding-testimonials</code> has the identical problem. Shown for review only.</div>` : ""}
         ${payload}
       </div>`;
   }
