@@ -6,6 +6,26 @@ Companion files: [build queue](lij-onboarding-build-queue.md) (what to work on) 
 
 ---
 
+## THE OPERATING MODEL (Zoran, 2026-07-27). This supersedes the roster below.
+
+**Every chat owns its own full loop.** A chat plans, spawns its OWN builder subagents, spawns its OWN tester subagents, tests with Zoran, and then relays only what matters upward. The orchestrator stops dispatching builders.
+
+| | Owns |
+|---|---|
+| **A chat** | Its plan · its builders · its testers · testing with Zoran · relaying up |
+| **MISTER_ORCHESTRATOR** | The two higher-level goals (get San Jose live, and build the template so the next academies onboard easily) · the queue as shared memory · routing between chats · catching collisions before they cost a build · protecting Zoran's attention |
+
+**What a chat relays up, and nothing more:** decisions Zoran made, anything that changes another chat's work, anything that changes the shared queue, blockers needing a human, and finished work. **Not** progress narration, not internal build detail, not things only that chat needs to know.
+
+**Rules that travel WITH the loop, non-negotiable, because they were each learned the expensive way:**
+1. **The tester never built the thing.** A builder verifying itself rubber-stamps itself. Spawn a separate agent.
+2. **Never send an undeployed build to Zoran for testing.** Commit, push, open the PR, confirm a preview exists first. Testing uncommitted worktree edits means prod is still running the old code, so every step either passes for the wrong reason or actively causes the bug the build exists to prevent. This cost two rooms a wasted session.
+3. **Verify a claim before acting on it**, especially a scary one. One audit produced four false blockers in a day. Rendered or executed output beats static analysis every time.
+4. **Trace overrides, do not grep literals.** A literal in a source file is not evidence it reaches output. Ask: does anything override this on the path to output, and does that override fail OPEN or CLOSED?
+5. **Say what you did not verify.** A short accurate report beats a long confident one.
+
+**Why this shape:** it keeps deep context where the work is, and keeps Zoran's attention on one track at a time rather than on N chats each reporting mechanics at him.
+
 ## Roster
 
 | Agent | Model | Territory | Spawns when |
