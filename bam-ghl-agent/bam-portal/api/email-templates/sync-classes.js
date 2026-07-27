@@ -72,15 +72,19 @@ export const TEMPLATE_SYNC_CLASS = Object.freeze({
   "nurture-4": "shared",
 
   // ── Onboarding welcome sequence ─────────────────────────────────────────
-  // SHARED ONLY BECAUSE THE FRAME IS TOKENIZED. These two are being re-shelled
-  // onto the tokenized shell (wordmark, location tag, domain and Instagram all
-  // come from the sending academy), which is what makes them safe to copy.
-  // If you reintroduce ANY hardcoded academy identity here - a domain, a phone
-  // number, a WhatsApp invite, a review link, a city - you must change this
-  // class to 'local' in the same commit. Nothing else will catch it.
-  "onboarding-welcome": "shared",
-  "onboarding-review": "shared",
-  // Academy-specific: how THIS academy wants its members to train.
+  // All three carry ONE academy's identity in the BODY, not just the frame:
+  // GTA's coach phone (289) 816-6569, the 1079 Linbrook Rd gym address, the GTA
+  // WhatsApp invite, coach Instagram handles, GTA's g.page review URL, and
+  // "By Any Means GTA" in the sign-offs. Re-shelling these onto the tokenized
+  // frame fixes the header and footer; it does NOT fix the body. Copying them
+  // would send GTA's phone number and gym address from another academy.
+  //
+  // These may be promoted to 'shared' ONLY when the body literals are gone -
+  // and the render-leak gate in api/_sync-class.test.mjs is what decides that,
+  // not anyone's reading of the diff. Flip the class, run the test: it passes,
+  // or it names the literal still in there.
+  "onboarding-welcome": "local",
+  "onboarding-review": "local",
   "onboarding-training": "local",
   // Onboarding copies of the nurture designs (free-trial CTA stripped). Same
   // content as nurture-1 / nurture-2, so they MUST carry the same class - one

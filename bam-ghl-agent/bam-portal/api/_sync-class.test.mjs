@@ -22,7 +22,7 @@ import {
 } from "./_sync-class.js";
 import { TEMPLATES as NURTURE } from "./email-templates/nurture-emails.js";
 import { ONBOARDING_TEMPLATES } from "./email-templates/onboarding-emails.js";
-import { renderEmail } from "./email-shells.js";
+import { renderEmail, clientVars } from "./email-shells.js";
 import { CANONICAL_DEFAULTS, canonicalSteps } from "./form-intro-automations.js";
 import { seedAutomations } from "./agent/seed-automations.js";
 
@@ -122,9 +122,9 @@ const DECIDED = {
   "nurture-2": "local",
   "nurture-3": "attributed",
   "nurture-4": "shared",
-  "onboarding-welcome": "shared",
+  "onboarding-welcome": "local",
   "onboarding-training": "local",
-  "onboarding-review": "shared",
+  "onboarding-review": "local",
   "onboarding-story": "local",
   "onboarding-era": "local",
   "onboarding-testimonials": "attributed",
@@ -147,6 +147,74 @@ const resolved = nurtureSteps.map((s) => `${s.body} -> ${resolveSyncClass(s)}`);
 for (const line of resolved) console.log("     " + line);
 ok(nurtureSteps.some((s) => resolveSyncClass(s) === "attributed"),
   "the canonical 'nurture' default contains an attributed step (template:nurture-3)");
+
+console.log("\n── RENDER-LEAK GATE: nothing declared `shared` may carry GTA identity ──");
+//
+// THIS IS THE GATE FOR RAISING A TEMPLATE TO `shared`. Do not delete it as
+// redundant with the declaration table - it is the thing that makes the table
+// trustworthy.
+//
+// Why it exists: every wrong class in this system's short history came from an
+// ASSERTION about what a template contains ("the re-shell fixed it", "that's
+// just the frame") rather than from looking at output. One such assertion said
+// onboarding-welcome was safe to copy while its body still carried GTA's coach
+// phone number and gym address. Human judgement, however senior, is not a
+// control. Rendered bytes are.
+//
+// So: render every `shared` template through the REAL send path (renderEmail)
+// for a synthetic NON-GTA academy, and fail if any GTA-identity literal
+// survives. Promoting a template to `shared` is then safe by construction -
+// the test either passes, or it names the literal still in there.
+const GTA_LITERALS = [
+  "byanymeanstoronto", "Linbrook", "Oakville", "By Any Means GTA", "BAM GTA",
+  "(289) 816-6569", "byanymeanszoran", "byanymeansadrian", "byanymeansgsc", "g.page",
+];
+// Digits-only forms too, so a differently formatted phone (tel: link, dashes,
+// no spaces) cannot slip past a string match on one formatting of it.
+const GTA_DIGITS = ["2898166569"];
+
+// A synthetic academy that is NOT BAM GTA. The clientId is deliberately not
+// GTA's uuid, so email-shells derives identity from these vars (locFromVars)
+// exactly as it would for a real unwired academy.
+const NON_GTA = {
+  business_name: "BAM San Jose",
+  website_setup: { domain: "byanymeanssanjose.com" },
+  owner_name: "Sample Owner",
+  email: "info@byanymeanssanjose.com",
+  address: "1051 W San Fernando St, San Jose, CA 95126",
+};
+function gtaLeaksIn(templateKey) {
+  const html = renderEmail({
+    clientId: "00000000-0000-4000-8000-00000000cafe",
+    subject: "Test",
+    body: `template:${templateKey}`,
+    vars: clientVars(NON_GTA),
+  });
+  const hay = html.toLowerCase();
+  const digits = html.replace(/\D+/g, "");
+  return [
+    ...GTA_LITERALS.filter((s) => hay.includes(s.toLowerCase())),
+    ...GTA_DIGITS.filter((d) => digits.includes(d)),
+  ];
+}
+
+const sharedKeys = liveKeys.filter((k) => syncClassForTemplate(k) === "shared");
+ok(sharedKeys.length > 0, `there is at least one shared template to check (${sharedKeys.join(", ") || "none"})`);
+for (const key of sharedKeys) {
+  const leaks = gtaLeaksIn(key);
+  ok(leaks.length === 0, `${key} renders clean for a non-GTA academy${leaks.length ? " - LEAKS: " + leaks.join(", ") : ""}`);
+}
+
+// NEGATIVE CONTROL. A leak detector that detects nothing passes everything.
+// These three are `local` precisely because their bodies still carry GTA
+// identity; the gate must SEE that. If one ever renders clean, the body swap
+// has landed and it becomes a candidate for `shared` - promote it deliberately,
+// do not delete this assertion.
+for (const key of ["onboarding-welcome", "onboarding-review", "onboarding-training"]) {
+  const leaks = gtaLeaksIn(key);
+  ok(leaks.length > 0,
+    `detector sees GTA identity in ${key} (${leaks.join(", ") || "NOTHING - detector may be broken"}), so flipping it to shared FAILS the gate`);
+}
 
 console.log("\n── SEEDER WIRING: an attributed step is seeded, but OFF ──");
 // The marking only does anything because seedAutomations consults the resolver.
