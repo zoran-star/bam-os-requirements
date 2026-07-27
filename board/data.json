@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "Third false blocker killed; found a real one the audit missed: one Google link shared by every academy",
     "Killed a second false blocker: the email identity fallback was already fixed and shipped",
     "SAN JOSE EMAIL IS LIVE: verified, sends as BAM San Jose, Lij's Gmail untouched",
     "Scaling program fully closed: Cole's SQL applied, dormant until Mike sets terms",
-    "Corrected a scout's blocker claim: SJ's nurture emails are clean, onboarding templates are not",
-    "Found: new academies get a weaker onboarding than GTA, using emails that already exist"
+    "Corrected a scout's blocker claim: SJ's nurture emails are clean, onboarding templates are not"
   ],
   "orchestrator": {
     "focus": "SJ email is live. Preset parity is the front now: audit done, planning room open on the two-way sync. Lij's ask-list is the biggest unblock you own.",
@@ -612,7 +612,7 @@
     },
     {
       "id": 59,
-      "title": "Agent default sections still claim to BE BAM GTA (address, coaches, Oakville)",
+      "title": "social_proof has no renderer (leaks 1 Google link to all) + defaults fail open with no offer",
       "severity": "blocker",
       "status": "queued",
       "owner": "us"
