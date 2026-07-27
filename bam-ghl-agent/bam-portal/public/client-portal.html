@@ -26320,7 +26320,7 @@ function _bbDropUnloadedBlobs(patch) {
 // because the row is. _bbGuardBlanks and the jsonb-card guards both read it.
 // Add a card-scoped column to _BB_GEN_COLS and it hydrates, renders and guards
 // itself. (public_name joins that list with the migration that adds it.)
-const _BB_GEN_COLS = ['legal_name', 'address', 'ein', 'phone', 'tax_config'];
+const _BB_GEN_COLS = ['legal_name', 'address', 'ein', 'phone', 'public_name', 'tax_config'];
 
 const _BB_COL_INFLIGHT = {};   // one request per academy+column set, not per caller
 async function _bbHydrateClientCols(cols) {
@@ -26404,7 +26404,19 @@ function _bbRenderGeneralCard(panel, meta) {
       <div class="bb-field-label">Business name <span class="bb-field-req">*</span></div>
       <input id="bb-gen-business_name" type="text" class="bb-input" value="${v('business_name')}"
         oninput="_bbGenChanged()" />
-      <div class="bb-field-hint">How customers know you - appears on funnels, emails, the portal header.</div>
+      <div class="bb-field-hint">Your internal shorthand - what you and the BAM team call this academy in the portal.</div>
+    </div>
+
+    <!-- Parent-facing name. business_name is the INTERNAL label ("BAM GTA") and
+         it was what {{location.name}} rendered, so parents were reading our
+         shorthand in their own texts and emails. This is the name they see.
+         Not in CLIENT_SELECT_COLS, so it hydrates async below (same pattern as
+         tax_config / brand_data). -->
+    <div class="bb-field">
+      <div class="bb-field-label">Name parents see</div>
+      <input id="bb-gen-public_name" type="text" class="bb-input" placeholder="${_bbEscapeHtml(c.business_name || '')}"
+        oninput="_bbGenChanged()" />
+      <div class="bb-field-hint">How you introduce yourself to parents in texts and emails, e.g. "By Any Means Toronto". Leave it empty and we use your business name.</div>
     </div>
 
     <div class="bb-field">
@@ -26534,9 +26546,13 @@ function _bbGenChanged() {
     legal_name:    document.getElementById('bb-gen-legal_name')?.value || '',
     address:       document.getElementById('bb-gen-address')?.value || '',
     ein:           document.getElementById('bb-gen-ein')?.value || '',
+    // public_name needs no flag of its own: it loads with the rest of
+    // _BB_GEN_COLS, and _bbGuardBlanks drops it until the row actually carries
+    // it, so a blank can never NULL the stored parent-facing name.
+    public_name:   document.getElementById('bb-gen-public_name')?.value || '',
     // time_zone moved to Settings; do NOT read it here (the field is gone, so
     // reading it would save an empty value and wipe the saved zone).
-  }, ['business_name', 'legal_name', 'address', 'ein']));
+  }, ['business_name', 'legal_name', 'address', 'ein', 'public_name']));
 }
 
 const _ENTITY_PRESETS = ['LLC','Corp','Sole prop','Partnership','Non-profit'];
@@ -30845,7 +30861,17 @@ const _bbOfferConfigs = {
       ..._bbStdOnboarding(
         ['Parent name','Phone','Email','Emergency contact name','Emergency contact phone'],
         ['Medical / allergies','School','Grade','Goals','Experience level','Jersey size','Add custom']
-      ).filter(f => f.key !== 'welcome_video' && f.key !== 'assets')
+      ).filter(f => f.key !== 'welcome_video' && f.key !== 'assets'),
+      // Two ACADEMY-level facts, collected here because this is where the owner
+      // is already thinking about what a new member gets. They save to the
+      // clients row, not offer.data (see the client_fact field types) - one
+      // academy has one community group and one review link, not one per offer.
+      { key:'__community_group__', type:'community_group', label:'Community group',
+        hint:'The group new members get invited to. Pick the platform so we name it properly ("Join the WhatsApp group"), then paste the invite link. No link means we leave the line out of your welcome message entirely.' },
+      { key:'__google_review__', type:'client_link', clientKey:'google_review_url',
+        label:'Google review link',
+        placeholder:'https://g.page/r/…/review',
+        hint:'Where happy parents leave you a review. We ask for one a week after they settle in. No link on file means we simply do not ask - never a button that goes nowhere.' }
     ]}
   ],
 
@@ -31627,6 +31653,32 @@ function _bbRenderField(field, sectionId) {
         <span>${loc ? _bbEscapeHtml(loc.title) : 'Pick a location…'}</span>
         <span class="bb-loc-pick-chev">▾</span>
       </button>`;
+      break;
+    }
+    // ── ACADEMY-level facts edited from inside an offer section ──────────────
+    // These write to the clients row, not offer.data: an academy has ONE
+    // community group and ONE review link no matter how many offers it sells.
+    // The columns are outside CLIENT_SELECT_COLS, so they hydrate async and the
+    // field stays read-only-looking until they land (never save a blank over a
+    // stored value).
+    case 'client_link': {
+      if (_bbClientFacts === null) { _bbLoadClientFacts(); body = `<div style="font-size:12px;color:var(--text-mute)">Loading…</div>`; break; }
+      body = `<input type="url" class="bb-input" value="${_bbEscapeHtml(_bbClientFacts[field.clientKey] || '')}"
+        placeholder="${_bbEscapeAttr(field.placeholder || '')}"
+        oninput="_bbClientFactChanged('${_bbEscapeAttr(field.clientKey)}', this.value)" />`;
+      break;
+    }
+    case 'community_group': {
+      if (_bbClientFacts === null) { _bbLoadClientFacts(); body = `<div style="font-size:12px;color:var(--text-mute)">Loading…</div>`; break; }
+      const _cgPlat = _bbClientFacts.community_group_platform || '';
+      const _cgUrl = _bbClientFacts.community_group_url || '';
+      body = `
+        <div class="bb-choice-row">${_BB_COMMUNITY_PLATFORMS.map(([val, label]) => `
+          <button type="button" class="bb-choice ${_cgPlat === val ? 'selected' : ''}" onclick="_bbCommunityPlatformPick('${val}')">${_bbEscapeHtml(label)}</button>
+        `).join('')}</div>
+        <input type="url" class="bb-input" style="margin-top:10px" value="${_bbEscapeHtml(_cgUrl)}"
+          placeholder="Paste the invite link"
+          oninput="_bbClientFactChanged('community_group_url', this.value)" />`;
       break;
     }
     case 'info':
@@ -32839,6 +32891,58 @@ async function _bbCqPreviewForm(offerId, sectionId) {
   }
 }
 
+// ── Academy-level facts edited from inside an offer section ─────────────────
+// The `client_link` and `community_group` field types read and write the CLIENTS
+// row, not offer.data. These columns sit outside CLIENT_SELECT_COLS, so they
+// hydrate once per session into this cache; `null` means "not loaded yet" and
+// the field renders a Loading… stub rather than an empty box that would save
+// a blank over the stored value.
+//
+// Platform is stored as a normalized KEY and the display word is rendered from
+// it (here and in api/email-shells.js), so the copy wording lives in code and
+// no academy can end up labelled with another's platform.
+const _BB_COMMUNITY_PLATFORMS = [
+  ['whatsapp', 'WhatsApp'],
+  ['facebook', 'Facebook'],
+  ['discord',  'Discord'],
+  ['telegram', 'Telegram'],
+  ['other',    'Other'],
+];
+let _bbClientFacts = null;
+let _bbClientFactsLoading = false;
+async function _bbLoadClientFacts() {
+  if (_bbClientFactsLoading || !CLIENT_ID || !_sb) return;
+  _bbClientFactsLoading = true;
+  try {
+    const { data } = await _sb.from('clients')
+      .select('community_group_url, community_group_platform, google_review_url')
+      .eq('id', CLIENT_ID).maybeSingle();
+    _bbClientFacts = data || {};
+  } catch (_) { _bbClientFacts = {}; }
+  _bbClientFactsLoading = false;
+  _bbRenderWizardBody();
+}
+// Text edits: update the cache and debounce the save. Deliberately NO re-render,
+// which would steal focus mid-typing. An emptied box saves '' -> the RPC NULLs
+// the column, which is the correct "no fact" state: the line or button that used
+// it disappears rather than rendering blank.
+let _bbClientFactSaveTimer = null;
+function _bbClientFactChanged(key, val) {
+  if (!_bbClientFacts) return;
+  _bbClientFacts[key] = val;
+  if (_bbClientFactSaveTimer) clearTimeout(_bbClientFactSaveTimer);
+  _bbClientFactSaveTimer = setTimeout(() => _bbSaveClientBasics({ [key]: val }), 600);
+}
+// Platform is a toggle: picking the selected one again clears it. Saves at once
+// (a click is a finished decision) and re-renders to move the selected state.
+function _bbCommunityPlatformPick(val) {
+  if (!_bbClientFacts) return;
+  const next = _bbClientFacts.community_group_platform === val ? '' : val;
+  _bbClientFacts.community_group_platform = next;
+  _bbSaveClientBasics({ community_group_platform: next });
+  _bbRenderWizardBody();
+}
+
 // Read-only "sales machine" readiness for this offer - pipeline, automations,
 // agent facts, form fields. Cached per offer; cleared by the setup actions below.
 let _bbSalesStatusCache = {};
@@ -33828,6 +33932,9 @@ async function switchClient(newId) {
     i.classList.toggle('active', oc.includes("'systems'"));
   });
   closeCampaignDetail && closeCampaignDetail();
+  // Academy-level facts are per-CLIENT_ID: drop them so the new academy re-reads
+  // its own, and never shows (or saves over) the previous one's group link.
+  _bbClientFacts = null; _bbClientFactsLoading = false;
   // Reapply per-client UI state
   applyMarketingNavState();
   applyV2NavState(row.v2_access === true);   // re-gate Members/Calendar for the new client
