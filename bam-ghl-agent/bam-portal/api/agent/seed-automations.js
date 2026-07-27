@@ -12,12 +12,14 @@
 // Dormant: seeds enabled:true + approved:false, so nothing sends until the
 // academy approves (and, for form intros, portal_entry_routing is on).
 //
-// SYNC CLASS: a canonical step whose effective sync_class resolves to
-// `attributed` (today: body 'template:nurture-3' in the Lead Nurture default)
-// carries real parent testimonials given to ONE academy. It is still SEEDED, so
-// the sequence keeps its shape and the portal shows the slot - but seeded
-// enabled:FALSE, so another academy's parents' words cannot send. The academy
-// turns it on once the step carries its own content. See api/_sync-class.js.
+// SYNC CLASS: a canonical step whose effective sync_class resolves to anything
+// stricter than `shared` is still SEEDED, so the sequence keeps its shape and
+// the portal shows the slot - but seeded enabled:FALSE, so no academy ever
+// live-sends another academy's words. That covers `attributed` (real parent
+// testimonials given to ONE academy, e.g. body 'template:nurture-3') AND
+// `local` (academy-specific literals: a schedule, a gym address, a coach phone,
+// a review link). The academy turns the step on once it carries its own
+// content. Full contract at stepEnabled() below. See api/_sync-class.js.
 // This is the only enforcement point behind the marking; the drift checker that
 // would otherwise catch a mis-marking was cancelled.
 //
@@ -68,15 +70,41 @@ export async function seedAutomations({ clientId, offerId = null, keys = null, s
   return results;
 }
 
-// A canonical step is seeded ON unless its effective sync_class is `attributed`
-// - content that belongs to a real, named person at one academy. Exported for
-// the test. NOTE: this writes only `enabled`, not a sync_class column. The
-// automation_steps.sync_class migration is written but NOT yet applied, and
-// posting an unknown column to PostgREST 400s the whole insert, which would
-// break every seed. Once that migration is applied, persist the resolved class
-// on the row here too.
+// THE SEED CONTRACT: only `shared` seeds ON. `local` and `attributed` are both
+// CREATED but seeded enabled:FALSE.
+//
+// This is not obvious from the code, so, explicitly:
+//
+//   shared      generic/tokenized copy that belongs to no one. Seeds ON. It is
+//               correct the moment it lands, in any academy.
+//   local       the STRUCTURE copies, the WORDS do not - this slot is that
+//               academy's own content and the text sitting in it right now is
+//               somebody else's (GTA's, usually) or a placeholder. Seeds OFF.
+//   attributed  a real, named person's words at one academy. Seeds OFF, and
+//               never copies at all.
+//
+// WHY `local` IS STILL CREATED RATHER THAN SKIPPED. The step exists so the
+// sequence keeps its shape and the slot is VISIBLE in the portal - a gap an
+// academy can see and fill beats a gap nobody knows is missing. It is simply
+// OFF until that academy's own content is written. That makes the downstream
+// job a clean, checkable contract:
+//
+//   "author the content for this step, then turn it on"
+//
+// rather than the version we had before, which was "author the content and hope
+// nobody enabled the step early". Under the old rule (`!== 'attributed'`) a
+// `local` step seeded ON, so between seeding and authoring, every academy was
+// live-sending another academy's literals. That window is now closed by
+// construction: nothing can send from a `local` slot until a human turns it on,
+// and the only reason to turn it on is that the content is now theirs.
+//
+// Exported for the test. NOTE: this writes only `enabled`, not a sync_class
+// column. The automation_steps.sync_class migration is written but NOT yet
+// applied, and posting an unknown column to PostgREST 400s the whole insert,
+// which would break every seed. Once that migration is applied, persist the
+// resolved class on the row here too.
 export function stepEnabled(step) {
-  return resolveSyncClass(step) !== "attributed";
+  return resolveSyncClass(step) === "shared";
 }
 
 async function loadSteps(sb, automationId) {
