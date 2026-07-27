@@ -177,7 +177,28 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 6. **No free-text owner copy override.** Copy changes route through the support ticket system, so every word stays staff-authored and therefore promotable; the ticket becomes the master-vs-local decision point.
 7. **Orphans: DELETE `trial_followup`** (zero enrollments ever, duplicate of `trial_form` which has run 30x). **Summer Special stays GTA-only, PARKED, recorded as an ACCEPTED divergence** (armed but never fired, so unproven not battle-tested). Future workstream in his words: "standardizing a reignition flow for sales presets".
 
-**Build order:** G first (small: clean GTA's rows) · A before D always · F before E.
+**CORRECTION (sync room, orchestrator-verified 2026-07-27):** the claim that "the nurture default is 3 plain SMS vs GTA's 4 designed emails" is **WRONG** and came from the parity scout. `NURTURE_DEFAULT` at `form-intro-automations.js:117-131` is ALREADY 4 designed email steps (`template:nurture-1..4`), tokenized, spread over ~8 weeks. Verified on origin/main. The 3-plain-SMS sequence is `ONBOARDING_DEFAULT`, which is item 53/D. **Nothing extra folds in, and nobody should re-tokenize `nurture-emails.js`; #1601 already cleaned it.** Nurture's only difference from GTA is the step-3 testimonials hold, handled as `attributed`.
+
+**REVISED BUILD ORDER (two waves).** H first: it is the only item leaking with NO seed step between the default and a parent. Everything else needs a seed or a send to do damage; H is already doing it. Wave 2 lands after wave 1 so the first checker run is a real baseline rather than a list of things already in flight.
+
+| Wave | Item | What | Severity |
+|---|---|---|---|
+| 1 | **H** | Neutralize agent-brain defaults + give `social_proof` a renderer | BLOCKER, **do first** |
+| 1 | G | Clean GTA's rows | SCALE, small |
+| 1 | F | Onboarding wizard collects the 4 new facts (gates E, **shares the review-link field with H**) | FRICTION |
+| 1 | E | Re-shell + block-ify the 3 GTA-shelled onboarding emails | FRICTION, largest |
+| 1 | D | Promote `ONBOARDING_DEFAULT` 3 -> 8 (needs A) | FRICTION |
+| 2 | **A** | `sync_class` + testimonials brake (gates D) | BLOCKER |
+| 2 | B | Override-tracing reverse check | SCALE |
+| 2 | C | Weekly GH Action -> one "Preset drift" issue | SCALE |
+
+**⚠️ ROUTE ONCE, NOT TWICE:** the new **Google review-link field closes TWO leaks with one build** - it is what `onboarding-review`'s CTA needs (item E) AND what finally gives `social_proof` a renderer (item H). Build the field once and wire both consumers, or the two items will each invent their own.
+
+**ZORAN'S CALL on the fail-open fork:** defaults go **neutral-or-empty, and the fail-open STAYS.** His reasoning: an agent with no fallback improvises, which is worse than a gap. The bug is what it falls back TO, not that it falls back. Once no default carries a real academy fact, failing open is harmless. Plus **a test asserting no default body contains an identity value**, drawing the identity set from where `email-shells.js` already resolves it. That test is what stops recurrence; cleanup alone would not. This unified both surfaces under one rule: **no fact, no output** - in an email the block does not render, in the agent brain the section is absent from the prompt.
+
+**⚠️ WIDER THAN A LEAK, ADD TO #59:** `fact-render` fails open TWICE (`if (!data) return {}` at :567 AND the bottom catch also returns `{}`). An academy with no training offer inherits GTA's program (ages 9+, groups of 6-12), schedule, pricing, policies, AND a coaches line claiming every coach "played at the college or professional level". **That last one is a FALSE CLAIM for a new academy, not merely a leak.**
+
+**Checker design (constraint landed, item B rewritten):** the original spec would have detected BEHIND by scanning step bodies for known identity values - exactly the literal-grep that produced three false positives. Now it traces the override path: no override on the path to output -> LEAK; override that fails OPEN -> LEAK; override that replaces unconditionally -> DEAD; override that fails CLOSED -> SAFE. AHEAD stays a pure structural diff (step counts, template refs, channels, timings), needing no literal scanning. **DEAD is a REPORTED verdict, not silence** - if the checker omits dead literals, the next human to grep re-raises the same false positive.
 | Item | What | Severity |
 |---|---|---|
 | A | Testimonials brake: `sync_class` + attributed marking + seed disabled + **the quote-free variant folded in from the guardrail room** | BLOCKER, before/with D |

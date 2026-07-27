@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-27 \u00b7 morning",
   "recentUpdates": [
+    "Plan rebuilt as two waves; one rule now covers emails and the agent brain: no fact, no output",
     "Three chats converged on preset automations; scopes reconciled into one owner",
     "Preset sync plan decided: GTA is the reference, GTA becomes a governed instance",
     "Guardrail ruled: quote-free variant is the only build; social_proof + Google labels wait for real reviews",
-    "Build 5 is at 0% and the Google API application has NOT been filed. That is the long pole",
-    "Proven risk: the clone path already carried GTA's quotes to Miami with a fake 5.0 rating"
+    "Build 5 is at 0% and the Google API application has NOT been filed. That is the long pole"
   ],
   "orchestrator": {
     "focus": "Preset convergence is the whole game now. The sync chat owns the standard AND seeding San Jose through it. It is building you a mockup of the user stories first; nothing gets built until you confirm it.",
@@ -258,6 +258,13 @@
     }
   ],
   "queue": [
+    {
+      "id": "H",
+      "title": "Neutralize agent defaults + give social_proof a renderer",
+      "severity": "blocker",
+      "status": "WAVE 1, do first",
+      "owner": "us"
+    },
     {
       "id": 5,
       "title": "Agent brain GTA fallback (pricing fixed, 3 bodies remain: see #59)",
@@ -525,55 +532,6 @@
       "owner": "us"
     },
     {
-      "id": "A",
-      "title": "Testimonials brake: sync_class marking + quote-free variant",
-      "severity": "blocker",
-      "status": "before/with D",
-      "owner": "us"
-    },
-    {
-      "id": "G",
-      "title": "Clean GTA's rows (delete dead sequence, detokenize 4 steps)",
-      "severity": "scale",
-      "status": "do first, small",
-      "owner": "us"
-    },
-    {
-      "id": "D",
-      "title": "Promote onboarding default from 3 steps to 8",
-      "severity": "friction",
-      "status": "after A",
-      "owner": "us"
-    },
-    {
-      "id": "E",
-      "title": "Re-shell + block-ify the 3 GTA-shelled onboarding emails",
-      "severity": "friction",
-      "status": "after F, largest",
-      "owner": "us"
-    },
-    {
-      "id": "F",
-      "title": "Onboarding wizard collects the 4 new facts",
-      "severity": "friction",
-      "status": "before E",
-      "owner": "us"
-    },
-    {
-      "id": "B",
-      "title": "Reverse pass in the divergence checker",
-      "severity": "scale",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": "C",
-      "title": "Weekly Preset drift GitHub issue",
-      "severity": "scale",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
       "id": 66,
       "title": "FILE the Google Business Profile API application (unfiled, gates Build 5)",
       "severity": "blocker",
@@ -607,6 +565,55 @@
       "severity": "friction",
       "status": "closed by decision",
       "owner": "later"
+    },
+    {
+      "id": "G",
+      "title": "Clean GTA's rows",
+      "severity": "scale",
+      "status": "wave 1, small",
+      "owner": "us"
+    },
+    {
+      "id": "F",
+      "title": "Wizard collects 4 new facts (shares review field with H)",
+      "severity": "friction",
+      "status": "wave 1, gates E",
+      "owner": "us"
+    },
+    {
+      "id": "E",
+      "title": "Re-shell + block-ify 3 onboarding emails",
+      "severity": "friction",
+      "status": "wave 1, largest",
+      "owner": "us"
+    },
+    {
+      "id": "D",
+      "title": "Promote onboarding default 3 to 8",
+      "severity": "friction",
+      "status": "wave 1, needs A",
+      "owner": "us"
+    },
+    {
+      "id": "A",
+      "title": "sync_class + testimonials brake",
+      "severity": "blocker",
+      "status": "wave 2, gates D",
+      "owner": "us"
+    },
+    {
+      "id": "B",
+      "title": "Override-tracing reverse check",
+      "severity": "scale",
+      "status": "wave 2",
+      "owner": "us"
+    },
+    {
+      "id": "C",
+      "title": "Weekly Preset drift issue",
+      "severity": "scale",
+      "status": "wave 2",
+      "owner": "us"
     }
   ],
   "chatMap": [
