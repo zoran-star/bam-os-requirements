@@ -19,6 +19,10 @@
 //   - the Google review URL      (review: the gold CTA)
 // Add resolver tokens first, then swap. Separate follow-up.
 //
+// Welcome's "online programs" and "bring a friend" items are NOT hardcoded: each is
+// gated on a per-academy fact (L.onlineProgramsUrl / L.referralOffer) and renders only
+// for an academy that has it. See quickStart() below.
+//
 // The BODY copy of these three is still GTA-specific in places (coach Instagram
 // handles, the GTA phone number, the Oakville address and Google Maps link, the GTA
 // weekly schedule, "The By Any Means GTA Team" sign-off, and welcome's preheader).
@@ -74,6 +78,12 @@ const TIP = (n, title, body) => `        <table role="presentation" width="100%"
           </td>
         </tr></table>`;
 
+// inline gold-on-black link, the one anchor style used inside body copy
+const LINK = (href, label) => `<a href="${href}" style="color:#0A0A0A;font-weight:600;">${label}</a>`;
+
+// one numbered quick-start item: bold "<n>. <lead>", then the body
+const ITEM = (n, lead, body, mb) => P(`<b style="color:#0A0A0A;">${n}. ${lead}</b> ${body}`, mb);
+
 // schedule row
 const SCHED = (day, younger, older) => `          <tr>
             <td style="padding:11px 0;border-bottom:1px solid #ECECEC;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#0A0A0A;">${day}</td>
@@ -82,19 +92,60 @@ const SCHED = (day, younger, older) => `          <tr>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1) WELCOME  (immediate) — quick-start links + schedule + location
-const welcome = shellHead("You're in. Everything you need to get started with By Any Means GTA.", "By Any Means - Welcome")
+const WHATSAPP = "https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t";
+
+// The quick-start list, built PER ACADEMY.
+//
+// Two of these items only make sense for an academy that actually has the thing they
+// point at: an online-programs library, and a refer-a-friend offer. They are not
+// hardcoded and they are not special-cased by academy - each one is gated on its FACT
+// being present on the location config (L, see api/email-shells.js). No fact, no line.
+// Same rule as dropEmptyShellLinks and the empty-merge-token pass: an academy without
+// the fact sends a SHORTER email, never a broken or a borrowed one.
+//
+// The numbers are assigned here, from each item's position in the list that survived,
+// so a dropped item leaves no gap and no "1, 3, 4" - the rest renumber cleanly. The
+// last surviving item carries the wider bottom margin before the CTA.
+//
+// Facts read (both optional):
+//   L.onlineProgramsUrl  - full URL of the academy's online-programs library
+//   L.referralOffer      - { lead, body, merchUrl? }, the refer-a-friend perk
+function quickStart(L) {
+  const items = [
+    ["Join the WhatsApp group", `for schedule updates and announcements: ${LINK(WHATSAPP, "tap to join")}.`],
+  ];
+
+  if (L && L.onlineProgramsUrl) {
+    const url = String(L.onlineProgramsUrl);
+    items.push(["Access the online programs", `any time at ${LINK(url, url.replace(/^https?:\/\//i, ""))}.`]);
+  }
+
+  items.push(["Follow along", `- Coach Zoran on ${LINK("https://www.instagram.com/byanymeanszoran/", "Instagram")}, Coach Adrian on ${LINK("https://www.instagram.com/byanymeansadrian/", "Instagram")}, and our ${LINK("https://www.instagram.com/byanymeanstoronto/", "general page")}.`]);
+
+  // The merch shop is part of the same perk (it is the "plus some merch" half of it),
+  // so it is nested inside the referral fact and drops with it - and drops on its own
+  // if an academy runs a referral offer with no shop behind it.
+  const ref = (L && L.referralOffer) || null;
+  if (ref && ref.lead && ref.body) {
+    const merch = ref.merchUrl ? ` (${LINK(ref.merchUrl, "check out the merch")})` : "";
+    items.push([ref.lead, `${ref.body}${merch}.`]);
+  }
+
+  items.push(["Need anything?", `Reach the coaches at ${LINK("tel:+12898166569", "(289) 816-6569")}.`]);
+
+  return items.map(([lead, body], i) => ITEM(i + 1, lead, body, i === items.length - 1 ? 26 : 14)).join("");
+}
+
+// A template may be a FUNCTION of the location config when its content depends on the
+// sending academy's facts (renderEmail calls it with L). The rest stay plain strings.
+const welcome = (L) => shellHead("You're in. Everything you need to get started with By Any Means GTA.", "By Any Means - Welcome")
   + EYEBROW("Welcome to the family")
   + H1("You're in.<br>Let's get to work.")
   + P("Hi {{contact.first_name}}, welcome to By Any Means Basketball. {{contact.athletes_full_name}} is all set, and we are pumped to have you both. Here is everything you need to hit the ground running.")
   + `      </td></tr>
       <tr><td style="padding:6px 36px 8px;">`
-  + P("<b style=\"color:#0A0A0A;\">1. Join the WhatsApp group</b> for schedule updates and announcements: <a href=\"https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t\" style=\"color:#0A0A0A;font-weight:600;\">tap to join</a>.", 14)
-  // Items 2 ("online programs") and 4 ("bring a friend" / merch) were REMOVED, not made
-  // configurable: both were GTA-only offers on GTA-only URLs. The remaining items are
-  // renumbered so the list still reads 1, 2, 3.
-  + P("<b style=\"color:#0A0A0A;\">2. Follow along</b> - Coach Zoran on <a href=\"https://www.instagram.com/byanymeanszoran/\" style=\"color:#0A0A0A;font-weight:600;\">Instagram</a>, Coach Adrian on <a href=\"https://www.instagram.com/byanymeansadrian/\" style=\"color:#0A0A0A;font-weight:600;\">Instagram</a>, and our <a href=\"https://www.instagram.com/byanymeanstoronto/\" style=\"color:#0A0A0A;font-weight:600;\">general page</a>.", 14)
-  + P("<b style=\"color:#0A0A0A;\">3. Need anything?</b> Reach the coaches at <a href=\"tel:+12898166569\" style=\"color:#0A0A0A;font-weight:600;\">(289) 816-6569</a>.", 26)
-  + CTA("https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t", "Join the WhatsApp group")
+  + quickStart(L)
+  + CTA(WHATSAPP, "Join the WhatsApp group")
   + `      </td></tr>
       <tr><td style="padding:6px 36px 8px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;"><tr>

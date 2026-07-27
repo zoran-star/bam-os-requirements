@@ -40,6 +40,20 @@ const LOCATIONS = {
     instagram: "https://instagram.com/byanymeanstoronto",
     city: "Oakville",
     ownerFirst: "Zoran",
+    // OPTIONAL per-academy facts. Only GTA has these today, which is exactly why the
+    // welcome email's "online programs" and "bring a friend" items render for GTA and
+    // for nobody else. They are read straight off this config by the template - no
+    // academy branch anywhere - and an academy that has neither simply sends a shorter
+    // email. They live here, beside GTA's other identity strings, because that is
+    // where GTA's facts already live and because clients.online_programs_url /
+    // clients.referral_offer (migration 20260727150000) is not applied yet; once it is,
+    // filling those columns is what turns these on for anyone else.
+    onlineProgramsUrl: "https://byanymeanstoronto.ca/online-programs",
+    referralOffer: {
+      lead: "Bring a friend",
+      body: "to training and you both get a free month plus some merch",
+      merchUrl: "https://byanymeansgsc.com",
+    },
   },
 };
 
@@ -63,7 +77,24 @@ function locFromVars(vars = {}) {
     instagram: "",
     city: String(vars.location_city || ""),
     ownerFirst: String(vars.location_owner || ""),
+    // Optional content facts. Absent (no column yet, or a NULL) means EMPTY, and the
+    // blocks that depend on them do not render at all. See onboarding-emails.js.
+    onlineProgramsUrl: String(vars.online_programs_url || ""),
+    referralOffer: normalizeReferral(vars.referral_offer),
   };
+}
+
+// A referral offer is {lead, body, merchUrl?} - the bold lead-in of the list item, the
+// perk itself, and optionally the merch shop it mentions. Stored snake_case (jsonb),
+// used camelCase. Anything missing lead or body is treated as no offer at all: a half
+// a sentence is worse than no line.
+function normalizeReferral(raw) {
+  const r = raw && typeof raw === "object" ? raw : null;
+  if (!r) return null;
+  const lead = String(r.lead || "").trim();
+  const body = String(r.body || "").trim();
+  if (!lead || !body) return null;
+  return { lead, body, merchUrl: String(r.merch_url || r.merchUrl || "").trim() };
 }
 
 export function locFor(clientId, vars) { return LOCATIONS[clientId] || locFromVars(vars); }
@@ -81,6 +112,11 @@ export function clientVars(client) {
     location_owner: c.owner_name ? String(c.owner_name).trim().split(/\s+/)[0] : "",
     location_email: c.email || "",
     location_city: cityFromAddress(c.address),
+    // Optional content facts (migration 20260727150000, not applied yet). A client row
+    // read before that migration simply has no such property, which reads as absent -
+    // the dependent blocks do not render and nothing throws.
+    online_programs_url: c.online_programs_url || "",
+    referral_offer: c.referral_offer || null,
   };
 }
 
@@ -283,7 +319,13 @@ export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl
   // email (api/email-templates/) so the DB holds a tiny ref, not 12KB of HTML.
   let raw = String(body || "");
   const tref = raw.match(/^\s*template:([\w/-]+)\s*$/);
-  if (tref && TEMPLATES[tref[1]]) raw = TEMPLATES[tref[1]];
+  // A template is normally a plain string. It may also be a FUNCTION of the location
+  // config, for a template whose content depends on facts the academy either has or
+  // does not (onboarding-welcome's online-programs and refer-a-friend items).
+  if (tref && TEMPLATES[tref[1]]) {
+    const t = TEMPLATES[tref[1]];
+    raw = typeof t === "function" ? t(L, vars) : t;
+  }
   // Resolve merge tokens BEFORE building markup: a resolved URL line becomes the
   // gold CTA in bodyToHtml, and an EMPTY {{location.website}} drops its line
   // while it is still a text line (inside markup it would be too late).

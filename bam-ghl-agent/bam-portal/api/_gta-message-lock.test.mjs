@@ -124,46 +124,12 @@ export function wordsOf(html) {
 //
 // Every entry must apply. A waiver whose `from` is no longer in the golden is a stale
 // waiver and fails the run - they cannot rot into a blanket exemption.
-const WORD_WAIVERS = {
-  "onboarding-welcome": [
-    {
-      decided: "27 Jul 2026",
-      why: "Owner's decision: drop the 'online programs' item. GTA-only offer on a GTA-only URL, not made configurable.",
-      from: "2. Access the online programs any time at byanymeanstoronto.ca/online-programs.\n",
-      to: "",
-    },
-    {
-      decided: "27 Jul 2026",
-      why: "Owner's decision: drop the 'bring a friend / merch' item. GTA's own referral perk and merch shop.",
-      from: "4. Bring a friend to training and you both get a free month plus some merch (check out the merch).\n",
-      to: "",
-    },
-    {
-      decided: "27 Jul 2026",
-      why: "Consequence of the two drops: the remaining items renumber so the list still reads 1, 2, 3.",
-      from: "3. Follow along",
-      to: "2. Follow along",
-    },
-    {
-      decided: "27 Jul 2026",
-      why: "Consequence of the two drops: the remaining items renumber so the list still reads 1, 2, 3.",
-      from: "5. Need anything?",
-      to: "3. Need anything?",
-    },
-    {
-      decided: "27 Jul 2026",
-      why: "The dropped 'online programs' item took its link with it.",
-      from: "https://byanymeanstoronto.ca/online-programs\n",
-      to: "",
-    },
-    {
-      decided: "27 Jul 2026",
-      why: "The dropped 'bring a friend / merch' item took its link with it.",
-      from: "https://byanymeansgsc.com\n",
-      to: "",
-    },
-  ],
-};
+// EMPTY, deliberately. The six entries that used to sit here excused the welcome
+// email's "online programs" and "bring a friend" items being dropped, plus the
+// renumbering that followed. Those two items are back (27 Jul 2026): they are now
+// gated on a per-academy fact rather than deleted, GTA has both facts, so GTA's words
+// are once again identical to production and no waiver is needed to say so.
+const WORD_WAIVERS = {};
 
 // ─── diff ────────────────────────────────────────────────────────────────────
 function lcsOps(a, b) {
