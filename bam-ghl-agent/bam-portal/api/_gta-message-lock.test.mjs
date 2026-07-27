@@ -1,0 +1,313 @@
+// BAM GTA MESSAGE LOCK.
+//
+// BAM GTA is live, with real paying members. Its automated emails must not change
+// because we refactored something behind them. This test renders every GTA email
+// through the REAL send path (renderEmail from api/email-shells.js) with GTA's real
+// client row values, and fails if the output moved away from a committed golden.
+//
+//   node api/_gta-message-lock.test.mjs         # exits non-zero on any difference
+//
+// TWO LOCKS, because "changed" means two very different things:
+//
+//   WORDS  (__goldens__/bam-gta/words/*.txt)
+//     The parent-visible text plus every link target, tags stripped. This is what a
+//     parent actually reads and taps. Generated from origin/main - i.e. GTA's output
+//     as it is in production - and it is the lock that matters. A failure here means
+//     a real person receives different words.
+//
+//   MARKUP (__goldens__/bam-gta/markup/*.html)
+//     The full rendered HTML, byte for byte. Catches everything the words lock
+//     cannot see: colours, padding, table structure, the <title>, comments.
+//
+// A failure prints the WORDS diff first, then says whether anything else was
+// markup-only, so whoever reads it can tell instantly whether a parent would notice.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// RE-BLESSING (when a change to GTA IS intended)
+//
+//   Markup only, e.g. moving an email onto the shared shell:
+//     node api/_gta-message-lock.test.mjs --bless-markup
+//   The words lock still runs afterwards, so this can never quietly change copy.
+//   Commit the regenerated files: the git diff IS the record of what moved.
+//
+//   Words, i.e. GTA's parents will read something different:
+//     node api/_gta-message-lock.test.mjs --bless-words I-AM-CHANGING-WHAT-GTA-PARENTS-READ
+//   The confirmation phrase is required and deliberately unpleasant to type. Put the
+//   reason and the person who decided it in the commit message.
+//
+// A difference that is EXPECTED but small does not get a re-bless - it gets an entry
+// in WORD_WAIVERS below, naming the decision and its date, so everything else in that
+// same email stays locked.
+
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { renderEmail, clientVars } from "./email-shells.js";
+import { TEMPLATES as NURTURE } from "./email-templates/nurture-emails.js";
+import { ONBOARDING_TEMPLATES } from "./email-templates/onboarding-emails.js";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const GOLD = path.join(HERE, "__goldens__", "bam-gta");
+const WORDS_DIR = path.join(GOLD, "words");
+const MARKUP_DIR = path.join(GOLD, "markup");
+
+// ─── the fixture: BAM GTA's real client row ──────────────────────────────────
+// Copied from the clients row for 39875f07-... (see scripts/snapshots/bam-gta.json).
+// Only the fields clientVars() reads. phone is genuinely null on the row.
+export const GTA = {
+  id: "39875f07-0a4b-4429-a201-2249bc1f24df",
+  business_name: "BAM GTA",
+  owner_name: "Zoran Savic",
+  email: "zoran@byanymeansbball.com",
+  phone: null,
+  address: "2205 Rosemount Cres",
+  website_setup: { domain: "byanymeanstoronto.ca" },
+};
+
+// A fixed sample family, so the merge fields resolve to something stable and the
+// golden is not full of "there" / "your athlete" fallbacks. Same names the render
+// harness uses (scripts/render-messages.mjs).
+const FAMILY = { first_name: "Maya", full_name: "Maya Alvarez", athlete: "Jordan Alvarez" };
+
+export const VARS = { ...clientVars(GTA), ...FAMILY };
+
+// Every template GTA can send. Taken from the modules themselves, not hardcoded, so a
+// NEW template cannot be added without a golden: an unblessed key fails below.
+export const KEYS = [...Object.keys(NURTURE), ...Object.keys(ONBOARDING_TEMPLATES)].sort();
+
+// Rendering is parameterised by renderEmail so the SAME fixture can be pointed at
+// another checkout's email-shells.js. That is how the goldens were bootstrapped from
+// origin/main: identical inputs, a different implementation. See __goldens__/README.md.
+export function renderWith(renderEmailFn, key) {
+  return renderEmailFn({ clientId: GTA.id, subject: key, body: `template:${key}`, vars: VARS });
+}
+const render = (key) => renderWith(renderEmail, key);
+
+// ─── what a parent actually sees ─────────────────────────────────────────────
+// Tags stripped, entities decoded, whitespace normalised. <head> goes: <title> and the
+// meta tags never reach a reader (the markup lock covers those). The hidden preheader
+// span STAYS - it is the line shown next to the subject in an inbox.
+function parentText(html) {
+  const s = String(html)
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<head[\s\S]*?<\/head>/i, " ")
+    .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|h1|h2|h3|h4|div|td|tr|table|li|ul|ol)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&middot;/g, "·")
+    .replace(/&rarr;/g, "->")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+  return s.split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+}
+
+// Where every link goes, in order. A button that still says "Join the WhatsApp group"
+// but points somewhere else is a change a parent very much notices.
+function links(html) {
+  return [...String(html).matchAll(/<a\b[^>]*\bhref="([^"]*)"/gi)].map((m) => m[1]);
+}
+
+// The words golden is text + link targets in one file, so both are locked together.
+export function wordsOf(html) {
+  return parentText(html).join("\n") + "\n\n--- LINKS ---\n" + links(html).join("\n") + "\n";
+}
+
+// ─── expected differences ────────────────────────────────────────────────────
+// A difference the owner DECIDED on. Each entry is an exact find/replace applied to
+// the GOLDEN before comparing, so it covers that one change and nothing else: if a
+// future edit touches anything else in the same email, the test still fails.
+//
+// Every entry must apply. A waiver whose `from` is no longer in the golden is a stale
+// waiver and fails the run - they cannot rot into a blanket exemption.
+const WORD_WAIVERS = {
+  "onboarding-welcome": [
+    {
+      decided: "27 Jul 2026",
+      why: "Owner's decision: drop the 'online programs' item. GTA-only offer on a GTA-only URL, not made configurable.",
+      from: "2. Access the online programs any time at byanymeanstoronto.ca/online-programs.\n",
+      to: "",
+    },
+    {
+      decided: "27 Jul 2026",
+      why: "Owner's decision: drop the 'bring a friend / merch' item. GTA's own referral perk and merch shop.",
+      from: "4. Bring a friend to training and you both get a free month plus some merch (check out the merch).\n",
+      to: "",
+    },
+    {
+      decided: "27 Jul 2026",
+      why: "Consequence of the two drops: the remaining items renumber so the list still reads 1, 2, 3.",
+      from: "3. Follow along",
+      to: "2. Follow along",
+    },
+    {
+      decided: "27 Jul 2026",
+      why: "Consequence of the two drops: the remaining items renumber so the list still reads 1, 2, 3.",
+      from: "5. Need anything?",
+      to: "3. Need anything?",
+    },
+    {
+      decided: "27 Jul 2026",
+      why: "The dropped 'online programs' item took its link with it.",
+      from: "https://byanymeanstoronto.ca/online-programs\n",
+      to: "",
+    },
+    {
+      decided: "27 Jul 2026",
+      why: "The dropped 'bring a friend / merch' item took its link with it.",
+      from: "https://byanymeansgsc.com\n",
+      to: "",
+    },
+  ],
+};
+
+// ─── diff ────────────────────────────────────────────────────────────────────
+function lcsOps(a, b) {
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const ops = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) { ops.push(["=", a[i]]); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) ops.push(["-", a[i++]]);
+    else ops.push(["+", b[j++]]);
+  }
+  while (i < n) ops.push(["-", a[i++]]);
+  while (j < m) ops.push(["+", b[j++]]);
+  return ops;
+}
+
+function printDiff(expected, actual, indent = "    ") {
+  const ops = lcsOps(expected.split("\n"), actual.split("\n"));
+  let run = 0;
+  ops.forEach((op, idx) => {
+    if (op[0] === "=") { run++; return; }
+    // one line of context above a change, so the diff is readable
+    if (run > 0) {
+      const prev = ops[idx - 1];
+      if (prev && prev[0] === "=") console.log(indent + "  " + trunc(prev[1]));
+      run = 0;
+    }
+    console.log(indent + (op[0] === "-" ? "- was:  " : "+ now:  ") + trunc(op[1]));
+  });
+}
+const trunc = (s) => (s.length > 220 ? s.slice(0, 217) + "..." : s);
+
+// ─── waiver application ──────────────────────────────────────────────────────
+function applyWaivers(key, golden, problems) {
+  let out = golden;
+  for (const w of WORD_WAIVERS[key] || []) {
+    if (!out.includes(w.from)) {
+      problems.push(`STALE WAIVER on ${key} (decided ${w.decided}): the golden no longer contains ${JSON.stringify(trunc(w.from))}. `
+        + "Remove or re-word the waiver - it is no longer describing a real difference.");
+      continue;
+    }
+    out = out.replace(w.from, w.to);
+  }
+  return out;
+}
+
+// ─── run ─────────────────────────────────────────────────────────────────────
+// Only when executed directly. Imported (to reuse the fixture), this file is inert.
+const RUN = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (RUN) main();
+
+function main() {
+const argv = process.argv.slice(2);
+const BLESS_MARKUP = argv.includes("--bless-markup");
+const BLESS_WORDS_AT = argv.indexOf("--bless-words");
+const WORDS_PHRASE = "I-AM-CHANGING-WHAT-GTA-PARENTS-READ";
+
+if (BLESS_WORDS_AT >= 0) {
+  if (argv[BLESS_WORDS_AT + 1] !== WORDS_PHRASE) {
+    console.error(`\n--bless-words rewrites the record of what BAM GTA's parents read today.\n`
+      + `If that is really what you mean, run:\n\n  node api/_gta-message-lock.test.mjs --bless-words ${WORDS_PHRASE}\n`);
+    process.exit(2);
+  }
+  fs.mkdirSync(WORDS_DIR, { recursive: true });
+  for (const k of KEYS) fs.writeFileSync(path.join(WORDS_DIR, `${k}.txt`), wordsOf(render(k)));
+  console.log(`\n⚠️  WORDS goldens rewritten for ${KEYS.length} templates.`);
+  console.log("   Read `git diff` line by line before committing. Every changed line is a line a BAM GTA parent will read.\n");
+}
+
+if (BLESS_MARKUP) {
+  fs.mkdirSync(MARKUP_DIR, { recursive: true });
+  for (const k of KEYS) fs.writeFileSync(path.join(MARKUP_DIR, `${k}.html`), render(k));
+  console.log(`\n📐 MARKUP goldens rewritten for ${KEYS.length} templates. The words lock still runs below.\n`);
+}
+
+console.log("\n── BAM GTA message lock ──");
+console.log(`   ${KEYS.length} templates, rendered through renderEmail() with GTA's real client row.\n`);
+
+const wordFails = [];
+const markupFails = [];
+const problems = [];
+
+for (const key of KEYS) {
+  const html = render(key);
+  const wPath = path.join(WORDS_DIR, `${key}.txt`);
+  const mPath = path.join(MARKUP_DIR, `${key}.html`);
+
+  if (!fs.existsSync(wPath) || !fs.existsSync(mPath)) {
+    problems.push(`NO GOLDEN for "${key}". A new GTA message must be blessed deliberately - see the header of this file.`);
+    continue;
+  }
+
+  const goldenWords = fs.readFileSync(wPath, "utf8");
+  const goldenMarkup = fs.readFileSync(mPath, "utf8");
+  const expectedWords = applyWaivers(key, goldenWords, problems);
+  const actualWords = wordsOf(html);
+
+  const wordsSame = expectedWords === actualWords;
+  const markupSame = goldenMarkup === html;
+
+  if (wordsSame && markupSame) { console.log(`  ✅ ${key}`); continue; }
+  if (!wordsSame) { wordFails.push({ key, expectedWords, actualWords, markupSame }); console.log(`  ❌ ${key}  WORDS CHANGED`); }
+  else { markupFails.push({ key, goldenMarkup, html }); console.log(`  ⚠️  ${key}  markup only`); }
+}
+
+// ─── report ──────────────────────────────────────────────────────────────────
+if (wordFails.length) {
+  console.log("\n\n════ WHAT A PARENT WOULD READ CHANGED ════");
+  console.log("These are the differences a real BAM GTA parent would notice.\n");
+  for (const f of wordFails) {
+    console.log(`  ${f.key}${f.markupSame ? "" : "   (the markup around them moved too)"}`);
+    printDiff(f.expectedWords, f.actualWords);
+    console.log("");
+  }
+}
+
+if (markupFails.length) {
+  console.log("\n════ MARKUP ONLY ════");
+  console.log("The parent-visible text and every link target are IDENTICAL in these.");
+  console.log("Only the HTML around them moved (colours, padding, structure, <title>).\n");
+  for (const f of markupFails) {
+    const g = f.goldenMarkup.split("\n"), a = f.html.split("\n");
+    const changed = lcsOps(g, a).filter((o) => o[0] !== "=").length;
+    console.log(`  ${f.key}: ${changed} changed line(s), ${f.goldenMarkup.length} -> ${f.html.length} bytes`);
+    printDiff(f.goldenMarkup, f.html, "      ");
+    console.log("");
+  }
+}
+
+if (problems.length) {
+  console.log("\n════ PROBLEMS WITH THE GUARD ITSELF ════\n");
+  for (const p of problems) console.log("  " + p);
+  console.log("");
+}
+
+const failed = wordFails.length + markupFails.length + problems.length;
+if (failed) {
+  console.log(`\n❌ FAILED: ${wordFails.length} with changed words, ${markupFails.length} markup-only, ${problems.length} guard problem(s).`);
+  console.log("   Intended? See RE-BLESSING at the top of api/_gta-message-lock.test.mjs.\n");
+  process.exit(1);
+}
+console.log(`\n✅ All ${KEYS.length} BAM GTA messages are byte-identical to their goldens.\n`);
+}

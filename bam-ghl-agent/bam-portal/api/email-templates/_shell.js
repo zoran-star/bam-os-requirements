@@ -3,8 +3,14 @@
 // This is the exact FRAME that used to live inline in api/email-shells.js, moved here
 // so the designed templates in this folder can ride the SAME markup instead of keeping
 // their own copy of it. api/email-shells.js imports FRAME from here; the onboarding
-// templates import SHELL_HEAD / SHELL_FOOT (the same string, split at the content slot)
+// templates import shellHead() / shellFoot() (the same string, split at the content slot)
 // because their content is a run of full <tr> rows rather than one block of prose.
+//
+// Two things are PARAMETERS of the shell rather than fixed strings, because the same
+// shell serves two audiences and one fixed value would be a lie to one of them: the
+// document <title> ({{DOC_TITLE}}) and the footer reason ({{FOOTER_REASON}}). See
+// FOOTER_REASON at the bottom. Anything a template leaves unfilled is defaulted by
+// fillShell() in api/email-shells.js.
 //
 // Why it lives in email-templates/ and not next to renderEmail: api/email-shells.js
 // imports the templates, so a template importing email-shells.js back would be a cycle
@@ -27,7 +33,7 @@ export const SHELL_HEAD = `<!DOCTYPE html>
 <meta name="x-apple-disable-message-reformatting">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-<title>{{ACADEMY_FULL}}</title>
+<title>{{DOC_TITLE}}</title>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!--[if mso]><style>* {font-family: Arial, sans-serif !important;}</style><![endif]-->
 </head>
@@ -74,7 +80,7 @@ export const SHELL_FOOT = `
           <a href="{{INSTAGRAM_URL}}" style="color:#B8B8B0;text-decoration:none;">Instagram</a>
         </p>
         <p style="margin:0;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:11px;line-height:1.7;color:#6E6E66;">
-          You're receiving this because you enquired about {{ACADEMY_FULL}}.
+          {{FOOTER_REASON}}
           <a href="{{UNSUBSCRIBE}}" style="color:#8C8C82;text-decoration:underline;">Unsubscribe</a>
         </p>
       </td></tr>
@@ -87,8 +93,34 @@ export const SHELL_FOOT = `
 // The whole shell with a single {{CONTENT}} slot, for a plain-text step body.
 export const FRAME = SHELL_HEAD + CONTENT_SLOT + SHELL_FOOT;
 
-// A designed template's own preheader line, dropped into the shell head. Templates that
-// pass nothing leave {{PREHEADER}} in place for renderEmail to fill from the subject.
-export function shellHead(preheader) {
-  return preheader ? SHELL_HEAD.replace("{{PREHEADER}}", preheader) : SHELL_HEAD;
+// WHY the footer reason is a parameter and not one fixed sentence:
+// the shell is shared by two audiences, and only one of the two sentences is TRUE of
+// each. A lead-nurture email goes to someone who asked about us; an ONBOARDING email
+// goes to someone who has already paid and joined, so "you enquired about" would be a
+// false statement to a member. Saying it right is not GTA-specific - every academy
+// sends both kinds - so the shell takes the reason rather than any academy forking it.
+export const FOOTER_REASON = {
+  // Lead nurture: they filled in a form / asked about us. The default.
+  enquired: "You're receiving this because you enquired about {{ACADEMY_FULL}}.",
+  // Onboarding: they have PAID and joined. Anything else is untrue for a member.
+  joined: "You're receiving this because you joined {{ACADEMY_FULL}}.",
+};
+
+// A designed template's own preheader line + <title>, dropped into the shell head.
+// Templates that pass nothing leave {{PREHEADER}} / {{DOC_TITLE}} in place for
+// renderEmail's fillShell to fill (from the subject, and from the academy name).
+// The title is the email's OWN name ("By Any Means - Welcome"), not the academy's:
+// it is what a browser tab / "view in browser" shows, and every email of a sequence
+// carrying the same academy name there tells the reader nothing.
+export function shellHead(preheader, title) {
+  let out = SHELL_HEAD;
+  if (preheader) out = out.replace("{{PREHEADER}}", preheader);
+  if (title) out = out.replace("{{DOC_TITLE}}", title);
+  return out;
+}
+
+// The footer with its reason baked in. A template declares its own audience here;
+// anything left unfilled falls back to `enquired` in fillShell.
+export function shellFoot(reason = FOOTER_REASON.enquired) {
+  return SHELL_FOOT.replace("{{FOOTER_REASON}}", reason);
 }
