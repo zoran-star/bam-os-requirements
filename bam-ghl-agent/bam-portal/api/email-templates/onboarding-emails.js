@@ -7,8 +7,25 @@
 // {{UNSUBSCRIBE}} / {{PREHEADER}} + resolveMergeVars tokens like {{contact.first_name}},
 // {{contact.athletes_full_name}}, {{location.city}}, {{location_owner.first_name}}).
 // Referenced from an automation_steps row via body = "template:<key>".
+//
+// The header/footer come from ./_shell.js (shellHead + SHELL_FOOT), the SAME shell
+// renderEmail wraps a plain step body in, so wordmark / location tag / site / support
+// email / Instagram / academy name all fill from the sending academy's own record.
+// Do not reintroduce a local header or footer here.
+//
+// STILL HARDCODED TO GTA, deliberately, because no merge token resolves them yet and an
+// unknown {{token}} would reach a parent as literal text:
+//   - the WhatsApp group invite  (welcome: the item-1 link AND the gold CTA below it)
+//   - the Google review URL      (review: the gold CTA)
+// Add resolver tokens first, then swap. Separate follow-up.
+//
+// The BODY copy of these three is still GTA-specific in places (coach Instagram
+// handles, the GTA phone number, the Oakville address and Google Maps link, the GTA
+// weekly schedule, "The By Any Means GTA Team" sign-off, and welcome's preheader).
+// That is copy work, not shell plumbing, and is NOT done here.
 
 import { TEMPLATES as NURTURE } from "./nurture-emails.js";
+import { shellHead, SHELL_FOOT } from "./_shell.js";
 
 // The onboarding sequence reuses the designed nurture emails, but its recipients
 // are PAYING members - so any "Book a free trial" call-to-action (right for a lead,
@@ -23,30 +40,6 @@ function stripFreeTrial(html) {
     // any text-only paragraph that mentions a free trial (e.g. "Come in for a free trial session.")
     .replace(/\s*<p[^>]*>[^<]*free trial[^<]*<\/p>/gi, "");
 }
-
-const HEAD = (title, preheader) => `<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta name="x-apple-disable-message-reformatting">
-<meta name="color-scheme" content="light">
-<meta name="supported-color-schemes" content="light">
-<title>${title}</title>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!--[if mso]><style>* {font-family: Arial, sans-serif !important;}</style><![endif]-->
-</head>
-<body style="margin:0;padding:0;background:#EDEDEA;font-family:'Inter Tight',Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
-<span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all;">${preheader}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#EDEDEA" style="background:#EDEDEA;">
-  <tr><td align="center" style="padding:34px 12px;">
-    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF" style="width:600px;max-width:600px;background:#FFFFFF;">
-      <tr><td style="font-size:0;line-height:0;mso-line-height-rule:exactly;height:3px;background:#E2DD9F;">&nbsp;</td></tr>
-      <tr><td bgcolor="#0A0A0A" style="padding:30px 36px 24px;background:#0A0A0A;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td align="left" valign="middle" style="font-family:'Anton',Impact,'Arial Narrow','Arial Black',Arial,sans-serif;font-weight:900;font-size:25px;line-height:1;letter-spacing:1px;color:#ffffff;text-transform:uppercase;">BY ANY MEANS&nbsp;<span style="color:#E2DD9F;">GTA</span></td>
-          <td align="right" valign="middle" style="font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#9A9A92;">OAKVILLE&nbsp;&middot;&nbsp;GTA</td>
-        </tr></table>
-      </td></tr>`;
 
 const EYEBROW = (label) => `
       <tr><td style="padding:50px 36px 8px;">
@@ -65,27 +58,6 @@ const CTA = (href, label) => `        <table role="presentation" cellpadding="0"
           </td>
         </tr></table>`;
 
-const FOOT = `
-      <tr><td style="padding:38px 36px 30px;"><div style="width:46px;height:2px;background:#E2DD9F;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</div></td></tr>
-      <tr><td bgcolor="#0A0A0A" style="padding:26px 36px 34px;background:#0A0A0A;">
-        <p style="margin:0 0 12px;font-family:'Anton',Impact,'Arial Narrow','Arial Black',Arial,sans-serif;font-weight:900;font-size:18px;line-height:1;letter-spacing:1px;text-transform:uppercase;color:#ffffff;">BY ANY MEANS&nbsp;<span style="color:#E2DD9F;">GTA</span></p>
-        <p style="margin:0 0 16px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:#9A9A92;">Youth and high-school basketball training in Oakville and across the GTA.</p>
-        <p style="margin:0 0 16px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#9A9A92;">
-          <a href="https://byanymeanstoronto.ca" style="color:#E2DD9F;text-decoration:none;font-weight:600;">byanymeanstoronto.ca</a>
-          <span style="color:#555555;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-          <a href="mailto:info@byanymeanstoronto.ca" style="color:#B8B8B0;text-decoration:none;">Email</a>
-          <span style="color:#555555;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-          <a href="https://instagram.com/byanymeanstoronto" style="color:#B8B8B0;text-decoration:none;">Instagram</a>
-        </p>
-        <p style="margin:0;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:11px;line-height:1.7;color:#888888;">
-          You're receiving this because you joined By Any Means Toronto.
-          <a href="{{UNSUBSCRIBE}}" style="color:#9A9A92;text-decoration:underline;">Unsubscribe</a>
-        </p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>`;
 
 // numbered "tip" block: gold number + bold title + body
 const TIP = (n, title, body) => `        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;"><tr>
@@ -104,17 +76,18 @@ const SCHED = (day, younger, older) => `          <tr>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1) WELCOME  (immediate) — quick-start links + schedule + location
-const welcome = HEAD("By Any Means - Welcome", "You're in. Everything you need to get started with By Any Means GTA.")
+const welcome = shellHead("You're in. Everything you need to get started with By Any Means GTA.")
   + EYEBROW("Welcome to the family")
   + H1("You're in.<br>Let's get to work.")
   + P("Hi {{contact.first_name}}, welcome to By Any Means Basketball. {{contact.athletes_full_name}} is all set, and we are pumped to have you both. Here is everything you need to hit the ground running.")
   + `      </td></tr>
       <tr><td style="padding:6px 36px 8px;">`
   + P("<b style=\"color:#0A0A0A;\">1. Join the WhatsApp group</b> for schedule updates and announcements: <a href=\"https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t\" style=\"color:#0A0A0A;font-weight:600;\">tap to join</a>.", 14)
-  + P("<b style=\"color:#0A0A0A;\">2. Access the online programs</b> any time at <a href=\"https://byanymeanstoronto.ca/online-programs\" style=\"color:#0A0A0A;font-weight:600;\">byanymeanstoronto.ca/online-programs</a>.", 14)
-  + P("<b style=\"color:#0A0A0A;\">3. Follow along</b> - Coach Zoran on <a href=\"https://www.instagram.com/byanymeanszoran/\" style=\"color:#0A0A0A;font-weight:600;\">Instagram</a>, Coach Adrian on <a href=\"https://www.instagram.com/byanymeansadrian/\" style=\"color:#0A0A0A;font-weight:600;\">Instagram</a>, and our <a href=\"https://www.instagram.com/byanymeanstoronto/\" style=\"color:#0A0A0A;font-weight:600;\">general page</a>.", 14)
-  + P("<b style=\"color:#0A0A0A;\">4. Bring a friend</b> to training and you both get a free month plus some merch (<a href=\"https://byanymeansgsc.com\" style=\"color:#0A0A0A;font-weight:600;\">check out the merch</a>).", 14)
-  + P("<b style=\"color:#0A0A0A;\">5. Need anything?</b> Reach the coaches at <a href=\"tel:+12898166569\" style=\"color:#0A0A0A;font-weight:600;\">(289) 816-6569</a>.", 26)
+  // Items 2 ("online programs") and 4 ("bring a friend" / merch) were REMOVED, not made
+  // configurable: both were GTA-only offers on GTA-only URLs. The remaining items are
+  // renumbered so the list still reads 1, 2, 3.
+  + P("<b style=\"color:#0A0A0A;\">2. Follow along</b> - Coach Zoran on <a href=\"https://www.instagram.com/byanymeanszoran/\" style=\"color:#0A0A0A;font-weight:600;\">Instagram</a>, Coach Adrian on <a href=\"https://www.instagram.com/byanymeansadrian/\" style=\"color:#0A0A0A;font-weight:600;\">Instagram</a>, and our <a href=\"https://www.instagram.com/byanymeanstoronto/\" style=\"color:#0A0A0A;font-weight:600;\">general page</a>.", 14)
+  + P("<b style=\"color:#0A0A0A;\">3. Need anything?</b> Reach the coaches at <a href=\"tel:+12898166569\" style=\"color:#0A0A0A;font-weight:600;\">(289) 816-6569</a>.", 26)
   + CTA("https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t", "Join the WhatsApp group")
   + `      </td></tr>
       <tr><td style="padding:6px 36px 8px;">
@@ -135,12 +108,12 @@ const welcome = HEAD("By Any Means - Welcome", "You're in. Everything you need t
       <tr><td style="padding:18px 36px 8px;">`
   + P("See you on the court,<br><b style=\"color:#0A0A0A;\">The By Any Means GTA Team</b>", 4)
   + `      </td></tr>`
-  + FOOT;
+  + SHELL_FOOT;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2) TRAINING  (+10 min) — three habits + Attention to Detail video
 const VIDEO_ID = "jC1xir7Jngc";
-const training = HEAD("By Any Means - Make Training Count", "Three habits that separate the players who improve fast from everyone else.")
+const training = shellHead("Three habits that separate the players who improve fast from everyone else.")
   + EYEBROW("Get the most out of it")
   + H1("How to make<br>training count.")
   + P("Hi {{contact.first_name}}, now that {{contact.athletes_full_name}} is part of the By Any Means family, here is how to get the absolute most out of every single session.")
@@ -158,11 +131,11 @@ const training = HEAD("By Any Means - Make Training Count", "Three habits that s
   + CTA(`https://www.youtube.com/watch?v=${VIDEO_ID}`, "Watch the video")
   + P("See you on the court,<br><b style=\"color:#0A0A0A;\">The By Any Means GTA Team</b>", 4)
   + `      </td></tr>`
-  + FOOT;
+  + SHELL_FOOT;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3) REVIEW  (+1 week after testimonials) — warm Google-review ask
-const review = HEAD("By Any Means - A Quick Favour", "If training has been a win for your athlete, would you share it?")
+const review = shellHead("If training has been a win for your athlete, would you share it?")
   + EYEBROW("A quick favour")
   + H1("Mind sharing<br>your story?")
   + P("Hi {{contact.first_name}}, we hope {{contact.athletes_full_name}} has been loving training with By Any Means. Watching our athletes get better every week is exactly why we do this.")
@@ -173,7 +146,7 @@ const review = HEAD("By Any Means - A Quick Favour", "If training has been a win
   + P("Thank you for being part of the family. It means more than you know.", 16)
   + P("With gratitude,<br><b style=\"color:#0A0A0A;\">The By Any Means GTA Team</b>", 4)
   + `      </td></tr>`
-  + FOOT;
+  + SHELL_FOOT;
 
 export const ONBOARDING_TEMPLATES = {
   "onboarding-welcome": welcome,
