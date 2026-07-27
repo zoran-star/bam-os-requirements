@@ -358,6 +358,28 @@ Artifacts, both pushed on `claude/optimistic-leavitt-db0107`:
 
 **PROCESS GATE (Zoran, 2026-07-27):** the sync room must show him a **MOCKUP of the user stories** and get his confirmation BEFORE any build. Sequence is fixed: mockup -> his confirmation -> plan to the orchestrator -> builder subagent -> then seed San Jose in that chat.
 
+## ⛔ #71 LIVE ONE-CLICK PATH TO THE MIAMI FAILURE (found 2026-07-27, fix in flight)
+
+**Editing a step's COPY in the portal silently RE-ENABLES a step a human deliberately turned off.** `api/automations.js:819` builds a full row with `enabled: b.enabled === undefined ? true : !!b.enabled` and PATCHes the whole row; `client-portal.html` calls upsert-step in two places and **neither sends `enabled`**. The edit is about wording; the side effect is switching a message back on.
+
+**Orchestrator-verified against prod:** **BAM San Jose's `nurture` step at position 2 is THE ONLY DISABLED STEP IN THE ENTIRE SYSTEM**, across all 46 academies. It is `template:nurture-3`, which carries BAM GTA's real parents' testimonials attributed via `{{location.city}}`. **Anyone opening it to tweak wording turns it back on and San Jose starts sending another academy's real customers' words as its own.** One click, no warning, no audit trail.
+
+Pre-existing, not introduced by this workstream. **It also silently defeats `sync_class`**: the seeder correctly seeds attributed steps disabled, and this hands that guarantee straight back. Server-side fix in flight (preserve `enabled` on update unless explicitly supplied) plus a regression test, deliberately not touching `client-portal.html` to avoid colliding with the Business Basics work.
+
+**Orchestrator survey of the pattern class, done:** `enabled: b.enabled === undefined ? true` at `:819` is the **only** instance of reassert-a-default-on-PATCH in the whole `api/` tree. Every other PATCH in `automations.js` sends a narrow explicit patch object. **The foundation builder's change to that file is a SELECT-list widening only** (adding `public_name`, `community_group_*`, `google_review_url` to `loadClient`), so it does not repeat the shape.
+
+## ⛔ ITEM G IS DROPPED (Zoran, 2026-07-27): "wait i dont want to change anything that GTA has"
+
+And his follow-on hard rule: **"GTA's automations must never actually change throughout this process, only the structural stuff behind it."**
+
+**Item G does not survive its own justification.** It existed because the ORIGINAL plan had a weekly drift checker that would flag GTA-vs-master differences forever. Zoran killed the checker; nothing compares them now, so the reason went with it.
+
+**The middle piece was actively harmful.** "Detokenize GTA's 4 sales steps" meant replacing the literal "By Any Means Basketball" with `{{location.name}}` - which renders **"BAM GTA"** today. It would have taken a live message reading "It's coach from By Any Means Basketball" and made it read "It's coach from BAM GTA": **worse copy, to real parents, to satisfy a check that no longer exists.** The other two pieces were litter removal with zero functional gain and a written note.
+
+**What replaces it:** write down that GTA's rows deliberately differ from the master, same shape as the 7-vs-8 record, so a future session does not "fix" the difference. "GTA is the reference" becomes descriptive rather than literal, which costs nothing once nothing compares them. **This also unblocks San Jose seeding earlier**, since G was gating it.
+
+**Already-caught regression from this rule:** three of GTA's rendered emails HAD changed today from the re-shell - a footer reading "because you enquired about" to people who have PAID and joined, plus two dropped content sections. Resolution: **GTA keeps them, the master ships without them**, which is exactly what marking those templates `local` means. A builder is restoring GTA's output byte-for-byte and adding a permanent **golden-snapshot guard** so "GTA does not change" stops depending on anyone remembering.
+
 ## ⚠️⚠️ ACCEPTED DIVERGENCE: THE MASTER SHIPS 7 ONBOARDING STEPS, GTA RUNS 8. THIS IS DELIBERATE.
 
 **Read this before "fixing" the gap.** `ONBOARDING_DEFAULT` ships with **SEVEN** steps. GTA's live sequence has **EIGHT**. The missing one is the **testimonials step**, and it is ABSENT rather than present-and-disabled, on purpose.
