@@ -1,1 +1,1 @@
-{"slug":"preset-sync","chat":"Plan: two-way preset sync","state":"done","one":"Plan written and pushed. 7 decisions locked, 7 build items queued (1 BLOCKER, 3 FRICTION, 3 SCALE).","blockedBy":null,"at":"2026-07-27T00:00:00Z"}
+{"slug":"preset-sync","chat":"Plan: two-way preset sync","state":"done","one":"Convergence plan v2 pushed: wave 1 brings master to GTA-parity templatized, wave 2 keeps it there. 8 decisions, 8 build items, 2 BLOCKERs.","blockedBy":null,"at":"2026-07-27T00:00:00Z"}
