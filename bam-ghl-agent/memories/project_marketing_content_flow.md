@@ -313,3 +313,15 @@ oversize filter, so this loosens staff only. Other buckets unchanged
 (message-attachments 25MB, member-avatars 5MB). If multi-GB finals become
 routine, TUS resumable uploads are the real fix - plain browser uploads
 restart from zero on any network blip.
+
+## Resumable finals uploads - TUS (2026-07-27, Cam)
+Staff finals (`commitFinals` in ContentView) now upload via
+`src/lib/uploads.js` `uploadFileResumable`: files > 6MB go through Supabase's
+TUS endpoint (`/storage/v1/upload/resumable`, tus-js-client, chunkSize MUST be
+exactly 6MB, x-upsert true) with retryDelays for blips and cross-attempt
+RESUME (deterministic object path `folder/ticketId/<size>-<mtime>-<name>` so a
+retry continues the same object and the recorded URL stays right). Small files
+keep the plain supabase-js upload. Button shows real byte-level percent
+aggregated across the 3-worker pool. `supabaseUrl` is now exported from
+lib/supabase.js. NOTE: TUS does not bypass the PROJECT-wide upload cap
+(dashboard-only) - Zoran must raise that for >cap files regardless.
