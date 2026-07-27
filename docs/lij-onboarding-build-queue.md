@@ -369,6 +369,18 @@ Artifacts, both pushed on `claude/optimistic-leavitt-db0107`:
 
 **PROCESS GATE (Zoran, 2026-07-27):** the sync room must show him a **MOCKUP of the user stories** and get his confirmation BEFORE any build. Sequence is fixed: mockup -> his confirmation -> plan to the orchestrator -> builder subagent -> then seed San Jose in that chat.
 
+## ✅ THE NEUTRAL VERIFIER EXISTS: `api/_blueprint-card-guards.test.mjs` (branch `claude/brand-data-evidence`, commit 237c26f)
+
+24 assertions, plain `node`, **no new dependencies**. `PORTAL_PATH=<any client-portal.html> node api/_blueprint-card-guards.test.mjs` **lifts the real card functions out of whichever file you point it at**, runs them in `node:vm` against controllable timers, and replays a faithful port of the RPC's wholesale jsonb replace. Neutral about whose implementation it tests.
+
+Measured by its author, run both ways rather than reported: **fixed tree 24/0. `origin/main` 9 passed, 15 FAILED**, naming all 18 destroyed `brand_data` keys and all 7 `kpi_data` keys including `site_pages`, and failing all six fail-closed scenarios (slow read, read failure, instant click, mid-session client switch).
+
+**The bar: any Business Basics fix must reach 24/24.** One assertion guards against over-correction: **"an empty client can still save" passes in BOTH trees** - break that and you have written a blanket lockout, not a guard. Two assertions protect against rot by checking things invisible from the card code: that `CLIENT_SELECT_COLS` still omits both jsonb columns, and that the migration still contains `COALESCE(p_patch->'brand_data', brand_data)`. If anyone later makes the RPC deep-merge, the test says so rather than silently going green on a stale port.
+
+**Deliberately not extracted into an importable module**, and the reasoning is right: the logic lives in a classic-script HTML file that cannot import ESM, so a module the portal could not actually call would be dead half-wired code. It tests the real thing in place. **Not covered, stated plainly:** the render path, proven with jsdom and PGlite, neither a repo dependency.
+
+**That branch has 3 commits and only the test is portable.** `5dffd1e` (hydration) is DISCARDED in favour of the Business Basics fix; `b2213ad` (shape change) lands later as 1c.
+
 ## 📏 HOUSE RULE 6 ADOPTED (2026-07-27): if the proof is not in the repo, the fix is not finished
 
 Two harnesses built today proved real data-loss bugs and were both left in scratchpads, so the fixes shipped and the evidence evaporated. A committed test must run on plain `node`, no new dependencies, no network, no database, and **must include a negative control** (an env flag that reverts one fix and shows the suite catching it) - a suite that only ever passes says nothing about whether it would notice a regression. Same failure shape as "never test an undeployed build": the work is real, the durability is not.

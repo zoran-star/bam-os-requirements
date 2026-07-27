@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "A neutral test now exists: it fails 15 of 24 checks against today's live code",
     "New house rule: if the proof is not in the repo, the fix is not finished",
     "Caught a collision: three workstreams editing one file, brand_data work was double-assigned",
     "Verifier caught the fix reintroducing the same bug through its own guard",
-    "Decided: tax IDs load only when you open the card, not on every login",
-    "Live one-click path to the Miami failure found: editing copy re-enables a disabled step"
+    "Decided: tax IDs load only when you open the card, not on every login"
   ],
   "orchestrator": {
     "focus": "Chats now own their own builders and testers; I keep the goals, the queue, routing and collisions. One track: automation templating.",
