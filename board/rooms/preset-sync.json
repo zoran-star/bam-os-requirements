@@ -1,1 +1,1 @@
-{"slug":"preset-sync","chat":"AUTOMATION TEMPLATING","state":"orange","one":"Renderers consolidated to one, 13 answers sent. Blocked: branch is local-only and builders cannot read it.","blockedBy":"Zoran: permission to push the branch","at":"2026-07-27T00:00:00Z"}
+{"slug":"preset-sync","chat":"AUTOMATION TEMPLATING","state":"blue","one":"Branch pushed, builders can read it. Renderers consolidated. Next: seed San Jose once the foundation lands.","blockedBy":null,"at":"2026-07-27T00:00:00Z"}
