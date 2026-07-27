@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "Killed a second false blocker: the email identity fallback was already fixed and shipped",
     "SAN JOSE EMAIL IS LIVE: verified, sends as BAM San Jose, Lij's Gmail untouched",
     "Scaling program fully closed: Cole's SQL applied, dormant until Mike sets terms",
     "Corrected a scout's blocker claim: SJ's nurture emails are clean, onboarding templates are not",
-    "Found: new academies get a weaker onboarding than GTA, using emails that already exist",
-    "Scaling program shipped staff-only, PRs 1596 + 1609 merged, staff guide live"
+    "Found: new academies get a weaker onboarding than GTA, using emails that already exist"
   ],
   "orchestrator": {
     "focus": "SJ email is live. Preset parity is the front now: audit done, planning room open on the two-way sync. Lij's ask-list is the biggest unblock you own.",
