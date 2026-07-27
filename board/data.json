@@ -1,16 +1,16 @@
 {
   "updated": "2026-07-27 \u00b7 morning",
   "recentUpdates": [
+    "Gate moved: you author the master off a map of all 8 GTA automations, not off a plan doc",
     "Plan rebuilt as two waves; one rule now covers emails and the agent brain: no fact, no output",
     "Three chats converged on preset automations; scopes reconciled into one owner",
     "Preset sync plan decided: GTA is the reference, GTA becomes a governed instance",
-    "Guardrail ruled: quote-free variant is the only build; social_proof + Google labels wait for real reviews",
-    "Build 5 is at 0% and the Google API application has NOT been filed. That is the long pole"
+    "Guardrail ruled: quote-free variant is the only build; social_proof + Google labels wait for real reviews"
   ],
   "orchestrator": {
     "focus": "Preset convergence is the whole game now. The sync chat owns the standard AND seeding San Jose through it. It is building you a mockup of the user stories first; nothing gets built until you confirm it.",
     "needs": [
-      "Confirm the mockup when the sync chat shows you the user stories",
+      "Work through the GTA automation map in the sync chat, it is the master spec",
       "File the Google Business Profile API application, it is days to weeks and unfiled",
       "Send Lij his ask-list, still the biggest thing you own",
       "SET UP TWILIO BITCH: 6 action items, submit target Thursday",
@@ -35,7 +35,7 @@
           "state": "done"
         },
         {
-          "name": "you: mockup",
+          "name": "you: author master",
           "state": "active"
         },
         {
@@ -55,10 +55,10 @@
           "state": "pending"
         }
       ],
-      "status": "Plan decided with 7 rulings. Zoran gated it: he sees a mockup of the user stories before anything is built.",
+      "status": "Gate moved: instead of reviewing the plan, you are authoring the master directly off a map of every automation GTA actually runs, annotated per message with AUTO / ASK / LEAK / NEVER / BRAND / DROP.",
       "next": {
         "who": "you",
-        "what": "Open the sync chat and confirm the mockup when it shows you"
+        "what": "Work through the GTA automation map in the sync chat. Your pass through it IS the master spec"
       },
       "checklist": null
     }
@@ -575,7 +575,7 @@
     },
     {
       "id": "F",
-      "title": "Wizard collects 4 new facts (shares review field with H)",
+      "title": "Wizard collects 2 new facts (was 4; review link + community group link)",
       "severity": "friction",
       "status": "wave 1, gates E",
       "owner": "us"
@@ -636,8 +636,8 @@
     {
       "name": "Plan: two-way preset sync",
       "sidebar": "Plan: two-way preset sync",
-      "state": "white",
-      "one": "Owns the whole preset standard AND seeding San Jose through it. Building your user-story mockup now",
+      "state": "blue",
+      "one": "Built you a map of all 8 GTA automations, annotated with what each academy must supply. You author the master from it",
       "builds": [
         "t-convergence"
       ]

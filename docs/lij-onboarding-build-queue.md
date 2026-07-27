@@ -192,7 +192,24 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 | 2 | B | Override-tracing reverse check | SCALE |
 | 2 | C | Weekly GH Action -> one "Preset drift" issue | SCALE |
 
-**⚠️ ROUTE ONCE, NOT TWICE:** the new **Google review-link field closes TWO leaks with one build** - it is what `onboarding-review`'s CTA needs (item E) AND what finally gives `social_proof` a renderer (item H). Build the field once and wire both consumers, or the two items will each invent their own.
+**~~ROUTE ONCE, NOT TWICE~~ RETRACTED by the sync room 2026-07-27:** the review-link field closes **ONE** leak, not two. It feeds `onboarding-review`'s CTA only. `social_proof` stays as-is because Zoran ruled LEAVE on it until Google is genuinely connected. **Do not brief a builder on the two-leak framing.**
+
+**THE GATE MOVED (Zoran, 2026-07-27).** He did not want the 4 user stories. He wants **every automation GTA runs, one per screen, with a switcher, colour-coded by whether it is in the free-trial preset, every message annotated with what the academy must configure.** His words: "from there I can plan out where we're gonna collect information and how we're gonna set up the master sales system preset for the automations, and derive it from GTAs." He is not reviewing the plan; he is **using GTA's live set as the worksheet to author the master from.** Better sequence: the master gets designed off what actually runs, not off a description of it.
+
+Artifacts, both pushed on `claude/optimistic-leavitt-db0107`:
+- **`docs/plans/gta-automation-map.html`** (73b58db) - the one he is working from. All 8 GTA automations, live bodies from prod, 6 gold (in the free-trial preset: contact_form, trial_form, missed_trial, ghosted, nurture, onboarding) and 2 grey (summer_special, trial_followup). Every message annotated with one of six sources, literals highlighted **inline in the copy**: `AUTO` we hold it · `ASK` academy supplies at onboarding · `LEAK` GTA literal hardcoded today · `NEVER` belongs to real people, does not travel · `BRAND` same for every academy · `DROP` GTA carries it, the master will not.
+- `docs/plans/preset-convergence-mockup.html` (8aa374d) - the 4 user stories, still valid, superseded as the gate.
+
+**FIELD DECISIONS (Zoran, these shrink item F from 4 fields to 2):**
+1. **Coach contact number -> comes from the BUSINESS NUMBER.** Not a question. Field removed.
+2. **Community group link -> KEPT**, and he placed it: the onboarding section of the **TRAINING OFFER SETUP** part of the client onboarding wizard. Not a standalone new section, so the builder does not choose placement.
+3. **Online programs URL -> DROPPED.** His reasoning: do not assume academies have online programs.
+4. **Refer-a-friend perk -> PARKED**, not dropped.
+5. **Google review link -> still needed**, for `onboarding-review`'s button.
+
+**Q13 going back to Zoran, not answered by the room:** who finds out first when someone edits GTA's rows, given a weekly check means GTA can carry an unreviewed change for up to seven days that is implicitly a claim on every academy. Correct handling; that is a decision, not an answer.
+
+**The other 12 answers land with the finalised plan.** The room is deliberately not answering against a master design Zoran is actively rewriting. **His pass through the map IS the master spec, and that is what the builder gets briefed from, not the earlier item list.**
 
 **ZORAN'S CALL on the fail-open fork:** defaults go **neutral-or-empty, and the fail-open STAYS.** His reasoning: an agent with no fallback improvises, which is worse than a gap. The bug is what it falls back TO, not that it falls back. Once no default carries a real academy fact, failing open is harmless. Plus **a test asserting no default body contains an identity value**, drawing the identity set from where `email-shells.js` already resolves it. That test is what stops recurrence; cleanup alone would not. This unified both surfaces under one rule: **no fact, no output** - in an email the block does not render, in the agent brain the section is absent from the prompt.
 
