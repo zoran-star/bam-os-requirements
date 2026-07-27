@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Two-way preset sync - plan</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#D4B65C; --gold-dim:#8d7936;
+    --bg:#0C0C0D; --card:#141416; --card2:#1A1A1D; --line:#2A2A2E;
+    --tx:#EDEDEF; --tx2:#A8A8B0; --tx3:#6E6E78;
+    --red:#E5674E; --amber:#E0A33C; --green:#5FBF8A; --blue:#5B9DD9;
+    --r-s:8px; --r-m:12px; --r-l:16px;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif; --mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:48px 20px 90px}
+  h1{font-size:clamp(30px,5vw,44px);line-height:1.1;letter-spacing:-.02em;margin:0 0 10px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:17px;margin:0 0 8px;max-width:62ch}
+  .meta{color:var(--tx3);font-size:13px;font-family:var(--mono);margin:0 0 40px}
+  h2{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:56px 0 6px;font-weight:700}
+  h2 .n{color:var(--tx3);margin-right:10px}
+  .lede{color:var(--tx2);font-size:16px;margin:0 0 22px;max-width:70ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-l);padding:24px}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  pre{font-family:var(--mono);font-size:13px;line-height:1.55;color:var(--tx2);margin:0;white-space:pre}
+  table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:640px}
+  th{text-align:left;font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:700;padding:0 14px 10px;border-bottom:1px solid var(--line)}
+  td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--tx2)}
+  td.k{color:var(--tx);font-weight:600;font-family:var(--mono);font-size:13px;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+  .p-go{background:rgba(95,191,138,.14);color:var(--green);border:1px solid rgba(95,191,138,.3)}
+  .p-tok{background:rgba(91,157,217,.14);color:var(--blue);border:1px solid rgba(91,157,217,.3)}
+  .p-re{background:rgba(224,163,60,.14);color:var(--amber);border:1px solid rgba(224,163,60,.3)}
+  .p-no{background:rgba(229,103,78,.14);color:var(--red);border:1px solid rgba(229,103,78,.3)}
+  .p-g{background:rgba(212,182,92,.13);color:var(--gold);border:1px solid rgba(212,182,92,.3)}
+  .grid{display:grid;gap:16px}
+  @media(min-width:760px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+  .rule{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:var(--r-m);padding:18px 20px}
+  .rule b{color:var(--tx);display:block;margin-bottom:5px;font-size:15px}
+  .rule p{margin:0;color:var(--tx2);font-size:14px}
+  .call{background:linear-gradient(180deg,rgba(212,182,92,.09),rgba(212,182,92,.02));border:1px solid rgba(212,182,92,.28);border-radius:var(--r-l);padding:22px 24px;margin:0 0 16px}
+  .call .q{color:var(--tx3);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;margin-bottom:7px}
+  .call .a{color:var(--tx);font-size:18px;font-weight:700;line-height:1.35;margin-bottom:7px}
+  .call .w{color:var(--tx2);font-size:14px;margin:0}
+  .warn{background:rgba(229,103,78,.07);border:1px solid rgba(229,103,78,.28);border-radius:var(--r-m);padding:18px 20px}
+  .warn b{color:var(--red);display:block;margin-bottom:5px}
+  .warn p{margin:0;color:var(--tx2);font-size:14px}
+  details{background:var(--card);border:1px solid var(--line);border-radius:var(--r-l);margin-top:14px;overflow:hidden}
+  summary{cursor:pointer;padding:18px 22px;font-weight:700;color:var(--tx);font-size:15px;list-style:none;display:flex;align-items:center;gap:10px}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"+";color:var(--gold);font-family:var(--mono);font-size:17px;font-weight:500}
+  details[open] summary::before{content:"-"}
+  details[open] summary{border-bottom:1px solid var(--line)}
+  .body{padding:6px 22px 24px}
+  .body h4{color:var(--gold);font-size:12px;letter-spacing:.11em;text-transform:uppercase;margin:22px 0 8px}
+  .body p,.body li{color:var(--tx2);font-size:14.5px}
+  .body code{font-family:var(--mono);font-size:12.5px;background:var(--card2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--gold)}
+  .body ul{padding-left:20px;margin:8px 0}
+  .body li{margin-bottom:6px}
+  .sev{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10.5px;font-weight:800;letter-spacing:.06em;font-family:var(--mono)}
+  .s-b{background:rgba(229,103,78,.16);color:var(--red)}
+  .s-f{background:rgba(224,163,60,.16);color:var(--amber)}
+  .s-s{background:rgba(91,157,217,.16);color:var(--blue)}
+  .foot{margin-top:64px;padding-top:22px;border-top:1px solid var(--line);color:var(--tx3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>The master can't see when <span>GTA is ahead</span>.</h1>
+  <p class="sub">The divergence checker only looks one way. It catches an academy drifting from the shared defaults. It cannot catch the shared defaults falling behind what BAM GTA actually runs. That already happened, in the sequence that greets every new paying member.</p>
+  <p class="meta">Plan &middot; 27 Jul 2026 &middot; decisions locked with Zoran &middot; facts verified against live prod rows</p>
+
+  <!-- ───────────────────────── 1. THE DRIFT ───────────────────────── -->
+  <h2><span class="n">01</span>The drift, both directions</h2>
+  <p class="lede">Same verdict word, opposite meanings, so nobody acted on either one.</p>
+  <div class="card scroll">
+<pre>
+     MASTER DEFAULTS                                     BAM GTA (live prod)
+     form-intro-automations.js                           what actually runs
+   ┌──────────────────────────────┐                  ┌──────────────────────────────┐
+   │  onboarding                  │                  │  onboarding                  │
+   │    3 SMS                     │   ◀── ✖ ────     │    8 steps                   │
+   │    0 emails                  │     NOTHING      │    6 designed emails         │
+   │    1 week                    │     LOOKS        │    ~24 days                  │
+   │                              │     THIS WAY     │                              │
+   ├──────────────────────────────┤                  ├──────────────────────────────┤
+   │  sales sequences             │                  │  4 sales steps hardcode      │
+   │    fully tokenized  ✔        │   ──── ✔ ──▶     │    "By Any Means Basketball" │
+   │    no academy literals       │     CAUGHT       │    "By Any Means GTA"        │
+   │                              │     as EDITED    │    byanymeanstoronto.ca      │
+   └──────────────────────────────┘                  └──────────────────────────────┘
+
+     GTA ahead  ->  reported as EDITED   ─┐
+                                          ├─  same word.  no signal.  no action.
+     GTA behind ->  reported as EDITED   ─┘
+</pre>
+  </div>
+
+  <div class="grid g2" style="margin-top:16px">
+    <div class="warn">
+      <b>The cost, in plain terms</b>
+      <p>Every academy launched since the preset shipped, San Jose included, gets a 3-step SMS-only welcome while GTA's members get 8 touches and 6 designed emails. The 6 email templates were already built and already reachable. The master simply pointed at none of them.</p>
+    </div>
+    <div class="warn" style="background:rgba(224,163,60,.07);border-color:rgba(224,163,60,.28)">
+      <b style="color:var(--amber)">There was already a rule</b>
+      <p>The header of <span style="font-family:var(--mono);font-size:13px">form-intro-automations.js</span> says good live edits must be promoted back into the defaults. It was written, never enforced, and never happened. A rule with nothing watching it is a comment.</p>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── 2. GTA'S REAL SEQUENCE ───────────────────────── -->
+  <h2><span class="n">02</span>What GTA actually runs</h2>
+  <p class="lede">Pulled from prod. 8 steps, 10 members enrolled, still firing.</p>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>#</th><th>When</th><th>Channel</th><th>What it sends</th><th>Content source</th></tr></thead>
+      <tbody>
+        <tr><td class="k">1</td><td>0m</td><td>SMS</td><td>Welcome, check your email</td><td>brand-global, hardcodes "By Any Means Basketball"</td></tr>
+        <tr><td class="k">2</td><td>0m</td><td>Email</td><td><span style="font-family:var(--mono);font-size:13px">onboarding-welcome</span></td><td>GTA shell + WhatsApp, schedule, venue, phone, merch</td></tr>
+        <tr><td class="k">3</td><td>+5m</td><td>SMS</td><td>The weekly schedule, pasted in</td><td>pure GTA fact</td></tr>
+        <tr><td class="k">4</td><td>+5m</td><td>Email</td><td><span style="font-family:var(--mono);font-size:13px">onboarding-training</span></td><td>GTA shell, body is brand-global</td></tr>
+        <tr><td class="k">5</td><td>+3d</td><td>Email</td><td><span style="font-family:var(--mono);font-size:13px">onboarding-story</span></td><td>tokenized shell, 1 literal</td></tr>
+        <tr><td class="k">6</td><td>+7d</td><td>Email</td><td><span style="font-family:var(--mono);font-size:13px">onboarding-era</span></td><td>tokenized shell, clean</td></tr>
+        <tr><td class="k">7</td><td>+7d</td><td>Email</td><td><span style="font-family:var(--mono);font-size:13px">onboarding-testimonials</span></td><td><span style="color:var(--red);font-weight:600">real parents' words</span></td></tr>
+        <tr><td class="k">8</td><td>+7d</td><td>Email</td><td><span style="font-family:var(--mono);font-size:13px">onboarding-review</span></td><td>GTA shell + GTA's Google link</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ───────────────────────── 3. THE LANDMINE ───────────────────────── -->
+  <h2><span class="n">03</span>Why a naive two-way sync would have shipped the bad thing</h2>
+  <div class="card scroll" style="border-color:rgba(229,103,78,.3)">
+<pre>
+   GTA's onboarding-testimonials carries REAL parent quotes.
+   The academy name and city inside it are TOKENIZED, which is exactly what
+   makes it dangerous: it renders cleanly for anybody.
+
+        "Best decision we made for our son."
+                        - Parent of Adam, {{location.city}}
+                                            │
+                                            └──▶ renders "San Jose"
+
+   A San Jose parent reads a San Jose family praising a program they never
+   attended. Zoran already caught this class of bug and deliberately held
+   nurture-3 for San Jose. A structure-only diff would have called that
+   hold "drift" and a naive sync would have undone it.
+</pre>
+  </div>
+  <div class="rule" style="margin-top:16px">
+    <b>So the sync has to separate three things, not two</b>
+    <p><b style="display:inline;color:var(--green)">Structure</b> (step count, timing, channel, which template a step points at) converges freely.
+    <b style="display:inline;color:var(--blue)">Tokenized copy</b> converges once it is genuinely academy-neutral.
+    <b style="display:inline;color:var(--red)">Attributed content</b> (real people's words, named coaches, addresses, photos) never propagates and must be impossible to pick up by accident.</p>
+  </div>
+
+  <!-- ───────────────────────── 4. DECISIONS ───────────────────────── -->
+  <h2><span class="n">04</span>The seven calls</h2>
+  <p class="lede">Made with Zoran, 27 Jul 2026.</p>
+
+  <div class="call">
+    <div class="q">01 &middot; Authority</div>
+    <div class="a">GTA is the reference implementation.</div>
+    <p class="w">The master is expected to match GTA's structure, tokenized. A gap is a master bug to close. <b style="color:var(--gold)">The trade, accepted knowingly:</b> GTA becomes a governed instance. Every edit to GTA's rows is now a claim on every academy, and GTA's 4 hardcoded sales steps stop being GTA's business and become bugs to fix.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">02 &middot; Where the check fires</div>
+    <div class="a">Weekly GitHub Action that opens and updates one issue.</div>
+    <p class="w">Extend the existing script with a reverse pass, schedule it in <span style="font-family:var(--mono);font-size:13px">.github/workflows</span>, keep a single issue titled "Preset drift" up to date rather than opening a new one each week. It lands in the repo where the fix lives and needs nobody to remember to look.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">03 &middot; The brake on attributed content</div>
+    <div class="a">A <span style="font-family:var(--mono)">sync_class</span> marker: shared / local / attributed.</div>
+    <p class="w">Set on the template so every step pointing at it inherits. Default is <b>shared</b>. <b>local</b> means the structure is shared but the words belong to this academy. <b>attributed</b> means it never propagates and must be re-authored. Attached to the smallest addressable unit, so it works for a step, a block, an offer or a pipeline stage, not just automations.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">04 &middot; The three GTA-shelled emails</div>
+    <div class="a">Re-shell all three, and collect the missing facts in onboarding.</div>
+    <p class="w"><span style="font-family:var(--mono);font-size:13px">onboarding-welcome</span>, <span style="font-family:var(--mono);font-size:13px">-training</span> and <span style="font-family:var(--mono);font-size:13px">-review</span> build their own header and footer with GTA's wordmark, "OAKVILLE &middot; GTA", the GTA domain and GTA's Instagram baked in as literals, instead of using the tokenized shell that already exists. Re-shelling is plumbing, not copywriting.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">05 &middot; Composition</div>
+    <div class="a">Blocks auto-render when their fact exists, and onboarding must guarantee the fact exists.</div>
+    <p class="w">An email stops being one blob and becomes an ordered list of blocks. A block with no fact does not render, the same fail-to-empty rule already used for the website link. Filling the wizard <em>is</em> composing the email, so there is no extra composition step, but the wizard has to actually ask.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">06 &middot; Owner copy changes</div>
+    <div class="a">Through the support ticket system, not a free-text field.</div>
+    <p class="w">This keeps every word staff-authored, which keeps every word promotable. It also puts the promote decision in exactly the right place: when a ticket asks for a copy change, staff decides right there whether it goes in the master for everyone or is recorded as a deliberate divergence for that one academy.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">07 &middot; The two orphan sequences</div>
+    <div class="a">Delete Trial Follow-up. Summer Special stays GTA-only, parked.</div>
+    <p class="w">Neither has ever enrolled a single lead. Trial Follow-up is a duplicate of <span style="font-family:var(--mono);font-size:13px">trial_form</span>, same trigger and same 20-minute wait, and <span style="font-family:var(--mono);font-size:13px">trial_form</span> has run 30 times including today. Summer Special is held pending a standardized reignition flow for sales presets, and is recorded as an accepted exception so the reverse check stops nagging.</p>
+  </div>
+
+  <!-- ───────────────────────── 5. BEFORE / AFTER ───────────────────────── -->
+  <h2><span class="n">05</span>What the check reports, before and after</h2>
+  <p class="lede">Today it flattens everything into one word. After, every line says what to do.</p>
+  <div class="grid g2">
+    <div class="card scroll">
+      <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);font-weight:700;margin-bottom:14px">Before</div>
+<pre>
+BAM GTA
+  MATCH    contact_form
+  EDITED   trial_form     step 1: body differs
+  MATCH    missed_trial
+  EDITED   ghosted        step 1: body differs
+  EDITED   nurture        step 3: body differs
+  EDITED   onboarding     8 steps vs 3 canonical
+  EXTRA    summer_special, trial_followup
+
+No broken seeds.
+exit 0
+</pre>
+      <p style="color:var(--tx3);font-size:13px;margin:16px 0 0">Four EDITED lines. Two are GTA behind the master, one is GTA ahead of it, one is a deliberate hold. Nothing distinguishes them, so the run passes and everyone moves on.</p>
+    </div>
+    <div class="card scroll" style="border-color:rgba(95,191,138,.3)">
+      <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);font-weight:700;margin-bottom:14px">After</div>
+<pre>
+BAM GTA   (reference academy)
+  MATCH     contact_form
+  BEHIND    trial_form    step 1 hardcodes
+                          "By Any Means GTA"
+                          -> fix GTA, use the token
+  MATCH     missed_trial
+  BEHIND    ghosted       steps 1-2 hardcode domain
+  AHEAD     onboarding    8 steps vs 3 in master
+                          -> PROMOTE 5 steps
+  HELD      nurture       step 3 attributed
+                          -> expected, not drift
+  ACCEPTED  summer_special
+                          reignition flow, parked
+
+1 AHEAD, 2 BEHIND -> issue "Preset drift" updated
+exit 1
+</pre>
+      <p style="color:var(--tx3);font-size:13px;margin:16px 0 0">Five verdicts instead of one, and each carries its own next action.</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <table>
+      <thead><tr><th>Verdict</th><th>Means</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill p-go">MATCH</span></td><td>Academy equals the master</td><td>None</td></tr>
+        <tr><td><span class="pill p-g">AHEAD</span></td><td>Reference academy has structure the master lacks</td><td>Promote into the master</td></tr>
+        <tr><td><span class="pill p-re">BEHIND</span></td><td>Reference academy lags the master, usually a hardcode</td><td>Fix the academy row</td></tr>
+        <tr><td><span class="pill p-tok">HELD</span></td><td>Difference is on <span style="font-family:var(--mono);font-size:13px">sync_class: attributed</span> or <span style="font-family:var(--mono);font-size:13px">local</span> content</td><td>None. Expected by design</td></tr>
+        <tr><td><span class="pill p-no">ACCEPTED</span></td><td>Recorded deliberate divergence with a written reason</td><td>None until the reason expires</td></tr>
+        <tr><td><span class="pill p-no">MISSING / EMPTY</span></td><td>Broken seed, unchanged from today</td><td>Re-seed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ───────────────────────── 6. THE 6 EMAILS ───────────────────────── -->
+  <h2><span class="n">06</span>The six onboarding emails</h2>
+  <p class="lede">All six already exist and are already reachable. This is the verdict on each.</p>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>Template</th><th>Shell</th><th>GTA literals in the body</th><th>sync_class</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="k">onboarding-era</td>
+          <td><span style="color:var(--green)">tokenized</span></td>
+          <td>none</td>
+          <td>shared</td>
+          <td><span class="pill p-go">Promote as-is</span></td>
+        </tr>
+        <tr>
+          <td class="k">onboarding-story</td>
+          <td><span style="color:var(--green)">tokenized</span></td>
+          <td>1 ("Toronto")</td>
+          <td>shared</td>
+          <td><span class="pill p-tok">Tokenize 1 word, promote</span></td>
+        </tr>
+        <tr>
+          <td class="k">onboarding-training</td>
+          <td><span style="color:var(--red)">GTA hardcoded</span></td>
+          <td>sign-off only, body is brand-global</td>
+          <td>shared</td>
+          <td><span class="pill p-re">Re-shell, then promote</span></td>
+        </tr>
+        <tr>
+          <td class="k">onboarding-review</td>
+          <td><span style="color:var(--red)">GTA hardcoded</span></td>
+          <td>GTA's Google review link</td>
+          <td>shared</td>
+          <td><span class="pill p-re">Re-shell + 1 new field</span></td>
+        </tr>
+        <tr>
+          <td class="k">onboarding-welcome</td>
+          <td><span style="color:var(--red)">GTA hardcoded</span></td>
+          <td>WhatsApp, schedule, venue, coach phone, merch, IG handles</td>
+          <td>shared shell, local blocks</td>
+          <td><span class="pill p-re">Re-shell + rebuild as blocks</span></td>
+        </tr>
+        <tr>
+          <td class="k">onboarding-testimonials</td>
+          <td><span style="color:var(--green)">tokenized</span></td>
+          <td>none, and that is the danger</td>
+          <td><b style="color:var(--red)">attributed</b></td>
+          <td><span class="pill p-no">Never propagates</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="rule" style="margin-top:16px">
+    <b>The one that matters most is the last row</b>
+    <p>The testimonials brake has to land before or with the promotion, never after. The moment the master's onboarding grows past 3 steps without it, the next academy seeded inherits another academy's parents.</p>
+  </div>
+
+  <!-- ───────────────────────── 7. BLOCK MODEL ───────────────────────── -->
+  <h2><span class="n">07</span>Where every line of an email comes from</h2>
+  <p class="lede">Five sources. This is the rule set the whole design rests on.</p>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>Source</th><th>Who fills it</th><th>Example</th><th>Travels to a new academy</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Frame</td><td>automatic</td><td>wordmark, site, Instagram, unsubscribe</td><td><span style="color:var(--green)">always</span></td></tr>
+        <tr><td class="k">Brand-global</td><td>written once in the master</td><td>"three habits that make training count"</td><td><span style="color:var(--green)">always</span></td></tr>
+        <tr><td class="k">Fact we hold</td><td>automatic</td><td>academy name, city, owner, domain</td><td><span style="color:var(--green)">always</span></td></tr>
+        <tr><td class="k">Fact we don't hold</td><td>owner, in the wizard</td><td>community group, review link, coach phone</td><td><span style="color:var(--amber)">only if we ask</span></td></tr>
+        <tr><td class="k">Someone's words</td><td>never travels</td><td>parent testimonials</td><td><span style="color:var(--red)">never</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card scroll" style="margin-top:16px">
+<pre>
+   onboarding-welcome, as nine blocks
+   ┌────────────────────────────────────────────────────────────────┐
+   │  ▸ greeting             shared     always renders              │
+   │  ▸ community group      local      needs: group link           │  owner
+   │  ▸ online programs      local      needs: programs URL         │  owner
+   │  ▸ follow us            shared     needs: Instagram            │  auto
+   │  ▸ refer a friend       local      needs: perk text            │  owner
+   │  ▸ contact a coach      shared     needs: clients.phone        │  auto
+   │  ▸ weekly schedule      shared     from schedule_slots         │  auto
+   │  ▸ venue                shared     from slot location_label    │  auto
+   │  ▸ sign-off             shared     always renders              │
+   └────────────────────────────────────────────────────────────────┘
+        same nine blocks for every academy
+        a block whose fact is MISSING simply does not render
+</pre>
+  </div>
+
+  <div class="grid g3" style="margin-top:16px">
+    <div class="rule"><b>No fact, no block</b><p>The same fail-to-empty rule already used for the website link. No academy ever ships a broken or borrowed block.</p></div>
+    <div class="rule"><b>Owner-supplied blocks are local</b><p>They never get promoted into the master and never report as drift, so "the letter changes fully" needs no extra marking.</p></div>
+    <div class="rule"><b>Only staff edits travel</b><p>GTA-as-reference stays safe, because owner-specific blocks are excluded by construction rather than by anyone remembering.</p></div>
+  </div>
+
+  <!-- ───────────────────────── 8. FIELDS ───────────────────────── -->
+  <h2><span class="n">08</span>The facts, and what each one costs</h2>
+  <p class="lede">Cheaper than it looked. Two are free, one exists already, four are new.</p>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>Fact</th><th>Source</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="k">weekly schedule</td><td><span style="font-family:var(--mono);font-size:13px">schedule_slots</span>, GTA has 86 live rows</td><td><span class="pill p-go">free, generate it</span></td></tr>
+        <tr><td class="k">training venue</td><td><span style="font-family:var(--mono);font-size:13px">schedule_slots.location_label</span></td><td><span class="pill p-go">free</span></td></tr>
+        <tr><td class="k">coach phone</td><td><span style="font-family:var(--mono);font-size:13px">clients.phone</span></td><td><span class="pill p-re">column exists, empty for GTA</span></td></tr>
+        <tr><td class="k">Google review link</td><td>nothing today</td><td><span class="pill p-no">new field</span></td></tr>
+        <tr><td class="k">community group</td><td>nothing today</td><td><span class="pill p-no">new field + platform label</span></td></tr>
+        <tr><td class="k">online programs URL</td><td>nothing today</td><td><span class="pill p-no">new field</span></td></tr>
+        <tr><td class="k">refer-a-friend perk</td><td>nothing today</td><td><span class="pill p-no">new field</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="warn" style="margin-top:16px">
+    <b>Do not wire the venue to clients.address</b>
+    <p>GTA's <span style="font-family:var(--mono);font-size:13px">clients.address</span> is "2205 Rosemount Cres". The gym in the welcome email is 1079 Linbrook Rd, Oakville. That column is the business address, not the training venue. The venue belongs to the schedule slot, which is also what makes it correct for an academy training in more than one place.</p>
+  </div>
+
+  <!-- ───────────────────────── 9. GUARDRAIL ───────────────────────── -->
+  <h2><span class="n">09</span>The guardrail this plan is held to</h2>
+  <div class="rule">
+    <b>Sales systems are shared. Never fork one academy's structure.</b>
+    <p>If one academy needs X, either every academy gets X or X is a runtime fact. This plan takes one exception knowingly: Summer Special stays GTA-only, parked pending a standardized reignition flow for sales presets. It is recorded as an ACCEPTED divergence with that reason attached, not left as silent drift, so it surfaces again the moment the reignition work starts.</p>
+  </div>
+
+  <!-- ───────────────────────── BUILD SPEC ───────────────────────── -->
+  <h2><span class="n">10</span>Build spec</h2>
+  <p class="lede">Seven items. Severity uses the standing triage: BLOCKER, FRICTION, SCALE.</p>
+
+  <details>
+    <summary>A. Testimonials brake <span class="sev s-b">BLOCKER</span></summary>
+    <div class="body">
+      <p>Must land before or with any onboarding promotion. Without it the promotion itself is the bug.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Add a <code>sync_class</code> declaration to the template registry in <code>api/email-templates/</code>. Three values: <code>shared</code> (default), <code>local</code>, <code>attributed</code>.</li>
+        <li>Mark <code>onboarding-testimonials</code> and <code>nurture-3</code> as <code>attributed</code>.</li>
+        <li>Add <code>sync_class</code> to <code>automation_steps</code>, defaulting to <code>shared</code>. A step whose body is <code>template:&lt;key&gt;</code> inherits the template's class, so the marking lives with the content and cannot be lost by editing a step.</li>
+        <li>Seeder rule: a step whose resolved class is <code>attributed</code> seeds with <code>enabled:false</code> and a note telling the academy to supply their own.</li>
+      </ul>
+      <h4>Done when</h4>
+      <p>A freshly seeded academy has the testimonials step present, disabled, and San Jose's existing deliberate hold reports as HELD rather than as drift.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>B. Reverse pass in the divergence checker <span class="sev s-s">SCALE</span></summary>
+    <div class="body">
+      <h4>Build</h4>
+      <ul>
+        <li>Declare the reference academy explicitly, GTA today, rather than inferring it.</li>
+        <li>Replace the single EDITED verdict with AHEAD, BEHIND, HELD, ACCEPTED, keeping MATCH, MISSING and EMPTY as they are.</li>
+        <li>AHEAD when the reference has structure the master lacks: more steps, a template reference the master does not carry, a different channel or timing.</li>
+        <li>BEHIND when the reference carries an academy literal where the master carries a token. Detect by scanning the reference's step bodies for known academy identity values, the same set <code>email-shells.js</code> resolves.</li>
+        <li>HELD when the differing content resolves to <code>attributed</code> or <code>local</code>.</li>
+        <li>ACCEPTED from a small file of recorded divergences, each requiring a written reason. Seed it with <code>summer_special</code>.</li>
+        <li>Exit 1 on any AHEAD or BEHIND as well as MISSING and EMPTY.</li>
+      </ul>
+      <h4>Note</h4>
+      <p>Keep the verdict set generic. A parallel audit covers stages, entry points, agents, calendars and offers, and those entities feed the same reporter with the same five verdicts.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>C. Weekly drift issue <span class="sev s-s">SCALE</span></summary>
+    <div class="body">
+      <h4>Build</h4>
+      <ul>
+        <li>Workflow in <code>.github/workflows/</code>, weekly schedule plus manual dispatch, running the checker with <code>--all</code>.</li>
+        <li>Find the open issue titled "Preset drift" and edit its body, or open it if absent. One issue, always current, never a weekly pile.</li>
+        <li>Body groups by verdict with the academy, the key and the suggested action. Close the issue automatically when a run comes back clean.</li>
+        <li>Needs the service key as a repo secret, read-only. The script never writes to the database.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>D. Promote the onboarding sequence <span class="sev s-f">FRICTION</span></summary>
+    <div class="body">
+      <p>Depends on A. Takes <code>ONBOARDING_DEFAULT</code> from 3 steps to 8.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Promote GTA's structure and timings: 0m SMS, 0m welcome email, +5m schedule SMS, +5m training email, +3d story, +7d era, +7d testimonials, +7d review.</li>
+        <li>The schedule SMS renders from <code>schedule_slots</code> and does not send when the academy has no slots, rather than carrying pasted text.</li>
+        <li><code>onboarding-era</code> promotes as-is. <code>onboarding-story</code> promotes after tokenizing one word.</li>
+        <li>Every step body stays a <code>template:&lt;key&gt;</code> reference so the database holds a reference, not markup.</li>
+      </ul>
+      <h4>Done when</h4>
+      <p>A newly seeded academy shows 8 onboarding steps, the divergence check reports MATCH for the key against GTA, and the testimonials step is present and disabled.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>E. Re-shell and block-ify the three GTA-shelled emails <span class="sev s-f">FRICTION</span></summary>
+    <div class="body">
+      <p>The largest item. Depends on F for the welcome email's owner-supplied blocks.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Delete the local <code>HEAD</code> and <code>FOOT</code> in <code>api/email-templates/onboarding-emails.js</code> and render all three through the tokenized shell that <code>email-shells.js</code> already fills. This alone removes the GTA wordmark, the "OAKVILLE &middot; GTA" tag, the GTA domain and GTA's Instagram from three emails.</li>
+        <li><code>onboarding-training</code>: re-shell and change the sign-off to a token. Body is otherwise brand-global.</li>
+        <li><code>onboarding-review</code>: re-shell and point the call to action at the new review-link field. No field, no button.</li>
+        <li><code>onboarding-welcome</code>: rebuild as the nine blocks. Each block declares what it needs and does not render without it. Schedule and venue come from <code>schedule_slots</code>.</li>
+      </ul>
+      <h4>Watch for</h4>
+      <p>The existing <code>stripFreeTrial</code> helper and <code>dropEmptyShellLinks</code> both operate on rendered markup. Blocks must be assembled before those run, not after.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>F. Collect the four missing facts in onboarding <span class="sev s-f">FRICTION</span></summary>
+    <div class="body">
+      <p>Zoran's condition on the auto-on decision: the wizard has to actually ask, otherwise auto-on silently means auto-off.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Four new fields: Google review link, community group link plus its platform label, online programs URL, refer-a-friend perk text. Plus filling <code>clients.phone</code>, which already exists and is empty for GTA.</li>
+        <li>The onboarding wizard rule applies in full: a registry row in <code>_OBF_STEPS</code>, a detector in <code>_obfFetchState()</code>, and the key listed in a section's <code>keys</code> in <code>_OBF_SECTIONS</code>. All three, or the step is defined and detected but invisible.</li>
+        <li>Show the owner what each fact turns on, so the connection between filling a field and the email a parent receives is visible at the point of action.</li>
+        <li>Backfill GTA's own five values, since GTA is the reference and has to be complete.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>G. Clean up GTA's own rows <span class="sev s-s">SCALE</span></summary>
+    <div class="body">
+      <p>Follows directly from GTA being the reference. These stop being GTA's business and become bugs.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Delete the <code>trial_followup</code> automation and its single step. Zero enrollments ever, disabled, never approved, and a duplicate of <code>trial_form</code> which has run 30 times including today. Its body also references a token that does not resolve.</li>
+        <li>Replace the hardcoded academy literals in the 4 sales steps with the tokens the master already uses: <code>contact_form</code> step 1, <code>trial_form</code> step 1, <code>ghosted</code> steps 1 and 2.</li>
+        <li>Record <code>summer_special</code> as an ACCEPTED divergence with the reason "held pending a standardized reignition flow for sales presets".</li>
+      </ul>
+      <h4>Done when</h4>
+      <p>GTA reports MATCH on every sales key and no EXTRA rows other than the one recorded exception.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Order of work, and what depends on what</summary>
+    <div class="body">
+<pre style="white-space:pre-wrap">A  testimonials brake  ──┬──▶  D  promote onboarding
+                         │
+B  reverse pass  ────────┴──▶  C  weekly issue
+
+G  clean GTA rows        (independent, do it first, it is small)
+
+F  collect facts  ──────────▶  E  re-shell + block-ify</pre>
+      <p style="margin-top:14px">G first because it is small and makes every later run cleaner. A before D, always. F before E, or the welcome email ships with its best blocks switched off.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>What changes for every future academy</summary>
+    <div class="body">
+      <ul>
+        <li>A new academy seeds an 8-step onboarding instead of 3, with 5 designed emails live and the testimonials step present but off until they supply their own.</li>
+        <li>Onboarding asks four new questions, and each one visibly turns on a block of the welcome email.</li>
+        <li>Copy change requests arrive as support tickets, and each ticket is the moment staff decides master-for-everyone or recorded divergence for one.</li>
+        <li>Drift in either direction surfaces weekly in one GitHub issue instead of waiting to be noticed.</li>
+        <li>GTA is now governed. Editing GTA is editing the reference, and the check will say so within the week.</li>
+      </ul>
+    </div>
+  </details>
+
+  <p class="foot">Every fact in this plan was verified against live production rows on 27 Jul 2026, not inferred from the code. Enrollment counts, step bodies, schedule slot counts and the address mismatch all come from the database.</p>
+
+</div>
+</body>
+</html>
