@@ -186,6 +186,20 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 
 **⚠️ A TENSION FOR ZORAN.** `source='manual'` is by definition a testimonial with no Google review behind it, so the table permits what his directive ("no testimonials anywhere unless Google reviews are connected") prohibits. The room's read, which I share: the real target was borrowed and fabricated quotes, not an academy's own honest ones. Its recommendation, to be mocked up for him: **manual quotes are allowed, must be that academy's own, and NEVER get review framing** - no star rating, no "Google review" label, no contribution to the aggregate. **Stars and review badges become things only synced Google rows can earn.**
 
+## #69 FIXED, AND IT IS BIGGER THAN FIRST FOUND (2026-07-27)
+
+**The mechanism is two halves, not one.** (a) `CLIENT_SELECT_COLS` omits the columns so the card reads `undefined` and renders blank; (b) the `update_client_basics` RPC treats those columns as `CASE WHEN patch ? key THEN NULLIF(val,'')`, so key-present-plus-empty-string writes NULL. `business_name`/`owner_name`/`email` survive only because the RPC gives THEM `COALESCE(NULLIF(...),col)`, which ignores blanks. **The SELECT is the root cause; the RPC's asymmetry is why it destroys rather than merely blanks.**
+
+**Fixed:** `legal_name`, `address`, `ein` added to the select, plus a `_bbGuardBlanks(patch, keys)` guard wrapping `_bbGenChanged` and `_bbStaffOwnerChanged` so an unhydrated field is never written at all. **Plus a fourth victim the builder found: `phone` on the Staff card owner block, 5 academies exposed, same mechanism, fixed.**
+
+**⚠️ TWO MORE VICTIMS, NOT FIXED, and this CORRECTS an orchestrator error.** I asserted `brand_data` hydrates async "by design". **That is wrong**, and I verified the correction myself: the only assignment to `row.brand_data` is inside the PATCH path (`:26271`), and the one async read (`_bbLoadSitePages`) returns `site_pages` locally and never writes back to the row. So **`brand_data` (11 academies) and `kpi_data` (7) also render blank**, and `_bbBrandChanged`/`_bbKpisChanged` post a full object of empty strings which the RPC's `COALESCE(patch->'brand_data', col)` writes wholesale. `_bbGuardBlanks` CANNOT cover them, since the patch value is a non-blank object. **The real fix is async hydration of the Brand and KPI cards: a separate build.** `tax_config` and `public_name` genuinely DO hydrate async and are fine.
+
+| 70 | Async-hydrate the Brand and KPI cards. Same data-loss class as #69 but needs hydration, not a blank guard: `brand_data` (11 academies) and `kpi_data` (7) render blank and are written back wholesale as empty objects | BLOCKER | queued | Do not attempt with `_bbGuardBlanks`; the patch value is a non-blank object |
+
+**⚠️ COLLISION, resolution already worked out:** the fix and the foundation build both edit `_bbGenChanged`. Keep the foundation's `public_name` spread INSIDE the fix's `_bbGuardBlanks({...}, [...])` wrapper, and leave `public_name` OUT of the guarded key list so its own loaded-flag stays the sole authority and a deliberate clear still works.
+
+**No repair of already-NULLed rows was attempted.** Assessing and repairing existing data loss is a separate decision for Zoran.
+
 ## ⚠️ #69 LIVE DATA-LOSS BUG, orchestrator-verified 2026-07-27
 
 `CLIENT_SELECT_COLS` in `public/client-portal.html` **omits `legal_name`, `address` and `ein`** (confirmed: only `business_name` of the four is present). They therefore render blank on the Business Basics card, and **every keystroke on that card NULLs them via the RPC.** Prod exposure confirmed by query: **10 academies have a legal name, 12 have an address, 7 have an EIN.**

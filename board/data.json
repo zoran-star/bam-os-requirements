@@ -1,14 +1,14 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "Restructured: every chat runs its own build and test loop, relays only what matters up",
+    "Data-loss bug is wider than found: Brand and KPI cards affected too, 18 more academies",
     "Serialized to one track: templating first, testimonials after. No parallel design",
     "sync_class write path now needs a test: it is a single point of failure with no detection behind it",
-    "Templating branch pushed: 36 files, builders can read the plans and the renderer now",
-    "Weekly drift check cancelled: the boundary gets enforced at write time instead",
-    "Reviews chat caught 5 gaps in the in-flight migration, incl. RLS that would let academies fabricate reviews"
+    "Templating branch pushed: 36 files, builders can read the plans and the renderer now"
   ],
   "orchestrator": {
-    "focus": "ONE TRACK: automation templating only. Testimonial connection is parked until it finishes, then it reads what was actually built and ties in.",
+    "focus": "Chats now own their own builders and testers; I keep the goals, the queue, routing and collisions. One track: automation templating.",
     "needs": [
       "Do NOT edit the Business Basics card until #69 is fixed, it silently wipes legal name, address and EIN",
       "Work through the GTA automation map in the sync chat, it is the master spec",
@@ -267,10 +267,17 @@
       "owner": "Zoran"
     },
     {
-      "id": 69,
-      "title": "DATA LOSS: editing Business Basics NULLs legal_name, address, ein",
+      "id": 70,
+      "title": "Brand + KPI cards blank and overwrite: needs async hydration",
       "severity": "blocker",
-      "status": "verified, needs fix",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 69,
+      "title": "Business Basics data loss (legal name, address, EIN, phone)",
+      "severity": "blocker",
+      "status": "FIXED, in review",
       "owner": "us"
     },
     {
