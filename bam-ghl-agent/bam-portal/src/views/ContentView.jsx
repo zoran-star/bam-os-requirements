@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import { supabase } from "../lib/supabase";
 import MediaLightbox from "../components/MediaLightbox";
 import { mlIsMedia, mlDownloadUrl } from "../lib/media";
+import { uploadFileResumable } from "../lib/uploads";
 
 const STORAGE_BUCKET = "ticket-files";
 const STORAGE_FOLDER = "guide-cards";
@@ -1550,6 +1551,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
   const [finalsDragOver, setFinalsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadDone, setUploadDone] = useState(0);   // completed files this batch
+  const [uploadPct, setUploadPct] = useState(0);     // overall bytes-sent percent
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
   const [sendModalOpen, setSendModalOpen] = useState(false);
@@ -1583,25 +1585,35 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
     if (!finalsToUpload.length) return;
     setUploading(true);
     setUploadDone(0);
+    setUploadPct(0);
     try {
       const files = finalsToUpload;
       const results = new Array(files.length);
+      // Aggregate byte-level progress across the parallel workers so the
+      // button shows a real percent instead of a blind "0/1" on big videos.
+      const sentBytes = new Array(files.length).fill(0);
+      const totalBytes = files.reduce((a, f) => a + (f.size || 0), 0) || 1;
+      const bumpPct = () => setUploadPct(Math.min(99, Math.round((sentBytes.reduce((a, b) => a + b, 0) / totalBytes) * 100)));
       let nextIdx = 0;
       async function worker() {
         for (;;) {
           const i = nextIdx++;
           if (i >= files.length) return;
           const file = files[i];
-          const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
           const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-          const path = `${TICKET_STORAGE_FOLDER}/${ticket.id}/${uid}-${safe}`;
-          const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
-            contentType: file.type || "application/octet-stream",
-            cacheControl: "3600",
+          // Deterministic path per file VERSION (size+mtime): re-attempting the
+          // same file lets TUS resume the same object instead of starting over,
+          // and the recorded URL stays correct on resume.
+          const stamp = `${file.size || 0}-${file.lastModified || 0}`;
+          const path = `${TICKET_STORAGE_FOLDER}/${ticket.id}/${stamp}-${safe}`;
+          const url = await uploadFileResumable({
+            accessToken: session?.access_token,
+            bucket: STORAGE_BUCKET,
+            path,
+            file,
+            onProgress: (sent) => { sentBytes[i] = sent; bumpPct(); },
           });
-          if (upErr) throw new Error(`Storage upload failed (${file.name}): ${upErr.message}`);
-          const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-          const entry = { name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || "" };
+          const entry = { name: file.name, url, size: file.size || 0, mime: file.type || "" };
           const folder = finalsFolder.trim();
           if (folder) entry.folder = folder;
           results[i] = entry;
@@ -2024,7 +2036,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
               padding: "10px 18px", background: tk.accent, color: "#0A0A0B",
               border: 0, borderRadius: 8, fontWeight: 700, cursor: uploading ? "wait" : "pointer", fontSize: 13,
               opacity: uploading ? 0.6 : 1,
-            }}>{uploading ? `Uploading… ${uploadDone}/${finalsToUpload.length}` : `Upload ${finalsToUpload.length} file${finalsToUpload.length === 1 ? "" : "s"}`}</button>
+            }}>{uploading ? `Uploading… ${uploadPct}% (${uploadDone}/${finalsToUpload.length})` : `Upload ${finalsToUpload.length} file${finalsToUpload.length === 1 ? "" : "s"}`}</button>
           )}
         </div>
       </Card>
