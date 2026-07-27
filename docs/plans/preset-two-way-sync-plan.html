@@ -86,6 +86,29 @@
     <cite>Zoran, 27 Jul 2026 - the directive this plan is built from</cite>
   </div>
 
+
+  <div class="card" style="border-color:rgba(229,103,78,.45);background:linear-gradient(180deg,rgba(229,103,78,.10),rgba(229,103,78,.02));margin:0 0 26px">
+    <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);font-weight:800;margin-bottom:9px">Superseded in part &middot; 27 Jul 2026</div>
+    <div style="font-size:19px;font-weight:800;line-height:1.32;margin-bottom:10px">The weekly check is dead. A structural fix replaced it.</div>
+    <p style="margin:0 0 10px;color:var(--tx2);font-size:14.5px">Zoran, verbatim: "we don't need that weekly check since our goal is to set up the sales system in a way where it's either the preset or custom stuff that gets edited."</p>
+    <p style="margin:0 0 10px;color:var(--tx2);font-size:14.5px">If every row is explicitly preset-owned or academy-owned <b>at the moment it is written</b>, and owners have no free-text override, the drift this document was built to detect cannot silently form. Detecting drift weekly was always a workaround for an ambiguous boundary. Removing the ambiguity is the stronger fix.</p>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="warn" style="margin:0">
+        <b>Dropped</b>
+        <p>Item B, the reverse check. Item C, the weekly GitHub Action and the "Preset drift" issue. The CI read-only key question, now moot. The seven-day governance window, which evaporates with the check.</p>
+      </div>
+      <div class="rule" style="margin:0">
+        <b>Now load-bearing, not belt-and-braces</b>
+        <p><span class="m">sync_class</span> was a second line of defence behind a safety net. It is now the ONLY mechanism, so strictest-wins (<span class="m">attributed &gt; local &gt; shared</span>, template beats step) is the enforcement rather than metadata. Item G matters more too: the model only holds once GTA actually IS the clean reference.</p>
+      </div>
+    </div>
+    <div class="warn" style="margin-top:14px;background:rgba(224,163,60,.08);border-color:rgba(224,163,60,.32)">
+      <b style="color:var(--amber)">The residual, written down so nobody rediscovers it the hard way</b>
+      <p>The structural model assumes nobody edits GTA's rows as a special case any more. Under the old plan a weekly issue would have caught that; under this one, nothing does. That is fine while GTA is the reference and its rows ARE the preset. But if GTA ever gets a genuine one-off that is not meant to travel, <b>it must be marked <span class="m">local</span> at the moment it is written</b>, or it silently becomes everyone's.</p>
+    </div>
+    <p style="margin:12px 0 0;color:var(--tx3);font-size:13px">Sections 03, 08 and build items B and C below are kept for their reasoning, not as work. The override-tracing rule in section 03 survives as <b>design guidance</b> for anyone wiring blocks and resolvers: it is still the right way to tell a live leak from a dead literal.</p>
+  </div>
+
   <!-- ───────────────────────── 1. THE DRIFT ───────────────────────── -->
   <h2><span class="n">01</span>Why it drifted without anyone seeing</h2>
   <p class="lede">The divergence checker only walks one way. Same verdict word for opposite problems, so neither got acted on.</p>
@@ -150,7 +173,7 @@
   </div>
 
   <!-- ───────────────────────── 3. OVERRIDE TRACING ───────────────────────── -->
-  <h2><span class="n">03</span>How the check decides what is real</h2>
+  <h2><span class="n">03</span>How to tell a live leak from a dead literal <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">&mdash; kept as design guidance</span></h2>
   <p class="lede">A GTA literal in a source file is not evidence of a leak. Three false positives in one day came from assuming it was. This is the rule that separated live from dead in every case.</p>
 
   <div class="rule" style="margin-bottom:16px">
@@ -503,7 +526,7 @@ exit 1
   </details>
 
   <details>
-    <summary>G. Clean GTA's own rows <span class="sev s-s">SCALE</span><span class="wave">wave 1, do first</span></summary>
+    <summary>G. Clean GTA's own rows <span class="sev s-b">BLOCKER</span><span class="wave">wave 1, do first</span></summary>
     <div class="body">
       <p>Small, independent, and makes every later run cleaner. Follows directly from GTA being the reference.</p>
       <h4>Build</h4>
@@ -566,7 +589,7 @@ exit 1
   </details>
 
   <details>
-    <summary>B. Override-tracing reverse check <span class="sev s-s">SCALE</span><span class="wave">wave 2</span></summary>
+    <summary>B. Override-tracing reverse check <span class="sev" style="background:rgba(229,103,78,.16);color:var(--red)">DROPPED</span><span class="wave">superseded 27 Jul</span></summary>
     <div class="body">
       <h4>Build</h4>
       <ul>
@@ -584,7 +607,7 @@ exit 1
   </details>
 
   <details>
-    <summary>C. Weekly drift issue <span class="sev s-s">SCALE</span><span class="wave">wave 2</span></summary>
+    <summary>C. Weekly drift issue <span class="sev" style="background:rgba(229,103,78,.16);color:var(--red)">DROPPED</span><span class="wave">superseded 27 Jul</span></summary>
     <div class="body">
       <h4>Build</h4>
       <ul>

@@ -136,6 +136,15 @@ and position; never touch an existing row's `enabled` flag. San Jose client id:
 - Canonical defaults: `bam-ghl-agent/bam-portal/api/form-intro-automations.js`
 - Divergence checker: `bam-ghl-agent/bam-portal/scripts/check-automation-divergence.mjs`
   (detects an academy drifting FROM the master, never the master lagging behind GTA -
-  that one-way blind spot is what let onboarding ship at 3 steps against GTA's 8)
+  that one-way blind spot is what let onboarding ship at 3 steps against GTA's 8).
+  **A reverse check was planned and then dropped, 2026-07-27.** Zoran replaced the
+  detective control with a structural one: every row is explicitly preset-owned or
+  academy-owned via `sync_class` at write time, and owners have no free-text override, so
+  the drift a reverse check would have found cannot silently form. `sync_class` is now the
+  only mechanism rather than a second line of defence, which makes strictest-wins
+  (`attributed > local > shared`, template beats step) load-bearing.
+  **Residual:** nothing now catches a one-off edit to GTA's rows. That is fine while GTA
+  IS the preset, but a genuine GTA-only change must be marked `local` when it is written
+  or it silently becomes everyone's.
 - The templating plan: `docs/plans/email-skill-rework.html`
 - The classification: `docs/plans/gta-automation-map.html`
