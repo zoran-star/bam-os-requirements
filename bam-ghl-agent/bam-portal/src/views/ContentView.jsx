@@ -2546,8 +2546,12 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
     catch (e) { alert("Download failed: " + (e.message || e)); }
     finally { setZipping(false); setDlNote(""); }
   };
+  // Links (text/uri-list) can't be zipped/downloaded but ARE valid finals -
+  // "ready to go" client submissions often arrive as a Drive/iCloud link.
+  const promotable = list.filter(f => !!f.url);
+  const promoteCount = promotable.filter(f => selected.has(keyOf(f))).length;
   const promoteSelected = async () => {
-    const picked = dlList.filter(f => selected.has(keyOf(f)));
+    const picked = promotable.filter(f => selected.has(keyOf(f)));
     if (!picked.length || !onPromote) return;
     setPromoting(true);
     try { await onPromote(picked); setSelected(new Set()); }
@@ -2577,7 +2581,7 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
 
   const tile = (f, i) => (
     <div key={i} style={{ position: "relative" }}>
-      {isDl(f) && (
+      {(isDl(f) || (onPromote && f.url)) && (
         <label onClick={e => e.stopPropagation()} style={{
           position: "absolute", top: 7, left: 7, zIndex: 3,
           width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
@@ -2615,13 +2619,13 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
           {zipping ? (dlNote || "Preparing…") : `↓ Download all (${dlList.length})`}
         </button>
       )}
-      {onPromote && selCount > 0 && (
+      {onPromote && promoteCount > 0 && (
         <button type="button" onClick={promoteSelected} disabled={promoting} style={{
           padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, fontFamily: "inherit",
           cursor: promoting ? "wait" : "pointer",
           border: `1px solid ${tk.accent}`, background: "transparent", color: tk.accent,
-        }} title="The file is already in storage - this adds it to Finals without re-uploading">
-          {promoting ? "Adding…" : `→ Use ${selCount} as final${selCount === 1 ? "" : "s"}`}
+        }} title="Already in storage (or a link) - adds it to Finals without re-uploading">
+          {promoting ? "Adding…" : `→ Use ${promoteCount} as final${promoteCount === 1 ? "" : "s"}`}
         </button>
       )}
       {onRemove && selCount > 0 && (
