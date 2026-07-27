@@ -27,6 +27,7 @@ import { resolveAgentActor } from "./agent/_auth.js";
 import { FORM_INTRO_DEFAULTS } from "./form-intro-automations.js";
 import { presetAutomationKeys } from "./agent/presets.js";
 import { seedAutomations } from "./agent/seed-automations.js";
+import { buildStepRow } from "./_automation-step.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -812,12 +813,10 @@ async function handler(req, res) {
       if (!b.automation_id || !(await ownsAutomation(b.automation_id))) return res.status(403).json({ error: "unknown automation" });
       if (!b.body || !String(b.body).trim()) return res.status(400).json({ error: "body required" });
       if (!["sms", "email"].includes(b.channel)) return res.status(400).json({ error: "channel must be sms|email" });
-      const row = {
-        automation_id: b.automation_id, position: Number(b.position) || 0,
-        wait_amount: Number(b.wait_amount) || 0, wait_unit: b.wait_unit || "days",
-        channel: b.channel, subject: b.subject ?? null, body: String(b.body),
-        enabled: b.enabled === undefined ? true : !!b.enabled, updated_at: new Date().toISOString(),
-      };
+      // Row shape lives in _automation-step.js. On UPDATE it deliberately OMITS
+      // `enabled` unless the caller sent it, so saving a step's wording can never
+      // re-enable a step a human turned off (the portal editor sends no `enabled`).
+      const row = buildStepRow(b);
       let r;
       if (b.id) r = await sb(`automation_steps?id=eq.${encodeURIComponent(b.id)}&automation_id=eq.${b.automation_id}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(row) });
       else r = await sb(`automation_steps`, { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify([row]) });
