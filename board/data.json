@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "Verifier EXECUTED the Miami failure again: fake 5.0 ratings still possible under a manual label",
+    "Decided: real reviews always outrank typed quotes, and one builder owns brand_data end to end",
     "Restructured: every chat runs its own build and test loop, relays only what matters up",
     "Data-loss bug is wider than found: Brand and KPI cards affected too, 18 more academies",
-    "Serialized to one track: templating first, testimonials after. No parallel design",
-    "sync_class write path now needs a test: it is a single point of failure with no detection behind it",
-    "Templating branch pushed: 36 files, builders can read the plans and the renderer now"
+    "Serialized to one track: templating first, testimonials after. No parallel design"
   ],
   "orchestrator": {
     "focus": "Chats now own their own builders and testers; I keep the goals, the queue, routing and collisions. One track: automation templating.",
@@ -259,6 +259,13 @@
     }
   ],
   "queue": [
+    {
+      "id": "bounce1",
+      "title": "BLOCKING: fabricated 5.0 aggregate still reachable via manual rows",
+      "severity": "blocker",
+      "status": "bounced to builder",
+      "owner": "us"
+    },
     {
       "id": "early-win",
       "title": "DECIDE: close the social_proof leak in days using a review-link field, no Google approval needed",

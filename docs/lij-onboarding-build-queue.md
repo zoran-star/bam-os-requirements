@@ -171,6 +171,18 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 
 **Verdict: ONE TABLE. Do NOT create `google_reviews`; extend `testimonials`.** It is well shaped for manual quotes and already anticipates sync via `external_id` + the unique index on `(client_id, source, external_id)`. Two tables feeding the same render slots would be two sources of truth for the same quote, the exact bug class this workstream exists to kill.
 
+## ⚠️ SECURITY VERIFICATION: 7 CLAIMS HOLD (EXECUTED), 2 REAL DEFECTS FOUND (2026-07-27)
+
+Run against a throwaway local Postgres with faithful `authenticated`/`service_role` roles and the real `my_client_ids()`/`is_staff()` bodies. **Executed, not reasoned.**
+
+**HOLDS:** google insert blocked (trigger fires before RLS), laundering blocked, per-column guard holds on quote/author/rating/review_created_at/external_id, starred-only update succeeds, manual CRUD works, google delete is a silent 0-row no-op, cross-tenant read returns 0 rows, service_role + staff both write google rows, index is rating-first, trigger order is `guard_source` before `updated_at`. Already covered: NULL source, `'Google'`, `' google '`, foreign `client_id` on insert and update, `ON CONFLICT (id)` upsert, flip-to-manual-then-delete. Migration genuinely UNAPPLIED, zero seed rows, zero academy literals. Render claims correct: `public_name || business_name` fallback, whole community line drops (same-line AND own-line lead-in), entire gold CTA `<table>` vanishes with no dead anchor.
+
+**⛔ BOUNCE 1, BLOCKING - THE FABRICATED-RATING HOLE.** The migration STATES manual quotes carry no rating and "must never be shown as if it did", but nothing enforces it. **Executed:** an academy inserted `source='manual', rating=5, author='Sarah K.'` with forged `external_id`/`review_created_at`/`synced_at` and produced **4 rows, avg_rating 5.0**. The `source` LABEL is locked; the **SUBSTANCE of the Miami failure - invented names plus a fabricated 5.0 aggregate - is still fully reachable, just badged `manual`.** It also contradicts Zoran's hierarchy ruling, which currently lives only in prose. **Fix (written and regression-checked by the verifier):** extend `testimonials_guard_source` (INSERT branch `:289`, else branch `:314`) to RAISE when a NON-STAFF caller sets `rating`, `external_id`, `review_created_at` or `synced_at` on a manual row. Trigger-level, not a CHECK, so staff/service can still seed. **Ship no reader aggregate until this lands.**
+
+**⚠️ BOUNCE 2, advisory.** The guard short-circuits on `current_user in ('service_role','postgres','supabase_admin')` (`:282`), so a **`SECURITY DEFINER` RPC owned by postgres bypasses BOTH RLS and the trigger** - proven by executing one. None exists today, but **this repo writes SECURITY DEFINER RPCs as a habit** (`update_client_basics` is one, in this very migration). Needs a comment at `:274`: no SECURITY DEFINER function may ever write `testimonials`.
+
+**Nits:** `relforcerowsecurity` false (table owner bypasses RLS, normal for Supabase); `anon` gets 0 rows rather than an error, fine now but **the future public free-trial cards will need a read policy.** **No collision** with the `CLIENT_SELECT_COLS` fix (hunks at 26317-33795 vs the constant at 60790). Open question: `public_name` is hydrated via the `_bbGenHydrateTax` side-channel because it sits outside `CLIENT_SELECT_COLS`; now that the fix adds three columns to that constant, does `public_name` belong there too?
+
 **Five gaps sent back to the builder while the migration is still UNAPPLIED** (cheap now, expensive after it ships):
 1. **NO `rating`** - the blocker. "Starred first, then highest-to-lowest, below 4 never displays" and the aggregate header are all uncomputable without it. `rating smallint check (rating is null or rating between 1 and 5)`, null for manual.
 2. **NO `review_created_at`** - `created_at` is when OUR row was written. On first sync every review would look like it arrived today, and the free-trial cards display review dates.
@@ -360,7 +372,15 @@ Artifacts, both pushed on `claude/optimistic-leavitt-db0107`:
 
 **Nothing is stubbed.** No resolver exists, not even one returning empty: a function answering "none on file" looks harmless but gets unpicked, because the real one needs a different shape once google-sourced starred rows exist.
 
-## ⚠️ OPEN, ZORAN'S CALL: the pinned-testimonial HIERARCHY
+## ✅ DECIDED: THE TESTIMONIAL HIERARCHY (Zoran, 2026-07-27). Tier 1, locked, auto-propagating.
+**Real reviews always outrank typed ones.** Order: pinned Google reviews -> pinned typed quotes -> remaining Google reviews highest-rating-down -> remaining typed quotes newest-first. Under 4 stars stays owner-card-only. **A pinned typed quote still sits BEHIND a pinned real review.** A typed quote **never wears a star rating, never wears a "Google review" badge or a date, and never moves the aggregate.** The hierarchy is tier 1 (locked, no per-academy reordering); the quotes themselves are tier 3.
+
+**⚠️ THIS RULE MUST BE ENFORCED IN THE DATABASE, NOT PROSE.** Verification proved an academy can currently insert `source='manual', rating=5, author='Sarah K.'` with forged `external_id`/`review_created_at`/`synced_at` and produce a 4-row, avg 5.0 aggregate. See the bounce below.
+
+## ✅ DECIDED: `brand_data` ownership (Zoran, 2026-07-27)
+**ONE builder owns both** the #70 hydration fix and the templating wave's `brand_data` cleanup (item 1c), so a single agent owns that column's read path, write path and shape together. Splitting them means two builders reasoning about the same hydration.
+
+## ORIGINAL, superseded: the hierarchy was open
 Proposed by the reviews chat, put to Zoran, popup dismissed, so **NOT decided and deliberately not propagated.** It matters to the active templating track because it governs which quote leads in the testimonials email:
 - Pinned Google reviews -> pinned typed-in quotes -> remaining Google reviews highest-rating-down -> remaining typed quotes newest-first. Under 4 stars stays owner-card-only.
 - A pinned typed quote still sits BEHIND a pinned real review.
