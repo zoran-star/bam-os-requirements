@@ -81,6 +81,12 @@ function locFromVars(vars = {}) {
     // blocks that depend on them do not render at all. See onboarding-emails.js.
     onlineProgramsUrl: String(vars.online_programs_url || ""),
     referralOffer: normalizeReferral(vars.referral_offer),
+    // Link facts. Deliberately NOT added to the hardcoded LOCATIONS entry above -
+    // they only ever come from the academy's own row, so no academy can inherit
+    // another's group invite or review link.
+    communityUrl: String(vars.location_community_url || ""),
+    communityPlatform: String(vars.location_community_platform || ""),
+    reviewUrl: String(vars.location_review_url || ""),
   };
 }
 
@@ -107,7 +113,12 @@ export function clientVars(client) {
   const c = client || {};
   const domain = c.website_setup && c.website_setup.domain;
   return {
-    location_name: c.business_name || "",
+    // The name PARENTS see. `business_name` is the INTERNAL label ("BAM GTA"),
+    // which is what this used to render - so parents read our own shorthand back
+    // in their messages. `public_name` is the parent-facing one ("By Any Means
+    // Toronto"); falling back to business_name keeps every academy that has not
+    // filled it in rendering exactly what it rendered before.
+    location_name: c.public_name || c.business_name || "",
     location_website: domain ? `https://${domain}` : "",
     location_owner: c.owner_name ? String(c.owner_name).trim().split(/\s+/)[0] : "",
     location_email: c.email || "",
@@ -117,7 +128,28 @@ export function clientVars(client) {
     // the dependent blocks do not render and nothing throws.
     online_programs_url: c.online_programs_url || "",
     referral_offer: c.referral_offer || null,
+    // Community group + review link. Both are LINK facts: empty means the line
+    // or button that carries them disappears (see dropEmptyLinkMentions /
+    // dropEmptyShellLinks), never renders dead.
+    location_community_url: c.community_group_url || "",
+    location_community_platform: communityPlatformLabel(c.community_group_platform),
+    location_review_url: c.google_review_url || "",
   };
+}
+
+// The platform key -> the word that names the group in copy ("Join the WhatsApp
+// group"). Stored normalized, rendered here, so the display wording lives in
+// code and one academy's label can never be another's. An unknown or missing
+// platform renders NOTHING rather than guessing, which leaves the surrounding
+// copy reading "Join the group" - still correct, still not a placeholder.
+const COMMUNITY_PLATFORMS = {
+  whatsapp: "WhatsApp",
+  facebook: "Facebook",
+  discord: "Discord",
+  telegram: "Telegram",
+};
+function communityPlatformLabel(key) {
+  return COMMUNITY_PLATFORMS[String(key || "").toLowerCase()] || "";
 }
 
 // Best-effort city from a street address ("1051 W San Fernando St, San Jose, CA
@@ -136,9 +168,9 @@ function cityFromAddress(address) {
 // fallbacks so a missing name never sends as a raw {{token}}). Tolerates spaces inside
 // the braces. Only touches these known tokens - the shell placeholders (UPPERCASE) are
 // left for the caller to fill.
-// Remove every reference to a website we do not have, at the SMALLEST unit that
-// still reads correctly - so an academy with no domain yet sends a shorter
-// message, never a broken one and never an empty one.
+// Remove every reference to a LINK we do not have, at the SMALLEST unit that
+// still reads correctly - so an academy missing a link sends a shorter message,
+// never a broken one and never an empty one.
 //
 //   line that is a BARE LINK ("{{location.website}}/free-trial")
 //       -> drop the line, plus a lead-in line above it ending in ":"
@@ -151,19 +183,27 @@ function cityFromAddress(address) {
 // an empty body reached the SMS provider, got rejected, and burned all 3 retry
 // attempts silently. Ghosted step 2 lost its entire value proposition the same
 // way. Sentence-level keeps both messages intact and sending.
-const WEBSITE_TOKEN = /\{\{\s*location\.website\s*\}\}/;
-function dropWebsiteMentions(text) {
+//
+// Generalized 2026-07-27 from website-only to EVERY link fact an academy may not
+// have yet: the website, the community group invite, and the Google review link.
+// One rule for all of them - no fact, no output.
+const LINK_TOKENS = ["location.website", "location.community_link", "location.review_link"];
+const tokenRe = (name, flags) => new RegExp("\\{\\{\\s*" + name.replace(/\./g, "\\.") + "\\s*\\}\\}", flags);
+function dropEmptyLinkMentions(text, emptyTokens) {
+  if (!emptyTokens.length) return String(text);
+  const EMPTY = new RegExp(emptyTokens.map((t) => tokenRe(t).source).join("|"));
+  const BARE = new RegExp("^\\s*\\S*(?:" + emptyTokens.map((t) => tokenRe(t).source).join("|") + ")\\S*\\s*$");
   const lines = String(text).split("\n");
   const out = [];
   for (const line of lines) {
-    if (!WEBSITE_TOKEN.test(line)) { out.push(line); continue; }
+    if (!EMPTY.test(line)) { out.push(line); continue; }
     // A bare link line: the whole line is the token plus its path, no prose.
-    const bareLink = /^\s*\S*\{\{\s*location\.website\s*\}\}\S*\s*$/.test(line);
+    const bareLink = BARE.test(line);
     let kept = "";
     if (!bareLink) {
       kept = line
         .split(/(?<=[.!?])\s+/)
-        .filter((sentence) => !WEBSITE_TOKEN.test(sentence))
+        .filter((sentence) => !EMPTY.test(sentence))
         .join(" ")
         .trim();
     }
@@ -196,18 +236,27 @@ export function resolveMergeVars(html, L, vars = {}) {
     "location.city": vars.location_city || L.city || "",
     "location.name": vars.location_name || L.full || "",
     "location.website": vars.location_website || L.siteUrl || "",
+    // Community group: the LINK gates the line, the PLATFORM only names it.
+    // Copy reads "Join the {{location.community_platform}} group:
+    // {{location.community_link}}" - with no platform on file that renders
+    // "Join the group", and with no link the whole line goes.
+    "location.community_link": vars.location_community_url || L.communityUrl || "",
+    "location.community_platform": vars.location_community_platform || L.communityPlatform || "",
+    // Review ask. No link on file means the CTA is removed outright, in plain
+    // text here and as a button by dropEmptyShellLinks.
+    "location.review_link": vars.location_review_url || L.reviewUrl || "",
     "location_owner.first_name": vars.location_owner || L.ownerFirst || "",
     // Filled at send time by the worker (e.g. "Our next session is Tue 6pm. ").
     // Empty string when no slot is known so the sentence just drops out.
     "next_session": vars.next_session || "",
   };
   let out = html;
-  // A blank {{location.website}} must not leave a link pointing at nothing, but
-  // it must ALSO not silently delete the message around it. Runs before
-  // substitution, on plain-text bodies only (a full HTML document is skipped -
-  // its links are shell placeholders, handled by dropEmptyShellLinks).
-  if (!map["location.website"] && !/^\s*<(?:!doctype|html)/i.test(out)) {
-    out = dropWebsiteMentions(out);
+  // A blank link token must not leave a link pointing at nothing, but it must
+  // ALSO not silently delete the message around it. Runs before substitution, on
+  // plain-text bodies only (a full HTML document is skipped - its links are
+  // shell placeholders, handled by dropEmptyShellLinks).
+  if (!/^\s*<(?:!doctype|html)/i.test(out)) {
+    out = dropEmptyLinkMentions(out, LINK_TOKENS.filter((t) => !map[t]));
   }
   for (const [k, val] of Object.entries(map)) {
     const token = "\\{\\{\\s*" + k.replace(/\./g, "\\.") + "\\s*\\}\\}";
@@ -287,14 +336,21 @@ function fillShell(html, L, { pre, unsub, reason, title }) {
 }
 
 // An academy with identity fields still empty (no domain / support email /
-// instagram on file) must ship NO broken or borrowed links: drop empty footer
-// anchors (with their dot separators) and any CTA table whose button href came
-// out site-relative (the domain was blank).
+// instagram / review link on file) must ship NO broken or borrowed links: drop
+// empty footer anchors (with their dot separators) and any CTA table whose
+// button href came out empty or site-relative (the fact was blank).
 function dropEmptyShellLinks(html) {
   const SEP = '<span[^>]*>&nbsp;&nbsp;&middot;&nbsp;&nbsp;<\\/span>\\s*';
   const A = '<a href="(?:mailto:)?"[^>]*>(?:(?!<\\/a>)[\\s\\S])*?<\\/a>';
   html = html.replace(new RegExp('\\s*' + SEP + A, "g"), "");
   html = html.replace(new RegExp(A + '\\s*' + SEP, "g"), "");
+  // The gold CTA button, when its link fact is missing: take the WHOLE table, not
+  // just the anchor. Stripping the anchor alone would leave a gold box with no
+  // label and no destination, which is exactly the "dead button" this forbids.
+  // Must run BEFORE the bare-anchor sweep below, which would otherwise eat the
+  // <a> first. Pinned to the gold cell so it can only ever match a real CTA.
+  const GOLD = '(?:(?!<table)(?!<\\/table>)[\\s\\S])*?bgcolor="#E2DD9F"(?:(?!<table)(?!<\\/table>)[\\s\\S])*?';
+  html = html.replace(new RegExp('\\s*<table[^>]*>' + GOLD + '<a href=""[^>]*>(?:(?!<table)[\\s\\S])*?<\\/table>', "g"), "");
   html = html.replace(new RegExp(A, "g"), "");
   html = html.replace(/<table[^>]*>(?:(?!<table)(?!<\/table>)[\s\S])*?<a href="\/[^"]*"(?:(?!<table)[\s\S])*?<\/table>/g, "");
   return html;
