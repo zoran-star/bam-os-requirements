@@ -268,6 +268,14 @@ Artifacts, both pushed on `claude/optimistic-leavitt-db0107`:
 
 **PROCESS GATE (Zoran, 2026-07-27):** the sync room must show him a **MOCKUP of the user stories** and get his confirmation BEFORE any build. Sequence is fixed: mockup -> his confirmation -> plan to the orchestrator -> builder subagent -> then seed San Jose in that chat.
 
+## BUILD 5 / GOOGLE REVIEWS NOW HAS AN OWNER: the **TESTIMONIAL CONNECTION** chat (2026-07-27)
+
+Spec'd twice, never started, and the handoff's own audience line ("a NEW chat building this end to end") was never acted on. That chat now exists. Its sequence, set by Zoran: scan -> visual mockup for him -> **WAIT for the automation templating build** -> verify that build against its plan -> report to the orchestrator -> Zoran confirms -> then read what was actually built and update its plan against reality.
+
+**⚠️ LIVE TABLE COLLISION handed to it to resolve.** The automation foundation builder is creating `testimonials (id, client_id, quote, author, source manual|google, starred, created_at)` RIGHT NOW, while the Build 5 handoff specifies `google_reviews (google_review_id UNIQUE per client, author_name, rating, text, review_created_at, starred, synced_at...)`. `testimonials.source` already accepts `'google'` and both carry `starred`. **Nobody reconciled them.** Open question for its plan: is `testimonials` the unified surface Google reviews sync INTO, are they two tables with a join, or should one absorb the other? Two sources of truth for the same quotes is the exact bug class this workstream exists to kill. If the in-flight table is shaped wrong, redirect the builder before it lands.
+
+**⚠️ The long pole remains unfiled:** the Google Business Profile API application. Days to weeks, and every fabricated 5-star card and borrowed testimonial stays live until it clears. Now on Zoran's action list via that chat's card.
+
 ## TESTIMONIAL GUARDRAIL: ZORAN'S RULINGS (2026-07-27). Plan doc `docs/plans/testimonial-guardrail-plan.html`
 
 1. **nurture-3 + onboarding-testimonials -> QUOTE-FREE VARIANT.** Drip still sends on schedule; the quote block drops out until the academy has reviews connected. **The only build item from that room**, folded into sync item A. Rationale: approving a drip is a routine click that would otherwise newly switch on re-attributed GTA quotes.

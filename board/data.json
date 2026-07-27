@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "TESTIMONIAL CONNECTION now owns the Google reviews build; mockup coming",
     "Zoran confirmed the plan: building now. Foundation builder running",
     "Item 1 applied to prod: 10 academies' website domains backfilled, GTA included",
     "Big change: 5 designed emails are AUTHORED PER ACADEMY, not copied. Onboarding left the sales preset",
-    "Verified: GTA's brand copy claims Friday training. GTA has never trained on a Friday",
-    "Two new wizard approval steps: the preset promised approval that never existed"
+    "Verified: GTA's brand copy claims Friday training. GTA has never trained on a Friday"
   ],
   "orchestrator": {
     "focus": "Preset convergence is the whole game now. The sync chat owns the standard AND seeding San Jose through it. It is building you a mockup of the user stories first; nothing gets built until you confirm it.",
@@ -636,11 +636,28 @@
       "column": null
     },
     {
-      "name": "Plan: testimonial guardrails",
-      "sidebar": "Plan: testimonial guardrails",
-      "state": "done",
-      "one": "Decided. Quote-free variant is the only build, folded into the sync chat. Archive it",
-      "column": "done"
+      "name": "TESTIMONIAL CONNECTION",
+      "sidebar": "TESTIMONIAL CONNECTION",
+      "state": "white",
+      "one": "Now owns connecting Google reviews end to end. Scanning, then building you a visual mockup",
+      "column": "infra",
+      "actions": [
+        {
+          "id": "google-api-app",
+          "title": "File the Google Business Profile API application",
+          "why": "Nothing about real reviews works until Google approves the Cloud project, and it has never been applied for. Days to weeks. Every fabricated 5-star card and every borrowed testimonial stays live until this clears.",
+          "whyHuman": "It is a business application against your Google Cloud project, tied to your identity.",
+          "steps": [
+            "Open Google Cloud Console for the existing project (GOOGLE_CLIENT_ID/SECRET are already in prod)",
+            "Request access to the Business Profile APIs",
+            "Submit the business justification, TESTIMONIAL CONNECTION can draft it for you",
+            "Confirm each academy's Google Business Profile is manageable by an account we can OAuth as"
+          ],
+          "code": null,
+          "verify": "Google approves Business Profile API access on the project, and the chat can start syncing an academy's reviews.",
+          "never": "Do not build curation on the Places API as a substitute. It only returns about 5 picked reviews, which makes starring and hiding meaningless."
+        }
+      ]
     },
     {
       "name": "AUTOMATION TEMPLATING",
@@ -881,8 +898,8 @@
     },
     {
       "id": "infra",
-      "title": "Unblock phone + tracking",
-      "goal": "Long-lead infrastructure that gates every academy, not just San Jose"
+      "title": "Unblock phone, tracking + reviews",
+      "goal": "Long-lead infrastructure gated on outside approvals, not on our code"
     },
     {
       "id": "done",
