@@ -298,8 +298,10 @@
       "items": [
         "Approve confirm automations",
         "Enable drips + re-enable nurture 3",
+        "Re-run entry-point seed (0 today)",
+        "Re-seed onboarding from fixed master",
         "Publish website",
-        "Verify domain + set email_domain",
+        "Stripe connect",
         "Owner phones set",
         "Seed price catalog + $40 fee"
       ],
@@ -621,6 +623,13 @@
       "severity": "friction",
       "status": "your call",
       "owner": "Zoran"
+    },
+    {
+      "id": 62,
+      "title": "SJ has 0 entry points and 0 funnels (one idempotent button press)",
+      "severity": "friction",
+      "status": "switch list",
+      "owner": "us"
     }
   ],
   "chatMap": [
