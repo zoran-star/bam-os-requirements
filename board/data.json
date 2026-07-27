@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "Orchestrator handoff written; MISTER_ORCHESTRATOR II spinning up on the same board",
+    "House rule 7: a test fixture that drifts from production passes for the wrong reason",
     "A neutral test now exists: it fails 15 of 24 checks against today's live code",
     "New house rule: if the proof is not in the repo, the fix is not finished",
-    "Caught a collision: three workstreams editing one file, brand_data work was double-assigned",
-    "Verifier caught the fix reintroducing the same bug through its own guard",
-    "Decided: tax IDs load only when you open the card, not on every login"
+    "Caught a collision: three workstreams editing one file, brand_data work was double-assigned"
   ],
   "orchestrator": {
     "focus": "Chats now own their own builders and testers; I keep the goals, the queue, routing and collisions. One track: automation templating.",
@@ -685,12 +685,19 @@
       "name": "MISTER_ORCHESTRATOR",
       "sidebar": "MISTER_ORCHESTRATOR",
       "state": "blue",
-      "one": "Foundation build landed. Found a live data-loss bug on Business Basics that wipes the exact fields your Twilio submission needs",
+      "one": "Handing over to MISTER_ORCHESTRATOR II. Handoff doc at docs/orchestrator-handoff.md; queue and board unchanged",
       "builds": [
         "t-breakdown",
         "t-email"
       ],
       "column": null
+    },
+    {
+      "name": "MISTER_ORCHESTRATOR II",
+      "sidebar": "MISTER_ORCHESTRATOR II",
+      "state": "white",
+      "column": "sj",
+      "one": "The continuing orchestrator. Reading the handoff, starting the board, connecting to every chat"
     },
     {
       "name": "TESTIMONIAL CONNECTION",
