@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "Testimonial inventory done: 1 live leak, 1 privacy exposure, 1 one-click trap. Room ready",
     "New directive: testimonials nowhere without Google reviews connected. Scout mapping all surfaces",
     "social_proof interim fix designed; confirmed it is the ONLY leak of its class",
     "Directive locked: new academies get GTA's automations, templatized. All chats aligned",
-    "Third false blocker killed; found a real one the audit missed: one Google link shared by every academy",
-    "Killed a second false blocker: the email identity fallback was already fixed and shipped"
+    "Third false blocker killed; found a real one the audit missed: one Google link shared by every academy"
   ],
   "orchestrator": {
     "focus": "Testimonial guardrail directive: scout inventorying every surface where quotes appear; planning room spawns from its findings. Convergence wave queued behind it.",
@@ -642,7 +642,14 @@
       "id": 64,
       "title": "Testimonial guardrail: no quotes anywhere without Google reviews connected",
       "severity": "blocker",
-      "status": "scout running",
+      "status": "inventory done, room waiting",
+      "owner": "us"
+    },
+    {
+      "id": 65,
+      "title": "CH3 testimonials with real minors' full names on an unauthenticated URL",
+      "severity": "blocker",
+      "status": "ruling in guardrail room",
       "owner": "us"
     }
   ],
@@ -656,6 +663,12 @@
         "t-breakdown",
         "t-email"
       ]
+    },
+    {
+      "name": "Plan: testimonial guardrails",
+      "sidebar": "Plan: testimonial guardrails",
+      "state": "blue",
+      "one": "Design the no-reviews-no-testimonials gate with the full 10-surface map. One urgent call inside: named minors on a public URL"
     },
     {
       "name": "SJ MESSAGE WORKSHOP",
