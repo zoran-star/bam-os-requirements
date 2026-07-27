@@ -167,6 +167,45 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 | 45 | **Post-approval env swap (gate E):** `TWILIO_MASTER_ACCOUNT_SID`, `TWILIO_MASTER_API_KEY_SID`, `TWILIO_MASTER_API_KEY_SECRET` on Vercel prod AND preview (use `printf`, never `echo`), then set `TWILIO_PRIMARY_PROFILE_SID` to the approved SID - that flag un-gates the whole A2P chain. Verify `TWILIO_A2P_POLICY_SID` on first live run. Smoke test the subaccount chain on one academy | BLOCKER after approval | queued | |
 | 46 | **Build an onboarding intake step for academy A2P data.** Every academy needs its OWN Secondary Profile + brand under its OWN EIN (one ISV brand cannot cover unrelated businesses). Each owner must supply legal name, EIN, CP 575-accurate details, live site, privacy policy, terms, and a rep on their own domain. Collect it at onboarding rather than chasing per academy | SCALE, high value | queued | Exactly the plug-and-play pattern Zoran wants |
 
+## PRESET SYNC PLAN: ZORAN'S 7 DECISIONS (2026-07-27, locked). Plan doc `docs/plans/preset-two-way-sync-plan.html`
+
+1. **GTA is the REFERENCE IMPLEMENTATION**, and he took this knowing the trade: **GTA is now a GOVERNED INSTANCE.** Every edit to GTA's rows is a claim on every academy, and GTA's 4 hardcoded sales steps become bugs to fix, not GTA's business.
+2. **Delivery = a weekly GitHub Action** opening/updating ONE issue titled "Preset drift". Not a portal view, not Slack.
+3. **Marking = `sync_class` (shared | local | attributed)** set on the TEMPLATE so steps inherit, plus a column on `automation_steps` defaulting to `shared`. Attached to the smallest addressable unit so it generalises to stages/offers/agents/calendars.
+4. The 3 GTA-shelled emails: **re-shell all 3**, collect the missing facts in onboarding.
+5. **Emails become ordered BLOCKS.** A block renders when its fact exists, vanishes when it does not (same fail-to-empty rule as the website link). His condition: **onboarding MUST actually ask for the facts**, or auto-on silently means auto-off.
+6. **No free-text owner copy override.** Copy changes route through the support ticket system, so every word stays staff-authored and therefore promotable; the ticket becomes the master-vs-local decision point.
+7. **Orphans: DELETE `trial_followup`** (zero enrollments ever, duplicate of `trial_form` which has run 30x). **Summer Special stays GTA-only, PARKED, recorded as an ACCEPTED divergence** (armed but never fired, so unproven not battle-tested). Future workstream in his words: "standardizing a reignition flow for sales presets".
+
+**Build order:** G first (small: clean GTA's rows) · A before D always · F before E.
+| Item | What | Severity |
+|---|---|---|
+| A | Testimonials brake: `sync_class` + attributed marking + seed disabled + **the quote-free variant folded in from the guardrail room** | BLOCKER, before/with D |
+| B | Reverse pass in `check-automation-divergence.mjs`: MATCH / AHEAD / BEHIND / HELD / ACCEPTED / MISSING / EMPTY | SCALE |
+| C | Weekly GH Action keeping one "Preset drift" issue current | SCALE |
+| D | Promote `ONBOARDING_DEFAULT` 3 steps -> 8 | FRICTION |
+| E | Re-shell + block-ify onboarding-welcome / -training / -review | FRICTION, largest |
+| F | Collect 4 new facts in the onboarding wizard | FRICTION |
+| G | Clean GTA's rows (delete trial_followup, detokenize 4 sales steps, record summer_special) | SCALE, small, first |
+
+**⚠️ BUILDER GOTCHA:** `clients.address` for GTA is "2205 Rosemount Cres" - that is the BUSINESS address. The gym in the welcome email is 1079 Linbrook Rd, Oakville. **Venue must come from `schedule_slots.location_label`**, which is also correct for an academy training in multiple places. Weekly schedule + venue come FREE from `schedule_slots` (GTA 86 rows, Miami 157); coach phone = `clients.phone` (column exists, empty for GTA). Only 4 genuinely new fields: review link, community group link + platform, online programs URL, refer-a-friend perk.
+
+**PROCESS GATE (Zoran, 2026-07-27):** the sync room must show him a **MOCKUP of the user stories** and get his confirmation BEFORE any build. Sequence is fixed: mockup -> his confirmation -> plan to the orchestrator -> builder subagent -> then seed San Jose in that chat.
+
+## TESTIMONIAL GUARDRAIL: ZORAN'S RULINGS (2026-07-27). Plan doc `docs/plans/testimonial-guardrail-plan.html`
+
+1. **nurture-3 + onboarding-testimonials -> QUOTE-FREE VARIANT.** Drip still sends on schedule; the quote block drops out until the academy has reviews connected. **The only build item from that room**, folded into sync item A. Rationale: approving a drip is a routine click that would otherwise newly switch on re-attributed GTA quotes.
+2. **CH3 minors' full names on the public URL -> KEEP AS IS.** Flagged, considered, closed. No build item. (Item 65 closed by decision.)
+3. **"Google review" labels on GTA + Miami free-trial pages -> LEAVE** until Google is connected, then replace with real synced reviews.
+4. **Agent `social_proof` leak -> LEAVE** until connected. (Item 63 deliberately deferred, not rejected.)
+5. Build 5 + the Google API access request -> routed to the "ORCHESTRATOR" session (worktree `bam-v2-engineering-build-fc4f9d`).
+
+**⚠️ BUILD 5 READINESS IS 0%**, not partially wired: no `google_reviews` table, no Business Profile OAuth (`api/google-oauth.js` is per-staff CALENDAR connect), no sync cron, no `api/website/reviews.js`, no Blueprint card, no `renderSocialProof()`, zero place ids stored. Reusable: the Google Cloud project with `GOOGLE_CLIENT_ID/SECRET` in prod plus the login/callback pattern.
+
+**⚠️ THE LONG POLE IS NOT OUR CODE: the Google Business Profile API application HAS NOT BEEN FILED.** Days to weeks for approval, and nothing per-academy syncs until it clears. Second prerequisite: each academy's Google Business Profile must be manageable by an account we can OAuth as. San Jose cannot be usefully connected at all yet: unlaunched, no review history.
+
+**⚠️ THE CONVERGENCE RISK, already proven once:** Miami's free-trial cards are GTA's three quotes rewritten with Miami names, badged "Google review" with a fabricated "5.0 Average across Google reviews" aggregate (`clients/detail-miami/detail/freetrial.jsx:532-565`). **The clone path ALREADY carried review-shaped content to a second academy.** The convergence wave is a clone path at scale, so attributed-marking must catch this class BEFORE the wave runs. Also corrected: `templates/academy-starter` has ZERO testimonials, so scaffolding does not fail open; the clone risk is GTA's own client folder.
+
 ## THE AUTOMATIONS DIRECTIVE (Zoran, 2026-07-26, locked - supersedes open questions)
 
 "The free trial sales system preset should have a DEFAULT PRESET OF AUTOMATIONS in the preset pipelines similar to BAM GTA's, just more templatized. When I onboard new academies onto that sales system preset, they get the SAME automations, templatized to them."
