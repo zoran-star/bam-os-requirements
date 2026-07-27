@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "social_proof interim fix designed; confirmed it is the ONLY leak of its class",
     "Directive locked: new academies get GTA's automations, templatized. All chats aligned",
     "Third false blocker killed; found a real one the audit missed: one Google link shared by every academy",
     "Killed a second false blocker: the email identity fallback was already fixed and shipped",
-    "SAN JOSE EMAIL IS LIVE: verified, sends as BAM San Jose, Lij's Gmail untouched",
-    "Scaling program fully closed: Cole's SQL applied, dormant until Mike sets terms"
+    "SAN JOSE EMAIL IS LIVE: verified, sends as BAM San Jose, Lij's Gmail untouched"
   ],
   "orchestrator": {
     "focus": "ZORAN'S DIRECTIVE LOCKED: the preset ships GTA's automations, templatized, to every new academy. The sync room plans the convergence; all preset chats aligned on it.",
@@ -629,6 +629,13 @@
       "title": "SJ has 0 entry points and 0 funnels (one idempotent button press)",
       "severity": "friction",
       "status": "switch list",
+      "owner": "us"
+    },
+    {
+      "id": 63,
+      "title": "Move GTA's review link to its own row, neutral shared default",
+      "severity": "blocker",
+      "status": "1 question for you",
       "owner": "us"
     }
   ],
