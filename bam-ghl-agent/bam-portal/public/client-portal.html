@@ -18133,7 +18133,10 @@ async function _obfFetchState() {
     preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
     offer_id: null, booking: false, has_ghl: true, contacts_n: 0,
     website_build: null, staging_url: null, site_accepted: false, brandboard: false,
-    texting: false, ads: false, ob: {}, legal_name: '', ein_value: '', address: '', chunks: {} };
+    texting: false, ads: false, ob: {}, legal_name: '', ein_value: '', address: '', chunks: {},
+    // Derived, never stored: the resolved domain + counted brand stats that
+    // replaced brand_data.domain / .website_url / .stats.
+    website: '', brand_stats: null };
   const [em, web, ss, prog, mbx] = await Promise.allSettled([
     _edwApi('status'),
     _wdwApi('status'),
@@ -18186,6 +18189,8 @@ async function _obfFetchState() {
     next.brandboard = !!v.website_brand_ok;
     // PR-2 collection pages: saved answers + the A2P trio for prefill.
     next.ob = v.onboarding_setup || {};
+    next.website = v.website || '';
+    next.brand_stats = v.brand_stats || null;
     next.chunks = v.chunks || {};
     next.legal_name = v.legal_name || '';
     next.ein_value = v.ein_value || '';
@@ -26268,9 +26273,12 @@ async function _bbSaveClientBasics(patch) {
   // values without a full reload.
   const row = (CLIENT_ROWS || []).find(c => c.id === CLIENT_ID);
   if (row) {
-    if (patch.brand_data) row.brand_data = { ...(row.brand_data || {}), ...patch.brand_data };
+    // jsonb columns merge into the cache; scalars overwrite. Keep this list in
+    // step with the jsonb columns update_client_basics whitelists.
+    const JSONB = ['brand_data', 'kpi_data', 'onboarding_setup'];
     Object.keys(patch).forEach(k => {
-      if (k !== 'brand_data') row[k] = patch[k];
+      if (JSONB.includes(k) && patch[k]) row[k] = { ...(row[k] || {}), ...patch[k] };
+      else if (!JSONB.includes(k)) row[k] = patch[k];
     });
   }
   _obtScheduleRefresh && _obtScheduleRefresh();
@@ -26496,16 +26504,49 @@ function _bbFillIfBlank(id, val) {
 }
 
 async function _bbBrandHydrate() {
-  const bd = await _bbLoadClientJsonCol('brand_data');
-  if (!bd) return;                                              // read failed: stay locked
+  const [bd, intake] = await Promise.all([
+    _bbLoadClientJsonCol('brand_data'),
+    _bbLoadClientJsonCol('onboarding_setup'),
+  ]);
+  if (!bd || !intake) return;                                   // read failed: stay locked
   if (!document.getElementById('bb-brand-color_primary')) return; // navigated away mid-fetch
   _BB_BRAND_TEXT_FIELDS.forEach(k => _bbFillIfBlank('bb-brand-' + k, bd[k]));
+  _bbFillIfBlank('bb-brand-references', intake.references);
   // website_status is a button row, not an input - repaint its selected state.
-  const ws = bd.website_status || '';
+  const ws = intake.website_status || '';
   document.querySelectorAll('#bb-brand-status-row .bb-choice').forEach(b => {
     b.classList.toggle('selected', b.getAttribute('data-opt') === ws);
   });
   _BB_BRAND_LOADED_FOR = CLIENT_ID;
+  _bbBrandRenderDerived();
+}
+
+// Domain and stats are read-only now: the domain comes from the wizard's
+// website_setup.domain, the stats are counted from members + schedule_slots +
+// address. Both ride the setup-status payload the Brand card already fetches.
+async function _bbBrandRenderDerived() {
+  const dom = document.getElementById('bb-brand-domain-view');
+  const stat = document.getElementById('bb-brand-stats-view');
+  if (!dom && !stat) return;
+  let st = null;
+  try {
+    const fresh = typeof _OBF_STATE !== 'undefined' && _OBF_STATE && (Date.now() - (_OBF_AT || 0) < 60000);
+    st = fresh ? _OBF_STATE : await _obfFetchState();
+  } catch (_) {}
+  const ac = st || {};   // setup-status spreads its academy block flat into the state
+  if (dom && document.getElementById('bb-brand-domain-view')) {
+    const url = ac.website || '';
+    dom.innerHTML = url
+      ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="color:var(--gold)">${escapeHTML(url.replace(/^https?:\/\//i, ''))}</a> - set up with your team when we wire DNS.`
+      : "No domain yet. Your team sets this up with you during the website build.";
+  }
+  if (stat && document.getElementById('bb-brand-stats-view')) {
+    const lines = (ac.brand_stats && Array.isArray(ac.brand_stats.lines)) ? ac.brand_stats.lines : [];
+    stat.innerHTML = lines.length
+      ? lines.map(l => `<div>${escapeHTML(l)}</div>`).join('')
+        + '<div style="margin-top:4px">Counted from your members and your schedule, so it is never out of date.</div>'
+      : 'These fill in from your members and your schedule once your academy is running.';
+  }
 }
 
 async function _bbKpisHydrate() {
@@ -26520,20 +26561,26 @@ async function _bbKpisHydrate() {
 // All brand data lives in clients.brand_data jsonb. Same auto-save
 // pattern as General. Includes a Mark-done CTA at the bottom that
 // flips brand_marked_done_at via the mark_onboarding_section RPC.
+// What brand_data actually holds after the 2026-07-27 reshape: identity the
+// owner authors and nothing else. Dropped: stats / domain / website_url
+// (derivable, therefore guaranteed to go stale). Moved out: site_pages to
+// website_setup, website_status + references to onboarding_setup.
 const _BB_BRAND_TEXT_FIELDS = [
   'color_primary', 'color_secondary', 'color_accent',
   'font_display', 'font_body',
   'logo_dark_url', 'logo_light_url', 'icon_url',
-  'website_url', 'domain', 'references', 'stats', 'notes',
-  'story', 'why_us', 'dream_athletes', 'proof',
+  'notes', 'story', 'why_us', 'dream_athletes', 'proof',
 ];
 function _bbRenderBrandCard(panel, meta) {
   _BB_BRAND_LOADED_FOR = null;   // lock saves until this render's hydrate lands
   const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
   const bd = c.brand_data || {};
+  // website_status and references are intake answers, not brand identity, so
+  // they live with the rest of the wizard answers in clients.onboarding_setup.
+  const intake = c.onboarding_setup || {};
   const adsApproval = c.ads_content_approval_required === true;
   const v = (k) => _bbEscapeHtml(bd[k] || '');
-  const websiteStatus = bd.website_status || '';
+  const websiteStatus = intake.website_status || '';
   const statusOpts = [
     'Have one, happy with it',
     'Have one, want it improved',
@@ -26624,25 +26671,31 @@ function _bbRenderBrandCard(panel, meta) {
       `).join('')}</div>
     </div>
 
+    <!-- Site URL + "domain you want" fields CUT (brand_data reshape 2026-07-27).
+         They were two hand-typed copies of clients.website_setup.domain, which
+         the domain wizard already owns, so they drifted apart the moment anyone
+         edited one. The resolved domain is shown read-only below instead. -->
     <div class="bb-field">
-      <div class="bb-field-label">Existing site URL</div>
-      <input id="bb-brand-website_url" type="url" class="bb-input" value="${v('website_url')}"
-        oninput="_bbBrandChanged()" placeholder="https://" />
+      <div class="bb-field-label">Your domain</div>
+      <div id="bb-brand-domain-view" class="bb-field-hint">Loading…</div>
     </div>
-    <div class="bb-field">
-      <div class="bb-field-label">Domain you want to use</div>
-      <input id="bb-brand-domain" type="text" class="bb-input" value="${v('domain')}"
-        oninput="_bbBrandChanged()" placeholder="e.g. youracademy.com" />
-      <div class="bb-field-hint">If we're building or rebuilding, we'll wire DNS to this domain.</div>
-    </div>
+
     <div class="bb-field">
       <div class="bb-field-label">Reference sites you like</div>
-      <textarea id="bb-brand-references" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="Paste 2-4 URLs - we'll pull inspiration from these for the build">${v('references')}</textarea>
+      <textarea id="bb-brand-references" class="bb-textarea" oninput="_bbBrandIntakeChanged()" placeholder="Paste 2-4 URLs - we'll pull inspiration from these for the build">${_bbEscapeHtml(intake.references || '')}</textarea>
     </div>
+
+    <!-- "Brand stats / proof points" free text CUT. It asked the owner to type
+         numbers the database already knows, so it went stale the day after it
+         was filled in: BAM GTA's said "Mon/Wed/Fri evening training" and
+         "43+ active members" while GTA trained Mon/Tue/Wed/Thu/Sat with 47
+         members (it has never trained on a Friday). Counted live instead.
+         Durable proof points that are NOT derivable belong in "Proof" below. -->
     <div class="bb-field">
-      <div class="bb-field-label">Brand stats / proof points</div>
-      <textarea id="bb-brand-stats" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="e.g. '15 years coaching · 200+ alumni in college ball · trained 12 D1 players'">${v('stats')}</textarea>
+      <div class="bb-field-label">Your stats</div>
+      <div id="bb-brand-stats-view" class="bb-field-hint">Counting…</div>
     </div>
+
     <div class="bb-field">
       <div class="bb-field-label">Anything else about brand?</div>
       <textarea id="bb-brand-notes" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="Voice, tone, what NOT to do, etc.">${v('notes')}</textarea>
@@ -26730,7 +26783,7 @@ async function _bbRenderBrandBoard() {
 // Lists every page of the academy site grouped by the offer that owns it. Each
 // row opens the Request-a-change annotator for that page (same click-to-note
 // flow as free trial / contact). Pages = offer funnels (_FN) + any extra site
-// pages saved on brand_data.site_pages ({ slug, label, offer_id }).
+// pages saved on website_setup.site_pages ({ slug, label, offer_id }).
 function _bbBaseOrigin() {
   const list = (typeof _FN !== 'undefined' && _FN) ? _FN : [];
   const prim = list.find(f => f.is_primary) || list[0];
@@ -26755,18 +26808,12 @@ function _bbCollectPages(sitePages) {
   _BB_PAGES = out;
   return out;
 }
-// brand_data is NOT in CLIENT_ROWS (CLIENT_SELECT_COLS omits it), so read the
-// site page inventory straight from the clients row.
+// The page inventory is website state, not brand identity, so it lives on
+// clients.website_setup.site_pages next to the domain and the build chunks.
+// website_setup is not in CLIENT_SELECT_COLS either, so read it on demand.
 async function _bbLoadSitePages() {
-  try {
-    if (_sb && CLIENT_ID) {
-      const { data } = await _sb.from('clients').select('brand_data').eq('id', CLIENT_ID).maybeSingle();
-      const sp = data && data.brand_data && data.brand_data.site_pages;
-      if (Array.isArray(sp)) return sp;
-    }
-  } catch (_) {}
-  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
-  return (c.brand_data && Array.isArray(c.brand_data.site_pages)) ? c.brand_data.site_pages : [];
+  const ws = await _bbLoadClientJsonCol('website_setup');
+  return (ws && Array.isArray(ws.site_pages)) ? ws.site_pages : [];
 }
 async function _bbRenderWebsitePages(host) {
   if (!host) return;
@@ -26837,39 +26884,41 @@ function _bbBrandChanged() {
     if (_BB_BRAND_LOADED_FOR !== CLIENT_ID) return null;
     const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
     const cur = (c && c.brand_data) || {};
-    const next = { ...cur,
-      color_primary:   document.getElementById('bb-brand-color_primary')?.value || '',
-      color_secondary: document.getElementById('bb-brand-color_secondary')?.value || '',
-      color_accent:    document.getElementById('bb-brand-color_accent')?.value || '',
-      font_display:    document.getElementById('bb-brand-font_display')?.value || '',
-      font_body:       document.getElementById('bb-brand-font_body')?.value || '',
-      logo_dark_url:   document.getElementById('bb-brand-logo_dark_url')?.value || '',
-      logo_light_url:  document.getElementById('bb-brand-logo_light_url')?.value || '',
-      icon_url:        document.getElementById('bb-brand-icon_url')?.value || '',
-      website_url:     document.getElementById('bb-brand-website_url')?.value || '',
-      domain:          document.getElementById('bb-brand-domain')?.value || '',
-      references:      document.getElementById('bb-brand-references')?.value || '',
-      stats:           document.getElementById('bb-brand-stats')?.value || '',
-      notes:           document.getElementById('bb-brand-notes')?.value || '',
-      story:           document.getElementById('bb-brand-story')?.value || '',
-      why_us:          document.getElementById('bb-brand-why_us')?.value || '',
-      dream_athletes:  document.getElementById('bb-brand-dream_athletes')?.value || '',
-      proof:           document.getElementById('bb-brand-proof')?.value || '',
-    };
+    // One list, used by both the save and the hydrate, so a field can never be
+    // written by one and forgotten by the other.
+    const next = { ...cur };
+    _BB_BRAND_TEXT_FIELDS.forEach(k => {
+      next[k] = document.getElementById('bb-brand-' + k)?.value || '';
+    });
     return { brand_data: next };
   });
   _bbAutoDone('brand');   // any brand edit = the section is engaged
 }
 
+// The Brand card's two intake answers (website_status, references) write to
+// clients.onboarding_setup alongside the rest of the wizard answers, NOT to
+// brand_data. Same locked-until-hydrated rule as the brand fields.
+function _bbBrandIntakeChanged() {
+  _bbBasicsScheduleSave(() => {
+    if (_BB_BRAND_LOADED_FOR !== CLIENT_ID) return null;
+    const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+    const cur = (c && c.onboarding_setup) || {};
+    return { onboarding_setup: { ...cur,
+      references: document.getElementById('bb-brand-references')?.value || '',
+    } };
+  });
+  _bbAutoDone('brand');
+}
+
 async function _bbBrandSetWebsiteStatus(opt) {
-  // Same trap as _bbBrandChanged: clicking a status button before brand_data
-  // has loaded would post {website_status} alone and wipe the other 18 keys.
-  const bd = await _bbLoadClientJsonCol('brand_data');
-  if (!bd) { alert("Couldn't load your brand details. Reload and try again."); return; }
-  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
-  const cur = (c && c.brand_data) || {};
+  // website_status is an intake answer, so it rides onboarding_setup. Load the
+  // whole object first: posting {website_status} on its own would replace the
+  // stored object wholesale and wipe every other wizard answer, exactly the
+  // trap _bbBrandChanged fell into.
+  const cur = await _bbLoadClientJsonCol('onboarding_setup');
+  if (!cur) { alert("Couldn't load your answers. Reload and try again."); return; }
   const next = (cur.website_status === opt) ? '' : opt;
-  await _bbSaveClientBasics({ brand_data: { ...cur, website_status: next } });
+  await _bbSaveClientBasics({ onboarding_setup: { ...cur, website_status: next } });
   _bbRenderFromHash();
 }
 

@@ -1889,7 +1889,8 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
           fontFamily: "monospace", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: tk.textMute,
         }}>🎨 Brand</summary>
         <div style={{ marginTop: 12 }}>
-          <BrandCard brand={ticket.client?.brand_data} tk={tk} />
+          <BrandCard brand={ticket.client?.brand_data} website={ticket.client?.website}
+            stats={ticket.client?.brand_stats} tk={tk} />
         </div>
       </details>
 
@@ -2344,12 +2345,23 @@ function ClientInputs({ ticket, tk, edit = null, onPromote = null }) {
 }
 
 // Client brand reference — colors, fonts, logos — so the content team builds
-// on-brand without leaving the ticket. Reads clients.brand_data.
-function BrandCard({ brand, tk }) {
+// on-brand without leaving the ticket.
+//
+// Colors/fonts/logos/notes come from clients.brand_data, which is where they
+// belong: the owner types them and they stay put. Website and Stats do NOT.
+// The site lives on clients.website_setup.domain, and the stats are counted at
+// read time from members + schedule_slots + address (api/_brand-stats.js).
+// They used to be free text on brand_data; BAM GTA's said "Mon/Wed/Fri evening
+// training" and "43+ active members" while it actually trained Mon/Tue/Wed/Thu/
+// Sat with 47 members. Anything the database already knows should never be
+// re-typed into a text box.
+function BrandCard({ brand, website, stats, tk }) {
   const b = brand || {};
+  const statLines = (stats && Array.isArray(stats.lines)) ? stats.lines : [];
   const colors = [["Primary", b.color_primary], ["Secondary", b.color_secondary], ["Accent", b.color_accent]].filter(c => c[1]);
   const logos = [["Dark bg", b.logo_dark_url], ["Light bg", b.logo_light_url], ["Icon", b.icon_url]].filter(l => l[1]);
-  const hasAny = colors.length || logos.length || b.font_display || b.font_body || b.notes || b.stats;
+  const hasAny = colors.length || logos.length || b.font_display || b.font_body || b.notes
+    || statLines.length || website;
   if (!hasAny) {
     return <div style={{ color: tk.textMute, fontSize: 13, fontStyle: "italic" }}>No brand info on file yet.</div>;
   }
@@ -2389,9 +2401,16 @@ function BrandCard({ brand, tk }) {
           ))}
         </div>
       ))}
-      {row("Website", b.website_url || b.domain ? <a href={(b.website_url || b.domain).startsWith("http") ? (b.website_url || b.domain) : `https://${b.website_url || b.domain}`} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{b.website_url || b.domain} ↗</a> : null)}
+      {row("Website", website
+        ? <a href={website} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{website.replace(/^https?:\/\//i, "")} ↗</a>
+        : null)}
       {row("Brand notes", b.notes ? <span style={{ whiteSpace: "pre-wrap" }}>{b.notes}</span> : null)}
-      {row("Stats", b.stats || null)}
+      {row("Stats", statLines.length ? (
+        <div>
+          {statLines.map(line => <div key={line}>{line}</div>)}
+          <div style={{ fontSize: 11, color: tk.textMute, marginTop: 4 }}>Counted live from members and the schedule.</div>
+        </div>
+      ) : null)}
     </div>
   );
 }

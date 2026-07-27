@@ -99,9 +99,17 @@ async function handler(req, res) {
       return { id: p.id, name: p.name || "", title: p.title || "", bio: p.bio || "", instagram: p.instagram || "", photo_url };
     });
 
-    // Whether the owner wants a public team page (Blueprint > Staff toggle,
-    // stored on brand_data.wants_about_page). Undecided defaults to showing it if
-    // there are coaches; an explicit "Not now" (false) hides the section.
+    // Whether the owner wants a public team page, read from
+    // brand_data.wants_about_page.
+    //
+    // HEADS UP (audited 2026-07-27, brand_data reshape): nothing writes this
+    // key. There is no Blueprint > Staff toggle in the portal, no writer
+    // anywhere in the repo, and zero of the 11 clients with brand_data have the
+    // key stored. So `wap` is always undefined and this block is inert today.
+    // Left in place deliberately rather than deleted: it fails OPEN in the safe
+    // direction (team page shows whenever there are coaches), and it is the
+    // read half of a toggle someone still intends to build. Either build the
+    // writer or delete both halves - do not leave it half-wired.
     let show_team_page = coaches.length > 0;
     try {
       const cr = await sbReq(`clients?id=eq.${encodeURIComponent(client_id)}&select=brand_data`);

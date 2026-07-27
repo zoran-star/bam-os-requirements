@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { PRESETS, buildPresetRows } from "../agent/presets.js";
+import { deriveBrandStats, resolveClientWebsite } from "../_brand-stats.js";
 
 // Sales-machine readiness for one offer (Gap #2 / DETAIL "what's left" view).
 //
@@ -61,13 +62,15 @@ async function handler(req, res) {
     // Academy-level state (station-model onboarding flow) - fetched regardless
     // of whether an offer exists yet, so the flow's academy group (Stripe,
     // contacts migration, Instagram) lights up before the first offer is built.
-    const clientRows = await sb(`clients?id=eq.${enc(clientId)}&select=booking_provider,pipeline_provider,stripe_connect_status,ghl_location_id,brand_data,website_setup,onboarding_setup,legal_name,ein,address,slack_channel_id,business_name&limit=1`);
+    const clientRows = await sb(`clients?id=eq.${enc(clientId)}&select=id,booking_provider,pipeline_provider,stripe_connect_status,ghl_location_id,brand_data,website_setup,onboarding_setup,legal_name,ein,address,time_zone,slack_channel_id,business_name&limit=1`);
     const cRow = (Array.isArray(clientRows) && clientRows[0]) || {};
-    const [contactRows, cancelledRows, igRows] = await Promise.all([
+    const [contactRows, cancelledRows, igRows, statsById] = await Promise.all([
       sb(`contacts?client_id=eq.${enc(clientId)}&select=id&limit=1000`),
       sb(`contacts?client_id=eq.${enc(clientId)}&tags=cs.{cancelled}&select=id&limit=500`),
       sb(`client_meta_messaging_config?client_id=eq.${enc(clientId)}&select=inbox_live&limit=1`),
+      cRow.id ? deriveBrandStats(sb, [cRow]).catch(() => ({})) : Promise.resolve({}),
     ]);
+    const brandStats = (statsById && statsById[cRow.id]) || { member_count: 0, weekdays: [], locality: "", lines: [] };
     const academy = {
       stripe_connected: cRow.stripe_connect_status === "connected",
       // Site copy collected (the "Tell your story" step): the Brand card's
@@ -92,6 +95,11 @@ async function handler(req, res) {
       website_brand_ok: !!(cRow.website_setup && cRow.website_setup.readiness
         && cRow.website_setup.readiness.manual && cRow.website_setup.readiness.manual.brand_ok === true),
       pipeline_provider: cRow.pipeline_provider || "ghl",
+      // Derived brand stats + the one canonical website, for the Blueprint
+      // Brand card. Both used to be free-text fields on brand_data; they are
+      // now counted / resolved from the tables that own them.
+      brand_stats: brandStats,
+      website: resolveClientWebsite(cRow),
       contacts: count(contactRows),
       cancelled_contacts: count(cancelledRows),
       ig_live: !!(Array.isArray(igRows) && igRows[0] && igRows[0].inbox_live),

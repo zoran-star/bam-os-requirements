@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { notifyOwners } from "./_notify-owners.js";
+import { deriveBrandStats, resolveClientWebsite, resolveClientDomain } from "./_brand-stats.js";
 // Vercel Serverless Function — Action Items (v1)
 //
 // A shared per-client to-do list. Visible to the academy team (client portal)
@@ -175,12 +176,18 @@ async function createSystemsOnboardingTicket(clientId) {
     business_name: c.business_name, legal_name: c.legal_name, owner_name: c.owner_name,
     email: c.email, phone: c.phone, address: c.address, time_zone: c.time_zone,
     entity_type: c.entity_type, ein: c.ein,
-    website: bd.website_url || null, domain: bd.domain || null,
+    // The site lives on website_setup.domain (the domain wizard owns it).
+    // brand_data.website_url / .domain were duplicates of it and are gone.
+    website: resolveClientWebsite(c) || null,
+    domain: resolveClientDomain(c) || null,
     marketing_included: c.marketing_included === true,
     slack_channel_id: c.slack_channel_id,
     ghl: { location_id: c.ghl_location_id, company_id: c.ghl_company_id, connect_status: c.ghl_connect_status },
     stripe: { account_id: c.stripe_connect_account_id, connect_status: c.stripe_connect_status },
     brand: bd,
+    // Counted at ticket-creation time from members + schedule_slots + address,
+    // not copied from a text box the owner filled in months ago.
+    brand_stats: ((await deriveBrandStats(sb, [c]).catch(() => ({})))[c.id]) || null,
     kpis: c.kpi_data || {},
     staff: staffRows || [],
     locations: locRows || [],

@@ -69,15 +69,17 @@ function deadlineInfo(submittedIso, priority) {
   return { due, label: `Due in ${rem} biz day${rem === 1 ? "" : "s"}`, overdue: false };
 }
 
-// Resolve the client's website from brand_data, wherever it was entered.
-// Different input paths have used different keys (website_url from Brand Basics,
-// domain from older imports), so check them all so Cam always sees a site if one
-// exists. Returns a clickable absolute URL (prepends https:// for bare domains).
-function clientWebsiteFrom(brand) {
-  if (!brand || typeof brand !== "object") return "";
-  const raw = [brand.website_url, brand.domain, brand.website, brand.url]
-    .map(v => (typeof v === "string" ? v.trim() : ""))
-    .find(Boolean);
+// Resolve the client's website. There is exactly one place it lives now:
+// clients.website_setup.domain, owned by the domain wizard. brand_data used to
+// carry website_url / domain / website / url copies of the same value, which
+// drifted apart the moment anyone edited one of them; those keys are gone.
+// The API resolves it server-side (api/_brand-stats.js resolveClientWebsite)
+// and hands back `client.website`; this only formats what it gets.
+// Returns a clickable absolute URL, or "" when no site is on file.
+function clientWebsiteFrom(client) {
+  const raw = typeof client?.website === "string"
+    ? client.website.trim()
+    : (typeof client?.website_setup?.domain === "string" ? client.website_setup.domain.trim() : "");
   if (!raw) return "";
   return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 }
@@ -133,7 +135,7 @@ function normalizeTicket(apiTicket) {
   return {
     id: apiTicket.id,
     academyName: apiTicket.client?.business_name || "—",
-    clientWebsite: clientWebsiteFrom(apiTicket.client?.brand_data),
+    clientWebsite: clientWebsiteFrom(apiTicket.client),
     assignedSm: apiTicket.assigned_to_name || "",
     priority: priorityOf(fields),
     campaignTitle: fields.campaign_title || "",

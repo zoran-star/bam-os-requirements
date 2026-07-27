@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { MARKETING_OPS_ROLES, CONTENT_MANAGER_ROLES, CONTENT_ROLES, hasRole } from "./_roles.js";
 import { CANONICAL_FUNNEL, mapStageName, buildKpis } from "./_ghl_funnel.js";
 import { notifyClientPush } from "./push/_send.js";
+import { deriveBrandStats, resolveClientWebsite } from "./_brand-stats.js";
 
 // Vercel Serverless Function — Marketing (combined: tickets + guide cards)
 //
@@ -526,8 +527,16 @@ async function enrichWithClient(tickets) {
   const clientIds = [...new Set(tickets.map(t => t.client_id).filter(Boolean))];
   const clientMap = {};
   if (clientIds.length) {
-    const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name,brand_data,scaling_manager_id,ads_content_approval_required`);
-    Object.assign(clientMap, Object.fromEntries((clients || []).map(c => [c.id, c])));
+    // website_setup carries the canonical domain (brand_data.domain /
+    // .website_url were duplicates and are gone); address + time_zone feed the
+    // derived brand stats that replaced the free-text brand_data.stats blob.
+    const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name,brand_data,website_setup,address,time_zone,scaling_manager_id,ads_content_approval_required`);
+    const stats = await deriveBrandStats(sb, clients || []).catch(() => ({}));
+    Object.assign(clientMap, Object.fromEntries((clients || []).map(c => [c.id, {
+      ...c,
+      website: resolveClientWebsite(c),
+      brand_stats: (stats && stats[c.id]) || { member_count: 0, weekdays: [], locality: "", lines: [] },
+    }])));
   }
   // Resolve the assignee name: explicit assigned_to, else the client's manager.
   const staffIds = [...new Set([
