@@ -1,30 +1,30 @@
 {
-  "updated": "2026-07-26 \u00b7 night",
+  "updated": "2026-07-27 \u00b7 morning",
   "recentUpdates": [
-    "Testimonial inventory done: 1 live leak, 1 privacy exposure, 1 one-click trap. Room ready",
-    "New directive: testimonials nowhere without Google reviews connected. Scout mapping all surfaces",
-    "social_proof interim fix designed; confirmed it is the ONLY leak of its class",
-    "Directive locked: new academies get GTA's automations, templatized. All chats aligned",
-    "Third false blocker killed; found a real one the audit missed: one Google link shared by every academy"
+    "Three chats converged on preset automations; scopes reconciled into one owner",
+    "Preset sync plan decided: GTA is the reference, GTA becomes a governed instance",
+    "Guardrail ruled: quote-free variant is the only build; social_proof + Google labels wait for real reviews",
+    "Build 5 is at 0% and the Google API application has NOT been filed. That is the long pole",
+    "Proven risk: the clone path already carried GTA's quotes to Miami with a fake 5.0 rating"
   ],
   "orchestrator": {
-    "focus": "Testimonial guardrail directive: scout inventorying every surface where quotes appear; planning room spawns from its findings. Convergence wave queued behind it.",
+    "focus": "Preset convergence is the whole game now. The sync chat owns the standard AND seeding San Jose through it. It is building you a mockup of the user stories first; nothing gets built until you confirm it.",
     "needs": [
-      "Send Lij his ask-list, it is now the biggest unblock",
-      "Try the price breakdown when the test chip appears",
-      "Monday: pull the IRS CP 575 letter, it starts the TrustHub clock",
-      "Send Lij his ask-list",
-      "GHL card stays ON HOLD until I give the go",
-      "Archive the 4 chats tagged ARCHIVE in the chat map below, your sidebar drops to 7"
+      "Confirm the mockup when the sync chat shows you the user stories",
+      "File the Google Business Profile API application, it is days to weeks and unfiled",
+      "Send Lij his ask-list, still the biggest thing you own",
+      "SET UP TWILIO BITCH: 6 action items, submit target Thursday",
+      "Meta CAPI token: 60% of GTA ad traffic is invisible until it exists"
     ]
   },
   "buildTasks": [
     {
-      "id": "t-brain",
-      "title": "Agent stops quoting GTA's reviews and address",
-      "phase": "next up",
-      "phaseTone": "work",
-      "why": "An academy with missing data currently inherits GTA's Google reviews, Oakville address and old prices. San Jose is fine today because its offer is filled in, but the hole is open for every future academy.",
+      "id": "t-convergence",
+      "short": "preset convergence",
+      "title": "Every new academy gets GTA's automations, templatized",
+      "phase": "your move",
+      "phaseTone": "you",
+      "why": "Today a new academy gets 3 onboarding steps and no emails while GTA runs 8 steps and 6 designed emails. This makes the preset hand every academy GTA's full system wearing their own name, and San Jose is the first one through it.",
       "pipeline": [
         {
           "name": "scout",
@@ -32,11 +32,11 @@
         },
         {
           "name": "plan",
-          "state": "pending"
+          "state": "done"
         },
         {
-          "name": "you: workshop",
-          "state": "pending"
+          "name": "you: mockup",
+          "state": "active"
         },
         {
           "name": "build",
@@ -47,7 +47,7 @@
           "state": "pending"
         },
         {
-          "name": "you: try it",
+          "name": "seed SJ",
           "state": "pending"
         },
         {
@@ -55,84 +55,12 @@
           "state": "pending"
         }
       ],
-      "status": "Unblocked now that #1587 and #1606 are merged. Queue items 5 and 22 are the next two builds.",
+      "status": "Plan decided with 7 rulings. Zoran gated it: he sees a mockup of the user stories before anything is built.",
       "next": {
-        "who": "agents",
-        "what": "I spawn the planner when you give the word"
+        "who": "you",
+        "what": "Open the sync chat and confirm the mockup when it shows you"
       },
-      "checklist": null,
-      "short": "agent brain"
-    },
-    {
-      "id": "t-email",
-      "title": "San Jose email goes fully live",
-      "phase": "shipped",
-      "phaseTone": "work",
-      "why": "Every automation email now sends as BAM San Jose, never Toronto. Your guardrail is doing its job: nothing SENDS until the sending domain is verified. This checklist is the last step between SJ and working email.",
-      "pipeline": [
-        {
-          "name": "scout",
-          "state": "done"
-        },
-        {
-          "name": "plan",
-          "state": "done"
-        },
-        {
-          "name": "you: guardrail",
-          "state": "done"
-        },
-        {
-          "name": "build",
-          "state": "done"
-        },
-        {
-          "name": "test 86/86",
-          "state": "done"
-        },
-        {
-          "name": "ship #1604",
-          "state": "done"
-        },
-        {
-          "name": "you: verify domain",
-          "state": "done"
-        }
-      ],
-      "status": "LIVE. Domain verified, email_domain set, and the from-address proved by running the real resolver against prod: San Jose renders BAM San Jose, GTA is byte-identical, an unknown academy still holds. Lij's Gmail re-confirmed untouched.",
-      "next": {
-        "who": "agents",
-        "what": "Nothing. Automations stay dormant until launch day"
-      },
-      "checklist": {
-        "id": "resend",
-        "steps": [
-          {
-            "id": "r1",
-            "t": "Squarespace: Domains, byanymeanssanjose.com, DNS settings"
-          },
-          {
-            "id": "r2",
-            "t": "Add TXT record. Host: resend._domainkey. Value: the long DKIM key (copy button)",
-            "copy": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDGgsx+n57yQRIjUMouaC7z14hJXC/Xq0nRsutU2GuoCV+ompCzYBCvHtEbL9/glpBbzqBkA7Rd1CNC9i0JQg5eg3L/Hcvi/EfFKVzE2ski4hHRZW/YDXvYbnjDQFlooQU3p+GW4asrd+wkAG0y0Dhrj8ObUMDCwoTYmmytmuwDTQIDAQAB"
-          },
-          {
-            "id": "r3",
-            "t": "Add MX record. Host: send. Priority: 10. Value: feedback-smtp.us-east-1.amazonses.com",
-            "copy": "feedback-smtp.us-east-1.amazonses.com"
-          },
-          {
-            "id": "r4",
-            "t": "Add TXT record. Host: send. Value: v=spf1 include:amazonses.com ~all",
-            "copy": "v=spf1 include:amazonses.com ~all"
-          },
-          {
-            "id": "r5",
-            "t": "Tell me 'records added'. I trigger verification and set SJ's email domain from here, you are done"
-          }
-        ]
-      },
-      "short": "SJ email"
+      "checklist": null
     }
   ],
   "humanTasks": [
@@ -583,41 +511,6 @@
       "owner": "us"
     },
     {
-      "id": 53,
-      "title": "Preset onboarding is 3 steps vs GTA's 8 (assets already exist)",
-      "severity": "blocker",
-      "status": "planning room",
-      "owner": "us"
-    },
-    {
-      "id": 54,
-      "title": "Divergence checker only points one way, master can silently lag",
-      "severity": "blocker",
-      "status": "planning room",
-      "owner": "us"
-    },
-    {
-      "id": 55,
-      "title": "Real parent quotes must never auto-propagate between academies",
-      "severity": "blocker",
-      "status": "planning room",
-      "owner": "us"
-    },
-    {
-      "id": 58,
-      "title": "Tokenize onboarding-emails.js before any promotion (gates #53)",
-      "severity": "blocker",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 59,
-      "title": "social_proof has no renderer (leaks 1 Google link to all) + defaults fail open with no offer",
-      "severity": "blocker",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
       "id": 60,
       "title": "onboarding_calls has a client-read RLS policy vs staff-only decision",
       "severity": "friction",
@@ -632,25 +525,88 @@
       "owner": "us"
     },
     {
-      "id": 63,
-      "title": "Move GTA's review link to its own row, neutral shared default",
+      "id": "A",
+      "title": "Testimonials brake: sync_class marking + quote-free variant",
       "severity": "blocker",
-      "status": "folded under #64",
+      "status": "before/with D",
       "owner": "us"
     },
     {
-      "id": 64,
-      "title": "Testimonial guardrail: no quotes anywhere without Google reviews connected",
-      "severity": "blocker",
-      "status": "inventory done, room waiting",
+      "id": "G",
+      "title": "Clean GTA's rows (delete dead sequence, detokenize 4 steps)",
+      "severity": "scale",
+      "status": "do first, small",
       "owner": "us"
+    },
+    {
+      "id": "D",
+      "title": "Promote onboarding default from 3 steps to 8",
+      "severity": "friction",
+      "status": "after A",
+      "owner": "us"
+    },
+    {
+      "id": "E",
+      "title": "Re-shell + block-ify the 3 GTA-shelled onboarding emails",
+      "severity": "friction",
+      "status": "after F, largest",
+      "owner": "us"
+    },
+    {
+      "id": "F",
+      "title": "Onboarding wizard collects the 4 new facts",
+      "severity": "friction",
+      "status": "before E",
+      "owner": "us"
+    },
+    {
+      "id": "B",
+      "title": "Reverse pass in the divergence checker",
+      "severity": "scale",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": "C",
+      "title": "Weekly Preset drift GitHub issue",
+      "severity": "scale",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 66,
+      "title": "FILE the Google Business Profile API application (unfiled, gates Build 5)",
+      "severity": "blocker",
+      "status": "YOUR ACTION",
+      "owner": "Zoran"
+    },
+    {
+      "id": 67,
+      "title": "Build 5 Google Reviews: 0% built, gated on the API application",
+      "severity": "blocker",
+      "status": "blocked on #66",
+      "owner": "us"
+    },
+    {
+      "id": 68,
+      "title": "Standardize a reignition flow for sales presets",
+      "severity": "general",
+      "status": "future workstream",
+      "owner": "us"
+    },
+    {
+      "id": 63,
+      "title": "social_proof leak: LEAVE until Google connected (Zoran's ruling)",
+      "severity": "friction",
+      "status": "deferred by decision",
+      "owner": "later"
     },
     {
       "id": 65,
-      "title": "CH3 testimonials with real minors' full names on an unauthenticated URL",
-      "severity": "blocker",
-      "status": "ruling in guardrail room",
-      "owner": "us"
+      "title": "CH3 minors on public URL: KEEP AS IS (Zoran's ruling)",
+      "severity": "friction",
+      "status": "closed by decision",
+      "owner": "later"
     }
   ],
   "chatMap": [
@@ -667,44 +623,17 @@
     {
       "name": "Plan: testimonial guardrails",
       "sidebar": "Plan: testimonial guardrails",
-      "state": "blue",
-      "one": "Design the no-reviews-no-testimonials gate with the full 10-surface map. One urgent call inside: named minors on a public URL"
-    },
-    {
-      "name": "SJ MESSAGE WORKSHOP",
-      "sidebar": "SJ MESSAGE WORKSHOP",
-      "state": "blue",
-      "one": "Renders all 13 SJ messages on localhost:4600 so you can read them like a parent would, then workshop the copy"
+      "state": "done",
+      "one": "Decided. Quote-free variant is the only build, folded into the sync chat. Archive it"
     },
     {
       "name": "Plan: two-way preset sync",
       "sidebar": "Plan: two-way preset sync",
-      "state": "blue",
-      "one": "Fixes the reason the preset silently fell behind GTA, plus a guard so real parent quotes can never auto-propagate"
-    },
-    {
-      "name": "SJ EMAIL GO-LIVE",
-      "sidebar": "SJ EMAIL GO-LIVE",
-      "state": "done",
-      "one": "San Jose email is live and verified. Gmail untouched. Archive it",
+      "state": "white",
+      "one": "Owns the whole preset standard AND seeding San Jose through it. Building your user-story mockup now",
       "builds": [
-        "t-email"
-      ],
-      "blockedBy": null
-    },
-    {
-      "name": "Test: price breakdown",
-      "sidebar": "Test: price + tax + fees breakdown (gate 2)",
-      "state": "done",
-      "one": "Verdict delivered, PR #1606 merged. Archive it",
-      "builds": []
-    },
-    {
-      "name": "Client Profile",
-      "sidebar": "Client Profile: consolidated view over the 7 onboarding calls (Mike's spec)",
-      "state": "done",
-      "one": "Scaling program fully shipped: SQL applied, APIs live, staff guide up. Dormant until Mike sets terms. Archive it",
-      "actions": []
+        "t-convergence"
+      ]
     },
     {
       "name": "SET UP TWILIO BITCH",
