@@ -9,7 +9,7 @@
 // so every BAM location reuses the same design with its own name / site / handle.
 // Brand: gold #E2DD9F, black #000000 / surface #0A0A0A, Anton (display) + Inter Tight.
 
-import { FRAME } from "./email-templates/_shell.js";
+import { FRAME, FOOTER_REASON } from "./email-templates/_shell.js";
 import { TEMPLATES as NURTURE_TEMPLATES } from "./email-templates/nurture-emails.js";
 import { ONBOARDING_TEMPLATES } from "./email-templates/onboarding-emails.js";
 
@@ -231,8 +231,13 @@ function bodyToHtml(body) {
 // Fill the shell identity placeholders (UPPERCASE) in a frame or a full designed
 // template - both carry the same placeholder set since the templates were
 // tokenized (2026-07-25, the canonical no-hardcode build).
-function fillShell(html, L, { pre, unsub }) {
+function fillShell(html, L, { pre, unsub, reason, title }) {
   return html
+    // Both of these are only still here if the template did NOT declare its own.
+    // {{FOOTER_REASON}} goes first: the sentence it expands to itself contains
+    // {{ACADEMY_FULL}}, which the pass below then fills.
+    .replace(/\{\{FOOTER_REASON\}\}/g, reason || FOOTER_REASON.enquired)
+    .replace(/\{\{DOC_TITLE\}\}/g, title || L.full)
     .replace(/\{\{PREHEADER\}\}/g, pre)
     .replace(/\{\{WORDMARK_SUFFIX\}\}/g, L.suffix)
     .replace(/\{\{LOCATION_TAG\}\}/g, L.locationTag)
@@ -263,8 +268,14 @@ function dropEmptyShellLinks(html) {
 // if the body is already a FULL designed email (a complete HTML document, e.g.
 // exported from Claude Design), send it AS-IS and only fill its placeholders (it
 // has its own frame; wrapping it again would double the header/footer).
-//   renderEmail({ clientId, subject, body, preheader?, unsubscribeUrl?, vars? }) -> html
-export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars } = {}) {
+// `footerReason` / `docTitle` are the shell's two per-message parameters, for a caller
+// sending a plain body through FRAME. A DESIGNED template declares its own (see
+// _shell.js shellHead/shellFoot) and those win - the template knows its audience.
+// Unset, they fall back to what production has always sent: the "enquired about"
+// reason and the academy name as the title.
+//   renderEmail({ clientId, subject, body, preheader?, unsubscribeUrl?, vars?,
+//                 footerReason?, docTitle? }) -> html
+export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars, footerReason, docTitle } = {}) {
   const L = locFor(clientId, vars);
   const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
   const unsub = unsubscribeUrl || (L.email ? `mailto:${L.email}?subject=Unsubscribe` : "");
@@ -277,11 +288,12 @@ export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl
   // gold CTA in bodyToHtml, and an EMPTY {{location.website}} drops its line
   // while it is still a text line (inside markup it would be too late).
   raw = resolveMergeVars(raw, L, vars);
+  const shellArgs = { pre, unsub, reason: footerReason, title: docTitle };
   let html;
   if (/^\s*<(?:!doctype|html)/i.test(raw)) {
-    html = fillShell(raw, L, { pre, unsub });
+    html = fillShell(raw, L, shellArgs);
   } else {
-    html = fillShell(FRAME.replace(/\{\{CONTENT\}\}/g, bodyToHtml(raw)), L, { pre, unsub });
+    html = fillShell(FRAME.replace(/\{\{CONTENT\}\}/g, bodyToHtml(raw)), L, shellArgs);
   }
   // Emails are LIGHT now (white body, black header/footer) so they render the same
   // in light + dark mode everywhere - no dark-mode lock needed (and signaling dark

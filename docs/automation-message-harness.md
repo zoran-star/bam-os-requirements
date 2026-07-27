@@ -131,8 +131,31 @@ Re-seeding is **diff-and-patch, never delete-and-recreate**: San Jose's `nurture
 and position; never touch an existing row's `enabled` flag. San Jose client id:
 `5576acf0-acd3-4c05-9f9f-ebfde8618154`.
 
+## The GTA message lock (the automated half of this)
+
+The harness above is for a **human** to look at. The lock is for CI:
+
+```bash
+node bam-ghl-agent/bam-portal/api/_gta-message-lock.test.mjs
+```
+
+It renders all 10 GTA email templates through the same `renderEmail` path, with GTA's
+real client row, and fails on any byte difference from a committed golden. Two goldens
+per template: the parent-visible **words** (text + every link target, generated from
+`origin/main` so it is production truth) and the full **markup**. A failure prints the
+words diff first, so you can tell instantly whether a parent would notice.
+
+Re-blessing is deliberate and documented in
+`bam-ghl-agent/bam-portal/api/__goldens__/README.md`. Expected-but-narrow differences go
+in `WORD_WAIVERS` inside the test, each naming the decision and its date, rather than
+loosening the test.
+
+Not covered: SMS steps, and the per-academy `automation_steps` bodies in the database.
+The lock covers the vendored templates, which is where a code refactor can move copy.
+
 ## Related
 
+- GTA message lock: `bam-ghl-agent/bam-portal/api/_gta-message-lock.test.mjs`
 - Canonical defaults: `bam-ghl-agent/bam-portal/api/form-intro-automations.js`
 - Divergence checker: `bam-ghl-agent/bam-portal/scripts/check-automation-divergence.mjs`
   (detects an academy drifting FROM the master, never the master lagging behind GTA -

@@ -8,7 +8,7 @@
 // {{contact.athletes_full_name}}, {{location.city}}, {{location_owner.first_name}}).
 // Referenced from an automation_steps row via body = "template:<key>".
 //
-// The header/footer come from ./_shell.js (shellHead + SHELL_FOOT), the SAME shell
+// The header/footer come from ./_shell.js (shellHead + shellFoot), the SAME shell
 // renderEmail wraps a plain step body in, so wordmark / location tag / site / support
 // email / Instagram / academy name all fill from the sending academy's own record.
 // Do not reintroduce a local header or footer here.
@@ -25,7 +25,13 @@
 // That is copy work, not shell plumbing, and is NOT done here.
 
 import { TEMPLATES as NURTURE } from "./nurture-emails.js";
-import { shellHead, SHELL_FOOT } from "./_shell.js";
+import { shellHead, shellFoot, FOOTER_REASON } from "./_shell.js";
+
+// These go to people who have already PAID and joined, never to a lead, so the shell's
+// footer reason must say "joined" - "enquired about" is a lead sentence and is simply
+// untrue of a member. The shell takes it as a parameter (FOOTER_REASON), so this is a
+// declaration of audience, not a fork of the shell.
+const MEMBER_FOOT = shellFoot(FOOTER_REASON.joined);
 
 // The onboarding sequence reuses the designed nurture emails, but its recipients
 // are PAYING members - so any "Book a free trial" call-to-action (right for a lead,
@@ -76,7 +82,7 @@ const SCHED = (day, younger, older) => `          <tr>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1) WELCOME  (immediate) — quick-start links + schedule + location
-const welcome = shellHead("You're in. Everything you need to get started with By Any Means GTA.")
+const welcome = shellHead("You're in. Everything you need to get started with By Any Means GTA.", "By Any Means - Welcome")
   + EYEBROW("Welcome to the family")
   + H1("You're in.<br>Let's get to work.")
   + P("Hi {{contact.first_name}}, welcome to By Any Means Basketball. {{contact.athletes_full_name}} is all set, and we are pumped to have you both. Here is everything you need to hit the ground running.")
@@ -108,12 +114,12 @@ const welcome = shellHead("You're in. Everything you need to get started with By
       <tr><td style="padding:18px 36px 8px;">`
   + P("See you on the court,<br><b style=\"color:#0A0A0A;\">The By Any Means GTA Team</b>", 4)
   + `      </td></tr>`
-  + SHELL_FOOT;
+  + MEMBER_FOOT;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2) TRAINING  (+10 min) — three habits + Attention to Detail video
 const VIDEO_ID = "jC1xir7Jngc";
-const training = shellHead("Three habits that separate the players who improve fast from everyone else.")
+const training = shellHead("Three habits that separate the players who improve fast from everyone else.", "By Any Means - Make Training Count")
   + EYEBROW("Get the most out of it")
   + H1("How to make<br>training count.")
   + P("Hi {{contact.first_name}}, now that {{contact.athletes_full_name}} is part of the By Any Means family, here is how to get the absolute most out of every single session.")
@@ -131,11 +137,11 @@ const training = shellHead("Three habits that separate the players who improve f
   + CTA(`https://www.youtube.com/watch?v=${VIDEO_ID}`, "Watch the video")
   + P("See you on the court,<br><b style=\"color:#0A0A0A;\">The By Any Means GTA Team</b>", 4)
   + `      </td></tr>`
-  + SHELL_FOOT;
+  + MEMBER_FOOT;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3) REVIEW  (+1 week after testimonials) — warm Google-review ask
-const review = shellHead("If training has been a win for your athlete, would you share it?")
+const review = shellHead("If training has been a win for your athlete, would you share it?", "By Any Means - A Quick Favour")
   + EYEBROW("A quick favour")
   + H1("Mind sharing<br>your story?")
   + P("Hi {{contact.first_name}}, we hope {{contact.athletes_full_name}} has been loving training with By Any Means. Watching our athletes get better every week is exactly why we do this.")
@@ -146,7 +152,7 @@ const review = shellHead("If training has been a win for your athlete, would you
   + P("Thank you for being part of the family. It means more than you know.", 16)
   + P("With gratitude,<br><b style=\"color:#0A0A0A;\">The By Any Means GTA Team</b>", 4)
   + `      </td></tr>`
-  + SHELL_FOOT;
+  + MEMBER_FOOT;
 
 export const ONBOARDING_TEMPLATES = {
   "onboarding-welcome": welcome,
