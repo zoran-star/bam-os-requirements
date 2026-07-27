@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Skill run - onboarding BAM GTA today</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#D4B65C; --bg:#0C0C0D; --card:#141416; --card2:#1A1A1D; --line:#2A2A2E;
+    --tx:#EDEDEF; --tx2:#A8A8B0; --tx3:#6E6E78;
+    --red:#E5674E; --green:#5FBF8A; --blue:#5B9DD9; --amber:#E0A33C;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif; --mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.62;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto;padding:40px 20px 100px}
+  h1{font-size:clamp(25px,4vw,35px);line-height:1.13;letter-spacing:-.02em;margin:0 0 9px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:16px;margin:0 0 8px;max-width:70ch}
+  .meta{color:var(--tx3);font-size:12.5px;font-family:var(--mono);margin:0 0 30px}
+  .m{font-family:var(--mono);font-size:13px}
+
+  .stage{display:flex;align-items:center;gap:11px;margin:44px 0 16px}
+  .stage .n{font-family:var(--mono);font-size:11px;color:var(--bg);background:var(--gold);border-radius:5px;padding:2px 8px;font-weight:700;flex:none}
+  .stage h2{margin:0;font-size:12.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);font-weight:700}
+  .stage .who{margin-left:auto;font-size:10px;letter-spacing:.11em;text-transform:uppercase;font-weight:700;color:var(--tx3)}
+
+  .turn{margin-bottom:14px}
+  .turn .lbl{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:800;margin-bottom:6px;color:var(--tx3)}
+  .skill .lbl{color:var(--blue)}
+  .staff .lbl{color:var(--gold)}
+  .bub{border-radius:13px;padding:15px 18px;font-size:14.5px}
+  .skill .bub{background:var(--card);border:1px solid var(--line)}
+  .staff .bub{background:rgba(212,182,92,.09);border:1px solid rgba(212,182,92,.32);color:#F2E6C4}
+  .bub p{margin:0 0 10px}
+  .bub p:last-child{margin-bottom:0}
+  .bub ul{margin:8px 0;padding-left:19px}
+  .bub li{margin-bottom:5px;color:var(--tx2)}
+  .skill .bub p{color:var(--tx2)}
+  .skill .bub b{color:var(--tx)}
+
+  pre{font-family:var(--mono);font-size:12px;line-height:1.62;color:var(--tx2);margin:10px 0 0;white-space:pre;overflow-x:auto;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:13px 15px}
+
+  .draft{background:var(--bg);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:10px;padding:15px 17px;margin:11px 0}
+  .draft .dh{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:9px}
+  .draft .subj{font-family:var(--mono);font-size:12.5px;color:var(--tx);margin-bottom:11px;padding-bottom:9px;border-bottom:1px solid var(--line)}
+  .draft .body{white-space:pre-wrap;font-size:14px;color:var(--tx);line-height:1.65}
+  .src{margin-top:11px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--tx3)}
+  .src b{color:var(--tx2)}
+
+  .flag{background:rgba(229,103,78,.09);border:1px solid rgba(229,103,78,.3);border-radius:9px;padding:12px 15px;margin:11px 0;font-size:13.5px;color:var(--tx2)}
+  .flag b{color:var(--red);display:block;margin-bottom:3px}
+  .ok{background:rgba(95,191,138,.08);border:1px solid rgba(95,191,138,.28);border-radius:9px;padding:12px 15px;margin:11px 0;font-size:13.5px;color:var(--tx2)}
+  .ok b{color:var(--green);display:block;margin-bottom:3px}
+
+  .mailwrap{border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#EDEDEA;margin:12px 0}
+  .mailbar{display:flex;align-items:center;gap:9px;padding:8px 12px;background:var(--card2);border-bottom:1px solid var(--line)}
+  .mailbar .l{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:700}
+  .mailbar a{margin-left:auto;font-size:11px;color:var(--gold);text-decoration:none;font-weight:600}
+  .mailwrap iframe{display:block;width:100%;height:430px;border:0;background:#EDEDEA}
+
+  .foot{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--tx3);font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
+  td{padding:8px 11px;border-bottom:1px solid var(--line);color:var(--tx2)}
+  td.k{color:var(--tx);font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Onboarding BAM GTA <span>today</span>, from nothing but the presets.</h1>
+  <p class="sub">A worked example of Skill A and Skill B, run by internal BAM staff against GTA's real data. Every value quoted below is what is actually in the database right now. The rendered emails at the end are the real ones.</p>
+  <p class="meta">Example &middot; 27 Jul 2026 &middot; academy: BAM GTA &middot; operator: BAM staff</p>
+
+  <!-- ══════ SKILL A ══════ -->
+  <div class="stage"><span class="n">A</span><h2>Skill A &middot; free-trial sales system</h2></div>
+
+  <div class="turn staff"><div class="lbl">Staff</div><div class="bub">
+    /sales-emails BAM GTA
+  </div></div>
+
+  <div class="stage" style="margin-top:26px"><span class="n">1</span><h2>Read</h2><span class="who">automatic</span></div>
+  <div class="turn skill"><div class="lbl">Skill</div><div class="bub">
+    <p>Read BAM GTA. Here is what you already have.</p>
+<pre>BRAND
+  story          482 chars   "By Any Means started in the GTA with one
+                             mission: give serious young hoopers the
+                             coaching, reps and accountability that
+                             actually move the needle..."
+  why_us         287 chars   "We coach with a plan, not just drills.
+                             Small groups, honest feedback, and a clear
+                             path for every athlete..."
+  proof          4 points    Hundreds of GTA athletes trained /
+                             Coaches with playing and certification
+                             pedigree / Programs feeding into rep and
+                             high-school ball / Mon-Wed-Fri sessions
+  stats          3 lines     Serving the GTA and Oakville / 43+ active
+                             members / Mon-Wed-Fri evening training
+  dream_athletes             Ages 9 to 17, driven and coachable
+  voice                      bold, gold-on-black, athletic. Confident,
+                             not flashy
+
+OFFER
+  selling points 7 bullets   science-based, positive environment, small
+                             groups, time-on-task drills, individual
+                             skill focus not team, culture off the
+                             court, athletes travel 40+ minutes
+  ages 9-17   capacity 12   coach ratio 2+   all skill levels
+
+SYSTEM
+  86 schedule slots   1 venue   3 staff   no testimonials on file
+  parent-facing name MISSING   domain byanymeanstoronto.ca</pre>
+    <div class="flag">
+      <b>Two sources disagree about your schedule</b>
+      brand_data says "Mon/Wed/Fri evening training", but your 86 live sessions run Mon, Tue, Wed, Thu and Sat. I will use the live sessions, since that is what parents actually book. Worth fixing the brand copy separately.
+    </div>
+    <div class="flag">
+      <b>No parent-facing name on file</b>
+      business_name is "BAM GTA", which is your internal label. Messages will read "It's coach from BAM GTA" until a parent-facing name is set. Suggested: By Any Means Basketball.
+    </div>
+  </div></div>
+
+  <div class="turn staff"><div class="lbl">Staff</div><div class="bub">
+    Set the parent-facing name to By Any Means Basketball. Leave the brand schedule copy, I'll fix that with Zoran later.
+  </div></div>
+
+  <!-- READINESS -->
+  <div class="stage" style="margin-top:26px"><span class="n">2</span><h2>Check readiness</h2><span class="who">automatic</span></div>
+  <div class="turn skill"><div class="lbl">Skill</div><div class="bub">
+<pre>story          READY   brand_data.story           482 chars
+why we differ  READY   brand_data.why_us          287 chars
+testimonials   EMPTY   no testimonials on file  ->  slot dropped</pre>
+    <p style="margin-top:11px">Two to write. The testimonials email will not ship, because there is nothing real to put in it. Add testimonials in the wizard and re-run me to bring it back.</p>
+    <div class="ok">
+      <b>Built already, no input needed</b>
+      Contact Form intro, Trial Form intro, Missed Trial intro and Ghosted are all done. Don't miss your shot is done. That is 4 automations and 1 email with nothing asked of you.
+    </div>
+  </div></div>
+
+  <!-- PROPOSE 1 -->
+  <div class="stage" style="margin-top:26px"><span class="n">3</span><h2>Propose in chat</h2><span class="who" style="color:var(--gold)">custom emails only</span></div>
+
+  <div class="turn skill"><div class="lbl">Skill &middot; email 1 of 2</div><div class="bub">
+    <p><b>Why us at all.</b> First email of the nurture sequence, one week after the lead goes cold.</p>
+    <p><b>My angle:</b> your origin story. You have 482 characters of it and it is specific, so I led with the mission and let the growth do the persuading rather than claiming anything.</p>
+
+    <div class="draft">
+      <div class="dh">Draft</div>
+      <div class="subj">Subject: Where By Any Means came from</div>
+      <div class="body">Hi {{contact.first_name}},
+
+By Any Means started in the GTA with one mission: give serious young hoopers the coaching, reps and accountability that actually move the needle.
+
+What began as small-group sessions near Oakville has grown into a training program families across the region trust to develop real game. 43 athletes train with us right now, and some of them drive more than 40 minutes to get here.
+
+That is the whole thing, really. We are not the closest option for a lot of our families. We are the one they picked.
+
+Come see a session.</div>
+      <div class="src"><b>Drew from:</b> brand_data.story verbatim for the opening, brand_data.stats for the 43 figure, and your own selling point "athletes travel 40+ minutes (from Milton and beyond) to train with us".</div>
+    </div>
+    <p><b>Did not claim:</b> anything about results or placements. Nothing in your data supports it yet.</p>
+  </div></div>
+
+  <div class="turn staff"><div class="lbl">Staff</div><div class="bub">
+    This is decent but it's the wrong card to lead with. Our strongest thing is that we're not a local program, we're a global brand. 502K subscribers on YouTube, camps in eight countries, Coleman founded it in 2015. Lead with that and put the local story second.
+  </div></div>
+
+  <div class="turn skill"><div class="lbl">Skill</div><div class="bub">
+    <p>Understood. That is brand-level and none of it is in this academy's record, so I am taking it from you rather than inventing it. Confirm the numbers and I will use them: <b>502K subscribers, 639 videos, 50+ countries, founded 2015 by Coleman Ayers</b>.</p>
+    <div class="draft">
+      <div class="dh">Draft, revised</div>
+      <div class="subj">Subject: A global basketball ecosystem</div>
+      <div class="body">Hi {{contact.first_name}},
+
+When you train with By Any Means Basketball, you're not joining a local program. You're plugging into a basketball brand the world already knows.
+
+Founded by Coleman Ayers in 2015 with one vision: change the world through hoops. 502K subscribers. 639 videos. Athletes in more than 50 countries. Camps run in Manila, Athens, Barcelona, Sydney, Paris, London and Belgrade.
+
+The same coaching philosophy your athlete trains on here in {{location.city}}.
+
+43 families train with us right now, and some drive more than 40 minutes to do it.
+
+Come see a session.</div>
+      <div class="src"><b>Drew from:</b> your figures for the brand section, brand_data.stats for the 43, and your selling point about travel distance. City fills itself from the address.</div>
+    </div>
+    <div class="ok">
+      <b>Recorded as GTA's own</b>
+      You supplied those figures, so they are GTA's content. They stay with this academy and do not travel to San Jose or anyone else. Nothing about GTA's existing setup changes either; this is added alongside it.
+    </div>
+  </div></div>
+
+  <div class="turn staff"><div class="lbl">Staff</div><div class="bub">
+    Numbers confirmed. Approve the email.
+  </div></div>
+
+  <!-- PROPOSE 2 -->
+  <div class="turn skill"><div class="lbl">Skill &middot; email 2 of 2</div><div class="bub">
+    <p><b>Why our way is different.</b> Second nurture email, one week later.</p>
+    <p><b>My angle:</b> your why_us is already an argument, so I kept its shape and gave it an opponent. Your line "we coach with a plan, not just drills" implies the alternative, so I said it out loud.</p>
+
+    <div class="draft">
+      <div class="dh">Draft</div>
+      <div class="subj">Subject: A new era of training</div>
+      <div class="body">Hi {{contact.first_name}},
+
+A lot of parents come to us frustrated. Their kid has been training, but they are not seeing the progress they expected.
+
+We have seen it too. In a lot of {{location.city}} programs the focus is on drills that look flashy but do not actually help kids perform in games. No real structure, no clear plan, very little accountability.
+
+We coach with a plan, not just drills. Small groups, honest feedback, and a clear path for every athlete from where they are to where they want to be.
+
+Twelve players a session, at least two coaches on the floor. Every athlete gets seen.
+
+Parents see the progress on the court and in the numbers.
+
+Come see a session.</div>
+      <div class="src"><b>Drew from:</b> brand_data.why_us almost verbatim, plus capacity 12 and coach ratio "at least 2 coaches per session" from your offer. Those two are facts in your record, so I stated them as facts.</div>
+    </div>
+    <p><b>Did not claim:</b> the European coaching background. It is not in your record anywhere. If it is true, tell me and I will add it.</p>
+  </div></div>
+
+  <div class="turn staff"><div class="lbl">Staff</div><div class="bub">
+    Add it, that's real. Zoran and the coaching staff brought the method over from Europe, it's more intentional and disciplined and focused on the whole player rather than highlights. Otherwise approved.
+  </div></div>
+
+  <div class="turn skill"><div class="lbl">Skill</div><div class="bub">
+    <p>Added as your claim, in your words. Both emails approved. Building.</p>
+  </div></div>
+
+  <!-- BUILD -->
+  <div class="stage" style="margin-top:26px"><span class="n">4</span><h2>Build</h2><span class="who">automatic</span></div>
+  <div class="turn skill"><div class="lbl">Skill</div><div class="bub">
+<pre>contact_form   1 step    built
+trial_form     1 step    built
+missed_trial   1 step    built
+ghosted        3 steps   built
+nurture        3 steps   built   (4th slot dropped, no testimonials)
+
+Filled from your record:
+  parent-facing name  By Any Means Basketball
+  website             byanymeanstoronto.ca
+  owner               Zoran
+  city                Oakville
+  logo, colours       brand_data
+Did not render:
+  footer Instagram    no instagram on file
+  footer tagline      no tagline on file</pre>
+  </div></div>
+
+  <!-- REVIEW -->
+  <div class="stage" style="margin-top:26px"><span class="n">5</span><h2>Render and review</h2><span class="who" style="color:var(--blue)">staff reads</span></div>
+  <div class="turn skill"><div class="lbl">Skill</div><div class="bub">
+    <p>Review page is up. Every message rendered through the real send path. Here is the second nurture email as it will actually arrive:</p>
+    <div class="mailwrap">
+      <div class="mailbar"><span class="l">N2 &middot; a new era of training &middot; rendered</span><a href="emails/nurture-2.html" target="_blank" rel="noopener">Open full size</a></div>
+      <iframe src="emails/nurture-2.html" title="A new era of training" loading="lazy"></iframe>
+    </div>
+    <p>Flip through the rest on the review page and send me notes against the references.</p>
+  </div></div>
+
+  <div class="turn staff"><div class="lbl">Staff</div><div class="bub">
+    N2 good. GH1 feels too casual for a first email, drop the emoji. Everything else ships.
+  </div></div>
+
+  <div class="turn skill"><div class="lbl">Skill</div><div class="bub">
+    <p>GH1 emoji removed, re-rendered. Installing.</p>
+<pre>5 automations installed, all approved:false
+Nothing will send until BAM GTA approves it in their wizard.</pre>
+  </div></div>
+
+  <!-- ══════ SKILL B ══════ -->
+  <div class="stage" style="margin-top:52px"><span class="n">B</span><h2>Skill B &middot; member onboarding</h2></div>
+
+  <div class="turn staff"><div class="lbl">Staff</div><div class="bub">
+    /onboarding-emails BAM GTA
+  </div></div>
+
+  <div class="turn skill"><div class="lbl">Skill</div><div class="bub">
+    <p>Read BAM GTA. Same record as before, plus your 86 sessions.</p>
+<pre>story          ALREADY APPROVED   authored in the sales run
+why we differ  ALREADY APPROVED   authored in the sales run
+how to train   READY              why_us + proof
+testimonials   EMPTY              slot dropped
+
+Built already, no input needed:
+  welcome SMS + welcome email   schedule generated from 86 sessions
+  schedule SMS                  venue from the session location
+  review ask                    no review link on file, no button
+  community group               WhatsApp link on file, line renders</pre>
+    <div class="ok">
+      <b>Two emails you already approved</b>
+      Where we came from and A new era are the same designs as your nurture ones, with the free-trial button removed. I am reusing them rather than asking you to write them twice. Say so if you want them different here.
+    </div>
+    <p><b>One email to write.</b></p>
+  </div></div>
+
+  <div class="turn skill"><div class="lbl">Skill &middot; email 1 of 1</div><div class="bub">
+    <p><b>How to get the most out of training.</b> Five minutes after a new member joins.</p>
+    <p><b>My angle:</b> your why_us says honest feedback and a clear path. That is a two-way thing, so I wrote it as what the athlete has to bring, not what you provide.</p>
+    <div class="draft">
+      <div class="dh">Draft</div>
+      <div class="subj">Subject: How to get the most out of training</div>
+      <div class="body">Hi {{contact.first_name}},
+
+Now that {{contact.athletes_full_name}} is part of the family, here is how to get the most out of every session.
+
+1. Talk to your coach.
+Every player can reach our coaches any time, about anything. Basketball, school, or life. Before practice, tell your coach what you want to work on and we will build the session around it.
+
+2. Know your weaknesses.
+Come ready to say what you want to improve. The more honest you are about the weak spots, the faster the growth.
+
+3. Do the extra work.
+Treat training like a class. There is homework too. Even twenty minutes a day moves the needle.
+
+See you on the court.</div>
+      <div class="src"><b>Drew from:</b> "honest feedback" and "a clear path for every athlete" from brand_data.why_us, and "coaches with playing and certification pedigree" from brand_data.proof for the reachability claim.</div>
+    </div>
+    <p><b>Did not claim:</b> anything about the online programs. There is no programs link in your record.</p>
+  </div></div>
+
+  <div class="turn staff"><div class="lbl">Staff</div><div class="bub">
+    Approved. Add the Attention to Detail video at the bottom, that's our own content and it belongs there.
+  </div></div>
+
+  <div class="turn skill"><div class="lbl">Skill</div><div class="bub">
+    <p>Added, and recorded as GTA's own. It stays with this academy and will not appear in another one unless somebody puts it there deliberately.</p>
+    <p>Building and rendering. Here is the welcome email, assembled entirely from your record with nothing asked of you:</p>
+    <div class="mailwrap">
+      <div class="mailbar"><span class="l">WEL &middot; welcome &middot; rendered</span><a href="emails/onboarding-welcome.html" target="_blank" rel="noopener">Open full size</a></div>
+      <iframe src="emails/onboarding-welcome.html" title="Welcome" loading="lazy"></iframe>
+    </div>
+<pre>onboarding   6 steps built, approved:false
+
+Filled from your record:
+  weekly schedule    generated from 86 sessions
+  venue              1079 Linbrook Rd, from the session location
+  coach phone        from your business number
+  community group    WhatsApp link
+Did not render:
+  review button      no Google review link on file
+  footer Instagram   no instagram on file</pre>
+  </div></div>
+
+  <!-- TALLY -->
+  <div class="stage" style="margin-top:52px"><span class="n">=</span><h2>What that cost</h2></div>
+  <div class="turn skill"><div class="lbl">Result</div><div class="bub">
+    <table>
+      <tbody>
+        <tr><td class="k">2</td><td>skill runs</td></tr>
+        <tr><td class="k">3</td><td>emails proposed in chat</td></tr>
+        <tr><td class="k">3</td><td>staff edits: lead with the brand, add Europe, add the video</td></tr>
+        <tr><td class="k">3</td><td>additions recorded as GTA-custom, none of them propagate</td></tr>
+        <tr><td class="k">1</td><td>email honestly dropped, testimonials</td></tr>
+        <tr><td class="k">6</td><td>automations installed, all dormant</td></tr>
+        <tr><td class="k">0</td><td>blank pages</td></tr>
+      </tbody>
+    </table>
+    <div class="ok" style="margin-top:14px">
+      <b>Everything staff added stays with GTA</b>
+      The global-ecosystem section, the Attention to Detail video and the Europe method claim are all GTA's content. None of them travel to San Jose or any academy after it, and none of them touch GTA's existing setup. San Jose writes its own from its own record.
+    </div>
+    <div class="flag">
+      <b>And two real problems surfaced without anyone hunting for them</b>
+      brand_data claims Mon/Wed/Fri while 86 live sessions say otherwise, and BAM GTA had no parent-facing name, so every message would have introduced the academy to parents as "BAM GTA".
+    </div>
+  </div></div>
+
+  <p class="foot">Every value quoted is real: brand_data.story, why_us, proof and stats are as stored today, the seven selling points and capacity 12 and coach ratio come from the offer, and the 86 schedule slots and missing testimonials were read from the database on 27 Jul 2026. The rendered emails embedded above are the actual output of the current send path.</p>
+
+</div>
+</body>
+</html>

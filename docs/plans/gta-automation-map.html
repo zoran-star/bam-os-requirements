@@ -78,6 +78,12 @@
   .bub{background:#25252A;border-radius:13px 13px 13px 4px;padding:11px 14px;font-size:12.5px;color:var(--tx);line-height:1.6;white-space:pre-wrap;word-break:break-word}
   .tplbox{background:var(--card2);border:1px dashed var(--line);border-radius:10px;padding:12px 14px}
   .tplbox .tk{font-family:var(--mono);font-size:12px;color:var(--gold);margin-bottom:8px}
+  .mailwrap{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#EDEDEA;margin-bottom:10px}
+  .mailbar{display:flex;align-items:center;gap:9px;padding:7px 11px;background:var(--card2);border-bottom:1px solid var(--line)}
+  .mailbar .lbl{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:700}
+  .mailbar a{margin-left:auto;font-size:11px;color:var(--gold);text-decoration:none;font-weight:600}
+  .mailbar a:hover{text-decoration:underline}
+  .mailwrap iframe{display:block;width:100%;height:620px;border:0;background:#EDEDEA}
   .el{display:block;padding:5px 9px;border-radius:6px;margin-bottom:5px;font-size:12px;line-height:1.5}
   .el:last-child{margin-bottom:0}
 
@@ -105,6 +111,8 @@
   .nt .src.need em{color:var(--gold)}
   .nt .src.no em{color:var(--red)}
 
+  .prop{margin-top:6px;padding:8px 11px;border:1px dashed rgba(212,182,92,.65);border-radius:7px;background:rgba(212,182,92,.10);color:#F0DFA8;font-size:12.5px;line-height:1.5}
+  .prop em{font-style:normal;font-weight:800;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-right:6px}
   .note{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:11px;padding:14px 16px;margin-top:14px}
   .note b{color:var(--tx);display:block;margin-bottom:3px;font-size:13.5px}
   .note p{margin:0;color:var(--tx2);font-size:13px}
@@ -120,7 +128,7 @@
   <div class="sw">
     <div class="swgrp">
       <div><div class="swlbl" style="color:var(--gold)">Free-trial sales system preset</div><div class="swrow" id="tabsA"></div></div>
-      <div><div class="swlbl">Outside the preset</div><div class="swrow" id="tabsB"></div></div>
+      <div><div class="swlbl">Outside the sales preset</div><div class="swrow" id="tabsB"></div></div>
     </div>
   </div>
 
@@ -128,13 +136,14 @@
     <div class="lg"><i style="background:var(--green)"></i><b>PHOTOCOPY</b> &middot; travels untouched today</div>
     <div class="lg"><i style="background:var(--gold)"></i><b>SWAP</b> &middot; travels once we collect the fact</div>
     <div class="lg"><i style="background:var(--red)"></i><b>CUSTOM</b> &middot; this academy's own, needs customising after</div>
+    <div class="lg" style="border-color:rgba(212,182,92,.5)"><i style="background:transparent;border:1px dashed var(--gold)"></i><b style="color:var(--gold)">PROPOSED</b> &middot; my recommendation to convert it</div>
   </div>
 
   <div id="panels"></div>
 </div>
 
 <script>
-const N = (st, w, d, src, srcState) => ({st, w, d, src, srcState});
+const N = (st, w, d, src, srcState, prop) => ({st, w, d, src, srcState, prop});
 
 const DATA = [
 {
@@ -142,7 +151,7 @@ const DATA = [
   trigger:"A parent fills the general contact or enquiry form on the website.",
   live:"Live, 1 lead enrolled",
   steps:[{ wait:"2 minutes", ch:"sms",
-    body:[{t:"Hi "},{t:"{{contact.first_name}}",k:"p"},{t:",\n\nIt's coach from "},{t:"By Any Means Basketball",k:"s"},{t:". Just saw you filled in the form for extra info, is there anything I can help with?",k:"p"}],
+    body:[{t:"Hi ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:",\n\nIt's coach from ",k:"p"},{t:"By Any Means Basketball",k:"s"},{t:". Just saw you filled in the form for extra info, is there anything I can help with?",k:"p"}],
     notes:[
       N("p","Parent's first name","Fills itself from whatever they typed on the form.","The lead's own form submission","have"),
       N("s","Academy name","Typed into GTA's message by hand. Becomes a blank that fills itself.","Business Basics &rarr; Name parents see","need"),
@@ -156,7 +165,7 @@ const DATA = [
   trigger:"A parent fills the free-trial form but never picks a time on the calendar.",
   live:"Live, 30 leads enrolled, fired today",
   steps:[{ wait:"20 minutes", ch:"sms",
-    body:[{t:"Hi "},{t:"{{contact.first_name}}",k:"p"},{t:", it's coach from "},{t:"By Any Means GTA",k:"s"},{t:".\n\nI saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?\n\nHere's the link to the calendar again: ",k:"p"},{t:"{{location.website}}/free-trial",k:"p"}],
+    body:[{t:"Hi ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:", it's coach from ",k:"p"},{t:"By Any Means GTA",k:"s"},{t:".\n\nI saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?\n\nHere's the link to the calendar again: ",k:"p"},{t:"{{location.website}}/free-trial",k:"p"}],
     notes:[
       N("p","Parent's first name","Fills from the form.","The lead's own form submission","have"),
       N("s","Academy name","Same hand-typed name as the contact form.","Business Basics &rarr; Name parents see","need"),
@@ -170,7 +179,7 @@ const DATA = [
   trigger:"An athlete no-showed their booked trial and the trainer marked \"did not attend\".",
   live:"Live, 7 leads enrolled",
   steps:[{ wait:"30 minutes", ch:"sms",
-    body:[{t:"Hi "},{t:"{{contact.first_name}}",k:"p"},{t:", sorry we missed you at your trial - want to grab another time? Here's the calendar: ",k:"p"},{t:"{{location.website}}/free-trial",k:"p"}],
+    body:[{t:"Hi ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:", sorry we missed you at your trial - want to grab another time? Here's the calendar: ",k:"p"},{t:"{{location.website}}/free-trial",k:"p"}],
     notes:[
       N("p","Parent's first name","Fills from the booking.","The lead's own record","have"),
       N("p","Free-trial link","Already a blank.","Business Basics &rarr; Website domain","have"),
@@ -184,21 +193,21 @@ const DATA = [
   live:"Live, 29 leads enrolled, fired today",
   steps:[
     { wait:"1 day", ch:"sms",
-      body:[{t:"Hey "},{t:"{{contact.first_name}}",k:"p"},{t:"! Just wanted to check in and see if you are still interested in having your child train with us 👍\n\n",k:"p"},{t:"byanymeanstoronto.ca",k:"s"}],
+      body:[{t:"Hey ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:"! Just wanted to check in and see if you are still interested in having your child train with us 👍\n\n",k:"p"},{t:"byanymeanstoronto.ca",k:"s"}],
       notes:[
         N("p","Parent's first name + the wording","No academy name anywhere in the sentence.","Written once in the master","have"),
         N("s","Website","Typed in. Becomes the same blank the other messages already use. No new field, the domain is already collected.","Business Basics &rarr; Website domain","have"),
       ]},
     { wait:"1 day", ch:"sms",
-      body:[{t:"Hi "},{t:"{{contact.fullName}}",k:"p"},{t:"\n\nJust wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: ",k:"p"},{t:"https://byanymeanstoronto.ca/free-trial",k:"s"},{t:"\n\nThank you! 🙏",k:"p"}],
+      body:[{t:"Hi ",k:"p"},{t:"{{contact.fullName}}",k:"p"},{t:"\n\nJust wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: ",k:"p"},{t:"https://byanymeanstoronto.ca/free-trial",k:"s"},{t:"\n\nThank you! 🙏",k:"p"}],
       notes:[
         N("p","Parent's full name + the wording","Generic.","Written once in the master","have"),
         N("s","Free-trial link","Typed in. Same swap.","Business Basics &rarr; Website domain","have"),
       ]},
-    { wait:"1 day", ch:"email", subj:"Try a session free",
-      body:[{t:"Hi "},{t:"{{contact.first_name}}",k:"p"},{t:",\n\nIt's coach "},{t:"{{location_owner.first_name}}",k:"p"},{t:" from "},{t:"{{location.name}}",k:"p"},{t:" - I just wanted to reach out over email to check and see if you would be interested in coming out to a free trial.\n\nIf so, feel free to book in using this link:\n\n",k:"p"},{t:"https://byanymeanstoronto.ca/free-trial",k:"s"},{t:"\n\nThanks!",k:"p"}],
+    { wait:"1 day", ch:"email", subj:"Try a session free", mail:"ghosted-3",
+      body:[{t:"Hi ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:",\n\nIt's coach ",k:"p"},{t:"{{location_owner.first_name}}",k:"p"},{t:" from ",k:"p"},{t:"{{location.name}}",k:"p"},{t:" - I just wanted to reach out over email to check and see if you would be interested in coming out to a free trial.\n\nIf so, feel free to book in using this link:\n\n",k:"p"},{t:"https://byanymeanstoronto.ca/free-trial",k:"s"},{t:"\n\nThanks!",k:"p"}],
       notes:[
-        N("p","Owner's first name","Already a blank. Signs with whoever owns the academy.","Team &rarr; Owner contact","have"),
+        N("c","Owner's first name","<b>Take it out.</b> The templated version reads \"It's coach from &lt;academy&gt;\", with no owner name at all.","Removed, not collected","no"),
         N("p","Academy name","This step already uses the blank. The other two automations should copy this.","Business Basics &rarr; Name parents see","have"),
         N("p","Switching to email on day 3","Deliberate. A fresh channel revives leads the text thread lost. Pure structure, copies as-is.","The preset","have"),
         N("s","Free-trial link","Typed in a third time.","Business Basics &rarr; Website domain","have"),
@@ -211,54 +220,50 @@ const DATA = [
   trigger:"Ghosted ran dry. The long game: four designed brand emails over about eight weeks.",
   live:"Live, 32 leads enrolled",
   steps:[
-    { wait:"1 week", ch:"email", subj:"A global basketball ecosystem", tpl:"nurture-1",
-      els:[{k:"p",t:"The brand story and the 50+ countries claim"},{k:"p",t:"Designed layout, fonts, gold accents"},{k:"p",t:"Header wordmark + city tag"},{k:"s",t:"Footer: website, email, Instagram, tagline"}],
+    { wait:"1 week", ch:"email", subj:"A global basketball ecosystem", tpl:"nurture-1", mail:"nurture-1",
+      els:[{k:"c",t:"The entire email, frame included"}],
       notes:[
-        N("p","The whole body","Global brand content. Nothing in it belongs to one academy.","Written once in the master","have"),
-        N("p","Header wordmark and city","Already blanks. Renders BY ANY MEANS SAN JOSE for San Jose.","Business Basics &rarr; name + address","have"),
-        N("s","Footer Instagram and tagline","<b>Not collected for anyone.</b> GTA's are hardcoded in its own entry, so every other academy's footer silently drops both links.","Business Basics &rarr; Instagram + tagline","need"),
+        N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Designed per academy during onboarding. San Jose starts with GTA's version.","Designed in onboarding","no"),
       ]},
-    { wait:"1 week", ch:"email", subj:"A new era of training", tpl:"nurture-2",
-      els:[{k:"p",t:"Training philosophy, entirely brand-global"},{k:"p",t:"Designed layout"},{k:"s",t:"Footer: Instagram + tagline"}],
-      notes:[ N("p","Everything except the footer","The cleanest template we own. Zero academy content in the body.","Written once in the master","have") ]},
-    { wait:"3 weeks", ch:"email", subj:"What families are saying", tpl:"nurture-3",
-      els:[{k:"c",t:"Three real GTA parent testimonials"},{k:"p",t:"Designed layout and the surrounding copy"},{k:"s",t:"Footer: Instagram + tagline"}],
+    { wait:"1 week", ch:"email", subj:"A new era of training", tpl:"nurture-2", mail:"nurture-2",
+      els:[{k:"c",t:"The entire email, frame included"}],
       notes:[
-        N("c","The parent quotes","<b>Real families' words.</b> The city inside them is already a blank, which is what makes it dangerous: it renders cleanly for anybody, so a San Jose parent would read a San Jose family praising a programme they never attended.","Cannot be copied. Ever.","no"),
-        N("c","How it gets customised after","The quote block drops out entirely and the email still sends. When an academy connects their own reviews, real quotes fill it back in.","Needs the quote-free version built","no"),
-        N("p","Everything around the quotes","The design, the headline and the closing all travel fine.","Written once in the master","have"),
+        N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Designed per academy during onboarding. San Jose starts with GTA's version.","Designed in onboarding","no"),
       ]},
-    { wait:"3 weeks", ch:"email", subj:"Don't miss your shot", tpl:"nurture-4",
-      els:[{k:"p",t:"Final call to action, brand-global"},{k:"s",t:"Footer: Instagram + tagline"}],
-      notes:[ N("p","The whole body","Generic closing email.","Written once in the master","have") ]},
+    { wait:"3 weeks", ch:"email", subj:"Don't miss your shot", tpl:"nurture-4", mail:"nurture-4",
+      els:[{k:"p",t:"Final call to action, brand-global"},{k:"p",t:"Logo, top left"},{k:"s",t:"City and footer"}],
+      notes:[ N("p","The whole email","<b>Good as-is.</b> Travels untouched to any academy.","Written once in the master","have") ]},
   ],
-  verdict:{t:"Three of four copy clean, one never can", p:"The quotes are the only genuinely uncopyable thing in the entire sales system. Everything else in Nurture is either already a blank or brand-global."}
+  verdict:{t:"One travels, one waits, two get authored", p:"Don't miss your shot travels as-is. The testimonials email stays templated until the testimonial connection is built in a separate chat. The global-ecosystem and new-era emails are authored per academy, decided 27 Jul. San Jose starts from GTA's."}
 },
 {
-  key:"onboarding", name:"Onboarding", icon:"👋", preset:true,
+  key:"onboarding", name:"Onboarding", icon:"👋", preset:false, post:true,
   trigger:"A brand-new PAID member goes live. This is the welcome drip, not a sales drip.",
   live:"Live, 10 members enrolled",
   steps:[
     { wait:"immediately", ch:"sms",
-      body:[{t:"Hi "},{t:"{{contact.first_name}}",k:"p"},{t:" welcome to "},{t:"By Any Means Basketball",k:"s"},{t:"! A couple things to get started:\n\n1) More information will be sent to your email so check that out when you can. Please join this WhatsApp Link for updates: ",k:"p"},{t:"chat.whatsapp.com/J5tq7Sn5EF...",k:"s"},{t:"\n\n2) If you would like to access the online programs, use this link: ",k:"c"},{t:"byanymeanstoronto.ca/online-programs",k:"c"},{t:"\n\n3) Check out our socials:\nCoach Zoran: ",k:"c"},{t:"instagram.com/byanymeanszoran",k:"c"},{t:"\nCoach Adrian: ",k:"c"},{t:"instagram.com/byanymeansadrian",k:"c"},{t:"\nGeneral Page: ",k:"s"},{t:"instagram.com/byanymeanstoronto",k:"s"},{t:"\n\n4) If you know any friends that would like to join, bring them out to training to receive a free month and some merch (check out our merch here: ",k:"c"},{t:"byanymeansgsc.com",k:"c"},{t:")\n\n5) If you need anything, reach out to the coaches here: ",k:"p"},{t:"(289) 816-6569",k:"s"}],
+      body:[{t:"Hi ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:" welcome to ",k:"p"},{t:"By Any Means Basketball",k:"s"},{t:"! A couple things to get started:\n\n1) More information will be sent to your email so check that out when you can. ",k:"p"},{t:"Please join this WhatsApp Link for updates: chat.whatsapp.com/J5tq7Sn5EF...",k:"s"},{t:"\n\n2) If you would like to access the online programs, use this link: byanymeanstoronto.ca/online-programs",k:"c"},{t:"\n\n3) Check out our socials:\nCoach Zoran: instagram.com/byanymeanszoran\nCoach Adrian: instagram.com/byanymeansadrian\nGeneral Page: instagram.com/byanymeanstoronto",k:"s"},{t:"\n\n4) If you know any friends that would like to join, bring them out to training to receive a free month and some merch (check out our merch here: byanymeansgsc.com)",k:"c"},{t:"\n\n5) If you need anything, reach out to the coaches here: ",k:"p"},{t:"(289) 816-6569",k:"s"}],
       notes:[
         N("s","Academy name","Same swap as everywhere else.","Business Basics &rarr; Name parents see","need"),
-        N("s","Community group link","Every academy has some group. WhatsApp for GTA, could be Facebook or Discord elsewhere, so we store the link and its platform.","Training offer setup &rarr; Onboarding section","need"),
-        N("c","Online programs link","<b>Genuinely custom.</b> Most academies will not have online programs at all. Cannot be assumed, cannot be a blank that sits empty.","This whole line disappears unless the academy has one","no"),
-        N("c","Individual coach Instagram handles","Coach Zoran and Coach Adrian are GTA people. A new academy has different coaches and may have no coach socials at all.","Custom per academy","no"),
+        N("s","Community group line","<b>The whole line</b> fills from the academy's own group. WhatsApp for GTA, could be Facebook or Discord elsewhere, so we store the link and its platform label.","Training offer setup &rarr; Onboarding section","need"),
+        N("c","Online programs link","<b>DROPPED from the master, 27 Jul.</b> Line removed entirely, for every academy including GTA.","Removed","no"),
+        N("s","Coach socials","Connectable if the coaches have their own. Onboarding must tell the client that anything they enter here is displayed publicly.","Team &rarr; coach socials","need"),
         N("s","General Instagram page","Different from the coach handles. Every academy should have one, we just never ask for it.","Business Basics &rarr; Instagram","need"),
-        N("c","Refer-a-friend perk and the merch shop","A free month plus merch is GTA's specific offer, and the merch site is a separate GTA business.","Parked for now, custom later","no"),
+        N("c","Refer-a-friend perk and the merch shop","<b>DROPPED from the master, 27 Jul.</b> Line removed entirely, for every academy including GTA.","Removed","no"),
         N("s","Coach contact number","Comes from the academy's own business number, so nobody gets asked for it twice.","Texting &rarr; Business number","have"),
         N("p","The numbered quick-start structure","The shape of the message, five numbered items, travels fine. It is the contents of the items that vary.","Written once in the master","have"),
       ]},
-    { wait:"immediately", ch:"email", subj:"Welcome to By Any Means Basketball", tpl:"onboarding-welcome",
-      els:[{k:"c",t:"Header + footer hardcoded to GTA: wordmark, OAKVILLE tag, domain, Instagram"},{k:"p",t:"Greeting with parent + athlete name"},{k:"s",t:"Quick-start: group link, coach phone"},{k:"c",t:"Quick-start: online programs, coach socials, merch"},{k:"p",t:"Weekly schedule table"},{k:"p",t:"Training venue + map link"},{k:"p",t:"Sign-off"}],
+    { wait:"immediately", ch:"email", subj:"Welcome to By Any Means Basketball", tpl:"onboarding-welcome", mail:"onboarding-welcome",
+      els:[{k:"p",t:"Logo, top left and bottom left"},{k:"s",t:"City or town, top right"},{k:"p",t:"Greeting with parent and athlete name"},{k:"s",t:"Community group line, the whole line"},{k:"c",t:"Online programs line, DROPPED"},{k:"s",t:"Follow along line, from coach socials"},{k:"c",t:"Bring a friend line, DROPPED"},{k:"s",t:"Coach phone"},{k:"s",t:"Weekly schedule table"},{k:"s",t:"Training venue"},{k:"p",t:"Sign-off"}],
       notes:[
-        N("c","The header and footer","<b>This email draws its own frame</b> with GTA's wordmark, OAKVILLE, the GTA domain and GTA's Instagram typed in, instead of using the frame that already fills itself in. Handed to San Jose as-is, a San Jose parent gets a GTA-branded email.","Fixed by using the existing frame. No new field.","need"),
-        N("p","Weekly schedule table","<b>Generates from the academy's real schedule.</b> GTA has 86 live sessions in the system, and this table is typed out by hand today.","Training offer setup &rarr; Schedule","have"),
-        N("p","Training venue","Comes from the session's own location, which also handles an academy that trains in more than one gym.","Locations. NOT the business address, they differ","have"),
-        N("s","Group link and coach phone","Same two facts as the SMS above. One question feeds both messages.","Training offer setup + Texting","need"),
-        N("c","Online programs, coach socials, merch","Same three custom items as the SMS. Each becomes a section that only appears if that academy has one.","Customised after","no"),
+        N("p","The logo","<b>Always the logo</b>, top left and bottom left. GTA and San Jose stay exactly as they are.","Brand &rarr; Logo","have"),
+        N("s","City or town, top right","Just the academy's main city or town, nothing else.","Business Basics &rarr; address","have"),
+        N("s","The community group line","<b>The whole line fills from the academy's own group.</b> Store the link plus its platform label so it reads Join the WhatsApp group, Join the Facebook group, and so on. Includes its button. No link on file means the line does not render.","Training offer setup &rarr; Onboarding section","need"),
+        N("c","The online programs line","<b>DROPPED from the master, 27 Jul.</b> Not carried forward for anyone. GTA is the reference, so GTA stops sending it too.","Removed","no"),
+        N("c","The bring-a-friend line","<b>DROPPED from the master, 27 Jul.</b> The referral perk and the merch shop go with it. GTA stops sending it too.","Removed","no"),
+        N("s","The follow-along line","The whole line fills from coach socials. Onboarding must warn the client that anything they enter here is shown publicly.","Team &rarr; coach socials","need"),
+        N("s","Weekly schedule and venue","Generate from the 86 real sessions already in the system. Typed by hand today only because nothing generates them yet.","Training offer setup &rarr; Schedule","have"),
+        N("s","Coach phone","Fills from the academy's own business number.","Texting &rarr; Business number","have"),
       ]},
     { wait:"+5 minutes", ch:"sms",
       body:[{t:"SCHEDULE:\n\nMONDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nTUESDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nWEDNESDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nTHURSDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nSATURDAYS\nYounger group: 11:30-12:30pm\nOlder Group: 12:30-1:30pm\n\nLOCATION: 1079 Linbrook Rd, ON L6J 2L2",k:"s"}],
@@ -267,29 +272,22 @@ const DATA = [
         N("s","The location line","Comes from the session's location.","Locations","have"),
         N("p","Sending a schedule at all, 5 minutes in","The structure travels. An academy with no sessions set up simply does not get this message, rather than getting an empty one.","The preset","have"),
       ]},
-    { wait:"+5 minutes", ch:"email", subj:"How to get the most out of training", tpl:"onboarding-training",
-      els:[{k:"c",t:"Header + footer hardcoded to GTA"},{k:"p",t:"Three habits that make training count"},{k:"p",t:"Attention to Detail video"},{k:"s",t:"By Any Means GTA sign-off"}],
+    { wait:"+5 minutes", ch:"email", subj:"How to get the most out of training", tpl:"onboarding-training", mail:"onboarding-training",
+      els:[{k:"c",t:"The entire email, frame included"}],
       notes:[
-        N("p","The three habits and the video","<b>Almost the whole email is brand-global.</b> Talk to your coach, know your weaknesses, do the extra work. True for every academy, and the video is BAM's own content.","Written once in the master","have"),
-        N("c","The header and footer","Same GTA frame problem as the welcome email.","Fixed by using the existing frame","need"),
-        N("s","The sign-off","Says By Any Means GTA Team.","Business Basics &rarr; Name parents see","need"),
+        N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Keep GTA's and San Jose's exactly as they are.","Designed in onboarding","no"),
       ]},
-    { wait:"+3 days", ch:"email", subj:"Where By Any Means came from", tpl:"onboarding-story",
-      els:[{k:"p",t:"The brand origin story"},{k:"p",t:"Frame already fills itself in"},{k:"s",t:"One word: Toronto"},{k:"s",t:"Footer: Instagram + tagline"}],
+    { wait:"+3 days", ch:"email", subj:"Where By Any Means came from", tpl:"onboarding-story", mail:"onboarding-story",
+      els:[{k:"c",t:"The entire email, frame included"}],
       notes:[
-        N("p","The whole story","Brand content, and this one already uses the self-filling frame.","Written once in the master","have"),
-        N("s","One word","The word Toronto, once. That is the entire gap on this email.","Business Basics &rarr; City, read from the address","have"),
+        N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Same design as the global-ecosystem email, so the same call.","Designed in onboarding","no"),
       ]},
-    { wait:"+7 days", ch:"email", subj:"A new era of training", tpl:"onboarding-era",
-      els:[{k:"p",t:"Training philosophy"},{k:"p",t:"Frame already fills itself in"},{k:"s",t:"Footer: Instagram + tagline"}],
-      notes:[ N("p","All of it","<b>The only email in the entire set that is already fully photocopyable.</b> Zero academy content, correct frame, nothing to fix.","Ready today","have") ]},
-    { wait:"+7 days", ch:"email", subj:"What families are saying about us", tpl:"onboarding-testimonials",
-      els:[{k:"c",t:"Real GTA parent testimonials"},{k:"p",t:"Designed layout and surrounding copy"}],
+    { wait:"+7 days", ch:"email", subj:"A new era of training", tpl:"onboarding-era", mail:"onboarding-era",
+      els:[{k:"c",t:"The entire email, frame included"}],
       notes:[
-        N("c","The parent quotes","Same landmine as Nurture, except this one greets people who have <b>already paid</b>. Same customers, same fabrication risk.","Cannot be copied","no"),
-        N("c","How it gets customised after","Quote block drops, email still sends. Real quotes appear once that academy has their own.","Needs the quote-free version","no"),
+        N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Designed per academy during onboarding.","Designed in onboarding","no"),
       ]},
-    { wait:"+7 days", ch:"email", subj:"Quick favour?", tpl:"onboarding-review",
+    { wait:"+7 days", ch:"email", subj:"Quick favour?", tpl:"onboarding-review", mail:"onboarding-review",
       els:[{k:"c",t:"Header + footer hardcoded to GTA"},{k:"p",t:"The warm ask, entirely generic"},{k:"s",t:"GTA's own Google review link"}],
       notes:[
         N("p","The ask itself","Nothing academy-specific in the wording.","Written once in the master","have"),
@@ -297,7 +295,7 @@ const DATA = [
         N("c","The header and footer","Third email with the GTA frame.","Fixed by using the existing frame","need"),
       ]},
   ],
-  verdict:{t:"The whole job is concentrated here", p:"Seven of the eight steps are mostly or entirely photocopyable. Everything genuinely custom in the entire sales system lives in two places: the five quick-start items in the first two messages, and the parent quotes. That is the list to work through."}
+  verdict:{t:"One email stays custom", p:"The community group line becomes a collected value. The online programs and bring-a-friend lines are dropped from the master entirely, so the welcome email is fully photocopyable. Only How to make training count is still authored per academy, and story and era are authored once with Lead Nurture."}
 },
 {
   key:"summer_special", name:"Summer Special", icon:"☀️", preset:false,
@@ -305,7 +303,7 @@ const DATA = [
   live:"Armed and approved, but has NEVER enrolled anyone or sent a message",
   steps:[
     { wait:"immediately", ch:"sms",
-      body:[{t:"Hi! It's coach from "},{t:"By Any Means Basketball",k:"s"},{t:" - we're just sending out this message to everyone because we have a HUGE summer discount on right now, and our spots are filling up.\nSo if you'd like to get your athlete training with us this summer, feel free to book a trial here: ",k:"p"},{t:"byanymeanstoronto.ca/free-trial",k:"s"},{t:"\nThanks!\nBAMily",k:"c"}],
+      body:[{t:"Hi! It's coach from ",k:"p"},{t:"By Any Means Basketball",k:"s"},{t:" - we're just sending out this message to everyone because we have a HUGE summer discount on right now, and our spots are filling up.\nSo if you'd like to get your athlete training with us this summer, feel free to book a trial here: ",k:"p"},{t:"byanymeanstoronto.ca/free-trial",k:"s"},{t:"\nThanks!\nBAMily",k:"c"}],
       notes:[
         N("s","Academy name and link","Same two swaps as everywhere else.","Business Basics","have"),
         N("p","The promo structure","Three nudges on day 0, 1 and 2. The shape is genuinely reusable for any seasonal push.","Would come from the preset","have"),
@@ -326,7 +324,7 @@ const DATA = [
   live:"Disabled, never approved, has never enrolled anyone",
   steps:[
     { wait:"20 minutes", ch:"sms", off:true,
-      body:[{t:"Hey "},{t:"{{contact.first_name}}",k:"p"},{t:", it's coach from "},{t:"BAM GTA",k:"s"},{t:"! I noticed you filled in a trial form but didn't book a time. Can I help you find one that works? ",k:"p"},{t:"{{next_session}}",k:"c"},{t:"Grab a spot here: ",k:"p"},{t:"byanymeanstoronto.ca/free-trial",k:"s"}],
+      body:[{t:"Hey ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:", it's coach from ",k:"p"},{t:"BAM GTA",k:"s"},{t:"! I noticed you filled in a trial form but didn't book a time. Can I help you find one that works? ",k:"p"},{t:"{{next_session}}",k:"c"},{t:"Grab a spot here: ",k:"p"},{t:"byanymeanstoronto.ca/free-trial",k:"s"}],
       notes:[
         N("c","{{next_session}}","This looks like a blank but nothing fills it. If this ever sent, a parent would read the literal characters.","Broken","no"),
         N("c","The whole automation","A duplicate of Trial Form intro. Same trigger, same 20 minute wait, same message. Trial Form intro has sent 30 times including today. This has sent zero.","Delete it","no"),
@@ -342,12 +340,19 @@ const un=(s)=>String(s).replace(/&lt;b&gt;/g,"<b>").replace(/&lt;\/b&gt;/g,"</b>
 
 function msgHTML(s,i){
   const head=`<div class="mh"><span class="no">${i+1}</span><span class="wt">${s.wait}</span><span class="ch ${s.ch}">${CH[s.ch]}</span>${s.subj?`<span class="subj">${esc(s.subj)}</span>`:""}${s.off?`<span class="off">disabled</span>`:""}</div>`;
-  let inner;
+  let inner="";
+  if(s.mail){
+    inner+=`<div class="mailwrap">
+      <div class="mailbar"><span class="lbl">Rendered exactly as GTA sends it today</span>
+      <a href="emails/${s.mail}.html" target="_blank" rel="noopener">Open full size</a></div>
+      <iframe src="emails/${s.mail}.html" title="${esc(s.subj||s.mail)}" loading="lazy"></iframe>
+    </div>`;
+  }
   if(s.tpl){
-    inner=`<div class="tplbox"><div class="tk">template:${s.tpl}</div>`
+    inner+=`<div class="tplbox"><div class="tk">template:${s.tpl}</div>`
       + s.els.map(e=>`<span class="el ${e.k}">${esc(e.t)}</span>`).join("") + `</div>`;
   } else {
-    inner=`<div class="bub">${s.body.map(p=>p.k?`<mark class="${p.k}">${esc(p.t)}</mark>`:esc(p.t)).join("")}</div>`;
+    inner+=`<div class="bub">${s.body.map(p=>p.k?`<mark class="${p.k}">${esc(p.t)}</mark>`:esc(p.t)).join("")}</div>`;
   }
   return `<div class="msg${s.off?" dis":""}">${head}<div class="mb">${inner}</div></div>`;
 }
@@ -357,6 +362,7 @@ function notesHTML(s){
       <div class="nw">${un(esc(n.w))}</div>
       <div class="nd">${un(esc(n.d))}</div>
       <div class="src ${n.srcState==="need"?"need":n.srcState==="no"?"no":""}"><em>${SRCN[n.srcState]}</em><span>${un(esc(n.src))}</span></div>
+      ${n.prop?`<div class="prop"><em>Proposed</em> ${un(esc(n.prop))}</div>`:""}
     </div></div>`).join("")+`</div>`;
 }
 function panHTML(d){
@@ -365,6 +371,8 @@ function panHTML(d){
   const tot=p+sw+c||1;
   const band=d.preset
     ? `<div class="band pre"><b>In the free-trial sales system preset.</b><p>Every academy on this preset gets this automation, so anything not photocopyable here has to be solved once for everyone.</p></div>`
+    : d.post
+    ? `<div class="band out"><b>Post-conversion, not part of the sales system.</b><p>This fires when someone has already paid, so it is a member welcome rather than a sales drip. Solved separately from the preset, which is why almost everything custom in the whole system ends up living here.</p></div>`
     : `<div class="band out"><b>Not in the preset.</b><p>Only GTA has this. It either joins the preset for everyone or gets recorded as a deliberate exception.</p></div>`;
   return `<div class="pan" data-k="${d.key}">
     <div class="ph">
@@ -399,7 +407,7 @@ function show(k){
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.k===k));
   window.scrollTo({top:0,behavior:"instant"});
 }
-show("onboarding");
+show("ghosted");
 </script>
 </body>
 </html>

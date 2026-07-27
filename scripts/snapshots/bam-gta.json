@@ -1,0 +1,77 @@
+{
+  "_note": "Read-only snapshot of BAM GTA, captured 27 Jul 2026 after the website_setup.domain backfill landed. Lets render-messages.mjs run with no database access. Regenerate with --client <uuid> once SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are set.",
+  "client": {
+    "id": "39875f07-0a4b-4429-a201-2249bc1f24df",
+    "business_name": "BAM GTA",
+    "legal_name": "LVLUP Basketball Training Inc.",
+    "owner_name": "Zoran Savic",
+    "email": "zoran@byanymeansbball.com",
+    "phone": null,
+    "address": "2205 Rosemount Cres",
+    "time_zone": "America/New_York",
+    "website_setup": { "domain": "byanymeanstoronto.ca" },
+    "brand_data": {
+      "story": "By Any Means started in the GTA with one mission: give serious young hoopers the coaching, reps and accountability that actually move the needle.",
+      "why_us": "We coach with a plan, not just drills. Small groups, honest feedback, and a clear path for every athlete.",
+      "domain": "byanymeanstoronto.ca",
+      "website_url": "https://byanymeanstoronto.ca",
+      "color_primary": "#D4B65C",
+      "font_display": "Anton",
+      "logo_dark_url": "https://placehold.co/480x160/0B0B0D/D4B65C/png?text=By+Any+Means"
+    }
+  },
+  "automations": [
+    {
+      "id": "74bc1ac2-84e4-477e-97e2-0ef7ff540c95",
+      "automation_key": "contact_form",
+      "name": "Contact Form intro",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        { "position": 0, "wait_amount": 2, "wait_unit": "minutes", "channel": "sms", "subject": null, "enabled": true,
+          "body": "Hi {{contact.first_name}},\n\nIt's coach from By Any Means Basketball. Just saw you filled in the form for extra info, is there anything I can help with?" }
+      ]
+    },
+    {
+      "id": "7361fd83-5f60-44b7-b124-9454fd5b3315",
+      "automation_key": "ghosted",
+      "name": "Ghosted",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        { "position": 0, "wait_amount": 1, "wait_unit": "days", "channel": "sms", "subject": null, "enabled": true,
+          "body": "Hey {{contact.first_name}}! Just wanted to check in and see if you are still interested in having your child train with us\n\nbyanymeanstoronto.ca" },
+        { "position": 1, "wait_amount": 1, "wait_unit": "days", "channel": "sms", "subject": null, "enabled": true,
+          "body": "Hi {{contact.fullName}}\n\nJust wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: {{location.website}}/free-trial\n\nThank you!" },
+        { "position": 2, "wait_amount": 1, "wait_unit": "days", "channel": "email", "subject": "Try a session free", "enabled": true,
+          "body": "Hi {{contact.first_name}},\n\nIt's coach {{location_owner.first_name}} from {{location.name}} - I just wanted to reach out over email to check and see if you would be interested in coming out to a free trial.\n\nIf so, feel free to book in using this link:\n\n{{location.website}}/free-trial\n\nThanks!" }
+      ]
+    },
+    {
+      "id": "49cfe3da-27cd-4a34-b8f0-eb145c8b97ca",
+      "automation_key": "nurture",
+      "name": "Lead Nurture",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        { "position": 0, "wait_amount": 1, "wait_unit": "weeks", "channel": "email", "subject": "A global basketball ecosystem", "enabled": true, "body": "template:nurture-1" },
+        { "position": 1, "wait_amount": 1, "wait_unit": "weeks", "channel": "email", "subject": "A new era of training", "enabled": true, "body": "template:nurture-2" },
+        { "position": 2, "wait_amount": 3, "wait_unit": "weeks", "channel": "email", "subject": "What families are saying", "enabled": false, "body": "template:nurture-3" },
+        { "position": 3, "wait_amount": 3, "wait_unit": "weeks", "channel": "email", "subject": "Don't miss your shot", "enabled": true, "body": "template:nurture-4" }
+      ]
+    },
+    {
+      "id": "fcfba24c-2d60-4b23-a1ac-e38934aebb1c",
+      "automation_key": "onboarding",
+      "name": "Onboarding",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        { "position": 1, "wait_amount": 0, "wait_unit": "minutes", "channel": "sms", "subject": "", "enabled": true,
+          "body": "Hi {{contact.first_name}} welcome to By Any Means Basketball! A couple things to get started:\n\n1) More information will be sent to your email so check that out when you can.\n\n2) If you need anything, reach out to the coaches here." },
+        { "position": 2, "wait_amount": 0, "wait_unit": "minutes", "channel": "email", "subject": "Welcome to By Any Means Basketball", "enabled": true, "body": "template:onboarding-welcome" },
+        { "position": 5, "wait_amount": 3, "wait_unit": "days", "channel": "email", "subject": "Where By Any Means came from", "enabled": true, "body": "template:onboarding-story" }
+      ]
+    }
+  ]
+}
