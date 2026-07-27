@@ -346,6 +346,27 @@ Artifacts, both pushed on `claude/optimistic-leavitt-db0107`:
 
 **PROCESS GATE (Zoran, 2026-07-27):** the sync room must show him a **MOCKUP of the user stories** and get his confirmation BEFORE any build. Sequence is fixed: mockup -> his confirmation -> plan to the orchestrator -> builder subagent -> then seed San Jose in that chat.
 
+## ⚠️⚠️ ACCEPTED DIVERGENCE: THE MASTER SHIPS 7 ONBOARDING STEPS, GTA RUNS 8. THIS IS DELIBERATE.
+
+**Read this before "fixing" the gap.** `ONBOARDING_DEFAULT` ships with **SEVEN** steps. GTA's live sequence has **EIGHT**. The missing one is the **testimonials step**, and it is ABSENT rather than present-and-disabled, on purpose.
+
+**Why it looks like a bug and is not:** under GTA-as-reference, master-lagging-GTA is exactly the failure this whole workstream exists to fix. So a future session will see the gap, promote the testimonials step to close it, and **ship GTA's real parents' quotes to every academy.** That is the original Miami failure with extra steps.
+
+**What closes it, and the ONLY thing that closes it:** the testimonial connection build. It inserts one step between `era` (position 6) and `review` (position 8). Nothing else may close this gap.
+
+`NURTURE_DEFAULT` keeps its 4 steps, because `nurture-3` already exists and is already held `enabled:false` per academy. The connection changes what fills it, not whether it is there.
+
+**The seam contract the connection must satisfy** (documented, deliberately unimplemented): ONE function answering "which testimonials should this academy's emails show", honouring `starred`, returning manual and google rows together, with the drop rule (empty store means the step does not ship) enforced **at seed time, not render time**.
+
+**Nothing is stubbed.** No resolver exists, not even one returning empty: a function answering "none on file" looks harmless but gets unpicked, because the real one needs a different shape once google-sourced starred rows exist.
+
+## ⚠️ OPEN, ZORAN'S CALL: the pinned-testimonial HIERARCHY
+Proposed by the reviews chat, put to Zoran, popup dismissed, so **NOT decided and deliberately not propagated.** It matters to the active templating track because it governs which quote leads in the testimonials email:
+- Pinned Google reviews -> pinned typed-in quotes -> remaining Google reviews highest-rating-down -> remaining typed quotes newest-first. Under 4 stars stays owner-card-only.
+- A pinned typed quote still sits BEHIND a pinned real review.
+- A typed quote never wears a star rating, a "Google review" badge or a date, and never moves the aggregate.
+- The hierarchy is tier 1 (locked, auto-propagating, no per-academy reordering); the quotes themselves are tier 3.
+
 ## ⏸ SERIALIZED: ONE TRACK AT A TIME (Zoran, 2026-07-27)
 
 Two parallel design processes were overstimulating. **AUTOMATION TEMPLATING runs alone; TESTIMONIAL CONNECTION is parked and surfaces nothing until it finishes.**
