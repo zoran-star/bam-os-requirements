@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preset convergence - user stories</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#D4B65C;
+    --bg:#0C0C0D; --card:#141416; --card2:#1A1A1D; --line:#2A2A2E;
+    --tx:#EDEDEF; --tx2:#A8A8B0; --tx3:#6E6E78;
+    --red:#E5674E; --amber:#E0A33C; --green:#5FBF8A; --blue:#5B9DD9;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif; --mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:44px 20px 90px}
+  h1{font-size:clamp(28px,5vw,42px);line-height:1.1;letter-spacing:-.02em;margin:0 0 10px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:17px;margin:0 0 6px;max-width:64ch}
+  .meta{color:var(--tx3);font-size:13px;font-family:var(--mono);margin:0 0 12px}
+  .m{font-family:var(--mono);font-size:13px}
+
+  .story{margin:60px 0 0;border-top:1px solid var(--line);padding-top:30px}
+  .stag{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .snum{font-family:var(--mono);font-size:12px;color:var(--tx3);letter-spacing:.1em}
+  .swho{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:700}
+  h2{font-size:clamp(21px,3vw,27px);margin:0 0 8px;font-weight:800;letter-spacing:-.01em;line-height:1.25}
+  .lede{color:var(--tx2);font-size:15.5px;margin:0 0 22px;max-width:74ch}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  pre{font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--tx2);margin:0;white-space:pre}
+  .grid{display:grid;gap:16px}
+  @media(min-width:800px){.g2{grid-template-columns:1fr 1fr}.gw{grid-template-columns:0.92fr 1.08fr}}
+
+  .panel-h{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;margin-bottom:14px;color:var(--tx3)}
+
+  /* wizard */
+  .q{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px}
+  .q.filled{border-color:rgba(95,191,138,.4);background:rgba(95,191,138,.05)}
+  .q .lbl{font-size:13.5px;font-weight:700;color:var(--tx);margin-bottom:3px;display:flex;align-items:center;gap:8px}
+  .q .dot{width:7px;height:7px;border-radius:999px;background:var(--tx3);flex:none}
+  .q.filled .dot{background:var(--green)}
+  .q .inp{font-family:var(--mono);font-size:12px;color:var(--tx2);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 10px;margin-top:6px;word-break:break-all}
+  .q .inp.empty{color:var(--tx3);font-style:italic}
+  .q .turns{font-size:11.5px;color:var(--tx3);margin-top:7px}
+  .q.filled .turns{color:var(--green)}
+
+  /* email preview */
+  .mail{background:#EDEDEA;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+  .mail .bar{background:#0A0A0A;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .mail .wm{font-size:15px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#fff;line-height:1}
+  .mail .wm i{color:#E2DD9F;font-style:normal}
+  .mail .tag{font-size:8.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#9A9A92}
+  .mail .doc{background:#fff;padding:18px}
+  .mail h3{font-family:'Plus Jakarta Sans';color:#0A0A0A;font-size:22px;line-height:1.05;margin:0 0 12px;text-transform:uppercase;font-weight:800;letter-spacing:-.5px}
+  .mail p{color:#333;font-size:13px;line-height:1.55;margin:0 0 11px}
+  .blk{border-left:2px solid #E2DD9F;padding:7px 0 7px 12px;margin:0 0 10px;position:relative}
+  .blk .bn{font-size:9px;letter-spacing:1.6px;text-transform:uppercase;color:#999;font-weight:700;margin-bottom:3px;font-family:var(--mono)}
+  .blk p{margin:0;font-size:12.5px}
+  .blk.off{border-left-color:#DDD;opacity:.42}
+  .blk.off p{color:#999;font-style:italic}
+  .mail .foot{background:#0A0A0A;padding:14px 18px;font-size:10.5px;color:#9A9A92}
+  .mail .foot a{color:#E2DD9F;text-decoration:none}
+
+  /* phone */
+  .phone{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .bub{background:#2C2C31;border-radius:14px 14px 14px 4px;padding:10px 13px;font-size:12.5px;color:var(--tx);margin-bottom:9px;max-width:86%;line-height:1.5;white-space:pre-wrap}
+  .when{font-family:var(--mono);font-size:10px;color:var(--tx3);letter-spacing:.06em;margin-bottom:4px}
+
+  /* timeline */
+  .tl{position:relative;padding-left:26px}
+  .tl:before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:1px;background:var(--line)}
+  .ti{position:relative;margin-bottom:14px}
+  .ti:before{content:"";position:absolute;left:-23px;top:7px;width:9px;height:9px;border-radius:999px;background:var(--card);border:2px solid var(--tx3)}
+  .ti.new:before{background:var(--gold);border-color:var(--gold)}
+  .ti.off:before{background:var(--card);border-color:var(--red)}
+  .ti .w{font-family:var(--mono);font-size:10.5px;color:var(--tx3);letter-spacing:.06em}
+  .ti .t{font-size:14px;font-weight:600;color:var(--tx);margin:1px 0 2px}
+  .ti .d{font-size:12.5px;color:var(--tx2)}
+  .ti.off .t{color:var(--tx3)}
+
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;vertical-align:middle}
+  .p-go{background:rgba(95,191,138,.14);color:var(--green);border:1px solid rgba(95,191,138,.3)}
+  .p-new{background:rgba(212,182,92,.14);color:var(--gold);border:1px solid rgba(212,182,92,.3)}
+  .p-no{background:rgba(229,103,78,.14);color:var(--red);border:1px solid rgba(229,103,78,.3)}
+  .p-b{background:rgba(91,157,217,.14);color:var(--blue);border:1px solid rgba(91,157,217,.3)}
+
+  .rule{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:12px;padding:16px 18px;margin-top:16px}
+  .rule b{color:var(--tx);display:block;margin-bottom:4px;font-size:14.5px}
+  .rule p{margin:0;color:var(--tx2);font-size:13.5px}
+  .warn{background:rgba(229,103,78,.07);border:1px solid rgba(229,103,78,.28);border-radius:12px;padding:16px 18px;margin-top:16px}
+  .warn b{color:var(--red);display:block;margin-bottom:4px}
+  .warn p{margin:0;color:var(--tx2);font-size:13.5px}
+
+  /* issue */
+  .issue{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .issue .ih{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .issue .ih .op{background:rgba(95,191,138,.15);color:var(--green);border:1px solid rgba(95,191,138,.35);border-radius:999px;padding:2px 11px;font-size:11px;font-weight:700}
+  .issue .ih .ti2{font-weight:700;font-size:15px}
+  .issue .ib{padding:16px 18px}
+  .vrow{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .vrow:last-child{border-bottom:none}
+  .vrow .vk{font-family:var(--mono);font-size:12px;color:var(--tx);min-width:132px;flex:none}
+  .vrow .vd{color:var(--tx2)}
+
+  /* ticket flow */
+  .fork{display:grid;gap:14px}
+  @media(min-width:800px){.fork{grid-template-columns:1fr 1fr}}
+  .fk{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .fk .fh{font-size:13px;font-weight:800;margin-bottom:6px}
+  .fk p{margin:0;font-size:13px;color:var(--tx2)}
+  .fk.a{border-color:rgba(212,182,92,.35)}.fk.a .fh{color:var(--gold)}
+  .fk.b{border-color:rgba(91,157,217,.35)}.fk.b .fh{color:var(--blue)}
+
+  .foot2{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--tx3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>What actually changes, <span>for four real people</span>.</h1>
+  <p class="sub">Before any of this gets built. Every name, domain, phone number and message below is San Jose's real data, because San Jose is the first academy the standard gets applied to.</p>
+  <p class="meta">Mockup &middot; 27 Jul 2026 &middot; academy: BAM San Jose &middot; owner: Elijah De Guzman &middot; sample parent: Maya Alvarez, athlete Jordan</p>
+
+  <!-- ═══════════════ STORY 1 ═══════════════ -->
+  <div class="story">
+    <div class="stag"><span class="snum">STORY 01</span><span class="swho">The academy owner, during onboarding</span></div>
+    <h2>Lij answers four new questions, and watches his welcome email fill in.</h2>
+    <p class="lede">Today the wizard never asks for these, so the welcome email cannot exist. Each question turns on exactly one block, and he can see which one as he types.</p>
+
+    <div class="grid gw">
+      <div class="card">
+        <div class="panel-h">Onboarding wizard &middot; new section</div>
+
+        <div class="q filled">
+          <div class="lbl"><span class="dot"></span>Community group link</div>
+          <div class="inp">https://chat.whatsapp.com/BAMSanJose</div>
+          <div class="turns">Turns on: "Join the group" block</div>
+        </div>
+
+        <div class="q filled">
+          <div class="lbl"><span class="dot"></span>Coach contact number</div>
+          <div class="inp">(408) 597-4327</div>
+          <div class="turns">Turns on: "Reach a coach" block</div>
+        </div>
+
+        <div class="q">
+          <div class="lbl"><span class="dot"></span>Online programs URL</div>
+          <div class="inp empty">not answered yet</div>
+          <div class="turns">Would turn on: "Train at home" block</div>
+        </div>
+
+        <div class="q">
+          <div class="lbl"><span class="dot"></span>Refer-a-friend perk</div>
+          <div class="inp empty">not answered yet</div>
+          <div class="turns">Would turn on: "Bring a friend" block</div>
+        </div>
+
+        <div class="rule" style="margin-top:18px">
+          <b>Filled automatically, never asked</b>
+          <p>Weekly schedule and training venue come from the academy's own schedule. Academy name, city, website and Instagram come from the client record. Lij is only ever asked for things we genuinely do not hold.</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-h">Welcome email, live preview</div>
+        <div class="mail">
+          <div class="bar"><div class="wm">BY ANY MEANS <i>SAN JOSE</i></div><div class="tag">SAN JOSE &middot; CA</div></div>
+          <div class="doc">
+            <h3>You're in.<br>Let's get to work.</h3>
+            <p>Hi Maya, welcome to BAM San Jose. Jordan is all set, and we are pumped to have you both.</p>
+
+            <div class="blk"><div class="bn">Join the group &middot; on</div><p>Join the group for schedule updates and announcements: <b>tap to join</b>.</p></div>
+            <div class="blk off"><div class="bn">Train at home &middot; off</div><p>hidden, no online programs URL on file</p></div>
+            <div class="blk"><div class="bn">Follow us &middot; on, automatic</div><p>Follow along on Instagram.</p></div>
+            <div class="blk off"><div class="bn">Bring a friend &middot; off</div><p>hidden, no referral perk on file</p></div>
+            <div class="blk"><div class="bn">Reach a coach &middot; on</div><p>Need anything? Reach the coaches at <b>(408) 597-4327</b>.</p></div>
+            <div class="blk"><div class="bn">Weekly schedule &middot; on, automatic</div><p>Mondays 7-8pm and 8-9pm, Tuesdays 7-8pm and 8-9pm, Saturdays 11:30-12:30.</p></div>
+            <div class="blk"><div class="bn">Venue &middot; on, automatic</div><p>1051 W San Fernando St, San Jose, CA 95126</p></div>
+
+            <p style="margin-top:14px">See you on the court,<br><b style="color:#0A0A0A">The BAM San Jose Team</b></p>
+          </div>
+          <div class="foot"><b style="color:#fff">BY ANY MEANS SAN JOSE</b><br>
+          <a href="#">byanymeanssanjose.com</a> &middot; Email &middot; Instagram</div>
+        </div>
+        <p style="color:var(--tx3);font-size:12.5px;margin:12px 0 0">Two questions unanswered, two blocks simply absent. No gap, no placeholder, no borrowed content. The email reads as though those blocks were never written.</p>
+      </div>
+    </div>
+
+    <div class="warn">
+      <b>The edge case worth looking at: an owner who answers none of them</b>
+      <p>This is the honest worst case, and it is still a correct email. Five of nine blocks survive on facts we already hold, so a completely silent owner still ships a real welcome rather than nothing or a broken one.</p>
+    </div>
+
+    <div class="card scroll" style="margin-top:14px">
+<pre>
+   WELCOME EMAIL, owner answered ZERO of the four questions
+   ┌──────────────────────────────────────────────────────────────┐
+   │  greeting            ON    "Hi Maya, welcome to BAM San Jose" │
+   │  join the group      off   no link on file                    │
+   │  train at home       off   no URL on file                     │
+   │  follow us           ON    Instagram from the client record   │
+   │  bring a friend      off   no perk on file                    │
+   │  reach a coach       off   clients.phone empty                │
+   │  weekly schedule     ON    generated from schedule_slots      │
+   │  venue               ON    from the slot's location label     │
+   │  sign-off            ON    always renders                     │
+   └──────────────────────────────────────────────────────────────┘
+        5 of 9 blocks render.  Shorter, still coherent, still correct.
+        Nothing borrowed from another academy in any of the 4 off states.
+</pre>
+    </div>
+  </div>
+
+  <!-- ═══════════════ STORY 2 ═══════════════ -->
+  <div class="story">
+    <div class="stag"><span class="snum">STORY 02</span><span class="swho">The parent who just paid</span></div>
+    <h2>Maya gets 8 touches over 24 days instead of 3 texts in a week.</h2>
+    <p class="lede">This is the gap that started the whole thing. The six emails already exist and are already reachable. San Jose's sequence simply points at none of them.</p>
+
+    <div class="grid g2">
+      <div class="card">
+        <div class="panel-h" style="color:var(--red)">Today &middot; what San Jose sends</div>
+        <div class="tl">
+          <div class="ti"><div class="w">IMMEDIATELY</div><div class="t">SMS</div><div class="d">Welcome to BAM San Jose, Maya! We're pumped to have you.</div></div>
+          <div class="ti"><div class="w">+2 DAYS</div><div class="t">SMS</div><div class="d">How are the first sessions feeling?</div></div>
+          <div class="ti"><div class="w">+5 DAYS</div><div class="t">SMS</div><div class="d">One week in with BAM San Jose.</div></div>
+        </div>
+        <p style="color:var(--tx3);font-size:12.5px;margin:8px 0 0">3 texts. No email. Done in a week. Then silence.</p>
+      </div>
+
+      <div class="card" style="border-color:rgba(95,191,138,.3)">
+        <div class="panel-h" style="color:var(--green)">After &middot; what GTA's members already get</div>
+        <div class="tl">
+          <div class="ti"><div class="w">IMMEDIATELY</div><div class="t">SMS</div><div class="d">Welcome, and check your email.</div></div>
+          <div class="ti new"><div class="w">IMMEDIATELY</div><div class="t">Email &middot; Welcome <span class="pill p-new">new</span></div><div class="d">The nine-block quick-start above.</div></div>
+          <div class="ti new"><div class="w">+5 MIN</div><div class="t">SMS &middot; the schedule <span class="pill p-new">new</span></div><div class="d">Generated from their real slots, not pasted.</div></div>
+          <div class="ti new"><div class="w">+5 MIN</div><div class="t">Email &middot; Make training count <span class="pill p-new">new</span></div><div class="d">Three habits. Brand-global, same for everyone.</div></div>
+          <div class="ti new"><div class="w">+3 DAYS</div><div class="t">Email &middot; Where we came from <span class="pill p-new">new</span></div><div class="d">The brand story.</div></div>
+          <div class="ti new"><div class="w">+10 DAYS</div><div class="t">Email &middot; A new era of training <span class="pill p-new">new</span></div><div class="d">Clean, zero academy literals.</div></div>
+          <div class="ti off"><div class="w">+17 DAYS</div><div class="t">Email &middot; What families say <span class="pill p-no">held off</span></div><div class="d">Ships present but disabled. See story 2b.</div></div>
+          <div class="ti new"><div class="w">+24 DAYS</div><div class="t">Email &middot; A quick favour <span class="pill p-new">new</span></div><div class="d">Review ask. No review link on file, no button.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule">
+      <b>Story 2b: the testimonials email, in a world where nothing is connected to Google</b>
+      <p>Google Business Profile is at zero. No table, no OAuth, no sync, and the API application that gates all of it has not been filed. So for weeks, every academy is in this state, and the design has to be right for that world rather than the one after it.</p>
+    </div>
+
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card scroll">
+        <div class="panel-h" style="color:var(--red)">What must never happen</div>
+<pre>
+   ┌────────────────────────────────────────┐
+   │  WHAT FAMILIES ARE SAYING              │
+   │                                        │
+   │  "Best decision we made for our son."  │
+   │        - Parent of Adam, San Jose      │
+   │                          ▲             │
+   │       a real GTA family, re-badged     │
+   │       as a San Jose family             │
+   └────────────────────────────────────────┘
+   This already happened once. Miami's free-trial
+   cards are GTA's three quotes rewritten with
+   Miami names and a fabricated 5.0 aggregate.
+   The clone path carried it. This wave IS a
+   clone path, at scale.
+</pre>
+      </div>
+      <div class="card scroll" style="border-color:rgba(95,191,138,.3)">
+        <div class="panel-h" style="color:var(--green)">The quote-free variant, what actually sends</div>
+<pre>
+   ┌────────────────────────────────────────┐
+   │  WHY FAMILIES STAY                     │
+   │                                        │
+   │  Small groups. Individual skill work.  │
+   │  Coaches who know every athlete by     │
+   │  name.                                 │
+   │                                        │
+   │  [ Come see a session ]                │
+   └────────────────────────────────────────┘
+   Same email, same design, same slot in the
+   sequence. The QUOTE BLOCK is the only thing
+   that drops. The email is shorter, and it is
+   entirely the academy's own claim about itself.
+   When their reviews connect, real quotes fill
+   the block back in.
+</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ STORY 3 ═══════════════ -->
+  <div class="story">
+    <div class="stag"><span class="snum">STORY 03</span><span class="swho">You, on a Monday morning</span></div>
+    <h2>One issue, always current, that says what to do about each line.</h2>
+    <p class="lede">Not a new issue every week. The same issue, edited in place, closing itself when everything is clean.</p>
+
+    <div class="issue">
+      <div class="ih"><span class="op">Open</span><span class="ti2">Preset drift</span><span style="color:var(--tx3);font-size:12px;font-family:var(--mono)">updated 2 hours ago &middot; automated</span></div>
+      <div class="ib">
+        <div style="font-size:13px;color:var(--tx2);margin-bottom:14px">Reference academy: <b style="color:var(--tx)">BAM GTA</b>. Checked 46 academies. <b style="color:var(--tx)">3 need attention.</b></div>
+
+        <div class="vrow"><span class="vk"><span class="pill p-new">AHEAD</span></span><span class="vd"><b style="color:var(--tx)">onboarding</b> &middot; GTA runs 8 steps, master has 3. The master is behind the reference.<br><span style="color:var(--tx3)">Promote 5 steps into the defaults so every academy seeds them.</span></span></div>
+
+        <div class="vrow"><span class="vk"><span class="pill p-no">BEHIND</span></span><span class="vd"><b style="color:var(--tx)">trial_form</b> &middot; GTA step 1 hardcodes "By Any Means GTA" where the master uses a token.<br><span style="color:var(--tx3)">Fix GTA's row. The reference has to be clean to be a reference.</span></span></div>
+
+        <div class="vrow"><span class="vk"><span class="pill p-no">BEHIND</span></span><span class="vd"><b style="color:var(--tx)">ghosted</b> &middot; GTA steps 1 and 2 hardcode the GTA domain.<br><span style="color:var(--tx3)">Same fix.</span></span></div>
+
+        <div class="vrow"><span class="vk"><span class="pill p-b">HELD</span></span><span class="vd"><b style="color:var(--tx)">nurture</b> &middot; BAM San Jose step 3 differs. Content is marked attributed.<br><span style="color:var(--tx3)">Expected. Not drift. No action, and it will not be raised again.</span></span></div>
+
+        <div class="vrow"><span class="vk"><span class="pill p-b">ACCEPTED</span></span><span class="vd"><b style="color:var(--tx)">summer_special</b> &middot; GTA only. Recorded reason: held pending a standardized reignition flow.<br><span style="color:var(--tx3)">No action until that work starts.</span></span></div>
+
+        <div class="vrow"><span class="vk"><span class="pill p-go">DEAD</span></span><span class="vd"><b style="color:var(--tx)">locFor GTA fallback</b> &middot; literal present in source, nothing carries it to output.<br><span style="color:var(--tx3)">Reported so nobody greps it and raises it a fourth time.</span></span></div>
+
+        <div class="vrow"><span class="vk"><span class="pill p-go">MATCH</span></span><span class="vd">contact_form, missed_trial &middot; and 43 other academies, all clean.<br><span style="color:var(--tx3)">Collapsed. Only the reference academy is listed line by line.</span></span></div>
+      </div>
+    </div>
+
+    <div class="rule">
+      <b>Why 46 academies do not make this unreadable</b>
+      <p>Only the reference academy is listed key by key, because only the reference can be AHEAD or BEHIND. Every other academy is one collapsed line unless it is genuinely broken, which means MISSING or EMPTY. A clean run closes the issue rather than posting "all clear".</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════ STORY 4 ═══════════════ -->
+  <div class="story">
+    <div class="stag"><span class="snum">STORY 04</span><span class="swho">An owner who wants different words</span></div>
+    <h2>Lij thinks the welcome email is too long. What happens now?</h2>
+    <p class="lede">There is no free-text box for him to edit it in. That is deliberate, and here is the flow it creates instead.</p>
+
+    <div class="card scroll">
+<pre>
+   Lij raises a support ticket:
+   "The welcome email is too long, can we cut the training habits section?"
+                       │
+                       ▼
+   Staff reads it and asks ONE question:
+   is this true for every academy, or only for San Jose?
+                       │
+          ┌────────────┴────────────┐
+          ▼                         ▼
+    TRUE FOR EVERYONE          ONLY SAN JOSE
+</pre>
+    </div>
+
+    <div class="fork" style="margin-top:14px">
+      <div class="fk a">
+        <div class="fh">Edit the master</div>
+        <p>Every academy gets the shorter email, including the ones onboarding next month. The improvement compounds instead of being trapped in one account. This is the path that was supposed to happen for GTA's six emails and never did.</p>
+      </div>
+      <div class="fk b">
+        <div class="fh">Record a divergence</div>
+        <p>San Jose's version is marked <span class="m">local</span> with Lij's reason written down. It never gets promoted, never reports as drift, and resurfaces the next time someone asks the same question.</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <b>The point of routing it through a ticket</b>
+      <p>A free-text box would let Lij improve the copy and nobody would ever find out. The ticket forces the one judgment that matters, at the moment somebody is already paying attention. It is the promote-back rule that was written in a code comment and never enforced, turned into a step a human actually takes.</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SUMMARY ═══════════════ -->
+  <div class="story">
+    <div class="stag"><span class="snum">SUMMARY</span><span class="swho">One rule under all four</span></div>
+    <div class="card" style="border-color:rgba(212,182,92,.35);background:linear-gradient(180deg,rgba(212,182,92,.07),rgba(212,182,92,.01))">
+      <div style="font-size:26px;font-weight:800;line-height:1.25;margin-bottom:10px">No fact, no output.</div>
+      <p style="margin:0;color:var(--tx2);font-size:15px;max-width:72ch">A block with no fact does not render. A quote block with no connected reviews does not render. A review button with no link does not render. An agent fact we do not hold is absent from the prompt. Nothing ever falls back to another academy's version of it, which is the single failure that produced every problem in this plan.</p>
+    </div>
+  </div>
+
+  <p class="foot2">San Jose's rows were read live: 6 automations seeded, all dormant pending approval, all fully tokenized, and nurture step 3 already disabled as the deliberate hold. That hold has to survive whatever the seeding does, which is why re-seeding is a diff-and-patch, never a delete-and-recreate.</p>
+
+</div>
+</body>
+</html>
