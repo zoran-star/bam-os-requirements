@@ -6,3 +6,4 @@ dist/
 whiteboard/.env.production
 .mcp.json
 .claude/worktrees/
+build/sj-messages/
