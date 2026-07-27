@@ -1,14 +1,17 @@
 {
-  "_note": "Read-only snapshot of BAM GTA, captured 27 Jul 2026 after the website_setup.domain backfill landed. Lets render-messages.mjs run with no database access. Regenerate with --client <uuid> once SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are set.",
+  "_note": "Read-only snapshot of BAM GTA's clients row, re-captured 27 Jul 2026 after public_name landed. It is the ONE source of truth for 'what GTA's client row looks like': render-messages.mjs renders from it, and api/_gta-message-lock.test.mjs builds its fixture from it, so a production change cannot be true for one and stale for the other. Regenerate with --client <uuid> once SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are set. Only fields that exist on the row belong here - an absent field must stay absent, because clientVars() treats absent as 'this academy has no such fact'.",
   "client": {
     "id": "39875f07-0a4b-4429-a201-2249bc1f24df",
     "business_name": "BAM GTA",
+    "public_name": "By Any Means Basketball",
     "legal_name": "LVLUP Basketball Training Inc.",
     "owner_name": "Zoran Savic",
     "email": "zoran@byanymeansbball.com",
     "phone": null,
     "address": "2205 Rosemount Cres",
     "time_zone": "America/New_York",
+    "community_group_url": null,
+    "google_review_url": null,
     "website_setup": { "domain": "byanymeanstoronto.ca" },
     "brand_data": {
       "story": "By Any Means started in the GTA with one mission: give serious young hoopers the coaching, reps and accountability that actually move the needle.",

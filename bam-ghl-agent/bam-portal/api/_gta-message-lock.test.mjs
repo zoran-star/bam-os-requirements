@@ -5,6 +5,10 @@
 // through the REAL send path (renderEmail from api/email-shells.js) with GTA's real
 // client row values, and fails if the output moved away from a committed golden.
 //
+// The client row comes from scripts/snapshots/bam-gta.json - the same snapshot
+// scripts/render-messages.mjs renders from - so there is one source of truth for it,
+// and fixtureProblems() below fails the run if that snapshot has gone stale.
+//
 //   node api/_gta-message-lock.test.mjs         # exits non-zero on any difference
 //
 // TWO LOCKS, because "changed" means two very different things:
@@ -52,17 +56,16 @@ const WORDS_DIR = path.join(GOLD, "words");
 const MARKUP_DIR = path.join(GOLD, "markup");
 
 // ─── the fixture: BAM GTA's real client row ──────────────────────────────────
-// Copied from the clients row for 39875f07-... (see scripts/snapshots/bam-gta.json).
-// Only the fields clientVars() reads. phone is genuinely null on the row.
-export const GTA = {
-  id: "39875f07-0a4b-4429-a201-2249bc1f24df",
-  business_name: "BAM GTA",
-  owner_name: "Zoran Savic",
-  email: "zoran@byanymeansbball.com",
-  phone: null,
-  address: "2205 Rosemount Cres",
-  website_setup: { domain: "byanymeanstoronto.ca" },
-};
+// READ FROM THE SNAPSHOT, not retyped here. scripts/snapshots/bam-gta.json is the
+// committed copy of GTA's clients row and is already what scripts/render-messages.mjs
+// renders from, so there is exactly ONE place that answers "what does GTA's row look
+// like today". This used to be a hardcoded literal beside it, and the two drifted: a
+// `public_name` column was added, production's value became "By Any Means Basketball",
+// and the lock went on rendering "BAM GTA" against goldens of that same dead reality -
+// green, and blind to a live copy change. Deriving it means a stale snapshot is the
+// only way to be stale, and SNAPSHOT_FRESHNESS below shouts when it is.
+const SNAPSHOT_PATH = path.resolve(HERE, "../../../scripts/snapshots/bam-gta.json");
+export const GTA = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, "utf8")).client;
 
 // A fixed sample family, so the merge fields resolve to something stable and the
 // golden is not full of "there" / "your athlete" fallbacks. Same names the render
@@ -130,6 +133,63 @@ export function wordsOf(html) {
 // gated on a per-academy fact rather than deleted, GTA has both facts, so GTA's words
 // are once again identical to production and no waiver is needed to say so.
 const WORD_WAIVERS = {};
+
+// ─── is the fixture still describing production? ─────────────────────────────
+// The bug this exists to catch is NOT "the copy changed". It is "the fixture went
+// stale and the lock kept saying ✅". That happened on 27 Jul 2026: the `public_name`
+// column was added, GTA's became "By Any Means Basketball", and because the fixture
+// still only carried `business_name`, clientVars()'s `public_name || business_name`
+// fallback quietly resolved to the old value. Everything rendered, everything matched,
+// everything passed - against a version of reality that no longer existed. A green
+// lock that cannot see a live change is worse than no lock, because it is trusted.
+//
+// So the lock now also asserts that the fixture is CARRYING the parent-facing name and
+// that the name is REACHING a parent. These look redundant next to 10 golden compares.
+// They are not: goldens only prove today's render equals yesterday's render. If the
+// fixture drops a field, BOTH sides of that compare move together and the diff is
+// empty. These checks compare the fixture against what it is supposed to be, which is
+// the one thing a self-consistent snapshot test can never do for itself.
+//
+// If a future column matters as much as this one did, add it here the same way.
+function fixtureProblems(renders) {
+  const out = [];
+  const pub = GTA.public_name;
+  const vars = clientVars(GTA);
+
+  // 1. The snapshot carries the parent-facing name at all.
+  if (!pub) {
+    out.push("STALE FIXTURE: scripts/snapshots/bam-gta.json has no `public_name`. Production has one "
+      + '("By Any Means Basketball"). Without it clientVars() falls back to business_name and every '
+      + "golden below locks the WRONG name while still passing. Re-capture the snapshot.");
+    return out;
+  }
+
+  // 2. It is what clientVars actually resolves {{location.name}} to - i.e. the
+  //    fallback is not silently standing in for it.
+  if (vars.location_name !== pub) {
+    out.push(`STALE FIXTURE: clientVars() resolves location_name to ${JSON.stringify(vars.location_name)}, `
+      + `but the snapshot's public_name is ${JSON.stringify(pub)}. The render is not using the row's own name.`);
+  }
+
+  // 3. It reaches a parent. A fixture field nothing renders is a field nobody is
+  //    locking, so the goldens would keep passing however wrong it got.
+  if (!renders.some((h) => h.includes(pub))) {
+    out.push(`STALE FIXTURE: no rendered GTA message contains ${JSON.stringify(pub)}. `
+      + "Either {{location.name}} left the templates or the fixture is not feeding them - "
+      + "either way these goldens are no longer locking the academy's name.");
+  }
+
+  // 4. And the INTERNAL label is not leaking the other way. "BAM GTA" is our own
+  //    shorthand; a paying parent must never read it back. This is the rule the
+  //    27 Jul change was made to enforce, so the lock enforces it too.
+  const leaked = renders.filter((h) => h.includes(GTA.business_name));
+  if (pub !== GTA.business_name && leaked.length) {
+    out.push(`INTERNAL LABEL LEAKED: ${leaked.length} rendered message(s) still contain `
+      + `${JSON.stringify(GTA.business_name)}, the internal name. Parents should only ever read `
+      + `${JSON.stringify(pub)}.`);
+  }
+  return out;
+}
 
 // ─── diff ────────────────────────────────────────────────────────────────────
 function lcsOps(a, b) {
@@ -210,14 +270,17 @@ if (BLESS_MARKUP) {
 }
 
 console.log("\n── BAM GTA message lock ──");
-console.log(`   ${KEYS.length} templates, rendered through renderEmail() with GTA's real client row.\n`);
+console.log(`   ${KEYS.length} templates, rendered through renderEmail() with GTA's real client row`);
+console.log(`   (scripts/snapshots/bam-gta.json, public_name ${JSON.stringify(GTA.public_name || null)}).\n`);
 
 const wordFails = [];
 const markupFails = [];
 const problems = [];
+const renders = [];
 
 for (const key of KEYS) {
   const html = render(key);
+  renders.push(html);
   const wPath = path.join(WORDS_DIR, `${key}.txt`);
   const mPath = path.join(MARKUP_DIR, `${key}.html`);
 
@@ -238,6 +301,10 @@ for (const key of KEYS) {
   if (!wordsSame) { wordFails.push({ key, expectedWords, actualWords, markupSame }); console.log(`  ❌ ${key}  WORDS CHANGED`); }
   else { markupFails.push({ key, goldenMarkup, html }); console.log(`  ⚠️  ${key}  markup only`); }
 }
+
+// Runs LAST, and runs under --bless-* too: re-blessing rewrites the goldens, so it is
+// the one moment a stale fixture would be baked in permanently and silently.
+problems.push(...fixtureProblems(renders));
 
 // ─── report ──────────────────────────────────────────────────────────────────
 if (wordFails.length) {
