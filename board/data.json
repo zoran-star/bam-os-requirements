@@ -1,14 +1,14 @@
 {
   "updated": "2026-07-26 \u00b7 night",
   "recentUpdates": [
+    "New directive: testimonials nowhere without Google reviews connected. Scout mapping all surfaces",
     "social_proof interim fix designed; confirmed it is the ONLY leak of its class",
     "Directive locked: new academies get GTA's automations, templatized. All chats aligned",
     "Third false blocker killed; found a real one the audit missed: one Google link shared by every academy",
-    "Killed a second false blocker: the email identity fallback was already fixed and shipped",
-    "SAN JOSE EMAIL IS LIVE: verified, sends as BAM San Jose, Lij's Gmail untouched"
+    "Killed a second false blocker: the email identity fallback was already fixed and shipped"
   ],
   "orchestrator": {
-    "focus": "ZORAN'S DIRECTIVE LOCKED: the preset ships GTA's automations, templatized, to every new academy. The sync room plans the convergence; all preset chats aligned on it.",
+    "focus": "Testimonial guardrail directive: scout inventorying every surface where quotes appear; planning room spawns from its findings. Convergence wave queued behind it.",
     "needs": [
       "Send Lij his ask-list, it is now the biggest unblock",
       "Try the price breakdown when the test chip appears",
@@ -635,7 +635,14 @@
       "id": 63,
       "title": "Move GTA's review link to its own row, neutral shared default",
       "severity": "blocker",
-      "status": "1 question for you",
+      "status": "folded under #64",
+      "owner": "us"
+    },
+    {
+      "id": 64,
+      "title": "Testimonial guardrail: no quotes anywhere without Google reviews connected",
+      "severity": "blocker",
+      "status": "scout running",
       "owner": "us"
     }
   ],
