@@ -1,11 +1,11 @@
 {
-  "updated": "2026-07-27 \u00b7 morning",
+  "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
-    "Gate moved: you author the master off a map of all 8 GTA automations, not off a plan doc",
-    "Plan rebuilt as two waves; one rule now covers emails and the agent brain: no fact, no output",
-    "Three chats converged on preset automations; scopes reconciled into one owner",
-    "Preset sync plan decided: GTA is the reference, GTA becomes a governed instance",
-    "Guardrail ruled: quote-free variant is the only build; social_proof + Google labels wait for real reviews"
+    "Zoran confirmed the plan: building now. Foundation builder running",
+    "Item 1 applied to prod: 10 academies' website domains backfilled, GTA included",
+    "Big change: 5 designed emails are AUTHORED PER ACADEMY, not copied. Onboarding left the sales preset",
+    "Verified: GTA's brand copy claims Friday training. GTA has never trained on a Friday",
+    "Two new wizard approval steps: the preset promised approval that never existed"
   ],
   "orchestrator": {
     "focus": "Preset convergence is the whole game now. The sync chat owns the standard AND seeding San Jose through it. It is building you a mockup of the user stories first; nothing gets built until you confirm it.",
@@ -22,8 +22,8 @@
       "id": "t-convergence",
       "short": "preset convergence",
       "title": "Every new academy gets GTA's automations, templatized",
-      "phase": "your move",
-      "phaseTone": "you",
+      "phase": "claude operating",
+      "phaseTone": "work",
       "why": "Today a new academy gets 3 onboarding steps and no emails while GTA runs 8 steps and 6 designed emails. This makes the preset hand every academy GTA's full system wearing their own name, and San Jose is the first one through it.",
       "pipeline": [
         {
@@ -36,11 +36,11 @@
         },
         {
           "name": "you: author master",
-          "state": "active"
+          "state": "done"
         },
         {
           "name": "build",
-          "state": "pending"
+          "state": "active"
         },
         {
           "name": "test",
@@ -55,10 +55,10 @@
           "state": "pending"
         }
       ],
-      "status": "Gate moved: instead of reviewing the plan, you are authoring the master directly off a map of every automation GTA actually runs, annotated per message with AUTO / ASK / LEAK / NEVER / BRAND / DROP.",
+      "status": "Plan final and approved. Item 1 (domain backfill) applied to prod. Foundation builder running on the parent-facing name, testimonials table, community link and review link.",
       "next": {
-        "who": "you",
-        "what": "Work through the GTA automation map in the sync chat. Your pass through it IS the master spec"
+        "who": "agents",
+        "what": "Foundation lands, then I dispatch the next wave. San Jose gets seeded in the sync chat after"
       },
       "checklist": null
     }
@@ -259,11 +259,67 @@
   ],
   "queue": [
     {
-      "id": "H",
-      "title": "Neutralize agent defaults + give social_proof a renderer",
+      "id": "2-5",
+      "title": "Data foundation: parent-facing name, testimonials table, 2 links",
       "severity": "blocker",
-      "status": "WAVE 1, do first",
+      "status": "BUILDING",
       "owner": "us"
+    },
+    {
+      "id": 6,
+      "title": "Two wizard approval steps (the promised approval never existed)",
+      "severity": "blocker",
+      "status": "next wave",
+      "owner": "us"
+    },
+    {
+      "id": 8,
+      "title": "Re-shell 3 onboarding emails onto the tokenized shell",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 9,
+      "title": "Emails wear brand_data (wrong gold, placeholder logos)",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 7,
+      "title": "brand_data cleanup + derive stats (currently states a false training day)",
+      "severity": "friction",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 10,
+      "title": "Delete trial_followup, detokenize GTA's 4 sales steps",
+      "severity": "scale",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": 11,
+      "title": "Parameterise the email renderer by client id",
+      "severity": "scale",
+      "status": "sync room",
+      "owner": "us"
+    },
+    {
+      "id": 12,
+      "title": "Override-tracing checker + weekly drift issue",
+      "severity": "scale",
+      "status": "queued",
+      "owner": "us"
+    },
+    {
+      "id": "a",
+      "title": "DECIDE: the sales agent reads zero brand_data",
+      "severity": "general",
+      "status": "YOUR CALL",
+      "owner": "Zoran"
     },
     {
       "id": 5,
@@ -565,55 +621,6 @@
       "severity": "friction",
       "status": "closed by decision",
       "owner": "later"
-    },
-    {
-      "id": "G",
-      "title": "Clean GTA's rows",
-      "severity": "scale",
-      "status": "wave 1, small",
-      "owner": "us"
-    },
-    {
-      "id": "F",
-      "title": "Wizard collects 2 new facts (was 4; review link + community group link)",
-      "severity": "friction",
-      "status": "wave 1, gates E",
-      "owner": "us"
-    },
-    {
-      "id": "E",
-      "title": "Re-shell + block-ify 3 onboarding emails",
-      "severity": "friction",
-      "status": "wave 1, largest",
-      "owner": "us"
-    },
-    {
-      "id": "D",
-      "title": "Promote onboarding default 3 to 8",
-      "severity": "friction",
-      "status": "wave 1, needs A",
-      "owner": "us"
-    },
-    {
-      "id": "A",
-      "title": "sync_class + testimonials brake",
-      "severity": "blocker",
-      "status": "wave 2, gates D",
-      "owner": "us"
-    },
-    {
-      "id": "B",
-      "title": "Override-tracing reverse check",
-      "severity": "scale",
-      "status": "wave 2",
-      "owner": "us"
-    },
-    {
-      "id": "C",
-      "title": "Weekly Preset drift issue",
-      "severity": "scale",
-      "status": "wave 2",
-      "owner": "us"
     }
   ],
   "chatMap": [
@@ -638,8 +645,8 @@
     {
       "name": "Plan: two-way preset sync",
       "sidebar": "Plan: two-way preset sync",
-      "state": "blue",
-      "one": "Built you a map of all 8 GTA automations, annotated with what each academy must supply. You author the master from it",
+      "state": "white",
+      "one": "Plan approved and dispatched. Owns San Jose's seeding once the build lands",
       "builds": [
         "t-convergence"
       ],

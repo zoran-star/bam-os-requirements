@@ -167,6 +167,44 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 | 45 | **Post-approval env swap (gate E):** `TWILIO_MASTER_ACCOUNT_SID`, `TWILIO_MASTER_API_KEY_SID`, `TWILIO_MASTER_API_KEY_SECRET` on Vercel prod AND preview (use `printf`, never `echo`), then set `TWILIO_PRIMARY_PROFILE_SID` to the approved SID - that flag un-gates the whole A2P chain. Verify `TWILIO_A2P_POLICY_SID` on first live run. Smoke test the subaccount chain on one academy | BLOCKER after approval | queued | |
 | 46 | **Build an onboarding intake step for academy A2P data.** Every academy needs its OWN Secondary Profile + brand under its OWN EIN (one ISV brand cannot cover unrelated businesses). Each owner must supply legal name, EIN, CP 575-accurate details, live site, privacy policy, terms, and a rep on their own domain. Collect it at onboarding rather than chasing per academy | SCALE, high value | queued | Exactly the plug-and-play pattern Zoran wants |
 
+## FINAL BUILD BRIEF (Zoran confirmed 2026-07-27: "let's build it"). Supersedes the earlier item list.
+
+**⚠️ HEADLINE CHANGE FROM EVERYTHING ABOVE: the preset is NOT "copy GTA's emails to everyone".** Structure travels; **five designed emails are AUTHORED PER ACADEMY.** That is a RECURRING per-academy cost, not a one-time promotion.
+
+**⚠️ ONBOARDING IS OUT OF THE SALES PRESET.** Zoran moved it: it is post-conversion, and the code already models it as `postConversion` rather than a stage engine. With onboarding out, **the sales preset is 93% photocopyable.**
+
+**Final classification:** Contact Form / Trial Form / Missed Trial = 100% photocopyable (Missed Trial already is, zero changes). Ghosted = 100% after 3 domain swaps + **DELETE the owner first name from step 3** (templated reads "It's coach from <academy>", no owner name; it appears in exactly ONE place across all 11 emails, so a single removal not a sweep). Nurture: nurture-4 travels as-is; **nurture-1 + nurture-2 are FULLY CUSTOM including the frame**; nurture-3 templated pending testimonials. Onboarding: welcome is now FULLY PHOTOCOPYABLE (online-programs and bring-a-friend lines DROPPED from the master entirely); training/story/era fully custom, and story+era are the same two designs as nurture-1/2 with the trial button stripped, so they are **authored ONCE at academy level and both skills read them**. Summer Special = GTA-only, parked against the reignition flow. Trial Follow-up = DELETE. **"Fully custom" means the ENTIRE email including the frame** (Zoran was explicit twice).
+
+**The two skills.** A = "free-trial sales system": 5 automations, builds 4 alone, proposes 2 emails. B = "member onboarding": 1 automation, 8 steps, proposes 1 email, reuses what A settled. **Operator = INTERNAL BAM STAFF, not owners.** Phases: READ / CHECK READINESS / PROPOSE IN CHAT / CONFIRM / BUILD / RENDER+REVIEW / INSTALL DORMANT. **Phase 3 covers FULLY CUSTOM EMAILS ONLY**; everything photocopyable builds silently and never reaches the chat. Phase 3 output is PLAIN TEXT IN CHAT: the angle, full copy, sources quoted back, and what it refused to claim. Guardrail wording: **the skill will not INVENT a fact, but staff CAN supply one** - it is not a block on humans. **Staff edits are the academy's own and NEVER propagate**; GTA's setup is not changed by any of this.
+
+**Readiness check replaced the diagnose step.** The 9-type selling-point taxonomy was deleted: it never decided anything and 4 of 9 types had no slot to fill. Replaced with a null check plus a length heuristic keyed to the exact field each email reads: READY / THIN / EMPTY, and EMPTY drops the slot.
+
+**BUILD ITEMS, IN ORDER:**
+1. ✅ **DONE 2026-07-27 by the orchestrator.** Backfill `website_setup.domain` from `brand_data.domain`. Verified first: GTA's was NULL while brand_data held it, so dropping the "duplicate" first would have stripped GTA's website from live messages. 10 clients backfilled incl. GTA + Miami; 2 empty strings cleaned to absent. `brand_data.domain` untouched until its readers move.
+2. Parent-facing name field beside legal name in Business Basics. `business_name` is the INTERNAL label ("BAM GTA") and is what `{{location.name}}` renders today, so parents read internal shorthand. **Its hint must change too** - it currently claims to be "how customers know you".
+3. New `testimonials` table (id, client_id, quote, author, source manual|google, starred, created_at). **Nothing exists today.** Do NOT wire to `onboarding_feedback.testimonial` (that is the OWNER reviewing BAM, opposite direction). GTA preset with its own real parents; **SAN JOSE STAYS EMPTY** - presetting it recreates the Miami fabrication exactly. Also feeds the free-trial page cards, which is where Miami happened.
+4. Community group link + platform label, in Training offer setup -> Onboarding section. Whole line drops with no link.
+5. Google review link. No link = no button, not a dead one.
+6. **Two new wizard steps: "Approve your follow-ups"** (Offer->sales, after Apply the Free Trial preset) and **"Approve your welcome messages"** (Offer->onboarding, after the onboarding form). The preset step's own subtitle already promises "Nothing texts anyone until you approve it" **and that approval has never existed as a step.** Full wizard rule: `_OBF_STEPS` row + `_obfFetchState` detector + `_OBF_SECTIONS` key, all three.
+7. `brand_data` cleanup: keep 12, drop 3 (stats, domain, website_url), move 3 (site_pages, website_status, references), decide on 1 (proof). Readers to adapt: `MarketingView.clientWebsiteFrom` and `action-items.js` both read domain+website_url; ContentView BrandCard renders a "Stats" row. Replace stats with DERIVED values.
+8. Re-shell onboarding-welcome/-training/-review onto the tokenized shell (they draw their own header/footer with GTA's wordmark, OAKVILLE, domain, Instagram typed in).
+9. Emails must wear `brand_data`: they hardcode gold `#E2DD9F` while the brand token is `#D4B65C`. Both academies' logo URLs are still placehold.co, so the frame needs a real-logo check.
+10. Delete `trial_followup`. Detokenize GTA's 4 sales steps. Record `summer_special` as an accepted divergence.
+11. Parameterise `scripts/render-gta-emails.mjs` by client id (it IS phase 6's review page).
+12. The override-tracing reverse checker + weekly drift issue.
+
+**⚠️ ORCHESTRATOR-VERIFIED, and worse than reported:** `brand_data.stats` for GTA claims "Mon/Wed/Fri evening training". Live `schedule_slots` are **Mon, Tue, Wed, Thu, Sat - GTA has NEVER trained on a Friday.** It also claims "43+ active members" against a real 47. San Jose's stats claim "Tue, Wed and Fri evening training" for an academy with ZERO slots that has not launched. This is not merely stale prose, it is **currently-wrong content**, and it is the argument for deriving stats rather than typing them.
+
+**OPEN DECISIONS SURFACED, needing Zoran:**
+- **(a) THE SALES AGENT READS ZERO `brand_data`.** `fact-render.js` and `prompt-structure.js` touch none of it. The agent has no idea the academy has a story or a why-us; its selling points come only from `offer.data.value`. A gap of omission, separate from the cleanup. **Escalated to Zoran.**
+- (c) `wants_about_page` is read by `api/website/team.js` and is stored for neither academy: a field the code expects that nobody ever set.
+- (d) Owner copy changes route through SUPPORT TICKETS with no free-text override, so **each such ticket is now a master-vs-local decision.** Whoever owns the ticket queue needs to know.
+- (e) **Nothing re-syncs when `brand_data` changes**; the skills are one-shot. Zoran's call: handle as a support ticket. Named rather than left implicit.
+
+**SAFE, checked:** `bam-client-sites` reads none of `brand_data`. Nothing in item 7 can break a live academy site.
+
+**⚠️ ARTIFACTS ARE LOCAL-ONLY** on `claude/optimistic-leavitt-db0107` after commit 78943ec (Zoran told that room to stop pushing and work on localhost). A builder cannot read a local branch; briefs must be self-contained until it pushes.
+
 ## PRESET SYNC PLAN: ZORAN'S 7 DECISIONS (2026-07-27, locked). Plan doc `docs/plans/preset-two-way-sync-plan.html`
 
 1. **GTA is the REFERENCE IMPLEMENTATION**, and he took this knowing the trade: **GTA is now a GOVERNED INSTANCE.** Every edit to GTA's rows is a claim on every academy, and GTA's 4 hardcoded sales steps become bugs to fix, not GTA's business.
