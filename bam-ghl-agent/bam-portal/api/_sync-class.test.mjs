@@ -24,7 +24,7 @@ import { TEMPLATES as NURTURE } from "./email-templates/nurture-emails.js";
 import { ONBOARDING_TEMPLATES } from "./email-templates/onboarding-emails.js";
 import { renderEmail, clientVars } from "./email-shells.js";
 import { CANONICAL_DEFAULTS, canonicalSteps } from "./form-intro-automations.js";
-import { seedAutomations } from "./agent/seed-automations.js";
+import { seedAutomations, stepEnabled } from "./agent/seed-automations.js";
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log("  ✅ " + m); } else { fail++; console.log("  ❌ " + m); } };
@@ -216,7 +216,7 @@ for (const key of ["onboarding-welcome", "onboarding-review", "onboarding-traini
     `detector sees GTA identity in ${key} (${leaks.join(", ") || "NOTHING - detector may be broken"}), so flipping it to shared FAILS the gate`);
 }
 
-console.log("\n── SEEDER WIRING: an attributed step is seeded, but OFF ──");
+console.log("\n── SEEDER WIRING: anything not `shared` is seeded, but OFF ──");
 // The marking only does anything because seedAutomations consults the resolver.
 // Fake sb() so this runs with no database: record what the seeder would POST.
 // Steps are tracked PER automation_id (a shared bucket would make the second
@@ -252,6 +252,26 @@ function fakeSb({ existingSteps = [] } = {}) {
   return { sb, calls };
 }
 
+// THE SEED CONTRACT (api/agent/seed-automations.js stepEnabled): ONLY `shared`
+// seeds ON. `local` and `attributed` are both CREATED - so the sequence keeps
+// its shape and the slot is visible in the portal - and both seeded OFF, until
+// that academy's own content is written into the slot and a human turns it on.
+//
+// The unit assertion first, so a failure points at the rule and not at whatever
+// step ordering a default happens to have today.
+console.log("\n── THE SEED CONTRACT: only `shared` seeds ON ──");
+ok(stepEnabled({ body: "template:nurture-4" }) === true,
+  "shared step seeds ON");
+ok(stepEnabled({ body: "template:onboarding-welcome" }) === false,
+  "LOCAL step seeds OFF (academy-specific literals must not send as another academy's)");
+ok(stepEnabled({ sync_class: "local", body: "SCHEDULE: ..." }) === false,
+  "a literal body the ROW marks 'local' seeds OFF");
+ok(stepEnabled({ body: "template:nurture-3" }) === false,
+  "attributed step seeds OFF");
+ok(stepEnabled({ body: "template:does-not-exist" }) === false,
+  "an unclassifiable step seeds OFF (fail closed)");
+ok(stepEnabled(null) === false, "a missing step row seeds OFF");
+
 {
   const { sb, calls } = fakeSb();
   await seedAutomations({ clientId: "client-1", keys: ["nurture"], sb });
@@ -261,10 +281,15 @@ function fakeSb({ existingSteps = [] } = {}) {
   for (const f of flags) console.log("     " + f);
   ok(seeded[2] && seeded[2].body === "template:nurture-3" && seeded[2].enabled === false,
     "step 3 (template:nurture-3, attributed) is seeded DISABLED");
-  ok([0, 1, 3].every((i) => seeded[i] && seeded[i].enabled === true),
-    "steps 1, 2 and 4 are seeded enabled");
+  // nurture-1 and nurture-2 are `local` - each academy's own story and its own
+  // account of how it trains. They seed OFF too, and that is the intended
+  // contract, not a regression: the academy authors them, then turns them on.
+  ok([0, 1].every((i) => seeded[i] && seeded[i].enabled === false),
+    "steps 1 and 2 (nurture-1/nurture-2, local) are seeded DISABLED");
+  ok(seeded[3] && seeded[3].body === "template:nurture-4" && seeded[3].enabled === true,
+    "step 4 (template:nurture-4, shared) is the only one seeded ON");
   ok(seeded.every((s) => s.body && s.position != null),
-    "the attributed step is still CREATED, not skipped (sequence keeps its shape)");
+    "the disabled steps are still CREATED, not skipped (sequence keeps its shape)");
   ok(seeded.every((s) => !("sync_class" in s)),
     "no sync_class column is written yet (its migration is unapplied; an unknown column 400s the insert)");
 }
@@ -278,13 +303,97 @@ function fakeSb({ existingSteps = [] } = {}) {
     "re-seeding an automation that already has steps writes nothing (no flag is flipped back)");
 }
 
-// Every canonical default: nothing attributed is ever seeded ON.
+// Every canonical default: nothing that is not `shared` is ever seeded ON.
 {
   const { sb, calls } = fakeSb();
   await seedAutomations({ clientId: "client-1", sb });
-  const wrong = calls.stepInserts.filter((s) => resolveSyncClass(s) === "attributed" && s.enabled);
+  const wrong = calls.stepInserts.filter((s) => resolveSyncClass(s) !== "shared" && s.enabled);
   ok(wrong.length === 0,
-    `no attributed step in ANY canonical default seeds enabled (checked ${calls.stepInserts.length} steps)`);
+    `no non-shared step in ANY canonical default seeds enabled (checked ${calls.stepInserts.length} steps)`
+    + (wrong.length ? " - ON but not shared: " + wrong.map((s) => s.body.slice(0, 40)).join(" | ") : ""));
+}
+
+console.log("\n── THE PROMOTED ONBOARDING DEFAULT: 7 steps, GTA's shape minus testimonials ──");
+// The welcome drip a brand-new PAYING member gets. It shipped at 3 plain SMS
+// against GTA's 8 steps; promoted to 7 on 2026-07-27. The 8th (testimonials) is
+// deliberately absent - it carries real GTA parents' quotes. See the comment on
+// ONBOARDING_DEFAULT.
+{
+  const onboarding = canonicalSteps(CANONICAL_DEFAULTS.onboarding);
+  ok(onboarding.length === 7, `onboarding default has 7 steps (got ${onboarding.length})`);
+
+  // Shape, pinned. Channel + wait, in order. A silent reorder or retiming of a
+  // paying member's first month is a change someone has to make on purpose.
+  const SHAPE = [
+    ["sms",   0,  "minutes"],
+    ["email", 0,  "minutes"],
+    ["sms",   5,  "minutes"],
+    ["email", 5,  "minutes"],
+    ["email", 3,  "days"],
+    ["email", 7,  "days"],
+    // +14, NOT +7: with the testimonials step absent, +7 would land the review
+    // ask a week earlier in a member's life than the sequence GTA proved. When
+    // testimonials is inserted at position 6 (+7), this returns to +7.
+    ["email", 14, "days"],
+  ];
+  SHAPE.forEach(([ch, amt, unit], i) => {
+    const s = onboarding[i];
+    ok(!!s && s.channel === ch && s.wait_amount === amt && s.wait_unit === unit && s.position === i,
+      `step ${i + 1}: ${ch} +${amt} ${unit} (got ${s ? `${s.channel} +${s.wait_amount} ${s.wait_unit} pos=${s.position}` : "MISSING"})`);
+  });
+
+  // The 6 designed emails GTA runs, minus testimonials.
+  const emailBodies = onboarding.filter((s) => s.channel === "email").map((s) => s.body);
+  ok(emailBodies.join("|") === [
+    "template:onboarding-welcome", "template:onboarding-training",
+    "template:onboarding-story", "template:onboarding-era", "template:onboarding-review",
+  ].join("|"), `the 5 designed emails, in order (got ${emailBodies.join(", ")})`);
+
+  // THE DIVERGENCE, ASSERTED. If someone closes the gap by pasting the template
+  // key in, this fails and points them at why.
+  ok(!onboarding.some((s) => templateRefKey(s.body) === "onboarding-testimonials"),
+    "the testimonials step is ABSENT - it carries real GTA parents' quotes ({{location.city}} "
+    + "re-attributes them to the sender). Only a per-academy testimonial connection may close this gap.");
+
+  // Seeded pattern.
+  const { sb, calls } = fakeSb();
+  await seedAutomations({ clientId: "client-1", keys: ["onboarding"], sb });
+  const seeded = calls.stepInserts;
+  for (const s of seeded) console.log(`     ${s.channel.padEnd(5)} ${String(s.body).slice(0, 44).replace(/\n/g, " ⏎ ").padEnd(46)} ${s.enabled ? "on" : "OFF"}`);
+  ok(seeded.length === 7, `all 7 steps are created (got ${seeded.length})`);
+  ok(seeded.map((s) => (s.enabled ? "1" : "0")).join("") === "1000000",
+    `enabled pattern is on,OFF,OFF,OFF,OFF,OFF,OFF (got ${seeded.map((s) => (s.enabled ? "on" : "OFF")).join(",")})`);
+  ok(seeded[0].enabled === true && seeded[0].channel === "sms",
+    "step 1 (the tokenized welcome SMS) is the only one that seeds ON - it is `shared`");
+  ok(seeded[2].enabled === false && seeded[2].channel === "sms",
+    "step 3 (the schedule SMS) seeds OFF: its row is marked sync_class 'local', so no academy can text a schedule that is not its own");
+  ok(seeded.slice(1).every((s) => s.enabled === false),
+    "every designed email seeds OFF - onboarding-welcome/-training/-story/-era/-review are all `local` today");
+}
+
+console.log("\n── NO GTA LITERAL IN ANY CANONICAL DEFAULT (bodies + subjects) ──");
+// The templates are gated by the render-leak gate above. This gates the OTHER
+// half - the step bodies and subjects written by hand in
+// api/form-intro-automations.js, where the schedule SMS trap lives: GTA's
+// version of that step is its literal training times and Oakville gym address,
+// and pasting it into the master would text it to every academy.
+{
+  const offenders = [];
+  for (const [key, def] of Object.entries(CANONICAL_DEFAULTS)) {
+    for (const s of canonicalSteps(def)) {
+      const text = `${s.subject || ""}\n${s.body || ""}`;
+      if (templateRefKey(s.body)) continue;  // template bodies: covered by the render-leak gate
+      const hay = text.toLowerCase();
+      const digits = text.replace(/\D+/g, "");
+      const hits = [
+        ...GTA_LITERALS.filter((l) => hay.includes(l.toLowerCase())),
+        ...GTA_DIGITS.filter((d) => d && digits.includes(d)),
+      ];
+      if (hits.length) offenders.push(`${key} pos ${s.position}: ${hits.join(", ")}`);
+    }
+  }
+  ok(offenders.length === 0,
+    `no literal step body or subject carries GTA identity${offenders.length ? " - " + offenders.join(" | ") : ""}`);
 }
 
 console.log(`\n${fail ? "❌" : "✅ ALL PASS"}: ${pass} passed, ${fail} failed`);
