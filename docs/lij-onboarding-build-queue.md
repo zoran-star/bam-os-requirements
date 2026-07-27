@@ -167,6 +167,14 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 | 45 | **Post-approval env swap (gate E):** `TWILIO_MASTER_ACCOUNT_SID`, `TWILIO_MASTER_API_KEY_SID`, `TWILIO_MASTER_API_KEY_SECRET` on Vercel prod AND preview (use `printf`, never `echo`), then set `TWILIO_PRIMARY_PROFILE_SID` to the approved SID - that flag un-gates the whole A2P chain. Verify `TWILIO_A2P_POLICY_SID` on first live run. Smoke test the subaccount chain on one academy | BLOCKER after approval | queued | |
 | 46 | **Build an onboarding intake step for academy A2P data.** Every academy needs its OWN Secondary Profile + brand under its OWN EIN (one ISV brand cannot cover unrelated businesses). Each owner must supply legal name, EIN, CP 575-accurate details, live site, privacy policy, terms, and a rep on their own domain. Collect it at onboarding rather than chasing per academy | SCALE, high value | queued | Exactly the plug-and-play pattern Zoran wants |
 
+## ⚠️ #69 LIVE DATA-LOSS BUG, orchestrator-verified 2026-07-27
+
+`CLIENT_SELECT_COLS` in `public/client-portal.html` **omits `legal_name`, `address` and `ein`** (confirmed: only `business_name` of the four is present). They therefore render blank on the Business Basics card, and **every keystroke on that card NULLs them via the RPC.** Prod exposure confirmed by query: **10 academies have a legal name, 12 have an address, 7 have an EIN.**
+
+**Why this is worse than it sounds:** legal name, address and EIN are exactly the three fields the Twilio TrustHub submission must copy character-for-character off the IRS CP 575. Losing them silently would break the submission that gates every academy's phone number, and there are only 3 free resubmissions.
+
+**INTERIM: do not edit the Business Basics card until this is fixed.** Pre-existing, not introduced by the foundation build; that build added a hydration guard so its own new `public_name` field cannot repeat the pattern.
+
 ## THE 13 ANSWERS (AUTOMATION TEMPLATING, 2026-07-27). These are the builder contract.
 
 **MARKING.** (1) Template vs step conflict: **THE STRICTEST WINS**, `attributed > local > shared`. A step marked `shared` pointing at an `attributed` template resolves `attributed`. Reason: the marking protects content, content lives in the template, and a step-level loosening would let someone un-protect real people's words by editing a row they thought was about timing. (2) Column DEFAULT `'shared'`, **no backfill needed** for the ~46 existing academies: resolution reads the template first and the column is only an override, so absent means inherit. (3) `attributed` means BOTH, at different layers: **the CONTENT never travels; the STEP still seeds so the sequence keeps its shape, but `enabled:false`.**

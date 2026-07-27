@@ -1,15 +1,16 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "Found a live data-loss bug: editing Business Basics wipes legal name, address and EIN",
     "Empty testimonials now DROPS the email entirely, which takes Google reviews off the critical path",
     "TESTIMONIAL CONNECTION now owns the Google reviews build; mockup coming",
     "Zoran confirmed the plan: building now. Foundation builder running",
-    "Item 1 applied to prod: 10 academies' website domains backfilled, GTA included",
-    "Big change: 5 designed emails are AUTHORED PER ACADEMY, not copied. Onboarding left the sales preset"
+    "Item 1 applied to prod: 10 academies' website domains backfilled, GTA included"
   ],
   "orchestrator": {
     "focus": "Preset convergence is the whole game now. The sync chat owns the standard AND seeding San Jose through it. It is building you a mockup of the user stories first; nothing gets built until you confirm it.",
     "needs": [
+      "Do NOT edit the Business Basics card until #69 is fixed, it silently wipes legal name, address and EIN",
       "Work through the GTA automation map in the sync chat, it is the master spec",
       "File the Google Business Profile API application, it is days to weeks and unfiled",
       "Send Lij his ask-list, still the biggest thing you own",
@@ -258,6 +259,13 @@
     }
   ],
   "queue": [
+    {
+      "id": 69,
+      "title": "DATA LOSS: editing Business Basics NULLs legal_name, address, ein",
+      "severity": "blocker",
+      "status": "verified, needs fix",
+      "owner": "us"
+    },
     {
       "id": "7-cred",
       "title": "DECIDE: read-only key in CI vs Vercel cron for the drift checker",
@@ -635,7 +643,7 @@
       "name": "MISTER_ORCHESTRATOR",
       "sidebar": "MISTER_ORCHESTRATOR",
       "state": "blue",
-      "one": "Two things wait on your word here: 'records added', and the ship order for the pricing PR",
+      "one": "Foundation build landed. Found a live data-loss bug on Business Basics that wipes the exact fields your Twilio submission needs",
       "builds": [
         "t-breakdown",
         "t-email"
@@ -647,7 +655,7 @@
       "sidebar": "TESTIMONIAL CONNECTION",
       "state": "white",
       "one": "Now owns connecting Google reviews end to end. Scanning, then building you a visual mockup",
-      "column": "infra",
+      "column": "reviews",
       "actions": [
         {
           "id": "google-api-app",
@@ -674,7 +682,7 @@
       "builds": [
         "t-convergence"
       ],
-      "column": "preset"
+      "column": "sales"
     },
     {
       "name": "SET UP TWILIO BITCH",
@@ -775,7 +783,7 @@
           "never": "Do not paste the API Key Secret into a public place. Send it in the chat only when you are ready for me to set it."
         }
       ],
-      "column": "infra"
+      "column": "twilio"
     },
     {
       "name": "BAM GTA free trial loading rate",
@@ -801,7 +809,7 @@
           "never": "Never paste the token into a chat, including this board. It only ever goes into the Supabase SQL editor."
         }
       ],
-      "column": "infra"
+      "column": "gta"
     },
     {
       "name": "BUILD GHL TOKENS",
@@ -828,7 +836,7 @@
           "never": "HOLD until that chat confirms whether GHL offers the Agency AND Sub-Account option. If it does not, these steps change."
         }
       ],
-      "column": "infra"
+      "column": "twilio"
     },
     {
       "name": "Enrollment agreement",
@@ -843,7 +851,7 @@
       "sidebar": "Vercel deployment guide for Ant",
       "state": "unknown",
       "one": "Not one of mine. Tell me what it is and I will map it",
-      "column": "done"
+      "column": "unsorted"
     }
   ],
   "journey": {
@@ -896,17 +904,32 @@
     {
       "id": "sj",
       "title": "Get San Jose live",
-      "goal": "Everything that has to be true before Lij can take his first real lead"
+      "goal": "Everything that must be true before Lij takes his first real lead"
     },
     {
-      "id": "preset",
-      "title": "Make the preset plug-and-play",
-      "goal": "So academy #4 gets GTA's whole system on day one without hand-writing anything"
+      "id": "sales",
+      "title": "Sales system",
+      "goal": "Make the free-trial preset hand every academy GTA's system, templatized to them"
     },
     {
-      "id": "infra",
-      "title": "Unblock phone, tracking + reviews",
-      "goal": "Long-lead infrastructure gated on outside approvals, not on our code"
+      "id": "reviews",
+      "title": "Reviews",
+      "goal": "Connect real Google reviews so no academy ever shows borrowed or invented quotes"
+    },
+    {
+      "id": "twilio",
+      "title": "Twilio",
+      "goal": "Own our own numbers, starting with the TrustHub approval that gates every academy"
+    },
+    {
+      "id": "gta",
+      "title": "GTA landing pages",
+      "goal": "Fix what GTA's own funnel loses before it reaches the pipeline"
+    },
+    {
+      "id": "unsorted",
+      "title": "Unsorted",
+      "goal": "Not yet mapped to a workstream. Drag these where they belong"
     },
     {
       "id": "done",
