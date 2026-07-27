@@ -207,6 +207,10 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 2. **Item G matters MORE.** GTA is currently drifted (4 hardcoded sales steps, 2 orphan sequences). The structural model only holds once GTA actually IS the clean reference, so cleaning it is what makes the model true on day one rather than housekeeping.
 3. **The override-tracing METHOD survives as design guidance**, not as a build item: "does anything override this value on the path to output, and does that override fail open or closed" is exactly what a builder needs when wiring blocks and resolvers.
 
+**⚠️ MANDATORY IN THE BUILDER CONTRACT (added 2026-07-27):** dropping the check also removed the only thing that would have caught **a builder getting `sync_class` wrong**. Under the old plan a mis-marked row surfaced in a weekly issue; under the new one, **a row marked `shared` that should have been `local` is indistinguishable from a correct one until it has already propagated.** That is not an argument to bring the check back, it is an argument that the `sync_class` write path is now a single point of failure with no detection behind it and therefore **needs a TEST, not just a code review**.
+
+**The specific assertion that must exist:** a step whose body is `template:<key>` resolves to the TEMPLATE's class **even when the step row says `shared`**. That is the exact case where a wrong answer is invisible and expensive, because it is how real people's words would silently start travelling between academies.
+
 **⚠️ HONEST RESIDUAL:** the structural model assumes nobody edits GTA's rows as a special case any more. The weekly issue would have caught that; nothing does now. Fine while GTA's rows ARE the preset, but **a genuine GTA one-off must be marked `local` at the moment it is written or it silently becomes everyone's.**
 
 ## THE 13 ANSWERS (AUTOMATION TEMPLATING, 2026-07-27). These are the builder contract.
@@ -282,7 +286,7 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 | Wave | Item | What | Severity |
 |---|---|---|---|
 | 1 | **H** | Neutralize agent-brain defaults + give `social_proof` a renderer | BLOCKER, **do first** |
-| 1 | G | Clean GTA's rows | SCALE, small |
+| 1 | **G** | Clean GTA's rows: delete `trial_followup`, detokenize the 4 hardcoded sales steps, record `summer_special` as an accepted divergence | **BLOCKER** (promoted from SCALE 2026-07-27: the structural model is only TRUE once GTA actually IS the clean reference, so this is a precondition, not housekeeping) |
 | 1 | F | Onboarding wizard collects the 4 new facts (gates E, **shares the review-link field with H**) | FRICTION |
 | 1 | E | Re-shell + block-ify the 3 GTA-shelled onboarding emails | FRICTION, largest |
 | 1 | D | Promote `ONBOARDING_DEFAULT` 3 -> 8 (needs A) | FRICTION |

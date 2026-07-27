@@ -1,11 +1,11 @@
 {
   "updated": "2026-07-27 \u00b7 evening",
   "recentUpdates": [
+    "sync_class write path now needs a test: it is a single point of failure with no detection behind it",
     "Templating branch pushed: 36 files, builders can read the plans and the renderer now",
     "Weekly drift check cancelled: the boundary gets enforced at write time instead",
     "Reviews chat caught 5 gaps in the in-flight migration, incl. RLS that would let academies fabricate reviews",
-    "Found a live data-loss bug: editing Business Basics wipes legal name, address and EIN",
-    "Empty testimonials now DROPS the email entirely, which takes Google reviews off the critical path"
+    "Found a live data-loss bug: editing Business Basics wipes legal name, address and EIN"
   ],
   "orchestrator": {
     "focus": "Preset convergence is the whole game now. The sync chat owns the standard AND seeding San Jose through it. It is building you a mockup of the user stories first; nothing gets built until you confirm it.",
