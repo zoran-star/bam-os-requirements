@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Templating the words inside the emails</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF9F6;--card:#FFFFFF;--card2:#F3F1EB;--line:#E4E0D6;
+    --tx:#1A1917;--tx2:#54514A;--tx3:#8A857B;
+    --gold:#9A7A22;--goldbg:#FBF3DC;--goldln:#E5D097;
+    --green:#2A7A4E;--greenbg:#E8F4EC;--greenln:#B7DCC4;
+    --red:#B23A22;--redbg:#FBECE8;--redln:#EFC9BE;
+    --blue:#255F92;--bluebg:#E9F1F8;--blueln:#C2D9EB;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1060px;margin:0 auto;padding:44px 20px 100px}
+  h1{font-size:clamp(27px,4.4vw,40px);line-height:1.1;letter-spacing:-.025em;margin:0 0 9px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:16.5px;margin:0 0 24px;max-width:68ch}
+  h2{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--gold);margin:52px 0 6px;font-weight:800}
+  .h2sub{color:var(--tx3);font-size:14px;margin:0 0 16px;max-width:74ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:0 1px 2px rgba(26,25,23,.04)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .m{font-family:var(--mono);font-size:13px}
+  .goal{background:var(--goldbg);border:1px solid var(--goldln);border-radius:14px;padding:18px 22px;margin-bottom:6px}
+  .goal .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:6px}
+  .goal p{margin:0;font-size:17px;color:var(--tx);font-weight:600;line-height:1.45}
+  table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:680px}
+  th{text-align:left;padding:9px 12px;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:800;border-bottom:2px solid var(--line)}
+  td{padding:12px;border-bottom:1px solid var(--line);color:var(--tx2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.k{color:var(--tx);font-weight:700}
+  .pill{display:inline-block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap}
+  .p-ok{background:var(--greenbg);color:var(--green)}
+  .p-no{background:var(--redbg);color:var(--red)}
+  .p-mid{background:var(--goldbg);color:var(--gold)}
+  .p-new{background:var(--bluebg);color:var(--blue)}
+  .note{border-radius:12px;padding:16px 18px}
+  .note b{display:block;margin-bottom:4px;font-size:15px}
+  .note p{margin:0;font-size:14px;color:var(--tx2)}
+  .note p+p{margin-top:7px}
+  .note+.note{margin-top:11px}
+  .n-warn{background:var(--redbg);border:1px solid var(--redln)}.n-warn b{color:var(--red)}
+  .n-gold{background:var(--goldbg);border:1px solid var(--goldln)}.n-gold b{color:var(--gold)}
+  .n-blue{background:var(--bluebg);border:1px solid var(--blueln)}.n-blue b{color:var(--blue)}
+  .n-ok{background:var(--greenbg);border:1px solid var(--greenln)}.n-ok b{color:var(--green)}
+  .grid{display:grid;gap:13px}
+  @media(min-width:800px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+  /* mirror */
+  .mirror{display:grid;gap:0;grid-template-columns:1fr;border:1px solid var(--line);border-radius:13px;overflow:hidden}
+  @media(min-width:760px){.mirror{grid-template-columns:1fr 1fr}}
+  .mirror>div{padding:18px 20px}
+  .mirror>div:first-child{background:var(--card);border-bottom:1px solid var(--line)}
+  @media(min-width:760px){.mirror>div:first-child{border-bottom:none;border-right:1px solid var(--line)}}
+  .mirror>div:last-child{background:var(--card2)}
+  .mirror .who{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:800;color:var(--tx3);margin-bottom:9px}
+  .mirror .big{font-size:16.5px;font-weight:700;color:var(--tx);line-height:1.4;margin-bottom:8px}
+  .mirror .sm{font-size:13.5px;color:var(--tx2);margin:0}
+  /* names */
+  .names{display:flex;gap:10px;flex-wrap:wrap}
+  .nm{flex:1;min-width:190px;border:1px solid var(--line);border-radius:11px;padding:14px 15px;background:var(--card)}
+  .nm .v{font-size:16px;font-weight:800;color:var(--tx);margin-bottom:5px}
+  .nm .w{font-size:12.5px;color:var(--tx2)}
+  /* email diff */
+  .mail{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card);font-size:14px}
+  .mail .hd{background:var(--card2);padding:9px 15px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:var(--tx3);border-bottom:1px solid var(--line)}
+  .mail .bd{padding:15px 17px}
+  .mail .ln{padding:3px 0;color:var(--tx2)}
+  .mail .ln b{color:var(--tx)}
+  .hl-red{background:#FBECE8;border-radius:4px;padding:1px 4px;color:#8E2D18;font-weight:600}
+  .hl-grn{background:#E8F4EC;border-radius:4px;padding:1px 4px;color:#1F5D3B;font-weight:600}
+  .lbl{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:800;margin-bottom:7px}
+  .dec{border:1px solid var(--goldln);background:var(--goldbg);border-radius:13px;padding:18px 20px}
+  .dec .q{font-size:16.5px;font-weight:800;color:var(--tx);margin-bottom:5px}
+  .dec .why{font-size:14px;color:var(--tx2);margin:0 0 12px}
+  .opt{background:#fff;border:1px solid var(--goldln);border-radius:10px;padding:12px 14px;margin-top:8px}
+  .opt .t{font-weight:700;color:var(--tx);font-size:14.5px}
+  .opt .d{font-size:13.5px;color:var(--tx2);margin-top:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Your emails know your details.<br><span>Your record does not.</span></h1>
+  <p class="sub">The last big step before the sales system copies itself. Nothing here is decided yet, and two things need your call.</p>
+
+  <div class="goal">
+    <div class="l">What this step does</div>
+    <p>Your phone, gym, schedule, group chat and coach handles come out of the email words and get read from your academy's record instead. Same emails, filled in per academy.</p>
+  </div>
+
+  <!-- MIRROR -->
+  <h2>The whole problem, in one comparison</h2>
+  <p class="h2sub">These two academies are exact opposites, and neither one can send a working welcome email because of it.</p>
+  <div class="mirror">
+    <div>
+      <div class="who">BAM GTA</div>
+      <div class="big">Your phone number is typed into the email. Your record has no phone at all.</div>
+      <p class="sm">So the email works, for you and nobody else. Copy it to another academy and it hands out your number.</p>
+    </div>
+    <div>
+      <div class="who">BAM San Jose</div>
+      <div class="big">Their phone number is in their record. They have no email that would ever read it.</div>
+      <p class="sm">So the welcome sequence simply does not switch on for them. Correct, and useless.</p>
+    </div>
+  </div>
+
+  <!-- THREE NAMES -->
+  <h2>Something I found while reading your welcome email</h2>
+  <p class="h2sub">One email, one parent, three different names for you. All three are in the same message today.</p>
+  <div class="names">
+    <div class="nm"><div class="v">By Any Means Basketball</div><div class="w">The subject line and the opening sentence. This is the parent-facing name you set.</div></div>
+    <div class="nm"><div class="v">By Any Means GTA</div><div class="w">The preview text, the gold wordmark at the top, and the sign-off at the bottom.</div></div>
+    <div class="nm"><div class="v">By Any Means Toronto</div><div class="w">The unsubscribe line at the very bottom: "you joined By Any Means Toronto".</div></div>
+  </div>
+  <div class="note n-blue" style="margin-top:12px">
+    <b>Why it happens, and why it is the same job</b>
+    <p>Two of those three names are typed into the code, in the one block that still holds your identity by hand. That block is also what makes you the only academy whose website, tagline and Instagram are not read from your own record. Fixing the words inside the emails and fixing that block are the same piece of work, so I would do them together rather than twice.</p>
+  </div>
+
+  <!-- FACTS -->
+  <h2>Every detail buried in the three emails</h2>
+  <p class="h2sub">Where each one should live, and whether the academy actually has it today. This is the real size of the job: the code change is the easy half.</p>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>The detail</th><th>Where it should be read from</th><th>BAM GTA</th><th>BAM San Jose</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Gym address</td><td>Your venues list, first one</td><td><span class="pill p-ok">exact match</span></td><td><span class="pill p-ok">on file</span></td></tr>
+        <tr><td class="k">Weekly schedule</td><td>Your real sessions</td><td><span class="pill p-ok">86 sessions, rebuilds it exactly</span></td><td><span class="pill p-no">no sessions yet</span></td></tr>
+        <tr><td class="k">Coach phone</td><td>Academy record</td><td><span class="pill p-no">blank</span></td><td><span class="pill p-ok">on file</span></td></tr>
+        <tr><td class="k">Parent-facing name</td><td>Academy record</td><td><span class="pill p-ok">set</span></td><td><span class="pill p-no">blank</span></td></tr>
+        <tr><td class="k">WhatsApp group invite</td><td>Academy record</td><td><span class="pill p-no">blank</span></td><td><span class="pill p-no">blank</span></td></tr>
+        <tr><td class="k">Google review link</td><td>Academy record</td><td><span class="pill p-no">blank</span></td><td><span class="pill p-no">blank</span></td></tr>
+        <tr><td class="k">Coach Instagram handles</td><td>Your team list, per person</td><td><span class="pill p-no">blank for everyone</span></td><td><span class="pill p-no">blank for everyone</span></td></tr>
+        <tr><td class="k">Academy Instagram page</td><td><b>nowhere yet</b></td><td><span class="pill p-new">needs a new field</span></td><td><span class="pill p-new">needs a new field</span></td></tr>
+        <tr><td class="k">Featured training video</td><td><b>nowhere yet</b></td><td><span class="pill p-new">needs a decision</span></td><td><span class="pill p-new">needs a decision</span></td></tr>
+        <tr><td class="k">Online programs link</td><td>Academy record</td><td><span class="pill p-mid">field exists, not switched on</span></td><td><span class="pill p-mid">same</span></td></tr>
+        <tr><td class="k">Bring-a-friend offer</td><td>Academy record</td><td><span class="pill p-mid">field exists, not switched on</span></td><td><span class="pill p-mid">same</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note n-ok" style="margin-top:14px">
+    <b>The good news, and it is better than expected</b>
+    <p>Your schedule and your gym address rebuild <b>exactly</b> from data you already have. I checked your 86 live sessions against the schedule typed into the email: Monday to Thursday 7-8pm and 8-9pm, Saturday 11:30 and 12:30, and your first venue is character for character the address in the email. Nothing has to be re-entered for either of those.</p>
+  </div>
+
+  <div class="note n-warn" style="margin-top:11px">
+    <b>The blanks are not a data-entry job for you</b>
+    <p>Every blank above already exists somewhere as a known-correct value, typed into the code. Your phone, your WhatsApp invite, your review link and your coaches' handles are all sitting in the email templates right now. Moving them into your record is a copy, not a question. <b>I am not going to ask you to re-type anything you already gave us.</b></p>
+  </div>
+
+  <!-- BEFORE / AFTER -->
+  <h2>What actually changes in the welcome email</h2>
+  <p class="h2sub">Left is what a BAM GTA parent gets today. Right is what they would get after. The goal is that these are identical.</p>
+  <div class="grid g2">
+    <div class="mail">
+      <div class="hd">Today, BAM GTA</div>
+      <div class="bd">
+        <div class="ln"><b>3.</b> Follow along - Coach <span class="hl-red">Zoran</span> on Instagram, Coach <span class="hl-red">Adrian</span> on Instagram, and our general page.</div>
+        <div class="ln"><b>5.</b> Need anything? Reach the coaches at <span class="hl-red">(289) 816-6569</span>.</div>
+        <div class="ln" style="margin-top:9px"><b>Weekly Schedule</b></div>
+        <div class="ln">Mondays &nbsp; <span class="hl-red">Younger 7-8pm · Older 8-9pm</span></div>
+        <div class="ln">Saturdays &nbsp; <span class="hl-red">Younger 11:30-12:30pm · Older 12:30-1:30pm</span></div>
+        <div class="ln" style="margin-top:9px"><b>Location</b></div>
+        <div class="ln"><span class="hl-red">1079 Linbrook Rd, Oakville, ON L6J 2L2</span></div>
+        <div class="ln" style="margin-top:9px">See you on the court,<br><b>The <span class="hl-red">By Any Means GTA</span> Team</b></div>
+      </div>
+    </div>
+    <div class="mail">
+      <div class="hd">After, BAM GTA. Identical words.</div>
+      <div class="bd">
+        <div class="ln"><b>3.</b> Follow along - Coach <span class="hl-grn">Zoran</span> on Instagram, Coach <span class="hl-grn">Adrian</span> on Instagram, and our general page.</div>
+        <div class="ln"><b>5.</b> Need anything? Reach the coaches at <span class="hl-grn">(289) 816-6569</span>.</div>
+        <div class="ln" style="margin-top:9px"><b>Weekly Schedule</b></div>
+        <div class="ln">Mondays &nbsp; <span class="hl-grn">Younger 7-8pm · Older 8-9pm</span></div>
+        <div class="ln">Saturdays &nbsp; <span class="hl-grn">Younger 11:30-12:30pm · Older 12:30-1:30pm</span></div>
+        <div class="ln" style="margin-top:9px"><b>Location</b></div>
+        <div class="ln"><span class="hl-grn">1079 Linbrook Rd, Oakville, ON L6J 2L2</span></div>
+        <div class="ln" style="margin-top:9px">See you on the court,<br><b>The <span class="hl-grn">By Any Means Basketball</span> Team</b></div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size:13.5px;color:var(--tx2);margin:11px 0 0">Every highlighted value is read from your record instead of typed in. The only word that moves is the sign-off, for the same reason the trial form text changed: <b>GTA is our internal shorthand and it is on your parents' screens.</b> Say the word and I will leave the sign-off exactly as it is.</p>
+
+  <div class="mail" style="margin-top:14px">
+    <div class="hd">The same email, for San Jose, once they have sessions on file</div>
+    <div class="bd">
+      <div class="ln"><b>3.</b> Follow along - <span style="color:var(--tx3)">no coach handles on file, so this line does not appear at all</span></div>
+      <div class="ln"><b>4.</b> Need anything? Reach the coaches at <span class="hl-grn">(408) 597-4327</span>.</div>
+      <div class="ln" style="margin-top:9px"><b>Location</b></div>
+      <div class="ln"><span class="hl-grn">1051 W San Fernando St, San Jose, CA 95126</span></div>
+      <div class="ln" style="margin-top:9px">See you on the court,<br><b>The <span class="hl-grn">By Any Means San Jose</span> Team</b></div>
+    </div>
+  </div>
+  <p style="font-size:13.5px;color:var(--tx2);margin:11px 0 0">A missing detail removes its line and renumbers the rest. It never sends a blank, and it never sends yours.</p>
+
+  <!-- DECISIONS -->
+  <h2>Two things only you can decide</h2>
+  <p class="h2sub">Everything else on this page I can do without asking.</p>
+
+  <div class="grid g2">
+    <div class="dec">
+      <div class="q">1. What do the schedule groups get called?</div>
+      <p class="why">Your email says "Younger" and "Older". Your actual sessions are named "Group 1 (Elementary)" and "Group 2 (High School)". Generating the schedule from real sessions means picking which wording a parent reads.</p>
+      <div class="opt"><div class="t">Keep "Younger" and "Older"</div><div class="d">Nothing your parents read changes. Every academy gets the same two labels, which may not fit an academy that splits by anything other than age.</div></div>
+      <div class="opt"><div class="t">Use your real session names</div><div class="d">"Group 1 (Elementary) 7-8pm". More accurate, works for any academy however they split their groups, but it is a visible change to your email.</div></div>
+    </div>
+
+    <div class="dec">
+      <div class="q">2. The training video in email two</div>
+      <p class="why">The "Attention to Detail" video is your own YouTube content. Right now it is hardcoded, so every academy would send yours.</p>
+      <div class="opt"><div class="t">Give every academy a video field</div><div class="d">They paste their own link. No link means the email drops the video section and still reads fine.</div></div>
+      <div class="opt"><div class="t">Drop the video from the shared version</div><div class="d">It stays in yours as your own content and never travels. Simpler, but a new academy's second email is thinner.</div></div>
+    </div>
+  </div>
+
+  <!-- BLOCKED -->
+  <h2>One thing has to happen before any of this</h2>
+  <div class="note n-warn" style="margin-top:0">
+    <b>A database change is waiting on you, and it blocks this build</b>
+    <p>Two small changes are written and have never been run anywhere. One of them adds the fields for the online programs link and the bring-a-friend offer. Until it runs, those two facts have nowhere to live except the code, which is the exact block that holds your three names. So removing that block would silently shorten your welcome email.</p>
+    <p><b>They only add fields. They change nothing that exists and nothing sends differently until the code goes out.</b> A person has to run them, not me.</p>
+  </div>
+
+  <h2>The order I would go in</h2>
+  <div class="card">
+    <div class="lbl">Once you have answered the two questions above</div>
+    <p style="margin:0 0 8px;color:var(--tx2);font-size:14.5px"><b>1.</b> Move your known-correct details out of the code and into your record. Nothing changes for a parent.</p>
+    <p style="margin:0 0 8px;color:var(--tx2);font-size:14.5px"><b>2.</b> Read them from the record in the three emails, and generate the schedule from your real sessions.</p>
+    <p style="margin:0 0 8px;color:var(--tx2);font-size:14.5px"><b>3.</b> Prove it byte for byte against the lock that now guards all 21 of your messages, exactly as I did for the text messages.</p>
+    <p style="margin:0;color:var(--tx2);font-size:14.5px"><b>4.</b> Flip those three emails to copyable. That is the jump from 8 of 17 to 13 of 17.</p>
+  </div>
+
+</div>
+</body>
+</html>
