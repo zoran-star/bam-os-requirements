@@ -112,9 +112,17 @@ async function handler(req, res) {
   // Migrating tier only (V2 or V1.5), GHL connected. The batch path also requires
   // the marker be NULL; the single-client path drops that so staff can force a re-run.
   const tierFilter = "or=(v2_access.eq.true,v15_access.eq.true)";
+  // PILOT GATE. Set IMPORT_PILOT_CLIENT_IDS to a comma-separated list of client
+  // uuids and the BATCH path considers ONLY those academies. Unset = normal
+  // behaviour across the whole eligible queue. Added 2026-07-28 to trial the
+  // email-import auth fix on one V1.5 academy without touching anyone else,
+  // V2 included. Remove the env var to open the batch back up.
+  const pilotIds = (process.env.IMPORT_PILOT_CLIENT_IDS || "")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  const pilotFilter = pilotIds.length ? `&id=in.(${pilotIds.join(",")})` : "";
   const q = onlyClient
     ? `clients?id=eq.${encodeURIComponent(onlyClient)}&ghl_location_id=not.is.null&${tierFilter}&select=id,business_name&limit=1`
-    : `clients?ghl_location_id=not.is.null&ghl_history_imported_at=is.null&${tierFilter}&select=id,business_name&order=ghl_connected_at.desc.nullslast&limit=${CANDIDATES}`;
+    : `clients?ghl_location_id=not.is.null&ghl_history_imported_at=is.null&${tierFilter}${pilotFilter}&select=id,business_name&order=ghl_connected_at.desc.nullslast&limit=${CANDIDATES}`;
 
   let list;
   try { list = await sb(q); } catch (e) { return res.status(500).json({ error: e.message }); }
