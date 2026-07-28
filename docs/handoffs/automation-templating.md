@@ -2,56 +2,91 @@
 
 ## Where I actually stopped
 
-**Mid-step: templating BAM GTA's 5 remaining hardcoded literals in its sales messages.**
-Nothing was applied to production. I dry-ran all five swaps through the real resolver first
-and the result splits three ways.
+**Step 1 of the dependency order is DONE and applied to production. PR #1627 is open.**
 
-**3 are proven byte-identical and safe to apply right now.** Verified by executing
-`resolveMergeVars` on the current body and the proposed body and comparing:
+All five of GTA's remaining hardcoded literals are templated. Both of the questions the previous
+session was waiting on were answered by Zoran and both are implemented:
 
-| Row | Swap | Result |
+| Row | Swap | Rendered result |
 |---|---|---|
 | `contact_form` step 0 | `By Any Means Basketball` -> `{{location.name}}` | identical |
+| `ghosted` step 0 | `byanymeanstoronto.ca` -> `{{location.domain}}` | identical |
 | `ghosted` step 1 | `https://byanymeanstoronto.ca/free-trial` -> `{{location.website}}/free-trial` | identical |
 | `ghosted` step 2 | same | identical |
+| `trial_form` step 0 | `By Any Means GTA` -> `{{location.name}}` | **changed, on purpose** |
 
-**2 are NOT identical and are waiting on Zoran.** I put both to him and he dismissed the
-prompt without answering, so they are undecided, not declined:
+Each was one UPDATE guarded on the md5 of the body I had verified, so it could not land on a row
+that had moved underneath me. `missed_trial` was already clean.
 
-- `ghosted` step 0 ends with the bare domain `byanymeanstoronto.ca`. `{{location.website}}`
-  renders `https://byanymeanstoronto.ca`, adding a protocol into an SMS. Options offered:
-  leave it hardcoded, accept the https, or build a bare-domain token.
-- `trial_form` step 0 says `it's coach from By Any Means GTA`. `{{location.name}}` now renders
-  `By Any Means Basketball`. Arguably the correct parent-facing name and consistent with every
-  other message, but it IS a change to a live text.
+**GTA is now byte-identical to the master** on every sales-preset body and name. Apply the master
+to a blank academy, fill in GTA's details, and you get exactly what GTA has. That is Zoran's own
+test and it now passes; there is a check for it in the commit message of `1737ece`.
 
-**The next single action:** get those two answers, then apply all five with one UPDATE per row,
-then re-render GTA and confirm the GTA lock still passes. `missed_trial` is already clean and
-needs nothing.
+**The one deliberate copy change** is `trial_form` step 0, now reading "By Any Means Basketball".
+It was re-blessed as a one-line golden diff across 21 messages, which is the record.
 
-### What I tried that did not work
+### What was found on the way, and matters more than the swap
 
-- **Swapping `ghosted` step 0's bare domain for `{{location.website}}`.** Renders with `https://`
-  prepended. `clientVars` builds `location_website` as `https://${domain}`, so there is no token
-  today that yields a bare domain. Do not retry the swap expecting it to be invisible.
-- **My first smoke test of `_brand-stats.js`** returned `{}` and looked broken. It was not. I had
-  guessed the signature; it takes `(sb, clients)` and queries the database. Check signatures
-  before reporting a module as broken.
+**The GTA fixture had drifted from production, badly, for the second time.**
+`scripts/snapshots/bam-gta.json` had `brand_data` truncated, `website_setup` reduced to the
+domain, `missed_trial` / `trial_form` / `summer_special` missing entirely, onboarding recorded as
+3 steps against production's 8, and the ghosted bodies already edited to the PROPOSED tokenized
+form rather than the live one. Anything that read it for "GTA's real state" got a wrong answer.
+Re-captured from production and verified body by body by md5, all 21 matching. `render-messages.mjs`
+now also selects every column `clientVars` reads, so a `--client` re-capture cannot silently drop
+a field the way the missing `public_name` once did.
+
+**The master had the same bare-domain bug, for everyone.** `form-intro-automations.js` ghosted
+step 0 used `{{location.website}}`, so every future academy would have texted `https://...` as a
+standalone SMS line. Fixed in the master, not just for GTA. This is why the bare-domain token was
+the right answer and "leave it hardcoded" was not.
+
+**GTA's identity is still half-pinned in code.** GTA is the ONLY academy with an entry in the
+`LOCATIONS` map in `email-shells.js`, so blanking its `website_setup.domain` changes nothing:
+`locFor()` falls straight back to the hardcoded `siteUrl`. Found because a negative control
+FAILED to be caught, not by reading code. **Deliberately not fixed:** the same entry carries GTA's
+tagline, instagram, `onlineProgramsUrl` and `referralOffer`, and the columns that would replace
+them (migration `20260727150000`) are unapplied, so deleting it today silently shortens GTA's
+welcome email. Severity SCALE, blocked on that migration.
+
+### New proof in the repo
+
+`api/_gta-step-lock.test.mjs` locks all 21 automation step bodies rendered through the real send
+path (`resolveMergeVars` for SMS exactly as `api/_send.js` calls it, `renderEmail` reduced to
+parent-visible words plus link targets for email). Three negative controls, all caught:
+`MUTATE=token` edits a body's web address, `MUTATE=domain` takes the academy's site away,
+`MUTATE=name` lets the internal label reach a parent.
+
+Full suite re-run at this point, 5 of 5 green: `_sync-class`, `_automation-step`,
+`_gta-message-lock`, `_gta-step-lock`, `_blueprint-card-guards`.
+
+### The next single action
+
+**Template the email bodies.** Phone, gym address, weekly schedule and coach handles come out of
+the words; the schedule generates from `schedule_slots` rather than being typed. GTA's
+`onboarding` steps 1 and 3 are where most of it sits, and both are SMS, not email: step 1 carries
+the WhatsApp invite, online-programs URL, three Instagram handles, the merch shop and the phone
+number; step 3 is a hand-typed weekly schedule plus the venue. Moves 5 messages from blocked to
+copying and flips those templates to `shared`.
 
 ### Things I believe but have NOT executed (house rule 5)
 
 - **"Templating the email bodies moves 5 messages from blocked to copying."** The 8-of-17 figure
-  today is real, computed by running `stepEnabled` over `CANONICAL_DEFAULTS`. The 13 and 15
-  projections are my arithmetic, not executed.
+  is real, computed by running `stepEnabled` over `CANONICAL_DEFAULTS`. The 13 and 15
+  projections are arithmetic, not executed.
 - **"~40 minutes of staff time per academy."** An estimate. No skill has ever been run.
 - **"Seeding San Jose through `applyPreset`/`seedAutomations` will work."** Never executed. The
   before-state is pinned in `scripts/snapshots/bam-san-jose.json`; the after has never happened.
-- **"`bam-client-sites` reads no `brand_data`."** I checked `clients/` and `design-system/` only.
+- **"`bam-client-sites` reads no `brand_data`."** Only `clients/` and `design-system/` checked.
 - **The unapplied migrations** (`20260727120000` sync_class, `20260727150000` welcome facts) have
-  never been run against any database. Their SQL is unverified.
-- **`upsert-automation`** has the same clobber shape as the bug I fixed in `upsert-step`. I judged
-  it fail-safe (its direction turns messaging OFF) and its only caller always sends both fields.
-  That judgement was not tested.
+  never been run against any database. Their SQL is unverified. I did confirm that `sync_class`
+  is genuinely absent from `automation_steps` in production, so that half is no longer a guess.
+- **`upsert-automation`** has the same clobber shape as the bug fixed in `upsert-step`. Judged
+  fail-safe (its direction turns messaging OFF) and its only caller always sends both fields.
+  That judgement is still untested.
+- **San Jose's snapshot has not been re-captured.** `scripts/snapshots/bam-san-jose.json` was
+  written by the same hand as the GTA one that turned out to be abridged. Treat it as suspect
+  until it has been checked against production the same way.
 
 ### Files another chat also touches
 
