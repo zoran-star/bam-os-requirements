@@ -16035,7 +16035,11 @@ async function _v15calCreateBooking() {
 // Reuses /api/ghl/inbox (list + thread) + /api/ghl/send-message. (P2 adds
 // pipeline/stage + failed filters; P3 adds mass send.)
 // ══════════════════════════════════════════════════════════════
-let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fClass: '', fPipeline: '', fStage: '', fChannels: [], active: null, messages: [], type: 'SMS', pending: [], readAt: {} };
+let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, readOnly: false, sentOnly: false, failedOnly: false, fClass: '', fPipeline: '', fStage: '', fChannels: [], active: null, messages: [], type: 'SMS', pending: [], readAt: {} };
+// readOnly / sentOnly join the existing unreadOnly / failedOnly as the four status
+// filters on the V1.5 channel tabs (Zoran 2026-07-28). All four are mutually
+// exclusive - picking one clears the rest, so the list is never filtered by two
+// contradictory states at once.
 // readAt: convId → the lastMessageDate at the moment you OPENED it. A conversation
 // is "read" (no dot) once opened, and re-flags as unread only if a NEWER message
 // arrives after that. GHL has no public mark-read API, so we track it per session.
@@ -16155,12 +16159,64 @@ function _v15ibPill(on) {
   return `padding:7px 16px;border-radius:999px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid ${on ? 'var(--gold)' : 'var(--border-med)'};background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'}`;
 }
 function _v15ibSetClass(v) { _V15IB.fClass = v; _v15ibRebuildBar(); _v15ibRenderList(); }
-function _v15ibSetUnread(v) { _V15IB.unreadOnly = v; if (v) _V15IB.failedOnly = false; _v15ibRebuildBar(); _v15ibRenderList(); }
+function _v15ibSetUnread(v) { _V15IB.unreadOnly = v; if (v) { _V15IB.failedOnly = false; _V15IB.readOnly = false; _V15IB.sentOnly = false; } _v15ibRebuildBar(); _v15ibRenderList(); }
+// Persist a read / unread state for one conversation so it survives a reload and
+// follows the user to another device. Server side: /api/ghl/inbox?action=mark-read
+// | mark-unread, both writing this user's row in ghl_conversation_reads.
+// Best-effort: the list already updated optimistically, so a failure here must not
+// throw in the middle of a bulk loop.
+async function _v15ibPersistRead(convId, state) {
+  if (!convId) return;
+  try {
+    const token = await _mreqAuthToken();
+    const action = state === 'unread' ? 'mark-unread' : 'mark-read';
+    fetch(`/api/ghl/inbox?action=${action}&client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ conversation_id: convId }),
+    }).catch(() => {});
+    // Keep the local read-state map in step so a re-render does not undo the change.
+    if (state === 'unread' && _V15IB.readAt) delete _V15IB.readAt[convId];
+  } catch (_) {}
+}
+// Mark one thread unread from the row itself, then drop back to the list.
+function _v15ibMarkUnread(convId, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  const c = _V15IB.convos.find(x => x.id === convId);
+  if (c) c.unreadCount = Math.max(1, c.unreadCount || 0);
+  _v15ibPersistRead(convId, 'unread');
+  _v15ibRebuildBar(); _v15ibRenderList();
+}
+// One status at a time. _v15ibSetStatus('') clears them all.
+function _v15ibSetStatus(which) {
+  _V15IB.unreadOnly = which === 'unread';
+  _V15IB.readOnly   = which === 'read';
+  _V15IB.sentOnly   = which === 'sent';
+  _V15IB.failedOnly = which === 'failed';
+  _v15ibRebuildBar(); _v15ibRenderList();
+}
+// SMS / Email tabs. These drive the SAME fChannels filter the Filters drawer uses,
+// so there is one filtering code path, not two. '' = both channels.
+function _v15ibSetChanTab(key) {
+  _V15IB.fChannels = key ? [key] : [];
+  _v15ibRenderAll();
+}
+function _v15ibChanTabActive() {
+  const f = _V15IB.fChannels || [];
+  return f.length === 1 && (f[0] === 'sms' || f[0] === 'email') ? f[0] : '';
+}
+// V1.5 only, and never on V2 - V2 keeps its merged single-thread inbox untouched.
+function _v15ibChanTabsOn() {
+  return (typeof V15_ACCESS !== 'undefined' && V15_ACCESS === true) &&
+         !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true);
+}
 // Tab click handler - clean so onclick strings stay simple
 function _v15ibTab(val) {
   if (val === 'unread') { _V15IB.unreadOnly = !_V15IB.unreadOnly; _V15IB.fClass = ''; }
   else { _V15IB.unreadOnly = false; _V15IB.fClass = val; }
   _V15IB.failedOnly = false;
+  _V15IB.readOnly = false;
+  _V15IB.sentOnly = false;
   _v15ibRebuildBar(); _v15ibRenderList();
 }
 // Re-render just the segmented tabs without blowing away the whole layout
@@ -16181,7 +16237,7 @@ function _v15ibRebuildBar() {
   const row = document.querySelector('.v15ib-cls-row');
   if (row) row.innerHTML = `${clsBtn('', 'All', totalPeople)}${clsBtn('member', 'Members', clsCounts.member + clsCounts.member_family)}${clsBtn('lead', 'Leads', clsCounts.lead)}${(clsCounts.spam + autoSpamCount) > 0 ? clsBtn('spam', 'Spam', clsCounts.spam + autoSpamCount) : ''}${unreadCount > 0 ? clsBtn('unread', 'Unread', unreadCount) : ''}`;
 }
-function _v15ibSetFailed(v) { _V15IB.failedOnly = v; if (v) _V15IB.unreadOnly = false; _v15ibRenderList(); }
+function _v15ibSetFailed(v) { _V15IB.failedOnly = v; if (v) { _V15IB.unreadOnly = false; _V15IB.readOnly = false; _V15IB.sentOnly = false; } _v15ibRenderList(); }
 function _v15ibSetPipeline(v) { _V15IB.fPipeline = v; _V15IB.fStage = ''; _v15ibRenderAll(); }
 function _v15ibSetStage(v) { _V15IB.fStage = v; _v15ibRenderAll(); }
 
@@ -16230,8 +16286,10 @@ function _v15ibBulkAction(action) {
   const ids = [..._V15IB.selected];
   if (action === 'read') {
     ids.forEach(id => { const c = _V15IB.convos.find(x => x.id === id); if (c) c.unreadCount = 0; });
+    ids.forEach(id => _v15ibPersistRead(id, 'read'));
   } else if (action === 'unread') {
     ids.forEach(id => { const c = _V15IB.convos.find(x => x.id === id); if (c) c.unreadCount = 1; });
+    ids.forEach(id => _v15ibPersistRead(id, 'unread'));
   }
   _V15IB.selected.clear();
   _V15IB.multiSelect = false;
@@ -16344,6 +16402,10 @@ function _v15ibFiltered() {
     if (_V15IB.fClass === 'member' && c.classification !== 'member' && c.classification !== 'member_family') return false;
     else if (_V15IB.fClass && _V15IB.fClass !== 'member' && c.classification !== _V15IB.fClass) return false;
     if (_V15IB.unreadOnly && !_v15ibIsUnread(c)) return false;
+    if (_V15IB.readOnly && _v15ibIsUnread(c)) return false;
+    // Sent = the last thing on the thread went out from us. lastMessageDirection
+    // is supplied by both store readers (sms_threads/email_threads.last_direction).
+    if (_V15IB.sentOnly && String(c.lastMessageDirection || '').toLowerCase() !== 'outbound') return false;
     if (_V15IB.failedOnly && !_V15IB_FAILED.includes(c.lastMessageStatus || '')) return false;
     if (_V15IB.fChannels.length && !_V15IB.fChannels.includes(_ibChannelBucket(c))) return false;
     if (_V15IB.fPipeline) {
@@ -16378,6 +16440,35 @@ function _v15ibRenderAll() {
   // Segmented tabs: All / Members / Leads / Spam / Unread (#2: merged unread into tabs)
   const clsBtn = (val, label, cnt) => cnt > 0 || val === '' || val === 'unread' ? `<button onclick="_v15ibTab('${val}')" class="v15ib-cls${(_V15IB.fClass === val && !_V15IB.unreadOnly) || (val === 'unread' && _V15IB.unreadOnly) ? ' on' : ''}">${label}${cnt > 0 ? ` <span class="v15ib-cls-n v15ib-count-flip">${cnt}</span>` : ''}</button>` : '';
   const clsRow = `<div class="v15ib-cls-row v15ib-count-animate">${clsBtn('', 'All', totalPeople)}${clsBtn('member', 'Members', clsCounts.member + clsCounts.member_family)}${clsBtn('lead', 'Leads', clsCounts.lead)}${(clsCounts.spam + autoSpamCount) > 0 ? clsBtn('spam', 'Spam', clsCounts.spam + autoSpamCount) : ''}${unreadCount > 0 ? clsBtn('unread', 'Unread', unreadCount) : ''}</div>`;
+
+  // ── V1.5 channel tabs + status pills (Zoran 2026-07-28) ──────────────────
+  // SMS and Email get their own tab, each with Read / Unread / Sent / Failed.
+  // Gated to V1.5 so V2's merged inbox is byte-identical to before.
+  let chanTabRow = '';
+  if (_v15ibChanTabsOn()) {
+    const curChan = _v15ibChanTabActive();
+    const nCh = (k) => _V15IB.convos.filter(c => _ibChannelBucket(c) === k).length;
+    const chTab = (key, label, cnt) =>
+      `<button onclick="_v15ibSetChanTab('${key}')" class="v15ib-cls${curChan === key ? ' active' : ''}" data-tip="${key === 'email' ? 'Email conversations' : key === 'sms' ? 'Text conversations' : 'Both channels'}">${label}${cnt != null ? `<span class="v15ib-cls-n">${cnt}</span>` : ''}</button>`;
+    // Counts use the same bucketing the filter uses, so tab count and list agree.
+    const statusOf = _V15IB.unreadOnly ? 'unread' : _V15IB.readOnly ? 'read' : _V15IB.sentOnly ? 'sent' : _V15IB.failedOnly ? 'failed' : '';
+    const inChan = _V15IB.convos.filter(c => !curChan || _ibChannelBucket(c) === curChan);
+    const sCount = {
+      unread: inChan.filter(c => _v15ibIsUnread(c)).length,
+      read:   inChan.filter(c => !_v15ibIsUnread(c)).length,
+      sent:   inChan.filter(c => String(c.lastMessageDirection || '').toLowerCase() === 'outbound').length,
+      failed: inChan.filter(c => _V15IB_FAILED.includes(c.lastMessageStatus || '')).length,
+    };
+    const sPill = (key, label) =>
+      `<button onclick="_v15ibSetStatus('${statusOf === key ? '' : key}')" class="v15ib-chan${statusOf === key ? ' on' : ''}">${label}<span style="opacity:.6;margin-left:5px">${sCount[key]}</span></button>`;
+    chanTabRow = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <div class="v15ib-cls-row">${chTab('', 'All')}${chTab('sms', 'SMS', nCh('sms'))}${chTab('email', 'Email', nCh('email'))}</div>
+        <span style="width:1px;height:18px;background:var(--border)"></span>
+        ${sPill('read', 'Read')}${sPill('unread', 'Unread')}${sPill('sent', 'Sent')}${sPill('failed', 'Failed')}
+        ${statusOf ? `<button onclick="_v15ibSetStatus('')" style="background:none;border:none;color:var(--text-mute);font-size:11px;cursor:pointer;text-decoration:underline">Clear</button>` : ''}
+      </div>`;
+  }
 
   // Filter drawer contents: channels + pipeline (only shown when toggled)
   const chanBtns = _v15ibVisibleChannels().map(ch => {
@@ -16439,6 +16530,7 @@ function _v15ibRenderAll() {
           </div>
         </div>
       </div>
+      ${chanTabRow}
       <div class="v15ib-filter-drawer ${_V15IB.filtersOpen ? 'open' : ''}" id="v15ib-filter-drawer">
         ${chanBtns}
         <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel" style="max-width:160px;padding:5px 8px;font-size:11px;border-radius:6px">${pipeOpts}</select>
@@ -16606,6 +16698,8 @@ function _v15ibRenderList() {
     if (_V15IB.searchQuery) msg = 'No results for "' + escapeHTML(_V15IB.searchQuery) + '"';
     else if (_V15IB.unreadOnly) msg = 'No unread conversations.';
     else if (_V15IB.failedOnly) msg = 'No failed messages - all good.';
+    else if (_V15IB.readOnly) msg = 'Nothing read here yet.';
+    else if (_V15IB.sentOnly) msg = 'Nothing sent on this channel yet.';
     body.innerHTML = `<div class="req-empty" style="padding:32px 16px;color:var(--text-mute);text-align:center;line-height:1.5">${msg}</div>`;
     return;
   }
