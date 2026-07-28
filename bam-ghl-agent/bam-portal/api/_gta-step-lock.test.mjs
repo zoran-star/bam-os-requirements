@@ -188,6 +188,44 @@ function fixtureProblems(rendered) {
     }
   }
 
+
+  // 5. GTA's own domain and owner reach the output at all. A staleness check, and it
+  //    is IMPORTANT to be honest about what it is not.
+  //
+  //    It was written to answer "is this actually GTA's render", because the
+  //    parent-facing name stopped being able to on 28 Jul 2026: BAM San Jose's
+  //    public_name is now the identical string, by Zoran's ruling that the name is the
+  //    brand and the city lives in the domain. So "the output contains By Any Means
+  //    Basketball" no longer tells the two academies apart.
+  //
+  //    IT DOES NOT ANSWER THAT EITHER, and a negative control proved it rather than
+  //    anyone reasoning about it. Swapping GTA's whole row and facts for San Jose's
+  //    and re-rendering leaves BOTH needles in the output:
+  //      - the domain, because GTA is the one academy with a hardcoded LOCATIONS entry
+  //        and the email footer takes its site from there, not from the row. That is
+  //        queue item 31.
+  //      - "Coach Zoran", because GTA's onboarding step 1 SMS is STILL a hand-typed
+  //        wall of GTA literals (the WhatsApp invite, the online-programs URL, three
+  //        Instagram handles, the merch shop, the phone number). Templating the
+  //        welcome EMAIL did not touch it; it is the same content in SMS form.
+  //
+  //    So no row-based check can discriminate until both of those are fixed, and the
+  //    control that tried was deleted rather than left passing for a weaker reason.
+  //    What survives is worth keeping: if either needle DISAPPEARS, something that
+  //    used to carry GTA's identity has stopped, which is a real staleness signal.
+  const IDENTITY = [
+    ["its own domain", (GTA.website_setup || {}).domain],
+    ["its owner's first name", String(GTA.owner_name || "").trim().split(/\s+/)[0]],
+  ];
+  for (const [what, needle] of IDENTITY) {
+    if (!needle) { out.push(`STALE FIXTURE: the snapshot has no ${what}.`); continue; }
+    if (!all.includes(needle)) {
+      out.push(`LOST FACT: nothing rendered here contains ${what} (${JSON.stringify(needle)}). `
+        + "Something that used to carry BAM GTA's identity has stopped. Read the note above before "
+        + "assuming this proves the wrong academy was rendered - it cannot, and it says why.");
+    }
+  }
+
   // 4. The parent-facing name reaches a parent, and the internal one does not.
   if (!MUTATE && GTA.public_name && !all.includes(GTA.public_name)) {
     out.push(`STALE FIXTURE: no rendered GTA step contains ${JSON.stringify(GTA.public_name)}. `

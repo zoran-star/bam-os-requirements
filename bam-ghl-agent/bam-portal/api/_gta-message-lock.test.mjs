@@ -185,6 +185,26 @@ function fixtureProblems(renders) {
       + "either way these goldens are no longer locking the academy's name.");
   }
 
+  // 3b. GTA's domain and owner reach the output at all. Read the long note on the
+  //     matching check in _gta-step-lock.test.mjs before trusting this for more than
+  //     it claims: it is a staleness check, NOT proof that the right academy was
+  //     rendered. The parent-facing name stopped being able to prove that on 28 Jul
+  //     2026 (San Jose renders the identical string now), and a negative control
+  //     showed the domain and owner cannot prove it either while GTA has a hardcoded
+  //     LOCATIONS entry. What this does catch is a fact that has silently stopped
+  //     rendering.
+  const all = renders.join("\n");
+  for (const [what, needle] of [
+    ["its own domain", (GTA.website_setup || {}).domain],
+    ["its owner's first name", String(GTA.owner_name || "").trim().split(/\s+/)[0]],
+  ]) {
+    if (!needle) { out.push(`STALE FIXTURE: the snapshot has no ${what}.`); continue; }
+    if (!all.includes(needle)) {
+      out.push(`LOST FACT: nothing rendered here contains ${what} (${JSON.stringify(needle)}). `
+        + "Something that used to carry BAM GTA's identity has stopped rendering.");
+    }
+  }
+
   // 4. And the INTERNAL label is not leaking the other way. "BAM GTA" is our own
   //    shorthand; a paying parent must never read it back. This is the rule the
   //    27 Jul change was made to enforce, so the lock enforces it too.

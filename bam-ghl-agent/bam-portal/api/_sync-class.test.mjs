@@ -183,10 +183,21 @@ const GTA_DIGITS = ["2898166569"];
 // A synthetic academy that is NOT BAM GTA. The clientId is deliberately not
 // GTA's uuid, so email-shells derives identity from these vars (locFromVars)
 // exactly as it would for a real unwired academy.
+// public_name is DELIBERATELY the same string GTA renders. From 28 Jul 2026 that is
+// production: Zoran ruled the parent-facing name is the BRAND and the city lives in
+// the domain, so BAM GTA and BAM San Jose render the identical name to a parent.
+//
+// That makes this fixture harder, not softer. The name has stopped being a way to
+// tell the two academies' output apart, so nothing in this gate may lean on it - and
+// with the two names identical, every assertion below is forced to prove itself on
+// the details that DO differ: the domain, the owner, the city, the gym, the phone.
+// If this line is ever "simplified" back to a distinct name, the gate quietly starts
+// passing for the easy reason again.
 const NON_GTA = {
   business_name: "BAM San Jose",
+  public_name: "By Any Means Basketball",
   website_setup: { domain: "byanymeanssanjose.com" },
-  owner_name: "Sample Owner",
+  owner_name: "Elijah De Guzman",
   email: "info@byanymeanssanjose.com",
   address: "1051 W San Fernando St, San Jose, CA 95126",
 };
