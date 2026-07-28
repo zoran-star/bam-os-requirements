@@ -1,6 +1,6 @@
 {
-  "_note": "BEFORE snapshot of BAM San Jose, read live from prod on 2026-07-27, ahead of the preset re-seed. Pinned deliberately so the re-seed has something to be diffed against. THE THING TO WATCH: nurture step at position 2 (template:nurture-3) is enabled:false. That is Zoran's deliberate hold on the testimonials email, not drift. A re-seed that flips it back to true has failed, which is why re-seeding is diff-and-patch and never delete-and-recreate. Every automation is approved:false, so nothing sends until Lij approves it.",
-  "_captured": "2026-07-27",
+  "_note": "BEFORE snapshot of BAM San Jose, captured from production. Pinned deliberately so a preset re-seed has something honest to be diffed against. THE THING TO WATCH: the nurture step at position 2 (template:nurture-3) is enabled:false. That is Zoran's deliberate hold on the testimonials email, not drift. A re-seed that flips it back to true has failed, which is why re-seeding is diff-and-patch and never delete-and-recreate. Every automation is approved:false, so nothing sends until Lij approves it. The facts block is EMPTY of sessions on purpose: San Jose has zero schedule_slots rows, so its schedule block does not render and its schedule SMS resolves to the venue line alone.",
+  "_captured": "2026-07-28, re-captured from production. The 2026-07-27 version had drifted in exactly the two rows this workstream then changed: ghosted steps 0 and 1 carried bodies production did not have. A stale BEFORE-state is worse than no before-state, because it makes a seeding diff lie in the reassuring direction - a fabricated baseline that already resembles the after-state shows a small clean diff and reads as success. Verified body by body by md5 against production after re-capture.",
   "client": {
     "id": "5576acf0-acd3-4c05-9f9f-ebfde8618154",
     "business_name": "BAM San Jose",
@@ -10,7 +10,37 @@
     "phone": "(408) 597-4327",
     "address": "1051 W San Fernando St, San Jose, CA 95126",
     "time_zone": "America/Los_Angeles",
-    "website_setup": { "domain": "byanymeanssanjose.com" },
+    "website_setup": {
+      "chunks": {
+        "core": {
+          "status": "ready",
+          "ready_at": "2026-07-23T14:29:50.273Z"
+        },
+        "deck": {
+          "status": "published",
+          "published_at": "2026-07-23T14:27:45.841Z"
+        },
+        "sales": {
+          "status": "ready",
+          "ready_at": "2026-07-23T13:42:37.767Z"
+        },
+        "agreement": {
+          "status": "ready",
+          "ready_at": "2026-07-23T13:42:37.767Z"
+        },
+        "templates": {
+          "status": "ready",
+          "ready_at": "2026-07-23T14:29:50.273Z"
+        },
+        "onboarding": {
+          "status": "waiting"
+        }
+      },
+      "domain": "byanymeanssanjose.com",
+      "status": "pending",
+      "checked_at": "2026-07-27T21:06:02.485Z",
+      "staging_url": "https://bam-client-sites.vercel.app/clients/bam-san-jose"
+    },
     "brand_data": {
       "story": "By Any Means San Jose was built on one mission: give serious young hoopers the coaching, reps and accountability that actually move the needle. What began as small-group sessions has grown into a training program families across San Jose trust to develop real game.",
       "why_us": "We coach with a plan, not just drills. Small groups, honest feedback, and a clear path for every athlete from where they are to where they want to be. Parents see the progress on the court and in the numbers.",
@@ -28,7 +58,13 @@
       "logo_dark_url": "https://placehold.co/480x160/0B0B0D/D4B65C/png?text=By+Any+Means",
       "logo_light_url": "https://placehold.co/480x160/FFFFFF/0B0B0D/png?text=By+Any+Means",
       "icon_url": "https://placehold.co/512x512/0B0B0D/D4B65C/png?text=BAM"
-    }
+    },
+    "public_name": null,
+    "community_group_url": null,
+    "community_group_platform": null,
+    "google_review_url": null,
+    "online_programs_url": null,
+    "referral_offer": null
   },
   "automations": [
     {
@@ -37,8 +73,15 @@
       "enabled": true,
       "approved": false,
       "steps": [
-        { "position": 0, "wait_amount": 2, "wait_unit": "minutes", "channel": "sms", "subject": null, "enabled": true,
-          "body": "Hi {{contact.first_name}},\n\nIt's coach from {{location.name}}. Just saw you filled in the form for extra info, is there anything I can help with?" }
+        {
+          "position": 0,
+          "wait_amount": 2,
+          "wait_unit": "minutes",
+          "channel": "sms",
+          "subject": null,
+          "enabled": true,
+          "body": "Hi {{contact.first_name}},\n\nIt's coach from {{location.name}}. Just saw you filled in the form for extra info, is there anything I can help with?"
+        }
       ]
     },
     {
@@ -47,8 +90,15 @@
       "enabled": true,
       "approved": false,
       "steps": [
-        { "position": 0, "wait_amount": 20, "wait_unit": "minutes", "channel": "sms", "subject": null, "enabled": true,
-          "body": "Hi {{contact.first_name}}, it's coach from {{location.name}}.\n\nI saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?\n\nHere's the link to the calendar again: {{location.website}}/free-trial" }
+        {
+          "position": 0,
+          "wait_amount": 20,
+          "wait_unit": "minutes",
+          "channel": "sms",
+          "subject": null,
+          "enabled": true,
+          "body": "Hi {{contact.first_name}}, it's coach from {{location.name}}.\n\nI saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?\n\nHere's the link to the calendar again: {{location.website}}/free-trial"
+        }
       ]
     },
     {
@@ -57,8 +107,15 @@
       "enabled": true,
       "approved": false,
       "steps": [
-        { "position": 0, "wait_amount": 30, "wait_unit": "minutes", "channel": "sms", "subject": null, "enabled": true,
-          "body": "Hi {{contact.first_name}}, sorry we missed you at your trial - want to grab another time? Here's the calendar: {{location.website}}/free-trial" }
+        {
+          "position": 0,
+          "wait_amount": 30,
+          "wait_unit": "minutes",
+          "channel": "sms",
+          "subject": null,
+          "enabled": true,
+          "body": "Hi {{contact.first_name}}, sorry we missed you at your trial - want to grab another time? Here's the calendar: {{location.website}}/free-trial"
+        }
       ]
     },
     {
@@ -67,12 +124,33 @@
       "enabled": true,
       "approved": false,
       "steps": [
-        { "position": 0, "wait_amount": 1, "wait_unit": "days", "channel": "sms", "subject": null, "enabled": true,
-          "body": "Hey {{contact.first_name}}! Just wanted to check in and see if you are still interested in having your child train with us\n\n{{location.website}}" },
-        { "position": 1, "wait_amount": 1, "wait_unit": "days", "channel": "sms", "subject": null, "enabled": true,
-          "body": "Hi {{contact.fullName}}\n\nJust wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: {{location.website}}/free-trial\n\nThank you!" },
-        { "position": 2, "wait_amount": 1, "wait_unit": "days", "channel": "email", "subject": "Try a session free", "enabled": true,
-          "body": "Hi {{contact.first_name}},\n\nIt's coach {{location_owner.first_name}} from {{location.name}} - I just wanted to reach out over email to check and see if you would be interested in coming out to a free trial.\n\nIf so, feel free to book in using this link:\n\n{{location.website}}/free-trial\n\nThanks!" }
+        {
+          "position": 0,
+          "wait_amount": 1,
+          "wait_unit": "days",
+          "channel": "sms",
+          "subject": null,
+          "enabled": true,
+          "body": "Hey {{contact.first_name}}! Just wanted to check in and see if you are still interested in having your child train with us 👍\n\n{{location.domain}}"
+        },
+        {
+          "position": 1,
+          "wait_amount": 1,
+          "wait_unit": "days",
+          "channel": "sms",
+          "subject": null,
+          "enabled": true,
+          "body": "Hi {{contact.fullName}}\n\nJust wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: {{location.website}}/free-trial\n\nThank you! 🙏"
+        },
+        {
+          "position": 2,
+          "wait_amount": 1,
+          "wait_unit": "days",
+          "channel": "email",
+          "subject": "Try a session free",
+          "enabled": true,
+          "body": "Hi {{contact.first_name}},\n\nIt's coach {{location_owner.first_name}} from {{location.name}} - I just wanted to reach out over email to check and see if you would be interested in coming out to a free trial.\n\nIf so, feel free to book in using this link:\n\n{{location.website}}/free-trial\n\nThanks!"
+        }
       ]
     },
     {
@@ -81,10 +159,42 @@
       "enabled": true,
       "approved": false,
       "steps": [
-        { "position": 0, "wait_amount": 1, "wait_unit": "weeks", "channel": "email", "subject": "A global basketball ecosystem", "enabled": true, "body": "template:nurture-1" },
-        { "position": 1, "wait_amount": 1, "wait_unit": "weeks", "channel": "email", "subject": "A new era of training", "enabled": true, "body": "template:nurture-2" },
-        { "position": 2, "wait_amount": 3, "wait_unit": "weeks", "channel": "email", "subject": "What families are saying", "enabled": false, "body": "template:nurture-3" },
-        { "position": 3, "wait_amount": 3, "wait_unit": "weeks", "channel": "email", "subject": "Don't miss your shot", "enabled": true, "body": "template:nurture-4" }
+        {
+          "position": 0,
+          "wait_amount": 1,
+          "wait_unit": "weeks",
+          "channel": "email",
+          "subject": "A global basketball ecosystem",
+          "enabled": true,
+          "body": "template:nurture-1"
+        },
+        {
+          "position": 1,
+          "wait_amount": 1,
+          "wait_unit": "weeks",
+          "channel": "email",
+          "subject": "A new era of training",
+          "enabled": true,
+          "body": "template:nurture-2"
+        },
+        {
+          "position": 2,
+          "wait_amount": 3,
+          "wait_unit": "weeks",
+          "channel": "email",
+          "subject": "What families are saying",
+          "enabled": false,
+          "body": "template:nurture-3"
+        },
+        {
+          "position": 3,
+          "wait_amount": 3,
+          "wait_unit": "weeks",
+          "channel": "email",
+          "subject": "Don't miss your shot",
+          "enabled": true,
+          "body": "template:nurture-4"
+        }
       ]
     },
     {
@@ -93,13 +203,39 @@
       "enabled": true,
       "approved": false,
       "steps": [
-        { "position": 0, "wait_amount": 2, "wait_unit": "minutes", "channel": "sms", "subject": null, "enabled": true,
-          "body": "Welcome to {{location.name}}, {{contact.first_name}}! We're pumped to have you. If anything comes up before the first session, text back here - this line reaches us directly." },
-        { "position": 1, "wait_amount": 2, "wait_unit": "days", "channel": "sms", "subject": null, "enabled": true,
-          "body": "Hi {{contact.first_name}}, how are the first sessions feeling? Anything we can do better, tell us right here - we read every message." },
-        { "position": 2, "wait_amount": 5, "wait_unit": "days", "channel": "sms", "subject": null, "enabled": true,
-          "body": "Hey {{contact.first_name}}, one week in with {{location.name}} - great to have you in the group. Consistency is where the growth is; see you at the next session!" }
+        {
+          "position": 0,
+          "wait_amount": 2,
+          "wait_unit": "minutes",
+          "channel": "sms",
+          "subject": null,
+          "enabled": true,
+          "body": "Welcome to {{location.name}}, {{contact.first_name}}! We're pumped to have you. If anything comes up before the first session, text back here - this line reaches us directly."
+        },
+        {
+          "position": 1,
+          "wait_amount": 2,
+          "wait_unit": "days",
+          "channel": "sms",
+          "subject": null,
+          "enabled": true,
+          "body": "Hi {{contact.first_name}}, how are the first sessions feeling? Anything we can do better, tell us right here - we read every message."
+        },
+        {
+          "position": 2,
+          "wait_amount": 5,
+          "wait_unit": "days",
+          "channel": "sms",
+          "subject": null,
+          "enabled": true,
+          "body": "Hey {{contact.first_name}}, one week in with {{location.name}} - great to have you in the group. Consistency is where the growth is; see you at the next session!"
+        }
       ]
     }
-  ]
+  ],
+  "facts": {
+    "location_venue": "1051 W San Fernando St, San Jose, CA 95126",
+    "location_schedule": [],
+    "location_coaches": []
+  }
 }
