@@ -60,10 +60,15 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  // public_name / community_group_* / google_review_url are the parent-facing
+  // public_name / community_group_* / google_review_url / phone are the parent-facing
   // facts clientVars() renders from - without them every message silently falls
-  // back to the internal name and drops its group + review links.
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,public_name,owner_name,email,phone,address,time_zone,website_setup,community_group_url,community_group_platform,google_review_url,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  // back to the internal name and drops its group, review and phone lines.
+  //
+  // online_programs_url and referral_offer joined the list on 28 Jul 2026, when
+  // migration 20260727150000 was applied. Before that, naming a column that does not
+  // exist yet makes PostgREST 400 the whole select and every automation stops. A
+  // column goes in this list AFTER its migration is live, never in the same commit.
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,public_name,owner_name,email,phone,address,time_zone,website_setup,community_group_url,community_group_platform,google_review_url,online_programs_url,referral_offer,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
