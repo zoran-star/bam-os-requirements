@@ -52,6 +52,15 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// The hour it should land in the academy's own timezone. Vercel crons are UTC
+// only, so this cron is scheduled at BOTH 15:00 and 16:00 UTC and this guard
+// picks the one that is 8am locally - 8am all year, either side of DST, with no
+// double send. Override per client with ghl_kpi_config.trial_summary.send_hour.
+const DEFAULT_SEND_HOUR = 8;
+function localHour(tz) {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }).format(new Date()));
+}
+
 // Start/end epoch-ms of "today" in an IANA timezone (DST-safe).
 function dayWindow(tz) {
   const now = new Date();
@@ -92,7 +101,7 @@ function resolveConfig(client) {
   if (!cfg.to_phone && !cfg.to_email) return null; // need at least one destination
   // skip_when_empty: only send on days that actually have a trial booked, so an
   // academy is never pinged on days it does not run (its schedule drives it).
-  return { to_phone: cfg.to_phone || null, to_email: cfg.to_email || null, timezone: cfg.timezone || "America/Los_Angeles", calendars, skip_when_empty: cfg.skip_when_empty === true };
+  return { send_hour: Number.isFinite(Number(cfg.send_hour)) ? Number(cfg.send_hour) : DEFAULT_SEND_HOUR, to_phone: cfg.to_phone || null, to_email: cfg.to_email || null, timezone: cfg.timezone || "America/Los_Angeles", calendars, skip_when_empty: cfg.skip_when_empty === true };
 }
 
 // Email the summary. Honors a client's own Resend domain, else sends via GHL
@@ -138,6 +147,13 @@ async function handler(req, res) {
     const cfg = resolveConfig(client);
     if (!cfg) continue;
     try {
+      // Wrong hour for this academy? Another scheduled run will be its 8am.
+      // ?force=1 bypasses it for a manual test.
+      const hourNow = localHour(cfg.timezone);
+      if (req.query.force !== "1" && hourNow !== cfg.send_hour) {
+        out.push({ client_id: client.id, skipped: `not ${cfg.send_hour}:00 in ${cfg.timezone} (local hour ${hourNow})` });
+        continue;
+      }
       if (!client.ghl_location_id) { out.push({ client_id: client.id, skipped: "no location" }); continue; }
       const creds = await pickGhlToken(client);
       if (!creds) { out.push({ client_id: client.id, skipped: "no ghl token" }); continue; }
