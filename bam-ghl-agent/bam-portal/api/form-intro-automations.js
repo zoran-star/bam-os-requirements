@@ -29,7 +29,8 @@
 //
 // Merge tokens used (resolve at SEND time via api/email-shells.js resolveMergeVars,
 // called from api/_send.js): {{contact.first_name}}, {{contact.fullName}},
-// {{location.name}}, {{location.website}}, {{location_owner.first_name}}. Identity
+// {{location.name}}, {{location.website}} (with protocol, for links),
+// {{location.domain}} (bare, for naming the site in prose), {{location_owner.first_name}}. Identity
 // tokens fail to EMPTY for an academy with no value on file (the website link line
 // drops from the message) - they never fall back to another academy's identity.
 //
@@ -99,7 +100,11 @@ export const GHOSTED_DEFAULT = {
   approved: false,
   steps: [
     { position: 0, wait_amount: 1, wait_unit: "days", channel: "sms", subject: null,
-      body: "Hey {{contact.first_name}}! Just wanted to check in and see if you are still interested in having your child train with us 👍\n\n{{location.website}}" },
+      // {{location.domain}}, NOT {{location.website}}: this line NAMES the site rather
+      // than linking it, and location.website carries the protocol, so the token that
+      // looks right here sends "https://byanymeanstoronto.ca" as a standalone SMS line.
+      // GTA's live copy has always read the bare domain; the master matches it.
+      body: "Hey {{contact.first_name}}! Just wanted to check in and see if you are still interested in having your child train with us 👍\n\n{{location.domain}}" },
     { position: 1, wait_amount: 1, wait_unit: "days", channel: "sms", subject: null,
       body: "Hi {{contact.fullName}}\n\nJust wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: {{location.website}}/free-trial\n\nThank you! 🙏" },
     { position: 2, wait_amount: 1, wait_unit: "days", channel: "email", subject: "Try a session free",

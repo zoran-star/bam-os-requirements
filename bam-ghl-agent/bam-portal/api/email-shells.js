@@ -120,6 +120,12 @@ export function clientVars(client) {
     // filled it in rendering exactly what it rendered before.
     location_name: c.public_name || c.business_name || "",
     location_website: domain ? `https://${domain}` : "",
+    // The SAME website with no protocol on the front ("byanymeanstoronto.ca"), for
+    // copy that names the site rather than linking it. An SMS that reads
+    // "https://byanymeanstoronto.ca" on its own line looks like a machine wrote it;
+    // the bare domain is what a person types. Without this token that line had to
+    // stay a hardcoded literal, which is the one thing keeping the row academy-specific.
+    location_domain: domain || "",
     location_owner: c.owner_name ? String(c.owner_name).trim().split(/\s+/)[0] : "",
     location_email: c.email || "",
     location_city: cityFromAddress(c.address),
@@ -187,7 +193,10 @@ function cityFromAddress(address) {
 // Generalized 2026-07-27 from website-only to EVERY link fact an academy may not
 // have yet: the website, the community group invite, and the Google review link.
 // One rule for all of them - no fact, no output.
-const LINK_TOKENS = ["location.website", "location.community_link", "location.review_link"];
+// `location.domain` is the bare-domain form of location.website and belongs here for
+// the same reason: no domain on file means the academy has no site to name, so the
+// mention goes rather than rendering a naked "" where a web address should be.
+const LINK_TOKENS = ["location.website", "location.domain", "location.community_link", "location.review_link"];
 const tokenRe = (name, flags) => new RegExp("\\{\\{\\s*" + name.replace(/\./g, "\\.") + "\\s*\\}\\}", flags);
 function dropEmptyLinkMentions(text, emptyTokens) {
   if (!emptyTokens.length) return String(text);
@@ -236,6 +245,10 @@ export function resolveMergeVars(html, L, vars = {}) {
     "location.city": vars.location_city || L.city || "",
     "location.name": vars.location_name || L.full || "",
     "location.website": vars.location_website || L.siteUrl || "",
+    // Bare domain, no protocol. Falls back to L.siteLabel, which is already the
+    // stripped form of the same site, so the two tokens can never name different
+    // places - they are one fact rendered two ways.
+    "location.domain": vars.location_domain || L.siteLabel || "",
     // Community group: the LINK gates the line, the PLATFORM only names it.
     // Copy reads "Join the {{location.community_platform}} group:
     // {{location.community_link}}" - with no platform on file that renders

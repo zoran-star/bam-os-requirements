@@ -62,7 +62,15 @@ async function load() {
     console.error("live read needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY. Use --data <snapshot.json> instead.");
     process.exit(2);
   }
-  const sel = "id,business_name,legal_name,owner_name,email,phone,address,time_zone,website_setup,brand_data";
+  // EVERY column clientVars() reads, or a re-capture silently drops a fact and the
+  // snapshot starts describing a world production left behind. That is exactly how
+  // the GTA lock went green while GTA's live copy had changed: the fixture had no
+  // `public_name`. If you add a field to clientVars, add it here in the same commit.
+  // NOT listed on purpose: online_programs_url and referral_offer. Their migration
+  // (20260727150000) is not applied, and naming a column that does not exist yet
+  // makes PostgREST 400 the whole select.
+  const sel = "id,business_name,public_name,legal_name,owner_name,email,phone,address,time_zone,"
+    + "community_group_url,community_group_platform,google_review_url,website_setup,brand_data";
   const rows = CLIENT_ID
     ? await sb(`clients?id=eq.${CLIENT_ID}&select=${sel}`)
     : await sb(`clients?business_name=eq.${encodeURIComponent(NAME)}&select=${sel}`);
