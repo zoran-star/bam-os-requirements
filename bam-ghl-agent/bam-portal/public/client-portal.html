@@ -7896,7 +7896,7 @@ if (window.__MOCK__) (() => {
         Sales
       </div>
 
-      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('pipelines', this)">
+      <div class="nav-item" id="nav-v15pipelines" data-feature="v15" style="display:none" onclick="switchView('pipelines', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="4" width="4" height="16" rx="1"/>
@@ -24407,16 +24407,41 @@ function applyV15NavState(v15) {
   const _v15only = V15_ACCESS && !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
   const _onV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true);
   const assetsNav = document.getElementById('nav-assets');
-  if (assetsNav) assetsNav.style.display = (_v15only || _onV2) ? 'none' : '';
+  // V1.5 gets the standalone Assets tab BACK so clients can upload media straight
+  // into their own asset library. V2 still hides it: its library lives in the
+  // Content Library card plus the orb fan.
+  if (assetsNav) assetsNav.style.display = _onV2 ? 'none' : '';
   // Contacts/Inbox/KPIs sharing + the Marketing "narrative" treatment now live in
   // applyCrmSupersetNav so V2 gets them too - override the bulk v15 toggle above.
   applyCrmSupersetNav();
   applySupportAccordionNav();    // V1.5: group Systems + Marketing under "Support"
-  applyV15ContactsPlacement();   // V1.5: Contacts moves to a button in the Inbox
+  applyV15ContactsPlacement();   // V1.5: Contacts placement (see note in that fn)
+  applyV15NavTrim();             // V1.5: no Inbox, no Sales, Contacts stands alone
   applyTabPermissions(); // re-subtract per-staff tab perms after the tier re-gate
   applyTalkToBamNav();
   try { _revealStoreTab(); } catch (_) {}
   try { _revealLivePagesTab(); } catch (_) {}  // Live Pages: V1 + V1.5 with a site  // show Store tab only for clients with a store
+}
+
+// V1.5 ONLY: no Inbox and no Sales/Pipeline tab. The GHL inbox and pipelines stay
+// in the codebase and stay fully live for V2 - this removes the way in for V1.5
+// academies, nothing more. Also drops both from the mobile bottom bar, and bounces
+// a V1.5 user off either view if a deep link drops them on it.
+function applyV15NavTrim() {
+  const v15only = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS === true) &&
+                  !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true);
+  if (!v15only) return;   // V2 and V1 untouched
+  ['nav-v15inbox', 'nav-v15pipelines'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  document.querySelectorAll('.mobile-nav-item[data-view="v15inbox"], .mobile-nav-item[data-view="pipelines"]')
+    .forEach((el) => { el.style.display = 'none'; });
+  // Standing on a view that no longer has a door? Go home.
+  try {
+    const cur = document.querySelector('.view.active');
+    if (cur && (cur.id === 'view-v15inbox' || cur.id === 'view-pipelines')) switchView('home');
+  } catch (_) {}
 }
 
 // V1.5 groups Systems + Marketing under an expandable "Support" accordion.
@@ -24452,10 +24477,13 @@ function toggleSupportAccordion() {
 function applyV15ContactsPlacement() {
   const v15only = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) &&
                   !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  // V1.5 no longer has an Inbox to hold Contacts, so the standalone nav item stays
+  // visible and the in-inbox button is switched off for everyone. Without this,
+  // removing the Inbox would leave V1.5 with no route to Contacts at all.
   const navContacts = document.getElementById('nav-contacts');
-  if (navContacts && v15only) navContacts.style.display = 'none';
+  if (navContacts && v15only) navContacts.style.display = '';
   const inboxBtn = document.getElementById('inbox-contacts-btn');
-  if (inboxBtn) inboxBtn.style.display = v15only ? 'inline-flex' : 'none';
+  if (inboxBtn) inboxBtn.style.display = 'none';
 }
 
 // "Messages" (the academy↔BAM team chat) is only a left-nav/bottom-bar item on
