@@ -126,8 +126,8 @@
 
       <div class="stage"><div class="sbox done">
         <div class="st">✓ Just landed</div>
-        <div class="t">The name field</div>
-        <div class="d">"By Any Means Basketball" now exists separately from your internal "BAM GTA". Two of your emails already read better because of it.</div>
+        <div class="t">Your messages templated</div>
+        <div class="d">Your name and web address came out of five message rows and became blanks. 20 of your 21 messages read exactly as before, and a test now proves that every time.</div>
         <div class="cnt"><b>8</b> of 17 copy</div>
       </div></div>
 
@@ -198,12 +198,12 @@
         <div class="d">Merged, migration applied, GTA's value set to "By Any Means Basketball".</div>
         <div class="unlock">unlocked everything below</div></div></div>
 
-      <div class="link now"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+      <div class="link done"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
         <div class="t">Template GTA's sales messages</div>
-        <div class="d">Swap your typed-in name and domain for blanks. Proven byte for byte afterwards so nothing your parents read changes.</div>
-        <div class="unlock">makes GTA genuinely template-derived</div></div></div>
+        <div class="d">Done. Your typed-in name and web address are now blanks that fill per academy. 20 of your 21 messages render exactly as before, character for character, and there is now a test in the repo that proves it every time anyone touches this.</div>
+        <div class="unlock">GTA is now genuinely template-derived</div></div></div>
 
-      <div class="link"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+      <div class="link now"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
         <div class="t">Template the email words</div>
         <div class="d">Phone, gym address, weekly schedule, coach handles. The schedule comes from the academy's real sessions rather than typed text.</div>
         <div class="unlock">moves 5 messages from blocked to copying</div></div></div>
@@ -226,9 +226,19 @@
     </div>
   </div>
 
-  <div class="note n-warn" style="margin-top:14px">
-    <b>Still true: none of this is deployed</b>
-    <p>Everything built today sits on a branch. Production runs the old code. The only live changes so far are the name field and one dead automation deleted.</p>
+  <div class="note n-ok" style="margin-top:14px">
+    <b>It is now up for review, as pull request 1627</b>
+    <p>Everything built so far is in one place waiting on you. It is not live until that is merged, so production still runs the old code for everything except your five message rows, which were updated directly and are live now.</p>
+  </div>
+
+  <div class="note n-gold" style="margin-top:11px">
+    <b>The one line of your copy that changed</b>
+    <p>Your trial form text message now opens "it's coach from By Any Means Basketball" where it used to say "By Any Means GTA". That was your call: GTA is our internal shorthand and parents were reading it back. Every other message is identical, character for character.</p>
+  </div>
+
+  <div class="note n-blue" style="margin-top:11px">
+    <b>The alarm was checking a version of you that no longer existed</b>
+    <p>The saved copy of your setup that the safety tests compare against had drifted badly: three of your seven message sequences were missing from it entirely, and your welcome sequence was recorded as 3 messages when you actually send 8. It has been re-taken straight from the live system and checked message by message. This is the second time that file has gone stale, so the check that catches it is now stricter.</p>
   </div>
 
   <!-- ══ SKILLS ══ -->
@@ -273,10 +283,10 @@
   <!-- ══ WATCHING ══ -->
   <h2>What I am still watching</h2>
   <div class="grid g2">
-    <div class="note n-warn" style="margin:0"><b>Nothing is live yet</b>
-      <p>Ten things built, zero shipped. The longer that gap stays open, the more likely something merges around it and needs rework.</p></div>
-    <div class="note n-blue" style="margin:0"><b>The alarm was checking stale details</b>
-      <p>The lock that guards your messages was comparing against a saved copy of your details from before the name field existed. Being fixed now, plus a check so it fails loudly if it drifts again.</p></div>
+    <div class="note n-blue" style="margin:0"><b>Your name still lives in code, in one place</b>
+      <p>You are the only academy whose website, tagline and Instagram are typed into the code rather than read from your own record. So "GTA built from the template" is true for your messages now, but not yet for your identity. Deleting it today would quietly shorten your welcome email, so it waits for one database change first.</p></div>
+    <div class="note n-warn" style="margin:0"><b>Two database changes have never been run anywhere</b>
+      <p>They are written but untested, and the page that reads them breaks completely if the code goes out before the change does. A person has to run them, not me.</p></div>
     <div class="note n-blue" style="margin:0"><b>Two academies have data problems</b>
       <p>Pro Precision's time zone says Toronto but they are in Australia. Locked In Sports had its website in only one place, which a cleanup would have erased if it had not been caught.</p></div>
     <div class="note n-blue" style="margin:0"><b>Testimonials are parked</b>
@@ -286,7 +296,7 @@
   <!-- ══ NEXT ══ -->
   <h2>The one next action</h2>
   <div class="card" style="border-color:var(--goldln);background:var(--goldbg)">
-    <p style="margin:0;font-size:16.5px;color:var(--tx)"><b>Nothing from you.</b> The name field landed, which was the last thing anyone was waiting on. Next is templating your messages and proving byte for byte that nothing your parents read changes, then the words inside the emails, which is the step that moves the most.</p>
+    <p style="margin:0;font-size:16.5px;color:var(--tx)"><b>Nothing from you, unless you want to look at pull request 1627.</b> Your messages are templated and locked. Next I am pulling your phone number, gym address, weekly schedule and coach handles out of the email words, which is the single biggest jump on this page: 8 of 17 messages copy today, 13 after it.</p>
   </div>
 
 </div>
