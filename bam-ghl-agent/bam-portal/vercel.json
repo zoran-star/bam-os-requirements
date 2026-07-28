@@ -97,6 +97,10 @@
       "schedule": "0 15 * * *"
     },
     {
+      "path": "/api/ghl/cron-trial-summary",
+      "schedule": "0 16 * * *"
+    },
+    {
       "path": "/api/automations?action=work",
       "schedule": "* * * * *"
     },
