@@ -15,7 +15,9 @@ import { withSentryApiRoute } from "../_sentry.js";
 //   GET /api/ghl/cron-import-history                 Bearer CRON_SECRET (Vercel cron)
 //   GET /api/ghl/cron-import-history?client_id=<id>  force ONE academy now (re-run ok)
 //
-// Eligibility: V2/V1.5 only (V1 pure-GHL is NEVER touched - hard rule), GHL
+// Eligibility: V2/V1.5 only (V1 pure-GHL is NEVER touched - hard rule) UNLESS the
+// academy is named in IMPORT_PILOT_CLIENT_IDS, which is an explicit per-academy
+// authorization to include it (see the ALLOWLIST comment in the handler). GHL
 // connected, clients.ghl_history_imported_at IS NULL. The marker is stamped only
 // when BOTH the SMS and email imports report done=true (each import is idempotent
 // - existing ghl_message_ids are skipped). A very large history that can't finish
@@ -112,17 +114,29 @@ async function handler(req, res) {
   // Migrating tier only (V2 or V1.5), GHL connected. The batch path also requires
   // the marker be NULL; the single-client path drops that so staff can force a re-run.
   const tierFilter = "or=(v2_access.eq.true,v15_access.eq.true)";
-  // PILOT GATE. Set IMPORT_PILOT_CLIENT_IDS to a comma-separated list of client
-  // uuids and the BATCH path considers ONLY those academies. Unset = normal
-  // behaviour across the whole eligible queue. Added 2026-07-28 to trial the
-  // email-import auth fix on one V1.5 academy without touching anyone else,
-  // V2 included. Remove the env var to open the batch back up.
+
+  // ALLOWLIST. IMPORT_PILOT_CLIENT_IDS is a comma-separated list of client uuids.
+  // When set:
+  //   - the BATCH path considers ONLY those academies (nobody else is touched)
+  //   - a listed academy BYPASSES the V2/V1.5 tier filter
+  //
+  // The tier bypass is deliberate and narrow. The repo hard rule is that V1
+  // academies are never touched unless Zoran says so per task; naming an academy
+  // in this env var IS that explicit, auditable per-academy authorization
+  // (Zoran, 2026-07-28: apply to HMS, Game Winner, Sage and Pro Precision, the
+  // last of which is V1). Importing an academy's own GHL history into our store
+  // is read-only against GHL and changes nothing the academy sees.
+  //
+  // Unset = original behaviour: whole eligible queue, tier filter enforced.
   const pilotIds = (process.env.IMPORT_PILOT_CLIENT_IDS || "")
     .split(",").map((s) => s.trim()).filter(Boolean);
-  const pilotFilter = pilotIds.length ? `&id=in.(${pilotIds.join(",")})` : "";
+  const allowlisted = pilotIds.includes(onlyClient);
+
   const q = onlyClient
-    ? `clients?id=eq.${encodeURIComponent(onlyClient)}&ghl_location_id=not.is.null&${tierFilter}&select=id,business_name&limit=1`
-    : `clients?ghl_location_id=not.is.null&ghl_history_imported_at=is.null&${tierFilter}${pilotFilter}&select=id,business_name&order=ghl_connected_at.desc.nullslast&limit=${CANDIDATES}`;
+    ? `clients?id=eq.${encodeURIComponent(onlyClient)}&ghl_location_id=not.is.null${allowlisted ? "" : `&${tierFilter}`}&select=id,business_name&limit=1`
+    : pilotIds.length
+      ? `clients?ghl_location_id=not.is.null&ghl_history_imported_at=is.null&id=in.(${pilotIds.join(",")})&select=id,business_name&order=ghl_connected_at.desc.nullslast&limit=${CANDIDATES}`
+      : `clients?ghl_location_id=not.is.null&ghl_history_imported_at=is.null&${tierFilter}&select=id,business_name&order=ghl_connected_at.desc.nullslast&limit=${CANDIDATES}`;
 
   let list;
   try { list = await sb(q); } catch (e) { return res.status(500).json({ error: e.message }); }
