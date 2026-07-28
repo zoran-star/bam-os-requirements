@@ -65,14 +65,20 @@ const MARKUP_DIR = path.join(GOLD, "markup");
 // green, and blind to a live copy change. Deriving it means a stale snapshot is the
 // only way to be stale, and SNAPSHOT_FRESHNESS below shouts when it is.
 const SNAPSHOT_PATH = path.resolve(HERE, "../../../scripts/snapshots/bam-gta.json");
-export const GTA = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, "utf8")).client;
+const SNAPSHOT = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, "utf8"));
+export const GTA = SNAPSHOT.client;
+// The facts that are not on the clients row (venue, weekly schedule, coach handles).
+// api/_academy-facts.js reads them from other tables at send time; the snapshot carries
+// what it resolved for GTA, so a golden locks the email a member actually receives
+// rather than one with its schedule block silently missing.
+export const FACTS = SNAPSHOT.facts || {};
 
 // A fixed sample family, so the merge fields resolve to something stable and the
 // golden is not full of "there" / "your athlete" fallbacks. Same names the render
 // harness uses (scripts/render-messages.mjs).
 const FAMILY = { first_name: "Maya", full_name: "Maya Alvarez", athlete: "Jordan Alvarez" };
 
-export const VARS = { ...clientVars(GTA), ...FAMILY };
+export const VARS = { ...clientVars(GTA), ...FACTS, ...FAMILY };
 
 // Every template GTA can send. Taken from the modules themselves, not hardcoded, so a
 // NEW template cannot be added without a golden: an unblessed key fails below.

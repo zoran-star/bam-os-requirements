@@ -107,18 +107,38 @@ const TIP = (n, title, body) => `        <table role="presentation" width="100%"
 // inline gold-on-black link, the one anchor style used inside body copy
 const LINK = (href, label) => `<a href="${href}" style="color:#0A0A0A;font-weight:600;">${label}</a>`;
 
+// An address as a Google Maps query. Commas dropped and spaces as "+", which is the
+// form these links were hand-written in and the form Maps has always taken - so
+// generating the link does not change where a member who taps it ends up, nor the
+// URL they see.
+const mapsQuery = (address) => encodeURIComponent(String(address || "").replace(/,/g, "")).replace(/%20/g, "+");
+
+// A displayed phone number as a dialable tel: target. Anything already in
+// international form is kept as-is; a bare 10-digit North American number gets its
+// +1. Anything else is passed through as digits rather than guessed at, because a
+// wrong country code is worse than an unprefixed one.
+const telHref = (phone) => {
+  const raw = String(phone || "").trim();
+  if (raw.startsWith("+")) return "+" + raw.slice(1).replace(/\D+/g, "");
+  const d = raw.replace(/\D+/g, "");
+  if (d.length === 10) return `+1${d}`;
+  if (d.length === 11 && d.startsWith("1")) return `+${d}`;
+  return d;
+};
+
 // one numbered quick-start item: bold "<n>. <lead>", then the body
 const ITEM = (n, lead, body, mb) => P(`<b style="color:#0A0A0A;">${n}. ${lead}</b> ${body}`, mb);
 
-// schedule row
-const SCHED = (day, younger, older) => `          <tr>
+// schedule row. `groups` is [{name, time}] for that day, in the order they run, so
+// however an academy splits its sessions - by age, by level, by anything - the row
+// says what the academy's own sessions are actually called.
+const SCHED = (day, groups) => `          <tr>
             <td style="padding:11px 0;border-bottom:1px solid #ECECEC;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#0A0A0A;">${day}</td>
-            <td align="right" style="padding:11px 0;border-bottom:1px solid #ECECEC;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:14px;color:#444444;">Younger ${younger}&nbsp;&nbsp;&middot;&nbsp;&nbsp;Older ${older}</td>
+            <td align="right" style="padding:11px 0;border-bottom:1px solid #ECECEC;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:14px;color:#444444;">${groups.map((g) => `${g.name} ${g.time}`).join("&nbsp;&nbsp;&middot;&nbsp;&nbsp;")}</td>
           </tr>`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1) WELCOME  (immediate) — quick-start links + schedule + location
-const WHATSAPP = "https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t";
 
 // The quick-start list, built PER ACADEMY.
 //
@@ -133,20 +153,37 @@ const WHATSAPP = "https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t";
 // so a dropped item leaves no gap and no "1, 3, 4" - the rest renumber cleanly. The
 // last surviving item carries the wider bottom margin before the CTA.
 //
-// Facts read (both optional):
+// Facts read (all optional):
+//   L.communityUrl       - the group-chat invite, and L.communityPlatform names it
 //   L.onlineProgramsUrl  - full URL of the academy's online-programs library
 //   L.referralOffer      - { lead, body, merchUrl? }, the refer-a-friend perk
+//   L.phone              - the number that reaches the coaches
 function quickStart(L) {
-  const items = [
-    ["Join the WhatsApp group", `for schedule updates and announcements: ${LINK(WHATSAPP, "tap to join")}.`],
-  ];
+  const items = [];
+
+  // The group chat. The PLATFORM only names it, the LINK gates it: with no platform
+  // on file this reads "Join the group", which is still correct, and with no invite
+  // the item disappears rather than offering a member a link to nowhere.
+  if (L && L.communityUrl) {
+    const platform = L.communityPlatform ? `${L.communityPlatform} ` : "";
+    items.push([`Join the ${platform}group`, `for schedule updates and announcements: ${LINK(L.communityUrl, "tap to join")}.`]);
+  }
 
   if (L && L.onlineProgramsUrl) {
     const url = String(L.onlineProgramsUrl);
     items.push(["Access the online programs", `any time at ${LINK(url, url.replace(/^https?:\/\//i, ""))}.`]);
   }
 
-  items.push(["Follow along", `- Coach Zoran on ${LINK("https://www.instagram.com/byanymeanszoran/", "Instagram")}, Coach Adrian on ${LINK("https://www.instagram.com/byanymeansadrian/", "Instagram")}, and our ${LINK("https://www.instagram.com/byanymeanstoronto/", "general page")}.`]);
+  // Coaches to follow, from the academy's own team list (client_users.instagram).
+  // No handles on file means no line at all - a "follow along" item naming nobody is
+  // worse than not asking. The academy's general page rides on the end when it has one.
+  const coaches = (L && Array.isArray(L.coaches) ? L.coaches : []).filter((c) => c && c.name && c.instagram);
+  if (coaches.length || (L && L.instagram)) {
+    const bits = coaches.map((c) => `Coach ${c.name} on ${LINK(c.instagram, "Instagram")}`);
+    if (L && L.instagram) bits.push(`our ${LINK(L.instagram, "general page")}`);
+    const list = bits.length > 1 ? `${bits.slice(0, -1).join(", ")}, and ${bits[bits.length - 1]}` : bits[0];
+    items.push(["Follow along", `- ${list}.`]);
+  }
 
   // The merch shop is part of the same perk (it is the "plus some merch" half of it),
   // so it is nested inside the referral fact and drops with it - and drops on its own
@@ -157,39 +194,67 @@ function quickStart(L) {
     items.push([ref.lead, `${ref.body}${merch}.`]);
   }
 
-  items.push(["Need anything?", `Reach the coaches at ${LINK("tel:+12898166569", "(289) 816-6569")}.`]);
+  // The coach contact line. Gated like the rest: an academy with no number on file
+  // does not tell a member to call one.
+  if (L && L.phone) {
+    items.push(["Need anything?", `Reach the coaches at ${LINK(`tel:${telHref(L.phone)}`, L.phone)}.`]);
+  }
 
   return items.map(([lead, body], i) => ITEM(i + 1, lead, body, i === items.length - 1 ? 26 : 14)).join("");
 }
 
 // A template may be a FUNCTION of the location config when its content depends on the
 // sending academy's facts (renderEmail calls it with L). The rest stay plain strings.
-const welcome = (L) => shellHead("You're in. Everything you need to get started with By Any Means GTA.", "By Any Means - Welcome")
-  + EYEBROW("Welcome to the family")
-  + H1("You're in.<br>Let's get to work.")
-  + P("Hi {{contact.first_name}}, welcome to By Any Means Basketball. {{contact.athletes_full_name}} is all set, and we are pumped to have you both. Here is everything you need to hit the ground running.")
-  + `      </td></tr>
-      <tr><td style="padding:6px 36px 8px;">`
-  + quickStart(L)
-  + CTA(WHATSAPP, "Join the WhatsApp group")
-  + `      </td></tr>
-      <tr><td style="padding:6px 36px 8px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;"><tr>
+// The weekly schedule block, generated from the academy's REAL sessions
+// (schedule_slots, collapsed into one typical week by api/_academy-facts.js) plus its
+// training venue (the locations table). Both were hand-typed here until 28 Jul 2026,
+// which is what made this email uncopyable: transcribing them into another academy's
+// welcome email would text one academy's training times and gym address to another
+// academy's members.
+//
+// No sessions on file means no schedule block, and no venue means no location block.
+// Neither renders empty and neither renders somebody else's.
+//
+// NOTE the venue is NOT clients.address. That is the BUSINESS address - GTA's is
+// 2205 Rosemount Cres, while members train at 1079 Linbrook Rd.
+function scheduleBlock(L) {
+  const week = (L && Array.isArray(L.schedule) ? L.schedule : []).filter((d) => d && d.day && (d.groups || []).length);
+  const venue = (L && L.venue) || "";
+  if (!week.length && !venue) return "";
+  const sched = week.length
+    ? `        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;"><tr>
           <td valign="middle" style="padding-right:14px;"><div style="width:32px;height:2px;background:#E2DD9F;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</div></td>
           <td valign="middle" style="font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;letter-spacing:3.4px;text-transform:uppercase;color:#777777;">Weekly Schedule</td>
         </tr></table>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">`
-  + SCHED("Mondays", "7-8pm", "8-9pm")
-  + SCHED("Tuesdays", "7-8pm", "8-9pm")
-  + SCHED("Wednesdays", "7-8pm", "8-9pm")
-  + SCHED("Thursdays", "7-8pm", "8-9pm")
-  + SCHED("Saturdays", "11:30-12:30pm", "12:30-1:30pm")
-  + `        </table>
-        <p style="margin:0 0 6px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#777777;">Location</p>
-        <p style="margin:0 0 8px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#333333;"><a href="https://maps.google.com/?q=1079+Linbrook+Rd+Oakville+ON+L6J+2L2" style="color:#0A0A0A;font-weight:600;text-decoration:none;">1079 Linbrook Rd, Oakville, ON L6J 2L2</a></p>
-      </td></tr>
-      <tr><td style="padding:18px 36px 8px;">`
-  + P("See you on the court,<br><b style=\"color:#0A0A0A;\">The By Any Means GTA Team</b>", 4)
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+${week.map((d) => SCHED(d.day, d.groups)).join("\n")}
+        </table>`
+    : "";
+  const loc = venue
+    ? `        <p style="margin:0 0 6px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#777777;">Location</p>
+        <p style="margin:0 0 8px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#333333;"><a href="https://maps.google.com/?q=${mapsQuery(venue)}" style="color:#0A0A0A;font-weight:600;text-decoration:none;">${venue}</a></p>`
+    : "";
+  return `      <tr><td style="padding:6px 36px 8px;">
+${[sched, loc].filter(Boolean).join("\n")}
+      </td></tr>`;
+}
+
+const welcome = (L) => shellHead("You're in. Everything you need to get started with {{location.name}}.", "By Any Means - Welcome")
+  + EYEBROW("Welcome to the family")
+  + H1("You're in.<br>Let's get to work.")
+  + P("Hi {{contact.first_name}}, welcome to {{location.name}}. {{contact.athletes_full_name}} is all set, and we are pumped to have you both. Here is everything you need to hit the ground running.")
+  + `      </td></tr>
+      <tr><td style="padding:6px 36px 8px;">`
+  + quickStart(L)
+  // The group-chat button carries the same fact as the quick-start item above it, so
+  // it appears and disappears with it. An empty href would leave a gold box that goes
+  // nowhere; dropEmptyShellLinks would strip it, but not offering it is clearer.
+  + (L && L.communityUrl ? CTA(L.communityUrl, `Join the ${L.communityPlatform ? `${L.communityPlatform} ` : ""}group`) : "")
+  + `      </td></tr>
+`
+  + scheduleBlock(L)
+  + `      <tr><td style="padding:18px 36px 8px;">`
+  + P("See you on the court,<br><b style=\"color:#0A0A0A;\">The {{location.name}} Team</b>", 4)
   + `      </td></tr>`
   + MEMBER_FOOT;
 
@@ -218,16 +283,21 @@ const training = shellHead("Three habits that separate the players who improve f
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3) REVIEW  (+1 week after testimonials) — warm Google-review ask
+// The review link is the whole point of this email, so with no link on file
+// dropEmptyShellLinks removes the button outright rather than leaving a gold box
+// pointing nowhere. "other families nearby" replaced "other families in the GTA":
+// the sentence needed to be true for every academy, and {{location.city}} was the
+// wrong fix - it narrows an academy that serves a region down to one town.
 const review = shellHead("If training has been a win for your athlete, would you share it?", "By Any Means - A Quick Favour")
   + EYEBROW("A quick favour")
   + H1("Mind sharing<br>your story?")
-  + P("Hi {{contact.first_name}}, we hope {{contact.athletes_full_name}} has been loving training with By Any Means. Watching our athletes get better every week is exactly why we do this.")
-  + P("If you have a minute, a quick Google review would mean the world to us. It helps other families in the GTA find us, and it lets us keep growing the program for your athlete.", 26)
+  + P("Hi {{contact.first_name}}, we hope {{contact.athletes_full_name}} has been loving training with {{location.name}}. Watching our athletes get better every week is exactly why we do this.")
+  + P("If you have a minute, a quick Google review would mean the world to us. It helps other families nearby find us, and it lets us keep growing the program for your athlete.", 26)
   + `      </td></tr>
       <tr><td style="padding:6px 36px 8px;">`
-  + CTA("https://g.page/r/CfuIFvZGkfmaEBM/review", "Leave a Google review")
+  + CTA("{{location.review_link}}", "Leave a Google review")
   + P("Thank you for being part of the family. It means more than you know.", 16)
-  + P("With gratitude,<br><b style=\"color:#0A0A0A;\">The By Any Means GTA Team</b>", 4)
+  + P("With gratitude,<br><b style=\"color:#0A0A0A;\">The {{location.name}} Team</b>", 4)
   + `      </td></tr>`
   + MEMBER_FOOT;
 

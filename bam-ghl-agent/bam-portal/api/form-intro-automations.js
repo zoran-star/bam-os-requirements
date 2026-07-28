@@ -206,9 +206,19 @@ export const ONBOARDING_DEFAULT = {
     //
     //    Generating this from schedule_slots (every session is already real data
     //    in the system) is the proper fix and is a separate build.
+    // GENERATED, since 28 Jul 2026. {{location.schedule}} is the academy's own
+    // schedule_slots collapsed into one typical week, and {{location.venue}} is its
+    // own training venue off the locations table (NOT clients.address, which is the
+    // business address - GTA's members train at a different building entirely).
+    // api/_academy-facts.js resolves both at send time.
+    //
+    // So this step is `shared` now and seeds ON: there is nothing academy-specific
+    // left in it to copy. An academy with no sessions on file renders an empty
+    // schedule, and an empty-after-merge body is dropped by api/_send.js rather
+    // than sent, so the step can be on and still send nothing until there is
+    // something true to say.
     { position: 2, wait_amount: 5, wait_unit: "minutes", channel: "sms", subject: null,
-      sync_class: "local",
-      body: "SCHEDULE:\n\n[Add this academy's weekly training days and times here, then switch this step on.]\n\nLOCATION: [Add the training venue address here.]" },
+      body: "SCHEDULE:\n\n{{location.schedule}}\n\nLOCATION: {{location.venue}}" },
 
     // 4. How to get the most out of training.
     { position: 3, wait_amount: 5, wait_unit: "minutes", channel: "email",

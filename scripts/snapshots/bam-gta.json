@@ -8,12 +8,12 @@
     "legal_name": "LVLUP Basketball Training Inc.",
     "owner_name": "Zoran Savic",
     "email": "zoran@byanymeansbball.com",
-    "phone": null,
+    "phone": "(289) 816-6569",
     "address": "2205 Rosemount Cres",
     "time_zone": "America/New_York",
-    "community_group_url": null,
-    "community_group_platform": null,
-    "google_review_url": null,
+    "community_group_url": "https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t",
+    "community_group_platform": "whatsapp",
+    "google_review_url": "https://g.page/r/CfuIFvZGkfmaEBM/review",
     "website_setup": {
       "chunks": {
         "core": { "status": "published" },
@@ -64,6 +64,31 @@
       "website_status": "Have one, happy with it",
       "color_secondary": "#0B0B0D"
     }
+  },
+  "_facts_note": "The member-facing facts that are NOT on the clients row, captured the same day and from the same production database. api/_academy-facts.js derives these at send time from the locations table, from schedule_slots collapsed into one typical week, and from client_users; they live here so an offline render and the step lock resolve exactly what a real send resolves. Re-capture them whenever GTA's venue, sessions or coach handles change.",
+  "facts": {
+    "location_venue": "1079 Linbrook Rd, Oakville, ON L6J 2L2",
+    "location_coaches": [
+      { "name": "Zoran", "instagram": "https://www.instagram.com/byanymeanszoran/" },
+      { "name": "Adrian", "instagram": "https://www.instagram.com/byanymeansadrian/" }
+    ],
+    "location_schedule": [
+      { "day": "Mondays", "groups": [
+        { "name": "Group 1 (Elementary) - Weeknights", "time": "7-8pm" },
+        { "name": "Group 2 (High School) - Weeknights", "time": "8-9pm" } ] },
+      { "day": "Tuesdays", "groups": [
+        { "name": "Group 1 (Elementary) - Weeknights", "time": "7-8pm" },
+        { "name": "Group 2 (High School) - Weeknights", "time": "8-9pm" } ] },
+      { "day": "Wednesdays", "groups": [
+        { "name": "Group 1 (Elementary) - Weeknights", "time": "7-8pm" },
+        { "name": "Group 2 (High School) - Weeknights", "time": "8-9pm" } ] },
+      { "day": "Thursdays", "groups": [
+        { "name": "Group 1 (Elementary) - Weeknights", "time": "7-8pm" },
+        { "name": "Group 2 (High School) - Weeknights", "time": "8-9pm" } ] },
+      { "day": "Saturdays", "groups": [
+        { "name": "Group 1 (Elementary) - Saturday", "time": "11:30am-12:30pm" },
+        { "name": "Group 2 (High School) - Saturday", "time": "12:30-1:30pm" } ] }
+    ]
   },
   "automations": [
     {
@@ -214,7 +239,7 @@
           "wait_unit": "minutes",
           "channel": "sms",
           "subject": null,
-          "body": "SCHEDULE:\n\nMONDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nTUESDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nWEDNESDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nTHURSDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nSATURDAYS\nYounger group: 11:30-12:30pm\nOlder Group: 12:30-1:30pm\n\nLOCATION: 1079 Linbrook Rd, ON L6J 2L2",
+          "body": "SCHEDULE:\n\n{{location.schedule}}\n\nLOCATION: {{location.venue}}",
           "enabled": true
         },
         {

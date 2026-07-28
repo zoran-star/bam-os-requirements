@@ -72,19 +72,28 @@ export const TEMPLATE_SYNC_CLASS = Object.freeze({
   "nurture-4": "shared",
 
   // ── Onboarding welcome sequence ─────────────────────────────────────────
-  // All three carry ONE academy's identity in the BODY, not just the frame:
-  // GTA's coach phone (289) 816-6569, the 1079 Linbrook Rd gym address, the GTA
-  // WhatsApp invite, coach Instagram handles, GTA's g.page review URL, and
-  // "By Any Means GTA" in the sign-offs. Re-shelling these onto the tokenized
-  // frame fixes the header and footer; it does NOT fix the body. Copying them
-  // would send GTA's phone number and gym address from another academy.
+  // These three used to carry ONE academy's identity in the BODY, not just the
+  // frame: GTA's coach phone (289) 816-6569, the 1079 Linbrook Rd gym address,
+  // the GTA WhatsApp invite, coach Instagram handles, GTA's g.page review URL,
+  // and "By Any Means GTA" in the sign-offs.
   //
-  // These may be promoted to 'shared' ONLY when the body literals are gone -
-  // and the render-leak gate in api/_sync-class.test.mjs is what decides that,
-  // not anyone's reading of the diff. Flip the class, run the test: it passes,
-  // or it names the literal still in there.
-  "onboarding-welcome": "local",
-  "onboarding-review": "local",
+  // PROMOTED 28 Jul 2026, welcome and review. Every one of those literals now
+  // reads from the sending academy's own record: the phone and the group invite
+  // and the review link off the clients row, the venue off the locations table,
+  // the weekly schedule generated from that academy's real schedule_slots, and
+  // the coach handles off its own team list. A fact an academy does not have
+  // removes its line rather than borrowing anyone's. The promotion was NOT a
+  // judgement call: the render-leak gate in api/_sync-class.test.mjs renders
+  // both for a synthetic non-GTA academy, first bare and then with facts of its
+  // own, and reports them clean.
+  "onboarding-welcome": "shared",
+  "onboarding-review": "shared",
+  // STAYS local, and not because of literals. Zoran ruled on 28 Jul 2026 that
+  // this is one of the emails AUTHORED per academy - it argues how that academy
+  // trains, in its own words, from its own why_us and proof. The skill writes
+  // it. Rendering safely is not the test; authorship is, exactly as for
+  // nurture-1 and nurture-2. It also still carries GTA's own "Attention to
+  // Detail" video and sign-off, which is correct for an academy-owned email.
   "onboarding-training": "local",
   // Onboarding copies of the nurture designs (free-trial CTA stripped). Same
   // content as nurture-1 / nurture-2, so they MUST carry the same class - one

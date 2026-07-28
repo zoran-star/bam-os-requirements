@@ -64,7 +64,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderEmail, resolveMergeVars, locFor, clientVars } from "./email-shells.js";
-import { GTA, VARS, wordsOf } from "./_gta-message-lock.test.mjs";
+import { GTA, VARS, FACTS, wordsOf } from "./_gta-message-lock.test.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const GOLD = path.join(HERE, "__goldens__", "bam-gta-steps");
@@ -92,7 +92,7 @@ function mutatedBody(body) {
 }
 
 const CLIENT = mutatedClient();
-const VARS_USED = MUTATE ? { ...clientVars(CLIENT), first_name: "Maya", full_name: "Maya Alvarez", athlete: "Jordan Alvarez" } : VARS;
+const VARS_USED = MUTATE ? { ...clientVars(CLIENT), ...FACTS, first_name: "Maya", full_name: "Maya Alvarez", athlete: "Jordan Alvarez" } : VARS;
 // MUTATE=domain resolves through locFromVars (any id with no LOCATIONS entry), because
 // GTA's hardcoded entry would otherwise supply the very site we just blanked. See the
 // header: that override is a real gap, filed separately, deliberately not fixed here.

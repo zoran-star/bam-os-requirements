@@ -37,6 +37,10 @@ const LOCATIONS = {
     siteUrl: "https://byanymeanstoronto.ca",
     siteLabel: "byanymeanstoronto.ca",
     email: "info@byanymeanstoronto.ca",
+    // Left in the short form on purpose. This is the FOOTER instagram link on every
+    // email, so "canonicalising" it to the www/trailing-slash form the welcome email's
+    // general-page link was hand-written in changes a link in all ten templates to buy
+    // a byte-identical match in one. Same account either way.
     instagram: "https://instagram.com/byanymeanstoronto",
     city: "Oakville",
     ownerFirst: "Zoran",
@@ -87,6 +91,19 @@ function locFromVars(vars = {}) {
     communityUrl: String(vars.location_community_url || ""),
     communityPlatform: String(vars.location_community_platform || ""),
     reviewUrl: String(vars.location_review_url || ""),
+    // Member-facing facts. `phone` comes off the client row; `venue` and `schedule`
+    // do NOT - they are separate tables, so a caller with database access fills
+    // them in (see academyFacts in api/_academy-facts.js) exactly the way the
+    // worker already fills next_session. A caller without them renders an email
+    // with those blocks absent, which is correct: an academy that has entered no
+    // sessions has no schedule to send.
+    phone: String(vars.location_phone || ""),
+    venue: String(vars.location_venue || ""),
+    schedule: Array.isArray(vars.location_schedule) ? vars.location_schedule : [],
+    // [{ name, instagram }] for the coaches an academy wants members to follow.
+    // Empty means the "follow along" line does not render, which is the right
+    // outcome: naming nobody is worse than not asking.
+    coaches: Array.isArray(vars.location_coaches) ? vars.location_coaches : [],
   };
 }
 
@@ -103,7 +120,23 @@ function normalizeReferral(raw) {
   return { lead, body, merchUrl: String(r.merch_url || r.merchUrl || "").trim() };
 }
 
-export function locFor(clientId, vars) { return LOCATIONS[clientId] || locFromVars(vars); }
+// An academy's location config. For an academy with no hardcoded entry this is
+// entirely its own row (locFromVars). For one WITH an entry - only BAM GTA today -
+// the hardcoded values still win, but any fact the entry does not carry falls
+// through to the row instead of being undefined.
+//
+// That fall-through is the point. The hardcoded entry deliberately omits the link
+// facts (community group, review link) because they must only ever come from an
+// academy's own record, and it predates the phone / venue / schedule facts entirely.
+// Spreading the row underneath means those resolve for GTA exactly as they do for
+// everyone else, with no academy branch anywhere. It also turns the entry from an
+// OVERRIDE into a FALLBACK: the day a column exists for GTA's tagline and instagram,
+// filling it is all it takes, and the entry stops being read without anyone
+// remembering to delete it.
+export function locFor(clientId, vars) {
+  const pinned = LOCATIONS[clientId];
+  return pinned ? { ...locFromVars(vars), ...pinned } : locFromVars(vars);
+}
 
 // The runtime identity vars for a clients row - the academy facts the resolver
 // trusts. Callers that have the client row loaded (the automations worker, the
@@ -129,6 +162,11 @@ export function clientVars(client) {
     location_owner: c.owner_name ? String(c.owner_name).trim().split(/\s+/)[0] : "",
     location_email: c.email || "",
     location_city: cityFromAddress(c.address),
+    // The number a MEMBER reaches the coaches on. Not the same thing as
+    // clients.address, which is the business address and not the gym - the venue
+    // is a separate fact entirely (see academyFacts). Empty means the line that
+    // carries it does not render.
+    location_phone: c.phone || "",
     // Optional content facts (migration 20260727150000, not applied yet). A client row
     // read before that migration simply has no such property, which reads as absent -
     // the dependent blocks do not render and nothing throws.
@@ -169,6 +207,24 @@ function cityFromAddress(address) {
   return /\d/.test(cand) ? "" : cand;
 }
 
+// A week's training, as plain text, for the SMS form of the schedule:
+//
+//   MONDAYS
+//   Group 1 (Elementary): 7-8pm
+//   Group 2 (High School): 8-9pm
+//
+// The value is the SAME structured week the welcome email builds its table from
+// ([{ day, groups: [{ name, time }] }]), so the text a member is texted and the
+// table a member is emailed can never disagree. Nothing on file renders "", which
+// leaves the step with no schedule in it - and that step seeds OFF until an academy
+// has entered its sessions, so nothing empty ever sends.
+export function scheduleText(week) {
+  if (!Array.isArray(week) || !week.length) return "";
+  return week
+    .map((d) => [String(d.day || "").toUpperCase(), ...(d.groups || []).map((g) => `${g.name}: ${g.time}`)].join("\n"))
+    .join("\n\n");
+}
+
 // Resolve GHL-style merge tokens (the ones our imported emails carry) to real values:
 // location tokens from the academy config, contact tokens from `vars` (with friendly
 // fallbacks so a missing name never sends as a raw {{token}}). Tolerates spaces inside
@@ -197,6 +253,19 @@ function cityFromAddress(address) {
 // the same reason: no domain on file means the academy has no site to name, so the
 // mention goes rather than rendering a naked "" where a web address should be.
 const LINK_TOKENS = ["location.website", "location.domain", "location.community_link", "location.review_link"];
+
+// The same rule, widened past links: any fact whose absence must take its mention
+// with it. The schedule and the venue joined on 28 Jul 2026 when the schedule SMS
+// stopped being hand-typed. Without them here, an academy with no sessions on file
+// texts its members "SCHEDULE:" followed by nothing, which is worse than the silence
+// it replaced - and it would not be caught by the empty-body guard in api/_send.js,
+// because "SCHEDULE:" and "LOCATION:" are not nothing.
+//
+// The existing shapes do the work unchanged: "{{location.schedule}}" alone on its line
+// is a BARE mention, so it goes and takes the dangling "SCHEDULE:" lead-in above it;
+// "LOCATION: {{location.venue}}" is a mention inside prose, so that sentence goes. An
+// academy with neither sends nothing at all, which _send.js then declines to send.
+const DROP_WHEN_EMPTY = [...LINK_TOKENS, "location.schedule", "location.venue"];
 const tokenRe = (name, flags) => new RegExp("\\{\\{\\s*" + name.replace(/\./g, "\\.") + "\\s*\\}\\}", flags);
 function dropEmptyLinkMentions(text, emptyTokens) {
   if (!emptyTokens.length) return String(text);
@@ -259,6 +328,12 @@ export function resolveMergeVars(html, L, vars = {}) {
     // text here and as a button by dropEmptyShellLinks.
     "location.review_link": vars.location_review_url || L.reviewUrl || "",
     "location_owner.first_name": vars.location_owner || L.ownerFirst || "",
+    // Member-facing facts, for the welcome sequence. The schedule renders as plain
+    // lines here (the SMS form); the welcome EMAIL builds a table from the same
+    // structured value off L. One fact, two presentations, never two sources.
+    "location.phone": vars.location_phone || L.phone || "",
+    "location.venue": vars.location_venue || L.venue || "",
+    "location.schedule": scheduleText(vars.location_schedule || L.schedule),
     // Filled at send time by the worker (e.g. "Our next session is Tue 6pm. ").
     // Empty string when no slot is known so the sentence just drops out.
     "next_session": vars.next_session || "",
@@ -269,7 +344,14 @@ export function resolveMergeVars(html, L, vars = {}) {
   // plain-text bodies only (a full HTML document is skipped - its links are
   // shell placeholders, handled by dropEmptyShellLinks).
   if (!/^\s*<(?:!doctype|html)/i.test(out)) {
-    out = dropEmptyLinkMentions(out, LINK_TOKENS.filter((t) => !map[t]));
+    const missing = DROP_WHEN_EMPTY.filter((t) => !map[t]);
+    out = dropEmptyLinkMentions(out, missing);
+    // Tidy the hole a dropped block leaves: a message that lost its opening lines
+    // must not start on a blank one, and two dropped blocks must not leave a gap
+    // three lines wide. Guarded on something ACTUALLY being missing, so a message
+    // with every fact on file is passed through untouched and this can never
+    // reformat copy that was fine.
+    if (missing.length) out = out.replace(/^\s*\n/, "").replace(/\n{3,}/g, "\n\n");
   }
   for (const [k, val] of Object.entries(map)) {
     const token = "\\{\\{\\s*" + k.replace(/\./g, "\\.") + "\\s*\\}\\}";

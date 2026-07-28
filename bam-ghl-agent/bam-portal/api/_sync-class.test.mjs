@@ -22,7 +22,7 @@ import {
 } from "./_sync-class.js";
 import { TEMPLATES as NURTURE } from "./email-templates/nurture-emails.js";
 import { ONBOARDING_TEMPLATES } from "./email-templates/onboarding-emails.js";
-import { renderEmail, clientVars } from "./email-shells.js";
+import { renderEmail, clientVars, resolveMergeVars, locFor } from "./email-shells.js";
 import { CANONICAL_DEFAULTS, canonicalSteps } from "./form-intro-automations.js";
 import { seedAutomations, stepEnabled } from "./agent/seed-automations.js";
 
@@ -122,9 +122,9 @@ const DECIDED = {
   "nurture-2": "local",
   "nurture-3": "attributed",
   "nurture-4": "shared",
-  "onboarding-welcome": "local",
-  "onboarding-training": "local",
-  "onboarding-review": "local",
+  "onboarding-welcome": "shared",   // promoted 28 Jul 2026, the body facts now come from the sending academy
+  "onboarding-training": "local",    // authored per academy (Zoran, 28 Jul 2026), not merely leaky
+  "onboarding-review": "shared",    // promoted 28 Jul 2026, the review link is the academy's own
   "onboarding-story": "local",
   "onboarding-era": "local",
   "onboarding-testimonials": "attributed",
@@ -167,7 +167,13 @@ console.log("\n── RENDER-LEAK GATE: nothing declared `shared` may carry GTA 
 // the test either passes, or it names the literal still in there.
 const GTA_LITERALS = [
   "byanymeanstoronto", "Linbrook", "Oakville", "By Any Means GTA", "BAM GTA",
-  "(289) 816-6569", "byanymeanszoran", "byanymeansadrian", "byanymeansgsc", "g.page",
+  "(289) 816-6569", "byanymeanszoran", "byanymeansadrian", "byanymeansgsc",
+  // GTA's review link, identified by ITS path and not by the g.page domain. The bare
+  // domain was on this list until 28 Jul 2026 and had to come off: g.page is Google's
+  // short host for Google Business review links, so every academy's own legitimate
+  // review link lives there. Flagging the domain would have made a correctly
+  // templated review email unpromotable forever, for a reason that was never GTA.
+  "g.page/r/CfuIFvZGkfmaEBM",
 ];
 // Digits-only forms too, so a differently formatted phone (tel: link, dashes,
 // no spaces) cannot slip past a string match on one formatting of it.
@@ -210,10 +216,64 @@ for (const key of sharedKeys) {
 // identity; the gate must SEE that. If one ever renders clean, the body swap
 // has landed and it becomes a candidate for `shared` - promote it deliberately,
 // do not delete this assertion.
-for (const key of ["onboarding-welcome", "onboarding-review", "onboarding-training"]) {
+for (const key of ["onboarding-training"]) {
   const leaks = gtaLeaksIn(key);
   ok(leaks.length > 0,
     `detector sees GTA identity in ${key} (${leaks.join(", ") || "NOTHING - detector may be broken"}), so flipping it to shared FAILS the gate`);
+}
+// onboarding-welcome and onboarding-review were on this list until 28 Jul 2026 and
+// came off it the way the comment above says they should: they started rendering
+// clean, so they were promoted deliberately. onboarding-training stays, and stays
+// `local` for a different reason - it is authored per academy, not merely leaky.
+
+// THE FACTS PASS. Everything above renders a template for an academy with NO facts
+// on file, which proves the blocks drop rather than leaking. It cannot prove the
+// opposite case, which is the one this build created: an academy WITH its own venue,
+// schedule, coaches, group chat and phone must render THOSE and never GTA's. A
+// template that ignored its inputs and printed GTA's gym would sail through the bare
+// pass, because with no facts the block is absent either way.
+{
+  const OWN = {
+    location_venue: "500 Innovation Way, San Jose, CA 95110",
+    location_schedule: [{ day: "Fridays", groups: [{ name: "Varsity", time: "6-7pm" }] }],
+    location_coaches: [{ name: "Elijah", instagram: "https://www.instagram.com/bamsanjose/" }],
+    location_community_url: "https://chat.whatsapp.com/SANJOSEINVITE",
+    location_community_platform: "WhatsApp",
+    location_review_url: "https://g.page/r/SANJOSEREVIEW/review",
+    location_phone: "(408) 597-4327",
+  };
+  for (const key of liveKeys.filter((k) => syncClassForTemplate(k) === "shared")) {
+    const html = renderEmail({
+      clientId: "00000000-0000-4000-8000-00000000cafe",
+      subject: "Test",
+      body: `template:${key}`,
+      vars: { ...clientVars(NON_GTA), ...OWN },
+    });
+    const hay = html.toLowerCase();
+    const digits = html.replace(/\D+/g, "");
+    const leaks = [
+      ...GTA_LITERALS.filter((s) => hay.includes(s.toLowerCase())),
+      ...GTA_DIGITS.filter((d) => digits.includes(d)),
+      // GTA's typed schedule and its group labels, which are not identity strings
+      // but are just as much one academy's content as its address is.
+      ...["Younger 7-8pm", "Older 8-9pm", "Group 1 (Elementary)"].filter((s) => html.includes(s)),
+    ];
+    ok(leaks.length === 0,
+      `${key} renders a fact-carrying non-GTA academy without leaking GTA${leaks.length ? " - LEAKS: " + leaks.join(", ") : ""}`);
+  }
+  // And the facts it was GIVEN actually reach the page, or the check above is
+  // passing because the template renders nothing at all.
+  const welcome = renderEmail({
+    clientId: "00000000-0000-4000-8000-00000000cafe", subject: "Test",
+    body: "template:onboarding-welcome", vars: { ...clientVars(NON_GTA), ...OWN },
+  });
+  for (const [what, needle] of [
+    ["its own venue", "500 Innovation Way"],
+    ["its own schedule", "Varsity 6-7pm"],
+    ["its own coach", "Coach Elijah"],
+    ["its own group invite", "SANJOSEINVITE"],
+    ["its own phone", "(408) 597-4327"],
+  ]) ok(welcome.includes(needle), `the welcome email renders ${what} (${needle})`);
 }
 
 console.log("\n── SEEDER WIRING: anything not `shared` is seeded, but OFF ──");
@@ -262,8 +322,10 @@ function fakeSb({ existingSteps = [] } = {}) {
 console.log("\n── THE SEED CONTRACT: only `shared` seeds ON ──");
 ok(stepEnabled({ body: "template:nurture-4" }) === true,
   "shared step seeds ON");
-ok(stepEnabled({ body: "template:onboarding-welcome" }) === false,
-  "LOCAL step seeds OFF (academy-specific literals must not send as another academy's)");
+ok(stepEnabled({ body: "template:onboarding-welcome" }) === true,
+  "onboarding-welcome seeds ON now that every fact in it comes from the sending academy");
+ok(stepEnabled({ body: "template:onboarding-training" }) === false,
+  "LOCAL step seeds OFF (an academy-authored email must not send as another academy's)");
 ok(stepEnabled({ sync_class: "local", body: "SCHEDULE: ..." }) === false,
   "a literal body the ROW marks 'local' seeds OFF");
 ok(stepEnabled({ body: "template:nurture-3" }) === false,
@@ -361,14 +423,30 @@ console.log("\n── THE PROMOTED ONBOARDING DEFAULT: 7 steps, GTA's shape minu
   const seeded = calls.stepInserts;
   for (const s of seeded) console.log(`     ${s.channel.padEnd(5)} ${String(s.body).slice(0, 44).replace(/\n/g, " ⏎ ").padEnd(46)} ${s.enabled ? "on" : "OFF"}`);
   ok(seeded.length === 7, `all 7 steps are created (got ${seeded.length})`);
-  ok(seeded.map((s) => (s.enabled ? "1" : "0")).join("") === "1000000",
-    `enabled pattern is on,OFF,OFF,OFF,OFF,OFF,OFF (got ${seeded.map((s) => (s.enabled ? "on" : "OFF")).join(",")})`);
+  // welcome (2) and review (7) seed ON: every fact in them is now the sending
+  // academy's own. The schedule SMS and the three authored emails stay OFF.
+  ok(seeded.map((s) => (s.enabled ? "1" : "0")).join("") === "1110001",
+    `enabled pattern is on,on,on,OFF,OFF,OFF,on (got ${seeded.map((s) => (s.enabled ? "on" : "OFF")).join(",")})`);
   ok(seeded[0].enabled === true && seeded[0].channel === "sms",
     "step 1 (the tokenized welcome SMS) is the only one that seeds ON - it is `shared`");
-  ok(seeded[2].enabled === false && seeded[2].channel === "sms",
-    "step 3 (the schedule SMS) seeds OFF: its row is marked sync_class 'local', so no academy can text a schedule that is not its own");
-  ok(seeded.slice(1).every((s) => s.enabled === false),
-    "every designed email seeds OFF - onboarding-welcome/-training/-story/-era/-review are all `local` today");
+  // The schedule SMS seeds ON since 28 Jul 2026 because it is GENERATED now - it
+  // carries {{location.schedule}} and {{location.venue}}, not one academy's typed
+  // times. Its safety moved from "never send it" to "there is nothing to send": an
+  // academy with no sessions and no venue resolves it to an empty string, which
+  // api/_send.js declines to send. Asserted directly below rather than trusted.
+  ok(seeded[2].enabled === true && seeded[2].channel === "sms",
+    "step 3 (the schedule SMS) seeds ON now that it generates from the academy's own sessions");
+  {
+    const bare = { id: "x", business_name: "Nobody Academy" };
+    const vars = clientVars(bare);
+    const rendered = resolveMergeVars(seeded[2].body, locFor("x", vars), vars);
+    ok(rendered.trim() === "",
+      `an academy with no sessions and no venue resolves the schedule SMS to nothing, so nothing sends (got ${JSON.stringify(rendered)})`);
+  }
+  ok([3, 4, 5].every((i) => seeded[i].enabled === false),
+    "the three AUTHORED emails (-training/-story/-era) still seed OFF - a human writes those");
+  ok(seeded[1].enabled === true && seeded[6].enabled === true,
+    "the welcome and review emails seed ON - both are `shared` and carry no academy's facts but the sender's");
 }
 
 console.log("\n── NO GTA LITERAL IN ANY CANONICAL DEFAULT (bodies + subjects) ──");

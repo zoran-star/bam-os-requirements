@@ -20,6 +20,7 @@ import { routeTransition } from "./agent/_router.js";
 import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
 import { renderEmail, clientVars } from "./email-shells.js";
+import { academyFacts } from "./_academy-facts.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { isMuted } from "./agent/_mutes.js";
 import { markUnqualified } from "./agent/_tags.js";
@@ -62,7 +63,7 @@ async function loadClient(clientId) {
   // public_name / community_group_* / google_review_url are the parent-facing
   // facts clientVars() renders from - without them every message silently falls
   // back to the internal name and drops its group + review links.
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,public_name,owner_name,email,address,time_zone,website_setup,community_group_url,community_group_platform,google_review_url,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,public_name,owner_name,email,phone,address,time_zone,website_setup,community_group_url,community_group_platform,google_review_url,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
@@ -500,6 +501,16 @@ async function runWork(res) {
         } catch (_) { /* leave blank */ }
       }
 
+      // The member-facing facts that are not on the client row: the training venue,
+      // the weekly schedule generated from real sessions, and the coaches to follow.
+      // Resolved here for the same reason next_session is, because they need database
+      // reads that clientVars deliberately does not do. Only fetched when the message
+      // actually references one, so the ordinary sales SMS pays nothing for it.
+      let facts = {};
+      if (/location\.(?:venue|schedule)|template:onboarding-welcome/.test(`${step.body || ""}${step.subject || ""}`)) {
+        try { facts = await academyFacts(sb, client); } catch (_) { /* shorter message, never a failed send */ }
+      }
+
       // {{location.*}} / {{location_owner.first_name}} resolve from the REAL
       // client row (clientVars), never the hardcoded LOCATIONS map - a new
       // academy must never send another academy's name, site, or owner. Unknown
@@ -507,7 +518,7 @@ async function runWork(res) {
       const result = await sendOn({
         channel: step.channel, clientId: job.client_id, contactId: job.contact_id,
         toEmail: info.email, toPhone: info.phone, subject: step.subject, body: step.body, ghlToken: token,
-        vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session, ...clientVars(client) },
+        vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session, ...clientVars(client), ...facts },
       });
 
       // HELD (email only): the academy has no verified sending domain, so nothing
