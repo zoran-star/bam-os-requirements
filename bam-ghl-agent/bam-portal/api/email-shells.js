@@ -218,11 +218,29 @@ function cityFromAddress(address) {
 // table a member is emailed can never disagree. Nothing on file renders "", which
 // leaves the step with no schedule in it - and that step seeds OFF until an academy
 // has entered its sessions, so nothing empty ever sends.
-export function scheduleText(week) {
-  if (!Array.isArray(week) || !week.length) return "";
-  return week
-    .map((d) => [String(d.day || "").toUpperCase(), ...(d.groups || []).map((g) => `${g.name}: ${g.time}`)].join("\n"))
+// The venue rides ALONG with the schedule here rather than being its own line in the
+// message body, and that is the fix for a half-state that would otherwise ship: an
+// academy with a gym but no sessions entered yet (San Jose, today) would have texted
+// its members "LOCATION: 1051 W San Fernando St" and nothing else, five minutes after
+// they paid. The all-empty case was handled and the half was not. This message IS the
+// schedule; with no schedule there is nothing to say, so the venue goes with it and
+// the whole body resolves to "" and is never sent.
+//
+// The same guards the email's table applies (skip a day with no groups, skip a group
+// missing its name or time) are applied here too, so the texted week and the emailed
+// week cannot disagree. They are unreachable through weeklySchedule, which already
+// filters both - they are here so the claim stays true if anything else ever builds
+// this value.
+export function scheduleText(week, venue) {
+  const days = (Array.isArray(week) ? week : [])
+    .map((d) => ({ day: String((d && d.day) || "").trim(), groups: ((d && d.groups) || []).filter((g) => g && g.name && g.time) }))
+    .filter((d) => d.day && d.groups.length);
+  if (!days.length) return "";
+  const out = days
+    .map((d) => [d.day.toUpperCase(), ...d.groups.map((g) => `${g.name}: ${g.time}`)].join("\n"))
     .join("\n\n");
+  const where = String(venue || "").trim();
+  return where ? `${out}\n\nLOCATION: ${where}` : out;
 }
 
 // Resolve GHL-style merge tokens (the ones our imported emails carry) to real values:
@@ -333,7 +351,7 @@ export function resolveMergeVars(html, L, vars = {}) {
     // structured value off L. One fact, two presentations, never two sources.
     "location.phone": vars.location_phone || L.phone || "",
     "location.venue": vars.location_venue || L.venue || "",
-    "location.schedule": scheduleText(vars.location_schedule || L.schedule),
+    "location.schedule": scheduleText(vars.location_schedule || L.schedule, vars.location_venue || L.venue),
     // Filled at send time by the worker (e.g. "Our next session is Tue 6pm. ").
     // Empty string when no slot is known so the sentence just drops out.
     "next_session": vars.next_session || "",
@@ -462,17 +480,22 @@ function dropEmptyShellLinks(html) {
 // reason and the academy name as the title.
 //   renderEmail({ clientId, subject, body, preheader?, unsubscribeUrl?, vars?,
 //                 footerReason?, docTitle? }) -> html
-export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars, footerReason, docTitle } = {}) {
+// The message CONTENT a body resolves to, before any shell is wrapped around it:
+// the template expanded if the body is a "template:<key>" ref, then merge tokens
+// filled. Separated out so the send path can ask "does this resolve to anything at
+// all" and get the same answer renderEmail would - see isEmptyAfterMerge in
+// api/_send.js. Asking that question of the raw body instead was wrong for a
+// template ref: "template:onboarding-review" is never an empty string, however
+// empty the email behind it turns out to be.
+export function templateBody({ clientId, body, vars } = {}) {
   const L = locFor(clientId, vars);
-  const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
-  const unsub = unsubscribeUrl || (L.email ? `mailto:${L.email}?subject=Unsubscribe` : "");
-  // A step body can be a short "template:<key>" reference to a vendored designed
-  // email (api/email-templates/) so the DB holds a tiny ref, not 12KB of HTML.
   let raw = String(body || "");
   const tref = raw.match(/^\s*template:([\w/-]+)\s*$/);
   // A template is normally a plain string. It may also be a FUNCTION of the location
   // config, for a template whose content depends on facts the academy either has or
-  // does not (onboarding-welcome's online-programs and refer-a-friend items).
+  // does not (onboarding-welcome's online-programs and refer-a-friend items). Such a
+  // template may return "" to mean "this academy has nothing to say here", and the
+  // whole email is then not sent rather than sent hollow.
   if (tref && TEMPLATES[tref[1]]) {
     const t = TEMPLATES[tref[1]];
     raw = typeof t === "function" ? t(L, vars) : t;
@@ -480,7 +503,14 @@ export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl
   // Resolve merge tokens BEFORE building markup: a resolved URL line becomes the
   // gold CTA in bodyToHtml, and an EMPTY {{location.website}} drops its line
   // while it is still a text line (inside markup it would be too late).
-  raw = resolveMergeVars(raw, L, vars);
+  return resolveMergeVars(raw, L, vars);
+}
+
+export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars, footerReason, docTitle } = {}) {
+  const L = locFor(clientId, vars);
+  const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
+  const unsub = unsubscribeUrl || (L.email ? `mailto:${L.email}?subject=Unsubscribe` : "");
+  const raw = templateBody({ clientId, body, vars });
   const shellArgs = { pre, unsub, reason: footerReason, title: docTitle };
   let html;
   if (/^\s*<(?:!doctype|html)/i.test(raw)) {

@@ -22,9 +22,10 @@ import {
 } from "./_sync-class.js";
 import { TEMPLATES as NURTURE } from "./email-templates/nurture-emails.js";
 import { ONBOARDING_TEMPLATES } from "./email-templates/onboarding-emails.js";
-import { renderEmail, clientVars, resolveMergeVars, locFor } from "./email-shells.js";
+import { renderEmail, clientVars, resolveMergeVars, locFor, templateBody } from "./email-shells.js";
 import { CANONICAL_DEFAULTS, canonicalSteps } from "./form-intro-automations.js";
 import { seedAutomations, stepEnabled } from "./agent/seed-automations.js";
+import { weeklySchedule } from "./_academy-facts.js";
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log("  ✅ " + m); } else { fail++; console.log("  ❌ " + m); } };
@@ -438,10 +439,62 @@ console.log("\n── THE PROMOTED ONBOARDING DEFAULT: 7 steps, GTA's shape minu
     "step 3 (the schedule SMS) seeds ON now that it generates from the academy's own sessions");
   {
     const bare = { id: "x", business_name: "Nobody Academy" };
-    const vars = clientVars(bare);
-    const rendered = resolveMergeVars(seeded[2].body, locFor("x", vars), vars);
-    ok(rendered.trim() === "",
-      `an academy with no sessions and no venue resolves the schedule SMS to nothing, so nothing sends (got ${JSON.stringify(rendered)})`);
+    const V = (extra) => ({ ...clientVars(bare), ...extra });
+    const render = (extra) => resolveMergeVars(seeded[2].body, locFor("x", V(extra)), V(extra));
+    const WEEK = [{ day: "Fridays", groups: [{ name: "Varsity", time: "6-7pm" }] }];
+
+    ok(render({}).trim() === "",
+      `an academy with no sessions and no venue resolves the schedule SMS to nothing, so nothing sends (got ${JSON.stringify(render({}))})`);
+
+    // THE HALF-EMPTY CASE, and the one that would actually have shipped. San Jose has
+    // a gym and zero sessions entered, so a venue-only render would have texted its
+    // members "LOCATION: 1051 W San Fernando St" and nothing else, five minutes after
+    // they paid. The all-empty case was handled and this one was not.
+    const venueOnly = render({ location_venue: "1051 W San Fernando St, San Jose, CA 95126" });
+    ok(venueOnly.trim() === "",
+      `an academy with a venue but NO sessions still sends nothing - the venue rides with the schedule, it is not its own message (got ${JSON.stringify(venueOnly)})`);
+
+    const both = render({ location_schedule: WEEK, location_venue: "500 Innovation Way" });
+    ok(both.includes("FRIDAYS") && both.includes("Varsity: 6-7pm") && both.includes("LOCATION: 500 Innovation Way"),
+      `with sessions and a venue the schedule SMS carries both (got ${JSON.stringify(both)})`);
+
+    const noVenue = render({ location_schedule: WEEK });
+    ok(noVenue.includes("Varsity: 6-7pm") && !noVenue.includes("LOCATION:"),
+      `with sessions but no venue it sends the week and no empty location line (got ${JSON.stringify(noVenue)})`);
+  }
+
+  // AN UNRECOGNISED TIME ZONE MUST NOT PRODUCE A SCHEDULE. Computing in UTC instead
+  // gives a plausible-looking timetable on the wrong days, which a member cannot tell
+  // from a right one. No schedule is visibly missing and stops the message sending.
+  {
+    const slots = [{ name: "Varsity", start_time: "2026-07-03T02:00:00Z", end_time: "2026-07-03T03:00:00Z", is_cancelled: false }];
+    const good = weeklySchedule(slots, "America/Los_Angeles");
+    ok(good.length === 1 && good[0].day === "Thursdays" && good[0].groups[0].time === "7-8pm",
+      `a real zone reads the session in the academy's own local time (got ${JSON.stringify(good)})`);
+    const warn = console.warn; let warned = ""; console.warn = (m) => { warned = String(m); };
+    const bad = weeklySchedule(slots, "Eastern Time (US & Canada)");
+    console.warn = warn;
+    ok(bad.length === 0, `an unrecognised time zone yields NO schedule rather than a wrong one (got ${JSON.stringify(bad)})`);
+    ok(/time zone/i.test(warned), "...and says so out loud rather than emptying silently");
+    const none = weeklySchedule(slots, "");
+    ok(none.length === 1, "an EMPTY time zone is not an error - it falls back to UTC and still builds");
+  }
+
+  // THE REVIEW ASK WITHOUT A REVIEW LINK. It seeds ON, so an academy with no Google
+  // review URL on file would have received three paragraphs asking for a review with
+  // no way to leave one: dropEmptyShellLinks correctly removes the dead button and
+  // nothing removed the sentences around it. The template returns "" instead, and the
+  // send path asks the RESOLVED content whether there is anything to send.
+  {
+    const noLink = { id: "y", business_name: "Nobody Academy" };
+    const withLink = { ...noLink, google_review_url: "https://g.page/r/NOBODYACADEMY/review" };
+    const body = "template:onboarding-review";
+    const empty = templateBody({ clientId: "y", body, vars: clientVars(noLink) });
+    ok(empty.trim() === "",
+      "the review email renders to NOTHING for an academy with no review link, so no review ask goes out without one");
+    const full = templateBody({ clientId: "y", body, vars: clientVars(withLink) });
+    ok(full.includes("NOBODYACADEMY") && full.includes("Leave a Google review"),
+      "...and renders in full, with that academy's own link, as soon as there is one");
   }
   ok([3, 4, 5].every((i) => seeded[i].enabled === false),
     "the three AUTHORED emails (-training/-story/-era) still seed OFF - a human writes those");

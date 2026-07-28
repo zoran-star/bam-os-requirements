@@ -738,11 +738,17 @@ async function handler(req, res) {
       // Load the client so the preview renders with the academy's OWN identity
       // (name / site / owner), exactly like the real send path.
       const client = await loadClient(clientId).catch(() => null);
+      // The member-facing facts too, or this stops being a preview of the real send.
+      // Without them the welcome email an owner approves from is missing its entire
+      // weekly schedule table, its location block, and its coaches - the parts an
+      // owner is most likely to be checking. That is worse than no preview, because
+      // it is a preview that quietly disagrees with what will be sent.
+      const facts = await academyFacts(sb, client).catch(() => ({}));
       const html = renderEmail({
         clientId,
         subject: b.subject || "",
         body: b.body || "",
-        vars: { first_name: "Alex", athlete: "Jordan", ...clientVars(client) },
+        vars: { first_name: "Alex", athlete: "Jordan", ...clientVars(client), ...facts },
       });
       return res.status(200).json({ html, subject: b.subject || "" });
     }

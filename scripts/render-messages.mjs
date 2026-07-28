@@ -17,13 +17,16 @@
 // Env for live reads: SUPABASE_URL (or VITE_SUPABASE_URL) + SUPABASE_SERVICE_ROLE_KEY
 // (or SUPABASE_SERVICE_KEY). Read-only. Nothing here enables, approves or sends.
 //
-// A snapshot is {client, automations:[{automation_key,name,enabled,approved,steps:[...]}]}
-// so the page can be rebuilt with no database access at all.
+// A snapshot is {client, facts, automations:[{automation_key,name,enabled,approved,steps:[...]}]}
+// so the page can be rebuilt with no database access at all. `facts` is captured through
+// api/_academy-facts.js, the same function the send path calls, so it can be re-derived
+// and diffed rather than trusted.
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderEmail, resolveMergeVars, locFor, clientVars } from "../bam-ghl-agent/bam-portal/api/email-shells.js";
+import { academyFacts } from "../bam-ghl-agent/bam-portal/api/_academy-facts.js";
 import { annotate } from "./lib/annotate.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -66,11 +69,13 @@ async function load() {
   // snapshot starts describing a world production left behind. That is exactly how
   // the GTA lock went green while GTA's live copy had changed: the fixture had no
   // `public_name`. If you add a field to clientVars, add it here in the same commit.
-  // NOT listed on purpose: online_programs_url and referral_offer. Their migration
-  // (20260727150000) is not applied, and naming a column that does not exist yet
-  // makes PostgREST 400 the whole select.
+  // online_programs_url and referral_offer joined the list on 28 Jul 2026, when
+  // migration 20260727150000 was applied. Before that, naming a column that does not
+  // exist yet makes PostgREST 400 the whole select - so a column goes here AFTER its
+  // migration is live, never in the same breath.
   const sel = "id,business_name,public_name,legal_name,owner_name,email,phone,address,time_zone,"
-    + "community_group_url,community_group_platform,google_review_url,website_setup,brand_data";
+    + "community_group_url,community_group_platform,google_review_url,online_programs_url,"
+    + "referral_offer,website_setup,brand_data";
   const rows = CLIENT_ID
     ? await sb(`clients?id=eq.${CLIENT_ID}&select=${sel}`)
     : await sb(`clients?business_name=eq.${encodeURIComponent(NAME)}&select=${sel}`);
@@ -82,7 +87,14 @@ async function load() {
     const steps = (await sb(`automation_steps?automation_id=eq.${a.id}&order=position.asc&select=position,wait_amount,wait_unit,channel,subject,body,enabled`)) || [];
     automations.push({ ...a, steps });
   }
-  return { client, automations };
+  // The member-facing facts that are NOT on the clients row: the training venue, the
+  // weekly schedule generated from real sessions, and the coaches to follow. Captured
+  // through the SAME function the send path uses, so a snapshot is producible only by
+  // capture and a committed one can be re-derived and compared rather than eyeballed.
+  // Without this the facts block could only ever be hand-written, which is exactly how
+  // both snapshots in this folder came to describe academies that had moved on.
+  const facts = await academyFacts(sb, client);
+  return { client, facts, automations };
 }
 
 // ─── the sample family, so merge fields read like a real send ────────────────
@@ -232,8 +244,11 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 
 // ─── run ─────────────────────────────────────────────────────────────────────
 const specs = ANNOTATE ? (await import(path.resolve(ROOT, ANNOTATE))).default : null;
-const { client, automations } = await load();
-const vars = { ...LEAD, next_session: "", ...clientVars(client) };
+const { client, facts, automations } = await load();
+// Mirrors api/automations.js: clientVars from the row, then the facts that need other
+// tables spread on top. A snapshot rendered without them would show an owner a welcome
+// email with no schedule, no venue and no coaches, and call it the real send.
+const vars = { ...LEAD, next_session: "", ...clientVars(client), ...(facts || {}) };
 const L = locFor(client.id, vars);
 
 fs.mkdirSync(path.join(OUT, "msg"), { recursive: true });

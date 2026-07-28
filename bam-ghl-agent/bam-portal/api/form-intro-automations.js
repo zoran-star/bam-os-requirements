@@ -217,8 +217,13 @@ export const ONBOARDING_DEFAULT = {
     // schedule, and an empty-after-merge body is dropped by api/_send.js rather
     // than sent, so the step can be on and still send nothing until there is
     // something true to say.
+    // {{location.schedule}} carries the venue with it. Splitting them into two lines
+    // here looked tidier and shipped a broken half: an academy with a gym and no
+    // sessions yet texted "LOCATION: <address>" on its own, five minutes after a
+    // member paid. One token means one answer - a week of training at a place, or
+    // nothing at all, in which case the body empties and api/_send.js skips it.
     { position: 2, wait_amount: 5, wait_unit: "minutes", channel: "sms", subject: null,
-      body: "SCHEDULE:\n\n{{location.schedule}}\n\nLOCATION: {{location.venue}}" },
+      body: "SCHEDULE:\n\n{{location.schedule}}" },
 
     // 4. How to get the most out of training.
     { position: 3, wait_amount: 5, wait_unit: "minutes", channel: "email",

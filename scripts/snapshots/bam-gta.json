@@ -239,7 +239,7 @@
           "wait_unit": "minutes",
           "channel": "sms",
           "subject": null,
-          "body": "SCHEDULE:\n\n{{location.schedule}}\n\nLOCATION: {{location.venue}}",
+          "body": "SCHEDULE:\n\n{{location.schedule}}",
           "enabled": true
         },
         {

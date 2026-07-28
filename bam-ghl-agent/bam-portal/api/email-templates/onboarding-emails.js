@@ -283,12 +283,15 @@ const training = shellHead("Three habits that separate the players who improve f
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3) REVIEW  (+1 week after testimonials) — warm Google-review ask
-// The review link is the whole point of this email, so with no link on file
-// dropEmptyShellLinks removes the button outright rather than leaving a gold box
-// pointing nowhere. "other families nearby" replaced "other families in the GTA":
+// The review link is the whole point of this email, so with no link on file the email
+// does not exist: it returns "" and api/_send.js skips the send. Dropping only the
+// BUTTON was not enough and was actively worse - it left three paragraphs asking a
+// parent for a Google review with no way to leave one. An academy gets this email the
+// day it has somewhere to send people, and not before.
+// "other families nearby" replaced "other families in the GTA":
 // the sentence needed to be true for every academy, and {{location.city}} was the
 // wrong fix - it narrows an academy that serves a region down to one town.
-const review = shellHead("If training has been a win for your athlete, would you share it?", "By Any Means - A Quick Favour")
+const review = (L) => (!L || !L.reviewUrl ? "" : shellHead("If training has been a win for your athlete, would you share it?", "By Any Means - A Quick Favour")
   + EYEBROW("A quick favour")
   + H1("Mind sharing<br>your story?")
   + P("Hi {{contact.first_name}}, we hope {{contact.athletes_full_name}} has been loving training with {{location.name}}. Watching our athletes get better every week is exactly why we do this.")
@@ -299,7 +302,7 @@ const review = shellHead("If training has been a win for your athlete, would you
   + P("Thank you for being part of the family. It means more than you know.", 16)
   + P("With gratitude,<br><b style=\"color:#0A0A0A;\">The {{location.name}} Team</b>", 4)
   + `      </td></tr>`
-  + MEMBER_FOOT;
+  + MEMBER_FOOT);
 
 export const ONBOARDING_TEMPLATES = {
   "onboarding-welcome": welcome,

@@ -36,6 +36,25 @@ function clockLabel(h, m) {
   return m ? `${h12}:${String(m).padStart(2, "0")}${ampm}` : `${h12}${ampm}`;
 }
 
+// A time zone Intl will actually accept. An academy row can hold something Intl
+// rejects outright (a Rails-style "Eastern Time (US & Canada)"), and a RangeError
+// thrown per slot would have been swallowed by the caller's catch, emptying the whole
+// schedule with no sign that anything went wrong. An EMPTY zone is safe because it
+// falls back to UTC; a wrong non-empty one is not, so it is caught here and named, and
+// weeklySchedule then declines to build a schedule at all rather than build a wrong one.
+// Pro Precision is the live example waiting to happen: its time zone says Toronto and
+// its address is in Australia.
+export function safeTimeZone(timeZone) {
+  const tz = String(timeZone || "").trim();
+  if (!tz) return { zone: "UTC", problem: "" };
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz }).format(new Date(0));
+    return { zone: tz, problem: "" };
+  } catch (_) {
+    return { zone: "UTC", problem: `clients.time_zone is ${JSON.stringify(tz)}, which is not a time zone this system recognises. The schedule was built in UTC, so its days and times are probably wrong. Fix the academy's time zone.` };
+  }
+}
+
 // A slot's local wall-clock parts, in the ACADEMY's time zone. An academy in San Jose
 // must not have its evening sessions described in Toronto time - that is the same bug
 // class as the trial confirmations, and it is why the zone is a parameter and has no
@@ -62,12 +81,20 @@ function localParts(iso, timeZone) {
 // Order is by weekday then start time, which is the order a person reads a timetable
 // in and is stable regardless of which rows the query happened to return first.
 export function weeklySchedule(slots, timeZone) {
+  const { zone, problem } = safeTimeZone(timeZone);
+  // FAIL CLOSED, and loudly. An unrecognised zone could be computed in UTC instead,
+  // and that is the worse answer: it produces a plausible-looking timetable on the
+  // wrong days at the wrong times, which a member has no way to tell from a right one.
+  // No schedule at all is visibly missing and stops the message sending. Note the
+  // EMPTY case is different and safe - no zone on file means UTC, and an academy that
+  // has not set a zone has almost always not set sessions either.
+  if (problem) { console.warn(`[academy-facts] ${problem}`); return []; }
   const seen = new Map();
   for (const s of slots || []) {
     if (s.is_cancelled) continue;
-    const start = localParts(s.start_time, timeZone);
+    const start = localParts(s.start_time, zone);
     if (!start) continue;
-    const end = s.end_time ? localParts(s.end_time, timeZone) : null;
+    const end = s.end_time ? localParts(s.end_time, zone) : null;
     const name = String(s.name || "").trim();
     if (!name) continue;
     // "7-8pm", not "7pm-8pm": when both ends of a range fall in the same half of the
@@ -122,7 +149,14 @@ export async function academyFacts(sb, client) {
   } catch (_) { /* no venue is a shorter email, never a failed send */ }
 
   try {
-    const slots = await sb(`schedule_slots?tenant_id=eq.${id}&is_cancelled=is.false&select=name,start_time,end_time,is_cancelled&order=start_time.asc&limit=500`);
+    // UPCOMING sessions only, and that bound is load-bearing twice over. Without it
+    // last term's cancelled-by-attrition classes stay in the "typical week" forever
+    // beside this term's, and - worse - the 500-row cap starts returning the OLDEST
+    // 500 once an academy passes it (about two years at GTA's rate), freezing the
+    // schedule on a dead timetable that never moves again. Every other reader of this
+    // table bounds it the same way (api/website/availability.js, calendars.js).
+    const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const slots = await sb(`schedule_slots?tenant_id=eq.${id}&is_cancelled=is.false&start_time=gte.${from}&select=name,start_time,end_time,is_cancelled&order=start_time.asc&limit=500`);
     out.location_schedule = weeklySchedule(slots, client.time_zone || "UTC");
   } catch (_) { /* same */ }
 

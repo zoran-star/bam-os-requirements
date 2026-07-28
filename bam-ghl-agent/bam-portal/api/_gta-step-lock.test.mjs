@@ -156,7 +156,39 @@ function fixtureProblems(rendered) {
       + "If that is a real change, say which step went and why in the commit; the testimonials step is held on purpose.");
   }
 
-  // 3. The parent-facing name reaches a parent, and the internal one does not.
+  // 3. The facts block is present AND reaching output. It is the newest way this
+  //    fixture can lie: venue, weekly schedule and coach handles live in other
+  //    tables, so nothing in the client row hints at them. Deleting the block would
+  //    show up as a golden diff, but DRIFT would not - the goldens and the render
+  //    would move together and both locks would stay green while claiming byte
+  //    identity with what a member actually receives. Same failure as the
+  //    `public_name` incident, one table further out.
+  //
+  //    Re-capture with scripts/render-messages.mjs --client <uuid>, which now builds
+  //    this block by calling api/_academy-facts.js - the same function the send path
+  //    calls - so it is derived rather than typed.
+  const facts = SNAPSHOT.facts;
+  if (!facts || !facts.location_venue || !(facts.location_schedule || []).length) {
+    out.push("STALE FIXTURE: scripts/snapshots/bam-gta.json has no `facts` venue or schedule. GTA has both in "
+      + "production (a locations row and 86 live schedule_slots), so the welcome email and the schedule SMS "
+      + "below are locking a version of GTA that sends neither. Re-capture the snapshot.");
+  } else {
+    const firstGroup = ((facts.location_schedule[0] || {}).groups || [])[0] || {};
+    for (const [what, needle] of [
+      ["the training venue", facts.location_venue],
+      ["the weekly schedule", firstGroup.name],
+      ["the coaches to follow", ((facts.location_coaches || [])[0] || {}).name],
+    ]) {
+      if (!needle) { out.push(`STALE FIXTURE: the facts block has no ${what}.`); continue; }
+      if (!all.includes(needle)) {
+        out.push(`STALE FIXTURE: ${what} (${JSON.stringify(needle)}) is in the snapshot's facts block but reaches no `
+          + "rendered message. Either the templates stopped reading it or the fixture is not feeding them - either "
+          + "way these goldens are no longer locking it.");
+      }
+    }
+  }
+
+  // 4. The parent-facing name reaches a parent, and the internal one does not.
   if (!MUTATE && GTA.public_name && !all.includes(GTA.public_name)) {
     out.push(`STALE FIXTURE: no rendered GTA step contains ${JSON.stringify(GTA.public_name)}. `
       + "Either the name token left the rows or the fixture is not feeding them.");
