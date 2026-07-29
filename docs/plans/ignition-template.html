@@ -226,6 +226,38 @@
     </div>
   </div>
 
+  <!-- ORDER OF OPERATIONS -->
+  <h2>The order of operations on the way out</h2>
+  <p class="h2sub">The rule that answers every case: <b>moving stages never sends a message. Only the destination's engine speaks</b>, and each kind of engine speaks in its own way.</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="lbl">They reply &rarr; a stage with a talker (agent or human)</div>
+      <div class="scroll"><table style="min-width:0;font-size:13px">
+        <tr><td class="mono" style="white-space:nowrap">1</td><td>their reply arrives</td></tr>
+        <tr><td class="mono">2</td><td><b>every unsent campaign step is cancelled, first.</b> Cancel before move, so a queued step can never fire after they answered</td></tr>
+        <tr><td class="mono">3</td><td>card moves Reignition &rarr; Booking</td></tr>
+        <tr><td class="mono">4</td><td>the booking agent reads the thread and <b>answers what they actually said</b></td></tr>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">So the next message they get is a response, not a script. No intro fires, nothing canned lands on top of their reply.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">They ghost the whole thing &rarr; an automation, or out</div>
+      <div class="scroll"><table style="min-width:0;font-size:13px">
+        <tr><td class="mono" style="white-space:nowrap">1</td><td>the last campaign step sends, its wait window passes, silence</td></tr>
+        <tr><td class="mono">2</td><td>card moves Reignition &rarr; Nurture (or is marked unqualified and leaves the board - no message, ever)</td></tr>
+        <tr><td class="mono">3</td><td>nurture enrols them at step one, <b>clock starting at zero</b></td></tr>
+        <tr><td class="mono">4</td><td>first nurture email arrives on nurture's own schedule, a week later</td></tr>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">The handoff itself is silent. There is a natural quiet gap between the campaign's last word and nurture's first, because each sequence only ever runs its own clock.</p>
+    </div>
+  </div>
+
+  <div class="note n-ok" style="margin-top:13px">
+    <b>Your two assumptions become a rule the attachment checks, not an assumption</b>
+    <p>You said it: a reply should always land where something can talk back, and a full ghost should always land in an automation or out of the pipeline. That is now a validation on attaching the station to any sales system: <b>the replied exit must point at a stage with an agent or human engine, and the ran-out exit must point at an automation stage or a terminal.</b> A future system that declares it the wrong way round gets refused at design time, loudly, instead of shipping a pipeline where a human reply is answered by a drip.</p>
+  </div>
+
   <!-- UI -->
   <h2>Where it lives in the portal</h2>
   <p class="h2sub">V2 clients only. Two homes: the owner WATCHES it in the Sales section, staff SETS IT UP from the Business Blueprint.</p>
