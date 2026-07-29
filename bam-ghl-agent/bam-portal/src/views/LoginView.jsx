@@ -66,7 +66,7 @@ export default function LoginView({ onLogin, supabase }) {
       minHeight: "100vh",
       background: "#000000",
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
+      fontFamily: "'Plus Jakarta Sans', -apple-system, system-ui, sans-serif",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap');

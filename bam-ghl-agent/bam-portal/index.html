@@ -8,6 +8,12 @@
     <link rel="apple-touch-icon" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>bam-portal</title>
+    <!-- Design-system fonts (DESIGN.md): Plus Jakarta Sans (UI) + Nunito (big
+         numbers) + DM Mono (technical values). Previously nothing was loaded
+         and the app silently fell back to the system font. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Nunito:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <!-- Reset the browser's default 8px body margin + white canvas so there's no
          white border / white flash around the (black) app before React paints. -->
     <style>

@@ -25,6 +25,8 @@ Change tokens.css + DESIGN.md FIRST (bump version/changelog) → mirror `client-
 ## Known debt (in DESIGN.md §9)
 Other views still on legacy radii/hardcodes (disperse per-view); emoji icons in OTHER views (staff blueprint checkboxes, notif drawer, modal opts.icon, mreq icons - swap per-view); Assets alert()/prompt() feedback; staff portal `src/tokens/tokens.js` separate palette (open decision).
 
+**2026-07-27 staff-portal Clients pass (Cole):** staff portal now actually LOADS the fonts (index.html: Plus Jakarta Sans + Nunito + DM Mono; the old `Inter` @import was replaced portal-wide - Login/SetPassword/PublicTicket too). ClientsCombinedView de-emojied (SVG stroke icons via local `_ico` helpers), radii moved to 8 controls / 12 cards / 16 modals, and it got module-level `showToast()`/`uiConfirm()` + `ToastHost`/`ConfirmHost` styled replacements for window.alert/confirm (pattern to reuse in other views); ActivationTab's window.prompt is now a real modal. Roster: clickable stat filters, URL-persisted q/cstatus/csort, brand-logo avatars (`ClientAvatar`), Last-seen column (presence RPC already returned last_seen_at), hover quick actions, skeleton rows (`.bp-skel` in index.css), hidden-in-setup hint. Other staff views still carry the old patterns - migrate per-view.
+
 ## Gotchas
 - client-portal.html `:root` and tokens.css MUST stay mirrored - drift breaks the system.
 - The tour verifier (`node bam-portal/scripts/verify-client-portal-ui.mjs`) must pass after any client-portal.html edit - passed on this pass.

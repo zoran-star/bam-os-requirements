@@ -575,7 +575,7 @@ export default function BAMPortal() {
       ];
 
   return (
-    <div style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh" }}>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh" }}>
 
       {/* New-version banner — appears when a fresh deploy is detected */}
       {updateReady && (
@@ -622,7 +622,7 @@ export default function BAMPortal() {
         />
       )}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap');
+        /* Fonts load from index.html (Plus Jakarta Sans + Nunito + DM Mono, per the design system). */
         *{box-sizing:border-box;margin:0;padding:0}
         html,body{background:${tk.bg};min-height:100dvh;overscroll-behavior:none}
         html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
