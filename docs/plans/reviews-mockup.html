@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reviews - mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Nunito:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#131416; --surface:#1B1D1F; --surface-el:#232629; --surface-hov:#2B2E32;
+  --border:rgba(255,255,255,0.08); --border-med:rgba(255,255,255,0.12); --border-str:rgba(255,255,255,0.16);
+  --text:#F0EDE8; --text-sub:#A5A19A; --text-mute:#6E6B63;
+  --gold:#D4B65C; --gold-glow:rgba(212,182,92,0.12); --gold-sheen:rgba(212,182,92,0.06);
+  --accent-ghost:rgba(212,182,92,0.10); --accent-border:rgba(212,182,92,0.25); --on-gold:#131416;
+  --green:#4CC76A; --green-soft:rgba(76,199,106,0.12);
+  --amber:#F0B84A; --amber-soft:rgba(240,184,74,0.12);
+  --red:#F07060; --red-soft:rgba(240,112,96,0.12);
+  --blue:#5A8FB8; --blue-soft:rgba(90,143,184,0.12);
+  --font-ui:"Plus Jakarta Sans",-apple-system,system-ui,sans-serif;
+  --font-num:"Nunito",sans-serif; --font-mono:"DM Mono",ui-monospace,monospace;
+  --r-xs:6px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --r-full:999px;
+  --shadow-pop:0 12px 40px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
+  font-size:13px;line-height:1.5;padding:34px 20px 90px;-webkit-font-smoothing:antialiased}
+.page{max-width:1180px;margin:0 auto}
+h1{font-family:var(--font-num);font-weight:900;font-size:30px;margin:0 0 4px}
+.lede{color:var(--text-sub);font-size:14px;margin:0 0 30px}
+.mlabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-mute)}
+.screen{margin:0 0 42px}
+.screen__hd{display:flex;align-items:baseline;gap:12px;margin:0 0 12px;
+  padding-bottom:9px;border-bottom:1px solid var(--border)}
+.screen__n{font-family:var(--font-num);font-weight:900;font-size:15px;color:var(--gold);
+  min-width:22px}
+.screen__t{font-family:var(--font-num);font-weight:800;font-size:17px}
+.screen__sub{color:var(--text-sub);font-size:12px;margin-left:auto;text-align:right}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+
+/* portal card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:18px 20px}
+.card__hd{display:flex;align-items:center;gap:10px;margin:0 0 16px}
+.card__title{font-family:var(--font-num);font-weight:800;font-size:15px}
+.card__icon{width:28px;height:28px;border-radius:var(--r-sm);background:var(--accent-ghost);
+  display:grid;place-items:center;color:var(--gold);font-size:14px}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:var(--r-full);
+  font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.pill--live{background:var(--green-soft);color:var(--green)}
+.pill--off{background:rgba(255,255,255,.05);color:var(--text-mute);border:1px solid var(--border)}
+.pill--hidden{background:rgba(255,255,255,.04);color:var(--text-mute);border:1px solid var(--border);text-transform:none;letter-spacing:0;font-weight:600}
+.pill--gold{background:var(--accent-ghost);color:var(--gold);border:1px solid var(--accent-border)}
+.pill--manual{background:var(--blue-soft);color:var(--blue)}
+.dot{width:5px;height:5px;border-radius:var(--r-full);background:currentColor}
+
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:var(--r-sm);
+  font-size:12.5px;font-weight:700;border:1px solid transparent;cursor:default}
+.btn--gold{background:var(--gold);color:var(--on-gold)}
+.btn--ghost{background:transparent;color:var(--text-sub);border-color:var(--border-med)}
+
+/* aggregate header */
+.agg{display:flex;align-items:center;gap:16px;padding:14px 16px;margin:0 0 14px;
+  background:var(--surface-el);border:1px solid var(--border);border-radius:var(--r-md)}
+.agg__score{font-family:var(--font-num);font-weight:900;font-size:32px;line-height:1;color:var(--gold)}
+.agg__stars{color:var(--gold);font-size:14px;letter-spacing:2px}
+.agg__meta{font-size:11.5px;color:var(--text-sub);margin-top:3px}
+.agg__sync{margin-left:auto;text-align:right;font-size:10.5px;color:var(--text-mute);
+  font-family:var(--font-mono);white-space:nowrap}
+
+/* review row */
+.rv{display:flex;gap:12px;padding:13px 14px;border:1px solid var(--border);
+  border-radius:var(--r-md);margin:0 0 9px;background:var(--surface-el)}
+.rv--star{border-color:var(--accent-border);background:var(--gold-sheen)}
+.rv--hidden{opacity:.42;background:transparent}
+.rv__star{font-size:15px;color:var(--text-mute);width:18px;flex:none;padding-top:1px}
+.rv__star--on{color:var(--gold)}
+.rv__body{flex:1;min-width:0}
+.rv__top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 5px}
+.rv__stars{color:var(--gold);font-size:11.5px;letter-spacing:1.5px}
+.rv__stars--low{color:var(--text-mute)}
+.rv__who{font-weight:700;font-size:12.5px}
+.rv__date{font-size:10.5px;color:var(--text-mute);font-family:var(--font-mono)}
+.rv__quote{font-size:12.5px;color:var(--text-sub);line-height:1.55}
+
+/* empty state */
+.empty{text-align:center;padding:30px 20px;border:1px dashed var(--border-med);
+  border-radius:var(--r-md);background:rgba(255,255,255,.015)}
+.empty__i{font-size:22px;margin:0 0 8px;opacity:.5}
+.empty__t{font-weight:700;font-size:13.5px;margin:0 0 5px}
+.empty__d{font-size:12px;color:var(--text-sub);max-width:330px;margin:0 auto}
+
+/* website preview */
+.web{background:#0C0C0D;border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:26px 24px;text-align:center}
+.web__eye{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--gold);margin:0 0 8px}
+.web__h{font-family:var(--font-num);font-weight:900;font-size:22px;margin:0 0 16px}
+.web__cards{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;text-align:left}
+.wc{background:#141416;border:1px solid var(--border);border-radius:var(--r-md);padding:13px}
+.wc__s{color:var(--gold);font-size:11px;letter-spacing:1.5px;margin:0 0 7px}
+.wc__q{font-size:11.5px;color:var(--text-sub);line-height:1.5;margin:0 0 9px}
+.wc__w{font-size:11px;font-weight:700}
+.wc__src{font-size:10px;color:var(--text-mute);margin-top:2px}
+
+/* chat */
+.chat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px}
+.msg{max-width:82%;padding:9px 13px;border-radius:14px;font-size:12.5px;line-height:1.5;margin:0 0 9px}
+.msg--them{background:var(--surface-el);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg--us{background:var(--gold);color:var(--on-gold);margin-left:auto;border-bottom-right-radius:4px;font-weight:500}
+.msg--bad{background:var(--red-soft);border:1px solid rgba(240,112,96,.3);color:var(--text);
+  margin-left:auto;border-bottom-right-radius:4px}
+
+/* notification */
+.notif{background:var(--surface-el);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:13px 15px;display:flex;gap:11px}
+.notif--loud{border-color:rgba(240,112,96,.45);background:rgba(240,112,96,.07)}
+.notif__i{width:30px;height:30px;border-radius:var(--r-sm);display:grid;place-items:center;
+  font-size:14px;flex:none;background:var(--green-soft);color:var(--green)}
+.notif__i--loud{background:var(--red-soft);color:var(--red)}
+.notif__t{font-weight:700;font-size:12.5px;margin:0 0 3px}
+.notif__d{font-size:11.5px;color:var(--text-sub);line-height:1.5}
+.notif__ch{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.chx{font-size:10px;font-weight:600;padding:2px 7px;border-radius:var(--r-xs);
+  background:rgba(255,255,255,.05);color:var(--text-sub);border:1px solid var(--border)}
+
+/* decisions */
+.dec{background:var(--surface);border:1px solid var(--accent-border);border-radius:var(--r-lg);
+  padding:18px 20px;margin:0 0 34px}
+.dec h2{font-family:var(--font-num);font-weight:800;font-size:16px;margin:0 0 12px}
+.dec ol{margin:0;padding-left:20px}
+.dec li{margin:0 0 9px;font-size:13px;color:var(--text-sub)}
+.dec b{color:var(--text)}
+.note{font-size:11.5px;color:var(--text-mute);margin:8px 0 0;font-style:italic}
+@media(max-width:900px){.grid2,.grid3,.web__cards{grid-template-columns:1fr}body{padding:20px 12px 60px}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Reviews</h1>
+<p class="lede">What you will see and do once an academy connects its Google Business Profile. Six screens, then the three things I need you to decide.</p>
+
+<!-- 1 -->
+<div class="screen">
+  <div class="screen__hd">
+    <div class="screen__n">1</div>
+    <div class="screen__t">Business Blueprint &rsaquo; Reviews, before connecting</div>
+    <div class="screen__sub">Every academy starts here</div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card__hd">
+        <div class="card__icon">&#9733;</div>
+        <div class="card__title">Reviews</div>
+        <span class="pill pill--off"><span class="dot"></span>Not connected</span>
+      </div>
+      <div class="empty">
+        <div class="empty__i">&#9733;</div>
+        <div class="empty__t">Connect your Google Business Profile</div>
+        <div class="empty__d">Your reviews will show on your website, feed your sales agent, and let you pick which ones lead. Nothing displays until you connect.</div>
+        <div style="margin-top:15px"><span class="btn btn--gold">Connect Google</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="mlabel" style="margin-bottom:10px">What is switched off right now</div>
+      <div class="rv" style="background:transparent;opacity:.55">
+        <div class="rv__body"><div class="rv__who">Website reviews section</div>
+        <div class="rv__quote">Absent from the page. Not an empty box, not a "coming soon". The section does not render.</div></div>
+      </div>
+      <div class="rv" style="background:transparent;opacity:.55">
+        <div class="rv__body"><div class="rv__who">Sales agent social proof</div>
+        <div class="rv__quote">The agent says nothing about reviews. It never sends another academy's link.</div></div>
+      </div>
+      <div class="rv" style="background:transparent;opacity:.55;margin-bottom:0">
+        <div class="rv__body"><div class="rv__who">Testimonial email blocks</div>
+        <div class="rv__quote">The quote block drops out. The email still sends, just without it.</div></div>
+      </div>
+      <p class="note">This is the "no fact, no output" rule. A block appears when the fact exists and vanishes when it does not.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 2 -->
+<div class="screen">
+  <div class="screen__hd">
+    <div class="screen__n">2</div>
+    <div class="screen__t">Reviews card, connected</div>
+    <div class="screen__sub">Tap a star to make a review lead everywhere</div>
+  </div>
+  <div class="card">
+    <div class="card__hd">
+      <div class="card__icon">&#9733;</div>
+      <div class="card__title">Reviews</div>
+      <span class="pill pill--live"><span class="dot"></span>Connected</span>
+      <span class="btn btn--ghost" style="margin-left:auto;padding:6px 11px;font-size:11.5px">Disconnect</span>
+    </div>
+
+    <div class="agg">
+      <div>
+        <div class="agg__score">4.9</div>
+      </div>
+      <div>
+        <div class="agg__stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <div class="agg__meta">Average across <b style="color:var(--text)">87 Google reviews</b></div>
+      </div>
+      <div class="agg__sync">Synced 06:12 today<br>Daily</div>
+    </div>
+
+    <div class="rv rv--star">
+      <div class="rv__star rv__star--on">&#9733;</div>
+      <div class="rv__body">
+        <div class="rv__top">
+          <span class="rv__stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+          <span class="rv__who">Maria G.</span>
+          <span class="rv__date">12 Jul 2026</span>
+          <span class="pill pill--gold">Shows first</span>
+        </div>
+        <div class="rv__quote">My son has grown so much in six months, not just as a player but in confidence. The coaches actually care who these kids become.</div>
+      </div>
+    </div>
+
+    <div class="rv">
+      <div class="rv__star">&#9734;</div>
+      <div class="rv__body">
+        <div class="rv__top">
+          <span class="rv__stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+          <span class="rv__who">Daniel K.</span>
+          <span class="rv__date">28 Jun 2026</span>
+        </div>
+        <div class="rv__quote">Small groups, real coaching, and he leaves every session wanting to come back. Worth every dollar.</div>
+      </div>
+    </div>
+
+    <div class="rv">
+      <div class="rv__star">&#9734;</div>
+      <div class="rv__body">
+        <div class="rv__top">
+          <span class="rv__stars">&#9733;&#9733;&#9733;&#9733;</span>
+          <span class="rv__who">Priya S.</span>
+          <span class="rv__date">14 Jun 2026</span>
+        </div>
+        <div class="rv__quote">Great coaching and a positive room. Parking near the gym can be tricky at peak times.</div>
+      </div>
+    </div>
+
+    <div class="rv rv--hidden">
+      <div class="rv__star">&#9734;</div>
+      <div class="rv__body">
+        <div class="rv__top">
+          <span class="rv__stars rv__stars--low">&#9733;&#9733;</span>
+          <span class="rv__who">Anon</span>
+          <span class="rv__date">02 Jun 2026</span>
+          <span class="pill pill--hidden">Hidden from display</span>
+        </div>
+        <div class="rv__quote">Sessions started late twice and nobody let us know.</div>
+      </div>
+    </div>
+    <p class="note">You see everything. Anything under 4 stars never leaves this card: not the website, not the agent, not an email. You cannot delete a review here, because it lives on Google. Starring only changes what leads.</p>
+  </div>
+</div>
+
+<!-- 3 -->
+<div class="screen">
+  <div class="screen__hd">
+    <div class="screen__n">3</div>
+    <div class="screen__t">Connected, but no reviews yet</div>
+    <div class="screen__sub">This is San Jose</div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card__hd">
+        <div class="card__icon">&#9733;</div>
+        <div class="card__title">Reviews</div>
+        <span class="pill pill--live"><span class="dot"></span>Connected</span>
+      </div>
+      <div class="empty">
+        <div class="empty__i">&#9675;</div>
+        <div class="empty__t">No reviews yet</div>
+        <div class="empty__d">Your profile is connected and we check daily. The moment your first review lands it appears here and everything switches on by itself.</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="mlabel" style="margin-bottom:10px">Why this matters</div>
+      <p style="color:var(--text-sub);margin:0 0 10px">San Jose has not launched, so it has no review history. Connected with zero reviews still displays <b style="color:var(--text)">nothing</b>, everywhere.</p>
+      <p style="color:var(--text-sub);margin:0">That is the guardrail working, not a bug. A new academy stays empty until it earns its own, and it never borrows anyone else's.</p>
+      <p class="note">This is the failure we are designing out. Miami's free trial page currently shows three quotes badged "Google review" with five stars and dates. They are GTA's three, rewritten with Miami names.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 4 -->
+<div class="screen">
+  <div class="screen__hd">
+    <div class="screen__n">4</div>
+    <div class="screen__t">What a parent sees on the academy website</div>
+    <div class="screen__sub">Starred first, then highest rated</div>
+  </div>
+  <div class="web">
+    <div class="web__eye">What parents say</div>
+    <div class="web__h">4.9 &#9733;&#9733;&#9733;&#9733;&#9733; across 87 Google reviews</div>
+    <div class="web__cards">
+      <div class="wc">
+        <div class="wc__s">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <div class="wc__q">My son has grown so much in six months, not just as a player but in confidence.</div>
+        <div class="wc__w">Maria G.</div>
+        <div class="wc__src">Google review &middot; 12 Jul 2026</div>
+      </div>
+      <div class="wc">
+        <div class="wc__s">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <div class="wc__q">Small groups, real coaching, and he leaves every session wanting to come back.</div>
+        <div class="wc__w">Daniel K.</div>
+        <div class="wc__src">Google review &middot; 28 Jun 2026</div>
+      </div>
+      <div class="wc">
+        <div class="wc__s">&#9733;&#9733;&#9733;&#9733;</div>
+        <div class="wc__q">Great coaching and a positive room.</div>
+        <div class="wc__w">Priya S.</div>
+        <div class="wc__src">Google review &middot; 14 Jun 2026</div>
+      </div>
+    </div>
+  </div>
+  <p class="note">Every number and badge on this section is now true. The 4.9 is a real average, the count is real, and "Google review" means it came from Google. Today those are typed into the page by hand.</p>
+</div>
+
+<!-- 5 -->
+<div class="screen">
+  <div class="screen__hd">
+    <div class="screen__n">5</div>
+    <div class="screen__t">What the sales agent says</div>
+    <div class="screen__sub">San Jose parent asking the same question</div>
+  </div>
+  <div class="grid2">
+    <div>
+      <div class="mlabel" style="margin-bottom:8px;color:var(--red)">Today</div>
+      <div class="chat">
+        <div class="msg msg--them">Have other parents been happy with it?</div>
+        <div class="msg msg--bad">Absolutely. Check out our Google reviews: share.google/yel2SPxIMKzjsJG9c</div>
+        <p class="note" style="margin:4px 0 0">That link is BAM GTA in Toronto. A San Jose parent gets sent a Toronto academy's reviews, because the link is hardcoded into a shared default that every academy inherits.</p>
+      </div>
+    </div>
+    <div>
+      <div class="mlabel" style="margin-bottom:8px;color:var(--green)">Connected</div>
+      <div class="chat">
+        <div class="msg msg--them">Have other parents been happy with it?</div>
+        <div class="msg msg--us">Really happy, we are at 4.9 stars across 87 reviews. One mum put it well: "My son has grown so much in six months, not just as a player but in confidence." Want me to send you the link?</div>
+        <p class="note" style="margin:4px 0 0">The agent quotes that academy's own top review, live at the moment it replies. An academy with none says nothing about reviews at all.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6 -->
+<div class="screen">
+  <div class="screen__hd">
+    <div class="screen__n">6</div>
+    <div class="screen__t">What the owner gets told</div>
+    <div class="screen__sub">Every review notifies. One star is unmissable.</div>
+  </div>
+  <div class="grid2">
+    <div class="notif">
+      <div class="notif__i">&#9733;</div>
+      <div>
+        <div class="notif__t">New 5 star review from Maria G.</div>
+        <div class="notif__d">"My son has grown so much in six months, not just as a player but in confidence."</div>
+        <div class="notif__ch"><span class="chx">Slack</span><span class="chx">Portal bell</span></div>
+      </div>
+    </div>
+    <div class="notif notif--loud">
+      <div class="notif__i notif__i--loud">&#9888;</div>
+      <div>
+        <div class="notif__t" style="color:var(--red)">1 star review just landed</div>
+        <div class="notif__d">"Sessions started late twice and nobody let us know." Hidden from your website and your agent already. Worth replying on Google today.</div>
+        <div class="notif__ch"><span class="chx">Slack, tagged</span><span class="chx">SMS</span><span class="chx">Portal bell</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="note">Proposed channel mix. A 1 star adds SMS and a direct tag so it cannot be missed in a busy channel. Say the word if you want it louder or quieter.</p>
+</div>
+
+<!-- 7 -->
+<div class="screen">
+  <div class="screen__hd">
+    <div class="screen__n">7</div>
+    <div class="screen__t">The hierarchy, once typed-in quotes are allowed</div>
+    <div class="screen__sub">Confirm this and it becomes the rule everywhere</div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="mlabel" style="margin-bottom:12px">Render order, top to bottom</div>
+
+      <div class="rv rv--star">
+        <div class="rv__star rv__star--on">&#9733;</div>
+        <div class="rv__body">
+          <div class="rv__top"><span class="pill pill--gold">1st</span>
+            <span class="rv__who">Pinned Google reviews</span>
+            <span class="rv__stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span></div>
+          <div class="rv__quote">The academy picked it AND a real parent left it on Google. Strongest thing we have.</div>
+        </div>
+      </div>
+
+      <div class="rv rv--star" style="border-color:var(--border-med);background:rgba(90,143,184,.05)">
+        <div class="rv__star rv__star--on" style="color:var(--blue)">&#9733;</div>
+        <div class="rv__body">
+          <div class="rv__top"><span class="pill pill--gold">2nd</span>
+            <span class="rv__who">Pinned typed-in quotes</span>
+            <span class="pill pill--manual">Typed in</span></div>
+          <div class="rv__quote">The academy picked it, but nothing public backs it. Always sits behind a real review.</div>
+        </div>
+      </div>
+
+      <div class="rv">
+        <div class="rv__star">&#9734;</div>
+        <div class="rv__body">
+          <div class="rv__top"><span class="pill pill--gold">3rd</span>
+            <span class="rv__who">Everything else from Google</span>
+            <span class="rv__stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span></div>
+          <div class="rv__quote">Highest rating down to lowest. Ties broken by newest.</div>
+        </div>
+      </div>
+
+      <div class="rv" style="background:rgba(90,143,184,.04)">
+        <div class="rv__star">&#9734;</div>
+        <div class="rv__body">
+          <div class="rv__top"><span class="pill pill--gold">4th</span>
+            <span class="rv__who">Everything else typed in</span>
+            <span class="pill pill--manual">Typed in</span></div>
+          <div class="rv__quote">Newest first, because there is no rating to sort on.</div>
+        </div>
+      </div>
+
+      <div class="rv rv--hidden" style="margin-bottom:0">
+        <div class="rv__star">&#9734;</div>
+        <div class="rv__body">
+          <div class="rv__top"><span class="rv__stars rv__stars--low">&#9733;&#9733;</span>
+            <span class="rv__who">Under 4 stars</span>
+            <span class="pill pill--hidden">Never displays</span></div>
+          <div class="rv__quote">Owner's card only. Never a website, never an email, never the agent.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="mlabel" style="margin-bottom:10px">Two things a typed-in quote can never do</div>
+        <div class="rv" style="background:transparent">
+          <div class="rv__body"><div class="rv__who">Wear a rating or a Google badge</div>
+          <div class="rv__quote">No stars, no "Google review" line, no review date. Only a synced review earns those.</div></div>
+        </div>
+        <div class="rv" style="background:transparent;margin-bottom:0">
+          <div class="rv__body"><div class="rv__who">Move the average</div>
+          <div class="rv__quote">The aggregate counts synced Google reviews only. Typing in ten quotes cannot make a 4.9 into a 5.0.</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="mlabel" style="margin-bottom:10px">Where this sits on your control dial</div>
+        <div class="rv" style="background:transparent">
+          <div class="rv__body">
+            <div class="rv__top"><span class="pill pill--gold">Tier 1</span><span class="rv__who">The hierarchy itself</span></div>
+            <div class="rv__quote">Locked, identical for every academy, auto-propagates. No academy reorders it, and nobody gets a custom rule.</div>
+          </div>
+        </div>
+        <div class="rv" style="background:transparent;margin-bottom:0">
+          <div class="rv__body">
+            <div class="rv__top"><span class="pill pill--manual">Tier 3</span><span class="rv__who">The quotes themselves</span></div>
+            <div class="rv__quote">The academy's own facts: its reviews, its typed quotes, which ones it pins. Never propagates to anyone else.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note">This is the same shape as the rest of the dial: the rule is master and shared, the content is the academy's own. It applies everywhere a quote can appear, which is the website cards, the testimonial emails, and the agent.</p>
+</div>
+
+<!-- decisions -->
+<div class="dec">
+  <h2>Three things to decide</h2>
+  <ol>
+    <li><b>One table or two.</b> A builder is right now creating a <code>testimonials</code> table for the email work, and my plan called for a separate <code>google_reviews</code> table. I say <b>one table</b>, with Google reviews syncing into it, or we end up with two versions of the same quote. I have already sent the builder the four columns it is missing (star rating above all, since every curation rule depends on it).</li>
+    <li><b>Do typed-in quotes survive?</b> The new table lets an academy type a quote in by hand, which is a testimonial with no Google review behind it, the thing your rule was aimed at. My recommendation: <b>allow them, but they never get review framing.</b> No star rating, no "Google review" badge, no counting toward the average. Only real synced reviews earn stars.</li>
+    <li><b>The cheap early win.</b> That same migration adds a per-academy Google review link field. Filling it in fixes the San Jose and Miami agents sending GTA's link, with <b>no Google API approval needed</b>, in days rather than weeks. You said leave it until we connect, when connecting meant the full build. This is a much smaller kind of connected. Want it now?</li>
+  </ol>
+  <p class="note">The full build still needs Google to approve our Cloud project for the Business Profile API, which is days to weeks and has not been filed yet. That application is the long pole on everything in screens 2 through 6.</p>
+</div>
+
+</div>
+</body>
+</html>
