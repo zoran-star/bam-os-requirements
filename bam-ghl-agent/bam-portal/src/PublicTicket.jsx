@@ -43,7 +43,7 @@ const STATUSES = ["New", "In Progress", "Awaiting Client", "Complete"];
 
 function Shell({ children }) {
   return (
-    <div style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh", color: tk.text }}>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh", color: tk.text }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}

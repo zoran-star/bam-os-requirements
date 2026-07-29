@@ -21,6 +21,9 @@ import {
   nudgeClientSlack,
 } from "../services/ticketsService";
 import { supabase } from "../lib/supabase";
+import { useUrlState } from "../hooks/useUrlState";
+import ClientAvatar from "../components/ClientAvatar.jsx";
+import { showToast, uiConfirm, ToastHost, ConfirmHost } from "../components/dialogs.jsx";
 
 // Lobby = unassigned working tickets (triage queue); Ongoing = the same working
 // statuses once someone is assigned. Assignment is the dividing line.
@@ -129,14 +132,21 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
   const isManager = me?.role === "admin" || me?.role === "systems_manager";
   const defaultTab = isManager ? "overview" : "ongoing";
 
-  const [tab, setTab] = useState(defaultTab);
+  // Tab + open ticket persist in the URL: reload/Back keeps your place, and a
+  // ticket becomes deep-linkable (?stab=ongoing&ticket=<id>) from Slack pings.
+  const [tab, setTab] = useUrlState("stab", defaultTab);
+  const [ticketParam, setTicketParam] = useUrlState("ticket", "");
   const [tickets, setTickets] = useState([]);
   const [pool, setPool] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelectedRaw] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Completed-tab filters (the archive is large — search text + academy).
+  // Search + academy filter apply on EVERY tab (not just Completed).
   const [completedSearch, setCompletedSearch] = useState("");
   const [completedAcademy, setCompletedAcademy] = useState("");
+  // Managers see everyone by default; this narrows to their own tickets.
+  const [mineOnly, setMineOnly] = useState(false);
+
+  const setSelected = (x) => { setSelectedRaw(x); setTicketParam(x ? x.id : ""); };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -151,15 +161,29 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Deep link: ?ticket=<id> opens that ticket once the list has loaded.
+  useEffect(() => {
+    if (!ticketParam || selected || loading) return;
+    const x = tickets.find(tk => tk.id === ticketParam);
+    if (x) setSelectedRaw(x);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, tickets]);
+
   // Realtime: auto-refresh the ticket list whenever any tickets row
   // changes (new ticket, status flip, delegation, client reply). No
-  // more manual refresh needed.
+  // more manual refresh needed. A brand-new ticket also gets a toast so
+  // whoever is on the board hears about it without watching the Lobby.
   useEffect(() => {
     const channel = supabase
       .channel("systems:tickets")
       .on("postgres_changes",
         { event: "*", schema: "public", table: "tickets" },
-        () => { load(); })
+        (payload) => {
+          load();
+          if (payload?.eventType === "INSERT") {
+            showToast("A new ticket just arrived - check the Lobby.", "info");
+          }
+        })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [load]);
@@ -178,32 +202,48 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
     return false;
   });
 
-  // Completed tab: title + academy/assignee/details search and an academy
-  // dropdown. Academy options come from the completed tickets in scope.
+  // Search (title + academy + assignee + details) and an academy dropdown -
+  // available on every ticket tab. Options come from the tab's tickets.
   const ticketTitle = (x) => resolveTicketTitle(x);
   const completedAcademies = [...new Set(
     visibleTickets.map(x => x.client?.business_name).filter(Boolean)
   )].sort((a, b) => a.localeCompare(b));
   const q = completedSearch.trim().toLowerCase();
-  const matchesCompletedFilters = (x) => {
+  const matchesFilters = (x) => {
     if (completedAcademy && (x.client?.business_name || "") !== completedAcademy) return false;
+    if (isManager && mineOnly && x.assigned_to !== me?.id) return false;
     if (!q) return true;
     const hay = [ticketTitle(x), x.client?.business_name, x.assignee?.name, Object.values(x.fields || {}).filter(Boolean).join(" ")]
       .filter(Boolean).join(" ").toLowerCase();
     return hay.includes(q);
   };
-  const completedFiltered = tab === "completed" && (q || completedAcademy);
-  const displayedTickets = tab === "completed" ? visibleTickets.filter(matchesCompletedFilters) : visibleTickets;
+  const completedFiltered = q || completedAcademy || (isManager && mineOnly);
+  // Overdue-first ordering on the working tabs: overdue, then nearest due,
+  // then no-due-date (newest first). Completed keeps its natural order.
+  const dueRank = (x) => (x.due_date ? new Date(x.due_date + "T00:00:00").getTime() : Infinity);
+  const displayedTickets = visibleTickets.filter(matchesFilters);
+  if (tab !== "completed") {
+    displayedTickets.sort((a, b) =>
+      (dueRank(a) - dueRank(b)) ||
+      (new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0))
+    );
+  }
+  const isOverdue = (x) => x.due_date && !["done","approved","cancelled"].includes(x.status)
+    && new Date(x.due_date + "T00:00:00") < biz(new Date());
 
   // Shared tab structure. Managers additionally get an Overview tab at
   // the front. Counts reuse the same scope as visibleTickets above
   // (managers see all, executors only their own).
   const tabs = [
     ...(isManager ? [{ key: "overview", label: "Overview" }] : []),
-    { key: "lobby",     label: "Lobby",           count: tickets.filter(x => isLobbyTicket(x) && inScope(x)).length },
-    { key: "ongoing",   label: "Ongoing",         count: tickets.filter(x => isOngoingTicket(x) && inScope(x)).length },
-    { key: "awaiting",  label: "Awaiting client", count: tickets.filter(x => ["awaiting_client","final_review"].includes(x.status) && inScope(x)).length },
-    { key: "review",    label: "In review",       count: tickets.filter(x => x.status === "in_review" && inScope(x)).length },
+    { key: "lobby",     label: "Lobby",           count: tickets.filter(x => isLobbyTicket(x) && inScope(x)).length,
+      overdue: tickets.filter(x => isLobbyTicket(x) && inScope(x) && isOverdue(x)).length },
+    { key: "ongoing",   label: "Ongoing",         count: tickets.filter(x => isOngoingTicket(x) && inScope(x)).length,
+      overdue: tickets.filter(x => isOngoingTicket(x) && inScope(x) && isOverdue(x)).length },
+    { key: "awaiting",  label: "Awaiting client", count: tickets.filter(x => ["awaiting_client","final_review"].includes(x.status) && inScope(x)).length,
+      overdue: tickets.filter(x => ["awaiting_client","final_review"].includes(x.status) && inScope(x) && isOverdue(x)).length },
+    { key: "review",    label: "In review",       count: tickets.filter(x => x.status === "in_review" && inScope(x)).length,
+      overdue: tickets.filter(x => x.status === "in_review" && inScope(x) && isOverdue(x)).length },
     { key: "completed", label: "Completed",       count: tickets.filter(x => ["done","approved","cancelled"].includes(x.status) && inScope(x)).length },
   ];
 
@@ -227,8 +267,26 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
                 borderRadius: 10, padding: "2px 8px", fontSize: 11, fontWeight: 700,
               }}>{tb.count}</span>
             )}
+            {tb.overdue > 0 && (
+              <span title={`${tb.overdue} overdue`} style={{
+                width: 7, height: 7, borderRadius: "50%", background: t.red || "#ED7969", flexShrink: 0,
+              }} />
+            )}
           </button>
         ))}
+        {isManager && (
+          <button
+            onClick={() => setMineOnly(m => !m)}
+            title="Show only tickets assigned to you"
+            style={{
+              marginLeft: "auto", alignSelf: "center", padding: "6px 14px",
+              background: mineOnly ? t.accent : "transparent",
+              color: mineOnly ? "#0B0B0D" : t.textMute,
+              border: `1px solid ${mineOnly ? t.accent : t.border}`,
+              borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+            }}
+          >Just mine</button>
+        )}
       </div>
 
       {tab === "overview" ? (
@@ -242,13 +300,13 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         />
       ) : (
         <>
-          {/* Completed tab: search + filter by academy (the archive is large). */}
-          {tab === "completed" && (
+          {/* Search + academy filter - every ticket tab */}
+          {(
             <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
               <input
                 value={completedSearch}
                 onChange={e => setCompletedSearch(e.target.value)}
-                placeholder="Search completed tasks…"
+                placeholder="Search tickets…"
                 style={{ flex: 1, minWidth: 240, padding: "10px 14px", borderRadius: 9, border: `1px solid ${t.border}`, background: t.surface, color: t.text, fontSize: 14, outline: "none" }}
               />
               <select
@@ -271,11 +329,23 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
             </div>
           )}
 
-          {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading tickets…</div>}
+          {loading && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: "16px 20px" }}>
+                  <div className="bp-skel" style={{ width: 32, height: 32, borderRadius: 8, background: t.border }} />
+                  <div style={{ flex: 1 }}>
+                    <div className="bp-skel" style={{ height: 12, width: "45%", borderRadius: 999, background: t.border, marginBottom: 8 }} />
+                    <div className="bp-skel" style={{ height: 10, width: "70%", borderRadius: 999, background: t.border }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {!loading && displayedTickets.length === 0 && (
             <div style={{ color: t.textMute, fontSize: 14, padding: "40px 0", textAlign: "center" }}>
-              {completedFiltered ? "No completed tasks match your search." : "No tickets in this tab."}
+              {completedFiltered ? "No tickets match your filters." : "No tickets in this tab."}
             </div>
           )}
 
@@ -337,6 +407,9 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
           onAction={async () => { await load(); }}
         />
       )}
+
+      <ToastHost tokens={t} />
+      <ConfirmHost tokens={t} />
     </div>
   );
 }
@@ -531,7 +604,7 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensit
   let dateColor = t.textMute;
   if (isUrgent) {
     if (ticket.priority === "urgent" && !ticket.due_date) {
-      dateLabel = "🔴 Urgent";
+      dateLabel = "Urgent";
       dateColor = t.red || "#ED7969";
     } else if (ticket.due_date) {
       const today = new Date(); today.setHours(0,0,0,0);
@@ -569,7 +642,10 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensit
       onMouseEnter={e => { e.currentTarget.style.background = isUrgent ? (dark ? "rgba(232,117,96,0.13)" : "rgba(232,117,96,0.16)") : t.bg; }}
       onMouseLeave={e => { e.currentTarget.style.background = isUrgent ? redBg : t.surface; }}
     >
-      <div style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{clientName}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <ClientAvatar client={ticket.client || {}} tokens={t} size={24} />
+        <span style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{clientName}</span>
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
         {timelineSensitive && (
@@ -596,7 +672,7 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensit
           style={{
             fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
             textTransform: "uppercase", letterSpacing: 0.5,
-            padding: "5px 10px", borderRadius: 6,
+            padding: "5px 10px", borderRadius: 8,
             border: `1px solid ${pingState === "done" ? (t.green || "#9DB87A") : t.border}`,
             color: pingState === "done" ? (t.green || "#9DB87A")
                  : pingState === "error" ? (t.red || "#ED7969")
@@ -607,8 +683,8 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensit
         >
           {pingState === "sending" ? "Pinging…"
            : pingState === "done" ? "✓ Pinged"
-           : pingState === "error" ? "⚠ Retry"
-           : "🔔 Ping Slack"}
+           : pingState === "error" ? "Retry"
+           : "Ping Slack"}
         </span>
       )}
     </button>
@@ -621,18 +697,38 @@ function TicketCard({ ticket, tokens: t, onOpen, completed }) {
   // On the Completed tab, surface the completion date (resolved_at) large
   // on the right so staff can scan "what got finished and when" at a glance.
   const showCompletedDate = completed && ticket.resolved_at;
+  // Due-date urgency chip: overdue red, today/tomorrow amber, else muted.
+  let dueChip = null;
+  if (!completed && ticket.due_date) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const due = new Date(ticket.due_date + "T00:00:00");
+    const diff = daysBetween(today, due);
+    const label = diff < 0 ? `${Math.abs(diff)}d overdue`
+      : diff === 0 ? "due today"
+      : diff === 1 ? "due tomorrow"
+      : `due in ${diff}d`;
+    const color = diff < 0 ? (t.red || "#ED7969") : diff <= 1 ? (t.amber || "#F0B84A") : t.textMute;
+    dueChip = (
+      <span style={{
+        fontSize: 11, fontWeight: 700, color, whiteSpace: "nowrap",
+        padding: "2px 9px", borderRadius: 999, background: `${color}18`, border: `1px solid ${color}44`,
+      }}>{label}</span>
+    );
+  }
   return (
     <div onClick={onOpen} style={{
       background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12,
       padding: "16px 20px", cursor: "pointer", transition: "border-color 0.2s",
-      display: "flex", alignItems: "center", gap: 20,
+      display: "flex", alignItems: "center", gap: 16,
     }}
       onMouseEnter={e => e.currentTarget.style.borderColor = t.borderMed}
       onMouseLeave={e => e.currentTarget.style.borderColor = t.border}
     >
+      <ClientAvatar client={ticket.client || {}} tokens={t} size={34} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-          {ticket.priority === "urgent" && <span style={{ fontSize: 11, fontWeight: 700, color: t.red }}>🔴 URGENT</span>}
+          {ticket.priority === "urgent" && <span style={{ fontSize: 11, fontWeight: 700, color: t.red }}>URGENT</span>}
+          {dueChip}
           {!showCompletedDate && <span style={{ fontSize: 12, color: t.textMute, marginLeft: "auto" }}>{formatDate(ticket.submitted_at)}</span>}
         </div>
         <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 4 }}>{title}</div>
@@ -692,7 +788,7 @@ function OfferConnect({ clientId, tokens: t, onCount }) {
         body: JSON.stringify({ action: "link", kind, ref_id, label, offer_id: offer_id || null }),
       });
       load();
-    } catch (e) { alert("Couldn't save: " + (e.message || e)); }
+    } catch (e) { showToast("Couldn't save: " + (e.message || e)); }
   };
 
   if (loading && !d) return <div style={{ fontSize: 13, color: t.textMute }}>Loading offers & connections…</div>;
@@ -763,6 +859,30 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
   const [flags, setFlags] = useState({});   // { fieldKey: { incorrect: bool, note: string } }
   const [copied, setCopied] = useState(false);
 
+  // Unsaved-work guard: half-typed notes/guide/messages shouldn't vanish on a
+  // stray overlay click or Esc. Saved states reset the baseline via `ticket`.
+  const dirty =
+    notes !== (ticket.staff_notes || "") ||
+    userGuide !== (ticket.user_guide || "") ||
+    clientRequest.trim() !== "" ||
+    clientReply.trim() !== "" ||
+    denyNotes.trim() !== "" ||
+    Object.keys(fieldEdits).length > 0;
+  const requestClose = async () => {
+    if (dirty && !(await uiConfirm({
+      title: "Discard unsaved changes?",
+      body: "You have typed notes or edits that haven't been saved.",
+      confirmLabel: "Discard", danger: true,
+    }))) return;
+    onClose();
+  };
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") requestClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, notes, userGuide, clientRequest, clientReply, denyNotes, fieldEdits]);
+
   // Auto-refresh the ticket from the server when the modal opens, so we
   // pick up any client responses that landed after the list was loaded.
   // Without this, staff sees a stale snapshot and misses new messages.
@@ -825,13 +945,13 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
       if (opts?.then) opts.then();
       if (opts?.toast) { setToast(opts.toast); setTimeout(() => setToast(""), 2800); }
     } else if (res?.error) {
-      alert(res.error);
+      showToast(res.error);
     }
     return res;
   };
 
   return (
-    <div onClick={onClose} style={{
+    <div onClick={requestClose} style={{
       position: "fixed", inset: 0, zIndex: 1000,
       background: dark ? "rgba(0,0,0,0.80)" : "rgba(0,0,0,0.35)",
       display: "flex", alignItems: "center", justifyContent: "center",
@@ -875,7 +995,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                 padding: "4px 10px", borderRadius: 999,
                 border: `1px solid ${t.red}55`,
                 background: `${t.red}15`,
-              }}>🔴 URGENT</span>
+              }}>URGENT</span>
             )}
             <span style={{ fontSize: 11, color: t.textMute, fontFamily: "monospace", marginLeft: "auto" }}>{ticket.id.slice(0, 8)}</span>
           </div>
@@ -932,7 +1052,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                   onChange={e => wrap(() => setTicketDueDate(ticket.id, e.target.value))}
                   disabled={busy}
                   style={{
-                    background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6,
+                    background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8,
                     padding: "3px 6px", fontSize: 12, color: t.text, fontFamily: "inherit",
                     colorScheme: dark ? "dark" : "light",
                   }}
@@ -966,10 +1086,10 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                     onMouseDown={e => e.preventDefault()}
                     onClick={async () => {
                       try { await navigator.clipboard.writeText(buildClaudeText(ticket.fields)); setCopied(true); setTimeout(() => setCopied(false), 1500); }
-                      catch (e) { alert("Copy failed: " + (e?.message || e)); }
+                      catch (e) { showToast("Copy failed: " + (e?.message || e)); }
                     }}
                     style={btn(t, "secondary")}
-                  >{copied ? "✓ Copied" : "📋 Copy for Claude"}</button>
+                  >{copied ? "✓ Copied" : "Copy for Claude"}</button>
                 </div>
                 {Object.entries(ticket.fields || {}).map(([k, v]) => {
                   // Resolve label: real question text > custom-answer hint > raw key
@@ -995,14 +1115,14 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                         <div style={{ marginTop: 4, marginBottom: 8 }}>
                           <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: fl.incorrect ? t.red : t.textMute, cursor: "pointer" }}>
                             <input type="checkbox" checked={!!fl.incorrect} onChange={e => setFlags(p => ({ ...p, [k]: { ...p[k], incorrect: e.target.checked } }))} style={{ accentColor: t.red }} />
-                            ⚠ Mark incorrect
+                            Mark incorrect
                           </label>
                           {fl.incorrect && (
                             <textarea
                               value={fl.note || ""}
                               onChange={e => setFlags(p => ({ ...p, [k]: { ...p[k], note: e.target.value } }))}
                               placeholder="What's wrong / what it should be"
-                              style={{ display: "block", width: "100%", marginTop: 6, padding: "8px 10px", background: t.bg, border: `1px solid ${t.red}66`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", minHeight: 46, resize: "vertical" }}
+                              style={{ display: "block", width: "100%", marginTop: 6, padding: "8px 10px", background: t.bg, border: `1px solid ${t.red}66`, borderRadius: 8, color: t.text, fontSize: 13, fontFamily: "inherit", minHeight: 46, resize: "vertical" }}
                             />
                           )}
                         </div>
@@ -1015,7 +1135,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                       {ticket.files.map((f, i) => (
                         <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, textDecoration: "none" }}>
-                          📎 {f.name}
+                          {f.name}
                         </a>
                       ))}
                     </div>
@@ -1066,7 +1186,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
 
           {/* Denial notes (visible when rework) */}
           {ticket.denial_notes && ticket.status === "needs_rework" && (
-            <Section title="⚠️ Denial feedback" tokens={t}>
+            <Section title="Denial feedback" tokens={t}>
               <div style={{ background: dark ? "rgba(232,117,96,0.08)" : "rgba(232,117,96,0.1)", border: `1px solid ${t.red}33`, borderRadius: 8, padding: 12, fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>
                 {ticket.denial_notes}
               </div>
@@ -1079,7 +1199,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             <Section title="Client conversation" tokens={t}>
               {ticket.status === "awaiting_client" && canClientComm && (
                 <div style={{ marginBottom: 12, padding: 10, background: dark ? "rgba(232,191,96,0.08)" : "rgba(232,191,96,0.12)", border: `1px solid ${t.accent}33`, borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontSize: 12, color: t.text, fontWeight: 600 }}>⏳ Awaiting client response</div>
+                  <div style={{ fontSize: 12, color: t.text, fontWeight: 600 }}>Awaiting client response</div>
                   <button onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => cancelClientRequest(ticket.id))} disabled={busy} style={btn(t, "ghost")}>Cancel request</button>
                 </div>
               )}
@@ -1099,7 +1219,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                       </div>
                       {m.body && <div style={{ fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>{m.body}</div>}
                       {(m.files || []).map((f, j) => (
-                        <a key={j} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, display: "block", marginTop: 4 }}>📎 {f.name}</a>
+                        <a key={j} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, display: "block", marginTop: 4 }}>{f.name}</a>
                       ))}
                     </div>
                   ))
@@ -1116,7 +1236,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                           <div style={{ fontSize: 11, color: t.textMute, fontWeight: 600, marginBottom: 4 }}>CLIENT REPLIED</div>
                           <div style={{ fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>{ticket.client_action_response}</div>
                           {(ticket.client_action_files || []).map((f, i) => (
-                            <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, display: "block", marginTop: 4 }}>📎 {f.name}</a>
+                            <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, display: "block", marginTop: 4 }}>{f.name}</a>
                           ))}
                         </div>
                       )}
@@ -1130,7 +1250,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                     onChange={e => setClientReply(e.target.value)}
                     placeholder="Reply to the client…"
                     rows={2}
-                    style={{ width: "100%", padding: "8px 10px", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical" }}
+                    style={{ width: "100%", padding: "8px 10px", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical" }}
                   />
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 8 }}>
                     <span style={{ fontSize: 11, color: t.textMute, lineHeight: 1.4 }}>
@@ -1273,7 +1393,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                       setToast(`Content requested - ticket ${String(json.ticket?.id || "").slice(0, 3).toUpperCase()} is in the content queue.`);
                       setTimeout(() => setToast(""), 4000);
                     } catch (e) {
-                      alert("Request failed: " + (e?.message || "error"));
+                      showToast("Request failed: " + (e?.message || "error"));
                     } finally {
                       setBusy(false);
                     }
@@ -1360,13 +1480,13 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             <button
               disabled={busy || connectBlocks}
               onMouseDown={e => e.preventDefault()}
-              onClick={() => { if (confirm("Mark this ticket complete?")) wrap(() => approveTicket(ticket.id)); }}
+              onClick={async () => { if (await uiConfirm({ title: "Mark this ticket complete?", confirmLabel: "Mark complete" })) wrap(() => approveTicket(ticket.id)); }}
               style={btn(t, "primary")}
               title={connectBlocks ? "Connect at least one pipeline/product/calendar to an offer first" : ""}
             >✓ Mark complete</button>
           )}
           {connectBlocks && (
-            <div style={{ fontSize: 12, color: t.amber || t.red, alignSelf: "center" }}>⚠ Connect at least one pipeline / product / calendar to an offer before completing.</div>
+            <div style={{ fontSize: 12, color: t.amber || t.red, alignSelf: "center" }}>Connect at least one pipeline / product / calendar to an offer before completing.</div>
           )}
 
           {/* Cancel ticket — any systems staff can cancel at any non-final
@@ -1381,7 +1501,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             >Cancel ticket</button>
           )}
           <button
-            onClick={onClose}
+            onClick={requestClose}
             style={{
               ...btn(t, "ghost"),
               ...(["done", "approved", "cancelled"].includes(ticket.status) ? { marginLeft: "auto" } : {}),
@@ -1544,7 +1664,7 @@ function ComplexValue({ value, tokens: t, depth = 0 }) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {value.map((item, i) => (
-          <div key={i} style={{ border: `1px solid ${t.border}`, borderRadius: 6, padding: "8px 10px", background: t.bg }}>
+          <div key={i} style={{ border: `1px solid ${t.border}`, borderRadius: 8, padding: "8px 10px", background: t.bg }}>
             <ComplexValue value={item} tokens={t} depth={depth + 1} />
           </div>
         ))}
@@ -1603,7 +1723,7 @@ function EditableRow({ label, value, originalValue, onChange, disabled, tokens: 
   const baseInputStyle = {
     width: "100%", padding: "8px 10px",
     background: t.bg, border: `1px solid ${isEdited ? t.accent : t.border}`,
-    borderRadius: 6, color: t.text, fontSize: 13,
+    borderRadius: 8, color: t.text, fontSize: 13,
     fontFamily: "inherit", outline: "none",
     transition: "border-color 0.15s",
   };
