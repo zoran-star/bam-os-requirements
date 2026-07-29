@@ -38556,9 +38556,19 @@ function _pcoRenderReport(j) {
   if (!rep) return;
   const d = j.drift && j.drift.counts ? j.drift.counts : { missing: 0, extra: 0, mismatched: 0, total: 0 };
   const clean = j.clean;
+  // A registry gap makes the drift arithmetic vacuous: cards on an unmapped role
+  // are skipped, not checked, so the count reads zero and the generic line below
+  // would say "0 drift item(s) found. Heal these" - unactionable, and the exact
+  // shape of green that hid 44 unchecked nurture cards on San Jose. Name the gap
+  // and the command that fills it.
+  const gaps = (j.registry && j.registry.gap_roles) || [];
   const head = clean
     ? '<span style="font-weight:800;color:#7BC47F">Clean - no drift.</span> Safe to flip.'
-    : `<span style="font-weight:800;color:#E5897B">${d.total} drift item(s) found.</span> Heal these before flipping (or use force).`;
+    : j.clean_blocked_by === 'registry_unseeded'
+      ? '<span style="font-weight:800;color:#E5897B">Nothing could be compared.</span> This academy has no GHL stage ids in its registry, so reconcile could not map a single card. Run <code>ghl-import.mjs seed-registry</code> (the import does it too), then reconcile again.'
+      : j.clean_blocked_by === 'registry_incomplete'
+        ? `<span style="font-weight:800;color:#E5897B">Part of the board was never checked.</span> No GHL stage is mapped for <b>${_pcoEsc(gaps.join(', '))}</b>, so cards there were skipped rather than compared - the zero above does not cover them. Run <code>ghl-import.mjs seed-registry</code>. If their GHL has no such column, that is a decision to make, not to force.`
+        : `<span style="font-weight:800;color:#E5897B">${d.total} drift item(s) found.</span> Heal these before flipping (or use force).`;
   const sample = (arr, label, fmt) => {
     if (!arr || !arr.length) return '';
     const rows = arr.slice(0, 8).map(fmt).join('');
@@ -38573,6 +38583,11 @@ function _pcoRenderReport(j) {
     (j.ghl && j.ghl.open_unmapped ? ` (+${j.ghl.open_unmapped} in unmapped stages)` : '') +
     ` &nbsp;·&nbsp; Portal open: <b>${j.portal ? j.portal.open_total : 0}</b></div>` +
     `<div style="margin-top:6px">Missing in portal: <b>${d.missing}</b> &nbsp;·&nbsp; Extra in portal: <b>${d.extra}</b> &nbsp;·&nbsp; Stage mismatch: <b>${d.mismatched}</b></div>` +
+    // Not drift, so not in the counts above, but the operator should see it: these
+    // cards are still open in GHL in a stage no role matches, so their role is
+    // vouched for by whoever classified them and by nothing this report checked.
+    (j.portal && j.portal.open_unverifiable
+      ? `<div style="margin-top:4px;color:var(--text-mute)"><b>${j.portal.open_unverifiable}</b> imported from stages the registry cannot name - classified by hand, not verified here.</div>` : '') +
     sample(drift.missing, 'Missing in portal (open in GHL, not mirrored)', m => `<div style="color:var(--text-mute)">· ${_pcoEsc(m.name) || m.ghl_opportunity_id} <span style="opacity:.7">[${_pcoEsc(m.role)}]</span></div>`) +
     sample(drift.mismatched, 'Stage mismatch (GHL vs portal)', m => `<div style="color:var(--text-mute)">· ${_pcoEsc(m.name) || m.ghl_opportunity_id} <span style="opacity:.7">GHL ${_pcoEsc(m.ghl_role)} / portal ${_pcoEsc(m.portal_role)}</span></div>`) +
     sample(drift.extra, 'Extra in portal (not open in GHL)', m => `<div style="color:var(--text-mute)">· ${_pcoEsc(m.name) || m.ghl_opportunity_id} <span style="opacity:.7">[${_pcoEsc(m.role)}]</span></div>`) +

@@ -12,49 +12,61 @@
 // Read-from-GHL + write-to-Supabase only. It does NOT touch GHL or flip any flag.
 // Idempotent: upserts on (client_id, role). Safe to re-run.
 //
-//   node scripts/seed-stages.js [clientId]
+//   node scripts/seed-stages.js <clientId>
 //
-// Defaults to BAM GTA (39875f07-0a4b-4429-a201-2249bc1f24df) when no id is given.
+// The academy is REQUIRED - there is no default (it used to be BAM GTA).
 // Needs VITE_SUPABASE_URL + SUPABASE_SERVICE_KEY (and a usable GHL token: the
 // client's ghl_access_token, else GHL_API_KEY / GHL_AGENCY_TOKEN) in ../../.env.local.
+//
+// The staff/CLI equivalent is `seed-registry` in api/admin/pipeline-cutover.js,
+// which does the same job through the same idempotent upsert but takes its token
+// from the normal per-academy OAuth path and needs no .env.local.
 
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ENV_PATH = join(__dirname, "..", ".env.local");
 
-const env = Object.fromEntries(
-  readFileSync(ENV_PATH, "utf8")
-    .split("\n")
-    .filter(l => l && !l.startsWith("#"))
-    .map(l => {
-      const idx = l.indexOf("=");
-      if (idx === -1) return ["", ""];
-      let v = l.slice(idx + 1);
-      if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
-      v = v.replace(/\\n/g, "").replace(/\\r/g, "").trim();
-      return [l.slice(0, idx), v];
-    })
-);
-
-const SUPABASE_URL = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
-const SUPABASE_KEY = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY;
 const GHL_V2 = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
-const CLIENT_ID = process.argv[2] || "39875f07-0a4b-4429-a201-2249bc1f24df"; // BAM GTA
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_KEY in .env.local");
-  process.exit(1);
+// Assigned by main(). Read at CALL time rather than at import time so this file
+// can be imported (by api/_ghl-migration.test.mjs, which asserts the ROLES table
+// below never authors a legacy key again) on a machine with no .env.local.
+let SUPABASE_URL = null;
+let SUPABASE_KEY = null;
+
+function loadEnv() {
+  return Object.fromEntries(
+    readFileSync(ENV_PATH, "utf8")
+      .split("\n")
+      .filter(l => l && !l.startsWith("#"))
+      .map(l => {
+        const idx = l.indexOf("=");
+        if (idx === -1) return ["", ""];
+        let v = l.slice(idx + 1);
+        if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+        v = v.replace(/\\n/g, "").replace(/\\r/g, "").trim();
+        return [l.slice(0, idx), v];
+      })
+  );
 }
 
 // Role registry definition. Matchers MUST stay identical to ROLE_MATCHERS in
-// api/agent/_store.js so the seeded ids match what the finders resolve today.
-const ROLES = [
+// api/agent/_store.js so the seeded ids match what the finders resolve today,
+// and the role KEYS must be ones the import surface accepts - this script and
+// api/admin/pipeline-cutover.js write into the same (client_id, role) rows.
+//
+// `ghosted`, not `interested`: this table authored the legacy key for six days
+// after migration 20260721150552 renamed it, and 20260723143000 exists purely to
+// clean up the duplicate stage rows that re-created. The GHL stage is still
+// NAMED "Interested" on most academies, which is why the matcher regex keeps
+// both words - the name mirror is deliberate, the role key is not.
+export const ROLES = [
   { role: "responded",       label: "Booking",      position: 0, is_terminal: false, match: (s) => /respond/i.test(s.name || "") },
-  { role: "interested",      label: "Ghosted",      position: 1, is_terminal: false, match: (s) => /interest|ghost/i.test(s.name || "") },
+  { role: "ghosted",         label: "Ghosted",      position: 1, is_terminal: false, match: (s) => /interest|ghost/i.test(s.name || "") },
   { role: "scheduled_trial", label: "Confirm",      position: 2, is_terminal: false, match: (s) => /(schedul|book).*trial/i.test(s.name || "") },
   { role: "done_trial",      label: "Closing",      position: 3, is_terminal: false, match: (s) => {
       const n = (s.name || "").toLowerCase();
@@ -92,6 +104,23 @@ async function ghl(method, path, token) {
 }
 
 async function main() {
+  const env = loadEnv();
+  SUPABASE_URL = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
+  SUPABASE_KEY = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY;
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_KEY in .env.local");
+    process.exit(1);
+  }
+  // NO DEFAULT ACADEMY. This used to fall back to BAM GTA when nobody named one,
+  // so a mistyped or forgotten argument rewrote the flagship academy's stage
+  // registry instead of failing. A write script that picks its own tenant is the
+  // same shape of foot-gun as one that writes a role nothing reads.
+  const CLIENT_ID = process.argv[2];
+  if (!CLIENT_ID) {
+    console.error("usage: node scripts/seed-stages.js <clientId>\n  The academy must be named explicitly - there is no default.");
+    process.exit(1);
+  }
+
   const rows = await sb(`clients?id=eq.${CLIENT_ID}&select=id,business_name,ghl_access_token,ghl_location_id`);
   const client = rows && rows[0];
   if (!client) { console.error(`No clients row for ${CLIENT_ID}`); process.exit(1); }
@@ -136,4 +165,7 @@ async function main() {
   console.log(`Upserted ${payload.length} pipeline_stages rows. Done.`);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+// Only when RUN, never when imported - see the note on SUPABASE_URL above.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(e => { console.error(e); process.exit(1); });
+}

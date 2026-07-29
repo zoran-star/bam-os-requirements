@@ -36,7 +36,7 @@ name, contact, stage_name, pipeline_name, last_stage_change_at).
 
 ### 2. Classify every card (you do this)
 Sort each card into ONE of the preset roles:
-`responded` (being worked / needs booking) · `interested` (went quiet / ghosted)
+`responded` (being worked / needs booking) · `ghosted` (went quiet)
 · `scheduled_trial` (booked, upcoming) · `done_trial` (attended, closing)
 · `nurture` (long game / said not now) · `won` / `unqualified` (terminal - only
 if their stage clearly says so).
@@ -63,19 +63,40 @@ node scripts/ghl-import.mjs shadow-on --client <id>
 ```
 Shadow keeps the store synced with GHL moves until the flip.
 
+`import` also seeds the stage registry (`pipeline_stages.ghl_stage_id`) from the
+live GHL board - reconcile maps GHL cards to portal roles through that column and
+can see nothing until it is filled. Check `registry.ok` in the import output. If
+it is false (GHL hiccup, token trouble), re-run it alone before reconciling:
+```bash
+node scripts/ghl-import.mjs seed-registry --client <id>
+```
+
 ### 5. Reconcile (the gate)
 ```bash
 node scripts/ghl-import.mjs reconcile --client <id>
 ```
-Show the drift report. `missing`/`mismatched` rows must be explained (usually:
+Show the drift report. `missing`/`mismatched`/`extra` must be explained (usually:
 cards the user chose to skip, or terminal stages). Re-import to fix, or accept.
+
+`drift.unverifiable` is NOT drift and is not counted: those cards are still open
+in GHL but sit in a stage whose name matches no role, so their role is vouched
+for by your classification alone. Worth eyeballing, never a reason to `--force`.
+
+**`clean: false` with zero drift is a real refusal, not a bug.** It means
+`registry.gap_roles` is non-empty: a role that holds cards, or that their board
+plainly has a column for, has no `ghl_stage_id`, so reconcile skipped those cards
+instead of checking them. `clean_blocked_by` says which case. Re-run
+`seed-registry`. If their GHL genuinely has no column for that role, say so to the
+user and decide together - that is a finding about the academy, not something to
+`--force` past. (Live example: BAM San Jose, 44 open `nurture` cards on a role
+with no GHL stage.)
 
 ### 6. Engine prep - make every card safe to launch on (the WS4 step)
 Before the flip, walk the launch-safety list with the user:
 - **Recency landed:** spot-check store rows carry `last_stage_change_at` from
   the dump - the agents' queue uses it so nobody who was texted yesterday gets
   texted again at go-live, and nobody waiting a week gets skipped.
-- **Cadence position, not cadence restart:** imported `responded`/`interested`
+- **Cadence position, not cadence restart:** imported `responded`/`ghosted`
   cards must read as MID-conversation to the follow-up engine (their recency
   stamp is the position). A card with no timestamp defaults to oldest - call
   those out and set a sensible date with the user.

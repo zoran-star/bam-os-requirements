@@ -1,7 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { isAutomationLive, enrollContact } from "../automations.js";
 import { nurtureStage, interestedStage } from "../agent/_stage.js";
-import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard, findOpenOpp, setStatus, moveStage, oppMatchClause, ROLE_MATCHERS } from "../agent/_store.js";
+import { shadowMirrorMove, shadowBackfillFromBoard, buildPortalBoard, findOpenOpp, setStatus, moveStage, oppMatchClause, roleForStageName } from "../agent/_store.js";
 import { resolvePresetKey, masterStageLabels } from "../agent/preset-master.js";
 import { pickGhlToken } from "./_core.js";
 // Vercel Serverless Function — Per-academy GHL Pipelines (kanban + moves)
@@ -30,19 +30,6 @@ const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABA
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
 function nowIso() { return new Date().toISOString(); }
-
-// Which pipeline ROLE is this GHL stage? Uses the SAME ROLE_MATCHERS the stage
-// finders and the shadow backfill use, so a stage resolves to the same role
-// everywhere. The legacy `interested` alias is skipped so the canonical
-// `ghosted` always wins. A custom academy stage matches nothing -> null, and
-// keeps behaving exactly as it does today.
-function roleForStageName(name) {
-  for (const [role, match] of Object.entries(ROLE_MATCHERS)) {
-    if (role === "interested") continue;
-    try { if (match({ name: name || "" })) return role; } catch (_) { /* skip */ }
-  }
-  return null;
-}
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
