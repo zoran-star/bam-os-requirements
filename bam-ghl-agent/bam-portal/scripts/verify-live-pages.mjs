@@ -158,8 +158,8 @@ const section = (t) => console.log(`\n${t}`);
 section('A. groups come back in a fixed order, funnels guessed only for known paths');
 {
   const r = buildResponse(SITE, PP_MANIFEST, PP_SEEDED, []);
-  ok(JSON.stringify(r.groups) === JSON.stringify(['Main pages', 'Sub pages', 'Funnels', 'Website pages']),
-    'group order is Main, Sub, Funnels, then the guessed ones', JSON.stringify(r.groups));
+  ok(JSON.stringify(r.groups) === JSON.stringify(['Main pages', 'Sub pages', 'Website pages', 'Funnels']),
+    'group order is Main, Sub, Website pages, Funnels', JSON.stringify(r.groups));
   const g = (p) => (r.pages.find((x) => x.path === p) || {}).group;   // may be missing under MUTATE
   ok(g('/contact') === 'Website pages', 'a seeded page with no manifest entry is a website page', g('/contact'));
 
@@ -192,7 +192,7 @@ section('C. grouped sections when the API sends groups, old flat list when it do
 {
   const grouped = buildResponse(SITE, PP_MANIFEST, PP_SEEDED, []);
   const out = await render({ enabled: true, site_url: SITE, manifest: true, groups: grouped.groups, pages: grouped.pages });
-  const heads = ['Main pages', 'Sub pages', 'Funnels', 'Website pages'].map((g) => out.indexOf('>' + g + '<'));
+  const heads = ['Main pages', 'Sub pages', 'Website pages', 'Funnels'].map((g) => out.indexOf('>' + g + '<'));
   ok(heads.every((i) => i > -1), 'a header for every group', heads.join(','));
   ok(heads[0] < heads[1] && heads[1] < heads[2] && heads[2] < heads[3], 'headers in the API order', heads.join(','));
   ok((out.match(/data-lp-path=/g) || []).length === grouped.pages.length, 'one card per page', String((out.match(/data-lp-path=/g) || []).length));
