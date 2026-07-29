@@ -159,8 +159,10 @@ const section = (t) => console.log(`\n${t}`);
 section('A. groups come back in a fixed order, funnels guessed only for known paths');
 {
   const r = buildResponse(SITE, PP_MANIFEST, PP_SEEDED, []);
-  ok(JSON.stringify(r.groups) === JSON.stringify(['Main pages', 'Sub pages', 'Website pages', 'Funnels']),
-    'group order is Main, Sub, Website pages, Funnels', JSON.stringify(r.groups));
+  // A site with a manifest sets its own section order, by the order its pages
+  // appear. Groups that exist only because of the seed or the path guess follow.
+  ok(JSON.stringify(r.groups) === JSON.stringify(['Main pages', 'Sub pages', 'Funnels', 'Website pages']),
+    'the manifest sets the group order, guessed groups follow', JSON.stringify(r.groups));
   const g = (p) => (r.pages.find((x) => x.path === p) || {}).group;   // may be missing under MUTATE
   ok(g('/contact') === 'Website pages', 'a seeded page with no manifest entry is a website page', g('/contact'));
 
@@ -195,9 +197,11 @@ section('C. grouped sections when the API sends groups, old flat list when it do
 {
   const grouped = buildResponse(SITE, PP_MANIFEST, PP_SEEDED, []);
   const out = await render({ enabled: true, site_url: SITE, manifest: true, groups: grouped.groups, pages: grouped.pages });
-  const heads = ['Main pages', 'Sub pages', 'Website pages', 'Funnels'].map((g) => out.indexOf('>' + g + '<'));
+  // Read the order out of the response rather than hardcoding it, so this checks
+  // that the RENDER follows the API instead of checking a copy of the same list.
+  const heads = grouped.groups.map((g) => out.indexOf('>' + g + '<'));
   ok(heads.every((i) => i > -1), 'a header for every group', heads.join(','));
-  ok(heads[0] < heads[1] && heads[1] < heads[2] && heads[2] < heads[3], 'headers in the API order', heads.join(','));
+  ok(heads.every((v, i) => i === 0 || heads[i - 1] < v), 'headers in the API order', heads.join(','));
   ok((out.match(/data-lp-path=/g) || []).length === grouped.pages.length, 'one card per page', String((out.match(/data-lp-path=/g) || []).length));
   // 6 from the manifest + 3 seeded, and '/' is in both, so 8.
   ok(grouped.pages.length === 8 && out.includes('8 pages live'), 'the count reflects every page, manifest plus seeded', String(grouped.pages.length));
@@ -208,6 +212,36 @@ section('C. grouped sections when the API sends groups, old flat list when it do
   });
   ok(!/Main pages|Website pages/.test(old) && (old.match(/data-lp-path=/g) || []).length === 2,
     'an older response with no groups renders flat, exactly as before');
+}
+
+// ── C2. a funnel renders as a chain, led by its landing page ──
+section('C2. a funnel is a chain: landing page first, its steps under it');
+{
+  const FUNNEL = [
+    { path: '/tryout-dominance', label: 'Tryout Dominance Camps', group: 'Funnel: Tryout Dominance Camps', step: 'Landing page', updated: null },
+    { path: '/camp-signup', label: 'Pick days, details, agreement', group: 'Funnel: Tryout Dominance Camps', step: 'Sign up', updated: null },
+    { path: '/camp-checkout', label: 'Card payment', group: 'Funnel: Tryout Dominance Camps', step: 'Checkout', updated: null },
+    { path: '/camp-thank-you', label: 'Booking confirmed', group: 'Funnel: Tryout Dominance Camps', step: 'Thank you', updated: null },
+    { path: '/', label: 'Home', group: 'Main pages', step: null, updated: null },
+  ];
+  const r = buildResponse(SITE, FUNNEL, [], []);
+  ok(JSON.stringify(r.groups) === JSON.stringify(['Funnel: Tryout Dominance Camps', 'Main pages']),
+    'the funnel section comes first because the manifest lists it first', JSON.stringify(r.groups));
+  ok(r.pages.map((p) => p.step).slice(0, 4).join('|') === 'Landing page|Sign up|Checkout|Thank you',
+    'steps keep the manifest order inside the group', r.pages.map((p) => p.step).join('|'));
+
+  const out = await render({ enabled: true, site_url: SITE, manifest: true, groups: r.groups, pages: r.pages });
+  ok(out.includes('Steps in this funnel'), 'the steps are drawn under the landing page, not beside it');
+  const iLanding = out.indexOf('/tryout-dominance');
+  const iSteps = out.indexOf('Steps in this funnel');
+  const iSignup = out.indexOf('/camp-signup');
+  ok(iLanding > -1 && iLanding < iSteps && iSteps < iSignup, 'landing page, then the steps rule, then the steps', `${iLanding} < ${iSteps} < ${iSignup}`);
+  ok(['Landing page', 'Sign up', 'Checkout', 'Thank you'].every((s) => out.includes('>' + s + '<')), 'every step is labelled on its card');
+  ok((out.match(/data-lp-path=/g) || []).length === 5, 'no page is lost or duplicated by the nesting', String((out.match(/data-lp-path=/g) || []).length));
+
+  // A group whose pages carry no step must not sprout an empty steps rule.
+  const flat = await render({ enabled: true, site_url: SITE, manifest: true, groups: ['Main pages'], pages: [FUNNEL[4]] });
+  ok(!flat.includes('Steps in this funnel'), 'a group with no steps keeps the plain grid');
 }
 
 // ── D. dates ──
