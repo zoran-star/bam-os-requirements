@@ -44,6 +44,7 @@
 
 import { sbRest } from "./_store.js";
 import { seedAutomations } from "./seed-automations.js";
+import { attachReignition } from "./reignition-station.js";
 
 // ── Agent templates ──────────────────────────────────────────────────────────
 // runtime  = which existing agent behaviour drives it (prompt-structure.js AGENT_SPECS).
@@ -344,6 +345,46 @@ export const PRESETS = {
   },
 };
 
+// ── The REIGNITION station, attached to every sales system ───────────────────
+// One shared station (api/agent/reignition-station.js), attached here to every
+// preset in the registry - which is what makes it a property of "a sales system"
+// rather than of one academy. Exits are declared BY ROLE, so free_trial and
+// discovery_trial both resolve them against their own stages with no per-system
+// code; a sales system added below gets the station by existing.
+//
+// WHERE THE GUARANTEE IS ENFORCED, AND WHY IT IS NOT ENFORCED HERE.
+// The rule (a reply must land on an agent or a human; silence must land on an
+// automation or a terminal) is a DESIGN-TIME rule, so the check that fails a build
+// belongs in a test, not in a module that production imports. attachReignition
+// still throws - and api/_reignition.test.mjs asserts that every preset in this
+// registry attaches cleanly, which is what actually blocks a bad sales system.
+// Here the throw is CAUGHT and logged, because this module is imported by the
+// automation worker, all four inbound webhooks, the router, the agent brain, the
+// board and apply-preset: a throw at import would take the portal down over a
+// mis-declared exit. Failing this way degrades exactly one feature (the preset
+// simply has no reignition station, so nothing can enter it) instead of all of
+// them. Fail closed on reignition, not on the portal.
+//
+// It attaches the station's EDGES (the router reads the flow graph straight from
+// this master, so `reignition + replied -> responded` has to live here) but NOT a
+// stamped stage row - buildPresetRows skips `attachOnUse` stations, so applying a
+// preset still writes exactly the stage anchors it wrote before. The reignition
+// row is stamped on first campaign approval instead, by stampReignitionStage().
+//
+// To point a future sales system's reignition somewhere else, attach it with an
+// override there: attachReignition(PRESETS.slow_burn, { exits: { replied: "..." } }).
+for (const key of Object.keys(PRESETS)) {
+  try {
+    attachReignition(PRESETS[key]);
+  } catch (e) {
+    // Loud, but survivable. A preset that lands here has NO reignition station, so
+    // no campaign can ever put anybody into it - the unsafe pipeline is refused,
+    // the portal stays up, and api/_reignition.test.mjs fails on the missing
+    // station, which is where this is meant to be caught.
+    console.error(`[presets] REIGNITION NOT ATTACHED to '${key}' - no campaign can run on it. ${e.message}`);
+  }
+}
+
 // ── Derived views over the station tree ──────────────────────────────────────
 
 // Every role a preset uses (for validation / display), in board (position) order.
@@ -410,7 +451,12 @@ export function presetContents(presetKey) {
     // Qualification dimensions the preset judges leads on (see the note on
     // PRESETS.free_trial: interest is NOT one of them). For UI rendering later.
     qualifications: p.qualifications || [],
-    stages: stages.map((s) => ({ role: s.role, label: s.label, engine: s.engine ? s.engine.kind : "human",
+    // engine "campaign" = a station whose engine is supplied per campaign rather
+    // than by the preset (reignition). It must NOT read as "human" - that would
+    // tell the UI a person works the stage, and would satisfy the reignition
+    // attachment check if anything ever pointed a `replied` exit at it.
+    stages: stages.map((s) => ({ role: s.role, label: s.label,
+      engine: s.engine ? s.engine.kind : (s.attachOnUse ? "campaign" : "human"),
       engine_ref: s.engine ? (s.engine.template || s.engine.key || null) : null })),
     agents: stages.filter((s) => s.engine && s.engine.kind === "agent")
       .map((s) => ({ template: s.engine.template, mission: (AGENT_TEMPLATES[s.engine.template] || {}).mission || "" })),
@@ -428,7 +474,12 @@ export function buildPresetRows(presetKey, clientId, offerId) {
   if (!p) throw new Error(`unknown preset '${presetKey}' (known: ${Object.keys(PRESETS).join(", ")})`);
   if (!clientId) throw new Error("clientId required");
 
-  const stageRows = [...p.stages].sort((a, b) => a.position - b.position).map((s) => ({
+  // `attachOnUse` stations (today: reignition) are part of the FLOW - their edges
+  // are compiled below and served to the router - but they are not stamped when a
+  // preset is applied. A stage nobody is running a campaign in would otherwise be a
+  // permanently empty column on every academy's board. They are stamped on first
+  // use instead (stampReignitionStage), through this same idempotent upsert.
+  const stageRows = [...p.stages].filter((s) => !s.attachOnUse).sort((a, b) => a.position - b.position).map((s) => ({
     client_id: clientId,
     offer_id: offerId || null,
     role: s.role,
