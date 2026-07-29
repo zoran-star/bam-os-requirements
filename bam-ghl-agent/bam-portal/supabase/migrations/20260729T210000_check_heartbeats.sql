@@ -1,8 +1,11 @@
 -- Durable "when did this check last run, and what did it say".
 --
--- ⛔ NOT APPLIED. Needs the orchestrator's gate: this is a NEW TABLE, not
--- additive columns, so it goes past him before it lands even with the
--- align-core-data-model step waived for this workstream.
+-- ✅ APPLIED to prod 2026-07-29 (mcp apply_migration, name: check_heartbeats),
+-- orchestrator gate cleared. Verified by querying production afterwards rather
+-- than trusting the success flag: 6 columns with the intended types, RLS
+-- enabled, exactly ONE policy (SELECT, staff-only), 1 trigger, 0 rows. The
+-- forge-resistance claim was verified by EXECUTION, not by reading the policy
+-- list: an insert as role `authenticated` fails with insufficient_privilege.
 --
 -- WHY IT EXISTS (AUTOMATION TEMPLATING II, 2026-07-29): the testimonial drift
 -- reconciler runs on a schedule and alerts only on failure, which means SILENCE
