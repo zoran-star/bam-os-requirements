@@ -31,6 +31,8 @@ Other views still on legacy radii/hardcodes (disperse per-view); emoji icons in 
 
 **2026-07-27 staff Systems pass (Cole):** dialogs EXTRACTED to `src/components/dialogs.jsx` (`showToast`/`uiConfirm`/`ToastHost`/`ConfirmHost` - ClientsCombinedView + SystemsView both import it now; use this in every view, mount the two hosts at the view root). SystemsView: emoji sweep (🔴📋📎🔔⏳⚠ gone), radius 8, URL-persisted `?stab=` + `?ticket=` (tickets deep-linkable), search+academy filter on ALL tabs, "Just mine" manager toggle, overdue-first sort + due chips on cards + red overdue dot on tab labels, avatars on cards/rows (api/tickets.js now returns clients.brand_data), skeletons, new-ticket realtime toast, TicketModal: Esc/overlay close with an unsaved-changes guard.
 
+**2026-07-27 staff Marketing pass (Cole):** MarketingView - type icons are SVG (TYPE_META.icon now holds JSX elements), homegrown Banner deleted in favor of shared dialogs.jsx toasts (hosts mount inside sectionTabs' fragment + the detail return), realtime on `marketing_tickets` with new-request toast (load() is now reusable/quiet-refresh), `?mticket=` deep link (sessionStorage stash from client-detail still honored), academy dropdown + "Due today" quick chip, type filter is icon chips with live counts (zero-count types hidden), avatars on rows, overdue dots on Active/Client-Dependent tabs, skeletons, action/revision modals get Esc + guarded discard. MediaLightbox was already wired for image/video previews - untouched.
+
 ## Gotchas
 - client-portal.html `:root` and tokens.css MUST stay mirrored - drift breaks the system.
 - The tour verifier (`node bam-portal/scripts/verify-client-portal-ui.mjs`) must pass after any client-portal.html edit - passed on this pass.
