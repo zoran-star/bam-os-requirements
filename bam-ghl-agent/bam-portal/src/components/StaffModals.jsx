@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { uiConfirm } from "./dialogs.jsx";
 
 // Canonical staff role allow-list. Keep in sync with VALID_STAFF_ROLES
 // in api/clients.js (invite-staff) and the canSee* role checks in App.jsx.
@@ -16,6 +17,17 @@ export function getRoleLabel(value) {
   return STAFF_ROLES.find(r => r.value === value)?.label || value;
 }
 
+// Shared Esc-to-close hook for both modals (guarded by each modal's own
+// requestClose, so unsaved work still gets its confirm).
+function useEscClose(requestClose, deps) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") requestClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+}
+
 // ─────────────────────────────────────────────────
 // New staff member modal
 // ─────────────────────────────────────────────────
@@ -26,6 +38,14 @@ export function NewStaffModal({ tokens, session, onClose, onCreated }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(null);
+
+  // Unsaved-work guard: typed name/email shouldn't vanish on a stray click.
+  const dirty = !sent && (name.trim() !== "" || email.trim() !== "");
+  const requestClose = async () => {
+    if (dirty && !(await uiConfirm({ title: "Discard this invite?", body: "The typed details will be lost.", danger: true, confirmLabel: "Discard" }))) return;
+    onClose();
+  };
+  useEscClose(requestClose, [dirty, name, email, sent]);
 
   const submit = async () => {
     setError("");
@@ -62,8 +82,8 @@ export function NewStaffModal({ tokens, session, onClose, onCreated }) {
   const inputStyle = { width: "100%", padding: "10px 12px", marginBottom: 14, background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 14, fontFamily: "inherit" };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(8px)" }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 12, padding: 28 }}>
+    <div onClick={requestClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(8px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 16, padding: 28 }}>
         {!sent ? (
           <>
             <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>Add staff member</div>
@@ -82,10 +102,10 @@ export function NewStaffModal({ tokens, session, onClose, onCreated }) {
               ))}
             </select>
 
-            {error && <div style={{ color: tokens.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
+            {error && <div style={{ color: tokens.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-              <button onClick={onClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+              <button onClick={requestClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>
               <button onClick={submit} disabled={busy} style={{ padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 600, cursor: busy ? "wait" : "pointer", fontSize: 13, opacity: busy ? 0.6 : 1 }}>
                 {busy ? "Sending…" : "Add + send invite"}
               </button>
@@ -114,6 +134,11 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
   const [name, setName]   = useState(member.name || "");
   const [email, setEmail] = useState(member.email || "");
   const [role, setRole]   = useState(member.role || "systems_executor");
+  // booking_url powers the "Book with [name]" CTAs on client onboarding
+  // checklists (SM / Cam / Ximena steps). Until now it was only settable
+  // via SQL - which is why some steps fall back to "Message us on Slack".
+  const [bookingUrl, setBookingUrl] = useState(member.booking_url || "");
+  const [avatarUrl, setAvatarUrl] = useState(member.avatar_url || "");
   const [busy, setBusy]   = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [error, setError] = useState("");
@@ -122,13 +147,24 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
   const hasChanges =
     name.trim() !== (member.name || "") ||
     email.trim() !== (member.email || "") ||
-    role !== (member.role || "");
+    role !== (member.role || "") ||
+    bookingUrl.trim() !== (member.booking_url || "") ||
+    avatarUrl.trim() !== (member.avatar_url || "");
+
+  const requestClose = async () => {
+    if (hasChanges && !(await uiConfirm({ title: "Discard unsaved changes?", danger: true, confirmLabel: "Discard" }))) return;
+    onClose();
+  };
+  useEscClose(requestClose, [hasChanges, name, email, role, bookingUrl, avatarUrl]);
 
   const saveChanges = async () => {
     setError("");
     if (!name.trim())  { setError("Name is required."); return; }
     if (!email.trim()) { setError("Email is required."); return; }
     if (!/^\S+@\S+\.\S+$/.test(email)) { setError("Enter a valid email."); return; }
+    for (const [label, v] of [["Booking link", bookingUrl], ["Avatar URL", avatarUrl]]) {
+      if (v.trim() && !/^https?:\/\//i.test(v.trim())) { setError(`${label} must start with http:// or https://`); return; }
+    }
 
     setBusy(true);
     try {
@@ -136,7 +172,10 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
       const res = await fetch("/api/clients?action=update-staff", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ id: member.id, name: name.trim(), email: email.trim(), role }),
+        body: JSON.stringify({
+          id: member.id, name: name.trim(), email: email.trim(), role,
+          booking_url: bookingUrl.trim(), avatar_url: avatarUrl.trim(),
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -144,7 +183,7 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
         setBusy(false);
         return;
       }
-      onSaved?.({ ...member, name: name.trim(), email: email.trim(), role });
+      onSaved?.({ ...member, name: name.trim(), email: email.trim(), role, booking_url: bookingUrl.trim() || null, avatar_url: avatarUrl.trim() || null });
       setBusy(false);
       onClose();
     } catch (e) {
@@ -182,8 +221,8 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
   const inputStyle = { width: "100%", padding: "10px 12px", marginBottom: 14, background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 14, fontFamily: "inherit" };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(8px)" }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 12, padding: 28 }}>
+    <div onClick={requestClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(8px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 16, padding: 28 }}>
         <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>Edit staff member</div>
         <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>Update details or send a password reset link.</div>
 
@@ -199,6 +238,15 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
             <option key={r.value} value={r.value}>{r.label}</option>
           ))}
         </select>
+
+        <label style={labelStyle}>Booking link</label>
+        <input style={{ ...inputStyle, marginBottom: 4 }} value={bookingUrl} onChange={e => setBookingUrl(e.target.value)} placeholder="https://calendly.com/..." type="url" />
+        <div style={{ fontSize: 11.5, color: tokens.textMute, marginBottom: 14, lineHeight: 1.5 }}>
+          Powers the "Book with {name.split(" ")[0] || "them"}" buttons on client onboarding checklists. Without it, those steps fall back to "Message us on Slack".
+        </div>
+
+        <label style={labelStyle}>Avatar URL</label>
+        <input style={inputStyle} value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="https://... (photo shown on the Team card)" type="url" />
 
         {/* Password reset action — sits between fields and footer */}
         <div style={{
@@ -222,10 +270,10 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
         </div>
 
         {banner && <div style={{ color: tokens.green, fontSize: 13, marginBottom: 12 }}>✓ {banner}</div>}
-        {error && <div style={{ color: tokens.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
+        {error && <div style={{ color: tokens.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+          <button onClick={requestClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>
           <button onClick={saveChanges} disabled={busy || !hasChanges} style={{
             padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8,
             fontWeight: 600, cursor: (busy || !hasChanges) ? "not-allowed" : "pointer",

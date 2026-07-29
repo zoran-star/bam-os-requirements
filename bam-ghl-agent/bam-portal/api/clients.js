@@ -2346,6 +2346,20 @@ async function handler(req, res) {
           authEmailSync = "updated";
         }
 
+        // Optional profile fields (Team page edit modal): booking_url powers
+        // the "Book with [SM]" CTAs on the client checklists; avatar_url shows
+        // on the staff cards. Empty string clears the field.
+        const staffPatch = { name: newName, email: newEmail, role: newRole };
+        for (const k of ["booking_url", "avatar_url"]) {
+          if (Object.prototype.hasOwnProperty.call(body, k) && typeof body[k] === "string") {
+            const v = body[k].trim();
+            if (v && !/^https?:\/\//i.test(v)) {
+              return res.status(400).json({ error: `${k.replace("_", " ")} must start with http:// or https://` });
+            }
+            staffPatch[k] = v || null;
+          }
+        }
+
         const updRes = await fetch(
           `${SUPABASE_URL}/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}`,
           {
@@ -2356,7 +2370,7 @@ async function handler(req, res) {
               "Content-Type": "application/json",
               Prefer: "return=representation",
             },
-            body: JSON.stringify({ name: newName, email: newEmail, role: newRole }),
+            body: JSON.stringify(staffPatch),
           }
         );
         if (!updRes.ok) {
@@ -2368,7 +2382,7 @@ async function handler(req, res) {
           return res.status(404).json({ error: "staff member not found" });
         }
         const row = rows[0];
-        return res.status(200).json({ id: row.id, name: row.name, email: row.email, role: row.role, auth_email_sync: authEmailSync });
+        return res.status(200).json({ id: row.id, name: row.name, email: row.email, role: row.role, booking_url: row.booking_url || null, avatar_url: row.avatar_url || null, auth_email_sync: authEmailSync });
       }
 
       // ── action=reset-staff-password ──
