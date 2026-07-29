@@ -24,11 +24,16 @@
 // quotes never move it. No aggregate on file = aggregate: null = no rating
 // renders anywhere.
 //
-// EMPTY STATES (do not collapse them): zero rows means "we never asked";
-// rows-but-none-starred means "they gave us quotes and chose not to feature
-// any". Both mean the testimonials email does not ship (decided at seed time,
-// not render time); only the first is a reason to go back to the academy.
-// `starredCount` is returned so seed-time logic can tell them apart.
+// ⚠️ THREE STATES, NOT TWO - and callers must not collapse them:
+//   1. zero rows                  → { testimonials: [] }   "we never asked"
+//   2. rows but none starred      → starredCount === 0     "they chose not to feature any"
+//   3. the resolver CANNOT ANSWER → this function THROWS.  An outage, not a fact.
+// Zoran approved "empty store means the email is dropped". He did NOT approve
+// "a failed lookup means the email is dropped" - that is an outage presenting
+// as a feature. So seed-time callers MUST let the throw propagate (or fail the
+// seed loudly), never catch-and-treat-as-empty. The website endpoint maps the
+// throw to a 500, which its consumers already render as "section absent" -
+// acceptable for a marketing section, wrong for a seed decision.
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
