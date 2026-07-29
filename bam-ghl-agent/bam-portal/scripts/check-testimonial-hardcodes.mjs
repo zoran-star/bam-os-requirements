@@ -97,6 +97,16 @@ if (!roots.length) { console.error("nothing to scan - bad path?"); process.exit(
 const store = await storeQuotes();
 const failures = [];
 
+// Every exemption silently removes real coverage: a green with five exemptions
+// is not the same green as one with none, so the count is printed on EVERY
+// run, pass or fail. Two are ruled (Miami, Supreme Hoops); a third+ should be
+// read as an alarm, not an entry.
+const namedExemptions = EXEMPT.filter((re) => !re.test("scripts/check-testimonial-hardcodes.mjs"));
+const exemptionNote = `${namedExemptions.length} active exemption(s): ${namedExemptions.map((re) => re.source.replace(/\\\//g, "/").replace(/^clients\//, "").replace(/\/$/, "")).join(", ") || "none"}`;
+if (namedExemptions.length > 2) {
+  console.error(`⚠️ ALARM: ${exemptionNote} - more than the two Zoran ruled. Every entry removes coverage; justify or delete.`);
+}
+
 for (const root of roots) {
   for (const file of walk(root)) {
     if (EXEMPT.some((re) => re.test(file))) continue;
@@ -111,6 +121,7 @@ for (const root of roots) {
 }
 
 if (failures.length) {
+  console.error(`(${exemptionNote})`);
   console.error(`FAIL - ${failures.length} hardcoded testimonial string(s) in source:\n`);
   for (const f of failures) {
     console.error(`  [${f.kind}] ${relative(process.cwd(), f.file)}\n      "${f.frag}"`);
@@ -120,6 +131,6 @@ if (failures.length) {
 
 console.log(
   store
-    ? `PASS - fabricated corpus (${FABRICATED.length} fragments) + ${store.length} store quotes: none found in source across ${roots.length} roots.`
-    : `PASS (DEGRADED - no Supabase env, store-quote half NOT checked) - fabricated corpus clean across ${roots.length} roots.`
+    ? `PASS - fabricated corpus (${FABRICATED.length} fragments) + ${store.length} store quotes: none found in source across ${roots.length} roots. (${exemptionNote})`
+    : `PASS (DEGRADED - no Supabase env, store-quote half NOT checked) - fabricated corpus clean across ${roots.length} roots. (${exemptionNote})`
 );

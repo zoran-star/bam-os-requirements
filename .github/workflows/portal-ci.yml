@@ -64,3 +64,12 @@ jobs:
       - name: Verify client-portal onboarding tour targets
         working-directory: bam-ghl-agent
         run: node bam-portal/scripts/verify-client-portal-ui.mjs
+
+      # No testimonial content may ship hardcoded from source - it must reach
+      # output through the resolver (api/_testimonials.js). Here this scans the
+      # portal's email templates + agent defaults for the fabricated-reviewer
+      # corpus; the bam-client-sites half of the same check runs in that repo.
+      # Without Supabase secrets the run is DEGRADED (store-quote half skipped)
+      # and says so in its output rather than passing silently.
+      - name: No hardcoded testimonials in email templates or agent defaults
+        run: node scripts/check-testimonial-hardcodes.mjs /nonexistent-no-sites-checkout-in-ci
