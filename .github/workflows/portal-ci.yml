@@ -91,11 +91,17 @@ jobs:
       # a regression, so each control deliberately breaks one thing and the suite
       # must NOTICE. Controls are discovered from each file's own MUTATE= docs.
       #
-      # Two conventions are in use and both are accepted as "caught": the suite
-      # exits non-zero (it failed, which is the point), or it prints NEGATIVE
-      # CONTROL PASSED and exits clean. The failure being hunted here is a control
-      # that changes nothing - exit 0 AND silent - because that means the control
-      # is decorative and the confidence it buys is fake.
+      # "Caught" REQUIRES the suite to print NEGATIVE CONTROL PASSED. A non-zero
+      # exit is deliberately NOT accepted as proof, and that is a fix rather than
+      # pedantry: every suite here prints the banner, and when a mutation matches
+      # nothing the suite ALSO exits non-zero (it prints NEGATIVE CONTROL FAILED
+      # and fails on purpose). So "rc != 0 means caught" reported a control that no
+      # longer existed as working - delete a control from the code, leave its
+      # MUTATE= line in the docs, and this step went green. Found 2026-07-29 by
+      # hitting the identical false positive in a hand-written verification loop.
+      #
+      # The failure being hunted is a control that changes nothing the suite
+      # notices, because then the confidence it buys is fake.
       - name: Run the negative controls
         run: |
           fail=0
@@ -111,11 +117,11 @@ jobs:
               continue
             fi
             for m in $controls; do
-              out=$(MUTATE="$m" node "$t" 2>&1) && rc=0 || rc=$?
-              if [ "$rc" -ne 0 ] || printf '%s' "$out" | grep -q 'NEGATIVE CONTROL PASSED'; then
+              out=$(MUTATE="$m" node "$t" 2>&1) || true
+              if printf '%s' "$out" | grep -q 'NEGATIVE CONTROL PASSED'; then
                 echo "  caught   $t MUTATE=$m"
               else
-                echo "::error file=bam-ghl-agent/bam-portal/$t::negative control MUTATE=$m changed nothing the suite noticed"
+                echo "::error file=bam-ghl-agent/bam-portal/$t::negative control MUTATE=$m did not report NEGATIVE CONTROL PASSED - it changed nothing the suite noticed, or it no longer exists in the code and only its MUTATE= doc line remains"
                 fail=1
               fi
             done
