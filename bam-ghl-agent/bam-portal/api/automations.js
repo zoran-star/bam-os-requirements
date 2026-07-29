@@ -859,11 +859,35 @@ async function handler(req, res) {
     // The approval itself: sets approved:true on this academy's five sales
     // automations, which is what lets anything send at all.
     //
-    // FAILS CLOSED, three ways: the rows are re-read scoped to this academy (never
+    // FAILS CLOSED, four ways: the rows are re-read scoped to this academy (never
     // trusted from the request), only the five shared sales keys are ever touched
-    // (the `onboarding` welcome sequence is NOT part of this yes), and an academy
+    // (the `onboarding` welcome sequence is NOT part of this yes), an academy
     // with no sales automations is refused rather than reported approved - nothing
-    // to approve is not approval.
+    // to approve is not approval - and a row with ZERO STEPS is skipped, because
+    // consent to an empty sequence is consent to whatever lands in it later.
+    //
+    // WHY THE STEP-LESS SKIP EXISTS, because it is not obvious and it was created by
+    // a fix to the other half of this path (2026-07-29). The seeder learned to repair
+    // a row born dormant: a step-less automation at enabled:false gets enabled:true
+    // and the canonical steps written into it. Good on its own. But this action used
+    // to approve every sales row it found without looking at whether it CONTAINED
+    // anything, and `approval-queue` happily renders a sequence with no messages in
+    // it. Composed, on BAM NY's real shape:
+    //
+    //   owner presses Approve over a screen with no messages on it -> approved:true
+    //   a routine re-seed runs (applyPreset calls seedAutomations, and
+    //     seed-preset-automations is a portal action) -> enabled:true + steps
+    //   isAutomationLive -> true. Four live outbound steps, no second consent.
+    //
+    // Before the seeder repair the row stayed enabled:false and stayed silent, so
+    // that fix turned a dormant, VISIBLE failure into an armed, INVISIBLE one. The
+    // owner's yes has to be about messages they read, so an empty sequence does not
+    // collect one and the fill has to come back and ask.
+    //
+    // The boundary is ZERO STEPS on purpose - the same boundary the seeder's repair
+    // uses. A row with steps is one an academy has configured; whether those steps
+    // are switched on is a separate decision the owner can see on the surface. A row
+    // with no steps is one the seeder will still write into.
     //
     // It writes `approved` ONLY. It must never touch `enabled` on an automation or
     // on a step: the seeder turns individual steps off on purpose, and flipping them
@@ -882,12 +906,26 @@ async function handler(req, res) {
       const autos = await sb(`automations?client_id=eq.${clientId}&automation_key=in.(${SALES_AUTOMATION_KEYS.join(",")})&select=id,automation_key,approved,enabled`) || [];
       const list = Array.isArray(autos) ? autos : [];
       if (!list.length) return res.status(400).json({ error: "no sales messages to approve yet - apply your sales preset first" });
-      for (const a of list) {
+      // Which of them actually contain something to consent to. One query for all
+      // five rather than one per row.
+      const stepRows = await sb(`automation_steps?automation_id=in.(${list.map((a) => a.id).join(",")})&select=automation_id`) || [];
+      const filled = new Set((Array.isArray(stepRows) ? stepRows : []).map((s) => s.automation_id));
+      const armable = list.filter((a) => filled.has(a.id));
+      // Named, and returned, so the surface can say "these are not ready yet"
+      // instead of reading green off an approval that covered nothing.
+      const skipped = list.filter((a) => !filled.has(a.id)).map((a) => a.automation_key);
+      if (!armable.length) {
+        return res.status(400).json({ error: "these sequences have no messages in them yet - nothing to approve", skipped });
+      }
+      for (const a of armable) {
         if (a.approved) continue;
         await sb(`automations?id=eq.${a.id}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ approved: true, updated_at: new Date().toISOString() }) });
       }
-      const after = list.map((a) => ({ ...a, approved: true }));
-      return res.status(200).json({ ok: true, ...salesApprovalState(after) });
+      // The response reports what is TRUE after the write, not what was asked for:
+      // a skipped row stays at its stored `approved`, so salesApprovalState cannot
+      // report done over a sequence nobody has read.
+      const after = list.map((a) => (filled.has(a.id) ? { ...a, approved: true } : a));
+      return res.status(200).json({ ok: true, skipped, ...salesApprovalState(after) });
     }
 
     // Home-screen X (Zoran 2026-07-21): pull one lead out of every active
@@ -944,8 +982,17 @@ async function handler(req, res) {
     //     enabled/approved on an existing one),
     //   - adds the default step ONLY when the automation has zero steps (never clobbers
     //     an edited message).
-    // Dormant: seeds enabled:true + approved:false, so nothing sends until approved
-    // AND portal_entry_routing.enabled is on.
+    // Dormant: seeds enabled:true, so nothing sends until approved AND
+    // portal_entry_routing.enabled is on.
+    //
+    // `approved` IS NOT IN THE INSERT, for the reason upsert-automation does not
+    // carry it either. It only ever wrote `!!def.approved`, which is false for every
+    // key in FORM_INTRO_DEFAULTS, so the row was born dormant - but this action runs
+    // under the plain canActOn scope, which admits any teammate with can_train_agent,
+    // and a fifth write site that PASSES an arming field is one edit away from
+    // birthing an armed row. Leaving the column off the payload means the database
+    // default (false, migration 20260625204628) decides, and there is nothing here to
+    // flip. Arming still has exactly two doors, both owner-scoped.
     if (b.action === "seed-form-intro") {
       const key = String(b.automation_key || "");
       const def = FORM_INTRO_DEFAULTS[key];
@@ -954,7 +1001,7 @@ async function handler(req, res) {
       let auto = Array.isArray(autos) && autos[0];
       if (!auto) {
         const ins = await sb(`automations?on_conflict=client_id,automation_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-          body: JSON.stringify([{ client_id: clientId, automation_key: key, name: def.name, enabled: !!def.enabled, approved: !!def.approved, offer_id: b.offer_id || null, updated_at: new Date().toISOString() }]) });
+          body: JSON.stringify([{ client_id: clientId, automation_key: key, name: def.name, enabled: !!def.enabled, offer_id: b.offer_id || null, updated_at: new Date().toISOString() }]) });
         auto = Array.isArray(ins) && ins[0];
       }
       if (!auto) return res.status(500).json({ error: "seed failed" });
@@ -984,6 +1031,13 @@ async function handler(req, res) {
     }
 
     // Verify an automation_id belongs to this academy before mutating its steps.
+    //
+    // `&client_id=eq.${clientId}` is the ENTIRE tenant boundary for set-approved -
+    // the arming write. Every other action here is reached through the handler's
+    // canActOn gate on the client_id in the BODY, which stops academy A asking about
+    // academy B; this one takes an automation_id instead, so without the scope on
+    // this select an owner of A could arm an automation belonging to B by id. The
+    // write itself carries the same filter (defence in depth, not a substitute).
     async function ownsAutomation(automationId) {
       const a = await sb(`automations?id=eq.${automationId}&client_id=eq.${clientId}&select=id&limit=1`);
       return Array.isArray(a) && !!a[0];
@@ -1049,7 +1103,7 @@ async function handler(req, res) {
         if (refuseArm) return res.status(refuseArm.status).json({ error: refuseArm.error });
       }
       const field = b.action === "set-enabled" ? "enabled" : "approved";
-      await sb(`automations?id=eq.${b.automation_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ [field]: !!b.value, updated_at: new Date().toISOString() }) });
+      await sb(`automations?id=eq.${b.automation_id}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ [field]: !!b.value, updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
 

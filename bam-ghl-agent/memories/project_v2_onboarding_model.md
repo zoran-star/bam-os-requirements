@@ -337,6 +337,9 @@ Update in the same commit that ships the change. Triggers:
 - Change to the auto-resend invite cron cadence or auth
 - New V2 feature added (Members is the only one today)
 - Tracker visibility logic changes
+- A step is added to / removed from the `_obf` wizard, or its detector changes
+- Anything changes about what the owner's sales-message approval covers (the five
+  keys, the `approved` flag's meaning, or the one-render-path invariant)
 
 ## Academy onboarding flow (`_obf`) — station-model restructure 2026-07-14
 The V2 "Finish your onboarding" flow (client-portal.html `_obf*`, opened from the
@@ -440,13 +443,167 @@ cards into it - no stage-mapping engine.
   `preset` (ONE step - `_obfApplyPreset(btn)` chains apply-preset →
   seed-preset-automations → sync-agent → seed-entry-points, all preset-keyed,
   idempotent, re-runnable; 409 needs_force asks before replacing a customized
-  pipeline), then subgroup **Onboarding**: `onboardingform` (onboarding
-  custom_field_defs > 0) + `members`.
+  pipeline) → `approve` (2026-07-29, below), then subgroup **Onboarding**:
+  `onboardingform` (onboarding custom_field_defs > 0) + `members`.
+- **`approve` - the owner's sales-message approval (2026-07-29).** The second
+  and last owner approval (the other is the brand board). Renders every step of
+  the five sales automations (`contact_form`, `trial_form`, `missed_trial`,
+  `ghosted`, `nurture` - `SALES_AUTOMATION_KEYS` in `api/_sales-approval.js`,
+  mirrored as `_OBF_SALES_KEYS` in client-portal.html) as a parent receives them;
+  approving sets `approved:true` on those five via `/api/automations`
+  `approve-sales-messages`. Sets `approved` ONLY - never `enabled`, on an
+  automation or a step.
+  - **ONE RENDER PATH.** `renderStepMessage` (`api/email-shells.js`) has exactly
+    THREE callers and no others: `sendOn()` in `api/_send.js`, the
+    `approval-queue` action, and the `preview-email` action (the Sales step
+    editor - routed through it 2026-07-29; it previously rendered its own way
+    with an unresolved subject, and it is the screen the approval step sends
+    owners to). Never add a fourth that renders itself.
+  - **TWO LOCKS, they cover different things. Keep both.**
+    `api/_approval-render.test.mjs` drives the real `sendOn` against a stubbed
+    global `fetch` and proves the approval surface AGREES with it - 8 MUTATE
+    controls (facts/vars/shell/subject/failopen/coverage/renderer/wiring). It is
+    a RELATIVE anchor and structurally cannot see a bug INSIDE
+    `renderStepMessage`, because both sides call it.
+    `api/_gta-step-lock.test.mjs` is the ABSOLUTE anchor: its goldens are now
+    produced BY `renderStepMessage` and record the resolved SUBJECT, the EMPTY
+    flag and the body, plus two synthetic `_probe-empty-*` steps that carry
+    `EMPTY: true`. Deleting the subject merge, or forcing `empty` false (which
+    kills the empty-after-merge skip - the 28 Jul review-ask bug and empty SMS
+    bodies burning retries), passes the agreement test and fails this one.
+  - **ARMING IS OWNER-ONLY ON EVERY ROUTE (Zoran's ruling, 2026-07-29).** There
+    turned out to be FOUR doors, found one at a time; all are closed in this
+    change, because a half-narrowed flag is worse than an un-narrowed one - the
+    label says owner-only while one route is not:
+    1. `approve-sales-messages` (the wizard step)
+    2. `set-approved` with `value === true` (reached by the Sales panel's On
+       switch, `_autoSetLive`, which fires set-approved + set-enabled together)
+    3. `upsert-automation`, which UPSERTS (`on_conflict` + `merge-duplicates`) and
+       wrote `approved`/`enabled` straight from the request body. **Those two
+       fields are now DROPPED from its row entirely** rather than guarded: on
+       insert the columns take their `false` defaults (migration 20260625204628),
+       on update PostgREST leaves absent columns alone. The panel's `_AUTO_SEED`
+       used to call it with `approved:true, enabled:true` for `onboarding` and
+       `nurture`, so merely OPENING the automations panel for an academy with no
+       nurture row created an ARMED sales sequence nobody had approved - and
+       `seedAutomations`, being edit-safe, would later fill it with steps. The
+       seed list now creates dormant rows only.
+    4. `booking-automations-set` in `api/agent-approvals.js` (found round 5,
+       2026-07-29). Writes `clients.ghl_kpi_config.booking_initial_automations`,
+       and when that sequence is enabled + approved with an enabled step,
+       `scriptedBookingOpener` makes its template **the FIRST message a new lead
+       receives**, ahead of the AI draft. Latent (no academy has the key set), and
+       invisible to the audit that found doors 1-3 because that audit was grepped
+       against the `automations` TABLE and this lives in a JSON blob. Gated in the
+       arming direction only; un-approving stays on `canActOn`.
+    5. `api/reignition.js` approving a campaign, which PATCHes
+       `{enabled:true, approved:true}` onto a real `automations` row (found round
+       6, 2026-07-29). It was never OPEN - that handler demands BAM staff, which is
+       stricter than `armingRefusal` - so it was a COVERAGE hole, not a live one.
+       Registered as the `reignition-approve` lane; the staff-only check still
+       decides. `seed-form-intro`'s insert also carried `approved`, under plain
+       `canActOn`; the field is off the payload now, same as door 3.
+    (1), (2), (4) and (5) go through `armingRefusal(lane, actor, clientId)` +
+    `ARMING_LANES` in `api/_sales-approval.js` - ONE registry, so a new arming
+    route is a registry entry rather than a fifth hand-written `if`, and
+    `_approval-render.test.mjs` fails if a registered lane is never called. It now
+    also sweeps the OTHER way: `AUTOMATION_WRITE_SITES` declares every write to the
+    `automations` table with the gate covering it, and an undeclared write fails.
+    Registry -> code alone could only ever check lanes somebody remembered to
+    register, which is exactly how door 5 stayed invisible. All
+    resolve to `actor.canApproveAsOwner(clientId)` (`api/agent/_auth.js`), not
+    `canActOn`. **`set-approved` with `value === false` and `set-enabled` in
+    BOTH directions stay on `canActOn`** - un-approving is an emergency stop and
+    must never wait for the owner, and operators keep the kill switch plus the
+    ability to re-enable something already approved. Only FIRST consent moved.
+  - **`_autoSetLive` sends `set-approved` ONLY on the first yes.** It used to send
+    it on both paths, which broke that promise in both directions: switching OFF
+    also set `approved:false`, so the next click read as a first arming and the
+    operator was blocked - **turn a sequence off once and you could never turn it
+    back on**; and switching ON an already-approved sequence re-sent
+    `set-approved:true`, which 403s a non-owner with "only the owner can switch
+    messages on for the first time" when it is not the first time. Off is the kill
+    switch: it touches `enabled` alone.
+    The `can_train_agent` FLAG is untouched - it means other things. Only the
+    approval ROUTES narrowed. Blast radius when this landed: exactly ONE non-owner
+    holder of `can_train_agent` across all nine academies (Filip, at BAM GTA).
+    BAM staff keep access throughout.
+  - The page reads `approved` + `enabled` PER SEQUENCE. Approval is per
+    automation, so partial approval is normal, and an approved automation can
+    still be switched off. Copy is conditional on those counts.
+  - Detector: counts approved **AND enabled** vs total over
+    `setup-status.automations[]` (which now returns `enabled` per automation),
+    filtered to those five. FAILS CLOSED TWICE: zero automations ≠ done, and
+    approved-but-disabled ≠ done, because the engine needs both to send. Adds
+    `approve`, `approve_n`, `approve_total` to the `_obfFetchState` return -
+    purely additive.
+  - **THE DORMANCY BUG behind that second guard (found + fixed round 5,
+    2026-07-29).** `_AUTO_SEED` creates rows through `upsert-automation`, which
+    deliberately carries no `enabled`, so they land on the DB default FALSE.
+    `seedAutomations` only inserted when the row was missing, so its intended
+    `enabled:true` never reached a row the panel had already created. Owner
+    approves → `approved:true, enabled:false` → the sequence never sends while the
+    wizard reads complete. **Verified live: BAM NY had `ghosted` and `nurture` at
+    enabled=false, approved=false, 0 steps** (San Jose was fine at enabled=true).
+    Fix: `seedAutomations` repairs `enabled` on an existing row **only when it has
+    zero steps** - a step-less row was never configured, so there is no human
+    decision to overrule, which is how this honours "never touch an existing row's
+    enabled" (the rule that protects San Jose's `nurture-3`). It never writes
+    `approved`. **The existing BAM NY rows are NOT repaired by the code change** -
+    they need a re-seed or a manual flip.
+  - **AND THE HOLE THAT REPAIR OPENED (found + fixed round 6, 2026-07-29).**
+    `approve-sales-messages` approved every sales row it found without asking
+    whether the row CONTAINED anything, and `approval-queue` renders a step-less
+    sequence as "No messages in this one yet". Each half had a passing test.
+    COMPOSED, on BAM NY's exact shape: owner presses Approve over a screen with no
+    messages on it → `approved:true` on both rows → a routine re-seed fills and
+    enables them → `isAutomationLive` true → four live outbound steps, no second
+    consent. Before the repair the row stayed `enabled:false` and stayed silent, so
+    **the round-5 fix converted a dormant, VISIBLE failure into an armed, INVISIBLE
+    one** - a fix applied to half a path (instance 5 of
+    `memories/reference_assurance_without_connection.md`). Fix: the approval SKIPS
+    a row with zero steps (same boundary as the seeder's repair), returns
+    `skipped:[keys]`, and the wizard excludes those sequences from the Approve
+    button and from the green "You approved these" tick. A later fill has to be
+    approved again. The check runs the whole composition, not the two halves.
+  - **Does NOT cover the confirm agent's scripted messages** (booking
+    confirmation, same-day check-in - `api/agent/confirm-automations.js`, gated by
+    `confirm_agent_mode`, not `approved`) **nor the booking agent's scripted
+    opener** (door 4 above - owner-GATED now, but still not owner-READ). The
+    preset step's sub was reworded because "Nothing texts anyone until you approve
+    it" was broader than true.
+  - **THE CHECKS PIN BEHAVIOUR, NOT TEXT (round 5, 2026-07-29).** Everything above
+    was previously enforced by grepping `api/automations.js` as a string, and a
+    tester reversed three of these behaviours with the pinned text intact and all
+    eight suites green: `canApproveAsOwner` widened by renaming ONE identifier
+    inside it, a `return res.status(403)` swapped for a `console.warn`, and
+    `if (false && ...)` prefixed onto the other gate. Deleting `approved` from the
+    three places `api/automations.js` requires it also shipped green.
+    **`api/_arming-gate.test.mjs`** now drives the real handlers over an in-memory
+    PostgREST that actually applies query filters, and asserts the REFUSAL (403 +
+    no write) and the enrol/live/worker gates. Its negative controls import a
+    mutated COPY of the real module, and a control whose target text has moved
+    reports NEGATIVE CONTROL FAILED rather than passing. If you add an arming
+    route, add a lane and a case there - a grep is not coverage.
+  - Not `launch:true` on purpose (would newly block the domain flip mid-flow).
 - Preset step detection: offer.data.sales.preset stamp OR legacy all-four
   (pipeline+automations+agent+entrypoints) so pre-stamp academies (GTA/DETAIL)
   read done.
 - `_obfFetchState` no longer calls /api/members - setup-status returns a
   members count.
+- **`_obfFetchState()`'s RETURN SHAPE IS LOAD-BEARING OUTSIDE THE WIZARD.** It has
+  three consumers, and nothing in the wizard code says so (audited 2026-07-29):
+  1. the wizard itself (`_obfRender` / `_obfFanSync`),
+  2. **Settings > Integrations** - `_settingsRenderIntegrations(await
+     _obfFetchState())` renders the Stripe / email-domain / Instagram rows off it
+     (arrived in the "Settings - Time zone above Integrations" PR, which is why
+     nobody spotted it),
+  3. **Blueprint > Brand > brand board** - `_bbRenderBrandBoard()` reads
+     `st.brandboard` + `st.staging_url` (via `_obfBrandBoardUrl`), falling back to
+     a fresh fetch when the 60s cache is cold.
+  **ADD to that return, never restructure it.** Renaming or removing a key breaks
+  screens the wizard has never heard of. New detectors are additive by
+  construction, which is how `approve` / `approve_n` / `approve_total` went in.
 
 `GET /api/offers/setup-status` (offer_id optional - resolves published/newest
 training offer) returns: pipeline_stages, transitions, automations[],

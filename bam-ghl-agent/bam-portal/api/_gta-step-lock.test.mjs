@@ -16,11 +16,33 @@
 // byte against a golden captured from GTA's live copy.
 //
 // WHAT IT RENDERS THROUGH.
-//   SMS   -> resolveMergeVars(body, L, vars), the same call api/_send.js makes.
-//   EMAIL -> renderEmail(...), then reduced to the parent-visible words + link
-//            targets by wordsOf() from the message lock. A `template:<key>` body
-//            resolves to the designed email, so the two locks overlap there on
-//            purpose: this one proves the ROW still points at that template.
+//   renderStepMessage() from api/email-shells.js, for BOTH channels - the single
+//   function api/_send.js calls at send time and the owner's approval surface
+//   (api/automations.js `approval-queue`) calls to show an owner what will send.
+//   Email output is reduced to the parent-visible words + link targets by wordsOf()
+//   from the message lock. A `template:<key>` body resolves to the designed email,
+//   so the two locks overlap there on purpose: this one proves the ROW still points
+//   at that template.
+//
+//   IT MUST STAY renderStepMessage, AND THAT IS THE POINT OF THIS NOTE. This lock
+//   used to call renderEmail / resolveMergeVars directly - the same operations
+//   renderStepMessage performs, one layer down. That made it a RELATIVE anchor: it
+//   proved the step bodies had not changed, but it could not see a bug inside
+//   renderStepMessage itself, and neither could api/_approval-render.test.mjs,
+//   which compares two callers of that function against each other. Between them
+//   they left the function that renders every academy's live sends unanchored.
+//   Deleting the subject merge, or forcing `empty` to false (which kills the
+//   empty-after-merge skip - the 28 Jul review-ask bug, and empty SMS bodies
+//   reaching the provider and burning all three retries), passed every suite in the
+//   repo. Now those goldens carry the SUBJECT, the EMPTY flag and the body that
+//   function returns, so either mutation moves a golden here.
+//
+// The golden therefore records all three parts of what renderStepMessage returns:
+//   SUBJECT:  the RESOLVED subject (email only - it is what reaches the inbox and
+//             what seeds the preheader inside the email)
+//   EMPTY:    whether the copy resolved to nothing, which is what makes the send
+//             path skip the step and the approval surface say so
+//   the body: parent-visible words + link targets (email) or the exact text (SMS)
 //
 // The fixture is scripts/snapshots/bam-gta.json - the same snapshot the message lock
 // and scripts/render-messages.mjs read, so "what GTA looks like today" has exactly one
@@ -63,7 +85,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { renderEmail, resolveMergeVars, locFor, clientVars } from "./email-shells.js";
+import { renderStepMessage, clientVars } from "./email-shells.js";
 import { GTA, VARS, FACTS, wordsOf } from "./_gta-message-lock.test.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -93,26 +115,105 @@ function mutatedBody(body) {
 
 const CLIENT = mutatedClient();
 const VARS_USED = MUTATE ? { ...clientVars(CLIENT), ...FACTS, first_name: "Maya", full_name: "Maya Alvarez", athlete: "Jordan Alvarez" } : VARS;
-// MUTATE=domain resolves through locFromVars (any id with no LOCATIONS entry), because
-// GTA's hardcoded entry would otherwise supply the very site we just blanked. See the
-// header: that override is a real gap, filed separately, deliberately not fixed here.
-const L = MUTATE === "domain" ? locFor("00000000-0000-0000-0000-000000000000", VARS_USED) : locFor(CLIENT.id, VARS_USED);
+// MUTATE=domain renders under an id with NO LOCATIONS entry, so identity resolves
+// through locFromVars the way it does for every academy that is not GTA. Without
+// this, GTA's hardcoded entry would supply the very site the control just blanked
+// and the control would prove nothing. See the header: that override is a real gap,
+// filed separately, deliberately not fixed here. It now applies to email as well as
+// SMS (both channels go through one function), which only makes the control louder.
+const RENDER_CLIENT_ID = MUTATE === "domain" ? "00000000-0000-0000-0000-000000000000" : CLIENT.id;
+
+// The hidden preheader - the line an inbox shows NEXT TO the subject. It is derived
+// from the subject inside renderEmail, and wordsOf() strips it (it lives in a
+// display:none span), so without recording it here the goldens could not see a
+// render that passed the RAW subject into renderEmail while returning the resolved
+// one: the subject line would read correctly and the inbox preview would show a
+// literal {{token}}.
+function preheaderOf(html) {
+  const m = /<span style="display:none[^"]*">([\s\S]*?)<\/span>/.exec(String(html));
+  return m ? m[1].trim() : "(none)";
+}
 
 // ─── render one step exactly as it sends ─────────────────────────────────────
-const isEmail = (s) => String(s.channel || "").toLowerCase() === "email";
-
 function renderStep(step) {
   const body = mutatedBody(step.body || "");
-  if (isEmail(step)) {
-    const html = renderEmail({ clientId: CLIENT.id, subject: step.subject || "", body, vars: VARS_USED });
-    return `SUBJECT: ${step.subject || ""}\n\n${wordsOf(html)}`;
+  const m = renderStepMessage({
+    channel: String(step.channel || "").toLowerCase(),
+    clientId: RENDER_CLIENT_ID, subject: step.subject, body, vars: VARS_USED,
+  });
+  if (m.channel === "email") {
+    return `SUBJECT: ${m.subject}\nPREHEADER: ${m.empty ? "(none)" : preheaderOf(m.html)}\nEMPTY: ${m.empty}\n\n${m.empty ? "(resolves to nothing - this step does not send)\n" : wordsOf(m.html)}`;
   }
-  return resolveMergeVars(String(body), L, VARS_USED) + "\n";
+  // JSON so whitespace is VISIBLE in the golden: a body that resolves to "\n\n" and
+  // one that resolves to "" are different outcomes and must not look identical here.
+  return `EMPTY: ${m.empty}\nTEXT: ${JSON.stringify(m.text)}\n`;
 }
+
+// ─── the empty-case probes ───────────────────────────────────────────────────
+// Two SYNTHETIC steps, blessed alongside the real ones. They are not GTA copy and
+// nothing sends them; they exist because recording the EMPTY flag only anchors it
+// if some golden actually carries EMPTY: true.
+//
+// This was measured, not assumed. With the flag recorded but every real GTA step
+// resolving to something, forcing `empty = false` inside renderStepMessage still
+// passed this lock - all 21 goldens already said EMPTY: false. That mutation is the
+// 28 Jul bug (the review-ask email sending with no review link) plus empty SMS
+// bodies reaching the provider and burning all three retries, so it is exactly the
+// one that must not slip through.
+//
+// `{{next_session}}` is the token used because it is empty by construction: the
+// worker fills it at send time from the academy's next open slot, and it is NOT in
+// DROP_WHEN_EMPTY, so a body that is only that token resolves to "" for every
+// academy, whatever data it has. That keeps the probes stable if GTA's row changes.
+// A probe also exists for each of the OTHER things renderStepMessage returns that
+// GTA's real rows happen not to exercise. Each one was added because a mutation
+// survived without it, not on principle:
+//
+//   _probe-subject-email  A TOKENISED subject with a non-empty body. Before it,
+//                         `onboarding-8` was the only golden whose subject carried a
+//                         token - and it is in the onboarding sequence, which the
+//                         sales approval does not even cover. De-tokenising that one
+//                         subject (an ordinary copy edit) and re-blessing left the
+//                         subject merge free to be deleted again with every suite
+//                         green. Its preheader is also derived from the subject, so
+//                         this probe anchors both.
+//   _probe-blank-sms      A body that resolves to WHITESPACE, not "". `empty` is
+//                         `!msg.trim()`; without this, weakening it to `!msg` shipped
+//                         green, and a whitespace-only body reaches the provider,
+//                         gets rejected and burns all three retries.
+const EMPTY_PROBES = [
+  { key: "_probe-empty-sms", automation: "_probe", step: { channel: "sms", position: 0, body: "{{next_session}}" } },
+  { key: "_probe-empty-email", automation: "_probe", step: { channel: "email", position: 0, subject: "Probe", body: "{{next_session}}" } },
+  // Two empty tokens either side of a blank line resolve to "\n\n" - truthy, but
+  // nothing a person could read.
+  { key: "_probe-blank-sms", automation: "_probe", step: { channel: "sms", position: 0, body: "{{next_session}}\n\n{{next_session}}" } },
+  { key: "_probe-subject-email", automation: "_probe", step: { channel: "email", position: 0,
+    subject: "{{contact.first_name}}, {{location.name}} has a spot for {{contact.athlete_first_name}}",
+    body: "Hi {{contact.first_name}}, see you at {{location.venue}} in {{location.city}}." } },
+  // A LONG tokenised subject, with a token straddling character 140.
+  //
+  // renderEmail builds the hidden preheader as `subject.slice(0, 140)` BEFORE any
+  // merge pass, so whether the subject arrives resolved or raw is invisible for a
+  // short one (the final whole-document resolveMergeVars fills it either way) and
+  // very visible for a long one: the raw form truncates mid-token and the inbox
+  // preview line ends in a dangling "{{". renderStepMessage passes the RESOLVED
+  // subject, so shipped behaviour is correct - this probe is what keeps it that way.
+  { key: "_probe-longsubject-email", automation: "_probe", step: { channel: "email", position: 0,
+    subject: "A quick note about your athlete's upcoming free trial session with our coaches this week, and everything worth bringing along - {{contact.first_name}}",
+    body: "Hi {{contact.first_name}}, details below." } },
+  // WHITESPACE AROUND THE BODY. renderStepMessage trims the body before rendering;
+  // the lock that preceded it did not. Every GTA row happens to be clean, so the
+  // byte-identity when this build landed was real rather than lucky - but the trim
+  // itself was untested, and a future row pasted in with a leading newline would have
+  // shifted silently. This pins it: the trim is the send path's behaviour and both
+  // the approval surface and the goldens must show the trimmed form.
+  { key: "_probe-untrimmed-sms", automation: "_probe", step: { channel: "sms", position: 0,
+    body: "\n\n  Hi {{contact.first_name}}, see you Tuesday.  \n\n" } },
+];
 
 // Every step in the snapshot, in send order, with a stable golden filename.
 function allSteps() {
-  const out = [];
+  const out = [...EMPTY_PROBES];
   for (const a of [...SNAPSHOT.automations].sort((x, y) => x.automation_key.localeCompare(y.automation_key))) {
     for (const s of [...(a.steps || [])].sort((x, y) => x.position - y.position)) {
       out.push({ key: `${a.automation_key}-${s.position}`, automation: a.automation_key, step: s });

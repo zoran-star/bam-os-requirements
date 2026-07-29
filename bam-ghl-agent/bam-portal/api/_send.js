@@ -9,7 +9,7 @@
 import { ghl } from "./ghl/_core.js";
 import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 import { sendEmail } from "./_email.js";
-import { renderEmail, resolveMergeVars, locFor, templateBody } from "./email-shells.js";
+import { renderStepMessage } from "./email-shells.js";
 import { notifyOwners } from "./_notify-owners.js";
 
 // ── the from-address guardrail (email only) ─────────────────────────────────
@@ -159,19 +159,13 @@ async function noticeHeldOnce(clientId) {
 // no message to send and no retry that could change that.
 const EMPTY_AFTER_MERGE = "empty after merge fields resolved";
 
-// Does this body render to nothing once the academy's own facts are filled in?
-//
-// It used to answer `false` for any "template:<key>" ref, on the reasoning that a
-// designed email is never empty. That stopped being true on 28 Jul 2026: a template
-// may now return "" when the academy lacks the one fact that gives the email its
-// purpose. The review ask is the case - with no Google review link on file it renders
-// three paragraphs asking for a review and no way to leave one, because
-// dropEmptyShellLinks correctly removes the dead button and nothing removed the
-// sentences around it. So the question is asked of the RESOLVED content now, which is
-// the same content renderEmail is about to wrap a shell around.
-function isEmptyAfterMerge(text, clientId, vars) {
-  return !templateBody({ clientId, body: text, vars: vars || {} }).trim();
-}
+// "Does this render to anything at all" is asked of the RESOLVED content, not the
+// raw body, and renderStepMessage answers it as `empty`. That matters for a
+// "template:<key>" ref, which is never an empty string however empty the email
+// behind it turns out to be: since 28 Jul 2026 a template may return "" when the
+// academy lacks the one fact that gives the email its purpose (the review ask with
+// no Google review link renders three paragraphs asking for a review and no way to
+// leave one).
 
 export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, subject, body, ghlToken, vars } = {}) {
   const text = String(body || "").trim();
@@ -189,22 +183,26 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
     // Wrap the step's text in the academy's branded shell so every automation
     // email is on-brand (the step body carries only the message copy). Subject
     // can carry merge tokens too, so resolve it against the same vars.
-    const subj = resolveMergeVars(String(subject || ""), locFor(clientId, vars), vars || {});
-    if (isEmptyAfterMerge(text, clientId, vars)) return { skipped: EMPTY_AFTER_MERGE };
-    const html = renderEmail({ clientId, subject: subj, body: text, vars });
-    const r = await sendEmail({ to: toEmail, subject: subj, html, from: sender.from, clientId });
+    // ONE RENDER PATH: this is the SAME call the owner's approval surface makes,
+    // so the email an owner approved is byte-for-byte the email that goes out.
+    const msg = renderStepMessage({ channel: "email", clientId, subject, body: text, vars });
+    if (msg.empty) return { skipped: EMPTY_AFTER_MERGE };
+    const r = await sendEmail({ to: toEmail, subject: msg.subject, html: msg.html, from: sender.from, clientId });
     if (r && r.skipped) return { skipped: r.skipped };
     return { sent: true, id: (r && r.id) || null };
   }
 
   if (channel === "sms") {
     if (!contactId && !toPhone) return { skipped: "no contact for sms" };
-    const message = resolveMergeVars(text, locFor(clientId, vars), vars || {});
+    // ONE RENDER PATH, same as the email branch above: the text an owner approved
+    // in the wizard is the text that reaches the phone.
+    const msg = renderStepMessage({ channel: "sms", clientId, body: text, vars });
+    const message = msg.text;
     // A step whose copy resolved to NOTHING (every sentence it had depended on a
     // merge field this academy has not filled in yet) is a no-op, not a failure:
     // skip it so the engine advances the sequence instead of handing an empty
     // body to the provider, eating a rejection, and burning all 3 retries.
-    if (!message.trim()) return { skipped: EMPTY_AFTER_MERGE };
+    if (msg.empty) return { skipped: EMPTY_AFTER_MERGE };
     // Provider gate: Twilio academies send via Twilio + own-store; else GHL.
     const g = await maybeSendSmsViaProvider(clientId, { ghlContactId: contactId, toPhone, body: message, sentBy: "automation" });
     if (g.handled) { if (!g.ok) throw new Error(g.error); return { sent: true, via: "twilio", id: g.sid }; }

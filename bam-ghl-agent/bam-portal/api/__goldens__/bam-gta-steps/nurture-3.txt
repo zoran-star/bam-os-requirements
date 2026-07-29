@@ -1,4 +1,6 @@
 SUBJECT: Don't miss your shot
+PREHEADER: Only a few spots left in our current sessions before the waitlist opens.
+EMPTY: false
 
 Only a few spots left in our current sessions before the waitlist opens.
 BY ANY MEANS GTA

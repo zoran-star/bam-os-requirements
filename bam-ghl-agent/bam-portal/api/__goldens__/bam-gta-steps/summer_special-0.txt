@@ -1,4 +1,2 @@
-Hi! It's coach from By Any Means Basketball - we're just sending out this message to everyone because we have a HUGE summer discount on right now, and our spots are filling up.
-So if you'd like to get your athlete training with us this summer, feel free to book a trial here: https://www.byanymeanstoronto.ca/free-trial
-Thanks!
-BAMily
+EMPTY: false
+TEXT: "Hi! It's coach from By Any Means Basketball - we're just sending out this message to everyone because we have a HUGE summer discount on right now, and our spots are filling up.\nSo if you'd like to get your athlete training with us this summer, feel free to book a trial here: https://www.byanymeanstoronto.ca/free-trial\nThanks!\nBAMily"

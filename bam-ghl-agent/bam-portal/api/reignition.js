@@ -34,6 +34,7 @@ import { resolvePresetKey } from "./agent/preset-master.js";
 import { PRESETS } from "./agent/presets.js";
 import { stampReignitionStage } from "./agent/reignition-station.js";
 import { contactsReadTable } from "./_contacts.js";
+import { armingRefusal } from "./_sales-approval.js";
 import {
   DEFAULT_PER_DAY, automationKeyFor, validateCampaignDraft, buildDryRun,
   planAdmissions, runAdmission, runReplyExit, runRanOutExit,
@@ -386,7 +387,19 @@ async function handlePost(req, res) {
     const presetKey = await resolvePresetKey(clientId, { sb });
     await stampReignitionStage({ clientId, offerId: c.offer_id || null, presetKey, preset: presetKey ? PRESETS[presetKey] : null, sb, log: () => {} });
 
-    await sb(`automations?id=eq.${auto.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ enabled: true, approved: true, updated_at: nowIso() }) });
+    // THIS IS AN ARMING LANE, and until 2026-07-29 it was not registered as one.
+    // The write below PATCHes approved:true onto a real `automations` row, which is
+    // the same decision `set-approved` makes on the Sales panel - it just arrives
+    // through a campaign instead of a switch. It was never OPEN: the handler refuses
+    // anyone who is not BAM staff a hundred lines up, which is stricter than
+    // armingRefusal (that admits academy owners too). But nothing said so, and
+    // ARMING_LANES was only ever checked registry -> code, so a route that armed a
+    // sequence without registering could not be seen. Registering it makes the lane
+    // visible to the sweep in api/_approval-render.test.mjs; the staff-only check
+    // above still decides, and stays the narrower of the two.
+    const refuseIgnite = armingRefusal("reignition-approve", actor, clientId);
+    if (refuseIgnite) return res.status(refuseIgnite.status).json({ error: refuseIgnite.error });
+    await sb(`automations?id=eq.${auto.id}&client_id=eq.${enc(clientId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ enabled: true, approved: true, updated_at: nowIso() }) });
     // WHO approved this is recorded, not just WHEN. Staff approval is the entire
     // gate on messaging several hundred people who never asked to hear from us;
     // an approval nobody's name is on is not a gate.

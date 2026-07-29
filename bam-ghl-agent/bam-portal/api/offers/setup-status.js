@@ -4,7 +4,7 @@ import { PRESETS, buildPresetRows } from "../agent/presets.js";
 // Sales-machine readiness for one offer (Gap #2 / DETAIL "what's left" view).
 //
 //   GET /api/offers/setup-status?client_id=&offer_id=
-//     → { ok, pipeline_stages, transitions, automations:[{key,approved}],
+//     → { ok, pipeline_stages, transitions, automations:[{key,approved,enabled}],
 //         agent_sections, sales_fields, onboarding_fields, entry_points,
 //         has_policy, booking_live, define_done, schedule_set, pricing_filled,
 //         prices_matched, members, preset:{key,version,applied_at}|null,
@@ -176,7 +176,7 @@ async function handler(req, res) {
     const [stages, edges, autos, agentSecs, salesDefs, onbDefs, eps, prices, memberRows] = await Promise.all([
       sb(`pipeline_stages?client_id=eq.${enc(clientId)}&${offerFilter}&select=role`),
       sb(`stage_transitions?client_id=eq.${enc(clientId)}&${offerFilter}&select=id`),
-      sb(`automations?client_id=eq.${enc(clientId)}&select=automation_key,approved`),
+      sb(`automations?client_id=eq.${enc(clientId)}&select=automation_key,approved,enabled`),
       sb(`agent_prompt_sections?client_id=eq.${enc(clientId)}&select=section_key`),
       sb(`custom_field_defs?client_id=eq.${enc(clientId)}&archived=eq.false&section=eq.sales&or=(offer_id.eq.${enc(offerId)},offer_id.is.null)&select=id`),
       sb(`custom_field_defs?client_id=eq.${enc(clientId)}&archived=eq.false&section=eq.onboarding&or=(offer_id.eq.${enc(offerId)},offer_id.is.null)&select=id`),
@@ -210,7 +210,10 @@ async function handler(req, res) {
       transitions: (sales.preset_key && PRESETS[sales.preset_key])
         ? buildPresetRows(sales.preset_key, clientId, null).transitionRows.length
         : count(edges),
-      automations: (Array.isArray(autos) ? autos : []).map(a => ({ key: a.automation_key, approved: !!a.approved })),
+      // `enabled` rides along because approval alone does not make a sequence send:
+      // the engine requires enabled AND approved, so the wizard step that reports the
+      // owner's approval must see both or it lights up over something silent.
+      automations: (Array.isArray(autos) ? autos : []).map(a => ({ key: a.automation_key, approved: !!a.approved, enabled: !!a.enabled })),
       agent_sections: count(agentSecs),
       sales_fields: count(salesDefs),
       onboarding_fields: count(onbDefs),

@@ -1,4 +1,6 @@
-SUBJECT: Quick favour, {{contact.first_name}}? 🙏
+SUBJECT: Quick favour, Maya? 🙏
+PREHEADER: If training has been a win for your athlete, would you share it?
+EMPTY: false
 
 If training has been a win for your athlete, would you share it?
 BY ANY MEANS GTA

@@ -39,8 +39,28 @@
 
 import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { register } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
+
+// This suite drives api/automations.js, whose first line imports api/_sentry.js,
+// which statically imports @sentry/node - and with it @sentry/core, the
+// OpenTelemetry SDK and `import-in-the-middle`. The CI step that runs these files
+// says they need no dependencies, so the specifier is answered locally rather than
+// making production load Sentry lazily to suit a test. Nothing under test changes:
+// sentryApiEnabled is false unless VERCEL_ENV is "production", so
+// withSentryApiRoute already returns the handler untouched and none of these
+// functions is called. Same stub as api/_arming-gate.test.mjs.
+register(`data:text/javascript,${encodeURIComponent(`
+  const STUB = "data:text/javascript,${encodeURIComponent(
+    "export function init(){} export function captureMessage(){} export function captureException(){}" +
+    " export function flush(){return Promise.resolve(true)}" +
+    " export function withIsolationScope(fn){return fn({setTag(){},setContext(){}})}")}";
+  export async function resolve(spec, ctx, next) {
+    if (spec === "@sentry/node") return { url: STUB, shortCircuit: true, format: "module" };
+    return next(spec, ctx);
+  }
+`)}`);
 
 const HERE   = path.dirname(fileURLToPath(import.meta.url));
 const TARGET = path.join(HERE, "automations.js");
