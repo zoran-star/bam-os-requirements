@@ -16,11 +16,11 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 | Migration file | What it does | Blocked features until applied | Added |
 |---|---|---|---|
 | `20260727150000_conversations_last_author_kind.sql` | `conversations.last_message_author_kind` + trigger update, stamps who sent the last message | Staff Inbox sender prefixes ("You:" / "Mike:") - inbox otherwise fine, API falls back | 2026-07-27 (Cole session, PR #1629) |
-| `20260729140000_ignition_campaigns.sql` | Adds `ignition_campaigns` + `ignition_roster`. Two NEW tables only, nothing existing is altered | ALL of reignition (warming old leads back into a sales system), which has no UI yet regardless. Nothing else is affected, and the every-minute cron degrades to a clean `{ok:true, skipped:"reignition tables not installed yet"}` rather than 500ing until this lands. A real outage still 500s - verified both ways | 2026-07-29 (automation templating session) |
 
 ## ✅ APPLIED (most recent first)
 
 | Migration file | Applied | By |
 |---|---|---|
+| `20260729140000_ignition_campaigns.sql` | 2026-07-29 | Claude (Supabase MCP, at Zoran's request). Verified after: 18 + 11 columns, 4 RLS policies, 9 indexes, RLS on, 0 rows. Constraints probed in a self-rolling-back block - blank consent_basis, per_day 500, an unknown state and an orphan roster row are all rejected |
 | `20260725121000_commission_calculator.sql` | 2026-07-26 | Zoran (SQL editor) |
 | `20260725120000_onboarding_calls.sql` | 2026-07-26 | Zoran (SQL editor) |
