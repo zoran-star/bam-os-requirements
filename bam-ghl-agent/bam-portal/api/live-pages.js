@@ -229,17 +229,16 @@ async function handler(req, res) {
       ? site.pages.filter(p => p && typeof p.path === "string" && typeof p.url === "string")
       : [];
 
-    // Still read the live sitemap so anything published since the last seed
-    // shows up on its own. Seeded entries win on label/order.
-    // Only pay for a sitemap read when nothing is seeded. With a seeded list the
-    // tab must render fast - a 6s sitemap wait on every open is what made it
-    // look like the tab was missing.
-    const live = seeded.length ? [] : ((await pagesFromSitemap(siteUrl)) || []);
-
     // The site's own manifest, when it publishes one. It is the ONLY source that
     // knows a sub page from a funnel and when a page last changed, so it wins on
     // label, group and order - but it never hides a path the site actually serves.
     const manifest = (await pagesFromManifest(siteUrl)) || [];
+
+    // Then the live sitemap, so anything published since the last seed shows up on
+    // its own. Only pay for it when neither the manifest nor the seed answered:
+    // the tab must render fast, and a 6s sitemap wait on every open is what once
+    // made it look like the tab was missing.
+    const live = (manifest.length || seeded.length) ? [] : ((await pagesFromSitemap(siteUrl)) || []);
 
     // Rebuild every URL from the CURRENT base, so the seeded paths follow the
     // site onto its new domain instead of pointing at the old .vercel.app one.
