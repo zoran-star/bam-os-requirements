@@ -136,7 +136,7 @@ async function pagesFromSitemap(siteUrl) {
 // ── Grouping ────────────────────────────────────────────────────────────────
 // The order sections appear in for the client. Anything a site invents that is
 // not in this list is appended after these, alphabetically.
-const GROUP_ORDER = ["Main pages", "Sub pages", "Funnels", "Website pages", "Other pages"];
+const GROUP_ORDER = ["Main pages", "Sub pages", "Website pages", "Funnels", "Other pages"];
 
 // For sites with no pages.json: a conservative guess so funnels do not sit mixed
 // in with website pages. Only these paths are treated as a funnel; everything
