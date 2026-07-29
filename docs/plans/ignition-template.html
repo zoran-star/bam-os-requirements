@@ -102,7 +102,7 @@
   <div class="card">
     <div class="dec"><div class="q">Who runs it?</div><div class="a">Staff, via the skill.<small>The design leaves room for an owner-facing campaign builder later; we do not build it now.</small></div></div>
     <div class="dec"><div class="q">Who approves a campaign?</div><div class="a">Our staff, for now.<small>No owner gate on campaigns yet.</small></div></div>
-    <div class="dec"><div class="q">How do people get in?</div><div class="a">Staff puts them in by hand. Repeatable.<small>No automatic audiences. Tags and filters help staff BUILD the roster, they never enrol anyone by themselves. The same person can be in a later campaign again.</small></div></div>
+    <div class="dec"><div class="q">How do people get in?</div><div class="a">Staff puts them in by hand. Repeatable.<small>No automatic audiences. Tags and filters help staff BUILD the roster, they never enrol anyone by themselves. The same person can be in a later campaign again. Every campaign records its consent basis: where these leads came from and why we may message them.</small></div></div>
     <div class="dec"><div class="q">Channels?</div><div class="a">Per campaign.<small>Texts, emails, or a mix - each campaign declares its own steps.</small></div></div>
     <div class="dec"><div class="q">The messages?</div><div class="a">Written fresh, every campaign.<small>No skeleton. They go through the same render + review as every other message in the system.</small></div></div>
     <div class="dec"><div class="q">Where do they sit?</div><div class="a">Their own Reignition stage, on the board.<small>Visible while the campaign plays out, adaptable to any sales system.</small></div></div>
@@ -176,7 +176,8 @@
   <h2>The rails, none of them optional</h2>
   <div class="grid g2">
     <div class="note n-warn" style="margin:0"><b>Some people can never be added, no matter who tries</b>
-      <p>Current members. Anyone already live in a pipeline stage. Anyone who unsubscribed or complained, ever. Anyone with no consent on file, or no working phone or email for the campaign's channels. The roster builder refuses them with the reason shown, and there is no override.</p></div>
+      <p>Current members. Anyone already live in a pipeline stage. Anyone marked do-not-disturb or who ever unsubscribed or complained. Anyone with no working phone or email for the campaign's channels. The roster builder refuses them with the reason shown, and there is no override.</p>
+      <p><b>And one honest limit, checked against the live data:</b> the system only records who OPTED OUT. "This person consented" does not exist as data anywhere, so no automatic check can prove it - a check that waved through everyone without an opt-out would protect nobody. So every campaign carries a <b>consent basis</b>, written by a person: where these leads came from and why we may message them. It is recorded on the campaign, and the dry run shows it beside the roster.</p></div>
     <div class="note n-warn" style="margin:0"><b>Quarantined imports stay quiet until a campaign names them</b>
       <p>Leads seeded from an academy's old system land quarantined. A reignition roster is the ONLY path by which any of them is ever messaged. Importing someone's leads can never, by itself, cause a single message.</p></div>
     <div class="note n-ok" style="margin:0"><b>A reply ends the campaign for that person, instantly</b>
@@ -192,7 +193,7 @@
     <div class="card">
       <div class="lbl">The campaign</div>
       <div class="scroll"><table style="min-width:0">
-        <tr><td class="k">Roster</td><td>staff picks from the 65 quarantined imports, say 48 make it past the rails</td></tr>
+        <tr><td class="k">Roster</td><td>staff picks from the 65 quarantined imports, say 48 make it past the rails. <b>For this first run, you name the roster yourself</b> - that is the standing rule on these imports, and it stands even though staff approval is the normal model</td></tr>
         <tr><td class="k">Messages</td><td>3 texts, written fresh for San Jose's offer</td></tr>
         <tr><td class="k">Pace</td><td>15 a day &rarr; fully launched in 4 days</td></tr>
         <tr><td class="k">Reply</td><td>straight to Booking, the agent takes over</td></tr>
