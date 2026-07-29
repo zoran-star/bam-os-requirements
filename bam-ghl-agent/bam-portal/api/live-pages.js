@@ -143,9 +143,12 @@ const GROUP_ORDER = ["Main pages", "Sub pages", "Website pages", "Funnels", "Oth
 // else stays a website page. A site that cares about the distinction should
 // publish pages.json rather than rely on this.
 const FUNNEL_PATHS = /^\/(free-?trial|trial|enroll|enrol|join|onboarding|register|registration|sign-?up|book|booking|book-a-[a-z-]+|checkout|apply|camp-register|thank-?you)\/?$/i;
+// ...plus anything the site itself named a funnel (/private-training-funnel).
+const FUNNEL_SUFFIX = /-funnel\/?$/i;
 
 function guessGroup(path) {
-  return FUNNEL_PATHS.test(String(path || "")) ? "Funnels" : "Website pages";
+  const p = String(path || "");
+  return (FUNNEL_PATHS.test(p) || FUNNEL_SUFFIX.test(p)) ? "Funnels" : "Website pages";
 }
 
 function orderGroups(names) {
