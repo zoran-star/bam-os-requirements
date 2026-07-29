@@ -22,7 +22,7 @@ export default function SetPasswordView({ supabase, onDone }) {
     <div style={{
       minHeight: "100vh", background: "#000000",
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
+      fontFamily: "'Plus Jakarta Sans', -apple-system, system-ui, sans-serif",
     }}>
       <div style={{ width: 420, maxWidth: "90vw" }}>
         <div style={{ textAlign: "center", marginBottom: 44 }}>

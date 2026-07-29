@@ -136,7 +136,7 @@ export default function RefreshCalendarSection({ tokens: tk, session }) {
         onClick={() => setSelectedId(isSel ? null : w.id)}
         style={{
           display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
-          fontSize: 12, borderRadius: 6, cursor: "pointer",
+          fontSize: 12, borderRadius: 8, cursor: "pointer",
           background: c.bg, color: c.fg,
           border: `1px solid ${isSel ? tk.accent : c.bd}`,
           boxShadow: isSel ? `0 0 0 1px ${tk.accent}` : "none",
@@ -152,7 +152,7 @@ export default function RefreshCalendarSection({ tokens: tk, session }) {
     <div>
       {notice && (
         <div style={{
-          marginBottom: 14, padding: "8px 14px", borderRadius: 6, fontSize: 12,
+          marginBottom: 14, padding: "8px 14px", borderRadius: 8, fontSize: 12,
           background: notice.type === "success" ? tk.greenSoft : tk.redSoft,
           color: notice.type === "success" ? tk.green : tk.red,
           border: `1px solid ${notice.type === "success" ? tk.green : tk.red}`,
@@ -164,14 +164,14 @@ export default function RefreshCalendarSection({ tokens: tk, session }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button onClick={() => setMonth(shiftMonth(month, -1))} style={{
             background: "transparent", border: `1px solid ${tk.borderMed}`, color: tk.textSub,
-            width: 30, height: 30, borderRadius: 6, cursor: "pointer",
+            width: 30, height: 30, borderRadius: 8, cursor: "pointer",
           }}>‹</button>
           <span style={{ fontSize: 14, fontWeight: 700, color: tk.text, minWidth: 130, textAlign: "center" }}>
             {monthLabel(month)}
           </span>
           <button onClick={() => setMonth(shiftMonth(month, 1))} style={{
             background: "transparent", border: `1px solid ${tk.borderMed}`, color: tk.textSub,
-            width: 30, height: 30, borderRadius: 6, cursor: "pointer",
+            width: 30, height: 30, borderRadius: 8, cursor: "pointer",
           }}>›</button>
           {month !== currentMonth() && (
             <button onClick={() => setMonth(currentMonth())} style={{
@@ -181,11 +181,11 @@ export default function RefreshCalendarSection({ tokens: tk, session }) {
         </div>
         <button onClick={() => setAttnOnly(!attnOnly)} style={{
           padding: "6px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em",
-          textTransform: "uppercase", borderRadius: 6, cursor: "pointer",
+          textTransform: "uppercase", borderRadius: 8, cursor: "pointer",
           background: attnOnly ? tk.redSoft : "transparent",
           color: attnOnly ? tk.red : tk.textMute,
           border: `1px solid ${attnOnly ? tk.red : tk.borderMed}`,
-        }}>⚠ Needs attention{attnCount ? ` (${attnCount})` : ""}</button>
+        }}>Needs attention{attnCount ? ` (${attnCount})` : ""}</button>
       </div>
 
       {/* Week lanes */}
@@ -210,7 +210,7 @@ export default function RefreshCalendarSection({ tokens: tk, session }) {
                     <span style={{
                       fontSize: 10, color: tk.accent, background: tk.accentGhost,
                       border: `1px solid ${tk.accentBorder}`, padding: "1px 7px",
-                      borderRadius: 6, marginLeft: 6,
+                      borderRadius: 8, marginLeft: 6,
                     }}>now</span>
                   )}
                 </div>
@@ -256,7 +256,7 @@ export default function RefreshCalendarSection({ tokens: tk, session }) {
             </div>
             <button onClick={() => setSelectedId(null)} style={{
               background: "transparent", border: `1px solid ${tk.border}`, color: tk.textMute,
-              width: 28, height: 28, borderRadius: 6, cursor: "pointer",
+              width: 28, height: 28, borderRadius: 8, cursor: "pointer",
             }}>✕</button>
           </div>
           <div style={{ fontSize: 12, color: tk.textSub, borderTop: `1px solid ${tk.border}`, paddingTop: 10, display: "grid", gap: 5 }}>
@@ -276,17 +276,17 @@ export default function RefreshCalendarSection({ tokens: tk, session }) {
             <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
               <button disabled={busy} onClick={() => act({ action: "nudge", id: selected.id }, `Nudge sent to ${selected.business_name}'s Slack channel.`)} style={{
                 background: tk.accent, color: "#0A0A0B", border: 0, fontSize: 12, fontWeight: 700,
-                padding: "7px 14px", borderRadius: 6, cursor: "pointer", opacity: busy ? 0.6 : 1,
+                padding: "7px 14px", borderRadius: 8, cursor: "pointer", opacity: busy ? 0.6 : 1,
               }}>Nudge now</button>
               {selected.status !== "submitted" && selected.status !== "skipped" && (
                 <>
                   <button disabled={busy} onClick={() => act({ action: "mark-received", id: selected.id }, "Marked received.")} style={{
                     background: "transparent", border: `1px solid ${tk.green}`, color: tk.green,
-                    fontSize: 12, padding: "7px 14px", borderRadius: 6, cursor: "pointer", opacity: busy ? 0.6 : 1,
+                    fontSize: 12, padding: "7px 14px", borderRadius: 8, cursor: "pointer", opacity: busy ? 0.6 : 1,
                   }}>Mark received</button>
                   <select disabled={busy} value="" onChange={e => e.target.value && act({ action: "move-week", id: selected.id, week: Number(e.target.value) }, "Window moved.")} style={{
                     background: "transparent", border: `1px solid ${tk.borderMed}`, color: tk.textSub,
-                    fontSize: 12, padding: "7px 10px", borderRadius: 6, cursor: "pointer",
+                    fontSize: 12, padding: "7px 10px", borderRadius: 8, cursor: "pointer",
                   }}>
                     <option value="">Move to week…</option>
                     {[1, 2, 3, 4].filter(w => w !== selected.week).map(w => (
@@ -295,7 +295,7 @@ export default function RefreshCalendarSection({ tokens: tk, session }) {
                   </select>
                   <button disabled={busy} onClick={() => act({ action: "skip", id: selected.id }, "Skipped this month.")} style={{
                     background: "transparent", border: `1px solid ${tk.borderMed}`, color: tk.textMute,
-                    fontSize: 12, padding: "7px 14px", borderRadius: 6, cursor: "pointer", opacity: busy ? 0.6 : 1,
+                    fontSize: 12, padding: "7px 14px", borderRadius: 8, cursor: "pointer", opacity: busy ? 0.6 : 1,
                   }}>Skip this month</button>
                 </>
               )}
@@ -315,7 +315,7 @@ export default function RefreshCalendarSection({ tokens: tk, session }) {
               <span key={c.id} style={{
                 display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12,
                 color: tk.textSub, background: tk.surfaceAlt, border: `1px solid ${tk.border}`,
-                padding: "4px 6px 4px 10px", borderRadius: 6,
+                padding: "4px 6px 4px 10px", borderRadius: 8,
               }}>
                 {c.business_name}
                 {canEdit ? (

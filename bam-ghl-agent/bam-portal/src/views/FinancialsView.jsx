@@ -145,7 +145,7 @@ function AlertsSection({ tokens, alerts }) {
                   background: tokens.redSoft, transition: "opacity 0.2s",
                 }}>
                   <button onClick={(e) => { e.stopPropagation(); dismiss(fp.id); }} title="Mark as handled" style={{
-                    width: 22, height: 22, borderRadius: 6, border: `2px solid ${tokens.red}50`,
+                    width: 22, height: 22, borderRadius: 8, border: `2px solid ${tokens.red}50`,
                     background: "transparent", cursor: "pointer", flexShrink: 0,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     transition: "all 0.12s",
@@ -174,7 +174,7 @@ function AlertsSection({ tokens, alerts }) {
                   background: tokens.amberSoft,
                 }}>
                   <button onClick={(e) => { e.stopPropagation(); dismiss(inv.id); }} title="Mark as handled" style={{
-                    width: 22, height: 22, borderRadius: 6, border: `2px solid ${tokens.amber}50`,
+                    width: 22, height: 22, borderRadius: 8, border: `2px solid ${tokens.amber}50`,
                     background: "transparent", cursor: "pointer", flexShrink: 0,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     transition: "all 0.12s",
@@ -614,7 +614,7 @@ export default function FinancialsView({ tokens, dark }) {
                 <div key={mo.month} style={{
                   display: "flex", alignItems: "center", gap: 14, padding: "4px 0",
                   animation: `slideUp 0.4s ${SPRING} ${i * 60 + 300}ms both`,
-                  borderRadius: 6, transition: `all 0.2s ${SPRING}`,
+                  borderRadius: 8, transition: `all 0.2s ${SPRING}`,
                   cursor: "default",
                 }}
                   onMouseEnter={e => { e.currentTarget.style.background = tokens.surfaceHov; e.currentTarget.style.transform = "translateX(2px)"; }}
@@ -678,7 +678,7 @@ export default function FinancialsView({ tokens, dark }) {
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {/* Visual bar */}
-                <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", background: tokens.borderMed }}>
+                <div style={{ display: "flex", height: 12, borderRadius: 8, overflow: "hidden", background: tokens.borderMed }}>
                   {tierEntries.map(([tier, val]) => (
                     <div key={tier} style={{
                       width: barsAnimated ? `${(val.revenue / totalMRR) * 100}%` : "0%",
@@ -877,7 +877,7 @@ export default function FinancialsView({ tokens, dark }) {
           <span style={{
             display: "inline-flex", alignItems: "center", gap: 6,
             fontSize: 11, fontWeight: 600, color: tokens.textMute,
-            padding: "4px 10px", borderRadius: 6,
+            padding: "4px 10px", borderRadius: 8,
             background: tokens.surfaceAlt || tokens.surfaceHov,
             border: `1px solid ${tokens.border}`,
           }}>

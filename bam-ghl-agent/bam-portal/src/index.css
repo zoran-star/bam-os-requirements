@@ -9,3 +9,10 @@ details::details-content {
   transition: height 0.28s cubic-bezier(0.22, 1, 0.36, 1), content-visibility 0.28s allow-discrete;
 }
 details[open]::details-content { height: auto; }
+
+/* ── Loading skeleton shimmer (Clients roster etc.) ── */
+@keyframes bp-skel-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
+.bp-skel { animation: bp-skel-pulse 1.4s ease-in-out infinite; }

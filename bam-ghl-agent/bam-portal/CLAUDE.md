@@ -15,6 +15,10 @@ Before ANY UI/front-end change in this folder (client portal, new pages, compone
 
 ## Supabase
 
+**🗄️ At the START of any session working in this folder from Zoran's machine (Supabase CLI available): check [`supabase/PENDING_SQL.md`](supabase/PENDING_SQL.md). If the PENDING table has rows, tell Zoran immediately and offer to run `/pending-sql`.** Remote/cloud sessions skip this check (they can't apply anyway).
+
+**⛔ If you add a migration file you cannot apply to prod yourself (remote/cloud sessions never can): add a row to [`supabase/PENDING_SQL.md`](supabase/PENDING_SQL.md) in the SAME commit.** That ledger is how the SQL reaches Zoran - `/showtime` and `/start` surface it, and `/pending-sql` applies it via the Supabase CLI. Write your code so it degrades gracefully until the migration lands (feature off / fallback query), never in a way that 500s pre-migration.
+
 Before touching Supabase migrations, seeds, local replay, storage buckets, or linked project repair, read [`supabase/README.md`](supabase/README.md).
 
 That README explains the current temporary migration state:

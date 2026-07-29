@@ -3,6 +3,7 @@ import { authFetch } from "../lib/authFetch";
 
 // Scheduled follow-ups timeline — approve / edit / skip / snooze the agent's
 // next nudges before they auto-send. (Approve-each: nothing sends unapproved.)
+import { showToast } from "../components/dialogs.jsx";
 async function api(action, payload = {}) {
   const res = await authFetch("/api/agent-followups", {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -36,7 +37,7 @@ export default function FollowupsPanel({ tokens }) {
 
   useEffect(() => { load(); }, []);
   async function load() { try { const d = await api("list"); setRows(d.followups || []); } catch (e) { setErr(e.message); } }
-  async function act(fn, id) { setBusy(id); try { await fn(); await load(); } catch (e) { alert(e.message); } finally { setBusy(null); } }
+  async function act(fn, id) { setBusy(id); try { await fn(); await load(); } catch (e) { showToast(e.message); } finally { setBusy(null); } }
   async function detect() {
     setBusy("detect"); setNote("Scanning for quiet leads…");
     try { const d = await api("detect-now"); const tot = (d.academies || []).reduce((s, a) => s + (a.drafted || 0), 0); setNote(`Done — ${tot} new follow-up${tot === 1 ? "" : "s"} drafted.`); await load(); }

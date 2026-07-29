@@ -233,29 +233,127 @@ if (window.__MOCK__) (() => {
   ]);
   // Hawkeye: agent-drafted actions waiting on the owner. `ghl_contact_id`s
   // match OPPS contactIds so the sales board stages glow for the same leads.
-  const HAWK_READY = [
+  // ══ Hawkeye deck seed - EVERY card kind across all 3 lanes ══════════════
+  // Booking lane: reply / reply+escalate / book / ghost / mark_lost /
+  //   mark_unqualified / reignite / reignite_due
+  // Confirm lane: reply / confirm_handoff / post_trial (form) / confirm_lost
+  // Closing lane: reply / closing_enroll / followup_* plan / closing_unqualified
+  // ?quiet=1 additionally shows the after-hours bar. contact ids match OPPS
+  // leads so the sales board stages glow for the same people.
+  const _tt = (arr) => arr.map(([role, text, d, h]) => ({ role, text, at: iso(d || 0, h || 0) }));
+  const HAWK_BOOKING = [
     { id: 'apx-1', kind: 'reply', status: 'pending', contact_name: 'Sasha Adams', ghl_contact_id: 'lead-3', ghl_conversation_id: 'cv-apx-1', reply_count: 3, confidence: 0.92, goal: 'Book the free trial',
+      summary: 'Mom of Deja (11). Came in from the Meta lead form, asked about weekend times twice.',
+      thread_tail: _tt([['parent', 'Do you have anything on weekends? Weekdays are tough with my shift.', 0, 5], ['agent', 'We do! Saturday mornings are our biggest U12 session.', 0, 5], ['parent', 'Ok what times Saturday?', 0, 1]]),
       draft_message: 'Hey Sasha! Coach Dre has two U12 spots left this Saturday at 9am. Want me to lock one in for Deja?',
       reasoning: 'Lead asked about weekend times in her last message. Saturday 9am has open capacity and matches Deja\'s age group.' },
-    { id: 'apx-2', kind: 'reply', status: 'pending', contact_name: 'Andre Boyd', ghl_contact_id: 'lead-9', ghl_conversation_id: 'cv-apx-2', reply_count: 5, confidence: 0.84, goal: 'Close post-trial',
-      draft_message: 'AJ looked great out there yesterday! Coach Dre thinks the U16 Elite group is the right fit. Want me to send over the enrollment link so he keeps the momentum?',
-      reasoning: 'Trial completed yesterday, parent replied positively. Best window to close is within 24 hours of the trial.' },
-    { id: 'apx-3', kind: 'reply', status: 'pending', contact_name: 'Nina Flores', ghl_contact_id: 'lead-10', ghl_conversation_id: 'cv-apx-3', reply_count: 4, confidence: 0.48, goal: 'Close post-trial',
+    { id: 'apx-3', kind: 'reply', status: 'pending', contact_name: 'Nina Flores', ghl_contact_id: 'lead-10', ghl_conversation_id: 'cv-apx-3', reply_count: 4, confidence: 0.48, goal: 'Book both siblings',
       escalate: true, escalate_reason: 'Asked for a sibling discount - no discount policy is configured for this academy.',
+      summary: 'Two kids (9 and 12). Very engaged, but pricing question is blocking.',
+      thread_tail: _tt([['parent', 'If I sign up both my girls is there any kind of family discount?', 0, 2]]),
       draft_message: 'Great question! Let me check with the team on sibling pricing and get right back to you today.',
       reasoning: 'Parent asked about enrolling both kids with a discount. I do not have pricing authority, so this needs a human call.' },
     { id: 'apx-4', kind: 'book', status: 'pending', contact_name: 'Malik Turner', ghl_contact_id: 'lead-4', ghl_conversation_id: 'cv-apx-4', confidence: 0.9, goal: 'Confirm the trial booking',
-      book_slot_at: iso(-1, -2), book_group: 'U16 Elite - Tuesday 6:00 PM', booking_asks: 'Confirmed Tuesday works, asked what Malik Jr should bring',
+      book_slot_at: iso(-1, -2), book_calendar_id: 'cal-u16', book_group: 'U16 Elite - Tuesday 6:00 PM', booking_asks: 'Confirmed Tuesday works, asked what Malik Jr should bring', athlete_name: 'Malik Turner Jr',
+      summary: 'Dad confirmed Tuesday 6pm works. Ready to book.',
+      thread_tail: _tt([['agent', 'Tuesday 6pm or Thursday 7pm - which works better for Malik Jr?', 1, 0], ['parent', 'Tuesday is good. What does he need to bring?', 0, 3]]),
       draft_message: 'You are all set for Tuesday 6pm at Northside Main Gym! Bring water and indoor shoes - doors open 15 minutes early.',
       reasoning: 'Lead confirmed the Tuesday slot in their last message, so I prepared the booking.' },
     { id: 'apx-5', kind: 'ghost', status: 'pending', contact_name: 'Owen Marsh', ghl_contact_id: 'lead-11',
-      reasoning: 'Said they were interested, then went quiet 6 days ago. Two nudges sent, no reply. Recommend one last touch or mark lost.' },
+      summary: 'Interested 6 days ago, then silence. Two nudges sent.',
+      thread_tail: _tt([['parent', 'Yeah we might be interested for my son', 6, 0], ['agent', 'Awesome! Want me to hold a spot at Saturday\'s session so he can try it out?', 6, 0], ['agent', 'Hey! Still happy to set that trial up whenever works for you.', 3, 0]]),
+      reasoning: 'Said they were interested, then went quiet 6 days ago. Two nudges sent, no reply. Recommend the Ghosted sequence.' },
     { id: 'apx-6', kind: 'ghost', status: 'pending', contact_name: 'Devon Ellis', ghl_contact_id: 'lead-5',
+      summary: 'Opened the booking link twice, never picked a time.',
       reasoning: 'Opened the trial booking link twice but never picked a time. Last reply 5 days ago.' },
     { id: 'apx-7', kind: 'mark_lost', status: 'pending', contact_name: 'Marcus Webb', ghl_contact_id: 'lead-13',
       lost_reason: 'Unreachable for 3 weeks: 6 texts undelivered, 2 calls no answer.',
+      summary: 'Number looks dead - everything bounces.',
       reasoning: 'No working contact channel. Keeping him on the board skews your pipeline numbers.' },
+    { id: 'apx-8', kind: 'mark_unqualified', status: 'pending', contact_name: 'Rhonda Pierce', ghl_contact_id: 'lead-14', ghl_conversation_id: 'cv-apx-8',
+      summary: 'Asked us to stop texting. Should come off the board entirely.',
+      thread_tail: _tt([['agent', 'Hi Rhonda! Following up on the trial for your son - want me to find a time this week?', 1, 4], ['parent', 'Please stop texting me. We went with another program.', 0, 6]]),
+      reasoning: 'Parent explicitly asked us to stop contacting them. Marking unqualified removes them from every sequence immediately.' },
+    { id: 'apx-9', kind: 'reignite', status: 'pending', contact_name: 'Grace Lin', ghl_contact_id: 'lead-15', ghl_conversation_id: 'cv-apx-9', confidence: 0.88,
+      reignite_at: iso(-45), reignite_date: iso(-45),
+      summary: 'Wants to start after school tryouts wrap in September.',
+      thread_tail: _tt([['parent', 'She wants to do it but school tryouts run through September. Can we pick this up after?', 0, 8]]),
+      draft_message: 'Totally understood - tryouts come first! I\'ll check back in mid-September and we\'ll get Mia set up then. Good luck!',
+      reignite_message: 'Hey Grace! Tryout season should be wrapping up - want me to grab Mia a spot in the U14 group this month?',
+      reasoning: 'Parent gave a clear future start window. Acknowledge now, park the lead, and fire a re-engagement message in mid-September.' },
+    { id: 'apx-10', kind: 'reignite_due', status: 'pending', contact_name: 'Tom Okafor', ghl_contact_id: 'lead-16', ghl_conversation_id: 'cv-apx-10', confidence: 0.86,
+      summary: 'Parked 2 months ago ("after basketball camp"). Today is the day.',
+      draft_message: 'Hey Tom! You mentioned getting Chidi in after summer camp wrapped up - want me to grab him a spot in this Saturday\'s U12 session?',
+      reasoning: 'The reignition you scheduled for this lead fires today. Camp season is over, so the timing you picked has arrived.' },
   ];
+  const HAWK_CONFIRM = [
+    { id: 'cfx-1', kind: 'reply', status: 'pending', contact_name: 'Kira Patel', ghl_contact_id: 'lead-6', ghl_conversation_id: 'cv-cfx-1', reply_count: 2, confidence: 0.94, goal: 'Confirm the trial',
+      summary: 'Trial booked for Saturday. Asked what Arjun should bring.',
+      thread_tail: _tt([['agent', 'Arjun is booked for Saturday 9am! See you at Northside Main Gym.', 1, 0], ['parent', 'Great! Anything he needs to bring?', 0, 2]]),
+      draft_message: 'Just water and indoor shoes! Doors open 8:45, and Coach Dre likes new players there a few minutes early for warm-up.',
+      reasoning: 'Simple logistics question about a confirmed trial - answer keeps the booking warm.' },
+    { id: 'cfx-2', kind: 'confirm_handoff', status: 'pending', contact_name: 'Tia Roberts', ghl_contact_id: 'lead-8', ghl_conversation_id: 'cv-cfx-2', confidence: 0.9,
+      summary: 'Booked Thursday, now says Thursday broke. Needs a rebook.',
+      thread_tail: _tt([['parent', 'So sorry - something came up Thursday. Can Jade come a different day?', 0, 4]]),
+      draft_message: 'No problem at all! Let me find Jade another time - does Saturday morning or Tuesday evening work better?',
+      reasoning: 'The booked slot fell through, so this goes back to the booking flow to pick a new time. The old booking gets released.' },
+    { id: 'cfx-3', kind: 'post_trial', status: 'pending', contact_name: 'Leo Sanders', ghl_contact_id: 'lead-7', ghl_conversation_id: 'cv-cfx-3', athlete_name: 'Eli Sanders',
+      summary: 'Trial was Sunday. How did it go?',
+      reasoning: 'Eli\'s trial session finished. Fill in whether he showed and if he\'s a fit - that decides which follow-up sequence runs.' },
+    { id: 'cfx-4', kind: 'confirm_lost', status: 'pending', contact_name: 'Dana Whitfield', ghl_contact_id: 'lead-17',
+      lost_reason: 'Two no-shows: booked twice, missed both, no response since.',
+      summary: 'Booked two trials, showed to neither.',
+      reasoning: 'Second no-show with no reply after. Recommend marking lost so the board reflects reality.' },
+  ];
+  const HAWK_CLOSING = [
+    { id: 'clx-1', kind: 'closing_enroll', status: 'pending', contact_name: 'Andre Boyd', ghl_contact_id: 'lead-9', ghl_conversation_id: 'cv-clx-1', reply_count: 5, confidence: 0.91, goal: 'Close post-trial',
+      summary: 'AJ crushed his trial. Dad said "he loved it" - ready for the enrollment link.',
+      thread_tail: _tt([['agent', 'How did AJ feel about yesterday\'s session?', 0, 20], ['parent', 'He LOVED it. Would not stop talking about coach Dre lol', 0, 4]]),
+      draft_message: 'That\'s what we love to hear! Here\'s AJ\'s enrollment link for the U16 Elite group - his spot from the trial is held for 48 hours: {enroll_link}',
+      reasoning: 'Trial completed, parent is enthusiastic. Best close window is inside 24 hours - send the link while the momentum is live.' },
+    { id: 'clx-2', kind: 'reply', status: 'pending', contact_name: 'Simone Vega', ghl_contact_id: 'lead-18', ghl_conversation_id: 'cv-clx-2', reply_count: 3, confidence: 0.77, goal: 'Answer pricing, keep the close alive',
+      summary: 'Post-trial, asked about monthly price and what\'s included.',
+      thread_tail: _tt([['parent', 'She had fun! What does membership run per month and does that include the strength sessions?', 0, 6]]),
+      draft_message: 'So glad she enjoyed it! U14 membership is $199/mo and yes - the Wednesday strength sessions are included, plus one guest pass a month.',
+      reasoning: 'Direct pricing question from a warm post-trial parent. Configured pricing is public, so I can answer and keep the close moving.' },
+    { id: 'clx-fu-1', kind: 'closing_followup', step_key: 'followup_1', status: 'pending', contact_name: 'Priya Nair', ghl_contact_id: 'lead-19', ghl_conversation_id: 'cv-clx-3', send_after: iso(-2),
+      summary: 'Went quiet after the trial - 3-touch follow-up plan.',
+      thread_tail: _tt([['agent', 'How did Rohan like Tuesday\'s session?', 2, 0]]),
+      draft_message: 'Hey Priya! Just floating this back up - Rohan\'s spot in the U12 group is still open from his trial. Want me to hold it for the week?',
+      reasoning: 'No reply since the trial. A spaced 3-touch plan keeps the door open without pressure - approve the schedule once and it runs on its own.' },
+    { id: 'clx-fu-2', kind: 'closing_followup', step_key: 'followup_2', status: 'pending', contact_name: 'Priya Nair', ghl_contact_id: 'lead-19', ghl_conversation_id: 'cv-clx-3', send_after: iso(-5),
+      draft_message: 'Coach Dre mentioned Rohan\'s footwork twice this week - he sees real potential. Happy to answer any questions you two have!' },
+    { id: 'clx-fu-3', kind: 'closing_followup', step_key: 'followup_3', status: 'pending', contact_name: 'Priya Nair', ghl_contact_id: 'lead-19', ghl_conversation_id: 'cv-clx-3', send_after: iso(-9),
+      draft_message: 'Last note from me, promise! If the timing ever works for Rohan we\'d love to have him. His trial notes stay on file - just text me here whenever.' },
+    { id: 'clx-4', kind: 'closing_unqualified', status: 'pending', contact_name: 'Bev Muller', ghl_contact_id: 'lead-20',
+      summary: 'Moving out of state next month.',
+      thread_tail: _tt([['parent', 'I should have mentioned - we\'re relocating to Phoenix next month, so this won\'t work out.', 0, 26]]),
+      reasoning: 'Family is relocating out of the area. No future re-engagement makes sense - mark unqualified.' },
+  ];
+  // Athlete-over-parent names for the deck headers (deck-names action).
+  const HAWK_NAMES = {
+    'lead-3': { athlete: 'Deja Adams', parent: 'Sasha Adams' }, 'lead-10': { athlete: 'Luna + Ivy Flores', parent: 'Nina Flores' },
+    'lead-4': { athlete: 'Malik Turner Jr', parent: 'Malik Turner' }, 'lead-11': { athlete: 'Cole Marsh', parent: 'Owen Marsh' },
+    'lead-5': { athlete: 'Devon Ellis Jr', parent: 'Devon Ellis' }, 'lead-13': { athlete: 'DeShawn Webb', parent: 'Marcus Webb' },
+    'lead-14': { athlete: 'Trey Pierce', parent: 'Rhonda Pierce' }, 'lead-15': { athlete: 'Mia Lin', parent: 'Grace Lin' },
+    'lead-16': { athlete: 'Chidi Okafor', parent: 'Tom Okafor' }, 'lead-6': { athlete: 'Arjun Patel', parent: 'Kira Patel' },
+    'lead-8': { athlete: 'Jade Roberts', parent: 'Tia Roberts' }, 'lead-7': { athlete: 'Eli Sanders', parent: 'Leo Sanders' },
+    'lead-17': { athlete: 'Zoe Whitfield', parent: 'Dana Whitfield' }, 'lead-9': { athlete: 'AJ Boyd', parent: 'Andre Boyd' },
+    'lead-18': { athlete: 'Camila Vega', parent: 'Simone Vega' }, 'lead-19': { athlete: 'Rohan Nair', parent: 'Priya Nair' },
+    'lead-20': { athlete: 'Hans Muller', parent: 'Bev Muller' },
+  };
+  // Book-it card calendar options + open slots (book-options action).
+  const HAWK_CALS = [
+    { key: 'cal-u12',  label: 'U12 Development - Sat 9:00 AM',  slots: [iso(-1, -3), iso(-3, -3), iso(-8, -3)] },
+    { key: 'cal-u16',  label: 'U16 Elite - Tue 6:00 PM',        slots: [iso(-1, -2), iso(-6, -2), iso(-13, -2)] },
+    { key: 'cal-open', label: 'Open Gym Intro - Thu 7:00 PM',   slots: [iso(-2, -4), iso(-9, -4)] },
+  ];
+  // ?quiet=1 -> the deck shows the after-hours "sends in the morning" bar.
+  const HAWK_QUIET = new URLSearchParams(location.search).get('quiet') === '1'
+    ? { until: (() => { const d = new Date(NOW + 86400e3); d.setHours(8, 0, 0, 0); return d.toISOString(); })() }
+    : null;
+  // Back-compat alias (older mock consumers referenced HAWK_READY).
+  const HAWK_READY = HAWK_BOOKING;
   const HAWK_FU = [
     { id: 'fu-1', status: 'pending', contact_name: 'Kira Patel', ghl_contact_id: 'lead-6', scheduled_at: iso(-1),
       draft_message: 'Hey Kira! Quick reminder about Arjun\'s trial this Saturday at 9am. Doors open 8:45 - see you there!' },
@@ -377,12 +475,14 @@ if (window.__MOCK__) (() => {
     if (p === '/api/agent-config') return act === 'get-mode' ? { mode: 'approve' } : { ok: true };
     if (p === '/api/agent-followups') return act === 'list' ? { followups: HAWK_FU } : { ok: true };
     if (p === '/api/agent-approvals') {
-      if (act === 'list-ready') return { ready: HAWK_READY };
+      if (act === 'list-ready') return { ready: HAWK_BOOKING, quiet: HAWK_QUIET, booking_provider: 'portal' };
+      if (act === 'deck-names') return { names: HAWK_NAMES };
+      if (act === 'book-options') return { calendars: HAWK_CALS };
       if (act === 'list-reignitions') return { reignitions: [] };
       return { ok: true, ready: [], followups: [], reignitions: [] };
     }
-    if (p === '/api/agent-confirm') return act === 'list-ready' ? { ready: HAWK_READY.filter(r => r.kind === 'book') } : { ok: true };
-    if (p === '/api/agent-closing') return act === 'list-ready' ? { ready: HAWK_READY.filter(r => r.id === 'apx-2' || r.id === 'apx-3') } : { ok: true };
+    if (p === '/api/agent-confirm') return act === 'list-ready' ? { ready: HAWK_CONFIRM } : { ok: true };
+    if (p === '/api/agent-closing') return act === 'list-ready' ? { ready: HAWK_CLOSING } : { ok: true };
     if (p === '/api/members') {
       // Member detail drawer (?id=...): single-member shape for openMemberPopup.
       const mid = q.get('id');
@@ -7907,7 +8007,7 @@ if (window.__MOCK__) (() => {
         Sales
       </div>
 
-      <div class="nav-item" data-feature="v15" style="display:none" onclick="switchView('pipelines', this)">
+      <div class="nav-item" id="nav-v15pipelines" data-feature="v15" style="display:none" onclick="switchView('pipelines', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="4" width="4" height="16" rx="1"/>
@@ -14868,6 +14968,20 @@ function _lpRenderPreview() {
 
 function _lpSetDevice(d) { _LP_DEVICE = d; _lpRenderPreview(); }
 
+// "Updated today" reads better than a date the client has to compare against
+// today's. Anything older than a week gets the actual date. Returns '' on a value
+// that is not a date, so a bad manifest entry shows nothing rather than "Invalid Date".
+function _lpWhen(iso) {
+  if (!iso) return '';            // new Date(null) is the epoch, which would read "Jan 1, 1970"
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return days + ' days ago';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+}
+
 function _lpOpen(path) {
   const page = ((_LP_DATA && _LP_DATA.pages) || []).find(p => p.path === path);
   if (!page) return;
@@ -14912,21 +15026,73 @@ async function openLivePagesView() {
       host.innerHTML = '<div class="req-empty" style="padding:20px 0">No live pages found for your site yet.</div>';
       return;
     }
-    const cards = pages.map(p => `
+    // Grouped sections (Main pages / Sub pages / Funnels), in the order the API
+    // gives them, so a client with 10+ pages can find one. Older API responses
+    // carry no group, in which case everything falls into one unnamed section and
+    // this renders exactly as it did before.
+    const groups = (_LP_DATA && Array.isArray(_LP_DATA.groups) && _LP_DATA.groups.length)
+      ? _LP_DATA.groups
+      : [null];
+    // Gate on the FORMATTED value, not on p.updated: a junk date formats to '' and
+    // would otherwise render a bare "Updated" with nothing after it.
+    const card = (p) => {
+      const when = _lpWhen(p.updated);
+      return `
       <button data-lp-path="${_bbEscapeHtml(p.path)}" onclick="_lpOpen('${_bbEscapeHtml(p.path).replace(/'/g, "\\'")}')"
         style="text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;cursor:pointer;font:inherit;color:inherit">
+        ${p.step ? `<div style="display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gold);border:1px solid var(--line);border-radius:999px;padding:2px 8px;margin-bottom:8px">${_bbEscapeHtml(p.step)}</div>` : ''}
         <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">${_bbEscapeHtml(p.label)}</div>
         <div style="font-size:12px;color:var(--muted);word-break:break-all">${_bbEscapeHtml(p.path)}</div>
-      </button>`).join('');
+        ${when ? `<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Updated ${_bbEscapeHtml(when)}</div>` : ''}
+      </button>`;
+    };
+    const grid = (list) => `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">${list.map(card).join('')}</div>`;
+    const sections = groups.map(g => {
+      const inGroup = g === null ? pages : pages.filter(p => p.group === g);
+      if (!inGroup.length) return '';
+      const head = g === null ? '' : `
+        <div style="display:flex;align-items:baseline;gap:10px;margin:0 0 10px">
+          <div style="font-weight:700;font-size:13px;color:var(--text)">${_bbEscapeHtml(g)}</div>
+          <div style="font-size:11.5px;color:var(--muted)">${inGroup.length} page${inGroup.length === 1 ? '' : 's'}</div>
+        </div>`;
+      // A funnel is a CHAIN, not a bag of pages: the landing page is what an ad
+      // points at, and the sign up, checkout and thank-you pages hang off it. When
+      // the site says so (via `step`), draw it that way. Groups with no steps keep
+      // the plain grid.
+      const landing = inGroup.filter(p => p.step && /landing/i.test(p.step));
+      const steps = inGroup.filter(p => p.step && !/landing/i.test(p.step));
+      const plain = inGroup.filter(p => !p.step);
+      const body = (landing.length && steps.length)
+        ? `${grid(landing)}
+           <div style="margin:10px 0 0 14px;padding-left:16px;border-left:2px solid var(--line)">
+             <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px">Steps in this funnel</div>
+             ${grid(steps)}
+           </div>
+           ${plain.length ? grid(plain) : ''}`
+        : grid(inGroup);
+      return `<div style="margin-bottom:22px">${head}${body}</div>`;
+    }).join('');
+    // Newest page change across the whole site, so the client can see at a glance
+    // that work is landing without opening each page. Compare as TIME, not as
+    // strings: a junk value like "whenever" sorts above every real date.
+    const latest = pages
+      .map(p => ({ iso: p.updated, t: p.updated ? new Date(p.updated).getTime() : NaN }))
+      .filter(x => !isNaN(x.t))
+      .sort((a, b) => a.t - b.t)
+      .map(x => x.iso)
+      .pop();
     host.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
         <div>
           <div style="font-weight:700;font-size:15px;color:var(--text)">Your live website</div>
           <a href="${_bbEscapeHtml(_LP_DATA.site_url)}" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--muted)">${_bbEscapeHtml(_LP_DATA.site_url)}</a>
         </div>
-        <div style="font-size:12px;color:var(--muted)">${pages.length} page${pages.length === 1 ? '' : 's'} live</div>
+        <div style="font-size:12px;color:var(--muted);text-align:right">
+          <div>${pages.length} page${pages.length === 1 ? '' : 's'} live</div>
+          ${latest ? `<div style="margin-top:2px">Last update ${_bbEscapeHtml(_lpWhen(latest))}</div>` : ''}
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:22px">${cards}</div>
+      <div style="margin-bottom:6px">${sections}</div>
       <div id="lp-preview"></div>`;
     _lpOpen(pages[0].path);
   } catch (e) {
@@ -16046,7 +16212,11 @@ async function _v15calCreateBooking() {
 // Reuses /api/ghl/inbox (list + thread) + /api/ghl/send-message. (P2 adds
 // pipeline/stage + failed filters; P3 adds mass send.)
 // ══════════════════════════════════════════════════════════════
-let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, failedOnly: false, fClass: '', fPipeline: '', fStage: '', fChannels: [], active: null, messages: [], type: 'SMS', pending: [], readAt: {} };
+let _V15IB = { convos: [], pipelines: [], contactPipe: {}, pipeOppCount: 0, ghlLoc: '', unreadOnly: false, readOnly: false, sentOnly: false, failedOnly: false, fClass: '', fPipeline: '', fStage: '', fChannels: [], active: null, messages: [], type: 'SMS', pending: [], readAt: {} };
+// readOnly / sentOnly join the existing unreadOnly / failedOnly as the four status
+// filters on the V1.5 channel tabs (Zoran 2026-07-28). All four are mutually
+// exclusive - picking one clears the rest, so the list is never filtered by two
+// contradictory states at once.
 // readAt: convId → the lastMessageDate at the moment you OPENED it. A conversation
 // is "read" (no dot) once opened, and re-flags as unread only if a NEWER message
 // arrives after that. GHL has no public mark-read API, so we track it per session.
@@ -16166,12 +16336,64 @@ function _v15ibPill(on) {
   return `padding:7px 16px;border-radius:999px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid ${on ? 'var(--gold)' : 'var(--border-med)'};background:${on ? 'var(--gold)' : 'transparent'};color:${on ? '#0B0B0D' : 'var(--text-sub)'}`;
 }
 function _v15ibSetClass(v) { _V15IB.fClass = v; _v15ibRebuildBar(); _v15ibRenderList(); }
-function _v15ibSetUnread(v) { _V15IB.unreadOnly = v; if (v) _V15IB.failedOnly = false; _v15ibRebuildBar(); _v15ibRenderList(); }
+function _v15ibSetUnread(v) { _V15IB.unreadOnly = v; if (v) { _V15IB.failedOnly = false; _V15IB.readOnly = false; _V15IB.sentOnly = false; } _v15ibRebuildBar(); _v15ibRenderList(); }
+// Persist a read / unread state for one conversation so it survives a reload and
+// follows the user to another device. Server side: /api/ghl/inbox?action=mark-read
+// | mark-unread, both writing this user's row in ghl_conversation_reads.
+// Best-effort: the list already updated optimistically, so a failure here must not
+// throw in the middle of a bulk loop.
+async function _v15ibPersistRead(convId, state) {
+  if (!convId) return;
+  try {
+    const token = await _mreqAuthToken();
+    const action = state === 'unread' ? 'mark-unread' : 'mark-read';
+    fetch(`/api/ghl/inbox?action=${action}&client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ conversation_id: convId }),
+    }).catch(() => {});
+    // Keep the local read-state map in step so a re-render does not undo the change.
+    if (state === 'unread' && _V15IB.readAt) delete _V15IB.readAt[convId];
+  } catch (_) {}
+}
+// Mark one thread unread from the row itself, then drop back to the list.
+function _v15ibMarkUnread(convId, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  const c = _V15IB.convos.find(x => x.id === convId);
+  if (c) c.unreadCount = Math.max(1, c.unreadCount || 0);
+  _v15ibPersistRead(convId, 'unread');
+  _v15ibRebuildBar(); _v15ibRenderList();
+}
+// One status at a time. _v15ibSetStatus('') clears them all.
+function _v15ibSetStatus(which) {
+  _V15IB.unreadOnly = which === 'unread';
+  _V15IB.readOnly   = which === 'read';
+  _V15IB.sentOnly   = which === 'sent';
+  _V15IB.failedOnly = which === 'failed';
+  _v15ibRebuildBar(); _v15ibRenderList();
+}
+// SMS / Email tabs. These drive the SAME fChannels filter the Filters drawer uses,
+// so there is one filtering code path, not two. '' = both channels.
+function _v15ibSetChanTab(key) {
+  _V15IB.fChannels = key ? [key] : [];
+  _v15ibRenderAll();
+}
+function _v15ibChanTabActive() {
+  const f = _V15IB.fChannels || [];
+  return f.length === 1 && (f[0] === 'sms' || f[0] === 'email') ? f[0] : '';
+}
+// V1.5 only, and never on V2 - V2 keeps its merged single-thread inbox untouched.
+function _v15ibChanTabsOn() {
+  return (typeof V15_ACCESS !== 'undefined' && V15_ACCESS === true) &&
+         !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true);
+}
 // Tab click handler - clean so onclick strings stay simple
 function _v15ibTab(val) {
   if (val === 'unread') { _V15IB.unreadOnly = !_V15IB.unreadOnly; _V15IB.fClass = ''; }
   else { _V15IB.unreadOnly = false; _V15IB.fClass = val; }
   _V15IB.failedOnly = false;
+  _V15IB.readOnly = false;
+  _V15IB.sentOnly = false;
   _v15ibRebuildBar(); _v15ibRenderList();
 }
 // Re-render just the segmented tabs without blowing away the whole layout
@@ -16192,7 +16414,7 @@ function _v15ibRebuildBar() {
   const row = document.querySelector('.v15ib-cls-row');
   if (row) row.innerHTML = `${clsBtn('', 'All', totalPeople)}${clsBtn('member', 'Members', clsCounts.member + clsCounts.member_family)}${clsBtn('lead', 'Leads', clsCounts.lead)}${(clsCounts.spam + autoSpamCount) > 0 ? clsBtn('spam', 'Spam', clsCounts.spam + autoSpamCount) : ''}${unreadCount > 0 ? clsBtn('unread', 'Unread', unreadCount) : ''}`;
 }
-function _v15ibSetFailed(v) { _V15IB.failedOnly = v; if (v) _V15IB.unreadOnly = false; _v15ibRenderList(); }
+function _v15ibSetFailed(v) { _V15IB.failedOnly = v; if (v) { _V15IB.unreadOnly = false; _V15IB.readOnly = false; _V15IB.sentOnly = false; } _v15ibRenderList(); }
 function _v15ibSetPipeline(v) { _V15IB.fPipeline = v; _V15IB.fStage = ''; _v15ibRenderAll(); }
 function _v15ibSetStage(v) { _V15IB.fStage = v; _v15ibRenderAll(); }
 
@@ -16241,8 +16463,10 @@ function _v15ibBulkAction(action) {
   const ids = [..._V15IB.selected];
   if (action === 'read') {
     ids.forEach(id => { const c = _V15IB.convos.find(x => x.id === id); if (c) c.unreadCount = 0; });
+    ids.forEach(id => _v15ibPersistRead(id, 'read'));
   } else if (action === 'unread') {
     ids.forEach(id => { const c = _V15IB.convos.find(x => x.id === id); if (c) c.unreadCount = 1; });
+    ids.forEach(id => _v15ibPersistRead(id, 'unread'));
   }
   _V15IB.selected.clear();
   _V15IB.multiSelect = false;
@@ -16355,6 +16579,10 @@ function _v15ibFiltered() {
     if (_V15IB.fClass === 'member' && c.classification !== 'member' && c.classification !== 'member_family') return false;
     else if (_V15IB.fClass && _V15IB.fClass !== 'member' && c.classification !== _V15IB.fClass) return false;
     if (_V15IB.unreadOnly && !_v15ibIsUnread(c)) return false;
+    if (_V15IB.readOnly && _v15ibIsUnread(c)) return false;
+    // Sent = the last thing on the thread went out from us. lastMessageDirection
+    // is supplied by both store readers (sms_threads/email_threads.last_direction).
+    if (_V15IB.sentOnly && String(c.lastMessageDirection || '').toLowerCase() !== 'outbound') return false;
     if (_V15IB.failedOnly && !_V15IB_FAILED.includes(c.lastMessageStatus || '')) return false;
     if (_V15IB.fChannels.length && !_V15IB.fChannels.includes(_ibChannelBucket(c))) return false;
     if (_V15IB.fPipeline) {
@@ -16389,6 +16617,35 @@ function _v15ibRenderAll() {
   // Segmented tabs: All / Members / Leads / Spam / Unread (#2: merged unread into tabs)
   const clsBtn = (val, label, cnt) => cnt > 0 || val === '' || val === 'unread' ? `<button onclick="_v15ibTab('${val}')" class="v15ib-cls${(_V15IB.fClass === val && !_V15IB.unreadOnly) || (val === 'unread' && _V15IB.unreadOnly) ? ' on' : ''}">${label}${cnt > 0 ? ` <span class="v15ib-cls-n v15ib-count-flip">${cnt}</span>` : ''}</button>` : '';
   const clsRow = `<div class="v15ib-cls-row v15ib-count-animate">${clsBtn('', 'All', totalPeople)}${clsBtn('member', 'Members', clsCounts.member + clsCounts.member_family)}${clsBtn('lead', 'Leads', clsCounts.lead)}${(clsCounts.spam + autoSpamCount) > 0 ? clsBtn('spam', 'Spam', clsCounts.spam + autoSpamCount) : ''}${unreadCount > 0 ? clsBtn('unread', 'Unread', unreadCount) : ''}</div>`;
+
+  // ── V1.5 channel tabs + status pills (Zoran 2026-07-28) ──────────────────
+  // SMS and Email get their own tab, each with Read / Unread / Sent / Failed.
+  // Gated to V1.5 so V2's merged inbox is byte-identical to before.
+  let chanTabRow = '';
+  if (_v15ibChanTabsOn()) {
+    const curChan = _v15ibChanTabActive();
+    const nCh = (k) => _V15IB.convos.filter(c => _ibChannelBucket(c) === k).length;
+    const chTab = (key, label, cnt) =>
+      `<button onclick="_v15ibSetChanTab('${key}')" class="v15ib-cls${curChan === key ? ' active' : ''}" data-tip="${key === 'email' ? 'Email conversations' : key === 'sms' ? 'Text conversations' : 'Both channels'}">${label}${cnt != null ? `<span class="v15ib-cls-n">${cnt}</span>` : ''}</button>`;
+    // Counts use the same bucketing the filter uses, so tab count and list agree.
+    const statusOf = _V15IB.unreadOnly ? 'unread' : _V15IB.readOnly ? 'read' : _V15IB.sentOnly ? 'sent' : _V15IB.failedOnly ? 'failed' : '';
+    const inChan = _V15IB.convos.filter(c => !curChan || _ibChannelBucket(c) === curChan);
+    const sCount = {
+      unread: inChan.filter(c => _v15ibIsUnread(c)).length,
+      read:   inChan.filter(c => !_v15ibIsUnread(c)).length,
+      sent:   inChan.filter(c => String(c.lastMessageDirection || '').toLowerCase() === 'outbound').length,
+      failed: inChan.filter(c => _V15IB_FAILED.includes(c.lastMessageStatus || '')).length,
+    };
+    const sPill = (key, label) =>
+      `<button onclick="_v15ibSetStatus('${statusOf === key ? '' : key}')" class="v15ib-chan${statusOf === key ? ' on' : ''}">${label}<span style="opacity:.6;margin-left:5px">${sCount[key]}</span></button>`;
+    chanTabRow = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <div class="v15ib-cls-row">${chTab('', 'All')}${chTab('sms', 'SMS', nCh('sms'))}${chTab('email', 'Email', nCh('email'))}</div>
+        <span style="width:1px;height:18px;background:var(--border)"></span>
+        ${sPill('read', 'Read')}${sPill('unread', 'Unread')}${sPill('sent', 'Sent')}${sPill('failed', 'Failed')}
+        ${statusOf ? `<button onclick="_v15ibSetStatus('')" style="background:none;border:none;color:var(--text-mute);font-size:11px;cursor:pointer;text-decoration:underline">Clear</button>` : ''}
+      </div>`;
+  }
 
   // Filter drawer contents: channels + pipeline (only shown when toggled)
   const chanBtns = _v15ibVisibleChannels().map(ch => {
@@ -16450,6 +16707,7 @@ function _v15ibRenderAll() {
           </div>
         </div>
       </div>
+      ${chanTabRow}
       <div class="v15ib-filter-drawer ${_V15IB.filtersOpen ? 'open' : ''}" id="v15ib-filter-drawer">
         ${chanBtns}
         <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel" style="max-width:160px;padding:5px 8px;font-size:11px;border-radius:6px">${pipeOpts}</select>
@@ -16617,6 +16875,8 @@ function _v15ibRenderList() {
     if (_V15IB.searchQuery) msg = 'No results for "' + escapeHTML(_V15IB.searchQuery) + '"';
     else if (_V15IB.unreadOnly) msg = 'No unread conversations.';
     else if (_V15IB.failedOnly) msg = 'No failed messages - all good.';
+    else if (_V15IB.readOnly) msg = 'Nothing read here yet.';
+    else if (_V15IB.sentOnly) msg = 'Nothing sent on this channel yet.';
     body.innerHTML = `<div class="req-empty" style="padding:32px 16px;color:var(--text-mute);text-align:center;line-height:1.5">${msg}</div>`;
     return;
   }
@@ -24629,16 +24889,41 @@ function applyV15NavState(v15) {
   const _v15only = V15_ACCESS && !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
   const _onV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true);
   const assetsNav = document.getElementById('nav-assets');
-  if (assetsNav) assetsNav.style.display = (_v15only || _onV2) ? 'none' : '';
+  // V1.5 gets the standalone Assets tab BACK so clients can upload media straight
+  // into their own asset library. V2 still hides it: its library lives in the
+  // Content Library card plus the orb fan.
+  if (assetsNav) assetsNav.style.display = _onV2 ? 'none' : '';
   // Contacts/Inbox/KPIs sharing + the Marketing "narrative" treatment now live in
   // applyCrmSupersetNav so V2 gets them too - override the bulk v15 toggle above.
   applyCrmSupersetNav();
   applySupportAccordionNav();    // V1.5: group Systems + Marketing under "Support"
-  applyV15ContactsPlacement();   // V1.5: Contacts moves to a button in the Inbox
+  applyV15ContactsPlacement();   // V1.5: Contacts placement (see note in that fn)
+  applyV15NavTrim();             // V1.5: no Inbox, no Sales, Contacts stands alone
   applyTabPermissions(); // re-subtract per-staff tab perms after the tier re-gate
   applyTalkToBamNav();
   try { _revealStoreTab(); } catch (_) {}
   try { _revealLivePagesTab(); } catch (_) {}  // Live Pages: V1 + V1.5 with a site  // show Store tab only for clients with a store
+}
+
+// V1.5 ONLY: no Inbox and no Sales/Pipeline tab. The GHL inbox and pipelines stay
+// in the codebase and stay fully live for V2 - this removes the way in for V1.5
+// academies, nothing more. Also drops both from the mobile bottom bar, and bounces
+// a V1.5 user off either view if a deep link drops them on it.
+function applyV15NavTrim() {
+  const v15only = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS === true) &&
+                  !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS === true);
+  if (!v15only) return;   // V2 and V1 untouched
+  ['nav-v15inbox', 'nav-v15pipelines'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  document.querySelectorAll('.mobile-nav-item[data-view="v15inbox"], .mobile-nav-item[data-view="pipelines"]')
+    .forEach((el) => { el.style.display = 'none'; });
+  // Standing on a view that no longer has a door? Go home.
+  try {
+    const cur = document.querySelector('.view.active');
+    if (cur && (cur.id === 'view-v15inbox' || cur.id === 'view-pipelines')) switchView('home');
+  } catch (_) {}
 }
 
 // V1.5 groups Systems + Marketing under an expandable "Support" accordion.
@@ -24674,10 +24959,13 @@ function toggleSupportAccordion() {
 function applyV15ContactsPlacement() {
   const v15only = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) &&
                   !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  // V1.5 no longer has an Inbox to hold Contacts, so the standalone nav item stays
+  // visible and the in-inbox button is switched off for everyone. Without this,
+  // removing the Inbox would leave V1.5 with no route to Contacts at all.
   const navContacts = document.getElementById('nav-contacts');
-  if (navContacts && v15only) navContacts.style.display = 'none';
+  if (navContacts && v15only) navContacts.style.display = '';
   const inboxBtn = document.getElementById('inbox-contacts-btn');
-  if (inboxBtn) inboxBtn.style.display = v15only ? 'inline-flex' : 'none';
+  if (inboxBtn) inboxBtn.style.display = 'none';
 }
 
 // "Messages" (the academy↔BAM team chat) is only a left-nav/bottom-bar item on
@@ -59439,22 +59727,97 @@ async function _ccLoadTrialsCount() {
 }
 // The full list of today's trials inside the KPI card (Zoran's wireframe):
 // one row per trial - time + athlete (parent in the sub position if no athlete).
+// Tapping a row pops their contact card (Zoran 2026-07-27) - the rows are kept
+// in _CC_TRIALS so the click handler has the booking without a refetch.
+let _CC_TRIALS = [];
+let _CC_TRIALS_TZ = 'America/Toronto';
 function _ccRenderTrialsList(trials, tz) {
   const listEl = document.getElementById('cc-sal-trials-list');
   const sub = document.getElementById('cc-sal-next');
   if (sub) sub.textContent = '';
   if (!listEl) return;
-  if (!trials || !trials.length) { listEl.innerHTML = ''; return; }
-  const rows = trials
-    .filter(t => t.start)
-    .sort((a, b) => new Date(a.start) - new Date(b.start))
-    .map(t => {
-      let time = '';
-      try { time = new Date(t.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz || 'America/Toronto' }); } catch (_) {}
-      const nm = _ccCapName(String(t.athlete || t.contactName || 'Trial').split(' ').slice(0, 2).join(' '));
-      return `<div class="cc-sal-li"><span class="t">${escapeHTML(time)}</span><span class="n">${escapeHTML(nm)}</span></div>`;
-    }).join('');
-  listEl.innerHTML = rows;
+  _CC_TRIALS_TZ = tz || 'America/Toronto';
+  _CC_TRIALS = (trials || []).filter(t => t.start).sort((a, b) => new Date(a.start) - new Date(b.start));
+  if (!_CC_TRIALS.length) { listEl.innerHTML = ''; return; }
+  listEl.innerHTML = _CC_TRIALS.map((t, i) => {
+    const nm = _ccCapName(String(t.athlete || t.contactName || 'Trial').split(' ').slice(0, 2).join(' '));
+    return `<div class="cc-sal-li click" onclick="event.stopPropagation();_ccOpenTrialCard(${i})" title="Open their contact card">`
+      + `<span class="t">${escapeHTML(_ccTrialTime(t))}</span><span class="n">${escapeHTML(nm)}</span></div>`;
+  }).join('');
+}
+function _ccTrialTime(t) {
+  try { return new Date(t.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: _CC_TRIALS_TZ }); } catch (_) { return ''; }
+}
+
+// Tap a trial -> their contact card pops up. Same shell the pipeline lead card
+// uses (#pl-drawer), so it centres as a modal on desktop and goes full-screen
+// on mobile with no extra CSS. If the lead is on the sales board we open the
+// FULL lead card (messages, journey, actions); otherwise we fall back to a
+// read-only card built from the booking + the contacts mirror.
+async function _ccOpenTrialCard(i) {
+  const t = _CC_TRIALS[i];
+  if (!t) return;
+  const cid = String(t.contactId || '');
+  if (cid && typeof _PL_DATA !== 'undefined' && _PL_DATA) {
+    const opps = ((_PL_DATA.pipelines) || []).reduce((a, p) => a.concat(p.opportunities || []), []);
+    const hit = opps.find(o => String(o.contactId || '') === cid && String(o.status || 'open').toLowerCase() === 'open')
+             || opps.find(o => String(o.contactId || '') === cid);
+    if (hit) { try { _plOpenCard(hit.id); return; } catch (_) { /* fall through to the read-only card */ } }
+  }
+  _ccTrialCard(t);
+}
+function _ccTrialCard(t) {
+  const drawer = document.getElementById('pl-drawer');
+  const overlay = document.getElementById('pl-drawer-overlay');
+  if (!drawer || !overlay) return;
+  const time = _ccTrialTime(t);
+  const nm = _ccCapName(String(t.athlete || t.contactName || 'Trial').split(' ').slice(0, 2).join(' '));
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+  drawer.innerHTML = `
+    <div class="pl-d-header">
+      <div>
+        <div class="pl-d-title">${escapeHTML(nm)}</div>
+        <div class="pl-d-sub">Trial today${time ? ' · ' + escapeHTML(time) : ''}${t.status ? ' · ' + escapeHTML(t.status) : ''}</div>
+      </div>
+      <button class="pc-d-close" onclick="closePipelineDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:22px;padding:4px 10px">×</button>
+    </div>
+    <div class="pl-d-section">
+      <div class="pl-d-row"><div class="lbl2">Athlete</div><div>${escapeHTML(t.athlete || '-')}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Parent</div><div>${escapeHTML(t.parent || t.contactName || '-')}</div></div>
+      ${t.age ? `<div class="pl-d-row"><div class="lbl2">Age</div><div>${escapeHTML(String(t.age))}</div></div>` : ''}
+      ${t.group ? `<div class="pl-d-row"><div class="lbl2">Group</div><div>${escapeHTML(t.group)}</div></div>` : ''}
+    </div>
+    <div class="pl-d-section" id="cc-trial-contact">
+      <div class="lbl">Contact</div>
+      ${t.contactId
+        ? `<div style="font-size:13px;color:var(--text-mute)"><span class="req-spin"></span> Loading…</div>`
+        : `<div style="font-size:13px;color:var(--text-mute)">No contact linked to this booking.</div>`}
+    </div>`;
+  if (t.contactId) _ccTrialCardContact(t.contactId);
+}
+async function _ccTrialCardContact(cid) {
+  const host = document.getElementById('cc-trial-contact');
+  if (!host) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/calendars-v15?action=contact&client_id=${encodeURIComponent(CLIENT_ID)}&id=${encodeURIComponent(cid)}`, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const c = j.contact || {};
+    if (!document.getElementById('cc-trial-contact')) return;   // card closed while loading
+    const cf = (c.customFields || []).filter(f => f.value != null && f.value !== '');
+    const tags = (c.tags || []).map(x => `<span style="font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:2px 8px;margin:0 4px 4px 0;display:inline-block">${escapeHTML(x)}</span>`).join('');
+    host.innerHTML = `<div class="lbl">Contact</div>
+      <div class="pl-d-row"><div class="lbl2">Phone</div><div>${c.phone ? `<a href="tel:${escapeHTML(c.phone)}" style="color:var(--accent)">${escapeHTML(c.phone)}</a>` : '-'}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Email</div><div>${c.email ? `<a href="mailto:${escapeHTML(c.email)}" style="color:var(--accent)">${escapeHTML(c.email)}</a>` : '-'}</div></div>
+      ${c.source ? `<div class="pl-d-row"><div class="lbl2">Source</div><div>${escapeHTML(c.source)}</div></div>` : ''}
+      ${c.dnd ? `<div style="font-size:11.5px;color:#c9871f;margin:6px 0">Do-not-contact is ON</div>` : ''}
+      ${tags ? `<div style="margin-top:10px">${tags}</div>` : ''}
+      ${cf.length ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">${cf.map(f => `<div class="pl-d-row"><div class="lbl2">${escapeHTML(f.name || 'Field')}</div><div>${escapeHTML(String(f.value))}</div></div>`).join('')}</div>` : ''}`;
+  } catch (e) {
+    if (host.isConnected) host.innerHTML = `<div class="lbl">Contact</div><div style="font-size:13px;color:var(--text-mute)">Couldn't load the contact - ${escapeHTML(e.message || String(e))}</div>`;
+  }
 }
 // "Trials today: 0" is a dead number - show the next booked trial instead.
 async function _ccNextTrial() {

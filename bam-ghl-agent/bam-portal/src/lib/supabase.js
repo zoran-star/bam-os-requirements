@@ -14,3 +14,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Exposed for the resumable (TUS) upload endpoint, which lives outside supabase-js.
+export { supabaseUrl };

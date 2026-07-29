@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { submitFeedback } from "../services/feedbackService";
 
+import { showToast } from "./dialogs.jsx";
 export default function FeedbackWidget({ tokens, currentPage, userName }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -33,7 +34,7 @@ export default function FeedbackWidget({ tokens, currentPage, userName }) {
       return;
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert("Speech recognition not supported."); return; }
+    if (!SR) { showToast("Speech recognition not supported."); return; }
     const recognition = new SR();
     recognition.continuous = true;
     recognition.interimResults = false;
@@ -105,7 +106,7 @@ export default function FeedbackWidget({ tokens, currentPage, userName }) {
               </span>
             </div>
             <div onClick={() => { setOpen(false); setListening(false); recognitionRef.current?.stop(); }} style={{
-              width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center",
+              width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "pointer", color: tokens.textMute, fontSize: 16,
               transition: "background 0.12s",
             }}

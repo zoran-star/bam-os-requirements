@@ -214,10 +214,20 @@ async function handler(req, res) {
         const ids = ctx.clients.map(c => c.id).join(",");
         filter = `&client_id=in.(${ids})`;
       }
-      const convos = await sb(
-        `conversations?select=id,client_id,kind,last_message_at,last_message_preview,clients(business_name)` +
-        `${filter}&order=last_message_at.desc.nullslast`
-      );
+      let convos;
+      try {
+        convos = await sb(
+          `conversations?select=id,client_id,kind,last_message_at,last_message_preview,last_message_author_kind,clients(business_name,owner_name,brand_data)` +
+          `${filter}&order=last_message_at.desc.nullslast`
+        );
+      } catch (_) {
+        // last_message_author_kind ships with its migration - tolerate a code
+        // deploy ahead of the SQL so the inbox never breaks.
+        convos = await sb(
+          `conversations?select=id,client_id,kind,last_message_at,last_message_preview,clients(business_name,owner_name,brand_data)` +
+          `${filter}&order=last_message_at.desc.nullslast`
+        );
+      }
       // Unread per user: count messages newer than the user's last_read_at
       // for each convo. One query for all reads, then compute in JS.
       const reads = await sb(
@@ -233,8 +243,11 @@ async function handler(req, res) {
           id: c.id,
           client_id: c.client_id,
           business_name: c.clients?.business_name || "(unknown)",
+          owner_name: c.clients?.owner_name || null,
+          brand_data: c.clients?.brand_data || null,
           last_message_at: c.last_message_at,
           last_message_preview: c.last_message_preview,
+          last_message_author_kind: c.last_message_author_kind || null,
           has_unread: !!hasUnread,
         };
       });

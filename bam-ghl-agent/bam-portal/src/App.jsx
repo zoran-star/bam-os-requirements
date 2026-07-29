@@ -39,8 +39,10 @@ const StripeContactLinkView = lazy(() => import('./views/StripeContactLinkView')
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
+import { ToastHost, ConfirmHost } from './components/dialogs.jsx';
 import SetPasswordView from './views/SetPasswordView';
 import { supabase } from './lib/supabase';
+import { listConversations } from './services/messagesService';
 import { configureStaffSentryContext } from './lib/sentry';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useStaffMe } from './hooks/useStaffMe';
@@ -255,6 +257,29 @@ export default function BAMPortal() {
   // User-initiated navigation: pushes a history entry so Back returns here, and
   // starts the new page with a clean query (drops the old page's sub-tabs).
   // Pass clientId to land directly inside a client's detail (Dashboard cards).
+  // Sidebar unread badge for Inbox: count of conversations with messages
+  // newer than this user's last read. Realtime on conversations (new msgs)
+  // + conversation_reads (opening a thread clears it), with a 60s fallback.
+  const [inboxUnread, setInboxUnread] = useState(0);
+  useEffect(() => {
+    if (!me) return;
+    let stopped = false;
+    const load = async () => {
+      try {
+        const rows = await listConversations();
+        if (!stopped) setInboxUnread(rows.filter(c => c.has_unread).length);
+      } catch (_) { /* badge is best-effort */ }
+    };
+    load();
+    const iv = setInterval(load, 60 * 1000);
+    const ch = supabase
+      .channel("nav:inbox-unread")
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversation_reads" }, load)
+      .subscribe();
+    return () => { stopped = true; clearInterval(iv); supabase.removeChannel(ch); };
+  }, [me]);
+
   const goNav = (next, clientId = null) => {
     if (typeof window !== "undefined") {
       const sp = new URLSearchParams();
@@ -556,7 +581,7 @@ export default function BAMPortal() {
         { label: "Clients", key: "clients", count: onboardingClients.length + activeClients.length },
       ]
     : [
-        { label: "Inbox", key: "inbox" },
+        { label: "Inbox", key: "inbox", ...(inboxUnread > 0 ? { count: inboxUnread } : {}) },
         { label: "Clients", key: "clients", count: onboardingClients.length + activeClients.length },
         ...(canSeeSystems ? [{ label: "Systems", key: "systems" }] : []),
         ...(canSeeSystems ? [{ label: "Website V2", key: "website-v2" }] : []),
@@ -575,7 +600,7 @@ export default function BAMPortal() {
       ];
 
   return (
-    <div style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh" }}>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh" }}>
 
       {/* New-version banner — appears when a fresh deploy is detected */}
       {updateReady && (
@@ -622,7 +647,7 @@ export default function BAMPortal() {
         />
       )}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap');
+        /* Fonts load from index.html (Plus Jakarta Sans + Nunito + DM Mono, per the design system). */
         *{box-sizing:border-box;margin:0;padding:0}
         html,body{background:${tk.bg};min-height:100dvh;overscroll-behavior:none}
         html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
@@ -889,7 +914,7 @@ export default function BAMPortal() {
               )}
 
               {nav === "inbox" && (
-                <InboxView tokens={tk} session={session} me={me} />
+                <InboxView tokens={tk} session={session} me={me} onOpenClient={(id) => goNav("clients", id)} />
               )}
 
               {nav === "tasks" && (
@@ -934,6 +959,12 @@ export default function BAMPortal() {
 
       {/* Universal feedback widget — always visible to staff. Submissions go to portal_feedback. Only Zoran sees the inbox. */}
       <UniversalFeedbackWidget tokens={tk} session={session} />
+
+      {/* Global toast + confirm hosts (dialogs.jsx) - every view gets styled
+          showToast()/uiConfirm() without mounting its own pair. View-local
+          hosts still work (host stack: most recent mount wins). */}
+      <ToastHost tokens={tk} />
+      <ConfirmHost tokens={tk} />
 
       {/* Toast */}
       {toast && (
@@ -1009,10 +1040,10 @@ function NewTicketModal({ tokens, clients, onClose }) {
         <label style={labelStyle}>Priority</label>
         <select style={inputStyle} value={priority} onChange={e => setPriority(e.target.value)}>
           <option value="standard">Standard</option>
-          <option value="urgent">🚨 Red alert (blocking)</option>
+          <option value="urgent">Red alert (blocking)</option>
         </select>
 
-        {error && <div style={{ color: "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
+        {error && <div style={{ color: "#ED7969", fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
           <button onClick={onClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>

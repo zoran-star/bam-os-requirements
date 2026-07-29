@@ -201,7 +201,7 @@ function outlineButton(t) {
     background: "transparent",
     color: t.textSub || t.textMute,
     border: `1px solid ${t.border}`,
-    borderRadius: 6,
+    borderRadius: 8,
     fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",

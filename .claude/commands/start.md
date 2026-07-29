@@ -14,6 +14,11 @@ State which connections are live: GitHub (always), Notion MCP, GoHighLevel MCP. 
 
 ## Step 2 — Show recent activity
 
+**First: check for queued SQL** - read `bam-ghl-agent/bam-portal/supabase/PENDING_SQL.md`.
+If the PENDING table has rows, flag it prominently:
+**"🗄️ N migration(s) queued for prod - run `/pending-sql` to apply."**
+(Don't apply here; the /pending-sql command owns that flow.)
+
 Show the last 5 commits with author + what changed:
 
 ```bash

@@ -8,6 +8,22 @@ import MarketingDashboard, { GoalEditor } from "../components/MarketingDashboard
 import GhlKpiDiscovery from "../components/GhlKpiDiscovery";
 import PhoneTab from "./PhoneTab.jsx";
 import ActivationTab from "./ActivationTab.jsx";
+import ClientAvatar from "../components/ClientAvatar.jsx";
+import { showToast, uiConfirm, ToastHost, ConfirmHost } from "../components/dialogs.jsx";
+
+// ─── Tiny stroke icons (design system: SVG stroke icons, no emojis) ────────
+const _ico = (paths, size = 14) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+    dangerouslySetInnerHTML={{ __html: paths }} />
+);
+const IcoPencil = ({ size }) => _ico('<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>', size);
+const IcoTrash = ({ size }) => _ico('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>', size);
+const IcoCheckCircle = ({ size }) => _ico('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>', size);
+const IcoClock = ({ size }) => _ico('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>', size);
+const IcoChat = ({ size }) => _ico('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>', size);
+const IcoSlack = ({ size }) => _ico('<rect x="13" y="2" width="3" height="8" rx="1.5"/><path d="M19 8.5V10h1.5A1.5 1.5 0 1 0 19 8.5"/><rect x="8" y="14" width="3" height="8" rx="1.5"/><path d="M5 15.5V14H3.5A1.5 1.5 0 1 0 5 15.5"/><rect x="14" y="13" width="8" height="3" rx="1.5"/><path d="M15.5 19H14v1.5a1.5 1.5 0 1 0 1.5-1.5"/><rect x="2" y="8" width="8" height="3" rx="1.5"/><path d="M8.5 5H10V3.5A1.5 1.5 0 1 0 8.5 5"/>', size);
+const IcoLink = ({ size }) => _ico('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', size);
 
 // ─── Combined Clients page ──────────────────────────────────────────────────
 // Replaces the old Clients tab + Client Setup tab. Two states:
@@ -124,10 +140,15 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialClientId]);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // all|active|onboarding|paused|churned
-  const [sortKey, setSortKey] = useState("alpha"); // alpha|recent|mrr
+  // Search/filter/sort live in the URL so reload + Back keep the view and a
+  // filtered list can be link-shared ("here's the churned list").
+  const [search, setSearch] = useUrlState("q", "");
+  const [statusFilter, setStatusFilter] = useUrlState("cstatus", "all"); // all|active|onboarding|paused|churned
+  const [sortKey, setSortKey] = useUrlState("csort", "alpha"); // alpha|recent|status*
   const [refreshCounter, setRefreshCounter] = useState(0);
+  // client_id -> latest client-side last_seen_at (from the same presence RPC
+  // that powers the online dot) - drives the "Last seen" column.
+  const [lastSeenMap, setLastSeenMap] = useState({});
 
   // Load clients + staff.
   // Hard cap at 500 to prevent runaway memory if the table ever grows huge.
@@ -152,8 +173,13 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
         const { data } = await supabase.rpc('clients_online_status');
         if (cancelled || !Array.isArray(data)) return;
         const map = {};
-        data.forEach(r => { if (r.is_online) map[r.client_id] = true; });
+        const seen = {};
+        data.forEach(r => {
+          if (r.is_online) map[r.client_id] = true;
+          if (r.last_seen_at) seen[r.client_id] = r.last_seen_at;
+        });
         setOnlineMap(map);
+        setLastSeenMap(seen);
       };
       loadOnline();
       presenceInterval = setInterval(loadOnline, 30 * 1000);
@@ -182,7 +208,9 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
       list = list.filter(c => {
         const biz = (c.business_name || "").toLowerCase();
         const own = (c.owner_name || "").toLowerCase();
-        return biz.includes(q) || own.includes(q);
+        const email = (c.email || "").toLowerCase();
+        const sm = (staffMap[c.scaling_manager_id]?.name || "").toLowerCase();
+        return biz.includes(q) || own.includes(q) || email.includes(q) || sm.includes(q);
       });
     }
     if (sortKey === "alpha") {
@@ -194,7 +222,18 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
       list = [...list].sort((a, b) => dir * (clientStatusPct(a) - clientStatusPct(b)));
     }
     return list;
-  }, [clients, statusFilter, search, sortKey]);
+  }, [clients, statusFilter, search, sortKey, staffMap]);
+
+  // Open a client straight into a specific detail tab (row quick actions).
+  // ClientDetail reads ?ctab= via useUrlState, so pre-stamp it then select.
+  const openClientTab = (id, tabName) => {
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.set("ctab", tabName);
+      window.history.replaceState(null, "", u.toString());
+    } catch (_) {}
+    setSelectedId(id);
+  };
 
   const selectedClient = selectedId ? clients.find(c => c.id === selectedId) : null;
 
@@ -222,6 +261,8 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
     );
   }
 
+  // (ToastHost/ConfirmHost render inside ClientDetail too - see its return.)
+
   // ─── LIST VIEW ───────────────────────────────────────────────────────────
   const counts = {
     // Total mirrors the default list: archived AND half-started onboarding are
@@ -233,14 +274,20 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
     churned: clients.filter(c => c.status === "churned" && !c.archived_at).length,
   };
 
+  // Half-started onboarding shells hidden from the default view - surfaced as
+  // a one-line hint under the table so the filter isn't a silent trap.
+  const hiddenInSetup = statusFilter === "all"
+    ? clients.filter(c => !c.archived_at && isIncompleteOnboarding(c)).length
+    : 0;
+
   return (
     <div>
-      {/* Header counts */}
+      {/* Header counts - clickable, they drive the status filter */}
       <div style={{ display: "flex", gap: 36, marginBottom: 28, alignItems: "baseline", flexWrap: "wrap" }}>
-        <Stat label="Total" value={counts.all} tokens={t} />
-        <Stat label="Active" value={counts.active} tokens={t} accent={t.green} />
-        <Stat label="Onboarding" value={counts.onboarding} tokens={t} accent={t.amber} />
-        {ROLES.canViewFinancials(role) && <Stat label="Paused" value={counts.paused} tokens={t} />}
+        <Stat label="Total" value={counts.all} tokens={t} active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
+        <Stat label="Active" value={counts.active} tokens={t} accent={t.green} active={statusFilter === "active"} onClick={() => setStatusFilter("active")} />
+        <Stat label="Onboarding" value={counts.onboarding} tokens={t} accent={t.amber} active={statusFilter === "onboarding"} onClick={() => setStatusFilter("onboarding")} />
+        {ROLES.canViewFinancials(role) && <Stat label="Paused" value={counts.paused} tokens={t} active={statusFilter === "paused"} onClick={() => setStatusFilter("paused")} />}
       </div>
 
       {/* Toolbar */}
@@ -248,10 +295,10 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search by business or point of contact..."
+          placeholder="Search business, contact, email, or SM..."
           style={{
             flex: 1, minWidth: 240, padding: "10px 14px", background: t.surface,
-            border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13,
+            border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13,
           }}
         />
         <SegmentedControl
@@ -271,7 +318,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
           onChange={e => setSortKey(e.target.value)}
           style={{
             padding: "10px 14px", background: t.surface, border: `1px solid ${t.border}`,
-            borderRadius: 6, color: t.text, fontSize: 13, cursor: "pointer",
+            borderRadius: 8, color: t.text, fontSize: 13, cursor: "pointer",
           }}
         >
           <option value="alpha">Sort: A → Z</option>
@@ -282,7 +329,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
             onClick={() => setSelectedId("__new__")}
             style={{
               padding: "10px 16px", background: t.accent, color: "#0B0B0D",
-              border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
+              border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
             + Add academy
@@ -290,7 +337,17 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
         )}
       </div>
 
-      {loading && <div style={{ color: t.textMute, padding: 24 }}>Loading clients…</div>}
+      {loading && (
+        <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, overflow: "hidden" }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.9fr 0.7fr 0.8fr", gap: 18, padding: "16px 18px", borderBottom: `1px solid ${t.border}`, alignItems: "center" }}>
+              {[0.85, 0.6, 0.5, 0.45, 0.9].map((w, j) => (
+                <div key={j} className="bp-skel" style={{ height: 12, width: `${w * 100}%`, borderRadius: 999, background: t.border, opacity: 0.6 }} />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
       {!loading && filtered.length === 0 && (
         <div style={{ color: t.textMute, padding: 36, textAlign: "center" }}>
           No clients match your filters.
@@ -299,10 +356,10 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
 
       {/* Table-style list */}
       {!loading && filtered.length > 0 && (
-        <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6, overflow: "hidden" }}>
+        <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, overflow: "hidden" }}>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "1.4fr 1fr 1fr 0.8fr",
+            gridTemplateColumns: "1.5fr 1fr 0.9fr 0.7fr 0.8fr",
             padding: "12px 18px",
             background: t.surface,
             borderBottom: `1px solid ${t.border}`,
@@ -311,8 +368,9 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
             <div>Business</div>
             <div>Point of contact</div>
             <div>Scaling Manager</div>
+            <div>Last seen</div>
             <div
-              onClick={() => setSortKey(k => (k === "statusDesc" ? "statusAsc" : "statusDesc"))}
+              onClick={() => setSortKey(sortKey === "statusDesc" ? "statusAsc" : "statusDesc")}
               title="Sort by onboarding progress"
               style={{ cursor: "pointer", userSelect: "none", display: "flex", alignItems: "center", gap: 5 }}
             >
@@ -329,11 +387,24 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
               staff={staffMap[c.scaling_manager_id]}
               tokens={t}
               isOnline={!!onlineMap[c.id]}
+              lastSeen={lastSeenMap[c.id]}
               onClick={() => setSelectedId(c.id)}
+              onMessage={() => openClientTab(c.id, "messages")}
             />
           ))}
         </div>
       )}
+
+      {/* Half-started signups are hidden from "All" - say so instead of losing them */}
+      {!loading && hiddenInSetup > 0 && (
+        <div style={{ fontSize: 12, color: t.textMute, marginTop: 10, textAlign: "center" }}>
+          +{hiddenInSetup} signup{hiddenInSetup === 1 ? "" : "s"} still in setup are hidden from this view -{" "}
+          <span onClick={() => setStatusFilter("onboarding")} style={{ color: t.accent, cursor: "pointer", fontWeight: 600 }}>view them</span>
+        </div>
+      )}
+
+      <ToastHost tokens={t} />
+      <ConfirmHost tokens={t} />
 
       {selectedId === "__new__" && (
         <NewClientModal
@@ -348,20 +419,40 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
   );
 }
 
-// ─── Stat tile ───────────────────────────────────────────────────────────────
-function Stat({ label, value, tokens, accent }) {
+// ─── Stat tile - clickable, doubles as a status filter ──────────────────────
+function Stat({ label, value, tokens, accent, active, onClick }) {
   return (
-    <div>
+    <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      title={onClick ? `Filter: ${label}` : undefined}
+      style={{ cursor: onClick ? "pointer" : "default", userSelect: "none", paddingBottom: 4, borderBottom: `2px solid ${active ? (accent || tokens.accent) : "transparent"}` }}
+    >
       <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.03em", color: accent || tokens.text }}>{value}</div>
       <div style={{ fontSize: 11, color: tokens.textMute, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 4 }}>{label}</div>
     </div>
   );
 }
 
+// Relative "last seen" label from a timestamp: now / 5m / 3h / 2d / Jul 12.
+function fmtAgo(iso) {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!(ms >= 0)) return null;
+  const m = Math.floor(ms / 60000);
+  if (m < 3) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 14) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 // ─── Segmented control ──────────────────────────────────────────────────────
 function SegmentedControl({ value, onChange, options, tokens }) {
   return (
-    <div style={{ display: "flex", background: tokens.surfaceEl, border: `1px solid ${tokens.border}`, borderRadius: 6, padding: 2 }}>
+    <div style={{ display: "flex", background: tokens.surfaceEl, border: `1px solid ${tokens.border}`, borderRadius: 8, padding: 2 }}>
       {options.map(o => (
         <button
           key={o.value}
@@ -380,9 +471,20 @@ function SegmentedControl({ value, onChange, options, tokens }) {
 }
 
 // ─── Single row in the list ─────────────────────────────────────────────────
-function ClientRow({ client, staff, tokens, isOnline, onClick }) {
+function ClientRow({ client, staff, tokens, isOnline, lastSeen, onClick, onMessage }) {
   const [hov, setHov] = useState(false);
   const t = tokens;
+
+  const qa = (title, onAct, icon) => (
+    <button
+      title={title}
+      onClick={(e) => { e.stopPropagation(); onAct(); }}
+      style={{
+        width: 26, height: 26, display: "inline-flex", alignItems: "center", justifyContent: "center",
+        background: t.surface, color: t.textSub, border: `1px solid ${t.border}`, borderRadius: 8, cursor: "pointer",
+      }}
+    >{icon}</button>
+  );
 
   return (
     <div
@@ -391,8 +493,8 @@ function ClientRow({ client, staff, tokens, isOnline, onClick }) {
       onMouseLeave={() => setHov(false)}
       style={{
         display: "grid",
-        gridTemplateColumns: "1.4fr 1fr 1fr 0.8fr",
-        padding: "14px 18px",
+        gridTemplateColumns: "1.5fr 1fr 0.9fr 0.7fr 0.8fr",
+        padding: "11px 18px",
         borderBottom: `1px solid ${t.border}`,
         cursor: "pointer",
         background: hov ? t.surfaceElHover || "rgba(255,255,255,0.03)" : "transparent",
@@ -400,22 +502,45 @@ function ClientRow({ client, staff, tokens, isOnline, onClick }) {
         alignItems: "center",
       }}
     >
-      <div style={{ fontWeight: 600, color: t.text, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
-        {isOnline && (
-          <span
-            title="A client teammate is online now"
-            style={{
-              width: 8, height: 8, borderRadius: "50%",
-              background: "#22C55E",
-              boxShadow: "0 0 0 2px rgba(34,197,94,0.18)",
-              flexShrink: 0,
-            }}
-          />
-        )}
-        <span>{client.business_name || "(unnamed)"}</span>
+      <div style={{ fontWeight: 600, color: t.text, fontSize: 14, display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <ClientAvatar client={client} tokens={t} size={30} />
+          {isOnline && (
+            <span
+              title="A client teammate is online now"
+              style={{
+                position: "absolute", right: -2, bottom: -2,
+                width: 9, height: 9, borderRadius: "50%",
+                background: "#22C55E",
+                border: `2px solid ${t.surfaceEl}`,
+              }}
+            />
+          )}
+        </div>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client.business_name || "(unnamed)"}</span>
       </div>
-      <div style={{ fontSize: 13, color: t.textSub }}>{client.owner_name || <span style={{ color: t.textMute, fontStyle: "italic" }}>none</span>}</div>
-      <div style={{ fontSize: 13, color: t.textSub }}>{staff?.name || <span style={{ color: t.textMute, fontStyle: "italic" }}>unassigned</span>}</div>
+      <div style={{ fontSize: 13, color: t.textSub, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {client.owner_name || <span style={{ color: t.textMute, fontStyle: "italic" }}>none</span>}
+        </span>
+        {/* Quick actions - visible on hover, click doesn't open the row */}
+        {hov && (
+          <span style={{ display: "inline-flex", gap: 5, marginLeft: "auto", flexShrink: 0 }}>
+            {qa("Message this client", onMessage, <IcoChat size={13} />)}
+            {client.slack_channel_id && qa("Open their Slack channel", () =>
+              window.open(`https://slack.com/app_redirect?channel=${encodeURIComponent(client.slack_channel_id)}`, "_blank"), <IcoSlack size={13} />)}
+            {qa("Copy client portal link", () => {
+              navigator.clipboard?.writeText("https://portal.byanymeansbusiness.com/client-portal.html")
+                .then(() => showToast("Portal link copied", "success"))
+                .catch(() => showToast("Couldn't copy the link"));
+            }, <IcoLink size={13} />)}
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{staff?.name || <span style={{ color: t.textMute, fontStyle: "italic" }}>unassigned</span>}</div>
+      <div style={{ fontSize: 12.5, color: isOnline ? t.green : t.textMute, fontWeight: isOnline ? 700 : 400 }}>
+        {isOnline ? "Online now" : (fmtAgo(lastSeen) || "-")}
+      </div>
       <div>
         {/* Onboarding progress bar (same renderer as the cards) — replaces the
             old status pill so staff see how far along each client actually is. */}
@@ -463,7 +588,10 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       {/* Header: title + status pill on one row, owner name below */}
       <div style={{ marginBottom: 22, paddingBottom: 18, borderBottom: `1px solid ${t.border}` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: t.text, letterSpacing: "-0.03em", margin: 0 }}>{client.business_name}</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+            <ClientAvatar client={client} tokens={t} size={42} />
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: t.text, letterSpacing: "-0.03em", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client.business_name}</h1>
+          </div>
           <StatusPill client={client} tokens={t} />
         </div>
         <div style={{ fontSize: 13, color: t.textSub, marginTop: 6 }}>
@@ -471,22 +599,26 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${t.border}`, marginBottom: 22 }}>
-        {tabs.map(tb => (
-          <button
-            key={tb.id}
-            onClick={() => setTab(tb.id)}
-            style={{
-              padding: "10px 18px",
-              background: "transparent",
-              color: tab === tb.id ? t.accent : t.textMute,
-              borderBottom: `2px solid ${tab === tb.id ? t.accent : "transparent"}`,
-              borderTop: "none", borderLeft: "none", borderRight: "none",
-              fontSize: 13, fontWeight: 600, cursor: "pointer",
-            }}
-          >{tb.label}</button>
-        ))}
+      {/* Tabs - horizontally scrollable (15 tabs cramp on laptops); a soft
+          right-edge fade hints there's more to scroll. */}
+      <div style={{ position: "relative", marginBottom: 22 }}>
+        <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${t.border}`, overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+          {tabs.map(tb => (
+            <button
+              key={tb.id}
+              onClick={() => setTab(tb.id)}
+              style={{
+                padding: "10px 18px",
+                background: "transparent",
+                color: tab === tb.id ? t.accent : t.textMute,
+                borderBottom: `2px solid ${tab === tb.id ? t.accent : "transparent"}`,
+                borderTop: "none", borderLeft: "none", borderRight: "none",
+                fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+              }}
+            >{tb.label}</button>
+          ))}
+        </div>
+        <div style={{ position: "absolute", top: 0, right: 0, bottom: 1, width: 36, pointerEvents: "none", background: `linear-gradient(to right, transparent, ${t.bg || "rgba(0,0,0,0.6)"})` }} />
       </div>
 
       {tab === "onboarding" && <OnboardingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} setTab={setTab} />}
@@ -503,6 +635,9 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       {tab === "activation" && <ActivationTab client={client} tokens={t} session={session} />}
       {tab === "actionItems" && <ActionItemsTab client={client} tokens={t} session={session} />}
       {tab === "notes" && <NotesTab client={client} tokens={t} me={me} session={session} staffMap={staffMap} />}
+
+      <ToastHost tokens={t} />
+      <ConfirmHost tokens={t} />
     </div>
   );
 }
@@ -601,7 +736,7 @@ const ONBOARDING_STAFF_ONLY_KEYS = new Set(["trigger_buildout", "ready_for_revie
 const ONBOARDING_DERIVED_KEYS = new Set(["sys_build_draft", "sys_client_review", "sys_revisions"]);
 function sysStepStatusLabel(it) {
   if (it.completed_at) return "✓ Done";
-  if (it.lit) return "👁 Awaiting client";
+  if (it.lit) return "Awaiting client";
   if (it.ticket_id) return "In progress";
   return "Pending";
 }
@@ -640,10 +775,10 @@ function OnboardingTab({ client, tokens, session, onChanged }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ completed: !it.completed_at }),
       });
-      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Couldn't save: " + (j.error || res.statusText)); }
+      if (!res.ok) { const j = await res.json().catch(() => ({})); showToast("Couldn't save: " + (j.error || res.statusText)); }
       await load();
       if (onChanged) onChanged();
-    } catch (e) { alert("Failed: " + (e?.message || e)); }
+    } catch (e) { showToast("Failed: " + (e?.message || e)); }
     finally { setBusyId(null); }
   }
 
@@ -676,7 +811,7 @@ function OnboardingTab({ client, tokens, session, onChanged }) {
         </div>
         <div style={{ fontSize: 12, color: t.textMute, marginTop: 14 }}>
           <span style={{ color: t.textSub, fontWeight: 600 }}>Next up: </span>
-          {next ? <span style={{ color: t.text }}>{next.title}</span> : <span>All steps complete 🎉</span>}
+          {next ? <span style={{ color: t.text }}>{next.title}</span> : <span>All steps complete</span>}
         </div>
       </div>
 
@@ -690,7 +825,7 @@ function OnboardingTab({ client, tokens, session, onChanged }) {
           return (
             <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 2px", borderBottom: `1px solid ${t.borderSoft || t.border}` }}>
               <button onClick={() => { if (!derived) toggle(it); }} disabled={busyId === it.id || derived} title={derived ? "Auto — mirrors the systems ticket" : ""} style={{
-                width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                width: 22, height: 22, borderRadius: 8, flexShrink: 0,
                 border: `1px ${derived ? "dashed" : "solid"} ${isDone ? t.green : t.border}`, background: isDone ? t.green : "transparent",
                 color: "#0A0A0B", cursor: derived ? "default" : (busyId === it.id ? "wait" : "pointer"), fontSize: 13, fontWeight: 800,
                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -743,9 +878,9 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ client_id: client.id, scheduling_app: next }),
       });
-      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Couldn't save: " + (j.error || res.statusText)); }
+      if (!res.ok) { const j = await res.json().catch(() => ({})); showToast("Couldn't save: " + (j.error || res.statusText)); }
       else if (onChanged) onChanged();
-    } catch (e) { alert("Couldn't save: " + (e?.message || e)); }
+    } catch (e) { showToast("Couldn't save: " + (e?.message || e)); }
     finally { setSavingSched(false); }
   }
 
@@ -762,9 +897,9 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({ client_id: client.id, onboarding_feedback_requested: requested }),
       });
-      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Couldn't save: " + (j.error || res.statusText)); }
+      if (!res.ok) { const j = await res.json().catch(() => ({})); showToast("Couldn't save: " + (j.error || res.statusText)); }
       else if (onChanged) onChanged();
-    } catch (e) { alert("Couldn't save: " + e.message); }
+    } catch (e) { showToast("Couldn't save: " + e.message); }
     finally { setSavingFb(false); }
   }
 
@@ -780,12 +915,12 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        alert("Couldn't save: " + (j.error || res.statusText));
+        showToast("Couldn't save: " + (j.error || res.statusText));
       } else if (onChanged) {
         onChanged();
       }
     } catch (e) {
-      alert("Couldn't save: " + (e?.message || e));
+      showToast("Couldn't save: " + (e?.message || e));
     } finally {
       setSavingOnb(false);
     }
@@ -1057,7 +1192,7 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
   }
 
   async function archive() {
-    if (!confirm(`Archive ${client.business_name}? They won't appear in the active list.`)) return;
+    if (!(await uiConfirm({ title: `Archive ${client.business_name}?`, body: "They won't appear in the active list.", confirmLabel: "Archive", danger: true }))) return;
     const tok = session?.access_token;
     const res = await fetch(`/api/clients?action=archive`, {
       method: "POST",
@@ -1149,7 +1284,7 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
           disabled={!hasChanges || saving}
           style={{
             padding: "10px 22px", background: hasChanges ? t.accent : t.surfaceEl,
-            color: hasChanges ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 6,
+            color: hasChanges ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 8,
             fontSize: 13, fontWeight: 600, cursor: hasChanges ? "pointer" : "not-allowed",
           }}
         >{saving ? "Saving…" : "Save changes"}</button>
@@ -1158,7 +1293,7 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
             onClick={() => { setEdits({}); setMsg(null); }}
             style={{
               padding: "10px 16px", background: "transparent", color: t.textSub,
-              border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer",
+              border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 13, cursor: "pointer",
             }}
           >Discard</button>
         )}
@@ -1182,7 +1317,7 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
       {canArchive && (
         <>
           <SectionTitle style={{ marginTop: 36, color: t.red }}>Danger zone</SectionTitle>
-          <div style={{ padding: "14px 16px", border: `1px solid ${t.red}33`, borderRadius: 6, display: "flex", gap: 12, alignItems: "center" }}>
+          <div style={{ padding: "14px 16px", border: `1px solid ${t.red}33`, borderRadius: 8, display: "flex", gap: 12, alignItems: "center" }}>
             <div style={{ fontSize: 13, color: t.textSub, flex: 1 }}>
               Archive this client (hides them from the active list, keeps history).
             </div>
@@ -1190,7 +1325,7 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
               onClick={archive}
               style={{
                 padding: "8px 18px", background: "transparent", color: t.red,
-                border: `1px solid ${t.red}`, borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                border: `1px solid ${t.red}`, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
               }}
             >Archive</button>
           </div>
@@ -1301,10 +1436,10 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        alert("Couldn't save: " + (j.error || res.statusText));
+        showToast("Couldn't save: " + (j.error || res.statusText));
       } else if (onChanged) onChanged();
     } catch (e) {
-      alert("Couldn't save: " + (e?.message || e));
+      showToast("Couldn't save: " + (e?.message || e));
     } finally {
       setSavingMetaAds(false);
     }
@@ -1326,7 +1461,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
       onChanged?.();
-    } catch (e) { alert("Couldn't save: " + (e.message || e)); }
+    } catch (e) { showToast("Couldn't save: " + (e.message || e)); }
     finally { setSavingOwnAcct(false); }
   }
 
@@ -1358,7 +1493,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
   // monthly spends and can change any (each change → a budget ticket).
   const [savingBudgetReq, setSavingBudgetReq] = useState(false);
   async function requestBudgetConfirmation() {
-    if (!confirm(`Send ${client.business_name} a request to confirm their monthly budgets?\n\nThey'll see a pop-up next time they open their portal.`)) return;
+    if (!(await uiConfirm({ title: `Send ${client.business_name} a request to confirm their monthly budgets?`, body: "They'll see a pop-up next time they open their portal.", confirmLabel: "Send request" }))) return;
     setSavingBudgetReq(true);
     try {
       const tok = session?.access_token;
@@ -1370,9 +1505,9 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
       onChanged?.();
-      alert("Budget confirmation request sent. The client will see it on their next visit.");
+      showToast("Budget confirmation request sent. The client will see it on their next visit.");
     } catch (e) {
-      alert("Couldn't send: " + (e.message || e));
+      showToast("Couldn't send: " + (e.message || e));
     } finally {
       setSavingBudgetReq(false);
     }
@@ -1608,7 +1743,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
               ? "BAM manages this client's ad campaigns and Meta setup."
               : "Client portal Marketing menu is greyed out and onboarding skips the marketing step."}
           </div>
-          {flagErr && <div style={{ color: t.red, fontSize: 12, marginTop: 4 }}>⚠ {flagErr}</div>}
+          {flagErr && <div style={{ color: t.red, fontSize: 12, marginTop: 4 }}>{flagErr}</div>}
         </div>
         {canEdit && (
           <button
@@ -1682,7 +1817,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
           </>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 15 }}>{client.ads_connected_at ? "✅" : "⏳"}</span>
+            <span style={{ color: client.ads_connected_at ? t.green : t.textMute, display: "inline-flex" }}>{client.ads_connected_at ? <IcoCheckCircle size={16} /> : <IcoClock size={16} />}</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>Connect ad account (Leadsie)</div>
               <div style={{ fontSize: 12, color: t.textMute, marginTop: 2 }}>
@@ -1724,14 +1859,14 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
             {live.length === 0 ? (
               <div style={{ color: t.textMute, fontSize: 13, fontStyle: "italic", padding: "8px 0" }}>No live tickets.</div>
             ) : (
-              <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, overflow: "hidden", marginBottom: past.length ? 12 : 0 }}>
+              <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, overflow: "hidden", marginBottom: past.length ? 12 : 0 }}>
                 {live.map(tk => <MktTicketRow key={tk.id} tk={tk} tokens={t} onOpen={openTicketOnMarketingPage} />)}
               </div>
             )}
             {past.length > 0 && (
               <details style={{ marginTop: 4 }}>
                 <summary style={{ cursor: "pointer", fontSize: 12.5, color: t.textMute, fontWeight: 600, padding: "6px 0" }}>Past tickets ({past.length})</summary>
-                <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, overflow: "hidden", marginTop: 6 }}>
+                <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, overflow: "hidden", marginTop: 6 }}>
                   {past.map(tk => <MktTicketRow key={tk.id} tk={tk} tokens={t} onOpen={openTicketOnMarketingPage} />)}
                 </div>
               </details>
@@ -1754,7 +1889,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
             <b style={{ color: t.text }}>Confirm monthly budgets?</b> Sends the client a pop-up of their live campaigns + spends to review and adjust.
           </div>
           <button type="button" onClick={requestBudgetConfirmation} disabled={savingBudgetReq}
-            style={{ padding: "8px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6,
+            style={{ padding: "8px 14px", fontSize: 12, fontWeight: 600, borderRadius: 8,
               border: "none", background: t.accent, color: "#0A0A0B",
               cursor: savingBudgetReq ? "wait" : "pointer", whiteSpace: "nowrap" }}>
             {savingBudgetReq ? "Sending…" : "Request budget confirmation"}
@@ -1764,7 +1899,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
 
       {/* Meta connection status */}
       <div style={{
-        padding: "12px 16px", marginBottom: 22, borderRadius: 6,
+        padding: "12px 16px", marginBottom: 22, borderRadius: 8,
         background: t.surfaceEl, border: `1px solid ${t.border}`,
         display: "flex", alignItems: "center", gap: 12, fontSize: 13,
       }}>
@@ -1798,7 +1933,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
               disabled={!metaConnected}
               style={{
                 width: "100%", padding: "9px 12px", background: t.surface,
-                border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13,
+                border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13,
               }}
             >
               <option value="">{metaConnected ? "(none — pick one)" : "Meta not connected"}</option>
@@ -1838,7 +1973,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
             ) : inlineCampaigns.length === 0 ? (
               <div style={{ fontSize: 12, color: t.textMute, fontStyle: "italic" }}>No campaigns found in this ad account.</div>
             ) : (
-              <div style={{ border: `1px solid ${t.border}`, borderRadius: 6, overflow: "hidden", maxHeight: 320, overflowY: "auto" }}>
+              <div style={{ border: `1px solid ${t.border}`, borderRadius: 12, overflow: "hidden", maxHeight: 320, overflowY: "auto" }}>
                 {inlineCampaigns.map(c => {
                   const on = pickedCampaigns.includes(c.id);
                   return (
@@ -1865,7 +2000,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
               disabled={!hasUnsaved || setupSaving}
               style={{
                 padding: "9px 18px", background: hasUnsaved ? t.accent : t.surfaceEl,
-                color: hasUnsaved ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 6,
+                color: hasUnsaved ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 8,
                 fontSize: 13, fontWeight: 600, cursor: hasUnsaved ? "pointer" : "not-allowed",
               }}
             >{setupSaving ? "Saving…" : "Save Meta setup"}</button>
@@ -1901,7 +2036,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
         <div style={{ color: t.textMute, padding: 12, fontStyle: "italic" }}>No active campaigns.</div>
       )}
       {client.meta_ad_account_id && !campaignsLoading && campaigns?.length > 0 && (
-        <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6, overflow: "hidden" }}>
+        <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, overflow: "hidden" }}>
           {campaigns.map(c => (
             <a
               key={c.id}
@@ -1976,7 +2111,7 @@ function ContentTab({ client, tokens, role, session, onChanged }) {
   async function toggleOrganicContent(nextValue) {
     setSavingOrganic(true);
     try { await saveClientFields({ organic_content: nextValue }); }
-    catch (err) { alert("Couldn't save: " + (err?.message || err)); }
+    catch (err) { showToast("Couldn't save: " + (err?.message || err)); }
     finally { setSavingOrganic(false); }
   }
 
@@ -1987,7 +2122,7 @@ function ContentTab({ client, tokens, role, session, onChanged }) {
   async function toggleAdsApproval(nextValue) {
     setSavingApproval(true);
     try { await saveClientFields({ ads_content_approval_required: nextValue }); }
-    catch (err) { alert("Couldn't save: " + (err?.message || err)); }
+    catch (err) { showToast("Couldn't save: " + (err?.message || err)); }
     finally { setSavingApproval(false); }
   }
 
@@ -2008,17 +2143,17 @@ function ContentTab({ client, tokens, role, session, onChanged }) {
         organic_video_credits_per_month: vidCredits === "" ? null : Number(vidCredits),
         organic_graphic_credits_per_month: gfxCredits === "" ? null : Number(gfxCredits),
       });
-    } catch (e) { alert("Couldn't save credits: " + (e.message || e)); }
+    } catch (e) { showToast("Couldn't save credits: " + (e.message || e)); }
     finally { setSavingCredits(false); }
   }
 
   // "Content-only" preset: paid ads OFF, organic content ON. Other services untouched.
   const [savingPreset, setSavingPreset] = useState(false);
   async function applyContentOnlyPreset() {
-    if (!confirm("Set this client to CONTENT-ONLY?\n\nTurns OFF paid ads (marketing) and turns ON organic content. Other services are left as-is.")) return;
+    if (!(await uiConfirm({ title: "Set this client to CONTENT-ONLY?", body: "Turns OFF paid ads (marketing) and turns ON organic content. Other services are left as-is.", confirmLabel: "Set content-only" }))) return;
     setSavingPreset(true);
     try { await saveClientFields({ marketing_included: false, organic_content: true }); }
-    catch (e) { alert("Couldn't apply preset: " + (e.message || e)); }
+    catch (e) { showToast("Couldn't apply preset: " + (e.message || e)); }
     finally { setSavingPreset(false); }
   }
 
@@ -2118,24 +2253,24 @@ function ContentTab({ client, tokens, role, session, onChanged }) {
               <input type="number" min="0" step="1" value={totCredits}
                 onChange={e => setTotCredits(e.target.value)} placeholder="∞"
                 style={{ display: "block", marginTop: 5, width: 130, padding: "9px 12px", fontSize: 13,
-                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
+                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 8 }} />
             </label>
             <label style={{ fontSize: 12, color: t.textSub }}>
               Video cap
               <input type="number" min="0" step="1" value={vidCredits}
                 onChange={e => setVidCredits(e.target.value)} placeholder="∞"
                 style={{ display: "block", marginTop: 5, width: 100, padding: "9px 12px", fontSize: 13,
-                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
+                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 8 }} />
             </label>
             <label style={{ fontSize: 12, color: t.textSub }}>
               Graphic cap
               <input type="number" min="0" step="1" value={gfxCredits}
                 onChange={e => setGfxCredits(e.target.value)} placeholder="∞"
                 style={{ display: "block", marginTop: 5, width: 100, padding: "9px 12px", fontSize: 13,
-                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 6 }} />
+                  background: t.surface, color: t.text, border: `1px solid ${t.border}`, borderRadius: 8 }} />
             </label>
             <button type="button" onClick={saveCredits} disabled={savingCredits || !creditsDirty}
-              style={{ padding: "9px 16px", fontSize: 13, fontWeight: 600, borderRadius: 6, border: "none",
+              style={{ padding: "9px 16px", fontSize: 13, fontWeight: 600, borderRadius: 8, border: "none",
                 background: creditsDirty ? t.accent : t.border, color: creditsDirty ? "#0A0A0B" : t.textMute,
                 cursor: creditsDirty && !savingCredits ? "pointer" : "default" }}>
               {savingCredits ? "Saving…" : "Save credits"}
@@ -2159,7 +2294,7 @@ function ContentTab({ client, tokens, role, session, onChanged }) {
             {!marketingIncluded && organicContent ? " — already set ✓" : "."}
           </div>
           <button type="button" onClick={applyContentOnlyPreset} disabled={savingPreset}
-            style={{ padding: "8px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6,
+            style={{ padding: "8px 14px", fontSize: 12, fontWeight: 600, borderRadius: 8,
               border: `1px solid ${t.border}`, background: "transparent", color: t.text,
               cursor: savingPreset ? "wait" : "pointer", whiteSpace: "nowrap" }}>
             {savingPreset ? "Applying…" : "Make content-only"}
@@ -2234,7 +2369,7 @@ function MarketingKpis({ client, tokens, session }) {
   const arrow = pct == null ? "→" : pct > 0 ? "↑" : pct < 0 ? "↓" : "→";
   const verdict =
     pct == null ? { text: "No leads the prior week to compare against.", color: t.textMute }
-    : pct <= -20 ? { text: "⚠ Drop-off detected", color: t.red }
+    : pct <= -20 ? { text: "Drop-off detected", color: t.red }
     : pct >= 20  ? { text: "✓ Lead flow up", color: t.green }
     :              { text: "→ Roughly steady", color: t.textSub };
   const arrowColor = pct == null ? t.textMute : pct > 0 ? t.green : pct < 0 ? t.red : t.textSub;
@@ -2243,7 +2378,7 @@ function MarketingKpis({ client, tokens, session }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 640 }}>
 
       {/* KPI 1 — Yesterday */}
-      <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, padding: 18 }}>
+      <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, padding: 18 }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute, marginBottom: 14 }}>
           Yesterday · {mdShort(y.date)}
         </div>
@@ -2255,7 +2390,7 @@ function MarketingKpis({ client, tokens, session }) {
       </div>
 
       {/* KPI 2 — Week over week */}
-      <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, padding: 18 }}>
+      <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, padding: 18 }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute, marginBottom: 14 }}>
           Weekly lead flow (Mon-Sun)
         </div>
@@ -2309,7 +2444,7 @@ function CampaignPickerModal({ campaigns, selected, loading, error, onToggle, on
   const t = tokens;
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6, padding: 0, maxWidth: 720, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, padding: 0, maxWidth: 720, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "18px 22px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: 17, fontWeight: 700, color: t.text }}>Pick campaigns to surface</div>
@@ -2516,7 +2651,7 @@ function MessagesTab({ client, tokens, session, me }) {
     return <div style={{ color: t.textMute, fontSize: 13, padding: 20 }}>Loading conversation…</div>;
   }
   if (err) {
-    return <div style={{ color: t.red, fontSize: 13, padding: 20 }}>⚠ {err}</div>;
+    return <div style={{ color: t.red, fontSize: 13, padding: 20 }}>{err}</div>;
   }
   if (!conversationId) {
     return <div style={{ color: t.textMute, fontSize: 13, padding: 20, fontStyle: "italic" }}>No conversation row for this client. Refresh the page.</div>;
@@ -2619,7 +2754,7 @@ function TeamTab({ client, tokens, session }) {
 
   const inputStyle = {
     flex: "1 1 180px", padding: "9px 12px", background: t.surfaceEl,
-    color: t.text, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13,
+    color: t.text, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 13,
   };
   const sorted = [...members].sort((a, b) => {
     if (a.role !== b.role) return a.role === "owner" ? -1 : 1;
@@ -2672,7 +2807,7 @@ function TeamTab({ client, tokens, session }) {
         return (
           <div key={m.id} style={{
             display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
-            border: `1px solid ${t.border}`, borderRadius: 6, background: t.surfaceEl, marginBottom: 8,
+            border: `1px solid ${t.border}`, borderRadius: 8, background: t.surfaceEl, marginBottom: 8,
           }}>
             <div style={{
               width: 34, height: 34, borderRadius: "50%", background: t.accent, color: "#0B0B0D",
@@ -2702,7 +2837,7 @@ function TeamTab({ client, tokens, session }) {
                   disabled={busy} onClick={() => setRevokeId(null)}>Keep</button>
                 <button style={{
                   padding: "6px 10px", background: t.red, color: "#fff", border: "none",
-                  borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
                 }} disabled={busy} onClick={() => revoke(m.id)}>
                   {busy ? "…" : "Confirm revoke"}
                 </button>
@@ -2710,7 +2845,7 @@ function TeamTab({ client, tokens, session }) {
             ) : (
               <button style={{
                 padding: "6px 12px", background: "transparent", color: t.red,
-                border: `1px solid ${t.red}55`, borderRadius: 6, fontSize: 12, fontWeight: 600,
+                border: `1px solid ${t.red}55`, borderRadius: 8, fontSize: 12, fontWeight: 600,
                 cursor: "pointer", flexShrink: 0,
               }} onClick={() => { setRevokeId(m.id); setMsg(null); }}>Revoke</button>
             ))}
@@ -2756,7 +2891,7 @@ function NotesTab({ client, tokens, me, session, staffMap }) {
       setBody("");
       setRefresh(x => x + 1);
     } else {
-      alert(`Error: ${error.message}`);
+      showToast(`Error: ${error.message}`);
     }
   }
 
@@ -2771,7 +2906,7 @@ function NotesTab({ client, tokens, me, session, staffMap }) {
           rows={3}
           style={{
             width: "100%", padding: 12, background: t.surface,
-            border: `1px solid ${t.border}`, borderRadius: 6, color: t.text,
+            border: `1px solid ${t.border}`, borderRadius: 8, color: t.text,
             fontSize: 13, fontFamily: "inherit", resize: "vertical",
           }}
         />
@@ -2781,7 +2916,7 @@ function NotesTab({ client, tokens, me, session, staffMap }) {
             disabled={saving || !body.trim()}
             style={{
               padding: "8px 18px", background: body.trim() ? t.accent : t.surfaceEl,
-              color: body.trim() ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 6,
+              color: body.trim() ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 8,
               fontSize: 13, fontWeight: 600, cursor: body.trim() ? "pointer" : "not-allowed",
             }}
           >{saving ? "Saving…" : "Add note"}</button>
@@ -2795,7 +2930,7 @@ function NotesTab({ client, tokens, me, session, staffMap }) {
         </div>
       )}
       {notes.map(n => (
-        <div key={n.id} style={{ padding: "12px 16px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6, marginBottom: 8 }}>
+        <div key={n.id} style={{ padding: "12px 16px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, marginBottom: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 12, color: t.textMute }}>
             <span><b style={{ color: t.text }}>{staffMap[n.staff_id]?.name || "Unknown"}</b></span>
             <span>{new Date(n.created_at).toLocaleString()}</span>
@@ -2883,7 +3018,7 @@ function ClientProfileTab({ client, tokens, session, setTab }) {
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
       setEditKey(null); setEdits({});
       load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showToast(e.message); }
     finally { setSaving(false); }
   }
 
@@ -2893,7 +3028,7 @@ function ClientProfileTab({ client, tokens, session, setTab }) {
 
   const doneCount = calls.filter(c => c.completed_at).length;
   const label = { fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: t.textMute, marginBottom: 3 };
-  const inputStyle = { width: "100%", padding: "9px 11px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical" };
+  const inputStyle = { width: "100%", padding: "9px 11px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical" };
 
   return (
     <div style={{ maxWidth: 780 }}>
@@ -2919,7 +3054,7 @@ function ClientProfileTab({ client, tokens, session, setTab }) {
               <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, background: `${chip.color}22`, color: chip.color, whiteSpace: "nowrap" }}>{chip.text}</span>
               {!isEditing && (
                 <button onClick={() => { setEditKey(it.onboarding_key); setEdits({}); }}
-                  style={{ padding: "5px 12px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Edit</button>
+                  style={{ padding: "5px 12px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 12, cursor: "pointer" }}>Edit</button>
               )}
             </div>
             {lk && (
@@ -2927,7 +3062,7 @@ function ClientProfileTab({ client, tokens, session, setTab }) {
                 {lk.note && <div style={{ flex: "1 1 260px", fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>{lk.note}</div>}
                 {(lk.actions || []).map(a => (
                   <button key={a.tab} onClick={() => setTab(a.tab)}
-                    style={{ padding: "5px 12px", background: "transparent", color: t.accent, border: `1px solid ${t.accent}66`, borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>{a.label} →</button>
+                    style={{ padding: "5px 12px", background: "transparent", color: t.accent, border: `1px solid ${t.accent}66`, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>{a.label} →</button>
                 ))}
               </div>
             )}
@@ -2961,9 +3096,9 @@ function ClientProfileTab({ client, tokens, session, setTab }) {
                 ))}
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
                   <button onClick={() => { setEditKey(null); setEdits({}); }}
-                    style={{ padding: "7px 14px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                    style={{ padding: "7px 14px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
                   <button onClick={() => save(it)} disabled={saving}
-                    style={{ padding: "7px 14px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>
+                    style={{ padding: "7px 14px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>
                 </div>
               </div>
             )}
@@ -3028,18 +3163,18 @@ function ActionItemsTab({ client, tokens, session }) {
       });
       setTitle(""); setDesc(""); setAssignee(""); setDue("");
       load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showToast(e.message); }
     finally { setSaving(false); }
   }
 
   async function toggle(it) {
     try { await api("PATCH", { id: it.id, completed: !it.completed_at }); load(); }
-    catch (e) { alert(e.message); }
+    catch (e) { showToast(e.message); }
   }
   async function remove(it) {
-    if (!confirm("Delete this action item?")) return;
+    if (!(await uiConfirm({ title: "Delete this action item?", danger: true, confirmLabel: "Delete" }))) return;
     try { await api("DELETE", null, "?id=" + encodeURIComponent(it.id)); load(); }
-    catch (e) { alert(e.message); }
+    catch (e) { showToast(e.message); }
   }
   function startEdit(it) {
     setEditId(it.id);
@@ -3054,7 +3189,7 @@ function ActionItemsTab({ client, tokens, session }) {
         assignee_id: edit.assignee_id || null, due_date: edit.due_date || null,
       });
       setEditId(null); load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showToast(e.message); }
   }
 
   const onb = items.filter(i => i.onboarding_key).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -3065,14 +3200,14 @@ function ActionItemsTab({ client, tokens, session }) {
   const groupLabel = { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: t.textMute, margin: "18px 0 10px" };
   const inputStyle = {
     width: "100%", padding: "9px 11px", background: t.surface,
-    border: `1px solid ${t.border}`, borderRadius: 6, color: t.text,
+    border: `1px solid ${t.border}`, borderRadius: 8, color: t.text,
     fontSize: 13, fontFamily: "inherit",
   };
 
   function row(it) {
     if (editId === it.id) {
       return (
-        <div key={it.id} style={{ padding: 14, background: t.surfaceEl, border: `1px solid ${t.accent}`, borderRadius: 8, marginBottom: 8 }}>
+        <div key={it.id} style={{ padding: 14, background: t.surfaceEl, border: `1px solid ${t.accent}`, borderRadius: 12, marginBottom: 8 }}>
           <input value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} style={{ ...inputStyle, marginBottom: 8 }} placeholder="Title" />
           <textarea value={edit.description} onChange={e => setEdit({ ...edit, description: e.target.value })} rows={2} style={{ ...inputStyle, marginBottom: 8, resize: "vertical" }} placeholder="Description" />
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -3083,28 +3218,28 @@ function ActionItemsTab({ client, tokens, session }) {
             <input type="date" value={edit.due_date} onChange={e => setEdit({ ...edit, due_date: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button onClick={() => setEditId(null)} style={{ padding: "7px 14px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-            <button onClick={saveEdit} style={{ padding: "7px 14px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Save</button>
+            <button onClick={() => setEditId(null)} style={{ padding: "7px 14px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+            <button onClick={saveEdit} style={{ padding: "7px 14px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Save</button>
           </div>
         </div>
       );
     }
     const overdue = !it.completed_at && it.due_date && it.due_date < today;
     return (
-      <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 8, opacity: it.completed_at ? 0.55 : 1 }}>
+      <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, marginBottom: 8, opacity: it.completed_at ? 0.55 : 1 }}>
         <input type="checkbox" checked={!!it.completed_at} onChange={() => toggle(it)} style={{ marginTop: 3, width: 18, height: 18, cursor: "pointer", accentColor: t.accent }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: t.text, textDecoration: it.completed_at ? "line-through" : "none", wordBreak: "break-word" }}>{it.title}</div>
           {it.description && <div style={{ fontSize: 13, color: t.textMute, marginTop: 3, whiteSpace: "pre-wrap" }}>{it.description}</div>}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, fontSize: 11 }}>
-            <span style={_aiChipStyle(t)}>{it.assignee_name ? `👤 ${it.assignee_name}` : "Unassigned"}</span>
-            {it.due_date && <span style={_aiChipStyle(t, overdue)}>📅 {it.due_date}{overdue ? " · overdue" : ""}</span>}
+            <span style={_aiChipStyle(t)}>{it.assignee_name || "Unassigned"}</span>
+            {it.due_date && <span style={_aiChipStyle(t, overdue)}>{it.due_date}{overdue ? " · overdue" : ""}</span>}
             {it.created_by_name && <span style={{ ..._aiChipStyle(t), opacity: 0.7 }}>by {it.created_by_name}</span>}
           </div>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => startEdit(it)} style={_aiIconBtn(t)} title="Edit">✎</button>
-          <button onClick={() => remove(it)} style={_aiIconBtn(t)} title="Delete">🗑</button>
+          <button onClick={() => startEdit(it)} style={_aiIconBtn(t)} title="Edit"><IcoPencil /></button>
+          <button onClick={() => remove(it)} style={_aiIconBtn(t)} title="Delete"><IcoTrash /></button>
         </div>
       </div>
     );
@@ -3119,7 +3254,7 @@ function ActionItemsTab({ client, tokens, session }) {
       setCallEdits(prev => { const n = { ...prev }; delete n[it.id]; return n; });
       setCallOpenId(null);
       load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showToast(e.message); }
     finally { setCallSaving(false); }
   }
 
@@ -3171,9 +3306,9 @@ function ActionItemsTab({ client, tokens, session }) {
             ))}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button onClick={() => { setCallEdits(prev => { const n = { ...prev }; delete n[it.id]; return n; }); setCallOpenId(null); }}
-                style={{ padding: "7px 14px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                style={{ padding: "7px 14px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
               <button onClick={() => saveCallData(it)} disabled={callSaving}
-                style={{ padding: "7px 14px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{callSaving ? "Saving…" : "Save call data"}</button>
+                style={{ padding: "7px 14px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{callSaving ? "Saving…" : "Save call data"}</button>
             </div>
           </div>
         )}
@@ -3213,7 +3348,7 @@ function ActionItemsTab({ client, tokens, session }) {
         Shared with the academy team — they see and edit the same list in their portal.
       </div>
 
-      <div style={{ padding: 14, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 18 }}>
+      <div style={{ padding: 14, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, marginBottom: 18 }}>
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="New action item…" style={{ ...inputStyle, marginBottom: 8 }} />
         <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} placeholder="Description (optional)" style={{ ...inputStyle, marginBottom: 8, resize: "vertical" }} />
         <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -3224,7 +3359,7 @@ function ActionItemsTab({ client, tokens, session }) {
           <input type="date" value={due} onChange={e => setDue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button onClick={addItem} disabled={saving || !title.trim()} style={{ padding: "8px 18px", background: title.trim() ? t.accent : t.surfaceEl, color: title.trim() ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: title.trim() ? "pointer" : "not-allowed" }}>{saving ? "Adding…" : "Add item"}</button>
+          <button onClick={addItem} disabled={saving || !title.trim()} style={{ padding: "8px 18px", background: title.trim() ? t.accent : t.surfaceEl, color: title.trim() ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: title.trim() ? "pointer" : "not-allowed" }}>{saving ? "Adding…" : "Add item"}</button>
         </div>
       </div>
 
@@ -3267,7 +3402,7 @@ function TransferOwnerButton({ client, tokens: t, session, onChanged }) {
   const [msg, setMsg] = useState(null);
 
   async function go() {
-    if (!confirm(`Transfer ${client.business_name} from "${client.owner_name || client.email}" to ${name} (${email})?\n\nThe current owner will immediately lose portal access. The new owner gets an invite email.`)) return;
+    if (!(await uiConfirm({ title: `Transfer ${client.business_name} from "${client.owner_name || client.email}" to ${name} (${email})?`, body: "The current owner will immediately lose portal access. The new owner gets an invite email.", confirmLabel: "Transfer", danger: true }))) return;
     setBusy(true); setMsg(null);
     try {
       const tok = session?.access_token;
@@ -3293,14 +3428,14 @@ function TransferOwnerButton({ client, tokens: t, session, onChanged }) {
 
   return (
     <>
-      <div style={{ padding: "14px 16px", border: `1px solid ${t.border}`, borderRadius: 6, marginTop: 10, display: "flex", gap: 12, alignItems: "center" }}>
+      <div style={{ padding: "14px 16px", border: `1px solid ${t.border}`, borderRadius: 8, marginTop: 10, display: "flex", gap: 12, alignItems: "center" }}>
         <div style={{ fontSize: 13, color: t.textSub, flex: 1 }}>
           <div style={{ color: t.text, fontWeight: 600, marginBottom: 2 }}>Transfer ownership</div>
           Move portal access to a different person. Current owner loses access immediately.
         </div>
         <button
           onClick={() => { setOpen(true); setMsg(null); setName(""); setEmail(""); }}
-          style={{ padding: "8px 18px", background: "transparent", color: t.text, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          style={{ padding: "8px 18px", background: "transparent", color: t.text, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
         >Transfer…</button>
       </div>
 
@@ -3321,12 +3456,12 @@ function TransferOwnerButton({ client, tokens: t, session, onChanged }) {
             <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>New owner name</label>
             <input
               value={name} onChange={e => setName(e.target.value)} placeholder="Full name" disabled={busy}
-              style={{ width: "100%", padding: "10px 12px", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", marginBottom: 14 }}
+              style={{ width: "100%", padding: "10px 12px", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, fontFamily: "inherit", marginBottom: 14 }}
             />
             <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>New owner email</label>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="newowner@email.com" disabled={busy}
-              style={{ width: "100%", padding: "10px 12px", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", marginBottom: 18 }}
+              style={{ width: "100%", padding: "10px 12px", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, fontFamily: "inherit", marginBottom: 18 }}
             />
 
             {msg && (
@@ -3337,11 +3472,11 @@ function TransferOwnerButton({ client, tokens: t, session, onChanged }) {
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button onClick={() => setOpen(false)} disabled={busy}
-                style={{ padding: "9px 16px", background: "transparent", color: t.textSub, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>
+                style={{ padding: "9px 16px", background: "transparent", color: t.textSub, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}>
                 Cancel
               </button>
               <button onClick={go} disabled={busy || !name.trim() || !email.trim()}
-                style={{ padding: "9px 22px", background: t.accent || "#E8C547", color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                style={{ padding: "9px 22px", background: t.accent || "#E8C547", color: "#0B0B0D", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
                 {busy ? "Transferring…" : "Transfer"}
               </button>
             </div>
@@ -3440,11 +3575,11 @@ function AuthActions({ client, tokens, session, onChanged }) {
                 Invite link
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11, color: t.textMute }}>
-                <span>{inviteResult.emailSent ? "📧 emailed" : "✗ email failed"}</span>
+                <span>{inviteResult.emailSent ? "emailed" : "✗ email failed"}</span>
                 <span>·</span>
                 <span>
-                  {inviteResult.slackPosted ? "💬 posted to Slack"
-                    : inviteResult.slackSkipped ? "💬 Slack not linked"
+                  {inviteResult.slackPosted ? "posted to Slack"
+                    : inviteResult.slackSkipped ? "Slack not linked"
                     : `✗ Slack: ${inviteResult.slackError || "failed"}`}
                 </span>
               </div>
@@ -3457,7 +3592,7 @@ function AuthActions({ client, tokens, session, onChanged }) {
                 onFocus={e => e.target.select()}
                 style={{
                   flex: 1, padding: "8px 10px",
-                  background: t.bg, border: `1px solid ${t.border}`, borderRadius: 6,
+                  background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8,
                   color: t.text, fontSize: 12, fontFamily: "monospace",
                   minWidth: 0,
                 }}
@@ -3466,7 +3601,7 @@ function AuthActions({ client, tokens, session, onChanged }) {
                 onClick={copyLink}
                 style={{
                   padding: "8px 14px", background: copied ? t.green : t.accent,
-                  color: "#0B0B0D", border: "none", borderRadius: 6,
+                  color: "#0B0B0D", border: "none", borderRadius: 8,
                   fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
                   transition: "background 0.15s",
                 }}
@@ -3698,7 +3833,7 @@ function EditField({ label, value, onChange, tokens, type = "text", hint }) {
         onChange={e => onChange(e.target.value)}
         style={{
           width: "100%", padding: "9px 12px", background: tokens.surface,
-          border: `1px solid ${tokens.border}`, borderRadius: 6, color: tokens.text, fontSize: 13,
+          border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 13,
         }}
       />
       {hint && <div style={{ fontSize: 11, color: tokens.textMute, marginTop: 4 }}>{hint}</div>}
@@ -3715,7 +3850,7 @@ function EditSelect({ label, value, onChange, options, tokens }) {
         onChange={e => onChange(e.target.value)}
         style={{
           width: "100%", padding: "9px 12px", background: tokens.surface,
-          border: `1px solid ${tokens.border}`, borderRadius: 6, color: tokens.text, fontSize: 13,
+          border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 13,
         }}
       >
         {options.map(o => {
@@ -3731,10 +3866,10 @@ function EditSelect({ label, value, onChange, options, tokens }) {
 function btnStyle(t, kind) {
   if (kind === "primary") return {
     padding: "9px 18px", background: t.accent, color: "#0B0B0D",
-    border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
+    border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
   };
   return {
     padding: "9px 16px", background: "transparent", color: t.text,
-    border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
+    border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
   };
 }
