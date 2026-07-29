@@ -373,6 +373,11 @@ When new onboarding completes:
    node bam-portal/scripts/verify-client-portal-ui.mjs
    ```
    The tour depends on 6 specific selectors (ticket types, live tickets list, marketing nav item, new campaign button, change campaign button, pending requests list). If you rename or remove any of them, the script exits 1. Fix by restoring the selector OR updating `TOUR_STEPS` / `TOUR_DEMO_CONTAINERS` in `client-portal.html`. See [[memories/project_client_portal_tour]] for the full tour design.
+5. **After ANY edit to a Business Blueprint card (Basics, Staff, Brand, KPIs) or to how the clients row is loaded or saved, run the hydration verifier:**
+   ```bash
+   node bam-portal/scripts/verify-bb-hydration.mjs
+   ```
+   Those cards render from the cached clients row and auto-save on every keystroke, and the columns they need are deliberately NOT in `CLIENT_SELECT_COLS`. Saving a field before it has loaded wrote blanks over real data in production (legal name, address, EIN, brand answers, KPIs). The script runs the real functions against a fake DOM and a controllable fake Supabase; `MUTATE=b1|b2|b3|b4` reverts one fix to prove the suite still catches it. Read the header comment before changing anything it checks.
 
 ### When editing bam-portal (staff portal)
 1. Stack is React/Vite/Supabase — see `bam-portal/package.json`

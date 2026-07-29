@@ -1,6 +1,19 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { NewStaffModal, EditStaffModal, getRoleLabel } from "../components/StaffModals";
+import { showToast, ToastHost, ConfirmHost } from "../components/dialogs.jsx";
+
+// One-line "what can this role see" hints under each group header, mirroring
+// api/_roles.js + the canSee* flags in App.jsx. Keep in sync when roles change.
+const ROLE_HINTS = {
+  admin:              "Full access: every client, financials, commissions, team",
+  scaling_manager:    "Their assigned clients, systems, marketing, commissions for their book",
+  systems_manager:    "All systems tickets + delegation",
+  systems_executor:   "Systems tickets assigned to them",
+  marketing_manager:  "Marketing + content across all clients, content routing",
+  marketing_executor: "Marketing + content execution",
+  content_executor:   "Content tickets assigned to them only",
+};
 
 const ROLE_TONE = {
   admin:              { bg: "rgba(232,197,71,0.10)",  border: "rgba(232,197,71,0.45)",  text: "accent" },
@@ -26,10 +39,12 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
   const [fetchError, setFetchError] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [banner, setBanner] = useState(null);
   const [refreshCounter, setRefreshCounter] = useState(0);
   const [pendingIds, setPendingIds] = useState(() => new Set());
   const [resendingId, setResendingId] = useState(null);
+  const [search, setSearch] = useState("");
+  // staff.id -> number of non-archived academies they're the Scaling Manager for
+  const [clientCounts, setClientCounts] = useState({});
 
   const isAdmin = me?.role === "admin";
 
@@ -40,7 +55,7 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
     (async () => {
       const { data, error } = await supabase
         .from("staff")
-        .select("id,name,email,role")
+        .select("id,name,email,role,booking_url,avatar_url")
         .order("name");
       if (cancelled) return;
       if (error) {
@@ -49,6 +64,17 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
         setStaff(data || []);
       }
       setLoading(false);
+
+      // Per-SM academy load ("manages N academies" on the cards).
+      try {
+        const { data: crows } = await supabase
+          .from("clients").select("scaling_manager_id").is("archived_at", null);
+        if (!cancelled && Array.isArray(crows)) {
+          const counts = {};
+          crows.forEach(r => { if (r.scaling_manager_id) counts[r.scaling_manager_id] = (counts[r.scaling_manager_id] || 0) + 1; });
+          setClientCounts(counts);
+        }
+      } catch { /* count line just won't show */ }
 
       // Which invites are still outstanding (never accepted)? Admin-only —
       // needs the service key to read auth state. Non-fatal if it fails.
@@ -92,10 +118,7 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
   const refresh = () => setRefreshCounter(x => x + 1);
   const editing = editingId ? staff.find(s => s.id === editingId) : null;
 
-  const showBanner = (text) => {
-    setBanner(text);
-    setTimeout(() => setBanner(null), 3500);
-  };
+  const showBanner = (text) => showToast(text, "success");
 
   const onCreated = (member) => {
     showBanner(`Invited ${member.name}.`);
@@ -107,9 +130,16 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
     refresh();
   };
 
+  const q = search.trim().toLowerCase();
+  const searched = q
+    ? staff.filter(s =>
+        (s.name || "").toLowerCase().includes(q) ||
+        (s.email || "").toLowerCase().includes(q) ||
+        getRoleLabel(s.role).toLowerCase().includes(q))
+    : staff;
   const grouped = STAFF_ROLE_ORDER.map(role => ({
     role,
-    members: staff.filter(s => s.role === role),
+    members: searched.filter(s => s.role === role),
   })).filter(g => g.members.length > 0);
 
   const rolePillColor = (role) => {
@@ -121,15 +151,6 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
 
   return (
     <div style={{ padding: "24px 28px", color: tk.text }}>
-      {banner && (
-        <div style={{
-          position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
-          background: tk.green, color: "#fff", padding: "12px 22px", borderRadius: 999,
-          fontSize: 13, fontWeight: 600, zIndex: 9999,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-        }}>{banner}</div>
-      )}
-
       {/* Slim header: count + admin-only Add button */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13, color: tk.textSub }}>
@@ -138,6 +159,16 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
             : `${staff.length} member${staff.length === 1 ? "" : "s"}${isAdmin ? " · click any card to edit or send a password reset" : ""}`
           }
         </div>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search name, email, or role…"
+          style={{
+            flex: "0 1 260px", minWidth: 180, padding: "9px 13px", fontSize: 13,
+            background: tk.surface, color: tk.text, border: `1px solid ${tk.border}`,
+            borderRadius: 8, outline: "none", fontFamily: "inherit",
+          }}
+        />
         {isAdmin && (
           <button
             onClick={() => setShowNew(true)}
@@ -151,7 +182,21 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
 
       {fetchError && (
         <div style={{ color: tk.red || "#ED7969", fontSize: 13, marginBottom: 16, padding: "10px 14px", border: `1px solid ${tk.red || "#ED7969"}55`, borderRadius: 8, background: `${tk.red || "#ED7969"}10` }}>
-          ⚠ Could not load staff: {fetchError}
+          Could not load staff: {fetchError}
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 12, padding: 18, display: "flex", alignItems: "center", gap: 14 }}>
+              <div className="bp-skel" style={{ width: 44, height: 44, borderRadius: 12, background: tk.border }} />
+              <div style={{ flex: 1 }}>
+                <div className="bp-skel" style={{ height: 12, width: "60%", borderRadius: 999, background: tk.border, marginBottom: 8 }} />
+                <div className="bp-skel" style={{ height: 10, width: "80%", borderRadius: 999, background: tk.border }} />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -167,6 +212,9 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
             fontSize: 10, color: tk.textMute, letterSpacing: "0.22em",
             textTransform: "uppercase", marginBottom: 12,
           }}>{getRoleLabel(group.role)} · {group.members.length}</div>
+          {ROLE_HINTS[group.role] && (
+            <div style={{ fontSize: 11.5, color: tk.textMute, margin: "-6px 0 12px", lineHeight: 1.4 }}>{ROLE_HINTS[group.role]}</div>
+          )}
 
           <div style={{
             display: "grid",
@@ -204,11 +252,17 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
                     e.currentTarget.style.boxShadow = "none";
                   }}
                 >
+                  {member.avatar_url ? (
+                    <img src={member.avatar_url} alt="" style={{
+                      width: 44, height: 44, borderRadius: 12, objectFit: "cover",
+                      border: `1px solid ${pill.border}`, flexShrink: 0, background: pill.bg,
+                    }} onError={e => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex"; }} />
+                  ) : null}
                   <div style={{
                     width: 44, height: 44, borderRadius: 12,
                     background: pill.bg, border: `1px solid ${pill.border}`,
                     color: pill.color, fontSize: 14, fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center",
+                    display: member.avatar_url ? "none" : "flex", alignItems: "center", justifyContent: "center",
                     flexShrink: 0,
                   }}>{initials}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -226,12 +280,26 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
                         padding: "3px 9px", borderRadius: 999,
                         background: pill.bg, border: `1px solid ${pill.border}`,
                       }}>{getRoleLabel(member.role)}</span>
+                      {member.role === "scaling_manager" && (
+                        <span style={{
+                          color: tk.textSub, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em",
+                          textTransform: "uppercase", padding: "3px 9px", borderRadius: 999,
+                          background: tk.surfaceEl || tk.bg, border: `1px solid ${tk.border}`,
+                        }}>{clientCounts[member.id] || 0} academies</span>
+                      )}
+                      {["scaling_manager", "marketing_manager", "marketing_executor"].includes(member.role) && !member.booking_url && (
+                        <span title="Client checklist booking buttons fall back to Slack until a booking link is set - edit this member to add one" style={{
+                          color: tk.amber || "#E8A547", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+                          textTransform: "uppercase", padding: "3px 9px", borderRadius: 999,
+                          background: `${tk.amber || "#E8A547"}1A`, border: `1px solid ${tk.amber || "#E8A547"}66`,
+                        }}>No booking link</span>
+                      )}
                       {pending && (
                         <span style={{
                           color: tk.amber || "#E8A547", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
                           textTransform: "uppercase", padding: "3px 9px", borderRadius: 999,
                           background: `${tk.amber || "#E8A547"}1A`, border: `1px solid ${tk.amber || "#E8A547"}66`,
-                        }}>⏳ Pending invite</span>
+                        }}>Pending invite</span>
                       )}
                     </div>
                   </div>
@@ -275,6 +343,9 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
           onSaved={onSaved}
         />
       )}
+
+      <ToastHost tokens={tk} />
+      <ConfirmHost tokens={tk} />
     </div>
   );
 }

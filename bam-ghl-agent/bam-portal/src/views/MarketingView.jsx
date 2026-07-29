@@ -1,17 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useUrlState } from "../hooks/useUrlState";
 import MarketingOverview from "./MarketingOverview";
 import RefreshCalendarSection from "./RefreshCalendarSection";
 import MediaLightbox from "../components/MediaLightbox";
 import { mlIsMedia, mlDownloadUrl } from "../lib/media";
+import { supabase } from "../lib/supabase";
+import ClientAvatar from "../components/ClientAvatar.jsx";
+import { showToast, uiConfirm, ToastHost, ConfirmHost } from "../components/dialogs.jsx";
+
+// Tiny stroke icons for the request types (design system: no emojis).
+const _mkIco = (paths, size = 13) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+    style={{ verticalAlign: "-2px" }} dangerouslySetInnerHTML={{ __html: paths }} />
+);
+const IcoReplace = () => _mkIco('<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>');
+const IcoPlus = () => _mkIco('<path d="M12 5v14M5 12h14"/>');
+const IcoTrashSm = () => _mkIco('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>');
+const IcoDollar = () => _mkIco('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>');
+const IcoRocket = () => _mkIco('<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>');
+const IcoClipboard = () => _mkIco('<rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>');
+const IcoDoc = ({ size = 22 }) => _mkIco('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>', size);
+const IcoLinkSm = () => _mkIco('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
 
 const TYPE_META = {
-  replace:           { icon: "🔄", label: "Replace creative" },
-  add:               { icon: "➕", label: "Add new creative" },
-  remove:            { icon: "🗑",  label: "Remove creative" },
-  budget:            { icon: "💰", label: "Budget change" },
-  "campaign-create": { icon: "🚀", label: "New campaign" },
-  "budget-review":   { icon: "📋", label: "Budget confirmation" },
+  replace:           { icon: <IcoReplace />, label: "Replace creative" },
+  add:               { icon: <IcoPlus />, label: "Add new creative" },
+  remove:            { icon: <IcoTrashSm />,  label: "Remove creative" },
+  budget:            { icon: <IcoDollar />, label: "Budget change" },
+  "campaign-create": { icon: <IcoRocket />, label: "New campaign" },
+  "budget-review":   { icon: <IcoClipboard />, label: "Budget confirmation" },
 };
 
 const STATUS_META = {
@@ -279,41 +297,66 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [selectedId, setSelectedId] = useState(null);
+  // Deep link: ?mticket=<id> opens the ticket once the list loads (Slack-able).
+  const [ticketParam, setTicketParam] = useUrlState("mticket", "");
+  const pendingDeepLink = useRef(ticketParam);
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [revisionModalOpen, setRevisionModalOpen] = useState(false);
   const [revisionMessage, setRevisionMessage] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
-  const [banner, setBanner] = useState(null); // { type, text }
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all"); // all | replace | add | remove | budget | campaign-create
   const [sortOrder, setSortOrder] = useState("due"); // due | priority | newest | oldest
-  const [stateFilter, setStateFilter] = useState("all"); // all | overdue | awaiting-revision (cross-cuts tabs)
+  const [stateFilter, setStateFilter] = useState("all"); // all | overdue | due-today | awaiting-revision (cross-cuts tabs)
+  const [academyFilter, setAcademyFilter] = useState("");
 
-  // ─── Fetch tickets on mount ───
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setFetchError("");
-      try {
-        const token = session?.access_token;
-        const res = await fetch("/api/marketing-tickets?scope=staff", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-        if (!cancelled) {
-          setTickets((json.tickets || []).map(normalizeTicket));
-        }
-      } catch (e) {
-        if (!cancelled) setFetchError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  // ─── Fetch tickets (mount + realtime refresh) ───
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) { setLoading(true); setFetchError(""); }
+    try {
+      const token = session?.access_token;
+      const res = await fetch("/api/marketing-tickets?scope=staff", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setTickets((json.tickets || []).map(normalizeTicket));
+    } catch (e) {
+      if (!quiet) setFetchError(e.message);
+    } finally {
+      if (!quiet) setLoading(false);
+    }
   }, [session]);
+  useEffect(() => { load(); }, [load]);
+
+  // Realtime: refresh the queue whenever a marketing ticket changes, and
+  // toast on brand-new client requests so staff on the page hear about them.
+  useEffect(() => {
+    const channel = supabase
+      .channel("marketing:tickets")
+      .on("postgres_changes", { event: "*", schema: "public", table: "marketing_tickets" }, (payload) => {
+        load({ quiet: true });
+        if (payload?.eventType === "INSERT") showToast("A new marketing request just arrived.", "info");
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [load]);
+
+  // URL <-> selection sync (skipped until any initial deep link is consumed).
+  useEffect(() => {
+    if (pendingDeepLink.current) return;
+    setTicketParam(selectedId || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+  useEffect(() => {
+    if (!pendingDeepLink.current || !tickets.length) return;
+    const id = pendingDeepLink.current;
+    pendingDeepLink.current = null;
+    if (tickets.find(t => t.id === id)) { setSection("tickets"); setSelectedId(id); }
+    else setTicketParam("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets]);
 
   // Deep-link: when the client-detail Marketing tab sends us here for a specific
   // ticket, it stashes the id. Once tickets load, jump to it and clear the stash.
@@ -351,9 +394,19 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   // Cross-cutting quick filters: every non-completed ticket that is overdue / in revision,
   // regardless of which tab it sits in — so "show me all overdue" is one click.
   const overdueAll  = live.filter(isOverdue);
+  const isDueToday  = t => {
+    const info = deadlineInfo(t._raw?.submitted_at, t.priority);
+    if (!info || info.overdue) return false;
+    const d = new Date(info.due); d.setHours(0,0,0,0);
+    const now = new Date(); now.setHours(0,0,0,0);
+    return d.getTime() === now.getTime();
+  };
+  const dueTodayAll = live.filter(isDueToday);
+  const academyOptions = [...new Set(tickets.map(t => t.academyName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
   const tabRows =
     stateFilter === "overdue"            ? overdueAll
+    : stateFilter === "due-today"         ? dueTodayAll
     : stateFilter === "awaiting-revision" ? awaitingRev
     : tab === "active"                    ? active
     : tab === "client-action"             ? clientDep
@@ -364,6 +417,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   // type filter, then sort by submitted date.
   const rows = (() => {
     let list = tabRows;
+    if (academyFilter) list = list.filter(t => t.academyName === academyFilter);
     if (typeFilter !== "all") list = list.filter(t => t.type === typeFilter);
     const q = search.trim().toLowerCase();
     if (q) {
@@ -395,10 +449,25 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
     return list;
   })();
 
-  const showBanner = (type, text) => {
-    setBanner({ type, text });
-    setTimeout(() => setBanner(null), 3500);
+  // Transient feedback goes through the shared toast system (dialogs.jsx).
+  const showBanner = (type, text) => showToast(text, type === "success" ? "success" : "error");
+
+  // Guarded modal closes - a half-typed message needs a confirm to discard.
+  const closeActionModal = async () => {
+    if (actionMessage.trim() && !(await uiConfirm({ title: "Discard this message?", danger: true, confirmLabel: "Discard" }))) return;
+    setActionModalOpen(false); setActionMessage("");
   };
+  const closeRevisionModal = async () => {
+    if (revisionMessage.trim() && !(await uiConfirm({ title: "Discard this message?", danger: true, confirmLabel: "Discard" }))) return;
+    setRevisionModalOpen(false); setRevisionMessage("");
+  };
+  useEffect(() => {
+    if (!actionModalOpen && !revisionModalOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") (actionModalOpen ? closeActionModal() : closeRevisionModal()); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionModalOpen, revisionModalOpen, actionMessage, revisionMessage]);
 
   const _patchTicket = async (id, body) => {
     const token = session?.access_token;
@@ -509,6 +578,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
 
   // Switcher between the cross-client Performance portal and the ticket queue.
   const sectionTabs = () => (
+    <><ToastHost tokens={tk} /><ConfirmHost tokens={tk} />
     <div style={{ display: "inline-flex", background: tk.surfaceEl, border: `1px solid ${tk.borderMed}`, borderRadius: 999, padding: 3, marginBottom: 20 }}>
       {[["performance", "Performance"], ["tickets", "Tickets"], ["refresh", "Creative Refresh"]].map(([id, label]) => (
         <button key={id} onClick={() => setSection(id)} style={{
@@ -518,13 +588,13 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
         }}>{label}{id === "tickets" && clientDep.length > 0 ? ` (${clientDep.length})` : ""}</button>
       ))}
     </div>
+    </>
   );
 
   // ─────────────────────── Performance portal (cross-client) ───────────────────────
   if (section === "performance") {
     return (
       <div style={{ padding: "24px 28px", color: tk.text }}>
-        {banner && <Banner banner={banner} tk={tk} />}
         {sectionTabs()}
         <MarketingOverview tokens={tk} session={session} />
       </div>
@@ -535,7 +605,6 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   if (section === "refresh") {
     return (
       <div style={{ padding: "24px 28px", color: tk.text }}>
-        {banner && <Banner banner={banner} tk={tk} />}
         {sectionTabs()}
         <RefreshCalendarSection tokens={tk} session={session} />
       </div>
@@ -548,7 +617,8 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
 
     return (
       <div style={{ padding: "24px 28px", color: tk.text }}>
-        {banner && <Banner banner={banner} tk={tk} />}
+        <ToastHost tokens={tk} />
+        <ConfirmHost tokens={tk} />
 
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 28 }}>
@@ -632,7 +702,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
                   padding: "10px 20px", borderRadius: 8, cursor: "pointer",
                   fontFamily: "inherit", fontSize: 13, fontWeight: 600,
                 }}
-              >↩  Request Content Revision</button>
+              ><IcoReplace /> Request Content Revision</button>
             )}
             <button
               onClick={toggleHold}
@@ -676,7 +746,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
             tk={tk}
             value={actionMessage}
             onChange={setActionMessage}
-            onCancel={() => { setActionModalOpen(false); setActionMessage(""); }}
+            onCancel={closeActionModal}
             onSubmit={submitActionRequest}
             academyName={selected.academyName}
           />
@@ -687,7 +757,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
             tk={tk}
             value={revisionMessage}
             onChange={setRevisionMessage}
-            onCancel={() => { setRevisionModalOpen(false); setRevisionMessage(""); }}
+            onCancel={closeRevisionModal}
             onSubmit={() => submitRevisionRequest(revisionMessage)}
             busy={actionBusy}
           />
@@ -699,7 +769,6 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   // ─────────────────────── List view ───────────────────────
   return (
     <div style={{ padding: "24px 28px", color: tk.text }}>
-      {banner && <Banner banner={banner} tk={tk} />}
       {sectionTabs()}
 
       {/* Toolbar: search + type filter + sort */}
@@ -717,19 +786,17 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
           }}
         />
         <select
-          value={typeFilter}
-          onChange={e => setTypeFilter(e.target.value)}
+          value={academyFilter}
+          onChange={e => setAcademyFilter(e.target.value)}
           style={{
             padding: "9px 12px", fontSize: 13,
             background: tk.surfaceEl, color: tk.text,
             border: `1px solid ${tk.border}`, borderRadius: 8,
-            cursor: "pointer", fontFamily: "inherit",
+            cursor: "pointer", fontFamily: "inherit", maxWidth: 190,
           }}
         >
-          <option value="all">All types</option>
-          {Object.entries(TYPE_META).map(([key, meta]) => (
-            <option key={key} value={key}>{meta.label}</option>
-          ))}
+          <option value="">All academies</option>
+          {academyOptions.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
         <select
           value={sortOrder}
@@ -750,8 +817,8 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 20, overflowX: "auto" }}>
-        <Tab label={`Active (${active.length})`}                  active={tab === "active"}         onClick={() => setTab("active")}         tk={tk} />
-        <Tab label={`Client Dependent (${clientDep.length})`}     active={tab === "client-action"} onClick={() => setTab("client-action")} tk={tk} red={clientDep.length > 0} />
+        <Tab label={`Active (${active.length})`}                  active={tab === "active"}         onClick={() => setTab("active")}         tk={tk} dot={active.some(isOverdue)} />
+        <Tab label={`Client Dependent (${clientDep.length})`}     active={tab === "client-action"} onClick={() => setTab("client-action")} tk={tk} red={clientDep.length > 0} dot={clientDep.some(isOverdue)} />
         <Tab label={`On Hold (${onHold.length})`}                 active={tab === "on-hold"}       onClick={() => setTab("on-hold")}       tk={tk} />
         <Tab label={`Completed (${completed.length})`}            active={tab === "completed"}     onClick={() => setTab("completed")}     tk={tk} />
       </div>
@@ -759,8 +826,26 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
       {/* Quick filters — cut across tabs so nothing overdue can hide */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <StateChip label="All"               active={stateFilter === "all"}               onClick={() => setStateFilter("all")} tk={tk} />
-        <StateChip label={`⚠ Overdue (${overdueAll.length})`}            active={stateFilter === "overdue"}            onClick={() => setStateFilter("overdue")} tk={tk} tone={tk.red || "#ED7969"} count={overdueAll.length} />
-        <StateChip label={`↩ Awaiting revision (${awaitingRev.length})`} active={stateFilter === "awaiting-revision"} onClick={() => setStateFilter("awaiting-revision")} tk={tk} tone={tk.amber || "#E8A547"} count={awaitingRev.length} />
+        <StateChip label={`Overdue (${overdueAll.length})`}            active={stateFilter === "overdue"}            onClick={() => setStateFilter("overdue")} tk={tk} tone={tk.red || "#ED7969"} count={overdueAll.length} />
+        <StateChip label={`Due today (${dueTodayAll.length})`} active={stateFilter === "due-today"} onClick={() => setStateFilter("due-today")} tk={tk} tone={tk.amber || "#E8A547"} count={dueTodayAll.length} />
+        <StateChip label={`Awaiting revision (${awaitingRev.length})`} active={stateFilter === "awaiting-revision"} onClick={() => setStateFilter("awaiting-revision")} tk={tk} tone={tk.amber || "#E8A547"} count={awaitingRev.length} />
+        <span style={{ width: 1, height: 18, background: tk.border, margin: "0 2px" }} />
+        {/* Type chips - replaces the old dropdown; counts show the workload shape */}
+        <StateChip label={`All types (${tabRows.length})`} active={typeFilter === "all"} onClick={() => setTypeFilter("all")} tk={tk} />
+        {Object.entries(TYPE_META).map(([key, meta]) => {
+          const n = tabRows.filter(t => t.type === key).length;
+          if (n === 0 && typeFilter !== key) return null;
+          return (
+            <button key={key} type="button" onClick={() => setTypeFilter(typeFilter === key ? "all" : key)} style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "6px 13px", fontSize: 12.5, fontWeight: 600, borderRadius: 999,
+              cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+              background: typeFilter === key ? `${tk.accent}22` : "transparent",
+              color: typeFilter === key ? tk.accent : tk.textSub,
+              border: `1px solid ${typeFilter === key ? tk.accent : tk.border}`,
+            }}>{meta.icon} {meta.label} ({n})</button>
+          );
+        })}
       </div>
 
       {/* Column headers */}
@@ -782,12 +867,19 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
       {/* Rows */}
       <Card tk={tk} style={{ padding: "4px 0" }}>
         {loading ? (
-          <div style={{ padding: "32px 16px", textAlign: "center", color: tk.textSub, fontSize: 13 }}>
-            Loading marketing tickets…
+          <div>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px", borderBottom: `1px solid ${tk.borderSoft || tk.border}` }}>
+                <div className="bp-skel" style={{ width: 24, height: 24, borderRadius: 8, background: tk.border }} />
+                <div className="bp-skel" style={{ height: 11, width: "22%", borderRadius: 999, background: tk.border }} />
+                <div className="bp-skel" style={{ height: 11, width: "30%", borderRadius: 999, background: tk.border }} />
+                <div className="bp-skel" style={{ height: 11, width: "18%", borderRadius: 999, background: tk.border }} />
+              </div>
+            ))}
           </div>
         ) : fetchError ? (
           <div style={{ padding: "32px 16px", textAlign: "center", color: tk.red || "#ED7969", fontSize: 13 }}>
-            ⚠ {fetchError}
+            {fetchError}
           </div>
         ) : rows.length === 0 ? (
           <div style={{ padding: "32px 16px", textAlign: "center", color: tk.textSub, fontSize: 13, fontStyle: "italic" }}>
@@ -830,7 +922,8 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
                   color: tk.textMute, padding: "2px 6px", borderRadius: 4,
                   background: "rgba(255,255,255,0.04)", border: `1px solid ${tk.border}`,
                 }}>{ticketCode(t.id)}</span>
-                <span>{t.academyName}</span>
+                <ClientAvatar client={{ business_name: t.academyName, brand_data: t._raw?.client?.brand_data }} tokens={tk} size={24} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.academyName}</span>
               </div>
               <div style={{ color: tk.textSub, fontSize: 13 }}>{t.campaignTitle}</div>
               <div style={{ color: tk.textSub, fontSize: 13 }}>
@@ -855,7 +948,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
 
 // ── helpers ──────────────────────────────────────
 
-function Tab({ label, active, onClick, tk, amber, red }) {
+function Tab({ label, active, onClick, tk, amber, red, dot }) {
   // When inactive, the count-color hint draws attention to tabs with pending work
   const hintColor = red ? (tk.red || "#ED7969") : amber ? (tk.amber || "#E8A547") : null;
   const inactiveColor = hintColor || tk.textSub;
@@ -872,7 +965,7 @@ function Tab({ label, active, onClick, tk, amber, red }) {
         marginBottom: -1,
         transition: "color 0.15s ease",
       }}
-    >{label}</div>
+    >{label}{dot && <span title="Has overdue tickets" style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: tk.red || "#ED7969", marginLeft: 6, verticalAlign: "2px" }} />}</div>
   );
 }
 
@@ -920,7 +1013,7 @@ function DeadlineLabel({ t, tk }) {
     <span style={{
       fontSize: 11, fontWeight: 600,
       color: info.overdue ? (tk.red || "#ED7969") : tk.textMute,
-    }}>{info.overdue ? "⚠ " : ""}{info.label}</span>
+    }}>{info.label}</span>
   );
 }
 
@@ -1016,9 +1109,9 @@ function renderClientInfo(t, tk, onAskSm) {
         <span style={{ color: tk.textMute }}>Not attached</span>
         <button onClick={onAskSm} style={{
           background: "transparent", border: `1px solid ${tk.accent}`, color: tk.accent,
-          padding: "6px 14px", borderRadius: 6, cursor: "pointer",
+          padding: "6px 14px", borderRadius: 8, cursor: "pointer",
           fontFamily: "inherit", fontSize: 12, fontWeight: 600,
-        }}>🔗 Ask SM for landing page</button>
+        }}><IcoLinkSm /> Ask SM for landing page</button>
       </div>
     )]);
 
@@ -1067,7 +1160,7 @@ function SubmittedFileTile({ f, tk }) {
             <video src={`${f.url}#t=0.5`} muted playsInline preload="metadata" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 4, background: tk.surface, display: "block" }} />
             <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, textShadow: "0 1px 3px rgba(0,0,0,0.7)", pointerEvents: "none" }}>▶</span>
           </div>
-        : <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, background: tk.surface, fontSize: 22, color: tk.textMute }}>📄</div>
+        : <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, background: tk.surface, fontSize: 22, color: tk.textMute }}><IcoDoc /></div>
       }
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{f.name}</span>
       <span
@@ -1151,7 +1244,7 @@ function renderSubmittedInfo(t, tk) {
       ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {t.files.map((f, i) => (
-            <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: tk.text, fontSize: 12, padding: "4px 10px", borderRadius: 6, background: tk.surfaceHov || "rgba(255,255,255,0.04)", textDecoration: "none" }}>{f.name} ↗</a>
+            <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: tk.text, fontSize: 12, padding: "4px 10px", borderRadius: 8, background: tk.surfaceHov || "rgba(255,255,255,0.04)", textDecoration: "none" }}>{f.name} ↗</a>
           ))}
         </div>
       )
@@ -1166,7 +1259,7 @@ function renderSubmittedInfo(t, tk) {
         background: "rgba(232,197,71,0.06)",
         borderLeft: `3px solid ${tk.accent}`,
         padding: "10px 12px",
-        borderRadius: 6,
+        borderRadius: 8,
         fontStyle: "italic",
         whiteSpace: "pre-wrap",
       }}>{t.clientNotes}</div>
@@ -1224,7 +1317,7 @@ function RevisionRequestModal({ tk, value, onChange, onCancel, onSubmit, busy })
           style={{
             width: "100%", minHeight: 120,
             background: "rgba(255,255,255,0.03)",
-            border: `1px solid ${tk.border}`, borderRadius: 6,
+            border: `1px solid ${tk.border}`, borderRadius: 8,
             color: tk.text, fontFamily: "inherit", fontSize: 14,
             padding: "10px 12px", resize: "vertical",
           }}
@@ -1233,7 +1326,7 @@ function RevisionRequestModal({ tk, value, onChange, onCancel, onSubmit, busy })
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 22 }}>
           <button onClick={onCancel} disabled={busy} style={{
             background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
-            padding: "10px 18px", borderRadius: 6,
+            padding: "10px 18px", borderRadius: 8,
             cursor: busy ? "wait" : "pointer",
             fontFamily: "inherit", fontSize: 12, fontWeight: 500,
             opacity: busy ? 0.6 : 1,
@@ -1241,7 +1334,7 @@ function RevisionRequestModal({ tk, value, onChange, onCancel, onSubmit, busy })
           <button onClick={onSubmit} disabled={!value.trim() || busy} style={{
             background: value.trim() && !busy ? (tk.amber || "#E8A547") : tk.border,
             color: "#0A0A0B", border: 0,
-            padding: "10px 20px", borderRadius: 6,
+            padding: "10px 20px", borderRadius: 8,
             cursor: value.trim() && !busy ? "pointer" : "not-allowed",
             fontFamily: "inherit", fontSize: 12, fontWeight: 700,
             opacity: value.trim() && !busy ? 1 : 0.6,
@@ -1288,7 +1381,7 @@ function ActionRequestModal({ tk, value, onChange, onCancel, onSubmit, academyNa
           style={{
             width: "100%", minHeight: 110,
             background: "rgba(255,255,255,0.03)",
-            border: `1px solid ${tk.border}`, borderRadius: 6,
+            border: `1px solid ${tk.border}`, borderRadius: 8,
             color: tk.text, fontFamily: "inherit", fontSize: 14,
             padding: "10px 12px", resize: "vertical",
           }}
@@ -1297,12 +1390,12 @@ function ActionRequestModal({ tk, value, onChange, onCancel, onSubmit, academyNa
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 22 }}>
           <button onClick={onCancel} style={{
             background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
-            padding: "10px 18px", borderRadius: 6, cursor: "pointer",
+            padding: "10px 18px", borderRadius: 8, cursor: "pointer",
             fontFamily: "inherit", fontSize: 12, fontWeight: 500,
           }}>Cancel</button>
           <button onClick={onSubmit} disabled={!value.trim()} style={{
             background: value.trim() ? tk.accent : tk.border, color: "#0A0A0B", border: 0,
-            padding: "10px 20px", borderRadius: 6,
+            padding: "10px 20px", borderRadius: 8,
             cursor: value.trim() ? "pointer" : "not-allowed",
             fontFamily: "inherit", fontSize: 12, fontWeight: 700,
             opacity: value.trim() ? 1 : 0.6,
@@ -1313,15 +1406,3 @@ function ActionRequestModal({ tk, value, onChange, onCancel, onSubmit, academyNa
   );
 }
 
-function Banner({ banner, tk }) {
-  const bg = banner.type === "success" ? tk.green : tk.red;
-  return (
-    <div style={{
-      position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
-      background: bg, color: "#fff",
-      padding: "12px 22px", borderRadius: 999, fontSize: 13, fontWeight: 600,
-      zIndex: 9999, boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-      animation: "toastIn 0.25s ease",
-    }}>{banner.text}</div>
-  );
-}

@@ -1,0 +1,442 @@
+{
+  "_note": "Read-only snapshot of BAM GTA as production actually holds it: the clients row PLUS every automation and every step. It is the ONE source of truth for 'what GTA looks like today' - scripts/render-messages.mjs renders from it, api/_gta-message-lock.test.mjs builds its client fixture from it, and api/_gta-step-lock.test.mjs locks the rendered step bodies from it, so a production change cannot be true for one and stale for another. Only fields that exist on the row belong here: an absent field must stay absent, because clientVars() treats absent as 'this academy has no such fact'.",
+  "_captured": "2026-07-28, straight from production (clients + automations + automation_steps for client 39875f07-0a4b-4429-a201-2249bc1f24df). The previous version of this file was hand-abridged: it truncated brand_data, dropped website_setup down to the domain, omitted the missed_trial / trial_form / summer_special automations entirely, showed onboarding as 3 steps when production has 8, and had already been edited to the PROPOSED tokenized ghosted bodies rather than the live ones. A fixture that drifts from production passes for the wrong reason. Re-capture whenever a production column or a GTA message row changes.",
+  "client": {
+    "id": "39875f07-0a4b-4429-a201-2249bc1f24df",
+    "business_name": "BAM GTA",
+    "public_name": "By Any Means Basketball",
+    "legal_name": "LVLUP Basketball Training Inc.",
+    "owner_name": "Zoran Savic",
+    "email": "zoran@byanymeansbball.com",
+    "phone": "(289) 816-6569",
+    "address": "2205 Rosemount Cres",
+    "time_zone": "America/New_York",
+    "community_group_url": "https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t",
+    "community_group_platform": "whatsapp",
+    "google_review_url": "https://g.page/r/CfuIFvZGkfmaEBM/review",
+    "website_setup": {
+      "chunks": {
+        "core": {
+          "status": "published"
+        },
+        "deck": {
+          "status": "published"
+        },
+        "sales": {
+          "status": "published"
+        },
+        "agreement": {
+          "status": "published"
+        },
+        "templates": {
+          "status": "published"
+        },
+        "onboarding": {
+          "status": "published"
+        }
+      },
+      "domain": "byanymeanstoronto.ca",
+      "status": "live",
+      "readiness": {
+        "manual": {
+          "brand_ok": true,
+          "brand_ok_at": "2026-07-21T01:00:50.083116+00:00",
+          "brand_ok_by": "owner",
+          "site_accepted": true,
+          "site_accepted_at": "2026-07-20T22:59:38.680883+00:00",
+          "site_accepted_by": "owner"
+        }
+      },
+      "checked_at": "2026-07-28T16:04:14.037Z"
+    },
+    "brand_data": {
+      "notes": "By Any Means brand: bold, gold-on-black, athletic. Confident, not flashy.",
+      "proof": "Hundreds of GTA athletes trained\nCoaches with playing and certification pedigree\nPrograms feeding into rep and high-school ball\nMon/Wed/Fri evening sessions near Oakville",
+      "stats": "Serving the GTA and Oakville\n43+ active members\nMon/Wed/Fri evening training",
+      "story": "By Any Means started in the GTA with one mission: give serious young hoopers the coaching, reps and accountability that actually move the needle. What began as small-group sessions near Oakville has grown into a training program families across the region trust to develop real game.",
+      "domain": "byanymeanstoronto.ca",
+      "why_us": "We coach with a plan, not just drills. Small groups, honest feedback, and a clear path for every athlete from where they are to where they want to be. Parents see the progress on the court and in the numbers.",
+      "icon_url": "https://placehold.co/512x512/0B0B0D/D4B65C/png?text=BAM",
+      "font_body": "Inter",
+      "references": "Happy with the current site - keep the look",
+      "site_pages": [
+        {
+          "url": "https://byanymeanstoronto.ca/",
+          "slug": "home",
+          "label": "Home",
+          "offer_id": null
+        },
+        {
+          "slug": "about",
+          "label": "About",
+          "offer_id": null
+        },
+        {
+          "slug": "programs",
+          "label": "Programs",
+          "offer_id": null
+        },
+        {
+          "slug": "faq",
+          "label": "FAQ",
+          "offer_id": null
+        },
+        {
+          "slug": "adapt",
+          "label": "ADAPT program",
+          "offer_id": null
+        }
+      ],
+      "website_url": "https://byanymeanstoronto.ca",
+      "color_accent": "#FFFFFF",
+      "font_display": "Anton",
+      "color_primary": "#D4B65C",
+      "logo_dark_url": "https://placehold.co/480x160/0B0B0D/D4B65C/png?text=By+Any+Means",
+      "dream_athletes": "Ages 9 to 17, driven and coachable. The player chasing a rep spot or varsity minutes, and the family that treats development like it matters. Effort first, everything else follows.",
+      "logo_light_url": "https://placehold.co/480x160/FFFFFF/0B0B0D/png?text=By+Any+Means",
+      "website_status": "Have one, happy with it",
+      "color_secondary": "#0B0B0D"
+    },
+    "online_programs_url": "https://byanymeanstoronto.ca/online-programs",
+    "referral_offer": {
+      "body": "to training and you both get a free month plus some merch",
+      "lead": "Bring a friend",
+      "merch_url": "https://byanymeansgsc.com"
+    }
+  },
+  "_facts_note": "The member-facing facts that are NOT on the clients row, captured the same day and from the same production database. api/_academy-facts.js derives these at send time from the locations table, from schedule_slots collapsed into one typical week, and from client_users; they live here so an offline render and the step lock resolve exactly what a real send resolves. Re-capture them whenever GTA's venue, sessions or coach handles change.",
+  "facts": {
+    "location_venue": "1079 Linbrook Rd, Oakville, ON L6J 2L2",
+    "location_coaches": [
+      {
+        "name": "Zoran",
+        "instagram": "https://www.instagram.com/byanymeanszoran/"
+      },
+      {
+        "name": "Adrian",
+        "instagram": "https://www.instagram.com/byanymeansadrian/"
+      }
+    ],
+    "location_schedule": [
+      {
+        "day": "Mondays",
+        "groups": [
+          {
+            "name": "Group 1 (Elementary)",
+            "time": "7-8pm"
+          },
+          {
+            "name": "Group 2 (High School)",
+            "time": "8-9pm"
+          }
+        ]
+      },
+      {
+        "day": "Tuesdays",
+        "groups": [
+          {
+            "name": "Group 1 (Elementary)",
+            "time": "7-8pm"
+          },
+          {
+            "name": "Group 2 (High School)",
+            "time": "8-9pm"
+          }
+        ]
+      },
+      {
+        "day": "Wednesdays",
+        "groups": [
+          {
+            "name": "Group 1 (Elementary)",
+            "time": "7-8pm"
+          },
+          {
+            "name": "Group 2 (High School)",
+            "time": "8-9pm"
+          }
+        ]
+      },
+      {
+        "day": "Thursdays",
+        "groups": [
+          {
+            "name": "Group 1 (Elementary)",
+            "time": "7-8pm"
+          },
+          {
+            "name": "Group 2 (High School)",
+            "time": "8-9pm"
+          }
+        ]
+      },
+      {
+        "day": "Saturdays",
+        "groups": [
+          {
+            "name": "Group 1 (Elementary)",
+            "time": "11:30am-12:30pm"
+          },
+          {
+            "name": "Group 2 (High School)",
+            "time": "12:30-1:30pm"
+          }
+        ]
+      }
+    ]
+  },
+  "automations": [
+    {
+      "id": "74bc1ac2-84e4-477e-97e2-0ef7ff540c95",
+      "automation_key": "contact_form",
+      "name": "📝 Contact Form intro",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        {
+          "position": 0,
+          "wait_amount": 2,
+          "wait_unit": "minutes",
+          "channel": "sms",
+          "subject": null,
+          "body": "Hi {{contact.first_name}},\n\nIt's coach from {{location.name}}. Just saw you filled in the form for extra info, is there anything I can help with?",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "7361fd83-5f60-44b7-b124-9454fd5b3315",
+      "automation_key": "ghosted",
+      "name": "👻 Ghosted",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        {
+          "position": 0,
+          "wait_amount": 1,
+          "wait_unit": "days",
+          "channel": "sms",
+          "subject": null,
+          "body": "Hey {{contact.first_name}}! Just wanted to check in and see if you are still interested in having your child train with us 👍\n\n{{location.domain}}",
+          "enabled": true
+        },
+        {
+          "position": 1,
+          "wait_amount": 1,
+          "wait_unit": "days",
+          "channel": "sms",
+          "subject": null,
+          "body": "Hi {{contact.fullName}}\n\nJust wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: {{location.website}}/free-trial\n\nThank you! 🙏",
+          "enabled": true
+        },
+        {
+          "position": 2,
+          "wait_amount": 1,
+          "wait_unit": "days",
+          "channel": "email",
+          "subject": "Try a session free",
+          "body": "Hi {{contact.first_name}},\n\nIt's coach {{location_owner.first_name}} from {{location.name}} - I just wanted to reach out over email to check and see if you would be interested in coming out to a free trial.\n\nIf so, feel free to book in using this link:\n\n{{location.website}}/free-trial\n\nThanks!",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "fb865847-6cd0-47d2-a8c0-5a516fe488b4",
+      "automation_key": "missed_trial",
+      "name": "📵 Missed Trial intro",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        {
+          "position": 0,
+          "wait_amount": 30,
+          "wait_unit": "minutes",
+          "channel": "sms",
+          "subject": null,
+          "body": "Hi {{contact.first_name}}, sorry we missed you at your trial - want to grab another time? Here's the calendar: {{location.website}}/free-trial",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "49cfe3da-27cd-4a34-b8f0-eb145c8b97ca",
+      "automation_key": "nurture",
+      "name": "💔 Lead Nurture",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        {
+          "position": 0,
+          "wait_amount": 1,
+          "wait_unit": "weeks",
+          "channel": "email",
+          "subject": "A global basketball ecosystem",
+          "body": "template:nurture-1",
+          "enabled": true
+        },
+        {
+          "position": 1,
+          "wait_amount": 1,
+          "wait_unit": "weeks",
+          "channel": "email",
+          "subject": "A new era of training",
+          "body": "template:nurture-2",
+          "enabled": true
+        },
+        {
+          "position": 2,
+          "wait_amount": 3,
+          "wait_unit": "weeks",
+          "channel": "email",
+          "subject": "What families are saying",
+          "body": "template:nurture-3",
+          "enabled": true
+        },
+        {
+          "position": 3,
+          "wait_amount": 3,
+          "wait_unit": "weeks",
+          "channel": "email",
+          "subject": "Don't miss your shot",
+          "body": "template:nurture-4",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "fcfba24c-2d60-4b23-a1ac-e38934aebb1c",
+      "automation_key": "onboarding",
+      "name": "👋 Onboarding",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        {
+          "position": 1,
+          "wait_amount": 0,
+          "wait_unit": "minutes",
+          "channel": "sms",
+          "subject": "",
+          "body": "Hi {{contact.first_name}} welcome to By Any Means Basketball! A couple things to get started:\n\n1) More information will be sent to your email so check that out when you can. Please join this WhatsApp Link for updates: https://chat.whatsapp.com/J5tq7Sn5EF0DJ1rFsqBO9v?mode=gi_t\n\n2) If you would like to access the online programs, use this link: https://byanymeanstoronto.ca/online-programs\n\n3) Check out our socials:\nCoach Zoran: https://www.instagram.com/byanymeanszoran/\nCoach Adrian: https://www.instagram.com/byanymeansadrian/\nGeneral Page: https://www.instagram.com/byanymeanstoronto/\n\n4) If you know any friends that would like to join, bring them out to training to receive a free month and some merch (check out our merch here: byanymeansgsc.com)\n\n5) If you need anything, reach out to the coaches here: (289) 816-6569",
+          "enabled": true
+        },
+        {
+          "position": 2,
+          "wait_amount": 0,
+          "wait_unit": "minutes",
+          "channel": "email",
+          "subject": "Welcome to By Any Means Basketball 🏀",
+          "body": "template:onboarding-welcome",
+          "enabled": true
+        },
+        {
+          "position": 3,
+          "wait_amount": 5,
+          "wait_unit": "minutes",
+          "channel": "sms",
+          "subject": null,
+          "body": "SCHEDULE:\n\n{{location.schedule}}",
+          "enabled": true
+        },
+        {
+          "position": 4,
+          "wait_amount": 5,
+          "wait_unit": "minutes",
+          "channel": "email",
+          "subject": "How to get the most out of training 🏀",
+          "body": "template:onboarding-training",
+          "enabled": true
+        },
+        {
+          "position": 5,
+          "wait_amount": 3,
+          "wait_unit": "days",
+          "channel": "email",
+          "subject": "Where By Any Means came from",
+          "body": "template:onboarding-story",
+          "enabled": true
+        },
+        {
+          "position": 6,
+          "wait_amount": 7,
+          "wait_unit": "days",
+          "channel": "email",
+          "subject": "A new era of training",
+          "body": "template:onboarding-era",
+          "enabled": true
+        },
+        {
+          "position": 7,
+          "wait_amount": 7,
+          "wait_unit": "days",
+          "channel": "email",
+          "subject": "What families are saying about us",
+          "body": "template:onboarding-testimonials",
+          "enabled": true
+        },
+        {
+          "position": 8,
+          "wait_amount": 7,
+          "wait_unit": "days",
+          "channel": "email",
+          "subject": "Quick favour, {{contact.first_name}}? 🙏",
+          "body": "template:onboarding-review",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "cb05f2a2-1ef7-4b56-bb6d-80c5083e89bf",
+      "automation_key": "summer_special",
+      "name": "☀️ Summer Special",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        {
+          "position": 0,
+          "wait_amount": 0,
+          "wait_unit": "days",
+          "channel": "sms",
+          "subject": null,
+          "body": "Hi! It's coach from By Any Means Basketball - we're just sending out this message to everyone because we have a HUGE summer discount on right now, and our spots are filling up.\nSo if you'd like to get your athlete training with us this summer, feel free to book a trial here: https://www.byanymeanstoronto.ca/free-trial\nThanks!\nBAMily",
+          "enabled": true
+        },
+        {
+          "position": 1,
+          "wait_amount": 1,
+          "wait_unit": "days",
+          "channel": "sms",
+          "subject": null,
+          "body": "Hi! Just wanted to reach back out and see if you got this message above on our summer discount for basketball training.\nIf you'd like to check us out: https://www.byanymeanstoronto.ca/",
+          "enabled": true
+        },
+        {
+          "position": 2,
+          "wait_amount": 2,
+          "wait_unit": "days",
+          "channel": "sms",
+          "subject": null,
+          "body": "Last chance to get access to our summer discount for basketball training! Here's the link to a free trial: https://www.byanymeanstoronto.ca/free-trial",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "067321a1-d158-4b77-8350-6526f5dc3eb6",
+      "automation_key": "trial_form",
+      "name": "🏀 Trial Form intro",
+      "enabled": true,
+      "approved": true,
+      "steps": [
+        {
+          "position": 0,
+          "wait_amount": 20,
+          "wait_unit": "minutes",
+          "channel": "sms",
+          "subject": null,
+          "body": "Hi {{contact.first_name}}, it's coach from {{location.name}}.\n\nI saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?\n\nHere's the link to the calendar again: {{location.website}}/free-trial",
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

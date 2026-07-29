@@ -9,6 +9,7 @@
 // so every BAM location reuses the same design with its own name / site / handle.
 // Brand: gold #E2DD9F, black #000000 / surface #0A0A0A, Anton (display) + Inter Tight.
 
+import { FRAME, FOOTER_REASON } from "./email-templates/_shell.js";
 import { TEMPLATES as NURTURE_TEMPLATES } from "./email-templates/nurture-emails.js";
 import { ONBOARDING_TEMPLATES } from "./email-templates/onboarding-emails.js";
 
@@ -16,63 +17,9 @@ import { ONBOARDING_TEMPLATES } from "./email-templates/onboarding-emails.js";
 // automation_steps body: lead-nurture sequence + onboarding welcome sequence.
 const TEMPLATES = { ...NURTURE_TEMPLATES, ...ONBOARDING_TEMPLATES };
 
-const FRAME = `<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta name="x-apple-disable-message-reformatting">
-<meta name="color-scheme" content="light">
-<meta name="supported-color-schemes" content="light">
-<title>{{ACADEMY_FULL}}</title>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!--[if mso]><style>* {font-family: Arial, sans-serif !important;}</style><![endif]-->
-</head>
-<body style="margin:0;padding:0;background:#EDEDEA;font-family:'Inter Tight',Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
-<span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all;">{{PREHEADER}}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#EDEDEA" style="background:#EDEDEA;">
-  <tr><td align="center" style="padding:34px 12px;">
-    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF" style="width:600px;max-width:600px;background:#FFFFFF;">
-
-      <!-- thin gold top accent -->
-      <tr><td style="font-size:0;line-height:0;mso-line-height-rule:exactly;height:3px;background:#E2DD9F;">&nbsp;</td></tr>
-
-      <!-- HEADER (black bar) -->
-      <tr><td bgcolor="#0A0A0A" style="background:#0A0A0A;padding:30px 36px 24px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td align="left" valign="middle" style="font-family:'Anton',Impact,'Arial Narrow','Arial Black',Arial,sans-serif;font-weight:900;font-size:25px;line-height:1;letter-spacing:1px;color:#ffffff;text-transform:uppercase;">BY ANY MEANS&nbsp;<span style="color:#E2DD9F;">{{WORDMARK_SUFFIX}}</span></td>
-          <td align="right" valign="middle" style="font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#8C8C82;">{{LOCATION_TAG}}</td>
-        </tr></table>
-      </td></tr>
-
-      <!-- CONTENT (white) -->
-      <tr><td bgcolor="#FFFFFF" style="background:#FFFFFF;padding:46px 36px 8px;">
-        {{CONTENT}}
-      </td></tr>
-
-      <!-- gold rule -->
-      <tr><td bgcolor="#FFFFFF" style="background:#FFFFFF;padding:30px 36px 32px;"><div style="width:46px;height:2px;background:#E2DD9F;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</div></td></tr>
-
-      <!-- FOOTER (black bar) -->
-      <tr><td bgcolor="#0A0A0A" style="background:#0A0A0A;padding:26px 36px 32px;">
-        <p style="margin:0 0 12px;font-family:'Anton',Impact,'Arial Narrow','Arial Black',Arial,sans-serif;font-weight:900;font-size:18px;line-height:1;letter-spacing:1px;text-transform:uppercase;color:#ffffff;">BY ANY MEANS&nbsp;<span style="color:#E2DD9F;">{{WORDMARK_SUFFIX}}</span></p>
-        <p style="margin:0 0 16px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:#9A9A92;">{{TAGLINE}}</p>
-        <p style="margin:0 0 16px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#8C8C82;">
-          <a href="{{SITE_URL}}" style="color:#E2DD9F;text-decoration:none;font-weight:600;">{{SITE_LABEL}}</a>
-          <span style="color:#3a3a32;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-          <a href="mailto:{{SUPPORT_EMAIL}}" style="color:#B8B8B0;text-decoration:none;">Email</a>
-          <span style="color:#3a3a32;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-          <a href="{{INSTAGRAM_URL}}" style="color:#B8B8B0;text-decoration:none;">Instagram</a>
-        </p>
-        <p style="margin:0;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:11px;line-height:1.7;color:#6E6E66;">
-          You're receiving this because you enquired about {{ACADEMY_FULL}}.
-          <a href="{{UNSUBSCRIBE}}" style="color:#8C8C82;text-decoration:underline;">Unsubscribe</a>
-        </p>
-      </td></tr>
-
-    </table>
-  </td></tr>
-</table>
-</body></html>`;
+// FRAME (the shell markup with its {{CONTENT}} slot) now lives in
+// ./email-templates/_shell.js so the designed templates in that folder ride the SAME
+// markup instead of each keeping a copy of the header/footer.
 
 // Per-location strings. Same design, each location's own identity, keyed by
 // client_id. An academy WITHOUT an entry here gets its identity derived from
@@ -90,9 +37,27 @@ const LOCATIONS = {
     siteUrl: "https://byanymeanstoronto.ca",
     siteLabel: "byanymeanstoronto.ca",
     email: "info@byanymeanstoronto.ca",
+    // Left in the short form on purpose. This is the FOOTER instagram link on every
+    // email, so "canonicalising" it to the www/trailing-slash form the welcome email's
+    // general-page link was hand-written in changes a link in all ten templates to buy
+    // a byte-identical match in one. Same account either way.
     instagram: "https://instagram.com/byanymeanstoronto",
     city: "Oakville",
     ownerFirst: "Zoran",
+    // OPTIONAL per-academy facts. Only GTA has these today, which is exactly why the
+    // welcome email's "online programs" and "bring a friend" items render for GTA and
+    // for nobody else. They are read straight off this config by the template - no
+    // academy branch anywhere - and an academy that has neither simply sends a shorter
+    // email. They live here, beside GTA's other identity strings, because that is
+    // where GTA's facts already live and because clients.online_programs_url /
+    // clients.referral_offer (migration 20260727150000) is not applied yet; once it is,
+    // filling those columns is what turns these on for anyone else.
+    onlineProgramsUrl: "https://byanymeanstoronto.ca/online-programs",
+    referralOffer: {
+      lead: "Bring a friend",
+      body: "to training and you both get a free month plus some merch",
+      merchUrl: "https://byanymeansgsc.com",
+    },
   },
 };
 
@@ -116,10 +81,62 @@ function locFromVars(vars = {}) {
     instagram: "",
     city: String(vars.location_city || ""),
     ownerFirst: String(vars.location_owner || ""),
+    // Optional content facts. Absent (no column yet, or a NULL) means EMPTY, and the
+    // blocks that depend on them do not render at all. See onboarding-emails.js.
+    onlineProgramsUrl: String(vars.online_programs_url || ""),
+    referralOffer: normalizeReferral(vars.referral_offer),
+    // Link facts. Deliberately NOT added to the hardcoded LOCATIONS entry above -
+    // they only ever come from the academy's own row, so no academy can inherit
+    // another's group invite or review link.
+    communityUrl: String(vars.location_community_url || ""),
+    communityPlatform: String(vars.location_community_platform || ""),
+    reviewUrl: String(vars.location_review_url || ""),
+    // Member-facing facts. `phone` comes off the client row; `venue` and `schedule`
+    // do NOT - they are separate tables, so a caller with database access fills
+    // them in (see academyFacts in api/_academy-facts.js) exactly the way the
+    // worker already fills next_session. A caller without them renders an email
+    // with those blocks absent, which is correct: an academy that has entered no
+    // sessions has no schedule to send.
+    phone: String(vars.location_phone || ""),
+    venue: String(vars.location_venue || ""),
+    schedule: Array.isArray(vars.location_schedule) ? vars.location_schedule : [],
+    // [{ name, instagram }] for the coaches an academy wants members to follow.
+    // Empty means the "follow along" line does not render, which is the right
+    // outcome: naming nobody is worse than not asking.
+    coaches: Array.isArray(vars.location_coaches) ? vars.location_coaches : [],
   };
 }
 
-export function locFor(clientId, vars) { return LOCATIONS[clientId] || locFromVars(vars); }
+// A referral offer is {lead, body, merchUrl?} - the bold lead-in of the list item, the
+// perk itself, and optionally the merch shop it mentions. Stored snake_case (jsonb),
+// used camelCase. Anything missing lead or body is treated as no offer at all: a half
+// a sentence is worse than no line.
+function normalizeReferral(raw) {
+  const r = raw && typeof raw === "object" ? raw : null;
+  if (!r) return null;
+  const lead = String(r.lead || "").trim();
+  const body = String(r.body || "").trim();
+  if (!lead || !body) return null;
+  return { lead, body, merchUrl: String(r.merch_url || r.merchUrl || "").trim() };
+}
+
+// An academy's location config. For an academy with no hardcoded entry this is
+// entirely its own row (locFromVars). For one WITH an entry - only BAM GTA today -
+// the hardcoded values still win, but any fact the entry does not carry falls
+// through to the row instead of being undefined.
+//
+// That fall-through is the point. The hardcoded entry deliberately omits the link
+// facts (community group, review link) because they must only ever come from an
+// academy's own record, and it predates the phone / venue / schedule facts entirely.
+// Spreading the row underneath means those resolve for GTA exactly as they do for
+// everyone else, with no academy branch anywhere. It also turns the entry from an
+// OVERRIDE into a FALLBACK: the day a column exists for GTA's tagline and instagram,
+// filling it is all it takes, and the entry stops being read without anyone
+// remembering to delete it.
+export function locFor(clientId, vars) {
+  const pinned = LOCATIONS[clientId];
+  return pinned ? { ...locFromVars(vars), ...pinned } : locFromVars(vars);
+}
 
 // The runtime identity vars for a clients row - the academy facts the resolver
 // trusts. Callers that have the client row loaded (the automations worker, the
@@ -129,12 +146,54 @@ export function clientVars(client) {
   const c = client || {};
   const domain = c.website_setup && c.website_setup.domain;
   return {
-    location_name: c.business_name || "",
+    // The name PARENTS see. `business_name` is the INTERNAL label ("BAM GTA"),
+    // which is what this used to render - so parents read our own shorthand back
+    // in their messages. `public_name` is the parent-facing one ("By Any Means
+    // Toronto"); falling back to business_name keeps every academy that has not
+    // filled it in rendering exactly what it rendered before.
+    location_name: c.public_name || c.business_name || "",
     location_website: domain ? `https://${domain}` : "",
+    // The SAME website with no protocol on the front ("byanymeanstoronto.ca"), for
+    // copy that names the site rather than linking it. An SMS that reads
+    // "https://byanymeanstoronto.ca" on its own line looks like a machine wrote it;
+    // the bare domain is what a person types. Without this token that line had to
+    // stay a hardcoded literal, which is the one thing keeping the row academy-specific.
+    location_domain: domain || "",
     location_owner: c.owner_name ? String(c.owner_name).trim().split(/\s+/)[0] : "",
     location_email: c.email || "",
     location_city: cityFromAddress(c.address),
+    // The number a MEMBER reaches the coaches on. Not the same thing as
+    // clients.address, which is the business address and not the gym - the venue
+    // is a separate fact entirely (see academyFacts). Empty means the line that
+    // carries it does not render.
+    location_phone: c.phone || "",
+    // Optional content facts (migration 20260727150000, not applied yet). A client row
+    // read before that migration simply has no such property, which reads as absent -
+    // the dependent blocks do not render and nothing throws.
+    online_programs_url: c.online_programs_url || "",
+    referral_offer: c.referral_offer || null,
+    // Community group + review link. Both are LINK facts: empty means the line
+    // or button that carries them disappears (see dropEmptyLinkMentions /
+    // dropEmptyShellLinks), never renders dead.
+    location_community_url: c.community_group_url || "",
+    location_community_platform: communityPlatformLabel(c.community_group_platform),
+    location_review_url: c.google_review_url || "",
   };
+}
+
+// The platform key -> the word that names the group in copy ("Join the WhatsApp
+// group"). Stored normalized, rendered here, so the display wording lives in
+// code and one academy's label can never be another's. An unknown or missing
+// platform renders NOTHING rather than guessing, which leaves the surrounding
+// copy reading "Join the group" - still correct, still not a placeholder.
+const COMMUNITY_PLATFORMS = {
+  whatsapp: "WhatsApp",
+  facebook: "Facebook",
+  discord: "Discord",
+  telegram: "Telegram",
+};
+function communityPlatformLabel(key) {
+  return COMMUNITY_PLATFORMS[String(key || "").toLowerCase()] || "";
 }
 
 // Best-effort city from a street address ("1051 W San Fernando St, San Jose, CA
@@ -148,14 +207,50 @@ function cityFromAddress(address) {
   return /\d/.test(cand) ? "" : cand;
 }
 
+// A week's training, as plain text, for the SMS form of the schedule:
+//
+//   MONDAYS
+//   Group 1 (Elementary): 7-8pm
+//   Group 2 (High School): 8-9pm
+//
+// The value is the SAME structured week the welcome email builds its table from
+// ([{ day, groups: [{ name, time }] }]), so the text a member is texted and the
+// table a member is emailed can never disagree. Nothing on file renders "", which
+// leaves the step with no schedule in it - and that step seeds OFF until an academy
+// has entered its sessions, so nothing empty ever sends.
+// The venue rides ALONG with the schedule here rather than being its own line in the
+// message body, and that is the fix for a half-state that would otherwise ship: an
+// academy with a gym but no sessions entered yet (San Jose, today) would have texted
+// its members "LOCATION: 1051 W San Fernando St" and nothing else, five minutes after
+// they paid. The all-empty case was handled and the half was not. This message IS the
+// schedule; with no schedule there is nothing to say, so the venue goes with it and
+// the whole body resolves to "" and is never sent.
+//
+// The same guards the email's table applies (skip a day with no groups, skip a group
+// missing its name or time) are applied here too, so the texted week and the emailed
+// week cannot disagree. They are unreachable through weeklySchedule, which already
+// filters both - they are here so the claim stays true if anything else ever builds
+// this value.
+export function scheduleText(week, venue) {
+  const days = (Array.isArray(week) ? week : [])
+    .map((d) => ({ day: String((d && d.day) || "").trim(), groups: ((d && d.groups) || []).filter((g) => g && g.name && g.time) }))
+    .filter((d) => d.day && d.groups.length);
+  if (!days.length) return "";
+  const out = days
+    .map((d) => [d.day.toUpperCase(), ...d.groups.map((g) => `${g.name}: ${g.time}`)].join("\n"))
+    .join("\n\n");
+  const where = String(venue || "").trim();
+  return where ? `${out}\n\nLOCATION: ${where}` : out;
+}
+
 // Resolve GHL-style merge tokens (the ones our imported emails carry) to real values:
 // location tokens from the academy config, contact tokens from `vars` (with friendly
 // fallbacks so a missing name never sends as a raw {{token}}). Tolerates spaces inside
 // the braces. Only touches these known tokens - the shell placeholders (UPPERCASE) are
 // left for the caller to fill.
-// Remove every reference to a website we do not have, at the SMALLEST unit that
-// still reads correctly - so an academy with no domain yet sends a shorter
-// message, never a broken one and never an empty one.
+// Remove every reference to a LINK we do not have, at the SMALLEST unit that
+// still reads correctly - so an academy missing a link sends a shorter message,
+// never a broken one and never an empty one.
 //
 //   line that is a BARE LINK ("{{location.website}}/free-trial")
 //       -> drop the line, plus a lead-in line above it ending in ":"
@@ -168,19 +263,43 @@ function cityFromAddress(address) {
 // an empty body reached the SMS provider, got rejected, and burned all 3 retry
 // attempts silently. Ghosted step 2 lost its entire value proposition the same
 // way. Sentence-level keeps both messages intact and sending.
-const WEBSITE_TOKEN = /\{\{\s*location\.website\s*\}\}/;
-function dropWebsiteMentions(text) {
+//
+// Generalized 2026-07-27 from website-only to EVERY link fact an academy may not
+// have yet: the website, the community group invite, and the Google review link.
+// One rule for all of them - no fact, no output.
+// `location.domain` is the bare-domain form of location.website and belongs here for
+// the same reason: no domain on file means the academy has no site to name, so the
+// mention goes rather than rendering a naked "" where a web address should be.
+const LINK_TOKENS = ["location.website", "location.domain", "location.community_link", "location.review_link"];
+
+// The same rule, widened past links: any fact whose absence must take its mention
+// with it. The schedule and the venue joined on 28 Jul 2026 when the schedule SMS
+// stopped being hand-typed. Without them here, an academy with no sessions on file
+// texts its members "SCHEDULE:" followed by nothing, which is worse than the silence
+// it replaced - and it would not be caught by the empty-body guard in api/_send.js,
+// because "SCHEDULE:" and "LOCATION:" are not nothing.
+//
+// The existing shapes do the work unchanged: "{{location.schedule}}" alone on its line
+// is a BARE mention, so it goes and takes the dangling "SCHEDULE:" lead-in above it;
+// "LOCATION: {{location.venue}}" is a mention inside prose, so that sentence goes. An
+// academy with neither sends nothing at all, which _send.js then declines to send.
+const DROP_WHEN_EMPTY = [...LINK_TOKENS, "location.schedule", "location.venue"];
+const tokenRe = (name, flags) => new RegExp("\\{\\{\\s*" + name.replace(/\./g, "\\.") + "\\s*\\}\\}", flags);
+function dropEmptyLinkMentions(text, emptyTokens) {
+  if (!emptyTokens.length) return String(text);
+  const EMPTY = new RegExp(emptyTokens.map((t) => tokenRe(t).source).join("|"));
+  const BARE = new RegExp("^\\s*\\S*(?:" + emptyTokens.map((t) => tokenRe(t).source).join("|") + ")\\S*\\s*$");
   const lines = String(text).split("\n");
   const out = [];
   for (const line of lines) {
-    if (!WEBSITE_TOKEN.test(line)) { out.push(line); continue; }
+    if (!EMPTY.test(line)) { out.push(line); continue; }
     // A bare link line: the whole line is the token plus its path, no prose.
-    const bareLink = /^\s*\S*\{\{\s*location\.website\s*\}\}\S*\s*$/.test(line);
+    const bareLink = BARE.test(line);
     let kept = "";
     if (!bareLink) {
       kept = line
         .split(/(?<=[.!?])\s+/)
-        .filter((sentence) => !WEBSITE_TOKEN.test(sentence))
+        .filter((sentence) => !EMPTY.test(sentence))
         .join(" ")
         .trim();
     }
@@ -213,18 +332,44 @@ export function resolveMergeVars(html, L, vars = {}) {
     "location.city": vars.location_city || L.city || "",
     "location.name": vars.location_name || L.full || "",
     "location.website": vars.location_website || L.siteUrl || "",
+    // Bare domain, no protocol. Falls back to L.siteLabel, which is already the
+    // stripped form of the same site, so the two tokens can never name different
+    // places - they are one fact rendered two ways.
+    "location.domain": vars.location_domain || L.siteLabel || "",
+    // Community group: the LINK gates the line, the PLATFORM only names it.
+    // Copy reads "Join the {{location.community_platform}} group:
+    // {{location.community_link}}" - with no platform on file that renders
+    // "Join the group", and with no link the whole line goes.
+    "location.community_link": vars.location_community_url || L.communityUrl || "",
+    "location.community_platform": vars.location_community_platform || L.communityPlatform || "",
+    // Review ask. No link on file means the CTA is removed outright, in plain
+    // text here and as a button by dropEmptyShellLinks.
+    "location.review_link": vars.location_review_url || L.reviewUrl || "",
     "location_owner.first_name": vars.location_owner || L.ownerFirst || "",
+    // Member-facing facts, for the welcome sequence. The schedule renders as plain
+    // lines here (the SMS form); the welcome EMAIL builds a table from the same
+    // structured value off L. One fact, two presentations, never two sources.
+    "location.phone": vars.location_phone || L.phone || "",
+    "location.venue": vars.location_venue || L.venue || "",
+    "location.schedule": scheduleText(vars.location_schedule || L.schedule, vars.location_venue || L.venue),
     // Filled at send time by the worker (e.g. "Our next session is Tue 6pm. ").
     // Empty string when no slot is known so the sentence just drops out.
     "next_session": vars.next_session || "",
   };
   let out = html;
-  // A blank {{location.website}} must not leave a link pointing at nothing, but
-  // it must ALSO not silently delete the message around it. Runs before
-  // substitution, on plain-text bodies only (a full HTML document is skipped -
-  // its links are shell placeholders, handled by dropEmptyShellLinks).
-  if (!map["location.website"] && !/^\s*<(?:!doctype|html)/i.test(out)) {
-    out = dropWebsiteMentions(out);
+  // A blank link token must not leave a link pointing at nothing, but it must
+  // ALSO not silently delete the message around it. Runs before substitution, on
+  // plain-text bodies only (a full HTML document is skipped - its links are
+  // shell placeholders, handled by dropEmptyShellLinks).
+  if (!/^\s*<(?:!doctype|html)/i.test(out)) {
+    const missing = DROP_WHEN_EMPTY.filter((t) => !map[t]);
+    out = dropEmptyLinkMentions(out, missing);
+    // Tidy the hole a dropped block leaves: a message that lost its opening lines
+    // must not start on a blank one, and two dropped blocks must not leave a gap
+    // three lines wide. Guarded on something ACTUALLY being missing, so a message
+    // with every fact on file is passed through untouched and this can never
+    // reformat copy that was fine.
+    if (missing.length) out = out.replace(/^\s*\n/, "").replace(/\n{3,}/g, "\n\n");
   }
   for (const [k, val] of Object.entries(map)) {
     const token = "\\{\\{\\s*" + k.replace(/\./g, "\\.") + "\\s*\\}\\}";
@@ -284,8 +429,13 @@ function bodyToHtml(body) {
 // Fill the shell identity placeholders (UPPERCASE) in a frame or a full designed
 // template - both carry the same placeholder set since the templates were
 // tokenized (2026-07-25, the canonical no-hardcode build).
-function fillShell(html, L, { pre, unsub }) {
+function fillShell(html, L, { pre, unsub, reason, title }) {
   return html
+    // Both of these are only still here if the template did NOT declare its own.
+    // {{FOOTER_REASON}} goes first: the sentence it expands to itself contains
+    // {{ACADEMY_FULL}}, which the pass below then fills.
+    .replace(/\{\{FOOTER_REASON\}\}/g, reason || FOOTER_REASON.enquired)
+    .replace(/\{\{DOC_TITLE\}\}/g, title || L.full)
     .replace(/\{\{PREHEADER\}\}/g, pre)
     .replace(/\{\{WORDMARK_SUFFIX\}\}/g, L.suffix)
     .replace(/\{\{LOCATION_TAG\}\}/g, L.locationTag)
@@ -299,14 +449,21 @@ function fillShell(html, L, { pre, unsub }) {
 }
 
 // An academy with identity fields still empty (no domain / support email /
-// instagram on file) must ship NO broken or borrowed links: drop empty footer
-// anchors (with their dot separators) and any CTA table whose button href came
-// out site-relative (the domain was blank).
+// instagram / review link on file) must ship NO broken or borrowed links: drop
+// empty footer anchors (with their dot separators) and any CTA table whose
+// button href came out empty or site-relative (the fact was blank).
 function dropEmptyShellLinks(html) {
   const SEP = '<span[^>]*>&nbsp;&nbsp;&middot;&nbsp;&nbsp;<\\/span>\\s*';
   const A = '<a href="(?:mailto:)?"[^>]*>(?:(?!<\\/a>)[\\s\\S])*?<\\/a>';
   html = html.replace(new RegExp('\\s*' + SEP + A, "g"), "");
   html = html.replace(new RegExp(A + '\\s*' + SEP, "g"), "");
+  // The gold CTA button, when its link fact is missing: take the WHOLE table, not
+  // just the anchor. Stripping the anchor alone would leave a gold box with no
+  // label and no destination, which is exactly the "dead button" this forbids.
+  // Must run BEFORE the bare-anchor sweep below, which would otherwise eat the
+  // <a> first. Pinned to the gold cell so it can only ever match a real CTA.
+  const GOLD = '(?:(?!<table)(?!<\\/table>)[\\s\\S])*?bgcolor="#E2DD9F"(?:(?!<table)(?!<\\/table>)[\\s\\S])*?';
+  html = html.replace(new RegExp('\\s*<table[^>]*>' + GOLD + '<a href=""[^>]*>(?:(?!<table)[\\s\\S])*?<\\/table>', "g"), "");
   html = html.replace(new RegExp(A, "g"), "");
   html = html.replace(/<table[^>]*>(?:(?!<table)(?!<\/table>)[\s\S])*?<a href="\/[^"]*"(?:(?!<table)[\s\S])*?<\/table>/g, "");
   return html;
@@ -316,25 +473,50 @@ function dropEmptyShellLinks(html) {
 // if the body is already a FULL designed email (a complete HTML document, e.g.
 // exported from Claude Design), send it AS-IS and only fill its placeholders (it
 // has its own frame; wrapping it again would double the header/footer).
-//   renderEmail({ clientId, subject, body, preheader?, unsubscribeUrl?, vars? }) -> html
-export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars } = {}) {
+// `footerReason` / `docTitle` are the shell's two per-message parameters, for a caller
+// sending a plain body through FRAME. A DESIGNED template declares its own (see
+// _shell.js shellHead/shellFoot) and those win - the template knows its audience.
+// Unset, they fall back to what production has always sent: the "enquired about"
+// reason and the academy name as the title.
+//   renderEmail({ clientId, subject, body, preheader?, unsubscribeUrl?, vars?,
+//                 footerReason?, docTitle? }) -> html
+// The message CONTENT a body resolves to, before any shell is wrapped around it:
+// the template expanded if the body is a "template:<key>" ref, then merge tokens
+// filled. Separated out so the send path can ask "does this resolve to anything at
+// all" and get the same answer renderEmail would - see isEmptyAfterMerge in
+// api/_send.js. Asking that question of the raw body instead was wrong for a
+// template ref: "template:onboarding-review" is never an empty string, however
+// empty the email behind it turns out to be.
+export function templateBody({ clientId, body, vars } = {}) {
   const L = locFor(clientId, vars);
-  const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
-  const unsub = unsubscribeUrl || (L.email ? `mailto:${L.email}?subject=Unsubscribe` : "");
-  // A step body can be a short "template:<key>" reference to a vendored designed
-  // email (api/email-templates/) so the DB holds a tiny ref, not 12KB of HTML.
   let raw = String(body || "");
   const tref = raw.match(/^\s*template:([\w/-]+)\s*$/);
-  if (tref && TEMPLATES[tref[1]]) raw = TEMPLATES[tref[1]];
+  // A template is normally a plain string. It may also be a FUNCTION of the location
+  // config, for a template whose content depends on facts the academy either has or
+  // does not (onboarding-welcome's online-programs and refer-a-friend items). Such a
+  // template may return "" to mean "this academy has nothing to say here", and the
+  // whole email is then not sent rather than sent hollow.
+  if (tref && TEMPLATES[tref[1]]) {
+    const t = TEMPLATES[tref[1]];
+    raw = typeof t === "function" ? t(L, vars) : t;
+  }
   // Resolve merge tokens BEFORE building markup: a resolved URL line becomes the
   // gold CTA in bodyToHtml, and an EMPTY {{location.website}} drops its line
   // while it is still a text line (inside markup it would be too late).
-  raw = resolveMergeVars(raw, L, vars);
+  return resolveMergeVars(raw, L, vars);
+}
+
+export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars, footerReason, docTitle } = {}) {
+  const L = locFor(clientId, vars);
+  const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
+  const unsub = unsubscribeUrl || (L.email ? `mailto:${L.email}?subject=Unsubscribe` : "");
+  const raw = templateBody({ clientId, body, vars });
+  const shellArgs = { pre, unsub, reason: footerReason, title: docTitle };
   let html;
   if (/^\s*<(?:!doctype|html)/i.test(raw)) {
-    html = fillShell(raw, L, { pre, unsub });
+    html = fillShell(raw, L, shellArgs);
   } else {
-    html = fillShell(FRAME.replace(/\{\{CONTENT\}\}/g, bodyToHtml(raw)), L, { pre, unsub });
+    html = fillShell(FRAME.replace(/\{\{CONTENT\}\}/g, bodyToHtml(raw)), L, shellArgs);
   }
   // Emails are LIGHT now (white body, black header/footer) so they render the same
   // in light + dark mode everywhere - no dark-mode lock needed (and signaling dark

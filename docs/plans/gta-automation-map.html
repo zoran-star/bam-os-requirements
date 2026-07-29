@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GTA automations - photocopyable or custom</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#D4B65C;
+    --bg:#0C0C0D; --card:#141416; --card2:#1A1A1D; --line:#2A2A2E;
+    --tx:#EDEDEF; --tx2:#A8A8B0; --tx3:#6E6E78;
+    --red:#E5674E; --green:#5FBF8A; --blue:#5B9DD9;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif; --mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1400px;margin:0 auto;padding:30px 18px 80px}
+  h1{font-size:clamp(23px,3.4vw,32px);line-height:1.14;letter-spacing:-.02em;margin:0 0 7px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:15px;margin:0 0 18px;max-width:76ch}
+  .m{font-family:var(--mono)}
+
+  .sw{position:sticky;top:0;z-index:30;background:rgba(12,12,13,.97);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);margin:0 -18px 20px;padding:11px 18px}
+  .swgrp{display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap}
+  .swlbl{font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--tx3);font-weight:700;margin-bottom:6px}
+  .swrow{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px}
+  .swrow::-webkit-scrollbar{height:5px}.swrow::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px}
+  .tab{flex:none;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--tx2);border-radius:999px;padding:6px 14px;font-size:12.5px;font-weight:600;font-family:var(--ui);white-space:nowrap;display:flex;align-items:center;gap:6px}
+  .tab .cd{width:6px;height:6px;border-radius:999px;flex:none}
+  .tab:hover{color:var(--tx)}
+  .tab.on{background:rgba(212,182,92,.13);border-color:rgba(212,182,92,.5);color:var(--tx)}
+  .tab.gray.on{background:rgba(255,255,255,.05);border-color:#4a4a52}
+
+  .leg{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+  .lg{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--tx2);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 11px}
+  .lg i{width:9px;height:9px;border-radius:2px;flex:none}
+  .lg b{color:var(--tx)}
+
+  .pan{display:none}.pan.on{display:block}
+
+  .ph{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:14px}
+  .hn{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .ph h2{font-size:21px;margin:0;font-weight:800;letter-spacing:-.01em}
+  .ph .key{font-family:var(--mono);font-size:11.5px;color:var(--tx3)}
+  .ph .trig{color:var(--tx2);font-size:13.5px;margin:0 0 13px;max-width:78ch}
+  .bar{display:flex;height:9px;border-radius:999px;overflow:hidden;background:var(--card2);margin-bottom:8px;max-width:520px}
+  .bar i{display:block}
+  .scr{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--tx2)}
+  .scr b{font-family:var(--mono)}
+
+  .band{border-radius:11px;padding:11px 15px;font-size:13px;margin-bottom:16px}
+  .band.pre{background:rgba(212,182,92,.09);border:1px solid rgba(212,182,92,.3)}
+  .band.pre b{color:var(--gold)}
+  .band.out{background:rgba(255,255,255,.03);border:1px solid var(--line)}
+  .band.out b{color:var(--tx2)}
+  .band p{margin:3px 0 0;color:var(--tx2)}
+
+  /* two column step row */
+  .row{display:grid;gap:14px;margin-bottom:14px;align-items:start}
+  @media(min-width:660px){.row{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr)}}
+  @media(min-width:660px) and (max-width:900px){
+    .bub,.tplbox{font-size:11.5px}.el{font-size:11px}
+    .nt{padding:9px 10px;gap:8px}.nt .st{width:64px;font-size:8px}
+    .nt .nw{font-size:12px}.nt .nd{font-size:11.5px}.nt .src{font-size:10.5px}
+  }
+  .msg{background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden}
+  .msg.dis{opacity:.5}
+  .mh{display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--card2);flex-wrap:wrap}
+  .mh .no{font-family:var(--mono);font-size:10.5px;color:var(--tx3);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 7px}
+  .mh .wt{font-family:var(--mono);font-size:11px;color:var(--gold)}
+  .mh .ch{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:2px 7px;border-radius:4px}
+  .ch.sms{background:rgba(91,157,217,.15);color:var(--blue)}
+  .ch.email{background:rgba(212,182,92,.15);color:var(--gold)}
+  .mh .subj{font-size:11.5px;color:var(--tx2);font-style:italic}
+  .mh .off{font-size:9.5px;text-transform:uppercase;font-weight:700;color:var(--red);background:rgba(229,103,78,.14);border-radius:4px;padding:1px 7px;margin-left:auto}
+  .mb{padding:14px}
+  .bub{background:#25252A;border-radius:13px 13px 13px 4px;padding:11px 14px;font-size:12.5px;color:var(--tx);line-height:1.6;white-space:pre-wrap;word-break:break-word}
+  .tplbox{background:var(--card2);border:1px dashed var(--line);border-radius:10px;padding:12px 14px}
+  .tplbox .tk{font-family:var(--mono);font-size:12px;color:var(--gold);margin-bottom:8px}
+  .mailwrap{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#EDEDEA;margin-bottom:10px}
+  .mailbar{display:flex;align-items:center;gap:9px;padding:7px 11px;background:var(--card2);border-bottom:1px solid var(--line)}
+  .mailbar .lbl{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:700}
+  .mailbar a{margin-left:auto;font-size:11px;color:var(--gold);text-decoration:none;font-weight:600}
+  .mailbar a:hover{text-decoration:underline}
+  .mailwrap iframe{display:block;width:100%;height:620px;border:0;background:#EDEDEA}
+  .el{display:block;padding:5px 9px;border-radius:6px;margin-bottom:5px;font-size:12px;line-height:1.5}
+  .el:last-child{margin-bottom:0}
+
+  mark{padding:1px 3px;border-radius:3px;background:none}
+  mark.p{background:rgba(95,191,138,.17);color:#A6E3C1;box-shadow:inset 0 0 0 1px rgba(95,191,138,.25)}
+  mark.s{background:rgba(212,182,92,.2);color:#F2E2AC;box-shadow:inset 0 0 0 1px rgba(212,182,92,.32)}
+  mark.c{background:rgba(229,103,78,.2);color:#FFB6A4;box-shadow:inset 0 0 0 1px rgba(229,103,78,.32)}
+  .el.p{background:rgba(95,191,138,.09);border-left:2px solid var(--green);color:#BFE8D3}
+  .el.s{background:rgba(212,182,92,.09);border-left:2px solid var(--gold);color:#EEDFB0}
+  .el.c{background:rgba(229,103,78,.1);border-left:2px solid var(--red);color:#F2BCAE}
+
+  /* notes */
+  .notes{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:6px 4px}
+  .nt{display:flex;gap:10px;padding:10px 13px;border-bottom:1px solid var(--line)}
+  .nt:last-child{border-bottom:none}
+  .nt .st{flex:none;width:78px;font-size:9px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;border-radius:4px;padding:3px 0;text-align:center;height:fit-content;margin-top:2px}
+  .st-p{background:rgba(95,191,138,.15);color:var(--green)}
+  .st-s{background:rgba(212,182,92,.16);color:var(--gold)}
+  .st-c{background:rgba(229,103,78,.15);color:var(--red)}
+  .nt .nb{min-width:0}
+  .nt .nw{font-size:13px;color:var(--tx);font-weight:600;margin-bottom:2px;word-break:break-word}
+  .nt .nd{font-size:12.5px;color:var(--tx2);margin-bottom:3px}
+  .nt .src{font-size:11.5px;color:var(--tx3);display:flex;align-items:baseline;gap:6px}
+  .nt .src em{font-style:normal;color:var(--green);font-weight:700;font-size:9px;letter-spacing:.08em;text-transform:uppercase;flex:none}
+  .nt .src.need em{color:var(--gold)}
+  .nt .src.no em{color:var(--red)}
+
+  .prop{margin-top:6px;padding:8px 11px;border:1px dashed rgba(212,182,92,.65);border-radius:7px;background:rgba(212,182,92,.10);color:#F0DFA8;font-size:12.5px;line-height:1.5}
+  .prop em{font-style:normal;font-weight:800;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-right:6px}
+  .note{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:11px;padding:14px 16px;margin-top:14px}
+  .note b{color:var(--tx);display:block;margin-bottom:3px;font-size:13.5px}
+  .note p{margin:0;color:var(--tx2);font-size:13px}
+  .note.warn{border-left-color:var(--red)}.note.warn b{color:var(--red)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Every GTA message, split into <span>photocopyable</span> or <span style="color:var(--red)">custom</span>.</h1>
+  <p class="sub">Automation on the left, notes on the right. Nothing in GTA changes from this. The job is to work out how much of it can be copied to a new academy untouched, and build a way to customise the rest afterwards.</p>
+
+  <div class="sw">
+    <div class="swgrp">
+      <div><div class="swlbl" style="color:var(--gold)">Free-trial sales system preset</div><div class="swrow" id="tabsA"></div></div>
+      <div><div class="swlbl">Outside the sales preset</div><div class="swrow" id="tabsB"></div></div>
+    </div>
+  </div>
+
+  <div class="leg">
+    <div class="lg"><i style="background:var(--green)"></i><b>PHOTOCOPY</b> &middot; travels untouched today</div>
+    <div class="lg"><i style="background:var(--gold)"></i><b>SWAP</b> &middot; travels once we collect the fact</div>
+    <div class="lg"><i style="background:var(--red)"></i><b>CUSTOM</b> &middot; this academy's own, needs customising after</div>
+    <div class="lg" style="border-color:rgba(212,182,92,.5)"><i style="background:transparent;border:1px dashed var(--gold)"></i><b style="color:var(--gold)">PROPOSED</b> &middot; my recommendation to convert it</div>
+  </div>
+
+  <div id="panels"></div>
+</div>
+
+<script>
+const N = (st, w, d, src, srcState, prop) => ({st, w, d, src, srcState, prop});
+
+const DATA = [
+{
+  key:"contact_form", name:"Contact Form intro", icon:"📝", preset:true,
+  trigger:"A parent fills the general contact or enquiry form on the website.",
+  live:"Live, 1 lead enrolled",
+  steps:[{ wait:"2 minutes", ch:"sms",
+    body:[{t:"Hi ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:",\n\nIt's coach from ",k:"p"},{t:"By Any Means Basketball",k:"s"},{t:". Just saw you filled in the form for extra info, is there anything I can help with?",k:"p"}],
+    notes:[
+      N("p","Parent's first name","Fills itself from whatever they typed on the form.","The lead's own form submission","have"),
+      N("s","Academy name","Typed into GTA's message by hand. Becomes a blank that fills itself.","Business Basics &rarr; Name parents see","need"),
+      N("p","The wording itself","Nothing academy-specific in it. Same sentence works for anyone.","Written once in the master","have"),
+      N("p","2 minute wait","Timing is structure, not content. Copies as-is.","The preset","have"),
+    ]}],
+  verdict:{t:"One field away from fully photocopyable", p:"Every part of this message travels except the academy name, and that one field is shared with three other automations. Nothing here is genuinely custom."}
+},
+{
+  key:"trial_form", name:"Trial Form intro", icon:"🏀", preset:true,
+  trigger:"A parent fills the free-trial form but never picks a time on the calendar.",
+  live:"Live, 30 leads enrolled, fired today",
+  steps:[{ wait:"20 minutes", ch:"sms",
+    body:[{t:"Hi ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:", it's coach from ",k:"p"},{t:"By Any Means GTA",k:"s"},{t:".\n\nI saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?\n\nHere's the link to the calendar again: ",k:"p"},{t:"{{location.website}}/free-trial",k:"p"}],
+    notes:[
+      N("p","Parent's first name","Fills from the form.","The lead's own form submission","have"),
+      N("s","Academy name","Same hand-typed name as the contact form.","Business Basics &rarr; Name parents see","need"),
+      N("p","Free-trial link","Already a blank. Fills from the academy's own domain, and the whole sentence drops rather than sending a dead link if there is no domain yet.","Business Basics &rarr; Website domain","have"),
+      N("p","The wording","Generic. Works for any academy.","Written once in the master","have"),
+    ]}],
+  verdict:{t:"Same single field", p:"Identical situation to the contact form. The link half is already done properly, which is what the name half should look like."}
+},
+{
+  key:"missed_trial", name:"Missed Trial intro", icon:"📵", preset:true,
+  trigger:"An athlete no-showed their booked trial and the trainer marked \"did not attend\".",
+  live:"Live, 7 leads enrolled",
+  steps:[{ wait:"30 minutes", ch:"sms",
+    body:[{t:"Hi ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:", sorry we missed you at your trial - want to grab another time? Here's the calendar: ",k:"p"},{t:"{{location.website}}/free-trial",k:"p"}],
+    notes:[
+      N("p","Parent's first name","Fills from the booking.","The lead's own record","have"),
+      N("p","Free-trial link","Already a blank.","Business Basics &rarr; Website domain","have"),
+      N("p","The wording","No academy name in it at all, which is why this one is already clean.","Written once in the master","have"),
+    ]}],
+  verdict:{t:"Already 100% photocopyable", p:"The only automation GTA runs that could be handed to a new academy today with zero changes. It is the shape every other message should end up in."}
+},
+{
+  key:"ghosted", name:"Ghosted", icon:"👻", preset:true,
+  trigger:"A first-touch message got no reply. The lead rolls forward into this drip.",
+  live:"Live, 29 leads enrolled, fired today",
+  steps:[
+    { wait:"1 day", ch:"sms",
+      body:[{t:"Hey ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:"! Just wanted to check in and see if you are still interested in having your child train with us 👍\n\n",k:"p"},{t:"byanymeanstoronto.ca",k:"s"}],
+      notes:[
+        N("p","Parent's first name + the wording","No academy name anywhere in the sentence.","Written once in the master","have"),
+        N("s","Website","Typed in. Becomes the same blank the other messages already use. No new field, the domain is already collected.","Business Basics &rarr; Website domain","have"),
+      ]},
+    { wait:"1 day", ch:"sms",
+      body:[{t:"Hi ",k:"p"},{t:"{{contact.fullName}}",k:"p"},{t:"\n\nJust wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: ",k:"p"},{t:"https://byanymeanstoronto.ca/free-trial",k:"s"},{t:"\n\nThank you! 🙏",k:"p"}],
+      notes:[
+        N("p","Parent's full name + the wording","Generic.","Written once in the master","have"),
+        N("s","Free-trial link","Typed in. Same swap.","Business Basics &rarr; Website domain","have"),
+      ]},
+    { wait:"1 day", ch:"email", subj:"Try a session free", mail:"ghosted-3",
+      body:[{t:"Hi ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:",\n\nIt's coach ",k:"p"},{t:"{{location_owner.first_name}}",k:"p"},{t:" from ",k:"p"},{t:"{{location.name}}",k:"p"},{t:" - I just wanted to reach out over email to check and see if you would be interested in coming out to a free trial.\n\nIf so, feel free to book in using this link:\n\n",k:"p"},{t:"https://byanymeanstoronto.ca/free-trial",k:"s"},{t:"\n\nThanks!",k:"p"}],
+      notes:[
+        N("c","Owner's first name","<b>Take it out.</b> The templated version reads \"It's coach from &lt;academy&gt;\", with no owner name at all.","Removed, not collected","no"),
+        N("p","Academy name","This step already uses the blank. The other two automations should copy this.","Business Basics &rarr; Name parents see","have"),
+        N("p","Switching to email on day 3","Deliberate. A fresh channel revives leads the text thread lost. Pure structure, copies as-is.","The preset","have"),
+        N("s","Free-trial link","Typed in a third time.","Business Basics &rarr; Website domain","have"),
+      ]},
+  ],
+  verdict:{t:"Three swaps, zero new fields", p:"Everything Ghosted needs is already collected. It is the cheapest automation to make photocopyable, and step 3 already shows the finished shape."}
+},
+{
+  key:"nurture", name:"Lead Nurture", icon:"💔", preset:true,
+  trigger:"Ghosted ran dry. The long game: four designed brand emails over about eight weeks.",
+  live:"Live, 32 leads enrolled",
+  steps:[
+    { wait:"1 week", ch:"email", subj:"A global basketball ecosystem", tpl:"nurture-1", mail:"nurture-1",
+      els:[{k:"c",t:"The entire email, frame included"}],
+      notes:[
+        N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Designed per academy during onboarding. San Jose starts with GTA's version.","Designed in onboarding","no"),
+      ]},
+    { wait:"1 week", ch:"email", subj:"A new era of training", tpl:"nurture-2", mail:"nurture-2",
+      els:[{k:"c",t:"The entire email, frame included"}],
+      notes:[
+        N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Designed per academy during onboarding. San Jose starts with GTA's version.","Designed in onboarding","no"),
+      ]},
+    { wait:"3 weeks", ch:"email", subj:"Don't miss your shot", tpl:"nurture-4", mail:"nurture-4",
+      els:[{k:"p",t:"Final call to action, brand-global"},{k:"p",t:"Logo, top left"},{k:"s",t:"City and footer"}],
+      notes:[ N("p","The whole email","<b>Good as-is.</b> Travels untouched to any academy.","Written once in the master","have") ]},
+  ],
+  verdict:{t:"One travels, one waits, two get authored", p:"Don't miss your shot travels as-is. The testimonials email stays templated until the testimonial connection is built in a separate chat. The global-ecosystem and new-era emails are authored per academy, decided 27 Jul. San Jose starts from GTA's."}
+},
+{
+  key:"onboarding", name:"Onboarding", icon:"👋", preset:false, post:true,
+  trigger:"A brand-new PAID member goes live. This is the welcome drip, not a sales drip.",
+  live:"Live, 10 members enrolled",
+  steps:[
+    { wait:"immediately", ch:"sms",
+      body:[{t:"Hi ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:" welcome to ",k:"p"},{t:"By Any Means Basketball",k:"s"},{t:"! A couple things to get started:\n\n1) More information will be sent to your email so check that out when you can. ",k:"p"},{t:"Please join this WhatsApp Link for updates: chat.whatsapp.com/J5tq7Sn5EF...",k:"s"},{t:"\n\n2) If you would like to access the online programs, use this link: byanymeanstoronto.ca/online-programs",k:"c"},{t:"\n\n3) Check out our socials:\nCoach Zoran: instagram.com/byanymeanszoran\nCoach Adrian: instagram.com/byanymeansadrian\nGeneral Page: instagram.com/byanymeanstoronto",k:"s"},{t:"\n\n4) If you know any friends that would like to join, bring them out to training to receive a free month and some merch (check out our merch here: byanymeansgsc.com)",k:"c"},{t:"\n\n5) If you need anything, reach out to the coaches here: ",k:"p"},{t:"(289) 816-6569",k:"s"}],
+      notes:[
+        N("s","Academy name","Same swap as everywhere else.","Business Basics &rarr; Name parents see","need"),
+        N("s","Community group line","<b>The whole line</b> fills from the academy's own group. WhatsApp for GTA, could be Facebook or Discord elsewhere, so we store the link and its platform label.","Training offer setup &rarr; Onboarding section","need"),
+        N("c","Online programs link","<b>DROPPED from the master, 27 Jul.</b> Line removed entirely, for every academy including GTA.","Removed","no"),
+        N("s","Coach socials","Connectable if the coaches have their own. Onboarding must tell the client that anything they enter here is displayed publicly.","Team &rarr; coach socials","need"),
+        N("s","General Instagram page","Different from the coach handles. Every academy should have one, we just never ask for it.","Business Basics &rarr; Instagram","need"),
+        N("c","Refer-a-friend perk and the merch shop","<b>DROPPED from the master, 27 Jul.</b> Line removed entirely, for every academy including GTA.","Removed","no"),
+        N("s","Coach contact number","Comes from the academy's own business number, so nobody gets asked for it twice.","Texting &rarr; Business number","have"),
+        N("p","The numbered quick-start structure","The shape of the message, five numbered items, travels fine. It is the contents of the items that vary.","Written once in the master","have"),
+      ]},
+    { wait:"immediately", ch:"email", subj:"Welcome to By Any Means Basketball", tpl:"onboarding-welcome", mail:"onboarding-welcome",
+      els:[{k:"p",t:"Logo, top left and bottom left"},{k:"s",t:"City or town, top right"},{k:"p",t:"Greeting with parent and athlete name"},{k:"s",t:"Community group line, the whole line"},{k:"c",t:"Online programs line, DROPPED"},{k:"s",t:"Follow along line, from coach socials"},{k:"c",t:"Bring a friend line, DROPPED"},{k:"s",t:"Coach phone"},{k:"s",t:"Weekly schedule table"},{k:"s",t:"Training venue"},{k:"p",t:"Sign-off"}],
+      notes:[
+        N("p","The logo","<b>Always the logo</b>, top left and bottom left. GTA and San Jose stay exactly as they are.","Brand &rarr; Logo","have"),
+        N("s","City or town, top right","Just the academy's main city or town, nothing else.","Business Basics &rarr; address","have"),
+        N("s","The community group line","<b>The whole line fills from the academy's own group.</b> Store the link plus its platform label so it reads Join the WhatsApp group, Join the Facebook group, and so on. Includes its button. No link on file means the line does not render.","Training offer setup &rarr; Onboarding section","need"),
+        N("c","The online programs line","<b>DROPPED from the master, 27 Jul.</b> Not carried forward for anyone. GTA is the reference, so GTA stops sending it too.","Removed","no"),
+        N("c","The bring-a-friend line","<b>DROPPED from the master, 27 Jul.</b> The referral perk and the merch shop go with it. GTA stops sending it too.","Removed","no"),
+        N("s","The follow-along line","The whole line fills from coach socials. Onboarding must warn the client that anything they enter here is shown publicly.","Team &rarr; coach socials","need"),
+        N("s","Weekly schedule and venue","Generate from the 86 real sessions already in the system. Typed by hand today only because nothing generates them yet.","Training offer setup &rarr; Schedule","have"),
+        N("s","Coach phone","Fills from the academy's own business number.","Texting &rarr; Business number","have"),
+      ]},
+    { wait:"+5 minutes", ch:"sms",
+      body:[{t:"SCHEDULE:\n\nMONDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nTUESDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nWEDNESDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nTHURSDAYS\nYounger group: 7-8pm\nOlder Group: 8-9pm\n\nSATURDAYS\nYounger group: 11:30-12:30pm\nOlder Group: 12:30-1:30pm\n\nLOCATION: 1079 Linbrook Rd, ON L6J 2L2",k:"s"}],
+      notes:[
+        N("s","The entire message","<b>Looks completely custom and is completely photocopyable.</b> Every line of this is already in the system as real sessions. It is typed out by hand purely because nothing generates it yet.","Training offer setup &rarr; Schedule","have"),
+        N("s","The location line","Comes from the session's location.","Locations","have"),
+        N("p","Sending a schedule at all, 5 minutes in","The structure travels. An academy with no sessions set up simply does not get this message, rather than getting an empty one.","The preset","have"),
+      ]},
+    { wait:"+5 minutes", ch:"email", subj:"How to get the most out of training", tpl:"onboarding-training", mail:"onboarding-training",
+      els:[{k:"c",t:"The entire email, frame included"}],
+      notes:[
+        N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Keep GTA's and San Jose's exactly as they are.","Designed in onboarding","no"),
+      ]},
+    { wait:"+3 days", ch:"email", subj:"Where By Any Means came from", tpl:"onboarding-story", mail:"onboarding-story",
+      els:[{k:"c",t:"The entire email, frame included"}],
+      notes:[
+        N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Same design as the global-ecosystem email, so the same call.","Designed in onboarding","no"),
+      ]},
+    { wait:"+7 days", ch:"email", subj:"A new era of training", tpl:"onboarding-era", mail:"onboarding-era",
+      els:[{k:"c",t:"The entire email, frame included"}],
+      notes:[
+        N("c","The entire email","<b>FULLY CUSTOM.</b> All of it, frame included. Designed per academy during onboarding.","Designed in onboarding","no"),
+      ]},
+    { wait:"+7 days", ch:"email", subj:"What families are saying about us", tpl:"onboarding-testimonials", mail:"onboarding-testimonials",
+      els:[{k:"s",t:"Quotes, to be wired to real testimonials"},{k:"s",t:"Attribution line"},{k:"p",t:"Logo, top left"},{k:"s",t:"City and footer"}],
+      notes:[
+        N("s","The whole email","<b>Gets fully connected to the academy's own testimonials</b>, same as the nurture one. Templated until that connection is built in a separate chat.","Blocked on the testimonial connection","need"),
+      ]},
+    { wait:"+7 days", ch:"email", subj:"Quick favour?", tpl:"onboarding-review", mail:"onboarding-review",
+      els:[{k:"c",t:"Header + footer hardcoded to GTA"},{k:"p",t:"The warm ask, entirely generic"},{k:"s",t:"GTA's own Google review link"}],
+      notes:[
+        N("p","The ask itself","Nothing academy-specific in the wording.","Written once in the master","have"),
+        N("s","Google review link","The button has nowhere to point without it. No link on file means no button, rather than a dead one.","Onboarding &rarr; Google review link","need"),
+        N("c","The header and footer","Third email with the GTA frame.","Fixed by using the existing frame","need"),
+      ]},
+  ],
+  verdict:{t:"One email stays custom", p:"The community group line becomes a collected value. The online programs and bring-a-friend lines are dropped from the master entirely, so the welcome email is fully photocopyable. Only How to make training count is still authored per academy, and story and era are authored once with Lead Nurture."}
+},
+{
+  key:"summer_special", name:"Summer Special", icon:"☀️", preset:false,
+  trigger:"A seasonal promo blast to cold leads. Manually enrolled, no automatic trigger.",
+  live:"Armed and approved, but has NEVER enrolled anyone or sent a message",
+  steps:[
+    { wait:"immediately", ch:"sms",
+      body:[{t:"Hi! It's coach from ",k:"p"},{t:"By Any Means Basketball",k:"s"},{t:" - we're just sending out this message to everyone because we have a HUGE summer discount on right now, and our spots are filling up.\nSo if you'd like to get your athlete training with us this summer, feel free to book a trial here: ",k:"p"},{t:"byanymeanstoronto.ca/free-trial",k:"s"},{t:"\nThanks!\nBAMily",k:"c"}],
+      notes:[
+        N("s","Academy name and link","Same two swaps as everywhere else.","Business Basics","have"),
+        N("p","The promo structure","Three nudges on day 0, 1 and 2. The shape is genuinely reusable for any seasonal push.","Would come from the preset","have"),
+        N("c","BAMily sign-off and the discount itself","BAMily is GTA's word for its community. The discount is GTA's own commercial decision.","Custom per academy","no"),
+      ]},
+    { wait:"+1 day", ch:"sms",
+      body:[{t:"Hi! Just wanted to reach back out and see if you got this message above on our summer discount for basketball training.\nIf you'd like to check us out: ",k:"p"},{t:"byanymeanstoronto.ca",k:"s"}],
+      notes:[ N("s","The link","Same swap.","Business Basics &rarr; Website domain","have") ]},
+    { wait:"+2 days", ch:"sms",
+      body:[{t:"Last chance to get access to our summer discount for basketball training! Here's the link to a free trial: ",k:"p"},{t:"byanymeanstoronto.ca/free-trial",k:"s"}],
+      notes:[ N("s","The link","Same swap.","Business Basics &rarr; Website domain","have") ]},
+  ],
+  verdict:{t:"Reusable shape, untested copy", p:"The three-touch structure would serve any academy running a seasonal push, and the only truly custom parts are the discount and the BAMily sign-off. But it has never actually sent a message, so nothing here is proven. Parked against the reignition flow."}
+},
+{
+  key:"trial_followup", name:"Trial Follow-up", icon:"🏀", preset:false,
+  trigger:"Trial form filled, no time picked. Which is the exact same trigger as Trial Form intro.",
+  live:"Disabled, never approved, has never enrolled anyone",
+  steps:[
+    { wait:"20 minutes", ch:"sms", off:true,
+      body:[{t:"Hey ",k:"p"},{t:"{{contact.first_name}}",k:"p"},{t:", it's coach from ",k:"p"},{t:"BAM GTA",k:"s"},{t:"! I noticed you filled in a trial form but didn't book a time. Can I help you find one that works? ",k:"p"},{t:"{{next_session}}",k:"c"},{t:"Grab a spot here: ",k:"p"},{t:"byanymeanstoronto.ca/free-trial",k:"s"}],
+      notes:[
+        N("c","{{next_session}}","This looks like a blank but nothing fills it. If this ever sent, a parent would read the literal characters.","Broken","no"),
+        N("c","The whole automation","A duplicate of Trial Form intro. Same trigger, same 20 minute wait, same message. Trial Form intro has sent 30 times including today. This has sent zero.","Delete it","no"),
+      ]},
+  ],
+  verdict:{warn:true, t:"Delete, do not photocopy", p:"Not an exception to record and not a feature to promote. Removing it makes GTA match the preset exactly."}
+},
+];
+
+const CH={sms:"SMS",email:"Email"}, STN={p:"PHOTOCOPY",s:"SWAP",c:"CUSTOM"}, SRCN={have:"COLLECTED",need:"NEED TO COLLECT",no:"CANNOT COPY"};
+const esc=(s)=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const un=(s)=>String(s).replace(/&lt;b&gt;/g,"<b>").replace(/&lt;\/b&gt;/g,"</b>").replace(/&amp;rarr;/g,"&rarr;").replace(/&amp;middot;/g,"&middot;");
+
+function msgHTML(s,i){
+  const head=`<div class="mh"><span class="no">${i+1}</span><span class="wt">${s.wait}</span><span class="ch ${s.ch}">${CH[s.ch]}</span>${s.subj?`<span class="subj">${esc(s.subj)}</span>`:""}${s.off?`<span class="off">disabled</span>`:""}</div>`;
+  let inner="";
+  if(s.mail){
+    inner+=`<div class="mailwrap">
+      <div class="mailbar"><span class="lbl">Rendered exactly as GTA sends it today</span>
+      <a href="emails/${s.mail}.html" target="_blank" rel="noopener">Open full size</a></div>
+      <iframe src="emails/${s.mail}.html" title="${esc(s.subj||s.mail)}" loading="lazy"></iframe>
+    </div>`;
+  }
+  if(s.tpl){
+    inner+=`<div class="tplbox"><div class="tk">template:${s.tpl}</div>`
+      + s.els.map(e=>`<span class="el ${e.k}">${esc(e.t)}</span>`).join("") + `</div>`;
+  } else {
+    inner+=`<div class="bub">${s.body.map(p=>p.k?`<mark class="${p.k}">${esc(p.t)}</mark>`:esc(p.t)).join("")}</div>`;
+  }
+  return `<div class="msg${s.off?" dis":""}">${head}<div class="mb">${inner}</div></div>`;
+}
+function notesHTML(s){
+  return `<div class="notes">`+s.notes.map(n=>
+    `<div class="nt"><span class="st st-${n.st}">${STN[n.st]}</span><div class="nb">
+      <div class="nw">${un(esc(n.w))}</div>
+      <div class="nd">${un(esc(n.d))}</div>
+      <div class="src ${n.srcState==="need"?"need":n.srcState==="no"?"no":""}"><em>${SRCN[n.srcState]}</em><span>${un(esc(n.src))}</span></div>
+      ${n.prop?`<div class="prop"><em>Proposed</em> ${un(esc(n.prop))}</div>`:""}
+    </div></div>`).join("")+`</div>`;
+}
+function panHTML(d){
+  let p=0,sw=0,c=0;
+  d.steps.forEach(s=>s.notes.forEach(n=>{ if(n.st==="p")p++; else if(n.st==="s")sw++; else c++; }));
+  const tot=p+sw+c||1;
+  const band=d.preset
+    ? `<div class="band pre"><b>In the free-trial sales system preset.</b><p>Every academy on this preset gets this automation, so anything not photocopyable here has to be solved once for everyone.</p></div>`
+    : d.post
+    ? `<div class="band out"><b>Post-conversion, not part of the sales system.</b><p>This fires when someone has already paid, so it is a member welcome rather than a sales drip. Solved separately from the preset, which is why almost everything custom in the whole system ends up living here.</p></div>`
+    : `<div class="band out"><b>Not in the preset.</b><p>Only GTA has this. It either joins the preset for everyone or gets recorded as a deliberate exception.</p></div>`;
+  return `<div class="pan" data-k="${d.key}">
+    <div class="ph">
+      <div class="hn"><h2>${d.icon} ${d.name}</h2><span class="key">${d.key}</span></div>
+      <p class="trig">${d.trigger} &nbsp;<span style="color:var(--tx3)">${d.live}</span></p>
+      <div class="bar">
+        <i style="width:${p/tot*100}%;background:var(--green)"></i>
+        <i style="width:${sw/tot*100}%;background:var(--gold)"></i>
+        <i style="width:${c/tot*100}%;background:var(--red)"></i>
+      </div>
+      <div class="scr">
+        <span><b style="color:var(--green)">${p}</b> photocopy</span>
+        <span><b style="color:var(--gold)">${sw}</b> swap</span>
+        <span><b style="color:var(--red)">${c}</b> custom</span>
+        <span style="color:var(--tx3)">${Math.round((p+sw)/tot*100)}% can travel</span>
+      </div>
+    </div>
+    ${band}
+    ${d.steps.map((s,i)=>`<div class="row">${msgHTML(s,i)}${notesHTML(s)}</div>`).join("")}
+    ${d.verdict?`<div class="note${d.verdict.warn?" warn":""}"><b>${d.verdict.t}</b><p>${d.verdict.p}</p></div>`:""}
+  </div>`;
+}
+
+document.getElementById("panels").innerHTML=DATA.map(panHTML).join("");
+const mkTab=(d)=>{const b=document.createElement("button");b.className="tab"+(d.preset?"":" gray");b.dataset.k=d.key;
+  b.innerHTML=`<span class="cd" style="background:${d.preset?"var(--gold)":"#54545C"}"></span>${d.icon} ${d.name}`;
+  b.onclick=()=>show(d.key);return b;};
+DATA.filter(d=>d.preset).forEach(d=>document.getElementById("tabsA").appendChild(mkTab(d)));
+DATA.filter(d=>!d.preset).forEach(d=>document.getElementById("tabsB").appendChild(mkTab(d)));
+function show(k){
+  document.querySelectorAll(".pan").forEach(p=>p.classList.toggle("on",p.dataset.k===k));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.k===k));
+  window.scrollTo({top:0,behavior:"instant"});
+}
+show("ghosted");
+</script>
+</body>
+</html>

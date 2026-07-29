@@ -1,0 +1,182 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BAM San Jose - message review</title>
+<style>
+:root{--gold:#D4B65C;--bg:#0C0C0D;--card:#141416;--card2:#1A1A1D;--line:#2A2A2E;
+--tx:#EDEDEF;--tx2:#A8A8B0;--tx3:#6E6E78;--red:#E5674E;--blue:#5B9DD9;--green:#5FBF8A;
+--ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:30px 18px 80px}
+h1{font-size:27px;margin:0 0 6px;font-weight:800;letter-spacing:-.02em}
+.sub{color:var(--tx2);font-size:14.5px;margin:0 0 20px}
+.sw{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);margin:0 -18px 18px;padding:11px 18px}
+.swrow{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px}
+.tab{flex:none;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--tx2);
+border-radius:999px;padding:6px 14px;font-size:12.5px;font-weight:600;font-family:var(--ui);white-space:nowrap}
+.tab:hover{color:var(--tx)}
+.tab.on{background:rgba(212,182,92,.13);border-color:var(--gold);color:var(--tx)}
+.pan{display:none}.pan.on{display:block}
+.ph{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;margin-bottom:13px}
+.ph h2{margin:0;font-size:20px;font-weight:800}
+.ph .meta{color:var(--tx3);font-size:12.5px}
+.ph .meta b{color:var(--gold)}
+.msg{background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:13px}
+.msg.off{opacity:.55}
+.mh{display:flex;align-items:center;gap:9px;padding:10px 14px;background:var(--card2);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.rf{font-family:var(--mono);font-size:11px;color:var(--bg);background:var(--gold);border-radius:5px;padding:1px 7px;font-weight:700}
+.wt{font-family:var(--mono);font-size:11px;color:var(--gold)}
+.ch{font-size:9.5px;letter-spacing:.1em;font-weight:700;padding:2px 7px;border-radius:4px}
+.ch.sms{background:rgba(91,157,217,.15);color:var(--blue)}
+.ch.email{background:rgba(212,182,92,.16);color:var(--gold)}
+.sj{font-size:11.5px;color:var(--tx2);font-style:italic}
+.dis{font-size:9.5px;text-transform:uppercase;font-weight:700;color:var(--red);
+background:rgba(229,103,78,.14);border-radius:4px;padding:1px 7px;margin-left:auto}
+.mb{padding:14px}
+.bub{background:#25252A;border-radius:13px 13px 13px 4px;padding:12px 15px;font-size:13px;
+white-space:pre-wrap;word-break:break-word;max-width:560px}
+.mailwrap{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#EDEDEA}
+.mailbar{display:flex;align-items:center;gap:9px;padding:7px 11px;background:var(--card2);border-bottom:1px solid var(--line)}
+.mailbar .l{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:700}
+.mailbar a{margin-left:auto;font-size:11px;color:var(--gold);text-decoration:none;font-weight:600}
+.mailwrap iframe{display:block;width:100%;height:480px;border:0;background:#EDEDEA}
+.empty{background:rgba(229,103,78,.08);border:1px solid rgba(229,103,78,.3);border-radius:11px;padding:14px 16px;color:var(--tx2);font-size:13.5px}
+.missing{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--red);border-radius:12px;padding:15px 18px;margin-top:26px}
+.missing.ok{border-left-color:var(--green)}
+.missing h3{margin:0 0 9px;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--red);font-weight:800}
+.missing.ok h3{color:var(--green)}
+.mrow{display:flex;gap:12px;padding:6px 0;font-size:13.5px;color:var(--tx2);flex-wrap:wrap}
+.mrow b{color:var(--tx);min-width:250px}
+.note{margin-top:22px;color:var(--tx3);font-size:12.5px}
+</style></head><body><div class="wrap">
+<h1>BAM San Jose</h1>
+<p class="sub">Every message rendered through the real send path, as Maya Alvarez would receive it.
+Reference each one by its tag when you send notes back.</p>
+<div class="sw"><div class="swrow"><button class="tab on" data-k="contact_form">Contact Form intro</button><button class="tab" data-k="trial_form">Trial Form intro</button><button class="tab" data-k="missed_trial">Missed Trial intro</button><button class="tab" data-k="ghosted">Ghosted</button><button class="tab" data-k="nurture">Lead Nurture</button><button class="tab" data-k="onboarding">Onboarding</button></div></div>
+<div class="pan on" data-k="contact_form">
+      <div class="ph"><h2>Contact Form intro</h2>
+        <span class="meta">1 step &middot;
+        <b>dormant, not approved</b></span></div>
+      <div class="msg">
+        <div class="mh"><span class="rf">CON1</span><span class="wt">2 minutes</span>
+          <span class="ch sms">SMS</span>
+          
+          </div>
+        <div class="mb"><div class="bub">Hi Maya,
+
+It's coach from BAM San Jose. Just saw you filled in the form for extra info, is there anything I can help with?</div></div></div>
+    </div><div class="pan" data-k="trial_form">
+      <div class="ph"><h2>Trial Form intro</h2>
+        <span class="meta">1 step &middot;
+        <b>dormant, not approved</b></span></div>
+      <div class="msg">
+        <div class="mh"><span class="rf">TRI1</span><span class="wt">20 minutes</span>
+          <span class="ch sms">SMS</span>
+          
+          </div>
+        <div class="mb"><div class="bub">Hi Maya, it's coach from BAM San Jose.
+
+I saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?
+
+Here's the link to the calendar again: https://byanymeanssanjose.com/free-trial</div></div></div>
+    </div><div class="pan" data-k="missed_trial">
+      <div class="ph"><h2>Missed Trial intro</h2>
+        <span class="meta">1 step &middot;
+        <b>dormant, not approved</b></span></div>
+      <div class="msg">
+        <div class="mh"><span class="rf">MIS1</span><span class="wt">30 minutes</span>
+          <span class="ch sms">SMS</span>
+          
+          </div>
+        <div class="mb"><div class="bub">Hi Maya, sorry we missed you at your trial - want to grab another time? Here's the calendar: https://byanymeanssanjose.com/free-trial</div></div></div>
+    </div><div class="pan" data-k="ghosted">
+      <div class="ph"><h2>Ghosted</h2>
+        <span class="meta">3 steps &middot;
+        <b>dormant, not approved</b></span></div>
+      <div class="msg">
+        <div class="mh"><span class="rf">GHO1</span><span class="wt">1 day</span>
+          <span class="ch sms">SMS</span>
+          
+          </div>
+        <div class="mb"><div class="bub">Hey Maya! Just wanted to check in and see if you are still interested in having your child train with us
+
+https://byanymeanssanjose.com</div></div></div><div class="msg">
+        <div class="mh"><span class="rf">GHO2</span><span class="wt">1 day</span>
+          <span class="ch sms">SMS</span>
+          
+          </div>
+        <div class="mb"><div class="bub">Hi Maya Alvarez
+
+Just wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: https://byanymeanssanjose.com/free-trial
+
+Thank you!</div></div></div><div class="msg">
+        <div class="mh"><span class="rf">GHO3</span><span class="wt">1 day</span>
+          <span class="ch email">EMAIL</span>
+          <span class="sj">Try a session free</span>
+          </div>
+        <div class="mb"><div class="mailwrap"><div class="mailbar"><span class="l">rendered exactly as it sends</span>
+             <a href="msg/ghosted-3.html" target="_blank" rel="noopener">Open full size</a></div>
+             <iframe src="msg/ghosted-3.html" loading="lazy" title="Try a session free"></iframe></div></div></div>
+    </div><div class="pan" data-k="nurture">
+      <div class="ph"><h2>Lead Nurture</h2>
+        <span class="meta">4 steps &middot;
+        <b>dormant, not approved</b></span></div>
+      <div class="msg">
+        <div class="mh"><span class="rf">NUR1</span><span class="wt">1 week</span>
+          <span class="ch email">EMAIL</span>
+          <span class="sj">A global basketball ecosystem</span>
+          </div>
+        <div class="mb"><div class="mailwrap"><div class="mailbar"><span class="l">rendered exactly as it sends</span>
+             <a href="msg/nurture-1.html" target="_blank" rel="noopener">Open full size</a></div>
+             <iframe src="msg/nurture-1.html" loading="lazy" title="A global basketball ecosystem"></iframe></div></div></div><div class="msg">
+        <div class="mh"><span class="rf">NUR2</span><span class="wt">1 week</span>
+          <span class="ch email">EMAIL</span>
+          <span class="sj">A new era of training</span>
+          </div>
+        <div class="mb"><div class="mailwrap"><div class="mailbar"><span class="l">rendered exactly as it sends</span>
+             <a href="msg/nurture-2.html" target="_blank" rel="noopener">Open full size</a></div>
+             <iframe src="msg/nurture-2.html" loading="lazy" title="A new era of training"></iframe></div></div></div><div class="msg off">
+        <div class="mh"><span class="rf">NUR3</span><span class="wt">3 weeks</span>
+          <span class="ch email">EMAIL</span>
+          <span class="sj">What families are saying</span>
+          <span class="dis">step disabled</span></div>
+        <div class="mb"><div class="mailwrap"><div class="mailbar"><span class="l">rendered exactly as it sends</span>
+             <a href="msg/nurture-3.html" target="_blank" rel="noopener">Open full size</a></div>
+             <iframe src="msg/nurture-3.html" loading="lazy" title="What families are saying"></iframe></div></div></div><div class="msg">
+        <div class="mh"><span class="rf">NUR4</span><span class="wt">3 weeks</span>
+          <span class="ch email">EMAIL</span>
+          <span class="sj">Don't miss your shot</span>
+          </div>
+        <div class="mb"><div class="mailwrap"><div class="mailbar"><span class="l">rendered exactly as it sends</span>
+             <a href="msg/nurture-4.html" target="_blank" rel="noopener">Open full size</a></div>
+             <iframe src="msg/nurture-4.html" loading="lazy" title="Don't miss your shot"></iframe></div></div></div>
+    </div><div class="pan" data-k="onboarding">
+      <div class="ph"><h2>Onboarding</h2>
+        <span class="meta">3 steps &middot;
+        <b>dormant, not approved</b></span></div>
+      <div class="msg">
+        <div class="mh"><span class="rf">ONB1</span><span class="wt">2 minutes</span>
+          <span class="ch sms">SMS</span>
+          
+          </div>
+        <div class="mb"><div class="bub">Welcome to BAM San Jose, Maya! We're pumped to have you. If anything comes up before the first session, text back here - this line reaches us directly.</div></div></div><div class="msg">
+        <div class="mh"><span class="rf">ONB2</span><span class="wt">2 days</span>
+          <span class="ch sms">SMS</span>
+          
+          </div>
+        <div class="mb"><div class="bub">Hi Maya, how are the first sessions feeling? Anything we can do better, tell us right here - we read every message.</div></div></div><div class="msg">
+        <div class="mh"><span class="rf">ONB3</span><span class="wt">5 days</span>
+          <span class="ch sms">SMS</span>
+          
+          </div>
+        <div class="mb"><div class="bub">Hey Maya, one week in with BAM San Jose - great to have you in the group. Consistency is where the growth is; see you at the next session!</div></div></div>
+    </div>
+<div class="missing"><h3>Did not render, and why</h3><div class="mrow"><b>footer Instagram link</b><span>no instagram on file, and nothing collects one</span></div><div class="mrow"><b>footer tagline</b><span>no tagline on file, and nothing collects one</span></div></div>
+<p class="note">Read-only. Nothing here enables, approves or sends anything.</p>
+<script>
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.pan').forEach(p=>p.classList.toggle('on',p.dataset.k===t.dataset.k));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
+  window.scrollTo({top:0,behavior:'instant'});
+});
+</script></div></body></html>

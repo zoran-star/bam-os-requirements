@@ -6,6 +6,7 @@ import { useState, useEffect, useLayoutEffect, useRef, Fragment } from "react";
 // Staff review the suggestion here; nothing is saved yet (next step = an editor
 // that persists the mapping to clients.ghl_kpi_config + a learning loop).
 
+import { showToast, uiConfirm } from "./dialogs.jsx";
 export default function GhlKpiDiscovery({ client, tokens, session, salesMode = false }) {
   const t = tokens;
   const [locations, setLocations] = useState([]);
@@ -217,18 +218,18 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
   // source — this is for junk/test/stale rows.)
   async function deleteDetailRow(it) {
     if (!it?.ids?.length) return;
-    if (!window.confirm(`Remove "${it.name}" from ${detail.title}?\n\nThis deletes the record from your KPI data.`)) return;
+    if (!(await uiConfirm({ title: `Remove "${it.name}" from ${detail.title}?`, body: "This deletes the record from your KPI data.", danger: true, confirmLabel: "Remove" }))) return;
     try {
       const res = await fetch(`/api/marketing?resource=ghl-kpi-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({ client_id: client.id, ids: it.ids }),
       });
-      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Delete failed: " + (j.error || res.status)); return; }
+      if (!res.ok) { const j = await res.json().catch(() => ({})); showToast("Delete failed: " + (j.error || res.status)); return; }
       setDetail(d => ({ ...d, items: d.items.filter(x => x !== it), count: Math.max(0, (d.count ?? d.items.length) - 1) }));
       const kr = await fetch(`/api/marketing?resource=ghl-kpis-monthly&client_id=${client.id}&months=6`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       if (kr.ok) setMonthly(await kr.json());
-    } catch (e) { alert("Delete failed: " + e.message); }
+    } catch (e) { showToast("Delete failed: " + e.message); }
   }
 
   // Per-month forms/calendars. Opening prefills with the month's effective
@@ -325,10 +326,10 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
         body: JSON.stringify({ client_id: client.id, ids: cell.ids }),
       });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) { alert("Delete failed: " + (j.error || res.status)); refetchBoardSilent(); return; }
+      if (!res.ok) { showToast("Delete failed: " + (j.error || res.status)); refetchBoardSilent(); return; }
       setTrash(tr => [{ key: ++trashSeq.current, name: cell.name || "record", ids: cell.ids }, ...tr.filter(e => !e.ids.some(id => idset.has(id)))].slice(0, 100));
       refreshMonthlyCounts();
-    } catch (e) { alert("Delete failed: " + e.message); refetchBoardSilent(); }
+    } catch (e) { showToast("Delete failed: " + e.message); refetchBoardSilent(); }
   }
   // Undo a delete — re-insert the stashed rows, then silently re-sync.
   async function undoDelete(entry) {
@@ -339,11 +340,11 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({ client_id: client.id, ids: entry.ids }),
       });
-      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Undo failed: " + (j.error || res.status)); return; }
+      if (!res.ok) { const j = await res.json().catch(() => ({})); showToast("Undo failed: " + (j.error || res.status)); return; }
       setTrash(tr => tr.filter(x => x !== entry));
       await refetchBoardSilent();
       refreshMonthlyCounts();
-    } catch (e) { alert("Undo failed: " + e.message); }
+    } catch (e) { showToast("Undo failed: " + e.message); }
   }
   // Click a card → that person's Stripe history (to judge if they're a live member).
   async function openPersonStripe(cell) {
@@ -581,7 +582,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
           <div style={{ fontSize: 10.5, color: t.textMute, marginTop: 2 }}>{niceDate(cell.date)}{cell.amount != null ? ` · $${cell.amount.toLocaleString()}` : ""}</div>
         </div>
         <button onClick={(e) => { e.stopPropagation(); deleteBoardCard(cell); }} title="Delete this record"
-          style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, cursor: "pointer", fontSize: 12, lineHeight: 1 }}>✕</button>
+          style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, cursor: "pointer", fontSize: 12, lineHeight: 1 }}>✕</button>
       </div>
     );
   };
@@ -766,7 +767,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
       <div style={card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div style={lbl}>Leads in — which forms count?</div>
-          <button onClick={loadFormActivity} disabled={!location} style={{ fontSize: 11, fontWeight: 600, padding: "5px 10px", borderRadius: 7, border: `1px solid ${t.borderMed}`, background: "transparent", color: t.text, cursor: location ? "pointer" : "default", marginBottom: 8 }}>📊 When were forms used?</button>
+          <button onClick={loadFormActivity} disabled={!location} style={{ fontSize: 11, fontWeight: 600, padding: "5px 10px", borderRadius: 7, border: `1px solid ${t.borderMed}`, background: "transparent", color: t.text, cursor: location ? "pointer" : "default", marginBottom: 8 }}>When were forms used?</button>
         </div>
         <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5, marginBottom: 12 }}>
           Tick the forms whose submissions count as a new lead (e.g. free-trial booking form + contact form). This becomes the config the KPIs read.
@@ -1093,14 +1094,14 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
           {trash.length > 0 && (
             <div onClick={e => e.stopPropagation()} style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1200, width: 268, background: t.surface, border: `1px solid ${t.borderMed}`, borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.45)", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "11px 12px", borderBottom: `1px solid ${t.border}` }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: t.text }}>🗑 Recently deleted <span style={{ color: t.textMute }}>({trash.length})</span></div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: t.text }}>Recently deleted <span style={{ color: t.textMute }}>({trash.length})</span></div>
                 <button onClick={() => undoDelete(trash[0])} style={{ fontSize: 11, fontWeight: 700, padding: "5px 10px", borderRadius: 7, border: "none", background: t.accent, color: "#0A0A0B", cursor: "pointer" }}>↩ Undo</button>
               </div>
               <div style={{ maxHeight: 200, overflowY: "auto" }}>
                 {trash.map(entry => (
                   <div key={entry.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 12px", borderBottom: `1px solid ${t.border}` }}>
                     <span style={{ fontSize: 12, color: t.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{entry.name}</span>
-                    <button onClick={() => undoDelete(entry)} title="Restore this record" style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: `1px solid ${t.borderMed}`, background: "transparent", color: t.text, cursor: "pointer" }}>↩</button>
+                    <button onClick={() => undoDelete(entry)} title="Restore this record" style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 8, border: `1px solid ${t.borderMed}`, background: "transparent", color: t.text, cursor: "pointer" }}>↩</button>
                   </div>
                 ))}
               </div>
@@ -1112,9 +1113,9 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
       {stripeView && (() => {
         const d = stripeView.data;
         const V = {
-          live: { label: "🟢 Active member", color: "#3FB950" },
-          at_risk: { label: "🟡 Past due", color: t.amber },
-          former: { label: "🔵 Former customer", color: t.textSub },
+          live: { label: "Active member", color: "#3FB950" },
+          at_risk: { label: "Past due", color: t.amber },
+          former: { label: "Former customer", color: t.textSub },
           none: { label: "⚪ No purchases found", color: t.textMute },
         };
         const reasonMsg = { no_email: "This record has no email, so we can't look it up in Stripe.", no_customer: "No Stripe customer found with this email on the connected account.", no_stripe: "This client has no connected Stripe account.", error: "Couldn't reach Stripe." };
@@ -1137,7 +1138,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
                     <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 14, fontWeight: 800, color: (V[d.verdict] || V.none).color }}>{(V[d.verdict] || V.none).label}</span>
                       <span style={{ fontSize: 12, color: t.textSub }}>Lifetime paid: <b style={{ color: t.text }}>${d.total_paid.toLocaleString()}</b></span>
-                      {d.customers_count > 1 && <span style={{ fontSize: 11, color: t.amber }}>⚠ {d.customers_count} Stripe customers with this email</span>}
+                      {d.customers_count > 1 && <span style={{ fontSize: 11, color: t.amber }}>{d.customers_count} Stripe customers with this email</span>}
                     </div>
 
                     <div style={{ marginTop: 18, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginBottom: 8 }}>Subscriptions</div>

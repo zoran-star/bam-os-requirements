@@ -29,7 +29,8 @@
 //
 // Merge tokens used (resolve at SEND time via api/email-shells.js resolveMergeVars,
 // called from api/_send.js): {{contact.first_name}}, {{contact.fullName}},
-// {{location.name}}, {{location.website}}, {{location_owner.first_name}}. Identity
+// {{location.name}}, {{location.website}} (with protocol, for links),
+// {{location.domain}} (bare, for naming the site in prose), {{location_owner.first_name}}. Identity
 // tokens fail to EMPTY for an academy with no value on file (the website link line
 // drops from the message) - they never fall back to another academy's identity.
 //
@@ -99,7 +100,11 @@ export const GHOSTED_DEFAULT = {
   approved: false,
   steps: [
     { position: 0, wait_amount: 1, wait_unit: "days", channel: "sms", subject: null,
-      body: "Hey {{contact.first_name}}! Just wanted to check in and see if you are still interested in having your child train with us 👍\n\n{{location.website}}" },
+      // {{location.domain}}, NOT {{location.website}}: this line NAMES the site rather
+      // than linking it, and location.website carries the protocol, so the token that
+      // looks right here sends "https://byanymeanstoronto.ca" as a standalone SMS line.
+      // GTA's live copy has always read the bare domain; the master matches it.
+      body: "Hey {{contact.first_name}}! Just wanted to check in and see if you are still interested in having your child train with us 👍\n\n{{location.domain}}" },
     { position: 1, wait_amount: 1, wait_unit: "days", channel: "sms", subject: null,
       body: "Hi {{contact.fullName}}\n\nJust wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: {{location.website}}/free-trial\n\nThank you! 🙏" },
     { position: 2, wait_amount: 1, wait_unit: "days", channel: "email", subject: "Try a session free",
@@ -130,25 +135,125 @@ export const NURTURE_DEFAULT = {
   ],
 };
 
-// 🎉 Onboarding - the WELCOME drip for a brand-new paid member. The worker
+// 🎉 Onboarding - the WELCOME drip for a brand-new PAID member. The worker
 // enrolls automation_key 'onboarding' the moment a member goes live (see
 // api/automations.js). Post-conversion piece of the preset (declared as
-// postConversion in api/agent/presets.js). DELIBERATELY skeletal: GTA's live
-// onboarding is packed with academy-only facts (WhatsApp invite, socials, coach
-// phone, weekly schedule, gym address) - those are OWNER-PROVIDED specifics the
-// academy fills in the portal after seeding, never default literals. Same dormant
-// rule: enabled:true + approved:false. Academy-agnostic merge fields only.
+// postConversion in api/agent/presets.js). Same dormant rule: enabled:true +
+// approved:false. Academy-agnostic merge fields only.
+//
+// PROMOTED from 3 plain SMS to 7 steps (2026-07-27), mirroring GTA's live
+// structure: the reference academy runs 6 designed emails woven through the
+// first few weeks, and every academy onboarded before this seeded the weak
+// 3-SMS version instead. That is obligation 1 of the canonical copy rule at the
+// top of this file: a default that lags the best live copy is a bug.
+//
+// ⚠️ DELIBERATE DIVERGENCE FROM GTA - 7 STEPS HERE, 8 THERE. DO NOT "FIX" IT.
+//
+// GTA has one more email between `onboarding-era` and `onboarding-review`: the
+// testimonials email (template:onboarding-testimonials). It is classed
+// `attributed` in api/email-templates/sync-classes.js because it carries REAL
+// BAM GTA PARENTS' QUOTES, re-attributed by {{location.city}} to whichever
+// academy sends it. Promoting that step into this master is how one academy's
+// real customers' words get sent as another academy's own - the exact near-miss
+// this whole sync_class system was built after.
+//
+// So the gap is the feature. The ONLY thing that may close it is the separate
+// testimonials workstream: a per-academy testimonial connection, where each
+// academy's step renders ITS OWN families' quotes. Not by pasting GTA's
+// template key in here, not by re-classing the template, not by "it renders
+// tokenized so it's fine" (it renders fine; the WORDS are still GTA's parents').
+// When that connection lands, insert the testimonials step between positions 5
+// and 6 at +7 days, and see the note on step 7 below.
+//
+// Academy-specific facts GTA's live version carries in these bodies (WhatsApp
+// invite, coach socials, general Instagram, coach phone, gym address, the
+// literal weekly schedule) are OWNER-PROVIDED and are deliberately NOT here.
+// They are collected per academy and filled in the portal. Copying GTA's text
+// would send GTA's phone number and Oakville gym address from every academy.
 export const ONBOARDING_DEFAULT = {
   name: "🎉 Onboarding",
   enabled: true,
   approved: false,
   steps: [
-    { position: 0, wait_amount: 2, wait_unit: "minutes", channel: "sms", subject: null,
-      body: "Welcome to {{location.name}}, {{contact.first_name}}! We're pumped to have you. If anything comes up before the first session, text back here - this line reaches us directly." },
-    { position: 1, wait_amount: 2, wait_unit: "days", channel: "sms", subject: null,
-      body: "Hi {{contact.first_name}}, how are the first sessions feeling? Anything we can do better, tell us right here - we read every message." },
-    { position: 2, wait_amount: 5, wait_unit: "days", channel: "sms", subject: null,
-      body: "Hey {{contact.first_name}}, one week in with {{location.name}} - great to have you in the group. Consistency is where the growth is; see you at the next session!" },
+    // 1. Instant SMS. Sets the expectation that the real detail is in the email
+    //    landing beside it. {{location.name}} resolves to the SENDING academy at
+    //    send time - never a literal academy name (GTA's live copy says "By Any
+    //    Means Basketball" here; that is exactly the literal a token replaces).
+    { position: 0, wait_amount: 0, wait_unit: "minutes", channel: "sms", subject: null,
+      body: "Hi {{contact.first_name}}, welcome to {{location.name}}! We're pumped to have you.\n\nMore information is on its way to your email, so check that out when you can.\n\nIf you need anything at all, just reply here - this line reaches the coaches directly." },
+
+    // 2. The welcome email, sent alongside the SMS above.
+    { position: 1, wait_amount: 0, wait_unit: "minutes", channel: "email",
+      subject: "Welcome to {{location.name}}",
+      body: "template:onboarding-welcome" },
+
+    // 3. The weekly schedule SMS. sync_class 'local' is LOAD-BEARING, not
+    //    decoration: it makes stepEnabled() (api/agent/seed-automations.js) seed
+    //    this step OFF in every academy.
+    //
+    //    GTA's live version of this step is its hand-typed training times and
+    //    the 1079 Linbrook Rd gym address. Copying that text into the master
+    //    would text GTA's schedule and Oakville address to members of every
+    //    other academy, so it is NOT here - the body below is a placeholder that
+    //    names the shape of the message and nothing else.
+    //
+    //    Kept-and-disabled rather than omitted, on purpose. Omitting it would
+    //    leave the master silently 6 steps against GTA's 8, and the next reader
+    //    comparing the two would close the gap the fast way: by pasting GTA's
+    //    text. A visible, switched-off slot is a standing instruction instead.
+    //    Nothing can send from it until an academy writes its own schedule and
+    //    turns it on.
+    //
+    //    Generating this from schedule_slots (every session is already real data
+    //    in the system) is the proper fix and is a separate build.
+    // GENERATED, since 28 Jul 2026. {{location.schedule}} is the academy's own
+    // schedule_slots collapsed into one typical week, and {{location.venue}} is its
+    // own training venue off the locations table (NOT clients.address, which is the
+    // business address - GTA's members train at a different building entirely).
+    // api/_academy-facts.js resolves both at send time.
+    //
+    // So this step is `shared` now and seeds ON: there is nothing academy-specific
+    // left in it to copy. An academy with no sessions on file renders an empty
+    // schedule, and an empty-after-merge body is dropped by api/_send.js rather
+    // than sent, so the step can be on and still send nothing until there is
+    // something true to say.
+    // {{location.schedule}} carries the venue with it. Splitting them into two lines
+    // here looked tidier and shipped a broken half: an academy with a gym and no
+    // sessions yet texted "LOCATION: <address>" on its own, five minutes after a
+    // member paid. One token means one answer - a week of training at a place, or
+    // nothing at all, in which case the body empties and api/_send.js skips it.
+    { position: 2, wait_amount: 5, wait_unit: "minutes", channel: "sms", subject: null,
+      body: "SCHEDULE:\n\n{{location.schedule}}" },
+
+    // 4. How to get the most out of training.
+    { position: 3, wait_amount: 5, wait_unit: "minutes", channel: "email",
+      subject: "How to get the most out of training",
+      body: "template:onboarding-training" },
+
+    // 5. The origin story (= the Lead Nurture "global ecosystem" design with the
+    //    free-trial CTA stripped). Subject is deliberately brand-free: not every
+    //    academy on this preset is a By Any Means academy.
+    { position: 4, wait_amount: 3, wait_unit: "days", channel: "email",
+      subject: "Where it all started",
+      body: "template:onboarding-story" },
+
+    // 6. A new era of training (= stripFreeTrial(nurture-2)).
+    { position: 5, wait_amount: 7, wait_unit: "days", channel: "email",
+      subject: "A new era of training",
+      body: "template:onboarding-era" },
+
+    // 7. The review ask. +14 days, NOT the +7 GTA uses, and that is deliberate.
+    //    In GTA this step is +7 days after the TESTIMONIALS step, which is
+    //    itself +7 days after era, so the ask reaches a parent about 24 days
+    //    after joining. The testimonials step is absent here (see the divergence
+    //    note above), so a +7 would land the ask a full week earlier in a
+    //    member's life than the version we know works. +14 preserves the timing
+    //    a parent actually experiences.
+    //    WHEN THE TESTIMONIALS STEP IS INSERTED between 6 and 7: that step takes
+    //    the +7, and this one goes back to +7.
+    { position: 6, wait_amount: 14, wait_unit: "days", channel: "email",
+      subject: "Quick favour?",
+      body: "template:onboarding-review" },
   ],
 };
 

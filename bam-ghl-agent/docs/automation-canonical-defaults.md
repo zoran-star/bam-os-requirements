@@ -36,6 +36,13 @@ node bam-portal/scripts/check-automation-divergence.mjs <clientId>
 - `EDITED` = per-academy copy. Deliberate is fine; generally-good edits get promoted back into the defaults (rule 1).
 - `--all` sweeps every academy that has automations.
 
-## The onboarding drip is skeletal on purpose
+## The onboarding drip: full shape, tokenized bodies
 
-GTA's live `onboarding` automation is packed with academy-only facts (WhatsApp invite, socials, coach phone, weekly schedule, gym address). Those are owner-provided specifics filled in the portal after seeding - never default literals. The shipped `ONBOARDING_DEFAULT` stays tokenized and skeletal.
+**Superseded 2026-07-27.** This section used to say the onboarding drip was "skeletal on purpose". It was not on purpose: `ONBOARDING_DEFAULT` shipped as 3 plain SMS against GTA's 8 steps, and every academy onboarded before that date seeded the weak version. It is now **7 steps** mirroring GTA's live structure (2 SMS + 5 designed emails over ~24 days).
+
+What stays true is the reason the old text was reaching for: GTA's live bodies are packed with academy-only facts (WhatsApp invite, socials, coach phone, weekly schedule, gym address). Those are owner-provided specifics filled in the portal after seeding, **never default literals**. So the master carries GTA's *shape* and tokenized copy, not GTA's words.
+
+Two consequences worth knowing before you touch it:
+
+- **7 here, 8 at GTA, deliberately.** The missing step is the testimonials email, which carries real GTA parents' quotes. Only a per-academy testimonial connection may close that gap. Full reasoning in the comment on `ONBOARDING_DEFAULT`.
+- **Most of the sequence seeds OFF.** Everything classed `local` is created but disabled (see `stepEnabled` in `api/agent/seed-automations.js`), including the schedule SMS and all five emails. That is the intended contract, not a broken seed: the academy authors its own content into the slot, then turns the step on. Do not "fix" it by loosening a `sync_class`.

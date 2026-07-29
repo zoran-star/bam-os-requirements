@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reignition: the settled design</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF9F6;--card:#FFFFFF;--card2:#F3F1EB;--line:#E4E0D6;
+    --tx:#1A1917;--tx2:#54514A;--tx3:#8A857B;
+    --gold:#9A7A22;--goldbg:#FBF3DC;--goldln:#E5D097;
+    --green:#2A7A4E;--greenbg:#E8F4EC;--greenln:#B7DCC4;
+    --red:#B23A22;--redbg:#FBECE8;--redln:#EFC9BE;
+    --blue:#255F92;--bluebg:#E9F1F8;--blueln:#C2D9EB;
+    --grey:#8A857B;--greybg:#F1EFE9;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:44px 20px 100px}
+  h1{font-size:clamp(27px,4.4vw,40px);line-height:1.1;letter-spacing:-.025em;margin:0 0 9px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:16.5px;margin:0 0 24px;max-width:72ch}
+  h2{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--gold);margin:52px 0 6px;font-weight:800}
+  .h2sub{color:var(--tx3);font-size:14px;margin:0 0 16px;max-width:78ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:0 1px 2px rgba(26,25,23,.04)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .hero{background:var(--goldbg);border:1px solid var(--goldln);border-radius:14px;padding:20px 24px}
+  .hero .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:6px}
+  .hero p{margin:0;font-size:18px;color:var(--tx);font-weight:700;line-height:1.4}
+  .hero small{display:block;margin-top:9px;font-size:14px;font-weight:500;color:var(--tx2)}
+  .note{border-radius:12px;padding:16px 18px}
+  .note b{display:block;margin-bottom:4px;font-size:15px}
+  .note p{margin:0;font-size:14px;color:var(--tx2)}
+  .note p+p{margin-top:7px}
+  .note+.note{margin-top:11px}
+  .n-warn{background:var(--redbg);border:1px solid var(--redln)}.n-warn b{color:var(--red)}
+  .n-gold{background:var(--goldbg);border:1px solid var(--goldln)}.n-gold b{color:var(--gold)}
+  .n-blue{background:var(--bluebg);border:1px solid var(--blueln)}.n-blue b{color:var(--blue)}
+  .n-ok{background:var(--greenbg);border:1px solid var(--greenln)}.n-ok b{color:var(--green)}
+  .grid{display:grid;gap:13px}
+  @media(min-width:820px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+  /* settled decisions */
+  .dec{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}
+  .dec:last-child{border-bottom:none}
+  .dec .q{flex:1;font-size:13.5px;color:var(--tx3)}
+  .dec .a{flex:1.4;font-size:14px;color:var(--tx);font-weight:700}
+  .dec .a small{display:block;font-weight:500;color:var(--tx2);font-size:13px}
+  /* station diagram */
+  .station{display:flex;flex-direction:column;gap:0;min-width:640px}
+  .srow{display:flex;align-items:center;gap:12px;padding:9px 0}
+  .sbox{border:1px solid var(--line);border-radius:11px;padding:11px 16px;background:var(--card);min-width:170px}
+  .sbox .t{font-weight:800;color:var(--tx);font-size:14.5px}
+  .sbox .d{font-size:12px;color:var(--tx3)}
+  .sbox.hot{background:var(--goldbg);border-color:var(--goldln)}
+  .sbox.grn{background:var(--greenbg);border-color:var(--greenln)}
+  .edge{flex:1;font-size:12.5px;color:var(--tx2);border-bottom:2px dashed var(--line);padding:0 4px 3px;white-space:nowrap}
+  .edge b{color:var(--gold)}
+  /* lifecycle */
+  .life{display:flex;gap:0;align-items:stretch;min-width:820px}
+  .lstage{flex:1;position:relative;padding-right:24px}
+  .lstage:last-child{padding-right:0}
+  .lstage:not(:last-child):after{content:"";position:absolute;right:6px;top:38px;width:11px;height:11px;
+    border-top:2px solid var(--line);border-right:2px solid var(--line);transform:rotate(45deg)}
+  .lbox{border-radius:12px;padding:13px 15px;height:100%;border:1px solid var(--line);background:var(--card)}
+  .lbox.gate{background:var(--goldbg);border-color:var(--goldln)}
+  .lbox .st{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:800;margin-bottom:5px;color:var(--tx3)}
+  .lbox.gate .st{color:var(--gold)}
+  .lbox .t{font-size:14.5px;font-weight:800;color:var(--tx);margin-bottom:4px}
+  .lbox .d{font-size:12.5px;color:var(--tx2)}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
+  th{text-align:left;padding:9px 12px;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:800;border-bottom:2px solid var(--line)}
+  td{padding:10px 12px;border-bottom:1px solid var(--line);color:var(--tx2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.k{color:var(--tx);font-weight:700;white-space:nowrap}
+  td.mono{font-family:var(--mono);font-size:12px;color:var(--tx3)}
+  .lbl{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:800;margin-bottom:7px}
+  a{color:var(--blue);font-weight:600}
+  .phone{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:15px}
+  .bub{background:#fff;border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:11px 14px;
+    font-size:13.5px;color:var(--tx);max-width:90%;margin-bottom:8px;white-space:pre-line}
+  .bub:last-child{margin-bottom:0}
+  .when{font-family:var(--mono);font-size:11px;color:var(--tx3);margin:0 0 4px 3px}
+  .big{font-size:34px;font-weight:800;line-height:1;letter-spacing:-.02em;color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Reignition:<br><span>the settled design.</span></h1>
+  <p class="sub">How an academy warms up leads it already has, one campaign at a time. You answered the eight design questions; this page is the result. <a href="skills-pipeline.html">Back to the five skills &rarr;</a></p>
+
+  <div class="hero">
+    <div class="l">The design in one line</div>
+    <p>Reignition is its own stage on the board. Staff hand-picks who goes in, writes the campaign's messages fresh, and a paced drip plays them out - a reply hands the person to the sales system, silence hands them to nurture.</p>
+    <small>The stage is defined by ROLE, not by name, so it bolts onto the free-trial system, the discovery-call system, and every sales system we ever build, unchanged.</small>
+  </div>
+
+  <!-- SETTLED -->
+  <h2>Your eight answers, locked in</h2>
+  <div class="card">
+    <div class="dec"><div class="q">Who runs it?</div><div class="a">Staff, via the skill.<small>The design leaves room for an owner-facing campaign builder later; we do not build it now.</small></div></div>
+    <div class="dec"><div class="q">Who approves a campaign?</div><div class="a">Our staff, for now.<small>No owner gate on campaigns yet.</small></div></div>
+    <div class="dec"><div class="q">How do people get in?</div><div class="a">Staff puts them in by hand. Repeatable.<small>No automatic audiences. Tags and filters help staff BUILD the roster, they never enrol anyone by themselves. The same person can be in a later campaign again. Every campaign records its consent basis: where these leads came from and why we may message them.</small></div></div>
+    <div class="dec"><div class="q">Channels?</div><div class="a">Per campaign.<small>Texts, emails, or a mix - each campaign declares its own steps.</small></div></div>
+    <div class="dec"><div class="q">The messages?</div><div class="a">Written fresh, every campaign.<small>No skeleton. They go through the same render + review as every other message in the system.</small></div></div>
+    <div class="dec"><div class="q">Where do they sit?</div><div class="a">Their own Reignition stage, on the board.<small>Visible while the campaign plays out, adaptable to any sales system.</small></div></div>
+    <div class="dec"><div class="q">No reply, sequence done?</div><div class="a">They drop into Nurture.<small>The long game takes them. Nurture's own dead end stays the final exit.</small></div></div>
+    <div class="dec"><div class="q">How fast?</div><div class="a">A paced drip. Default 15 a day.<small>Staff-settable, always inside the academy's own daytime hours.</small></div></div>
+  </div>
+
+  <!-- STATION -->
+  <h2>The stage, and why it fits any sales system</h2>
+  <p class="h2sub">Reignition is a side-station like Ghosted. Its exits point at ROLES the pipeline already has, not at named stages, which is the whole trick.</p>
+  <div class="card scroll">
+    <div class="station">
+      <div class="srow">
+        <div class="sbox hot"><div class="t">Reignition</div><div class="d">the campaign plays out here</div></div>
+        <div class="edge">they reply &rarr; <b>the front stage</b>, the booking agent takes over</div>
+        <div class="sbox grn"><div class="t">Booking</div><div class="d">worked like any live lead</div></div>
+      </div>
+      <div class="srow">
+        <div class="sbox" style="visibility:hidden"></div>
+        <div class="edge">sequence runs out &rarr; <b>nurture</b>, the long game</div>
+        <div class="sbox"><div class="t">Nurture</div><div class="d">slow emails, ~8 weeks</div></div>
+      </div>
+      <div class="srow">
+        <div class="sbox" style="visibility:hidden"></div>
+        <div class="edge">wrong person / complaint &rarr; <b>out</b>, immediately</div>
+        <div class="sbox"><div class="t">Out</div><div class="d">unqualified, or a human takes it</div></div>
+      </div>
+    </div>
+    <p style="margin:12px 0 0;font-size:13.5px;color:var(--tx2)">The free-trial system and the discovery-call system both have a front stage and a nurture stage, so this bolts onto either today, and onto any future system that has them, with zero changes. <b>The only way in is a campaign roster.</b> No form feeds it, no automation feeds it, nothing enters by accident.</p>
+  </div>
+
+  <div class="note n-blue" style="margin-top:13px">
+    <b>How exits work here, since it has been a while: a stage declares them</b>
+    <p>Every stage in a sales system carries its own exit list: <b>a trigger, and where it goes</b>. "Replied &rarr; Booking", "ran out &rarr; Nurture", "unqualified &rarr; out". The preset compiles those into the routes the board and the agents follow. Reignition is a stage like any other, so its exits are declared the same way - which means <b>the exit point is adjustable per sales system when the station is attached</b>, not welded in. A future system where a reply should land somewhere other than the front stage just declares a different exit.</p>
+  </div>
+
+  <div class="note n-gold" style="margin-top:11px">
+    <b>My recommendation for the free-trial system: a reply exits into Booking, as a reply, not as a new lead</b>
+    <p>Concretely: the moment they reply, their remaining campaign steps are cancelled, the card moves Reignition &rarr; Booking, and the <b>booking agent picks up the conversation with their reply already in the thread</b>. What deliberately does NOT happen: the new-lead intro message never fires - they are mid-conversation, not a fresh form fill, and "thanks for reaching out!" after they answered our own text would read as a bot.</p>
+    <p>The colder alternative (exit into Nurture instead) is right for a future system whose reignition is a slow-burn play, and the adjustable exit above is exactly how that system would declare it.</p>
+  </div>
+
+  <!-- CAMPAIGN LIFECYCLE -->
+  <h2>A campaign's life</h2>
+  <p class="h2sub">Draft costs nothing and sends nothing. The dry run is the gate.</p>
+  <div class="card scroll">
+    <div class="life">
+      <div class="lstage"><div class="lbox">
+        <div class="st">1 &middot; draft</div>
+        <div class="t">Build the roster</div>
+        <div class="d">Staff picks people by hand. Tags and filters narrow the list; nobody is added by a rule. Repeat visitors from old campaigns are allowed.</div>
+      </div></div>
+      <div class="lstage"><div class="lbox">
+        <div class="st">2 &middot; draft</div>
+        <div class="t">Write the messages</div>
+        <div class="d">Fresh for this campaign: 1-3 steps, texts or emails or both, with their waits. Rendered exactly as they will send.</div>
+      </div></div>
+      <div class="lstage"><div class="lbox gate">
+        <div class="st">3 &middot; the gate</div>
+        <div class="t">Dry run</div>
+        <div class="d">The exact roster, the count, and everyone the rails removed, with reasons. Nothing has sent yet. Staff approves here.</div>
+      </div></div>
+      <div class="lstage"><div class="lbox">
+        <div class="st">4 &middot; running</div>
+        <div class="t">The drip</div>
+        <div class="d">15 people a day enter the stage and get step 1. Each person's later steps follow the campaign's own waits, inside their local hours.</div>
+      </div></div>
+      <div class="lstage"><div class="lbox">
+        <div class="st">5 &middot; done</div>
+        <div class="t">Or halted</div>
+        <div class="d">Replies leave as they happen. Halt at any moment: whoever has not been reached is simply never reached.</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="note n-blue" style="margin-top:13px">
+    <b>The pacing trick: we pace the door, not the messages</b>
+    <p>The drip admits up to the daily number of people INTO the stage each day; once someone is in, their messages just follow the campaign's own waits. Pacing never touches the send machinery, so every guard that already protects sends - quiet hours, time zones, empty-message skips, the works - applies untouched. 60 people at 15 a day means the campaign takes four days to fully launch.</p>
+  </div>
+
+  <!-- RAILS -->
+  <h2>The rails, none of them optional</h2>
+  <div class="grid g2">
+    <div class="note n-warn" style="margin:0"><b>Some people can never be added, no matter who tries</b>
+      <p>Current members. Anyone already live in a pipeline stage. Anyone marked do-not-disturb or who ever unsubscribed or complained. Anyone with no working phone or email for the campaign's channels. The roster builder refuses them with the reason shown, and there is no override.</p>
+      <p><b>And one honest limit, checked against the live data:</b> the system only records who OPTED OUT. "This person consented" does not exist as data anywhere, so no automatic check can prove it - a check that waved through everyone without an opt-out would protect nobody. So every campaign carries a <b>consent basis</b>, written by a person: where these leads came from and why we may message them. It is recorded on the campaign, and the dry run shows it beside the roster.</p></div>
+    <div class="note n-warn" style="margin:0"><b>Quarantined imports stay quiet until a campaign names them</b>
+      <p>Leads seeded from an academy's old system land quarantined. A reignition roster is the ONLY path by which any of them is ever messaged. Importing someone's leads can never, by itself, cause a single message.</p></div>
+    <div class="note n-ok" style="margin:0"><b>A reply ends the campaign for that person, instantly</b>
+      <p>Their remaining steps are cancelled, they move to the front stage, and the booking agent takes over mid-conversation. Nobody gets campaign step 3 after they already answered step 1.</p></div>
+    <div class="note n-ok" style="margin:0"><b>They become ordinary leads the moment it works</b>
+      <p>After the campaign there is nothing special about them. The agent works them, ghosted catches the quiet ones, nurture catches the rest. No parallel track exists to maintain.</p></div>
+  </div>
+
+  <!-- WORKED EXAMPLE -->
+  <h2>The first real run: San Jose's 65 imported leads</h2>
+  <p class="h2sub">The exact case this was designed for, using the summer special you already run by hand.</p>
+  <div class="grid g2">
+    <div class="card">
+      <div class="lbl">The campaign</div>
+      <div class="scroll"><table style="min-width:0">
+        <tr><td class="k">Roster</td><td>staff picks from the 65 quarantined imports, say 48 make it past the rails. <b>For this first run, you name the roster yourself</b> - that is the standing rule on these imports, and it stands even though staff approval is the normal model</td></tr>
+        <tr><td class="k">Messages</td><td>3 texts, written fresh for San Jose's offer</td></tr>
+        <tr><td class="k">Pace</td><td>15 a day &rarr; fully launched in 4 days</td></tr>
+        <tr><td class="k">Reply</td><td>straight to Booking, the agent takes over</td></tr>
+        <tr><td class="k">Silence</td><td>into Nurture after the last step</td></tr>
+      </table></div>
+      <p style="margin:11px 0 0;font-size:13px;color:var(--tx2)">The board shows a Reignition stage with a live count the whole time, so the campaign is visible, not invisible.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">What a lead sees</div>
+      <div class="phone">
+        <div class="when">day 1</div>
+        <div class="bub">Hey Maya! It's coach from By Any Means Basketball - you reached out about training a while back. We just opened summer spots and I thought of you. Want me to hold one for Jordan?</div>
+        <div class="when">day 3, if quiet</div>
+        <div class="bub">No stress if the timing was wrong before - the summer group is filling up though. Happy to answer anything.</div>
+        <div class="when">day 6, if quiet</div>
+        <div class="bub">Last one from me! If you'd ever like Jordan to try a free session, the door's open: byanymeanssanjose.com/free-trial</div>
+      </div>
+      <p style="margin:11px 0 0;font-size:13px;color:var(--tx2)">Sample copy only - each campaign's messages are written fresh and reviewed before the dry run.</p>
+    </div>
+  </div>
+
+  <!-- ORDER OF OPERATIONS -->
+  <h2>The order of operations on the way out</h2>
+  <p class="h2sub">The rule that answers every case: <b>moving stages never sends a message. Only the destination's engine speaks</b>, and each kind of engine speaks in its own way.</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <div class="lbl">They reply &rarr; a stage with a talker (agent or human)</div>
+      <div class="scroll"><table style="min-width:0;font-size:13px">
+        <tr><td class="mono" style="white-space:nowrap">1</td><td>their reply arrives</td></tr>
+        <tr><td class="mono">2</td><td><b>every unsent campaign step is cancelled, first.</b> Cancel before move, so a queued step can never fire after they answered</td></tr>
+        <tr><td class="mono">3</td><td>card moves Reignition &rarr; Booking</td></tr>
+        <tr><td class="mono">4</td><td>the booking agent reads the thread and <b>answers what they actually said</b></td></tr>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">So the next message they get is a response, not a script. No intro fires, nothing canned lands on top of their reply.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">They ghost the whole thing &rarr; an automation, or out</div>
+      <div class="scroll"><table style="min-width:0;font-size:13px">
+        <tr><td class="mono" style="white-space:nowrap">1</td><td>the last campaign step sends, its wait window passes, silence</td></tr>
+        <tr><td class="mono">2</td><td>card moves Reignition &rarr; Nurture (or is marked unqualified and leaves the board - no message, ever)</td></tr>
+        <tr><td class="mono">3</td><td>nurture enrols them at step one, <b>clock starting at zero</b></td></tr>
+        <tr><td class="mono">4</td><td>first nurture email arrives on nurture's own schedule, a week later</td></tr>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">The handoff itself is silent. There is a natural quiet gap between the campaign's last word and nurture's first, because each sequence only ever runs its own clock.</p>
+    </div>
+  </div>
+
+  <div class="note n-ok" style="margin-top:13px">
+    <b>Your two assumptions become a rule the attachment checks, not an assumption</b>
+    <p>You said it: a reply should always land where something can talk back, and a full ghost should always land in an automation or out of the pipeline. That is now a validation on attaching the station to any sales system: <b>the replied exit must point at a stage with an agent or human engine, and the ran-out exit must point at an automation stage or a terminal.</b> A future system that declares it the wrong way round gets refused at design time, loudly, instead of shipping a pipeline where a human reply is answered by a drip.</p>
+  </div>
+
+  <!-- UI -->
+  <h2>Where it lives in the portal</h2>
+  <p class="h2sub">V2 clients only. Two homes: the owner WATCHES it in the Sales section, staff SETS IT UP from the Business Blueprint.</p>
+  <div class="grid g3">
+    <div class="card">
+      <div class="lbl">1 &middot; the tile &middot; Sales section</div>
+      <div style="border:1px solid var(--goldln);background:var(--goldbg);border-radius:12px;padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:var(--gold)">Reignition</div>
+        <div style="font-size:30px;font-weight:800;color:var(--tx);line-height:1.2">43</div>
+        <div style="font-size:12px;color:var(--tx2)">people being reignited &middot; Summer special</div>
+      </div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)"><b>Only appears while a campaign is active.</b> No campaign, no tile - the section stays clean for the academies that never run one.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">2 &middot; click the tile &middot; the roster</div>
+      <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px;font-size:12px">
+        <div style="display:flex;justify-content:space-between;padding:7px 11px;border-bottom:1px solid var(--line);color:var(--tx3);font-weight:800;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase"><span>Person</span><span>On step</span><span>Next</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 11px;border-bottom:1px solid var(--line)"><span style="font-weight:700;color:var(--tx)">Maya A.</span><span>text 1</span><span style="color:var(--tx3)">text 2 &middot; Thu</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 11px;border-bottom:1px solid var(--line)"><span style="font-weight:700;color:var(--tx)">Devon R.</span><span>text 2</span><span style="color:var(--tx3)">email &middot; Sat</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 11px"><span style="font-weight:700;color:var(--tx)">Priya S.</span><span style="color:var(--green);font-weight:700">replied ✓</span><span style="color:var(--tx3)">with the agent</span></div>
+      </div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)">Everyone on the campaign, which step they are on, and what is coming next and when. Replies show as already handed to the sales system.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">3 &middot; click a person &middot; their card</div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:12.5px">
+        <div style="font-weight:800;color:var(--tx);font-size:14px">Maya Alvarez</div>
+        <div style="color:var(--tx3);font-family:var(--mono);font-size:11px;margin-bottom:6px">(408) 555-0114 &middot; enquired Aug 2025</div>
+        <div style="color:var(--tx2)">The same contact card used everywhere else in the portal: thread, notes, tags, history.</div>
+      </div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)"><b>Nothing new is invented here</b> - the popup IS the existing contact card, so the roster is just another way in.</p>
+    </div>
+  </div>
+
+  <div class="note n-blue" style="margin-top:13px">
+    <b>Setup lives in the Business Blueprint, and stays staff-only</b>
+    <p>Building a campaign - roster, messages, pace, consent basis, dry run - is a staff surface inside the Business Blueprint. The owner's Sales-section tile is a window, not a control: they watch the campaign run, they do not launch or edit one. If we ever open campaign-building to owners, this is the seam where it happens.</p>
+  </div>
+
+  <!-- WHAT GETS BUILT -->
+  <h2>What this needs that does not exist yet</h2>
+  <div class="grid g2">
+    <div class="card"><div class="lbl">New</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)"><b>The campaign itself:</b> roster + states + pace + consent basis, and the drip that admits people daily. Two new tables, one small cron.</p></div>
+    <div class="card"><div class="lbl">New, small</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)"><b>The stage:</b> the reignition station with its declared, adjustable exits, stamped onto an academy's pipeline on first use.</p></div>
+    <div class="card"><div class="lbl">New, small</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)"><b>The two surfaces:</b> the owner's tile + roster view in the Sales section (V2 only, shown only while active), and the staff campaign builder in the Business Blueprint.</p></div>
+    <div class="card"><div class="lbl">Reused whole</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)"><b>Everything else:</b> messages ride the existing automation machinery - worker, renderer, review page, quiet hours, reply handling, locks - and the person popup IS the existing contact card. No second send path, no second contact card.</p></div>
+  </div>
+
+  <h2>What I need from you</h2>
+  <div class="card" style="border-color:var(--goldln);background:var(--goldbg)">
+    <p style="margin:0;font-size:16.5px;color:var(--tx)"><b>Workshop this page, then approve it.</b> Everything on it follows your eight answers; the only inventions are the pacing-at-the-door trick and the role-based exits, and both exist to keep it one system instead of two.</p>
+  </div>
+
+</div>
+</body>
+</html>

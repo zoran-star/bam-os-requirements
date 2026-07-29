@@ -20,6 +20,7 @@ import { routeTransition } from "./agent/_router.js";
 import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
 import { renderEmail, clientVars } from "./email-shells.js";
+import { academyFacts } from "./_academy-facts.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { isMuted } from "./agent/_mutes.js";
 import { markUnqualified } from "./agent/_tags.js";
@@ -27,6 +28,7 @@ import { resolveAgentActor } from "./agent/_auth.js";
 import { FORM_INTRO_DEFAULTS } from "./form-intro-automations.js";
 import { presetAutomationKeys } from "./agent/presets.js";
 import { seedAutomations } from "./agent/seed-automations.js";
+import { buildStepRow } from "./_automation-step.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -58,7 +60,15 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,owner_name,email,address,time_zone,website_setup,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  // public_name / community_group_* / google_review_url / phone are the parent-facing
+  // facts clientVars() renders from - without them every message silently falls
+  // back to the internal name and drops its group, review and phone lines.
+  //
+  // online_programs_url and referral_offer joined the list on 28 Jul 2026, when
+  // migration 20260727150000 was applied. Before that, naming a column that does not
+  // exist yet makes PostgREST 400 the whole select and every automation stops. A
+  // column goes in this list AFTER its migration is live, never in the same commit.
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,public_name,owner_name,email,phone,address,time_zone,website_setup,community_group_url,community_group_platform,google_review_url,online_programs_url,referral_offer,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 
@@ -496,6 +506,16 @@ async function runWork(res) {
         } catch (_) { /* leave blank */ }
       }
 
+      // The member-facing facts that are not on the client row: the training venue,
+      // the weekly schedule generated from real sessions, and the coaches to follow.
+      // Resolved here for the same reason next_session is, because they need database
+      // reads that clientVars deliberately does not do. Only fetched when the message
+      // actually references one, so the ordinary sales SMS pays nothing for it.
+      let facts = {};
+      if (/location\.(?:venue|schedule)|template:onboarding-welcome/.test(`${step.body || ""}${step.subject || ""}`)) {
+        try { facts = await academyFacts(sb, client); } catch (_) { /* shorter message, never a failed send */ }
+      }
+
       // {{location.*}} / {{location_owner.first_name}} resolve from the REAL
       // client row (clientVars), never the hardcoded LOCATIONS map - a new
       // academy must never send another academy's name, site, or owner. Unknown
@@ -503,7 +523,7 @@ async function runWork(res) {
       const result = await sendOn({
         channel: step.channel, clientId: job.client_id, contactId: job.contact_id,
         toEmail: info.email, toPhone: info.phone, subject: step.subject, body: step.body, ghlToken: token,
-        vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session, ...clientVars(client) },
+        vars: { first_name: info.firstName, full_name: info.fullName, athlete, next_session, ...clientVars(client), ...facts },
       });
 
       // HELD (email only): the academy has no verified sending domain, so nothing
@@ -723,11 +743,17 @@ async function handler(req, res) {
       // Load the client so the preview renders with the academy's OWN identity
       // (name / site / owner), exactly like the real send path.
       const client = await loadClient(clientId).catch(() => null);
+      // The member-facing facts too, or this stops being a preview of the real send.
+      // Without them the welcome email an owner approves from is missing its entire
+      // weekly schedule table, its location block, and its coaches - the parts an
+      // owner is most likely to be checking. That is worse than no preview, because
+      // it is a preview that quietly disagrees with what will be sent.
+      const facts = await academyFacts(sb, client).catch(() => ({}));
       const html = renderEmail({
         clientId,
         subject: b.subject || "",
         body: b.body || "",
-        vars: { first_name: "Alex", athlete: "Jordan", ...clientVars(client) },
+        vars: { first_name: "Alex", athlete: "Jordan", ...clientVars(client), ...facts },
       });
       return res.status(200).json({ html, subject: b.subject || "" });
     }
@@ -812,12 +838,10 @@ async function handler(req, res) {
       if (!b.automation_id || !(await ownsAutomation(b.automation_id))) return res.status(403).json({ error: "unknown automation" });
       if (!b.body || !String(b.body).trim()) return res.status(400).json({ error: "body required" });
       if (!["sms", "email"].includes(b.channel)) return res.status(400).json({ error: "channel must be sms|email" });
-      const row = {
-        automation_id: b.automation_id, position: Number(b.position) || 0,
-        wait_amount: Number(b.wait_amount) || 0, wait_unit: b.wait_unit || "days",
-        channel: b.channel, subject: b.subject ?? null, body: String(b.body),
-        enabled: b.enabled === undefined ? true : !!b.enabled, updated_at: new Date().toISOString(),
-      };
+      // Row shape lives in _automation-step.js. On UPDATE it deliberately OMITS
+      // `enabled` unless the caller sent it, so saving a step's wording can never
+      // re-enable a step a human turned off (the portal editor sends no `enabled`).
+      const row = buildStepRow(b);
       let r;
       if (b.id) r = await sb(`automation_steps?id=eq.${encodeURIComponent(b.id)}&automation_id=eq.${b.automation_id}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(row) });
       else r = await sb(`automation_steps`, { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify([row]) });

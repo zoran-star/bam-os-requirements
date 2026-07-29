@@ -29,6 +29,12 @@ async function sb(path, init = {}) {
 async function requireStaff(req) {
   const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!bearer) return null;
+  // api/ghl/cron-import-history calls this with CRON_SECRET, exactly as it calls
+  // the SMS importer. Without this line every cron email import returned 401
+  // "staff only", so `stamped = sms.done && email.done` was never true and NO
+  // academy was ever marked imported - which head-of-line blocked the whole
+  // queue on the same 3 candidates. Mirrors import-ghl-history.js.
+  if (process.env.CRON_SECRET && bearer === process.env.CRON_SECRET) return "cron-import-history";
   const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${bearer}` } });
   if (!r.ok) return null;
   const user = await r.json();

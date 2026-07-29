@@ -452,7 +452,7 @@ export default function MeetingPrepModal({ event, tokens, dark, onClose, onOpenC
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <span style={{
                 fontSize: 11, fontWeight: 600, letterSpacing: "0.02em",
-                padding: "3px 9px", borderRadius: 6,
+                padding: "3px 9px", borderRadius: 8,
                 background: tokens.accentGhost, color: tokens.accent,
               }}>MEETING PREP</span>
             </div>
@@ -653,7 +653,7 @@ export default function MeetingPrepModal({ event, tokens, dark, onClose, onOpenC
                           <button
                             onClick={() => setExpandedCalls(p => ({ ...p, [pageId]: !p[pageId] }))}
                             style={{
-                              marginTop: 10, padding: "4px 8px", borderRadius: 6,
+                              marginTop: 10, padding: "4px 8px", borderRadius: 8,
                               background: "transparent", border: `1px solid ${tokens.border}`,
                               color: tokens.textSub, fontSize: 11, fontWeight: 600,
                               cursor: "pointer", fontFamily: "inherit",

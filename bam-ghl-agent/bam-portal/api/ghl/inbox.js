@@ -118,6 +118,13 @@ function writeInboxCache(clientId, payload) {
 }
 
 // ── Per-user read state (GHL has no reliable mark-read API, so we track it) ──
+// Sentinel written by ?action=mark-unread. A read-time of the epoch can never be
+// >= a real message date, so the thread reads as unread; applyReads also forces a
+// count of at least 1 so an outbound-only thread (GHL unreadCount 0) still shows.
+// Chosen over deleting the row so "mark unread" survives on every device instead
+// of falling back to whatever GHL reports.
+const MARK_UNREAD_AT = "1970-01-01T00:00:00.000Z";
+const MARK_UNREAD_MS = 0;
 // Map of ghl_conversation_id → last_read_at (ms) for this user+academy.
 async function loadUserReads(clientId, userId) {
   const map = new Map();
@@ -138,6 +145,8 @@ function applyReads(convos, readsMap) {
   return (convos || []).map(c => {
     const r = readsMap.get(c.id);
     if (r == null) return c;
+    // Explicitly marked unread: force it, even if the source says 0 unread.
+    if (r === MARK_UNREAD_MS) return { ...c, unreadCount: Math.max(1, c.unreadCount || 0) };
     const lastMs = c.lastMessageDate ? new Date(c.lastMessageDate).getTime() : 0;
     return r >= lastMs ? { ...c, unreadCount: 0 } : c;
   });
@@ -331,7 +340,10 @@ async function handler(req, res) {
   // ── POST ?action=mark-read ── Per-user read receipt for a GHL conversation.
   // Called when the user opens a thread. Idempotent upsert. No GHL call.
   if (req.method === "POST") {
-    if (req.query.action !== "mark-read") return res.status(400).json({ error: "unsupported POST action" });
+    const act = req.query.action;
+    if (act !== "mark-read" && act !== "mark-unread") {
+      return res.status(400).json({ error: "unsupported POST action" });
+    }
     const convId = (req.body && req.body.conversation_id) || req.query.conversation_id;
     if (!convId) return res.status(400).json({ error: "conversation_id required" });
     try {
@@ -340,10 +352,16 @@ async function handler(req, res) {
         headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
         body: JSON.stringify([{
           client_id: clientId, ghl_conversation_id: String(convId),
-          auth_user_id: ctx.user.id, last_read_at: new Date().toISOString(),
+          auth_user_id: ctx.user.id,
+          // mark-unread writes the epoch instead of deleting the row. applyReads
+          // compares last_read_at against the thread's last message, so an epoch
+          // read-time can never satisfy it and the thread reads as unread again,
+          // on every device, for this user only. Re-opening the thread overwrites
+          // it with a real timestamp via mark-read.
+          last_read_at: act === "mark-unread" ? MARK_UNREAD_AT : new Date().toISOString(),
         }]),
       });
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, state: act === "mark-unread" ? "unread" : "read" });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

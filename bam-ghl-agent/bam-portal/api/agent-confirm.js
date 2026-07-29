@@ -84,7 +84,9 @@ async function sb(path, init = {}) {
 }
 
 async function loadClient(clientId) {
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,owner_name,email,address,website_setup,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,booking_provider,time_zone&limit=1`);
+  // public_name / community_group_* / google_review_url feed clientVars(), so the
+  // confirm agent's location tokens render the academy's parent-facing identity.
+  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,public_name,owner_name,email,address,website_setup,community_group_url,community_group_platform,google_review_url,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,booking_provider,time_zone&limit=1`);
   return Array.isArray(rows) && rows[0];
 }
 

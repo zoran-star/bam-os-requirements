@@ -1,0 +1,31 @@
+{
+  "_why": "BAM GTA's trial_followup automation, deleted from prod 2026-07-27 with Zoran's approval, as part of making GTA look as if it had been created from the template. Captured here first so the delete is reversible.",
+  "_why_deleted": "A duplicate of trial_form: same trigger (trial form filled, no time picked), same 20-minute wait, same message. trial_form has enrolled 30 leads including that same day; this had enrolled ZERO, ever, and was both disabled and never approved. It also referenced {{next_session}}, which nothing resolves, so had it ever sent, a parent would have read the literal characters.",
+  "_verified_at_delete": "0 enrollments, 0 jobs, enabled:false, approved:false, 1 step",
+  "_client": "BAM GTA, 39875f07-0a4b-4429-a201-2249bc1f24df",
+  "automation": {
+    "id": "2320e3b7-dbdd-4b34-8119-a751afed90ce",
+    "automation_key": "trial_followup",
+    "name": "🏀 Trial Follow-up",
+    "enabled": false,
+    "approved": false,
+    "offer_id": "52a6285c-7832-44e1-b531-ab7ef9d8fc21",
+    "ghl_stage_name": null,
+    "created_at": "2026-06-26T22:23:13.974591+00:00",
+    "updated_at": "2026-06-26T22:23:13.974591+00:00"
+  },
+  "steps": [
+    {
+      "id": "d618c6b0-389e-46a2-a7fc-e5e71bc26496",
+      "position": 0,
+      "wait_amount": 20,
+      "wait_unit": "minutes",
+      "channel": "sms",
+      "subject": null,
+      "enabled": true,
+      "body": "Hey {{contact.first_name}}, it's coach from BAM GTA! I noticed you filled in a trial form but didn't book a time. Can I help you find one that works? {{next_session}}Grab a spot here: byanymeanstoronto.ca/free-trial",
+      "created_at": "2026-06-26T22:23:13.974591+00:00",
+      "updated_at": "2026-06-26T22:23:13.974591+00:00"
+    }
+  ]
+}

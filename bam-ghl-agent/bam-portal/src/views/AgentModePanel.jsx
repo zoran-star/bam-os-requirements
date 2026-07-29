@@ -4,6 +4,7 @@ import { authFetch } from "../lib/authFetch";
 // BAM-staff control: per-academy agent autonomy mode. One switch governs BOTH
 // the Responded reply bot and the follow-up nudge engine.
 //   off → silent · hawkeye → approve each · self_drive → auto-send (unsure → inbox)
+import { showToast } from "../components/dialogs.jsx";
 async function api(action, payload = {}) {
   const res = await authFetch("/api/agent-config", {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -16,8 +17,8 @@ async function api(action, payload = {}) {
 
 const MODES = [
   { key: "off",        label: "Off",        hint: "Agent is silent - nothing drafts or sends." },
-  { key: "hawkeye",    label: "👁 Hawkeye", hint: "Agent drafts every message; you approve each one before it sends." },
-  { key: "self_drive", label: "🚀 Self-drive", hint: "Agent sends high-confidence messages itself. Anything it's unsure about still drops to the inbox." },
+  { key: "hawkeye",    label: "Hawkeye", hint: "Agent drafts every message; you approve each one before it sends." },
+  { key: "self_drive", label: "Self-drive", hint: "Agent sends high-confidence messages itself. Anything it's unsure about still drops to the inbox." },
 ];
 
 // Per-agent hint copy. Booking works Responded-stage leads; Confirm works leads
@@ -64,7 +65,7 @@ export default function AgentModePanel({ tokens }) {
     setBusy(client_id);
     const action = agent === "confirm" ? "set-confirm-mode" : agent === "closing" ? "set-closing-mode" : agent === "member_care" ? "set-member-care-mode" : "set-mode";
     try { await api(action, { client_id, mode }); await load(); }
-    catch (e) { alert(e.message); } finally { setBusy(null); setWarn(null); }
+    catch (e) { showToast(e.message); } finally { setBusy(null); setWarn(null); }
   }
   function pick(row, mode, agent = "booking") {
     const cur = agent === "confirm" ? (row.confirm_mode || "off") : agent === "closing" ? (row.closing_mode || "off") : agent === "member_care" ? (row.member_care_mode || "off") : row.mode;
@@ -90,7 +91,7 @@ export default function AgentModePanel({ tokens }) {
         leads (get them to book a trial). <b style={{ color: text }}>Confirm</b> works leads already booked (make sure
         they show up, hand off to rebook if they can't). <b style={{ color: text }}>Closing</b> works good-fit trial
         attendees (follow up and get them enrolled). In <b style={{ color: text }}>Hawkeye</b>, every message waits
-        for approval in <b style={{ color: text }}>Inbox → 👁 Hawkeye</b>. In <b style={{ color: red }}>Self-drive</b>, the
+        for approval in <b style={{ color: text }}>Inbox → Hawkeye</b>. In <b style={{ color: red }}>Self-drive</b>, the
         agent texts on its own.
       </div>
 

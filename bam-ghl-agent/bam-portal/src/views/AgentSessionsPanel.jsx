@@ -127,7 +127,7 @@ export default function AgentSessionsPanel({ tokens: t, dark }) {
 
       {/* List */}
       {error && (
-        <div style={{ padding: 12, background: "#3a1212", border: "1px solid #5a1d1d", borderRadius: 6, color: "#f8b4b4" }}>
+        <div style={{ padding: 12, background: "#3a1212", border: "1px solid #5a1d1d", borderRadius: 8, color: "#f8b4b4" }}>
           {error}
         </div>
       )}
@@ -238,7 +238,7 @@ export default function AgentSessionsPanel({ tokens: t, dark }) {
               </div>
               <button
                 onClick={() => setSelectedId(null)}
-                style={{ background: "transparent", border: `1px solid ${t.border}`, color: t.text, padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+                style={{ background: "transparent", border: `1px solid ${t.border}`, color: t.text, padding: "6px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}
               >
                 Close
               </button>
@@ -253,7 +253,7 @@ export default function AgentSessionsPanel({ tokens: t, dark }) {
                   {/* Technical (left) */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: t.textMute }}>
-                      🛠 Technical Summary
+                      Technical Summary
                     </div>
                     <div style={{
                       padding: 16, background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8,
@@ -280,7 +280,7 @@ export default function AgentSessionsPanel({ tokens: t, dark }) {
                   {/* Full transcript (full-width below) */}
                   <details style={{ gridColumn: "1 / -1", marginTop: 10 }}>
                     <summary style={{ cursor: "pointer", color: t.textMute, fontSize: 12, fontWeight: 600, padding: "8px 0" }}>
-                      📜 Full raw transcript ({selectedDetail.message_count || 0} messages)
+                      Full raw transcript ({selectedDetail.message_count || 0} messages)
                     </summary>
                     <pre style={{
                       marginTop: 8, padding: 16, background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8,

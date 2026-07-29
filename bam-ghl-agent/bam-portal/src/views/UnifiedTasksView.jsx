@@ -776,7 +776,7 @@ function TaskDetailPanel({ task, tokens, dark, onUpdateTask, onClose }) {
         <div
           onClick={() => onUpdateTask(task.id, { completed: !task.completed, status: task.completed ? "todo" : "done" })}
           style={{
-            width: 22, height: 22, borderRadius: 6, flexShrink: 0, marginTop: 2,
+            width: 22, height: 22, borderRadius: 8, flexShrink: 0, marginTop: 2,
             border: `2px solid ${task.completed ? tokens.green : tokens.accent}`,
             background: task.completed ? tokens.green : "transparent",
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -788,7 +788,7 @@ function TaskDetailPanel({ task, tokens, dark, onUpdateTask, onClose }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, lineHeight: 1.3, letterSpacing: "-0.01em" }}>{task.title}</div>
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-            {task.project && <span style={{ fontSize: 11, fontWeight: 500, color: tokens.textMute, padding: "2px 8px", borderRadius: 6, background: tokens.surfaceAlt }}>{task.project}</span>}
+            {task.project && <span style={{ fontSize: 11, fontWeight: 500, color: tokens.textMute, padding: "2px 8px", borderRadius: 8, background: tokens.surfaceAlt }}>{task.project}</span>}
             {task.assignee && <Avatar name={task.assignee} size={18} dark={dark} />}
             {task.assignee && <span style={{ fontSize: 12, color: tokens.textSub }}>{task.assignee}</span>}
           </div>
@@ -797,7 +797,7 @@ function TaskDetailPanel({ task, tokens, dark, onUpdateTask, onClose }) {
           {task.permalink && (
             <a href={task.permalink} target="_blank" rel="noopener noreferrer" style={{
               fontSize: 11, fontWeight: 600, color: tokens.textMute, padding: "4px 10px",
-              borderRadius: 6, border: `1px solid ${tokens.border}`, textDecoration: "none",
+              borderRadius: 8, border: `1px solid ${tokens.border}`, textDecoration: "none",
               transition: "all 0.2s",
             }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = tokens.accentBorder; e.currentTarget.style.color = tokens.accent; }}
@@ -1128,7 +1128,7 @@ function MyToDoPanel({ tokens, dark, tasks, onCreateTask, onUpdateTask, isLoadin
                       onUpdateTask(task.id, { completed: true, status: "done" });
                     }}
                     style={{
-                      width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                      width: 20, height: 20, borderRadius: 8, flexShrink: 0,
                       border: `2px solid ${color}`, cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
@@ -1151,7 +1151,7 @@ function MyToDoPanel({ tokens, dark, tasks, onCreateTask, onUpdateTask, isLoadin
                   {task.project && (
                     <span style={{
                       fontSize: 11, fontWeight: 500, color: tokens.textMute,
-                      padding: "2px 8px", borderRadius: 6,
+                      padding: "2px 8px", borderRadius: 8,
                       background: tokens.surfaceAlt, whiteSpace: "nowrap",
                     }}>{task.project}</span>
                   )}
@@ -1213,7 +1213,7 @@ function MyToDoPanel({ tokens, dark, tasks, onCreateTask, onUpdateTask, isLoadin
                   <div
                     onClick={(e) => { e.stopPropagation(); onUpdateTask(task.id, { completed: true, status: "done" }); }}
                     style={{
-                      width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                      width: 20, height: 20, borderRadius: 8, flexShrink: 0,
                       border: `2px solid ${tokens.textMute}`, cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       transition: "all 0.2s ease",
@@ -1232,7 +1232,7 @@ function MyToDoPanel({ tokens, dark, tasks, onCreateTask, onUpdateTask, isLoadin
                   {task.project && (
                     <span style={{
                       fontSize: 11, fontWeight: 500, color: tokens.textMute,
-                      padding: "2px 8px", borderRadius: 6,
+                      padding: "2px 8px", borderRadius: 8,
                       background: tokens.surfaceAlt, whiteSpace: "nowrap",
                     }}>{task.project}</span>
                   )}
