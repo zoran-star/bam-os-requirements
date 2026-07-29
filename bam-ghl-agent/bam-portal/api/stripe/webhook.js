@@ -1,4 +1,3 @@
-/* global Buffer, process */
 import { withSentryApiRoute } from "../_sentry.js";
 import { notifyClientPush } from "../push/_send.js";
 // Vercel Serverless Function — Stripe webhook (Connect events)

@@ -8,6 +8,7 @@
     "build": "vite build",
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
+    "lint:api-no-undef": "node scripts/lint-api-no-undef.mjs",
     "lint:parent-api": "eslint api/parent",
     "preview": "vite preview",
     "test:runtime": "bash -lc 'supabase status -o env | grep -E \"^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=\" > /tmp/bam-runtime.env; source /tmp/bam-runtime.env; VITE_SUPABASE_URL=\"$API_URL\" SUPABASE_URL=\"$API_URL\" RUNTIME_TEST_SUPABASE_URL=\"$API_URL\" RUNTIME_TEST_SUPABASE_ANON_KEY=\"$ANON_KEY\" SUPABASE_SERVICE_ROLE_KEY=\"$SERVICE_ROLE_KEY\" RUNTIME_TEST_SUPABASE_SERVICE_ROLE_KEY=\"$SERVICE_ROLE_KEY\" vitest run api/_runtime api/runtime'"

@@ -204,10 +204,17 @@ function buildPricing(offer, catalogRows) {
   const out = [];
   for (const o of offerings) {
     const title = String(o.title).trim();
-    const options = [{ term: "monthly", key: `${title}|monthly`, included: o.whats_included || "" }];
+    // Build S: the plan's one-time fee is its own catalog row, `<plan>|signup_fee`.
+    // Charge/waive is an explicit owner choice per option (mirrors
+    // signupFeeAppliesTo in api/website/checkout.js), so anything unanswered
+    // waives it and the card shows no fee.
+    const hasFee = parseFloat(o.signup_fee) > 0;
+    const charges = (v) => hasFee && String(v || "").toLowerCase() === "charge";
+    const planFee = pickRoutable(byKey.get(`${title}|signup_fee`));
+    const options = [{ term: "monthly", key: `${title}|monthly`, included: o.whats_included || "", feeCharged: charges(o.signup_fee_on_base) }];
     for (const c of (o.commitments || [])) {
       const term = termFromLength(c.length);
-      if (term) options.push({ term, key: `${title}|${term}`, included: c.whats_included || o.whats_included || "" });
+      if (term) options.push({ term, key: `${title}|${term}`, included: c.whats_included || o.whats_included || "", feeCharged: charges(c.signup_fee_charge) });
     }
     for (const opt of options) {
       const row = pickRoutable(byKey.get(opt.key));
@@ -382,6 +389,7 @@ async function handler(req, res) {
       lead_fields: buildFields(offer, [...coreDefs, ...salesDefs], "sales"),
       pricing: buildPricing(offer, catalogRows),
       purchasable,
+      signup_fees: signupFees,
       trial,
       activation,
       agreement_url: agreementUrl,

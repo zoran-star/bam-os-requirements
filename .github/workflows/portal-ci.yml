@@ -11,11 +11,23 @@ on:
     paths:
       - "bam-ghl-agent/bam-portal/**"
       - ".github/workflows/portal-ci.yml"
+      # The GTA byte-for-byte locks and the approval-render suite read their
+      # fixtures from scripts/snapshots/ at the MONOREPO ROOT, which is outside the
+      # filter above. So a PR editing only a snapshot did not run the very suites
+      # whose entire job is to notice when a snapshot and production disagree - the
+      # one change most able to break them was the one change that skipped them.
+      - "scripts/snapshots/**"
   push:
     branches: [main]
     paths:
       - "bam-ghl-agent/bam-portal/**"
       - ".github/workflows/portal-ci.yml"
+      # The GTA byte-for-byte locks and the approval-render suite read their
+      # fixtures from scripts/snapshots/ at the MONOREPO ROOT, which is outside the
+      # filter above. So a PR editing only a snapshot did not run the very suites
+      # whose entire job is to notice when a snapshot and production disagree - the
+      # one change most able to break them was the one change that skipped them.
+      - "scripts/snapshots/**"
 
 # Cancel an in-progress run if the same PR/branch gets a new push.
 concurrency:
@@ -60,6 +72,49 @@ jobs:
             exit 1
           fi
           echo "All API functions parse OK."
+
+      # ONE eslint rule - no-undef - and deliberately only that one.
+      #
+      # WHY THIS STEP EXISTS. `api/automations.js` shipped `const client`
+      # declared inside a try and read from the catch. const is block-scoped, so
+      # every retryable send failure threw ReferenceError from INSIDE the error
+      # handler; that crashed the cron run, and because the crash skipped the
+      # attempts counter, the 15-minute stale-claim reaper re-queued the same job
+      # forever - a send that could never fail out and could never stop. The step
+      # ABOVE cannot see this: `node --check` parses that file happily, because
+      # scope errors are not syntax errors. eslint flagged the exact line.
+      #
+      # It shipped anyway. api/*.js was being linted with BROWSER globals, so
+      # `process` and `Buffer` produced 1223 no-undef errors that were not bugs,
+      # and a linter that cries wolf 1223 times is one nobody runs. The cure was
+      # the api/ block in eslint.config.js (declare the right environment), NOT a
+      # mass edit of live payment and messaging code. Exactly 4 real errors were
+      # hiding underneath, every one of them a live crash.
+      #
+      # WHY NOT MORE RULES. api/ still carries 943 no-unused-vars / no-empty /
+      # no-useless-escape errors. Gating on those means CI is red the day it
+      # lands, and a gate that
+      # blocks merges for style gets switched off by whoever needs to ship - and
+      # then there is nothing again. no-undef is different in kind: it cannot
+      # fire on working code. Every hit is a name that does not exist at runtime.
+      # DO NOT widen this step. If you want the rest, add a separate advisory one.
+      #
+      # The script self-tests before it trusts a clean run: it lints a name that
+      # is definitely undefined and requires no-undef back, so a config drift that
+      # silently stops checking api/ fails loudly instead of passing green. The
+      # MUTATE=probe control below proves that self-test is not decorative, under
+      # the same rule as every other control here - it counts as caught ONLY if
+      # the run SAYS "NEGATIVE CONTROL PASSED".
+      - name: Lint gate - no-undef on api/
+        run: |
+          npm run lint:api-no-undef
+          out=$(MUTATE=probe npm run --silent lint:api-no-undef 2>&1) || true
+          if printf '%s' "$out" | grep -q 'NEGATIVE CONTROL PASSED'; then
+            echo "  caught   lint-api-no-undef MUTATE=probe"
+          else
+            echo "::error file=bam-ghl-agent/bam-portal/scripts/lint-api-no-undef.mjs::MUTATE=probe did not report NEGATIVE CONTROL PASSED - the gate's self-test no longer proves the rule fires"
+            exit 1
+          fi
 
       # Every committed plain-node suite, discovered by GLOB rather than a list.
       #
