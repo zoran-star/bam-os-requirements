@@ -1,5 +1,16 @@
 # Email 2-way mailbox sync (V2) — hybrid: Resend for bulk + connected mailbox for humans
 
+## ⏸️ LIVE STATUS (2026-07-20) — built + merged, OAuth fix PENDING A DEPLOY
+- Branch `claude/email-portal-gmail-routing-flsjx7` **merged to main** (PR #1512). Follow-up PR #1514 wired the `inbox` step into the new paged wizard (`_OBF_SECTIONS.wired.keys` - it was orphaned in `_OBF_STEPS` only) and shipped.
+- **Phase 0 migration APPLIED to prod** (`20260720170000_email_mailbox_sync_foundation`): `client_mailboxes` + `email_messages` mailbox cols + provider check + RLS. Verified.
+- **Env prereqs OK**: MESSAGING_ENC_KEY / RESEND_API_KEY / CRON_SECRET / SUPABASE_SERVICE_KEY present; EMAIL_OAUTH_BASE_URL absent (defaults to portal.byanymeansbusiness.com - fine).
+- **The Gmail connect blocker (fixed, pending deploy):** OAuth failed first `invalid_client` (both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` had a **trailing newline** - the classic `echo` vs `printf` gotcha), then `redirect_uri_mismatch` because the env pointed at the **WRONG OAuth client**. There are TWO clients in the "My First Project" Google project:
+  - `602088218985-nrkp…` = OLD/stale, what the env used to point at.
+  - `739260006097-nmhvjthmvfvsq4encg4lv9sospsjq5b2.apps.googleusercontent.com` = the REAL one (has redirect URIs `staff.byanymeansbusiness.com/api/auth/google/callback` + `portal.byanymeansbusiness.com/api/email/callback`, Gmail scopes, test users info@byanymeanstoronto.ca + info@byanymeansbball.com).
+  - **Fixed:** `GOOGLE_CLIENT_ID` repointed to `739260006097…` (clean, no newline); `GOOGLE_CLIENT_SECRET` reset by Zoran in the Vercel dashboard to that client's secret. This ALSO fixes staff Google Calendar OAuth (same var).
+- **⏳ TO ACTIVATE:** env changes need a deploy. Zoran chose to wait for the next real bam-portal code deploy rather than burn a redeploy-only build. **On the next merge to main touching bam-portal, the OAuth fix goes live** - then RETEST: GTA (`info@byanymeanstoronto.ca`) + DETAIL (`info@byanymeansbball.com`, explicit `?email=` since its `email_domain` is null) connect → verify `client_mailboxes` row + first sync in `email_messages` → reply-from-portal shows in Gmail Sent. MX nuance: GTA MX still points at Resend, so fresh inbound won't route to Gmail until an MX flip; first sync still pulls the last 2 days from the Gmail account directly, and portal→Sent works regardless.
+
+
 **Scoped 2026-07-20 (Zoran).** GTA is off-GHL; its email runs on the portal's
 Resend spine, so mail lives ONLY in the portal - Gmail never sees it. Zoran wants
 the human 1-to-1 emails visible in the real inbox (Gmail/Outlook) too, without
