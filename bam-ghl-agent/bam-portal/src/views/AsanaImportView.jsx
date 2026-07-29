@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { fetchAsanaImport, importAsanaTicket, saveAcademyMapping } from "../services/asanaImportService";
 
 // Normalize strings for loose matching (lowercase, strip punctuation/whitespace)
+import { showToast } from "../components/dialogs.jsx";
 function norm(s) {
   return (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -139,7 +140,7 @@ export default function AsanaImportView({ tokens: t, dark }) {
       flash("Marked academy as skip");
       return;
     }
-    if (!clientId) { alert("Pick a client (or mark 'not a client')"); return; }
+    if (!clientId) { showToast("Pick a client (or mark 'not a client')"); return; }
 
     setBusy(true);
 
@@ -164,7 +165,7 @@ export default function AsanaImportView({ tokens: t, dark }) {
     });
 
     setBusy(false);
-    if (error) { alert(`Import failed: ${error}`); return; }
+    if (error) { showToast(`Import failed: ${error}`); return; }
 
     const s = new Set(imported); s.add(idx); setImported(s);
     setAlreadyImported(alreadyImported + 1);
@@ -270,7 +271,7 @@ function TicketCard({
         <Field label="Created"              value={ticket.created_at?.slice(0,10) || "—"} tokens={t} />
         <Field label="Due"                  value={ticket.due_on || "—"} tokens={t} />
         {ticket.parsed.red_alert && (
-          <div style={{ fontSize: 11, color: t.red, fontWeight: 700, letterSpacing: 0.4 }}>🔴 RED ALERT</div>
+          <div style={{ fontSize: 11, color: t.red, fontWeight: 700, letterSpacing: 0.4 }}>RED ALERT</div>
         )}
 
         <div>
@@ -322,7 +323,7 @@ function TicketCard({
             <select value={priority} onChange={e => setPriority(e.target.value)} style={selectStyle(t)}>
               <option value="low">Low</option>
               <option value="standard">Standard</option>
-              <option value="urgent">🔴 Urgent</option>
+              <option value="urgent">Urgent</option>
             </select>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { authFetch } from "../lib/authFetch";
 import { fetchSOPTree, fetchSOPContent, fetchSolutionWarehouses } from "../services/notionService";
 import { useIsMobile } from '../hooks/useMediaQuery';
 
+import { showToast } from "../components/dialogs.jsx";
 /* ─── SOP parsing/rendering helpers ─── */
 
 function parseContent(content, tokens) {
@@ -362,7 +363,7 @@ export default function KnowledgeBaseView({ tokens }) {
     try {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
-        alert("Speech recognition is not supported in this browser.");
+        showToast("Speech recognition is not supported in this browser.");
         return;
       }
       const recognition = new SpeechRecognition();
@@ -652,7 +653,7 @@ export default function KnowledgeBaseView({ tokens }) {
             <div style={{ marginBottom: 16 }}>
               <div style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "4px 10px", borderRadius: 6,
+                padding: "4px 10px", borderRadius: 8,
                 background: `${tokens.amber}15`,
                 border: `1px solid ${tokens.amber}30`,
                 fontSize: 11, fontWeight: 600, color: tokens.amber,
@@ -731,7 +732,7 @@ export default function KnowledgeBaseView({ tokens }) {
                                       onClick={() => handleSourceClick(src)}
                                       style={{
                                         fontSize: 11, color: tokens.accent, cursor: "pointer",
-                                        padding: "3px 8px", borderRadius: 6,
+                                        padding: "3px 8px", borderRadius: 8,
                                         background: tokens.accentGhost,
                                         transition: "opacity 0.12s",
                                       }}
@@ -1049,7 +1050,7 @@ export default function KnowledgeBaseView({ tokens }) {
                                 letterSpacing: "0.04em", padding: "8px 4px",
                                 textTransform: "uppercase", cursor: "pointer",
                                 display: "flex", alignItems: "center", gap: 6,
-                                userSelect: "none", borderRadius: 6,
+                                userSelect: "none", borderRadius: 8,
                                 transition: "background 0.12s",
                               }}
                               onMouseEnter={e => { e.currentTarget.style.background = tokens.surfaceHov; }}
@@ -1177,7 +1178,7 @@ export default function KnowledgeBaseView({ tokens }) {
                 <div style={{ width: 1, height: 48, background: tokens.border }} />
                 {[1, 2, 3, 4].map(i => (
                   <div key={i}>
-                    <div style={{ width: 36, height: 32, borderRadius: 6, background: tokens.surfaceEl, animation: `pulse 1.2s ease ${i * 100}ms infinite` }} />
+                    <div style={{ width: 36, height: 32, borderRadius: 8, background: tokens.surfaceEl, animation: `pulse 1.2s ease ${i * 100}ms infinite` }} />
                     <div style={{ width: 70, height: 14, borderRadius: 4, background: tokens.surfaceEl, marginTop: 8 }} />
                   </div>
                 ))}

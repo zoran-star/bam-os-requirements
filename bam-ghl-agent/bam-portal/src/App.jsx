@@ -39,6 +39,7 @@ const StripeContactLinkView = lazy(() => import('./views/StripeContactLinkView')
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
+import { ToastHost, ConfirmHost } from './components/dialogs.jsx';
 import SetPasswordView from './views/SetPasswordView';
 import { supabase } from './lib/supabase';
 import { listConversations } from './services/messagesService';
@@ -959,6 +960,12 @@ export default function BAMPortal() {
       {/* Universal feedback widget — always visible to staff. Submissions go to portal_feedback. Only Zoran sees the inbox. */}
       <UniversalFeedbackWidget tokens={tk} session={session} />
 
+      {/* Global toast + confirm hosts (dialogs.jsx) - every view gets styled
+          showToast()/uiConfirm() without mounting its own pair. View-local
+          hosts still work (host stack: most recent mount wins). */}
+      <ToastHost tokens={tk} />
+      <ConfirmHost tokens={tk} />
+
       {/* Toast */}
       {toast && (
         <div style={{
@@ -1033,10 +1040,10 @@ function NewTicketModal({ tokens, clients, onClose }) {
         <label style={labelStyle}>Priority</label>
         <select style={inputStyle} value={priority} onChange={e => setPriority(e.target.value)}>
           <option value="standard">Standard</option>
-          <option value="urgent">🚨 Red alert (blocking)</option>
+          <option value="urgent">Red alert (blocking)</option>
         </select>
 
-        {error && <div style={{ color: "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
+        {error && <div style={{ color: "#ED7969", fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
           <button onClick={onClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>

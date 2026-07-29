@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "../supabase";
 
+import { showToast, uiConfirm } from "../components/dialogs.jsx";
 const STORAGE_BUCKET = "resources";              // private - gated file attachments
 const BLOCK_IMAGE_BUCKET = "resource-block-images"; // public - decorative inline images
 // Login-gated client portal base for shareable resource deep links.
@@ -93,7 +94,7 @@ export default function ResourcesView({ tokens, dark, me }) {
 
   // ─── Delete ───
   const handleDelete = async (resource) => {
-    if (!window.confirm(`Delete "${resource.title}"? This removes all files. Cannot be undone.`)) return;
+    if (!(await uiConfirm({ title: `Delete "${resource.title}"?`, body: "This removes all files. Cannot be undone.", danger: true, confirmLabel: "Delete" }))) return;
     try {
       // Best-effort storage cleanup first (RLS allows admin)
       const paths = (resource.resource_files || []).map(f => f.storage_path).filter(Boolean);
@@ -104,7 +105,7 @@ export default function ResourcesView({ tokens, dark, me }) {
       if (error) throw error;
       await load();
     } catch (e) {
-      alert("Delete failed: " + (e.message || String(e)));
+      showToast("Delete failed: " + (e.message || String(e)));
     }
   };
 
@@ -116,7 +117,7 @@ export default function ResourcesView({ tokens, dark, me }) {
 
   const handleCopyLink = useCallback(async (r) => {
     const url = shareUrlFor(r);
-    if (!url) { alert("Could not build a link for this resource."); return; }
+    if (!url) { showToast("Could not build a link for this resource."); return; }
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -155,7 +156,7 @@ export default function ResourcesView({ tokens, dark, me }) {
   };
 
   const handleConvertAll = async () => {
-    if (!window.confirm("Convert all legacy PDF resources into interactive pages? This uses AI and may take a minute.")) return;
+    if (!(await uiConfirm({ title: "Convert all legacy PDF resources into interactive pages?", body: "This uses AI and may take a minute.", confirmLabel: "Convert all" }))) return;
     setConverting("all"); setError(null);
     let total = 0;
     try {
@@ -541,7 +542,7 @@ function ResourceFormModal({ tokens: tk, resource, categories, me, onClose, onSa
           )}
           <label style={{
             display: "inline-block", padding: "8px 14px",
-            background: tk.surface, border: `1px solid ${tk.borderMed}`, borderRadius: 6,
+            background: tk.surface, border: `1px solid ${tk.borderMed}`, borderRadius: 8,
             cursor: saving ? "not-allowed" : "pointer", fontSize: 13, color: tk.text, fontWeight: 500,
           }}>
             + Add file(s)
@@ -626,7 +627,7 @@ function CategoryManagerModal({ tokens: tk, categories, onClose, onChanged }) {
   };
 
   const deleteCategory = async (cat) => {
-    if (!window.confirm(`Delete category "${cat.name}"? Only works if no resources use it.`)) return;
+    if (!(await uiConfirm({ title: `Delete category "${cat.name}"?`, body: "Only works if no resources use it.", danger: true, confirmLabel: "Delete" }))) return;
     setBusy(true); setErr(null);
     try {
       const { error } = await supabase.from("resource_categories").delete().eq("id", cat.id);
@@ -800,7 +801,7 @@ function btnSecondary(tk) {
 
 function btnIcon(tk) {
   return {
-    padding: "6px 10px", borderRadius: 6,
+    padding: "6px 10px", borderRadius: 8,
     background: "transparent", border: `1px solid ${tk.border}`,
     color: tk.textSub, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
   };
@@ -896,9 +897,9 @@ function BlockCard({ tk, block: b, idx, total, disabled, onUpdate, onRemove, onM
       {b.type === "callout" && (
         <>
           <select style={{ ...ti, marginBottom: 8 }} value={b.variant || "tip"} onChange={(e) => onUpdate({ variant: e.target.value })} disabled={disabled}>
-            <option value="tip">Tip 💡</option>
-            <option value="warn">Warning ⚠️</option>
-            <option value="info">Info ℹ️</option>
+            <option value="tip">Tip</option>
+            <option value="warn">Warning</option>
+            <option value="info">Info</option>
           </select>
           <textarea style={ta} placeholder="Callout text" value={b.text || ""} onChange={(e) => onUpdate({ text: e.target.value })} disabled={disabled} />
         </>
@@ -952,14 +953,14 @@ function BlockImageUpload({ tk, disabled, onUploaded }) {
       const { data } = supabase.storage.from(BLOCK_IMAGE_BUCKET).getPublicUrl(path);
       onUploaded(data.publicUrl);
     } catch (err) {
-      alert("Image upload failed: " + (err.message || err));
+      showToast("Image upload failed: " + (err.message || err));
     } finally {
       setBusy(false);
       e.target.value = "";
     }
   };
   return (
-    <label style={{ display: "inline-block", padding: "7px 12px", background: tk.surface, border: `1px solid ${tk.borderMed}`, borderRadius: 6, cursor: disabled ? "not-allowed" : "pointer", fontSize: 12, color: tk.text }}>
+    <label style={{ display: "inline-block", padding: "7px 12px", background: tk.surface, border: `1px solid ${tk.borderMed}`, borderRadius: 8, cursor: disabled ? "not-allowed" : "pointer", fontSize: 12, color: tk.text }}>
       {busy ? "Uploading…" : "Or upload an image"}
       <input type="file" accept="image/*" onChange={pick} style={{ display: "none" }} disabled={disabled || busy} />
     </label>
@@ -968,7 +969,7 @@ function BlockImageUpload({ tk, disabled, onUploaded }) {
 
 function btnIconDanger(tk) {
   return {
-    padding: "6px 10px", borderRadius: 6,
+    padding: "6px 10px", borderRadius: 8,
     background: "transparent", border: `1px solid ${tk.border}`,
     color: tk.red, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
   };

@@ -92,7 +92,7 @@ export default function PhoneTab({ client, tokens: t, session }) {
     row: { display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, padding: "7px 0", borderBottom: `1px solid ${t.border}` },
     btn: (primary) => ({
       background: primary ? t.accent : "transparent", color: primary ? "#0B0B0D" : t.text,
-      border: `1px solid ${primary ? t.accent : t.border}`, borderRadius: 6, padding: "9px 16px",
+      border: `1px solid ${primary ? t.accent : t.border}`, borderRadius: 8, padding: "9px 16px",
       fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
     }),
   };

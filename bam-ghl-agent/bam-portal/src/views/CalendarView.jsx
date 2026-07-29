@@ -3,6 +3,7 @@ import { fetchEvents, getCalendarConnectUrl, disconnectCalendar } from "../servi
 import MeetingPrepModal from './MeetingPrepModal';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
+import { showToast } from "../components/dialogs.jsx";
 const HOURS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const HOUR_HEIGHT = 60;
@@ -134,12 +135,12 @@ function EventDetailModal({ event, tokens, onClose, onPrepCall, mappedClient, on
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <span style={{
                   fontSize: 11, fontWeight: 600, color, letterSpacing: "0.02em",
-                  padding: "3px 9px", borderRadius: 6, background: typeBg(event.type, tokens),
+                  padding: "3px 9px", borderRadius: 8, background: typeBg(event.type, tokens),
                   textTransform: "capitalize",
                 }}>{event.type || "event"}</span>
                 {event.status && event.status !== "confirmed" && (
                   <span style={{
-                    fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 6,
+                    fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 8,
                     background: `${tokens.amber}15`, color: tokens.amber,
                     textTransform: "capitalize",
                   }}>{event.status}</span>
@@ -513,7 +514,7 @@ export default function CalendarView({ tokens, dark }) {
       window.location.href = url;
     } else {
       setConnecting(false);
-      alert("Your session expired. Sign in again, then reconnect.");
+      showToast("Your session expired. Sign in again, then reconnect.");
     }
   }
 
@@ -571,7 +572,7 @@ export default function CalendarView({ tokens, dark }) {
             onClick={handleDisconnectCalendar}
             style={{
               marginLeft: "auto", background: "transparent", border: `1px solid ${tokens.border}`,
-              color: tokens.textSub, borderRadius: 6, padding: "5px 11px",
+              color: tokens.textSub, borderRadius: 8, padding: "5px 11px",
               fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
             }}
           >Disconnect</button>
@@ -637,7 +638,7 @@ export default function CalendarView({ tokens, dark }) {
                         {((hi + di) % 3 === 0) && (
                           <div style={{
                             position: "absolute", top: 4, left: 2, right: 2, height: 36,
-                            borderRadius: 6, background: tokens.borderMed,
+                            borderRadius: 8, background: tokens.borderMed,
                             animation: "calPulse 1.5s ease-in-out infinite",
                             animationDelay: `${(hi * 5 + di) * 80}ms`,
                           }} />
@@ -733,7 +734,7 @@ export default function CalendarView({ tokens, dark }) {
                               left: `calc(${leftPct}% + 1px)`,
                               width: `calc(${widthPct}% - 2px)`,
                               height,
-                              background: bg, borderRadius: 6, padding: "4px 6px",
+                              background: bg, borderRadius: 8, padding: "4px 6px",
                               borderLeft: `3px solid ${color}`, overflow: "hidden",
                               cursor: "pointer", zIndex: 1,
                               transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",

@@ -180,7 +180,7 @@ export default function InboxView({ tokens: tk, session, me, onOpenClient }) {
                 <button key={v} onClick={() => setOnlyUnread(v === "unread")}
                   style={{
                     flex: 1, padding: "5px 0", background: on ? t.surface : "transparent",
-                    color: on ? t.text : t.textMute, border: "none", borderRadius: 6,
+                    color: on ? t.text : t.textMute, border: "none", borderRadius: 8,
                     fontSize: 12, fontWeight: 600, cursor: "pointer",
                   }}>{label}</button>
               );

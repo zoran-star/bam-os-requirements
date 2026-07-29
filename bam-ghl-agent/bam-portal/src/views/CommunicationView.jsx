@@ -6,7 +6,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 function SkeletonBlock({ width, height, tokens, style }) {
   return (
     <div style={{
-      width: width || "100%", height: height || 16, borderRadius: 6,
+      width: width || "100%", height: height || 16, borderRadius: 8,
       background: tokens.borderMed,
       animation: "cardIn 1.5s ease-in-out infinite alternate",
       ...style,
@@ -113,7 +113,7 @@ function formatMessageText(text) {
     let match = remaining.match(/^```([\s\S]*?)```/);
     if (match) {
       parts.push(<pre key={key++} style={{
-        background: "rgba(128,128,128,0.1)", borderRadius: 6,
+        background: "rgba(128,128,128,0.1)", borderRadius: 8,
         padding: "8px 12px", margin: "4px 0", fontSize: 13,
         fontFamily: "'SF Mono', 'Fira Code', monospace",
         overflowX: "auto", whiteSpace: "pre-wrap", lineHeight: 1.5,
@@ -561,7 +561,7 @@ export default function CommunicationView({ tokens, dark }) {
                   <span style={{
                     fontSize: 10, fontWeight: 700,
                     background: sidebarTab === tab.key ? "rgba(255,255,255,0.25)" : tokens.border,
-                    padding: "1px 5px", borderRadius: 6, minWidth: 18, textAlign: "center",
+                    padding: "1px 5px", borderRadius: 8, minWidth: 18, textAlign: "center",
                   }}>
                     {tab.count}
                   </span>
@@ -618,7 +618,7 @@ export default function CommunicationView({ tokens, dark }) {
                 onClick={() => setSortMode(s.key)}
                 style={{
                   flex: 1, padding: "5px 0", border: "none", cursor: "pointer",
-                  borderRadius: 6, fontSize: 11, fontWeight: 600, fontFamily: "inherit",
+                  borderRadius: 8, fontSize: 11, fontWeight: 600, fontFamily: "inherit",
                   transition: `all 0.2s ${spring}`,
                   background: sortMode === s.key ? tokens.surfaceEl : "transparent",
                   color: sortMode === s.key ? tokens.text : tokens.textMute,
@@ -874,7 +874,7 @@ export default function CommunicationView({ tokens, dark }) {
                           <span style={{
                             fontSize: 11, fontWeight: 600, color: tokens.textMute,
                             letterSpacing: "0.04em", textTransform: "uppercase",
-                            padding: "3px 10px", borderRadius: 6,
+                            padding: "3px 10px", borderRadius: 8,
                             background: tokens.surfaceEl,
                             border: `1px solid ${tokens.border}`,
                           }}>
@@ -968,7 +968,7 @@ export default function CommunicationView({ tokens, dark }) {
                               {msg.attachments > 0 && (!msg.files || msg.files.length === 0) && (
                                 <div style={{
                                   display: "inline-flex", alignItems: "center", gap: 5,
-                                  marginTop: 6, padding: "3px 8px", borderRadius: 6,
+                                  marginTop: 6, padding: "3px 8px", borderRadius: 8,
                                   background: tokens.surfaceEl,
                                   border: `1px solid ${tokens.border}`,
                                   fontSize: 12, color: tokens.textMute,
@@ -981,7 +981,7 @@ export default function CommunicationView({ tokens, dark }) {
                               {msg.replyCount > 0 && (
                                 <div style={{
                                   display: "inline-flex", alignItems: "center", gap: 5,
-                                  marginTop: 6, padding: "3px 8px", borderRadius: 6,
+                                  marginTop: 6, padding: "3px 8px", borderRadius: 8,
                                   background: tokens.accentGhost,
                                   border: `1px solid ${tokens.accentBorder}`,
                                   cursor: "pointer",

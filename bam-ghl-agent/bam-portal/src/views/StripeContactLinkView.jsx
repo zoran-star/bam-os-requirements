@@ -98,7 +98,7 @@ export default function StripeContactLinkView({ tokens, session }) {
   const card = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: 20 };
   const input = {
     width: "100%", padding: "10px 12px", background: t.bg, border: `1px solid ${t.border}`,
-    borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box",
+    borderRadius: 8, color: t.text, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box",
   };
   const btn = (primary) => ({
     padding: "9px 16px", border: primary ? 0 : `1px solid ${t.borderMed}`,

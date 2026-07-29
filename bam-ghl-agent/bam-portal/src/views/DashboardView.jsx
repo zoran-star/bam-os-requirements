@@ -388,7 +388,7 @@ export default function DashboardView({ tokens, dark, onboardingClients, activeC
                 Tasks Due
                 <span style={{ fontSize: 14, fontWeight: 400, color: tokens.red, marginLeft: 10 }}>{dueTodayTasks.length}</span>
                 {inProgressTasks.length > 0 && (
-                  <span style={{ fontSize: 11, fontWeight: 500, color: tokens.blue, marginLeft: 10, padding: "2px 8px", borderRadius: 6, background: `${tokens.blue}15` }}>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: tokens.blue, marginLeft: 10, padding: "2px 8px", borderRadius: 8, background: `${tokens.blue}15` }}>
                     {inProgressTasks.length} in progress
                   </span>
                 )}

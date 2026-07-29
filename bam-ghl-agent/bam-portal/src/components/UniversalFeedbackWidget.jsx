@@ -173,8 +173,8 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
                 background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8,
               }}>
                 {[
-                  { key: "bug", label: "🐛 Bug" },
-                  { key: "feature", label: "✨ Feature" },
+                  { key: "bug", label: "Bug" },
+                  { key: "feature", label: "Feature" },
                 ].map(o => (
                   <button
                     key={o.key}
@@ -222,7 +222,7 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
                   style={{
                     padding: "7px 12px", background: "transparent",
                     color: t.text, border: `1px solid ${t.border}`,
-                    borderRadius: 6, fontSize: 12, fontWeight: 600,
+                    borderRadius: 8, fontSize: 12, fontWeight: 600,
                     cursor: "pointer", fontFamily: "inherit",
                   }}
                 >Choose file</button>
@@ -245,7 +245,7 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
                   onClick={handleClose}
                   style={{
                     padding: "9px 16px", background: "transparent",
-                    border: `1px solid ${t.border}`, borderRadius: 6,
+                    border: `1px solid ${t.border}`, borderRadius: 8,
                     color: t.textSub, fontSize: 13, fontWeight: 600,
                     cursor: "pointer", fontFamily: "inherit",
                   }}
@@ -257,7 +257,7 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
                   style={{
                     padding: "9px 18px",
                     background: sending || !text.trim() ? `${t.accent}55` : t.accent,
-                    color: "#0A0A0B", border: 0, borderRadius: 6,
+                    color: "#0A0A0B", border: 0, borderRadius: 8,
                     fontSize: 13, fontWeight: 700,
                     cursor: sending || !text.trim() ? "not-allowed" : "pointer",
                     fontFamily: "inherit",
