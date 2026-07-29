@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Business contact vs owner contact: the gate</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF9F6;--card:#FFFFFF;--card2:#F3F1EB;--line:#E4E0D6;
+    --tx:#1A1917;--tx2:#54514A;--tx3:#8A857B;
+    --gold:#9A7A22;--goldbg:#FBF3DC;--goldln:#E5D097;
+    --green:#2A7A4E;--greenbg:#E8F4EC;--greenln:#B7DCC4;
+    --red:#B23A22;--redbg:#FBECE8;--redln:#EFC9BE;
+    --blue:#255F92;--bluebg:#E9F1F8;--blueln:#C2D9EB;
+    --grey:#8A857B;--greybg:#F1EFE9;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:44px 20px 100px}
+  h1{font-size:clamp(27px,4.4vw,40px);line-height:1.1;letter-spacing:-.025em;margin:0 0 9px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:16.5px;margin:0 0 24px;max-width:72ch}
+  h2{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--gold);margin:52px 0 6px;font-weight:800}
+  .h2sub{color:var(--tx3);font-size:14px;margin:0 0 16px;max-width:78ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:0 1px 2px rgba(26,25,23,.04)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .hero{background:var(--goldbg);border:1px solid var(--goldln);border-radius:14px;padding:20px 24px}
+  .hero .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:6px}
+  .hero p{margin:0;font-size:18px;color:var(--tx);font-weight:700;line-height:1.4}
+  .hero small{display:block;margin-top:9px;font-size:14px;font-weight:500;color:var(--tx2)}
+  .note{border-radius:12px;padding:16px 18px}
+  .note b{display:block;margin-bottom:4px;font-size:15px}
+  .note p{margin:0;font-size:14px;color:var(--tx2)}
+  .note p+p{margin-top:7px}
+  .note+.note{margin-top:11px}
+  .n-warn{background:var(--redbg);border:1px solid var(--redln)}.n-warn b{color:var(--red)}
+  .n-gold{background:var(--goldbg);border:1px solid var(--goldln)}.n-gold b{color:var(--gold)}
+  .n-blue{background:var(--bluebg);border:1px solid var(--blueln)}.n-blue b{color:var(--blue)}
+  .n-ok{background:var(--greenbg);border:1px solid var(--greenln)}.n-ok b{color:var(--green)}
+  .grid{display:grid;gap:13px}
+  @media(min-width:820px){.g2{grid-template-columns:1fr 1fr}}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:800;padding:0 12px 8px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:11px 12px 11px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--tx2)}
+  tr:last-child td{border-bottom:none}
+  td b{color:var(--tx)}
+  .m{font-family:var(--mono);font-size:12.5px;background:var(--greybg);padding:1px 6px;border-radius:5px;color:var(--tx)}
+  .pill{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .p-ok{background:var(--greenbg);color:var(--green);border:1px solid var(--greenln)}
+  .p-no{background:var(--redbg);color:var(--red);border:1px solid var(--redln)}
+  .p-ask{background:var(--goldbg);color:var(--gold);border:1px solid var(--goldln)}
+  .dq{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--card)}
+  .dq+.dq{margin-top:12px}
+  .dq .num{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800}
+  .dq h3{margin:4px 0 8px;font-size:17px;font-weight:800;letter-spacing:-.01em}
+  .dq .why{font-size:14px;color:var(--tx2);margin:0 0 11px}
+  .rec{background:var(--greenbg);border:1px solid var(--greenln);border-radius:9px;padding:10px 13px;font-size:14px}
+  .rec b{color:var(--green);font-weight:800}
+  .foot{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);color:var(--tx3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Business contact, <span>separate from owner contact</span></h1>
+  <p class="sub">Four things to decide. Everything below is verified against the live database and the real code today, and the two phone numbers are marked as candidates rather than facts because that is what they are.</p>
+
+  <div class="hero">
+    <div class="l">The problem, in one line</div>
+    <p>Every BAM GTA email published to a parent carries <span class="m">zoran@byanymeansbball.com</span> as its contact and its unsubscribe address.</p>
+    <small>There is no field for an academy's business email, so the system uses the owner's personal one. Today GTA is saved only by a hardcoded exception in the code; delete that exception and your inbox becomes the public contact for every GTA email.</small>
+  </div>
+
+  <h2>What changes</h2>
+  <p class="h2sub">Two new fields on the academy, beside the owner's, not replacing them. The owner's email and phone keep meaning exactly what they mean now.</p>
+  <div class="card scroll">
+    <table>
+      <tr><th>Field</th><th>What it is</th><th>Who sees it</th><th>Used for</th></tr>
+      <tr>
+        <td><b>Owner email</b><br><span class="m">clients.email</span></td>
+        <td>The person who runs the academy</td>
+        <td><span class="pill p-no">Never public</span></td>
+        <td>Login, staff contact, owner alerts</td>
+      </tr>
+      <tr>
+        <td><b>Business email</b><br><span class="m">business_email</span> <span class="pill p-ask">new</span></td>
+        <td>The academy's public address</td>
+        <td><span class="pill p-ok">Public</span></td>
+        <td>Email footer, unsubscribe link, website contact</td>
+      </tr>
+      <tr>
+        <td><b>Owner phone</b><br><span class="m">client_users.phone</span></td>
+        <td>The owner's mobile</td>
+        <td><span class="pill p-no">Never public</span></td>
+        <td>Owner alerts and guardrail texts</td>
+      </tr>
+      <tr>
+        <td><b>Business phone</b><br><span class="m">business_phone</span> <span class="pill p-ask">new</span></td>
+        <td>The number parents call</td>
+        <td><span class="pill p-ok">Public</span></td>
+        <td>Website, emails, listings</td>
+      </tr>
+    </table>
+  </div>
+
+  <h2>Riding along: the Google rating</h2>
+  <p class="h2sub">Another room owns these three fields. They are listed here because the card gets edited once, by one person, rather than twice. I am placing them, not designing them.</p>
+  <div class="card scroll">
+    <table>
+      <tr><th>Field</th><th>What it holds</th></tr>
+      <tr><td><b>Google rating</b></td><td>1.0 to 5.0</td></tr>
+      <tr><td><b>Review count</b></td><td>How many reviews that rating is built on</td></tr>
+      <tr><td><b>Checked on</b></td><td>The date somebody actually looked. Stamped automatically, never typed.</td></tr>
+    </table>
+  </div>
+  <div class="note n-gold" style="margin-top:12px">
+    <b>It is shown as a dated reading, never as "your rating"</b>
+    <p>On screen it reads <b>"Google showed 4.9 from 67 reviews on 29 Jul"</b>, not "Google rating: 4.9".</p>
+    <p>The reason is subtle and worth a sentence. These numbers get pulled from your signed-in Google view rather than typed, which sounds more trustworthy. It is actually the opposite risk: <b>a number we genuinely fetched looks current, when it may be weeks stale</b> - the next review lands and nothing tells us. A typed number invites doubt; a fetched one does not. So the date is not decoration, it is the part that keeps it honest.</p>
+    <p>The rating and the count are one thing to fill in, not two. Setting one without the other is rejected by the database on purpose.</p>
+  </div>
+
+  <h2>Decide these four</h2>
+  <p class="h2sub">Each has a recommendation. Say yes to all four and this is ready to build.</p>
+
+  <div class="dq">
+    <div class="num">Decision 1</div>
+    <h3>Confirm the two business phone numbers</h3>
+    <p class="why">Only San Jose's <b>owner</b> number is confirmed by you. Both <b>business</b> numbers came off Google listings, which is a source, not a confirmation. A business phone is not a display field: it becomes the number parents ring. A wrong one looks perfectly correct on every screen while calls go to somebody who has never heard of the academy.</p>
+    <div class="card scroll" style="margin-bottom:11px">
+      <table>
+        <tr><th>Academy</th><th>Value</th><th>Source</th><th>Status</th></tr>
+        <tr><td><b>San Jose</b> owner</td><td><span class="m">+1 (408) 425-7251</span></td><td>You confirmed it</td><td><span class="pill p-ok">Fact</span></td></tr>
+        <tr><td><b>San Jose</b> business</td><td><span class="m">408-597-4327</span></td><td>Google listing</td><td><span class="pill p-ask">Candidate</span></td></tr>
+        <tr><td><b>BAM GTA</b> business</td><td><span class="m">(289) 816-6569</span></td><td>Google listing</td><td><span class="pill p-ask">Candidate</span></td></tr>
+        <tr><td><b>BAM GTA</b> business email</td><td><span class="m">info@byanymeanstoronto.ca</span></td><td>Already in the code</td><td><span class="pill p-ok">Fact</span></td></tr>
+        <tr><td><b>San Jose</b> business email</td><td><span class="m">elijah@byanymeanssanjose.com</span></td><td>Already on the row</td><td><span class="pill p-ask">Is this the public one?</span></td></tr>
+      </table>
+    </div>
+    <div class="rec"><b>Recommendation:</b> confirm the two candidates before anything is written. Also worth a look: San Jose's business email is currently the same as Elijah's own address. That may be right for a one-person academy, but it should be a choice rather than an accident.</div>
+  </div>
+
+  <div class="dq">
+    <div class="num">Decision 2</div>
+    <h3>When an academy has no business email, refuse or fall back?</h3>
+    <p class="why">If the field is empty, the system either publishes nothing, or quietly reaches for the owner's personal address. Falling back would reinstate the exact bug we are removing, and make it harder to spot, because the field would look configured.</p>
+    <div class="rec"><b>Recommendation: hold it AND say so.</b> Not just refuse - refusing quietly is its own failure mode, because emails stop going out and nobody finds out until someone notices the silence.
+    <br><br>You already have this exact behaviour running in production: when an academy's sending domain is not set up, the system <b>holds the emails and texts the owner</b> to say why, and will not text them again about the same thing. Held emails then go out on their own once setup finishes. Same rule here, same reason, and it is already proven rather than proposed.</div>
+  </div>
+
+  <div class="dq">
+    <div class="num">Decision 3</div>
+    <h3>Must the business email be proven connected, not just typed?</h3>
+    <p class="why">An address saved in a box is not an address that works. If it is not verified for sending and not connected for receiving, you get a from-address that looks configured, bounces, and sends every parent reply into a void nobody checks.</p>
+    <div class="rec"><b>Recommendation: yes, prove it.</b> This is the third time today the same failure shape has shown up: something that reports readiness it does not actually have. The setup step should refuse to call itself done until both directions are proven.</div>
+  </div>
+
+  <div class="dq">
+    <div class="num">Decision 4</div>
+    <h3>What happens to GTA's hardcoded exception?</h3>
+    <p class="why">GTA's business email lives in a hardcoded block in the code. Once the new field exists, keeping both means two sources of truth for the same fact, with the code silently winning. That is the thing we have spent the week removing.</p>
+    <div class="rec"><b>Recommendation: delete it in this build,</b> once GTA's row is filled and the footer is verified reading the new field. Not left as a backup. A backup that overrides the real value is not a backup.</div>
+  </div>
+
+  <h2>Two facts I checked rather than assumed</h2>
+  <div class="grid g2">
+    <div class="note n-ok">
+      <b>San Jose's owner alerts DO work</b>
+      <p>An earlier finding said San Jose had no phone numbers at all, so every owner guardrail was silently dead. <b>That is now out of date.</b> Elijah is on the row with a phone, so alerts reach him. Verified in the live database today.</p>
+    </div>
+    <div class="note n-warn">
+      <b>Only the owner has a phone, at both academies</b>
+      <p>GTA has 5 team members and San Jose has 4. At both, <b>only the owner has a phone number saved.</b> Anything meant to reach a wider team by text reaches one person. Not part of this build, but worth knowing.</p>
+    </div>
+  </div>
+
+  <h2>What this unblocks</h2>
+  <div class="note n-gold">
+    <b>The last GTA-specific hardcode can finally be removed</b>
+    <p>The blocker was never technical. Removing GTA's hardcoded block would have put your personal inbox in the footer and the unsubscribe link of every GTA email, so it could not be removed. <b>With a business email field, that stops being a decision and becomes ordinary work.</b></p>
+  </div>
+
+  <h2>Not in this build</h2>
+  <div class="card scroll">
+    <table>
+      <tr><th>Item</th><th>Why not</th></tr>
+      <tr><td><b>Anything that USES the Google rating</b></td><td>The fields get stored and shown on the card. Nothing reads them yet, deliberately. A reader built before the data exists is the "it is harmless until switched on" argument, and that one has already cost us once.</td></tr>
+      <tr><td><b>The email wordmark</b></td><td>Your ruling: that belongs in the branding deck. 35 of your 41 academies currently show "BY ANY MEANS" on their parent emails when they are not BAM academies.</td></tr>
+      <tr><td><b>Moving the owner's email anywhere</b></td><td>It stays exactly where it is and keeps meaning what it means. The business email is a new field beside it, not a replacement.</td></tr>
+    </table>
+  </div>
+
+  <div class="foot">
+    Gate for the business/owner contact split. Nothing is built yet. Every number, address and count on this page was read from the live database or the current code on 2026-07-29.
+  </div>
+
+</div>
+</body>
+</html>

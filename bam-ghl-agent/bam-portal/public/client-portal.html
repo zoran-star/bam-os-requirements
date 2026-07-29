@@ -5342,6 +5342,17 @@ if (window.__MOCK__) (() => {
   .obf2-notebtn { background:var(--surface); border:1px solid var(--amber); border-radius:var(--r-xs); color:var(--amber); padding:3px 10px; font:inherit; font-size:11px; font-weight:700; cursor:pointer; transition:background var(--t-fast); }
   .obf2-notebtn:hover { background:var(--amber-soft); }
 
+  /* Sales-message approval (Offer > Approve messages): every message shown as the
+     parent receives it - an SMS as a bubble, an email in its real branded frame. */
+  .obf2-msg { margin-top:9px; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); overflow:hidden; }
+  .obf2-msg.off { opacity:.6; }
+  .obf2-msghead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:9px 12px; border-bottom:1px solid var(--border); font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text-sub); }
+  .obf2-msgwhen { margin-left:auto; font-weight:600; letter-spacing:0; text-transform:none; font-size:11px; color:var(--text-mute); }
+  .obf2-sms { margin:12px; padding:11px 14px; max-width:min(420px,100%); background:var(--surface-el); border:1px solid var(--border-med); border-radius:var(--r-lg); font-size:13px; line-height:1.5; color:var(--text); white-space:pre-wrap; overflow-wrap:anywhere; }
+  .obf2-subj { padding:11px 12px 0; font-size:12.5px; color:var(--text); overflow-wrap:anywhere; }
+  .obf2-mail { display:block; width:100%; height:360px; border:0; border-top:1px solid var(--border); background:#fff; margin-top:11px; }
+  .obf2-msgnote { padding:11px 12px; font-size:11.5px; line-height:1.5; color:var(--text-mute); }
+
   /* Inputs + choice cards + dropzone */
   .obf2-lab { font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-mute); margin-bottom:5px; }
   .obf2-inp, .obf2-sel { background:var(--surface); border:1px solid var(--border-med); border-radius:var(--r-sm); color:var(--text); font:inherit; font-size:13px; padding:10px 12px; transition:border-color var(--t-fast), box-shadow var(--t-fast); }
@@ -18186,12 +18197,31 @@ const _OBF_SECTIONS = [
   { id: 'academy', label: 'Academy', full: 'Your academy', keys: ['basics', 'locations', 'coaches'] },
   { id: 'brand',   label: 'Brand',   full: 'Your brand',   keys: ['brand', 'sitecopy', 'instagram', 'brandboard'] },
   { id: 'wired',   label: 'Wired',   full: 'Get wired',    keys: ['stripe', 'contacts', 'email', 'inbox', 'texting', 'ads'] },
-  { id: 'offer',   label: 'Offer',   full: 'Your offer',   keys: ['define', 'schedule', 'pricing', 'policy', 'preset', 'leads', 'onboardingform', 'members', 'cancelled'] },
+  { id: 'offer',   label: 'Offer',   full: 'Your offer',   keys: ['define', 'schedule', 'pricing', 'policy', 'preset', 'approve', 'leads', 'onboardingform', 'members', 'cancelled'] },
   { id: 'launch',  label: 'Launch',  full: 'Launch',       keys: ['website'] },
 ];
 // Where the wizard is parked (section index, step index within the section's
 // visible steps). Set on open (first incomplete step) and by bar/rail/arrows.
 let _OBF_NAV = { s: 0, i: 0 };
+// The free-trial sales system: the five automations the owner approves on the
+// Approve step, and what a parent has to do to receive each one. SHARED across
+// every academy - never fork this list for one client.
+//
+// This page cannot import from api/, so the keys are duplicated here. They are the
+// same five as SALES_AUTOMATION_KEYS in api/_sales-approval.js, and
+// api/_approval-render.test.mjs reads this literal out of this file and fails if
+// the two lists ever drift apart. `onboarding` is deliberately absent: it is the
+// welcome sequence for people who have already paid, not a sales message.
+// The labels are ours rather than the automation rows' `name`, which still carry
+// emojis from the V1 era (no emojis in product UI - DESIGN.md).
+const _OBF_SALES_KEYS = ['contact_form', 'trial_form', 'missed_trial', 'ghosted', 'nurture'];
+const _OBF_SALES_LABELS = {
+  contact_form: { title: 'Contact form reply', when: 'Goes out when somebody fills in the contact form on your website.' },
+  trial_form:   { title: 'Free trial reply',   when: 'Goes out when somebody asks for a free trial but has not booked a session yet.' },
+  missed_trial: { title: 'Missed their trial', when: 'Goes out when somebody books a free trial and does not turn up.' },
+  ghosted:      { title: 'Gone quiet',         when: 'Goes out when a lead stops replying, to bring them back.' },
+  nurture:      { title: 'Long-term follow-up', when: 'The slow drip over the following weeks for leads who are not ready yet.' },
+};
 // Step flags (accepted mockup 2026-07-14):
 //   launch:true   - blocks the first booking; named in the banner up top
 //   team:true     - BAM runs it; owner sees a live status line, no CTA
@@ -18220,7 +18250,27 @@ const _OBF_STEPS = [
   { key: 'pricing', railLabel: 'Pricing',  group: 'training', title: 'Confirm your pricing', sub: 'Set your tiers, matched to Stripe. Unlocks checkout and booking', cta: 'Set pricing', go: "_obfGoOffer('pricing')", note: '_obfPricingNote', launch: true },
   { key: 'policy', railLabel: 'Policy',   group: 'training', title: 'Set your membership policy', sub: 'Cancellation, pausing and refunds. Flows into the enrollment agreement and member management', cta: 'Set policy', go: "_obfGoOffer('policy')" },
   // ...sell it (the whole sales machine is ONE preset)...
-  { key: 'preset', railLabel: 'Sales preset',   group: 'training', subgroup: 'sales', title: 'Apply the Free Trial preset', sub: 'Pipeline, follow-ups, booking agent and lead forms, wired to this offer in one click. Nothing texts anyone until you approve it.', cta: 'Apply preset', go: '_obfApplyPreset(this)', launch: true },
+  // The sub used to end "Nothing texts anyone until you approve it." That promise
+  // was broader than anything makes true (the confirm agent's scripted messages are
+  // gated separately) AND the approval step it referred to did not exist for weeks.
+  // It now says the true, narrower thing and names the step that delivers it.
+  { key: 'preset', railLabel: 'Sales preset',   group: 'training', subgroup: 'sales', title: 'Apply the Free Trial preset', sub: 'Pipeline, follow-ups, booking agent and lead forms, wired to this offer in one click. The follow-up messages stay off until you approve them on the next step.', cta: 'Apply preset', go: '_obfApplyPreset(this)', launch: true },
+  // ...read every word of it and say yes. One of the three things this flow asks an
+  // owner to approve (the brand board, this, and accepting their new website - the
+  // enforced list is OWNER_APPROVALS in api/_approval-render.test.mjs, because the
+  // first version of this comment said "one of only TWO" and was wrong). Approving
+  // sets approved:true on the five sales automations, which is the flag the engine
+  // checks before it queues or sends one of THEIR steps.
+  //
+  // SCOPE, and the copy is deliberately kept inside it: this approves the five
+  // sales AUTOMATIONS and nothing else. The confirm agent's scripted initial
+  // messages (booking confirmation, same-day check-in) live in
+  // api/agent/confirm-automations.js, not in the automations table, and are gated by
+  // confirm_agent_mode rather than by `approved` - so they are not shown here and
+  // are not covered by this yes. Do not write copy on this step that promises
+  // nothing at all reaches a lead until the owner approves; that is broader than
+  // anything currently makes true.
+  { key: 'approve', railLabel: 'Approve messages', group: 'training', subgroup: 'sales', title: 'Approve your sales messages', sub: 'The five follow-up sequences your sales system runs, shown exactly as a parent receives them. None of them send to anybody until you approve them.' },
   { key: 'leads', railLabel: 'Leads',    group: 'training', subgroup: 'sales', title: 'Import your active leads', sub: 'Once the preset is applied, our team sorts each open card from your old pipeline into the right stage', team: true, ghlOnly: true, note: '_obfLeadsNote' },
   // ...fill it.
   { key: 'onboardingform', railLabel: 'Form', group: 'training', subgroup: 'onboarding', title: 'Set up your onboarding form', sub: 'What you collect at signup, plus the welcome message new members get', cta: 'Set up', go: "_obfGoOffer('onboarding')" },
@@ -18390,7 +18440,8 @@ async function _obfFetchState() {
   const next = { basics: false, ein: false, brand: false, locations: false, coaches: false, sitecopy: false,
     stripe: false, email: false, inbox: false, website: false, contacts: false, instagram: false,
     define: false, schedule: false, pricing: false, policy: false,
-    preset: false, leads: false, onboardingform: false, members: false, cancelled: false,
+    preset: false, approve: false, approve_n: 0, approve_total: 0,
+    leads: false, onboardingform: false, members: false, cancelled: false,
     offer_id: null, booking: false, has_ghl: true, contacts_n: 0,
     website_build: null, staging_url: null, site_accepted: false, brandboard: false,
     texting: false, ads: false, ob: {}, legal_name: '', ein_value: '', address: '', chunks: {} };
@@ -18427,6 +18478,25 @@ async function _obfFetchState() {
     const legacyPreset = (v.pipeline_stages || 0) > 0 && Array.isArray(v.automations) && v.automations.length > 0
       && (v.agent_sections || 0) > 0 && (v.entry_points || 0) > 0;
     next.preset = !!v.preset || legacyPreset;
+    // Sales-message approval: how many of the five sales automations this academy
+    // has APPROVED AND CAN ACTUALLY SEND. setup-status returns
+    // [{key, approved, enabled}] for every automation, so the detector is a count
+    // over data we already have - no extra round trip.
+    //
+    // FAILS CLOSED TWICE, and it is the copy the owner actually sees, so both
+    // matter here more than in api/_sales-approval.js:
+    //   - no sales automations at all (preset not applied) is NOT done. `[].every()`
+    //     is true, and that would have marked the step complete for an academy with
+    //     no sales system.
+    //   - approved but DISABLED is NOT done. The engine needs enabled AND approved
+    //     to enrol or send, so a row at approved:true / enabled:false is silent, and
+    //     a green tick over a silent sequence is worse than a red one. `a.enabled`
+    //     rather than `a.enabled !== false`, so an API that stops returning the
+    //     field reads as not-done instead of as done.
+    const _salesAutos = (v.automations || []).filter(a => _OBF_SALES_KEYS.includes(a.key));
+    next.approve_total = _salesAutos.length;
+    next.approve_n = _salesAutos.filter(a => a.approved && a.enabled).length;
+    next.approve = next.approve_total > 0 && next.approve_n === next.approve_total;
     next.onboardingform = (v.onboarding_fields || 0) > 0;
     next.members = (v.members || 0) > 0;
     next.booking = !!v.booking_live;
@@ -18632,6 +18702,9 @@ function _obfClose() { document.getElementById('obf-overlay')?.remove(); }
 async function _obfOpen() {
   if (!_obfIsV2()) return;
   _obfClose();
+  // Re-read the rendered messages on every open: an owner who edits a message in
+  // Sales and comes back must see the edit, not the render from last time.
+  _OBF_APPROVE = null;
   document.body.insertAdjacentHTML('beforeend', `<div id="obf-overlay" onclick="if(event.target===this)_obfClose()">
     <div class="obf2-card">
       <div class="obf2-top">
@@ -18766,6 +18839,7 @@ function _obfRender(st) {
     : step.key === 'texting' ? _obfWizTextingPage(st)
     : step.key === 'ads' ? _obfWizAdsPage(st)
     : step.key === 'contacts' ? _obfWizContactsPage(st)
+    : step.key === 'approve' ? _obfWizApprovePage(st, sec, step)
     : step.key === 'sitecopy' ? _obfWizStoryPage(st, sec, step)
     : (OFFER_EMBED[step.key] && st.offer_id) ? _obfWizOfferPage(st, sec, step, OFFER_EMBED[step.key])
     : _obfWizStepPage(st, sec, step);
@@ -19184,6 +19258,248 @@ async function _obfApplyPreset(btn) {
   } catch (e) {
     if (btn) { btn.textContent = 'Apply preset'; btn.disabled = false; }
     alert("Couldn't apply the preset - " + (e && e.message || e) + "\n\nNothing is half-broken: every piece that did land is saved, and re-running picks up where it left off.");
+  }
+}
+
+// ── Approve your sales messages (one of the owner's THREE approvals) ──
+// THREE, by Zoran's ruling 2026-07-29, and do not "correct" it back to two: accepting
+// the new website is a real approval and always was. The three are: approve your brand
+// board (Brand), approve your sales messages (Offer, here), accept your new website
+// (Launch). The enforced list is OWNER_APPROVALS in api/_approval-render.test.mjs,
+// which fails if a fourth ever appears.
+// Until it is given, the five sales automations sit at approved:false, which the
+// engine checks before it queues or sends any of THEIR steps.
+//
+// WHAT THIS PAGE DOES NOT COVER, so nobody reads it as a total gate: only the five
+// automations in _OBF_SALES_KEYS. The confirm agent's scripted initial messages
+// (booking confirmation, same-day check-in - api/agent/confirm-automations.js, with
+// per-academy overrides in clients.ghl_kpi_config.confirm_initial_automations) are
+// not rows in the automations table, are gated by confirm_agent_mode rather than by
+// `approved`, and so are neither shown nor approved here. Bringing them in is a
+// separate build; until then the copy on this page stays inside what it covers.
+//
+// ONE RENDER PATH: every message here comes back from /api/automations
+// `approval-queue`, which renders through renderStepMessage in api/email-shells.js -
+// the exact call api/_send.js makes at send time, with the same clientVars +
+// academyFacts vars. Nothing on this page renders a message itself, and nothing may
+// start to: what an owner approves has to be provably what a parent receives.
+// api/_approval-render.test.mjs holds that line.
+let _OBF_APPROVE = null;   // { loading, err, messages, approved, total } for this open
+
+function _obfWizApprovePage(st, sec, step) {
+  const ok = !!st.approve;
+  const head = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="obf2-check ${ok ? 'ok' : ''}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+      ${ok ? '' : `<span class="obf2-tag gold">Your approval</span>`}
+    </div>
+    <div class="obf2-title" style="margin-top:10px">${step.title}</div>
+    <div class="obf2-sub">${step.sub}</div>`;
+  // No preset yet means there is nothing to read. Send them to the step that
+  // creates the messages rather than showing an empty page.
+  if (!st.preset) {
+    return `<div class="obf2-stepcard">${head}
+      <div class="obf2-note" style="color:var(--amber)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        <span>Your messages arrive with the Free Trial preset. Apply it first and they show up here to read.</span>
+        <button class="obf2-notebtn" onclick="_obfWizJumpKey('preset')">Go to the preset</button>
+      </div>
+    </div>`;
+  }
+  setTimeout(() => _obfApproveMount(), 0);
+  return `<div class="obf2-stepcard ${ok ? 'ok' : ''}">${head}
+    <div id="obf-approve-host"><div class="req-empty" style="padding:18px 0"><span class="req-spin"></span> Rendering your messages exactly as a parent gets them…</div></div>
+  </div>`;
+}
+
+// Fetch once per wizard open; every later render of this page reuses it. Cleared
+// after an approval so the state on screen is the state in the database.
+function _obfApproveMount() {
+  if (!document.getElementById('obf-approve-host')) return;
+  if (_OBF_APPROVE) { _obfApproveRender(); return; }
+  _OBF_APPROVE = { loading: true };
+  _autoApi('approval-queue')
+    .then(d => { _OBF_APPROVE = { messages: d.messages || [], approved: d.approved || 0, total: d.total || 0 }; })
+    .catch(e => { _OBF_APPROVE = { err: (e && e.message) || String(e) }; })
+    .finally(() => _obfApproveRender());
+}
+
+// "sends right away" / "sends 2 days later" - the wait a parent actually feels.
+function _obfApproveWhen(s, i) {
+  const n = Number(s.wait_amount) || 0;
+  if (!n) return i === 0 ? 'sends right away' : 'sends straight after the one above';
+  const unit = String(s.wait_unit || 'days').replace(/s$/, '');
+  return `sends ${n} ${unit}${n === 1 ? '' : 's'} later`;
+}
+
+function _obfApproveMsgHtml(s, i) {
+  const isEmail = String(s.channel).toLowerCase() === 'email';
+  const off = !s.enabled || s.empty;
+  const head = `<div class="obf2-msghead">
+      <span>${isEmail ? 'Email' : 'Text'}</span>
+      <span class="obf2-msgwhen">${_obfApproveWhen(s, i)}</span>
+    </div>`;
+  // The server could not render this one (an unrecognised channel on the row). It
+  // is shown rather than hidden, because a message an owner cannot see is exactly
+  // what this page exists to prevent - and it is honest about the consequence: the
+  // send path fails on the same step, so it does not reach anybody either.
+  if (s.unrenderable) {
+    return `<div class="obf2-msg off">${head}
+      <div class="obf2-msgnote" style="color:var(--amber)">This message could not be shown, so it is not sending to anybody. Message us and we will fix it.</div>
+    </div>`;
+  }
+  // A step the system left off, or one whose copy needs a detail this academy has
+  // not entered yet. Say so plainly instead of showing an empty bubble - it is not
+  // going to send, and the owner should not approve it thinking it will.
+  //
+  // The `empty` line states a fact the render itself establishes. The `enabled`
+  // line deliberately states only THAT it is off, not WHY: a step can be off for
+  // reasons this page cannot see (the seeder's sync_class rule, or a human turning
+  // it off in Sales), and the earlier wording asserted one specific reason the code
+  // could not back.
+  if (off) {
+    return `<div class="obf2-msg off">${head}
+      <div class="obf2-msgnote">${s.empty
+        ? 'Waiting on a detail your academy has not added yet, so this one stays off until it has something to say.'
+        : 'Switched off, so this one does not send. You can turn it on in Sales.'}</div>
+    </div>`;
+  }
+  if (isEmail) {
+    return `<div class="obf2-msg">${head}
+      ${s.subject ? `<div class="obf2-subj"><b>Subject:</b> ${escapeHTML(s.subject)}</div>` : ''}
+      <iframe class="obf2-mail" title="Email preview" loading="lazy" sandbox="" srcdoc="${escapeHTML(s.html)}"></iframe>
+    </div>`;
+  }
+  return `<div class="obf2-msg">${head}
+    <div class="obf2-sms">${escapeHTML(s.text)}</div>
+  </div>`;
+}
+
+function _obfApproveRender() {
+  const host = document.getElementById('obf-approve-host');
+  if (!host || !_OBF_APPROVE) return;
+  const a = _OBF_APPROVE;
+  if (a.loading) return;
+  if (a.err) { host.innerHTML = `<div style="font-size:12.5px;color:var(--red);padding:14px 0">Couldn't load your messages - ${escapeHTML(a.err)}</div>`; return; }
+  const list = a.messages || [];
+  if (!list.length) {
+    host.innerHTML = `<div class="obf2-note" style="color:var(--amber)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      <span>No sales messages are set up yet. Re-apply the Free Trial preset and they land here.</span>
+      <button class="obf2-notebtn" onclick="_obfWizJumpKey('preset')">Go to the preset</button>
+    </div>`;
+    return;
+  }
+  // PER-SEQUENCE STATE, not one boolean. `set-approved` is per automation, so
+  // partial approval is a NORMAL state, not a hypothetical: an academy can have
+  // trial_form approved and texting for weeks while the other four sit off. The
+  // page collapsed all of that into `allOk`, and then told an owner whose leads
+  // were already being texted "None of them has gone to anybody yet". Approving is
+  // also not the same as sending - an automation can be approved and still switched
+  // off - so the two flags are read separately and neither is inferred.
+  // A sequence with NO STEPS is not something anyone can consent to. It used to sit
+  // in `pending`, so the owner was offered "Approve these messages" over a card that
+  // said "No messages in this one yet" - and the API took the yes. A later re-seed
+  // then filled the row and the sequence went live on a consent given over nothing.
+  // The API now skips these rows; this is the same rule on the surface, so the
+  // button never promises something the API will refuse.
+  const empty = list.filter(seq => !(seq.steps || []).length);
+  const pending = list.filter(seq => !seq.approved && (seq.steps || []).length);
+  const live = list.filter(seq => seq.approved && seq.enabled);
+  const paused = list.filter(seq => seq.approved && !seq.enabled);
+  const n = (arr, one, many) => `${arr.length} ${arr.length === 1 ? one : many}`;
+  const emptyLine = empty.length
+    ? `<div class="obf2-hint" style="margin-top:9px">${n(empty, 'sequence has', 'sequences have')} no messages in ${empty.length === 1 ? 'it' : 'them'} yet, so ${empty.length === 1 ? 'it is' : 'they are'} not part of this approval. Re-apply the preset to fill ${empty.length === 1 ? 'it' : 'them'}, then approve again.</div>`
+    : '';
+
+  const sequences = list.map(seq => {
+    const lab = _OBF_SALES_LABELS[seq.automation_key] || { title: seq.automation_key, when: '' };
+    const steps = (seq.steps || []).map((s, i) => _obfApproveMsgHtml(s, i)).join('');
+    const badge = !seq.approved ? `<span class="obf2-tag gold">Waiting on you</span>`
+      : seq.enabled ? `<span class="obf2-tag" style="color:var(--green);border-color:rgba(52,211,153,.35)">Approved and sending</span>`
+      : `<span class="obf2-tag mute">Approved, switched off</span>`;
+    return `<div class="obf2-secthead" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${lab.title}${badge}</div>
+      <div style="font-size:12px;color:var(--text-sub);line-height:1.5;margin-top:5px">${lab.when}</div>
+      ${steps || `<div class="obf2-msg off"><div class="obf2-msgnote">No messages in this one yet.</div></div>`}`;
+  }).join('');
+
+  // The footer describes the state the academy is ACTUALLY in. Every sentence here
+  // is conditional on a count for that reason.
+  //
+  // The no-sequences-live line is PRESENT TENSE ("None of these is sending right
+  // now"), because present tense is all `approved && enabled` can support. "None has
+  // gone to anybody yet" is a claim about HISTORY, and a sequence that was approved,
+  // sent for a month and then switched off would make it a lie.
+  const pausedLine = paused.length
+    ? `<div class="obf2-hint" style="margin-top:9px">${n(paused, 'sequence is', 'sequences are')} approved but switched off, so ${paused.length === 1 ? 'it does' : 'they do'} not send until turned back on in Sales.</div>`
+    : '';
+  // THREE STATES, not two. "Nothing is waiting on you" is only the finished state
+  // when there is also nothing EMPTY: an academy whose sequences are all step-less
+  // has nothing pending and nothing approved, and the old two-way branch showed it
+  // the green "You approved these" tick over five empty cards.
+  host.innerHTML = `${sequences}
+    ${!pending.length && !empty.length
+      ? `<div class="obf2-done" style="margin-top:18px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          You approved these${live.length ? `. ${n(live, 'sequence is', 'sequences are')} on and sending` : ''}
+        </div>
+        ${pausedLine}
+        <div class="obf2-hint" style="margin-top:9px">Want to change the wording? Edit any message in Sales and it updates here.</div>`
+      : !pending.length
+      ? `${emptyLine}
+        ${pausedLine}
+        <div class="obf2-hint" style="margin-top:9px">${live.length ? `${n(live, 'sequence is', 'sequences are')} approved and sending.` : 'Nothing here is sending right now.'}</div>`
+      : `<button onclick="_obfApprove(this)" class="obf2-cta blk" style="margin-top:20px;font-weight:800">Approve the ${pending.length === list.length ? 'messages' : n(pending, 'sequence still waiting', 'sequences still waiting')}</button>
+        ${emptyLine}
+        ${pausedLine}
+        <div class="obf2-hint" style="margin-top:10px">${live.length
+          ? `${n(live, 'sequence is', 'sequences are')} already approved and sending. Approving covers the ${pending.length === 1 ? 'one' : pending.length + ' others'} still waiting.`
+          : 'None of these is sending right now.'} You can edit any message later in Sales.</div>`}`;
+}
+
+async function _obfApprove(btn) {
+  // The prompt names only the sequences this click actually changes. Saying "none
+  // has gone to anybody yet" unconditionally is false the moment one is already
+  // approved and sending, which is a normal state (approval is per automation).
+  //
+  // Re-read before asking, rather than trusting the cache from when the wizard was
+  // opened: a teammate switching a sequence on in Sales meanwhile would otherwise
+  // make the count in this prompt wrong at the moment the owner is consenting to it.
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  const reset = () => { if (btn) { btn.disabled = false; btn.textContent = 'Approve these messages'; } };
+  try {
+    const fresh = await _autoApi('approval-queue');
+    _OBF_APPROVE = { messages: fresh.messages || [], approved: fresh.approved || 0, total: fresh.total || 0 };
+    _obfApproveRender();
+  } catch (_) { /* fall back to what is on screen */ }
+  // Only sequences that CONTAIN messages count as waiting - see _obfApproveRender.
+  // A step-less row is skipped by the API, so counting it here would put a number in
+  // the consent prompt that the write does not honour.
+  const fresh2 = ((_OBF_APPROVE && _OBF_APPROVE.messages) || []);
+  const waiting = fresh2.filter(s => !s.approved && (s.steps || []).length).length;
+  const emptyCount = fresh2.filter(s => !(s.steps || []).length).length;
+  if (!waiting) {
+    reset();
+    _plToast(emptyCount ? 'These sequences have no messages in them yet' : 'These are already approved');
+    return;
+  }
+  if (!confirm(`Approve your sales messages?\n\nThis turns on the ${waiting === 1 ? 'sequence' : waiting + ' sequences'} still waiting for your yes. You can edit any message later in Sales.`)) { reset(); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Recording your approval…'; }
+  try {
+    const out = await _autoApi('approve-sales-messages');
+    _OBF_APPROVE = null;
+    await _obfFetchState().catch(() => {});
+    _obfRender(_OBF_STATE);
+    // The API returns the sequences it REFUSED to approve (no messages in them).
+    // Say so rather than reporting a blanket yes over rows it left alone.
+    const skipped = (out && Array.isArray(out.skipped)) ? out.skipped : [];
+    _plToast(skipped.length
+      ? `Approved. ${skipped.length === 1 ? '1 sequence' : skipped.length + ' sequences'} had no messages yet and still need your yes once filled`
+      : 'Your sales messages are approved');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Approve these messages'; }
+    alert("Couldn't record your approval - " + (e && e.message || e));
   }
 }
 
@@ -28842,10 +29158,18 @@ let _AUTO = { list: [], overview: [] };
 // nothing until they have enabled steps (the engine's isAutomationLive gate), so
 // on-by-default is safe. Ghosted ships OFF (the academy approves it once their copy is
 // reviewed).
+// Rows created so the panel shows every sequence an academy could run. They seed
+// DORMANT - the enabled/approved fields that used to be here are gone, because
+// upsert-automation no longer accepts them and the columns default to false.
+//
+// They used to carry enabled:true, approved:true for onboarding and nurture, which
+// meant that merely OPENING this panel for an academy with no nurture row created an
+// ARMED sales sequence that nobody had approved. Nothing may arm a sequence except an
+// owner, through the approve step or the On switch.
 const _AUTO_SEED = [
-  { automation_key: 'onboarding', name: 'Onboarding', enabled: true, approved: true },
-  { automation_key: 'ghosted', name: 'Ghosted', enabled: false, approved: false },
-  { automation_key: 'nurture', name: 'Lead Nurture', enabled: true, approved: true },
+  { automation_key: 'onboarding', name: 'Onboarding' },
+  { automation_key: 'ghosted', name: 'Ghosted' },
+  { automation_key: 'nurture', name: 'Lead Nurture' },
 ];
 const _AUTO_UNITS = ['minutes', 'hours', 'days', 'weeks', 'months'];
 
@@ -29119,7 +29443,7 @@ async function _taRenderAutomations() {
     const have = new Set(list.map(a => a.automation_key));
     let seeded = false;
     for (const s of _AUTO_SEED) {
-      if (!have.has(s.automation_key)) { await _autoApi('upsert-automation', { automation_key: s.automation_key, name: s.name, enabled: !!s.enabled, approved: !!s.approved }); seeded = true; }
+      if (!have.has(s.automation_key)) { await _autoApi('upsert-automation', { automation_key: s.automation_key, name: s.name }); seeded = true; }
     }
     // Missed Trial first-touch: seed from the shipped defaults (with its default SMS
     // step) the SAME idempotent + edit-safe way the Contact / Trial form intros seed.
@@ -29214,7 +29538,7 @@ function _autoCardHtml(a) {
       <div style="font-size:15px;font-weight:700;color:var(--text)">${escapeHTML(a.name || a.automation_key)}</div>
       ${_autoCountsStrip(a)}
       <span style="flex:1"></span>
-      <button onclick="_autoSetLive('${a.id}',${!(a.enabled && a.approved)})" style="${seg(!!(a.enabled && a.approved))}">${(a.enabled && a.approved) ? 'On' : 'Off'}</button>
+      <button onclick="_autoSetLive('${a.id}',${!(a.enabled && a.approved)})" ${(!a.approved && !_autoCanArm()) ? 'title="Only an owner or BAM support can switch this on the first time" style="' + seg(false) + ';opacity:.55;cursor:not-allowed"' : 'style="' + seg(!!(a.enabled && a.approved)) + '"'}>${(a.enabled && a.approved) ? 'On' : 'Off'}</button>
     </div>
     <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:12px">${statusLine}</div>
     ${stepsHtml}
@@ -29296,8 +29620,18 @@ async function _autoPreviewEmail(sid) {
   _autoPreviewModal(subj);
   try {
     const d = await _autoApi('preview-email', { subject: subj, body });
+    // Use the SERVER's resolved subject, not the raw editor text the modal opened
+    // with. The editor value still contains {{contact.first_name}}, so showing it
+    // was the exact symptom the one-render-path work set out to remove - the owner
+    // reads a literal token here and a real name in their onboarding approval.
+    const s = document.getElementById('auto-prev-subj');
+    if (s) s.innerHTML = d.subject ? `<b style="color:var(--text)">Subject:</b> ${escapeHTML(d.subject)}` : '';
     const f = document.getElementById('auto-prev-frame');
-    if (f) f.srcdoc = d.html || '<p style="padding:24px;font-family:sans-serif">Empty.</p>';
+    // And say the SAME thing about an empty render as the approval surface does,
+    // rather than the bare word "Empty."
+    if (f) f.srcdoc = d.empty
+      ? '<p style="padding:32px;font-family:sans-serif;color:#666;line-height:1.5">Nothing to send yet. This message needs a detail your academy has not added yet, so it stays off until it has something to say.</p>'
+      : (d.html || '<p style="padding:24px;font-family:sans-serif">Empty.</p>');
   } catch (e) {
     const b = document.getElementById('auto-prev-body');
     if (b) b.innerHTML = `<div style="padding:24px;color:#e07070;font-family:inherit">Couldn't render - ${escapeHTML(e.message)}</div>`;
@@ -29306,15 +29640,52 @@ async function _autoPreviewEmail(sid) {
 function _autoPreviewClose() { const o = document.getElementById('auto-prev-ov'); if (o) o.remove(); }
 function _autoPreviewModal(subject) {
   _autoPreviewClose();
-  const subjLine = subject ? `<div style="font-size:12px;color:var(--text-sub);padding:2px 0 0"><b style="color:var(--text)">Subject:</b> ${escapeHTML(subject)}</div>` : '';
+  // Deliberately does NOT show the raw editor subject. That value still contains
+  // {{contact.first_name}}, and showing it while the render is in flight flashed the
+  // literal token in the header before the resolved one replaced it - a small version
+  // of exactly the disagreement this work exists to remove. It stays quiet until
+  // _autoPreviewEmail fills in the server's resolved subject.
+  const subjLine = `<div id="auto-prev-subj" style="font-size:12px;color:var(--text-sub);padding:2px 0 0"></div>`;
+  void subject;
   document.body.insertAdjacentHTML('beforeend', `<div id="auto-prev-ov" onclick="if(event.target===this)_autoPreviewClose()" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9400;display:flex;align-items:center;justify-content:center;padding:18px"><div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:680px;height:86vh;display:flex;flex-direction:column;overflow:hidden"><div style="display:flex;align-items:flex-start;gap:9px;padding:13px 16px;border-bottom:1px solid var(--border)"><div><div style="font-size:14px;font-weight:700;color:var(--text)">Email preview</div>${subjLine}</div><span style="flex:1"></span><button onclick="_autoPreviewClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;line-height:1">×</button></div><div id="auto-prev-body" style="flex:1;background:#fff;overflow:hidden"><iframe id="auto-prev-frame" title="Email preview" style="width:100%;height:100%;border:0;background:#fff" srcdoc="<div style=&quot;padding:40px;text-align:center;color:#888;font-family:sans-serif&quot;>Rendering…</div>"></iframe></div></div></div>`);
 }
 
+// Am I the person who may ARM live messaging? Owner, or BAM staff. Mirrors
+// canApproveAsOwner in api/agent/_auth.js - the server is the real gate, this only
+// stops the button firing a request it knows will 403.
+function _autoCanArm() { return (typeof _MY_TAB_ROLE !== 'undefined' && _MY_TAB_ROLE === 'owner') || _IS_BAM_STAFF === true; }
+
 // One switch: On = approved + running, Off = both off. (Approve + On were two
 // gates that both had to be true to send; collapsed into a single toggle.)
+//
+// Because it fuses approve + enable, switching ON an automation that has never been
+// approved IS the owner's first consent, and it is owner-only server-side (Zoran
+// 2026-07-29: arming live messaging to parents is an owner decision on every route).
+// Everything else here is unchanged for operators: switching OFF, and switching back
+// on something the owner already approved, both stay open.
 async function _autoSetLive(autoId, on) {
+  const a = _AUTO.list.find(x => x.id === autoId);
+  // The owner's FIRST yes is the only thing that needs them. A sequence they have
+  // already approved is an operator's to switch on and off freely.
+  const needsFirstYes = on && a && !a.approved;
+  if (needsFirstYes && !_autoCanArm()) {
+    alert("Switching this on for the first time is the academy owner's call.\n\nThese messages go to real parents, so the first yes is theirs. Ask an owner to approve it in their onboarding, under Offer > Approve messages, or ask BAM support. After that you can switch it on and off from here.");
+    return;
+  }
   try {
-    await _autoApi('set-approved', { automation_id: autoId, value: on });
+    // ONLY on the first yes, and ONLY in the arming direction.
+    //
+    // This used to send set-approved on BOTH paths, which broke the promise in two
+    // ways. Switching OFF also set approved:false, so the next click read as a first
+    // arming and the client blocked it: an operator could turn a sequence off once
+    // and never turn it back on. And switching ON an already-approved sequence sent
+    // set-approved:true again, which the server refuses for a non-owner with the
+    // arming-lane message about switching messages on for the FIRST time - when it
+    // was not the first time.
+    //
+    // Switching off is the KILL SWITCH, not a withdrawal of the owner's approval, so
+    // it touches `enabled` alone.
+    if (needsFirstYes) await _autoApi('set-approved', { automation_id: autoId, value: true });
     await _autoApi('set-enabled', { automation_id: autoId, value: on });
     _plToast(on ? 'Automation on' : 'Automation off');
     _taRenderPanel();
@@ -29653,7 +30024,9 @@ async function _taRenderKnowledge() {
     const locked   = sections.filter(s => s.scope !== 'derived' && s.scope !== 'policy' && !s.editable);
     const host = document.getElementById('ta-section-list'); if (!host) return;
 
-    // ── Brain health strip: N of 8 facts live + chips for any fully-missing fact ──
+    // ── Brain health strip: N of M facts live + chips for any fully-missing fact ──
+    // Both numbers come from the API (bh.live / bh.total, derived from FACT_KEYS).
+    // Do not hardcode the total here - the backend already made that mistake once.
     const bh = res.brain_health || null;
     let stripHtml = '';
     if (bh) {
@@ -38185,9 +38558,19 @@ function _pcoRenderReport(j) {
   if (!rep) return;
   const d = j.drift && j.drift.counts ? j.drift.counts : { missing: 0, extra: 0, mismatched: 0, total: 0 };
   const clean = j.clean;
+  // A registry gap makes the drift arithmetic vacuous: cards on an unmapped role
+  // are skipped, not checked, so the count reads zero and the generic line below
+  // would say "0 drift item(s) found. Heal these" - unactionable, and the exact
+  // shape of green that hid 44 unchecked nurture cards on San Jose. Name the gap
+  // and the command that fills it.
+  const gaps = (j.registry && j.registry.gap_roles) || [];
   const head = clean
     ? '<span style="font-weight:800;color:#7BC47F">Clean - no drift.</span> Safe to flip.'
-    : `<span style="font-weight:800;color:#E5897B">${d.total} drift item(s) found.</span> Heal these before flipping (or use force).`;
+    : j.clean_blocked_by === 'registry_unseeded'
+      ? '<span style="font-weight:800;color:#E5897B">Nothing could be compared.</span> This academy has no GHL stage ids in its registry, so reconcile could not map a single card. Run <code>ghl-import.mjs seed-registry</code> (the import does it too), then reconcile again.'
+      : j.clean_blocked_by === 'registry_incomplete'
+        ? `<span style="font-weight:800;color:#E5897B">Part of the board was never checked.</span> No GHL stage is mapped for <b>${_pcoEsc(gaps.join(', '))}</b>, so cards there were skipped rather than compared - the zero above does not cover them. Run <code>ghl-import.mjs seed-registry</code>. If their GHL has no such column, that is a decision to make, not to force.`
+        : `<span style="font-weight:800;color:#E5897B">${d.total} drift item(s) found.</span> Heal these before flipping (or use force).`;
   const sample = (arr, label, fmt) => {
     if (!arr || !arr.length) return '';
     const rows = arr.slice(0, 8).map(fmt).join('');
@@ -38202,6 +38585,11 @@ function _pcoRenderReport(j) {
     (j.ghl && j.ghl.open_unmapped ? ` (+${j.ghl.open_unmapped} in unmapped stages)` : '') +
     ` &nbsp;·&nbsp; Portal open: <b>${j.portal ? j.portal.open_total : 0}</b></div>` +
     `<div style="margin-top:6px">Missing in portal: <b>${d.missing}</b> &nbsp;·&nbsp; Extra in portal: <b>${d.extra}</b> &nbsp;·&nbsp; Stage mismatch: <b>${d.mismatched}</b></div>` +
+    // Not drift, so not in the counts above, but the operator should see it: these
+    // cards are still open in GHL in a stage no role matches, so their role is
+    // vouched for by whoever classified them and by nothing this report checked.
+    (j.portal && j.portal.open_unverifiable
+      ? `<div style="margin-top:4px;color:var(--text-mute)"><b>${j.portal.open_unverifiable}</b> imported from stages the registry cannot name - classified by hand, not verified here.</div>` : '') +
     sample(drift.missing, 'Missing in portal (open in GHL, not mirrored)', m => `<div style="color:var(--text-mute)">· ${_pcoEsc(m.name) || m.ghl_opportunity_id} <span style="opacity:.7">[${_pcoEsc(m.role)}]</span></div>`) +
     sample(drift.mismatched, 'Stage mismatch (GHL vs portal)', m => `<div style="color:var(--text-mute)">· ${_pcoEsc(m.name) || m.ghl_opportunity_id} <span style="opacity:.7">GHL ${_pcoEsc(m.ghl_role)} / portal ${_pcoEsc(m.portal_role)}</span></div>`) +
     sample(drift.extra, 'Extra in portal (not open in GHL)', m => `<div style="color:var(--text-mute)">· ${_pcoEsc(m.name) || m.ghl_opportunity_id} <span style="opacity:.7">[${_pcoEsc(m.role)}]</span></div>`) +

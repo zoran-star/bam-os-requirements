@@ -43,19 +43,36 @@ export async function resolveStaff(req) {
 }
 
 // Staff OR academy owner / can_train_agent member.
+//
+// TWO SCOPES, and the difference matters. `canActOn` is the OPERATE scope: it lets
+// a teammate with can_train_agent work the agent for their academy, which is the
+// point of that flag. `canApproveAsOwner` is narrower - it is for the handful of
+// decisions the product calls THE OWNER'S, where a teammate holding an operational
+// flag is not the person being asked. Today that is the sales-message approval
+// (api/automations.js `approve-sales-messages`), which arms live outbound to leads.
+// Without the split, can_train_agent silently carried that authority.
+//
+// BAM staff keep both, deliberately: they already operate every account, the
+// concierge path depends on it, and they can reach the same flag through the
+// pre-existing per-automation `set-approved` regardless. Blocking them here would
+// change nothing about what staff can do and would break the concierge flow.
 export async function resolveAgentActor(req) {
   const user = await getUser(req);
   if (!user) return null;
   const staff = await isStaffUser(user);
-  let mem = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&or=(role.eq.owner,can_train_agent.eq.true)&select=client_id`);
+  let mem = await sb(`client_users?user_id=eq.${user.id}&status=eq.active&or=(role.eq.owner,can_train_agent.eq.true)&select=client_id,role`);
   if ((!mem || !mem.length) && user.email) {
-    mem = await sb(`client_users?email=eq.${encodeURIComponent(user.email)}&status=eq.active&or=(role.eq.owner,can_train_agent.eq.true)&select=client_id`);
+    mem = await sb(`client_users?email=eq.${encodeURIComponent(user.email)}&status=eq.active&or=(role.eq.owner,can_train_agent.eq.true)&select=client_id,role`);
   }
-  const academyClientIds = Array.isArray(mem) ? mem.map(m => m.client_id) : [];
+  const rows = Array.isArray(mem) ? mem : [];
+  const academyClientIds = rows.map(m => m.client_id);
+  const ownerClientIds = rows.filter(m => String(m.role || "") === "owner").map(m => m.client_id);
   return {
     email: user.email || "user",
     isStaff: staff,
     academyClientIds,
+    ownerClientIds,
     canActOn: (clientId) => staff || academyClientIds.includes(clientId),
+    canApproveAsOwner: (clientId) => staff || ownerClientIds.includes(clientId),
   };
 }

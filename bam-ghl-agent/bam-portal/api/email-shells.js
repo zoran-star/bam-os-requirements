@@ -506,6 +506,72 @@ export function templateBody({ clientId, body, vars } = {}) {
   return resolveMergeVars(raw, L, vars);
 }
 
+// ── THE ONE RENDER PATH ──────────────────────────────────────────────────────
+// The message an automation step will actually put on the wire, rendered.
+//
+// api/_send.js sends EXACTLY this, and the owner's approval surface (the
+// `approval-queue` action in api/automations.js, behind the onboarding wizard's
+// "Approve your sales messages" step) SHOWS exactly this. Same function, same
+// vars, so a message an owner approved cannot disagree with the one a parent gets.
+//
+// That is a claim about RENDERING, not about coverage: it says the surface shows
+// the true text of the steps it renders, not that every message an academy can send
+// passes through the surface. It does not - see api/_sales-approval.js.
+//
+// DO NOT WRITE A SECOND RENDERER FOR PREVIEWS. One existed and quietly
+// disagreed with the send (it rendered the welcome email without the academy's
+// venue, weekly schedule and coaches - most of what an owner is actually
+// checking).
+//
+// EXACTLY THREE CALLERS render an automation step's message, and all three are
+// this function - no more, no fewer:
+//   1. api/_send.js sendOn()                        - the send itself
+//   2. api/automations.js `approval-queue`          - the onboarding approval step
+//   3. api/automations.js `preview-email`           - the Sales step editor preview
+// (3) called renderEmail directly until 29 Jul 2026, with its own sample family and
+// an unresolved subject. It is the screen the approval step sends owners to ("edit
+// any message in Sales"), so the two owner-facing surfaces disagreed about the same
+// message. If you add a fourth caller, it comes through here too.
+//
+// TWO LOCKS, and they cover different things - keep both:
+//   api/_approval-render.test.mjs drives the real sendOn() against a stubbed
+//   transport and proves the approval surface AGREES with it. That is a relative
+//   anchor: a bug inside THIS function moves both sides together and is invisible
+//   to it.
+//   api/_gta-step-lock.test.mjs holds the ABSOLUTE anchor - committed goldens of the
+//   subject, the empty flag and the body this function returns for BAM GTA's real
+//   rows, plus two probes that carry EMPTY: true. Deleting the subject merge or
+//   forcing `empty` false passes the agreement test and fails that one.
+//
+//   renderStepMessage({ channel, clientId, subject, body, vars })
+//     -> { channel:'sms',   text,          empty }
+//     -> { channel:'email', subject, html, empty }
+//
+// `empty` means the copy resolved to NOTHING once this academy's own facts were
+// filled in - every sentence it had depended on a fact nobody has entered yet.
+// The send path skips such a step (it is a no-op, not a failure); the approval
+// surface shows it as "nothing to send yet" instead of an empty bubble.
+export function renderStepMessage({ channel, clientId, subject, body, vars } = {}) {
+  const v = vars || {};
+  // The same trim the send path has always applied before rendering.
+  const text = String(body || "").trim();
+  const L = locFor(clientId, v);
+  if (channel === "email") {
+    // The subject carries merge tokens too, and it is the resolved one that both
+    // reaches the inbox and seeds the preheader inside renderEmail.
+    const subj = resolveMergeVars(String(subject || ""), L, v);
+    const empty = !templateBody({ clientId, body: text, vars: v }).trim();
+    return { channel: "email", subject: subj, empty, html: empty ? "" : renderEmail({ clientId, subject: subj, body: text, vars: v }) };
+  }
+  if (channel === "sms") {
+    // GHL does not process merge tokens on raw /conversations/messages sends, so
+    // SMS tokens resolve here (email tokens resolve inside renderEmail).
+    const msg = resolveMergeVars(text, L, v);
+    return { channel: "sms", text: msg, empty: !msg.trim() };
+  }
+  throw new Error(`renderStepMessage: unknown channel '${channel}'`);
+}
+
 export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars, footerReason, docTitle } = {}) {
   const L = locFor(clientId, vars);
   const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);

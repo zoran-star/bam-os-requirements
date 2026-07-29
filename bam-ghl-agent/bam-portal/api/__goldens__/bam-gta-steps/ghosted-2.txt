@@ -1,4 +1,6 @@
 SUBJECT: Try a session free
+PREHEADER: Try a session free
+EMPTY: false
 
 Try a session free
 BY ANY MEANS GTA

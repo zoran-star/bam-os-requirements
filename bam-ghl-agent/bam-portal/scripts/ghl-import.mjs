@@ -5,7 +5,11 @@
 // with Claude in the loop: dump the board, Claude classifies every open card
 // into a preset stage role, staff confirm, then import + reconcile + flip.
 //
-//   node scripts/ghl-import.mjs dump      --client <id> [--out board.json]
+//   node scripts/ghl-import.mjs dump         --client <id> [--out board.json]
+//   node scripts/ghl-import.mjs seed-registry --client <id>
+//        fills pipeline_stages.ghl_stage_id from the live GHL board. `import`
+//        runs it too - this is here for a re-run after a GHL hiccup, and because
+//        reconcile can map nothing until it has happened.
 //   node scripts/ghl-import.mjs import    --client <id> --map cards.json [--dry-run]
 //        cards.json: [{ "id": "<ghlOpportunityId>", "role": "responded", ... }]
 //        (extra fields from the dump - name/contact_id/phone/... - ride along)
@@ -20,7 +24,7 @@
 
 import fs from "node:fs";
 import {
-  actionDump, actionImportCards, actionReconcile, actionSetShadow, actionFlip, loadClientFlags,
+  actionDump, actionSeedRegistry, actionImportCards, actionReconcile, actionSetShadow, actionFlip, loadClientFlags,
 } from "../api/admin/pipeline-cutover.js";
 
 const args = process.argv.slice(2);
@@ -31,8 +35,8 @@ const clientId = val("--client");
 
 function die(msg) { console.error(msg); process.exit(1); }
 
-if (!cmd || !["dump", "import", "shadow-on", "reconcile", "flip", "rollback"].includes(cmd)) {
-  die("usage: ghl-import.mjs <dump|import|shadow-on|reconcile|flip|rollback> --client <id> [--map cards.json] [--out board.json] [--dry-run] [--force]");
+if (!cmd || !["dump", "seed-registry", "import", "shadow-on", "reconcile", "flip", "rollback"].includes(cmd)) {
+  die("usage: ghl-import.mjs <dump|seed-registry|import|shadow-on|reconcile|flip|rollback> --client <id> [--map cards.json] [--out board.json] [--dry-run] [--force]");
 }
 if (!clientId) die("--client <id> required");
 
@@ -45,6 +49,12 @@ if (cmd === "dump") {
   const path = val("--out");
   if (path) { fs.writeFileSync(path, JSON.stringify(out, null, 2)); console.log(`wrote ${out.total_cards} open cards + ${out.pipelines.length} pipelines to ${path}`); }
   else console.log(JSON.stringify(out, null, 2));
+}
+
+if (cmd === "seed-registry") {
+  const out = await actionSeedRegistry(clientId);
+  if (out.error) die(`seed-registry failed: ${out.error.message}`);
+  console.log(JSON.stringify(out, null, 2));
 }
 
 if (cmd === "import") {

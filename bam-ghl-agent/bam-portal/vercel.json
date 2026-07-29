@@ -105,6 +105,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/reignition?action=admit",
+      "schedule": "10 14 * * *"
+    },
+    {
       "path": "/api/automations?action=rearm",
       "schedule": "*/15 * * * *"
     },

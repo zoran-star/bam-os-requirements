@@ -1,4 +1,6 @@
 SUBJECT: What families are saying
+PREHEADER: In their words: what families and athletes say about training with us.
+EMPTY: false
 
 In their words: what families and athletes say about training with us.
 BY ANY MEANS GTA

@@ -76,6 +76,33 @@ export const ROLE_MATCHERS = {
   },
 };
 
+// THE ROLE KEYS ANYTHING MAY WRITE. ROLE_MATCHERS above is the READ side and
+// deliberately still answers `interested`, so a row that predates the rename
+// still resolves. This list is the WRITE side.
+//
+// Migration 20260721150552 renamed the role to `ghosted`; two days later
+// 20260723143000 had to clean up after it, because the code kept authoring the
+// old key and every stamp after the rename re-created it - BAM San Jose ended up
+// with a whole duplicate stage carrying live leads. Anything that iterates
+// ROLE_MATCHERS and ends in an UPSERT must iterate this instead, or it re-opens
+// exactly that. Before this existed, the only thing stopping the self-seed in
+// shadowBackfillFromBoard from minting an `interested` row alongside `ghosted`
+// was that `ghosted` happens to be declared first and claims the stage id.
+export const LEGACY_ROLE_KEYS = new Set(["interested"]);
+export const SEEDABLE_ROLES = Object.keys(ROLE_MATCHERS).filter((r) => !LEGACY_ROLE_KEYS.has(r));
+
+// Which pipeline ROLE is this GHL stage, by name? Iterating SEEDABLE_ROLES is what
+// skips the legacy `interested` alias so the canonical `ghosted` always wins. A
+// custom academy stage ("New Lead", "Contacted") matches nothing and returns null,
+// which is a meaningful answer: that stage is outside the preset, so the only thing
+// that can say what a card in it is for is a human classifying it.
+export function roleForStageName(name) {
+  for (const role of SEEDABLE_ROLES) {
+    try { if (ROLE_MATCHERS[role]({ name: name || "" })) return role; } catch (_) { /* skip */ }
+  }
+  return null;
+}
+
 // The Training pipeline for an academy (the one all the finders target): the
 // pipeline whose name matches /training/i, else the first one. Returns null when
 // there are no pipelines. Identical to the per-finder logic it replaces; THROWS
@@ -358,7 +385,7 @@ export async function shadowBackfillFromBoard(clientId, { pipelines, shadow } = 
     // role, and seed the registry once per role.
     const roleByStageId = new Map();       // ghl stage id -> { role, pipelineId, stageName, position, rowId }
     for (const p of pipelines) {
-      for (const role of Object.keys(ROLE_MATCHERS)) {
+      for (const role of SEEDABLE_ROLES) {
         const st = (p.stages || []).find(s => ROLE_MATCHERS[role](s));
         if (st && !roleByStageId.has(st.id)) {
           roleByStageId.set(st.id, { role, pipelineId: p.id, stageName: st.name, position: st.position });

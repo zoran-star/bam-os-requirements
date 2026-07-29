@@ -571,7 +571,18 @@ async function handler(req, res) {
         const msg = (body.body || "").trim();
         postClientSlackNotification(t.client_id,
           `💬 Message from BAM — Systems [${code}]${msg ? `\n_${msg}_` : ""}`, req);
-        pushClient("New message from BAM", msg || "Open the portal to read it.");
+        // Was `pushClient("New message from BAM", msg || "...")`. No such function
+        // has ever existed in this module, so every staff reply threw a
+        // ReferenceError here - AFTER the ticket row was patched and the Slack
+        // message sent, so the reply landed but the request 500'd. Rewritten onto
+        // the real API the sibling branches already use; the "new-message" event
+        // renders the identical title/body this call was asking for.
+        notifyClientPush(t.client_id, "new-message", {
+          sender: "BAM",
+          preview: msg || "Open the portal to read it.",
+          ticketId: t.id,
+          view: "systems",
+        }).catch(() => {});
       } else if (action === "nudge_client") {
         const ask = t.status === "final_review"
           ? "your final sign-off"

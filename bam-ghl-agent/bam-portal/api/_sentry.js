@@ -1,5 +1,3 @@
-/* global process */
-
 import * as Sentry from "@sentry/node";
 
 const fallbackDsn = "https://6f7a59ca46bb683295a81cc97086b160@o4511491372023808.ingest.us.sentry.io/4511527636828160";

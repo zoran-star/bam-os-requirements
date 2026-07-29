@@ -20,6 +20,7 @@
 // academy has such an offer the agent treats it as not-currently-offered.
 
 import { resolveFee, applyFee, taxFee } from "../_fees.js";
+import { resolveTestimonials } from "../_testimonials.js";
 
 // ── tiny helpers ─────────────────────────────────────────────────────────────
 const money = (v) => { const n = Number(String(v).replace(/[^0-9.]/g, "")); return isFinite(n) && n > 0 ? `$${n}` : null; };
@@ -489,12 +490,67 @@ export function renderSellingPoints(data) {
   return parts.length ? parts.join("\n\n") : null;
 }
 
+// social_proof <- the testimonials store, via THE resolver (api/_testimonials.js).
+//
+// WHY THIS EXISTS, and it is a leak fix rather than a feature. The body for this
+// section used to be a hardcoded literal in prompt-structure.js:
+//     "Google Reviews: https://share.google/yel2SPxIMKzjsJG9c"
+// That is BAM GTA's link, living in the SHARED prompt structure every academy's
+// agent is built from, and nothing overrode it: this renderer did not exist, and
+// 0 of 47 academies had a stored `social_proof` row. So San Jose, DETAIL Miami
+// and Next Level all pointed parents at a Toronto academy's review page. Same
+// shape as the "near Oakville/GTA" default renderQualification was written to
+// kill, one section over.
+//
+// PURE ON PURPOSE: takes the already-resolved payload rather than a clientId, so
+// the hierarchy lives in the resolver and this function is testable without a
+// database. Do not re-resolve in here.
+//
+// The manual-vs-google distinction is NOT re-implemented here. A manual row does
+// not merely have null rating/date - the KEYS ARE ABSENT (api/_testimonials.js
+// publicShape, enforced again by testimonials_guard_source in the DB), so a typed
+// quote physically cannot render stars or a date. Duplicating that guard is how
+// the two copies drift, so this reads `source === "google"` for the one thing it
+// is allowed to add and nothing else.
+export function renderSocialProof(resolved, reviewUrl) {
+  const r = resolved || {};
+  const agg = r.aggregate || null;
+  const rows = Array.isArray(r.testimonials) ? r.testimonials : [];
+  const url = String(reviewUrl || "").trim();
+  const parts = [];
+
+  // The aggregate is a POINT-IN-TIME READING off the owner's Google profile, not
+  // a sync - it goes stale silently the moment the next review lands. Rendered as
+  // what Google showed, never as "your rating", for the same reason the card
+  // shows a date: a number we genuinely fetched reads as current in a way a typed
+  // one never would, so the provenance has to carry its own caveat.
+  if (agg && agg.rating != null && agg.count != null) {
+    parts.push(`Google showed ${agg.rating} stars across ${agg.count} reviews${agg.checked_at ? ` (read ${String(agg.checked_at).slice(0, 10)})` : ""}.`);
+  }
+
+  // One or two quotes, in the order the resolver gave them - the hierarchy is
+  // Zoran's tier-1 lock and re-sorting here would fork it.
+  for (const row of rows.slice(0, 2)) {
+    if (!row || !row.quote) continue;
+    const who = row.author || "Parent";
+    const stars = row.source === "google" && row.rating != null ? ` (${row.rating} stars on Google)` : "";
+    parts.push(`A parent said: "${String(row.quote).trim()}" - ${who}${stars}`);
+  }
+
+  if (url) parts.push(`If a parent asks where to leave a review, send them here: ${url}`);
+
+  // NO FACT, NO OUTPUT. Returning null makes the section absent, which raises the
+  // brain-health nudge chip exactly like the other eight. An academy with no
+  // reviews says nothing about reviews - it never borrows another academy's.
+  return parts.length ? parts.join("\n\n") : null;
+}
+
 // ── source map: where each derived fact is edited (the "Edit the brain" jump) ─
 // Every derived section is a VIEW onto a source the academy already owns. This
 // map tells the UI (client + staff portals) the plain-words source of each fact
 // and a machine `jump` target the client portal turns into a real deep link into
-// the Business Blueprint. Keys here ARE the 8 derivable facts (social_proof is
-// deliberately excluded - it is not rendered until the Google Reviews build).
+// the Business Blueprint. Keys here ARE the derivable facts, and the COUNT is read
+// from this map rather than written down anywhere - see FACT_KEYS below.
 export const FACT_SOURCES = {
   program:              { label: "Rendered from: Offer - General info step",               jump: "offer:general_info" },
   schedule:             { label: "Rendered from: Offer - Schedule step",                   jump: "offer:schedule" },
@@ -504,9 +560,18 @@ export const FACT_SOURCES = {
   business_info:        { label: "Rendered from: your Locations",                          jump: "locations" },
   qualification_config: { label: "Rendered from: Offer - General info and your Locations", jump: "offer:general_info+locations" },
   coaches:              { label: "Rendered from: your Team",                               jump: "team" },
+  // The review link lives on the clients row, edited in the offer's Onboarding
+  // step (the `__google_review__` field) beside the community group, because an
+  // academy has one review link, not one per offer. When a Reviews card exists
+  // this jump should point there instead.
+  social_proof:         { label: "Rendered from: your reviews and your Google review link", jump: "offer:onboarding" },
 };
-// The 8 fact keys we try to render live (order = the UI's canonical order). Used
-// for the "N of 8 facts live" brain-health strip. social_proof is NOT one of them.
+// The fact keys we try to render live (order = the UI's canonical order).
+//
+// The brain-health strip's TOTAL is derived from this list (api/agent-train.js),
+// never written down. It used to read `total: 8` as a literal while `live` was
+// computed from this array's length, so adding a ninth fact would have rendered
+// "9 of 8 facts live" - a wrong number in the product, not a stale comment.
 export const FACT_KEYS = Object.keys(FACT_SOURCES);
 
 // ── loader: which rendered facts does this academy get? ──────────────────────
@@ -543,7 +608,7 @@ export async function derivedFactOverrides(clientId, sbFn, opts = {}) {
         // tax_config is the academy's tax TEMPLATE ({ label, pct }). It was not
         // read here before 2026-07-26, which is why the renderer could state a
         // total but never its parts.
-        sbFn(`clients?id=eq.${enc}&select=business_name,address,website_setup,tax_config&limit=1`).catch(() => []),
+        sbFn(`clients?id=eq.${enc}&select=business_name,address,website_setup,tax_config,google_review_url&limit=1`).catch(() => []),
         sbFn(`locations?client_id=eq.${enc}&select=id,title,address,notes&order=sort_order.asc&limit=10`).catch(() => []),
         sbFn(`client_users?client_id=eq.${enc}&status=eq.active&select=name,role,title,bio&limit=50`).catch(() => []),
         sbFn(`offer_prices?tenant_id=eq.${enc}&is_routable=eq.true&is_active=eq.true&order=sort_order.asc&select=title,amount_cents,currency,billing_interval,source_offer_id,source_offer_price_key`).catch(() => null),
@@ -575,6 +640,25 @@ export async function derivedFactOverrides(clientId, sbFn, opts = {}) {
     set("selling_points", renderSellingPoints(data));
     set("qualification_config", renderQualification(data, client, locations));
     set("coaches",        renderCoaches(staff));
+
+    // social_proof is the only fact that needs its own read, so it gets its own
+    // catch - and that catch is LOAD-BEARING, not defensive habit.
+    //
+    // `resolveTestimonials` THROWS when it cannot answer, deliberately, so a seed
+    // decision fails loudly rather than baking a wrong step. But this function's
+    // outer catch returns `{}` for EVERYTHING, so an unguarded throw here would
+    // blank all NINE facts and drop the agent back to its hardcoded defaults for
+    // program, pricing, schedule and the rest. Losing the whole academy config
+    // because a review lookup blipped is far worse than losing one section.
+    //
+    // So: prompt-side degrades quietly to fact-absent, seed-side fails loudly.
+    // Same resolver, deliberately opposite handling, and the asymmetry is the
+    // point - a page can afford to lose a strip, a seed cannot afford to bake a
+    // wrong step and move on.
+    try {
+      set("social_proof", renderSocialProof(await resolveTestimonials(clientId), client && client.google_review_url));
+    } catch (_) { /* reviews unavailable -> the agent says nothing about reviews */ }
+
     return out;
   } catch (_) {
     return {};

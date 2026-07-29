@@ -90,7 +90,16 @@ async function handler(req, res) {
   slots.sort(function(a, b) { return new Date(a.start) - new Date(b.start); });
 
   // Include raw GHL response keys when empty to help diagnose misconfigured calendars.
-  var extra = slots.length === 0 ? { _ghl_keys: Object.keys(data || {}), _date_keys: Object.keys(dateMap) } : {};
+  // `_date_keys` was `Object.keys(dateMap)` and dateMap has never existed in this
+  // file, so the one branch that exists to EXPLAIN an empty calendar was the one
+  // branch that threw ReferenceError. Nothing here catches it - withSentryApiRoute
+  // re-throws - so a calendar with zero free slots answered with an unhandled 500
+  // instead of `{ok:true, slots:[]}`, and only when slots were empty, which is
+  // exactly when someone is debugging. Derived from `data` now, which is what the
+  // name meant: the date-shaped top-level keys GHL actually returned.
+  var extra = slots.length === 0
+    ? { _ghl_keys: Object.keys(data || {}), _date_keys: Object.keys(data || {}).filter(function(k) { return DATE_RE.test(k); }) }
+    : {};
   return res.status(200).json(Object.assign({ ok: true, slots: slots }, extra));
 }
 

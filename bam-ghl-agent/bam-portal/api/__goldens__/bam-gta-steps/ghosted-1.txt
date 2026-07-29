@@ -1,5 +1,2 @@
-Hi Maya Alvarez
-
-Just wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: https://byanymeanstoronto.ca/free-trial
-
-Thank you! 🙏
+EMPTY: false
+TEXT: "Hi Maya Alvarez\n\nJust wanted to see if my last message went through. We can get you in the gym for a free trial, here's the link: https://byanymeanstoronto.ca/free-trial\n\nThank you! 🙏"

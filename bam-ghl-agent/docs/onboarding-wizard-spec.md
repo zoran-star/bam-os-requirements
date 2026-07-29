@@ -107,6 +107,68 @@ Conditionals indent with an amber "if X". System actions render as gold rows.
   charge + Info to collect from new leads. Everything else stamped by the
   preset or handled by the team during funnel build. Applying = funnel build
   triggers silently (no "pings our team" copy anywhere owner-facing).
+- **Approve messages** (BUILT 2026-07-29, directly after Sales): one of the
+  owner's THREE approvals, and the thing the preset step had promised since it
+  shipped. Opening it renders every message in the five sales automations
+  (`contact_form`, `trial_form`, `missed_trial`, `ghosted`, `nurture`) exactly as
+  a parent receives them - SMS as bubbles, email in its real branded frame.
+  Approving sets `approved:true` on those five, which is what lets the engine
+  queue or send any of their steps. Writes `approved` ONLY: never `enabled`, on
+  an automation or a step, because the seeder turns `local` / `attributed` steps
+  off on purpose (api/_sync-class.js).
+  - ONE RENDER PATH, load-bearing: the surface renders through
+    `renderStepMessage` in `api/email-shells.js` - the same call `api/_send.js`
+    makes at send time, with the same `clientVars` + `academyFacts` vars. Exactly
+    three callers (send, this surface, the Sales step preview) and no others.
+    Locked by a PAIR of tests: `api/_approval-render.test.mjs` proves the surface
+    agrees with the real `sendOn()`, and `api/_gta-step-lock.test.mjs` holds the
+    absolute anchor (goldens produced BY `renderStepMessage`, recording subject +
+    empty flag + body). The first alone is not enough - both its sides call the
+    same function, so a bug inside it reads as agreement.
+  - Owner-only (`canApproveAsOwner`): a teammate with `can_train_agent` may
+    operate the agent but is not who this step asks. BAM staff keep access.
+    The decision lives in `armingRefusal` / `ARMING_LANES`
+    (`api/_sales-approval.js`), one registry for every route that can arm a
+    scripted message, and the refusals are proved by INVOKING the handlers in
+    `api/_arming-gate.test.mjs`.
+  - The page reads approved + enabled PER SEQUENCE. Approval is per automation, so
+    partial approval is a normal state and the copy is conditional on the counts.
+  - Detector: across those five, how many are approved **AND enabled**, vs total,
+    from the `automations[]` setup-status returns (which now carries `enabled`).
+    FAILS CLOSED TWICE - zero sales automations (preset not applied) is not
+    "approved", and an automation that is approved but DISABLED cannot send, so it
+    is not done either. That second case is real: the automations panel creates
+    placeholder rows that land on the DB default `enabled:false`, and BAM NY was
+    sitting in exactly that state on 2026-07-29. `seedAutomations` now repairs
+    `enabled` on a step-less row (never on one that has steps, and never
+    `approved`).
+  - **AN EMPTY SEQUENCE NEVER COLLECTS THE YES (2026-07-29).** A sales row with
+    ZERO STEPS is skipped by `approve-sales-messages` and excluded from the
+    wizard's Approve button; the response returns `skipped:[...]` and the surface
+    names them. This closes a failure the seeder repair above CREATED: the owner
+    pressed Approve over a screen reading "No messages in this one yet", both rows
+    went `approved:true`, and a routine re-seed (`applyPreset` calls
+    `seedAutomations`; `seed-preset-automations` is a portal action) then filled
+    and enabled them - four live outbound steps on a consent given over nothing.
+    Before the repair the row stayed silent, so that fix turned a dormant, VISIBLE
+    failure into an armed, INVISIBLE one. The fill has to come back and ask.
+    Asserted as a COMPOSED scenario (approve -> real re-seed -> `isAutomationLive`)
+    in `api/_arming-gate.test.mjs`, not as two passing halves.
+  - **SCOPE, do not overclaim.** This covers the five sales automations and
+    nothing else. TWO other lanes put scripted copy in front of a lead, both
+    stored in `clients.ghl_kpi_config` rather than in the `automations` table:
+    the confirm agent's booking confirmation and same-day check-in
+    (`api/agent/confirm-automations.js`, gated by `confirm_agent_mode` /
+    `shouldAutoSend`), and the booking agent's scripted OPENER
+    (`api/agent/booking-automations.js` + `scriptedBookingOpener`), which when
+    live+approved is the first message a new lead receives. Neither is shown or
+    approved here. The opener is now owner-GATED (arming it takes an owner) but
+    still not owner-READ. The preset step's old sub ("Nothing texts anyone until
+    you approve it") was broader than true and now says the narrower, accurate
+    thing. Bringing both under one owner approval is an OPEN BUILD.
+  - NOT a `launch:true` must-have, deliberately: adding it to the go-live
+    checklist would newly block the domain flip for any academy mid-flow whose
+    automations are not all approved. Worth a decision, not a silent one.
 - **Onboarding**: form fields (always-asked + toggles + custom) · Active
   members: file drop ANY layout → columns auto-mapped → matched to plan +
   Stripe sub (confident matches auto-attach; unmatched import badged "needs
@@ -125,6 +187,23 @@ Conditionals indent with an amber "if X". System actions render as gold rows.
 - **Go live**: the launch checklist (computed: pricing, preset, deck approved,
   site accepted) + Flip the domain (wizard: records → their registrar →
   verify; staff concierge for non-technical owners).
+
+## The owner approves THREE times (Zoran's ruling, 2026-07-29)
+
+Settled after a build described the sales-message step as "the second and last".
+Accepting the new website is a real approval and always was, so the count matches
+the code rather than the other way round:
+
+| # | Approval | Where | Records |
+|---|---|---|---|
+| 1 | Approve your brand board | Brand | `brand_ok` |
+| 2 | Approve your sales messages | Offer | `automations.approved` on the five |
+| 3 | Accept your new website | Launch | `site_accepted` |
+
+Enforced, not just written down: `OWNER_APPROVALS` in
+`bam-portal/api/_approval-render.test.mjs` fails the suite if a FOURTH owner
+approval appears in client-portal.html, or if a listed one disappears. Any prose
+quoting a count is checked against it. Do not revise the number back to two.
 
 ## The build pipeline (staff side)
 
@@ -178,6 +257,11 @@ so agents wait on A2P. Revisit before build of the Go live page.
 
 ## Deferred / parked decisions
 
+- **The confirm agent's scripted messages are outside the owner's approval** -
+  booking confirmation + same-day check-in send on `confirm_agent_mode`, not on
+  `approved`, so the Approve step cannot gate them (see Offer > Approve messages)
+- **Should Approve messages be a launch must-have?** - built without the flag so
+  it cannot retroactively block a mid-flow academy's domain flip
 - **How the academy pays BAM** - no home in the flow yet (the one open design hole)
 - Launch definition final sign-off (proposal above)
 - V2 support ticket system + Zoran-icon Slack replacement - full design banked

@@ -39,6 +39,7 @@ import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { normalizeReigniteAt, scheduleReignition, cancelReignitions, reigniteContactIdSet, reigniteParkMap, repliedAfterPark, dueReignitions, markReignition, listReignitions } from "./agent/_reignite.js";
 import { liveMemberContactIds } from "./agent/_live-members.js";
 import { resolveAgentActor } from "./agent/_auth.js";
+import { armingRefusal } from "./_sales-approval.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -1164,6 +1165,29 @@ async function handler(req, res) {
       const client = await loadClient(clientId);
       if (!client) return res.status(404).json({ error: "academy not found" });
       const cur = (client.ghl_kpi_config && client.ghl_kpi_config.booking_initial_automations) || {};
+      // ARMING A SALES MESSAGE, SO IT IS THE OWNER'S CALL (Zoran, 2026-07-29).
+      //
+      // This is the FOURTH arming lane and the one nobody saw, because it is not a
+      // row in the `automations` table - it is a blob on clients.ghl_kpi_config, and
+      // the audit that found the other three grepped the table. What it arms is not
+      // a follow-up either: when this sequence is enabled + approved with an enabled
+      // step, scriptedBookingOpener() puts its template in front of the AI draft, so
+      // it becomes THE FIRST MESSAGE A NEW LEAD RECEIVES. Latent today (no academy
+      // has booking_initial_automations set) which is exactly why it should be shut
+      // before the first one does.
+      //
+      // ONLY IN THE ARMING DIRECTION, same as set-approved. A non-owner may still
+      // save with approved falsy - that un-arms, and an emergency stop must never
+      // wait for the owner. Note the consequence, deliberately accepted: because
+      // sanitizeBookingAutomations rebuilds `approved` from the incoming payload,
+      // a non-owner editing the copy of an already-approved sequence has to save it
+      // un-approved and have an owner arm it again. Re-consent after a rewrite of
+      // the first message a lead sees is the behaviour we want, not a side effect.
+      const wantsApproved = !!(b.automations && typeof b.automations === "object" && b.automations.approved === true);
+      if (wantsApproved) {
+        const refuseBooking = armingRefusal("booking-automations-set", actor, clientId);
+        if (refuseBooking) return res.status(refuseBooking.status).json({ error: refuseBooking.error });
+      }
       const merged = sanitizeBookingAutomations(b.automations && typeof b.automations === "object" ? b.automations : {}, cur);
       const cfg = { ...(client.ghl_kpi_config || {}), booking_initial_automations: merged };
       try {

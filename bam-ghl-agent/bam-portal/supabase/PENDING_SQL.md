@@ -21,5 +21,6 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
 | Migration file | Applied | By |
 |---|---|---|
+| `20260729140000_ignition_campaigns.sql` | 2026-07-29 | Claude (Supabase MCP, at Zoran's request). Verified after: 18 + 11 columns, 4 RLS policies, 9 indexes, RLS on, 0 rows. Constraints probed in a self-rolling-back block - blank consent_basis, per_day 500, an unknown state and an orphan roster row are all rejected |
 | `20260725121000_commission_calculator.sql` | 2026-07-26 | Zoran (SQL editor) |
 | `20260725120000_onboarding_calls.sql` | 2026-07-26 | Zoran (SQL editor) |

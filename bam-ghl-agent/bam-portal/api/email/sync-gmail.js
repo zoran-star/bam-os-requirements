@@ -143,7 +143,7 @@ async function inboundSideEffects(client, clientId, contact, bodyText) {
         if (rs && provider === "portal") {
           const rows = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${cid}&status=eq.open&select=id,ghl_opportunity_id,stage_role&limit=1`);
           const opp = Array.isArray(rows) && rows[0];
-          if (opp && (opp.stage_role === "ghosted" || opp.stage_role === "interested" || opp.stage_role === "nurture")) {
+          if (opp && (opp.stage_role === "ghosted" || opp.stage_role === "interested" || opp.stage_role === "nurture" || opp.stage_role === "reignition")) {
             await moveStage({ clientId, sb, ghl, token: creds.token, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id }, stage: rs, role: "responded", contactId: String(ghlContactId) });
             await markReopened({ clientId, sb, oppRef: { id: opp.id, ghlOpportunityId: opp.ghl_opportunity_id } });
           }

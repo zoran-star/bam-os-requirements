@@ -19,8 +19,9 @@ import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_
 import { routeTransition } from "./agent/_router.js";
 import { nextSessionLabel } from "./_next_session.js";
 import { sendOn } from "./_send.js";
-import { renderEmail, clientVars } from "./email-shells.js";
+import { renderEmail, clientVars, renderStepMessage } from "./email-shells.js";
 import { academyFacts } from "./_academy-facts.js";
+import { SALES_AUTOMATION_KEYS, salesApprovalState, armingRefusal } from "./_sales-approval.js";
 import { withinQuietHours, nextSendableTime, quietTz } from "./agent/_quiet.js";
 import { isMuted } from "./agent/_mutes.js";
 import { markUnqualified } from "./agent/_tags.js";
@@ -93,6 +94,16 @@ function addWait(date, amount, unit) {
   }
   return d;
 }
+
+// The sample family every OWNER-FACING render uses (the Sales step preview and the
+// onboarding approval surface), so the same message cannot read differently on the
+// two screens an owner is sent between. Contact tokens only - the academy's own
+// facts come from its row and its other tables, spread over the top at each site.
+//
+// {{next_session}} is the one token a preview cannot know: the worker resolves the
+// academy's next OPEN slot at send time. Empty here renders exactly as a real send
+// with no slot known - the sentence carrying it drops out.
+const PREVIEW_FAMILY = { first_name: "Alex", full_name: "Alex Rivera", athlete: "Jordan Rivera", athlete_first: "Jordan", next_session: "" };
 
 async function loadSteps(automationId) {
   const rows = await sb(`automation_steps?automation_id=eq.${automationId}&order=position.asc&select=*`);
@@ -412,6 +423,22 @@ async function runWork(res) {
       }
     };
 
+    // DECLARED OUT HERE ON PURPOSE - DO NOT MOVE IT BACK INSIDE THE `try`.
+    // The catch at the bottom of this loop computes the retry time in the
+    // academy's OWN timezone: nextSendableTime(..., quietTz(client)). `const`/`let`
+    // inside the `try` is block-scoped to the try, so the catch cannot see it and
+    // reading `client` there throws ReferenceError - INSIDE the error handler,
+    // where nothing catches it. That escapes runWork() and kills the entire cron
+    // run (see the catch for the full blast radius). The retryable branch is the
+    // only one that touched `client`, which is why the exhausted-retries branch
+    // looked fine and this went unnoticed.
+    // Degradation is deliberate: it starts as null, so a job that fails BEFORE the
+    // client row loads hits quietTz(null) -> the QUIET_TZ default (America/Toronto),
+    // exactly what every other quiet-hours caller does with a missing client. It
+    // never silently becomes UTC, which would move sends outside the parent-facing
+    // window.
+    let client = null;
+
     try {
       // automation still live?
       if (!autoCache.has(job.automation_id)) {
@@ -451,7 +478,7 @@ async function runWork(res) {
       // Load the client BEFORE the quiet-hours check: quiet hours are evaluated in
       // the academy's own timezone (clients.time_zone), so `client` must exist here.
       if (!clientCache.has(job.client_id)) clientCache.set(job.client_id, await loadClient(job.client_id));
-      const client = clientCache.get(job.client_id);
+      client = clientCache.get(job.client_id) || null;
 
       // Quiet hours: never send outside the window — defer this job to next morning
       // (re-queue as pending; do NOT advance until it actually sends).
@@ -544,7 +571,15 @@ async function runWork(res) {
       // ADVANCE past this step (a suppressed/no-contact skip still moves the sequence on).
       await advance(steps, step.position);
     } catch (e) {
-      // Send/processing failed — retry up to MAX_ATTEMPTS, else mark failed.
+      // Send/processing failed - retry up to MAX_ATTEMPTS, else mark failed.
+      // NOTHING in this block may throw. There is no try/catch around the job
+      // loop, so a throw here escapes runWork() and the handler: the remaining
+      // jobs in this run are never processed, the cron gets a 500, and this job
+      // stays parked in 'sending' with its attempts NEVER incremented - so it can
+      // never reach MAX_ATTEMPTS and can never fail out. The stale-claim reaper at
+      // the top of runWork frees it after 15 min, which turns a retryable blip
+      // into an unbounded re-send loop rather than a stuck row. `client` is
+      // hoisted above the try for exactly this reason.
       const attempts = (job.attempts || 0) + 1;
       if (attempts >= MAX_ATTEMPTS) { await finish({ status: "failed", attempts, last_error: String(e.message || e).slice(0, 300) }); failed++; }
       else { await finish({ status: "pending", attempts, last_error: String(e.message || e).slice(0, 300), run_after: nextSendableTime(new Date(Date.now() + RETRY_BACKOFF_MS), quietTz(client)).toISOString() }); }
@@ -736,9 +771,16 @@ async function handler(req, res) {
       return res.status(200).json({ automations: out });
     }
 
-    // Render an email step to full HTML for the in-portal preview modal. Uses the
-    // SAME renderEmail the sender uses (template:<key> refs resolved, brand frame,
-    // GHL merge tokens) so the preview matches the real send. Sample contact tokens.
+    // Render an email step to full HTML for the in-portal preview modal (the Sales
+    // step editor's "Preview" button). Goes through renderStepMessage, the SAME
+    // call api/_send.js makes at send time and the approval surface below makes -
+    // one render path for all three.
+    //
+    // It used to call renderEmail directly with its own sample family and an
+    // UNRESOLVED subject, so a subject carrying {{contact.first_name}} previewed as
+    // the literal token. That mattered more once the approval step started telling
+    // owners to "edit any message in Sales": the two owner-facing surfaces would
+    // have disagreed about the same message.
     if (b.action === "preview-email") {
       // Load the client so the preview renders with the academy's OWN identity
       // (name / site / owner), exactly like the real send path.
@@ -749,13 +791,141 @@ async function handler(req, res) {
       // owner is most likely to be checking. That is worse than no preview, because
       // it is a preview that quietly disagrees with what will be sent.
       const facts = await academyFacts(sb, client).catch(() => ({}));
-      const html = renderEmail({
-        clientId,
-        subject: b.subject || "",
-        body: b.body || "",
-        vars: { first_name: "Alex", athlete: "Jordan", ...clientVars(client), ...facts },
+      const m = renderStepMessage({
+        channel: "email", clientId, subject: b.subject, body: b.body,
+        vars: { ...PREVIEW_FAMILY, ...clientVars(client), ...facts },
       });
-      return res.status(200).json({ html, subject: b.subject || "" });
+      return res.status(200).json({ html: m.html, subject: m.subject, empty: m.empty });
+    }
+
+    // ── The owner's sales-message approval (onboarding wizard, Offer section) ──
+    //
+    // `approval-queue` returns every message in the five SALES automations
+    // (SALES_AUTOMATION_KEYS), RENDERED, so the owner reads exactly what a parent
+    // will receive before those sequences are allowed to send.
+    // `approve-sales-messages` is the yes.
+    //
+    // SCOPE: these five and nothing else. The confirm agent's scripted booking
+    // confirmation and same-day check-in are not automations rows and are gated by
+    // confirm_agent_mode, not `approved` - see the header of api/_sales-approval.js.
+    //
+    // ONE RENDER PATH. Both the vars and the renderer here are the send path's:
+    // clientVars(client) + academyFacts(sb, client) spread into vars, then
+    // renderStepMessage - the same call sendOn() makes at send time and the same one
+    // `preview-email` above makes. See the header of api/email-shells.js for the
+    // full list of callers and for which lock covers what.
+    if (b.action === "approval-queue") {
+      const client = await loadClient(clientId).catch(() => null);
+      const facts = await academyFacts(sb, client).catch(() => ({}));
+      const vars = { ...PREVIEW_FAMILY, ...clientVars(client), ...facts };
+      const autos = await sb(`automations?client_id=eq.${clientId}&automation_key=in.(${SALES_AUTOMATION_KEYS.join(",")})&select=*`) || [];
+      // Preset order, not alphabetical: the owner reads the sequences in the order a
+      // lead meets them.
+      const list = SALES_AUTOMATION_KEYS.map((k) => (Array.isArray(autos) ? autos : []).find((a) => a.automation_key === k)).filter(Boolean);
+      const messages = [];
+      for (const a of list) {
+        const steps = await loadSteps(a.id);
+        messages.push({
+          id: a.id, automation_key: a.automation_key, approved: !!a.approved, enabled: !!a.enabled,
+          steps: steps.map((s) => {
+            const base = {
+              id: s.id, position: s.position, channel: s.channel,
+              wait_amount: s.wait_amount, wait_unit: s.wait_unit,
+              // A step the seeder left OFF (its copy is another academy's literals
+              // until this one writes its own - see api/_sync-class.js) will not
+              // send, and the surface says so rather than showing it as approved.
+              enabled: !!s.enabled,
+            };
+            // FAIL SOFT, PER STEP. renderStepMessage throws on a channel it does
+            // not know, and `channel` is not validated on every write path into
+            // automation_steps - so one malformed row would 500 this handler and
+            // blank the ENTIRE approval surface, where the send path would only
+            // lose that one step. The owner reads and approves the rest, and the
+            // bad step is shown as unrenderable. It cannot send either: sendOn
+            // throws on the same channel, so the step fails rather than going out.
+            try {
+              const m = renderStepMessage({ channel: s.channel, clientId, subject: s.subject, body: s.body, vars });
+              return { ...base, subject: m.subject || "", html: m.html || "", text: m.text || "", empty: !!m.empty };
+            } catch (e) {
+              console.error("[automations] approval-queue could not render step", s.id, e && e.message);
+              return { ...base, subject: "", html: "", text: "", empty: false, unrenderable: String((e && e.message) || e).slice(0, 200) };
+            }
+          }),
+        });
+      }
+      return res.status(200).json({ ok: true, messages, ...salesApprovalState(list) });
+    }
+
+    // The approval itself: sets approved:true on this academy's five sales
+    // automations, which is what lets anything send at all.
+    //
+    // FAILS CLOSED, four ways: the rows are re-read scoped to this academy (never
+    // trusted from the request), only the five shared sales keys are ever touched
+    // (the `onboarding` welcome sequence is NOT part of this yes), an academy
+    // with no sales automations is refused rather than reported approved - nothing
+    // to approve is not approval - and a row with ZERO STEPS is skipped, because
+    // consent to an empty sequence is consent to whatever lands in it later.
+    //
+    // WHY THE STEP-LESS SKIP EXISTS, because it is not obvious and it was created by
+    // a fix to the other half of this path (2026-07-29). The seeder learned to repair
+    // a row born dormant: a step-less automation at enabled:false gets enabled:true
+    // and the canonical steps written into it. Good on its own. But this action used
+    // to approve every sales row it found without looking at whether it CONTAINED
+    // anything, and `approval-queue` happily renders a sequence with no messages in
+    // it. Composed, on BAM NY's real shape:
+    //
+    //   owner presses Approve over a screen with no messages on it -> approved:true
+    //   a routine re-seed runs (applyPreset calls seedAutomations, and
+    //     seed-preset-automations is a portal action) -> enabled:true + steps
+    //   isAutomationLive -> true. Four live outbound steps, no second consent.
+    //
+    // Before the seeder repair the row stayed enabled:false and stayed silent, so
+    // that fix turned a dormant, VISIBLE failure into an armed, INVISIBLE one. The
+    // owner's yes has to be about messages they read, so an empty sequence does not
+    // collect one and the fill has to come back and ask.
+    //
+    // The boundary is ZERO STEPS on purpose - the same boundary the seeder's repair
+    // uses. A row with steps is one an academy has configured; whether those steps
+    // are switched on is a separate decision the owner can see on the surface. A row
+    // with no steps is one the seeder will still write into.
+    //
+    // It writes `approved` ONLY. It must never touch `enabled` on an automation or
+    // on a step: the seeder turns individual steps off on purpose, and flipping them
+    // on here would live-send one academy's words from another academy's number.
+    if (b.action === "approve-sales-messages") {
+      // OWNER ONLY (plus BAM staff - see resolveAgentActor). The operate scope
+      // `canActOn` admits any teammate with can_train_agent, and this action arms
+      // live outbound to leads under a step the product calls the owner's approval.
+      // An operational flag is not that person's consent. The decision itself lives
+      // in armingRefusal (api/_sales-approval.js) so it can be tested by invoking it
+      // rather than by grepping for it - see api/_arming-gate.test.mjs.
+      const refuseApprove = armingRefusal("approve-sales-messages", actor, clientId);
+      if (refuseApprove) return res.status(refuseApprove.status).json({ error: refuseApprove.error });
+      // `enabled` is selected because salesApprovalState needs it: a row that is
+      // approved but disabled cannot send, so it must not be reported as done.
+      const autos = await sb(`automations?client_id=eq.${clientId}&automation_key=in.(${SALES_AUTOMATION_KEYS.join(",")})&select=id,automation_key,approved,enabled`) || [];
+      const list = Array.isArray(autos) ? autos : [];
+      if (!list.length) return res.status(400).json({ error: "no sales messages to approve yet - apply your sales preset first" });
+      // Which of them actually contain something to consent to. One query for all
+      // five rather than one per row.
+      const stepRows = await sb(`automation_steps?automation_id=in.(${list.map((a) => a.id).join(",")})&select=automation_id`) || [];
+      const filled = new Set((Array.isArray(stepRows) ? stepRows : []).map((s) => s.automation_id));
+      const armable = list.filter((a) => filled.has(a.id));
+      // Named, and returned, so the surface can say "these are not ready yet"
+      // instead of reading green off an approval that covered nothing.
+      const skipped = list.filter((a) => !filled.has(a.id)).map((a) => a.automation_key);
+      if (!armable.length) {
+        return res.status(400).json({ error: "these sequences have no messages in them yet - nothing to approve", skipped });
+      }
+      for (const a of armable) {
+        if (a.approved) continue;
+        await sb(`automations?id=eq.${a.id}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ approved: true, updated_at: new Date().toISOString() }) });
+      }
+      // The response reports what is TRUE after the write, not what was asked for:
+      // a skipped row stays at its stored `approved`, so salesApprovalState cannot
+      // report done over a sequence nobody has read.
+      const after = list.map((a) => (filled.has(a.id) ? { ...a, approved: true } : a));
+      return res.status(200).json({ ok: true, skipped, ...salesApprovalState(after) });
     }
 
     // Home-screen X (Zoran 2026-07-21): pull one lead out of every active
@@ -768,11 +938,34 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, exited: (n && n.exited) || 0 });
     }
 
+    // NOTE: this action does NOT carry `enabled` / `approved`. See below.
     if (b.action === "upsert-automation") {
       if (!b.automation_key) return res.status(400).json({ error: "automation_key required" });
+      // THE THIRD DOOR, closed by construction rather than by a guard.
+      //
+      // This wrote `approved: !!b.approved` and `enabled: !!b.enabled` straight from
+      // the request body, and because it upserts (on_conflict + merge-duplicates) it
+      // UPDATES an existing row. So a POST of
+      //   {action:'upsert-automation', automation_key:'trial_form', approved:true, enabled:true}
+      // armed a live sales sequence under the plain `canActOn` scope - the same hole
+      // set-approved had, one action over, and reachable by anyone who could open the
+      // automations panel.
+      //
+      // It was not only theoretical: the panel's own seed list (_AUTO_SEED in
+      // client-portal.html) called it with approved:true, enabled:true for
+      // `onboarding` and `nurture`. Merely OPENING that panel for an academy with no
+      // nurture row created one already armed, with nobody having approved anything -
+      // and seed-preset-automations, being edit-safe, would later fill it with steps.
+      //
+      // The fields are DROPPED rather than guarded. On INSERT the columns take their
+      // database defaults (both false - migration 20260625204628), which is exactly
+      // the dormant seed the whole model depends on. On UPDATE, PostgREST only writes
+      // the columns present in the payload, so an academy's live state is untouched
+      // by a rename. Arming now has exactly two doors, both owner-scoped:
+      // `approve-sales-messages` and `set-approved`.
       const row = {
         client_id: clientId, automation_key: String(b.automation_key),
-        name: b.name ?? null, enabled: !!b.enabled, approved: !!b.approved,
+        name: b.name ?? null,
         ghl_stage_name: b.ghl_stage_name ?? null, updated_at: new Date().toISOString(),
       };
       // Offer tie-in: scope the automation to an offer when the caller says so.
@@ -789,8 +982,17 @@ async function handler(req, res) {
     //     enabled/approved on an existing one),
     //   - adds the default step ONLY when the automation has zero steps (never clobbers
     //     an edited message).
-    // Dormant: seeds enabled:true + approved:false, so nothing sends until approved
-    // AND portal_entry_routing.enabled is on.
+    // Dormant: seeds enabled:true, so nothing sends until approved AND
+    // portal_entry_routing.enabled is on.
+    //
+    // `approved` IS NOT IN THE INSERT, for the reason upsert-automation does not
+    // carry it either. It only ever wrote `!!def.approved`, which is false for every
+    // key in FORM_INTRO_DEFAULTS, so the row was born dormant - but this action runs
+    // under the plain canActOn scope, which admits any teammate with can_train_agent,
+    // and a fifth write site that PASSES an arming field is one edit away from
+    // birthing an armed row. Leaving the column off the payload means the database
+    // default (false, migration 20260625204628) decides, and there is nothing here to
+    // flip. Arming still has exactly two doors, both owner-scoped.
     if (b.action === "seed-form-intro") {
       const key = String(b.automation_key || "");
       const def = FORM_INTRO_DEFAULTS[key];
@@ -799,7 +1001,7 @@ async function handler(req, res) {
       let auto = Array.isArray(autos) && autos[0];
       if (!auto) {
         const ins = await sb(`automations?on_conflict=client_id,automation_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-          body: JSON.stringify([{ client_id: clientId, automation_key: key, name: def.name, enabled: !!def.enabled, approved: !!def.approved, offer_id: b.offer_id || null, updated_at: new Date().toISOString() }]) });
+          body: JSON.stringify([{ client_id: clientId, automation_key: key, name: def.name, enabled: !!def.enabled, offer_id: b.offer_id || null, updated_at: new Date().toISOString() }]) });
         auto = Array.isArray(ins) && ins[0];
       }
       if (!auto) return res.status(500).json({ error: "seed failed" });
@@ -829,6 +1031,13 @@ async function handler(req, res) {
     }
 
     // Verify an automation_id belongs to this academy before mutating its steps.
+    //
+    // `&client_id=eq.${clientId}` is the ENTIRE tenant boundary for set-approved -
+    // the arming write. Every other action here is reached through the handler's
+    // canActOn gate on the client_id in the BODY, which stops academy A asking about
+    // academy B; this one takes an automation_id instead, so without the scope on
+    // this select an owner of A could arm an automation belonging to B by id. The
+    // write itself carries the same filter (defence in depth, not a substitute).
     async function ownsAutomation(automationId) {
       const a = await sb(`automations?id=eq.${automationId}&client_id=eq.${clientId}&select=id&limit=1`);
       return Array.isArray(a) && !!a[0];
@@ -868,8 +1077,33 @@ async function handler(req, res) {
 
     if (b.action === "set-enabled" || b.action === "set-approved") {
       if (!b.automation_id || !(await ownsAutomation(b.automation_id))) return res.status(403).json({ error: "unknown automation" });
+      // ARMING IS THE OWNER'S CALL, ON EVERY ROUTE (Zoran, 2026-07-29). Switching on
+      // live messaging to parents is an owner decision wherever it happens - not only
+      // on the onboarding step that carries his name.
+      //
+      // This is the SECOND door to that decision. The wizard's approve-sales-messages
+      // action was already owner-scoped, but the Sales panel's On/Off switch
+      // (_autoSetLive) fires set-approved + set-enabled together, so this route was
+      // "arm this sequence" under the weaker `canActOn` scope - which admits any
+      // teammate holding can_train_agent. A teammate could flip the five sequences On,
+      // parents would start receiving texts, and the wizard's approve step would go
+      // green with the owner never having read a message.
+      //
+      // NARROW, AND ONLY IN THE ARMING DIRECTION:
+      //   set-approved value=true   -> owner (or BAM staff). First consent.
+      //   set-approved value=false  -> canActOn. Un-approving is an emergency stop;
+      //                               it must never wait for the owner.
+      //   set-enabled  either way   -> canActOn. Operators keep the kill switch and
+      //                               can re-enable what the owner already approved.
+      //
+      // The can_train_agent FLAG is untouched - it means other things. Only these
+      // routes narrowed.
+      if (b.action === "set-approved" && !!b.value) {
+        const refuseArm = armingRefusal("set-approved", actor, clientId);
+        if (refuseArm) return res.status(refuseArm.status).json({ error: refuseArm.error });
+      }
       const field = b.action === "set-enabled" ? "enabled" : "approved";
-      await sb(`automations?id=eq.${b.automation_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ [field]: !!b.value, updated_at: new Date().toISOString() }) });
+      await sb(`automations?id=eq.${b.automation_id}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ [field]: !!b.value, updated_at: new Date().toISOString() }) });
       return res.status(200).json({ ok: true });
     }
 

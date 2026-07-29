@@ -1,4 +1,3 @@
-/* global process */
 import { withSentryApiRoute } from "./_sentry.js";
 import { ADMIN_ROLES, hasRole } from "./_roles.js";
 

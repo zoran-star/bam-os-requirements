@@ -81,11 +81,23 @@ Offer / Launch) so the scorecard matches what the owner sees.
 
 From the scorecard, derive and present a SHORT ranked list:
 
-1. **🟡 Ready chunks nobody started** → name the runbook and where it runs
-   (`/branding-deck`, `/site-build --phase <x>`, `/email-templates`,
-   `/agreement` run in the **bam-client-sites repo**; `/ghl-pipeline-import`
-   runs here). Offer to start it in this session if it's portal-side, or to
-   set up the sites-repo session if not.
+1. **🟡 Ready chunks nobody started** → name the runbook and where it runs.
+   Chunk to skill:
+
+   | Chunk | Skill | Repo |
+   |---|---|---|
+   | deck | `/branding-deck` | bam-client-sites |
+   | core | `/site-build --phase core` | bam-client-sites |
+   | templates | `/email-templates` (member emails only) | bam-client-sites |
+   | sales | `/sales-system` | bam-client-sites, but it drives monorepo scripts too |
+   | onboarding | `/site-build --phase onboarding` | bam-client-sites |
+   | agreement | `/agreement` | bam-client-sites |
+
+   `/ghl-pipeline-import` runs here. Note `/site-build` no longer owns
+   `--phase sales`: the whole sales system (funnel pages, the ten messages, the
+   two authored emails, the trial emails, the rendered review) is `/sales-system`.
+   Offer to start it in this session if it's portal-side, or to set up the
+   sites-repo session if not.
 2. **⬜ Waiting chunks** → say which OWNER step unlocks each one ("agreement
    goes ready when policy + legal name are in").
 3. **Stalled owner steps** (untouched for days with things blocked behind

@@ -29,6 +29,31 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  // api/ is Vercel serverless JavaScript running on Node, NOT in a browser.
+  // Without this block those files inherited `globals.browser` from the block
+  // above, so `process`, `Buffer`, `console` and friends read as undefined and
+  // eslint reported 1223 no-undef errors that were not bugs. That noise is why
+  // nobody ran the linter, and it is how a REAL no-undef (`client` read from a
+  // catch after being declared inside the try, api/automations.js) shipped and
+  // put the send worker into a 15-minute retry loop.
+  //
+  // Declaring the right environment is a CONFIG fix: it clears the false
+  // reports without editing a single line of live payment, messaging or
+  // automation code, which a mass "fix the lint" pass would have done.
+  // .mjs is included so the api/_*.test.mjs suites are covered too - they were
+  // matched by no config block at all, i.e. silently unlinted.
+  {
+    files: ['api/**/*.js', 'api/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        // On the Node 20 runtime but not in globals.node for this version of
+        // the `globals` package. Mirrors the fetch entry the TS block below
+        // already carries.
+        fetch: 'readonly',
+      },
+    },
+  },
   ...tseslint.configs.recommended.map((config) => ({
     ...config,
     files: serverTsFiles,

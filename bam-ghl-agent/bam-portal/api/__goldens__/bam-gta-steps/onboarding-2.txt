@@ -1,4 +1,6 @@
 SUBJECT: Welcome to By Any Means Basketball 🏀
+PREHEADER: You're in. Everything you need to get started with By Any Means Basketball.
+EMPTY: false
 
 You're in. Everything you need to get started with By Any Means Basketball.
 BY ANY MEANS GTA
