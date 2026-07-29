@@ -133,14 +133,38 @@ jobs:
         run: node bam-portal/scripts/verify-client-portal-ui.mjs
 
       # Business Blueprint hydration guards. Separate from the suites above because
-      # it lives in scripts/ and runs from the parent directory. Its own negative
-      # control (MUTATE=b1) reverts one fix and must make it fail.
+      # it lives in scripts/ and runs from the parent directory.
+      #
+      # This script carries FOUR controls, each reverting a different hydration fix,
+      # and CI ran only b1 - so b2, b3 and b4 were committed, documented and never
+      # executed, the same "trusted because it exists" gap the suites step above was
+      # rewritten to close. All four bite; nobody had checked.
+      #
+      # Controls are read from the script's own MUT map, which is the source of
+      # truth. Do NOT go back to grepping the prose docs: they said "b1|b2|b3|b4" in
+      # one line and "b1|b2|b3" in another, and a MUTATE= glob found only b1, which
+      # is how a loop that looked like it covered everything covered one quarter.
+      #
+      # The script now prints the same NEGATIVE CONTROL PASSED banner as the api
+      # suites, so this step applies the identical rule: a control counts as caught
+      # only when the run SAYS so. Exit status cannot carry it - an unknown control
+      # name and a control whose target text has moved both exit non-zero too.
       - name: Verify Business Blueprint hydration guards
         working-directory: bam-ghl-agent
         run: |
           node bam-portal/scripts/verify-bb-hydration.mjs
-          if MUTATE=b1 node bam-portal/scripts/verify-bb-hydration.mjs >/dev/null 2>&1; then
-            echo "::error::verify-bb-hydration MUTATE=b1 passed, so its negative control is decorative"
-            exit 1
-          fi
-          echo "Hydration guards pass and their negative control bites."
+          controls=$(sed -n '/^const MUT = {/,/^};/p' bam-portal/scripts/verify-bb-hydration.mjs \
+                     | grep -oE '^  [A-Za-z][A-Za-z0-9_]*:' | tr -d ' :')
+          [ -n "$controls" ] || { echo "::error::could not read the MUT control map - re-point this step at it"; exit 1; }
+          fail=0
+          for m in $controls; do
+            out=$(MUTATE="$m" node bam-portal/scripts/verify-bb-hydration.mjs 2>&1) || true
+            if printf '%s' "$out" | grep -q 'NEGATIVE CONTROL PASSED'; then
+              echo "  caught   MUTATE=$m"
+            else
+              echo "::error::verify-bb-hydration MUTATE=$m did not report NEGATIVE CONTROL PASSED - it is decorative, missing, or its target text has moved"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || exit 1
+          echo "Hydration guards pass and every one of their negative controls bites."

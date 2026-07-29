@@ -183,8 +183,22 @@ const MUT = {
 };
 let srcFinal = src;
 if (process.env.MUTATE) {
+  // An UNKNOWN control name used to destructure `undefined` and die with a
+  // TypeError. That exited non-zero, which is exactly what a caught control looks
+  // like from the outside, so CI could not tell "this control bit" from "this
+  // control does not exist". Say so explicitly instead, and do not print the
+  // PASSED banner, so a stale name in the docs fails the build.
+  if (!Object.prototype.hasOwnProperty.call(MUT, process.env.MUTATE)) {
+    console.log('\n❌ NEGATIVE CONTROL FAILED: no control named ' + process.env.MUTATE
+      + '. Known controls: ' + Object.keys(MUT).join(', '));
+    process.exit(1);
+  }
   const [re, rep] = MUT[process.env.MUTATE];
-  if (!re.test(srcFinal)) throw new Error('mutation target not found: ' + process.env.MUTATE);
+  if (!re.test(srcFinal)) {
+    console.log('\n❌ NEGATIVE CONTROL FAILED: ' + process.env.MUTATE
+      + ' target text has moved, so it reverts nothing. Re-point it at the fix it is meant to break.');
+    process.exit(1);
+  }
   srcFinal = srcFinal.replace(re, rep);
   console.log('!! MUTATED: ' + process.env.MUTATE + ' fix reverted\n');
 }
@@ -425,4 +439,15 @@ check(rowI2.business_name === STORED.business_name,
   'blank business_name leaves the cache alone (RPC COALESCEs it)');
 
 console.log(fails ? `\nRESULT: ${fails} FAILURE(S)` : '\nRESULT: ALL PASS');
+
+// Under a control, report in the SAME language as the api/_*.test.mjs suites, so
+// CI can apply one rule everywhere: a control counts as caught only if the run
+// SAYS it was caught. Exit status alone cannot carry that, because this script
+// also exits non-zero when a control is missing or its target has moved.
+if (process.env.MUTATE) {
+  console.log(fails
+    ? `\n✅ NEGATIVE CONTROL PASSED: MUTATE=${process.env.MUTATE} was caught by ${fails} assertion(s).`
+    : `\n❌ NEGATIVE CONTROL FAILED: MUTATE=${process.env.MUTATE} reverted a fix and every assertion still passed. That control is decorative.`);
+  process.exit(fails ? 0 : 1);
+}
 process.exit(fails ? 1 : 0);
