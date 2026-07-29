@@ -14857,6 +14857,20 @@ function _lpRenderPreview() {
 
 function _lpSetDevice(d) { _LP_DEVICE = d; _lpRenderPreview(); }
 
+// "Updated today" reads better than a date the client has to compare against
+// today's. Anything older than a week gets the actual date. Returns '' on a value
+// that is not a date, so a bad manifest entry shows nothing rather than "Invalid Date".
+function _lpWhen(iso) {
+  if (!iso) return '';            // new Date(null) is the epoch, which would read "Jan 1, 1970"
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return days + ' days ago';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+}
+
 function _lpOpen(path) {
   const page = ((_LP_DATA && _LP_DATA.pages) || []).find(p => p.path === path);
   if (!page) return;
@@ -14901,21 +14915,58 @@ async function openLivePagesView() {
       host.innerHTML = '<div class="req-empty" style="padding:20px 0">No live pages found for your site yet.</div>';
       return;
     }
-    const cards = pages.map(p => `
+    // Grouped sections (Main pages / Sub pages / Funnels), in the order the API
+    // gives them, so a client with 10+ pages can find one. Older API responses
+    // carry no group, in which case everything falls into one unnamed section and
+    // this renders exactly as it did before.
+    const groups = (_LP_DATA && Array.isArray(_LP_DATA.groups) && _LP_DATA.groups.length)
+      ? _LP_DATA.groups
+      : [null];
+    // Gate on the FORMATTED value, not on p.updated: a junk date formats to '' and
+    // would otherwise render a bare "Updated" with nothing after it.
+    const card = (p) => {
+      const when = _lpWhen(p.updated);
+      return `
       <button data-lp-path="${_bbEscapeHtml(p.path)}" onclick="_lpOpen('${_bbEscapeHtml(p.path).replace(/'/g, "\\'")}')"
         style="text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;cursor:pointer;font:inherit;color:inherit">
         <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">${_bbEscapeHtml(p.label)}</div>
         <div style="font-size:12px;color:var(--muted);word-break:break-all">${_bbEscapeHtml(p.path)}</div>
-      </button>`).join('');
+        ${when ? `<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Updated ${_bbEscapeHtml(when)}</div>` : ''}
+      </button>`;
+    };
+    const sections = groups.map(g => {
+      const inGroup = g === null ? pages : pages.filter(p => p.group === g);
+      if (!inGroup.length) return '';
+      const head = g === null ? '' : `
+        <div style="display:flex;align-items:baseline;gap:10px;margin:0 0 10px">
+          <div style="font-weight:700;font-size:13px;color:var(--text)">${_bbEscapeHtml(g)}</div>
+          <div style="font-size:11.5px;color:var(--muted)">${inGroup.length} page${inGroup.length === 1 ? '' : 's'}</div>
+        </div>`;
+      return `<div style="margin-bottom:20px">${head}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">${inGroup.map(card).join('')}</div>
+      </div>`;
+    }).join('');
+    // Newest page change across the whole site, so the client can see at a glance
+    // that work is landing without opening each page. Compare as TIME, not as
+    // strings: a junk value like "whenever" sorts above every real date.
+    const latest = pages
+      .map(p => ({ iso: p.updated, t: p.updated ? new Date(p.updated).getTime() : NaN }))
+      .filter(x => !isNaN(x.t))
+      .sort((a, b) => a.t - b.t)
+      .map(x => x.iso)
+      .pop();
     host.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
         <div>
           <div style="font-weight:700;font-size:15px;color:var(--text)">Your live website</div>
           <a href="${_bbEscapeHtml(_LP_DATA.site_url)}" target="_blank" rel="noopener" style="font-size:12.5px;color:var(--muted)">${_bbEscapeHtml(_LP_DATA.site_url)}</a>
         </div>
-        <div style="font-size:12px;color:var(--muted)">${pages.length} page${pages.length === 1 ? '' : 's'} live</div>
+        <div style="font-size:12px;color:var(--muted);text-align:right">
+          <div>${pages.length} page${pages.length === 1 ? '' : 's'} live</div>
+          ${latest ? `<div style="margin-top:2px">Last update ${_bbEscapeHtml(_lpWhen(latest))}</div>` : ''}
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:22px">${cards}</div>
+      <div style="margin-bottom:6px">${sections}</div>
       <div id="lp-preview"></div>`;
     _lpOpen(pages[0].path);
   } catch (e) {
