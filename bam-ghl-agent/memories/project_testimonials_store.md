@@ -34,7 +34,10 @@ hardcoded testimonial (fabricated corpus or any store quote pasted into source)
 appears in bam-client-sites or the portal's email/agent files. Exempt while
 ruled stay-as-is: detail-miami, supreme-hoops-training (a FOURTH fabricated-
 reviews academy, found by this check's first run 2026-07-29). Run it before
-declaring any consumer converted.
+declaring any consumer converted. STANDING RULE (orchestrator, 2026-07-29): CI
+runs only the corpus half and reports itself DEGRADED - no Supabase secrets in
+Actions, deliberately. The FULL check (with env, store-quote half included)
+must be run locally before merging any PR that touches testimonial content.
 
 **The skill:** repo-root `.claude/skills/testimonials/SKILL.md`. Filling the
 store is only half the build: free-trial cards, testimonial emails, agent
