@@ -29,16 +29,18 @@ staff-portal page. Any field on any row is editable by anyone who can see it.
 >   registry SM_CALLS in api/action-items.js); staff edit it in the client's
 >   Action Items tab (expandable per-call editor, PATCH {id, call_data}).
 >   MIGRATIONS APPLIED TO PROD 2026-07-26 (onboarding_calls +
->   commission_calculator; 46 clients, 0 with payment_model set = system live
->   but dormant until Mike sets terms). NOTE: onboarding_calls still carries a
+>   commission_calculator). NOTE: onboarding_calls still carries a
 >   client-read RLS policy from Cole's original client-visible spec - inert
 >   (no client code reads the table; API uses service role) but worth dropping
 >   for defense-in-depth now that the program is staff-only.
->   Gated tier:"program" (Cole's call 2026-07-25): the calls appear ONLY for
->   clients with clients.payment_model set (Commissions tab) AND non-V1 -
->   setting payment terms is the one switch that turns the sequence + the
->   staff Profile tab content on; clearing the model removes the items again
->   (onboarding_calls data survives). Calibration prompt on every call:
+>   ⚠️ UNGATED 2026-07-29 (Zoran): the calls now run for EVERY client, legacy
+>   V1 included - `tier:"program"` was REMOVED from the SM_CALLS steps and the
+>   "program" branch + the payment_model probe in loadClientSignals are gone.
+>   Why: the old gate needed clients.payment_model set (Commissions tab) and
+>   0 of 47 clients had it, so nobody ever saw the sequence. Deliberate V1
+>   exposure and safe because the steps are staff_only - V1 academies see
+>   nothing new. Do NOT re-add a payment_model gate without Zoran.
+>   Calibration prompt on every call:
 >   "What do you currently have in place for this?"
 >   NOT counted in ONBOARDING_STEP_COLS (roster bar = core steps only).
 >
