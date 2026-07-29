@@ -30,6 +30,7 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
+import { execFileSync } from "node:child_process";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -86,6 +87,40 @@ async function storeQuotes() {
 }
 
 const siteRepo = process.argv[2] || `${process.env.HOME}/bam-client-sites`;
+
+// ⚠️ NAME THE TREE YOU JUDGED. A local run resolves bam-client-sites as a
+// sibling working directory, and that checkout is frequently parked on a stale
+// branch with uncommitted changes - five sessions have hit it. So this check's
+// sites-half verdict describes whatever that neighbour happens to be checked
+// out on, NOT origin/main.
+//
+// This bit me: I reported "FAILS with 14 hits against origin/main" when I had
+// actually measured a tree parked on feat/global-components-free-trial from a
+// month earlier. The hit count happened to match, so nothing looked wrong, and
+// no reader could have told from the output which tree it was. A check that
+// does not name the tree it judged can be honestly misread, which is worse than
+// one that fails - so the ref is printed on EVERY run, and a sibling that is
+// not clean-on-main gets a loud warning.
+function siteRepoRef(dir) {
+  if (!existsSync(dir)) return null;
+  try {
+    const g = (args) =>
+      execFileSync("git", ["-C", dir, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const branch = g(["rev-parse", "--abbrev-ref", "HEAD"]);
+    const sha = g(["rev-parse", "HEAD"]);
+    const date = g(["log", "-1", "--format=%ad", "--date=short"]);
+    const dirty = g(["status", "--porcelain"]).split("\n").filter(Boolean).length;
+    // A DETACHED worktree sitting exactly on origin/main is the RECOMMENDED way
+    // to run this, so it must not warn - otherwise the warning trains people to
+    // ignore it, and a warning everyone ignores is worse than none.
+    let atOriginMain = false;
+    try { atOriginMain = g(["rev-parse", "origin/main"]) === sha; } catch (_) {}
+    return { branch, sha: sha.slice(0, 7), date, dirty, atOriginMain };
+  } catch (_) {
+    return null;
+  }
+}
+const siteRef = siteRepoRef(siteRepo);
 const roots = [
   ...(existsSync(siteRepo) ? [join(siteRepo, "clients"), join(siteRepo, "templates")] : []),
   new URL("../api/email-templates", import.meta.url).pathname,
@@ -96,6 +131,24 @@ if (!roots.length) { console.error("nothing to scan - bad path?"); process.exit(
 
 const store = await storeQuotes();
 const failures = [];
+
+// Printed on every run, pass or fail, so no verdict can be attributed to the
+// wrong tree.
+const refNote = siteRef
+  ? `sites tree: ${siteRepo} @ ${siteRef.branch} ${siteRef.sha} (${siteRef.date})` +
+    (siteRef.atOriginMain ? " = origin/main" : "") +
+    (siteRef.dirty ? ` +${siteRef.dirty} uncommitted` : "")
+  : `sites tree: NOT SCANNED (${siteRepo} absent) - portal roots only`;
+console.log(refNote);
+if (siteRef && (!siteRef.atOriginMain || siteRef.dirty)) {
+  console.error(
+    `⚠️  THE SITES TREE IS NOT CLEAN-ON-MAIN, so this run's sites-half verdict is\n` +
+    `   about that tree, not about origin/main. If you are relying on this before a\n` +
+    `   merge, run it against a fresh worktree off origin/main instead:\n` +
+    `     git -C ${siteRepo} worktree add --detach /tmp/sites-main origin/main\n` +
+    `     node scripts/check-testimonial-hardcodes.mjs /tmp/sites-main`
+  );
+}
 
 // Every exemption silently removes real coverage: a green with five exemptions
 // is not the same green as one with none, so the count is printed on EVERY
