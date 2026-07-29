@@ -27,7 +27,12 @@ This is what makes the session safe. Do it before any building.
    If pull fails (conflicts / "untracked files would be overwritten"), **stop and ask the user** —
    don't force anything.
 
-2. **Load the canonical context — actually read these now, in full:**
+2. **Check for queued SQL** - read `bam-ghl-agent/bam-portal/supabase/PENDING_SQL.md`.
+   If the PENDING table has rows, tell the user up front:
+   **"🗄️ N migration(s) are queued for prod - run `/pending-sql` to apply (blocked: <short list>)."**
+   Don't apply them here; just surface it.
+
+3. **Load the canonical context — actually read these now, in full:**
    - `bam-ghl-agent/docs/portal-engineering-guide.md` ← the build reference (map, patterns, safe-build protocol, footguns)
    - `bam-ghl-agent/CLAUDE.md` ← project overview + rules
    - `bam-ghl-agent/memories/MEMORY.md` ← the index of deep-dive notes (open the specific note when its topic comes up)
