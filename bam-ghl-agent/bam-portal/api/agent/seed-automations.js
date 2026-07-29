@@ -61,7 +61,7 @@ export async function seedAutomations({ clientId, offerId = null, keys = null, s
       if (steps.length) {
         await sb(`automation_steps`, {
           method: "POST", headers: { Prefer: "return=minimal" },
-          body: JSON.stringify(steps.map((s, i) => ({ automation_id: auto.id, position: s.position != null ? s.position : i, wait_amount: s.wait_amount, wait_unit: s.wait_unit, channel: s.channel, subject: s.subject ?? null, body: s.body, enabled: stepEnabled(s), updated_at: new Date().toISOString() }))),
+          body: JSON.stringify(steps.map((s, i) => ({ automation_id: auto.id, position: s.position != null ? s.position : i, wait_amount: s.wait_amount, wait_unit: s.wait_unit, channel: s.channel, subject: s.subject ?? null, body: s.body, sync_class: resolveSyncClass(s), enabled: stepEnabled(s), updated_at: new Date().toISOString() }))),
         });
       }
     }
@@ -98,11 +98,25 @@ export async function seedAutomations({ clientId, offerId = null, keys = null, s
 // construction: nothing can send from a `local` slot until a human turns it on,
 // and the only reason to turn it on is that the content is now theirs.
 //
-// Exported for the test. NOTE: this writes only `enabled`, not a sync_class
-// column. The automation_steps.sync_class migration is written but NOT yet
-// applied, and posting an unknown column to PostgREST 400s the whole insert,
-// which would break every seed. Once that migration is applied, persist the
-// resolved class on the row here too.
+// Exported for the test.
+//
+// PERSISTING THE CLASS, and why it is not optional (2026-07-29). The seeder now
+// writes `sync_class` on the row as well as `enabled`. It could not before - the
+// migration was unapplied and posting an unknown column 400s the whole insert -
+// and that gap turned out to be a live hole, not a formality.
+//
+// resolveSyncClass takes the STRICTEST of the row's own column and the class of
+// the template its body references. With nothing on the row, the template ref was
+// carrying the entire answer. So editing a body to anything that is not still
+// `template:<key>` silently DECLASSIFIED the step: an academy's real parent
+// testimonials went from `attributed` to `shared`, which is copyable, and no test
+// noticed because the row looked ordinary. Executed, all four of these resolved
+// `shared` before this change: a literal body, an empty body, a null body, and
+// `Template:nurture-3` with a capital T.
+//
+// With the class on the row, the body is only ever able to make a step STRICTER,
+// never looser, which is the invariant the whole strictest-wins design assumed it
+// already had. Existing rows were backfilled in the same change.
 export function stepEnabled(step) {
   return resolveSyncClass(step) === "shared";
 }

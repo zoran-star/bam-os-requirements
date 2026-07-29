@@ -364,8 +364,16 @@ ok(stepEnabled(null) === false, "a missing step row seeds OFF");
     "step 4 (template:nurture-4, shared) is the only one seeded ON");
   ok(seeded.every((s) => s.body && s.position != null),
     "the disabled steps are still CREATED, not skipped (sequence keeps its shape)");
-  ok(seeded.every((s) => !("sync_class" in s)),
-    "no sync_class column is written yet (its migration is unapplied; an unknown column 400s the insert)");
+  // REVERSED 2026-07-29, deliberately. This used to assert the OPPOSITE - that no
+  // sync_class was written, because the migration was unapplied and an unknown
+  // column 400s the whole insert. The migration is applied now, and leaving the
+  // column unwritten turned out to be a live hole: with nothing on the row, a body
+  // edit silently declassified a step from `attributed` to `shared`. The seeder
+  // stamps the resolved class, and it must keep stamping it.
+  ok(seeded.every((s) => typeof s.sync_class === "string" && s.sync_class),
+    "every seeded step carries its resolved sync_class on the row");
+  ok(seeded[0].sync_class === "local" && seeded[2].sync_class === "attributed" && seeded[3].sync_class === "shared",
+    "and the stamped class is the RESOLVED one per step (local / attributed / shared), not a blanket default");
 }
 
 {
@@ -385,6 +393,45 @@ ok(stepEnabled(null) === false, "a missing step row seeds OFF");
   ok(wrong.length === 0,
     `no non-shared step in ANY canonical default seeds enabled (checked ${calls.stepInserts.length} steps)`
     + (wrong.length ? " - ON but not shared: " + wrong.map((s) => s.body.slice(0, 40)).join(" | ") : ""));
+}
+
+console.log("\n── THE CLASS SURVIVES A BODY EDIT (the laundering hole, closed 2026-07-29) ──");
+// FOUND BY AN ADVERSARIAL TESTER, and it was live in production.
+//
+// resolveSyncClass takes the strictest of the ROW's class and the class of the
+// TEMPLATE its body references. Until 2026-07-29 the seeder wrote no class on the
+// row, so the template ref carried the entire answer - and the moment a body
+// stopped being exactly `template:<key>`, the step silently DECLASSIFIED. Real
+// parent testimonials went from `attributed` (never copy) to `shared` (copy
+// freely) because somebody edited the words, and nothing anywhere noticed.
+//
+// The seeder now persists the resolved class, and existing rows were backfilled.
+// These assertions are what stops it coming back: a body may only ever make a
+// step STRICTER, never looser.
+{
+  const EDITS = [
+    ["a literal body", "What families are saying about us"],
+    ["an empty body", ""],
+    ["a null body", null],
+    ["a near-miss ref (capital T)", "Template:nurture-3"],
+  ];
+  for (const [label, body] of EDITS) {
+    ok(resolveSyncClass({ sync_class: "attributed", body }) === "attributed",
+      `an attributed row stays attributed after ${label}`);
+    ok(mayCopyToAnotherAcademy({ sync_class: "attributed", body }) === false,
+      `...and still may not be copied to another academy after ${label}`);
+  }
+  // The hole itself, asserted directly, so the reason for the fix is legible:
+  // WITHOUT a class on the row, every one of those edits resolves `shared`.
+  for (const [label, body] of EDITS) {
+    ok(resolveSyncClass({ body }) === "shared",
+      `(the hole: with NO class on the row, ${label} resolves shared - which is why the seeder must persist it)`);
+  }
+  // And the seeder does persist it now. Class comes from the step, not a default.
+  ok(resolveSyncClass({ body: "template:nurture-3" }) === "attributed"
+    && resolveSyncClass({ body: "template:nurture-1" }) === "local"
+    && resolveSyncClass({ body: "template:nurture-4" }) === "shared",
+    "the class the seeder stamps is the resolved class of the canonical step, not a blanket default");
 }
 
 console.log("\n── THE PROMOTED ONBOARDING DEFAULT: 7 steps, GTA's shape minus testimonials ──");
