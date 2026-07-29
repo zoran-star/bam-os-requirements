@@ -28,7 +28,7 @@
  *   m1  manifest replaces the page list instead of leading it  -> B goes red
  *   m2  render never draws a section header                    -> C goes red
  *   m3  _lpWhen returns the raw value on a bad date            -> D goes red
- * Expected: unmutated ALL PASS; m1 -> 10 failures, m2 -> 2, m3 -> 2.
+ * Expected: unmutated ALL PASS; m1 -> 11 failures, m2 -> 2, m3 -> 2.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +65,7 @@ function grabBlock(src, startMarker, endMarker) {
 const apiPieces = [
   api.match(/const GROUP_ORDER = \[[^\]]*\];/)[0],
   api.match(/const FUNNEL_PATHS = \/[^\n]*\/i;/)[0],
+  api.match(/const FUNNEL_SUFFIX = \/[^\n]*\/i;/)[0],
   grab(api, 'guessGroup'),
   grab(api, 'orderGroups'),
   grab(api, 'labelFor'),
@@ -168,9 +169,11 @@ section('A. groups come back in a fixed order, funnels guessed only for known pa
     { path: '/free-trial', url: `${SITE}/free-trial`, label: 'Free Trial' },
     { path: '/enroll', url: `${SITE}/enroll`, label: 'Enroll' },
     { path: '/programs', url: `${SITE}/programs`, label: 'Programs' },
+    { path: '/private-training-funnel', url: `${SITE}/private-training-funnel`, label: 'Private Training Funnel' },
   ], []);
   const gg = (p) => (noManifest.pages.find((x) => x.path === p) || {}).group;
   ok(gg('/free-trial') === 'Funnels' && gg('/enroll') === 'Funnels', 'a site with no manifest still separates its funnels');
+  ok(gg('/private-training-funnel') === 'Funnels', 'a path the site itself named a funnel is grouped as one', gg('/private-training-funnel'));
   ok(gg('/programs') === 'Website pages' && gg('/') === 'Website pages', 'and does not guess a funnel out of an ordinary page');
 }
 
