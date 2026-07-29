@@ -23,6 +23,8 @@
 
 // clients.address is the BUSINESS address, not the gym. GTA's is "2205 Rosemount
 // Cres" while members train at 1079 Linbrook Rd. Never substitute one for the other.
+import { resolveTestimonials } from "./_testimonials.js";
+
 const VENUE_FROM = "locations, lowest sort_order";
 
 // Mon..Sun, as the plural day names the copy uses.
@@ -128,7 +130,7 @@ export function weeklySchedule(slots, timeZone) {
 // Every failure here is swallowed into an empty fact on purpose: a schedule lookup
 // that throws must not stop a welcome email from sending. A shorter email beats none.
 export async function academyFacts(sb, client) {
-  const out = { location_venue: "", location_schedule: [], location_coaches: [] };
+  const out = { location_venue: "", location_schedule: [], location_coaches: [], location_testimonials: [] };
   const id = client && client.id;
   if (!sb || !id) return out;
 
@@ -159,6 +161,26 @@ export async function academyFacts(sb, client) {
     const slots = await sb(`schedule_slots?tenant_id=eq.${id}&is_cancelled=is.false&start_time=gte.${from}&select=name,start_time,end_time,is_cancelled&order=start_time.asc&limit=500`);
     out.location_schedule = weeklySchedule(slots, client.time_zone || "UTC");
   } catch (_) { /* same */ }
+
+  try {
+    // The academy's OWN approved quotes, straight from THE resolver so the email
+    // cannot order or filter them differently from the website and the agent.
+    // Reader injected: this module holds no credentials, and a second resolver
+    // entry point would be the fork api/_testimonials.js forbids.
+    const { testimonials } = await resolveTestimonials(id, sb);
+    out.location_testimonials = Array.isArray(testimonials) ? testimonials : [];
+  } catch (_) {
+    // Swallowed like every other fact here: a store read that throws must not
+    // stop a send. It leaves the list EMPTY, which drops the quote block and
+    // its lead-in rather than sending a hollow section.
+    //
+    // ⚠️ AND THAT IS WHY THE REAL DROP RULE LIVES AT SEED TIME, NOT HERE. Zoran
+    // approved "empty store means the email is dropped"; he did not approve "a
+    // failed lookup means the email is dropped". At render time, empty and
+    // unreachable are indistinguishable, so this layer must never be the thing
+    // deciding whether the testimonials email exists. The seeder decides that,
+    // where a throw can fail loudly instead of quietly looking like no data.
+  }
 
   return out;
 }

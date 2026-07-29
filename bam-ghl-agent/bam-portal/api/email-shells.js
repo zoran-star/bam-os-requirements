@@ -104,6 +104,7 @@ function locFromVars(vars = {}) {
     // Empty means the "follow along" line does not render, which is the right
     // outcome: naming nobody is worse than not asking.
     coaches: Array.isArray(vars.location_coaches) ? vars.location_coaches : [],
+    testimonials: Array.isArray(vars.location_testimonials) ? vars.location_testimonials : [],
   };
 }
 
@@ -231,6 +232,38 @@ function cityFromAddress(address) {
 // week cannot disagree. They are unreachable through weeklySchedule, which already
 // filters both - they are here so the claim stays true if anything else ever builds
 // this value.
+// The quote blocks for the testimonials email, built from THE resolver's rows.
+// One fact, one presentation, never a second copy of the quotes in markup.
+//
+// Follows the same rule as everywhere else the store renders: a typed quote is
+// PLAIN. No stars, no "Google review" label, no date - those belong to synced
+// Google rows only, and manual rows do not even carry the fields. The email
+// design's gold left-bar is preserved from the hand-built version so nothing
+// about the look changes; only where the words come from.
+//
+// Empty list returns "", which makes "{{location.testimonials}}" a bare empty
+// token, which drops its own line AND the dangling lead-in above it via
+// DROP_WHEN_EMPTY - the same mechanism that stops "SCHEDULE:" shipping with
+// nothing under it.
+export function testimonialsHtml(list) {
+  const rows = Array.isArray(list) ? list : [];
+  if (!rows.length) return "";
+  const esc = (v) => String(v == null ? "" : v)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return rows.map((t) => {
+    const quote = esc(t.quote).replace(/\n{2,}/g, "<br><br>").replace(/\n/g, " ");
+    // Attribution is the author alone for a typed quote. A google row may name
+    // its source, because that one IS verifiable.
+    const who = t.source === "google"
+      ? `${esc(t.author || "Parent")} &middot; Google review`
+      : esc(t.author || "Parent");
+    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-left:3px solid #E2DD9F;margin:0 0 18px;"><tr><td style="padding:2px 0 2px 18px;">\n' +
+      `          <p style="margin:0 0 8px;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#333333;font-style:italic;">"${quote}"</p>\n` +
+      `          <p style="margin:0;font-family:'Inter Tight',Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:#777777;font-weight:600;">${who}</p>\n` +
+      "        </td></tr></table>";
+  }).join("\n        ");
+}
+
 export function scheduleText(week, venue) {
   const days = (Array.isArray(week) ? week : [])
     .map((d) => ({ day: String((d && d.day) || "").trim(), groups: ((d && d.groups) || []).filter((g) => g && g.name && g.time) }))
@@ -283,7 +316,7 @@ const LINK_TOKENS = ["location.website", "location.domain", "location.community_
 // is a BARE mention, so it goes and takes the dangling "SCHEDULE:" lead-in above it;
 // "LOCATION: {{location.venue}}" is a mention inside prose, so that sentence goes. An
 // academy with neither sends nothing at all, which _send.js then declines to send.
-const DROP_WHEN_EMPTY = [...LINK_TOKENS, "location.schedule", "location.venue"];
+const DROP_WHEN_EMPTY = [...LINK_TOKENS, "location.schedule", "location.venue", "location.testimonials"];
 const tokenRe = (name, flags) => new RegExp("\\{\\{\\s*" + name.replace(/\./g, "\\.") + "\\s*\\}\\}", flags);
 function dropEmptyLinkMentions(text, emptyTokens) {
   if (!emptyTokens.length) return String(text);
@@ -352,6 +385,9 @@ export function resolveMergeVars(html, L, vars = {}) {
     "location.phone": vars.location_phone || L.phone || "",
     "location.venue": vars.location_venue || L.venue || "",
     "location.schedule": scheduleText(vars.location_schedule || L.schedule, vars.location_venue || L.venue),
+    // The academy's own approved quotes. EMPTY when it has none, which drops the
+    // block and its lead-in rather than shipping a quote-shaped hole.
+    "location.testimonials": testimonialsHtml(vars.location_testimonials || L.testimonials),
     // Filled at send time by the worker (e.g. "Our next session is Tue 6pm. ").
     // Empty string when no slot is known so the sentence just drops out.
     "next_session": vars.next_session || "",

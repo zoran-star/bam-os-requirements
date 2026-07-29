@@ -120,12 +120,18 @@ function publicShape(row) {
  * @returns {Promise<{aggregate: {rating:string,count:number,checked_at:string}|null,
  *   testimonials: Array, starredCount: number}>}
  */
-export async function resolveTestimonials(clientId) {
-  const [client] = (await sbReq(
+export async function resolveTestimonials(clientId, reader) {
+  // ONE function, with an OPTIONAL reader rather than a second entry point.
+  // api/_academy-facts.js already holds a PostgREST reader of exactly this shape
+  // and has no credentials of its own, so it injects it. A resolveForEmails()
+  // variant would be the fork this module's header forbids.
+  const read = reader || sbReq;
+
+  const [client] = (await read(
     `clients?id=eq.${clientId}&select=google_rating,google_review_count,google_rating_checked_at`
   )) || [];
 
-  const rows = (await sbReq(
+  const rows = (await read(
     `testimonials?client_id=eq.${clientId}` +
     `&select=quote,author,source,rating,starred,review_created_at,created_at`
   )) || [];
