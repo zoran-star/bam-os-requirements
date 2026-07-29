@@ -26,3 +26,30 @@ cd bam-ghl-agent/bam-portal && npm run dev -- --host --port 5174
 - After UI edits still run `node bam-portal/scripts/verify-client-portal-ui.mjs` (tour selectors).
 
 **Extending:** add rows to the `T` table fixtures or a branch in `mockApi()` inside the MOCK MODE block.
+
+## Hawkeye deck fully seeded (2026-07-27, Cole's UI/UX pass prep)
+
+`?mock=1` now seeds EVERY Hawkeye card kind so the deck can be styled with
+states prod rarely has all at once:
+
+- **Booking lane** (`HAWK_BOOKING`): reply (high-conf), reply+escalate, book
+  (calendar+slots via new `book-options` mock), ghost x2, mark_lost,
+  mark_unqualified, reignite (park + future message), reignite_due
+- **Confirm lane** (`HAWK_CONFIRM`): reply, confirm_handoff (reschedule),
+  post_trial (the form card), confirm_lost
+- **Closing lane** (`HAWK_CLOSING`): closing_enroll, reply (pricing),
+  followup_1..3 rows that group into ONE "Follow-up plan" card (step_key
+  prefix drives grouping in _hk2Load), closing_unqualified
+- `deck-names` mock (`HAWK_NAMES`) -> athlete-over-parent header names
+- Cards carry `thread_tail` arrays ({role: 'agent'|'parent', text, at}) so the
+  conversation bubbles render without the hydrate fetch
+- **`?mock=1&quiet=1`** -> after-hours "sends in the morning" bar
+- `booking_provider: 'portal'` (Book-it card portal copy)
+
+Verified via Playwright: all 12 _kinds land in the right lanes, plan groups,
+names hydrate. KNOWN PRE-EXISTING mock gap (also on baseline): `_paintReport`
+throws "reading 'length'" from `_renderAdReport` - marketing ad-report mock
+shape, unrelated to the deck.
+
+Open the deck: run mock portal -> Sales section -> Hawkeye (V2 boots into the
+command center; `_hk2Open()` from console also works).

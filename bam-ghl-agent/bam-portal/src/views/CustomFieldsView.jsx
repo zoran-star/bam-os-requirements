@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 // then add / edit / delete the fields shown on its contacts. Dormant elsewhere:
 // nothing renders these values yet (that lands with the contact-drawer work).
 
+import { uiConfirm } from "../components/dialogs.jsx";
 const TYPES = [
   { v: "text", label: "Text" },
   { v: "number", label: "Number" },
@@ -75,7 +76,7 @@ export default function CustomFieldsView({ tokens, session }) {
   }
 
   async function deleteField(id) {
-    if (!confirm("Delete this field? Any saved values are removed.")) return;
+    if (!(await uiConfirm({ title: "Delete this field?", body: "Any saved values are removed.", danger: true, confirmLabel: "Delete" }))) return;
     const res = await fetch(`/api/custom-fields?id=${id}`, { method: "DELETE", headers: authHeaders() });
     if (res.ok) setFields(prev => prev.filter(f => f.id !== id));
     else { const j = await res.json().catch(() => ({})); setErr(j.error || "delete failed"); }
@@ -85,7 +86,7 @@ export default function CustomFieldsView({ tokens, session }) {
   const card = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: 20 };
   const input = {
     width: "100%", padding: "10px 12px", background: t.bg, border: `1px solid ${t.border}`,
-    borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box",
+    borderRadius: 8, color: t.text, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box",
   };
   const btn = (primary) => ({
     padding: "9px 16px", border: primary ? 0 : `1px solid ${t.borderMed}`,
@@ -232,7 +233,7 @@ function ImportModal({ tokens, btn, authHeaders, clientId, onClose, onDone }) {
             <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
               {rows.map(r => (
                 <label key={r.ghl_field_id} style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6,
+                  display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8,
                   background: t.bg, opacity: r.imported ? 0.5 : 1, cursor: r.imported ? "default" : "pointer",
                 }}>
                   <input type="checkbox" disabled={r.imported} checked={r.imported || !!sel[r.ghl_field_id]}

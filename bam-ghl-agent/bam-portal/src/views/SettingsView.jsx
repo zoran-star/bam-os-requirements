@@ -9,6 +9,7 @@ import MessagingMigrationPanel from '../components/MessagingMigrationPanel';
 
 // Google Calendar was removed from here — it is now connected per-staff
 // directly on the Calendar page (each person links their own).
+import { showToast } from "../components/dialogs.jsx";
 const INTEGRATIONS = [
   { key: "ghl", label: "GoHighLevel", desc: "CRM, contacts, pipelines, conversations", endpoint: "/api/ghl?action=locations" },
   { key: "asana", label: "Asana", desc: "Tasks, projects, team assignments", endpoint: "/api/asana/tasks?mode=user&user=mike&limit=1" },
@@ -59,8 +60,8 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (!file.type.startsWith("image/")) { alert("Please pick an image file."); return; }
-    if (file.size > 5 * 1024 * 1024) { alert("Max image size is 5 MB."); return; }
+    if (!file.type.startsWith("image/")) { showToast("Please pick an image file."); return; }
+    if (file.size > 5 * 1024 * 1024) { showToast("Max image size is 5 MB."); return; }
     setAvatarUploading(true);
     try {
       const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
@@ -78,7 +79,7 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
       if (!res.ok) throw new Error((await res.json()).error || "save failed");
       setAvatarUrl(pub.publicUrl);
     } catch (err) {
-      alert("Photo upload failed: " + (err.message || err));
+      showToast("Photo upload failed: " + (err.message || err));
     } finally {
       setAvatarUploading(false);
     }
@@ -182,7 +183,7 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
     try {
       const { data: { session: s } } = await supabase.auth.getSession();
       const tok = s?.access_token;
-      if (!tok) { alert('Sign in first.'); return; }
+      if (!tok) { showToast('Sign in first.'); return; }
       const res = await fetch('/api/auth/staff-meta/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
@@ -190,12 +191,12 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.redirect_url) {
-        alert('Failed to start Meta connect: ' + (json.error || 'unknown error'));
+        showToast('Failed to start Meta connect: ' + (json.error || 'unknown error'));
         return;
       }
       window.location.href = json.redirect_url;
     } catch (e) {
-      alert('Connect Meta failed: ' + e.message);
+      showToast('Connect Meta failed: ' + e.message);
     }
   };
 
@@ -228,7 +229,7 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
   const toggleVoice = () => {
     if (listening) { recognitionRef.current?.stop(); setListening(false); return; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert("Speech recognition not supported."); return; }
+    if (!SR) { showToast("Speech recognition not supported."); return; }
     const recognition = new SR();
     recognition.continuous = true;
     recognition.interimResults = false;
@@ -547,12 +548,12 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                         <span style={{
-                          fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 6,
+                          fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 8,
                           color: statusColor, background: `${statusColor}12`,
                           textTransform: "capitalize",
                         }}>{fb.status}</span>
                         <span style={{
-                          fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 6,
+                          fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 8,
                           color: fb.source === "voice" ? tokens.blue : tokens.textMute,
                           background: fb.source === "voice" ? `${tokens.blue}12` : tokens.surfaceHov,
                         }}>{fb.source === "voice" ? "Voice" : "Text"}</span>
@@ -636,18 +637,18 @@ function ChangePasswordButton({ tokens }) {
             <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 18 }}>You'll stay signed in.</div>
             <input type="password" placeholder="New password (min 8)" autoComplete="new-password"
               value={newPw} onChange={e => setNewPw(e.target.value)} disabled={busy}
-              style={{ width: "100%", padding: "10px 12px", background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 6, color: tokens.text, fontSize: 13, fontFamily: "inherit", marginBottom: 10, boxSizing: "border-box" }} />
+              style={{ width: "100%", padding: "10px 12px", background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 13, fontFamily: "inherit", marginBottom: 10, boxSizing: "border-box" }} />
             <input type="password" placeholder="Confirm new password" autoComplete="new-password"
               value={confirm} onChange={e => setConfirm(e.target.value)} disabled={busy}
-              style={{ width: "100%", padding: "10px 12px", background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 6, color: tokens.text, fontSize: 13, fontFamily: "inherit", marginBottom: 14, boxSizing: "border-box" }} />
+              style={{ width: "100%", padding: "10px 12px", background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 13, fontFamily: "inherit", marginBottom: 14, boxSizing: "border-box" }} />
             {msg && (
               <div style={{ fontSize: 13, fontWeight: 600, color: msg.kind === "ok" ? (tokens.green || "#7DCB94") : (tokens.red || "#ED7969"), marginBottom: 14 }}>
                 {msg.text}
               </div>
             )}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button onClick={() => setOpen(false)} disabled={busy} style={{ padding: "9px 16px", background: "transparent", color: tokens.textSub, border: `1px solid ${tokens.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-              <button onClick={save} disabled={busy || !newPw || !confirm} style={{ padding: "9px 22px", background: tokens.accent || "#E8C547", color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{busy ? "Saving…" : "Save password"}</button>
+              <button onClick={() => setOpen(false)} disabled={busy} style={{ padding: "9px 16px", background: "transparent", color: tokens.textSub, border: `1px solid ${tokens.border}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={save} disabled={busy || !newPw || !confirm} style={{ padding: "9px 22px", background: tokens.accent || "#E8C547", color: "#0B0B0D", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{busy ? "Saving…" : "Save password"}</button>
             </div>
           </div>
         </div>

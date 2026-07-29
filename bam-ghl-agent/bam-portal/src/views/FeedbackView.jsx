@@ -14,6 +14,7 @@ import AppErrorsPanel from "./AppErrorsPanel";
 // float to the top; resolved items sink to the bottom and dim out.
 // ────────────────────────────────────────────────────────────────────────────
 
+import { showToast, uiConfirm } from "../components/dialogs.jsx";
 export default function FeedbackView({ tokens, dark, session }) {
   const t = tokens;
   // Top-level switcher: 'feedback' (default) | 'sessions' | 'app-errors'
@@ -106,7 +107,7 @@ export default function FeedbackView({ tokens, dark, session }) {
       setFeedback(prev => prev.map(f => f.id === item.id
         ? { ...f, resolved_at: item.resolved_at }
         : f));
-      alert(`Failed to update: ${e.message}`);
+      showToast(`Failed to update: ${e.message}`);
     }
   };
 
@@ -120,11 +121,11 @@ export default function FeedbackView({ tokens, dark, session }) {
     });
     const j = await res.json().catch(() => ({}));
     if (j.reason === "github_not_configured") {
-      alert("GitHub isn't connected yet — an admin needs to set GITHUB_TOKEN + GITHUB_REPO in Vercel.");
+      showToast("GitHub isn't connected yet — an admin needs to set GITHUB_TOKEN + GITHUB_REPO in Vercel.");
       return;
     }
     if (!res.ok || !j.url) {
-      alert("Couldn't create the spec: " + (j.error || res.statusText));
+      showToast("Couldn't create the spec: " + (j.error || res.statusText));
       return;
     }
     setFeedback(prev => prev.map(f => (f.id === item.id ? { ...f, github_issue_url: j.url } : f)));
@@ -137,7 +138,7 @@ export default function FeedbackView({ tokens, dark, session }) {
       <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
         {[
           { key: "feedback", label: "Feedback" },
-          { key: "ship", label: "🚀 Ship queue" },
+          { key: "ship", label: "Ship queue" },
           { key: "app-errors", label: "App errors" },
           { key: "sessions", label: "Agent sessions" },
         ].map(s => {
@@ -196,8 +197,8 @@ export default function FeedbackView({ tokens, dark, session }) {
           label="Kind"
           options={[
             { value: "all", label: `All` },
-            { value: "bug", label: `🐛 Bug ${counts.bugs}` },
-            { value: "feature", label: `✨ Feature ${counts.features}` },
+            { value: "bug", label: `Bug ${counts.bugs}` },
+            { value: "feature", label: `Feature ${counts.features}` },
           ]}
           value={kindFilter}
           onChange={setKindFilter}
@@ -219,7 +220,7 @@ export default function FeedbackView({ tokens, dark, session }) {
               onClick={() => setRefresh(x => x + 1)}
               style={{
                 marginLeft: "auto", padding: "6px 12px", background: "transparent",
-                color: t.textSub, border: `1px solid ${t.border}`, borderRadius: 6,
+                color: t.textSub, border: `1px solid ${t.border}`, borderRadius: 8,
                 fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
               }}
             >Refresh</button>
@@ -292,17 +293,17 @@ function ContextPanel({ ctx, t }) {
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6,
+          fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 8,
           border: `1px solid ${t.border}`, background: t.surface,
           color: errors.length ? (t.red || "#ED7969") : t.textMute,
           cursor: "pointer", fontFamily: "inherit",
         }}
-      >{open ? "▾" : "▸"} 🧭 Context{summary ? ` · ${summary}` : ""}</button>
+      >{open ? "▾" : "▸"} Context{summary ? ` · ${summary}` : ""}</button>
 
       {open && (
         <div style={{
           marginTop: 8, padding: "10px 12px", background: t.surface,
-          border: `1px solid ${t.border}`, borderRadius: 6,
+          border: `1px solid ${t.border}`, borderRadius: 8,
           fontSize: 11, color: t.textMute, lineHeight: 1.7, ...mono,
         }}>
           {ctx.url && <div>url: {ctx.url}</div>}
@@ -347,7 +348,7 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
     : f.portal === "spec" ? "Offer spec"
     : "Staff portal";
   const kindColor = f.kind === "feature" ? "#C787FF" : (t.red || "#ED7969");
-  const kindLabel = f.kind === "feature" ? "✨ Feature" : "🐛 Bug";
+  const kindLabel = f.kind === "feature" ? "Feature" : "Bug";
   const author = staff?.name || f.submitter_email || "Anonymous";
   const when = f.created_at ? new Date(f.created_at).toLocaleString() : "";
   const isImage = f.file_url && /\.(png|jpe?g|gif|webp|svg)$/i.test(f.file_url);
@@ -364,7 +365,7 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
         {/* Resolve checkbox */}
         <label style={{
           flexShrink: 0, marginTop: 2,
-          width: 22, height: 22, borderRadius: 6,
+          width: 22, height: 22, borderRadius: 8,
           border: `2px solid ${resolved ? (t.green || "#7ED996") : t.border}`,
           background: resolved ? (t.green || "#7ED996") : "transparent",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -400,7 +401,7 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
               <span style={{ fontSize: 12, color: t.textMute }}>{f.submitter_email}</span>
             )}
             {f.client_name && (
-              <span style={{ fontSize: 11, fontWeight: 700, color: t.accent || t.text, border: `1px solid ${t.border}`, borderRadius: 999, padding: "2px 8px" }}>🏠 {f.client_name}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: t.accent || t.text, border: `1px solid ${t.border}`, borderRadius: 999, padding: "2px 8px" }}>{f.client_name}</span>
             )}
             <span style={{ marginLeft: "auto", fontSize: 12, color: t.textMute, fontFamily: "JetBrains Mono, monospace" }}>{when}</span>
           </div>
@@ -421,7 +422,7 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
                     src={f.file_url}
                     alt={f.file_name || "attachment"}
                     style={{
-                      maxWidth: 360, maxHeight: 240, borderRadius: 6,
+                      maxWidth: 360, maxHeight: 240, borderRadius: 8,
                       border: `1px solid ${t.border}`, display: "block",
                     }}
                   />
@@ -430,9 +431,9 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
                 <a href={f.file_url} target="_blank" rel="noreferrer" style={{
                   display: "inline-flex", alignItems: "center", gap: 8,
                   padding: "8px 12px", background: t.surface,
-                  border: `1px solid ${t.border}`, borderRadius: 6,
+                  border: `1px solid ${t.border}`, borderRadius: 8,
                   color: t.text, textDecoration: "none", fontSize: 13,
-                }}>📎 {f.file_name || "Attachment"} ↗</a>
+                }}>{f.file_name || "Attachment"} ↗</a>
               )}
             </div>
           )}
@@ -451,13 +452,13 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
               <a href={f.github_issue_url} target="_blank" rel="noreferrer" style={{
                 display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600,
                 color: t.accent || "#E8C547", textDecoration: "none",
-              }}>📋 View build spec ↗</a>
+              }}>View build spec ↗</a>
             ) : !resolved ? (
               <button
                 onClick={async () => { setSpecBusy(true); try { await onSpec(); } finally { setSpecBusy(false); } }}
                 disabled={specBusy}
                 style={{
-                  fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 6,
+                  fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 8,
                   border: `1px solid ${t.border}`, background: t.surface, color: t.text,
                   cursor: specBusy ? "default" : "pointer", fontFamily: "inherit",
                 }}
@@ -496,16 +497,16 @@ function ShipQueuePanel({ tokens, session }) {
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ship = async (pr) => {
-    if (!window.confirm(`Ship "${pr.title}"?\n\nThis merges it and deploys to production.`)) return;
+    if (!(await uiConfirm({ title: `Ship "${pr.title}"?`, body: "This merges it and deploys to production.", confirmLabel: "Ship it", danger: true }))) return;
     setBusyPr(pr.number);
     try {
       const tok = session?.access_token;
       const res = await fetch(`/api/clients?action=ship-merge&pr=${pr.number}`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok || !j.ok) { alert("Couldn't ship: " + (j.error || res.statusText)); return; }
+      if (!res.ok || !j.ok) { showToast("Couldn't ship: " + (j.error || res.statusText)); return; }
       setPrs(prev => (prev || []).filter(p => p.number !== pr.number));
       setShippedCount(n => n + 1);
-    } catch (e) { alert("Ship failed: " + (e?.message || e)); }
+    } catch (e) { showToast("Ship failed: " + (e?.message || e)); }
     finally { setBusyPr(null); }
   };
 
@@ -536,7 +537,7 @@ function ShipQueuePanel({ tokens, session }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16 }}>
         <div style={{ fontSize: 14, color: t.text, fontWeight: 600 }}>Ready to ship</div>
         <div style={{ fontSize: 12, color: t.textMute }}>{prs.length} waiting{shippedCount ? ` · ${shippedCount} shipped` : ""}</div>
-        <button onClick={load} style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.surface, color: t.text, cursor: "pointer" }}>Refresh</button>
+        <button onClick={load} style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.surface, color: t.text, cursor: "pointer" }}>Refresh</button>
       </div>
 
       {prs.length === 0 ? (
@@ -557,10 +558,10 @@ function ShipQueuePanel({ tokens, session }) {
                 onClick={() => ship(pr)}
                 disabled={busyPr === pr.number}
                 style={{
-                  fontSize: 13, fontWeight: 700, padding: "8px 16px", borderRadius: 6, border: "none",
+                  fontSize: 13, fontWeight: 700, padding: "8px 16px", borderRadius: 8, border: "none",
                   background: t.accent, color: "#000", cursor: busyPr === pr.number ? "default" : "pointer",
                 }}
-              >{busyPr === pr.number ? "Shipping…" : "🚀 Approve & ship"}</button>
+              >{busyPr === pr.number ? "Shipping…" : "Approve & ship"}</button>
             </div>
           ))}
         </div>

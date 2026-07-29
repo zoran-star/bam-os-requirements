@@ -173,7 +173,7 @@ export default function OnboardingRow({ client, tokens, index, onClick, expanded
                     onClick={e => { e.stopPropagation(); onToggleCheck?.(client.id, stage.offset + ti); }}
                     style={{
                       display: "flex", alignItems: "center", gap: 10, padding: "7px 4px",
-                      cursor: "pointer", borderRadius: 6, transition: "background 0.1s",
+                      cursor: "pointer", borderRadius: 8, transition: "background 0.1s",
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = tokens.surfaceHov}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}

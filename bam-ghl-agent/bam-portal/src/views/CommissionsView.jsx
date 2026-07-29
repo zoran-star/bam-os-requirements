@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 // spec), review monthly cycles, and can preview / manually run a cycle - the
 // daily crons handle the automatic runs and the batched Anna+Cole reports.
 
+import { showToast, uiConfirm } from "../components/dialogs.jsx";
 const MODEL_LABEL = { flat_retainer: "Flat Retainer", growth_percentage: "Growth %" };
 
 function money(n) {
@@ -147,7 +148,7 @@ function SettingsForm({ c, t, api, reload }) {
     revenue_integration_connection: c.revenue_integration_connection || "",
   });
   const [busy, setBusy] = useState(false);
-  const input = { width: "100%", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit" };
+  const input = { width: "100%", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, fontFamily: "inherit" };
   const label = { fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: t.textMute, margin: "10px 0 4px" };
   const isGrowth = f.payment_model === "growth_percentage";
 
@@ -158,8 +159,8 @@ function SettingsForm({ c, t, api, reload }) {
       reload();
     } catch (e) {
       if (e.code === "baseline_locked") {
-        if (confirm(e.message + "\n\nOverride and re-lock for 9 months?")) return save(true);
-      } else alert(e.message);
+        if (await uiConfirm({ title: "Baseline is locked", body: e.message, confirmLabel: "Override and re-lock", danger: true })) return save(true);
+      } else showToast(e.message);
     } finally { setBusy(false); }
   }
 
@@ -198,7 +199,7 @@ function SettingsForm({ c, t, api, reload }) {
         </div>
       </>)}
       <button onClick={() => save(false)} disabled={busy}
-        style={{ marginTop: 12, padding: "8px 16px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+        style={{ marginTop: 12, padding: "8px 16px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
         {busy ? "Saving…" : "Save terms"}
       </button>
     </div>
@@ -218,8 +219,8 @@ function CycleHistory({ c, cycles, t, api, reload, isAdmin }) {
         ...(grossOverride !== "" ? { gross_override: grossOverride } : {}),
       });
       if (dryRun) setPreview(j.preview);
-      else { alert("Cycle closed" + (j.row?.invoice_id ? ` - Stripe invoice ${j.row.invoice_id}` : "") + "."); reload(); }
-    } catch (e) { alert(e.message); }
+      else { showToast("Cycle closed" + (j.row?.invoice_id ? ` - Stripe invoice ${j.row.invoice_id}` : "") + "."); reload(); }
+    } catch (e) { showToast(e.message); }
     finally { setBusy(false); }
   }
 
@@ -254,10 +255,10 @@ function CycleHistory({ c, cycles, t, api, reload, isAdmin }) {
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
           <input type="number" placeholder="Gross override ($)" value={grossOverride} onChange={e => setGrossOverride(e.target.value)}
             title="Use when the automatic revenue pull failed - enter gross revenue by hand"
-            style={{ width: 150, padding: "7px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 12 }} />
-          <button onClick={() => run(true)} disabled={busy} style={{ padding: "7px 12px", background: "transparent", color: t.text, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 12, cursor: "pointer" }}>Preview today's cycle</button>
-          <button onClick={() => { if (confirm("Close this cycle now and generate the Stripe invoice?")) run(false); }} disabled={busy}
-            style={{ padding: "7px 12px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Run cycle now</button>
+            style={{ width: 150, padding: "7px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 12 }} />
+          <button onClick={() => run(true)} disabled={busy} style={{ padding: "7px 12px", background: "transparent", color: t.text, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 12, cursor: "pointer" }}>Preview today's cycle</button>
+          <button onClick={async () => { if (await uiConfirm({ title: "Close this cycle now?", body: "This computes the cycle and generates the Stripe invoice.", confirmLabel: "Run cycle" })) run(false); }} disabled={busy}
+            style={{ padding: "7px 12px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Run cycle now</button>
         </div>
       )}
       {preview && (

@@ -72,7 +72,7 @@ export default function ActivationTab({ client, tokens: t, session }) {
     </div>
   );
 
-  if (err) return <div style={{ color: "#e0654f", fontSize: 13 }}>Couldn't load activation status - {err} <button onClick={load} style={{ marginLeft: 8, background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, padding: "5px 10px", cursor: "pointer", font: "inherit", fontSize: 12 }}>Retry</button></div>;
+  if (err) return <div style={{ color: "#e0654f", fontSize: 13 }}>Couldn't load activation status - {err} <button onClick={load} style={{ marginLeft: 8, background: "transparent", border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, padding: "5px 10px", cursor: "pointer", font: "inherit", fontSize: 12 }}>Retry</button></div>;
   if (!data) return <div style={{ color: t.textMute, fontSize: 13 }}>Loading activation status…</div>;
 
   const it = data.items || {};
@@ -105,7 +105,7 @@ export default function ActivationTab({ client, tokens: t, session }) {
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
             <div style={S.label}>Website build</div>
             <span style={{ fontSize: 10.5, color: t.textMute }}>build → staging → readiness → flip</span>
-            <button onClick={setBuildState} disabled={!!busy} style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, padding: "4px 10px", cursor: "pointer", font: "inherit", fontSize: 11 }}>Set state</button>
+            <button onClick={setBuildState} disabled={!!busy} style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, padding: "4px 10px", cursor: "pointer", font: "inherit", fontSize: 11 }}>Set state</button>
           </div>
           {row(it.website_build.build_status === "verified", `Build: ${it.website_build.build_status}`, it.website_build.staging_url ? `Staging: ${it.website_build.staging_url}` : "Set the staging URL via Set state", ["building", "staging_ready"].includes(it.website_build.build_status))}
           {row(it.website_build.auto_ok, "Automated readiness", it.website_build.auto_ok ? "Last run passed (pages + offer endpoint)" : "Run it - checks staging pages + the offer endpoint")}
@@ -130,9 +130,9 @@ export default function ActivationTab({ client, tokens: t, session }) {
                     {stt === "ready" || stt === "building" ? (
                       <div style={{ display: "flex", gap: 6 }}>
                         {stt === "ready" ? <button onClick={() => buildApi("POST", { action: "chunk", chunk: ck, status: "building" })} disabled={!!busy}
-                          style={{ background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11 }}>Building</button> : null}
+                          style={{ background: "transparent", border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11 }}>Building</button> : null}
                         <button onClick={() => buildApi("POST", { action: "chunk", chunk: ck, status: "published" })} disabled={!!busy}
-                          style={{ background: "rgba(212,182,92,.12)", border: "1px solid rgba(212,182,92,.4)", borderRadius: 6, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11, fontWeight: 700 }}>Published</button>
+                          style={{ background: "rgba(212,182,92,.12)", border: "1px solid rgba(212,182,92,.4)", borderRadius: 8, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11, fontWeight: 700 }}>Published</button>
                       </div>
                     ) : null}
                   </div>
@@ -157,7 +157,7 @@ export default function ActivationTab({ client, tokens: t, session }) {
                   <div style={{ fontSize: 11.5, color: t.textMute, marginTop: 1 }}>{stamp}</div>
                 </div>
                 <button onClick={() => buildApi("POST", { action: "sign", key: k, ok: !on })} disabled={!!busy}
-                  style={{ background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11 }}>
+                  style={{ background: "transparent", border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, padding: "3px 9px", cursor: "pointer", font: "inherit", fontSize: 11 }}>
                   {on ? "Unsign" : k === "copy_ok" ? "Sign off" : "Record"}
                 </button>
               </div>
@@ -165,7 +165,7 @@ export default function ActivationTab({ client, tokens: t, session }) {
           })}
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             <button onClick={() => buildApi("GET", { action: "readiness" })} disabled={!!busy}
-              style={{ background: "rgba(212,182,92,.12)", border: "1px solid rgba(212,182,92,.4)", borderRadius: 6, color: t.text, padding: "7px 13px", cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 700 }}>
+              style={{ background: "rgba(212,182,92,.12)", border: "1px solid rgba(212,182,92,.4)", borderRadius: 8, color: t.text, padding: "7px 13px", cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 700 }}>
               {busy === "build" ? "Working…" : "Run readiness checks"}
             </button>
             <div style={{ fontSize: 11, color: t.textMute, alignSelf: "center" }}>The domain wizard refuses to flip until build_status = verified.</div>

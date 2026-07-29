@@ -177,8 +177,8 @@ export function TicketIntake() {
 
   const pathOptions = [
     { key: "Bug/Change", title: "Fix or change something", desc: "Something isn't working right, or you need a modification to an existing system.", icon: "⚙" },
-    { key: "Systems Menu", title: "Add something from our systems menu", desc: "Choose from our pre-built systems and automations to add to your account.", icon: "📋" },
-    { key: "Custom Build", title: "Request a custom build", desc: "Need something unique? Describe what you need and we'll scope it out.", icon: "🔧" },
+    { key: "Systems Menu", title: "Add something from our systems menu", desc: "Choose from our pre-built systems and automations to add to your account.", icon: null },
+    { key: "Custom Build", title: "Request a custom build", desc: "Need something unique? Describe what you need and we'll scope it out.", icon: null },
   ];
 
   const generateTicketId = () => {
@@ -265,7 +265,7 @@ export function TicketIntake() {
                 onMouseLeave={e => { e.currentTarget.style.borderColor = tk.border; e.currentTarget.style.background = tk.surfaceEl; }}
               >
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 18 }}>
-                  <span style={{ fontSize: 24, lineHeight: 1 }}>{opt.icon}</span>
+                  {opt.icon && <span style={{ fontSize: 24, lineHeight: 1 }}>{opt.icon}</span>}
                   <div>
                     <div style={{ fontSize: 17, fontWeight: 600, color: tk.text, marginBottom: 6, letterSpacing: "-0.01em" }}>{opt.title}</div>
                     <div style={{ fontSize: 14, color: tk.textSub, lineHeight: 1.5 }}>{opt.desc}</div>
@@ -527,7 +527,7 @@ export function TicketIntake() {
 const ONBOARDING_RESOURCES = [
   {
     section: "How to Submit Your Ads",
-    icon: "📹",
+    icon: null,
     items: [
       { title: "Ad Submission Guide", desc: "Step-by-step walkthrough for submitting ad content to your BAM team.", type: "guide" },
       { title: "What We Need From You", desc: "Checklist of assets, access, and approvals required before we can run your ads.", type: "checklist" },
@@ -536,7 +536,7 @@ const ONBOARDING_RESOURCES = [
   },
   {
     section: "Ad Requests & Guides",
-    icon: "📋",
+    icon: null,
     items: [
       { title: "Request New Ad Creative", desc: "Submit a request for new video or static ad creative from the production team.", type: "action" },
       { title: "Ad Copy Templates", desc: "Proven ad copy templates for trial offers, seasonal promos, and testimonials.", type: "template" },
@@ -546,7 +546,7 @@ const ONBOARDING_RESOURCES = [
   },
   {
     section: "Resources",
-    icon: "🎬",
+    icon: null,
     items: [
       { title: "The Perfect Testimonial", desc: "How to capture a great client testimonial in under 5 minutes. Script and setup included.", type: "guide" },
       { title: "How to Film on iPhone", desc: "Lighting, framing, audio — everything you need to shoot pro-quality content on your phone.", type: "guide" },
@@ -597,7 +597,7 @@ export function ContentPortal() {
           {ONBOARDING_RESOURCES.map((section, si) => (
             <div key={si} style={{ marginBottom: 32 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <span style={{ fontSize: 20 }}>{section.icon}</span>
+                {section.icon && <span style={{ fontSize: 20 }}>{section.icon}</span>}
                 <span style={{ fontSize: 18, fontWeight: 600, color: tk.text, letterSpacing: "-0.01em" }}>{section.section}</span>
               </div>
 

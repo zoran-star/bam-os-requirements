@@ -4,21 +4,23 @@ import { useState, useEffect } from "react";
 // Module-level dispatchers so any nested tab/component in this view can call
 // showToast()/uiConfirm() without prop-drilling; the hosts render at the view
 // root. Falls back to the native dialogs if a host isn't mounted.
-let _toastPush = null;
+const _toastHosts = [];
 export function showToast(msg, kind = "error") {
   const text = typeof msg === "string" ? msg : (msg && msg.message) || String(msg);
-  if (_toastPush) _toastPush({ text, kind });
+  const push = _toastHosts[_toastHosts.length - 1];
+  if (push) push({ text, kind });
   else window.alert(text);
 }
 export function ToastHost({ tokens: t }) {
   const [toasts, setToasts] = useState([]);
   useEffect(() => {
-    _toastPush = ({ text, kind }) => {
+    const push = ({ text, kind }) => {
       const id = Math.random().toString(36).slice(2);
       setToasts(prev => [...prev.slice(-3), { id, text, kind }]);
       setTimeout(() => setToasts(prev => prev.filter(x => x.id !== id)), 4500);
     };
-    return () => { _toastPush = null; };
+    _toastHosts.push(push);
+    return () => { const i = _toastHosts.indexOf(push); if (i > -1) _toastHosts.splice(i, 1); };
   }, []);
   if (!toasts.length) return null;
   return (
@@ -34,19 +36,21 @@ export function ToastHost({ tokens: t }) {
     </div>
   );
 }
-let _confirmOpen = null;
+const _confirmHosts = [];
 export function uiConfirm(opts) {
   const o = typeof opts === "string" ? { title: opts } : opts;
   return new Promise(resolve => {
-    if (_confirmOpen) _confirmOpen(o, resolve);
+    const open = _confirmHosts[_confirmHosts.length - 1];
+    if (open) open(o, resolve);
     else resolve(window.confirm(o.body ? `${o.title}\n\n${o.body}` : o.title));
   });
 }
 export function ConfirmHost({ tokens: t }) {
   const [req, setReq] = useState(null); // { title, body, confirmLabel, danger, resolve }
   useEffect(() => {
-    _confirmOpen = (o, resolve) => setReq({ ...o, resolve });
-    return () => { _confirmOpen = null; };
+    const open = (o, resolve) => setReq({ ...o, resolve });
+    _confirmHosts.push(open);
+    return () => { const i = _confirmHosts.indexOf(open); if (i > -1) _confirmHosts.splice(i, 1); };
   }, []);
   if (!req) return null;
   const done = (val) => { req.resolve(val); setReq(null); };

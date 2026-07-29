@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import {
   listMessages, sendMessage, editMessage, deleteMessage, markRead, uploadAttachment,
 } from "../services/messagesService";
+import { uiConfirm } from "./dialogs.jsx";
 
 const EDIT_DELETE_WINDOW_MS = 5 * 60 * 1000;
 const TYPING_TIMEOUT_MS = 3000; // hide "typing..." if no broadcast for this long
@@ -202,7 +203,7 @@ export default function MessageThread({ conversationId, tokens: t, session, me, 
     }
   };
   const onDelete = async (m) => {
-    if (!confirm("Delete this message?")) return;
+    if (!(await uiConfirm({ title: "Delete this message?", danger: true, confirmLabel: "Delete" }))) return;
     try {
       await deleteMessage(m.id);
       setMessages(prev => prev.map(x => x.id === m.id ? { ...x, deleted_at: new Date().toISOString(), body: null, files: [] } : x));
@@ -264,7 +265,7 @@ export default function MessageThread({ conversationId, tokens: t, session, me, 
                       style={{
                         width: "100%", minWidth: 220, minHeight: 60, padding: 6, fontSize: 13,
                         background: t.bg, color: t.text, border: `1px solid ${t.border}`,
-                        borderRadius: 6, fontFamily: "inherit", resize: "vertical",
+                        borderRadius: 8, fontFamily: "inherit", resize: "vertical",
                       }}
                     />
                     <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
@@ -281,14 +282,14 @@ export default function MessageThread({ conversationId, tokens: t, session, me, 
                           const isImage = (f.mime || "").startsWith("image/");
                           return isImage ? (
                             <a key={i} href={f.url} target="_blank" rel="noreferrer">
-                              <img src={f.url} alt={f.name} style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, display: "block" }} />
+                              <img src={f.url} alt={f.name} style={{ maxWidth: 240, maxHeight: 240, borderRadius: 8, display: "block" }} />
                             </a>
                           ) : (
                             <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{
                               color: t.accent, fontSize: 12, textDecoration: "none",
-                              padding: "5px 9px", border: `1px solid ${t.border}`, borderRadius: 6,
+                              padding: "5px 9px", border: `1px solid ${t.border}`, borderRadius: 8,
                               display: "inline-block", maxWidth: "100%",
-                            }}>📎 {f.name}</a>
+                            }}>{f.name}</a>
                           );
                         })}
                       </div>
@@ -318,17 +319,17 @@ export default function MessageThread({ conversationId, tokens: t, session, me, 
 
       {/* Composer */}
       <div style={{ borderTop: `1px solid ${t.border}`, padding: "12px 16px", background: t.surface }}>
-        {error && <div style={{ color: t.red, fontSize: 12, marginBottom: 6 }}>⚠ {error}</div>}
+        {error && <div style={{ color: t.red, fontSize: 12, marginBottom: 6 }}>{error}</div>}
         {files.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
             {files.map((f, i) => (
               <div key={i} style={{
-                fontSize: 11, padding: "4px 8px", borderRadius: 6,
+                fontSize: 11, padding: "4px 8px", borderRadius: 8,
                 background: f.error ? `${t.red}15` : t.surfaceEl,
                 border: `1px solid ${f.error ? t.red : t.border}`, color: t.text,
                 display: "flex", alignItems: "center", gap: 6,
               }}>
-                <span>{f.uploading ? "⏳" : f.error ? "⚠" : "📎"}</span>
+                <span>{f.uploading ? "" : f.error ? "" : ""}</span>
                 <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.file.name}</span>
                 <button onClick={() => removePending(f.file)} style={{
                   background: "none", border: "none", color: t.textMute, cursor: "pointer", padding: 0, fontSize: 14,
@@ -339,12 +340,12 @@ export default function MessageThread({ conversationId, tokens: t, session, me, 
         )}
         <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
           <label style={{
-            cursor: "pointer", padding: "8px 10px", borderRadius: 6,
+            cursor: "pointer", padding: "8px 10px", borderRadius: 8,
             color: t.textMute, border: `1px solid ${t.border}`, background: "transparent",
             fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center",
           }} title="Attach files">
             <input type="file" multiple onChange={e => onPickFiles(e.target.files)} style={{ display: "none" }} />
-            📎
+            
           </label>
           <textarea
             value={composer}
@@ -377,11 +378,11 @@ export default function MessageThread({ conversationId, tokens: t, session, me, 
 function btn(t, kind) {
   if (kind === "primary") return {
     padding: "6px 12px", background: t.accent, color: "#0B0B0D",
-    border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
+    border: "none", borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer",
   };
   return {
     padding: "6px 12px", background: "transparent", color: t.textSub,
-    border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 11, cursor: "pointer",
+    border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 11, cursor: "pointer",
   };
 }
 function inlineLink(t) {
