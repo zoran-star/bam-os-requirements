@@ -10,8 +10,9 @@
 -- WHY IT EXISTS (AUTOMATION TEMPLATING II, 2026-07-29): the testimonial drift
 -- reconciler runs on a schedule and alerts only on failure, which means SILENCE
 -- IS NOT A PASS - a dead cron and a clean estate produce identical observable
--- output: nothing. They counted 34 crons in vercel.json with nothing watching
--- whether any of them ran. This exists so the testimonial check is not the 35th.
+-- output: nothing. Roughly 33-34 crons in vercel.json (two rooms counted
+-- differently on different refs) with nothing watching whether ANY of them ran.
+-- Recount before quoting a number; the point is that the count is unwatched. This exists so the testimonial check is not the 35th.
 --
 -- It is the same reasoning as `clients.google_rating_checked_at` one level up: a
 -- fetched fact that looks current and may be days dead needs its timestamp

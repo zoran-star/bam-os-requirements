@@ -13,7 +13,20 @@
 //
 // ⚠️ SILENCE IS NOT A PASS. The scheduled run alerts on FAILURE, so a broken
 // cron looks exactly like a clean estate. The endpoint always returns its full
-// verdict with a timestamp so the state can be asked for rather than inferred.
+// verdict with a timestamp so the state can be asked for rather than inferred,
+// and persists a heartbeat to `check_heartbeats`.
+//
+// ⛔ WHERE EXPECTED CADENCE LIVES, and it is deliberately NOT in the heartbeat
+// table (design answer agreed with the orchestrator, 2026-07-29):
+// `vercel.json` is the single source of truth for schedules. A copy of the
+// cadence in `check_heartbeats` would be a second crontab that drifts from the
+// real one, and then a staleness alert cannot tell you which copy is wrong -
+// the exact copies-drift fault this workstream exists to kill.
+// The principle: the table records what HAPPENED. Expectations belong with the
+// thing being observed, never beside the observation. So a future fleet watchdog
+// reads cadence from `vercel.json`, and each check's key-to-path mapping lives
+// in the file that WRITES its heartbeat (here, CHECK_KEY in
+// api/testimonial-drift.js) so the mapping cannot drift from the writer.
 //
 // ⛔ COUPLING, NAMED ON PURPOSE: this keys on
 // `automation_steps.sync_class = 'attributed'`, which is decided by
