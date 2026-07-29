@@ -371,13 +371,19 @@ async function handler(req, res) {
             editable: glob ? canGlobal : true,                         // local = always editable; global = only a global editor
           };
         });
-      // Brain health: of the 8 derivable facts, how many are live vs fully missing
+      // Brain health: of the derivable facts, how many are live vs fully missing
       // (renderer returned null - the offer/locations/team are too sparse). "Thin"
       // facts that DID render are counted live; only absent keys are missing.
+      //
+      // `total` is DERIVED from FACT_KEYS, not written down. It was the literal 8
+      // while `live` was computed from FACT_KEYS.length, so the moment a ninth fact
+      // was wired (social_proof, 2026-07-29) a fully-configured academy would have
+      // been shown "9 of 8 facts live". A count in two places is a count that
+      // disagrees with itself eventually; there is now one source.
       const missing = FACT_KEYS
         .filter(k => derived[k] == null)
         .map(k => ({ key: k, label: (bySection.get(k) || {}).label || k, jump: (FACT_SOURCES[k] || {}).jump || null }));
-      const brain_health = { live: FACT_KEYS.length - missing.length, total: 8, missing };
+      const brain_health = { live: FACT_KEYS.length - missing.length, total: FACT_KEYS.length, missing };
       const training_offer_id = (Array.isArray(offerIdRows) && offerIdRows[0] && offerIdRows[0].id) || null;
       return res.status(200).json({ agent, sections, can_edit_global: canGlobal, brain_health, training_offer_id });
     }

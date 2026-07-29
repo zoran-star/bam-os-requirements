@@ -30024,7 +30024,9 @@ async function _taRenderKnowledge() {
     const locked   = sections.filter(s => s.scope !== 'derived' && s.scope !== 'policy' && !s.editable);
     const host = document.getElementById('ta-section-list'); if (!host) return;
 
-    // ── Brain health strip: N of 8 facts live + chips for any fully-missing fact ──
+    // ── Brain health strip: N of M facts live + chips for any fully-missing fact ──
+    // Both numbers come from the API (bh.live / bh.total, derived from FACT_KEYS).
+    // Do not hardcode the total here - the backend already made that mistake once.
     const bh = res.brain_health || null;
     let stripHtml = '';
     if (bh) {

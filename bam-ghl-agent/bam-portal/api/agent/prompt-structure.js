@@ -256,7 +256,22 @@ export const SECTIONS = [
     "tag": "social_proof",
     "layer": "location",
     "label": "Social proof",
-    "body": "Google Reviews: https://share.google/yel2SPxIMKzjsJG9c"
+    // EMPTY ON PURPOSE, and it must stay empty. This body used to be
+    //     "Google Reviews: https://share.google/yel2SPxIMKzjsJG9c"
+    // which is BAM GTA's link sitting in the structure EVERY academy's agent is
+    // built from. Nothing overrode it - `social_proof` had no renderer and 0 of 47
+    // academies had a stored row - so San Jose, DETAIL Miami and Next Level all
+    // pointed parents at a Toronto academy's review page. It is now rendered per
+    // academy by renderSocialProof (api/agent/fact-render.js) from that academy's
+    // own testimonials and its own clients.google_review_url.
+    //
+    // The ENTRY stays so the section keeps its label and its row in the training
+    // UI (api/agent-train.js maps over SECTIONS); only the leaking literal is
+    // gone. An academy with no reviews renders nothing here, which is the
+    // fact-absent state the brain-health chip is for. Never put an example link
+    // in this body - a default that names one academy is a default every other
+    // academy serves.
+    "body": ""
   },
   {
     "key": "selling_points",
