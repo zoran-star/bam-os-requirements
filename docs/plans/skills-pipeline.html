@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The three skills: what exists, what is missing</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF9F6;--card:#FFFFFF;--card2:#F3F1EB;--line:#E4E0D6;
+    --tx:#1A1917;--tx2:#54514A;--tx3:#8A857B;
+    --gold:#9A7A22;--goldbg:#FBF3DC;--goldln:#E5D097;
+    --green:#2A7A4E;--greenbg:#E8F4EC;--greenln:#B7DCC4;
+    --red:#B23A22;--redbg:#FBECE8;--redln:#EFC9BE;
+    --blue:#255F92;--bluebg:#E9F1F8;--blueln:#C2D9EB;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1060px;margin:0 auto;padding:44px 20px 100px}
+  h1{font-size:clamp(27px,4.4vw,40px);line-height:1.1;letter-spacing:-.025em;margin:0 0 9px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:16.5px;margin:0 0 24px;max-width:68ch}
+  h2{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--gold);margin:52px 0 6px;font-weight:800}
+  .h2sub{color:var(--tx3);font-size:14px;margin:0 0 16px;max-width:74ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:0 1px 2px rgba(26,25,23,.04)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .m{font-family:var(--mono);font-size:12.5px}
+  .goal{background:var(--goldbg);border:1px solid var(--goldln);border-radius:14px;padding:18px 22px;margin-bottom:6px}
+  .goal .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:6px}
+  .goal p{margin:0;font-size:17px;color:var(--tx);font-weight:600;line-height:1.45}
+  .pill{display:inline-block;font-size:10px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap;vertical-align:2px}
+  .p-ok{background:var(--greenbg);color:var(--green)}
+  .p-no{background:var(--redbg);color:var(--red)}
+  .p-half{background:var(--goldbg);color:var(--gold)}
+  .note{border-radius:12px;padding:16px 18px}
+  .note b{display:block;margin-bottom:4px;font-size:15px}
+  .note p{margin:0;font-size:14px;color:var(--tx2)}
+  .note p+p{margin-top:7px}
+  .note+.note{margin-top:11px}
+  .n-warn{background:var(--redbg);border:1px solid var(--redln)}.n-warn b{color:var(--red)}
+  .n-gold{background:var(--goldbg);border:1px solid var(--goldln)}.n-gold b{color:var(--gold)}
+  .n-blue{background:var(--bluebg);border:1px solid var(--blueln)}.n-blue b{color:var(--blue)}
+  .n-ok{background:var(--greenbg);border:1px solid var(--greenln)}.n-ok b{color:var(--green)}
+  .grid{display:grid;gap:13px}
+  @media(min-width:800px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+  /* pipeline */
+  .pipe{display:flex;flex-direction:column;min-width:660px}
+  .stage{display:flex;gap:14px;align-items:flex-start}
+  .stage .rail{flex:none;width:26px;display:flex;flex-direction:column;align-items:center;align-self:stretch}
+  .stage .dot{width:15px;height:15px;border-radius:999px;border:3px solid var(--line);background:var(--card);margin-top:20px;flex:none}
+  .stage.ok .dot{background:var(--green);border-color:var(--green)}
+  .stage.half .dot{background:var(--goldbg);border-color:var(--gold)}
+  .stage .bar{flex:1;width:3px;background:var(--line);min-height:16px}
+  .stage:last-child .bar{display:none}
+  .stage .body{flex:1;padding:10px 0 16px}
+  .trig{font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:800;color:var(--blue);margin-bottom:3px}
+  .stage .t{font-size:16px;font-weight:800;color:var(--tx)}
+  .stage .d{font-size:13.5px;color:var(--tx2);margin-top:3px;max-width:66ch}
+  .stage .who{font-family:var(--mono);font-size:12px;color:var(--tx3);margin-top:5px}
+  /* budget table */
+  table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:620px}
+  th{text-align:left;padding:9px 12px;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:800;border-bottom:2px solid var(--line)}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--tx2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.k{color:var(--tx);font-weight:700}
+  td.num{font-family:var(--mono);font-size:13px;white-space:nowrap}
+  tr.total td{border-top:2px solid var(--line);font-weight:800;color:var(--tx)}
+  .lbl{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:800;margin-bottom:7px}
+  .big{font-size:38px;font-weight:800;line-height:1;letter-spacing:-.02em;color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>You were right.<br><span>The website skills already exist.</span></h1>
+  <p class="sub">Four build skills shipped into the client-sites repo two weeks ago, and your portal already fires the triggers between them. What you asked for is not three new skills. It is one missing half, two approval steps, and one collision to settle.</p>
+
+  <div class="goal">
+    <div class="l">Your goal</div>
+    <p>A new academy fully onboarded in about 30 minutes, with the skills doing the human-judgement work and staff approving it.</p>
+  </div>
+
+  <!-- PIPELINE -->
+  <h2>The pipeline, as it already runs</h2>
+  <p class="h2sub">Every trigger below is live in production today. When a stage becomes ready, the academy's Slack channel gets pinged with the exact skill to run.</p>
+  <div class="card scroll">
+    <div class="pipe">
+
+      <div class="stage ok"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+        <div class="trig">fires when the owner submits their brand brief</div>
+        <div class="t">1 &nbsp;Branding deck <span class="pill p-ok">exists</span></div>
+        <div class="d">Scans their old site for colors and fonts, builds their theme and a one-page brand board the owner approves on their own staging site. Everything downstream wears this theme automatically.</div>
+        <div class="who">/branding-deck &middot; owner approves the board in their wizard</div>
+      </div></div>
+
+      <div class="stage ok"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+        <div class="trig">fires when the deck is published</div>
+        <div class="t">2 &nbsp;Core site <span class="pill p-ok">exists</span></div>
+        <div class="d">Home, about, contact, programs. The pages scaffold from the shared kit, and the copy is written from the owner's own story, proof and offers, then workshopped by staff before it replaces the draft.</div>
+        <div class="who">/site-build --phase core &middot; plus /email-templates for the transactional emails</div>
+      </div></div>
+
+      <div class="stage half"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+        <div class="trig">fires when the sales preset is chosen in the wizard</div>
+        <div class="t">3 &nbsp;Sales system <span class="pill p-half">half exists</span></div>
+        <div class="d"><b>The funnel page half exists</b> (/site-build --phase sales builds the free-trial page). <b>The email and automation half is the missing piece:</b> nothing seeds the messages, drafts the 3 authored emails from the owner's story, or renders the review page staff and the owner approve from. That machinery was all built and tested this month. No skill drives it yet.</div>
+        <div class="who">/site-build --phase sales &middot; MISSING: the sales-messages skill</div>
+      </div></div>
+
+      <div class="stage ok"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
+        <div class="trig">fires when pricing, policy and the form are in</div>
+        <div class="t">4 &nbsp;Onboarding + agreement <span class="pill p-ok">exists</span></div>
+        <div class="d">The enroll funnel page and the branded legal agreement, from the offer's policy and legal details.</div>
+        <div class="who">/site-build --phase onboarding &middot; /agreement</div>
+      </div></div>
+
+    </div>
+  </div>
+
+  <!-- WHAT GETS BUILT -->
+  <h2>So the build is exactly three things</h2>
+  <div class="grid g3">
+    <div class="card">
+      <div class="lbl">Build A</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px">The sales-messages skill</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)">The missing half of stage 3. Seeds all 17 messages dormant, drafts the 3 authored emails from the owner's story as plain text in chat, staff approves, then it renders every message exactly as a parent gets it. Drives the machinery already built and locked this month.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">Build B</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px">Two owner approval steps</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)">The wizard has promised "nothing texts anyone until you approve it" for weeks with no step behind it. The owner sees the same rendered page staff reviewed, and approving is what switches the messages on. One render path, so what they approve IS what sends, proven by a committed test.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">Build C</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px">A re-run guard</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)">Small but load-bearing: re-running a site build refuses to overwrite pages that carry newer hand-fixes, instead of silently clobbering them. See the collision below.</p>
+    </div>
+  </div>
+
+  <!-- COLLISION -->
+  <h2>One collision, found while mapping, needs your ruling</h2>
+  <div class="note n-warn">
+    <b>Two things write the same website files, and a re-run eats the fixes</b>
+    <p>When a client asks for a page change, the website-fix loop edits their live pages directly. But re-running the core site build <b>replaces those same pages wholesale</b> from the kit. Any client-requested fixes made since the last build would be silently overwritten. Nothing guards this today.</p>
+    <p><b>Build C is the fix I recommend:</b> the site build checks whether the client's pages carry fix commits newer than its own last run, and stops with a list of them instead of overwriting. Staff folds them in deliberately.</p>
+  </div>
+  <div class="note n-blue">
+    <b>Smaller, same family: two unrelated things are both called "site pages"</b>
+    <p>The label list an owner edits in their Blueprint and the file map the deploy scripts push are different stores with the same name, and nothing reconciles them. Not urgent, logged so it stops surprising people.</p>
+  </div>
+
+  <!-- MINUTES -->
+  <h2>The 30 minutes, honestly</h2>
+  <p class="h2sub">Your target was set when this was emails. It now covers branding, sites, funnels, emails and automations, so here is the honest split. The key: there are two clocks, and yours is the owner's.</p>
+  <div class="grid g2">
+    <div class="card">
+      <div class="lbl">The owner's clock, what "onboarded in 30 minutes" can mean</div>
+      <div class="big">~30 min</div>
+      <div class="scroll"><table style="min-width:0;margin-top:10px">
+        <tr><td class="k">Brand card (logo, colors, fonts)</td><td class="num">~5 min</td></tr>
+        <tr><td class="k">Story brief (story, proof, dream athletes)</td><td class="num">~10 min</td></tr>
+        <tr><td class="k">Offer + pricing</td><td class="num">~10 min</td></tr>
+        <tr><td class="k">Approve the brand board</td><td class="num">~2 min</td></tr>
+        <tr><td class="k">Approve their messages (Build B)</td><td class="num">~3 min</td></tr>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">The owner types their answers once and approves twice. <b>This clock can hit your 30.</b></p>
+    </div>
+    <div class="card">
+      <div class="lbl">The staff + AI clock, spread across the same days</div>
+      <div class="big">~70 min</div>
+      <div class="scroll"><table style="min-width:0;margin-top:10px">
+        <tr><td class="k">Branding deck</td><td class="num">~10 min</td></tr>
+        <tr><td class="k">Core site copy review</td><td class="num">~20 min</td></tr>
+        <tr><td class="k">Sales funnel page</td><td class="num">~10 min</td></tr>
+        <tr><td class="k">Sales messages: 3 drafts + rendered review</td><td class="num">~15 min</td></tr>
+        <tr><td class="k">Email templates + agreement</td><td class="num">~15 min</td></tr>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">Estimates, not measurements. <b>The first San Jose run is the measurement</b>, and these numbers get replaced with real ones.</p>
+    </div>
+  </div>
+
+  <!-- SAFETY -->
+  <h2>Carried in from the last two weeks, not negotiable</h2>
+  <div class="grid g2">
+    <div class="note n-ok" style="margin:0"><b>What the owner approves is what sends</b>
+      <p>One render path. The approval page, the staff review page and the real send all call the same code, and a committed test proves preview equals send. The preview that quietly disagreed with the send was found and fixed this month; the test is what stops it coming back.</p></div>
+    <div class="note n-ok" style="margin:0"><b>A trigger that fires early does nothing, loudly</b>
+      <p>Every stage states what it does when the stage before it is missing or half-done: it declines and says why, it never throws and never builds from someone else's data. The enroll-funnel outage is the lesson applied.</p></div>
+  </div>
+
+  <!-- THE ASK -->
+  <h2>The one thing I need from you</h2>
+  <div class="card" style="border-color:var(--goldln);background:var(--goldbg)">
+    <p style="margin:0;font-size:16.5px;color:var(--tx)"><b>Approve the three builds (A, B, C), or tell me which to change.</b> Nothing else here is new work: stages 1, 2 and 4 exist and stay as they are, wearing the same triggers your portal already fires.</p>
+  </div>
+
+</div>
+</body>
+</html>
