@@ -233,29 +233,127 @@ if (window.__MOCK__) (() => {
   ]);
   // Hawkeye: agent-drafted actions waiting on the owner. `ghl_contact_id`s
   // match OPPS contactIds so the sales board stages glow for the same leads.
-  const HAWK_READY = [
+  // ══ Hawkeye deck seed - EVERY card kind across all 3 lanes ══════════════
+  // Booking lane: reply / reply+escalate / book / ghost / mark_lost /
+  //   mark_unqualified / reignite / reignite_due
+  // Confirm lane: reply / confirm_handoff / post_trial (form) / confirm_lost
+  // Closing lane: reply / closing_enroll / followup_* plan / closing_unqualified
+  // ?quiet=1 additionally shows the after-hours bar. contact ids match OPPS
+  // leads so the sales board stages glow for the same people.
+  const _tt = (arr) => arr.map(([role, text, d, h]) => ({ role, text, at: iso(d || 0, h || 0) }));
+  const HAWK_BOOKING = [
     { id: 'apx-1', kind: 'reply', status: 'pending', contact_name: 'Sasha Adams', ghl_contact_id: 'lead-3', ghl_conversation_id: 'cv-apx-1', reply_count: 3, confidence: 0.92, goal: 'Book the free trial',
+      summary: 'Mom of Deja (11). Came in from the Meta lead form, asked about weekend times twice.',
+      thread_tail: _tt([['parent', 'Do you have anything on weekends? Weekdays are tough with my shift.', 0, 5], ['agent', 'We do! Saturday mornings are our biggest U12 session.', 0, 5], ['parent', 'Ok what times Saturday?', 0, 1]]),
       draft_message: 'Hey Sasha! Coach Dre has two U12 spots left this Saturday at 9am. Want me to lock one in for Deja?',
       reasoning: 'Lead asked about weekend times in her last message. Saturday 9am has open capacity and matches Deja\'s age group.' },
-    { id: 'apx-2', kind: 'reply', status: 'pending', contact_name: 'Andre Boyd', ghl_contact_id: 'lead-9', ghl_conversation_id: 'cv-apx-2', reply_count: 5, confidence: 0.84, goal: 'Close post-trial',
-      draft_message: 'AJ looked great out there yesterday! Coach Dre thinks the U16 Elite group is the right fit. Want me to send over the enrollment link so he keeps the momentum?',
-      reasoning: 'Trial completed yesterday, parent replied positively. Best window to close is within 24 hours of the trial.' },
-    { id: 'apx-3', kind: 'reply', status: 'pending', contact_name: 'Nina Flores', ghl_contact_id: 'lead-10', ghl_conversation_id: 'cv-apx-3', reply_count: 4, confidence: 0.48, goal: 'Close post-trial',
+    { id: 'apx-3', kind: 'reply', status: 'pending', contact_name: 'Nina Flores', ghl_contact_id: 'lead-10', ghl_conversation_id: 'cv-apx-3', reply_count: 4, confidence: 0.48, goal: 'Book both siblings',
       escalate: true, escalate_reason: 'Asked for a sibling discount - no discount policy is configured for this academy.',
+      summary: 'Two kids (9 and 12). Very engaged, but pricing question is blocking.',
+      thread_tail: _tt([['parent', 'If I sign up both my girls is there any kind of family discount?', 0, 2]]),
       draft_message: 'Great question! Let me check with the team on sibling pricing and get right back to you today.',
       reasoning: 'Parent asked about enrolling both kids with a discount. I do not have pricing authority, so this needs a human call.' },
     { id: 'apx-4', kind: 'book', status: 'pending', contact_name: 'Malik Turner', ghl_contact_id: 'lead-4', ghl_conversation_id: 'cv-apx-4', confidence: 0.9, goal: 'Confirm the trial booking',
-      book_slot_at: iso(-1, -2), book_group: 'U16 Elite - Tuesday 6:00 PM', booking_asks: 'Confirmed Tuesday works, asked what Malik Jr should bring',
+      book_slot_at: iso(-1, -2), book_calendar_id: 'cal-u16', book_group: 'U16 Elite - Tuesday 6:00 PM', booking_asks: 'Confirmed Tuesday works, asked what Malik Jr should bring', athlete_name: 'Malik Turner Jr',
+      summary: 'Dad confirmed Tuesday 6pm works. Ready to book.',
+      thread_tail: _tt([['agent', 'Tuesday 6pm or Thursday 7pm - which works better for Malik Jr?', 1, 0], ['parent', 'Tuesday is good. What does he need to bring?', 0, 3]]),
       draft_message: 'You are all set for Tuesday 6pm at Northside Main Gym! Bring water and indoor shoes - doors open 15 minutes early.',
       reasoning: 'Lead confirmed the Tuesday slot in their last message, so I prepared the booking.' },
     { id: 'apx-5', kind: 'ghost', status: 'pending', contact_name: 'Owen Marsh', ghl_contact_id: 'lead-11',
-      reasoning: 'Said they were interested, then went quiet 6 days ago. Two nudges sent, no reply. Recommend one last touch or mark lost.' },
+      summary: 'Interested 6 days ago, then silence. Two nudges sent.',
+      thread_tail: _tt([['parent', 'Yeah we might be interested for my son', 6, 0], ['agent', 'Awesome! Want me to hold a spot at Saturday\'s session so he can try it out?', 6, 0], ['agent', 'Hey! Still happy to set that trial up whenever works for you.', 3, 0]]),
+      reasoning: 'Said they were interested, then went quiet 6 days ago. Two nudges sent, no reply. Recommend the Ghosted sequence.' },
     { id: 'apx-6', kind: 'ghost', status: 'pending', contact_name: 'Devon Ellis', ghl_contact_id: 'lead-5',
+      summary: 'Opened the booking link twice, never picked a time.',
       reasoning: 'Opened the trial booking link twice but never picked a time. Last reply 5 days ago.' },
     { id: 'apx-7', kind: 'mark_lost', status: 'pending', contact_name: 'Marcus Webb', ghl_contact_id: 'lead-13',
       lost_reason: 'Unreachable for 3 weeks: 6 texts undelivered, 2 calls no answer.',
+      summary: 'Number looks dead - everything bounces.',
       reasoning: 'No working contact channel. Keeping him on the board skews your pipeline numbers.' },
+    { id: 'apx-8', kind: 'mark_unqualified', status: 'pending', contact_name: 'Rhonda Pierce', ghl_contact_id: 'lead-14', ghl_conversation_id: 'cv-apx-8',
+      summary: 'Asked us to stop texting. Should come off the board entirely.',
+      thread_tail: _tt([['agent', 'Hi Rhonda! Following up on the trial for your son - want me to find a time this week?', 1, 4], ['parent', 'Please stop texting me. We went with another program.', 0, 6]]),
+      reasoning: 'Parent explicitly asked us to stop contacting them. Marking unqualified removes them from every sequence immediately.' },
+    { id: 'apx-9', kind: 'reignite', status: 'pending', contact_name: 'Grace Lin', ghl_contact_id: 'lead-15', ghl_conversation_id: 'cv-apx-9', confidence: 0.88,
+      reignite_at: iso(-45), reignite_date: iso(-45),
+      summary: 'Wants to start after school tryouts wrap in September.',
+      thread_tail: _tt([['parent', 'She wants to do it but school tryouts run through September. Can we pick this up after?', 0, 8]]),
+      draft_message: 'Totally understood - tryouts come first! I\'ll check back in mid-September and we\'ll get Mia set up then. Good luck!',
+      reignite_message: 'Hey Grace! Tryout season should be wrapping up - want me to grab Mia a spot in the U14 group this month?',
+      reasoning: 'Parent gave a clear future start window. Acknowledge now, park the lead, and fire a re-engagement message in mid-September.' },
+    { id: 'apx-10', kind: 'reignite_due', status: 'pending', contact_name: 'Tom Okafor', ghl_contact_id: 'lead-16', ghl_conversation_id: 'cv-apx-10', confidence: 0.86,
+      summary: 'Parked 2 months ago ("after basketball camp"). Today is the day.',
+      draft_message: 'Hey Tom! You mentioned getting Chidi in after summer camp wrapped up - want me to grab him a spot in this Saturday\'s U12 session?',
+      reasoning: 'The reignition you scheduled for this lead fires today. Camp season is over, so the timing you picked has arrived.' },
   ];
+  const HAWK_CONFIRM = [
+    { id: 'cfx-1', kind: 'reply', status: 'pending', contact_name: 'Kira Patel', ghl_contact_id: 'lead-6', ghl_conversation_id: 'cv-cfx-1', reply_count: 2, confidence: 0.94, goal: 'Confirm the trial',
+      summary: 'Trial booked for Saturday. Asked what Arjun should bring.',
+      thread_tail: _tt([['agent', 'Arjun is booked for Saturday 9am! See you at Northside Main Gym.', 1, 0], ['parent', 'Great! Anything he needs to bring?', 0, 2]]),
+      draft_message: 'Just water and indoor shoes! Doors open 8:45, and Coach Dre likes new players there a few minutes early for warm-up.',
+      reasoning: 'Simple logistics question about a confirmed trial - answer keeps the booking warm.' },
+    { id: 'cfx-2', kind: 'confirm_handoff', status: 'pending', contact_name: 'Tia Roberts', ghl_contact_id: 'lead-8', ghl_conversation_id: 'cv-cfx-2', confidence: 0.9,
+      summary: 'Booked Thursday, now says Thursday broke. Needs a rebook.',
+      thread_tail: _tt([['parent', 'So sorry - something came up Thursday. Can Jade come a different day?', 0, 4]]),
+      draft_message: 'No problem at all! Let me find Jade another time - does Saturday morning or Tuesday evening work better?',
+      reasoning: 'The booked slot fell through, so this goes back to the booking flow to pick a new time. The old booking gets released.' },
+    { id: 'cfx-3', kind: 'post_trial', status: 'pending', contact_name: 'Leo Sanders', ghl_contact_id: 'lead-7', ghl_conversation_id: 'cv-cfx-3', athlete_name: 'Eli Sanders',
+      summary: 'Trial was Sunday. How did it go?',
+      reasoning: 'Eli\'s trial session finished. Fill in whether he showed and if he\'s a fit - that decides which follow-up sequence runs.' },
+    { id: 'cfx-4', kind: 'confirm_lost', status: 'pending', contact_name: 'Dana Whitfield', ghl_contact_id: 'lead-17',
+      lost_reason: 'Two no-shows: booked twice, missed both, no response since.',
+      summary: 'Booked two trials, showed to neither.',
+      reasoning: 'Second no-show with no reply after. Recommend marking lost so the board reflects reality.' },
+  ];
+  const HAWK_CLOSING = [
+    { id: 'clx-1', kind: 'closing_enroll', status: 'pending', contact_name: 'Andre Boyd', ghl_contact_id: 'lead-9', ghl_conversation_id: 'cv-clx-1', reply_count: 5, confidence: 0.91, goal: 'Close post-trial',
+      summary: 'AJ crushed his trial. Dad said "he loved it" - ready for the enrollment link.',
+      thread_tail: _tt([['agent', 'How did AJ feel about yesterday\'s session?', 0, 20], ['parent', 'He LOVED it. Would not stop talking about coach Dre lol', 0, 4]]),
+      draft_message: 'That\'s what we love to hear! Here\'s AJ\'s enrollment link for the U16 Elite group - his spot from the trial is held for 48 hours: {enroll_link}',
+      reasoning: 'Trial completed, parent is enthusiastic. Best close window is inside 24 hours - send the link while the momentum is live.' },
+    { id: 'clx-2', kind: 'reply', status: 'pending', contact_name: 'Simone Vega', ghl_contact_id: 'lead-18', ghl_conversation_id: 'cv-clx-2', reply_count: 3, confidence: 0.77, goal: 'Answer pricing, keep the close alive',
+      summary: 'Post-trial, asked about monthly price and what\'s included.',
+      thread_tail: _tt([['parent', 'She had fun! What does membership run per month and does that include the strength sessions?', 0, 6]]),
+      draft_message: 'So glad she enjoyed it! U14 membership is $199/mo and yes - the Wednesday strength sessions are included, plus one guest pass a month.',
+      reasoning: 'Direct pricing question from a warm post-trial parent. Configured pricing is public, so I can answer and keep the close moving.' },
+    { id: 'clx-fu-1', kind: 'closing_followup', step_key: 'followup_1', status: 'pending', contact_name: 'Priya Nair', ghl_contact_id: 'lead-19', ghl_conversation_id: 'cv-clx-3', send_after: iso(-2),
+      summary: 'Went quiet after the trial - 3-touch follow-up plan.',
+      thread_tail: _tt([['agent', 'How did Rohan like Tuesday\'s session?', 2, 0]]),
+      draft_message: 'Hey Priya! Just floating this back up - Rohan\'s spot in the U12 group is still open from his trial. Want me to hold it for the week?',
+      reasoning: 'No reply since the trial. A spaced 3-touch plan keeps the door open without pressure - approve the schedule once and it runs on its own.' },
+    { id: 'clx-fu-2', kind: 'closing_followup', step_key: 'followup_2', status: 'pending', contact_name: 'Priya Nair', ghl_contact_id: 'lead-19', ghl_conversation_id: 'cv-clx-3', send_after: iso(-5),
+      draft_message: 'Coach Dre mentioned Rohan\'s footwork twice this week - he sees real potential. Happy to answer any questions you two have!' },
+    { id: 'clx-fu-3', kind: 'closing_followup', step_key: 'followup_3', status: 'pending', contact_name: 'Priya Nair', ghl_contact_id: 'lead-19', ghl_conversation_id: 'cv-clx-3', send_after: iso(-9),
+      draft_message: 'Last note from me, promise! If the timing ever works for Rohan we\'d love to have him. His trial notes stay on file - just text me here whenever.' },
+    { id: 'clx-4', kind: 'closing_unqualified', status: 'pending', contact_name: 'Bev Muller', ghl_contact_id: 'lead-20',
+      summary: 'Moving out of state next month.',
+      thread_tail: _tt([['parent', 'I should have mentioned - we\'re relocating to Phoenix next month, so this won\'t work out.', 0, 26]]),
+      reasoning: 'Family is relocating out of the area. No future re-engagement makes sense - mark unqualified.' },
+  ];
+  // Athlete-over-parent names for the deck headers (deck-names action).
+  const HAWK_NAMES = {
+    'lead-3': { athlete: 'Deja Adams', parent: 'Sasha Adams' }, 'lead-10': { athlete: 'Luna + Ivy Flores', parent: 'Nina Flores' },
+    'lead-4': { athlete: 'Malik Turner Jr', parent: 'Malik Turner' }, 'lead-11': { athlete: 'Cole Marsh', parent: 'Owen Marsh' },
+    'lead-5': { athlete: 'Devon Ellis Jr', parent: 'Devon Ellis' }, 'lead-13': { athlete: 'DeShawn Webb', parent: 'Marcus Webb' },
+    'lead-14': { athlete: 'Trey Pierce', parent: 'Rhonda Pierce' }, 'lead-15': { athlete: 'Mia Lin', parent: 'Grace Lin' },
+    'lead-16': { athlete: 'Chidi Okafor', parent: 'Tom Okafor' }, 'lead-6': { athlete: 'Arjun Patel', parent: 'Kira Patel' },
+    'lead-8': { athlete: 'Jade Roberts', parent: 'Tia Roberts' }, 'lead-7': { athlete: 'Eli Sanders', parent: 'Leo Sanders' },
+    'lead-17': { athlete: 'Zoe Whitfield', parent: 'Dana Whitfield' }, 'lead-9': { athlete: 'AJ Boyd', parent: 'Andre Boyd' },
+    'lead-18': { athlete: 'Camila Vega', parent: 'Simone Vega' }, 'lead-19': { athlete: 'Rohan Nair', parent: 'Priya Nair' },
+    'lead-20': { athlete: 'Hans Muller', parent: 'Bev Muller' },
+  };
+  // Book-it card calendar options + open slots (book-options action).
+  const HAWK_CALS = [
+    { key: 'cal-u12',  label: 'U12 Development - Sat 9:00 AM',  slots: [iso(-1, -3), iso(-3, -3), iso(-8, -3)] },
+    { key: 'cal-u16',  label: 'U16 Elite - Tue 6:00 PM',        slots: [iso(-1, -2), iso(-6, -2), iso(-13, -2)] },
+    { key: 'cal-open', label: 'Open Gym Intro - Thu 7:00 PM',   slots: [iso(-2, -4), iso(-9, -4)] },
+  ];
+  // ?quiet=1 -> the deck shows the after-hours "sends in the morning" bar.
+  const HAWK_QUIET = new URLSearchParams(location.search).get('quiet') === '1'
+    ? { until: (() => { const d = new Date(NOW + 86400e3); d.setHours(8, 0, 0, 0); return d.toISOString(); })() }
+    : null;
+  // Back-compat alias (older mock consumers referenced HAWK_READY).
+  const HAWK_READY = HAWK_BOOKING;
   const HAWK_FU = [
     { id: 'fu-1', status: 'pending', contact_name: 'Kira Patel', ghl_contact_id: 'lead-6', scheduled_at: iso(-1),
       draft_message: 'Hey Kira! Quick reminder about Arjun\'s trial this Saturday at 9am. Doors open 8:45 - see you there!' },
@@ -377,12 +475,14 @@ if (window.__MOCK__) (() => {
     if (p === '/api/agent-config') return act === 'get-mode' ? { mode: 'approve' } : { ok: true };
     if (p === '/api/agent-followups') return act === 'list' ? { followups: HAWK_FU } : { ok: true };
     if (p === '/api/agent-approvals') {
-      if (act === 'list-ready') return { ready: HAWK_READY };
+      if (act === 'list-ready') return { ready: HAWK_BOOKING, quiet: HAWK_QUIET, booking_provider: 'portal' };
+      if (act === 'deck-names') return { names: HAWK_NAMES };
+      if (act === 'book-options') return { calendars: HAWK_CALS };
       if (act === 'list-reignitions') return { reignitions: [] };
       return { ok: true, ready: [], followups: [], reignitions: [] };
     }
-    if (p === '/api/agent-confirm') return act === 'list-ready' ? { ready: HAWK_READY.filter(r => r.kind === 'book') } : { ok: true };
-    if (p === '/api/agent-closing') return act === 'list-ready' ? { ready: HAWK_READY.filter(r => r.id === 'apx-2' || r.id === 'apx-3') } : { ok: true };
+    if (p === '/api/agent-confirm') return act === 'list-ready' ? { ready: HAWK_CONFIRM } : { ok: true };
+    if (p === '/api/agent-closing') return act === 'list-ready' ? { ready: HAWK_CLOSING } : { ok: true };
     if (p === '/api/members') {
       // Member detail drawer (?id=...): single-member shape for openMemberPopup.
       const mid = q.get('id');
