@@ -13,12 +13,25 @@
 -- published by Google, and anyone can check it in five seconds. So it may
 -- display while the quotes stay plain.
 --
--- These columns are STAFF-ENTERED from the owner's own Business Profile
--- dashboard. They are an interim measure with a deliberate shelf life: once
--- the Google Business Profile sync lands, the aggregate is computed from
--- synced `testimonials` rows and these columns are read only as a fallback for
--- academies that never connected. Nothing should be built that assumes they
--- are the permanent source.
+-- HOW THESE ARE POPULATED, and why the naming matters:
+--
+-- The testimonials skill READS them off the owner's Business Profile via
+-- Claude in Chrome. So they are not hand-typed, but they are also NOT synced -
+-- they are a POINT-IN-TIME READING that goes stale silently the moment the
+-- academy's next review lands.
+--
+-- ⚠️ Label these in any UI as "what their Google profile showed on <date>",
+-- never as a live or verified figure. The precedent is `clients.email`, which
+-- the card labelled "Owner email" while publishing it to parents as the public
+-- contact address: a field whose label disagreed with its use, filled
+-- inconsistently by academies who were each right by their own reading. A
+-- rating that reads as fetched-and-current when it was read once weeks ago is
+-- the same error in a new place.
+--
+-- Interim with a deliberate shelf life: once Google Business Profile sync
+-- lands, the aggregate is computed from synced `testimonials` rows and these
+-- become a fallback for academies that never connected. Nothing should be
+-- built that assumes they are the permanent source.
 --
 -- ALL ADDITIVE. Nothing is renamed, dropped, or rewritten.
 
@@ -27,11 +40,11 @@ alter table public.clients add column if not exists google_review_count integer;
 alter table public.clients add column if not exists google_rating_checked_at timestamptz;
 
 comment on column public.clients.google_rating is
-  'Public Google star rating, staff-entered from the owner''s Business Profile dashboard. Empty = no rating renders anywhere. Superseded by the synced aggregate once Google Business Profile sync lands.';
+  'Google star rating as READ from the owner''s Business Profile at google_rating_checked_at. A point-in-time reading, NOT a synced or verified figure. Empty = no rating renders anywhere. Label it in UI as what their profile showed on that date, never as current.';
 comment on column public.clients.google_review_count is
-  'Number of public Google reviews behind google_rating. Meaningless without it: see the both-or-neither constraint.';
+  'Number of public Google reviews behind google_rating, read at the same moment. Meaningless without it: see the both-or-neither constraint.';
 comment on column public.clients.google_rating_checked_at is
-  'When a human last read these two figures off Google. Makes staleness VISIBLE rather than silent - a rating with no checked-at date is a number nobody has confirmed since it was typed.';
+  'When these two figures were last read off Google. NOT decoration: it is what makes staleness visible instead of silent. A rating without it is a number nobody can date, and readers should treat an old reading as old.';
 
 -- Range guards. A rating outside 1.0-5.0 or a negative count is a typo, and a
 -- typo in a number we publish to parents is the same class of problem as an
