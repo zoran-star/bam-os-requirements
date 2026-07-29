@@ -9,6 +9,19 @@ Adding to `_OBF_STEPS` alone = invisible in the wizard. The old checklist render
 is gone; do not build onboarding anywhere else. Full rule + do-not-touch list in
 [`../CLAUDE.md`](../CLAUDE.md).
 
+## ⛔ Before pushing staff-portal (src/) changes: build AND lint
+
+`npx vite build` alone does NOT catch undefined variables - a leftover
+reference to a deleted identifier builds green and then blanks the page in
+production (this happened 2026-07-27: a removed `banner` state with one
+missed render site blanked ?p=content). Always also run:
+
+```bash
+npx eslint src/ -f json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const n=JSON.parse(d).flatMap(f=>f.messages).filter(m=>m.ruleId==='no-undef');n.forEach(m=>console.log(m.message));process.exit(n.length?1:0)})"
+```
+
+Zero `no-undef` results required before any push.
+
 ## ⛔ Front-end work: load the design system first
 
 Before ANY UI/front-end change in this folder (client portal, new pages, components), read [`design-system/DESIGN.md`](design-system/DESIGN.md) and use the tokens in [`design-system/tokens.css`](design-system/tokens.css). Never hardcode colors/radii/fonts/shadows a token covers. If a token changes, mirror it in `public/client-portal.html`'s `:root` in the same commit (and vice versa). The V2 Home / Assets / Calendar views are the reference implementations.

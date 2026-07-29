@@ -1,6 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from "react";
 import { authFetch } from "../lib/authFetch";
 import { showToast } from "../components/dialogs.jsx";
+import { SkelRows } from "../components/Skeleton.jsx";
 const SandboxApp = lazy(() => import("../sandbox/SandboxApp"));
 const FollowupsPanel = lazy(() => import("./FollowupsPanel"));
 const AgentModePanel = lazy(() => import("./AgentModePanel"));
@@ -66,7 +67,7 @@ export default function AgentTrainingView({ tokens }) {
     <div style={{ padding: "8px 4px", fontFamily: F, color: text }}>
       <Tabs />
       <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Agent autonomy</div>
-      <Suspense fallback={<div style={{ color: sub, padding: 24 }}>Loading…</div>}>
+      <Suspense fallback={<div style={{ padding: 24 }}><SkelRows n={5} avatar={false} /></div>}>
         <AgentModePanel tokens={c} />
       </Suspense>
     </div>
@@ -82,7 +83,7 @@ export default function AgentTrainingView({ tokens }) {
   );
 
   if (err) return <div style={{ padding: 24, color: red, fontFamily: F }}><Tabs />⚠ {err}</div>;
-  if (!lessons) return <div style={{ padding: 24, color: sub, fontFamily: F }}><Tabs />Loading…</div>;
+  if (!lessons) return <div style={{ padding: 24, fontFamily: F }}><Tabs /><SkelRows n={5} avatar={false} /></div>;
 
   const active = lessons.filter(l => l.active !== false);
   const byAcademy = {};

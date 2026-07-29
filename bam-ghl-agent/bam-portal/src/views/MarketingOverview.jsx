@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import MarketingDashboard, { GoalEditor } from "../components/MarketingDashboard";
+import { SkelStats, SkelCards } from "../components/Skeleton.jsx";
 
 // Cross-client marketing overview — the "single marketing portal". One roster
 // of every marketing client this month: verdict, spend, leads, CPL vs goal,
@@ -45,7 +46,7 @@ export default function MarketingOverview({ tokens, session }) {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div style={{ padding: 24, color: t.textSub }}>Loading marketing overview…</div>;
+  if (loading) return <div style={{ padding: 24 }}><SkelStats n={4} t={t} /><SkelCards n={6} h={120} t={t} /></div>;
   if (err) return <div style={{ padding: 24, color: t.red }}>Couldn't load overview: {err}</div>;
   if (!data) return null;
 

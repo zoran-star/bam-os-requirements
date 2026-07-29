@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "../supabase";
+import { SkelRows } from "../components/Skeleton.jsx";
 
 import { showToast, uiConfirm } from "../components/dialogs.jsx";
 const STORAGE_BUCKET = "resources";              // private - gated file attachments
@@ -251,7 +252,7 @@ export default function ResourcesView({ tokens, dark, me }) {
 
       {/* List */}
       {loading ? (
-        <div style={{ padding: 40, textAlign: "center", color: tk.textSub }}>Loading…</div>
+        <SkelRows n={6} t={tk} />
       ) : filtered.length === 0 ? (
         <div style={{
           padding: 60, textAlign: "center", color: tk.textSub,

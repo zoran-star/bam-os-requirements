@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import AgentSessionsPanel from "./AgentSessionsPanel";
 import AppErrorsPanel from "./AppErrorsPanel";
+import { SkelRows } from "../components/Skeleton.jsx";
 
 // ─── Feedback tab ────────────────────────────────────────────────────────────
 // ADMIN-ONLY view that lists all submissions from portal_feedback.
@@ -521,7 +522,7 @@ function ShipQueuePanel({ tokens, session }) {
     return <span style={{ fontSize: 11, fontWeight: 700, color: m.c }}>{m.label}</span>;
   };
 
-  if (prs === null) return <div style={{ color: t.textMute, padding: 24 }}>Loading…</div>;
+  if (prs === null) return <div style={{ padding: 24 }}><SkelRows n={4} avatar={false} t={t} /></div>;
 
   if (reason === "github_not_configured") {
     return (

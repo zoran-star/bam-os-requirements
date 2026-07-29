@@ -4,6 +4,7 @@ import {
   listMessages, sendMessage, editMessage, deleteMessage, markRead, uploadAttachment,
 } from "../services/messagesService";
 import { uiConfirm } from "./dialogs.jsx";
+import { SkelBubbles } from "./Skeleton.jsx";
 
 const EDIT_DELETE_WINDOW_MS = 5 * 60 * 1000;
 const TYPING_TIMEOUT_MS = 3000; // hide "typing..." if no broadcast for this long
@@ -234,7 +235,7 @@ export default function MessageThread({ conversationId, tokens: t, session, me, 
           display: "flex", flexDirection: "column", gap: 14,
         }}
       >
-        {loading && <div style={{ color: t.textMute, fontSize: 12, textAlign: "center" }}>Loading…</div>}
+        {loading && <SkelBubbles n={4} t={t} />}
         {!loading && messages.length === 0 && (
           <div style={{ color: t.textMute, fontSize: 13, textAlign: "center", padding: 40 }}>
             No messages yet. Send the first one ↓

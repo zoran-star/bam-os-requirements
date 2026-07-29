@@ -10,6 +10,7 @@ import PhoneTab from "./PhoneTab.jsx";
 import ActivationTab from "./ActivationTab.jsx";
 import ClientAvatar from "../components/ClientAvatar.jsx";
 import { showToast, uiConfirm, ToastHost, ConfirmHost } from "../components/dialogs.jsx";
+import { SkelRows } from "../components/Skeleton.jsx";
 
 // ─── Tiny stroke icons (design system: SVG stroke icons, no emojis) ────────
 const _ico = (paths, size = 14) => (
@@ -2460,7 +2461,7 @@ function CampaignPickerModal({ campaigns, selected, loading, error, onToggle, on
           </div>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
-          {loading && <div style={{ padding: 24, color: t.textMute, textAlign: "center" }}>Loading…</div>}
+          {loading && <SkelRows n={4} t={t} />}
           {error && <div style={{ padding: 24, color: t.red }}>{error}</div>}
           {!loading && !error && campaigns.length === 0 && (
             <div style={{ padding: 24, color: t.textMute, textAlign: "center", fontStyle: "italic" }}>No campaigns in this ad account.</div>
@@ -2544,7 +2545,7 @@ function SystemsTab({ client, tokens: t, dark, me }) {
         <span style={{ fontSize: 12, color: t.textMute }}>newest first · click to open</span>
       </div>
 
-      {loading && <div style={{ color: t.textMute, fontSize: 13 }}>Loading…</div>}
+      {loading && <SkelRows n={3} avatar={false} t={t} pad="8px 0" />}
 
       {!loading && tickets.length === 0 && (
         <div style={{ color: t.textMute, fontSize: 13, padding: "24px 0", fontStyle: "italic" }}>
@@ -2796,7 +2797,7 @@ function TeamTab({ client, tokens, session }) {
         </div>
       )}
 
-      {loading && <div style={{ color: t.textMute }}>Loading…</div>}
+      {loading && <SkelRows n={4} avatar={false} t={t} pad="9px 2px" />}
       {!loading && sorted.length === 0 && (
         <div style={{ color: t.textMute, padding: 24, fontStyle: "italic", textAlign: "center" }}>
           No portal users yet.
@@ -2923,7 +2924,7 @@ function NotesTab({ client, tokens, me, session, staffMap }) {
         </div>
       </div>
 
-      {loading && <div style={{ color: t.textMute }}>Loading…</div>}
+      {loading && <SkelRows n={4} avatar={false} t={t} pad="9px 2px" />}
       {!loading && notes.length === 0 && (
         <div style={{ color: t.textMute, padding: 24, fontStyle: "italic", textAlign: "center" }}>
           No notes yet. Be the first to add one.
@@ -3364,7 +3365,7 @@ function ActionItemsTab({ client, tokens, session }) {
       </div>
 
       {err && <div style={{ color: "#e08b7e", marginBottom: 12 }}>{err}</div>}
-      {loading && <div style={{ color: t.textMute }}>Loading…</div>}
+      {loading && <SkelRows n={4} avatar={false} t={t} pad="9px 2px" />}
       {!loading && items.length === 0 && <div style={{ color: t.textMute, padding: 24, fontStyle: "italic", textAlign: "center" }}>No action items yet.</div>}
 
       {onb.length > 0 && <div style={groupLabel}>Onboarding · {onb.filter(i => i.completed_at).length}/{onb.length}</div>}
