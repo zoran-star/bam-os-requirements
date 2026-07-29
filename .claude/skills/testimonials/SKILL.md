@@ -35,6 +35,43 @@ Any of the three can come back empty. Record what you have and stop; do not fill
 
 If you only have public-page access, collect the rating and count, leave the quotes empty, and say so.
 
+## ⛔ A human approves every quote, in chat, before anything is written
+
+**Nothing reaches `testimonials` without a recorded human approval.** Not one row, not in a hurry, not because a caller passed a flag. You find and transcribe; a person decides.
+
+This is the guardrail, not a formality. The Miami fabrication happened because selection and transcription ran unsupervised and the output looked real. Separating "who found it" from "who chose it" is what makes that failure structurally impossible rather than merely discouraged.
+
+The flow is the same one the other skills use: **propose in plain text in chat, human confirms, then write.**
+
+### Presenting candidates
+
+One block per candidate, in plain text in the chat. Never a table, never a summary, never "and 14 more like these".
+
+```
+[3] Maria G.
+    "My son has grown so much in six months, not just as a player
+     but in confidence. The coaches actually care who these kids become."
+    148 chars · COMPLETE
+```
+
+Show for every candidate: the number, the author as written, the **full** text, the character count, and whether it is complete or truncated. The person approving needs to see completeness to judge it, so it goes beside the quote rather than in a note underneath.
+
+Then ask which numbers to write, and which of those to star. Write only those. If the answer is "none", write nothing and say so.
+
+### Truncated reviews are not approvable
+
+**A review that ends mid-sentence must be shown as `TRUNCATED` and must not be offered for approval.**
+
+Do not complete it, do not trim it back to the last full sentence, do not paraphrase the ending. A smoothed ending is a fabricated one, and it is indistinguishable from a real one after the fact.
+
+Truncation is common: pulling GTA's reviews from the public page returned 9 of 10 incomplete, and San Jose's returned 3 of 22 with none complete. Get the full text from the owner dashboard, then re-present it.
+
+### Verbatim means verbatim
+
+No paraphrasing. No tidying. No fixing a typo, no completing a sentence, no merging two reviews, no translating, no "cleaning up" grammar. Trim leading and trailing whitespace and nothing else.
+
+If a quote is awkward, that is the parent's voice and it stays. The only permitted edit is the one the owner explicitly asks for on their own review: shortening a display name.
+
 ## Writing the quotes
 
 Each quote is one row in `testimonials` with `source = 'manual'`, `client_id` set to that academy, and nothing else invented.
@@ -80,7 +117,9 @@ Both stop the email. Only the first is a reason to go back to the academy.
 
 ## What you must not do
 
+- Write anything without a human approving it in chat first.
 - Copy another academy's quotes, in any form, however edited. Attributed content never travels between academies.
+- Use reviews written about a **different business**, even the same owner's previous one, without an explicit decision to do so. Real reviews of the same coach under a prior business name are not automatically this academy's reviews, and presenting them as such is a softer form of the substitution this store exists to prevent. If it is agreed, the attribution must name the business the review was actually written about.
 - Write a `source = 'google'` row. Only the sync job does that, and the database enforces it.
 - Put a rating, date or sync field on a typed row.
 - Invent an author, a city, or a date.
