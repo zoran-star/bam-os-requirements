@@ -151,10 +151,16 @@ function guessGroup(path) {
   return (FUNNEL_PATHS.test(p) || FUNNEL_SUFFIX.test(p)) ? "Funnels" : "Website pages";
 }
 
-function orderGroups(names) {
-  const known = GROUP_ORDER.filter((g) => names.includes(g));
-  const extra = names.filter((n) => !GROUP_ORDER.includes(n)).sort((a, b) => a.localeCompare(b));
-  return [...known, ...extra];
+// A site that publishes a manifest decides its own section order, by the order its
+// pages appear: a funnel's landing page comes before its steps, and the funnels come
+// in the order the academy thinks about them. Groups that only exist because of the
+// seed or the path guess fall back to GROUP_ORDER after those.
+function orderGroups(names, manifestOrder = []) {
+  const fromManifest = manifestOrder.filter((g) => names.includes(g));
+  const rest = names.filter((n) => !fromManifest.includes(n));
+  const known = GROUP_ORDER.filter((g) => rest.includes(g));
+  const extra = rest.filter((n) => !GROUP_ORDER.includes(n)).sort((a, b) => a.localeCompare(b));
+  return [...fromManifest, ...known, ...extra];
 }
 
 // The site's own manifest: grouping + a last-changed date per page, which only
@@ -188,6 +194,10 @@ async function pagesFromManifest(siteUrl) {
         path,
         label: typeof p.label === "string" && p.label.trim() ? p.label.trim() : labelFor(path),
         group: typeof p.group === "string" && p.group.trim() ? p.group.trim() : guessGroup(path),
+        // Where this page sits in its funnel: "Landing page", "Sign up",
+        // "Checkout", "Thank you". A group whose pages carry steps renders as a
+        // chain led by the landing page instead of a flat list of cards.
+        step: typeof p.step === "string" && p.step.trim() ? p.step.trim() : null,
         updated: typeof p.updated === "string" && p.updated.trim() ? p.updated.trim() : null,
       });
     }
@@ -248,14 +258,14 @@ async function handler(req, res) {
     const abs = (p) => `${siteUrl}${p === "/" ? "" : p}`;
     const byPath = new Map();
     // Manifest first so its order is the order the client sees inside each group.
-    for (const p of manifest) byPath.set(p.path, { path: p.path, url: abs(p.path), label: p.label, group: p.group, updated: p.updated });
-    for (const p of seeded) if (!byPath.has(p.path)) byPath.set(p.path, { path: p.path, url: abs(p.path), label: p.label || labelFor(p.path), group: guessGroup(p.path), updated: null });
-    for (const p of live) if (!byPath.has(p.path)) byPath.set(p.path, { path: p.path, url: abs(p.path), label: p.label, group: guessGroup(p.path), updated: null });
+    for (const p of manifest) byPath.set(p.path, { path: p.path, url: abs(p.path), label: p.label, group: p.group, step: p.step, updated: p.updated });
+    for (const p of seeded) if (!byPath.has(p.path)) byPath.set(p.path, { path: p.path, url: abs(p.path), label: p.label || labelFor(p.path), group: guessGroup(p.path), step: null, updated: null });
+    for (const p of live) if (!byPath.has(p.path)) byPath.set(p.path, { path: p.path, url: abs(p.path), label: p.label, group: guessGroup(p.path), step: null, updated: null });
 
     let pages = [...byPath.values()];
-    if (!pages.length) pages = [{ path: "/", url: siteUrl, label: "Home", group: "Website pages", updated: null }];
+    if (!pages.length) pages = [{ path: "/", url: siteUrl, label: "Home", group: "Website pages", step: null, updated: null }];
 
-    const groups = orderGroups([...new Set(pages.map((p) => p.group))]);
+    const groups = orderGroups([...new Set(pages.map((p) => p.group))], [...new Set(manifest.map((p) => p.group))]);
     // Sort by group, then keep the manifest's order within a group; pages that
     // came from a sitemap or the seed have no intended order, so Home first then
     // alphabetical, the way someone reviews a site.
