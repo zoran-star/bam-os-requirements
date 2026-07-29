@@ -29,6 +29,13 @@ listing only (By Any Means San Jose, 5.0/22).
 owner panel) via Claude in Chrome; "View full review" expands full text there.
 The PUBLIC Maps page truncates behind an unopenable "See more" - never use it.
 
+**The guard:** `bam-portal/scripts/check-testimonial-hardcodes.mjs` FAILS when a
+hardcoded testimonial (fabricated corpus or any store quote pasted into source)
+appears in bam-client-sites or the portal's email/agent files. Exempt while
+ruled stay-as-is: detail-miami, supreme-hoops-training (a FOURTH fabricated-
+reviews academy, found by this check's first run 2026-07-29). Run it before
+declaring any consumer converted.
+
 **The skill:** repo-root `.claude/skills/testimonials/SKILL.md`. Filling the
 store is only half the build: free-trial cards, testimonial emails, agent
 social_proof and website review CTAs must all pull from the store/resolver, per
