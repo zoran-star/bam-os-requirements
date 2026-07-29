@@ -2,28 +2,96 @@
 
 ## Where I actually stopped
 
-**Step 1 of the dependency order is DONE and applied to production. PR #1627 is open.**
+**PR #1627 IS MERGED.** `origin/main` is at `5e4219f`, 59 commits, merge commit not squashed so
+every message survives as the change log. **The branch was deliberately NOT deleted** - work
+continued on it immediately and is now a follow-up PR's worth of commits.
 
-All five of GTA's remaining hardcoded literals are templated. Both of the questions the previous
-session was waiting on were answered by Zoran and both are implemented:
+The whole templating wave is live: the message locks, the render-backed leak gate, the templated
+message bodies, the schedule generated from real sessions, `api/_academy-facts.js`, the
+consolidated renderer, and the seven defects an adversarial tester caught. **San Jose and BAM GTA
+are byte-identical across the entire sales preset on main.**
 
-| Row | Swap | Rendered result |
+### The five skills, Zoran's own structure (ruled 2026-07-29)
+
+1. **Branding deck** - reviews their old site + assets, staff+skill pass in localhost, owner
+   approves the board on staging. **Exists** (`/branding-deck` in bam-client-sites).
+2. **Core site build** - deck in, home/about/contact/programs out. **Exists** as
+   `/site-build --phase core`. **NO owner gate**: our team approves in the workshop session.
+3. **GHL migration** - seeds their contacts, message history and pipeline into the portal, then
+   flips them off GHL. **Designed, not built.** Blocked on the seeding-flow design.
+4. **Sales system build: free trial** - the ENTIRE system in one isolated skill. **BUILT this
+   session** as `/sales-system` in bam-client-sites.
+5. **Member management** - agreement + enroll funnel + member emails. **Parked on the
+   orchestrator's backlog by his explicit instruction**, starts when he judges the sales preset
+   genuinely plug-and-play.
+
+**The owner approves exactly TWICE in the whole onboarding: their brand board, and their sales
+messages.** That sentence is on `docs/plans/skills-pipeline.html` verbatim because it is what stops
+a third approval being added later by someone with a good local reason.
+
+**Isolation rule, his words:** more sales systems are coming, each needs its own build process, so
+**the thing that forks is the SKILL, never the machinery underneath.**
+
+### What is in flight right now
+
+Three builds, all on `claude/optimistic-leavitt-db0107`, none committed to main:
+
+| | Build | State |
 |---|---|---|
-| `contact_form` step 0 | `By Any Means Basketball` -> `{{location.name}}` | identical |
-| `ghosted` step 0 | `byanymeanstoronto.ca` -> `{{location.domain}}` | identical |
-| `ghosted` step 1 | `https://byanymeanstoronto.ca/free-trial` -> `{{location.website}}/free-trial` | identical |
-| `ghosted` step 2 | same | identical |
-| `trial_form` step 0 | `By Any Means GTA` -> `{{location.name}}` | **changed, on purpose** |
+| A | `/sales-system` skill | **Built, tested, 4 defects fixed, committed** |
+| B | Owner sales-message approval step | Built, **adversarial tester running** |
+| E | Reignition backend + migration | Built, **adversarial tester running** |
 
-Each was one UPDATE guarded on the md5 of the body I had verified, so it could not land on a row
-that had moved underneath me. `missed_trial` was already clean.
+**Build D (site-build re-run guard) was DROPPED** by Zoran: "staff would never re run an entire
+site build". The underlying collision finding stays true; the guard is not worth building.
 
-**GTA is now byte-identical to the master** on every sales-preset body and name. Apply the master
-to a blank academy, fill in GTA's details, and you get exactly what GTA has. That is Zoran's own
-test and it now passes; there is a check for it in the commit message of `1737ece`.
+### The decision waiting to be executed on Build E
 
-**The one deliberate copy change** is `trial_form` step 0, now reading "By Any Means Basketball".
-It was re-blessed as a one-line golden diff across 21 messages, which is the record.
+**Reduce the webhook change to the minimum, and split the consolidation into its own change after
+PR #1546 lands.** E's builder went outside its scope and refactored four live inbound-webhook
+files (`twilio`, `resend`, `ghl` inbound + `email/sync-gmail`) from four copy-pasted stage-role
+lists into a shared helper. Asked to justify it, it answered straight: **"not necessary. That was a
+tidy-up I did while I was in there"**, and volunteered that half its own reasoning was circular
+(the consolidation gave its test something exported to assert against).
+
+Deciding facts: without the role added, unsent campaign steps are still cancelled (`exitEnrollment`
+is role-blind), so the cost is the card MOVE being delayed up to ~24 hours, **a delay not a hole**;
+and **the consolidation DELETES the exact line PR #1546 is rewriting**, so shipping it now makes a
+stale PR more expensive to land. The minimal version is four files, four lines.
+
+**Do not execute the trim while E's tester is mid-pass.** When you do, one assertion in
+`api/_reignition.test.mjs` checks the shared constant - cut the consolidation and that assertion
+goes green while measuring a constant nothing uses. Rewrite it against the four files' literals or
+delete it. **It must not be left green and meaningless.**
+
+### The live hole found and closed this session
+
+**A body edit silently declassified a step from `attributed` to `shared`.** `resolveSyncClass`
+takes the strictest of a row's class and its template's class; the seeder wrote no class on the
+row, so the template ref carried the whole answer. Any body that stopped being exactly
+`template:<key>` resolved `shared` - copyable. An academy's real parent testimonials were one edit
+away from copying to every other academy, with the row looking completely ordinary.
+
+Executed before the fix, all four resolved `shared`: a literal body, an empty body, a null body,
+and `Template:nurture-3` with a capital T.
+
+Fixed in `cd49fef`: the seeder stamps `resolveSyncClass(step)`, and **all 10 non-shared rows across
+both live academies were backfilled**. San Jose's `nurture-3` verified still `enabled:false` after.
+
+**The pattern worth carrying:** the seeder's comment said "persist this once that migration is
+applied". The migration was applied that morning, which **silently promoted a correct deferral into
+a live defect**, and nothing connected the two events. Standing duty now sits with whoever applies a
+migration: sweep for deferred TODOs it just activated. **Refinement that matters:** only comments
+that DEFER AN ACTION become defects. Comments that DEGRADE GRACEFULLY ("fall back to empty if the
+table is missing") are guards, not landmines - a sweep that flags both cries wolf.
+
+### The next single action
+
+**Design the seeding flow** (direct / altered / reignited), which is the last design blocking
+Build C, the GHL migration skill. Zoran approved reignition first precisely so the seeding design
+has somewhere to put cold leads. After that: build C, then the reignition UI (Sales-section tile +
+Blueprint campaign builder), then seed San Jose end to end - which is also **the measurement** that
+replaces every minute estimate on the status page.
 
 ### What was found on the way, and matters more than the swap
 
@@ -60,15 +128,6 @@ parent-visible words plus link targets for email). Three negative controls, all 
 Full suite re-run at this point, 5 of 5 green: `_sync-class`, `_automation-step`,
 `_gta-message-lock`, `_gta-step-lock`, `_blueprint-card-guards`.
 
-### The next single action
-
-**Template the email bodies.** Phone, gym address, weekly schedule and coach handles come out of
-the words; the schedule generates from `schedule_slots` rather than being typed. GTA's
-`onboarding` steps 1 and 3 are where most of it sits, and both are SMS, not email: step 1 carries
-the WhatsApp invite, online-programs URL, three Instagram handles, the merch shop and the phone
-number; step 3 is a hand-typed weekly schedule plus the venue. Moves 5 messages from blocked to
-copying and flips those templates to `shared`.
-
 ### Things I believe but have NOT executed (house rule 5)
 
 - **"Templating the email bodies moves 5 messages from blocked to copying."** The 8-of-17 figure
@@ -98,10 +157,11 @@ copying and flips those templates to `shared`.
 
 ### Said by Zoran in chat and written down nowhere else
 
-- **The skills are meant to cover more than emails.** His words: the skills should edit "all of the
-  human judgement aspects of it (websites, email templates, branding, etc.)". **Everything planned
-  so far is emails only.** Websites and branding are unscoped. This is the biggest gap between the
-  plan and what he actually asked for.
+- **CLOSED 2026-07-29. The skills covering more than emails is settled.** He asked for "all of the
+  human judgement aspects of it (websites, email templates, branding, etc.)" and it sat parked for
+  days. Put to him before building, he restructured it himself into the five skills above. The
+  website skills turned out to ALREADY EXIST in bam-client-sites; what was missing was the sales
+  system's message half, which is now built.
 - **"GTA as if it was created FROM the template"** is the framing he uses for why GTA gets
   templated at all. The test he has in mind: apply the master to a blank academy, fill in GTA's
   details, and you should get exactly what GTA has today.
@@ -116,13 +176,15 @@ copying and flips those templates to `shared`.
 ---
 
 
-**Goal:** make the free-trial sales system preset fully plug and play. Apply the preset and
-everything copies onto a new academy, onboarding feeds it, and two skills handle the
-human-judgement parts.
+**Goal:** a new academy fully onboarded in about 30 minutes of the OWNER's time, with five skills
+doing the human-judgement work and staff approving it. The free-trial sales system is the piece
+that had to become plug and play first.
 
-**Branch:** `claude/optimistic-leavitt-db0107`, pushed, no PR open.
-**Status as of 27 Jul 2026:** 8 of the 17 preset messages copy to a new academy. Nothing is
-deployed. Everything below is on that branch.
+**Branch:** `claude/optimistic-leavitt-db0107`. **#1627 is MERGED** (main at `5e4219f`); the branch
+lives on and carries the next PR's worth of work.
+**Status:** 11 of the 17 preset messages copy to a new academy with nobody involved, measured by
+running `stepEnabled` over `CANONICAL_DEFAULTS`, not estimated. Of the 6 that do not, 5 are
+authored per academy by design and 1 is the parked testimonials email.
 
 ---
 
@@ -130,11 +192,12 @@ deployed. Everything below is on that branch.
 
 | Page | What it is |
 |---|---|
-| `docs/plans/status.html` | The dependency flow and the message counter. Start here |
-| `docs/plans/gta-automation-map.html` | Every GTA message classified photocopy / swap / custom |
-| `docs/plans/email-skill-rework.html` | The two skills, their 7 phases, the brand_data migration |
-| `docs/plans/skill-run-example.html` | A worked transcript of both skills against GTA's real data |
+| `docs/plans/skills-pipeline.html` | **The five skills and why in that order. Start here** |
+| `docs/plans/sales-system-inventory.html` | Every item of the sales system: templated / fills in / written |
+| `docs/plans/ignition-template.html` | Reignition, the approved design |
+| `docs/plans/status.html` | The message counter and what blocks what |
 | `docs/automation-message-harness.md` | The renderer, and why rendered output beats grep |
+| `docs/plans/email-skill-rework.html` | The older two-skill design. Superseded by the five, still useful on the 7 phases |
 
 Serve them: `python3 -m http.server 5188 --directory docs/plans`
 
@@ -185,23 +248,30 @@ BODIES still carry GTA's phone, gym address, schedule and coach handles.
 
 ## What is left, in dependency order
 
-1. **Template GTA's sales messages.** Unblocked. Swap the typed-in name and domain in
-   `contact_form` step 1, `trial_form` step 1, `ghosted` steps 1 and 2 for tokens. `public_name`
-   now exists and GTA's is "By Any Means Basketball", so `{{location.name}}` renders identically
-   to today. **Prove it byte for byte with the GTA lock afterwards.**
-2. **Template the email words.** The big one: moves 5 messages from blocked to copying. Pull
-   phone, gym address, weekly schedule and coach handles out of the email bodies. The schedule
-   should generate from `schedule_slots` (GTA has 86 live rows) rather than being typed.
-   Once done, those templates become `shared` and seed ON.
-3. **Build the two skills.** Spec in `email-skill-rework.html`. They author the 2 genuinely
-   per-academy emails from what the owner already entered.
-4. **Two wizard approval steps.** So an owner approves their messages before anything sends.
-   The wizard already promises this and the step has never existed. Full rule: `_OBF_STEPS` row
-   + `_obfFetchState` detector + `_OBF_SECTIONS` key, all three or it is invisible.
-5. **Seed San Jose.** Render before, seed through `applyPreset`/`seedAutomations` (the same path
-   a new academy uses, NOT a one-off script), render after, diff. Then a SEPARATE agent scans
-   whether it took.
-6. **Deploy.**
+Items 1 and 2 of the old list (templating GTA's messages, then the email bodies) are **DONE and
+merged**. What remains:
+
+1. **Design the seeding flow** - direct / altered / reignited. The last design blocking Build C.
+   Reignition is already designed and approved, so cold leads have somewhere to go.
+2. **Finish the three in-flight builds.** A is done; B and E are with adversarial testers. Then
+   execute the agreed E trim (minimum webhook change, consolidation split out after #1546).
+3. **Build C, the `/ghl-migration` skill.** Two phases: `seed` (dump, classify with CANONICAL
+   role names, import, shadow-on, reconcile, quarantine, report) and `flip` (refuses until the
+   sales system is approved and sending; flips pipeline/booking/calendar/email only). **Includes
+   repairing the reconcile gate**, which has never worked - `pipeline_stages.ghl_stage_id` is
+   never populated, so every imported row lands in `extra` and the only way to flip today is
+   `--force`.
+4. **The reignition UI.** The Sales-section tile (V2 only, shown only while a campaign is active,
+   live count, click to roster, click a person for the existing contact card) and the staff
+   campaign builder in the Business Blueprint.
+5. **Seed San Jose end to end.** Render before, seed through `applyPreset`/`seedAutomations` (the
+   real path, never a one-off script), render after, diff, then a SEPARATE agent scans whether it
+   took. **This run is also the MEASUREMENT** that replaces every minute estimate on the status
+   page, and Zoran's 30-minute target is measured against the owner's clock, not the staff clock.
+6. **Item 31 and the support-email decision**, as ONE visual for Zoran. Removing GTA's hardcoded
+   `LOCATIONS` entry needs two brand calls from him (the gold wordmark suffix, and which address
+   parents write to - `clients.email` is his personal inbox, not a support address) plus two new
+   columns and a city fix. Measured: 7 of 9 identity fields still differ.
 
 ---
 
