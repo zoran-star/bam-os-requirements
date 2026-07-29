@@ -52,12 +52,14 @@ const FABRICATED = [
   "Raymond T.",
 ];
 
-// Files ALLOWED to carry these strings: this check itself, and DETAIL Miami's
-// pages, which Zoran explicitly ruled stay as-is for now (2026-07-29). Remove
-// the Miami exemption the day that ruling changes.
+// Files ALLOWED to carry these strings: this check itself, plus the academies
+// Zoran explicitly ruled stay-as-is until their own real reviews connect
+// (Miami and Supreme Hoops, both ruled 2026-07-29). Each exemption dies the
+// day that academy's reviews are pulled through the skill.
 const EXEMPT = [
   /scripts\/check-testimonial-hardcodes\.mjs$/,
   /clients\/detail-miami\//,
+  /clients\/supreme-hoops-training\//,
 ];
 
 const SCAN_EXT = new Set([".jsx", ".js", ".mjs", ".html", ".css", ".md", ".json"]);
