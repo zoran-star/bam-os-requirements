@@ -48,6 +48,13 @@
 **Scale (px):** 10 micro-label · 11 label/badge · 12 meta · 13 body · 15 section title (700) · 18-22 stat value (800 Nunito) · 20 drawer title · 32 hero number.
 **Micro-labels:** 10-11px, 600-700, uppercase, `letter-spacing:.04-.08em`, `--text-mute`.
 
+> **Contrast floor (2026-07-28):** `--text-mute` was bumped in BOTH themes
+> (dark #6E6B63 -> #7C786F, light #A5A19A -> #807C74) after failing WCAG on
+> the staff queues - muted must stay >= 4:1 against its surface. STAFF ONLY:
+> the client portal keeps its own `:root` copy with the original values by
+> Cam's call (internal-tool usability change, not a brand change) - do NOT
+> blindly re-mirror these two values into client-portal.html.
+
 ## 4 · Radius scale (LOCKED)
 
 | Token | px | Use |

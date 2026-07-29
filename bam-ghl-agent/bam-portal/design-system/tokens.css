@@ -32,7 +32,7 @@
   /* ── Text ── */
   --text:        #F0EDE8;
   --text-sub:    #A5A19A;
-  --text-mute:   #6E6B63;
+  --text-mute:   #7C786F;   /* was #6E6B63 - 3.5:1; now 4.2:1 (staff legibility, 2026-07-28) */
 
   /* ── Gold (THE accent - one gold, everywhere) ── */
   --gold:          #D4B65C;
@@ -90,7 +90,7 @@ html[data-theme="light"] {
 
   --text:        #1C1B18;
   --text-sub:    #6E6B63;
-  --text-mute:   #A5A19A;
+  --text-mute:   #807C74;   /* was #A5A19A - 2.6:1 on white, failed WCAG; now 4.2:1 */
 
   --gold:          #C8A84E;
   --accent:        #C8A84E;
