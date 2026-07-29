@@ -131,6 +131,10 @@
     {
       "path": "/api/commissions?action=cron-reports",
       "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/testimonial-drift",
+      "schedule": "0 13 * * *"
     }
   ],
   "headers": [
