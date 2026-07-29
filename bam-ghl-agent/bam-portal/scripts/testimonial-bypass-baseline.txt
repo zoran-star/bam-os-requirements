@@ -1,0 +1,57 @@
+# BYPASS BASELINE - surfaces that render testimonial content WITHOUT going
+# through the resolver seam. Generated from bam-client-sites origin/main
+# 2026-07-29, the day GTA became the first converted consumer.
+#
+# THIS LIST MAY ONLY SHRINK. check-testimonial-hardcodes.mjs FAILS when a file
+# not listed here renders testimonial-shaped markup without referencing the
+# seam (/api/website/testimonials outside the monorepo, resolveTestimonials
+# inside it). That is what makes a FIFTH consumer safe by construction: a new
+# page that hardcodes quotes fails immediately, even if its invented text is
+# nothing the fabricated corpus has ever seen. It is the answer to the gap the
+# corpus cannot close.
+#
+# It is a baseline, not an approval. Every line is a legacy surface that has
+# not been converted yet. Delete a line when that file starts reading the
+# resolver; the check tells you when a listed file no longer needs to be here.
+#
+# 39 entries across 14 academies at creation. GTA's two files are deliberately
+# absent: they are converted, so they must keep using the seam or fail.
+clients/bam-san-jose/site-draft/site/components.jsx
+clients/basketball-plus/index.html
+clients/by-any-means/aau.html
+clients/by-any-means/develop.html
+clients/by-any-means/mentalskills.html
+clients/by-any-means/pointguards.html
+clients/by-any-means/smallguard.html
+clients/by-any-means/usp.html
+clients/ch3-training/index.html
+clients/danny-cooper-basketball/Danny Cooper Basketball - Camps.dc.html
+clients/danny-cooper-basketball/Danny Cooper Basketball - Online Training.dc.html
+clients/danny-cooper-basketball/Danny Cooper Basketball.dc.html
+clients/defy-the-odds/Home.dc.html
+clients/defy-the-odds/Story.dc.html
+clients/detail-miami/FreeTrial.dc.html
+clients/detail-miami/Home.dc.html
+clients/detail-miami/detail/freetrial.jsx
+clients/detail-miami/summer-camp.html
+clients/johnson-basketball-training/Academy.dc.html
+clients/johnson-basketball-training/Johnson Basketball.dc.html
+clients/outwork-everyone/Home School.dc.html
+clients/outwork-everyone/In-Person Training.dc.html
+clients/outwork-everyone/Outwork Everyone.dc.html
+clients/outwork-everyone/Ramp Up.dc.html
+clients/prime-by-design/Prime By Design.dc.html
+clients/pro-precision/Shooting.dc.html
+clients/probound-training/About.dc.html
+clients/probound-training/Complete Player Academy.dc.html
+clients/probound-training/Contact.dc.html
+clients/probound-training/Mini Ballers Academy.dc.html
+clients/probound-training/PT Academy.dc.html
+clients/probound-training/ProBound Homepage.dc.html
+clients/probound-training/Programs.dc.html
+clients/probound-training/Schedule.dc.html
+clients/probound-training/Shooting Lab.dc.html
+clients/probound-training/Testimonials.dc.html
+clients/sage-hoops/index.html
+clients/supreme-hoops-training/Supreme Hoops Training.dc.html
+clients/supreme-hoops-training/index.html

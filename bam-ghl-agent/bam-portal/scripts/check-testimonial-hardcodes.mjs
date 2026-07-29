@@ -120,17 +120,83 @@ for (const root of roots) {
   }
 }
 
-if (failures.length) {
+// ── CHECK 2: THE BYPASS RATCHET ────────────────────────────────────────────
+// The corpus half only catches strings we already know. This half catches the
+// shape: a surface that renders testimonial content WITHOUT going through the
+// resolver. That is what makes a fifth consumer safe by construction - a new
+// page with freshly invented quotes fails here even though no corpus could
+// know its text. (Supreme Hoops was exactly that: novel invention, invisible
+// to a corpus.)
+//
+// Baseline may only SHRINK. A file not in it must reference the seam.
+const SHAPE = [/tstcard/i, /testimonial/i, /ft-tst/i, /tst__/i, /review-card/i, /reviewcard/i];
+const SEAM = [/api\/website\/testimonials/, /resolveTestimonials/];
+const BASELINE_FILE = new URL("./testimonial-bypass-baseline.txt", import.meta.url).pathname;
+
+const baseline = new Set(
+  existsSync(BASELINE_FILE)
+    ? readFileSync(BASELINE_FILE, "utf8")
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith("#"))
+    : []
+);
+
+// Only files that can RENDER content can bypass the seam. A .css defining
+// .tstcard styles, a NOTES.md, or a vercel.json mentioning the word cannot
+// hardcode a quote into output - including them produced 11 false positives on
+// the first run. The fix is scoping the detector, NOT padding the baseline:
+// a baseline entry added to silence a check is how a check becomes decorative.
+const RENDER_EXT = new Set([".jsx", ".js", ".html"]);
+
+const newBypasses = [];
+const nowConverted = [];
+if (existsSync(siteRepo)) {
+  for (const root of [join(siteRepo, "clients"), join(siteRepo, "templates"), join(siteRepo, "brands")].filter(existsSync)) {
+    for (const file of walk(root)) {
+      if (!RENDER_EXT.has(file.slice(file.lastIndexOf(".")))) continue;
+      const rel = file.slice(siteRepo.length + 1);
+      const text = readFileSync(file, "utf8");
+      if (!SHAPE.some((re) => re.test(text))) continue;
+      const usesSeam = SEAM.some((re) => re.test(text));
+      if (usesSeam && baseline.has(rel)) nowConverted.push(rel);
+      if (!usesSeam && !baseline.has(rel)) newBypasses.push(rel);
+    }
+  }
+}
+
+if (nowConverted.length) {
+  console.log(
+    `↓ ${nowConverted.length} baseline entr(y/ies) now use the resolver - delete them from ` +
+    `scripts/testimonial-bypass-baseline.txt:\n${nowConverted.map((f) => "    " + f).join("\n")}`
+  );
+}
+
+if (failures.length || newBypasses.length) {
   console.error(`(${exemptionNote})`);
+}
+if (failures.length) {
   console.error(`FAIL - ${failures.length} hardcoded testimonial string(s) in source:\n`);
   for (const f of failures) {
     console.error(`  [${f.kind}] ${relative(process.cwd(), f.file)}\n      "${f.frag}"`);
   }
-  process.exit(1);
 }
+if (newBypasses.length) {
+  console.error(
+    `\nFAIL - ${newBypasses.length} surface(s) render testimonial content WITHOUT the resolver ` +
+    `and are not in the baseline:\n${newBypasses.map((f) => "    " + f).join("\n")}\n\n` +
+    `  Read testimonials from /api/website/testimonials (outside the monorepo) or\n` +
+    `  resolveTestimonials() (inside it). Do NOT add a baseline entry to silence this:\n` +
+    `  the baseline is a record of legacy debt and may only shrink.`
+  );
+}
+if (failures.length || newBypasses.length) process.exit(1);
 
+const corpusLine = store
+  ? `fabricated corpus (${FABRICATED.length} fragments) + ${store.length} store quotes: none in source`
+  : `fabricated corpus clean (DEGRADED - no Supabase env, store-quote half NOT checked)`;
 console.log(
-  store
-    ? `PASS - fabricated corpus (${FABRICATED.length} fragments) + ${store.length} store quotes: none found in source across ${roots.length} roots. (${exemptionNote})`
-    : `PASS (DEGRADED - no Supabase env, store-quote half NOT checked) - fabricated corpus clean across ${roots.length} roots. (${exemptionNote})`
+  `PASS - ${corpusLine}; no new resolver bypasses ` +
+  `(${baseline.size} legacy surface(s) still in the baseline). ` +
+  `(${exemptionNote})`
 );

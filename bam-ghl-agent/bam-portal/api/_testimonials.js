@@ -1,9 +1,43 @@
 // THE testimonial resolver - the one function answering "which testimonials
-// should this academy show", for every consumer: the website cards
-// (api/website/testimonials.js), the testimonial emails at seed time, and the
-// agent's social_proof fact. If two surfaces answer that question differently,
-// that is the two-sources-of-truth bug the store exists to kill - so nothing
-// else may re-implement this ordering.
+// should this academy show", for every consumer. If two surfaces answer that
+// question differently, that is the two-sources-of-truth bug the store exists
+// to kill - so nothing else may re-implement this ordering.
+//
+// ═══ ADDING A NEW CONSUMER: READ THIS, YOU DO NOT NEED TO ASK ANYONE ═══
+//
+// TWO SEAMS. Pick by where your code lives:
+//   • INSIDE this monorepo → import { resolveTestimonials } from "../_testimonials.js"
+//   • OUTSIDE it (bam-client-sites, an app, a new site) → GET
+//     /api/website/testimonials?client_id=<uuid>, CORS-gated by
+//     clients.allowed_domains. Never reach the database directly from outside;
+//     never add an HTTP hop from inside.
+//
+// ONE SHAPE, ALWAYS. This returns the same three facts to everybody:
+//   { aggregate: {rating,count,checked_at}|null, testimonials: [...], starredCount }
+// CONSUMERS FORMAT; THE RESOLVER DOES NOT. The page wants cards, the agent
+// wants a sentence, an email wants a block - each renders these facts its own
+// way. Do NOT add resolveForAgent()/resolveForPage() variants: the moment this
+// grows per-consumer shapes it has forked, and consumer #5 needs shape #5.
+//
+// TESTIMONIALS ARE A SALES-SIDE FACT (Zoran, 2026-07-29). They exist to bring
+// prospects in: websites, sales copy, the agent. People who have already
+// joined do not need them. Asking members FOR reviews is deferred to the
+// Google-API era and is not this seam's job.
+//
+// THE THREE FACTS, and what a consumer may do with them:
+//   aggregate     - the academy's real Google rating + count, read at
+//                   checked_at. A POINT-IN-TIME READING, not live: label it
+//                   with its date, never as current. null = render no rating.
+//   testimonials  - already ordered by the locked hierarchy and already
+//                   filtered. Render top-N; do not re-sort, do not re-filter.
+//                   A row with source 'manual' has NO rating and NO date keys,
+//                   so review framing (stars, "Google review", a date) is
+//                   physically unavailable for typed quotes. Do not add it.
+//   starredCount  - only for telling the two empty states apart, below.
+//
+// A NEW CONSUMER IS ENFORCED, NOT TRUSTED: scripts/check-testimonial-hardcodes.mjs
+// FAILS when a surface renders testimonial-shaped markup without referencing one
+// of the two seams. A page that hardcodes quotes cannot pass by being novel.
 //
 // THE HIERARCHY (Zoran, tier 1, locked, no per-academy reordering):
 //   1. pinned (starred) Google reviews
