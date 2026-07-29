@@ -1,8 +1,9 @@
 -- The academy's public Google rating, as a CHECKABLE fact.
 --
--- ⛔ NOT APPLIED. Needs the orchestrator's gate and an `align-core-data-model`
--- pass (there is no fc-core-srvc checkout on this machine, so the alignment
--- step could not run here). Do not apply this without both.
+-- ✅ APPLIED to prod 2026-07-29 via mcp apply_migration (name: client_google_rating),
+-- orchestrator gate cleared, align-core-data-model waived by Zoran's blanket
+-- instruction for this workstream. Columns + all three constraints verified in
+-- production by query afterwards, not by the success flag.
 --
 -- Context: Zoran's ruling 2026-07-29, "quotes stay plain, the rating is real."
 --

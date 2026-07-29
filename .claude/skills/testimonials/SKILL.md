@@ -98,6 +98,14 @@ Each quote is one row in `testimonials` with `source = 'manual'`, `client_id` se
 - **`starred`:** the ones the academy wants leading. Ask; do not choose for them.
 - **Everything else stays null.** `rating`, `review_created_at`, `external_id` and `synced_at` belong to synced reviews. The database will raise if you try, and that error is correct: a typed quote must never be able to pass as a verified one.
 
+### Five per academy, maximum
+
+**Never write more than five testimonials for an academy.** Zoran's ruling, 2026-07-29: five is enough and more is clutter.
+
+If an academy has more than five worth using, that is a good problem: present the candidates, let the human pick the five. If five are already stored and a better one turns up, swap it rather than adding a sixth.
+
+The cap is on what is STORED, not on what you show for approval. Present everything you found; store only the chosen five.
+
 ### Under 4 stars
 
 Do not type in a review below 4 stars. The hierarchy hides those from every display surface anyway, so a typed one is invisible content that only makes the store misleading to read.
@@ -142,6 +150,23 @@ Both stop the email. Only the first is a reason to go back to the academy.
 - Invent an author, a city, or a date.
 - Seed a new academy with anything at all. A new academy starts empty and stays empty until it has its own.
 - Treat a thin result as failure. An academy with two real quotes is in a better position than one with six borrowed ones.
+
+## The store is only half the build
+
+Zoran's requirement, 2026-07-29: filling the table is not done until **everything that shows testimonials pulls from it**. A store nobody reads is theater; the point of collecting is that the surfaces change.
+
+The consumers, and what "pulled from properly" means for each:
+
+| Surface | What must read the store |
+|---|---|
+| Free-trial page testimonial cards | Cards render from `testimonials` rows via the resolver, not from arrays hardcoded in the page. The academy's aggregate (rating + count) renders from its `clients` columns, never typed into markup. |
+| Testimonials emails (`nurture-3`, onboarding) | Quote content resolves from the store at seed time. Empty store = the step is dropped, enforced at seed. |
+| Agent `social_proof` fact | Renders from the store + the academy's own `google_review_url`. Never the shared hardcoded default. |
+| Website review CTAs | Point at that academy's own `google_review_url`, or vanish when it is empty. |
+
+One resolver feeds all of them: a single function answering "which testimonials should this academy show", honouring `starred` and the hierarchy. If two surfaces answer that question differently, that is the two-sources-of-truth bug this store exists to kill.
+
+**Sequencing note:** the agent fact renderer attaches through the orchestrator (the templating room owns `fact-render.js`); hand them the shape rather than attaching it yourself. But do not report the build finished while any consumer still reads hardcoded content for an academy whose store is populated.
 
 ## Finishing
 
