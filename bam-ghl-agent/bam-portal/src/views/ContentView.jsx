@@ -990,15 +990,6 @@ function ContentTicketsTab({ tk, session, me }) {
   // ─────────────────── List view ───────────────────
   return (
     <div>
-      {banner && (
-        <div style={{
-          position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
-          background: tk.green, color: "#fff",
-          padding: "12px 22px", borderRadius: 999, fontSize: 13, fontWeight: 600,
-          zIndex: 9999, boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-        }}>{banner}</div>
-      )}
-
       {/* Toolbar: search + type filter + sort */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <input
