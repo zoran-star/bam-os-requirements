@@ -122,11 +122,11 @@
         "day": "Mondays",
         "groups": [
           {
-            "name": "Group 1 (Elementary) - Weeknights",
+            "name": "Group 1 (Elementary)",
             "time": "7-8pm"
           },
           {
-            "name": "Group 2 (High School) - Weeknights",
+            "name": "Group 2 (High School)",
             "time": "8-9pm"
           }
         ]
@@ -135,11 +135,11 @@
         "day": "Tuesdays",
         "groups": [
           {
-            "name": "Group 1 (Elementary) - Weeknights",
+            "name": "Group 1 (Elementary)",
             "time": "7-8pm"
           },
           {
-            "name": "Group 2 (High School) - Weeknights",
+            "name": "Group 2 (High School)",
             "time": "8-9pm"
           }
         ]
@@ -148,11 +148,11 @@
         "day": "Wednesdays",
         "groups": [
           {
-            "name": "Group 1 (Elementary) - Weeknights",
+            "name": "Group 1 (Elementary)",
             "time": "7-8pm"
           },
           {
-            "name": "Group 2 (High School) - Weeknights",
+            "name": "Group 2 (High School)",
             "time": "8-9pm"
           }
         ]
@@ -161,11 +161,11 @@
         "day": "Thursdays",
         "groups": [
           {
-            "name": "Group 1 (Elementary) - Weeknights",
+            "name": "Group 1 (Elementary)",
             "time": "7-8pm"
           },
           {
-            "name": "Group 2 (High School) - Weeknights",
+            "name": "Group 2 (High School)",
             "time": "8-9pm"
           }
         ]
@@ -174,11 +174,11 @@
         "day": "Saturdays",
         "groups": [
           {
-            "name": "Group 1 (Elementary) - Saturday",
+            "name": "Group 1 (Elementary)",
             "time": "11:30am-12:30pm"
           },
           {
-            "name": "Group 2 (High School) - Saturday",
+            "name": "Group 2 (High School)",
             "time": "12:30-1:30pm"
           }
         ]
