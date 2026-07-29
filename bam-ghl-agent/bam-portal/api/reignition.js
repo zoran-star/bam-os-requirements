@@ -430,7 +430,24 @@ async function runAdmit(res) {
   let campaigns = [];
   try {
     campaigns = (await sb(`ignition_campaigns?state=in.(approved,running)&order=created_at.asc&limit=${CAMPAIGN_CAP}&select=*`)) || [];
-  } catch (e) { return res.status(500).json({ error: `load campaigns: ${e.message}` }); }
+  } catch (e) {
+    // Until 20260729140000_ignition_campaigns.sql is applied, these tables do not
+    // exist and PostgREST answers 404/PGRST205. This cron runs every minute, so
+    // returning 500 for that would mean a permanent red alert describing a state
+    // that is simply "the migration has not landed yet" - and a monitor that cries
+    // wolf every minute is one nobody reads when something real breaks. Report it
+    // as a clean no-op instead. bam-portal/CLAUDE.md requires exactly this: code
+    // ships ahead of its migration and degrades to feature-off, never to a 500.
+    //
+    // ONLY the missing-table case. A genuine outage - a timeout, a 5xx, a bad key
+    // - still fails loudly, because "the feature is not installed" and "the
+    // database is down" must never look the same from the outside.
+    const msg = String(e && e.message || "");
+    if (/PGRST205|42P01|Supabase 404|does not exist|Could not find the table/i.test(msg)) {
+      return res.status(200).json({ ok: true, admitted: 0, skipped: "reignition tables not installed yet" });
+    }
+    return res.status(500).json({ error: `load campaigns: ${e.message}` });
+  }
 
   const out = [];
   for (const c of campaigns) {
