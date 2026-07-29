@@ -1,5 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { useUrlState } from "../hooks/useUrlState";
+import ClientAvatar from "../components/ClientAvatar.jsx";
+import { showToast, uiConfirm, ToastHost, ConfirmHost } from "../components/dialogs.jsx";
+
+// Tiny stroke icons (design system: no emojis in product UI).
+const _ctIco = (paths, size = 13) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+    style={{ verticalAlign: "-2px" }} dangerouslySetInnerHTML={{ __html: paths }} />
+);
+const IcoImage = ({ size }) => _ctIco('<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>', size);
+const IcoVideo = ({ size }) => _ctIco('<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>', size);
+const IcoFile = ({ size }) => _ctIco('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>', size);
+const IcoLinkCt = ({ size }) => _ctIco('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', size);
+const IcoSend = ({ size }) => _ctIco('<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>', size);
 import JSZip from "jszip";
 import { supabase } from "../lib/supabase";
 import MediaLightbox from "../components/MediaLightbox";
@@ -106,7 +120,6 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   const [loading, setLoading]     = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [creating, setCreating]   = useState(false);
-  const [banner, setBanner]       = useState(null);
   const [error, setError]         = useState("");
 
   // Managers/admin can manage the content routing roster (who owns each client's
@@ -135,10 +148,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
     }
   };
 
-  const showBanner = (text) => {
-    setBanner(text);
-    setTimeout(() => setBanner(null), 3500);
-  };
+  const showBanner = (text) => showToast(text, "success");
 
   const handleSave = async (formData) => {
     const token = session?.access_token;
@@ -167,7 +177,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
       setEditingId(null);
       setCreating(false);
     } catch (e) {
-      alert("Save failed: " + e.message);
+      showToast("Save failed: " + e.message);
     }
   };
 
@@ -190,7 +200,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
       setEditingId(null);
       showBanner(`Deleted "${target.title}".`);
     } catch (e) {
-      alert("Delete failed: " + e.message);
+      showToast("Delete failed: " + e.message);
     }
   };
 
@@ -204,6 +214,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
 
   // ─── Top-level tab bar (Guide cards | Tickets) ───
   const renderMainTabs = () => (
+    <><ToastHost tokens={tk} /><ConfirmHost tokens={tk} />
     <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 24 }}>
       <MainTab label="Tickets" active={mainTab === "tickets"} onClick={() => setMainTab("tickets")} tk={tk} />
       <MainTab label="Guide cards" active={mainTab === "guides"} onClick={() => setMainTab("guides")} tk={tk} />
@@ -211,6 +222,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
         <MainTab label="Routing" active={mainTab === "routing"} onClick={() => setMainTab("routing")} tk={tk} />
       )}
     </div>
+    </>
   );
 
   // If the user is on the Tickets tab, hand off to the dedicated component
@@ -241,7 +253,6 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
     return (
       <div style={{ padding: "24px 28px", color: tk.text }}>
         {renderMainTabs()}
-        {banner && <Banner banner={banner} tk={tk} />}
         <GuideEditor
           tk={tk}
           initial={editing || { title: "", purpose: "", filming_tips: "", example_script: "", example_assets: [], example_links: [] }}
@@ -258,7 +269,6 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   return (
     <div style={{ padding: "24px 28px", color: tk.text }}>
       {renderMainTabs()}
-      {banner && <Banner banner={banner} tk={tk} />}
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <div style={{ fontSize: 13, color: tk.textSub }}>
@@ -272,7 +282,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
           }}
         >+ New guide card</button>
       </div>
-      {error && <div style={{ color: tk.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
+      {error && <div style={{ color: tk.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
       {loading ? (
         <div style={{ padding: 48, textAlign: "center", color: tk.textSub, fontSize: 14 }}>
@@ -337,13 +347,13 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
                     <div style={{ display: "flex", gap: 6 }}>
                       {assets.slice(0, 3).map((a, i) => (
                         <img key={i} src={a.url || a} alt="" style={{
-                          width: 38, height: 38, borderRadius: 6, objectFit: "cover",
+                          width: 38, height: 38, borderRadius: 8, objectFit: "cover",
                           border: `1px solid ${tk.border}`,
                         }} />
                       ))}
                       {assets.length > 3 && (
                         <div style={{
-                          width: 38, height: 38, borderRadius: 6, border: `1px solid ${tk.border}`,
+                          width: 38, height: 38, borderRadius: 8, border: `1px solid ${tk.border}`,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           color: tk.textMute, fontSize: 11, fontWeight: 600,
                         }}>+{assets.length - 3}</div>
@@ -355,7 +365,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
                       fontSize: 11, color: tk.textMute,
                       padding: "4px 10px", borderRadius: 999,
                       border: `1px solid ${tk.border}`,
-                    }}>🔗 {links.length}</div>
+                    }}><IcoLinkCt /> {links.length}</div>
                   )}
                   {assets.length === 0 && links.length === 0 && (
                     <div style={{ fontSize: 11, color: tk.textMute, fontStyle: "italic" }}>No example content yet</div>
@@ -453,6 +463,30 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
   const [error, setError]       = useState("");
   const fileInputRef = useRef(null);
 
+  // Unsaved-work guard: a guide is long-form writing - never let a stray
+  // Cancel/Esc throw it away silently. Snapshot the initial form once.
+  const initialSnap = useRef(JSON.stringify({
+    title: initial.title || "",
+    links: Array.isArray(initial.example_links) ? initial.example_links : [],
+    isDefault: initial.is_default === true,
+    angles: normalizeAngles(initial),
+  }));
+  const dirty = JSON.stringify({ title, links, isDefault, angles }) !== initialSnap.current;
+  const requestCancel = async () => {
+    if (dirty && !(await uiConfirm({
+      title: "Discard unsaved guide changes?",
+      body: "Everything you typed since opening this editor will be lost.",
+      danger: true, confirmLabel: "Discard",
+    }))) return;
+    onCancel();
+  };
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") requestCancel(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, title, links, isDefault, angles]);
+
   const labelStyle = { fontSize: 11, fontWeight: 700, color: tk.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" };
   const inputStyle = {
     width: "100%", padding: "10px 12px", marginBottom: 18,
@@ -531,7 +565,7 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <button onClick={onCancel} style={{
+      <button onClick={requestCancel} style={{
         background: "transparent", border: 0, color: tk.textMute,
         fontSize: 13, cursor: "pointer", marginBottom: 18,
         padding: 0, fontFamily: "inherit",
@@ -561,7 +595,7 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
               <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: tk.textMute, minWidth: 16 }}>{i + 1}</span>
               <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} value={a.name} onChange={e => patchAngle(i, { name: e.target.value })} placeholder="Angle name (e.g. Testimonial)" />
               {angles.length > 1 && (
-                <button onClick={() => removeAngle(i)} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 6, color: tk.textMute, cursor: "pointer", fontSize: 16 }} aria-label="Remove angle">×</button>
+                <button onClick={() => removeAngle(i)} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 8, color: tk.textMute, cursor: "pointer", fontSize: 16 }} aria-label="Remove angle">×</button>
               )}
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
@@ -587,7 +621,7 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
                     <div key={j} style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
                       <input style={{ ...inputStyle, marginBottom: 0, width: 108, flexShrink: 0, padding: "8px 10px" }} value={s.label} onChange={e => patchBeat(i, m, j, { label: e.target.value })} placeholder="Beat" />
                       <textarea style={{ ...inputStyle, marginBottom: 0, flex: 1, minHeight: 38, padding: "8px 10px", resize: "vertical", lineHeight: 1.4 }} value={s.text} onChange={e => patchBeat(i, m, j, { text: e.target.value })} placeholder="What to say / show" />
-                      <button onClick={() => removeBeat(i, m, j)} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 6, color: tk.textMute, cursor: "pointer", fontSize: 15 }} aria-label="Remove beat">×</button>
+                      <button onClick={() => removeBeat(i, m, j)} style={{ width: 32, height: 32, flexShrink: 0, background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 8, color: tk.textMute, cursor: "pointer", fontSize: 15 }} aria-label="Remove beat">×</button>
                     </div>
                   ))}
                 </div>
@@ -626,7 +660,7 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
               onClick={() => removeLink(i)}
               style={{
                 width: 32, height: 32, flexShrink: 0,
-                background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 6,
+                background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 8,
                 color: tk.textMute, cursor: "pointer", fontSize: 16,
               }}
               aria-label="Remove link"
@@ -645,7 +679,7 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
         }}
       >+ Add link</button>
 
-      {error && <div style={{ color: tk.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
+      {error && <div style={{ color: tk.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
       <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 8 }}>
         <div>
@@ -658,7 +692,7 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
           )}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onCancel} style={{
+          <button onClick={requestCancel} style={{
             padding: "10px 16px", background: "transparent",
             border: `1px solid ${tk.border}`, borderRadius: 8,
             color: tk.text, cursor: "pointer", fontSize: 13,
@@ -675,16 +709,6 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
   );
 }
 
-function Banner({ banner, tk }) {
-  return (
-    <div style={{
-      position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
-      background: tk.green, color: "#fff",
-      padding: "12px 22px", borderRadius: 999, fontSize: 13, fontWeight: 600,
-      zIndex: 9999, boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-    }}>{banner}</div>
-  );
-}
 
 function truncate(s, max) {
   if (!s) return "";
@@ -744,8 +768,8 @@ function ctkFormatRelative(iso) {
 }
 
 const TYPE_META_CT = {
-  graphic: { icon: "🖼", label: "Graphic" },
-  video:   { icon: "🎬", label: "Video" },
+  graphic: { icon: <IcoImage />, label: "Graphic" },
+  video:   { icon: <IcoVideo />, label: "Video" },
   mixed:   { icon: "✦",  label: "Mixed" },
 };
 
@@ -755,7 +779,6 @@ function ContentTicketsTab({ tk, session, me }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState(null);
-  const [banner, setBanner] = useState(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all"); // all | graphic | video | mixed
   const [channelFilter, setChannelFilter] = useState("all"); // all | ads | organic
@@ -785,7 +808,7 @@ function ContentTicketsTab({ tk, session, me }) {
   // rows that scrolled out of the current tab/filter.
   useEffect(() => { setSelectedIds(new Set()); }, [subTab, stateFilter, channelFilter, typeFilter]);
 
-  const showBanner = (text) => { setBanner(text); setTimeout(() => setBanner(null), 3500); };
+  const showBanner = (text) => showToast(text, "success");
 
   // Reassign every selected ticket to one owner (loops the per-ticket assign action).
   async function bulkReassign(staffId) {
@@ -809,9 +832,8 @@ function ContentTicketsTab({ tk, session, me }) {
 
   useEffect(() => { refetch(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  async function refetch() {
-    setLoading(true);
-    setError("");
+  async function refetch({ quiet = false } = {}) {
+    if (!quiet) { setLoading(true); setError(""); }
     try {
       const token = session?.access_token;
       const res = await fetch("/api/marketing?resource=content-tickets&scope=staff", {
@@ -821,11 +843,42 @@ function ContentTicketsTab({ tk, session, me }) {
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       setTickets(json.tickets || []);
     } catch (e) {
-      setError(e.message);
+      if (!quiet) setError(e.message);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }
+
+  // Realtime: the queue used to load once per visit and go stale all day.
+  // Refresh quietly on any content_tickets change; toast on brand-new requests.
+  useEffect(() => {
+    const channel = supabase
+      .channel("content:tickets")
+      .on("postgres_changes", { event: "*", schema: "public", table: "content_tickets" }, (payload) => {
+        refetch({ quiet: true });
+        if (payload?.eventType === "INSERT") showToast("A new content request just arrived.", "info");
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Deep link: ?cticket=<id> opens that ticket once loaded (Slack-able).
+  const [ticketParam, setTicketParam] = useUrlState("cticket", "");
+  const pendingDeepLink = useRef(ticketParam);
+  useEffect(() => {
+    if (pendingDeepLink.current) return;
+    setTicketParam(selectedId || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+  useEffect(() => {
+    if (!pendingDeepLink.current || !tickets.length) return;
+    const id = pendingDeepLink.current;
+    pendingDeepLink.current = null;
+    if (tickets.find(t => t.id === id)) setSelectedId(id);
+    else setTicketParam("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets]);
 
   async function patchTicket(id, body) {
     const token = session?.access_token;
@@ -866,8 +919,23 @@ function ContentTicketsTab({ tk, session, me }) {
     t.status !== "completed" && t.status !== "cancelled" &&
     !!ctkDeadlineInfo(t.submitted_at, ctkPriorityOf(t))?.overdue;
   const overdueAll = channelScoped.filter(ctkIsOverdue);
+  const ctkOpen = t => t.status !== "completed" && t.status !== "cancelled";
+  const ctkIsDueToday = t => {
+    if (!ctkOpen(t)) return false;
+    const info = ctkDeadlineInfo(t.submitted_at, ctkPriorityOf(t));
+    if (!info || info.overdue) return false;
+    const d = new Date(info.due); d.setHours(0, 0, 0, 0);
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    return d.getTime() === now.getTime();
+  };
+  const dueTodayAll = channelScoped.filter(ctkIsDueToday);
+  // "My queue": everything assigned to me that's still open, across sub-tabs -
+  // one flat list so executors don't tab-hop to assemble their day.
+  const myQueue = channelScoped.filter(t => ctkOpen(t) && t.assigned_to === me?.id);
   const tabRows =
     stateFilter === "overdue"       ? overdueAll
+    : stateFilter === "due-today"   ? dueTodayAll
+    : stateFilter === "mine"        ? myQueue
     : subTab === "active"           ? active
     : subTab === "client-dependent" ? clientDep
                                     : completed;
@@ -948,10 +1016,13 @@ function ContentTicketsTab({ tk, session, me }) {
         <div style={{ display: "flex", gap: 4, background: tk.surfaceEl, border: `1px solid ${tk.border}`, borderRadius: 8, padding: 3 }}>
           {[["all", "All"], ["ads", "Ads"], ["organic", "Organic"]].map(([k, label]) => {
             const on = channelFilter === k;
+            const n = k === "all" ? scoped.filter(t => t.status === "active").length
+              : scoped.filter(t => (t.channel || "ads") === k && t.status === "active").length;
+            label = `${label} (${n})`;
             const color = k === "organic" ? "#7BC47F" : k === "ads" ? "#7E9CD9" : tk.accent;
             return (
               <button key={k} type="button" onClick={() => setChannelFilter(k)} style={{
-                padding: "6px 12px", fontSize: 12.5, fontWeight: 600, borderRadius: 6, border: "none",
+                padding: "6px 12px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "none",
                 cursor: "pointer", fontFamily: "inherit",
                 background: on ? `${color}22` : "transparent",
                 color: on ? (k === "all" ? tk.text : color) : tk.textMute,
@@ -991,15 +1062,17 @@ function ContentTicketsTab({ tk, session, me }) {
       </div>
 
       <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 18, overflowX: "auto" }}>
-        <SubTab label={`Active (${active.length})`}             active={subTab === "active"}            onClick={() => setSubTab("active")}            tk={tk} />
-        <SubTab label={`Client Dependent (${clientDep.length})`} active={subTab === "client-dependent"} onClick={() => setSubTab("client-dependent")} tk={tk} red={clientDep.length > 0} />
+        <SubTab label={`Active (${active.length})`}             active={subTab === "active"}            onClick={() => setSubTab("active")}            tk={tk} dot={active.some(ctkIsOverdue)} />
+        <SubTab label={`Client Dependent (${clientDep.length})`} active={subTab === "client-dependent"} onClick={() => setSubTab("client-dependent")} tk={tk} red={clientDep.length > 0} dot={clientDep.some(ctkIsOverdue)} />
         <SubTab label={`Completed (${completed.length})`}        active={subTab === "completed"}         onClick={() => setSubTab("completed")}         tk={tk} />
       </div>
 
       {/* Quick filters — cut across tabs so nothing overdue can hide */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <CtkStateChip label="All" active={stateFilter === "all"} onClick={() => setStateFilter("all")} tk={tk} />
-        <CtkStateChip label={`⚠ Overdue (${overdueAll.length})`} active={stateFilter === "overdue"} onClick={() => setStateFilter("overdue")} tk={tk} tone={tk.red || "#ED7969"} count={overdueAll.length} />
+        <CtkStateChip label={`Overdue (${overdueAll.length})`} active={stateFilter === "overdue"} onClick={() => setStateFilter("overdue")} tk={tk} tone={tk.red || "#ED7969"} count={overdueAll.length} />
+        <CtkStateChip label={`Due today (${dueTodayAll.length})`} active={stateFilter === "due-today"} onClick={() => setStateFilter("due-today")} tk={tk} tone={tk.amber || "#E8A547"} count={dueTodayAll.length} />
+        {me?.id && <CtkStateChip label={`My queue (${myQueue.length})`} active={stateFilter === "mine"} onClick={() => setStateFilter("mine")} tk={tk} count={myQueue.length} />}
       </div>
 
       {/* Bulk reassign bar — appears once rows are selected (managers/admin only).
@@ -1065,9 +1138,18 @@ function ContentTicketsTab({ tk, session, me }) {
 
       <div style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 10, padding: "4px 0" }}>
         {loading ? (
-          <div style={{ padding: "32px 16px", textAlign: "center", color: tk.textSub, fontSize: 13 }}>Loading content tickets…</div>
+          <div>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px", borderBottom: `1px solid ${tk.borderSoft || tk.border}` }}>
+                <div className="bp-skel" style={{ width: 24, height: 24, borderRadius: 8, background: tk.border }} />
+                <div className="bp-skel" style={{ height: 11, width: "24%", borderRadius: 999, background: tk.border }} />
+                <div className="bp-skel" style={{ height: 11, width: "34%", borderRadius: 999, background: tk.border }} />
+                <div className="bp-skel" style={{ height: 11, width: "16%", borderRadius: 999, background: tk.border }} />
+              </div>
+            ))}
+          </div>
         ) : error ? (
-          <div style={{ padding: "32px 16px", textAlign: "center", color: tk.red || "#ED7969", fontSize: 13 }}>⚠ {error}</div>
+          <div style={{ padding: "32px 16px", textAlign: "center", color: tk.red || "#ED7969", fontSize: 13 }}>{error}</div>
         ) : visible.length === 0 ? (
           <div style={{ padding: "32px 16px", textAlign: "center", color: tk.textSub, fontSize: 13, fontStyle: "italic" }}>
             No tickets in this view.
@@ -1118,6 +1200,7 @@ function ContentTicketsTab({ tk, session, me }) {
                   color: tk.textMute, padding: "2px 6px", borderRadius: 4,
                   background: "rgba(255,255,255,0.04)", border: `1px solid ${tk.border}`,
                 }}>{ctkCode(t.id)}</span>
+                <ClientAvatar client={{ business_name: t.client?.business_name, brand_data: t.client?.brand_data }} tokens={tk} size={24} />
                 <span>{academyName}</span>
                 <CtkChannelBadge channel={t.channel} />
                 <CtkPriorityChip priority={pri} tk={tk} />
@@ -1148,7 +1231,7 @@ function ContentTicketsTab({ tk, session, me }) {
                   <div style={{
                     fontSize: 11, fontWeight: 600, marginTop: 3,
                     color: dl.overdue ? CT_PRIORITY_META.high.color : tk.textSub,
-                  }}>{dl.overdue ? "⚠ " : ""}{dl.label}</div>
+                  }}>{dl.label}</div>
                 )}
               </div>
             </div>
@@ -1159,7 +1242,7 @@ function ContentTicketsTab({ tk, session, me }) {
   );
 }
 
-function SubTab({ label, active, onClick, tk, red }) {
+function SubTab({ label, active, onClick, tk, red, dot }) {
   const inactiveColor = red ? (tk.red || "#ED7969") : tk.textSub;
   return (
     <div
@@ -1174,7 +1257,7 @@ function SubTab({ label, active, onClick, tk, red }) {
         marginBottom: -1,
         transition: "color 0.15s ease",
       }}
-    >{label}</div>
+    >{label}{dot && <span title="Has overdue tickets" style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: tk.red || "#ED7969", marginLeft: 6, verticalAlign: "2px" }} />}</div>
   );
 }
 
@@ -1340,7 +1423,7 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
     if (!picked.length || zipping) return;
     setZipping(true);
     try { await ctkDownloadPicked(picked, "client-media", setDlNote, clientId); }
-    catch (e) { alert("Download failed: " + (e.message || e)); }
+    catch (e) { showToast("Download failed: " + (e.message || e)); }
     finally { setZipping(false); setDlNote(""); }
   };
   const selBtn = (accent) => ({
@@ -1540,7 +1623,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
       await onRefetch();
       showBanner("Brief updated.");
     } catch (e) {
-      alert("Save failed: " + (e?.message || "error"));
+      showToast("Save failed: " + (e?.message || "error"));
     } finally {
       setSavingCtx(false);
     }
@@ -1631,7 +1714,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
       // The storage upload + DB write may have already succeeded even if the
       // response errored, so refetch so any saved finals still show up.
       try { await onRefetch(); } catch { /* ignore */ }
-      alert("Upload failed: " + e.message + "\n\nIf your files don't appear, refresh - they may have saved.");
+      showToast("Upload failed: " + e.message + " - if your files don't appear after a refresh, retry the upload (it resumes where it stopped).");
     } finally {
       setUploading(false);
     }
@@ -1659,7 +1742,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
   // ── Remove finals uploaded by mistake (multi-select from FilesByFolder) ──
   async function removeFinals(toRemove) {
     if (!toRemove?.length) return;
-    if (!window.confirm(`Remove ${toRemove.length} file${toRemove.length === 1 ? "" : "s"} from finals? This can't be undone.`)) return;
+    if (!(await uiConfirm({ title: `Remove ${toRemove.length} file${toRemove.length === 1 ? "" : "s"} from finals?`, body: "This can't be undone.", danger: true, confirmLabel: "Remove" }))) return;
     const removeKeys = new Set(toRemove.map(f => f.url || f.name));
     const kept = finalsExisting.filter(f => !removeKeys.has(f.url || f.name));
     // Best-effort: also delete the objects from storage (DB removal is what matters).
@@ -1680,9 +1763,10 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
   async function sendForReview() {
     if (busy) return;
     if (!finalsExisting.length) {
-      alert("Upload at least one final creative before sending for review.");
+      showToast("Upload at least one final creative before sending for review.");
       return;
     }
+    if (!(await uiConfirm({ title: `Send ${finalsExisting.length} final${finalsExisting.length === 1 ? "" : "s"} for client review?`, body: `${academyName} will see these in their portal and approve or request changes.`, confirmLabel: "Send for review" }))) return;
     setBusy(true);
     try {
       await patchTicket(ticket.id, { action: "send-for-review" });
@@ -1690,7 +1774,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
       onBack();
       await onRefetch();
     } catch (e) {
-      alert("Send for review failed: " + e.message);
+      showToast("Send for review failed: " + e.message);
     } finally {
       setBusy(false);
     }
@@ -1702,9 +1786,10 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
   async function sendToSystems() {
     if (busy) return;
     if (!finalsExisting.length) {
-      alert("Upload at least one final file before sending to systems.");
+      showToast("Upload at least one final file before sending to systems.");
       return;
     }
+    if (!(await uiConfirm({ title: originSystemsId ? `Return ${finalsExisting.length} final${finalsExisting.length === 1 ? "" : "s"} to the systems ticket?` : `Send ${finalsExisting.length} final${finalsExisting.length === 1 ? "" : "s"} to the systems team?`, body: `For ${academyName}.`, confirmLabel: originSystemsId ? "Return to Systems" : "Send to Systems" }))) return;
     setBusy(true);
     try {
       await patchTicket(ticket.id, { action: originSystemsId ? "return-to-systems" : "send-to-systems" });
@@ -1714,7 +1799,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
       onBack();
       await onRefetch();
     } catch (e) {
-      alert("Send to systems failed: " + e.message);
+      showToast("Send to systems failed: " + e.message);
     } finally {
       setBusy(false);
     }
@@ -1723,9 +1808,10 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
   async function sendToMarketing(marketingNotes) {
     if (busy) return;
     if (!finalsExisting.length) {
-      alert("Upload at least one final creative before sending to marketing.");
+      showToast("Upload at least one final creative before sending to marketing.");
       return;
     }
+    if (!(await uiConfirm({ title: `Send ${finalsExisting.length} final${finalsExisting.length === 1 ? "" : "s"} to marketing?`, body: `${academyName}'s creatives hand off to the marketing team to launch.`, confirmLabel: "Send to marketing" }))) return;
     setBusy(true);
     try {
       await patchTicket(ticket.id, { action: "send-to-marketing", marketing_notes: marketingNotes || "" });
@@ -1735,7 +1821,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
       onBack();
       await onRefetch();
     } catch (e) {
-      alert("Send to marketing failed: " + e.message);
+      showToast("Send to marketing failed: " + e.message);
     } finally {
       setBusy(false);
     }
@@ -1752,7 +1838,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
       await onRefetch();
       onBack();
     } catch (e) {
-      alert("Send failed: " + e.message);
+      showToast("Send failed: " + e.message);
     } finally {
       setBusy(false);
     }
@@ -1768,7 +1854,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
       await onRefetch();
       onBack();
     } catch (e) {
-      alert("Cancel failed: " + e.message);
+      showToast("Cancel failed: " + e.message);
     } finally {
       setBusy(false);
     }
@@ -1838,7 +1924,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
                   padding: "3px 10px", borderRadius: 999,
                   color: dl.overdue ? CT_PRIORITY_META.high.color : tk.textSub,
                   border: `1px solid ${dl.overdue ? CT_PRIORITY_META.high.color + "66" : tk.border}`,
-                }}>{dl.overdue ? "⚠ " : "⏱ "}{dl.label}</span>
+                }}>{dl.label}</span>
               ) : null;
             })()}
             {canReassign ? (
@@ -1849,7 +1935,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
                 border: `1px solid ${tk.accent}`, background: `${tk.accent}14`,
                 opacity: assignBusy ? 0.6 : 1,
               }}>
-                👤 Owner ·
+                Owner ·
                 <select
                   value={ticket.assigned_to || ""}
                   disabled={assignBusy}
@@ -1882,7 +1968,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
                 fontSize: 11, fontWeight: 600, color: tk.accent, letterSpacing: "0.04em",
                 padding: "3px 10px", borderRadius: 999,
                 border: `1px solid ${tk.accent}`, background: `${tk.accent}14`,
-              }}>👤 Owner · {ticket.assigned_to_name || "Unassigned"}</span>
+              }}>Owner · {ticket.assigned_to_name || "Unassigned"}</span>
             )}
             <span style={{
               fontSize: 11, fontWeight: 500, color: tk.textSub, letterSpacing: "0.04em",
@@ -1899,7 +1985,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
         <summary style={{
           cursor: "pointer", userSelect: "none",
           fontFamily: "monospace", fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: tk.textMute,
-        }}>🎨 Brand</summary>
+        }}>Brand</summary>
         <div style={{ marginTop: 12 }}>
           <BrandCard brand={ticket.client?.brand_data} tk={tk} />
         </div>
@@ -1966,10 +2052,10 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
             {finalsToUpload.map((f, i) => (
               <div key={i} style={{
                 display: "flex", alignItems: "center", gap: 10,
-                padding: "8px 12px", borderRadius: 6,
+                padding: "8px 12px", borderRadius: 8,
                 background: "rgba(232,197,71,0.08)", border: `1px solid ${tk.accentBorder || tk.accent}`,
               }}>
-                <div style={{ fontSize: 18 }}>{(f.type || "").startsWith("image/") ? "🖼" : (f.type || "").startsWith("video/") ? "🎬" : "📄"}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>{(f.type || "").startsWith("image/") ? <IcoImage size={17} /> : (f.type || "").startsWith("video/") ? <IcoVideo size={17} /> : <IcoFile size={17} />}</div>
                 <div style={{ flex: 1, fontSize: 13, color: tk.text }}>{f.name}</div>
                 <button onClick={() => setFinalsToUpload(prev => prev.filter((_, j) => j !== i))} style={{
                   background: "transparent", border: 0, color: tk.textMute, cursor: "pointer", fontSize: 16,
@@ -2083,7 +2169,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
               cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
               fontFamily: "inherit", fontSize: 13, fontWeight: 700,
               opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
-            }}>{originSystemsId ? "📤  Return to Systems" : funnelMode ? "📤  Send to Systems" : reviewMode ? "📤  Send for client review" : "📤  Send to Marketing"}</button>
+            }}><IcoSend /> {originSystemsId ? "Return to Systems" : funnelMode ? "Send to Systems" : reviewMode ? "Send for client review" : "Send to Marketing"}</button>
         </div>
       )}
 
@@ -2116,7 +2202,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
               style={{
                 width: "100%", minHeight: 100,
                 background: "rgba(255,255,255,0.03)",
-                border: `1px solid ${tk.border}`, borderRadius: 6,
+                border: `1px solid ${tk.border}`, borderRadius: 8,
                 color: tk.text, fontFamily: "inherit", fontSize: 14,
                 padding: "10px 12px", resize: "vertical",
               }}
@@ -2125,12 +2211,12 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
               <button onClick={() => setSendModalOpen(false)} disabled={busy} style={{
                 background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
-                padding: "10px 18px", borderRadius: 6, cursor: busy ? "wait" : "pointer",
+                padding: "10px 18px", borderRadius: 8, cursor: busy ? "wait" : "pointer",
                 fontFamily: "inherit", fontSize: 12, fontWeight: 500, opacity: busy ? 0.6 : 1,
               }}>Cancel</button>
               <button onClick={() => sendToMarketing(sendNotes)} disabled={busy} style={{
                 background: tk.accent, color: "#0A0A0B", border: 0,
-                padding: "10px 20px", borderRadius: 6,
+                padding: "10px 20px", borderRadius: 8,
                 cursor: busy ? "wait" : "pointer",
                 fontFamily: "inherit", fontSize: 12, fontWeight: 700,
                 opacity: busy ? 0.6 : 1,
@@ -2161,7 +2247,7 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
               style={{
                 width: "100%", minHeight: 110,
                 background: "rgba(255,255,255,0.03)",
-                border: `1px solid ${tk.border}`, borderRadius: 6,
+                border: `1px solid ${tk.border}`, borderRadius: 8,
                 color: tk.text, fontFamily: "inherit", fontSize: 14,
                 padding: "10px 12px", resize: "vertical",
               }}
@@ -2169,12 +2255,12 @@ function ContentTicketDetail({ tk, session, ticket, me, owners = [], canReassign
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
               <button onClick={() => { setActionModalOpen(false); setActionMsg(""); }} style={{
                 background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
-                padding: "10px 18px", borderRadius: 6, cursor: "pointer",
+                padding: "10px 18px", borderRadius: 8, cursor: "pointer",
                 fontFamily: "inherit", fontSize: 12, fontWeight: 500,
               }}>Cancel</button>
               <button onClick={submitActionRequest} disabled={!actionMsg.trim() || busy} style={{
                 background: actionMsg.trim() ? tk.accent : tk.border, color: "#0A0A0B", border: 0,
-                padding: "10px 20px", borderRadius: 6,
+                padding: "10px 20px", borderRadius: 8,
                 cursor: actionMsg.trim() && !busy ? "pointer" : "not-allowed",
                 fontFamily: "inherit", fontSize: 12, fontWeight: 700,
                 opacity: actionMsg.trim() && !busy ? 1 : 0.6,
@@ -2260,7 +2346,7 @@ function ClientInputs({ ticket, tk, edit = null, onPromote = null }) {
         <>
           {row("Offer", editing
             ? textInput("offer", { placeholder: "Offer name" })
-            : <span><span style={{ color: tk.accent }}>📦 New campaign</span> · offer: <b>{ctx.offer || "—"}</b></span>)}
+            : <span><span style={{ color: tk.accent }}>New campaign</span> · offer: <b>{ctx.offer || "—"}</b></span>)}
           {ctx.is_new_offer && row("New offer description", editing
             ? textArea("new_offer_description", { placeholder: "Describe the new offer", minRows: 2 })
             : (ctx.new_offer_description || "—"))}
@@ -2273,7 +2359,7 @@ function ClientInputs({ ticket, tk, edit = null, onPromote = null }) {
         </>
       )}
       {ctx.source === "add-creative" && row("Source", <span>Add-creative on <b>{ctx.campaign_title || "(unspecified)"}</b></span>)}
-      {ctx.source === "marketing-revision" && row("Source", <span style={{ color: tk.red || "#ED7969" }}>↩ Revision requested by marketing</span>)}
+      {ctx.source === "marketing-revision" && row("Source", <span style={{ color: tk.red || "#ED7969" }}>Revision requested by marketing</span>)}
 
       {(ctx.format !== undefined || editing) && row("Format", editing
         ? textInput("format", { placeholder: "e.g. Reel, Static, Carousel" })
@@ -2392,7 +2478,7 @@ function BrandCard({ brand, tk }) {
           {logos.map(([name, url]) => (
             <a key={name} href={url} target="_blank" rel="noreferrer" title={name} style={{
               display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-              padding: 6, borderRadius: 6, border: `1px solid ${tk.border}`, background: name === "Light bg" ? "#fff" : tk.surfaceHov,
+              padding: 6, borderRadius: 8, border: `1px solid ${tk.border}`, background: name === "Light bg" ? "#fff" : tk.surfaceHov,
               textDecoration: "none",
             }}>
               <img src={url} alt={name} style={{ width: 48, height: 36, objectFit: "contain" }} />
@@ -2543,7 +2629,7 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
     if (!picked.length) return;
     setZipping(true);
     try { await ctkDownloadPicked(picked, zipName, setDlNote); }
-    catch (e) { alert("Download failed: " + (e.message || e)); }
+    catch (e) { showToast("Download failed: " + (e.message || e)); }
     finally { setZipping(false); setDlNote(""); }
   };
   // Links (text/uri-list) can't be zipped/downloaded but ARE valid finals -
@@ -2555,7 +2641,7 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
     if (!picked.length || !onPromote) return;
     setPromoting(true);
     try { await onPromote(picked); setSelected(new Set()); }
-    catch (e) { alert("Could not add to finals: " + (e.message || e)); }
+    catch (e) { showToast("Could not add to finals: " + (e.message || e)); }
     finally { setPromoting(false); }
   };
   const removeSelected = async () => {
@@ -2563,12 +2649,12 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
     if (!picked.length || !onRemove) return;
     setRemoving(true);
     try { await onRemove(picked); setSelected(new Set()); }
-    catch (e) { alert("Remove failed: " + (e.message || e)); }
+    catch (e) { showToast("Remove failed: " + (e.message || e)); }
     finally { setRemoving(false); }
   };
 
   const btn = (accent) => ({
-    padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, fontFamily: "inherit",
+    padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 8, fontFamily: "inherit",
     cursor: zipping ? "wait" : "pointer",
     border: `1px solid ${accent ? tk.accent : tk.border}`,
     background: accent ? tk.accent : "transparent",
@@ -2601,7 +2687,7 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
   );
 
   const removeBtn = {
-    padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, fontFamily: "inherit",
+    padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 8, fontFamily: "inherit",
     cursor: removing ? "wait" : "pointer",
     border: `1px solid ${tk.danger || "#E0524A"}`, background: "transparent", color: tk.danger || "#E0524A",
   };
@@ -2621,7 +2707,7 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
       )}
       {onPromote && promoteCount > 0 && (
         <button type="button" onClick={promoteSelected} disabled={promoting} style={{
-          padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, fontFamily: "inherit",
+          padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 8, fontFamily: "inherit",
           cursor: promoting ? "wait" : "pointer",
           border: `1px solid ${tk.accent}`, background: "transparent", color: tk.accent,
         }} title="Already in storage (or a link) - adds it to Finals without re-uploading">
@@ -2649,7 +2735,7 @@ function FilesByFolder({ files, tk, compact, minmax = 180, zipName = "creatives"
               fontFamily: "monospace", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase",
               color: name ? tk.accent : tk.textMute,
             }}>
-              {name ? `📁 ${name}` : "Uncategorized"} <span style={{ color: tk.textMute }}>({groups[name].length})</span>
+              {name || "Uncategorized"} <span style={{ color: tk.textMute }}>({groups[name].length})</span>
             </summary>
             <div style={{ marginTop: 10 }}>{grid(groups[name])}</div>
           </details>
@@ -2674,7 +2760,7 @@ function ctkThumbUrl(url, width = 400) {
 function FilePreviewTile({ file, tk, compact }) {
   const isImage = (file.mime || "").startsWith("image/");
   const isVideo = (file.mime || "").startsWith("video/");
-  const icon = isImage ? "🖼" : isVideo ? "🎬" : "📄";
+  const icon = isImage ? <IcoImage size={16} /> : isVideo ? <IcoVideo size={16} /> : <IcoFile size={16} />;
   // Media tiles preview in the lightbox; the Download caption below keeps the
   // one-click download. The lightbox renders as a sibling of the <a>, never
   // inside it, so modal clicks don't navigate.
@@ -2828,14 +2914,14 @@ function ContentRoutingTab({ tk, session }) {
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
     } catch (e) {
       setClients(prev => prev.map(c => c.id === client.id ? { ...c, [field]: prevVal } : c));
-      alert("Save failed: " + (e.message || e));
+      showToast("Save failed: " + (e.message || e));
     } finally {
       setSavingKey(null);
     }
   }
 
   const selStyle = {
-    width: "100%", padding: "7px 9px", fontSize: 13, borderRadius: 6,
+    width: "100%", padding: "7px 9px", fontSize: 13, borderRadius: 8,
     background: tk.surfaceEl, color: tk.text, border: `1px solid ${tk.border}`, cursor: "pointer",
   };
 
@@ -2876,7 +2962,7 @@ function ContentRoutingTab({ tk, session }) {
         placeholder="Search clients…"
         style={{
           width: 260, maxWidth: "100%", padding: "8px 11px", fontSize: 13, marginBottom: 14,
-          background: tk.surfaceEl, color: tk.text, border: `1px solid ${tk.border}`, borderRadius: 6,
+          background: tk.surfaceEl, color: tk.text, border: `1px solid ${tk.border}`, borderRadius: 8,
         }}
       />
 
@@ -2890,7 +2976,7 @@ function ContentRoutingTab({ tk, session }) {
             padding: "10px 14px", background: tk.surfaceEl || tk.surface,
             fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: tk.textMute, fontWeight: 700,
           }}>
-            <span>Client</span><span>🌱 Organic owner</span><span>📣 Ads owner</span>
+            <span>Client</span><span>Organic owner</span><span>Ads owner</span>
           </div>
           {filtered.map((c, i) => (
             <div key={c.id} style={{
