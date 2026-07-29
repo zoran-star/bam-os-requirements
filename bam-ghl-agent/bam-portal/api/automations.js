@@ -512,7 +512,7 @@ async function runWork(res) {
       // reads that clientVars deliberately does not do. Only fetched when the message
       // actually references one, so the ordinary sales SMS pays nothing for it.
       let facts = {};
-      if (/location\.(?:venue|schedule)|template:onboarding-welcome/.test(`${step.body || ""}${step.subject || ""}`)) {
+      if (/location\.(?:venue|schedule|testimonials)|template:(?:onboarding-welcome|nurture-3|onboarding-testimonials)/.test(`${step.body || ""}${step.subject || ""}`)) {
         try { facts = await academyFacts(sb, client); } catch (_) { /* shorter message, never a failed send */ }
       }
 

@@ -45,6 +45,14 @@ const FABRICATED = [
   "Priya S.",
   "Dwayne R.",
   "Average across Google reviews",
+  // nurture-3's hardcoded quotes, attributed by CITY VARIABLE so any academy
+  // that enabled the step claimed them as its own. Added 2026-07-29 once the
+  // email started rendering from the store, so it goes green - adding it while
+  // the literal was still shipping would have been a check born red. It stays
+  // so the quotes cannot creep back into the template.
+  "Parent of Adam",
+  "The style of training is like no other we have experienced",
+  "The sessions are intense, creative, and science-based",
   // Miami's rewrites of the same three cards:
   "improved his footwork more in two months at DETAIL",
   "Left booking right away",
