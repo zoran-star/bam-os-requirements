@@ -134,6 +134,17 @@
     <p style="margin:12px 0 0;font-size:13.5px;color:var(--tx2)">The free-trial system and the discovery-call system both have a front stage and a nurture stage, so this bolts onto either today, and onto any future system that has them, with zero changes. <b>The only way in is a campaign roster.</b> No form feeds it, no automation feeds it, nothing enters by accident.</p>
   </div>
 
+  <div class="note n-blue" style="margin-top:13px">
+    <b>How exits work here, since it has been a while: a stage declares them</b>
+    <p>Every stage in a sales system carries its own exit list: <b>a trigger, and where it goes</b>. "Replied &rarr; Booking", "ran out &rarr; Nurture", "unqualified &rarr; out". The preset compiles those into the routes the board and the agents follow. Reignition is a stage like any other, so its exits are declared the same way - which means <b>the exit point is adjustable per sales system when the station is attached</b>, not welded in. A future system where a reply should land somewhere other than the front stage just declares a different exit.</p>
+  </div>
+
+  <div class="note n-gold" style="margin-top:11px">
+    <b>My recommendation for the free-trial system: a reply exits into Booking, as a reply, not as a new lead</b>
+    <p>Concretely: the moment they reply, their remaining campaign steps are cancelled, the card moves Reignition &rarr; Booking, and the <b>booking agent picks up the conversation with their reply already in the thread</b>. What deliberately does NOT happen: the new-lead intro message never fires - they are mid-conversation, not a fresh form fill, and "thanks for reaching out!" after they answered our own text would read as a bot.</p>
+    <p>The colder alternative (exit into Nurture instead) is right for a future system whose reignition is a slow-burn play, and the adjustable exit above is exactly how that system would declare it.</p>
+  </div>
+
   <!-- CAMPAIGN LIFECYCLE -->
   <h2>A campaign's life</h2>
   <p class="h2sub">Draft costs nothing and sends nothing. The dry run is the gate.</p>
@@ -215,15 +226,56 @@
     </div>
   </div>
 
+  <!-- UI -->
+  <h2>Where it lives in the portal</h2>
+  <p class="h2sub">V2 clients only. Two homes: the owner WATCHES it in the Sales section, staff SETS IT UP from the Business Blueprint.</p>
+  <div class="grid g3">
+    <div class="card">
+      <div class="lbl">1 &middot; the tile &middot; Sales section</div>
+      <div style="border:1px solid var(--goldln);background:var(--goldbg);border-radius:12px;padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:var(--gold)">Reignition</div>
+        <div style="font-size:30px;font-weight:800;color:var(--tx);line-height:1.2">43</div>
+        <div style="font-size:12px;color:var(--tx2)">people being reignited &middot; Summer special</div>
+      </div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)"><b>Only appears while a campaign is active.</b> No campaign, no tile - the section stays clean for the academies that never run one.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">2 &middot; click the tile &middot; the roster</div>
+      <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px;font-size:12px">
+        <div style="display:flex;justify-content:space-between;padding:7px 11px;border-bottom:1px solid var(--line);color:var(--tx3);font-weight:800;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase"><span>Person</span><span>On step</span><span>Next</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 11px;border-bottom:1px solid var(--line)"><span style="font-weight:700;color:var(--tx)">Maya A.</span><span>text 1</span><span style="color:var(--tx3)">text 2 &middot; Thu</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 11px;border-bottom:1px solid var(--line)"><span style="font-weight:700;color:var(--tx)">Devon R.</span><span>text 2</span><span style="color:var(--tx3)">email &middot; Sat</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 11px"><span style="font-weight:700;color:var(--tx)">Priya S.</span><span style="color:var(--green);font-weight:700">replied ✓</span><span style="color:var(--tx3)">with the agent</span></div>
+      </div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)">Everyone on the campaign, which step they are on, and what is coming next and when. Replies show as already handed to the sales system.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">3 &middot; click a person &middot; their card</div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:12.5px">
+        <div style="font-weight:800;color:var(--tx);font-size:14px">Maya Alvarez</div>
+        <div style="color:var(--tx3);font-family:var(--mono);font-size:11px;margin-bottom:6px">(408) 555-0114 &middot; enquired Aug 2025</div>
+        <div style="color:var(--tx2)">The same contact card used everywhere else in the portal: thread, notes, tags, history.</div>
+      </div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)"><b>Nothing new is invented here</b> - the popup IS the existing contact card, so the roster is just another way in.</p>
+    </div>
+  </div>
+
+  <div class="note n-blue" style="margin-top:13px">
+    <b>Setup lives in the Business Blueprint, and stays staff-only</b>
+    <p>Building a campaign - roster, messages, pace, consent basis, dry run - is a staff surface inside the Business Blueprint. The owner's Sales-section tile is a window, not a control: they watch the campaign run, they do not launch or edit one. If we ever open campaign-building to owners, this is the seam where it happens.</p>
+  </div>
+
   <!-- WHAT GETS BUILT -->
   <h2>What this needs that does not exist yet</h2>
-  <div class="grid g3">
-    <div class="card"><div class="lbl">New</div><div class="big">1</div>
-      <p style="margin:8px 0 0;font-size:13.5px;color:var(--tx2)"><b>The campaign itself:</b> roster + states + pace, and the drip that admits people daily. Two new tables, one small cron.</p></div>
-    <div class="card"><div class="lbl">New, small</div><div class="big">1</div>
-      <p style="margin:8px 0 0;font-size:13.5px;color:var(--tx2)"><b>The stage:</b> the reignition station with its role-based exits, stamped onto any academy's pipeline on first use.</p></div>
-    <div class="card"><div class="lbl">Reused whole</div><div class="big">rest</div>
-      <p style="margin:8px 0 0;font-size:13.5px;color:var(--tx2)">Messages ride the existing automation machinery: the same worker, renderer, review page, quiet hours, reply handling and locks. No second send path.</p></div>
+  <div class="grid g2">
+    <div class="card"><div class="lbl">New</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)"><b>The campaign itself:</b> roster + states + pace + consent basis, and the drip that admits people daily. Two new tables, one small cron.</p></div>
+    <div class="card"><div class="lbl">New, small</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)"><b>The stage:</b> the reignition station with its declared, adjustable exits, stamped onto an academy's pipeline on first use.</p></div>
+    <div class="card"><div class="lbl">New, small</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)"><b>The two surfaces:</b> the owner's tile + roster view in the Sales section (V2 only, shown only while active), and the staff campaign builder in the Business Blueprint.</p></div>
+    <div class="card"><div class="lbl">Reused whole</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)"><b>Everything else:</b> messages ride the existing automation machinery - worker, renderer, review page, quiet hours, reply handling, locks - and the person popup IS the existing contact card. No second send path, no second contact card.</p></div>
   </div>
 
   <h2>What I need from you</h2>
