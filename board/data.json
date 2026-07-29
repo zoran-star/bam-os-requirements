@@ -1,974 +1,982 @@
 {
-  "updated": "2026-07-27 \u00b7 evening",
-  "recentUpdates": [
-    "Orchestrator handoff written; MISTER_ORCHESTRATOR II spinning up on the same board",
-    "House rule 7: a test fixture that drifts from production passes for the wrong reason",
-    "A neutral test now exists: it fails 15 of 24 checks against today's live code",
-    "New house rule: if the proof is not in the repo, the fix is not finished",
-    "Caught a collision: three workstreams editing one file, brand_data work was double-assigned"
+ "updated": "2026-07-29 · alignment step off, GTA reviews running",
+ "recentUpdates": [
+  "You switched off the data-model alignment step. Adopted, and I dropped the Luka chase from your list",
+  "Testimonials migration cleared to apply. GTA's reviews are being pulled now via your Chrome owner view",
+  "One thing I will not decide for you: CLAUDE.md still tells every session to use that step. Cole reads that file too",
+  "Your Chrome idea beat both options they offered: no API key, no billing, no Google approval, not capped at 5 reviews",
+  "It also killed the 30 minute cost. Staff paste a link, no owner chasing",
+  "New question for later: at academy 10 or 50, someone needs owner access to each listing for this to work",
+  "You ruled: business contact splits from owner contact, for email AND phone. Routed to the templating chat"
+ ],
+ "orchestrator": {
+  "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
+  "needs": [
+   "Send Lij his ask-list. Still the biggest thing you own and the biggest San Jose unblock",
+   "File the Google Business Profile API application. Days to weeks, still unfiled",
+   "SET UP TWILIO BITCH: 6 items, submit target Thursday, only 3 free attempts",
+   "Meta CAPI token: 60% of GTA ad traffic is invisible until it exists",
+   "Tell me what the 'Vercel deployment guide for Ant' chat is, it is unmapped",
+   "Decide on PR #1546 (stage rename, open since 21 July). It collides with 2 live builds. Rebase and merge, or accept a bigger rebase later",
+   "Cole's inbox migration is still pending and deliberately unapplied. Tell me when you want it run",
+   "Double-check San Jose's business number against GHL: is it 408-597-4327?"
   ],
-  "orchestrator": {
-    "focus": "Chats now own their own builders and testers; I keep the goals, the queue, routing and collisions. One track: automation templating.",
-    "needs": [
-      "Do NOT edit the Business Basics card until #69 is fixed, it silently wipes legal name, address and EIN",
-      "Work through the GTA automation map in the sync chat, it is the master spec",
-      "File the Google Business Profile API application, it is days to weeks and unfiled",
-      "Send Lij his ask-list, still the biggest thing you own",
-      "SET UP TWILIO BITCH: 6 action items, submit target Thursday",
-      "Meta CAPI token: 60% of GTA ad traffic is invisible until it exists"
-    ]
+  "chat": "MISTER_ORCHESTRATOR II"
+ },
+ "buildTasks": [
+  {
+   "id": "t-convergence",
+   "short": "preset convergence",
+   "title": "Every new academy gets GTA's automations, templatized",
+   "phase": "claude operating",
+   "phaseTone": "work",
+   "why": "Today a new academy gets 3 onboarding steps and no emails while GTA runs 8 steps and 6 designed emails. This makes the preset hand every academy GTA's full system wearing their own name, and San Jose is the first one through it.",
+   "pipeline": [
+    {
+     "name": "scout",
+     "state": "done"
+    },
+    {
+     "name": "plan",
+     "state": "done"
+    },
+    {
+     "name": "you: author master",
+     "state": "done"
+    },
+    {
+     "name": "build",
+     "state": "active"
+    },
+    {
+     "name": "test",
+     "state": "pending"
+    },
+    {
+     "name": "seed SJ",
+     "state": "pending"
+    },
+    {
+     "name": "ship",
+     "state": "pending"
+    }
+   ],
+   "status": "One track at a time now. Foundation is built and under security review; the templating wave proceeds, testimonial wiring deliberately left as a clean seam for later.",
+   "next": {
+    "who": "agents",
+    "what": "Foundation lands, then I dispatch the next wave. San Jose gets seeded in the sync chat after"
+   },
+   "checklist": null
+  }
+ ],
+ "humanTasks": [
+  {
+   "id": "trusthub",
+   "title": "Twilio TrustHub, submit Thursday",
+   "why": "Unlocks phone numbers for every academy AFTER San Jose. Only 3 free submissions exist, so this is copy-from-the-document work, not trial and error. Not urgent for SJ: everything runs on GHL meanwhile.",
+   "held": false,
+   "steps": [
+    {
+     "id": "t1",
+     "t": "MON: find the IRS CP 575 for FullControl, save as PDF. If lost, phone the IRS for a 147C and tell me immediately"
+    },
+    {
+     "id": "t2",
+     "t": "MON: transcribe 4 fields exactly: legal name (no abbreviations, no DBA), EIN as 00-0000000, business type, registered address"
+    },
+    {
+     "id": "t3",
+     "t": "MON: check the EIN issue date, top-right of the letter"
+    },
+    {
+     "id": "t4",
+     "t": "MON: create a rep email on the FullControl domain (gmail and info@ fail)"
+    },
+    {
+     "id": "t5",
+     "t": "MON: rep details: real name, title, position, phone as +1XXXXXXXXXX"
+    },
+    {
+     "id": "t6",
+     "t": "MON-WED: FullControl site live: custom domain, legal name AND logo visible, not parked. The real long pole"
+    },
+    {
+     "id": "t7",
+     "t": "THU: create the Twilio account, upgrade off trial, add billing"
+    },
+    {
+     "id": "t8",
+     "t": "THU: submit with the CP 575 open on screen. ISV/Reseller/Partner, vertical EDUCATION, address via autocomplete"
+    },
+    {
+     "id": "t9",
+     "t": "SAT: read the result. Approved = send me the SIDs"
+    },
+    {
+     "id": "t10",
+     "t": "Only if rejected: file the $10 appeal with the CP 575 PDF, 5-7 business days"
+    }
+   ]
   },
-  "buildTasks": [
+  {
+   "id": "ghl",
+   "title": "GHL tokens: fix the FC2 app",
+   "why": "SJ launches on GHL texting, and it currently survives on a single-use refresh token: one lost response kills it with no recovery. That exact failure took out 14 other academies. This fix removes the single point of failure.",
+   "held": true,
+   "heldWhy": "ON HOLD: waiting to confirm whether GHL offers the Agency AND Sub-Account option. If not, these steps change. I will tell you the moment it resolves.",
+   "steps": [
     {
-      "id": "t-convergence",
-      "short": "preset convergence",
-      "title": "Every new academy gets GTA's automations, templatized",
-      "phase": "claude operating",
-      "phaseTone": "work",
-      "why": "Today a new academy gets 3 onboarding steps and no emails while GTA runs 8 steps and 6 designed emails. This makes the preset hand every academy GTA's full system wearing their own name, and San Jose is the first one through it.",
-      "pipeline": [
-        {
-          "name": "scout",
-          "state": "done"
-        },
-        {
-          "name": "plan",
-          "state": "done"
-        },
-        {
-          "name": "you: author master",
-          "state": "done"
-        },
-        {
-          "name": "build",
-          "state": "active"
-        },
-        {
-          "name": "test",
-          "state": "pending"
-        },
-        {
-          "name": "seed SJ",
-          "state": "pending"
-        },
-        {
-          "name": "ship",
-          "state": "pending"
-        }
-      ],
-      "status": "One track at a time now. Foundation is built and under security review; the templating wave proceeds, testimonial wiring deliberately left as a clean seam for later.",
-      "next": {
-        "who": "agents",
-        "what": "Foundation lands, then I dispatch the next wave. San Jose gets seeded in the sync chat after"
-      },
-      "checklist": null
+     "id": "g1",
+     "t": "Uninstall FC2 first (dots menu). GHL locks the settings while installed"
+    },
+    {
+     "id": "g2",
+     "t": "Set distribution to Agency AND Sub-Account"
+    },
+    {
+     "id": "g3",
+     "t": "Add the mint scopes: oauth.write + oauth.readonly, plus contacts, conversations, opportunities, calendars, locations, users, custom fields, tags"
+    },
+    {
+     "id": "g4",
+     "t": "Remove the junk scopes: adPublishing, saas, snapshots, twilioaccount, phone numbers"
+    },
+    {
+     "id": "g5",
+     "t": "Confirm redirect includes portal.byanymeansbusiness.com/api/agency-connect, save"
+    },
+    {
+     "id": "g6",
+     "t": "Run the install link, pick the AGENCY on the consent screen, expect a pass/fail table"
+    },
+    {
+     "id": "g7",
+     "t": "Open /api/agency-connect: should read Healthy, Company token"
     }
-  ],
-  "humanTasks": [
-    {
-      "id": "trusthub",
-      "title": "Twilio TrustHub, submit Thursday",
-      "why": "Unlocks phone numbers for every academy AFTER San Jose. Only 3 free submissions exist, so this is copy-from-the-document work, not trial and error. Not urgent for SJ: everything runs on GHL meanwhile.",
-      "held": false,
-      "steps": [
-        {
-          "id": "t1",
-          "t": "MON: find the IRS CP 575 for FullControl, save as PDF. If lost, phone the IRS for a 147C and tell me immediately"
-        },
-        {
-          "id": "t2",
-          "t": "MON: transcribe 4 fields exactly: legal name (no abbreviations, no DBA), EIN as 00-0000000, business type, registered address"
-        },
-        {
-          "id": "t3",
-          "t": "MON: check the EIN issue date, top-right of the letter"
-        },
-        {
-          "id": "t4",
-          "t": "MON: create a rep email on the FullControl domain (gmail and info@ fail)"
-        },
-        {
-          "id": "t5",
-          "t": "MON: rep details: real name, title, position, phone as +1XXXXXXXXXX"
-        },
-        {
-          "id": "t6",
-          "t": "MON-WED: FullControl site live: custom domain, legal name AND logo visible, not parked. The real long pole"
-        },
-        {
-          "id": "t7",
-          "t": "THU: create the Twilio account, upgrade off trial, add billing"
-        },
-        {
-          "id": "t8",
-          "t": "THU: submit with the CP 575 open on screen. ISV/Reseller/Partner, vertical EDUCATION, address via autocomplete"
-        },
-        {
-          "id": "t9",
-          "t": "SAT: read the result. Approved = send me the SIDs"
-        },
-        {
-          "id": "t10",
-          "t": "Only if rejected: file the $10 appeal with the CP 575 PDF, 5-7 business days"
-        }
-      ]
-    },
-    {
-      "id": "ghl",
-      "title": "GHL tokens: fix the FC2 app",
-      "why": "SJ launches on GHL texting, and it currently survives on a single-use refresh token: one lost response kills it with no recovery. That exact failure took out 14 other academies. This fix removes the single point of failure.",
-      "held": true,
-      "heldWhy": "ON HOLD: waiting to confirm whether GHL offers the Agency AND Sub-Account option. If not, these steps change. I will tell you the moment it resolves.",
-      "steps": [
-        {
-          "id": "g1",
-          "t": "Uninstall FC2 first (dots menu). GHL locks the settings while installed"
-        },
-        {
-          "id": "g2",
-          "t": "Set distribution to Agency AND Sub-Account"
-        },
-        {
-          "id": "g3",
-          "t": "Add the mint scopes: oauth.write + oauth.readonly, plus contacts, conversations, opportunities, calendars, locations, users, custom fields, tags"
-        },
-        {
-          "id": "g4",
-          "t": "Remove the junk scopes: adPublishing, saas, snapshots, twilioaccount, phone numbers"
-        },
-        {
-          "id": "g5",
-          "t": "Confirm redirect includes portal.byanymeansbusiness.com/api/agency-connect, save"
-        },
-        {
-          "id": "g6",
-          "t": "Run the install link, pick the AGENCY on the consent screen, expect a pass/fail table"
-        },
-        {
-          "id": "g7",
-          "t": "Open /api/agency-connect: should read Healthy, Company token"
-        }
-      ]
-    },
-    {
-      "id": "lij",
-      "title": "Send Lij his ask-list",
-      "why": "His side takes days and nothing on it is blocked by us. The sooner it goes, the sooner coaches, photos and Stripe stop being the long pole.",
-      "held": false,
-      "steps": [
-        {
-          "id": "l1",
-          "t": "Stripe connect link"
-        },
-        {
-          "id": "l2",
-          "t": "Gym address, member count, group size and coach ratio"
-        },
-        {
-          "id": "l3",
-          "t": "Coach names, titles, short bios (feeds the AI)"
-        },
-        {
-          "id": "l4",
-          "t": "5-10 training photos"
-        },
-        {
-          "id": "l5",
-          "t": "Google Business link + 2-3 quotable parents"
-        },
-        {
-          "id": "l6",
-          "t": "Privacy policy + terms content for his site"
-        },
-        {
-          "id": "l7",
-          "t": "He creates his own Twilio account (30 min)"
-        },
-        {
-          "id": "l8",
-          "t": "Opt-in wording + 2 sample text messages"
-        },
-        {
-          "id": "l9",
-          "t": "Warn him: one-time texting gap on cutover day, weeks after launch"
-        }
-      ]
-    },
-    {
-      "id": "quick",
-      "title": "Quick wins",
-      "why": "Small things that unblock or de-noise.",
-      "held": false,
-      "steps": [
-        {
-          "id": "q3",
-          "t": "Lawyer sign-off on the SJ agreement, then the draft banner comes off"
-        }
-      ]
-    }
-  ],
-  "lanes": [
-    {
-      "name": "Lij",
-      "state": "blocked",
-      "items": [
-        "Stripe connect",
-        "Coach bios + photos",
-        "Group size + member count",
-        "Testimonials + Google link",
-        "Privacy + terms content",
-        "His Twilio account"
-      ],
-      "note": "all waiting on the ask-list"
-    },
-    {
-      "name": "Launch switch list",
-      "state": "blocked",
-      "items": [
-        "Approve confirm automations",
-        "Enable drips + re-enable nurture 3",
-        "Re-run entry-point seed (0 today)",
-        "Re-seed onboarding from fixed master",
-        "Publish website",
-        "Stripe connect",
-        "Owner phones set",
-        "Seed price catalog + $40 fee"
-      ],
-      "note": "flipped together on launch day, item 25"
-    },
-    {
-      "name": "Other sessions",
-      "state": "moving",
-      "items": [
-        "Agreement engine, unmerged",
-        "GHL tokens, mid-flight",
-        "Client profile, waiting on Cole's SQL"
-      ],
-      "note": "everything else closed and handed back"
-    },
-    {
-      "name": "Twilio track",
-      "state": "moving",
-      "items": [
-        "Thu: submit TrustHub profile",
-        "Sat: result",
-        "Fallback: $10 appeal, ~08-12",
-        "SJ unaffected, runs on GHL"
-      ],
-      "note": "de-risking, never preempts SJ"
-    }
-  ],
-  "queue": [
-    {
-      "id": 71,
-      "title": "One click re-enables SJ's held testimonial email (only disabled step in the system)",
-      "severity": "blocker",
-      "status": "fix in flight",
-      "owner": "templating"
-    },
-    {
-      "id": 73,
-      "title": "Locked In Sports' only website ref is brand_data.website_url (blocks 1c)",
-      "severity": "blocker",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 72,
-      "title": "Second unguarded writer of legal name/EIN/address in the onboarding wizard",
-      "severity": "blocker",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": "bounce1",
-      "title": "BLOCKING: fabricated 5.0 aggregate still reachable via manual rows",
-      "severity": "blocker",
-      "status": "bounced to builder",
-      "owner": "us"
-    },
-    {
-      "id": "early-win",
-      "title": "DECIDE: close the social_proof leak in days using a review-link field, no Google approval needed",
-      "severity": "blocker",
-      "status": "YOUR CALL",
-      "owner": "Zoran"
-    },
-    {
-      "id": 70,
-      "title": "Brand + KPI cards blank and overwrite: needs async hydration",
-      "severity": "blocker",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 69,
-      "title": "Business Basics data loss (legal name, address, EIN, phone)",
-      "severity": "blocker",
-      "status": "FIXED, in review",
-      "owner": "us"
-    },
-    {
-      "id": "2-5",
-      "title": "Data foundation: parent-facing name, testimonials table, 2 links",
-      "severity": "blocker",
-      "status": "BUILDING",
-      "owner": "us"
-    },
-    {
-      "id": 6,
-      "title": "Two wizard approval steps (the promised approval never existed)",
-      "severity": "blocker",
-      "status": "next wave",
-      "owner": "us"
-    },
-    {
-      "id": 8,
-      "title": "Re-shell 3 onboarding emails onto the tokenized shell",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 9,
-      "title": "Emails wear brand_data (wrong gold, placeholder logos)",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 7,
-      "title": "brand_data cleanup + derive stats (currently states a false training day)",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 10,
-      "title": "Delete trial_followup, detokenize GTA's 4 sales steps",
-      "severity": "scale",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 11,
-      "title": "Parameterise the email renderer by client id",
-      "severity": "scale",
-      "status": "sync room",
-      "owner": "us"
-    },
-    {
-      "id": 12,
-      "title": "Override-tracing checker + weekly drift issue",
-      "severity": "scale",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": "a",
-      "title": "DECIDE: the sales agent reads zero brand_data",
-      "severity": "general",
-      "status": "YOUR CALL",
-      "owner": "Zoran"
-    },
-    {
-      "id": 5,
-      "title": "Agent brain GTA fallback (pricing fixed, 3 bodies remain: see #59)",
-      "severity": "blocker",
-      "status": "narrowed, see #59",
-      "owner": "us"
-    },
-    {
-      "id": 22,
-      "title": "AI books trials in Toronto time",
-      "severity": "blocker",
-      "status": "unblocked, queued",
-      "owner": "us"
-    },
-    {
-      "id": 23,
-      "title": "Quiet-hours no-arg leaks (6am PT texts)",
-      "severity": "blocker",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 6,
-      "title": "Funnel form is a GTA copy",
-      "severity": "blocker",
-      "status": "parked til #116",
-      "owner": "us"
-    },
-    {
-      "id": 16,
-      "title": "Signed-agreement assembly",
-      "severity": "blocker",
-      "status": "verify owner",
-      "owner": "agreement session"
-    },
-    {
-      "id": 25,
-      "title": "SJ go-live switch list",
-      "severity": "blocker",
-      "status": "launch day",
-      "owner": "us"
-    },
-    {
-      "id": 26,
-      "title": "GHL token warmth (FC2 fix)",
-      "severity": "blocker",
-      "status": "on your checklist, HELD",
-      "owner": "Zoran"
-    },
-    {
-      "id": 27,
-      "title": "Portal-spine migration: flip 5 rails off GHL",
-      "severity": "blocker",
-      "status": "needs its own plan",
-      "owner": "us"
-    },
-    {
-      "id": 35,
-      "title": "register-a2p.js missing privacy/terms URLs",
-      "severity": "blocker",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 36,
-      "title": "Connect-existing-Twilio path (SJ uses it)",
-      "severity": "blocker",
-      "status": "post-launch tail",
-      "owner": "us"
-    },
-    {
-      "id": 39,
-      "title": "No phones on SJ users (guardrails silent)",
-      "severity": "blocker",
-      "status": "Lij's set, rest at launch",
-      "owner": "us"
-    },
-    {
-      "id": 43,
-      "title": "FullControl website live (Twilio gate)",
-      "severity": "blocker",
-      "status": "by Wednesday",
-      "owner": "Zoran"
-    },
-    {
-      "id": 10,
-      "title": "Quiet-hours null default",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 14,
-      "title": "DOB / grade / school missing from funnel",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 17,
-      "title": "Emergency contact required in preset",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 21,
-      "title": "BAM NY half-seed re-seed",
-      "severity": "friction",
-      "status": "PARKED, SJ first",
-      "owner": "later"
-    },
-    {
-      "id": 24,
-      "title": "Agent prompt em-dash sweep",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 29,
-      "title": "Nurture-3 held for SJ (real testimonials)",
-      "severity": "friction",
-      "status": "held on purpose",
-      "owner": "us"
-    },
-    {
-      "id": 33,
-      "title": "GTA stale $185-565 stored pricing note",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 40,
-      "title": "Lij email mismatch (login-linked, change carefully)",
-      "severity": "friction",
-      "status": "needs safe change",
-      "owner": "us"
-    },
-    {
-      "id": 44,
-      "title": "FullControl privacy + terms pages",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 45,
-      "title": "Post-approval Twilio env swap (gate E)",
-      "severity": "friction",
-      "status": "after TrustHub",
-      "owner": "us"
-    },
-    {
-      "id": 20,
-      "title": "Slack team notification channels",
-      "severity": "general",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 11,
-      "title": "GTA default client_id in 5 endpoints",
-      "severity": "scale",
-      "status": "backlog",
-      "owner": "later"
-    },
-    {
-      "id": 12,
-      "title": "members/intake.js GTA-wired",
-      "severity": "scale",
-      "status": "backlog",
-      "owner": "later"
-    },
-    {
-      "id": 13,
-      "title": "Stage positions per-academy",
-      "severity": "scale",
-      "status": "backlog",
-      "owner": "later"
-    },
-    {
-      "id": 15,
-      "title": "Remove legacy clause fallbacks later",
-      "severity": "scale",
-      "status": "backlog",
-      "owner": "later"
-    },
-    {
-      "id": 18,
-      "title": "GHL import reconcile gate",
-      "severity": "scale",
-      "status": "backlog",
-      "owner": "later"
-    },
-    {
-      "id": 19,
-      "title": "CLI preset_key stamp",
-      "severity": "scale",
-      "status": "backlog",
-      "owner": "later"
-    },
-    {
-      "id": 31,
-      "title": "GTA runs on LOCATIONS hardcode, not data",
-      "severity": "scale",
-      "status": "backlog",
-      "owner": "later"
-    },
-    {
-      "id": 46,
-      "title": "Onboarding intake step for per-academy A2P data",
-      "severity": "scale",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 47,
-      "title": "Portal 'Connect email domain' button (Resend API + records shown in-portal, per academy)",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 48,
-      "title": "bam-portal cancels every PR preview build",
-      "severity": "friction",
-      "status": "blocks gate-2 pattern",
-      "owner": "us"
-    },
-    {
-      "id": 50,
-      "title": "Sign-up-fee rendering unproven until SJ's $40 is entered",
-      "severity": "friction",
-      "status": "launch-day check",
-      "owner": "us"
-    },
-    {
-      "id": 51,
-      "title": "Root SPF for Google missing (Lij's Gmail unprotected)",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    },
-    {
-      "id": 52,
-      "title": "DNS handoff process fix: never paste values from tables",
-      "severity": "friction",
-      "status": "adopted",
-      "owner": "us"
-    },
-    {
-      "id": 60,
-      "title": "onboarding_calls has a client-read RLS policy vs staff-only decision",
-      "severity": "friction",
-      "status": "your call",
-      "owner": "Zoran"
-    },
-    {
-      "id": 62,
-      "title": "SJ has 0 entry points and 0 funnels (one idempotent button press)",
-      "severity": "friction",
-      "status": "switch list",
-      "owner": "us"
-    },
-    {
-      "id": 66,
-      "title": "FILE the Google Business Profile API application (unfiled, gates Build 5)",
-      "severity": "blocker",
-      "status": "YOUR ACTION",
-      "owner": "Zoran"
-    },
-    {
-      "id": 67,
-      "title": "Build 5 Google Reviews: 0% built, gated on the API application",
-      "severity": "blocker",
-      "status": "blocked on #66",
-      "owner": "us"
-    },
-    {
-      "id": 68,
-      "title": "Standardize a reignition flow for sales presets",
-      "severity": "general",
-      "status": "future workstream",
-      "owner": "us"
-    },
-    {
-      "id": 63,
-      "title": "social_proof leak: LEAVE until Google connected (Zoran's ruling)",
-      "severity": "friction",
-      "status": "deferred by decision",
-      "owner": "later"
-    },
-    {
-      "id": 65,
-      "title": "CH3 minors on public URL: KEEP AS IS (Zoran's ruling)",
-      "severity": "friction",
-      "status": "closed by decision",
-      "owner": "later"
-    },
-    {
-      "id": 74,
-      "title": "Pro Precision is in Australia with a Toronto timezone",
-      "severity": "friction",
-      "status": "queued",
-      "owner": "us"
-    }
-  ],
-  "chatMap": [
-    {
-      "name": "MISTER_ORCHESTRATOR",
-      "sidebar": "MISTER_ORCHESTRATOR",
-      "state": "blue",
-      "one": "Handing over to MISTER_ORCHESTRATOR II. Handoff doc at docs/orchestrator-handoff.md; queue and board unchanged",
-      "builds": [
-        "t-breakdown",
-        "t-email"
-      ],
-      "column": null
-    },
-    {
-      "name": "MISTER_ORCHESTRATOR II",
-      "sidebar": "MISTER_ORCHESTRATOR II",
-      "state": "white",
-      "column": "sj",
-      "one": "The continuing orchestrator. Reading the handoff, starting the board, connecting to every chat"
-    },
-    {
-      "name": "TESTIMONIAL CONNECTION",
-      "sidebar": "TESTIMONIAL CONNECTION",
-      "state": "orange",
-      "one": "Parked on purpose so you only run one design track at a time. Restarts when templating is done",
-      "column": "reviews",
-      "actions": [],
-      "blockedBy": "waiting for AUTOMATION TEMPLATING to finish, by your call. Nothing is waiting on it, so parking costs nothing"
-    },
-    {
-      "name": "AUTOMATION TEMPLATING",
-      "sidebar": "AUTOMATION TEMPLATING",
-      "state": "white",
-      "one": "The only active track. Building the wave, holding off on anything testimonial-dependent",
-      "builds": [
-        "t-convergence"
-      ],
-      "column": "sales"
-    },
-    {
-      "name": "SET UP TWILIO BITCH",
-      "sidebar": "SET UP TWILIO BITCH",
-      "state": "red",
-      "one": "The TrustHub submission. Unlocks phone numbers for every academy after San Jose. Target Thursday",
-      "actions": [
-        {
-          "id": "th-cp575",
-          "title": "Find the IRS CP 575 letter for FullControl",
-          "why": "Every field on the Twilio form is copied character for character off this one letter. It is the single source of truth, and getting a field wrong burns one of only 3 free submissions.",
-          "whyHuman": "It is your business paperwork, in your email or with your accountant.",
-          "steps": [
-            "Search your email, your accountant, and the company formation documents",
-            "Save it as a PDF, you will need the file itself if the submission gets rejected",
-            "If it is gone, phone the IRS and request a 147C replacement, then tell me immediately because it adds unknown days",
-            "Note the EIN issue date from the top right of the letter"
-          ],
-          "code": null,
-          "verify": "You have a PDF of the CP 575 open on screen showing legal name, EIN and address.",
-          "never": "Do not copy the legal name off a W2 or W9. Their formatting differs and a mismatch is its own rejection."
-        },
-        {
-          "id": "th-rep",
-          "title": "Set up the authorised rep email and details",
-          "why": "A free or generic email address is a documented cause of brand rejection. The rep's email domain has to match the business.",
-          "whyHuman": "Needs your email admin access.",
-          "steps": [
-            "Create or confirm an email address on the FullControl domain",
-            "Not gmail, not outlook, and not a shared address like info@",
-            "Have ready: your real name, real job title, the job position from Twilio's dropdown (CEO, Director, and so on)",
-            "Have your phone in the +1XXXXXXXXXX format"
-          ],
-          "code": null,
-          "verify": "You can send and receive from the FullControl-domain address.",
-          "never": null
-        },
-        {
-          "id": "th-site",
-          "title": "Get the FullControl website live",
-          "why": "This is the real long pole, not Twilio. A parked page or a bare landing page is exactly what triggers rejection error 18601.",
-          "whyHuman": "Your call on scope and content.",
-          "steps": [
-            "Point it at a custom FullControl domain, not a vercel.app or similar",
-            "Make sure it is publicly reachable: not parked, not password protected, no redirect elsewhere",
-            "The legal business name AND the logo must be visible on the page",
-            "Privacy policy and terms are NOT needed for this step, they come later at campaign time"
-          ],
-          "code": null,
-          "verify": "Open the site in a private browsing window. It loads, and you can see the legal entity name and logo without logging in.",
-          "never": null
-        },
-        {
-          "id": "th-submit",
-          "title": "Create the Twilio account and submit the profile",
-          "why": "This starts the clock. A clean submission comes back within 48 hours.",
-          "whyHuman": "Account creation, billing and the legal attestation are all yours.",
-          "steps": [
-            "Sign up for the new Twilio account, upgrade off trial, add a billing method",
-            "Open the Primary Business Profile form with your CP 575 PDF open beside it",
-            "Business identity: pick ISV / Reseller / Partner, NOT Direct Customer",
-            "Vertical: EDUCATION",
-            "Enter the address using the Console autocomplete rather than typing it, so it matches USPS records",
-            "Copy each field off the CP 575 exactly, then submit"
-          ],
-          "code": null,
-          "verify": "Twilio shows the profile as submitted or pending review. Check back Saturday.",
-          "never": "Never use a DUNS number for a US entity, and never abbreviate the legal name or add a DBA. You only get 3 free submissions."
-        },
-        {
-          "id": "th-appeal",
-          "title": "Only if rejected: file the appeal",
-          "why": "Twilio explicitly names newly issued tax IDs as a valid appeal reason, which is our exact situation since the EIN is roughly 60 to 90 days old.",
-          "whyHuman": "Requires your Twilio support login and payment.",
-          "steps": [
-            "Open a Twilio Support ticket referencing the profile SID",
-            "Attach the CP 575 as a PDF",
-            "Ask for the submission to be appealed to manual vetting",
-            "Pay the $10 fee"
-          ],
-          "code": null,
-          "verify": "Approval typically lands 5 to 7 business days later, around August 12.",
-          "never": null
-        },
-        {
-          "id": "th-handoff",
-          "title": "On approval: hand me the four values",
-          "why": "One of them, the primary profile SID, is the single flag that un-gates the whole automated phone chain in the portal.",
-          "whyHuman": "They live in your Twilio console.",
-          "steps": [
-            "From the new Twilio account, copy the master Account SID",
-            "Create an API key and copy the API Key SID and the API Key Secret",
-            "Copy the approved Primary Profile SID",
-            "Send them to me and I will set them on Vercel and smoke test the chain"
-          ],
-          "code": null,
-          "verify": "I confirm the env vars are set on both production and preview and one academy passes a smoke test.",
-          "never": "Do not paste the API Key Secret into a public place. Send it in the chat only when you are ready for me to set it."
-        }
-      ],
-      "column": "twilio"
-    },
-    {
-      "name": "BAM GTA free trial loading rate",
-      "sidebar": "BAM GTA free trial loading rate",
-      "state": "red",
-      "one": "Server-side Meta tracking is built and deployed but inert until you generate one token",
-      "actions": [
-        {
-          "id": "meta-capi-token",
-          "title": "Generate the Meta Conversions API token for BAM GTA",
-          "why": "The server-side tracking is fully built, merged and deployed, but it does nothing until this token exists. It recovers the ad-blocked half of GTA's conversions: roughly 60% of ad traffic is currently invisible to Meta.",
-          "whyHuman": "Needs your Meta login, and a live access token must never be pasted into a chat transcript.",
-          "steps": [
-            "Go to business.facebook.com/events_manager2",
-            "Pick the data source: Form Fills BAM Toronto (1692167884521071)",
-            "Settings, then the Conversions API section",
-            "Click Generate access token, and copy it",
-            "Open the Supabase SQL editor for project jnojmfmpnsfmtqmwhopz",
-            "Run the SQL below, pasting your token where the placeholder is"
-          ],
-          "code": "update clients\nset meta_capi = '{\"pixels\":[{\"id\":\"1692167884521071\",\"token\":\"PASTE_TOKEN_HERE\"}]}'::jsonb\nwhere id = '39875f07-0a4b-4429-a201-2249bc1f24df';",
-          "verify": "In Events Manager, open that pixel and check Test Events. You should see server-side events arriving, and PageView plus Lead counts should stop being browser-only.",
-          "never": "Never paste the token into a chat, including this board. It only ever goes into the Supabase SQL editor."
-        }
-      ],
-      "column": "gta"
-    },
-    {
-      "name": "BUILD GHL TOKENS",
-      "sidebar": "BUILD GHL TOKENS",
-      "state": "orange",
-      "one": "The FC2 fix for 14 cold academies, held before you start",
-      "blockedBy": "confirming whether GHL offers the Agency AND Sub-Account option; that chat resolves it, then this turns red",
-      "actions": [
-        {
-          "id": "fc2-app-fix",
-          "title": "Reconfigure the FC2 app, then run agency connect",
-          "why": "14 academies have cold GHL tokens, and San Jose launches on GHL texting. It currently survives on a single-use refresh token: one lost response kills it with no recovery.",
-          "whyHuman": "Needs your GHL marketplace access and an OAuth consent only you can give.",
-          "steps": [
-            "Uninstall FC2 first, GHL locks the settings while an install is active",
-            "Set distribution to Agency AND Sub-Account",
-            "Add the mint scopes: oauth.write and oauth.readonly, plus contacts, conversations, opportunities, calendars, locations, users, custom fields and tags",
-            "Remove the junk scopes: adPublishing, saas, snapshots, twilioaccount, phone numbers",
-            "Check the redirect URL includes portal.byanymeansbusiness.com/api/agency-connect, then save",
-            "Run the install link and pick the AGENCY on the consent screen, not a sub-account"
-          ],
-          "code": null,
-          "verify": "Open portal.byanymeansbusiness.com/api/agency-connect. It should read Healthy, Company token.",
-          "never": "HOLD until that chat confirms whether GHL offers the Agency AND Sub-Account option. If it does not, these steps change."
-        }
-      ],
-      "column": "twilio"
-    },
-    {
-      "name": "Enrollment agreement",
-      "sidebar": "Enrollment agreement population and storage",
-      "state": "orange",
-      "one": "Owns the agreement engine, publish step comes after sign-off",
-      "blockedBy": "lawyer sign-off on the SJ agreement",
-      "column": "sj"
-    },
-    {
-      "name": "Vercel deployment guide for Ant",
-      "sidebar": "Vercel deployment guide for Ant",
-      "state": "unknown",
-      "one": "Not one of mine. Tell me what it is and I will map it",
-      "column": "unsorted"
-    }
-  ],
-  "journey": {
-    "title": "BAM San Jose \u00b7 road to launch",
-    "note": "Big-bang launch: everything switches on the same day, after you review it all with Lij.",
-    "steps": [
-      {
-        "name": "Academy set up",
-        "state": "done",
-        "detail": "Offers, pricing, brand, policy, 536 contacts syncing"
-      },
-      {
-        "name": "Sales system clean",
-        "state": "done",
-        "detail": "All 6 GTA leaks dead, drips seeded, prices honest"
-      },
-      {
-        "name": "Email live",
-        "state": "done",
-        "detail": "Verified. Sends as BAM San Jose, Gmail untouched"
-      },
-      {
-        "name": "Lij's materials",
-        "state": "active",
-        "detail": "Now the front of the queue: send him the ask-list"
-      },
-      {
-        "name": "Website published",
-        "state": "next",
-        "detail": "Goes live only once everything else is ready"
-      },
-      {
-        "name": "Lawyer sign-off",
-        "state": "waiting",
-        "detail": "Agreement approved, draft banner comes off"
-      },
-      {
-        "name": "LAUNCH DAY",
-        "state": "waiting",
-        "detail": "Flip the switch list: automations, drips, agents, payments"
-      },
-      {
-        "name": "Phone to Twilio",
-        "state": "later",
-        "detail": "Weeks after launch. Runs on GHL until then"
-      }
-    ]
+   ]
   },
-  "columns": [
+  {
+   "id": "lij",
+   "title": "Send Lij his ask-list",
+   "why": "His side takes days and nothing on it is blocked by us. The sooner it goes, the sooner coaches, photos and Stripe stop being the long pole.",
+   "held": false,
+   "steps": [
     {
-      "id": "sj",
-      "title": "Get San Jose live",
-      "goal": "Everything that must be true before Lij takes his first real lead"
+     "id": "l1",
+     "t": "Stripe connect link"
     },
     {
-      "id": "sales",
-      "title": "Sales system",
-      "goal": "Make the free-trial preset hand every academy GTA's system, templatized to them"
+     "id": "l2",
+     "t": "Gym address, member count, group size and coach ratio"
     },
     {
-      "id": "reviews",
-      "title": "Reviews",
-      "goal": "Connect real Google reviews so no academy ever shows borrowed or invented quotes"
+     "id": "l3",
+     "t": "Coach names, titles, short bios (feeds the AI)"
     },
     {
-      "id": "twilio",
-      "title": "Twilio",
-      "goal": "Own our own numbers, starting with the TrustHub approval that gates every academy"
+     "id": "l4",
+     "t": "5-10 training photos"
     },
     {
-      "id": "gta",
-      "title": "GTA landing pages",
-      "goal": "Fix what GTA's own funnel loses before it reaches the pipeline"
+     "id": "l5",
+     "t": "Google Business link + 2-3 quotable parents"
     },
     {
-      "id": "unsorted",
-      "title": "Unsorted",
-      "goal": "Not yet mapped to a workstream. Drag these where they belong"
+     "id": "l6",
+     "t": "Privacy policy + terms content for his site"
     },
     {
-      "id": "done",
-      "title": "Done, safe to archive",
-      "goal": "Reported back, nothing left inside"
+     "id": "l7",
+     "t": "He creates his own Twilio account (30 min)"
+    },
+    {
+     "id": "l8",
+     "t": "Opt-in wording + 2 sample text messages"
+    },
+    {
+     "id": "l9",
+     "t": "Warn him: one-time texting gap on cutover day, weeks after launch"
     }
+   ]
+  },
+  {
+   "id": "quick",
+   "title": "Quick wins",
+   "why": "Small things that unblock or de-noise.",
+   "held": false,
+   "steps": [
+    {
+     "id": "q3",
+     "t": "Lawyer sign-off on the SJ agreement, then the draft banner comes off"
+    }
+   ]
+  }
+ ],
+ "lanes": [
+  {
+   "name": "Lij",
+   "state": "blocked",
+   "items": [
+    "Stripe connect",
+    "Coach bios + photos",
+    "Group size + member count",
+    "Testimonials + Google link",
+    "Privacy + terms content",
+    "His Twilio account"
+   ],
+   "note": "all waiting on the ask-list"
+  },
+  {
+   "name": "Launch switch list",
+   "state": "blocked",
+   "items": [
+    "Approve confirm automations",
+    "Enable drips + re-enable nurture 3",
+    "Re-run entry-point seed (0 today)",
+    "Re-seed onboarding from fixed master",
+    "Publish website",
+    "Stripe connect",
+    "Owner phones set",
+    "Seed price catalog + $40 fee"
+   ],
+   "note": "flipped together on launch day, item 25"
+  },
+  {
+   "name": "Other sessions",
+   "state": "moving",
+   "items": [
+    "Agreement engine, unmerged",
+    "GHL tokens, mid-flight",
+    "Client profile, waiting on Cole's SQL"
+   ],
+   "note": "everything else closed and handed back"
+  },
+  {
+   "name": "Twilio track",
+   "state": "moving",
+   "items": [
+    "Thu: submit TrustHub profile",
+    "Sat: result",
+    "Fallback: $10 appeal, ~08-12",
+    "SJ unaffected, runs on GHL"
+   ],
+   "note": "de-risking, never preempts SJ"
+  }
+ ],
+ "queue": [
+  {
+   "id": 71,
+   "title": "One click re-enables SJ's held testimonial email (only disabled step in the system)",
+   "severity": "blocker",
+   "status": "fix in flight",
+   "owner": "templating"
+  },
+  {
+   "id": 73,
+   "title": "Locked In Sports' only website ref is brand_data.website_url (blocks 1c)",
+   "severity": "blocker",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 72,
+   "title": "Second unguarded writer of legal name/EIN/address in the onboarding wizard",
+   "severity": "blocker",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": "bounce1",
+   "title": "BLOCKING: fabricated 5.0 aggregate still reachable via manual rows",
+   "severity": "blocker",
+   "status": "bounced to builder",
+   "owner": "us"
+  },
+  {
+   "id": "early-win",
+   "title": "DECIDE: close the social_proof leak in days using a review-link field, no Google approval needed",
+   "severity": "blocker",
+   "status": "YOUR CALL",
+   "owner": "Zoran"
+  },
+  {
+   "id": 70,
+   "title": "Brand + KPI cards blank and overwrite: needs async hydration",
+   "severity": "blocker",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 69,
+   "title": "Business Basics data loss (legal name, address, EIN, phone)",
+   "severity": "blocker",
+   "status": "FIXED, in review",
+   "owner": "us"
+  },
+  {
+   "id": "2-5",
+   "title": "Data foundation: parent-facing name, testimonials table, 2 links",
+   "severity": "blocker",
+   "status": "BUILDING",
+   "owner": "us"
+  },
+  {
+   "id": 6,
+   "title": "Two wizard approval steps (the promised approval never existed)",
+   "severity": "blocker",
+   "status": "next wave",
+   "owner": "us"
+  },
+  {
+   "id": 8,
+   "title": "Re-shell 3 onboarding emails onto the tokenized shell",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 9,
+   "title": "Emails wear brand_data (wrong gold, placeholder logos)",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 7,
+   "title": "brand_data cleanup + derive stats (currently states a false training day)",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 10,
+   "title": "Delete trial_followup, detokenize GTA's 4 sales steps",
+   "severity": "scale",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 11,
+   "title": "Parameterise the email renderer by client id",
+   "severity": "scale",
+   "status": "sync room",
+   "owner": "us"
+  },
+  {
+   "id": 12,
+   "title": "Override-tracing checker + weekly drift issue",
+   "severity": "scale",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": "a",
+   "title": "DECIDE: the sales agent reads zero brand_data",
+   "severity": "general",
+   "status": "YOUR CALL",
+   "owner": "Zoran"
+  },
+  {
+   "id": 5,
+   "title": "Agent brain GTA fallback (pricing fixed, 3 bodies remain: see #59)",
+   "severity": "blocker",
+   "status": "narrowed, see #59",
+   "owner": "us"
+  },
+  {
+   "id": 22,
+   "title": "AI books trials in Toronto time",
+   "severity": "blocker",
+   "status": "unblocked, queued",
+   "owner": "us"
+  },
+  {
+   "id": 23,
+   "title": "Quiet-hours no-arg leaks (6am PT texts)",
+   "severity": "blocker",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 6,
+   "title": "Funnel form is a GTA copy",
+   "severity": "blocker",
+   "status": "parked til #116",
+   "owner": "us"
+  },
+  {
+   "id": 16,
+   "title": "Signed-agreement assembly",
+   "severity": "blocker",
+   "status": "verify owner",
+   "owner": "agreement session"
+  },
+  {
+   "id": 25,
+   "title": "SJ go-live switch list",
+   "severity": "blocker",
+   "status": "launch day",
+   "owner": "us"
+  },
+  {
+   "id": 26,
+   "title": "GHL token warmth (FC2 fix)",
+   "severity": "blocker",
+   "status": "on your checklist, HELD",
+   "owner": "Zoran"
+  },
+  {
+   "id": 27,
+   "title": "Portal-spine migration: flip 5 rails off GHL",
+   "severity": "blocker",
+   "status": "needs its own plan",
+   "owner": "us"
+  },
+  {
+   "id": 35,
+   "title": "register-a2p.js missing privacy/terms URLs",
+   "severity": "blocker",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 36,
+   "title": "Connect-existing-Twilio path (SJ uses it)",
+   "severity": "blocker",
+   "status": "post-launch tail",
+   "owner": "us"
+  },
+  {
+   "id": 39,
+   "title": "No phones on SJ users (guardrails silent)",
+   "severity": "blocker",
+   "status": "Lij's set, rest at launch",
+   "owner": "us"
+  },
+  {
+   "id": 43,
+   "title": "FullControl website live (Twilio gate)",
+   "severity": "blocker",
+   "status": "by Wednesday",
+   "owner": "Zoran"
+  },
+  {
+   "id": 10,
+   "title": "Quiet-hours null default",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 14,
+   "title": "DOB / grade / school missing from funnel",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 17,
+   "title": "Emergency contact required in preset",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 21,
+   "title": "BAM NY half-seed re-seed",
+   "severity": "friction",
+   "status": "PARKED, SJ first",
+   "owner": "later"
+  },
+  {
+   "id": 24,
+   "title": "Agent prompt em-dash sweep",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 29,
+   "title": "Nurture-3 held for SJ (real testimonials)",
+   "severity": "friction",
+   "status": "held on purpose",
+   "owner": "us"
+  },
+  {
+   "id": 33,
+   "title": "GTA stale $185-565 stored pricing note",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 40,
+   "title": "Lij email mismatch (login-linked, change carefully)",
+   "severity": "friction",
+   "status": "needs safe change",
+   "owner": "us"
+  },
+  {
+   "id": 44,
+   "title": "FullControl privacy + terms pages",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 45,
+   "title": "Post-approval Twilio env swap (gate E)",
+   "severity": "friction",
+   "status": "after TrustHub",
+   "owner": "us"
+  },
+  {
+   "id": 20,
+   "title": "Slack team notification channels",
+   "severity": "general",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 11,
+   "title": "GTA default client_id in 5 endpoints",
+   "severity": "scale",
+   "status": "backlog",
+   "owner": "later"
+  },
+  {
+   "id": 12,
+   "title": "members/intake.js GTA-wired",
+   "severity": "scale",
+   "status": "backlog",
+   "owner": "later"
+  },
+  {
+   "id": 13,
+   "title": "Stage positions per-academy",
+   "severity": "scale",
+   "status": "backlog",
+   "owner": "later"
+  },
+  {
+   "id": 15,
+   "title": "Remove legacy clause fallbacks later",
+   "severity": "scale",
+   "status": "backlog",
+   "owner": "later"
+  },
+  {
+   "id": 18,
+   "title": "GHL import reconcile gate",
+   "severity": "scale",
+   "status": "backlog",
+   "owner": "later"
+  },
+  {
+   "id": 19,
+   "title": "CLI preset_key stamp",
+   "severity": "scale",
+   "status": "backlog",
+   "owner": "later"
+  },
+  {
+   "id": 31,
+   "title": "GTA runs on LOCATIONS hardcode, not data",
+   "severity": "scale",
+   "status": "backlog",
+   "owner": "later"
+  },
+  {
+   "id": 46,
+   "title": "Onboarding intake step for per-academy A2P data",
+   "severity": "scale",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 47,
+   "title": "Portal 'Connect email domain' button (Resend API + records shown in-portal, per academy)",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 48,
+   "title": "bam-portal cancels every PR preview build",
+   "severity": "friction",
+   "status": "blocks gate-2 pattern",
+   "owner": "us"
+  },
+  {
+   "id": 50,
+   "title": "Sign-up-fee rendering unproven until SJ's $40 is entered",
+   "severity": "friction",
+   "status": "launch-day check",
+   "owner": "us"
+  },
+  {
+   "id": 51,
+   "title": "Root SPF for Google missing (Lij's Gmail unprotected)",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  },
+  {
+   "id": 52,
+   "title": "DNS handoff process fix: never paste values from tables",
+   "severity": "friction",
+   "status": "adopted",
+   "owner": "us"
+  },
+  {
+   "id": 60,
+   "title": "onboarding_calls has a client-read RLS policy vs staff-only decision",
+   "severity": "friction",
+   "status": "your call",
+   "owner": "Zoran"
+  },
+  {
+   "id": 62,
+   "title": "SJ has 0 entry points and 0 funnels (one idempotent button press)",
+   "severity": "friction",
+   "status": "switch list",
+   "owner": "us"
+  },
+  {
+   "id": 66,
+   "title": "FILE the Google Business Profile API application (unfiled, gates Build 5)",
+   "severity": "blocker",
+   "status": "YOUR ACTION",
+   "owner": "Zoran"
+  },
+  {
+   "id": 67,
+   "title": "Build 5 Google Reviews: 0% built, gated on the API application",
+   "severity": "blocker",
+   "status": "blocked on #66",
+   "owner": "us"
+  },
+  {
+   "id": 68,
+   "title": "Standardize a reignition flow for sales presets",
+   "severity": "general",
+   "status": "future workstream",
+   "owner": "us"
+  },
+  {
+   "id": 63,
+   "title": "social_proof leak: LEAVE until Google connected (Zoran's ruling)",
+   "severity": "friction",
+   "status": "deferred by decision",
+   "owner": "later"
+  },
+  {
+   "id": 65,
+   "title": "CH3 minors on public URL: KEEP AS IS (Zoran's ruling)",
+   "severity": "friction",
+   "status": "closed by decision",
+   "owner": "later"
+  },
+  {
+   "id": 74,
+   "title": "Pro Precision is in Australia with a Toronto timezone",
+   "severity": "friction",
+   "status": "queued",
+   "owner": "us"
+  }
+ ],
+ "chatMap": [
+  {
+   "name": "MISTER_ORCHESTRATOR II",
+   "sidebar": "MISTER_ORCHESTRATOR II",
+   "state": "white",
+   "column": null,
+   "one": "Holding the goals and the queue. Now also holding skill 4 (member management) as your backlog item"
+  },
+  {
+   "name": "TESTIMONIAL CONNECTION",
+   "sidebar": "TESTIMONIAL CONNECTION",
+   "state": "white",
+   "one": "Gate 1 passed. Building the gather step, then hand-seeding GTA, then San Jose",
+   "column": "reviews",
+   "actions": [],
+   "blockedBy": null
+  },
+  {
+   "name": "AUTOMATION TEMPLATING",
+   "sidebar": "AUTOMATION TEMPLATING",
+   "state": "done",
+   "one": "Retired and handed over. Branch clean and pushed. Safe to archive",
+   "builds": [
+    "t-convergence"
+   ],
+   "column": "done"
+  },
+  {
+   "name": "SET UP TWILIO BITCH",
+   "sidebar": "SET UP TWILIO BITCH",
+   "state": "red",
+   "one": "The TrustHub submission, target Thursday. NEW: registration asks how you collect consent, and we store no opt-in record at all",
+   "actions": [
+    {
+     "id": "th-cp575",
+     "title": "Find the IRS CP 575 letter for FullControl",
+     "why": "Every field on the Twilio form is copied character for character off this one letter. It is the single source of truth, and getting a field wrong burns one of only 3 free submissions.",
+     "whyHuman": "It is your business paperwork, in your email or with your accountant.",
+     "steps": [
+      "Search your email, your accountant, and the company formation documents",
+      "Save it as a PDF, you will need the file itself if the submission gets rejected",
+      "If it is gone, phone the IRS and request a 147C replacement, then tell me immediately because it adds unknown days",
+      "Note the EIN issue date from the top right of the letter"
+     ],
+     "code": null,
+     "verify": "You have a PDF of the CP 575 open on screen showing legal name, EIN and address.",
+     "never": "Do not copy the legal name off a W2 or W9. Their formatting differs and a mismatch is its own rejection."
+    },
+    {
+     "id": "th-rep",
+     "title": "Set up the authorised rep email and details",
+     "why": "A free or generic email address is a documented cause of brand rejection. The rep's email domain has to match the business.",
+     "whyHuman": "Needs your email admin access.",
+     "steps": [
+      "Create or confirm an email address on the FullControl domain",
+      "Not gmail, not outlook, and not a shared address like info@",
+      "Have ready: your real name, real job title, the job position from Twilio's dropdown (CEO, Director, and so on)",
+      "Have your phone in the +1XXXXXXXXXX format"
+     ],
+     "code": null,
+     "verify": "You can send and receive from the FullControl-domain address.",
+     "never": null
+    },
+    {
+     "id": "th-site",
+     "title": "Get the FullControl website live",
+     "why": "This is the real long pole, not Twilio. A parked page or a bare landing page is exactly what triggers rejection error 18601.",
+     "whyHuman": "Your call on scope and content.",
+     "steps": [
+      "Point it at a custom FullControl domain, not a vercel.app or similar",
+      "Make sure it is publicly reachable: not parked, not password protected, no redirect elsewhere",
+      "The legal business name AND the logo must be visible on the page",
+      "Privacy policy and terms are NOT needed for this step, they come later at campaign time"
+     ],
+     "code": null,
+     "verify": "Open the site in a private browsing window. It loads, and you can see the legal entity name and logo without logging in.",
+     "never": null
+    },
+    {
+     "id": "th-submit",
+     "title": "Create the Twilio account and submit the profile",
+     "why": "This starts the clock. A clean submission comes back within 48 hours.",
+     "whyHuman": "Account creation, billing and the legal attestation are all yours.",
+     "steps": [
+      "Sign up for the new Twilio account, upgrade off trial, add a billing method",
+      "Open the Primary Business Profile form with your CP 575 PDF open beside it",
+      "Business identity: pick ISV / Reseller / Partner, NOT Direct Customer",
+      "Vertical: EDUCATION",
+      "Enter the address using the Console autocomplete rather than typing it, so it matches USPS records",
+      "Copy each field off the CP 575 exactly, then submit"
+     ],
+     "code": null,
+     "verify": "Twilio shows the profile as submitted or pending review. Check back Saturday.",
+     "never": "Never use a DUNS number for a US entity, and never abbreviate the legal name or add a DBA. You only get 3 free submissions."
+    },
+    {
+     "id": "th-appeal",
+     "title": "Only if rejected: file the appeal",
+     "why": "Twilio explicitly names newly issued tax IDs as a valid appeal reason, which is our exact situation since the EIN is roughly 60 to 90 days old.",
+     "whyHuman": "Requires your Twilio support login and payment.",
+     "steps": [
+      "Open a Twilio Support ticket referencing the profile SID",
+      "Attach the CP 575 as a PDF",
+      "Ask for the submission to be appealed to manual vetting",
+      "Pay the $10 fee"
+     ],
+     "code": null,
+     "verify": "Approval typically lands 5 to 7 business days later, around August 12.",
+     "never": null
+    },
+    {
+     "id": "th-handoff",
+     "title": "On approval: hand me the four values",
+     "why": "One of them, the primary profile SID, is the single flag that un-gates the whole automated phone chain in the portal.",
+     "whyHuman": "They live in your Twilio console.",
+     "steps": [
+      "From the new Twilio account, copy the master Account SID",
+      "Create an API key and copy the API Key SID and the API Key Secret",
+      "Copy the approved Primary Profile SID",
+      "Send them to me and I will set them on Vercel and smoke test the chain"
+     ],
+     "code": null,
+     "verify": "I confirm the env vars are set on both production and preview and one academy passes a smoke test.",
+     "never": "Do not paste the API Key Secret into a public place. Send it in the chat only when you are ready for me to set it."
+    }
+   ],
+   "column": "twilio"
+  },
+  {
+   "name": "BAM GTA free trial loading rate",
+   "sidebar": "BAM GTA free trial loading rate",
+   "state": "red",
+   "one": "Server-side Meta tracking is built and deployed but inert until you generate one token",
+   "actions": [
+    {
+     "id": "meta-capi-token",
+     "title": "Generate the Meta Conversions API token for BAM GTA",
+     "why": "The server-side tracking is fully built, merged and deployed, but it does nothing until this token exists. It recovers the ad-blocked half of GTA's conversions: roughly 60% of ad traffic is currently invisible to Meta.",
+     "whyHuman": "Needs your Meta login, and a live access token must never be pasted into a chat transcript.",
+     "steps": [
+      "Go to business.facebook.com/events_manager2",
+      "Pick the data source: Form Fills BAM Toronto (1692167884521071)",
+      "Settings, then the Conversions API section",
+      "Click Generate access token, and copy it",
+      "Open the Supabase SQL editor for project jnojmfmpnsfmtqmwhopz",
+      "Run the SQL below, pasting your token where the placeholder is"
+     ],
+     "code": "update clients\nset meta_capi = '{\"pixels\":[{\"id\":\"1692167884521071\",\"token\":\"PASTE_TOKEN_HERE\"}]}'::jsonb\nwhere id = '39875f07-0a4b-4429-a201-2249bc1f24df';",
+     "verify": "In Events Manager, open that pixel and check Test Events. You should see server-side events arriving, and PageView plus Lead counts should stop being browser-only.",
+     "never": "Never paste the token into a chat, including this board. It only ever goes into the Supabase SQL editor."
+    }
+   ],
+   "column": "gta"
+  },
+  {
+   "name": "BUILD GHL TOKENS",
+   "sidebar": "BUILD GHL TOKENS",
+   "state": "orange",
+   "one": "The FC2 fix for 14 cold academies, held before you start",
+   "blockedBy": "confirming whether GHL offers the Agency AND Sub-Account option; that chat resolves it, then this turns red",
+   "actions": [
+    {
+     "id": "fc2-app-fix",
+     "title": "Reconfigure the FC2 app, then run agency connect",
+     "why": "14 academies have cold GHL tokens, and San Jose launches on GHL texting. It currently survives on a single-use refresh token: one lost response kills it with no recovery.",
+     "whyHuman": "Needs your GHL marketplace access and an OAuth consent only you can give.",
+     "steps": [
+      "Uninstall FC2 first, GHL locks the settings while an install is active",
+      "Set distribution to Agency AND Sub-Account",
+      "Add the mint scopes: oauth.write and oauth.readonly, plus contacts, conversations, opportunities, calendars, locations, users, custom fields and tags",
+      "Remove the junk scopes: adPublishing, saas, snapshots, twilioaccount, phone numbers",
+      "Check the redirect URL includes portal.byanymeansbusiness.com/api/agency-connect, then save",
+      "Run the install link and pick the AGENCY on the consent screen, not a sub-account"
+     ],
+     "code": null,
+     "verify": "Open portal.byanymeansbusiness.com/api/agency-connect. It should read Healthy, Company token.",
+     "never": "HOLD until that chat confirms whether GHL offers the Agency AND Sub-Account option. If it does not, these steps change."
+    }
+   ],
+   "column": "twilio"
+  },
+  {
+   "name": "Enrollment agreement",
+   "sidebar": "Enrollment agreement population and storage",
+   "state": "orange",
+   "one": "Owns the agreement engine, publish step comes after sign-off",
+   "blockedBy": "lawyer sign-off on the SJ agreement",
+   "column": "sj"
+  },
+  {
+   "name": "Vercel deployment guide for Ant",
+   "sidebar": "Vercel deployment guide for Ant",
+   "state": "blue",
+   "one": "I do not know what this chat is or whether it still matters. Tell me and I will file it or close it",
+   "column": "unsorted"
+  },
+  {
+   "name": "AUTOMATION TEMPLATING II",
+   "sidebar": "AUTOMATION TEMPLATING II",
+   "state": "white",
+   "column": "sales",
+   "one": "Reignition bounced back to its builder. Sales skill and owner approval still under test"
+  },
+  {
+   "name": "GTA enroll funnel bug",
+   "sidebar": "GTA enroll funnel bug",
+   "state": "done",
+   "column": "done",
+   "one": "Fixed and merged. Funnel verified live. Safe to archive"
+  }
+ ],
+ "journey": {
+  "title": "BAM San Jose · road to launch",
+  "note": "Big-bang launch: everything switches on the same day, after you review it all with Lij.",
+  "steps": [
+   {
+    "name": "Academy set up",
+    "state": "done",
+    "detail": "Offers, pricing, brand, policy, 536 contacts syncing"
+   },
+   {
+    "name": "Sales system clean",
+    "state": "done",
+    "detail": "All 6 GTA leaks dead, drips seeded, prices honest"
+   },
+   {
+    "name": "Email live",
+    "state": "done",
+    "detail": "Verified. Sends as BAM San Jose, Gmail untouched"
+   },
+   {
+    "name": "Lij's materials",
+    "state": "active",
+    "detail": "Now the front of the queue: send him the ask-list"
+   },
+   {
+    "name": "Website published",
+    "state": "next",
+    "detail": "Goes live only once everything else is ready"
+   },
+   {
+    "name": "Lawyer sign-off",
+    "state": "waiting",
+    "detail": "Agreement approved, draft banner comes off"
+   },
+   {
+    "name": "LAUNCH DAY",
+    "state": "waiting",
+    "detail": "Flip the switch list: automations, drips, agents, payments"
+   },
+   {
+    "name": "Phone to Twilio",
+    "state": "later",
+    "detail": "Weeks after launch. Runs on GHL until then"
+   }
   ]
+ },
+ "columns": [
+  {
+   "id": "sj",
+   "title": "Get San Jose live",
+   "goal": "Everything that must be true before Lij takes his first real lead"
+  },
+  {
+   "id": "sales",
+   "title": "Sales system",
+   "goal": "Make the free-trial preset hand every academy GTA's system, templatized to them"
+  },
+  {
+   "id": "reviews",
+   "title": "Reviews",
+   "goal": "Connect real Google reviews so no academy ever shows borrowed or invented quotes"
+  },
+  {
+   "id": "twilio",
+   "title": "Twilio",
+   "goal": "Own our own numbers, starting with the TrustHub approval that gates every academy"
+  },
+  {
+   "id": "gta",
+   "title": "GTA landing pages",
+   "goal": "Fix what GTA's own funnel loses before it reaches the pipeline"
+  },
+  {
+   "id": "unsorted",
+   "title": "Unsorted",
+   "goal": "Not yet mapped to a workstream. Drag these where they belong"
+  },
+  {
+   "id": "done",
+   "title": "Done, safe to archive",
+   "goal": "Reported back, nothing left inside"
+  }
+ ]
 }

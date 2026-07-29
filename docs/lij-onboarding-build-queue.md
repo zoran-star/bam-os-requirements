@@ -4,6 +4,602 @@ Live queue of everything the San Jose onboarding surfaces. Onboarding spans days
 
 **Started 2026-07-25.**
 
+## 🚨 PRODUCTION INCIDENT 2026-07-25 to 07-29: THE ENROLLMENT FUNNEL WAS DEAD FOR TEN ACADEMIES, INCLUDING SAN JOSE. FIXED ([PR #1633](https://github.com/zoran-star/bam-os-requirements/pull/1633), merged by Zoran in the enroll-funnel chat 2026-07-29 03:09 UTC).
+
+**Cause:** a commit added `signup_fee_cents: (planFee && opt.feeCharged) ? ... : null` to `buildPricing()` in `api/website/offer.js:226`. **Neither identifier was ever defined.** ES modules are strict mode, so it threw `ReferenceError` on every call, the handler's catch turned it into a 500, and the enrollment page rendered its error screen. **Orchestrator-verified live both ways:** 500 `{"error":"planFee is not defined"}` before the merge, HTTP 200 after, and `byanymeanstoronto.ca/enroll` now serves 200.
+
+**⛔ THE LESSON, AND IT IS THE MOST IMPORTANT ONE IN THIS FILE FOR ANYONE SHIPPING "INERT" WORK.** The feature was carefully verified as **shipped inert** because zero academies had the config to activate it. **The BEHAVIOUR was dead. The undefined REFERENCE fires regardless of config.** A guard that itself throws is not a guard. Several builds in this workstream have been justified as "inert until someone configures it" - that justification is now known to be insufficient on its own.
+
+**⚠️ THE INCIDENT REPORT UNDERSTATED IT TWICE, found by the scan:**
+1. **Not GTA-only. TEN academies were down** - every academy selling a membership: GTA, San Jose, CH3, DETAIL Miami, GAME Winner, Prime By Design, X Basketball Academy, Hoops Made Simple, D.A. Hoops, Elite Smart Athletes. Proven by an A/B on ONE academy on ONE deploy: an offer with 0 membership offerings returned 200, an offer with 3 returned 500. The trigger is **≥1 non-archived `pricing_offerings` row of type `membership` with a non-empty title.**
+2. **It was BLOCKING THE SAN JOSE LAUNCH.** `api/website/build-state.js:113` runs the site readiness check by fetching this exact endpoint, and it fails CLOSED (`ok:false`). `can_verify` requires `readiness.auto.ok`, so **San Jose's site could not have been marked verified at all.** Nobody knew, because nobody had tried yet.
+
+**Also notable:** the sibling additive blocks in that same file are each wrapped in their own try/catch and fail open. **The one broken line sat bare inside the response object literal.** The defensive pattern was applied everywhere except the line that broke.
+
+## ⛔ THREE MORE CRASHES OF THE SAME CLASS, FOUND BY THE SCAN (2026-07-29). NONE ARE FIRING TODAY.
+
+| # | Where | Trigger | Status |
+|---|---|---|---|
+| 75 | `api/website/ch3-slots.js:93` `dateMap` | The calendar returns **zero slots** in the requested window | **Executed: forced it with a past date range, HTTP 500 `FUNCTION_INVOCATION_FAILED` on both calendars.** Latent only because both calendars currently have slots. Parent sees "Could not load times." **The diagnostic written to help debug a misconfigured calendar is the thing that crashes on a misconfigured calendar.** |
+| 76 | `api/automations.js:533` `client` | Any exception in the send path **and** `attempts < 3` | **Read, not executed. Worse than a one-off:** the ReferenceError fires BEFORE `finish()`, so `attempts` never persists; the reclaim sweep flips the job back to pending after 15 min; it increments 0→1 and throws again. **It can never reach MAX_ATTEMPTS so it never gets marked failed** - it recurs forever, and each run skips every job ordered after it in that batch. **Verified NOT firing:** `max(attempts)=0` across `automation_jobs`, zero `failed`, zero `sending`. **Directly relevant to San Jose's drips.** |
+| 77 | `api/tickets.js:574` `pushClient` | Staff clicks Reply on a ticket (`staff_reply`) | Read only, not executed (it is a POST that sends Slack + a client message). **Partial-completion hazard:** the DB write and the Slack post both run BEFORE this line, so the reply IS saved and Slack IS notified, then staff get a 500 and no success toast. Looks like a failure, was a success, invites a duplicate reply. |
+| 78 | `api/website/offer.js:247` | Always | **Executed: the origin check compares against the UNION of every client's `allowed_domains`, never against the requested `client_id`.** I read San Jose's full offer using GTA's origin. Mostly public marketing data, but it also exposes `intake_fields`/`lead_fields`, and the check READS as per-tenant when it is not. SCALE. |
+
+**⚠️ NEW SAN JOSE LAUNCH-LIST ITEM, found while verifying: `clients.allowed_domains` is NULL for San Jose.** Its own domain is not on any allowlist, so a request from `byanymeanssanjose.com` gets 403. It only reads 200 today by borrowing another academy's origin, which is item 78's bug. **Add to item 25's switch list: set San Jose's `allowed_domains` before the site publishes.**
+
+## 📏 THE DURABLE FIX IS NOT "ADD LINTING", AND THE SCAN IS PRECISE ABOUT WHY
+
+**`api/` is not unlinted, it is MIS-linted, and `npm run lint` ALREADY PRINTS `'planFee' is not defined` today.** The config applies `globals.browser` to server code, so `api/` emits **1,225 `no-undef` hits, of which 1,220 are `process` (1,137) and `Buffer` (83)**. The four real bugs are buried in that noise and nothing gates on it. Separately, **all 85 `.ts` files under `api/` have `no-undef` off entirely.**
+
+**So two things must change TOGETHER or the gate is worthless:** add a `globals.node` block for `api/**` (drops it from 1,225 to 5, all real), and enable `no-undef` for `api/**/*.ts` with the TS parser. Then make `npm run lint` a required check. **`npm run build` could never have caught this**: it is `vite build`, which never compiles `api/` (Vercel builds serverless functions separately), which is why the commit could honestly claim the build passed.
+
+**⚠️ AND THE HONEST CAVEAT: a lint gate is necessary and cheap but NOT sufficient.** It catches undefined identifiers. It would NOT have caught `opt.feeCharged.amount` - the same guard-that-throws class, invisible to `no-undef`. **The complementary control is what actually caught this in 30 seconds: a post-deploy smoke probe of the public `api/website/*` GETs asserting 200.** That catches this class regardless of the bug's shape.
+
+**Scan coverage, stated rather than implied:** 320/320 files parsed, 0 parse errors. ESM import/export name check clean. `no-use-before-define` produced 31 textual-order false positives, spot-verified. 12 of 27 `api/website/*` endpoints are GET-capable and all 12 were probed. **NOT covered: 15 POST-only endpoints** (probing them charges cards or sends mail), including `checkout.js`, the actual money POST - read instead, and its Build S variable is correctly scoped. **4 GETs returned 401** (staff-authed). The `/enroll` page itself lives in `bam-client-sites` and was not read.
+
+## ⛔ ITEM 31 IS ITS OWN BUILD, NOT A FOLD-IN (MEASURED 2026-07-28, not estimated). AND IT EXPOSED A SUPPORT-EMAIL HOLE.
+
+The orchestrator asked whether item 31 was cheap enough to fold into the wave now that the migration landed. **The room measured it: diffed GTA's pinned `LOCATIONS` entry against what its row alone produces. NINE fields differed.** Two were genuinely cheap and are BANKED: `online_programs_url` and `referral_offer` now live on GTA's row instead of in code, which is exactly the part the migration unblocked. Nothing a parent reads moved; both locks confirm byte-identity.
+
+**Seven remain, and the blocker is not code:**
+
+| field | pinned today | from the row alone |
+|---|---|---|
+| `email` | info@byanymeanstoronto.ca | **zoran@byanymeansbball.com** |
+| `suffix` | GTA (the gold wordmark) | BASKETBALL |
+| `full` | By Any Means Toronto | By Any Means Basketball |
+| `tagline` | the real one | **no column exists** |
+| `instagram` | the real one | **no column exists** |
+| `city` | Oakville | **empty** |
+| `locationTag` | OAKVILLE · GTA | **empty** |
+
+**⛔ THE SETTLING ONE: removing that entry today would put Zoran's PERSONAL inbox in the footer and the unsubscribe link of every email BAM GTA sends.** `clients.email` is his address, not a support address. Not fixable in code: it needs either a support-email field or his decision about which address parents write to. **Two more are BRAND decisions he must SEE, not be told about:** the gold wordmark would read "BY ANY MEANS BASKETBALL" instead of "BY ANY MEANS GTA", and the unsubscribe line's "you joined By Any Means Toronto" would change.
+
+**Second-order find, worth its own line:** `city` comes out empty because `cityFromAddress` cannot parse "2205 Rosemount Cres" - **and that is the BUSINESS address anyway, not the gym**. So even with a column, GTA's city is wrong at source. The venue lives in the `locations` table now, so the real fix is probably deriving city from the VENUE rather than from `clients.address`. Another decision, not a line change.
+
+**Verdict: planner-plus-gate-1 build. Two new columns for a human to apply, one data fix, two brand calls from Zoran.** Goes to him as its own visual after the wave. **Instead, the cheap half is templating GTA's onboarding step 1 SMS** - self-contained, no migration, no decision, and it removes the other surviving identity discriminator. That rides along with `loadClient()` in one pass.
+
+**⚠️ ORCHESTRATOR ESCALATION, QUERIED FROM PRODUCTION: THE SUPPORT-EMAIL HOLE IS NOT GTA-ONLY, AND GTA IS THE ONLY ACADEMY PROTECTED FROM IT.** GTA's exposure is masked precisely BECAUSE of the hardcode everyone wants to delete. Every other academy has no `LOCATIONS` entry, so whatever the footer reads from the row is what its parents already see today:
+
+- **BAM GTA** `clients.email` = `zoran@byanymeansbball.com` (masked by `LOCATIONS`)
+- **BAM San Jose** = `elijah@byanymeanssanjose.com` (the OWNER's address, on the business domain, not an `info@`)
+- **Pro Precision** = `nathanp@proprecision.com.au` (the owner's personal address)
+- **Locked In Sports** = `info@lockedinsports.com` (correctly a support address)
+
+**✅ VERIFIED BY EXECUTION 2026-07-28. THE ANSWER IS YES, AND IT IS BOTH LINKS.** San Jose's `nurture-4` rendered through the real `renderEmail` path produces:
+
+```
+mailto:elijah@byanymeanssanjose.com
+mailto:elijah@byanymeanssanjose.com?subject=Unsubscribe
+```
+
+Footer region reads `byanymeanssanjose.com · Email` then `You're receiving this because you enquired about By Any Means Basketball. Unsubscribe`. **GTA for contrast, same path: row says `zoran@byanymeansbball.com`, rendered mailto says `info@byanymeanstoronto.ca`.** The hardcode is the only thing between Zoran's personal inbox and every email BAM GTA sends, now proven both ways rather than argued.
+
+**✅ ZORAN'S RULING (2026-07-28): San Jose's email stays `elijah@byanymeanssanjose.com`.** "The only email that should be set for san jose is elijah@byanymeanssanjose.com." So the footer and unsubscribe showing Lij's address is ACCEPTED for San Jose and **this is not a launch blocker**. It also reinforces the existing canonical-domain ruling in item 40.
+
+**⚠️ AND HIS QUESTION EXPOSED THE ROOT CAUSE, ORCHESTRATOR-VERIFIED: THERE IS NO BUSINESS EMAIL FIELD. `clients.email` IS THE OWNER EMAIL.** The portal input bound to it is at `client-portal.html:27327`, sits in the **Staff card's owner block**, is wired to `_bbStaffOwnerChanged()`, and is labelled **`placeholder="Owner email"`**. There is no support, business or contact email column on `clients` at all (the only email-ish columns are `email`, `email_domain`, `email_provider`, `email_setup`).
+
+**So the defect is now precisely stateable: a field the UI calls "Owner email" is published to parents as the public contact address in every academy's email footer and unsubscribe link.** That is why academies filled it inconsistently and both were right by their own reading: GTA holds `zoran@byanymeansbball.com` (correct as an owner email, saved from publication only by the `LOCATIONS` hardcode) while Locked In Sports holds `info@lockedinsports.com` (correct as a public contact). **The column has two meanings and no owner.**
+
+**Status: NOT a San Jose blocker (Zoran ruled), but it IS the thing standing under item 31.** GTA's hardcode cannot retire until the footer stops reading an owner-labelled field, and `fromFor`'s `info@<verified domain>` is the ready-made source. Goes to Zoran with item 31 as one visual, not separately.
+
+**⚠️ TWO LANES, DO NOT CONFLATE THEM.** This is the FOOTER and UNSUBSCRIBE only. **The FROM header is a different mechanism and is already correct:** `fromFor()` in `api/_send.js` builds `info@<verified domain>` and holds the send outright if the domain is unverified. So San Jose's mail arrives FROM `By Any Means Basketball <info@byanymeanssanjose.com>` while the footer invites a reply to `elijah@`. **Item 3's build solved the header and left the body untouched, which is exactly why this survived: the fix looked complete from the outside.**
+
+**THE FIX IS PROBABLY NOT A SCHEMA CHANGE.** `fromFor` already derives `info@<domain>`. The footer could resolve the same way instead of reading `clients.email`, and then **no new column is needed at all.** So the decision to put to Zoran is "reuse the address we already send from" rather than "add a support-email field", which is a far easier call.
+
+**Orchestrator scoping of the real exposure, so nobody over-panics:** only GTA and San Jose have `email_domain` set. Pro Precision and Locked In Sports have it NULL, and under the from-address guardrail their automation email HOLDS rather than sends. So **the live exposure today is San Jose only**, GTA is masked by the hardcode, and the others are not sending this mail at all. It still must be decided before San Jose launches, and it is not San Jose-only in principle.
+
+**SUPERSEDED, kept for the record - this was the open question before it was executed:** whether the email footer and unsubscribe line actually render `clients.email` for a non-GTA academy. The render path is the templating room's and it can answer by executing rather than reading. **If it does, San Jose launches with Lij's own inbox as the address parents reply to** - which may well be what he wants at his size, but it should be a choice rather than a default nobody noticed. **There is no support-email field on `clients` at all**, which is the actual gap underneath both this and item 31.
+
+## ⛔ NO TEST CAN CURRENTLY PROVE WHICH ACADEMY A RENDER BELONGS TO (2026-07-28, EXECUTED). READ THIS BEFORE WRITING ANY IDENTITY ASSERTION.
+
+Answering the orchestrator's question about the parent-facing name, the templating room found something bigger and reported it against its own earlier claim. **All of this is executed, not reasoned.**
+
+**The null answer first, which was the question asked: NOTHING in the leak gate leaned on the parent-facing name.** Its literal list keys on domain, gym, internal label, phone, coach handles and review path. The gate's synthetic non-GTA academy was hardened anyway (it had no `public_name` and rendered "BAM San Jose", which stopped being production the moment Zoran ruled), so every assertion there must now prove itself on details that actually differ.
+
+**Then the real finding: NEITHER LOCK HAD ANY ASSERTION THAT ITS GOLDENS WERE GTA'S RENDER AT ALL.** A check was written keyed on domain and owner as instructed, plus a fourth negative control swapping in San Jose's row and facts and demanding the check catch it. **THE CONTROL FAILED. Both discriminators survive a full row swap:**
+
+1. **The domain survives because of ITEM 31.** GTA is the one academy with a hardcoded `LOCATIONS` entry, and the email FOOTER takes its site from there rather than from the client row. **Swapping GTA's `website_setup.domain` to San Jose's leaves `byanymeanstoronto.ca` in every email.** Item 31 now carries an executed demonstration instead of an argument.
+2. **"Coach Zoran" survives** for the reason in the correction below.
+
+**Consequence, and it governs every future test in this workstream: `_gta-message-lock` and `_gta-step-lock` are STALENESS checks, not identity proofs.** They catch a fact that has stopped rendering. They **cannot** prove the right academy was rendered. The room deleted the failing control rather than leave it passing for a weaker reason, and wrote the whole finding into the test file so the next person does not rediscover it by writing the same broken check. **The note also records that domain and owner do NOT work today, and why**, so nobody re-points an assertion at those and assumes it is solved.
+
+**The identity-discriminator situation, stated plainly: there is currently NO reliable one.** Name is out (GTA and SJ render identically since Zoran's ruling). Domain is out (item 31's `LOCATIONS` fallback). Owner is out (the hand-typed onboarding SMS below). This is fixed by fixing item 31 and the SMS, not by finding a cleverer field.
+
+## ⚠️ CORRECTION, RAISED BY THE TEMPLATING ROOM AGAINST ITS OWN EARLIER CLAIM (2026-07-28), IN ITS NAME
+
+**"GTA is byte-identical to the master" was true ONLY of the four SALES automations, NOT of onboarding.** The room asked for this correction to be recorded rather than quietly amended.
+
+**GTA's `onboarding` step 1 SMS is still a hand-typed wall of GTA literals**: the WhatsApp invite, the online-programs URL, three Instagram handles, the merch shop and the phone number. Templating the welcome EMAIL did not touch it; it is the same content in SMS form, sitting in GTA's row. **It does NOT leak to other academies** (the master's equivalent step is a short generic SMS), so it is **not a San Jose blocker**, but **GTA is not yet fully template-derived** and it is why "coach Zoran" survives a full row swap.
+
+**NEW ITEM, owned by the templating room: template GTA's onboarding step 1 SMS.** Together with item 31 it is what would make a row-based identity check possible at all.
+
+## ✅ DECIDED (Zoran, 2026-07-28): THE PARENT-FACING NAME IS THE **BRAND**, NOT THE LOCATION
+
+Rendering San Jose for review surfaced what no test would have: **every one of its messages said "BAM San Jose" to parents** - our internal label, the exact problem `public_name` exists to fix, sitting unfixed in the academy about to launch, hours after he approved the same fix for GTA.
+
+**His ruling:** San Jose's `public_name` is `"By Any Means Basketball"`, the same string GTA renders. The city lives in the domain and the footer. `business_name` stays "BAM San Jose" so staff still see which academy they are in.
+
+**⚠️ IT REMAINS A PER-ACADEMY RUNTIME FACT AND MUST STAY ONE.** Detail Miami, Pro Precision and Locked In Sports run this same preset and are **not** By Any Means academies. **Two academies sharing a value is not the same as the value being shared.** Orchestrator-verified in production: only GTA and San Jose have a non-null `public_name`; the other academies are correctly NULL.
+
+**⚠️ ORCHESTRATOR CATCH, AND IT IS A HOUSE-RULE-7-CLASS RISK: THE NAME IS NO LONGER A DISCRIMINATOR BETWEEN GTA AND SAN JOSE.** Until today, "BAM San Jose" vs "By Any Means Basketball" distinguished the two academies' rendered output. **They now render the identical string.** Consequences, which apply to every future test, fixture and leak audit:
+- **A harness that renders GTA's row while claiming to render San Jose now passes any name-based check.** That is precisely the "passes for the wrong reason" failure, and this workstream has already been bitten by it twice.
+- The existing leak audits still hold, but only because they keyed on **domain, owner and city**, not on name.
+- **Standing instruction: never use the parent-facing name as the identity discriminator in an assertion.** Use `email_domain` (`byanymeanssanjose.com` vs `byanymeanstoronto.ca`) or `owner_name` (Elijah De Guzman vs Zoran Savic). Both were verified live and both still differ.
+
+**CHANGES ANOTHER CHAT'S WORK:** SJ's `clients.public_name` moved from NULL to a value, so anything rendering or asserting against San Jose's name now gets a different string.
+
+**Noted, not new work:** the render's own "did not render" block reports San Jose has no footer Instagram and no tagline, and **neither has anywhere to be stored**. Same hole as the hardcoded-wordmark SCALE item, one layer down.
+
+## ✅ [PR #1627](https://github.com/zoran-star/bam-os-requirements/pull/1627) READY FOR ZORAN (2026-07-28, head `7fe2683`). THE INDEPENDENT TESTER FOUND SEVEN DEFECTS, TWO WOULD HAVE SHIPPED TO SAN JOSE ON DAY ONE.
+
+**This is house rule 1 paying for itself in a single run.** The tester built none of the code and the builder built none of the tests. **Both live defects were CREATED BY the promotion of those templates to `shared`** - that is, by the very act of making them travel, which is precisely the risk this workstream carries and precisely what a self-review would have rubber-stamped.
+
+1. **The review email seeded ON and asked for a Google review with no link.** SJ has `google_review_url: null`, so a member would have got three paragraphs asking for a review and no way to leave one. `dropEmptyShellLinks` correctly removed the dead button; **nothing removed the sentences around it.** The empty-after-merge guard in `_send.js` could not catch it because it returned "not empty" for ANY `template:` ref **by definition**. It now asks the resolved content, and the review template returns nothing when there is no link.
+2. **The schedule SMS would have texted "LOCATION: 1051 W San Fernando St" and nothing else**, five minutes after a San Jose member paid. The all-empty case was handled; **the HALF-empty case was not, and the half is exactly the state San Jose is in**: a gym on file, zero sessions entered.
+
+**Five more, all fixed:** the slot query had no lower time bound and would have frozen on a dead timetable at ~500 lifetime slots · an unrecognised `clients.time_zone` silently emptied the schedule and now fails CLOSED with a warning (**⚠️ Pro Precision is this waiting to happen**: zone says Toronto, address is Australia, see item 74) · **the in-portal preview an owner APPROVES from was rendering a different email than the send** · `scheduleText` could disagree with the email table despite a comment promising it could not · the fixture's facts block was un-recapturable and unchecked.
+
+**93 checks green across five files, three negative controls still catch, GTA byte-identical through all seven fixes.**
+
+**PROVENANCE THREAD PARTLY CLOSED, EARLIER THAN PLANNED.** `render-messages.mjs` now BUILDS the facts block by calling `_academy-facts.js`, the same function the send path calls, so that part of a snapshot is DERIVED rather than typed, and the step lock asserts venue, schedule and coach handles all reach a rendered message. **Deleting the block was always catchable; drift was not, because both sides moved together.** The general mechanism is still deliberately unbuilt, still waiting for the San Jose re-capture to supply a real second caller.
+
+**NEW ITEM, deliberately not fixed, SCALE:** the email shell renders a hardcoded "BY ANY MEANS" wordmark and `<title>` for every academy, so **a non-BAM-branded academy wears our brand.** Pre-existing; `form-intro-automations.js` already concedes it in a comment. Bites at the first non-BAM academy, not at San Jose.
+
+**⚠️ ORCHESTRATOR CHECK ON RULE 2, stated plainly rather than left for a room to discover: THERE IS NO PORTAL PREVIEW FOR THIS PR.** Vercel's `bam-portal` build reports "Canceled by Ignored Build Step" while 59 of the 106 changed files live in `bam-ghl-agent/bam-portal`. So **Zoran's gate on #1627 CANNOT be a click-through of the deployed portal.** It is a review of the rendered messages plus the committed suite. Anyone who later plans a hands-on test script against a preview URL for this PR will find nothing running the new code.
+
+## 📋 THE AGGREGATE FIELD SHAPE (testimonials room, 2026-07-29). For the templating room's single card pass.
+
+| column | type | notes |
+|---|---|---|
+| `google_rating` | `numeric(2,1)` | 1.0-5.0. Empty = no rating renders anywhere |
+| `google_review_count` | `integer` | >= 0 |
+| `google_rating_checked_at` | `timestamptz` | When the figures were read off Google |
+
+**Three constraints, all in the migration, none needing card logic:** range guards on each, and **both-or-neither** - rating and count must both be set or both be null. **Half a fact ("4.9 stars" with no count) reads as a whole one next to a parent's decision**, and "is there a rating to show" must have exactly one answer.
+
+**Card requirements, mostly labelling:** label it as **a reading with a date, never as current or verified** ("Google showed 4.9 from 67 reviews on 29 Jul", not "Google rating: 4.9") · the two numbers are **one field to a human**, entered and cleared together, with `checked_at` stamped by the writer · read-only is defensible since the skill populates them, and if editable, the both-or-neither constraint needs handling rather than a raw error. **No reader, no render change, nothing consumes these yet** - deliberately, because a reader shipped ahead of its data is the inert-until-configured argument the enroll incident retired.
+
+**⚠️ THE HONESTY RISK CHANGED SHAPE, and the room caught it rather than declaring victory.** Zoran ruled the skill should pull reviews via **Claude in Chrome** from his own signed-in owner view - no API key, no billing, no Google approval, and not capped at the 5 reviews the Places API returns. **But a browser reading is not a sync. It is a POINT-IN-TIME SNAPSHOT that goes stale silently the moment the next review lands.** So the risk moved from "a human typed it and the card implies we verified it" to **"we did fetch it, which makes it look current when it may be weeks old"**. Written into the column comments rather than left for the card to get right.
+
+## ⛔ SUPERSEDED BY ZORAN (2026-07-29): **`align-core-data-model` IS OFF ENTIRELY FOR THIS WORKSTREAM, NOT JUST FOR THREE COLUMNS.**
+
+His words: **"ignore fc core services and align data model and tell mister orchestrator to do the same"**.
+
+So the orchestrator's case-by-case waiver below is moot: **no `fc-core-srvc` checkout, no alignment step, for schema work in this workstream.** The escalation to chase Luka for repo access is **dropped from Zoran's list** on the same instruction, recoverable if anyone wants it back.
+
+**⚠️ A DOCS CONTRADICTION NOW EXISTS AND SOMEBODY SHOULD CLOSE IT DELIBERATELY.** The repo `CLAUDE.md` still says *"Backend or persistent-data changes: use the `align-core-data-model` skill"*, and the skill is still installed. **Zoran has overridden that instruction verbally for this work.** The file now contradicts the standing instruction, which means the next session, or Cole, will read the file and follow the rule Zoran just switched off. **Whether that override is workstream-scoped or repo-wide is a question for Zoran, not something to infer** - the file is shared and changing it affects every future session. Raised, not resolved.
+
+## ⏸ SUPERSEDED, kept for the reasoning: ORCHESTRATOR RULING: **`align-core-data-model` WAIVED FOR THESE THREE COLUMNS. Recorded as an explicit exception, not a skip.**
+
+**The blocker is real and I verified it:** there is **no `fc-core-srvc` checkout anywhere on this machine**, so the skill stops at its first step. This matches the standing item *"Ask Luka for fc-core-srvc repo access for zoran-star - core parity review stuck since Jul 10."*
+
+**The ruling:** three **additive, nullable** columns on an existing tenant table, introducing **no new entity, no new relationship, no status or workflow, and no tenancy change**, is the lowest-risk category the skill exists to govern. Blocking a build on access that has been stuck for three weeks costs more than the parity review buys here. **Proceed, apply the migration, and log it for a retro-parity pass when access lands.**
+
+**⚠️ THIS IS THE SECOND THING THAT `fc-core-srvc` ACCESS HAS NOW BLOCKED.** It stopped being a nice-to-have the moment it started gating builds. **Escalated to Zoran as a one-message ask to Luka**, because that is a cheaper fix than continuing to waive the rule case by case. **If a third build hits it, stop waiving and escalate harder** - a rule waived three times is a rule nobody follows.
+
+**⚠️ A SCALE QUESTION NOBODY HAS ASKED, raised by the Chrome decision:** pulling reviews through a signed-in OWNER browser works beautifully for GTA and San Jose because Zoran has owner access to both. **At academy #10 or #50, it requires BAM staff to hold owner access on every academy's Google listing, or the owner to sit and do it.** That is a real onboarding prerequisite, not a technical detail, and it belongs on the ask-list template rather than being discovered per academy. **Not blocking; flagged now while it is cheap.**
+
+**Zoran's other rulings:** **San Jose uses its OWN listing only** (By Any Means San Jose, 5.0 from 22); prior-business reviews are NOT used. **The gather is STAFF work, not owner-facing** - staff paste the link, the skill scrapes it - **which collapses the 30-minute cost entirely**, since there is no owner chase. **Approval in chat is a HARD GATE, not a step:** nothing reaches `testimonials` without a recorded human approval, and truncated reviews are shown as TRUNCATED and cannot be approved until complete.
+
+## ✅ DECIDED (Zoran, 2026-07-29): **SPLIT BUSINESS CONTACT FROM OWNER CONTACT, FOR BOTH EMAIL AND PHONE.** This is the fix that unblocks item 31.
+
+His words: *"in one of the chats i talked about setting up a business email section separate from the owner email section - i want the same thing for phone numbers - also make sure that chat builds that build out and seeds the right info for gta and san jose"*
+
+**This closes the root cause found earlier today:** `clients.email` is labelled **"Owner email"** in the portal (`client-portal.html:27327`, in the Staff card's owner block) and is simultaneously **published to parents as the public contact in every email footer and unsubscribe link.** One column, two meanings, no owner. GTA is masked from the consequences only by the `LOCATIONS` hardcode - which is exactly why **item 31 could not proceed**: deleting that entry would put Zoran's personal inbox in every GTA email.
+
+**With a business email field, item 31 stops being blocked on a decision and becomes ordinary work.**
+
+**The same split applies to phone**, and San Jose is the proof case: **zero phone numbers on any `client_users` row**, so every owner-notification guardrail is silently inoperative (item 39).
+
+**SEED VALUES. Zoran-confirmed for the personal number; the rest to be confirmed before writing.**
+
+| | Owner contact (notifications) | Business contact (public) |
+|---|---|---|
+| **San Jose** | Lij, **+1 (408) 425-7251** ✅ confirmed by Zoran | **408-597-4327** (on its Google listing; Zoran to double-check against GHL) |
+| **BAM GTA** | Zoran, `zoran@byanymeansbball.com` | `info@byanymeanstoronto.ca` (currently hardcoded in `LOCATIONS`) · phone **(289) 816-6569** (from its Google listing, orchestrator-verified) |
+
+**⚠️ ROUTING, AND THE COLLISION RULE THAT COMES WITH IT.** Two rooms now want to change `clients` and both would touch the Business Basics card. **That is the exact duplicate-dispatch failure a previous orchestrator made.** The split:
+
+- **AUTOMATION TEMPLATING owns `business_email` + `business_phone`**: schema, the Business Basics card UI, wiring the email footer and unsubscribe to read business rather than owner, seeding GTA and San Jose, and the item 31 unblock. **It was Zoran's own chat for this thread and it owns item 31 and `email-shells.js`.**
+- **TESTIMONIAL CONNECTION owns `google_rating` + `google_review_count`** and brings its columns to the orchestrator. **It does NOT touch the Business Basics card.** Templating adds those two fields in the same card pass so the card is edited once by one room.
+- **Migrations are additive `add column if not exists`, so separate files are fine.** The contested surface is the CARD, not the schema.
+
+## ✅ TESTIMONIALS GATE 1 PASSED (2026-07-29). THREE ZORAN DECISIONS.
+
+**Production state, read not assumed:** all five migration gaps shipped and the blocking bounce is genuinely closed. `testimonials_guard_source` now raises when a **non-staff** caller sets `rating`, `external_id`, `review_created_at` or `synced_at` on a typed row, on **both INSERT and UPDATE**, and google rows are read-only except `starred`. **The fabricated-rating hole is enforced in the database, not in prose.** Table live and EMPTY. **GTA's `google_review_url` is already populated** (`https://g.page/r/CfuIFvZGkfmaEBM/review`); **San Jose's is NULL**. Both academies' `public_name` reads "By Any Means Basketball".
+
+### 1. ⭐ THE AGGREGATE SPLITS FROM THE QUOTES (new ruling, needs schema)
+
+**The problem put to him:** GTA has 4.9 from 67 real reviews, but hand-copied quotes enter as `manual`, and his own locked rule forbids a typed quote from wearing a rating. **So the honest page looks WEAKER than the fabricated one it replaces.** That is the real tension, stated plainly rather than designed around.
+
+**His ruling: the quotes stay plain and the RATING IS REAL.** The 4.9 and the 67 become **ONE fact on the academy's row**, entered by staff from the owner's own Google dashboard, publicly checkable in five seconds. **He explicitly did NOT take the option of badging copied quotes as Google reviews.** The hierarchy is untouched: a typed quote still never wears stars, a badge or a date.
+
+**⚠️ NEEDS SCHEMA, NOT LANDING UNILATERALLY: two columns on `clients` (rating + review count), staff-entered.** The room will run `align-core-data-model` and bring the shape to the orchestrator first. **`clients` is the table three workstreams already converge on**, so this gets a collision check before it is applied.
+
+### 2. ✅ SKILL PLACEMENT CONFIRMED BY ZORAN, with two reasons the rooms had not given
+
+Branding deck gathers, sales system consumes. **The templating room reached this independently on engineering grounds; Zoran has now confirmed it with two additional reasons, so it is a locked ruling rather than a room's judgement call:**
+- **An academy's testimonials serve EVERY sales system, not just the free trial.** Gathering inside the sales skill means sales system #2 either re-asks or forks - **his own no-fork rule, applied at the skill layer.**
+- **The drop rule is enforced at SEED time, and the sales skill IS the seeder.** So the store must be populated BEFORE it runs, or the step drops and needs re-seeding later. **Ordering, not preference.**
+- Skill 1 already reviews the academy's old site and assets, which is exactly where existing reviews live, and it runs first.
+
+**📌 LANGUAGE RULE, adopt everywhere: Zoran did NOT recognise "skill 1 / skill 3" as labels and asked what they meant.** Use plain names with him from here: **"the branding deck one", "the free trial system one", "the member management one"**. Numbered skills are internal shorthand and should not reach him.
+
+### 3. SAN JOSE: THE HOLE IS CLOSED, AND THE ANSWER IS YES
+
+Lij has an existing listing. **San Jose does not stay empty: it gets real reviews that are genuinely his, treated exactly like GTA's.** Nothing San Jose-shaped gets built until the link is in hand, and **if it turns out thin or unusable the standing "San Jose stays empty" ruling reasserts itself rather than being overridden by this answer.** That is the right default.
+
+**⚠️ ORCHESTRATOR CORRECTION, MATERIAL: THERE ARE TWO POSSIBLE LISTINGS AND THEY ARE NOT EQUIVALENT.** I verified a listing called **"By Any Means San Jose", 5.0 from 22 reviews**, place id `0xa1f5ff551d480055:0x5722cbf91f43764a`, pointing at byanymeanssanjose.com. **That is San Jose's OWN listing and those are San Jose's OWN reviews.** A listing under a PRIOR business (3D Sports Prep or similar) is a different thing: real reviews of Lij's coaching, but **written about a different business entity.** **Prefer the By Any Means San Jose listing.** Reviews from a prior business are not automatically this academy's, and presenting them as such is a softer version of the exact substitution this workstream exists to prevent. If Zoran wants prior-business reviews used, that is a decision he should make explicitly.
+
+### ⚠️ HELD FOR LATER, RAISED BY THE ROOM: once GTA's cards carry its real quotes, **the same three testimonials exist in two versions - GTA's true ones and Miami's rewritten copies.** Miami keeps its fabricated cards under Zoran's earlier "leave until connected" ruling, so the divergence is deliberate. **Worth re-asking him once GTA's are honest**, because the comparison becomes visible in a way it was not before.
+
+## ✅ ROUTING DECIDED (templating room, 2026-07-29): **THE TESTIMONIAL GATHER GOES IN SKILL 1 (BRANDING DECK). ONE GATHER, TWO CONSUMER SLOTS.**
+
+**The reason is structural, not aesthetic, and it is the good kind of argument.** Testimonials are read by things in **two different skills**:
+- `nurture-3` and the agent's `social_proof` fact → **skill 3, sales system**
+- `onboarding-testimonials` (golden at `api/__goldens__/bam-gta/markup/onboarding-testimonials.html`) → **skill 4, member management**
+
+**So a gather step inside skill 3 would mean skill 4 could never run without skill 3 having run first.** The four-skill split exists precisely to keep them independently runnable - the same reasoning that put GHL migration at position 3 because it depends on nothing. A gather in skill 3 would create **the first hard ordering dependency between two skills**, and it would surface to a user as "why is member management asking about reviews".
+
+**The table's shape agrees:** `testimonials` is keyed on `client_id` with `quote, author, source, rating, starred, external_id, review_created_at, synced_at`. **Academy-level, not offer-level and not preset-level - an asset store, not a sales-system artifact.** Already shaped for the deferred Google sync, so hand-seeding now and syncing later is the same table with no migration.
+
+| Slot | Skill | What |
+|---|---|---|
+| **GATHER** | **1, branding deck** | Collect and validate, owner-facing, once |
+| Consumer | 3, sales system | Enable `nurture-3` when real testimonials exist, plus the `social_proof` renderer |
+| Consumer | **4, member management** | The 7-vs-8 onboarding step gap |
+
+**⚠️ TWO CORRECTIONS TO THE ORCHESTRATOR'S FRAMING, both of which reduce collision surface:**
+1. **The missing eighth step lives in the ONBOARDING automation, which is SKILL 4 - the orchestrator's own backlog item - NOT skill 3.** So closing that gap never touches the sales-system spec. **The only thing that touches skill 3 is the `social_proof` renderer, which is a consumer and not the gather.**
+2. **`social_proof` is the ONE agent fact of nine with NO renderer at all**, deliberately excluded until real reviews exist (`api/agent/fact-render.js:509` says so in place, and it is why the brain-health strip reads "8 facts" rather than 9). **The testimonials build makes that renderer buildable for the first time.**
+
+**⚠️ COST TO NAME TO ZORAN, against his 30-minute budget:** skill 1 currently ends at the owner approving a brand board on staging. **A gather step adds an owner-facing collection task to the EARLIEST skill, and chasing real reviews out of a new academy is not a two-minute job.** It belongs there structurally, but it is **the one place this lengthens the critical path rather than running in parallel.**
+
+## ✅ REIGNITION SHIPPED, MIGRATION APPLIED TO PROD (2026-07-29, at Zoran's request). **Orchestrator-verified independently:** `ignition_campaigns` and `ignition_roster` both exist. Also confirmed unchanged in the same query: 10 non-shared `sync_class` rows, **1 disabled step (San Jose's held `nurture-3`)**, and `testimonials` still empty at 0 rows. The owner approval gate is through round 6 with **62 negative controls**; branch caught up with main, 0 behind.
+
+**Two outstanding for Zoran, neither for a room:** an iOS push behaviour question, and **Cole's inbox migration is still PENDING and was deliberately NOT applied.**
+
+## ⚠️⚠️ CORRECTION TO A LOAD-BEARING ASSUMPTION (orchestrator-verified 2026-07-29): **SAN JOSE HAS 22 REAL GOOGLE REVIEWS AT 5.0. IT IS NOT REVIEWLESS.**
+
+The queue has repeatedly said *"San Jose cannot be usefully connected at all yet: unlaunched, no review history"*. **That is FALSE.** Verified in the browser against the live listing Zoran supplied:
+
+| Fact | Value |
+|---|---|
+| Listing | **By Any Means San Jose**, Sports club |
+| Rating | **5.0 from 22 reviews** |
+| Website on listing | byanymeanssanjose.com |
+| **Phone on listing** | **+1 408-597-4327** |
+| Place id | `0xa1f5ff551d480055:0x5722cbf91f43764a` |
+
+**Why this matters more than it looks:**
+1. **The "SAN JOSE STAYS EMPTY" ruling was never about San Jose having nothing to say - it was about not giving it SOMEBODY ELSE'S words.** San Jose having 22 of its own real reviews satisfies that ruling's intent completely. **The ruling stands as written (never preset another academy's quotes) and simply no longer bites**, because SJ can be seeded from its own.
+2. **It unblocks `nurture-3` for San Jose with genuine content.** That step is `enabled:false` precisely because it carries GTA's real parents' testimonials attributed via `{{location.city}}`. With real SJ testimonials in the table, the launch switch list item becomes doable rather than aspirational.
+3. **⚠️ A NEW FACT NOBODY HAD: San Jose has a business phone, +1 408-597-4327**, published on its own Google listing. The queue records **zero phone numbers on ANY San Jose user** (all four `client_users` rows null, `staff_notify_phone` null) which makes every owner-notification guardrail inoperative for SJ (item 39). **This is a candidate value for that gap and it is NOT the number already on file** (Lij's personal +1 408 425-7251, recorded in item 40). **Do not write it anywhere without confirming with Zoran which number should receive owner alerts.**
+
+**What Google's own summary says SJ's reviews are about**, useful for whoever drafts its messages: fundamentals and form, game-based situations, basketball IQ, coaches connecting with players across ages and skill levels, customized workouts, and confidence.
+
+**⚠️ SAME EXTRACTION WALL AS GTA:** only 3 of 22 loaded on the public page and **none of them complete** - Google truncates with a "See more" that resists script clicks, real mouse clicks and dispatched events alike. **The route that works is the OWNER view (Manage your Business Profile → Reviews), which shows full text untruncated.** Recorded so the testimonials chat does not spend a session rediscovering it.
+
+## 🔥 REIGNITION DESIGNED (Zoran, by Q&A, 2026-07-29). Plan `docs/plans/ignition-template.html`, awaiting his workshop.
+
+**Shape:** a preset-attachable pipeline stage (`role: reignition`, exits point at ROLES - replied → responded, ran_out → nurture - **so it bolts onto free_trial, discovery_trial and any future preset unchanged**) plus a campaign object. Staff hand-picks a roster (**MANUAL enrolment, repeatable, NO automatic tag audiences**), writes 1-3 fresh messages per campaign, per-campaign channel mix, staff-only approval for now, **paced admission (default 15/day) AT THE DOOR** so the existing send machinery and every one of its guards applies untouched - **no parallel send path.** Hard non-overridable exclusions: members, active-in-stage, unsubscribed/complained, no consent, no contact info. **Two new tables (`ignition_campaigns`, `ignition_roster`), one admissions cron, one stamped stage. Everything else reuses the worker, renderer and locks whole.**
+
+**This is the flow `summer_special` was parked against.** That accepted divergence now has a home; it should be reconsidered when reignition lands rather than staying parked forever.
+
+**⚠️ ORCHESTRATOR FLAG 1, AGAINST A LOCKED DECISION: the first real run is SAN JOSE'S 65 IMPORTS, and the standing rule on those is stricter than "staff picks the roster".** The locked wording is: *"65+ imported leads have NO import quarantine. Never mass-enable automations on them without **Zoran naming who may be contacted**."* The design satisfies the MECHANISM beautifully (manual roster, no tag audiences, paced admission), but the rule names **Zoran**, not staff generally. **So the SJ first run needs his explicit sign-off on the actual roster, as a one-off, even though staff-approval is the standing model.** Recorded so nobody reads "staff-only approval" as having replaced it.
+
+**✅ FLAG 2 EXECUTED, AND THE ANSWER IS A THIRD OPTION: IT COULD NOT FAIL OPEN OR CLOSED, BECAUSE THE FIELD IT WOULD TEST DOES NOT EXIST.**
+
+**Traced, not argued.** The only exclusion-shaped column on either contact store is `dnd boolean NOT NULL DEFAULT false` (`contacts` and `ghl_contacts`), populated from GHL's own DND settings at sync (`cron-sync-contacts.js:132`), recording **OPT-OUT ONLY**. Both schemas were searched for consent / opt / unsub / complain shapes and `dnd` is the entire result. **The contacts-store backfill bakes `coalesce(gc.dnd,false)`, so absence of data IS the contactable value by construction.** Live: San Jose has 547 mirrored contacts, 51 with `dnd=true`.
+
+**So the draft's "no consent on file → excluded" rail was UNIMPLEMENTABLE as written, and implementing it against `dnd` would have waved through every import that never explicitly opted out** - the exact fail-open, confirmed by execution rather than reasoning.
+
+**Design change, already committed:** the automatic rail now claims only what is real (`dnd=true`, unsubscribed, complained). Positive consent becomes a **per-campaign CONSENT BASIS**: a human writes down where the roster's leads came from and why we may message them, it is recorded on the campaign, and **the dry run displays it beside the roster.** An attestation that is honest, rather than a checkbox that lies. Future: stamp a consent source on new leads at capture so it becomes data over time.
+
+## ⚠️ CROSS-CHAT CONSEQUENCE OF THAT FINDING, ROUTED BY THE ORCHESTRATOR: **WE STORE NO POSITIVE CONSENT RECORD ANYWHERE, AND THE TWILIO TRACK DEPENDS ON ONE.**
+
+This is not a reignition gap. **It is system-wide and it was found by accident.** Every academy's messaging runs on an opt-out-only model.
+
+**Why it lands on the Twilio track specifically:** A2P campaign registration requires describing **how consent is collected**, and carriers can ask for evidence of it. Lij's ask-list already carries *"opt-in language + 2 sample texts"*, which is the same subject arriving from the other direction. **Nobody had connected the two.** The registration answer needs to be truthful about what we actually capture, and today what we capture is: nothing positive, only DND mirrored from GHL.
+
+**Not raised as a blocker and NOT a legal opinion.** Stated as a fact the Twilio submission needs to be built on rather than discover: **there is no consent record to point at.** The reignition design's per-campaign consent basis and a future consent-source stamp at capture are the two things that would change that, and the funnel forms are a genuine basis already, just unrecorded.
+
+**⏸ SUPERSEDED, the original question:** Imported GHL leads are exactly the population least likely to carry a consent record, because consent was captured (or not) in someone else's system. **If the exclusion tests a consent field that is simply ABSENT on imports, an exclusion written to protect them may pass every one of them through.** That is the fail-open pattern this project has been bitten by repeatedly. It must be traced to output and proven to fail CLOSED before the first campaign runs, and the first campaign is the SJ 65. Not asserted here as a defect - flagged as the question that must be executed.
+
+**His other rulings this session:**
+1. **Core site build has NO owner gate** - the team approves in the workshop session. **The owner approves exactly TWICE in the whole onboarding: brand board, and sales messages.** That is a strong, quotable simplification of the whole onboarding and is worth holding onto when anyone proposes a third approval.
+2. **Sites keep building off the GTA kit for now.** His words: *"doesn't matter too much right now because we have staff constructing the site"*. A real template library (full page / section / component tiers) is a FUTURE design he wants: **backlog line, not scoped.** Registry beginnings already exist in `bam-client-sites` (`system/components/REGISTRY.md`, 2 entries).
+3. **Program pages: one page per class in the offer** (`offers.data.schedule.classes[]`). The sales system build reads the offer to decide which pages exist. **GTA is the messy precedent** (classes "Group 1/2" against marketing pages Elementary/HS/ADAPT); **the fix is a naming convention at onboarding, not code.**
+4. **GHL migration's stage mapping must be a best guess workshopped with staff on an editable mockup, NEVER auto-applied.**
+
+## ✅ SUPERSEDED BY FOUR SKILLS (Zoran, 2026-07-29). Replaces the three-skill cut below AND the WS4 five-runbook cut.
+
+| # | Skill | Scope |
+|---|---|---|
+| 1 | **Branding deck** | Reviews their old site + branding assets. Staff + skill pass in localhost |
+| 2 | **Core site build** | Takes the deck, creates the core sites in localhost with staff |
+| 3 | **Sales system build** | The ENTIRE free-trial system in ONE isolated skill: funnel websites, automations, emails, nurture |
+| 4 | **Member management build** | Agreement + enroll funnel + onboarding automation + member emails (welcome / receipt / reschedule) |
+
+**His stated reason for isolating skill 3: MORE SALES SYSTEMS ARE COMING, each needing its own build process.** One skill per sales system, shared machinery underneath. **That is the no-fork guardrail applied at the skill layer**, and it is a better articulation of the rule than the queue had: the thing that forks is the SKILL, not the machinery.
+
+**📌 SKILL 4 IS A NAMED ORCHESTRATOR BACKLOG ITEM, assigned by Zoran directly.** His words: *"will leave it as a backlog item for mister orchestrator to build after i am truly comfortable with the sales system preset being plug n play"*. **Its trigger is a judgement of HIS, not a date and not a dependency**: it starts when he is satisfied the sales preset is genuinely plug and play. Do not start it early, and do not let it drift off the list because it has no deadline.
+
+**Two clarifications he answered by popup:** transactional emails split by **which system SENDS them** (trial booking confirmation + reminder go into the sales build; welcome / receipt / reschedule park with skill 4), and **localhost workshops are STAFF-ONLY, the owner approves on staging.**
+
+**WS4 family consequences:** `/site-build` splits (core phase becomes `/core-site-build`, sales phase folds into `/sales-system`) · `/email-templates` shrinks to the member emails and parks with skill 4 · `/agreement` parks with skill 4 but **keeps working as-is meanwhile** · `/branding-deck` unchanged.
+
+**Build list after his gate 1:** A = the `/sales-system` skill · B = ONE owner approval step now, the sales one (the member one parks with skill 4) · C = the site-build re-run guard for the website-fix collision.
+
+## ⛔ LIVE HOLE FOUND AND FIXED (`cd49fef`, 2026-07-29): A BODY EDIT SILENTLY DECLASSIFIED A STEP FROM `attributed` TO `shared`. IT INVALIDATED AN ASSUMPTION THE WHOLE `sync_class` DESIGN RESTED ON.
+
+`resolveSyncClass` takes the strictest of a row's own class and the class of the template its body references. **The seeder never wrote a class on the row**, so the template reference was carrying the ENTIRE answer. **The moment a body stopped being exactly `template:<key>`, the step resolved `shared` - copyable.** An academy's real parent testimonials, **one body edit away from being copyable to every other academy**, with the row looking completely ordinary.
+
+**Executed before the fix, all four resolved `shared`:** a literal body, an empty body, a null body, and `Template:nurture-3` with a capital T.
+
+**Fixed:** the seeder now stamps `resolveSyncClass(step)` on every row, **all 10 non-shared rows across both live academies were backfilled from their bodies**, San Jose's `nurture-3` verified still `enabled:false` after. **Orchestrator-verified in production: 10 non-shared steps, 1 disabled step.** One existing assertion was deliberately REVERSED (it asserted no class was written, which was right yesterday and wrong today) and it caught the change immediately, which is the suite working. Eight new assertions cover the four laundering shapes. Suite 7 of 7 green, eight negative controls across two suites catching.
+
+## 📏 THE GENERAL LESSON, AND IT POINTS STRAIGHT AT AN ORCHESTRATOR ACTION: **APPLYING A MIGRATION SILENTLY PROMOTES EVERY "DO X ONCE MIGRATION Y IS APPLIED" COMMENT INTO AN OUTSTANDING DEFECT.**
+
+The seeder's own comment prescribed persisting the class and deferred it *"once that migration is applied"*, because an unknown column would have 400'd the whole insert. **I applied that migration earlier the same day. The comment went stale the moment I did, and nothing connected the two.** No test could see it because both sides of the comparison agreed. **This is a standing duty on whoever applies a migration: sweep for deferred TODOs that the migration just activated, in the same breath.**
+
+**✅ SWEEP DONE (orchestrator, 2026-07-29). TWO hits on main, and only one was ever a defect:**
+- `api/agent/seed-automations.js:104` - **the defect above. Fixed.**
+- `api/action-items.js:301` - **SAFE, and the distinction is worth keeping.** It is a runtime try/catch that degrades to `{}` if `onboarding_calls` does not exist, so a code deploy ahead of the SQL cannot break the checklist. **Orchestrator-verified: `onboarding_calls` exists in production, so the guard is now simply inert.**
+
+**⚠️ THE REFINEMENT THAT MAKES THE RULE USABLE: only comments that DEFER AN ACTION become defects when the migration lands. Comments that DEGRADE GRACEFULLY do not.** "Persist this once the column exists" is a landmine. "Fall back to empty if the table is missing" is a guard. Do not let a future sweep flag every migration-referencing comment and cry wolf.
+
+## ✅ DST SCOPE CLOSED WITH EVIDENCE (2026-07-29): **contained to reignition, no broader fix.**
+
+`startOfDayIso` is defined once (`api/agent/reignition.js:87`) and imported by exactly two files, both reignition's own. **No caller outside the build.** The room then looked for the same BUG rather than the same function, which is the better question: four other files do hand-rolled start-of-day maths (`api/marketing.js:262-263`, `api/calendar/events.js:113`, plus some `src/` views), **but all use `setHours(0,0,0,0)` on SERVER-local time and none reads `clients.time_zone`.** They are not attempting per-academy local midnight, so they cannot get it wrong.
+
+**📌 ITEM 82, SCALE, one line, deliberately not scoped:** those four files compute "today" in **server-local time** (Vercel, effectively UTC) rather than the academy's. The room correctly declined to open it inside a reignition build. **Whether server-local is the right basis for a marketing due-date is a real question with a small blast radius** - a due date can roll while it is still the previous day for a Toronto or San Jose academy. Logged so it is not rediscovered; not queued for work.
+
+## 📏 AMENDMENT, FROM INSTANCE FIVE: **WIRING A WEAK TEST INTO CI IS WORSE THAN LEAVING IT UNRUN, BECAUSE UNRUN IT WAS HONEST ABOUT BEING UNRUN.**
+
+The room's words, and they correct my own CI write-up from hours earlier. **E's new webhook check pins the role SET but not the operator, the negation or the destination.** The tester ran the full suite against five mutations and **ALL FIVE SHIP GREEN**: negating the whole condition (every booked, won or scheduled lead yanked to Responded on any reply), `&&` instead of `||` (nobody ever bounces, **every academy**), `if (false && ...)`, repointing `role:"responded"` to `"nurture"`, and dropping the `provider === "portal"` guard.
+
+**So CI now runs a suite that will be quoted as proof the reply path is safe, and it proves only that four string literals appear on one line** - on the one file set where a mistake reaches every lead of every academy. **The pattern arriving inside the very mechanism built to fix the pattern.** Fix instructed: assert the condition line equals the expected literal, or diff the four files against `origin/main` and assert the only delta.
+
+## ✅ THE ANTIDOTE, NAMED (build B's builder, 2026-07-29): **AN ENFORCED INVENTORY INSTEAD OF A COMMENT.**
+
+B's builder found a **THIRD** renderer (`api/agent-confirm.js:522/533`, the confirm agent rendering scripted messages directly). Rather than weaken the "one render path" claim or quietly note the exception, **it converted the comment into an enforced inventory: a new renderer FAILS the check, and a stale exception raises a note.**
+
+**That is the general antidote to the whole pattern.** Every instance so far has been a claim that was true when written and unconnected to whether it stayed true. **An inventory that fails when reality diverges is a claim that maintains itself.** Prefer it anywhere a comment currently asserts "this is the only X" or "X never happens".
+
+## 📏 NEW RULE (2026-07-29): **AN EQUIVALENCE TEST ANCHORS NOTHING. TWO CALLERS OF THE SAME FUNCTION AGREE EVEN WHEN THE FUNCTION IS WRONG.**
+
+**This one is the orchestrator's mistake and it is recorded as such.** I pushed for the owner-approval invariant as *"one render path, any surface that shows an owner a message imports it, and a committed test proves preview output equals send output for the same inputs."* The room built exactly that. **B's tester then proved the test can only ever demonstrate AGREEMENT, never CORRECTNESS.** Both sides call the same function, so **two REAL regressions inside that function passed EVERY suite in the repo**: dropping the subject merge, and killing the empty-after-merge skip - **the latter being the exact 28-Jul review-ask bug**, the one where a member is asked for a Google review with no link.
+
+**The fix, and the generalisable shape: an equivalence test needs an ABSOLUTE anchor, not a relative one.** The GTA step lock now goldens **through `renderStepMessage` itself**, so the function is pinned to known-good output rather than merely pinned to itself. **Whenever a test asserts "A equals B", ask what happens when A and B are wrong together.** If the answer is "it passes", the test is measuring consistency and calling it correctness.
+
+## ⚠️ THE PATTERN, NOW AT FOUR INSTANCES IN ONE WEEK: **THINGS THAT REPORT SUCCESS OR SAFETY WITHOUT PROVIDING IT**
+
+1. **`runAdmission` returned `admitted:true` having created no card** (build E, D1).
+2. **A COMMENT asserting portal-only where there was no gate** (build E, D2) - and earlier, prose asserting manual quotes carry no rating while nothing enforced it.
+3. **Seven, then nine, committed suites that nothing ever ran** (the CI gap).
+4. **A one-render-path test that proved agreement, not correctness** (build B) - **commissioned by the orchestrator specifically to prevent this class, and belonging to it.**
+
+**The common shape: a thing whose PURPOSE is assurance, which is trusted precisely because it exists, and which is not connected to the outcome it claims.** It is the same family as house rule 7's stale fixture. **When something's job is to give confidence, the question is never "does it pass" but "what would make it fail".**
+
+## ✅ CI WIRING DONE (`9a517d6`), AND IT WAS **NINE** SUITES, NOT SEVEN
+
+`_approval-render` and `_reignition` were added by this session's own builders and would have joined the unrun pile the day they landed.
+
+**What now runs on every PR touching the portal:** every `api/_*.test.mjs`, **discovered by GLOB rather than a list** - a hardcoded list rots exactly the way the original gap formed, one forgotten line at a time. **Plus every negative control**, discovered from each suite's own `MUTATE=` docs, each of which must be CAUGHT. **The failure it hunts is a control that changes nothing** (exit 0 and silent), because such a control is decorative and the confidence it buys is fake. Also wired `verify-bb-hydration.mjs` (guards against writing blanks over real academy data, equally unrun) with its own `MUTATE=b1`.
+
+**⚠️ THE SUBTLETY THAT SAVED THE FIX FROM BEING THE BUG: a BROKEN suite fails under every mutation, so ALL of its controls report "caught" for entirely the wrong reason.** The control step therefore requires a clean run first, and says plainly that an unhealthy suite's controls cannot be judged. **Without that, wiring the controls would itself have been a green thing measuring nothing - the same shape as the hole it was fixing.** Verified by running the exact loops locally: 8 of 9 green at the time, 15 controls caught, and the not-green gate fires correctly.
+
+## ⛔⛔ HOUSE RULE 6 NEEDS A CLAUSE: **ALL SEVEN COMMITTED TEST SUITES ARE ADVISORY. NOTHING IN CI RUNS ANY OF THEM.** Orchestrator-verified 2026-07-29.
+
+Rule 6 says *"if the proof is not in the repo, the fix is not finished"*. **Being in the repo is not enough. Nothing executes them.**
+
+**Verified against `.github/workflows/portal-ci.yml` and `package.json` on main:**
+- CI runs exactly four things: `npm ci`, `npm run build` (which is `vite build`, compiling **`src/` only, never `api/`**), `node --check` on files (**parses without executing**), and `verify-client-portal-ui.mjs`.
+- **There is no `test` npm script.** The only test-shaped script is `test:runtime`, which requires a local Supabase and runs a different directory.
+- **Seven committed suites, none of them run:** `_automation-step`, `_blueprint-card-guards`, `_fees`, `_gta-message-lock`, `_gta-step-lock`, `_offer-schedule`, `_sync-class`.
+
+**So every piece of proof this workstream has built - the GTA byte-for-byte locks, the sync_class leak gate with its negative controls, the Blueprint data-loss guards, the fee reconciliation - runs ONLY when a human types the command.** The negative controls that make those suites meaningful are equally unexecuted. **A suite nobody runs is a comment that takes longer to write.**
+
+**AMENDED RULE 6:** the proof must be in the repo **AND something must run it without a human choosing to.** Until a suite is wired into CI, it protects the person who wrote it and nobody after them.
+
+**ROUTED: the templating room owns wiring the seven suites into `portal-ci.yml`**, since it owns most of them and is already in that area. Small, cheap, and it protects everything built this week. **Not a San Jose blocker.**
+
+## ⚠️ ITEM 81, IN FLIGHT: **THE "OWNER'S APPROVAL" IS NOT OWNER-ONLY.** `api/agent/_auth.js:50-59` admits **any `client_users` row with `can_train_agent=true`**, so **a teammate can arm live outbound messaging under a step we call the owner's approval.** Found by build B's tester. Being scoped to `role='owner'`. Note this interacts with Zoran's ruling that the owner approves exactly TWICE in the whole onboarding: if the approval is not actually the owner's, that ruling is not being honoured in code.
+
+## ⛔ BUILD E RE-VERIFY: nine originals genuinely fixed, **SEVEN NEW DEFECTS, two of them the SAME SHAPE as the D1 just fixed.** Sent back naming the shape, not the instances: **the builder made the CARD mandatory and left everything downstream of it optional.**
+
+- **R1:** `runAdmission` aborts correctly when the card fails, then calls `enrol` and returns `{admitted:true}` **without reading what enrol returned.** `enrollContact` never throws for its own refusals - it returns objects, and the tester executed all five, every one yielding `admitted:true, enrollment_id:null`. **The person is marked admitted, never messaged, `reconcile` skips them forever, the campaign never completes, and because they now hold an open opportunity the `in_pipeline` rail bars them from every FUTURE campaign.** Silently stranded, having received nothing.
+- **R2:** the same half-path shape one step earlier. A throw between `createOpp` and the roster write leaves an orphan card, and because rails are screened BEFORE placement and `loadCandidates` re-reads `open_stage_role`, **the card this feature created becomes the reason the rail rejects the person next pass**, routed to `excluded` with the reason "already live in a pipeline stage". **The only thing in that stage is our own half-finished admission.**
+- **R3:** see the CI amendment above.
+
+**Also fixed in flight, and one is a live-academy correctness bug:** **`startOfDayIso` is wrong on BOTH DST days for BOTH live academies** (GTA `America/New_York`, SJ `America/Los_Angeles`) - spring-forward gives 23:00 the previous day, fall-back gives 01:00. Same family as the timezone work in item 4/22. Plus: `pgList` misses `&` and `#`, so **one malformed contact id stalls a campaign's admissions forever, silently** (fail-closed but invisible); `rosterProgress` reports a live step for someone who already replied; and **`assertStepsCancelled` fails OPEN on an unrecognised status - in the one function whose entire job is to fail closed.**
+
+**Webhook trim verified byte-perfect:** `git diff origin/main` is one changed line per file, no import, no helper, no churn. #1546's grep will find them.
+
+## ✅ BUILD E FIRST RE-SUBMISSION: all nine originals fixed, suite now **120 assertions and NINE controls, all caught**, back with the SAME tester for re-verification. Both decisions applied: **the webhook change is reduced to the minimum**, verified - all four files carry `"interested"` and `reignition` inline, imports and comment block gone, **so #1546's grep will find them again.**
+
+**Behaviour worth reinforcing in future builders:** E's builder changed its mind on two things and said so unprompted. It **deleted the `sent_step_N` column entirely** after the tester showed it was a second copy of a fact the automation engine already owns, and it volunteered that the *"`interested` disappears from the files a rename PR greps"* argument **would have changed its own recommendation on its own.**
+
+## ⛔ BUILD B: EIGHT DEFECTS, back with its builder. See the equivalence-test rule above - its headline defect is the orchestrator's.
+
+## ⛔ BUILD E IS NOT SHIPPABLE: NINE DEFECTS, AND D1 MEANS REIGNITION DOES NOT WORK AT ALL (2026-07-29). Back with the builder.
+
+**D1, fatal:** the `in_pipeline` rail excludes anyone with an open opportunity, and admission then only FINDS an existing card, never CREATES one. So `oppRef` is null for 100% of admitted people, **no card is ever created, and `runAdmission` returns `admitted:true` anyway.** People get messaged, the board column is permanently empty, and **`replied → responded` never fires, so a warm reply never reaches the booking agent.** The entire four-webhook change it justified is currently inert, because no opportunity can ever carry `stage_role='reignition'`.
+
+**D2, the one that could message someone who should have been excluded:** there is a COMMENT asserting portal-only and **no actual gate**. On a GHL academy the portal `opportunities` table is empty, so the "already active in a pipeline" rail **passes everyone, including a lead mid-conversation with the booking agent**, and the texts still send. **A comment is not a gate** - the same shape as the fabricated-rating hole, where prose stood in for enforcement.
+
+**D5, ruled by the room, and the ruling is right:** the module-load throw in `presets.js` would take down the automation worker, all four inbound webhooks, the router, the agent brain, the board and apply-preset. **A design-time guarantee enforced by a runtime import with total blast radius is not a sound trade.** Validation moves into the test suite; the module-load call downgrades to a non-throwing console error.
+
+**⚠️ THE WEBHOOK TRIM IS CONFIRMED, AND THE TESTER FOUND THE REASON THAT DECIDES IT.** The consolidation is byte-correct (executed differential across both presets' full role vocabulary: `added: ['reignition'], dropped: []`, one definition, no fifth copy, GHL branch untouched, both `ghosted` and legacy `interested` preserved). **BUT after it, the string `"interested"` no longer appears in ANY of the three webhooks.** So #1546's author greps those files, finds nothing, and concludes they need no change. **The consolidation actively HIDES work from the rename PR.** That is a better argument for trimming than either of the two the orchestrator and the room had.
+
+**⚠️ REQUIRED BEFORE [#1546](https://github.com/zoran-star/bam-os-requirements/pull/1546) MERGES: the reply-bounce role list has NO test pinning its contents.** The tester mutated the real implementation and **both ADDING `responded` and DROPPING `nurture` shipped green.** Pin that list first, or the rename can silently change the vocabulary with a green suite.
+
+**Not a defect, worth knowing:** `agent_reignitions` (the closing agent's parked follow-ups) is genuinely unrelated and nothing crosses over, but `api/agent/_reignite.js`, `reignition.js` and `reignition-station.js` now sit in one directory describing **two unrelated systems**. Human confusion risk, not mechanical.
+
+## 📌 ITEM 80, QUEUED, OWNED BY THE TEMPLATING ROOM: **the inbound-webhook role-list consolidation, to land AFTER [#1546](https://github.com/zoran-star/bam-os-requirements/pull/1546).**
+
+Build E's builder had consolidated four inbound-webhook role lists into a shared helper. **It is a genuinely good change and is deliberately NOT being lost - it is being split out, not dropped.** Build E ships only the minimum (`reignition` added to the four existing lists); the consolidation becomes its own reviewed change once #1546 lands. Executed after E's tester finishes, never while a tester is mid-pass.
+
+**The two facts that DECIDED it, both from the builder and both correcting an assumption:**
+1. **The blast radius of not adding the role was smaller than the room had been carrying it.** The reply's unsent campaign steps are cancelled instantly regardless, because the `exitEnrollment` call in those webhooks is **role-blind**. What is lost is only the card MOVE: a warm reply sits in Reignition until the daily admit cron reconciles it, so **up to ~24 hours before the booking agent picks it up rather than seconds.** A real degradation of exactly the moment the feature exists for, **but a delay, not a hole.**
+2. **#1546 conflicts HARDER with the consolidation than with the minimum.** The consolidation **deletes the very line #1546 is rewriting** and adds an import; the minimal version is a trivial rebase. **Shipping the refactor now would make a stale PR materially more expensive to land, which is the opposite of what a refactor is for.**
+
+**The builder's own answer is the standard worth quoting at future builders:** adding the role was *"necessary"*; consolidating was *"not necessary. That was a tidy-up I did while I was in there."* **It volunteered that half its own reasoning was circular** - the consolidation *"gave my test something exported to assert against"* - and correctly called that not a necessity argument.
+
+## 📏 HOUSE RULE 7 WORKED PREVENTIVELY FOR THE FIRST TIME (2026-07-29)
+
+Rule 7 was learned twice by finding stale fixtures **after** they had already been trusted. Here the room caught one **before creating it**: cutting the consolidation would leave an assertion checking a shared constant that nothing uses any more, so **it would pass while proving nothing about the webhooks - a green test measuring a dead world.** It is being rewritten to assert against the four files' actual literals, or deleted. **Nobody found this; someone anticipated it.** That is the rule graduating from a scar into a habit, and it is worth noting because it is the first time.
+
+## ⚠️ COLLISION, FOUND WHILE CHECKING BUILD E: **[#1546](https://github.com/zoran-star/bam-os-requirements/pull/1546) TOUCHES ALL THREE INBOUND-WEBHOOK FILES**
+
+Build E's builder touched **four live inbound-webhook files that were not in its original scope** (already the tester's top attack target). **#1546 modifies `api/ghl/inbound-webhook.js`, `api/resend/inbound-webhook.js` AND `api/twilio/inbound-webhook.js`** - plus `api/automations.js`, which #1627 already moved.
+
+**So #1546 now collides with TWO of the three in-flight builds**, and it has been open since 2026-07-21. It is a stage-rename PR ("interested" → "ghosted"), so it is not abandoned work, just stale. **Whoever merges second resolves, and it will be us.** It needs a decision: rebase it onto main and merge it, or accept that it will need a substantial rebase later. Flagged, not scheduled.
+
+## ✅ PR #1627 MERGED 2026-07-29 14:54 UTC. `origin/main` = `5e4219f`, 59 commits, merge commit NOT squashed so every message survives as the change log.
+
+**Orchestrator-verified on main:** `api/_academy-facts.js` and `api/_gta-step-lock.test.mjs` present, `scripts/sj-message-preview.mjs` gone. **The branch was deliberately NOT deleted** - three builders are committing to it and their work becomes a follow-up PR.
+
+**⚠️ WHAT MOVED, FOR ANYONE HOLDING AN UNMERGED BRANCH. Rebase, do not merge-resolve.**
+- **`api/email-shells.js`** moved substantially: `templateBody()` is a new export, `locFor()` now spreads the row UNDER the pinned `LOCATIONS` entry, `clientVars()` gained `location_domain` / `location_phone`, `scheduleText()` is new, and `DROP_WHEN_EMPTY` widened past link tokens.
+- **`api/_send.js`**: `isEmptyAfterMerge()` is now template-aware (it resolves the template body instead of returning false for any `template:` ref). **Small diff, load-bearing** - this is the fix for the review-email defect.
+- **`api/automations.js`**: `loadClient()` select widened (phone + the two content facts), `academyFacts` spread into vars at send time, preview action now matches the send path.
+
+**Orchestrator scan of the blast radius: only ONE open PR touches any of those files - [#1546](https://github.com/zoran-star/bam-os-requirements/pull/1546)** ("rename the free-trial interested stage to ghosted"), which touches `automations.js` and has been open since 2026-07-21. Everything else is clear.
+
+**Also landed on Zoran's instruction:** GTA's classes renamed at source to drop the redundant day suffix (4 `slot_templates` + all 86 live `schedule_slots`), traced first - booking availability matches `/group\s*\d+/` and the age parser reads the parenthetical, so neither depends on the suffix. Goldens re-blessed, suite green, controls catching.
+
+**⛔ BUILD D (site-build re-run guard) IS DROPPED by Zoran: "staff would never re run an entire site build".** Queue line closed. **The underlying collision finding stays TRUE** (two things can author the same page); it just is not worth building a guard against.
+
+## ⚠️ COLLISION CHECK FOR BUILD B, RUN BY THE ORCHESTRATOR BEFORE BEING ASKED (2026-07-29)
+
+Build B adds a wizard approval step, which means `_OBF_STEPS` + `_obfFetchState` + `_OBF_SECTIONS` in `client-portal.html`. **Nine open PRs touch that file. Only ONE touches the onboarding wizard functions:**
+
+- **⚠️ [PR #1523](https://github.com/zoran-star/bam-os-requirements/pull/1523) "Inbox connect: loading screen + return to the same onboarding step"** adds `_obfInboxLoading()` and calls `_obfOpen()` and `_obfWizJumpKey(back)`. **This is the one real collision.** Last updated 2026-07-20, so it has been open over a week and is stale rather than racing us.
+- **#1521** ("Hide the Instagram onboarding step for now") is onboarding-titled but touches **none** of the `_obf*` functions.
+- **#1546, #1625** touch the file but not the wizard.
+- Six others (#1516, #1267, #1192, #632, #336) touch the file elsewhere.
+
+**⚠️ CORRECTION TO THIS CHECK, ORCHESTRATOR ERROR, FOUND ON RE-RUN AFTER THE MERGE.** My first pass filtered candidate PRs by TITLE and so **only examined four of the nine**. That was the wrong method: it is the same title-trusting mistake that made me nearly dismiss #1521, and it got the right answer for the wrong reason. **On a full pass, [#1516](https://github.com/zoran-star/bam-os-requirements/pull/1516) also touches `_obf*`** despite being titled "V2 portal: Settings - Time zone above Integrations".
+
+**It is a CONSUMER, not a modifier, and that is the useful finding.** #1516 calls `_obfFetchState()` from the **Settings** view and renders integration rows (`Stripe`, `Email domain`, `Instagram / Meta`) off its result. So **`_obfFetchState` has a second consumer OUTSIDE the onboarding wizard**, and its blast radius is wider than the wizard alone. **Build B adds a detector key, which is additive and safe for that consumer.** But anyone who ever changes the SHAPE of what `_obfFetchState` returns breaks a Settings screen, and nothing in the wizard code says so.
+
+**📌 ITEM 79, SCALE, orchestrator backlog: `_obfFetchState` is a DE-FACTO SHARED API with nothing anywhere declaring it one.** Its own file gives no hint, which is precisely why a collision check missed it. **The next person to refactor it for a perfectly good local reason breaks a Settings screen they have never opened.** Fix is cheap and is documentation, not code: annotate the function with its consumers, or have the wizard spec name it as a shared surface. **The general class is worth more than the instance** - `client-portal.html` is a monolith and this is unlikely to be the only undeclared shared surface in it. Not scoped, not urgent, and no builder may widen into it.
+
+**Ruling (unchanged after the correction): Build B may proceed on the wizard functions.** #1523 adds a NEW function and jump-navigation calls; it does not restructure `_OBF_STEPS`, the state detector or the sections map, so the two are additive rather than conflicting. **Whoever merges SECOND resolves**, and since #1523 has sat for over a week, that is likely us. **Do not resolve a #1523 conflict by dropping `_obfWizJumpKey` or `_obfInboxLoading`** - they are its whole purpose.
+
+## ⏸ SUPERSEDED (kept for the record): THREE SKILLS, AS A PIPELINE, NOT TWO EMAIL SKILLS. The parked escalation is CLOSED.
+
+His words: *"we had website ones before i believe, but we can re-design all of them together. i want one for the branding deck (where all of the other things reads from), then one for the CORE sites (home, about, contact, etc.) (triggered when branding is done in onboarding), then one for the sales system preset from the offer (when the sales system preset is chosen in the onboarding wizard) which will give the websites and then all the emails and automations."*
+
+| # | Skill | Produces | Fires when |
+|---|---|---|---|
+| 1 | **Branding deck** | The brand foundation everything else reads from | onboarding |
+| 2 | **Core sites** | home, about, contact etc. | branding completes |
+| 3 | **Sales system** | the funnel WEBSITES **plus** all emails and automations | the sales preset is chosen in the wizard |
+
+**They are PIPELINE STAGES, not parallel tools.** The two email skills previously designed **are no longer the design**; they fold into skill 3 as its email half. **Everything shipped this week survives intact** - the templated messages, render harness, locks and leak gate are exactly the machinery skill 3 drives. Only the skill layer above them is redesigned, and **all three get designed together before anything is built.**
+
+**Approver confirmed: BAM STAFF ONLY.** Staff runs the skills and approves drafts; the OWNER approves the rendered output in their own wizard.
+
+**⚠️ THE ROOM'S BEST OBSERVATION: his three skills map ONE-TO-ONE onto `website_setup.chunks` (`deck` / `core` / `sales`), which ALREADY EXISTS in production with exactly his trigger semantics** - publishing `deck` unlocks `core`. **The pipeline he described is already the data model. What does not exist is anything that BUILDS a chunk.** A scout is mapping how sites are built today and what the deck chunk physically is; all three then go to gate 1 as ONE visual.
+
+**⚠️ ORCHESTRATOR FLAG 1, THE COLLISION THAT MATTERS MOST: THE SCOPE JUST TRIPLED AND THE 30 MINUTE TARGET DID NOT MOVE.** The 30 minutes was set against emails and automations. It now has to cover **branding, core websites, funnel websites, emails and automations**. The earlier three-way question (is 40 min wrong, does the design change, or does Zoran hear the real number) is now **sharper, not softer**, and it must be answered against the FULL pipeline. **Scope growth must not be allowed to quietly kill the target without Zoran being told the new number.**
+
+**⚠️ ORCHESTRATOR FLAG 2, CHECK BEFORE DESIGNING: a CORE SITES skill overlaps things that already exist.** There is already a **website pages editor in Brand > Website** (any page, including free trial and contact), the `website-fix` implement loop against `bam-client-sites`, and `bam-client-sites` has its own deploy wiring plus a known dead `academy-starter` project. **Skill 2 must be designed as a producer FOR those surfaces, not a second way to author pages**, or we get two sources of truth for a site - the same bug class this whole workstream exists to kill.
+
+## 🎯 ZORAN'S TARGET FOR THE REST OF THE TEMPLATING TRACK (2026-07-29): A NEW ACADEMY FULLY ONBOARDED IN 30 MINUTES
+
+His words: make it **EASY to install the free trial sales system into a new academy, ideally getting them fully onboarded in 30 minutes.** That is now the measure the remaining work is judged against, not "the messages copy correctly". He named the two remaining pieces himself: **build the two skills**, and **set up the owner approval**.
+
+**⚠️ THIS COLLIDES WITH A NUMBER ALREADY IN OUR OWN DOCS, AND THE PLAN MUST RESOLVE IT RATHER THAN ROUTE AROUND IT.** The templating handoff carries **"roughly 40 minutes of staff time per academy"**, honestly flagged as an estimate never measured because no skill has ever run. **That is 40 minutes for the EMAILS ALONE against a 30 minute target for the WHOLE onboarding.** Exactly one of these is true and the plan must say which: (1) the 40 is wrong and the real number is far smaller, (2) the design changes to hit 30, or (3) 30 is not achievable for the email half, **in which case Zoran hears it plainly with the real number**. He is entitled to decide whether 2 authored emails per academy is worth the minutes. **That is his call, not a design detail, and it must not be quietly absorbed.**
+
+**THE SKILLS SCOPE QUESTION IS NOW LIVE.** It was parked on his board awaiting a ruling: he asked the skills to cover **"all of the human judgement aspects of it (websites, email templates, branding, etc.)"** while everything designed is emails only. **He has now said "build the skills", so scope gets settled WITH HIM inside this planning session**, looking at something, rather than the email-only assumption being inherited by default.
+
+**Two constraints the orchestrator put into the plan brief:**
+1. **The owner approval step is only worth building if what the owner sees is provably what sends.** The wizard has promised "Nothing texts anyone until you approve it" for a long time and that approval has never existed. **The tester already found the in-portal preview an owner approves from was rendering a DIFFERENT email than the send.** The plan must say how that is guaranteed, not assume it.
+2. **"It is inert until someone configures it" is no longer accepted as a safety argument.** The 2026-07-25 enroll incident killed ten academies for four days because a shipped-inert feature had a reference that fired regardless of config. **The skills and the approval steps are precisely config-gated features. Plan them so the guard cannot be the thing that throws.**
+
+**Process, per the operating model:** the room plans it directly WITH Zoran (gate 1 = a visual he can approve or reject in under two minutes, not a spec), then sends the agreed plan up to the orchestrator so it lands here and can be checked against what other chats are touching before any builder starts.
+
+## 🎯 FIRST HARD EVIDENCE THE TEMPLATE WORKS (2026-07-28): SAN JOSE AND GTA ARE BYTE-IDENTICAL ACROSS THE SALES PRESET
+
+`contact_form`, `trial_form`, `missed_trial` and all three `ghosted` steps have **identical body checksums** between the two academies. Not asserted, measured. This is the first time the claim "structure travels, identity is a runtime fact" has been demonstrated rather than designed.
+
+**A new academy now gets 11 of 17 preset messages, up from 8.** The email bodies are templated: phone, group invite, review link, coach handles, venue and the weekly schedule all read from the sending academy, with the schedule generated from real `schedule_slots`. `onboarding-welcome`, `onboarding-review` and the schedule SMS promoted to `shared`.
+
+**⚠️ THE QUEUE'S OWN PROJECTIONS WERE WRONG AND ARE CORRECTED. 13 and 15 were arithmetic; EXECUTED they are 11 and 16.** The difference is Zoran's own earlier correction being applied properly: **`onboarding-training` is one of the emails AUTHORED per academy, not a photocopy**, so templating was never going to free it. It stays `local` for AUTHORSHIP, not for leakage, and it keeps the leak gate's negative-control seat that welcome and review vacated. Do not "fix" it to `shared`.
+
+**LIVE-DATA FIX IN SAN JOSE, and it was PREVENTIVE, not damage control.** SJ's `ghosted` step 0 body was still `{{location.website}}`, so a San Jose parent would have received `https://byanymeanssanjose.com` as a standalone SMS line - **exactly what Zoran rejected for GTA**. It was there because SJ was seeded from the master BEFORE the bare-domain token existed. Patched with one md5-guarded UPDATE, `enabled` untouched, `nurture-3` verified `enabled:false` before AND after. **Orchestrator-verified against production: every SJ automation is `approved:false`, so nothing could have sent and no San Jose parent received anything.** This is the shape of bug the workstream exists to catch: a fix applied to the master leaves already-seeded academies carrying the old defect, silently.
+
+**⚠️ AND IT GENERALISES, so treat it as a class not an incident.** Any academy seeded before a master fix keeps the pre-fix body forever, because seeding is a one-time copy with no re-sync. San Jose was caught only because someone was actively looking at it. **Nothing today tells us which OTHER academies carry pre-fix bodies.** Recorded as a real gap, not scheduled.
+
+**Confirmed while checking: SJ's `onboarding` automation has only 3 steps against the master's now-7**, because SJ was seeded before the promotion. That is expected and is what item 25's "re-seed onboarding from the corrected master" covers. Not drift.
+
+**`scripts/snapshots/bam-san-jose.json` WAS stale, confirmed, and worse than guessed:** it had drifted in exactly the two rows this workstream then changed (ghosted 0 and 1 carried bodies production never had). **Anyone treating that file as San Jose's before-state was reading fiction.** Re-captured, verified body by body by md5, all 13 matching, client row gained the columns `clientVars` reads. The provenance framing is what made this get done first rather than after the diff.
+
+**Not claimed done:** a separate tester that built none of it is mid-run against both commits. `loadClient()` gaining `online_programs_url,referral_offer` is deliberately deferred because it touches `api/automations.js`, which that tester is examining; it plus item 31 go in one pass after. Nothing blocking.
+
+## ✅ TEMPLATING II, FIRST RELAY (2026-07-28). GTA's last 5 literals are APPLIED, and PR #1627 is OPEN.
+
+**Escalation 2 is now CLOSED end to end.** GTA's 5 remaining hardcoded literals are templated and applied to the live rows (one guarded UPDATE each, md5-pinned). GTA is byte-identical to the master on every sales-preset message body and name, so **"GTA as if it was created FROM the template" is literally true** for `contact_form`, `trial_form`, `missed_trial` and `ghosted`. 20 of GTA's 21 messages render unchanged; the 21st is the `trial_form` line Zoran approved.
+
+**Zoran's bare-domain ruling shipped as `{{location.domain}}`, and it caught a SHARED bug, not a GTA one.** The master's `form-intro-automations.js` ghosted step 0 was using `{{location.website}}`, so **every future academy would have texted `https://...` as a standalone SMS line.** Applied to the master as well as GTA.
+
+**[PR #1627](https://github.com/zoran-star/bam-os-requirements/pull/1627) IS OPEN.** 38 commits, 103 files. The room took the open call and opened early per its predecessor's recommendation. The deliberate deletion of `scripts/sj-message-preview.mjs` is called out in the PR body so it does not read as an accident. **⛔ DO NOT MERGE until the two migrations below are applied**, because the code reads columns that do not exist yet.
+
+**⚠️ HOUSE RULE 7 FIRED A SECOND TIME, AND WORSE. `scripts/snapshots/bam-gta.json` had drifted badly and is now re-captured.** The drift: `brand_data` truncated, `website_setup` cut to just the domain, `missed_trial` / `trial_form` / `summer_special` missing entirely, onboarding recorded as 3 steps against production's 8, and the ghosted bodies already holding the PROPOSED tokenized form rather than the live one. **Anyone who read that file for GTA's real state in the last day got a wrong answer.** Re-captured from production and verified body by body by md5, all 21 matching; `render-messages.mjs` now selects every column `clientVars` reads. **This is the second stale-fixture incident in two days. The pattern is not bad luck, it is that fixtures have no owner and no freshness assertion unless someone builds one.**
+
+**📏 HOUSE RULE 7, SHARPENED BY THE TEMPLATING ROOM (2026-07-28). The rule as written would NOT have caught the second incident.** Rule 7 says a fixture that drifts from production passes for the wrong reason, and the fix shape given was "read the same snapshot production reads, plus an assertion that fails if the fixture loses a field production has". **That is a COMPLETENESS check, and completeness is the wrong axis.** The predecessor's failure was a missing field, which completeness catches. The second failure was different: the file had been **hand-written and hand-edited while its own `_note` claimed it was "re-captured from production"**. Every field was present, and every field was wrong. A completeness assertion would have passed it cleanly.
+
+**The corrected rule: the axis is PROVENANCE, not completeness.** A snapshot should be producible only by capture, and should carry checksums of what it claims to mirror, so anyone with database access can verify it in one command instead of by eye. **A fixture that lies about its own origin is the failure mode; a fixture missing a field is only the cheapest symptom of it.**
+
+**⚠️ AND THE SAME HAND WROTE `scripts/snapshots/bam-san-jose.json`, WHICH IS THEREFORE SUSPECT.** This matters more than it sounds: that file is the **before-state for seeding San Jose**, which is the first real test of whether the template works. **A wrong baseline would make the seeding diff lie in the one place we most need it to be honest**, and it would lie in the reassuring direction. It is flagged, and step 5 of the dependency order re-captures it.
+
+**Mechanism decision, the room's call and I accepted it:** the freshness check is currently a one-off duplicated in TWO places (`fixtureProblems()` in both `_gta-message-lock.test.mjs` and `_gta-step-lock.test.mjs`, each hardcoded to GTA specifics like "onboarding has 8 steps"). It gets built ONCE and generically at the San Jose re-capture, because that is the moment a genuine second caller exists and the shared shape is observed rather than guessed. Building it now against one file would be guessing at the second caller.
+
+**NEW PROOF IN THE REPO:** `api/_gta-step-lock.test.mjs` locks all 21 automation step bodies rendered through the real send path, with three negative controls (`MUTATE=token|domain|name`), all three caught. Full suite 5 of 5 green, re-run rather than quoted.
+
+**✅ BOTH MIGRATIONS APPLIED TO PROD 2026-07-28 by the orchestrator, on Zoran's approval. PR #1627 is UNBLOCKED.** Verified by querying production before and after, not by trusting the success flag. `automation_steps.sync_class` is `text NOT NULL DEFAULT 'shared'` with the check constraint present; `clients.online_programs_url` (text) and `clients.referral_offer` (jsonb) are both nullable with no default. Blast radius measured: 34 automation steps all defaulted to `shared`, 0 clients have either new column populated, so **nothing changed for any academy** and the columns stay inert until the code merges.
+
+**⚠️ EXPECTED, DO NOT "FIX" IT: San Jose's `nurture-3` row reads `sync_class = 'shared'`.** Verified still `enabled:false` after the migration (id `9654a2d5`, position 2, the ONLY disabled step in the system, unchanged). Its body is `template:nurture-3`, and the resolver takes the STRICTEST of the row and the template, so it resolves **`attributed`** despite the row saying `shared`. That is the column default doing what the migration's own comment says it does. **This is exactly the case the mandated test must assert.** Anyone hand-editing that row to say `attributed` is treating a symptom and should not.
+
+**⛔ SUPERSEDED, kept for the record: two migrations had NEVER been run against any database.** `20260727120000` (`automation_steps.sync_class`) and `20260727150000` (`clients.online_programs_url` + `referral_offer`). `sync_class` confirmed genuinely absent from production. **Orchestrator-reviewed: both are purely additive** (`add column if not exists`, guarded constraint, nullable or defaulted, no backfill, no client-specific data), so applying them is inert until the code merges, and applying them FIRST is the required order. **Escalated to Zoran.**
+
+**⚠️ ROUTING CORRECTION BY THE ORCHESTRATOR: the room's "new backlog item" is item 31, which already exists, and its finding UPGRADES it rather than adding to it.** Item 31 said GTA's `website_setup` had no domain so `clientVars` returned empty. **That half is now fixed** (build item 1 backfilled it). The room found the deeper half: GTA is the ONLY academy with an entry in the `LOCATIONS` map in `email-shells.js`, so `locFor()` falls straight back to the hardcoded `siteUrl` and **blanking GTA's domain changes nothing at all.** Found by a negative control failing to be caught, not by reading. **Deliberately NOT fixed**, correctly: that same entry also carries GTA's tagline, instagram, `onlineProgramsUrl` and `referralOffer`, and the columns that would replace them are in the unapplied `20260727150000`, so deleting it today silently shortens GTA's welcome email. **Item 31 severity stays FRICTION, now blocked on that migration.** Do not open a second item for this.
+
+## ⚠️ TEMPLATING CHAT HANDOVER, AND THE TWO THINGS IT SURFACED (2026-07-27 evening)
+
+AUTOMATION TEMPLATING was retired and handed to a successor chat inheriting the SAME worktree (`payment-link-popup-47309e`) and branch (`claude/optimistic-leavitt-db0107`, clean, fully pushed, handover at `fd3e11d`). Its handoff doc `docs/handoffs/automation-templating.md` now opens with "Where I actually stopped" and is the successor's first read.
+
+**⚠️ ESCALATION 1, THE BIGGEST GAP BETWEEN THE PLAN AND WHAT ZORAN ACTUALLY ASKED FOR, and it was written down nowhere until now.** Zoran asked that the skills cover **"all of the human judgement aspects of it (websites, email templates, branding, etc.)"**. **Everything designed and built so far is EMAILS ONLY.** Websites and branding are entirely unscoped. This is not a build item yet; it is a scope question that needs Zoran and a visual before anyone plans it. **Do not let a builder quietly widen the email skills to cover it.**
+
+**⚠️ ESCALATION 2: GTA's last 5 literals are dry-run but UNAPPLIED, and 2 are waiting on an answer Zoran dismissed rather than declined.** 3 are proven byte-identical by executing the real resolver and are safe to apply (`contact_form` step 0 name, `ghosted` steps 1 and 2 free-trial URL). The 2 undecided ones:
+- `ghosted` step 0 ends in the bare domain `byanymeanstoronto.ca`; `{{location.website}}` renders `https://byanymeanstoronto.ca`, so tokenizing it puts a protocol into an SMS. No bare-domain token exists today. Options: leave hardcoded, accept the https, or build a bare-domain token.
+- `trial_form` step 0 says "it's coach from By Any Means GTA"; `{{location.name}}` now renders "By Any Means Basketball". Arguably the correct parent-facing name and consistent with every other message, but it IS a change to live copy going to real parents.
+
+**✅ BOTH ANSWERED BY ZORAN 2026-07-27 evening, escalation 2 is CLOSED. Do not re-ask.**
+1. **Bare domain: BUILD A BARE-DOMAIN TOKEN.** Not "leave it hardcoded", not "accept the https". GTA's SMS must stay byte-identical (no protocol appears in it) AND the row becomes template-derived, so every academy gets its own bare domain. This is a small new build item on top of the 5 swaps: no token yielding a bare domain exists today, because `clientVars` builds `location_website` as `https://${domain}`.
+2. **`trial_form` step 0 renders "By Any Means Basketball".** He accepted the change to live copy. His reasoning is the one already banked in build item 2: `business_name` ("BAM GTA") is the INTERNAL label and parents were reading internal shorthand, which is exactly what the parent-facing name field was built to fix. **The GTA lock must be re-blessed surgically for this one row**, and the re-bless is deliberate, not drift.
+
+**FRAMING NOTE, learned from him twice and worth carrying:** he rejects changes to GTA when they are described as *changes*, and accepts the same changes when they are described as *templating*. His own framing for why GTA gets templated at all is "GTA as if it was created FROM the template": apply the master to a blank academy, fill in GTA's details, and you should get exactly what GTA has today.
+
+**Other things that chat recorded and that a successor must not re-derive:** `upsert-automation` has the same clobber shape as the `upsert-step` bug that was fixed, judged fail-safe but NEVER TESTED · both migrations (`20260727120000` sync_class, `20260727150000` welcome facts) have never been run against any database, so their SQL is unverified · the `api/email-shells.js` merge was resolved by UNIONING both sides (optional content facts AND link facts), so do not "clean up" either set · the 13 and 15 message projections are arithmetic, not executed; only the 8-of-17 figure was measured · Zoran wants a SEPARATE agent to scan San Jose after seeding, not the agent that seeded it.
+
+**PREDECESSOR'S ANSWERS TO THE TWO OPEN CALLS, and two of its claims that did NOT hold.**
+
+- **PR: OPEN IT EARLY.** Its own reasoning for holding has expired: the wave is coherent, every suite passed at the last full run, and main has already moved twice underneath it (#1616, #1617), costing one conflict resolution in `email-shells.js`. A third divergence is a worse trade than an early review. **One line that MUST go in the PR body so the deletion does not read as an accident:** the branch deletes `scripts/sj-message-preview.mjs` + `.sh` + `.data.json`, which merged to main as #1615. That is deliberate consolidation into `scripts/render-messages.mjs`, which is parameterised by client where the deleted one was pinned to San Jose. The SJ fixture was carried into `scripts/snapshots/bam-san-jose.json`, so nothing was lost, and `docs/automation-message-harness.md` explains it in place. **The call still belongs to the successor; this is the predecessor's recommendation, not an instruction.**
+- **Worktree:** it confirmed it is done and will not touch anything after `fd3e11d`. **Orchestrator note: I detached that worktree's HEAD so the branch is free**, because the successor chat opens in a fresh worktree and git refuses the same branch in two. The branch was verified clean and fully pushed before detaching.
+- **A second pushed branch exists and is deliberately UNMERGED: `claude/brand-data-evidence`.** It carries the `brand_data` cleanup plus the neutral Blueprint test, held pending the Business Basics fix landing. The test was already taken from it. Do not treat that branch as abandoned.
+- **⚠️ CORRECTION 1, orchestrator-verified: `board/rooms/preset-sync.json` DOES NOT EXIST.** The predecessor believed it had written it, and `board/rooms/index.json` lists the slug, so the card has been silently showing no live status. The successor must actually create the file. It flagged honestly that it had not verified this, which is how it got caught.
+- **⚠️ CORRECTION 2, orchestrator-verified: the static server on :5188 is NOT running** (connection refused), so the status page Zoran reads is not being served. The successor should start its own from its own worktree. **It would have gone stale anyway**, because the old worktree is now detached at `fd3e11d` and will not follow the successor's commits.
+- Its persistent monitor watching main for dependency signals is spent, all three dependencies landed.
+- **Not verified by it, stated plainly:** it did not re-run every suite before handing over. Last full run was at the lock-fixture merge, 5 of 5 green.
+
+**ORCHESTRATOR HANDOVER 2026-07-27 evening.** MISTER_ORCHESTRATOR II is now holding the role. Nothing moved: this file, `board/data.json` and `board/rooms/*.json` all stay in worktree `agent-teams-access-6ba23e`, the board still serves from there on port 4599, and every room keeps the same paths. Both design chats were told directly. AUTOMATION TEMPLATING remains the only active track; TESTIMONIAL CONNECTION remains parked by Zoran's serialization call. Role continuity doc: [orchestrator-handoff.md](orchestrator-handoff.md).
+
 ---
 
 Team roster, spawn prompts and gate mechanics: [lij-onboarding-team-playbook.md](lij-onboarding-team-playbook.md).

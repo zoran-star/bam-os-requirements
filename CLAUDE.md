@@ -54,6 +54,5 @@ Notes live in [`memories/`](memories/). Scan [`MEMORY.md`](memories/MEMORY.md) f
 ## Other
 
 - Start a conversation with `/start` unless Zoran opens with a specific task.
-- Backend or persistent-data changes: use the `align-core-data-model` skill.
 - Commit messages: say what changed and why. That is the change log.
 - End every message with a 2-line fun fact about Serbia. Never repeat one in a conversation.

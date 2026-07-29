@@ -31,7 +31,9 @@ case "${1:-start}" in
       exit 0
     fi
     lsof -ti :$PORT 2>/dev/null | xargs kill 2>/dev/null || true
-    nohup python3 -m http.server "$PORT" --directory "$DIR" >"$LOGFILE" 2>&1 &
+    # Served with no-store headers, never plain http.server: a cached board looks
+    # alive while showing a layout and cards that no longer exist.
+    nohup python3 "$(dirname "${BASH_SOURCE[0]}")/mission-board-server.py" "$PORT" "$DIR" >"$LOGFILE" 2>&1 &
     echo $! > "$PIDFILE"
     for _ in $(seq 1 20); do
       if alive; then echo "mission board up: $URL"; exit 0; fi
