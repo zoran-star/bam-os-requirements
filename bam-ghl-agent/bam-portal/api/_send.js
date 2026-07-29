@@ -9,7 +9,7 @@
 import { ghl } from "./ghl/_core.js";
 import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 import { sendEmail } from "./_email.js";
-import { renderEmail, resolveMergeVars, locFor } from "./email-shells.js";
+import { renderEmail, resolveMergeVars, locFor, templateBody } from "./email-shells.js";
 import { notifyOwners } from "./_notify-owners.js";
 
 // ── the from-address guardrail (email only) ─────────────────────────────────
@@ -159,11 +159,18 @@ async function noticeHeldOnce(clientId) {
 // no message to send and no retry that could change that.
 const EMPTY_AFTER_MERGE = "empty after merge fields resolved";
 
-// Does this body render to nothing? Only meaningful for plain copy - a
-// "template:<key>" ref resolves to a whole designed email and never empties out.
+// Does this body render to nothing once the academy's own facts are filled in?
+//
+// It used to answer `false` for any "template:<key>" ref, on the reasoning that a
+// designed email is never empty. That stopped being true on 28 Jul 2026: a template
+// may now return "" when the academy lacks the one fact that gives the email its
+// purpose. The review ask is the case - with no Google review link on file it renders
+// three paragraphs asking for a review and no way to leave one, because
+// dropEmptyShellLinks correctly removes the dead button and nothing removed the
+// sentences around it. So the question is asked of the RESOLVED content now, which is
+// the same content renderEmail is about to wrap a shell around.
 function isEmptyAfterMerge(text, clientId, vars) {
-  if (/^\s*template:[\w/-]+\s*$/.test(text)) return false;
-  return !resolveMergeVars(text, locFor(clientId, vars), vars || {}).trim();
+  return !templateBody({ clientId, body: text, vars: vars || {} }).trim();
 }
 
 export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, subject, body, ghlToken, vars } = {}) {

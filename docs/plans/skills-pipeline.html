@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The five build skills, and why in this order</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF9F6;--card:#FFFFFF;--card2:#F3F1EB;--line:#E4E0D6;
+    --tx:#1A1917;--tx2:#54514A;--tx3:#8A857B;
+    --gold:#9A7A22;--goldbg:#FBF3DC;--goldln:#E5D097;
+    --green:#2A7A4E;--greenbg:#E8F4EC;--greenln:#B7DCC4;
+    --red:#B23A22;--redbg:#FBECE8;--redln:#EFC9BE;
+    --blue:#255F92;--bluebg:#E9F1F8;--blueln:#C2D9EB;
+    --grey:#8A857B;--greybg:#F1EFE9;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1060px;margin:0 auto;padding:44px 20px 100px}
+  h1{font-size:clamp(27px,4.4vw,40px);line-height:1.1;letter-spacing:-.025em;margin:0 0 9px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:16.5px;margin:0 0 24px;max-width:70ch}
+  h2{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--gold);margin:52px 0 6px;font-weight:800}
+  .h2sub{color:var(--tx3);font-size:14px;margin:0 0 16px;max-width:76ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:0 1px 2px rgba(26,25,23,.04)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .goal{background:var(--goldbg);border:1px solid var(--goldln);border-radius:14px;padding:18px 22px;margin-bottom:6px}
+  .goal .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:6px}
+  .goal p{margin:0;font-size:17px;color:var(--tx);font-weight:600;line-height:1.45}
+  .pill{display:inline-block;font-size:10px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap;vertical-align:2px}
+  .p-ok{background:var(--greenbg);color:var(--green)}
+  .p-half{background:var(--goldbg);color:var(--gold)}
+  .p-later{background:var(--greybg);color:var(--grey)}
+  .note{border-radius:12px;padding:16px 18px}
+  .note b{display:block;margin-bottom:4px;font-size:15px}
+  .note p{margin:0;font-size:14px;color:var(--tx2)}
+  .note p+p{margin-top:7px}
+  .note+.note{margin-top:11px}
+  .n-warn{background:var(--redbg);border:1px solid var(--redln)}.n-warn b{color:var(--red)}
+  .n-gold{background:var(--goldbg);border:1px solid var(--goldln)}.n-gold b{color:var(--gold)}
+  .n-blue{background:var(--bluebg);border:1px solid var(--blueln)}.n-blue b{color:var(--blue)}
+  .n-ok{background:var(--greenbg);border:1px solid var(--greenln)}.n-ok b{color:var(--green)}
+  .grid{display:grid;gap:13px}
+  @media(min-width:800px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}}
+  /* skill blocks */
+  .skill{border:1px solid var(--line);border-radius:14px;background:var(--card);margin-bottom:14px;overflow:hidden}
+  .skill.dim{opacity:.6}
+  .skill.hero{border-color:var(--goldln)}
+  .skill .hd{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:16px 20px 2px}
+  .skill .num{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--tx3)}
+  .skill .t{font-size:18px;font-weight:800;color:var(--tx)}
+  .skill .trig{font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:800;color:var(--blue);padding:0 20px;margin-top:3px}
+  .skill .bd{padding:9px 20px 14px;font-size:14px;color:var(--tx2)}
+  .skill .bd p{margin:0 0 8px;max-width:80ch}
+  .skill .bd p:last-child{margin-bottom:0}
+  .steps{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .step{background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:7px 12px;font-size:12.5px;color:var(--tx2)}
+  .step b{color:var(--tx);display:block;font-size:12.5px}
+  .step.new{background:var(--goldbg);border-color:var(--goldln)}
+  .step.new b{color:var(--gold)}
+  /* needs / hands rail */
+  .rail{display:grid;grid-template-columns:1fr;border-top:1px solid var(--line);background:var(--card2)}
+  @media(min-width:700px){.rail{grid-template-columns:1fr 1fr}}
+  .rail>div{padding:11px 20px}
+  .rail>div:first-child{border-bottom:1px solid var(--line)}
+  @media(min-width:700px){.rail>div:first-child{border-bottom:none;border-right:1px solid var(--line)}}
+  .rail .l{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:800;color:var(--tx3);margin-bottom:2px}
+  .rail .v{font-size:13.5px;color:var(--tx);font-weight:600}
+  .rail .v.free{color:var(--blue)}
+  /* flags table */
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
+  th{text-align:left;padding:9px 12px;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:800;border-bottom:2px solid var(--line)}
+  td{padding:10px 12px;border-bottom:1px solid var(--line);color:var(--tx2)}
+  tr:last-child td{border-bottom:none}
+  td.k{color:var(--tx);font-weight:700}
+  td.arrow{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+  tr.stays td{background:var(--goldbg)}
+  .lbl{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:800;margin-bottom:7px}
+  .big{font-size:36px;font-weight:800;line-height:1;letter-spacing:-.02em;color:var(--gold)}
+  td.num2{font-family:var(--mono);font-size:13px;white-space:nowrap;text-align:right}
+  a{color:var(--blue);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>The five build skills,<br><span>and why in this order.</span></h1>
+  <p class="sub">Each skill fires when the owner finishes the step that feeds it, and the academy's Slack channel gets the exact skill to run. Staff runs it and workshops the result in localhost; the owner never sees localhost. <b>The owner approves twice in the whole process, and only twice:</b> their brand board, and their sales messages. Everything else our team approves in the workshop session. Every stage below says what it <b>needs</b> from the one before and what it <b>hands over</b> to the next, so the order is an argument rather than a list.</p>
+
+  <div class="goal">
+    <div class="l">Your goal</div>
+    <p>A new academy fully onboarded in about 30 minutes of their time, with the skills doing the human-judgement work and staff approving it.</p>
+  </div>
+
+  <h2>The pipeline</h2>
+  <p class="h2sub">Top to bottom. Every trigger already fires in production today.</p>
+
+  <!-- 1 -->
+  <div class="skill">
+    <div class="hd"><span class="num">1</span><span class="t">Branding deck</span><span class="pill p-ok">exists</span></div>
+    <div class="trig">Fires when the owner submits their brand brief</div>
+    <div class="bd">
+      <p>Reviews their old website and whatever branding assets they entered, then takes a pass at their brand in localhost with the staff member: colors, fonts, logo treatment. The output is their theme plus a one-page brand board on their staging site, and the owner approving that board is what releases everything below.</p>
+      <div class="steps">
+        <div class="step"><b>Scan</b>their old site for colors + fonts</div>
+        <div class="step"><b>Theme</b>workshopped in localhost</div>
+        <div class="step"><b>Board</b>one page, on their staging site</div>
+        <div class="step"><b>Owner approves</b>in their wizard</div>
+      </div>
+    </div>
+    <div class="rail">
+      <div><div class="l">Needs</div><div class="v">Their brief and their old site. Nothing else.</div></div>
+      <div><div class="l">Hands over</div><div class="v">The theme every single thing below wears.</div></div>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="skill">
+    <div class="hd"><span class="num">2</span><span class="t">Core site build</span><span class="pill p-ok">exists</span></div>
+    <div class="trig">Fires when the deck is published</div>
+    <div class="bd">
+      <p>Takes the branding deck and builds the core sites in localhost with the staff member: home, about, contact, programs. Pages scaffold from the shared kit already wearing their theme, and every word of copy comes from what the owner typed in onboarding, their story, their proof, their offers. Staff workshops it, then it goes to staging.</p>
+      <div class="steps">
+        <div class="step"><b>Scaffold</b>home &middot; about &middot; contact &middot; programs</div>
+        <div class="step"><b>Write</b>copy from their story + offers</div>
+        <div class="step"><b>Workshop</b>in localhost with staff</div>
+        <div class="step"><b>Team approves</b>in the session, no owner gate</div>
+      </div>
+      <p style="margin-top:9px;font-size:13px"><b>Our team approves this one.</b> The owner already signed off the brand board in stage 1, and the site wears it. No second approval from them.</p>
+    </div>
+    <div class="rail">
+      <div><div class="l">Needs</div><div class="v">The published theme. It cannot start before the deck.</div></div>
+      <div><div class="l">Hands over</div><div class="v">A live site the sales funnels plug straight into.</div></div>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="skill" style="border-color:var(--blueln)">
+    <div class="hd"><span class="num">3</span><span class="t">GHL migration</span><span class="pill p-half">to build</span></div>
+    <div class="trig">Fires once they are connected &middot; skipped entirely if they have no GHL history</div>
+    <div class="bd">
+      <p>Brings everything they already have out of GoHighLevel and into the portal: their <b>contacts</b>, their <b>message history</b>, and their <b>live pipeline</b> with every lead sitting in the right stage. Both systems keep running side by side afterwards, with GHL still in charge, so nothing can fall between them.</p>
+      <p><b>Why it sits here, and not inside the sales system:</b> it depends on nothing above it and nothing below it. It is the one stage that could run at any point, which is exactly why it is its own skill rather than bolted onto the sales system. It goes third so the data is in and verified well before anything needs it.</p>
+      <div class="steps">
+        <div class="step new"><b>Pull</b>their pipeline out of GHL</div>
+        <div class="step new"><b>Sort</b>every lead into the right stage</div>
+        <div class="step new"><b>Seed</b>contacts + message history</div>
+        <div class="step new"><b>Quarantine</b>old leads, so nothing texts them</div>
+        <div class="step new"><b>Check</b>both systems agree, lead for lead</div>
+      </div>
+    </div>
+    <div class="rail">
+      <div><div class="l">Needs</div><div class="v free">Nothing. It is independent of every other stage.</div></div>
+      <div><div class="l">Hands over</div><div class="v">Their real people and history, in the portal, verified.</div></div>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="skill hero">
+    <div class="hd"><span class="num">4</span><span class="t">Sales system build: free trial</span><span class="pill p-half">to build</span></div>
+    <div class="trig">Fires when the free-trial preset is chosen in the wizard</div>
+    <div class="bd">
+      <p><b>The entire sales system in one skill:</b> the funnel websites, the pipeline, the three AI agents, every automation and email, the nurture sequence and the trial booking emails. It sets all of it up, then walks staff through a review of everything it made, including the <b>2 emails</b> it drafts from the owner's own story. Everything installs switched off until the owner approves it.</p>
+      <p><a href="sales-system-inventory.html">See every single item in it, and what is templated versus written &rarr;</a></p>
+      <div class="steps">
+        <div class="step"><b>Funnel pages</b>free trial + contact</div>
+        <div class="step new"><b>Seed</b>the messages, installed dormant</div>
+        <div class="step new"><b>Draft</b>2 emails from their own words</div>
+        <div class="step new"><b>Trial emails</b>booking confirmation + reminder</div>
+        <div class="step new"><b>Review</b>every message, rendered as sent</div>
+        <div class="step new"><b>Owner approves</b>and it switches on</div>
+      </div>
+    </div>
+    <div class="rail">
+      <div><div class="l">Needs</div><div class="v">Their offer, and a live site for the funnels to live on.</div></div>
+      <div><div class="l">Hands over</div><div class="v">A sending sales system, and the go-ahead for the switchover.</div></div>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="skill dim">
+    <div class="hd"><span class="num">5</span><span class="t">Member management build</span><span class="pill p-later">backlog, by your call</span></div>
+    <div class="trig">Fires when pricing, policy and the form are in</div>
+    <div class="bd">
+      <p>The agreement, the enroll funnel, the member onboarding sequence and the member emails (welcome, receipt, reschedule). <b>Parked until you are truly comfortable the free-trial system is plug and play.</b> The pieces that exist today keep working exactly as they are; nothing new gets designed here yet.</p>
+    </div>
+  </div>
+
+  <!-- SWITCHOVER -->
+  <h2>The switchover: seeding and flipping are two different moments</h2>
+  <p class="h2sub">Stage 3 seeds. The flip happens later, once the sales system is approved and actually sending, so there is never a window where neither system is handling their leads.</p>
+
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>What</th><th>Before</th><th>After the flip</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Pipeline</td><td class="arrow">GoHighLevel</td><td class="arrow">the portal</td><td>their board lives here now</td></tr>
+        <tr><td class="k">Bookings + calendar</td><td class="arrow">GoHighLevel</td><td class="arrow">the portal</td><td>real sessions, real capacity</td></tr>
+        <tr><td class="k">Email</td><td class="arrow">GoHighLevel</td><td class="arrow">the portal</td><td>sends from their own domain</td></tr>
+        <tr class="stays"><td class="k">Text messages</td><td class="arrow">GoHighLevel</td><td class="arrow"><b>stays on GoHighLevel</b></td><td>your call: they keep the number</td></tr>
+        <tr class="stays"><td class="k">Contacts</td><td class="arrow">GoHighLevel</td><td class="arrow"><b>stays on GoHighLevel</b></td><td>texting needs it, see below</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note n-gold" style="margin-top:13px">
+    <b>Contacts and texting travel together, and that is not a choice we get to make</b>
+    <p>GoHighLevel can only text a person it holds a contact record for, and their replies only come back to us through that same record. So the moment contacts move to the portal, texting stops working for every new lead. Since you want them keeping their number and their texting, <b>contacts stay put too</b>. They are still fully copied into the portal and visible there, just not in charge.</p>
+    <p><b>DETAIL Miami already runs exactly like this</b>, so this is a proven shape rather than a theory. BAM GTA is the only academy fully off GHL, and that is because it moved its texting to its own number.</p>
+  </div>
+
+  <div class="note n-warn" style="margin-top:11px">
+    <b>Their old leads do not get texted, ever, unless you say so</b>
+    <p>Seeding brings across every lead they already had. San Jose alone has more than 65. If the sales system switched on over the top of them, it would start messaging people who signed up months ago. <b>Seeded leads are quarantined by default</b> and releasing any of them is a deliberate act with a name on it.</p>
+  </div>
+
+  <!-- BUILD LIST -->
+  <h2>So the build list is four things</h2>
+  <div class="grid g4">
+    <div class="card">
+      <div class="lbl">Build A</div>
+      <div style="font-size:15.5px;font-weight:800;margin-bottom:6px">The sales system skill</div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)">The gold steps in stage 4. The funnel-page half exists and folds in; the messages half is new and drives the machinery built and locked this month.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">Build B</div>
+      <div style="font-size:15.5px;font-weight:800;margin-bottom:6px">The owner approval step</div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)">One new step in their wizard. They see every message exactly as a parent gets it, and approving is what switches the system on. What they approve is provably what sends.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">Build C</div>
+      <div style="font-size:15.5px;font-weight:800;margin-bottom:6px">The migration skill</div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)">Stage 3. Mostly drives tools that already exist, plus one real repair: the safety check that is meant to confirm both systems agree has never actually worked, so today the only way to flip is to skip it.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">Build D</div>
+      <div style="font-size:15.5px;font-weight:800;margin-bottom:6px">A re-run guard</div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)">Rebuilding a site currently replaces its pages wholesale, which would quietly eat any client-requested fixes made since. It now stops and lists them instead.</p>
+    </div>
+  </div>
+
+  <!-- MINUTES -->
+  <h2>The 30 minutes, honestly</h2>
+  <p class="h2sub">Two clocks. Yours is the owner's, and it can hit 30. The staff clock is estimates until San Jose's first real run replaces them with measurements.</p>
+  <div class="grid g2">
+    <div class="card">
+      <div class="lbl">The owner's clock</div>
+      <div class="big">~30 min</div>
+      <div class="scroll"><table style="min-width:0;margin-top:10px">
+        <tr><td class="k">Brand card (logo, colors, fonts)</td><td class="num2">~5</td></tr>
+        <tr><td class="k">Story brief</td><td class="num2">~10</td></tr>
+        <tr><td class="k">Offer + pricing</td><td class="num2">~10</td></tr>
+        <tr><td class="k">Approve the brand board</td><td class="num2">~2</td></tr>
+        <tr><td class="k">Approve their sales messages</td><td class="num2">~3</td></tr>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">They answer once and approve twice. Nothing else is asked of them.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">The staff + skill clock, spread across the same days</div>
+      <div class="big">~85 min</div>
+      <div class="scroll"><table style="min-width:0;margin-top:10px">
+        <tr><td class="k">1 &nbsp;Branding deck</td><td class="num2">~10</td></tr>
+        <tr><td class="k">2 &nbsp;Core site build</td><td class="num2">~20</td></tr>
+        <tr><td class="k">3 &nbsp;GHL migration</td><td class="num2">~15</td></tr>
+        <tr><td class="k">4 &nbsp;Sales system build</td><td class="num2">~35</td></tr>
+        <tr><td class="k">5 &nbsp;Member management</td><td class="num2">parked</td></tr>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">Stage 3 is zero for an academy with no GHL history.</p>
+    </div>
+  </div>
+
+  <!-- SAFETY -->
+  <h2>Carried in from the last two weeks</h2>
+  <div class="grid g3">
+    <div class="note n-ok" style="margin:0"><b>What the owner approves is what sends</b>
+      <p>The approval page, the staff review and the real send all run the same code, with a committed test proving it. The mismatch found and fixed this month cannot quietly return.</p></div>
+    <div class="note n-ok" style="margin:0"><b>A skill that fires early does nothing, loudly</b>
+      <p>Each one says what it does when the stage before it is missing or half-done: it declines and explains. It never throws, and never builds from another academy's data.</p></div>
+    <div class="note n-ok" style="margin:0"><b>The flip refuses rather than guesses</b>
+      <p>An academy flipped once before while its old system still owned new leads, and every new lead went invisible. The flip now checks that first and backs out rather than proceeding.</p></div>
+  </div>
+
+  <h2>The one thing I need from you</h2>
+  <div class="card" style="border-color:var(--goldln);background:var(--goldbg)">
+    <p style="margin:0;font-size:16.5px;color:var(--tx)"><b>Workshop this page, then approve it.</b> When you do, I build A, B, C and D. Skills 1 and 2 stay as they are, skill 5 sits on the backlog in your words, and San Jose's first run becomes the stopwatch that replaces every estimate here.</p>
+  </div>
+
+</div>
+</body>
+</html>

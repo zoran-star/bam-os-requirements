@@ -1,13 +1,41 @@
 # Automation message render harness
 
-`scripts/sj-message-preview.mjs` + `.sh` + `.data.json`
+`scripts/render-messages.mjs`
 
-Renders every automation step for an academy **exactly as a parent receives it**, then
-serves it as a static review page on `:4600`.
+Renders every automation message an academy would send, **exactly as a parent receives
+it**, and writes the review page staff work from.
 
 ```bash
-bash scripts/sj-message-preview.sh
+# no database access needed
+node scripts/render-messages.mjs --data scripts/snapshots/bam-gta.json
+
+# live, needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+node scripts/render-messages.mjs --name "BAM San Jose"
+node scripts/render-messages.mjs --client 39875f07-0a4b-4429-a201-2249bc1f24df
+
+# with the photocopy / swap / custom markup layered on
+node scripts/render-messages.mjs --data scripts/snapshots/bam-gta.json \
+  --annotate scripts/annotations/bam-gta.mjs
 ```
+
+Writes `docs/plans/review/index.html` (override with `--out`) plus one file per email
+under `msg/`.
+
+Read-only. It cannot enable, approve, or send anything.
+
+## One renderer, deliberately
+
+There were briefly three: a GTA-pinned annotator, a San Jose-pinned previewer
+(`sj-message-preview.mjs`, PR #1615), and a parameterised one. All three rendered the same
+thing through the same modules. Consolidated 2026-07-27 into this single script; the other
+two are deleted. If you find yourself writing a fourth, parameterise this one instead.
+
+| Piece | Where it lives |
+|---|---|
+| The renderer | `scripts/render-messages.mjs` |
+| Markup engine, optional | `scripts/lib/annotate.mjs` |
+| Per-academy markup rules | `scripts/annotations/<academy>.mjs` |
+| Offline fixtures | `scripts/snapshots/<academy>.json` |
 
 ## What makes it trustworthy
 
@@ -16,17 +44,27 @@ It imports the REAL production send path rather than approximating it:
 | Piece | Source |
 |---|---|
 | `renderEmail`, `resolveMergeVars`, `locFor`, `clientVars` | `bam-ghl-agent/bam-portal/api/email-shells.js` |
-| The 4 designed nurture emails | `api/email-templates/nurture-emails.js` |
+| The designed emails | `api/email-templates/nurture-emails.js`, `onboarding-emails.js` |
 | How `vars` are assembled | mirrors `api/automations.js` (`{ first_name, full_name, athlete, next_session, ...clientVars(client) }`) |
 
 SMS renders through `resolveMergeVars` the same way `api/_send.js` does. Emails render
 through `renderEmail`, so `template:<key>` refs resolve, the branded shell fills with the
 academy's own identity, and empty-token link dropping behaves as it does in a real send.
 
-Designed emails show as real HTML in auto-sized iframes; SMS as phone bubbles with
-character and segment counts. Grouped by sequence, with the wait before each message.
+## What the review page gives staff
 
-Read-only. It cannot enable, approve, or send anything.
+- A switcher across every automation, one automation on screen at a time.
+- Every message in send order, with the wait before it. SMS as phone bubbles, emails as
+  real HTML in a frame.
+- A **stable reference on every message** (`CON1`, `GHO3`, `NUR2`, `ONB1`) so a note can
+  point at something exactly instead of "the second paragraph in the third email".
+- Disabled steps visibly marked rather than quietly absent.
+- **A "did not render, and why" block.** The one thing staff cannot see by reading the
+  email is a block that vanished because a fact was missing. That list is the point.
+
+This is the surface phase 6 of the two email skills hands to staff, and the same page the
+academy owner approves from in the wizard. One page, two audiences, different verbs: staff
+leaves notes, the owner approves.
 
 ## Why rendered output beats grep here
 
@@ -53,30 +91,83 @@ This codebase deliberately carries comments naming old bad values so nobody rein
 them. Any drift checker that string-matches will re-raise every already-fixed bug forever
 and train everyone to ignore it. Check code paths, not strings.
 
-## Limitation
+## Snapshots
 
-Pinned to one academy: a `CLIENT_ID` const plus a committed data snapshot in
-`.data.json` rather than a live read. Parameterising by client id and reading
-`automation_steps` live turns this into a before/after verification surface for any
-academy a preset change touches.
+A snapshot is `{client, automations:[{automation_key, name, enabled, approved, steps:[…]}]}`,
+so the page rebuilds with no database access. Useful for reviewing on a machine without
+service-role credentials, and for keeping a before/after pair across a preset change.
+
+Regenerate one by running with `--client` or `--name` where creds are available.
+
+## Annotation, optional
+
+`--annotate` marks up every run of text in every email with a verdict, so nothing is left
+unmarked: **photocopy** travels untouched, **swap** travels once a fact is collected,
+**custom** is authored per academy. Each email declares a base verdict covering all of its
+text, and rules override specific runs.
+
+Unmarked text reads as "already fine" when usually it just has not been looked at, which
+is why the markup is total rather than selective.
 
 ## ⚠️ Two things that must survive
 
-**1. `nurture-3` and `onboarding-testimonials` must NOT be promoted with the other
-onboarding emails.** Both quote real BAM GTA parents, re-attributed to whatever academy
-sends them via `{{location.city}}` ("Parent of Adam, {{location.city}}"). Zoran's ruling
-(2026-07-27) is a **quote-free variant**: the drip still sends on schedule and the quote
-block drops out until that academy has Google reviews connected. Until that variant
-exists, these stay disabled. Promoting them blind ships exactly the thing that was held.
+**1. The testimonials emails do not ship without real testimonials.** `nurture-3` and
+`onboarding-testimonials` quote real BAM GTA parents, re-attributed to whatever academy
+sends them via `{{location.city}}` ("Parent of Adam, {{location.city}}").
 
-**2. San Jose's 13 steps are untouched and dormant, and must be re-seeded from the
-corrected master, never hand-edited.** Hand edits fork San Jose from the master and
-create the very drift the two-way preset sync work exists to fix. San Jose client id:
+> **Superseded ruling, 2026-07-27.** An earlier note here specified a *quote-free variant*
+> that still sent with the quote block dropped. Zoran later ruled the simpler thing: an
+> empty testimonials store means **the email does not ship at all**, and it returns once
+> real testimonials are typed in. There is no quote-free variant to build. This also takes
+> the Google Business Profile work off the critical path entirely.
+
+Until the `testimonials` table exists and holds real entries for an academy, these steps
+stay disabled. Promoting them blind ships exactly the thing that was held.
+
+**2. San Jose's steps are dormant and must be re-seeded, never hand-edited.** Hand edits
+fork San Jose from the master and create the very drift this workstream exists to fix.
+Re-seeding is **diff-and-patch, never delete-and-recreate**: San Jose's `nurture-3` is
+`enabled:false` deliberately and a naive re-seed re-enables it. Add missing steps by key
+and position; never touch an existing row's `enabled` flag. San Jose client id:
 `5576acf0-acd3-4c05-9f9f-ebfde8618154`.
+
+## The GTA message lock (the automated half of this)
+
+The harness above is for a **human** to look at. The lock is for CI:
+
+```bash
+node bam-ghl-agent/bam-portal/api/_gta-message-lock.test.mjs
+```
+
+It renders all 10 GTA email templates through the same `renderEmail` path, with GTA's
+real client row, and fails on any byte difference from a committed golden. Two goldens
+per template: the parent-visible **words** (text + every link target, generated from
+`origin/main` so it is production truth) and the full **markup**. A failure prints the
+words diff first, so you can tell instantly whether a parent would notice.
+
+Re-blessing is deliberate and documented in
+`bam-ghl-agent/bam-portal/api/__goldens__/README.md`. Expected-but-narrow differences go
+in `WORD_WAIVERS` inside the test, each naming the decision and its date, rather than
+loosening the test.
+
+Not covered: SMS steps, and the per-academy `automation_steps` bodies in the database.
+The lock covers the vendored templates, which is where a code refactor can move copy.
 
 ## Related
 
+- GTA message lock: `bam-ghl-agent/bam-portal/api/_gta-message-lock.test.mjs`
 - Canonical defaults: `bam-ghl-agent/bam-portal/api/form-intro-automations.js`
 - Divergence checker: `bam-ghl-agent/bam-portal/scripts/check-automation-divergence.mjs`
   (detects an academy drifting FROM the master, never the master lagging behind GTA -
-  that one-way blind spot is what let onboarding ship at 3 steps against GTA's 8)
+  that one-way blind spot is what let onboarding ship at 3 steps against GTA's 8).
+  **A reverse check was planned and then dropped, 2026-07-27.** Zoran replaced the
+  detective control with a structural one: every row is explicitly preset-owned or
+  academy-owned via `sync_class` at write time, and owners have no free-text override, so
+  the drift a reverse check would have found cannot silently form. `sync_class` is now the
+  only mechanism rather than a second line of defence, which makes strictest-wins
+  (`attributed > local > shared`, template beats step) load-bearing.
+  **Residual:** nothing now catches a one-off edit to GTA's rows. That is fine while GTA
+  IS the preset, but a genuine GTA-only change must be marked `local` when it is written
+  or it silently becomes everyone's.
+- The templating plan: `docs/plans/email-skill-rework.html`
+- The classification: `docs/plans/gta-automation-map.html`

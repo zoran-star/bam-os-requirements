@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preset convergence - plan</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#D4B65C;
+    --bg:#0C0C0D; --card:#141416; --card2:#1A1A1D; --line:#2A2A2E;
+    --tx:#EDEDEF; --tx2:#A8A8B0; --tx3:#6E6E78;
+    --red:#E5674E; --amber:#E0A33C; --green:#5FBF8A; --blue:#5B9DD9;
+    --r-m:12px; --r-l:16px;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif; --mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:48px 20px 90px}
+  h1{font-size:clamp(30px,5vw,44px);line-height:1.1;letter-spacing:-.02em;margin:0 0 10px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:17px;margin:0 0 8px;max-width:64ch}
+  .meta{color:var(--tx3);font-size:13px;font-family:var(--mono);margin:0 0 34px}
+  h2{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:56px 0 6px;font-weight:700}
+  h2 .n{color:var(--tx3);margin-right:10px}
+  .lede{color:var(--tx2);font-size:16px;margin:0 0 22px;max-width:72ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-l);padding:24px}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  pre{font-family:var(--mono);font-size:13px;line-height:1.55;color:var(--tx2);margin:0;white-space:pre}
+  table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:620px}
+  th{text-align:left;font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:700;padding:0 14px 10px;border-bottom:1px solid var(--line)}
+  td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--tx2)}
+  td.k{color:var(--tx);font-weight:600;font-family:var(--mono);font-size:13px;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .m{font-family:var(--mono);font-size:13px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+  .p-go{background:rgba(95,191,138,.14);color:var(--green);border:1px solid rgba(95,191,138,.3)}
+  .p-tok{background:rgba(91,157,217,.14);color:var(--blue);border:1px solid rgba(91,157,217,.3)}
+  .p-re{background:rgba(224,163,60,.14);color:var(--amber);border:1px solid rgba(224,163,60,.3)}
+  .p-no{background:rgba(229,103,78,.14);color:var(--red);border:1px solid rgba(229,103,78,.3)}
+  .p-g{background:rgba(212,182,92,.13);color:var(--gold);border:1px solid rgba(212,182,92,.3)}
+  .grid{display:grid;gap:16px}
+  @media(min-width:760px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+  .rule{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:var(--r-m);padding:18px 20px}
+  .rule b{color:var(--tx);display:block;margin-bottom:5px;font-size:15px}
+  .rule p{margin:0;color:var(--tx2);font-size:14px}
+  .call{background:linear-gradient(180deg,rgba(212,182,92,.09),rgba(212,182,92,.02));border:1px solid rgba(212,182,92,.28);border-radius:var(--r-l);padding:22px 24px;margin:0 0 14px}
+  .call .q{color:var(--tx3);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;margin-bottom:7px}
+  .call .a{color:var(--tx);font-size:18px;font-weight:700;line-height:1.35;margin-bottom:7px}
+  .call .w{color:var(--tx2);font-size:14px;margin:0}
+  .warn{background:rgba(229,103,78,.07);border:1px solid rgba(229,103,78,.28);border-radius:var(--r-m);padding:18px 20px}
+  .warn b{color:var(--red);display:block;margin-bottom:5px}
+  .warn p{margin:0;color:var(--tx2);font-size:14px}
+  .quote{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:var(--r-m);padding:22px 24px;margin:0 0 18px}
+  .quote p{margin:0 0 10px;color:var(--tx);font-size:16.5px;line-height:1.6;font-style:italic}
+  .quote cite{color:var(--tx3);font-size:12px;font-style:normal;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+  details{background:var(--card);border:1px solid var(--line);border-radius:var(--r-l);margin-top:12px;overflow:hidden}
+  summary{cursor:pointer;padding:17px 22px;font-weight:700;color:var(--tx);font-size:15px;list-style:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"+";color:var(--gold);font-family:var(--mono);font-size:17px;font-weight:500}
+  details[open] summary::before{content:"-"}
+  details[open] summary{border-bottom:1px solid var(--line)}
+  .body{padding:6px 22px 24px}
+  .body h4{color:var(--gold);font-size:12px;letter-spacing:.11em;text-transform:uppercase;margin:22px 0 8px}
+  .body p,.body li{color:var(--tx2);font-size:14.5px}
+  .body code{font-family:var(--mono);font-size:12.5px;background:var(--card2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--gold)}
+  .body ul{padding-left:20px;margin:8px 0}
+  .body li{margin-bottom:6px}
+  .sev{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10.5px;font-weight:800;letter-spacing:.06em;font-family:var(--mono)}
+  .s-b{background:rgba(229,103,78,.16);color:var(--red)}
+  .s-f{background:rgba(224,163,60,.16);color:var(--amber)}
+  .s-s{background:rgba(91,157,217,.16);color:var(--blue)}
+  .wave{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--tx3);border:1px solid var(--line);border-radius:5px;padding:2px 8px;margin-left:auto}
+  .foot{margin-top:64px;padding-top:22px;border-top:1px solid var(--line);color:var(--tx3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Make the master <span>equal GTA minus identity</span>, then keep it there.</h1>
+  <p class="sub">Two halves. One build wave that brings the shared defaults up to what BAM GTA actually runs, with every academy fact turned into a token. Then the mechanism that stops them drifting apart again, in either direction.</p>
+  <p class="meta">Plan &middot; 27 Jul 2026 &middot; decisions locked with Zoran &middot; every fact verified against live prod rows and current source</p>
+
+  <div class="quote">
+    <p>"Get all of the chats working on the sales system preset automations in line with setting up the free trial sales system preset to have a default preset of automations in the pipelines that are the preset pipelines, similar to that of BAM GTA, just more templatized. When I onboard new academies onto that sales system preset I want to make sure they have the same automations, templatized to them."</p>
+    <cite>Zoran, 27 Jul 2026 - the directive this plan is built from</cite>
+  </div>
+
+
+  <div class="card" style="border-color:rgba(229,103,78,.45);background:linear-gradient(180deg,rgba(229,103,78,.10),rgba(229,103,78,.02));margin:0 0 26px">
+    <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);font-weight:800;margin-bottom:9px">Superseded in part &middot; 27 Jul 2026</div>
+    <div style="font-size:19px;font-weight:800;line-height:1.32;margin-bottom:10px">The weekly check is dead. A structural fix replaced it.</div>
+    <p style="margin:0 0 10px;color:var(--tx2);font-size:14.5px">Zoran, verbatim: "we don't need that weekly check since our goal is to set up the sales system in a way where it's either the preset or custom stuff that gets edited."</p>
+    <p style="margin:0 0 10px;color:var(--tx2);font-size:14.5px">If every row is explicitly preset-owned or academy-owned <b>at the moment it is written</b>, and owners have no free-text override, the drift this document was built to detect cannot silently form. Detecting drift weekly was always a workaround for an ambiguous boundary. Removing the ambiguity is the stronger fix.</p>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="warn" style="margin:0">
+        <b>Dropped</b>
+        <p>Item B, the reverse check. Item C, the weekly GitHub Action and the "Preset drift" issue. The CI read-only key question, now moot. The seven-day governance window, which evaporates with the check.</p>
+      </div>
+      <div class="rule" style="margin:0">
+        <b>Now load-bearing, not belt-and-braces</b>
+        <p><span class="m">sync_class</span> was a second line of defence behind a safety net. It is now the ONLY mechanism, so strictest-wins (<span class="m">attributed &gt; local &gt; shared</span>, template beats step) is the enforcement rather than metadata. Item G matters more too: the model only holds once GTA actually IS the clean reference.</p>
+      </div>
+    </div>
+    <div class="warn" style="margin-top:14px;background:rgba(224,163,60,.08);border-color:rgba(224,163,60,.32)">
+      <b style="color:var(--amber)">The residual, written down so nobody rediscovers it the hard way</b>
+      <p>The structural model assumes nobody edits GTA's rows as a special case any more. Under the old plan a weekly issue would have caught that; under this one, nothing does. That is fine while GTA is the reference and its rows ARE the preset. But if GTA ever gets a genuine one-off that is not meant to travel, <b>it must be marked <span class="m">local</span> at the moment it is written</b>, or it silently becomes everyone's.</p>
+    </div>
+    <p style="margin:12px 0 0;color:var(--tx3);font-size:13px">Sections 03, 08 and build items B and C below are kept for their reasoning, not as work. The override-tracing rule in section 03 survives as <b>design guidance</b> for anyone wiring blocks and resolvers: it is still the right way to tell a live leak from a dead literal.</p>
+  </div>
+
+  <!-- ───────────────────────── 1. THE DRIFT ───────────────────────── -->
+  <h2><span class="n">01</span>Why it drifted without anyone seeing</h2>
+  <p class="lede">The divergence checker only walks one way. Same verdict word for opposite problems, so neither got acted on.</p>
+  <div class="card scroll">
+<pre>
+     MASTER DEFAULTS                                     BAM GTA (live prod)
+     form-intro-automations.js                           what actually runs
+   ┌──────────────────────────────┐                  ┌──────────────────────────────┐
+   │  onboarding                  │                  │  onboarding                  │
+   │    3 SMS                     │   ◀── ✖ ────     │    8 steps                   │
+   │    0 emails                  │     NOTHING      │    6 designed emails         │
+   │    1 week                    │     LOOKS        │    ~24 days                  │
+   │                              │     THIS WAY     │                              │
+   ├──────────────────────────────┤                  ├──────────────────────────────┤
+   │  sales sequences             │                  │  4 sales steps hardcode      │
+   │    fully tokenized  ✔        │   ──── ✔ ──▶     │    "By Any Means Basketball" │
+   │    no academy literals       │     CAUGHT       │    "By Any Means GTA"        │
+   │                              │     as EDITED    │    byanymeanstoronto.ca      │
+   └──────────────────────────────┘                  └──────────────────────────────┘
+
+     GTA ahead  ->  reported as EDITED   ─┐
+                                          ├─  same word.  no signal.  no action.
+     GTA behind ->  reported as EDITED   ─┘
+</pre>
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="warn">
+      <b>The cost</b>
+      <p>Every academy launched since the preset shipped, San Jose included, gets a 3-step SMS-only welcome while GTA's members get 8 touches and 6 designed emails. The templates were already built and already reachable. The master pointed at none of them.</p>
+    </div>
+    <div class="warn" style="background:rgba(224,163,60,.07);border-color:rgba(224,163,60,.28)">
+      <b style="color:var(--amber)">There was already a rule</b>
+      <p>The header of <span class="m">form-intro-automations.js</span> says good live edits must be promoted back into the defaults. Written, never enforced, never happened. A rule with nothing watching it is a comment.</p>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── 2. TWO SURFACES ───────────────────────── -->
+  <h2><span class="n">02</span>It is two surfaces, not one</h2>
+  <p class="lede">The same bug shows up twice, in two places that look unrelated and are not.</p>
+  <div class="card scroll">
+<pre>
+   SURFACE 1: the automations            SURFACE 2: the agent brain
+   rows in automations + automation_steps  prompt-structure.js + fact-render.js
+
+   default step body                       default fact body
+        │                                       │
+        │ seeded per academy                    │ overridden per academy
+        ▼                                       ▼
+   the academy's own row                   fact-render.js set()
+        │                                       │
+        │                                       │  if (!data) return {}   ◀── FAILS OPEN
+        ▼                                       ▼
+   what a parent receives                  what the agent tells a parent
+
+   Same failure in both: a DEFAULT that contains a real academy's fact,
+   reaching an academy it does not belong to.
+</pre>
+  </div>
+  <div class="warn" style="margin-top:16px">
+    <b>Surface 2 is leaking right now, to every academy, unconditionally</b>
+    <p><span class="m">social_proof</span> sits in <span class="m">ACADEMY_ORDER</span> at prompt-structure.js:476 but has no renderer in fact-render.js. The comment at :509 says so out loud. Its default body is one hardcoded Google Reviews link, and nothing ever renders over it. Separately, <span class="m">fact-render</span> fails open twice, at <span class="m">if (!data) return {}</span> and again in its catch, so an academy with no training offer inherits GTA's program, schedule, pricing, policies and a coaches line claiming every coach played at college or professional level.</p>
+  </div>
+
+  <!-- ───────────────────────── 3. OVERRIDE TRACING ───────────────────────── -->
+  <h2><span class="n">03</span>How to tell a live leak from a dead literal <span style="color:var(--tx3);font-weight:400;text-transform:none;letter-spacing:0">&mdash; kept as design guidance</span></h2>
+  <p class="lede">A GTA literal in a source file is not evidence of a leak. Three false positives in one day came from assuming it was. This is the rule that separated live from dead in every case.</p>
+
+  <div class="rule" style="margin-bottom:16px">
+    <b>Does anything override this value on the path to output, and does that override fail open or closed?</b>
+    <p>Grepping for literals finds text. Tracing overrides finds leaks. The checker traces the path, it does not scan for strings.</p>
+  </div>
+
+  <div class="card scroll">
+<pre>
+   default value
+        │
+        ├──▶ is there an override on the path to output?
+        │
+        │    NO ─────────────────────────────▶  ⛔ LIVE LEAK
+        │                                        the default IS the output
+        │                                        e.g. social_proof, no renderer exists
+        │
+        └──▶ YES: what happens when the override has nothing to say?
+                    │
+                    ├── fails CLOSED (renders nothing) ──▶  ✔ SAFE
+                    │                                       e.g. blank domain drops
+                    │                                       the sentence carrying it
+                    │
+                    └── fails OPEN (default survives) ───▶  ⛔ LIVE LEAK
+                                                            e.g. if (!data) return {}
+                                                            hands back GTA's facts
+
+   NOT A LEAK, and the checker must say so rather than staying silent:
+     · a literal inside a comment documenting a value that was removed
+     · a fallback that a later commit deleted, still named in surrounding code
+     · a default that a renderer replaces unconditionally on every path
+</pre>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <table>
+      <thead><tr><th>Value</th><th>Override on the path</th><th>Behaviour</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td class="k">social_proof</td><td>none exists</td><td>default is the output</td><td><span class="pill p-no">live leak</span></td></tr>
+        <tr><td class="k">program / pricing / schedule</td><td>fact-render set()</td><td>fails open when no offer</td><td><span class="pill p-no">live leak</span></td></tr>
+        <tr><td class="k">qualification "near Oakville"</td><td>renderQualification</td><td>replaces unconditionally</td><td><span class="pill p-go">dead</span></td></tr>
+        <tr><td class="k">literals inside comments</td><td>not on any output path</td><td>documentation only</td><td><span class="pill p-go">dead</span></td></tr>
+        <tr><td class="k">blank academy domain</td><td>dropEmptyShellLinks</td><td>fails closed, drops the sentence</td><td><span class="pill p-go">safe</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ───────────────────────── 4. THE ONE PRINCIPLE ───────────────────────── -->
+  <h2><span class="n">04</span>One principle covers both surfaces</h2>
+  <p class="lede">Everything below is an application of a single rule.</p>
+  <div class="card" style="border-color:rgba(212,182,92,.35);background:linear-gradient(180deg,rgba(212,182,92,.07),rgba(212,182,92,.01))">
+    <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:10px">The rule</div>
+    <div style="font-size:22px;font-weight:800;line-height:1.3;margin-bottom:12px">No fact, no output.</div>
+    <p style="margin:0;color:var(--tx2);font-size:15px;max-width:70ch">A default may never contain a real academy's fact. Where a fact is missing, the thing that needed it renders nothing at all, rather than falling back to somebody else's version of it. In an email that means the block does not appear. In the agent brain it means the section is absent from the prompt. Same rule, two surfaces.</p>
+  </div>
+  <div class="grid g3" style="margin-top:16px">
+    <div class="rule"><b>Defaults go neutral-or-empty</b><p>Zoran's call. The fail-open stays, because an agent with no fallback improvises, which is worse than a gap. What changes is that falling open becomes harmless.</p></div>
+    <div class="rule"><b>Emails become blocks</b><p>A block declares the fact it needs. No fact, no block. Nine blocks for every academy, and each academy renders the ones it can fill.</p></div>
+    <div class="rule"><b>A test enforces it</b><p>Assert that no default body contains an academy identity value. That is what stops this recurring, not the cleanup itself.</p></div>
+  </div>
+
+  <!-- ───────────────────────── 5. GTA'S SEQUENCE ───────────────────────── -->
+  <h2><span class="n">05</span>What GTA actually runs</h2>
+  <p class="lede">Pulled from prod. 8 steps, 10 members enrolled, still firing. This is the target the master converges to.</p>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>#</th><th>When</th><th>Channel</th><th>What it sends</th><th>Content source</th></tr></thead>
+      <tbody>
+        <tr><td class="k">1</td><td>0m</td><td>SMS</td><td>Welcome, check your email</td><td>brand-global, hardcodes "By Any Means Basketball"</td></tr>
+        <tr><td class="k">2</td><td>0m</td><td>Email</td><td><span class="m">onboarding-welcome</span></td><td>GTA shell + WhatsApp, schedule, venue, phone, merch</td></tr>
+        <tr><td class="k">3</td><td>+5m</td><td>SMS</td><td>The weekly schedule, pasted in</td><td>pure GTA fact</td></tr>
+        <tr><td class="k">4</td><td>+5m</td><td>Email</td><td><span class="m">onboarding-training</span></td><td>GTA shell, body is brand-global</td></tr>
+        <tr><td class="k">5</td><td>+3d</td><td>Email</td><td><span class="m">onboarding-story</span></td><td>tokenized shell, 1 literal</td></tr>
+        <tr><td class="k">6</td><td>+7d</td><td>Email</td><td><span class="m">onboarding-era</span></td><td>tokenized shell, clean</td></tr>
+        <tr><td class="k">7</td><td>+7d</td><td>Email</td><td><span class="m">onboarding-testimonials</span></td><td><span style="color:var(--red);font-weight:600">real parents' words</span></td></tr>
+        <tr><td class="k">8</td><td>+7d</td><td>Email</td><td><span class="m">onboarding-review</span></td><td>GTA shell + GTA's Google link</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="rule" style="margin-top:16px">
+    <b>Correction to the queue: nurture is not a gap</b>
+    <p><span class="m">NURTURE_DEFAULT</span> is already 4 designed email steps (<span class="m">template:nurture-1..4</span>) and it is the only definition in the codebase. The sequence that is 3 plain SMS is <b>onboarding</b>. Nurture's only difference from GTA is the testimonials hold at step 3, which this plan handles as <span class="m">attributed</span>. Nothing extra folds in, and <span class="m">nurture-emails.js</span> is already clean, so it must not be re-tokenized.</p>
+  </div>
+
+  <!-- ───────────────────────── 6. THE LANDMINE ───────────────────────── -->
+  <h2><span class="n">06</span>Why a naive convergence would ship the bad thing</h2>
+  <div class="card scroll" style="border-color:rgba(229,103,78,.3)">
+<pre>
+   GTA's onboarding-testimonials carries REAL parent quotes.
+   The academy name and city inside it are TOKENIZED, which is exactly what
+   makes it dangerous: it renders cleanly for anybody.
+
+        "Best decision we made for our son."
+                        - Parent of Adam, {{location.city}}
+                                            │
+                                            └──▶ renders "San Jose"
+
+   A San Jose parent reads a San Jose family praising a program they never
+   attended. Zoran already caught this class of bug and deliberately held
+   nurture-3 for San Jose. A structure-only diff would call that hold
+   "drift" and a naive convergence would undo it.
+</pre>
+  </div>
+  <div class="rule" style="margin-top:16px">
+    <b>So convergence separates three things, not two</b>
+    <p><b style="display:inline;color:var(--green)">Structure</b> (step count, timing, channel, which template a step points at) converges freely.
+    <b style="display:inline;color:var(--blue)">Tokenized copy</b> converges once genuinely academy-neutral.
+    <b style="display:inline;color:var(--red)">Attributed content</b> (real people's words, named coaches, addresses, photos) never propagates and must be impossible to pick up by accident.</p>
+  </div>
+
+  <!-- ───────────────────────── 7. DECISIONS ───────────────────────── -->
+  <h2><span class="n">07</span>The eight calls</h2>
+  <p class="lede">Made with Zoran, 27 Jul 2026.</p>
+
+  <div class="call">
+    <div class="q">01 &middot; Authority</div>
+    <div class="a">GTA is the reference implementation.</div>
+    <p class="w">The master equals GTA's live automation system with identity templatized, not a separately-authored lighter version. A gap is a master bug to close. <b style="color:var(--gold)">The trade, accepted knowingly:</b> GTA becomes a governed instance. Every edit to GTA's rows is a claim on every academy, and GTA's 4 hardcoded sales steps stop being GTA's business and become bugs to fix.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">02 &middot; Where the check fires</div>
+    <div class="a">Weekly GitHub Action that opens and updates one issue.</div>
+    <p class="w">Reverse pass added to the existing script, scheduled in <span class="m">.github/workflows</span>, keeping a single issue titled "Preset drift" current rather than opening a new one weekly. It lands in the repo where the fix lives and needs nobody to remember to look.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">03 &middot; How the check decides</div>
+    <div class="a">Trace overrides, never grep literals.</div>
+    <p class="w">A value is flagged only when nothing overrides it on the path to output, or when the override fails open. Comments, deleted fallbacks and unconditionally-replaced defaults are reported as dead rather than passed over in silence, so the checker is trusted instead of tuned out.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">04 &middot; The brake on attributed content</div>
+    <div class="a">A <span class="m" style="font-size:16px">sync_class</span> marker: shared / local / attributed.</div>
+    <p class="w">Set on the template so every step pointing at it inherits. Default is <b>shared</b>. <b>local</b> means structure is shared but the words belong to this academy. <b>attributed</b> means it never propagates and must be re-authored. Attached to the smallest addressable unit, so it works for a step, a block, an offer or a pipeline stage.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">05 &middot; The agent brain's fail-open</div>
+    <div class="a">Make every default neutral-or-empty. Keep the fail-open.</div>
+    <p class="w">Failing open is the right behaviour, because an agent with no fallback improvises. The bug is what it falls back to. Once no default carries a real academy fact, falling open is harmless, and a missing fact renders nothing instead of GTA's version.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">06 &middot; The three GTA-shelled emails</div>
+    <div class="a">Re-shell all three, and collect the missing facts in onboarding.</div>
+    <p class="w"><span class="m">onboarding-welcome</span>, <span class="m">-training</span> and <span class="m">-review</span> build their own header and footer with GTA's wordmark, "OAKVILLE &middot; GTA", the GTA domain and GTA's Instagram baked in as literals, instead of using the tokenized shell that already exists. Re-shelling is plumbing, not copywriting.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">07 &middot; Composition and owner copy</div>
+    <div class="a">Blocks auto-render when their fact exists. Copy changes go through support tickets.</div>
+    <p class="w">Filling the wizard <em>is</em> composing the email, so there is no extra step, but the wizard has to actually ask or auto-on silently means auto-off. No free-text override in the product: routing copy changes through tickets keeps every word staff-authored and therefore promotable, and puts the promote-or-hold decision exactly where someone is already making a judgment.</p>
+  </div>
+
+  <div class="call">
+    <div class="q">08 &middot; The two orphan sequences</div>
+    <div class="a">Delete Trial Follow-up. Summer Special stays GTA-only, parked.</div>
+    <p class="w">Neither has ever enrolled a single lead. Trial Follow-up duplicates <span class="m">trial_form</span>, same trigger and same 20-minute wait, and <span class="m">trial_form</span> has run 30 times including today. Summer Special is held pending a standardized reignition flow for sales presets, recorded as an accepted exception so the check stops nagging and it resurfaces when that work starts.</p>
+  </div>
+
+  <!-- ───────────────────────── 8. BEFORE / AFTER ───────────────────────── -->
+  <h2><span class="n">08</span>What the check reports, before and after</h2>
+  <div class="grid g2">
+    <div class="card scroll">
+      <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);font-weight:700;margin-bottom:14px">Before</div>
+<pre>
+BAM GTA
+  MATCH    contact_form
+  EDITED   trial_form     step 1: body differs
+  MATCH    missed_trial
+  EDITED   ghosted        step 1: body differs
+  EDITED   nurture        step 3: body differs
+  EDITED   onboarding     8 steps vs 3 canonical
+  EXTRA    summer_special, trial_followup
+
+No broken seeds.
+exit 0
+</pre>
+      <p style="color:var(--tx3);font-size:13px;margin:16px 0 0">Four EDITED lines. Two are GTA behind the master, one is GTA ahead, one is a deliberate hold. Nothing distinguishes them, so the run passes.</p>
+    </div>
+    <div class="card scroll" style="border-color:rgba(95,191,138,.3)">
+      <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);font-weight:700;margin-bottom:14px">After</div>
+<pre>
+BAM GTA   (reference academy)
+  MATCH     contact_form
+  BEHIND    trial_form    step 1 hardcodes
+                          "By Any Means GTA"
+                          -> fix GTA, use the token
+  MATCH     missed_trial
+  BEHIND    ghosted       steps 1-2 hardcode domain
+  AHEAD     onboarding    8 steps vs 3 in master
+                          -> PROMOTE 5 steps
+  HELD      nurture       step 3 attributed
+                          -> expected, not drift
+  ACCEPTED  summer_special
+                          reignition flow, parked
+
+AGENT BRAIN
+  LEAK      social_proof  no renderer on the path
+                          -> default reaches everyone
+
+1 AHEAD, 2 BEHIND, 1 LEAK -> "Preset drift" updated
+exit 1
+</pre>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <table>
+      <thead><tr><th>Verdict</th><th>Means</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill p-go">MATCH</span></td><td>Academy equals the master</td><td>None</td></tr>
+        <tr><td><span class="pill p-g">AHEAD</span></td><td>Reference has structure the master lacks</td><td>Promote into the master</td></tr>
+        <tr><td><span class="pill p-re">BEHIND</span></td><td>Reference lags the master, usually a hardcode</td><td>Fix the academy row</td></tr>
+        <tr><td><span class="pill p-no">LEAK</span></td><td>A default reaches output unoverridden, or its override fails open</td><td>Neutralize the default</td></tr>
+        <tr><td><span class="pill p-tok">HELD</span></td><td>Difference sits on <span class="m">attributed</span> or <span class="m">local</span> content</td><td>None. Expected by design</td></tr>
+        <tr><td><span class="pill p-no">ACCEPTED</span></td><td>Recorded deliberate divergence with a written reason</td><td>None until the reason expires</td></tr>
+        <tr><td><span class="pill p-go">DEAD</span></td><td>Literal exists but nothing carries it to output</td><td>None. Reported so it is not re-raised</td></tr>
+        <tr><td><span class="pill p-no">MISSING / EMPTY</span></td><td>Broken seed, unchanged from today</td><td>Re-seed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ───────────────────────── 9. THE 6 EMAILS ───────────────────────── -->
+  <h2><span class="n">09</span>The six onboarding emails</h2>
+  <p class="lede">All six already exist and are already reachable via <span class="m">template:&lt;key&gt;</span>. This is the verdict on each.</p>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>Template</th><th>Shell</th><th>GTA literals in the body</th><th>sync_class</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td class="k">onboarding-era</td><td><span style="color:var(--green)">tokenized</span></td><td>none</td><td>shared</td><td><span class="pill p-go">Promote as-is</span></td></tr>
+        <tr><td class="k">onboarding-story</td><td><span style="color:var(--green)">tokenized</span></td><td>1 ("Toronto")</td><td>shared</td><td><span class="pill p-tok">Tokenize 1 word, promote</span></td></tr>
+        <tr><td class="k">onboarding-training</td><td><span style="color:var(--red)">GTA hardcoded</span></td><td>sign-off only, body is brand-global</td><td>shared</td><td><span class="pill p-re">Re-shell, then promote</span></td></tr>
+        <tr><td class="k">onboarding-review</td><td><span style="color:var(--red)">GTA hardcoded</span></td><td>GTA's Google review link</td><td>shared</td><td><span class="pill p-re">Re-shell + 1 new field</span></td></tr>
+        <tr><td class="k">onboarding-welcome</td><td><span style="color:var(--red)">GTA hardcoded</span></td><td>WhatsApp, schedule, venue, coach phone, merch, IG handles</td><td>shared shell, local blocks</td><td><span class="pill p-re">Re-shell + rebuild as blocks</span></td></tr>
+        <tr><td class="k">onboarding-testimonials</td><td><span style="color:var(--green)">tokenized</span></td><td>none, and that is the danger</td><td><b style="color:var(--red)">attributed</b></td><td><span class="pill p-no">Never propagates</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="rule" style="margin-top:16px">
+    <b>The last row is the one that gates the wave</b>
+    <p>The testimonials brake has to land before or with the promotion, never after. The moment the master's onboarding grows past 3 steps without it, the next academy seeded inherits another academy's parents.</p>
+  </div>
+
+  <!-- ───────────────────────── 10. BLOCK MODEL ───────────────────────── -->
+  <h2><span class="n">10</span>Where every line comes from</h2>
+  <p class="lede">Five sources. This is the rule set the convergence rests on.</p>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>Source</th><th>Who fills it</th><th>Example</th><th>Travels to a new academy</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Frame</td><td>automatic</td><td>wordmark, site, Instagram, unsubscribe</td><td><span style="color:var(--green)">always</span></td></tr>
+        <tr><td class="k">Brand-global</td><td>written once in the master</td><td>"three habits that make training count"</td><td><span style="color:var(--green)">always</span></td></tr>
+        <tr><td class="k">Fact we hold</td><td>automatic</td><td>academy name, city, owner, domain</td><td><span style="color:var(--green)">always</span></td></tr>
+        <tr><td class="k">Fact we don't hold</td><td>owner, in the wizard</td><td>community group, review link, coach phone</td><td><span style="color:var(--amber)">only if we ask</span></td></tr>
+        <tr><td class="k">Someone's words</td><td>never travels</td><td>parent testimonials</td><td><span style="color:var(--red)">never</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card scroll" style="margin-top:16px">
+<pre>
+   onboarding-welcome, as nine blocks
+   ┌────────────────────────────────────────────────────────────────┐
+   │  ▸ greeting             shared     always renders              │
+   │  ▸ community group      local      needs: group link           │  owner
+   │  ▸ online programs      local      needs: programs URL         │  owner
+   │  ▸ follow us            shared     needs: Instagram            │  auto
+   │  ▸ refer a friend       local      needs: perk text            │  owner
+   │  ▸ contact a coach      shared     needs: clients.phone        │  auto
+   │  ▸ weekly schedule      shared     from schedule_slots         │  auto
+   │  ▸ venue                shared     from slot location_label    │  auto
+   │  ▸ sign-off             shared     always renders              │
+   └────────────────────────────────────────────────────────────────┘
+        same nine blocks for every academy
+        a block whose fact is MISSING simply does not render
+</pre>
+  </div>
+
+  <!-- ───────────────────────── 11. FIELDS ───────────────────────── -->
+  <h2><span class="n">11</span>The facts, and what each one costs</h2>
+  <p class="lede">Cheaper than it looked. Two are free, one exists already, four are new, and one of the four fixes a leak on the other surface too.</p>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>Fact</th><th>Source</th><th>Also feeds</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="k">weekly schedule</td><td><span class="m">schedule_slots</span>, GTA has 86 live rows</td><td>agent <span class="m">schedule</span> fact</td><td><span class="pill p-go">free</span></td></tr>
+        <tr><td class="k">training venue</td><td><span class="m">schedule_slots.location_label</span></td><td>agent <span class="m">business_info</span></td><td><span class="pill p-go">free</span></td></tr>
+        <tr><td class="k">coach phone</td><td><span class="m">clients.phone</span></td><td>-</td><td><span class="pill p-re">exists, empty for GTA</span></td></tr>
+        <tr><td class="k">Google review link</td><td>nothing today</td><td><b style="color:var(--gold)">agent social_proof</b></td><td><span class="pill p-no">new field</span></td></tr>
+        <tr><td class="k">community group</td><td>nothing today</td><td>-</td><td><span class="pill p-no">new field + platform</span></td></tr>
+        <tr><td class="k">online programs URL</td><td>nothing today</td><td>-</td><td><span class="pill p-no">new field</span></td></tr>
+        <tr><td class="k">refer-a-friend perk</td><td>nothing today</td><td>-</td><td><span class="pill p-no">new field</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="rule">
+      <b>One field closes two leaks</b>
+      <p>The review link is what <span class="m">onboarding-review</span>'s button needs AND what gives <span class="m">social_proof</span> a renderer. Add it once and the unconditional Google Reviews leak becomes a rendered fact that is simply absent when the academy has not supplied one.</p>
+    </div>
+    <div class="warn">
+      <b>Do not wire the venue to clients.address</b>
+      <p>GTA's <span class="m">clients.address</span> is "2205 Rosemount Cres". The gym in the welcome email is 1079 Linbrook Rd, Oakville. That column is the business address, not the training venue. The venue belongs to the schedule slot, which is also what makes it correct for an academy training in more than one place.</p>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── 12. GUARDRAIL ───────────────────────── -->
+  <h2><span class="n">12</span>The guardrail this plan is held to</h2>
+  <div class="rule">
+    <b>Sales systems are shared. Never fork one academy's structure.</b>
+    <p>If one academy needs X, either every academy gets X or X is a runtime fact. This plan takes one exception knowingly: Summer Special stays GTA-only, parked pending a standardized reignition flow for sales presets. It is recorded as an ACCEPTED divergence with that reason attached rather than left as silent drift, so it resurfaces the moment the reignition work starts.</p>
+  </div>
+
+  <!-- ───────────────────────── BUILD SPEC ───────────────────────── -->
+  <h2><span class="n">13</span>Build spec</h2>
+  <p class="lede">Two waves. Wave 1 converges the master to GTA minus identity. Wave 2 keeps it there. Severity uses the standing triage: BLOCKER, FRICTION, SCALE.</p>
+
+  <details>
+    <summary>H. Neutralize the agent brain's defaults <span class="sev s-b">BLOCKER</span><span class="wave">wave 1</span></summary>
+    <div class="body">
+      <p>The only item leaking to every academy right now, unconditionally, with no seed step in between. Do this first.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Give <code>social_proof</code> a renderer in <code>fact-render.js</code> fed by the new review-link field, and add it to the <code>set()</code> list. With <code>set()</code> already skipping falsy bodies, an academy with no link renders nothing, which is the correct outcome.</li>
+        <li>Sweep every default body in <code>prompt-structure.js</code> for real academy facts and replace them with neutral-or-empty. <code>program</code>, <code>schedule</code>, <code>pricing</code>, <code>policies</code> and <code>coaches</code> all currently carry GTA's answers. The <code>coaches</code> default asserting every coach played at college or professional level is a false claim for a new academy, not just a leak.</li>
+        <li>Keep both fail-open returns exactly as they are. Per Zoran's call the fallback is correct once what it falls back to is harmless.</li>
+        <li>Add the test that asserts no default body contains an academy identity value, drawing the identity set from the same place <code>email-shells.js</code> resolves it.</li>
+      </ul>
+      <h4>Done when</h4>
+      <p>An academy with no training offer produces a prompt with those sections absent rather than populated with another academy's answers, and the test fails if anyone reintroduces a literal.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>A. sync_class and the testimonials brake <span class="sev s-b">BLOCKER</span><span class="wave">wave 2, gates D</span></summary>
+    <div class="body">
+      <p>Must land before or with item D. Without it the promotion is itself the bug.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Add a <code>sync_class</code> declaration to the template registry in <code>api/email-templates/</code>. Three values: <code>shared</code> (default), <code>local</code>, <code>attributed</code>.</li>
+        <li>Mark <code>onboarding-testimonials</code> and <code>nurture-3</code> as <code>attributed</code>.</li>
+        <li>Add <code>sync_class</code> to <code>automation_steps</code>, default <code>shared</code>. A step whose body is <code>template:&lt;key&gt;</code> inherits the template's class, so the marking lives with the content and cannot be lost by editing a step.</li>
+        <li>Seeder rule: a step whose resolved class is <code>attributed</code> seeds <code>enabled:false</code> with a note telling the academy to supply their own.</li>
+      </ul>
+      <h4>Done when</h4>
+      <p>A freshly seeded academy has the testimonials step present and disabled, and San Jose's existing deliberate hold reports HELD rather than drift.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>G. Clean GTA's own rows <span class="sev s-b">BLOCKER</span><span class="wave">wave 1, do first</span></summary>
+    <div class="body">
+      <p>Small, independent, and makes every later run cleaner. Follows directly from GTA being the reference.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Delete the <code>trial_followup</code> automation and its single step. Zero enrollments ever, disabled, never approved, duplicates <code>trial_form</code> which has run 30 times including today, and its body references a token that does not resolve.</li>
+        <li>Replace hardcoded academy literals with the tokens the master already uses, in <code>contact_form</code> step 1, <code>trial_form</code> step 1, and <code>ghosted</code> steps 1 and 2.</li>
+        <li>Record <code>summer_special</code> as an ACCEPTED divergence, reason "held pending a standardized reignition flow for sales presets".</li>
+      </ul>
+      <h4>Done when</h4>
+      <p>GTA reports MATCH on every sales key, with no EXTRA rows other than the recorded exception.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>F. Collect the four missing facts in onboarding <span class="sev s-f">FRICTION</span><span class="wave">wave 1, gates E</span></summary>
+    <div class="body">
+      <p>Zoran's condition on the auto-on decision: the wizard has to actually ask, otherwise auto-on silently means auto-off.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Four new fields: Google review link, community group link plus platform label, online programs URL, refer-a-friend perk text. Plus filling <code>clients.phone</code>, which exists and is empty for GTA.</li>
+        <li>The onboarding wizard rule applies in full: a registry row in <code>_OBF_STEPS</code>, a detector in <code>_obfFetchState()</code>, and the key listed in a section's <code>keys</code> in <code>_OBF_SECTIONS</code>. All three, or the step is defined and detected but invisible.</li>
+        <li>Show the owner what each fact turns on, so the link between filling a field and the email a parent receives is visible at the point of action.</li>
+        <li>Backfill GTA's own five values. GTA is the reference and has to be complete.</li>
+      </ul>
+      <h4>Note</h4>
+      <p>The review link is shared with item H. Build the field once and wire both consumers.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>D. Promote the onboarding sequence <span class="sev s-f">FRICTION</span><span class="wave">wave 1, needs A</span></summary>
+    <div class="body">
+      <p>Takes <code>ONBOARDING_DEFAULT</code> from 3 steps to 8.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Promote GTA's structure and timings: 0m SMS, 0m welcome email, +5m schedule SMS, +5m training email, +3d story, +7d era, +7d testimonials, +7d review.</li>
+        <li>The schedule SMS renders from <code>schedule_slots</code> and does not send when the academy has no slots, rather than carrying pasted text.</li>
+        <li><code>onboarding-era</code> promotes as-is. <code>onboarding-story</code> promotes after tokenizing one word.</li>
+        <li>Every step body stays a <code>template:&lt;key&gt;</code> reference so the database holds a reference, not markup.</li>
+      </ul>
+      <h4>Done when</h4>
+      <p>A newly seeded academy shows 8 onboarding steps, the check reports MATCH against GTA for the key, and the testimonials step is present and disabled.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>E. Re-shell and block-ify the three GTA-shelled emails <span class="sev s-f">FRICTION</span><span class="wave">wave 1, needs F</span></summary>
+    <div class="body">
+      <p>The largest item.</p>
+      <h4>Build</h4>
+      <ul>
+        <li>Delete the local <code>HEAD</code> and <code>FOOT</code> in <code>api/email-templates/onboarding-emails.js</code> and render all three through the tokenized shell <code>email-shells.js</code> already fills. This alone removes the GTA wordmark, the "OAKVILLE &middot; GTA" tag, the GTA domain and GTA's Instagram from three emails.</li>
+        <li><code>onboarding-training</code>: re-shell, tokenize the sign-off. Body is otherwise brand-global.</li>
+        <li><code>onboarding-review</code>: re-shell, point the call to action at the review-link field. No field, no button.</li>
+        <li><code>onboarding-welcome</code>: rebuild as the nine blocks, each declaring what it needs and rendering nothing without it. Schedule and venue come from <code>schedule_slots</code>.</li>
+      </ul>
+      <h4>Watch for</h4>
+      <p><code>stripFreeTrial</code> and <code>dropEmptyShellLinks</code> both operate on rendered markup. Blocks must be assembled before those run, not after.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>B. Override-tracing reverse check <span class="sev" style="background:rgba(229,103,78,.16);color:var(--red)">DROPPED</span><span class="wave">superseded 27 Jul</span></summary>
+    <div class="body">
+      <h4>Build</h4>
+      <ul>
+        <li>Declare the reference academy explicitly, GTA today, rather than inferring it.</li>
+        <li>Replace the single EDITED verdict with AHEAD, BEHIND, HELD, ACCEPTED, LEAK and DEAD, keeping MATCH, MISSING and EMPTY as they are.</li>
+        <li>AHEAD when the reference has structure the master lacks: more steps, a template reference the master does not carry, a different channel or timing. This is a structural diff and needs no literal scanning.</li>
+        <li>BEHIND, LEAK and DEAD all come from override tracing, never from grepping. For each default, resolve whether an override exists on the path to output and whether it fails open or closed. No override, or an override that fails open, is a LEAK. An override that replaces unconditionally makes the literal DEAD, and DEAD is reported rather than hidden so the same false positive is not raised twice.</li>
+        <li>HELD when the differing content resolves to <code>attributed</code> or <code>local</code>.</li>
+        <li>ACCEPTED from a small file of recorded divergences, each requiring a written reason. Seed it with <code>summer_special</code>.</li>
+        <li>Exit 1 on AHEAD, BEHIND, LEAK, MISSING or EMPTY.</li>
+      </ul>
+      <h4>Note</h4>
+      <p>Keep the verdict set generic. A parallel audit covers stages, entry points, agents, calendars and offers, and those entities feed the same reporter with the same verdicts.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>C. Weekly drift issue <span class="sev" style="background:rgba(229,103,78,.16);color:var(--red)">DROPPED</span><span class="wave">superseded 27 Jul</span></summary>
+    <div class="body">
+      <h4>Build</h4>
+      <ul>
+        <li>Workflow in <code>.github/workflows/</code>, weekly schedule plus manual dispatch, running the checker with <code>--all</code>.</li>
+        <li>Find the open issue titled "Preset drift" and edit its body, or open it if absent. One issue, always current, never a weekly pile.</li>
+        <li>Body groups by verdict with the academy, the key and the suggested action. Close automatically when a run comes back clean.</li>
+        <li>Needs the service key as a repo secret, read-only. The script never writes to the database.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>Order of work</summary>
+    <div class="body">
+<pre style="white-space:pre-wrap">WAVE 1  converge the master to GTA minus identity
+
+  H  neutralize agent defaults     leaking NOW, no seed step in between
+  G  clean GTA's rows              small, independent
+  F  collect facts  ───────────▶   E  re-shell + block-ify
+  A  sync_class brake  ────────▶   D  promote onboarding 3 -> 8
+
+WAVE 2  keep it there
+
+  B  override-tracing check  ──▶   C  weekly drift issue</pre>
+      <p style="margin-top:14px">H first because it is the only thing leaking with nothing in between it and a parent. G next because it is small and makes every later run cleaner. A before D always. F before E, or the welcome email ships with its best blocks switched off. Wave 2 lands after wave 1 so its first run is a real baseline rather than a list of things already being fixed.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>What changes for every future academy</summary>
+    <div class="body">
+      <ul>
+        <li>A new academy seeds an 8-step onboarding instead of 3, with 5 designed emails live and the testimonials step present but off until they supply their own.</li>
+        <li>The agent goes live with facts it actually holds, and stays silent on the ones it does not, instead of answering with GTA's program, pricing and coaching claims.</li>
+        <li>Onboarding asks four new questions, each visibly turning on a block of the welcome email, and one of them also turns on the agent's social proof.</li>
+        <li>Copy change requests arrive as support tickets, and each ticket is the moment staff decides master-for-everyone or recorded divergence for one.</li>
+        <li>Drift in either direction, plus any new leak, surfaces weekly in one GitHub issue instead of waiting to be noticed.</li>
+        <li>GTA is now governed. Editing GTA is editing the reference, and the check will say so within the week.</li>
+      </ul>
+    </div>
+  </details>
+
+  <p class="foot">Every fact here was verified against live production rows and current source on 27 Jul 2026, not inferred. Enrollment counts, step bodies, schedule slot counts, the address mismatch, the missing social_proof renderer and both fail-open returns were each read directly.</p>
+
+</div>
+</body>
+</html>

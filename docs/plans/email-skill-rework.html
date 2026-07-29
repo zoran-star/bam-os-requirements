@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Email build skills - rework plan</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#D4B65C; --bg:#0C0C0D; --card:#141416; --card2:#1A1A1D; --line:#2A2A2E;
+    --tx:#EDEDEF; --tx2:#A8A8B0; --tx3:#6E6E78;
+    --red:#E5674E; --green:#5FBF8A; --blue:#5B9DD9; --amber:#E0A33C;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif; --mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1100px;margin:0 auto;padding:40px 20px 90px}
+  h1{font-size:clamp(26px,4.2vw,38px);line-height:1.12;letter-spacing:-.02em;margin:0 0 9px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:16.5px;margin:0 0 8px;max-width:72ch}
+  .meta{color:var(--tx3);font-size:12.5px;font-family:var(--mono);margin:0 0 34px}
+  h2{font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:54px 0 6px;font-weight:700}
+  h2 .n{color:var(--tx3);margin-right:10px}
+  .lede{color:var(--tx2);font-size:15.5px;margin:0 0 20px;max-width:76ch}
+  .m{font-family:var(--mono);font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:22px}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  pre{font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--tx2);margin:0;white-space:pre}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:700;padding:0 13px 9px;border-bottom:1px solid var(--line)}
+  td{padding:11px 13px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--tx2)}
+  td.k{color:var(--tx);font-weight:600;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .grid{display:grid;gap:15px}
+  @media(min-width:800px){.g2{grid-template-columns:1fr 1fr}}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+  .p-a{background:rgba(95,191,138,.14);color:var(--green);border:1px solid rgba(95,191,138,.3)}
+  .p-b{background:rgba(212,182,92,.14);color:var(--gold);border:1px solid rgba(212,182,92,.3)}
+  .p-c{background:rgba(229,103,78,.14);color:var(--red);border:1px solid rgba(229,103,78,.3)}
+  .rule{background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:12px;padding:16px 18px}
+  .rule b{color:var(--tx);display:block;margin-bottom:4px;font-size:14.5px}
+  .rule p{margin:0;color:var(--tx2);font-size:13.5px}
+  .warn{background:rgba(229,103,78,.07);border:1px solid rgba(229,103,78,.28);border-radius:12px;padding:16px 18px}
+  .warn b{color:var(--red);display:block;margin-bottom:4px}
+  .warn p{margin:0;color:var(--tx2);font-size:13.5px}
+  .phase{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:13px}
+  .ph{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--card2);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .ph .num{font-family:var(--mono);font-size:11px;color:var(--bg);background:var(--gold);border-radius:6px;padding:2px 8px;font-weight:700}
+  .ph h3{margin:0;font-size:16px;font-weight:800}
+  .ph .who{margin-left:auto;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--tx3)}
+  .pb{padding:16px 18px}
+  .pb p{margin:0 0 9px;color:var(--tx2);font-size:14px}
+  .pb ul{margin:6px 0 0;padding-left:19px}
+  .pb li{color:var(--tx2);font-size:13.5px;margin-bottom:5px}
+  .pb code{font-family:var(--mono);font-size:12px;background:var(--card2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--gold)}
+  .foot{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--tx3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>The academy already told us <span>what to write</span>. Nothing reads it.</h1>
+  <p class="sub">Two skills, one for the sales preset and one for member onboarding, both run by internal BAM staff. Each builds what it can alone, checks whether it has anything to write from, and proposes the rest as plain copy in the chat before a single thing gets built.</p>
+  <p class="meta">Plan &middot; 27 Jul 2026 &middot; rev 2, after the logic audit</p>
+
+  <h2><span class="n">01</span>What exists today</h2>
+  <p class="lede">There is no skill. There is not even the generator the code claims to have.</p>
+  <div class="card scroll">
+<pre>
+   nurture-emails.js, line 1:
+   "GENERATED - do not hand-edit. Re-run the generator to refresh."
+
+   There is no generator. Searched the monorepo and bam-client-sites.
+   The one instruction the file gives is impossible to follow.
+
+   WHAT ACTUALLY HAPPENS
+   ┌──────────────────────────────────────────────────────────────┐
+   │  1  hand-design HTML in Claude Design                        │
+   │  2  hand-paste into nurture-emails.js as a 36KB escaped      │
+   │     JS string                                                │
+   │  3  onboarding-emails.js is hand-written JS: HEAD + P() +    │
+   │     CTA() + FOOT concatenated by hand                        │
+   │  4  nothing anywhere reads the academy's onboarding data     │
+   └──────────────────────────────────────────────────────────────┘
+</pre>
+  </div>
+
+  <h2><span class="n">02</span>The brand deck is already written</h2>
+  <p class="lede">The biggest thing in the plan, and the product already promises it.</p>
+
+  <div class="card" style="border-color:rgba(212,182,92,.4);background:linear-gradient(180deg,rgba(212,182,92,.08),rgba(212,182,92,.01))">
+    <div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:9px">The onboarding wizard, "Tell your story" step</div>
+    <p style="margin:0;font-size:17px;line-height:1.5;color:var(--tx);font-style:italic">"Why families should pick you, who your dream athletes are, your story and your proof. Your website and emails get written from these, in your words."</p>
+    <p style="margin:11px 0 0;color:var(--tx2);font-size:13.5px">The wizard says the emails come from this. Nothing delivers it. The job is not a new input, it is honouring the promise already on screen.</p>
+  </div>
+
+  <div class="grid g2" style="margin-top:15px">
+    <div class="card">
+      <div style="font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:700;margin-bottom:11px">brand_data, design</div>
+      <table style="min-width:0"><tbody>
+        <tr><td class="k">color_primary</td><td>#D4B65C</td></tr>
+        <tr><td class="k">color_secondary</td><td>#0B0B0D</td></tr>
+        <tr><td class="k">font_display</td><td>Anton</td></tr>
+        <tr><td class="k">font_body</td><td>Inter</td></tr>
+        <tr><td class="k">logo_dark_url</td><td>logo for dark grounds</td></tr>
+        <tr><td class="k">notes</td><td>the voice: bold, gold-on-black, athletic</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card" style="border-color:rgba(95,191,138,.35)">
+      <div style="font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--green);font-weight:700;margin-bottom:11px">brand_data, copy</div>
+      <table style="min-width:0"><tbody>
+        <tr><td class="k">story</td><td>origin story, already written</td></tr>
+        <tr><td class="k">why_us</td><td>why their way is different</td></tr>
+        <tr><td class="k">proof</td><td>four proof points</td></tr>
+        <tr><td class="k">stats</td><td>who they serve, member count</td></tr>
+        <tr><td class="k">dream_athletes</td><td>the ideal family, so tone can match</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="card scroll" style="margin-top:15px">
+    <table>
+      <thead><tr><th>Email</th><th>Its job</th><th>Source already written</th><th>Both academies</th></tr></thead>
+      <tbody>
+        <tr><td class="k">story</td><td>Why us at all</td><td><span class="m">brand_data.story</span> + <span class="m">stats</span></td><td><span class="pill p-a">yes</span></td></tr>
+        <tr><td class="k">why we differ</td><td>Why our way</td><td><span class="m">brand_data.why_us</span></td><td><span class="pill p-a">yes</span></td></tr>
+        <tr><td class="k">how to train</td><td>Get the most from it</td><td><span class="m">why_us</span> + <span class="m">proof</span></td><td><span class="pill p-a">yes</span></td></tr>
+        <tr><td class="k">testimonials</td><td>Someone vouches</td><td>nothing. No store exists</td><td><span class="pill p-c">no</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="warn" style="margin-top:15px">
+    <b>Two things to fix while wiring it</b>
+    <p>Both academies' logo URLs are still <span class="m">placehold.co</span> placeholders, so the frame needs a real-logo check before it drops the wordmark. And the emails hardcode gold <span class="m">#E2DD9F</span> while the brand token is <span class="m">#D4B65C</span>, so the emails are not currently wearing the brand they claim to.</p>
+  </div>
+
+  <h2><span class="n">03</span>One template, shell plus blocks</h2>
+  <div class="card scroll">
+<pre>
+   ONE TEMPLATE                          PER ACADEMY IT WEARS
+   ┌────────────────────────────┐        ┌────────────────────────────┐
+   │  header    logo_dark_url   │  ◀──   │  logo, real one only       │
+   │  accent    color_primary   │  ◀──   │  #D4B65C                   │
+   │  display   font_display    │  ◀──   │  Anton                     │
+   ├────────────────────────────┤        └────────────────────────────┘
+   │  BLOCKS the slot picks:    │
+   │    hero      headline + lead        one design, many contents
+   │    stat row  3 numbers              from brand_data.stats
+   │    tips      numbered list          from why_us
+   │    proof     claim list             from brand_data.proof
+   │    quote     attributed             from testimonials ONLY
+   │    cta       button                 drops with no destination
+   ├────────────────────────────┤
+   │  footer    logo + city + links      all already collected
+   └────────────────────────────┘
+
+   Every email becomes shell + an ordered list of blocks.
+   A block whose fact is missing does not render.
+</pre>
+  </div>
+  <div class="rule" style="margin-top:15px">
+    <b>Why this is worth more than styling</b>
+    <p>Today six designed emails exist as 36KB of hand-pasted HTML nobody can safely edit. As shell plus blocks they become data, so the skill can assemble them, the harness can prove them, and a copy change stops being a design job.</p>
+  </div>
+
+  <h2><span class="n">04</span>Two skills</h2>
+  <p class="lede">Split by what they own. The sales preset and the member welcome are different systems with different approvers.</p>
+  <div class="grid g2">
+    <div class="card" style="border-color:rgba(212,182,92,.4)">
+      <div style="font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:8px">Skill A</div>
+      <div style="font-size:19px;font-weight:800;margin-bottom:9px">Free-trial sales system</div>
+      <p style="margin:0 0 11px;color:var(--tx2);font-size:13.5px">Contact Form intro, Trial Form intro, Missed Trial intro, Ghosted, Lead Nurture.</p>
+      <table style="min-width:0"><tbody>
+        <tr><td class="k">builds alone</td><td>4 automations, 100% photocopyable</td></tr>
+        <tr><td class="k">proposes</td><td>2 emails</td></tr>
+        <tr><td class="k">may drop</td><td>the testimonials email</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card">
+      <div style="font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:700;margin-bottom:8px">Skill B</div>
+      <div style="font-size:19px;font-weight:800;margin-bottom:9px">Member onboarding</div>
+      <p style="margin:0 0 11px;color:var(--tx2);font-size:13.5px">One automation, eight steps. Fires after someone has paid, so it is a welcome and not a sales drip.</p>
+      <table style="min-width:0"><tbody>
+        <tr><td class="k">builds alone</td><td>schedule SMS, venue, frame, review ask</td></tr>
+        <tr><td class="k">proposes</td><td>1 email, plus what A settled</td></tr>
+        <tr><td class="k">may drop</td><td>the testimonials email</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="rule" style="margin-top:15px">
+    <b>Neither skill owns the story or the why-we-differ email</b>
+    <p>Those two designs appear in both sequences, the onboarding copies being the same designs with the trial button removed. So they are authored ONCE as academy-level email content, and both skills read them. Whichever runs first triggers the authoring, and the second offers back what is already approved instead of asking again. There is no run-A-first rule to remember, because there is no ordering dependency left.</p>
+  </div>
+
+  <h2><span class="n">05</span>The phases, shared by both</h2>
+  <p class="lede">Run by internal BAM staff. Only the fully customizable emails reach the chat. Everything else builds without a question.</p>
+
+  <div class="phase">
+    <div class="ph"><span class="num">1</span><h3>READ</h3><span class="who">automatic</span></div>
+    <div class="pb">
+      <p>Pull everything the academy has already entered.</p>
+      <ul>
+        <li><b style="color:var(--gold)">clients.brand_data</b> story, why_us, proof, stats, dream_athletes, voice, colours, fonts, logos</li>
+        <li><code>offer.data</code> selling points, program structure, ages, capacity, coach ratio</li>
+        <li><code>schedule_slots</code> sessions and venues, <code>clients</code> name, city, domain, phone</li>
+        <li><code>staff</code> coaches, <code>offer_prices</code>, <code>testimonials</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="ph"><span class="num">2</span><h3>CHECK READINESS</h3><span class="who">automatic</span></div>
+    <div class="pb">
+      <p>One line per authorable email, keyed to the exact field it will be written from. Not a judgement, a fact.</p>
+      <div class="card scroll" style="background:var(--bg);padding:14px;margin:10px 0">
+<pre>   story          READY   brand_data.story          482 chars
+   why we differ  READY   brand_data.why_us         287 chars
+   how to train   READY   why_us + proof
+   proof          THIN    brand_data.proof          4 bullets, no detail
+   testimonials   EMPTY   no testimonials on file   -&gt; slot dropped</pre>
+      </div>
+      <ul>
+        <li><b>READY</b> propose a draft</li>
+        <li><b>THIN</b> propose, and say out loud it will read thin</li>
+        <li><b>EMPTY</b> drop the slot. Do not propose, do not invent</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="phase" style="border-color:rgba(212,182,92,.55)">
+    <div class="ph" style="background:rgba(212,182,92,.09)"><span class="num">3</span><h3>PROPOSE IN CHAT</h3><span class="who" style="color:var(--gold)">custom emails only</span></div>
+    <div class="pb">
+      <p><b>This phase covers the fully customizable emails only.</b> Everything photocopyable is built silently and never reaches the chat. Staff is asked about the authored emails and nothing else.</p>
+      <div class="grid g2" style="margin:12px 0">
+        <div class="card" style="padding:14px;border-color:rgba(212,182,92,.4)">
+          <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:8px">Proposed in chat</div>
+          <table style="min-width:0;font-size:13px"><tbody>
+            <tr><td class="k">story</td><td>why us at all</td></tr>
+            <tr><td class="k">why we differ</td><td>why our way</td></tr>
+            <tr><td class="k">how to train</td><td>get the most from it</td></tr>
+            <tr><td class="k">testimonials</td><td>only if the store has entries</td></tr>
+          </tbody></table>
+        </div>
+        <div class="card" style="padding:14px">
+          <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);font-weight:700;margin-bottom:8px">Never reaches the chat</div>
+          <table style="min-width:0;font-size:13px"><tbody>
+            <tr><td class="k">4 sales automations</td><td>100% photocopyable</td></tr>
+            <tr><td class="k">don't miss your shot</td><td>travels as-is</td></tr>
+            <tr><td class="k">welcome email</td><td>fully photocopyable</td></tr>
+            <tr><td class="k">schedule SMS, venue</td><td>generated from sessions</td></tr>
+            <tr><td class="k">review ask</td><td>generic, plus the link</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+      <p>For each one that qualifies, the skill proposes <b>the angle and the full copy, written out in the chat as text</b>. No design, no rendering. Just the idea and the words, so staff can read and react fast.</p>
+      <ul>
+        <li>The angle it took and why, naming the source it drew from</li>
+        <li>The subject line and the complete body copy, in plain text</li>
+        <li>Which of the owner's own phrases it used, quoted back</li>
+        <li>Anything it would not claim, and what would unblock it</li>
+      </ul>
+      <p style="margin-top:10px"><b>Whole emails, one at a time.</b> Never a fragment out of context.</p>
+      <div class="rule" style="margin-top:12px">
+        <b>The welcome email carries nothing custom any more</b>
+        <p>Its two custom lines, online programs and bring a friend, were dropped from the master on 27 Jul. With those gone the whole email builds from collected values, so it never reaches the chat. Note the consequence: GTA is the reference, so GTA stops sending those two lines as well.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase" style="border-color:rgba(212,182,92,.55)">
+    <div class="ph" style="background:rgba(212,182,92,.09)"><span class="num">4</span><h3>CONFIRM OR REWRITE</h3><span class="who" style="color:var(--gold)">staff decides</span></div>
+    <div class="pb">
+      <p>Staff confirms, edits inline, asks for a different angle, or drops the email. Nothing moves on until each one has an answer.</p>
+      <ul>
+        <li>A dropped email leaves the sequence rather than shipping weak</li>
+        <li>Edited copy is the academy's own and never propagates anywhere else</li>
+        <li><b>The skill will not invent a fact, but staff can supply one.</b> The guardrail is against fabrication, not against humans. If staff types a real fact the skill did not have, it uses it.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="ph"><span class="num">5</span><h3>BUILD</h3><span class="who">automatic</span></div>
+    <div class="pb">
+      <p>Everything gets built in one pass, the photocopyable messages and the confirmed copy together. Confirmed copy drops into the shell wearing the academy's own logo, colours and fonts, assembled as blocks.</p>
+    </div>
+  </div>
+
+  <div class="phase" style="border-color:rgba(91,157,217,.45)">
+    <div class="ph" style="background:rgba(91,157,217,.08)"><span class="num">6</span><h3>RENDER AND REVIEW</h3><span class="who" style="color:var(--blue)">staff reads, notes go back to chat</span></div>
+    <div class="pb">
+      <p>The skill builds a review page in the same shape as the annotation map: a switcher across the top to flip between automations, everything for that one below.</p>
+      <ul>
+        <li>Every message in send order, through the <b>real send path</b>. SMS as bubbles, emails as the actual HTML in a frame</li>
+        <li>Where every filled value came from, so a wrong <em>source</em> is visible and not just a wrong word</li>
+        <li><b>What did NOT render, and why.</b> The blocks that dropped for a missing fact, listed. That is the one thing staff cannot see by reading the email</li>
+        <li>A short stable reference on every message and block (GH2, N1-hero, WEL-schedule) so a note points at something exactly</li>
+      </ul>
+      <p style="margin-top:11px">Staff reads, writes notes, pastes them back into the chat. The skill applies them, re-renders, and the same page updates in place.</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="ph"><span class="num">7</span><h3>INSTALL, DORMANT</h3><span class="who">automatic</span></div>
+    <div class="pb">
+      <p>Write the templates, seed the steps, leave everything <code>approved:false</code>. The academy's own approval is a separate gate in the wizard, see section 07.</p>
+    </div>
+  </div>
+
+  <div class="card scroll" style="margin-top:15px">
+<pre>
+   THE REVIEW PAGE, per academy
+   ┌──────────────────────────────────────────────────────────────────┐
+   │  Contact  ·  Trial  ·  Missed  ·  Ghosted  ·  Nurture            │  flip
+   ├──────────────────────────────────────────────────────────────────┤
+   │  GH1   +1 day   SMS                                              │
+   │  ┌────────────────────────────┐   from: parent-facing name       │
+   │  │ Hey Maya! Just wanted to.. │   from: website domain           │
+   │  └────────────────────────────┘                                  │
+   │                                                                  │
+   │  GH3   +1 day   EMAIL                                            │
+   │  ┌────────────────────────────┐   from: brand_data.logo_dark     │
+   │  │ [the real rendered email]  │   from: owner first name         │
+   │  └────────────────────────────┘                                  │
+   │  DID NOT RENDER                                                  │
+   │    footer Instagram    no instagram on file                      │
+   │    footer tagline      no tagline on file                        │
+   └──────────────────────────────────────────────────────────────────┘
+
+   Staff notes come back as:  "GH1 too casual, N1-hero cut the last line"
+</pre>
+  </div>
+
+  <h2><span class="n">06</span>Readiness, run against both academies today</h2>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>Email</th><th>BAM GTA</th><th>BAM San Jose</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td class="k">story</td><td><span class="pill p-a">ready</span></td><td><span class="pill p-a">ready</span></td><td>brand_data.story, both written</td></tr>
+        <tr><td class="k">why we differ</td><td><span class="pill p-a">ready</span></td><td><span class="pill p-a">ready</span></td><td>brand_data.why_us, both written</td></tr>
+        <tr><td class="k">how to train</td><td><span class="pill p-a">ready</span></td><td><span class="pill p-a">ready</span></td><td>why_us + proof</td></tr>
+        <tr><td class="k">proof points</td><td><span class="pill p-b">thin</span></td><td><span class="pill p-b">thin</span></td><td>brand_data.proof, 4 bullets each</td></tr>
+        <tr><td class="k">testimonials</td><td><span class="pill p-c">empty</span></td><td><span class="pill p-c">empty</span></td><td>no store exists yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="rule" style="margin-top:15px">
+    <b>Three of five draft today, from what the owner already typed</b>
+    <p>No new questions, for either academy. The only slot with nothing behind it is testimonials, and under the drop rule that email simply does not ship until real ones exist.</p>
+  </div>
+
+  <h2><span class="n">07</span>What has to be built that does not exist</h2>
+  <p class="lede">Two things, and neither is in the codebase today. I checked the schema and the code.</p>
+
+  <div class="card">
+    <div style="font-size:16px;font-weight:800;margin-bottom:4px">A. A testimonials store</div>
+    <p style="color:var(--tx2);font-size:13.5px;margin:0 0 12px">Nothing exists. No table, no column, nothing in brand_data. The one near-hit, <span class="m">onboarding_feedback.testimonial</span>, is the academy OWNER reviewing BAM's onboarding, which is the opposite direction. Do not wire to it.</p>
+    <div class="card scroll" style="background:var(--bg);padding:14px;margin-bottom:12px">
+<pre>   testimonials
+   ─────────────────────────────────────
+   id            uuid
+   client_id     uuid
+   quote         text
+   author        text        "Parent of Adam"
+   source        text        'manual' | 'google'
+   starred       boolean     manual ones default true
+   created_at    timestamptz</pre>
+    </div>
+    <ul style="margin:0;padding-left:19px;color:var(--tx2);font-size:13.5px">
+      <li><b>Where:</b> alongside "Tell your story" in the wizard, which already promises "your story and your proof". Testimonials are the missing third. Hand-typed.</li>
+      <li><b>The rule:</b> empty means no testimonials email in either sequence. Typed means those are the ones shown.</li>
+      <li><b>Forward-compatible:</b> when Google connects, <span class="m">source='google'</span> rows join the same table and <span class="m">starred</span> decides what shows. No migration later.</li>
+      <li><b>Bonus:</b> this also feeds the free-trial page cards, which is where the Miami fabrication happened. One store fixes both surfaces.</li>
+    </ul>
+    <div class="warn" style="margin-top:13px">
+      <b>San Jose starts empty, on purpose</b>
+      <p>GTA can be preset with its own real parents. San Jose has none, so presetting it with anything recreates the Miami problem exactly. Under the drop rule San Jose simply does not send that email until Lij supplies real ones, which is the correct outcome and better than the current state where they would send GTA's.</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:15px">
+    <div style="font-size:16px;font-weight:800;margin-bottom:4px">B. Two academy-approval steps in the wizard</div>
+    <p style="color:var(--tx2);font-size:13.5px;margin:0 0 12px">The preset step's subtitle already says "Nothing texts anyone until you approve it." That approval does not exist as a step. Staff approving the render is a different gate from the academy approving the sending, and only the first one has a home today.</p>
+    <table>
+      <thead><tr><th>Step</th><th>Section</th><th>Sits after</th><th>Does</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Approve your follow-ups</td><td>Offer &rarr; sales</td><td>Apply the Free Trial preset</td><td>Opens the review page, owner reads all 5 automations, approves, sets approved:true</td></tr>
+        <tr><td class="k">Approve your welcome messages</td><td>Offer &rarr; onboarding</td><td>Set up your onboarding form</td><td>Same for the onboarding drip</td></tr>
+      </tbody>
+    </table>
+    <div class="rule" style="margin-top:13px">
+      <b>The owner sees the same page staff used</b>
+      <p>One surface, two audiences, different verbs. Staff leaves notes, the owner approves. The detector is approved count against total, so the step completes itself.</p>
+      <p style="margin-top:7px">Full wizard rule applies: a registry row in <span class="m">_OBF_STEPS</span>, a detector in <span class="m">_obfFetchState()</span>, and the key listed in <span class="m">_OBF_SECTIONS</span>. All three, or the step is defined and detected but invisible.</p>
+    </div>
+  </div>
+
+  <h2><span class="n">08</span>Known gap, named on purpose</h2>
+  <div class="warn">
+    <b>Nothing re-syncs when brand_data changes</b>
+    <p>The skills are one-shot. If an owner rewrites their story in the wizard next month, the built emails keep the old version silently. Handled as a support ticket when brand data changes, decided 27 Jul. Worth naming rather than leaving implicit, because it is the same drift shape this whole workstream exists to fix.</p>
+  </div>
+
+  <h2><span class="n">09</span>What changes</h2>
+  <div class="card scroll">
+<pre>
+   BEFORE                              AFTER
+   ────────                            ─────
+   blank page, 5 emails                3 drafts written from their own
+                                       answers, 0 blank pages
+
+   design in Claude Design,            skill renders through the real send
+   hope it renders                     path and shows the actual email
+
+   paste 36KB strings by hand          skill installs the templates
+
+   no idea if a claim is supported     every draft names its source, and
+                                       refuses where there is nothing
+
+   "nothing sends until you            the owner actually has a step where
+    approve it", with no step          they approve it
+</pre>
+  </div>
+  <div class="rule" style="margin-top:15px">
+    <b>The cost per academy</b>
+    <p>Two skill runs and three confirmations, not five blank pages. Skill A proposes 2 emails, Skill B proposes 1 more and offers back whatever A already settled. A fourth appears only once an academy has real testimonials. Everything else in both systems builds without a question being asked.</p>
+  </div>
+
+
+  <h2><span class="n">10</span>brand_data cleanup, and what adapts to it</h2>
+  <p class="lede">19 fields today. Keep 12, drop 3, move 3, one to decide. Traced against every reader in the codebase.</p>
+
+  <div class="warn">
+    <b>Ordering is not optional: backfill before you drop</b>
+    <p>GTA's <span class="m">website_setup.domain</span> is EMPTY while <span class="m">brand_data.domain</span> holds the domain. The field that looks like a duplicate is currently the only place GTA's domain exists. Drop it first and GTA's messages lose their website. Backfill website_setup from brand_data, point every consumer at one resolver, then drop. Doing it in that order also fixes why <span class="m">{{location.website}}</span> has been falling back to the hardcoded LOCATIONS entry.</p>
+  </div>
+
+  <div class="card scroll" style="margin-top:15px">
+    <table>
+      <thead><tr><th>Field</th><th>Verdict</th><th>Code readers</th><th>Adaptation</th></tr></thead>
+      <tbody>
+        <tr><td class="k">story, why_us, dream_athletes, notes</td><td><span class="pill p-a">keep</span></td><td>story only, a completion tick in setup-status</td><td>None. These are what the skills read</td></tr>
+        <tr><td class="k">colors, fonts, logos</td><td><span class="pill p-a">keep</span></td><td>ContentView BrandCard</td><td>None. Logos still placehold.co for both academies</td></tr>
+        <tr><td class="k">domain, website_url</td><td><span class="pill p-c">drop</span></td><td>MarketingView, action-items</td><td>Backfill website_setup.domain FIRST, then one clientWebsite(client) resolver both call</td></tr>
+        <tr><td class="k">stats</td><td><span class="pill p-c">drop</span></td><td>ContentView BrandCard "Stats" row</td><td>Derive at render from members, schedule_slots and address. Content team gets 47 and the real weekdays instead of stale prose</td></tr>
+        <tr><td class="k">site_pages</td><td><span class="pill p-b">move</span></td><td>client-portal, 3 refs</td><td>To website_setup.site_pages. Mechanical</td></tr>
+        <tr><td class="k">website_status</td><td><span class="pill p-b">move</span></td><td>client-portal, 1 write</td><td>To the intake record</td></tr>
+        <tr><td class="k">references</td><td><span class="pill p-b">move</span></td><td>none</td><td>Move freely</td></tr>
+        <tr><td class="k">proof</td><td><span class="pill p-b">decide</span></td><td>none</td><td>Overlaps offer.data.value.what_makes_different. Arguably distinct, track record versus programme, but nobody will remember which is which</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid g2" style="margin-top:15px">
+    <div class="rule">
+      <b>The principle</b>
+      <p>brand_data holds only what a human wrote that is recorded nowhere else. Anything countable, scheduled or configured is read live at render time. Under that rule <span class="m">stats</span> disappears and the emails carry a schedule that is true on the day they send, instead of one that claimed Friday training GTA has never run.</p>
+    </div>
+    <div class="rule" style="border-left-color:var(--blue)">
+      <b>Client websites are safe</b>
+      <p>bam-client-sites reads none of this. Checked clients/ and design-system/; the only hits were a nested worktree copy of the monorepo. Nothing dropped here can break a live academy site.</p>
+    </div>
+  </div>
+
+  <div class="warn" style="margin-top:15px">
+    <b>Two loose ends the trace found</b>
+    <p><b>The sales agent reads zero brand_data.</b> fact-render.js and prompt-structure.js touch none of it, so the agent has no idea the academy has a story or a why-us; its selling points come only from the offer. A gap of omission, worth its own decision.</p>
+    <p style="margin-top:8px"><b><span class="m">wants_about_page</span> exists in code but not in data.</b> api/website/team.js reads it and neither academy has it stored. A fourth category: fields the code expects that nobody ever set.</p>
+  </div>
+
+
+  <h2><span class="n">11</span>The testimonial seam</h2>
+  <p class="lede">The testimonial connection is parked until this build finishes, then it attaches to what was actually built. This is the attachment point, defined now so it is not improvised later.</p>
+
+  <div class="rule">
+    <b>A gap, deliberately, not a stub</b>
+    <p>Nothing here reads or writes the testimonials store. Not even a resolver returning empty. A function that answers "none on file" looks harmless, but it is exactly the thing that gets unpicked, because the real one needs a different shape once google-sourced starred rows exist. A gap at a named position costs less than a stub that has to be undone.</p>
+  </div>
+
+  <div class="card scroll" style="margin-top:15px">
+<pre>
+   WHAT SHIPS NOW                        WHERE THE CONNECTION ATTACHES
+   ──────────────                        ─────────────────────────────
+   ONBOARDING_DEFAULT = 7 steps          insert ONE step between
+     1  welcome SMS                      era (6) and review (8)
+     2  welcome email
+     3  schedule SMS
+     4  how to train
+     5  story                      ◀──   the testimonials step is
+     6  era                              ABSENT, not present-and-disabled
+     7  review
+
+   NURTURE_DEFAULT = 4 steps             nurture-3 already exists and is
+     3  testimonials, held         ◀──   already held disabled per academy.
+                                         The connection changes WHAT FILLS
+                                         it, not whether it is there.
+</pre>
+  </div>
+
+  <div class="rule" style="margin-top:15px">
+    <b>The contract the connection has to satisfy</b>
+    <p>One function answering "which testimonials should this academy's emails show". It honours <span class="m">starred</span>, returns manual and google-sourced rows together, and the drop rule is enforced <b>at seed time, not render time</b>: an academy with no testimonials does not get the step, rather than getting a step that renders to nothing. Enforcing at render time would leave a step that looks live in the portal and silently sends an empty shell.</p>
+  </div>
+
+  <div class="warn" style="margin-top:15px">
+    <b>The seam creates a divergence, and it must be recorded or someone closes it wrongly</b>
+    <p>A 7-step master against GTA's 8-step live sequence means <b>master does not equal GTA on exactly one step, deliberately</b>. Under GTA-as-reference that reads like the master lagging, which is precisely the bug this workstream exists to fix.</p>
+    <p style="margin-top:9px">Without a record, a future session sees the gap, "fixes" it by promoting the testimonials step, and ships GTA's parents to every academy. That is the original failure with extra steps. So it goes in the accepted-divergence record alongside <span class="m">summer_special</span>, and the reason must name the testimonial connection as the thing that closes it.</p>
+  </div>
+
+  <p class="foot">Checked against live data and current source on 27 Jul 2026: brand_data is populated for both academies, the missing generator was confirmed across both repos, and the absence of any testimonials store was confirmed against the schema.</p>
+
+</div>
+</body>
+</html>
