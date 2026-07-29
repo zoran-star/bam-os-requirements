@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The free-trial sales system, item by item</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF9F6;--card:#FFFFFF;--card2:#F3F1EB;--line:#E4E0D6;
+    --tx:#1A1917;--tx2:#54514A;--tx3:#8A857B;
+    --gold:#9A7A22;--goldbg:#FBF3DC;--goldln:#E5D097;
+    --green:#2A7A4E;--greenbg:#E8F4EC;--greenln:#B7DCC4;
+    --red:#B23A22;--redbg:#FBECE8;--redln:#EFC9BE;
+    --blue:#255F92;--bluebg:#E9F1F8;--blueln:#C2D9EB;
+    --grey:#8A857B;--greybg:#F1EFE9;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:44px 20px 100px}
+  h1{font-size:clamp(27px,4.4vw,40px);line-height:1.1;letter-spacing:-.025em;margin:0 0 9px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:16.5px;margin:0 0 24px;max-width:72ch}
+  h2{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--gold);margin:50px 0 6px;font-weight:800}
+  .h2sub{color:var(--tx3);font-size:14px;margin:0 0 16px;max-width:80ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:0 1px 2px rgba(26,25,23,.04)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .m{font-family:var(--mono);font-size:12.5px}
+  /* key */
+  .key{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 6px}
+  .kk{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--tx2);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:7px 12px}
+  .tag{display:inline-block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;padding:3px 8px;border-radius:5px;white-space:nowrap}
+  .t-copy{background:var(--greenbg);color:var(--green)}
+  .t-fill{background:var(--bluebg);color:var(--blue)}
+  .t-auth{background:var(--goldbg);color:var(--gold)}
+  .t-gap{background:var(--redbg);color:var(--red)}
+  .t-park{background:var(--greybg);color:var(--grey)}
+  /* headline */
+  .hero{background:var(--goldbg);border:1px solid var(--goldln);border-radius:14px;padding:20px 24px;margin-bottom:8px}
+  .hero .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:6px}
+  .hero p{margin:0;font-size:19px;color:var(--tx);font-weight:700;line-height:1.35}
+  .hero small{display:block;margin-top:8px;font-size:14px;font-weight:500;color:var(--tx2)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:800px}
+  th{text-align:left;padding:9px 11px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);font-weight:800;border-bottom:2px solid var(--line);white-space:nowrap}
+  td{padding:10px 11px;border-bottom:1px solid var(--line);color:var(--tx2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.k{color:var(--tx);font-weight:700;white-space:nowrap}
+  td.mono{font-family:var(--mono);font-size:12px;color:var(--tx3)}
+  tr.auth td{background:var(--goldbg)}
+  tr.park td{background:var(--greybg)}
+  .grp td{background:var(--card2);font-weight:800;color:var(--tx);font-size:11px;letter-spacing:.09em;text-transform:uppercase}
+  .note{border-radius:12px;padding:16px 18px}
+  .note b{display:block;margin-bottom:4px;font-size:15px}
+  .note p{margin:0;font-size:14px;color:var(--tx2)}
+  .note p+p{margin-top:7px}
+  .note+.note{margin-top:11px}
+  .n-warn{background:var(--redbg);border:1px solid var(--redln)}.n-warn b{color:var(--red)}
+  .n-gold{background:var(--goldbg);border:1px solid var(--goldln)}.n-gold b{color:var(--gold)}
+  .n-blue{background:var(--bluebg);border:1px solid var(--blueln)}.n-blue b{color:var(--blue)}
+  .grid{display:grid;gap:13px}
+  @media(min-width:820px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+  .lbl{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:800;margin-bottom:7px}
+  .big{font-size:36px;font-weight:800;line-height:1;letter-spacing:-.02em}
+  a{color:var(--blue);font-weight:600}
+  .stage{border-left:3px solid var(--goldln);padding:2px 0 2px 14px;margin-bottom:14px}
+  .stage .n{font-size:15.5px;font-weight:800;color:var(--tx)}
+  .stage .d{font-size:13.5px;color:var(--tx2)}
+  .stage .e{font-family:var(--mono);font-size:12px;color:var(--tx3);margin-top:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>The free-trial sales system,<br><span>item by item.</span></h1>
+  <p class="sub">Everything the sales system contains, and for each piece whether it copies to a new academy untouched, fills itself in from a fact the academy already gave us, or has to be written by a person. <a href="skills-pipeline.html">Back to the five skills &rarr;</a></p>
+
+  <div class="hero">
+    <div class="l">The whole thing in one line</div>
+    <p>A person writes two emails. Everything else either copies as-is or fills itself in.</p>
+    <small>10 messages, 5 pipeline stages, 2 funnel pages, 3 AI agents, 2 trial emails and 15 facts. Two of the messages need a human.</small>
+  </div>
+
+  <div class="key" style="margin-top:14px">
+    <div class="kk"><span class="tag t-copy">copies</span> travels untouched, nobody involved</div>
+    <div class="kk"><span class="tag t-fill">fills in</span> templated, fills from their own details</div>
+    <div class="kk"><span class="tag t-auth">written</span> a person writes it, per academy</div>
+    <div class="kk"><span class="tag t-park">parked</span> held back on purpose</div>
+    <div class="kk"><span class="tag t-gap">gap</span> nothing fills it yet</div>
+  </div>
+
+  <!-- ══ MESSAGES ══ -->
+  <h2>1 &nbsp;The messages, all ten</h2>
+  <p class="h2sub">In send order per automation. "Fills in" lists exactly which of their details the message pulls in when it sends.</p>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>When</th><th></th><th>Message</th><th>Status</th><th>Fills in</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="5">Contact form intro &middot; they fill in the contact page</td></tr>
+        <tr><td class="mono">+2 min</td><td class="mono">text</td><td class="k">First touch</td><td><span class="tag t-copy">copies</span></td><td>their name, their academy name</td></tr>
+
+        <tr class="grp"><td colspan="5">Trial form intro &middot; they started a booking but picked no time</td></tr>
+        <tr><td class="mono">+20 min</td><td class="mono">text</td><td class="k">Nudge to pick a time</td><td><span class="tag t-copy">copies</span></td><td>their name, academy name, booking link</td></tr>
+
+        <tr class="grp"><td colspan="5">Missed trial &middot; they booked and did not show</td></tr>
+        <tr><td class="mono">+30 min</td><td class="mono">text</td><td class="k">Want another time?</td><td><span class="tag t-copy">copies</span></td><td>their name, booking link</td></tr>
+
+        <tr class="grp"><td colspan="5">Ghosted &middot; they went quiet</td></tr>
+        <tr><td class="mono">+1 day</td><td class="mono">text</td><td class="k">Still interested?</td><td><span class="tag t-copy">copies</span></td><td>their name, the academy's web address</td></tr>
+        <tr><td class="mono">+1 day</td><td class="mono">text</td><td class="k">Did my message land?</td><td><span class="tag t-copy">copies</span></td><td>their full name, booking link</td></tr>
+        <tr><td class="mono">+1 day</td><td class="mono">email</td><td class="k">A note from the owner</td><td><span class="tag t-copy">copies</span></td><td>their name, <b>the owner's first name</b>, academy name, booking link</td></tr>
+
+        <tr class="grp"><td colspan="5">Lead nurture &middot; the long game, about eight weeks</td></tr>
+        <tr class="auth"><td class="mono">+1 week</td><td class="mono">email</td><td class="k">Their story</td><td><span class="tag t-auth">written</span></td><td>drafted from the story they typed in onboarding</td></tr>
+        <tr class="auth"><td class="mono">+1 week</td><td class="mono">email</td><td class="k">Why they train differently</td><td><span class="tag t-auth">written</span></td><td>drafted from their why-us and proof</td></tr>
+        <tr class="park"><td class="mono">+3 weeks</td><td class="mono">email</td><td class="k">What families say</td><td><span class="tag t-park">parked</span></td><td>never sends until they have real testimonials of their own</td></tr>
+        <tr><td class="mono">+3 weeks</td><td class="mono">email</td><td class="k">Last call</td><td><span class="tag t-copy">copies</span></td><td>nothing, it is generic by design</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid g3" style="margin-top:13px">
+    <div class="card"><div class="lbl">Copy untouched</div><div class="big" style="color:var(--green)">7</div>
+      <p style="margin:8px 0 0;font-size:13px;color:var(--tx2)">Nobody looks at these. They arrive already correct for the academy.</p></div>
+    <div class="card"><div class="lbl">A person writes</div><div class="big" style="color:var(--gold)">2</div>
+      <p style="margin:8px 0 0;font-size:13px;color:var(--tx2)">The skill drafts both from what the owner already typed. Staff reads and approves in chat.</p></div>
+    <div class="card"><div class="lbl">Held back</div><div class="big" style="color:var(--grey)">1</div>
+      <p style="margin:8px 0 0;font-size:13px;color:var(--tx2)">The testimonials email. It cannot ship until the academy has real quotes of its own.</p></div>
+  </div>
+
+  <div class="note n-blue" style="margin-top:13px">
+    <b>The member welcome sequence is not counted here, on purpose</b>
+    <p>There are 7 more messages in the member onboarding sequence, and by your split those belong to the member management build, not the sales system. Applying the free-trial preset does still install them, because the preset covers what happens after someone joins as well, but they stay switched off and nobody writes their content until skill 5 starts.</p>
+  </div>
+
+  <!-- ══ PIPELINE ══ -->
+  <h2>2 &nbsp;The pipeline &middot; <span style="color:var(--tx3);text-transform:none;letter-spacing:0;font-weight:600">5 stages, nobody edits any of it</span></h2>
+  <p class="h2sub">The board a lead travels across, with every route between stages. Identical for every academy on this system.</p>
+  <div class="card">
+    <div class="stage"><div class="n">1 &nbsp;Booking <span class="tag t-copy">copies</span></div>
+      <div class="d">Where a new lead lands. An AI agent works to get them booked.</div>
+      <div class="e">enters from: the free-trial page, the contact page &middot; leaves to: booked, went quiet, not interested, unqualified</div></div>
+    <div class="stage"><div class="n">2 &nbsp;Ghosted <span class="tag t-copy">copies</span></div>
+      <div class="d">They stopped replying. The ghosted messages run here.</div>
+      <div class="e">leaves to: they replied, or the sequence ran out into nurture</div></div>
+    <div class="stage"><div class="n">3 &nbsp;Confirm <span class="tag t-copy">copies</span></div>
+      <div class="d">Trial is booked. An AI agent confirms it and handles changes.</div>
+      <div class="e">enters from: the free-trial calendar &middot; leaves to: good fit, not a fit, no show, cancelled, no longer wants</div></div>
+    <div class="stage"><div class="n">4 &nbsp;Closing <span class="tag t-copy">copies</span></div>
+      <div class="d">They did the trial. An AI agent works to enrol them.</div>
+      <div class="e">leaves to: enrols (becomes a member), says no, went quiet, unqualified</div></div>
+    <div class="stage"><div class="n">5 &nbsp;Nurture <span class="tag t-copy">copies</span></div>
+      <div class="d">The long game. The nurture emails run here.</div>
+      <div class="e">leaves to: they replied, or the sequence ran out</div></div>
+    <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)"><b>23 routes between stages in total</b>, all part of the template. Nothing here is decided per academy.</p>
+  </div>
+
+  <!-- ══ AGENTS ══ -->
+  <h2>3 &nbsp;The three AI agents</h2>
+  <p class="h2sub">How they behave is templated. What they know about the academy is assembled from what the owner already filled in elsewhere.</p>
+  <div class="grid g3">
+    <div class="card"><div class="lbl">Stage 1</div><div style="font-size:16px;font-weight:800;margin-bottom:4px">Booking agent</div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)">Answers a new lead and gets them booked into a trial.</p></div>
+    <div class="card"><div class="lbl">Stage 3</div><div style="font-size:16px;font-weight:800;margin-bottom:4px">Confirm agent</div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)">Confirms the trial, handles reschedules and no-shows.</p></div>
+    <div class="card"><div class="lbl">Stage 4</div><div style="font-size:16px;font-weight:800;margin-bottom:4px">Closing agent</div>
+      <p style="margin:0;font-size:13px;color:var(--tx2)">Follows up after the trial and works to enrol them.</p></div>
+  </div>
+
+  <p style="margin:16px 0 8px;font-size:14px;color:var(--tx2)"><b>What the agents know, and where each piece comes from.</b> Eight of the nine fill themselves in from screens the owner has already completed. One does not exist yet.</p>
+  <div class="card scroll">
+    <table style="min-width:640px">
+      <thead><tr><th>What it knows</th><th>Where it comes from</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="k">The programme</td><td>Offer, general info</td><td><span class="tag t-fill">fills in</span></td></tr>
+        <tr><td class="k">The schedule</td><td>Offer, schedule step</td><td><span class="tag t-fill">fills in</span></td></tr>
+        <tr><td class="k">Pricing</td><td>Offer, pricing step</td><td><span class="tag t-fill">fills in</span></td></tr>
+        <tr><td class="k">Policies</td><td>Offer, policy step</td><td><span class="tag t-fill">fills in</span></td></tr>
+        <tr><td class="k">Selling points</td><td>Offer, value step</td><td><span class="tag t-fill">fills in</span></td></tr>
+        <tr><td class="k">The gym and area</td><td>Their locations</td><td><span class="tag t-fill">fills in</span></td></tr>
+        <tr><td class="k">Who qualifies</td><td>Offer general info + locations</td><td><span class="tag t-fill">fills in</span></td></tr>
+        <tr><td class="k">The coaches</td><td>Their team</td><td><span class="tag t-fill">fills in</span></td></tr>
+        <tr><td class="k">Social proof</td><td><b>nowhere yet</b></td><td><span class="tag t-gap">gap</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note n-warn" style="margin-top:12px">
+    <b>Social proof is the one hole, and it is the same hole as the testimonials email</b>
+    <p>Nothing fills it in, so the agents have no reviews or parent quotes to draw on. It is deliberately switched off rather than guessing, and it closes when the Google Reviews work lands. Worth knowing that the same missing thing costs us an email and an agent's best argument.</p>
+  </div>
+
+  <!-- ══ WEBSITES ══ -->
+  <h2>4 &nbsp;The funnel pages, and the trial emails</h2>
+  <div class="grid g2">
+    <div class="card">
+      <div class="lbl">Two pages</div>
+      <table style="min-width:0"><tbody>
+        <tr><td class="k">Free trial page</td><td><span class="tag t-fill">fills in</span></td></tr>
+        <tr><td class="k">Contact page</td><td><span class="tag t-fill">fills in</span></td></tr>
+      </tbody></table>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">The layout, the form, the calendar and the tracking are all shared. The words are written for the academy, the same way the core site was.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">Two trial emails</div>
+      <table style="min-width:0"><tbody>
+        <tr><td class="k">Booking confirmation</td><td><span class="tag t-fill">fills in</span></td></tr>
+        <tr><td class="k">Trial reminder</td><td><span class="tag t-fill">fills in</span></td></tr>
+      </tbody></table>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">These moved into this build because this system is what sends them. The member emails went with member management, for the same reason.</p>
+    </div>
+  </div>
+
+  <!-- ══ FACTS ══ -->
+  <h2>5 &nbsp;The fifteen details that fill everything in</h2>
+  <p class="h2sub">Every blank in every message and page pulls from one of these. This is the whole list, and where each one is edited.</p>
+  <div class="card scroll">
+    <table style="min-width:700px">
+      <thead><tr><th>The detail</th><th>Where the academy sets it</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Parent-facing name</td><td>Business Basics, the name parents see</td></tr>
+        <tr><td class="k">Website address</td><td>their domain, used both with and without the https</td></tr>
+        <tr><td class="k">Owner's first name</td><td>Business Basics</td></tr>
+        <tr><td class="k">Support email</td><td>Business Basics</td></tr>
+        <tr><td class="k">City</td><td>worked out from their address</td></tr>
+        <tr><td class="k">Coach phone number</td><td>Business Basics</td></tr>
+        <tr><td class="k">Online programs link</td><td>Business Basics, optional</td></tr>
+        <tr><td class="k">Bring-a-friend offer</td><td>Business Basics, optional</td></tr>
+        <tr><td class="k">Group chat invite</td><td>Business Basics, optional</td></tr>
+        <tr><td class="k">Group chat platform</td><td>so the copy can say "the WhatsApp group"</td></tr>
+        <tr><td class="k">Google review link</td><td>Business Basics, optional</td></tr>
+        <tr><td class="k">Training venue</td><td><b>their venues list</b>, the first one</td></tr>
+        <tr><td class="k">Weekly schedule</td><td><b>their real sessions</b>, collapsed into one typical week</td></tr>
+        <tr><td class="k">Coaches to follow</td><td><b>their team</b>, anyone with a handle who is shown publicly</td></tr>
+        <tr><td class="k">Lead and athlete names</td><td>whoever the message is going to</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note n-gold" style="margin-top:12px">
+    <b>Anything missing removes its own line, never leaves a blank</b>
+    <p>An academy with no group chat simply does not get that sentence, and the numbered list closes up behind it. An academy with no sessions on file sends no schedule rather than an empty one. That rule is tested for every message.</p>
+  </div>
+
+  <h2>What this adds up to</h2>
+  <div class="card" style="border-color:var(--goldln);background:var(--goldbg)">
+    <p style="margin:0;font-size:16.5px;color:var(--tx)">Of the whole sales system, <b>two emails need a person</b>, and the skill drafts both of them from words the owner already gave us. Everything else copies or fills itself in. The two real holes are <b>social proof</b> and <b>testimonials</b>, and they are the same hole.</p>
+  </div>
+
+</div>
+</body>
+</html>
