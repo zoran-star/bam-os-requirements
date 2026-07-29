@@ -8,6 +8,7 @@ import MarketingDashboard, { GoalEditor } from "../components/MarketingDashboard
 import GhlKpiDiscovery from "../components/GhlKpiDiscovery";
 import PhoneTab from "./PhoneTab.jsx";
 import ActivationTab from "./ActivationTab.jsx";
+import ClientAvatar from "../components/ClientAvatar.jsx";
 
 // ─── Tiny stroke icons (design system: SVG stroke icons, no emojis) ────────
 const _ico = (paths, size = 14) => (
@@ -494,24 +495,6 @@ function Stat({ label, value, tokens, accent, active, onClick }) {
     >
       <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.03em", color: accent || tokens.text }}>{value}</div>
       <div style={{ fontSize: 11, color: tokens.textMute, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 4 }}>{label}</div>
-    </div>
-  );
-}
-
-// ─── Client avatar: brand logo when set, initials fallback ──────────────────
-function ClientAvatar({ client, tokens: t, size = 28 }) {
-  const [broken, setBroken] = useState(false);
-  const bd = client.brand_data || {};
-  const logo = typeof bd.logo === "string" ? bd.logo : (bd.logo && bd.logo.url) || null;
-  const initials = (client.business_name || "?")
-    .split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
-  if (logo && !broken) {
-    return <img src={logo} alt="" onError={() => setBroken(true)}
-      style={{ width: size, height: size, borderRadius: 8, objectFit: "cover", flexShrink: 0, background: t.surface, border: `1px solid ${t.border}` }} />;
-  }
-  return (
-    <div style={{ width: size, height: size, borderRadius: 8, flexShrink: 0, background: t.surface, border: `1px solid ${t.border}`, color: t.textSub, display: "flex", alignItems: "center", justifyContent: "center", fontSize: Math.round(size * 0.36), fontWeight: 700 }}>
-      {initials}
     </div>
   );
 }
