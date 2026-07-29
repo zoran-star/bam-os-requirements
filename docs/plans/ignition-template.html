@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ignition: waking up leads an academy already has</title>
+<title>Reignition: the settled design</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -41,31 +41,35 @@
   .n-ok{background:var(--greenbg);border:1px solid var(--greenln)}.n-ok b{color:var(--green)}
   .grid{display:grid;gap:13px}
   @media(min-width:820px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
-  /* anatomy */
-  .part{display:flex;gap:15px;align-items:flex-start;padding:15px 0;border-bottom:1px solid var(--line)}
-  .part:last-child{border-bottom:none}
-  .part .n{flex:none;width:34px;height:34px;border-radius:9px;background:var(--goldbg);border:1px solid var(--goldln);
-    display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--gold);font-size:14px}
-  .part .b{flex:1}
-  .part .t{font-size:16px;font-weight:800;color:var(--tx);margin-bottom:2px}
-  .part .d{font-size:14px;color:var(--tx2);max-width:74ch}
-  .part .e{font-family:var(--mono);font-size:12px;color:var(--tx3);margin-top:6px;background:var(--card2);
-    border:1px solid var(--line);border-radius:8px;padding:8px 11px;display:inline-block}
-  /* doors */
-  .door{border:1px solid var(--line);border-radius:12px;padding:15px 17px;background:var(--card)}
-  .door.warm{border-color:var(--greenln);background:var(--greenbg)}
-  .door.mid{border-color:var(--goldln);background:var(--goldbg)}
-  .door.cold{border-color:var(--blueln);background:var(--bluebg)}
-  .door .h{font-size:15.5px;font-weight:800;color:var(--tx);margin-bottom:3px}
-  .door .w{font-family:var(--mono);font-size:11.5px;color:var(--tx3);margin-bottom:7px}
-  .door p{margin:0;font-size:13.5px;color:var(--tx2)}
-  /* sms preview */
-  .phone{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:15px}
-  .bub{background:#fff;border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:11px 14px;
-    font-size:13.5px;color:var(--tx);max-width:88%;margin-bottom:8px;white-space:pre-line}
-  .bub:last-child{margin-bottom:0}
-  .when{font-family:var(--mono);font-size:11px;color:var(--tx3);margin:0 0 4px 3px}
-  table{width:100%;border-collapse:collapse;font-size:14px;min-width:600px}
+  /* settled decisions */
+  .dec{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}
+  .dec:last-child{border-bottom:none}
+  .dec .q{flex:1;font-size:13.5px;color:var(--tx3)}
+  .dec .a{flex:1.4;font-size:14px;color:var(--tx);font-weight:700}
+  .dec .a small{display:block;font-weight:500;color:var(--tx2);font-size:13px}
+  /* station diagram */
+  .station{display:flex;flex-direction:column;gap:0;min-width:640px}
+  .srow{display:flex;align-items:center;gap:12px;padding:9px 0}
+  .sbox{border:1px solid var(--line);border-radius:11px;padding:11px 16px;background:var(--card);min-width:170px}
+  .sbox .t{font-weight:800;color:var(--tx);font-size:14.5px}
+  .sbox .d{font-size:12px;color:var(--tx3)}
+  .sbox.hot{background:var(--goldbg);border-color:var(--goldln)}
+  .sbox.grn{background:var(--greenbg);border-color:var(--greenln)}
+  .edge{flex:1;font-size:12.5px;color:var(--tx2);border-bottom:2px dashed var(--line);padding:0 4px 3px;white-space:nowrap}
+  .edge b{color:var(--gold)}
+  /* lifecycle */
+  .life{display:flex;gap:0;align-items:stretch;min-width:820px}
+  .lstage{flex:1;position:relative;padding-right:24px}
+  .lstage:last-child{padding-right:0}
+  .lstage:not(:last-child):after{content:"";position:absolute;right:6px;top:38px;width:11px;height:11px;
+    border-top:2px solid var(--line);border-right:2px solid var(--line);transform:rotate(45deg)}
+  .lbox{border-radius:12px;padding:13px 15px;height:100%;border:1px solid var(--line);background:var(--card)}
+  .lbox.gate{background:var(--goldbg);border-color:var(--goldln)}
+  .lbox .st{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:800;margin-bottom:5px;color:var(--tx3)}
+  .lbox.gate .st{color:var(--gold)}
+  .lbox .t{font-size:14.5px;font-weight:800;color:var(--tx);margin-bottom:4px}
+  .lbox .d{font-size:12.5px;color:var(--tx2)}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th{text-align:left;padding:9px 12px;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:800;border-bottom:2px solid var(--line)}
   td{padding:10px 12px;border-bottom:1px solid var(--line);color:var(--tx2);vertical-align:top}
   tr:last-child td{border-bottom:none}
@@ -73,176 +77,157 @@
   td.mono{font-family:var(--mono);font-size:12px;color:var(--tx3)}
   .lbl{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:800;margin-bottom:7px}
   a{color:var(--blue);font-weight:600}
-  .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13.5px;color:var(--tx2)}
-  .box{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 13px;font-weight:600;color:var(--tx)}
-  .box.g{background:var(--goldbg);border-color:var(--goldln);color:var(--gold)}
-  .arr{color:var(--tx3);font-weight:700}
+  .phone{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:15px}
+  .bub{background:#fff;border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:11px 14px;
+    font-size:13.5px;color:var(--tx);max-width:90%;margin-bottom:8px;white-space:pre-line}
+  .bub:last-child{margin-bottom:0}
+  .when{font-family:var(--mono);font-size:11px;color:var(--tx3);margin:0 0 4px 3px}
+  .big{font-size:34px;font-weight:800;line-height:1;letter-spacing:-.02em;color:var(--gold)}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <h1>Ignition:<br><span>waking up leads they already have.</span></h1>
-  <p class="sub">Every academy arrives with a pile of old leads nobody followed up. Ignition is the warm, safe way to put those people back into the sales system, one campaign at a time, without blasting anyone. <a href="skills-pipeline.html">Back to the five skills &rarr;</a></p>
+  <h1>Reignition:<br><span>the settled design.</span></h1>
+  <p class="sub">How an academy warms up leads it already has, one campaign at a time. You answered the eight design questions; this page is the result. <a href="skills-pipeline.html">Back to the five skills &rarr;</a></p>
 
   <div class="hero">
-    <div class="l">The idea in one line</div>
-    <p>An ignition is just another front door into the pipeline, exactly like the free-trial form is, except the people come from a tag instead of a form.</p>
-    <small>That one decision is what makes it a template. The pipeline already understands "here is a door, here is who comes through it, here is what we say when they do." Ignition is a third kind of door, so every sales system we ever build gets it for free.</small>
+    <div class="l">The design in one line</div>
+    <p>Reignition is its own stage on the board. Staff hand-picks who goes in, writes the campaign's messages fresh, and a paced drip plays them out - a reply hands the person to the sales system, silence hands them to nurture.</p>
+    <small>The stage is defined by ROLE, not by name, so it bolts onto the free-trial system, the discovery-call system, and every sales system we ever build, unchanged.</small>
   </div>
 
-  <!-- HOW THE PIPELINE ALREADY THINKS -->
-  <h2>Why it fits without bending anything</h2>
-  <p class="h2sub">The sales system already has two kinds of door. We are adding a third, not building a parallel system.</p>
+  <!-- SETTLED -->
+  <h2>Your eight answers, locked in</h2>
   <div class="card">
-    <div class="scroll"><table>
-      <thead><tr><th>Door</th><th>Who comes through it</th><th>What we say when they arrive</th></tr></thead>
-      <tbody>
-        <tr><td class="k">Free trial page</td><td>someone who filled the form</td><td class="mono">the trial-form intro</td></tr>
-        <tr><td class="k">Contact page</td><td>someone who asked a question</td><td class="mono">the contact-form intro</td></tr>
-        <tr><td class="k">Trial calendar</td><td>someone who booked a time</td><td class="mono">the confirm agent</td></tr>
-        <tr style="background:var(--goldbg)"><td class="k">Ignition &nbsp;<span style="color:var(--gold)">new</span></td><td><b>everyone carrying a chosen tag</b></td><td class="mono"><b>the reignition opener</b></td></tr>
-      </tbody>
-    </table></div>
-    <p style="margin:12px 0 0;font-size:13.5px;color:var(--tx2)">Because a door is declared against a <b>stage role</b> rather than a named stage, the same ignition works on any sales system that has that role. Our second preset, the discovery-call system, already does. It inherits ignition the day this ships, with no extra work.</p>
+    <div class="dec"><div class="q">Who runs it?</div><div class="a">Staff, via the skill.<small>The design leaves room for an owner-facing campaign builder later; we do not build it now.</small></div></div>
+    <div class="dec"><div class="q">Who approves a campaign?</div><div class="a">Our staff, for now.<small>No owner gate on campaigns yet.</small></div></div>
+    <div class="dec"><div class="q">How do people get in?</div><div class="a">Staff puts them in by hand. Repeatable.<small>No automatic audiences. Tags and filters help staff BUILD the roster, they never enrol anyone by themselves. The same person can be in a later campaign again.</small></div></div>
+    <div class="dec"><div class="q">Channels?</div><div class="a">Per campaign.<small>Texts, emails, or a mix - each campaign declares its own steps.</small></div></div>
+    <div class="dec"><div class="q">The messages?</div><div class="a">Written fresh, every campaign.<small>No skeleton. They go through the same render + review as every other message in the system.</small></div></div>
+    <div class="dec"><div class="q">Where do they sit?</div><div class="a">Their own Reignition stage, on the board.<small>Visible while the campaign plays out, adaptable to any sales system.</small></div></div>
+    <div class="dec"><div class="q">No reply, sequence done?</div><div class="a">They drop into Nurture.<small>The long game takes them. Nurture's own dead end stays the final exit.</small></div></div>
+    <div class="dec"><div class="q">How fast?</div><div class="a">A paced drip. Default 15 a day.<small>Staff-settable, always inside the academy's own daytime hours.</small></div></div>
   </div>
 
-  <!-- ANATOMY -->
-  <h2>What you fill in to make one</h2>
-  <p class="h2sub">Six things. Everything else is the template.</p>
-  <div class="card">
+  <!-- STATION -->
+  <h2>The stage, and why it fits any sales system</h2>
+  <p class="h2sub">Reignition is a side-station like Ghosted. Its exits point at ROLES the pipeline already has, not at named stages, which is the whole trick.</p>
+  <div class="card scroll">
+    <div class="station">
+      <div class="srow">
+        <div class="sbox hot"><div class="t">Reignition</div><div class="d">the campaign plays out here</div></div>
+        <div class="edge">they reply &rarr; <b>the front stage</b>, the booking agent takes over</div>
+        <div class="sbox grn"><div class="t">Booking</div><div class="d">worked like any live lead</div></div>
+      </div>
+      <div class="srow">
+        <div class="sbox" style="visibility:hidden"></div>
+        <div class="edge">sequence runs out &rarr; <b>nurture</b>, the long game</div>
+        <div class="sbox"><div class="t">Nurture</div><div class="d">slow emails, ~8 weeks</div></div>
+      </div>
+      <div class="srow">
+        <div class="sbox" style="visibility:hidden"></div>
+        <div class="edge">wrong person / complaint &rarr; <b>out</b>, immediately</div>
+        <div class="sbox"><div class="t">Out</div><div class="d">unqualified, or a human takes it</div></div>
+      </div>
+    </div>
+    <p style="margin:12px 0 0;font-size:13.5px;color:var(--tx2)">The free-trial system and the discovery-call system both have a front stage and a nurture stage, so this bolts onto either today, and onto any future system that has them, with zero changes. <b>The only way in is a campaign roster.</b> No form feeds it, no automation feeds it, nothing enters by accident.</p>
+  </div>
 
-    <div class="part"><div class="n">1</div><div class="b">
-      <div class="t">Who</div>
-      <div class="d">The tag that defines the audience, plus how cold is too cold. Anyone carrying the tag whose last contact was longer ago than your floor.</div>
-      <div class="e">tag: summer-2025-enquiry &nbsp;&middot;&nbsp; last heard from: more than 60 days ago</div>
-    </div></div>
+  <!-- CAMPAIGN LIFECYCLE -->
+  <h2>A campaign's life</h2>
+  <p class="h2sub">Draft costs nothing and sends nothing. The dry run is the gate.</p>
+  <div class="card scroll">
+    <div class="life">
+      <div class="lstage"><div class="lbox">
+        <div class="st">1 &middot; draft</div>
+        <div class="t">Build the roster</div>
+        <div class="d">Staff picks people by hand. Tags and filters narrow the list; nobody is added by a rule. Repeat visitors from old campaigns are allowed.</div>
+      </div></div>
+      <div class="lstage"><div class="lbox">
+        <div class="st">2 &middot; draft</div>
+        <div class="t">Write the messages</div>
+        <div class="d">Fresh for this campaign: 1-3 steps, texts or emails or both, with their waits. Rendered exactly as they will send.</div>
+      </div></div>
+      <div class="lstage"><div class="lbox gate">
+        <div class="st">3 &middot; the gate</div>
+        <div class="t">Dry run</div>
+        <div class="d">The exact roster, the count, and everyone the rails removed, with reasons. Nothing has sent yet. Staff approves here.</div>
+      </div></div>
+      <div class="lstage"><div class="lbox">
+        <div class="st">4 &middot; running</div>
+        <div class="t">The drip</div>
+        <div class="d">15 people a day enter the stage and get step 1. Each person's later steps follow the campaign's own waits, inside their local hours.</div>
+      </div></div>
+      <div class="lstage"><div class="lbox">
+        <div class="st">5 &middot; done</div>
+        <div class="t">Or halted</div>
+        <div class="d">Replies leave as they happen. Halt at any moment: whoever has not been reached is simply never reached.</div>
+      </div></div>
+    </div>
+  </div>
 
-    <div class="part"><div class="n">2</div><div class="b">
-      <div class="t">Who never, no matter what</div>
-      <div class="d">Exclusions that are not optional and cannot be switched off: current members, anyone already live in a stage, anyone who unsubscribed or complained, anyone with no consent on file, and anyone with no working phone or email.</div>
-      <div class="e">always excluded &middot; members &middot; already active &middot; unsubscribed &middot; complained &middot; no consent</div>
-    </div></div>
+  <div class="note n-blue" style="margin-top:13px">
+    <b>The pacing trick: we pace the door, not the messages</b>
+    <p>The drip admits up to the daily number of people INTO the stage each day; once someone is in, their messages just follow the campaign's own waits. Pacing never touches the send machinery, so every guard that already protects sends - quiet hours, time zones, empty-message skips, the works - applies untouched. 60 people at 15 a day means the campaign takes four days to fully launch.</p>
+  </div>
 
-    <div class="part"><div class="n">3</div><div class="b">
-      <div class="t">Which door they come through</div>
-      <div class="d">Warm people go to the front of the pipeline and get worked by the booking agent. Cold people go to the long game instead. You pick per campaign.</div>
-      <div class="e">into: Booking &nbsp;(or Nurture, for the colder list)</div>
-    </div></div>
-
-    <div class="part"><div class="n">4</div><div class="b">
-      <div class="t">What we open with</div>
-      <div class="d">The one genuinely written part. A new lead gets "thanks for your enquiry"; someone from eight months ago needs a message that admits time has passed and gives them a reason to care now. It goes through the same review and the same owner approval as every other message.</div>
-      <div class="e">the reignition opener &middot; 1 to 3 messages &middot; written per campaign</div>
-    </div></div>
-
-    <div class="part"><div class="n">5</div><div class="b">
-      <div class="t">How fast</div>
-      <div class="d">A drip, never a blast. So many per day, inside their own hours and their own time zone. Sixty-five texts at once is how a number gets flagged by the carriers.</div>
-      <div class="e">pace: 15 a day &middot; their local hours only</div>
-    </div></div>
-
-    <div class="part"><div class="n">6</div><div class="b">
-      <div class="t">How it stops</div>
-      <div class="d">A reply pulls that person straight out of the campaign and into the normal pipeline, immediately. And you can halt the whole thing mid-flight: anyone not yet reached is simply never reached.</div>
-      <div class="e">reply &rarr; out of the campaign, into Booking &nbsp;&middot;&nbsp; halt &rarr; nobody else is sent to</div>
-    </div></div>
-
+  <!-- RAILS -->
+  <h2>The rails, none of them optional</h2>
+  <div class="grid g2">
+    <div class="note n-warn" style="margin:0"><b>Some people can never be added, no matter who tries</b>
+      <p>Current members. Anyone already live in a pipeline stage. Anyone who unsubscribed or complained, ever. Anyone with no consent on file, or no working phone or email for the campaign's channels. The roster builder refuses them with the reason shown, and there is no override.</p></div>
+    <div class="note n-warn" style="margin:0"><b>Quarantined imports stay quiet until a campaign names them</b>
+      <p>Leads seeded from an academy's old system land quarantined. A reignition roster is the ONLY path by which any of them is ever messaged. Importing someone's leads can never, by itself, cause a single message.</p></div>
+    <div class="note n-ok" style="margin:0"><b>A reply ends the campaign for that person, instantly</b>
+      <p>Their remaining steps are cancelled, they move to the front stage, and the booking agent takes over mid-conversation. Nobody gets campaign step 3 after they already answered step 1.</p></div>
+    <div class="note n-ok" style="margin:0"><b>They become ordinary leads the moment it works</b>
+      <p>After the campaign there is nothing special about them. The agent works them, ghosted catches the quiet ones, nurture catches the rest. No parallel track exists to maintain.</p></div>
   </div>
 
   <!-- WORKED EXAMPLE -->
-  <h2>Worked example: the summer special, which you already run by hand</h2>
-  <p class="h2sub">Today it is three texts to everybody, sent manually. This is the same campaign as an ignition.</p>
+  <h2>The first real run: San Jose's 65 imported leads</h2>
+  <p class="h2sub">The exact case this was designed for, using the summer special you already run by hand.</p>
   <div class="grid g2">
     <div class="card">
-      <div class="lbl">How it works today</div>
-      <div class="phone">
-        <div class="when">day 0, to everyone</div>
-        <div class="bub">Hi! It's coach from By Any Means Basketball - we're just sending out this message to everyone because we have a HUGE summer discount on right now...</div>
-        <div class="when">day 1</div>
-        <div class="bub">Hi! Just wanted to reach back out and see if you got this message above...</div>
-        <div class="when">day 3</div>
-        <div class="bub">Last chance to get access to our summer discount!</div>
-      </div>
-      <p style="margin:11px 0 0;font-size:13px;color:var(--tx2)">Sent to "everyone". No audience rules, no exclusions, no pacing, and nothing catches the replies, so they land in the inbox for a human to sort.</p>
-    </div>
-    <div class="card" style="border-color:var(--goldln)">
-      <div class="lbl">The same thing as an ignition</div>
+      <div class="lbl">The campaign</div>
       <div class="scroll"><table style="min-width:0">
-        <tr><td class="k">Who</td><td>tagged <span class="mono">summer-enquiry</span>, quiet 60+ days</td></tr>
-        <tr><td class="k">Never</td><td>members, active leads, unsubscribed</td></tr>
-        <tr><td class="k">Door</td><td>Booking, the front of the pipeline</td></tr>
-        <tr><td class="k">Opener</td><td>the same 3 messages, approved once</td></tr>
-        <tr><td class="k">Pace</td><td>15 a day, their hours</td></tr>
-        <tr><td class="k">On reply</td><td>the booking agent takes over instantly</td></tr>
+        <tr><td class="k">Roster</td><td>staff picks from the 65 quarantined imports, say 48 make it past the rails</td></tr>
+        <tr><td class="k">Messages</td><td>3 texts, written fresh for San Jose's offer</td></tr>
+        <tr><td class="k">Pace</td><td>15 a day &rarr; fully launched in 4 days</td></tr>
+        <tr><td class="k">Reply</td><td>straight to Booking, the agent takes over</td></tr>
+        <tr><td class="k">Silence</td><td>into Nurture after the last step</td></tr>
       </table></div>
-      <p style="margin:11px 0 0;font-size:13px;color:var(--tx2)"><b>The difference that matters:</b> a reply is no longer a message sitting in an inbox. The person is in the pipeline, on the board, being worked, and every follow-up already built for them takes over.</p>
+      <p style="margin:11px 0 0;font-size:13px;color:var(--tx2)">The board shows a Reignition stage with a live count the whole time, so the campaign is visible, not invisible.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">What a lead sees</div>
+      <div class="phone">
+        <div class="when">day 1</div>
+        <div class="bub">Hey Maya! It's coach from By Any Means Basketball - you reached out about training a while back. We just opened summer spots and I thought of you. Want me to hold one for Jordan?</div>
+        <div class="when">day 3, if quiet</div>
+        <div class="bub">No stress if the timing was wrong before - the summer group is filling up though. Happy to answer anything.</div>
+        <div class="when">day 6, if quiet</div>
+        <div class="bub">Last one from me! If you'd ever like Jordan to try a free session, the door's open: byanymeanssanjose.com/free-trial</div>
+      </div>
+      <p style="margin:11px 0 0;font-size:13px;color:var(--tx2)">Sample copy only - each campaign's messages are written fresh and reviewed before the dry run.</p>
     </div>
   </div>
 
-  <!-- SAFETY -->
-  <h2>The rails, because this is the one part that can go badly wrong</h2>
-  <div class="grid g2">
-    <div class="note n-warn" style="margin:0"><b>Nothing sends until you say who</b>
-      <p>Seeded leads land quarantined. An ignition campaign is the only way any of them ever gets a message, and every campaign names its audience out loud and is approved before it runs. There is no path where importing someone's leads causes messages to go out.</p></div>
-    <div class="note n-warn" style="margin:0"><b>A dry run first, every time</b>
-      <p>Before anything sends, you see the exact count, a sample of who is in, and everyone the exclusions removed and why. If that list looks wrong, nothing has happened yet.</p></div>
-    <div class="note n-ok" style="margin:0"><b>One person, one ignition, ever</b>
-      <p>Somebody who has already been reignited is not eligible again, so overlapping campaigns cannot double-text the same family. It is remembered per person, not per campaign.</p></div>
-    <div class="note n-ok" style="margin:0"><b>They are ordinary leads the moment it works</b>
-      <p>After the opener, nothing about them is special. The booking agent works them, ghosted catches the quiet ones, nurture catches the rest. No parallel track to maintain.</p></div>
-  </div>
-
-  <!-- THE THREE DOORS -->
-  <h2>How this plugs into bringing their leads across</h2>
-  <p class="h2sub">You described three kinds of lead when we seed an academy. Ignition is what the third kind needs, and it is why designing it first was right.</p>
+  <!-- WHAT GETS BUILT -->
+  <h2>What this needs that does not exist yet</h2>
   <div class="grid g3">
-    <div class="door warm">
-      <div class="h">Direct</div>
-      <div class="w">recent &middot; already moving</div>
-      <p>Lands exactly where they were, on the board, mid-conversation. <b>No message at all.</b> They should not notice anything happened.</p>
-    </div>
-    <div class="door mid">
-      <div class="h">Altered</div>
-      <div class="w">their stage does not map to ours</div>
-      <p>Our best guess at the right stage, shown to staff as an editable list before anything is written. <b>No message</b>, just placed correctly.</p>
-    </div>
-    <div class="door cold">
-      <div class="h">Reignited</div>
-      <div class="w">cold &middot; nobody followed up</div>
-      <p>Held in quarantine until an ignition campaign wakes them, warmly and paced. <b>This is the only group that gets messaged.</b></p>
-    </div>
-  </div>
-  <div class="note n-blue" style="margin-top:13px">
-    <b>Their pipeline will not look like ours, and that is the normal case</b>
-    <p>Academies name their stages whatever they like and let leads go stale in them. So the migration never assumes a mapping. It reads their board, makes its best guess at which of our stages each lead belongs in, and hands staff an <b>editable list to work through</b> before a single lead moves. The guess is a starting point, not a decision.</p>
-  </div>
-
-  <!-- GENERALISES -->
-  <h2>It is a template, so an academy can run several</h2>
-  <div class="card">
-    <div class="flow">
-      <div class="box">Summer special</div>
-      <span class="arr">&rarr;</span>
-      <div class="box g">Booking</div>
-      <span style="color:var(--tx3)">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-      <div class="box">We moved gyms</div>
-      <span class="arr">&rarr;</span>
-      <div class="box g">Booking</div>
-      <span style="color:var(--tx3)">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-      <div class="box">Old enquiries, 2024</div>
-      <span class="arr">&rarr;</span>
-      <div class="box g">Nurture</div>
-    </div>
-    <p style="margin:14px 0 0;font-size:14px;color:var(--tx2)">Same template, three campaigns, different audiences and different doors. And because a campaign points at a <b>role</b> rather than a named stage, the discovery-call sales system and every future one gets ignition without being rebuilt.</p>
+    <div class="card"><div class="lbl">New</div><div class="big">1</div>
+      <p style="margin:8px 0 0;font-size:13.5px;color:var(--tx2)"><b>The campaign itself:</b> roster + states + pace, and the drip that admits people daily. Two new tables, one small cron.</p></div>
+    <div class="card"><div class="lbl">New, small</div><div class="big">1</div>
+      <p style="margin:8px 0 0;font-size:13.5px;color:var(--tx2)"><b>The stage:</b> the reignition station with its role-based exits, stamped onto any academy's pipeline on first use.</p></div>
+    <div class="card"><div class="lbl">Reused whole</div><div class="big">rest</div>
+      <p style="margin:8px 0 0;font-size:13.5px;color:var(--tx2)">Messages ride the existing automation machinery: the same worker, renderer, review page, quiet hours, reply handling and locks. No second send path.</p></div>
   </div>
 
   <h2>What I need from you</h2>
   <div class="card" style="border-color:var(--goldln);background:var(--goldbg)">
-    <p style="margin:0 0 10px;font-size:16.5px;color:var(--tx)"><b>Workshop this, then tell me it is right.</b> Three things I have decided that you may want differently:</p>
-    <p style="margin:0 0 6px;font-size:14.5px;color:var(--tx2)"><b>1.</b> The opener is written per campaign, not per academy. A summer special and a we-moved-gyms need different words, and no template can guess them.</p>
-    <p style="margin:0 0 6px;font-size:14.5px;color:var(--tx2)"><b>2.</b> Warm goes to Booking so the AI agent works them. The alternative is dropping them in Nurture and letting the emails do it, which is slower but gentler.</p>
-    <p style="margin:0;font-size:14.5px;color:var(--tx2)"><b>3.</b> One ignition per person, ever. Strict, and it means a great campaign next year cannot re-reach someone reignited this year.</p>
+    <p style="margin:0;font-size:16.5px;color:var(--tx)"><b>Workshop this page, then approve it.</b> Everything on it follows your eight answers; the only inventions are the pacing-at-the-door trick and the role-based exits, and both exist to keep it one system instead of two.</p>
   </div>
 
 </div>
