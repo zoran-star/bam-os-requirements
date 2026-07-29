@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pre-seeding testimonials - gate 1</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Nunito:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#131416; --surface:#1B1D1F; --surface-el:#232629;
+  --border:rgba(255,255,255,0.08); --border-med:rgba(255,255,255,0.12);
+  --text:#F0EDE8; --text-sub:#A5A19A; --text-mute:#6E6B63;
+  --gold:#D4B65C; --gold-sheen:rgba(212,182,92,0.06);
+  --accent-ghost:rgba(212,182,92,0.10); --accent-border:rgba(212,182,92,0.25); --on-gold:#131416;
+  --green:#4CC76A; --green-soft:rgba(76,199,106,0.12);
+  --amber:#F0B84A; --amber-soft:rgba(240,184,74,0.12);
+  --red:#F07060; --red-soft:rgba(240,112,96,0.12);
+  --blue:#5A8FB8; --blue-soft:rgba(90,143,184,0.12);
+  --font-ui:"Plus Jakarta Sans",-apple-system,system-ui,sans-serif;
+  --font-num:"Nunito",sans-serif; --font-mono:"DM Mono",ui-monospace,monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:999px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
+  font-size:13px;line-height:1.5;padding:34px 20px 90px;-webkit-font-smoothing:antialiased}
+.page{max-width:1140px;margin:0 auto}
+h1{font-family:var(--font-num);font-weight:900;font-size:29px;margin:0 0 4px}
+.lede{color:var(--text-sub);font-size:14px;margin:0 0 28px}
+.mlabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-mute)}
+.sec{margin:0 0 40px}
+.sec__hd{display:flex;align-items:baseline;gap:12px;margin:0 0 14px;padding-bottom:9px;
+  border-bottom:1px solid var(--border)}
+.sec__n{font-family:var(--font-num);font-weight:900;font-size:15px;color:var(--gold);min-width:20px}
+.sec__t{font-family:var(--font-num);font-weight:800;font-size:17px}
+.sec__sub{color:var(--text-sub);font-size:12px;margin-left:auto;text-align:right}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px}
+.card--pick{border-color:var(--accent-border);background:var(--gold-sheen)}
+.card--bad{border-color:rgba(240,112,96,.35)}
+.card__t{font-family:var(--font-num);font-weight:800;font-size:14px;margin:0 0 4px}
+.card__d{font-size:12px;color:var(--text-sub);margin:0}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:var(--r-full);
+  font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.pill--ok{background:var(--green-soft);color:var(--green)}
+.pill--warn{background:var(--amber-soft);color:var(--amber)}
+.pill--bad{background:var(--red-soft);color:var(--red)}
+.pill--info{background:var(--blue-soft);color:var(--blue)}
+.pill--gold{background:var(--accent-ghost);color:var(--gold);border:1px solid var(--accent-border)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;padding:8px 10px;background:var(--surface-el);color:var(--text-mute);
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-sub)}
+td b{color:var(--text)}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--surface-el);
+  padding:1px 5px;border-radius:4px;color:#d8d8d2}
+/* web card preview */
+.web{background:#0C0C0D;border:1px solid var(--border);border-radius:var(--r-md);padding:16px 14px}
+.web__h{font-family:var(--font-num);font-weight:900;font-size:15px;margin:0 0 12px;text-align:center}
+.web__h small{display:block;font-family:var(--font-ui);font-weight:600;font-size:10px;
+  color:var(--text-mute);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+.wc{background:#141416;border:1px solid var(--border);border-radius:var(--r-sm);padding:11px;margin:0 0 8px}
+.wc:last-child{margin-bottom:0}
+.wc__s{color:var(--gold);font-size:10.5px;letter-spacing:1.5px;margin:0 0 6px}
+.wc__q{font-size:11.5px;color:var(--text-sub);line-height:1.5;margin:0 0 7px}
+.wc__w{font-size:11px;font-weight:700}
+.wc__src{font-size:10px;color:var(--text-mute);margin-top:2px}
+.stamp{font-size:10.5px;font-weight:700;padding:5px 9px;border-radius:var(--r-sm);
+  display:block;text-align:center;margin:0 0 11px}
+.stamp--bad{background:var(--red-soft);color:var(--red)}
+.stamp--ok{background:var(--green-soft);color:var(--green)}
+.stamp--warn{background:var(--amber-soft);color:var(--amber)}
+.alarm{border:1px solid rgba(240,112,96,.4);border-left:3px solid var(--red);
+  background:rgba(240,112,96,.06);border-radius:var(--r-md);padding:14px 16px;margin:0 0 18px}
+.alarm b{color:var(--red)}
+.ok{border:1px solid rgba(76,199,106,.35);border-left:3px solid var(--green);
+  background:rgba(76,199,106,.05);border-radius:var(--r-md);padding:14px 16px;margin:0 0 18px}
+.note{font-size:11.5px;color:var(--text-mute);font-style:italic;margin:9px 0 0}
+.flow{display:flex;align-items:stretch;gap:9px;flex-wrap:wrap}
+.fstep{flex:1;min-width:150px;background:var(--surface-el);border:1px solid var(--border);
+  border-radius:var(--r-md);padding:11px 13px}
+.fstep--me{border-color:var(--accent-border);background:var(--gold-sheen)}
+.fstep__n{font-size:10px;font-weight:700;color:var(--text-mute);letter-spacing:.06em;text-transform:uppercase}
+.fstep__t{font-weight:700;font-size:12.5px;margin:3px 0 3px}
+.fstep__d{font-size:11px;color:var(--text-sub)}
+@media(max-width:880px){.grid2,.grid3{grid-template-columns:1fr}body{padding:20px 12px 60px}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Pre-seeding real testimonials</h1>
+<p class="lede">Google connection is deferred. We type the real reviews in by hand instead. Here is what that changes, and the two things only you can decide.</p>
+
+<div class="ok">
+  <b style="color:var(--green)">The foundation is real, I checked production rather than the plan.</b>
+  All five fixes shipped. A typed quote now <b style="color:var(--text)">cannot</b> carry a star rating, a review date or sync fields: the database raises an error, not a comment in a file. An academy cannot write a <code>source='google'</code> row at all. The table is live and empty, 0 rows. GTA's real review link is already on its own row.
+</div>
+
+<!-- 1 -->
+<div class="sec">
+  <div class="sec__hd">
+    <div class="sec__n">1</div>
+    <div class="sec__t">The problem your own rule creates</div>
+    <div class="sec__sub">This is the decision</div>
+  </div>
+  <p style="color:var(--text-sub);margin:0 0 14px">GTA has <b style="color:var(--text)">4.9 stars from 67 real Google reviews</b>. If we hand-copy them, they go in as typed quotes, and your locked rule says a typed quote never wears a rating, a badge, a date, or moves the average. So the honest version of GTA's page is <b style="color:var(--text)">weaker looking than the dishonest one it replaces</b>.</p>
+  <div class="grid3">
+    <div class="card card--bad">
+      <span class="stamp stamp--bad">TODAY, AND IT IS FABRICATED</span>
+      <div class="web">
+        <div class="web__h"><small>What parents say</small>5.0 &#9733;&#9733;&#9733;&#9733;&#9733;<br><small style="margin-top:4px">Average across Google reviews</small></div>
+        <div class="wc">
+          <div class="wc__s">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+          <div class="wc__q">My son has grown so much in just a few months, not just as a player but in confidence.</div>
+          <div class="wc__w">Marcus T.</div>
+          <div class="wc__src">Google review &middot; Jan 29, 2026</div>
+        </div>
+      </div>
+      <p class="note">Hardcoded in the page. The 5.0, the stars, the date and the "Google review" label are all typed by hand. Miami's are the same three, rewritten with Miami names.</p>
+    </div>
+
+    <div class="card">
+      <span class="stamp stamp--warn">OPTION A: QUOTES ONLY</span>
+      <div class="web">
+        <div class="web__h"><small>What parents say</small></div>
+        <div class="wc">
+          <div class="wc__q">My son has grown so much in six months, not just as a player but in confidence. The coaches actually care who these kids become.</div>
+          <div class="wc__w">Maria G.</div>
+        </div>
+      </div>
+      <p class="note">Every word real, taken from your actual reviews. But no stars and no 4.9 anywhere, so the page loses the strongest number you own until Google is connected.</p>
+    </div>
+
+    <div class="card card--pick">
+      <span class="stamp stamp--ok">OPTION B: QUOTES PLAIN, RATING REAL</span>
+      <div class="web">
+        <div class="web__h"><small>What parents say</small>4.9 &#9733;&#9733;&#9733;&#9733;&#9733;<br><small style="margin-top:4px">67 Google reviews</small></div>
+        <div class="wc">
+          <div class="wc__q">My son has grown so much in six months, not just as a player but in confidence. The coaches actually care who these kids become.</div>
+          <div class="wc__w">Maria G.</div>
+        </div>
+      </div>
+      <p class="note">The 4.9 and the 67 are one fact on the academy's row, entered by staff from the owner's own dashboard, and anyone can check it on Google in five seconds. Quotes stay plain. <b style="color:var(--text)">My recommendation.</b></p>
+    </div>
+  </div>
+  <p class="note" style="margin-top:12px">Why B and not "just badge the copied ones as Google reviews": a hand-copied quote is real but nothing verified it and nothing can reconcile it later. Badging it green is the Miami shape again, only with better intentions. A single aggregate is different in kind: it is one number, publicly checkable, and it cannot be quietly wrong about who said what.</p>
+</div>
+
+<!-- 2 -->
+<div class="sec">
+  <div class="sec__hd">
+    <div class="sec__n">2</div>
+    <div class="sec__t">San Jose, and the hole in the plan</div>
+    <div class="sec__sub">I need an answer before I build anything San Jose shaped</div>
+  </div>
+  <div class="alarm">
+    <b>San Jose has no reviews and no Google listing on file.</b> Its <code>google_review_url</code> is empty and it has not launched. "Do the same with San Jose's reviews" has nothing to read from. If we preset it with anything, that is the Miami failure happening a third time, with our eyes open.
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card__t">The one question that decides it</div>
+      <p class="card__d">Does Lij have an existing Google listing under <b>3D Sports Prep</b>, or any other business he has run? If yes, those reviews are real and his, and we can use them. If no, San Jose stays empty and that is the correct outcome, not a gap to fill.</p>
+      <p class="note">This has been asked twice and not answered. It is the only thing blocking the San Jose half.</p>
+    </div>
+    <div class="card">
+      <div class="card__t">What happens either way</div>
+      <table>
+        <tr><td><b>He has a listing</b></td><td>We type his real reviews in, same as GTA. San Jose launches with genuine proof.</td></tr>
+        <tr><td><b>He does not</b></td><td>Store stays empty. <code>nurture-3</code> stays off, the testimonials email does not ship, and the free-trial page has no reviews section. All correct.</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 3 -->
+<div class="sec">
+  <div class="sec__hd">
+    <div class="sec__n">3</div>
+    <div class="sec__t">Which skill the step belongs in</div>
+    <div class="sec__sub">My recommendation, yours to overrule</div>
+  </div>
+  <div class="flow">
+    <div class="fstep fstep--me">
+      <div class="fstep__n">Skill 1</div>
+      <div class="fstep__t">Branding deck</div>
+      <div class="fstep__d"><b style="color:var(--gold)">Gather here.</b> It already reviews their old site and assets, which is exactly where testimonials and reviews live. Runs first, so the store is full before anything needs it.</div>
+    </div>
+    <div class="fstep">
+      <div class="fstep__n">Skill 2</div>
+      <div class="fstep__t">Core site build</div>
+      <div class="fstep__d">Unaffected.</div>
+    </div>
+    <div class="fstep fstep--me">
+      <div class="fstep__n">Skill 3</div>
+      <div class="fstep__t">Sales system build</div>
+      <div class="fstep__d"><b style="color:var(--gold)">Consume here.</b> Reads the store to decide whether the testimonials email ships and what the free-trial cards show.</div>
+    </div>
+    <div class="fstep">
+      <div class="fstep__n">Skill 4</div>
+      <div class="fstep__t">Member management</div>
+      <div class="fstep__d">Also reads the store later. Your backlog, not started.</div>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:14px">
+    <div class="card">
+      <div class="card__t">Why gathering is not inside skill 3</div>
+      <p class="card__d">You isolated skill 3 because more sales systems are coming, each with its own build. An academy's testimonials are not owned by a sales system: the same quotes serve the free trial, the next system, and member emails. Putting gathering inside skill 3 means the second sales system either re-asks for them or forks. <b>The store is shared machinery; only the skill forks.</b></p>
+    </div>
+    <div class="card">
+      <div class="card__t">The ordering reason, which is the harder one</div>
+      <p class="card__d">Your rule is that an empty store <b>drops</b> the email, and that is decided when the system is seeded, not when the email sends. Skill 3 is the seeder. So the quotes have to already be in place before skill 3 runs, or the step gets dropped and somebody has to re-seed later to bring it back.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 4 -->
+<div class="sec">
+  <div class="sec__hd">
+    <div class="sec__n">4</div>
+    <div class="sec__t">What I would then do, in order</div>
+    <div class="sec__sub">Nothing here starts until you answer 1 and 2</div>
+  </div>
+  <table>
+    <tr><th style="width:26px"></th><th>Step</th><th>Note</th></tr>
+    <tr><td><b>1</b></td><td><b>Build the gathering step</b> into skill 1, plus the one resolver skill 3 reads.</td><td>The resolver is the seam the templating room deliberately left unbuilt. One function, honours pinning, returns typed and synced rows together.</td></tr>
+    <tr><td><b>2</b></td><td><b>Run it by hand for GTA.</b></td><td>You are signed in as owner, so Manage your Business Profile shows the full text. The public page truncates 9 of 10 reviews behind "See more" and cannot be expanded, so that route is a dead end.</td></tr>
+    <tr><td><b>3</b></td><td><b>Replace GTA's fabricated cards</b> with the real quotes.</td><td>This is the moment the fake 5.0 and the invented "Google review" badges come off a live page.</td></tr>
+    <tr><td><b>4</b></td><td><b>San Jose</b>, only if Lij has a real listing.</td><td>Otherwise it stays empty, deliberately.</td></tr>
+    <tr><td><b>5</b></td><td><b>Close the 7 versus 8 step gap.</b></td><td>The master is missing the testimonials step on purpose. Mine is the only build allowed to add it, and only once a store exists to feed it.</td></tr>
+  </table>
+  <p class="note">Miami keeps its fabricated cards for now, since you ruled they stay until connected. Worth revisiting once GTA's are real, because the same three quotes will then exist in two versions: GTA's true ones and Miami's rewritten copies.</p>
+</div>
+
+</div>
+</body>
+</html>
