@@ -9,6 +9,7 @@ import GhlKpiDiscovery from "../components/GhlKpiDiscovery";
 import PhoneTab from "./PhoneTab.jsx";
 import ActivationTab from "./ActivationTab.jsx";
 import ClientAvatar from "../components/ClientAvatar.jsx";
+import { showToast, uiConfirm, ToastHost, ConfirmHost } from "../components/dialogs.jsx";
 
 // ─── Tiny stroke icons (design system: SVG stroke icons, no emojis) ────────
 const _ico = (paths, size = 14) => (
@@ -23,72 +24,6 @@ const IcoClock = ({ size }) => _ico('<circle cx="12" cy="12" r="10"/><path d="M1
 const IcoChat = ({ size }) => _ico('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>', size);
 const IcoSlack = ({ size }) => _ico('<rect x="13" y="2" width="3" height="8" rx="1.5"/><path d="M19 8.5V10h1.5A1.5 1.5 0 1 0 19 8.5"/><rect x="8" y="14" width="3" height="8" rx="1.5"/><path d="M5 15.5V14H3.5A1.5 1.5 0 1 0 5 15.5"/><rect x="14" y="13" width="8" height="3" rx="1.5"/><path d="M15.5 19H14v1.5a1.5 1.5 0 1 0 1.5-1.5"/><rect x="2" y="8" width="8" height="3" rx="1.5"/><path d="M8.5 5H10V3.5A1.5 1.5 0 1 0 8.5 5"/>', size);
 const IcoLink = ({ size }) => _ico('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', size);
-
-// ─── Toast + confirm: styled replacements for window.alert / window.confirm ─
-// Module-level dispatchers so any nested tab/component in this view can call
-// showToast()/uiConfirm() without prop-drilling; the hosts render at the view
-// root. Falls back to the native dialogs if a host isn't mounted.
-let _toastPush = null;
-function showToast(msg, kind = "error") {
-  const text = typeof msg === "string" ? msg : (msg && msg.message) || String(msg);
-  if (_toastPush) _toastPush({ text, kind });
-  else window.alert(text);
-}
-function ToastHost({ tokens: t }) {
-  const [toasts, setToasts] = useState([]);
-  useEffect(() => {
-    _toastPush = ({ text, kind }) => {
-      const id = Math.random().toString(36).slice(2);
-      setToasts(prev => [...prev.slice(-3), { id, text, kind }]);
-      setTimeout(() => setToasts(prev => prev.filter(x => x.id !== id)), 4500);
-    };
-    return () => { _toastPush = null; };
-  }, []);
-  if (!toasts.length) return null;
-  return (
-    <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, maxWidth: 380 }}>
-      {toasts.map(x => (
-        <div key={x.id} onClick={() => setToasts(prev => prev.filter(y => y.id !== x.id))} style={{
-          background: t.surfaceEl, color: t.text, border: `1px solid ${x.kind === "error" ? "#7a2f2f" : x.kind === "success" ? `${t.green}66` : t.border}`,
-          borderLeft: `3px solid ${x.kind === "error" ? "#e08b7e" : x.kind === "success" ? t.green : t.accent}`,
-          borderRadius: 12, padding: "11px 14px", fontSize: 13, lineHeight: 1.5,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.35)", cursor: "pointer", wordBreak: "break-word",
-        }}>{x.text}</div>
-      ))}
-    </div>
-  );
-}
-let _confirmOpen = null;
-function uiConfirm(opts) {
-  const o = typeof opts === "string" ? { title: opts } : opts;
-  return new Promise(resolve => {
-    if (_confirmOpen) _confirmOpen(o, resolve);
-    else resolve(window.confirm(o.body ? `${o.title}\n\n${o.body}` : o.title));
-  });
-}
-function ConfirmHost({ tokens: t }) {
-  const [req, setReq] = useState(null); // { title, body, confirmLabel, danger, resolve }
-  useEffect(() => {
-    _confirmOpen = (o, resolve) => setReq({ ...o, resolve });
-    return () => { _confirmOpen = null; };
-  }, []);
-  if (!req) return null;
-  const done = (val) => { req.resolve(val); setReq(null); };
-  return (
-    <div onClick={() => done(false)} style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 16, padding: "22px 24px", maxWidth: 440, width: "100%", boxShadow: "0 16px 48px rgba(0,0,0,0.5)" }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: t.text, lineHeight: 1.45 }}>{req.title}</div>
-        {req.body && <div style={{ fontSize: 13, color: t.textSub, marginTop: 8, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{req.body}</div>}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
-          <button onClick={() => done(false)} style={{ padding: "8px 16px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-          <button onClick={() => done(true)} autoFocus style={{ padding: "8px 16px", background: req.danger ? "#c0392b" : t.accent, color: req.danger ? "#fff" : "#0B0B0D", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-            {req.confirmLabel || (req.danger ? "Yes, do it" : "Confirm")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Combined Clients page ──────────────────────────────────────────────────
 // Replaces the old Clients tab + Client Setup tab. Two states:
