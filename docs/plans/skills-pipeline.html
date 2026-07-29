@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>The three skills: what exists, what is missing</title>
+<title>The four build skills</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -13,6 +13,7 @@
     --green:#2A7A4E;--greenbg:#E8F4EC;--greenln:#B7DCC4;
     --red:#B23A22;--redbg:#FBECE8;--redln:#EFC9BE;
     --blue:#255F92;--bluebg:#E9F1F8;--blueln:#C2D9EB;
+    --grey:#8A857B;--greybg:#F1EFE9;
     --ui:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
   }
   *{box-sizing:border-box}
@@ -33,6 +34,7 @@
   .p-ok{background:var(--greenbg);color:var(--green)}
   .p-no{background:var(--redbg);color:var(--red)}
   .p-half{background:var(--goldbg);color:var(--gold)}
+  .p-later{background:var(--greybg);color:var(--grey)}
   .note{border-radius:12px;padding:16px 18px}
   .note b{display:block;margin-bottom:4px;font-size:15px}
   .note p{margin:0;font-size:14px;color:var(--tx2)}
@@ -44,28 +46,27 @@
   .n-ok{background:var(--greenbg);border:1px solid var(--greenln)}.n-ok b{color:var(--green)}
   .grid{display:grid;gap:13px}
   @media(min-width:800px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
-  /* pipeline */
-  .pipe{display:flex;flex-direction:column;min-width:660px}
-  .stage{display:flex;gap:14px;align-items:flex-start}
-  .stage .rail{flex:none;width:26px;display:flex;flex-direction:column;align-items:center;align-self:stretch}
-  .stage .dot{width:15px;height:15px;border-radius:999px;border:3px solid var(--line);background:var(--card);margin-top:20px;flex:none}
-  .stage.ok .dot{background:var(--green);border-color:var(--green)}
-  .stage.half .dot{background:var(--goldbg);border-color:var(--gold)}
-  .stage .bar{flex:1;width:3px;background:var(--line);min-height:16px}
-  .stage:last-child .bar{display:none}
-  .stage .body{flex:1;padding:10px 0 16px}
-  .trig{font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:800;color:var(--blue);margin-bottom:3px}
-  .stage .t{font-size:16px;font-weight:800;color:var(--tx)}
-  .stage .d{font-size:13.5px;color:var(--tx2);margin-top:3px;max-width:66ch}
-  .stage .who{font-family:var(--mono);font-size:12px;color:var(--tx3);margin-top:5px}
-  /* budget table */
-  table{width:100%;border-collapse:collapse;font-size:14.5px;min-width:620px}
-  th{text-align:left;padding:9px 12px;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);font-weight:800;border-bottom:2px solid var(--line)}
-  td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--tx2);vertical-align:top}
+  /* skill blocks */
+  .skill{border:1px solid var(--line);border-radius:14px;background:var(--card);margin-bottom:14px;overflow:hidden}
+  .skill.dim{opacity:.62}
+  .skill .hd{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:16px 20px 4px}
+  .skill .num{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--tx3)}
+  .skill .t{font-size:18px;font-weight:800;color:var(--tx)}
+  .skill .trig{font-size:11px;letter-spacing:.09em;text-transform:uppercase;font-weight:800;color:var(--blue);padding:0 20px;margin-top:2px}
+  .skill .bd{padding:10px 20px 16px;font-size:14px;color:var(--tx2)}
+  .skill .bd p{margin:0 0 8px;max-width:78ch}
+  .skill .bd p:last-child{margin-bottom:0}
+  .steps{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .step{background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:7px 12px;font-size:12.5px;color:var(--tx2)}
+  .step b{color:var(--tx);display:block;font-size:12.5px}
+  .step.new{background:var(--goldbg);border-color:var(--goldln)}
+  .step.new b{color:var(--gold)}
+  /* budget */
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:0}
+  td{padding:9px 12px;border-bottom:1px solid var(--line);color:var(--tx2)}
   tr:last-child td{border-bottom:none}
   td.k{color:var(--tx);font-weight:700}
-  td.num{font-family:var(--mono);font-size:13px;white-space:nowrap}
-  tr.total td{border-top:2px solid var(--line);font-weight:800;color:var(--tx)}
+  td.num2{font-family:var(--mono);font-size:13px;white-space:nowrap;text-align:right}
   .lbl{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);font-weight:800;margin-bottom:7px}
   .big{font-size:38px;font-weight:800;line-height:1;letter-spacing:-.02em;color:var(--gold)}
 </style>
@@ -73,126 +74,141 @@
 <body>
 <div class="wrap">
 
-  <h1>You were right.<br><span>The website skills already exist.</span></h1>
-  <p class="sub">Four build skills shipped into the client-sites repo two weeks ago, and your portal already fires the triggers between them. What you asked for is not three new skills. It is one missing half, two approval steps, and one collision to settle.</p>
+  <h1>The four build skills,<br><span>in onboarding order.</span></h1>
+  <p class="sub">Each one fires automatically when the owner finishes the step that feeds it, and the academy's Slack channel gets pinged with the exact skill to run. Staff runs it, workshops the result in localhost, and the owner approves the finished thing on their own staging site. The owner never sees localhost.</p>
 
   <div class="goal">
     <div class="l">Your goal</div>
-    <p>A new academy fully onboarded in about 30 minutes, with the skills doing the human-judgement work and staff approving it.</p>
+    <p>A new academy fully onboarded in about 30 minutes of their time, with the skills doing the human-judgement work and staff approving it.</p>
   </div>
 
-  <!-- PIPELINE -->
-  <h2>The pipeline, as it already runs</h2>
-  <p class="h2sub">Every trigger below is live in production today. When a stage becomes ready, the academy's Slack channel gets pinged with the exact skill to run.</p>
-  <div class="card scroll">
-    <div class="pipe">
+  <!-- ═══ SKILL 1 ═══ -->
+  <h2>The pipeline</h2>
+  <p class="h2sub">Top to bottom. Every trigger already fires in production today.</p>
 
-      <div class="stage ok"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
-        <div class="trig">fires when the owner submits their brand brief</div>
-        <div class="t">1 &nbsp;Branding deck <span class="pill p-ok">exists</span></div>
-        <div class="d">Scans their old site for colors and fonts, builds their theme and a one-page brand board the owner approves on their own staging site. Everything downstream wears this theme automatically.</div>
-        <div class="who">/branding-deck &middot; owner approves the board in their wizard</div>
-      </div></div>
-
-      <div class="stage ok"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
-        <div class="trig">fires when the deck is published</div>
-        <div class="t">2 &nbsp;Core site <span class="pill p-ok">exists</span></div>
-        <div class="d">Home, about, contact, programs. The pages scaffold from the shared kit, and the copy is written from the owner's own story, proof and offers, then workshopped by staff before it replaces the draft.</div>
-        <div class="who">/site-build --phase core &middot; plus /email-templates for the transactional emails</div>
-      </div></div>
-
-      <div class="stage half"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
-        <div class="trig">fires when the sales preset is chosen in the wizard</div>
-        <div class="t">3 &nbsp;Sales system <span class="pill p-half">half exists</span></div>
-        <div class="d"><b>The funnel page half exists</b> (/site-build --phase sales builds the free-trial page). <b>The email and automation half is the missing piece:</b> nothing seeds the messages, drafts the 3 authored emails from the owner's story, or renders the review page staff and the owner approve from. That machinery was all built and tested this month. No skill drives it yet.</div>
-        <div class="who">/site-build --phase sales &middot; MISSING: the sales-messages skill</div>
-      </div></div>
-
-      <div class="stage ok"><div class="rail"><div class="dot"></div><div class="bar"></div></div><div class="body">
-        <div class="trig">fires when pricing, policy and the form are in</div>
-        <div class="t">4 &nbsp;Onboarding + agreement <span class="pill p-ok">exists</span></div>
-        <div class="d">The enroll funnel page and the branded legal agreement, from the offer's policy and legal details.</div>
-        <div class="who">/site-build --phase onboarding &middot; /agreement</div>
-      </div></div>
-
+  <div class="skill">
+    <div class="hd"><span class="num">1</span><span class="t">Branding deck</span><span class="pill p-ok">exists</span></div>
+    <div class="trig">Fires when the owner submits their brand brief</div>
+    <div class="bd">
+      <p>Reviews their old website and any branding assets they entered, then takes a pass at their brand in localhost with the staff member: colors, fonts, logo treatment. The output is their theme plus a one-page brand board on their staging site, and the owner approving that board is what moves the pipeline forward. Everything below wears this theme automatically, forever.</p>
+      <div class="steps">
+        <div class="step"><b>Scan</b>their old site for colors + fonts</div>
+        <div class="step"><b>Theme</b>their palette, workshopped in localhost</div>
+        <div class="step"><b>Board</b>one page, on their staging site</div>
+        <div class="step"><b>Owner approves</b>the board, in their wizard</div>
+      </div>
     </div>
+  </div>
+
+  <!-- ═══ SKILL 2 ═══ -->
+  <div class="skill">
+    <div class="hd"><span class="num">2</span><span class="t">Core site build</span><span class="pill p-ok">exists</span></div>
+    <div class="trig">Fires when the deck is published</div>
+    <div class="bd">
+      <p>Takes the branding deck and creates the core sites in localhost with the staff member: home, about, contact, programs. Pages scaffold from the shared kit wearing their theme, and every word of copy is written from what the owner already typed - their story, their proof, their offers. Staff workshops it, then it goes to staging for the owner.</p>
+      <div class="steps">
+        <div class="step"><b>Scaffold</b>home &middot; about &middot; contact &middot; programs</div>
+        <div class="step"><b>Write</b>copy from their story + offers</div>
+        <div class="step"><b>Workshop</b>in localhost with staff</div>
+        <div class="step"><b>Staging</b>owner sees the finished site</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SKILL 3 ═══ -->
+  <div class="skill" style="border-color:var(--goldln)">
+    <div class="hd"><span class="num">3</span><span class="t">Sales system build: free trial</span><span class="pill p-half">the build</span></div>
+    <div class="trig">Fires when the free-trial preset is chosen in the wizard</div>
+    <div class="bd">
+      <p><b>The entire sales system in one skill:</b> the funnel website, every automation, every email, the extra nurture emails, and the trial messages. Sets it all up, then walks staff through a review of everything it made - the funnel page, the message sequences rendered exactly as a parent receives them, and the 3 emails it drafts from the owner's own story for staff to approve in chat. Everything installs switched off until the owner approves it.</p>
+      <div class="steps">
+        <div class="step"><b>Funnel page</b>the free-trial website</div>
+        <div class="step new"><b>Seed</b>all messages, installed dormant</div>
+        <div class="step new"><b>Draft</b>3 story emails from their own words</div>
+        <div class="step new"><b>Trial emails</b>booking confirmation + reminder</div>
+        <div class="step new"><b>Review</b>every message, rendered as sent</div>
+        <div class="step new"><b>Owner approves</b>in their wizard, switches it on</div>
+      </div>
+      <p style="margin-top:12px;font-size:13px"><span class="pill p-ok" style="margin-right:6px">exists</span>the funnel page half &nbsp;&nbsp;<span class="pill p-half" style="margin-right:6px">to build</span>the gold steps: the messages half + the owner approval step</p>
+    </div>
+  </div>
+
+  <!-- ═══ SKILL 4 ═══ -->
+  <div class="skill dim">
+    <div class="hd"><span class="num">4</span><span class="t">Member management build</span><span class="pill p-later">backlog, by your call</span></div>
+    <div class="trig">Fires when pricing, policy and the form are in</div>
+    <div class="bd">
+      <p>The agreement, the enroll funnel, the member onboarding automation, and the member emails (welcome, receipt, reschedule). <b>Deliberately parked until you are truly comfortable that the free-trial sales system is plug and play.</b> Logged on the orchestrator's backlog. The pieces that exist today (/agreement, the enroll page build) keep working as they are; nothing new gets designed here yet.</p>
+    </div>
+  </div>
+
+  <!-- WHY ISOLATED -->
+  <h2>Why the sales system is its own skill</h2>
+  <div class="note n-gold">
+    <b>One skill per sales system. Shared machinery underneath. Always.</b>
+    <p>More sales systems are coming, and each will need its own build process. So the free-trial build is isolated now: when sales system #2 arrives, it gets its own sibling skill with its own steps, and it drives the <b>same</b> message machinery, the same render path, the same locks. A new system is a new skill, never a fork of the machinery - that is the same rule that keeps one academy's structure from forking the preset.</p>
   </div>
 
   <!-- WHAT GETS BUILT -->
-  <h2>So the build is exactly three things</h2>
+  <h2>So the build list is three things</h2>
   <div class="grid g3">
     <div class="card">
       <div class="lbl">Build A</div>
-      <div style="font-size:16px;font-weight:800;margin-bottom:6px">The sales-messages skill</div>
-      <p style="margin:0;font-size:13.5px;color:var(--tx2)">The missing half of stage 3. Seeds all 17 messages dormant, drafts the 3 authored emails from the owner's story as plain text in chat, staff approves, then it renders every message exactly as a parent gets it. Drives the machinery already built and locked this month.</p>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px">The sales system skill</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)">The gold steps in skill 3. The funnel-page half already exists and folds in; the messages half is new and drives the machinery built and locked this month. The two trial emails move in from the old email-templates skill; the member emails park with skill 4.</p>
     </div>
     <div class="card">
       <div class="lbl">Build B</div>
-      <div style="font-size:16px;font-weight:800;margin-bottom:6px">Two owner approval steps</div>
-      <p style="margin:0;font-size:13.5px;color:var(--tx2)">The wizard has promised "nothing texts anyone until you approve it" for weeks with no step behind it. The owner sees the same rendered page staff reviewed, and approving is what switches the messages on. One render path, so what they approve IS what sends, proven by a committed test.</p>
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px">The owner approval step</div>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)">One new step in the owner's wizard: they see every sales message rendered exactly as a parent gets it, and approving is what switches the system on. One render path, so what they approve IS what sends, proven by a committed test. The member-messages approval step parks with skill 4.</p>
     </div>
     <div class="card">
       <div class="lbl">Build C</div>
       <div style="font-size:16px;font-weight:800;margin-bottom:6px">A re-run guard</div>
-      <p style="margin:0;font-size:13.5px;color:var(--tx2)">Small but load-bearing: re-running a site build refuses to overwrite pages that carry newer hand-fixes, instead of silently clobbering them. See the collision below.</p>
+      <p style="margin:0;font-size:13.5px;color:var(--tx2)">Re-running a site build currently replaces the client's pages wholesale, which would silently eat any client-requested fixes made since. The build now stops and lists them instead, and staff folds them in deliberately.</p>
     </div>
-  </div>
-
-  <!-- COLLISION -->
-  <h2>One collision, found while mapping, needs your ruling</h2>
-  <div class="note n-warn">
-    <b>Two things write the same website files, and a re-run eats the fixes</b>
-    <p>When a client asks for a page change, the website-fix loop edits their live pages directly. But re-running the core site build <b>replaces those same pages wholesale</b> from the kit. Any client-requested fixes made since the last build would be silently overwritten. Nothing guards this today.</p>
-    <p><b>Build C is the fix I recommend:</b> the site build checks whether the client's pages carry fix commits newer than its own last run, and stops with a list of them instead of overwriting. Staff folds them in deliberately.</p>
-  </div>
-  <div class="note n-blue">
-    <b>Smaller, same family: two unrelated things are both called "site pages"</b>
-    <p>The label list an owner edits in their Blueprint and the file map the deploy scripts push are different stores with the same name, and nothing reconciles them. Not urgent, logged so it stops surprising people.</p>
   </div>
 
   <!-- MINUTES -->
   <h2>The 30 minutes, honestly</h2>
-  <p class="h2sub">Your target was set when this was emails. It now covers branding, sites, funnels, emails and automations, so here is the honest split. The key: there are two clocks, and yours is the owner's.</p>
+  <p class="h2sub">Two clocks. Yours is the owner's, and it can hit 30. The staff clock is honest estimates until San Jose's first run replaces them with measurements.</p>
   <div class="grid g2">
     <div class="card">
-      <div class="lbl">The owner's clock, what "onboarded in 30 minutes" can mean</div>
+      <div class="lbl">The owner's clock</div>
       <div class="big">~30 min</div>
-      <div class="scroll"><table style="min-width:0;margin-top:10px">
-        <tr><td class="k">Brand card (logo, colors, fonts)</td><td class="num">~5 min</td></tr>
-        <tr><td class="k">Story brief (story, proof, dream athletes)</td><td class="num">~10 min</td></tr>
-        <tr><td class="k">Offer + pricing</td><td class="num">~10 min</td></tr>
-        <tr><td class="k">Approve the brand board</td><td class="num">~2 min</td></tr>
-        <tr><td class="k">Approve their messages (Build B)</td><td class="num">~3 min</td></tr>
+      <div class="scroll"><table style="margin-top:10px">
+        <tr><td class="k">Brand card (logo, colors, fonts)</td><td class="num2">~5</td></tr>
+        <tr><td class="k">Story brief</td><td class="num2">~10</td></tr>
+        <tr><td class="k">Offer + pricing</td><td class="num2">~10</td></tr>
+        <tr><td class="k">Approve the brand board</td><td class="num2">~2</td></tr>
+        <tr><td class="k">Approve their sales messages</td><td class="num2">~3</td></tr>
       </table></div>
-      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">The owner types their answers once and approves twice. <b>This clock can hit your 30.</b></p>
     </div>
     <div class="card">
-      <div class="lbl">The staff + AI clock, spread across the same days</div>
+      <div class="lbl">The staff + skill clock, spread across the same days</div>
       <div class="big">~70 min</div>
-      <div class="scroll"><table style="min-width:0;margin-top:10px">
-        <tr><td class="k">Branding deck</td><td class="num">~10 min</td></tr>
-        <tr><td class="k">Core site copy review</td><td class="num">~20 min</td></tr>
-        <tr><td class="k">Sales funnel page</td><td class="num">~10 min</td></tr>
-        <tr><td class="k">Sales messages: 3 drafts + rendered review</td><td class="num">~15 min</td></tr>
-        <tr><td class="k">Email templates + agreement</td><td class="num">~15 min</td></tr>
+      <div class="scroll"><table style="margin-top:10px">
+        <tr><td class="k">1 &nbsp;Branding deck</td><td class="num2">~10</td></tr>
+        <tr><td class="k">2 &nbsp;Core site build</td><td class="num2">~20</td></tr>
+        <tr><td class="k">3 &nbsp;Sales system build</td><td class="num2">~35</td></tr>
+        <tr><td class="k">4 &nbsp;Member management</td><td class="num2">parked</td></tr>
       </table></div>
-      <p style="margin:10px 0 0;font-size:13px;color:var(--tx2)">Estimates, not measurements. <b>The first San Jose run is the measurement</b>, and these numbers get replaced with real ones.</p>
     </div>
   </div>
 
   <!-- SAFETY -->
-  <h2>Carried in from the last two weeks, not negotiable</h2>
+  <h2>Carried in from the last two weeks</h2>
   <div class="grid g2">
     <div class="note n-ok" style="margin:0"><b>What the owner approves is what sends</b>
-      <p>One render path. The approval page, the staff review page and the real send all call the same code, and a committed test proves preview equals send. The preview that quietly disagreed with the send was found and fixed this month; the test is what stops it coming back.</p></div>
-    <div class="note n-ok" style="margin:0"><b>A trigger that fires early does nothing, loudly</b>
-      <p>Every stage states what it does when the stage before it is missing or half-done: it declines and says why, it never throws and never builds from someone else's data. The enroll-funnel outage is the lesson applied.</p></div>
+      <p>The approval page, the staff review and the real send all run the same code. A committed test proves preview equals send, so the divergence found and fixed this month cannot quietly return.</p></div>
+    <div class="note n-ok" style="margin:0"><b>A skill that fires early does nothing, loudly</b>
+      <p>Each skill states what it does when the stage before it is missing or half-done: it declines and says why. It never throws, and it never builds from another academy's data.</p></div>
   </div>
 
   <!-- THE ASK -->
   <h2>The one thing I need from you</h2>
   <div class="card" style="border-color:var(--goldln);background:var(--goldbg)">
-    <p style="margin:0;font-size:16.5px;color:var(--tx)"><b>Approve the three builds (A, B, C), or tell me which to change.</b> Nothing else here is new work: stages 1, 2 and 4 exist and stay as they are, wearing the same triggers your portal already fires.</p>
+    <p style="margin:0;font-size:16.5px;color:var(--tx)"><b>Workshop this page, then approve it.</b> When you do, I build A, B and C. Skills 1 and 2 stay as they are, skill 4 goes on the orchestrator's backlog in your words, and San Jose's first run through skill 3 becomes the measurement that replaces every estimate on this page.</p>
   </div>
 
 </div>
