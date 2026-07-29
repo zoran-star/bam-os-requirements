@@ -110,6 +110,14 @@ const MUTATE = process.env.MUTATE || "";
 let WIRE = null;
 const VERIFIED_DOMAINS = ["byanymeanstoronto.ca", "byanymeanssanjose.com"];
 let SENDING_DOMAIN = VERIFIED_DOMAINS[0];
+// The academy's PUBLIC email (clients.business_email), which the send path resolves
+// for itself: it is the footer contact line, the {{SUPPORT_EMAIL}} link and the
+// unsubscribe destination, and an email that cannot carry one is HELD rather than
+// sent. Set per academy in sendSide() from the same snapshot the surface renders
+// from, so the two sides are comparing the same academy's address. If it disagreed
+// with the snapshot, the compare below would report it as a difference - which is
+// the correct alarm, not a nuisance.
+let SENDING_BUSINESS_EMAIL = "";
 
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
@@ -120,6 +128,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u === "https://api.resend.com/emails" && method === "POST") { WIRE = { channel: "email", subject: body.subject, html: body.html, from: body.from }; return json({ id: "stub-email" }); }
   if (u.includes("/conversations/messages") && method === "POST") { WIRE = { channel: "sms", text: body.message }; return json({ messageId: "stub-sms" }); }
   if (u === "https://api.resend.com/domains") return json({ data: VERIFIED_DOMAINS.map((name) => ({ name, status: "verified" })) });
+  if (u.includes("/rest/v1/clients?") && u.includes("select=business_email")) return json([{ business_email: SENDING_BUSINESS_EMAIL }]);
   if (u.includes("/rest/v1/clients?") && u.includes("email_domain")) return json([{ email_domain: SENDING_DOMAIN, business_name: "stub" }]);
   if (u.includes("/rest/v1/clients?") && u.includes("messaging_provider")) return json([{ messaging_provider: "ghl" }]);
   if (u.includes("/rest/v1/email_suppressions")) return json([]);      // nobody is suppressed
@@ -229,6 +238,7 @@ function approvalSide(step, ac) {
 async function sendSide(step, ac) {
   WIRE = null;
   SENDING_DOMAIN = ac.domain || VERIFIED_DOMAINS[0];
+  SENDING_BUSINESS_EMAIL = ac.client.business_email || "";
   const common = { clientId: ac.client.id, subject: step.subject, body: step.body, vars: ac.vars };
   const r = String(step.channel).toLowerCase() === "email"
     ? await sendOn({ channel: "email", toEmail: "parent@example.test", ...common })

@@ -36,7 +36,22 @@ const LOCATIONS = {
     tagline: "Youth and high-school basketball training in Oakville and across the GTA.",
     siteUrl: "https://byanymeanstoronto.ca",
     siteLabel: "byanymeanstoronto.ca",
-    email: "info@byanymeanstoronto.ca",
+    // NO `email` HERE ANY MORE. It held "info@byanymeanstoronto.ca", which meant GTA
+    // was the ONE academy whose emails published a public address instead of its
+    // owner's personal inbox - everyone else got clients.email, and clients.email is
+    // the owner. That address is now clients.business_email (migration
+    // 20260729T210000), so the row wins and the fix reaches every academy at once.
+    // Re-adding it here would put GTA back on a private copy of a shared fact.
+    //
+    // WHY THIS ENTRY STILL EXISTS AT ALL, i.e. what deleting it would break TODAY:
+    // `tagline` and `instagram`. locFromVars() hardcodes both to "" because there is
+    // NO COLUMN for either, so deleting this entry strips GTA's tagline line and its
+    // footer Instagram link out of every email it sends. That is a regression, not a
+    // cleanup. Two columns (clients.tagline, clients.instagram_url) plus their
+    // clientVars() lines are the whole remaining cost; add them, fill GTA's row, and
+    // this entry can go. Everything else it carries (suffix, locationTag, full, site,
+    // city, ownerFirst, the two content facts) already resolves from the row for
+    // every other academy.
     // Left in the short form on purpose. This is the FOOTER instagram link on every
     // email, so "canonicalising" it to the www/trailing-slash form the welcome email's
     // general-page link was hand-written in changes a link in all ten templates to buy
@@ -160,7 +175,19 @@ export function clientVars(client) {
     // stay a hardcoded literal, which is the one thing keeping the row academy-specific.
     location_domain: domain || "",
     location_owner: c.owner_name ? String(c.owner_name).trim().split(/\s+/)[0] : "",
-    location_email: c.email || "",
+    // The email a PARENT sees, replies to and unsubscribes through. This used to read
+    // `c.email`, which is the OWNER's address - so every academy published the person
+    // WE contact as the address parents contact, and pointed the unsubscribe mailto at
+    // it. BAM GTA's is zoran@byanymeansbball.com, a personal inbox; DETAIL Miami's and
+    // Johnson Bball's are both Mike's. GTA only looked right because of the hardcoded
+    // LOCATIONS entry above, which no other academy has.
+    //
+    // NO FALLBACK TO c.email. Not "for now", not "until academies fill it in". Falling
+    // back is the bug, and it also hides the bug: a field that renders something reads
+    // as configured. Empty here drops the footer contact line and the footer Email
+    // link, and the send path HOLDS the email rather than shipping one with no
+    // unsubscribe path (see unsubscribeFor below and api/_send.js).
+    location_email: c.business_email || "",
     location_city: cityFromAddress(c.address),
     // The number a MEMBER reaches the coaches on. Not the same thing as
     // clients.address, which is the business address and not the gym - the venue
@@ -572,10 +599,24 @@ export function renderStepMessage({ channel, clientId, subject, body, vars } = {
   throw new Error(`renderStepMessage: unknown channel '${channel}'`);
 }
 
+// The unsubscribe destination this email WILL carry, resolved the one way, so the
+// send path can ask the question before it sends and get the same answer the render
+// gives. Empty means the rendered email has NO unsubscribe path at all - which is
+// worse than one pointing at the wrong inbox, so api/_send.js HOLDS on empty rather
+// than sending. Asking that question of `clients.business_email` directly instead of
+// through here would be a second opinion about the same email, and the two would
+// drift the first time an explicit unsubscribeUrl was passed.
+export function unsubscribeFor({ clientId, unsubscribeUrl, vars } = {}) {
+  const explicit = String(unsubscribeUrl || "").trim();
+  if (explicit) return explicit;
+  const L = locFor(clientId, vars);
+  return L.email ? `mailto:${L.email}?subject=Unsubscribe` : "";
+}
+
 export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars, footerReason, docTitle } = {}) {
   const L = locFor(clientId, vars);
   const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
-  const unsub = unsubscribeUrl || (L.email ? `mailto:${L.email}?subject=Unsubscribe` : "");
+  const unsub = unsubscribeFor({ clientId, unsubscribeUrl, vars });
   const raw = templateBody({ clientId, body, vars });
   const shellArgs = { pre, unsub, reason: footerReason, title: docTitle };
   let html;

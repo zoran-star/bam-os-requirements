@@ -16,6 +16,7 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 | Migration file | What it does | Blocked features until applied | Added |
 |---|---|---|---|
 | `20260727150000_conversations_last_author_kind.sql` | `conversations.last_message_author_kind` + trigger update, stamps who sent the last message | Staff Inbox sender prefixes ("You:" / "Mike:") - inbox otherwise fine, API falls back | 2026-07-27 (Cole session, PR #1629) |
+| `20260729T210000_clients_business_email.sql` | `clients.business_email` (the academy's PUBLIC email, split from the owner's `clients.email`) + whitelists it and the three `google_rating*` columns in `update_client_basics` + seeds GTA `info@byanymeanstoronto.ca` and San Jose `elijah@byanymeanssanjose.com` | **APPLY BEFORE THIS BRANCH DEPLOYS.** The code drops the hardcoded GTA email, so until this is applied + seeded every academy's automation email **HOLDS** (nothing wrong goes out, engine re-queues, owner texted once/24h) and the Business Basics "Business email" + Google-reading fields stay blank and unsaveable. No data is lost in either state, but GTA's parent email stops. | 2026-07-29 (business/owner email split) |
 
 ## ✅ APPLIED (most recent first)
 

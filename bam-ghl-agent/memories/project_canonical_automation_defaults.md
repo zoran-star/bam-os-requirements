@@ -9,6 +9,22 @@ Branch `claude/bam-v2-preset-automations-5148eb`. Build handoff: `docs/build-han
 3. **Auto-seed on preset apply** - `applyPreset` (api/agent/presets.js) seeds the preset's automations via the shared `api/agent/seed-automations.js` (create-if-missing, steps-only-when-zero, dormant approved:false). Portal `seed-preset-automations` action delegates to the same seeder.
 4. **Divergence check** - `scripts/check-automation-divergence.mjs <clientId>|--all`: MATCH/EDITED/MISSING/EMPTY per key; exit 1 on MISSING/EMPTY. Run in onboarding QA after every preset apply.
 
+## Business email split off the owner's (2026-07-29)
+
+`clients.business_email` = the ACADEMY's public address. `clients.email` = the OWNER's, unchanged.
+
+| Fact | Column | Renders as |
+|---|---|---|
+| Who parents email / unsubscribe through | `clients.business_email` | footer "Email" link, `{{SUPPORT_EMAIL}}`, the unsubscribe mailto |
+| Who WE contact | `clients.email` | nothing parent-facing, ever |
+| Number a member calls | `clients.phone` | `{{location.phone}}` (already existed, do NOT add a second phone column) |
+
+- `clientVars()` reads `business_email` with **no fallback**. Empty does not borrow the owner's, it **HOLDS the send** (`api/_send.js`, same shape as the unverified-domain hold: owner texted once per 24h, own `email_events` type `business_email_hold_notice`, per-reason cooldown).
+- GTA's `LOCATIONS` entry lost its `email:` line. **What still blocks deleting that entry: `tagline` + `instagram` have no columns.** Add `clients.tagline` + `clients.instagram_url` and it can go.
+- Migration `20260729T210000_clients_business_email.sql` (⚠️ **PENDING** - also whitelists the 3 `google_rating*` cols in `update_client_basics` and seeds GTA `info@byanymeanstoronto.ca` + SJ `elijah@byanymeanssanjose.com`). Until applied: every academy's automation email holds. Not in the `loadClient` select lists yet on purpose (the after-the-migration rule); `_send.js` reads it via its own caught query - fold that in and delete it once applied.
+- Business Basics card also got the Google reading fields (rating + count + stamped date), labelled **"Google showed 4.9 from 67 reviews on 29 Jul"**, never as current. Nothing consumes them.
+- Locks: `api/_business-email.test.mjs` (5 controls), `_gta-message-lock` now fails if the snapshot drops `business_email` or if the owner address reaches a parent, `verify-bb-hydration` controls b5/b6/b7.
+
 ## The standing rule
 
 Defaults = the single canonical proven copy. Generally-good academy edits get PROMOTED back into the defaults; academy-specific facts NEVER become default literals (they are runtime merge tokens). Onboarding drip stays skeletal on purpose (GTA's is full of GTA-only facts, owner fills specifics).

@@ -26924,7 +26924,14 @@ function _bbDropUnloadedBlobs(patch) {
 // because the row is. _bbGuardBlanks and the jsonb-card guards both read it.
 // Add a card-scoped column to _BB_GEN_COLS and it hydrates, renders and guards
 // itself. (public_name joins that list with the migration that adds it.)
-const _BB_GEN_COLS = ['legal_name', 'address', 'ein', 'phone', 'public_name', 'tax_config'];
+//
+// Three of these have NO input of their own and are never written by this card:
+// email_domain (read-only, it is what tells the owner whether their business email
+// can actually send) and google_rating_checked_at (STAMPED by the writer, never
+// typed - see _bbGenRatingPatch). They ride the same load because they are read by
+// the same card at the same moment.
+const _BB_GEN_COLS = ['legal_name', 'address', 'ein', 'phone', 'public_name', 'tax_config',
+  'business_email', 'email_domain', 'google_rating', 'google_review_count', 'google_rating_checked_at'];
 
 const _BB_COL_INFLIGHT = {};   // one request per academy+column set, not per caller
 async function _bbHydrateClientCols(cols) {
@@ -26944,7 +26951,21 @@ async function _bbHydrateClientCols(cols) {
     }
     const { data, error } = await _BB_COL_INFLIGHT[key];
     delete _BB_COL_INFLIGHT[key];
-    if (error || !data) return null;               // still unloaded - guards hold
+    if (error || !data) {
+      // ONE unnameable column 400s the WHOLE select, and this is a batch: a column
+      // whose migration has not been applied yet would freeze every OTHER field on
+      // the card - legal name, address, EIN - as permanently unloaded, and an
+      // unloaded field is a field the owner cannot edit. So on failure, ask for the
+      // columns one at a time. The ones that exist load; the ones that do not stay
+      // ABSENT from the row, which is exactly what keeps _bbGuardBlanks refusing to
+      // write them. Costs extra requests only in the failure case, and marks
+      // nothing loaded that did not actually come back.
+      if ((missing || []).length > 1) {
+        for (const one of missing) await _bbHydrateClientCols([one]);
+        return (CLIENT_ROWS || []).find(r => r.id === cid) || null;
+      }
+      return null;                                 // still unloaded - guards hold
+    }
     // NEVER overwrite a key that is already there. A save can land while this
     // is in flight, and this response is older than that save - assigning it
     // would reset a just-typed legal name or EIN to its pre-save value (or to
@@ -27023,6 +27044,19 @@ function _bbRenderGeneralCard(panel, meta) {
       <div class="bb-field-hint">How you introduce yourself to parents in texts and emails, e.g. "By Any Means Toronto". Leave it empty and we use your business name.</div>
     </div>
 
+    <!-- The academy's PUBLIC email. Deliberately NOT the owner email (that one is
+         under Staff, and it is who WE contact). Every automation email publishes
+         this in its footer, links it as "Email", and points its unsubscribe here.
+         Empty is a real state and it HOLDS sends - it does not quietly fall back to
+         the owner's inbox, which is the bug this field exists to remove. -->
+    <div class="bb-field">
+      <div class="bb-field-label">Business email</div>
+      <input id="bb-gen-business_email" type="email" class="bb-input" value="${v('business_email')}"
+        oninput="_bbGenChanged();_bbGenEmailNote()" placeholder="info@youracademy.com" />
+      <div class="bb-field-hint">The address parents see, reply to and unsubscribe through. Not your personal inbox: that stays as your owner email under Staff. It has to be a real mailbox wired up to SEND (through Resend, which BAM sets up) and to RECEIVE (in Gmail), or your emails bounce and parent replies land nowhere.</div>
+      <div class="bb-field-hint" id="bb-gen-business_email-note"></div>
+    </div>
+
     <div class="bb-field">
       <div class="bb-field-label">Legal name</div>
       <input id="bb-gen-legal_name" type="text" class="bb-input" value="${v('legal_name')}"
@@ -27068,6 +27102,30 @@ function _bbRenderGeneralCard(panel, meta) {
       <div class="bb-field-hint" id="bb-gen-tax-note">Leave empty if you charge no sales tax. Prices are then charged exactly as entered.</div>
     </div>
 
+    <!-- Google review READING. Stored and shown, consumed by nothing (no badge, no
+         page, no email reads these yet - that is deliberate, see the migration).
+         Two rules the copy has to hold:
+          - it is a READING ON A DATE, never a current or verified figure. It goes
+            stale silently the moment the next review lands, so the date is what
+            keeps it honest. The readout below always names the date.
+          - the rating and the count are ONE fact to a human and the database
+            refuses half of it, so this saves them together or not at all and says
+            so instead of surfacing a constraint error. -->
+    <div class="bb-field" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+      <div class="bb-field-label">Google reviews</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="width:110px">
+          <input id="bb-gen-google_rating" type="number" min="1" max="5" step="0.1" class="bb-input" placeholder="4.9" oninput="_bbGenRatingChanged()" />
+          <div class="bb-field-hint">Star rating</div>
+        </div>
+        <div style="width:130px">
+          <input id="bb-gen-google_review_count" type="number" min="0" step="1" class="bb-input" placeholder="67" oninput="_bbGenRatingChanged()" />
+          <div class="bb-field-hint">How many reviews</div>
+        </div>
+      </div>
+      <div class="bb-field-hint" id="bb-gen-google-note"></div>
+    </div>
+
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
   `;
   _bbGenHydrate();
@@ -27085,7 +27143,9 @@ function _bbRenderGeneralCard(panel, meta) {
 // plan: re-price through Price Match, never silently).
 async function _bbGenHydrate() {
   const row = await _bbHydrateClientCols(_BB_GEN_COLS);
-  if (!row) { _bbGenTaxNote(); return; }   // load failed: fields stay blank AND unsaveable
+  // Load failed: fields stay blank AND unsaveable. The notes still run, so the
+  // owner sees "not set yet" rather than a silently empty box.
+  if (!row) { _bbGenTaxNote(); _bbGenEmailNote(); _bbGenGoogleNote(); return; }
   _BB_GEN_COLS.forEach(k => {
     if (k === 'tax_config') return;                 // jsonb, handled below
     const el = document.getElementById('bb-gen-' + k);
@@ -27096,6 +27156,117 @@ async function _bbGenHydrate() {
   if (l && !l.value && t && t.label) l.value = t.label;
   if (r && !r.value && t && t.pct != null) r.value = t.pct;
   _bbGenTaxNote();
+  _bbGenEmailNote();
+  _bbGenGoogleNote();
+}
+
+// What the business email can actually DO right now, using the one signal that
+// already exists: clients.email_domain, the domain BAM has set up with Resend. It is
+// a cheap partial answer and it is labelled as one - a matching domain proves the
+// SENDING half is wired, and nothing here has checked that anyone reads the replies.
+// Saying "verified" off a domain match would be the same mistake as publishing the
+// owner's address: a signal that reads as more than it is.
+function _bbGenEmailNote() {
+  const note = document.getElementById('bb-gen-business_email-note'); if (!note) return;
+  const row = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  const addr = (document.getElementById('bb-gen-business_email')?.value || '').trim();
+  const sending = String(row.email_domain || '').trim().toLowerCase();
+  const at = addr.indexOf('@');
+  const dom = at > 0 ? addr.slice(at + 1).toLowerCase() : '';
+  if (!addr) {
+    note.textContent = 'Not set. Until this is filled in your automation emails are HELD, not sent: we will not publish your personal owner address to parents or point their unsubscribe at it.';
+    return;
+  }
+  if (!dom || !/\./.test(dom)) { note.textContent = 'That does not look like an email address yet.'; return; }
+  if (!sending) {
+    note.textContent = 'Your sending domain is not set up yet, so emails stay held until BAM finishes email setup for ' + dom + '.';
+    return;
+  }
+  if (dom === sending) {
+    note.textContent = 'Sending is set up for ' + dom + '. Nothing here checks that replies to this address reach a person, so send yourself a test and reply to it.';
+    return;
+  }
+  note.textContent = 'Heads up: BAM has ' + sending + ' set up for sending, but this address is on ' + dom + '. Emails go out as ' + sending + ', so replies to a different domain can go somewhere nobody reads. Tell BAM if ' + dom + ' is the one you want.';
+}
+
+// The dated readout. NEVER "Google rating: 4.9" - a number we genuinely fetched
+// reads as current in a way a typed one does not, so the sentence always says who
+// showed it and when. A half-filled pair says what is missing instead of saving,
+// because the database refuses halves and a raw constraint error is not an answer.
+function _bbGenGoogleNote() {
+  const note = document.getElementById('bb-gen-google-note'); if (!note) return;
+  const row = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  const rv = (document.getElementById('bb-gen-google_rating')?.value || '').trim();
+  const cv = (document.getElementById('bb-gen-google_review_count')?.value || '').trim();
+  if (!!rv !== !!cv) {
+    note.textContent = 'Fill in both the rating and the review count. "4.9 stars" with no count is half a fact, so we save the two together or not at all.';
+    return;
+  }
+  const rating = parseFloat(rv), count = parseInt(cv, 10);
+  if (rv && (!isFinite(rating) || rating < 1 || rating > 5)) { note.textContent = 'A Google rating is between 1.0 and 5.0.'; return; }
+  if (cv && (!isFinite(count) || count < 0)) { note.textContent = 'The review count cannot be negative.'; return; }
+  if (!rv) {
+    note.textContent = 'Not recorded. Open your Google Business Profile, then type what it shows. Nothing reads these yet: they are stored so your own numbers are on file instead of somebody else\'s.';
+    return;
+  }
+  const stamp = row.google_rating_checked_at ? _bbGenShortDate(row.google_rating_checked_at) : '';
+  const stored = row.google_rating != null && String(row.google_rating) === String(rating)
+    && String(row.google_review_count) === String(count);
+  note.textContent = (stored && stamp)
+    ? 'Google showed ' + rating + ' from ' + count + ' reviews on ' + stamp + '. That is a reading on that date, not a live figure: it goes out of date the moment your next review lands, so check it again when you quote it.'
+    : 'Saving as: Google showed ' + rating + ' from ' + count + ' reviews, read today. We stamp the date for you so nobody quotes it later as if it were current.';
+}
+// "2026-07-29T18:38:11Z" -> "29 Jul". Short because the sentence around it carries
+// the meaning, and the year only matters when it is not this one.
+function _bbGenShortDate(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const s = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return d.getFullYear() === new Date().getFullYear() ? s : s + ' ' + d.getFullYear();
+}
+
+let _bbGenRatingSaveTimer = null;
+function _bbGenRatingChanged() {
+  _bbGenGoogleNote();
+  // Own debounce timer, same reason as the tax block: _bbBasicsScheduleSave shares
+  // ONE timer, so scheduling through it could swallow a basics patch typed <600ms
+  // earlier.
+  if (_bbGenRatingSaveTimer) clearTimeout(_bbGenRatingSaveTimer);
+  _bbGenRatingSaveTimer = setTimeout(async () => {
+    const p = _bbGenRatingPatch();
+    if (!p) return;
+    await _bbSaveClientBasics(p);
+    _bbGenGoogleNote();          // repaint with the stored reading + its new date
+  }, 600);
+}
+// The rating TRIPLE, or nothing.
+//  - Not loaded yet? Blank boxes mean "we do not know", never "the owner cleared
+//    it". Same rule as every other field on this card.
+//  - Half filled, or out of range? Send NOTHING. clients_google_rating_pair_check
+//    rejects a half, and a rejected UPDATE takes the whole patch down with it. The
+//    note above already says what is missing.
+//  - Both blank, with something stored? That is a real clear: all three go null
+//    together, because a date with no reading is worse than no date.
+//  - google_rating_checked_at is STAMPED here, never typed. A rating nobody can
+//    date reads as current forever.
+function _bbGenRatingPatch() {
+  const row = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  if (!('google_rating' in row)) return null;
+  const rv = (document.getElementById('bb-gen-google_rating')?.value || '').trim();
+  const cv = (document.getElementById('bb-gen-google_review_count')?.value || '').trim();
+  if (!rv && !cv) {
+    const had = row.google_rating != null || row.google_review_count != null;
+    return had ? { google_rating: '', google_review_count: '', google_rating_checked_at: '' } : null;
+  }
+  const rating = parseFloat(rv), count = parseInt(cv, 10);
+  if (!isFinite(rating) || rating < 1 || rating > 5) return null;
+  if (!isFinite(count) || count < 0 || String(count) !== cv) return null;
+  if (String(row.google_rating) === String(rating) && String(row.google_review_count) === String(count)) return null;
+  return {
+    google_rating: String(rating),
+    google_review_count: String(count),
+    google_rating_checked_at: new Date().toISOString(),
+  };
 }
 function _bbGenTaxNote() {
   const note = document.getElementById('bb-gen-tax-note'); if (!note) return;
@@ -27154,9 +27325,15 @@ function _bbGenChanged() {
     // _BB_GEN_COLS, and _bbGuardBlanks drops it until the row actually carries
     // it, so a blank can never NULL the stored parent-facing name.
     public_name:   document.getElementById('bb-gen-public_name')?.value || '',
+    // The academy's public email. Same deal as public_name: it loads with the rest
+    // of _BB_GEN_COLS and _bbGuardBlanks drops it until the row actually carries it,
+    // so a save fired before the load lands can never blank it. It has to be in the
+    // guard list for that to hold - a blank here does not "just fall back to the
+    // owner email" any more, it holds every automation email the academy sends.
+    business_email: document.getElementById('bb-gen-business_email')?.value || '',
     // time_zone moved to Settings; do NOT read it here (the field is gone, so
     // reading it would save an empty value and wipe the saved zone).
-  }, ['business_name', 'legal_name', 'address', 'ein', 'public_name']));
+  }, ['business_name', 'legal_name', 'address', 'ein', 'public_name', 'business_email']));
 }
 
 const _ENTITY_PRESETS = ['LLC','Corp','Sole prop','Partnership','Non-profit'];

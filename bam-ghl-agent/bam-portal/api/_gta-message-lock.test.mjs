@@ -205,6 +205,41 @@ function fixtureProblems(renders) {
     }
   }
 
+  // 3c. The academy's PUBLIC email is on the row, is what clientVars resolves
+  //     location_email to, and REACHES a parent - and the OWNER's address does not.
+  //     Added for the same reason as public_name in (1): until 29 Jul 2026 this fact
+  //     came from a hardcoded LOCATIONS entry in email-shells.js, so it rendered
+  //     correctly for GTA and for nobody else. Now it comes from
+  //     clients.business_email, and the snapshot is what stands in for that column
+  //     here. If a re-capture drops it, every golden below still MATCHES - both sides
+  //     move together - while every locked email quietly loses its footer contact
+  //     line and its unsubscribe destination. That is precisely the class of silent
+  //     staleness this section exists for.
+  const biz = GTA.business_email;
+  const owner = GTA.email;
+  if (!biz) {
+    out.push("STALE FIXTURE: scripts/snapshots/bam-gta.json has no `business_email`. That column "
+      + "(migration 20260729T210000) is now the ONLY source of the footer contact address and the "
+      + "unsubscribe mailto. Without it these goldens lock emails with NO unsubscribe path, and they "
+      + "still pass. Re-add it, or re-capture once the migration is applied.");
+  } else {
+    if (vars.location_email !== biz) {
+      out.push(`STALE FIXTURE: clientVars() resolves location_email to ${JSON.stringify(vars.location_email)}, `
+        + `but the snapshot's business_email is ${JSON.stringify(biz)}.`);
+    }
+    if (!renders.some((h) => h.includes(`mailto:${biz}?subject=Unsubscribe`))) {
+      out.push(`LOST FACT: no rendered GTA email points its unsubscribe at ${JSON.stringify(biz)}. `
+        + "Either the unsubscribe link stopped rendering or it is pointing somewhere else.");
+    }
+  }
+  // The bug in one line: the owner's personal inbox must appear NOWHERE in a
+  // parent-facing email. This is the assertion that would have caught the original.
+  if (owner && renders.some((h) => h.includes(owner))) {
+    out.push(`OWNER EMAIL PUBLISHED: ${JSON.stringify(owner)} is clients.email - the address WE contact `
+      + "the owner on - and it appears in a rendered parent-facing email. That is the bug "
+      + "clients.business_email was added to remove: no public field may fall back to it.");
+  }
+
   // 4. And the INTERNAL label is not leaking the other way. "BAM GTA" is our own
   //    shorthand; a paying parent must never read it back. This is the rule the
   //    27 Jul change was made to enforce, so the lock enforces it too.

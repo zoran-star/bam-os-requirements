@@ -34,8 +34,19 @@ import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORTAL = process.env.PORTAL_PATH || path.join(HERE, "..", "public", "client-portal.html");
-const MIGRATION = path.join(HERE, "..", "supabase", "migrations",
-  "20260725033015_restore_update_client_basics_full_whitelist.sql");
+// The CURRENT definition of update_client_basics, found rather than named. FOUR
+// migrations have redefined that function now (20260725033015 called itself "the full
+// current whitelist" and has been superseded twice since), and a precondition pinned
+// to a superseded copy is checking a contract the database does not run - it would
+// keep passing while the live function lost the very behaviour it asserts. Newest
+// migration that redefines it wins.
+const MIGRATIONS_DIR = path.join(HERE, "..", "supabase", "migrations");
+const MIGRATION = path.join(MIGRATIONS_DIR, fs.readdirSync(MIGRATIONS_DIR)
+  .filter((f) => f.endsWith(".sql"))
+  .filter((f) => /CREATE OR REPLACE FUNCTION public\.update_client_basics/i
+    .test(fs.readFileSync(path.join(MIGRATIONS_DIR, f), "utf8")))
+  .sort()
+  .pop());
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log("  ✅ " + m); } else { fail++; console.log("  ❌ " + m); } };
