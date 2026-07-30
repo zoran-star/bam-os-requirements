@@ -168,19 +168,25 @@ jobs:
       # discarded which steps. A rule in one file does not reach the next file. An
       # enforced inventory does.
       #
-      # 29 instances in api/ at creation, 4 judged HARMFUL. The counts print on
-      # EVERY run, green or red: a green run carrying 4 known-harmful entries is
-      # not the same green as one carrying none, and a step that hides that is
-      # telling a comfortable lie. New instances FAIL until somebody either fixes
-      # them or argues for them in writing, in the file.
+      # The counts print on EVERY run, green or red: a green run carrying known
+      # HARMFUL entries is not the same green as one carrying none, and a step that
+      # hides that is telling a comfortable lie. The numbers are deliberately NOT
+      # repeated here - a count maintained by hand in a comment is wrong the first
+      # time somebody forgets and then quoted for a year. New instances FAIL until
+      # somebody either fixes them or argues for them in writing, in the file.
       #
-      # The five controls each plant a REAL mutation - a new offender that fetches
-      # directly, one that reaches the network only through an import, a correct
-      # three-outcome function that must NOT be flagged, a dead inventory line, and
-      # a rubber-stamp reason. Every one was checked against an actual weakening of
-      # the checker before this step was written, because a control wired into CI
-      # without that check converts a verdict into an institutional claim it has
-      # not earned.
+      # The controls each plant a REAL mutation - a new offender that fetches
+      # directly, one that reaches the network only through an import, one that
+      # reaches it through an INJECTED fetch impl, a correct three-outcome function
+      # that must NOT be flagged, a dead inventory line, and a rubber-stamp reason.
+      # Every one was checked against an actual weakening of the checker before this
+      # step was written, because a control wired into CI without that check
+      # converts a verdict into an institutional claim it has not earned.
+      #
+      # The injected-fetch one is there because the gate WAS blind to it: the seed
+      # matched `fetch(`, and api/stripe/_requirements.js reaches Stripe through
+      # `const doFetch = opts.fetchImpl || globalThis.fetch`, so a canCharge-shaped
+      # collapse written that way was scanned in silence. Found by planting one.
       #
       # Controls come from the script's own MUT map, NOT from a grep of its prose.
       # scripts/verify-live-pages.mjs and verify-testimonial-seed-drift.mjs write

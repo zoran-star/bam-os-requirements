@@ -38,9 +38,10 @@
 //       ghl(), stripeGet(). A `fetch`-only scan found 6 functions; following the
 //       call graph found 29, and the 23 it had missed included every single
 //       Supabase-backed predicate in the agent stack. So this builds a call
-//       graph over api/, seeds it with the functions that literally call fetch,
+//       graph over api/, seeds it with the functions that so much as NAME fetch,
 //       and propagates through module-local calls and relative imports until it
-//       stops growing.
+//       stops growing. Naming rather than calling matters: see TOUCHES_FETCH,
+//       where a seed of `fetch(` left an injected-fetch collapse invisible.
 //
 //   (b) "a bare boolean literal" - `return false;` / `return true;` - is the
 //       collapse itself. It is what the ERROR path returns. A function whose only
@@ -74,9 +75,11 @@
 // for code that no longer exists is the "trusted because it exists" failure this
 // repo has already paid for twice.
 //
-// The counts print on EVERY run, green or not. This one is green today carrying
-// FOUR HARMFUL entries, and that is not the same green as a run carrying none. A
-// check that hides that difference is telling a comfortable lie.
+// The counts print on EVERY run, green or not. A green run carrying HARMFUL
+// entries is not the same green as one carrying none, and a check that hides
+// that difference is telling a comfortable lie. The numbers are deliberately not
+// repeated in this comment: a count maintained by hand in prose is wrong the
+// first time somebody forgets, and then quoted for a year. Run it to see them.
 //
 // ── WHAT THIS DOES NOT CATCH (stated so nobody quotes it as more than it is) ──
 //
@@ -108,12 +111,14 @@
 //   MUTATE=compliant     plants a three-outcome function; must stay SILENT
 //   MUTATE=stale         plants an inventory line for a function that is gone
 //   MUTATE=stub          plants a rubber-stamp entry with no real reason
+//   MUTATE=injected      plants one reached through an INJECTED fetch impl
 //
 // Each was checked against a real weakening of THIS FILE before it was wired
 // into CI, because a control that cannot fail is decoration. Killing the call
 // graph fails `indirect` (and turns 23 live entries stale); breaking the boolean
 // regex fails `newoffender`; deleting the stale rule fails `stale`; setting
-// MIN_REASON to 0 fails `stub`.
+// MIN_REASON to 0 fails `stub`; narrowing the seed back to `fetch(` fails
+// `injected`, which is not hypothetical - that WAS the seed, and it was blind.
 //
 // The MUT map below is the source of truth for that list. CI reads the map, not
 // this prose, for exactly the reason above.
@@ -139,6 +144,7 @@ const MUT = {
   compliant: "plant a three-outcome function - the check must NOT flag it",
   stale: "plant an inventory line whose function does not exist",
   stub: "plant a rubber-stamp entry - a verdict with no real reason",
+  injected: "plant one that reaches the network through an INJECTED fetch",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -314,7 +320,22 @@ function resolveRelative(from, spec) {
 
 const QUESTION_NAME = /^(can|is|has|have|should|does|do|are|was|were|check|must|will|may)([A-Z_]|$)/;
 const BOOL_RETURN = /\breturn\s+(?:true|false)\s*(?=[;}\n]|$)/g;
-const LITERAL_FETCH = /\bfetch\s*\(/;
+// The word `fetch`, NOT `fetch(`. That distinction is the whole of a real hole
+// this gate had on its first day. api/stripe/_requirements.js does
+//
+//     const doFetch = opts.fetchImpl || globalThis.fetch;
+//     r = await doFetch(url, ...)
+//
+// which is the ordinary way to make a network call injectable for tests. A seed
+// of /\bfetch\s*\(/ never matches it: `globalThis.fetch` has no paren after it,
+// and `doFetch(` fails the word boundary. So a canCharge-shaped collapse written
+// in that style was scanned and passed in SILENCE - the exact bug this gate
+// exists to catch, invisible to the gate. Found by planting one, not by reading
+// the regex; MUTATE=injected keeps it found. Widening to the bare word costs
+// nothing: it is matched against comment- and string-blanked source, and it
+// added zero hits on the real tree. `fetchImpl`, `doFetch` and `prefetch` do not
+// match, which is correct - naming a variable after fetch is not making a call.
+const TOUCHES_FETCH = /\bfetch\b/;
 
 export function scan(sources) {
   const mods = new Map();
@@ -349,7 +370,7 @@ export function scan(sources) {
 
   // Seed with literal fetch, then close over the call graph.
   const networky = new Set();
-  for (const [file, m] of mods) for (const [n, fn] of m.top) if (LITERAL_FETCH.test(fn.own)) networky.add(key(file, n));
+  for (const [file, m] of mods) for (const [n, fn] of m.top) if (TOUCHES_FETCH.test(fn.own)) networky.add(key(file, n));
   for (let changed = true, guard = 0; changed && guard < 50; guard++) {
     changed = false;
     for (const [file, m] of mods) for (const [n, fn] of m.top) {
@@ -361,7 +382,7 @@ export function scan(sources) {
   const hits = [];
   for (const [file, m] of mods) {
     for (const fn of m.fns) {
-      const reaches = LITERAL_FETCH.test(fn.own) || calleesOf(file, fn.own).some((k) => networky.has(k));
+      const reaches = TOUCHES_FETCH.test(fn.own) || calleesOf(file, fn.own).some((k) => networky.has(k));
       if (!reaches) continue;
       const bools = fn.own.match(BOOL_RETURN);
       if (!bools) continue;
@@ -415,6 +436,7 @@ const PLANT_DIR = path.join(API, "__mutation__");
 const PLANTED_DIRECT = path.join(PLANT_DIR, "planted-direct.js");
 const PLANTED_INDIRECT = path.join(PLANT_DIR, "planted-indirect.js");
 const PLANTED_COMPLIANT = path.join(PLANT_DIR, "planted-compliant.js");
+const PLANTED_INJECTED = path.join(PLANT_DIR, "planted-injected.js");
 
 if (MUTATE === "newoffender") {
   sources.set(PLANTED_DIRECT, `
@@ -441,6 +463,26 @@ import { isMuted } from "../agent/_mutes.js";
 export async function hasQuietHours(clientId, contactId) {
   try {
     return await isMuted(clientId, contactId, "booking");
+  } catch (_) {
+    return false;
+  }
+}
+`);
+}
+
+// The shape that was ACTUALLY invisible on day one, kept as a control so it
+// cannot go invisible again. Not one `fetch(` in it: the call goes through a
+// variable holding an injected impl, which is the normal way to make a network
+// call testable and is now live in api/stripe/_requirements.js.
+if (MUTATE === "injected") {
+  sources.set(PLANTED_INJECTED, `
+export async function isAccountReady(acctId, opts = {}) {
+  const doFetch = opts.fetchImpl || globalThis.fetch;
+  try {
+    const r = await doFetch("https://example.invalid/accounts/" + acctId);
+    if (!r.ok) return false;
+    const a = await r.json();
+    return a.charges_enabled === true;
   } catch (_) {
     return false;
   }
@@ -544,9 +586,10 @@ if (MUTATE) {
   const plantedId = {
     newoffender: "api/__mutation__/planted-direct.js::isAcademyPaid",
     indirect: "api/__mutation__/planted-indirect.js::hasQuietHours",
+    injected: "api/__mutation__/planted-injected.js::isAccountReady",
   }[MUTATE];
 
-  if (MUTATE === "newoffender" || MUTATE === "indirect") {
+  if (MUTATE === "newoffender" || MUTATE === "indirect" || MUTATE === "injected") {
     if (unaudited.includes(plantedId)) {
       console.log(`\nNEGATIVE CONTROL PASSED - MUTATE=${MUTATE} planted ${plantedId} and the check reported it as unaudited.`);
       process.exit(0);
