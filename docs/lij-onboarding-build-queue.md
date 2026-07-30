@@ -4,6 +4,14 @@ Live queue of everything the San Jose onboarding surfaces. Onboarding spans days
 
 **Started 2026-07-25.**
 
+## ORCHESTRATOR HANDOVER 2026-07-30 evening. MISTER_ORCHESTRATOR III holds the role.
+
+Nothing moved. This file, `board/data.json` and `board/rooms/*.json` stay in worktree `agent-teams-access-6ba23e`, the board still serves on port 4599, every room keeps the same paths and the same house rules. Role continuity doc: [orchestrator-handoff.md](orchestrator-handoff.md).
+
+**AUTOMATION TEMPLATING III spawned.** Its cold-context handover is `docs/handoffs/automation-templating-2026-07-30.md` on branch `claude/tokenize-academy-name`. **The branch was checked out in worktree `rename-interested-ghosted-stage-a4bc48`; I detached that worktree at `2cffb75` before spawning**, because a branch cannot be checked out twice and releasing the old one first is what made the previous handover work. Verified fully pushed first; its one uncommitted file (`.claude/launch.json`, a dev-server entry) is untouched and still there.
+
+**Its next single action: plan "route by actual age" to gate 1.** That is the `booking_group` leak, the only one of the five still live, and Zoran's four decisions on it are already locked (2026-07-30). **The door leak is FIXED but not landed:** it is in [PR #1656](https://github.com/zoran-star/bam-os-requirements/pull/1656), OPEN and MERGEABLE, and its fix also depends on the pending venue-entry-note migration. **A branch nobody merges is a fix nobody has**, and the switch goes last with the deploy verified in between.
+
 ## 🚨 PRODUCTION INCIDENT 2026-07-25 to 07-29: THE ENROLLMENT FUNNEL WAS DEAD FOR TEN ACADEMIES, INCLUDING SAN JOSE. FIXED ([PR #1633](https://github.com/zoran-star/bam-os-requirements/pull/1633), merged by Zoran in the enroll-funnel chat 2026-07-29 03:09 UTC).
 
 **Cause:** a commit added `signup_fee_cents: (planFee && opt.feeCharged) ? ... : null` to `buildPricing()` in `api/website/offer.js:226`. **Neither identifier was ever defined.** ES modules are strict mode, so it threw `ReferenceError` on every call, the handler's catch turned it into a 500, and the enrollment page rendered its error screen. **Orchestrator-verified live both ways:** 500 `{"error":"planFee is not defined"}` before the merge, HTTP 200 after, and `byanymeanstoronto.ca/enroll` now serves 200.

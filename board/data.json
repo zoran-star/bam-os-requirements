@@ -1,13 +1,14 @@
 {
- "updated": "2026-07-30 · templating handed over",
+ "updated": "2026-07-30 · orchestrator III up, templating successor spawned",
  "recentUpdates": [
+  "MISTER_ORCHESTRATOR III is up. Same queue file, same board, same house rules. Nothing changed for any chat",
+  "AUTOMATION TEMPLATING III spawned. Its branch was freed first, so it can pick up exactly where the last one stopped",
+  "Its first job: kill the last live leak, where every academy's AI carries GTA's age groups and nothing can ever clear it",
   "TWO San Jose launch blockers found and verified: its own site is locked out of the portal, and its funnel would capture leads into a void",
   "San Jose's 5 real testimonials are correct and would still fail to show in production, because its domain is not allowlisted",
   "Templating handed over. A chip is open for the next orchestrator, whose first job is starting its successor",
   "Audit found 2 NEW leaks nobody had: every academy's trial-confirmation text describes GTA's gym door, and the AI carries GTA's age groups permanently",
-  "The 30 vs 85 minute thing resolves: both are ours. 30 is the OWNER's time, 85 is staff time. Your question was about staff, so 85 is right",
-  "Honest verdict on 85: plausible best case, but nobody can know until it is run once. San Jose can no longer be that test",
-  "6 PRs merged: CI resurrected, the clock bug class closed for good, 'Send nothing' fixed, public ticket form given a real route"
+  "The 30 vs 85 minute thing resolves: both are ours. 30 is the OWNER's time, 85 is staff time. Your question was about staff, so 85 is right"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
@@ -27,7 +28,7 @@
    "Confirm real parent quotes are exempt from the no-em-dash rule. Two of GTA's five contain them",
    "Decide: build a heartbeat so we can tell a dead scheduled job from a quiet day? 33 jobs, none watched"
   ],
-  "chat": "MISTER_ORCHESTRATOR II"
+  "chat": "MISTER_ORCHESTRATOR III"
  },
  "buildTasks": [
   {
@@ -693,11 +694,11 @@
  ],
  "chatMap": [
   {
-   "name": "MISTER_ORCHESTRATOR II",
-   "sidebar": "MISTER_ORCHESTRATOR II",
+   "name": "MISTER_ORCHESTRATOR III",
+   "sidebar": "MISTER_ORCHESTRATOR III",
    "state": "white",
    "column": null,
-   "one": "Holding the goals and the queue. Now also holding skill 4 (member management) as your backlog item"
+   "one": "Holding the goals, the queue, routing and collisions. Still holding member management as your backlog item"
   },
   {
    "name": "TESTIMONIAL CONNECTION",
@@ -712,11 +713,22 @@
    "name": "AUTOMATION TEMPLATING",
    "sidebar": "AUTOMATION TEMPLATING",
    "state": "done",
-   "one": "Retired and handed over. Branch clean and pushed. Safe to archive",
+   "one": "Retired and handed over to III. Branch freed, clean and pushed. Safe to archive",
    "builds": [
     "t-convergence"
    ],
    "column": "done"
+  },
+  {
+   "name": "AUTOMATION TEMPLATING III",
+   "sidebar": "AUTOMATION TEMPLATING III",
+   "state": "white",
+   "column": null,
+   "one": "Just spawned. Planning the fix that routes a kid to a class by their real age instead of GTA's age groups",
+   "builds": [
+    "t-convergence"
+   ],
+   "blockedBy": null
   },
   {
    "name": "SET UP TWILIO BITCH",
