@@ -844,6 +844,24 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 📏 THE LAST "WORKS ON MY LAPTOP" GAP, CLOSED BY READING THE ACTUAL RUNNER LOG
+
+#1669's author had verified its CI step locally and **never confirmed the real runner executes it.** It pulled the Actions log for `387610f` and read the output:
+
+```
+Network-boolean inventory - 29 function(s) ... (251 files scanned)
+  HARMFUL  4
+  caught   MUTATE=newoffender · indirect · compliant · stale · stub · injected
+```
+
+**All six controls discovered and judged on Node 20, ahead of the suites.** Its own summary is the rule: **"until I read that, 'CI runs my controls' was a claim about my machine."**
+
+**This is house rule 9 - test the surface the thing actually runs on - applied to CI ITSELF**, and it is the one place the rule is easiest to skip, because a local run of the CI step feels like the CI step. **It is not: it is the same script under a different discovery mechanism, a different Node, and a different working directory, and this repo has already been bitten by a CI job completing in 0s and reading as "no failures" for a day and a half.**
+
+**Third instance tonight of the same discipline** (a room watching for the FIELD rather than the deploy status, an agent refusing a clean zero, and now this), which is what a habit looks like as distinct from a rule.
+
+**Also accepted a correction to its own evidence:** its grep was `global.fetch`, where `.` is a regex wildcard, so it matched the prose *"global fetch"* in a comment and was reported as though the literal were present. **Conclusion unchanged, evidence looser than described.** Caught by the other agent, which is the second time tonight these two corrected each other's verification rather than each other's code.
+
 ## 📏 AND THEN IT HAPPENED TO THE PERSON WHO NAMED IT, WITHIN THE HOUR. **NAMING A PATTERN DOES NOT IMMUNISE YOU AGAINST IT.**
 
 #1671's author closed its report with *"a gate reporting zero hits is indistinguishable from a gate that is not looking"* - and its own supporting test was an instance of exactly that.
