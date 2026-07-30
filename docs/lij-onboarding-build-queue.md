@@ -844,6 +844,20 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## ✅ [PR #1671](https://github.com/zoran-star/bam-os-requirements/pull/1671): THE GMAIL GUARD FAILS CLOSED, AND IT FOUND A SECOND HALF NOBODY HAD NAMED
+
+`hasGmailMailbox` becomes `gmailMailboxState`, returning `yes` / `no` / `unknown`. 64 assertions, **6 negative controls, each PRINTING the banner**, and the `collapse` control restores the original bug verbatim and fails 26 assertions including *"the GHL email import is NOT called"*.
+
+**⭐ THE GAP IT FOUND WHILE WRITING THE FIX, which the brief did not contain: "we could not ask" has TWO halves and only one was obvious.** The request failing (500, 503, DNS reset) was the known one. The other is that **`sb()` returns `null` on an empty body, and a JSON error object is not a list of zero mailboxes** - yet `Array.isArray(rows) && rows.length > 0` turned **both** into a confident "no". **An unreadable answer and a negative answer are as different as an unreachable service and a negative answer, and the second pair is much easier to miss because a value did come back.**
+
+**⚠️ THE STAMPING HALF IS THE LOAD-BEARING PART AND IT IS EASY TO GET BACKWARDS.** `unknown` is treated **like** `yes` for skipping and **unlike** `yes` for stamping. Stamping on an unknown would remove the academy from a candidate pool filtered on `ghl_history_imported_at=is.null`, **converting one blip into a permanent, silent skip** - the same bug pointing the other way. **Deferral and completion must not share a marker.**
+
+Visibility done properly: `gmail-unknown` and `gmail-connected` are distinct reasons, `gmail_unknown_deferred` appears in the JSON and the summary line, and a warn fires **only** on deferral.
+
+**⚠️ NEAR-MISS WORTH RECORDING: it initially edited the SHARED CHECKOUT instead of its worktree**, caught it when a guard blocked a `git -C`, moved both files and restored the checkout, then **proved it byte-exact by diffing against `HEAD~1`.** **Orchestrator-verified afterwards: `/Users/zoransavic/bam-os-requirements` is clean - nothing staged, nothing unstaged, only the three known untracked paths.** **That is the same checkout that held a staged revert of an entire build earlier tonight**, so the trap caught two different agents in one session and the restore is worth confirming rather than trusting.
+
+**Could not verify, stated plainly by its author:** it took the production facts from the brief rather than re-querying, and it does not control merge order. **Both were verified independently by the orchestrator.**
+
 ## ✅ [PR #1670](https://github.com/zoran-star/bam-os-requirements/pull/1670): STRIPE NOW ANSWERS IN THREE STATES, AND IT FOUND A BRANCH NOTHING CAN EVER REACH
 
 `api/stripe/_requirements.js` becomes the single place anything asks Stripe about a connected account. **`canCharge()` is gone.** `readStripeAccount()` returns `ready` · `not_ready` **plus which items** · `unreachable`, and **only `ready` may tick the step**, so the stored row is byte-identical to before in every case, asserted including that an unreachable Stripe never writes `connected`.

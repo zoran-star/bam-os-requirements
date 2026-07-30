@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · three coupled PRs, order set",
+ "updated": "2026-07-30 · all three fixes built, waiting on you to merge in order",
  "recentUpdates": [
+  "All three fixes are built and green. Merge in order: 1671, then 1670, then 1669",
+  "The Miami fix found a second hole nobody had named: an unreadable answer from the database was ALSO being read as a confident 'no Gmail here'",
+  "It also nearly edited the main repo folder by mistake, caught itself, and put it back. I checked and it is clean. That folder has now caught two agents tonight",
   "Three PRs ready and they have to merge in ORDER: 1671 (Miami's inbox), then 1670 (Stripe), then 1669 (the new check)",
   "New find beyond the brief: the portal has a whole 'Stripe access was revoked' screen that NOTHING can ever trigger",
-  "So an academy that cuts us off in their own Stripe keeps reading as connected here, and billing fails the moment a real person tries it. 11 academies are connected",
-  "The agents coordinated the merge order with each other and one of them tested my suggestion and found it wrong before doing it",
-  "The new check found 29 places with this bug shape, not the 6 a simple search would have. Four are actually harmful",
-  "Worst one: one bad moment during a scheduled job would DOUBLE every email thread at DETAIL Miami, with no way to tell which are copies"
+  "So an academy that cuts us off in their own Stripe keeps reading as connected here, and billing fails the moment a real person tries it. 11 academies are connected"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
