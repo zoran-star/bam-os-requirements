@@ -483,6 +483,23 @@ if (window.__MOCK__) (() => {
     }
     if (p === '/api/agent-confirm') return act === 'list-ready' ? { ready: HAWK_CONFIRM } : { ok: true };
     if (p === '/api/agent-closing') return act === 'list-ready' ? { ready: HAWK_CLOSING } : { ok: true };
+    // The Hawkeye send gate, mirrored from api/agent/_hawk-gate.js so the whole
+    // redirect loop is testable offline: SMS to a contact with a pending card 409s
+    // (booking -> confirm -> closing priority), email is never blocked, and
+    // hawkeye_ack walks through. CONVOS seeds lead-3 (booking) and lead-9 (closing)
+    // as flagged rows; every other conversation sends normally.
+    if (p === '/api/ghl/send-message') {
+      let b = {}; try { b = JSON.parse((init && init.body) || '{}'); } catch (_) {}
+      const cid = String(b.contact_id || b.contactId || '');
+      const isSms = String(b.type || 'SMS').toUpperCase() === 'SMS';
+      if (isSms && cid && !b.hawkeye_ack) {
+        for (const [rows, agent] of [[HAWK_BOOKING, 'booking'], [HAWK_CONFIRM, 'confirm'], [HAWK_CLOSING, 'closing']]) {
+          const card = rows.find(r => r.status === 'pending' && String(r.ghl_contact_id || '') === cid);
+          if (card) return { __status: 409, error: 'hawkeye_pending', agent, card_id: card.id, contact_id: cid };
+        }
+      }
+      return { ok: true, sent_via: isSms ? 'twilio' : 'resend', message_id: 'mock-' + Date.now() };
+    }
     if (p === '/api/members') {
       // Member detail drawer (?id=...): single-member shape for openMemberPopup.
       const mid = q.get('id');
@@ -591,7 +608,11 @@ if (window.__MOCK__) (() => {
       const u = new URL(raw, location.origin);
       if (u.origin === location.origin && u.pathname.startsWith('/api/')) {
         const body = mockApi(u, init) || { ...DEFAULT_API };
-        return Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        // A mock handler can ask for a real HTTP status (the Hawkeye 409 needs one -
+        // the client branches on r.status, not on the body alone).
+        const status = Number(body.__status) || 200;
+        if (body.__status) delete body.__status;
+        return Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
       }
     } catch (_) { /* fall through to real fetch */ }
     return _realFetch(input, init);
