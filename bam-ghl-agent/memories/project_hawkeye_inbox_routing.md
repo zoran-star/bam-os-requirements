@@ -62,6 +62,20 @@ POST /api/ghl/send-message -> 409
 
 The mock `fetch` override now honors a `__status` field from a handler, and `mockApi` mirrors the gate for `/api/ghl/send-message`. Fixture conversations `cv-10` (`lead-3`, booking) and `cv-11` (`lead-9`, closing) are the flagged rows; everything else sends normally. Verified offline: chips render, all 3 open surfaces redirect, desktop + mobile forced sends 409 -> toast + deck with the draft kept, email + `hawkeye_ack` pass, cleared index = fail-open thread open.
 
+## Verified against the PRODUCTION db (2026-07-30)
+
+The mock rig proves the UI loop; these checks prove the queries against real rows in project `jnojmfmpnsfmtqmwhopz`. Nothing was left mutated.
+
+- **Filter syntax**: the gate's parked-row filter (`status=eq.approved&sent_at=is.null&send_after=not.is.null`) is byte-identical to the one `scheduledStoreMessages()` in `api/messaging/read-thread.js` already runs in prod. The `not.is.null` idiom is used in 8+ live API files. Syntax is proven by working code, not by assumption.
+- **Columns**: all of `id/client_id/ghl_contact_id/status/sent_at/send_after/send_error/updated_at` exist on all 3 tables. `contacts.phone10` exists and is a GENERATED column.
+- **Cancel-parked**: ran the exact UPDATE inside `BEGIN ... ROLLBACK` against the 2 real parked closing rows. It matched exactly those 2, the CHECK constraint accepted `canceled`, and `send_error` landed. Rollback confirmed: both rows still `approved` with null `send_error`.
+- **`canceled` is allowed** on all three tables (constraint introspected). This is why the gate writes `canceled` and never `dismissed` (see below).
+- **Gate read**: found the real pending card for contact `b9OFwgP5O3Yyy1X0XC75`; returned nothing for an unknown contact, so an unflagged lead's send proceeds.
+- **phone10 path**: both real flagged contacts resolve by last-10 digits, each mapping to 1 pending card. The Twilio path (which runs before GHL contact lookup) can therefore find the card with only a phone number.
+- Contact ids come in BOTH shapes in prod (portal uuid `56f31a4e-...` and GHL id `b9OFwgP5O3Yyy1X0XC75`); the gate treats them as opaque text, which is correct.
+
+**Do NOT write `status='dismissed'` here.** Confirmed live: no reply table's CHECK constraint allows it and zero rows with that status exist anywhere. That is a separate pre-existing defect (the deck's "Send nothing"), tracked outside this work.
+
 ## Known, out of scope
 
 The deck's own render puts escalation cards first, so a redirect can land with the focused lead's card second on screen even though `_HK2.focusContact` moved it to the front of the queue. Pre-existing `_hk2Render` behavior, untouched here.
