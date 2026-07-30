@@ -124,7 +124,13 @@ export function calendarForGroup(calendars, group) {
 
 // "2026-07-07T19:00:00-04:00"-style local-offset ISO + local day key, matching
 // what the GHL free-slots API emitted so downstream consumers are unchanged.
-function localIsoParts(dateUtc, timeZone) {
+//
+// The `parts.hour === "24" ? "00"` below is NOT redundant. `hour12: false` is a
+// hint the engine resolves, and an h24 runtime (Node 20) renders local midnight
+// as hour 24 while an h23 runtime (Node 24) renders 00. The date parts are
+// correct on both, so mapping the hour alone is a complete repair - proven by
+// execution, and MUTATE=isoguard proves it is load-bearing.
+export function localIsoParts(dateUtc, timeZone) {
   const fmt = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZoneName: "longOffset" });
   const parts = Object.fromEntries(fmt.formatToParts(new Date(dateUtc)).map(p => [p.type, p.value]));
   const off = (parts.timeZoneName || "GMT+00:00").replace("GMT", "") || "+00:00";
