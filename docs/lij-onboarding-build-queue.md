@@ -844,6 +844,44 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 🎯🎯 AGE ROUTING IS LIVE (2026-07-30). **AUTOMATION TEMPLATING III IS CLOSED.** The `booking_group` leak is GONE, not parked.
+
+**Merged in the order that mattered, orchestrator-verified by timestamp:** [client-sites #174](https://github.com/zoran-star/bam-client-sites/pull/174) at **21:45:06**, deploy confirmed live in the served bundle, then [portal #1661](https://github.com/zoran-star/bam-os-requirements/pull/1661) at **21:50:32**. `main` is `33c487d`. **Portal-first would have opened a window where GTA's page still accepted 8 year olds and their bookings failed silently.**
+
+**Executed against the LIVE production endpoint, not a harness:**
+
+| calendar | age | times offered |
+|---|---|---|
+| Group 1 | 9 (bottom, inclusive) | 10 |
+| Group 1 | 13 (top, inclusive) | 10 |
+| Group 1 | **8** | **0** |
+| Group 1 | **14** | **0** |
+| Group 1 | `"nine"`, unreadable | **10** |
+| Group 2 | 14 | 10 |
+| Group 2 | **40**, open top | **10** |
+| Group 2 | **9** | **0** |
+| either | no age sent (old sites) | 10 |
+
+**Unreadable offers everything; unqualified offers nothing.** That is house rule 10 living in the product: *cannot read the age* and *does not qualify* are different answers and stay different. **The plan's finish condition is met: `_shared-default-identity` reports ZERO deferred entries.**
+
+### 📏 A MERGED PR IS NOT A DEPLOYED PR, AND IT NEARLY BECAME A FALSE BLOCKER
+
+After merging, the room probed production and the filter did not fire. It polled **six minutes across ten attempts**, cache-busted, confirmed a cache MISS, re-read the code, confirmed GTA's `booking_provider`, and was assembling an escalation. **The Vercel `bam-portal` deployment was still `pending`.** It went `success` on the next check and the filter worked immediately.
+
+**The rule: read the commit's DEPLOYMENT STATUS first, then probe behaviour. `bam-portal` is slow enough that six minutes of red probes proves nothing.** This is house rule 2's other half - we knew never to TEST an undeployed build, and had not written down never to DISBELIEVE a deployed one too early.
+
+**⚠️ AND IT WAS THE SIXTH TIME IN ONE SESSION THAT THE MEASUREMENT LIED RATHER THAN THE THING MEASURED**, by the room's own count: a `zsh` loop that did not word-split, `| head` returning head's status, searching from the wrong directory for a snapshot that exists, an unfollowed 308, a `.jsx` path compiled to `.js`, and this. **The room had the check-the-harness instinct, applied it four times that evening, and still nearly filed this one.** That is the strongest argument yet that the defence has to be a habit of procedure rather than of vigilance.
+
+### ⛔ OPEN AND NO LONGER OWNED BY ANYONE. Routed here so they are not lost.
+
+1. **🔴 `ftGroupForAge`'s `>= 14` in `bam-client-sites/clients/bam-gta/gta/freetrial.jsx`.** The **last hardcoded class boundary in the estate**, in a different repo from the fix that removed all the others. **Edit the portal's ranges and that page silently sends parents to the wrong calendar, where they see no times.** Sharpest remaining item; spawned as its own build.
+2. **GAME Winner and X Basketball** have 4 and several training offers with **nothing recording which one their booking calendar serves.** **No code can decide this** - the academies have to be asked.
+3. **DETAIL Miami** has no class ages, so it is unarmed and on old behaviour. Its welcome email also prints `Training - DETAIL Academy (Mon, Wed, Fri)` once per weekday to someone who has just paid.
+4. `derivedFactOverrides` picks the offer for the nine facts with its own query and **no id tiebreak**, so facts and routing can come from **different offers** at those two academies.
+5. **San Jose's ages are a conversion of Lij's grades and he has not confirmed them** (6-12, 9-12, 12-18). Already on his ask-list as a confirmation.
+6. **🔴 `scripts/verify-live-pages.mjs` and `verify-testimonial-seed-drift.mjs` have working controls CI CANNOT DISCOVER and does not run.** Their `MUTATE=m1|m2|m3` sits on one line so the discovery grep finds only `m1`, and neither prints the banner, **so wiring them in as-is would report them decorative.** This is a blind spot **inside the mechanism built to catch decorative controls** - the pattern arriving in its own antidote for the second time. Highest leverage item on this list by this file's own standards.
+7. **Item 80** (inbound-webhook role-list consolidation, blocked on #1546) and the **`business_phone` half**, both queued behind B and never started.
+
 ## 🚨🚨 EMERGENCY CONTACT IS REQUIRED, COLLECTED, AND THEN DROPPED. AT EVERY ACADEMY. LIVE TODAY. **BLOCKER before San Jose launch.**
 
 Found by MEMBER MANAGEMENT by rendering, **orchestrator-verified in production independently**.
