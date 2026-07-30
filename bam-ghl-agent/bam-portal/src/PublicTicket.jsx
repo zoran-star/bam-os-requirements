@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { supabase } from "./supabase";
-import { runTicketSubmit, failureMessage, supportMailto, SUPPORT_EMAIL } from "./publicTicketSubmit";
+import { runTicketSubmit, makeIntakeDb, failureMessage, supportMailto, SUPPORT_EMAIL, HONEYPOT_FIELD } from "./publicTicketSubmit";
 
 // ─── TOKENS (client-facing dark only) ───────────────────────────────────────
 
@@ -38,7 +37,9 @@ const SYSTEMS_MENU = [
 ];
 
 const CATEGORIES = ["Funnel", "Automation", "Dashboard", "Integration", "Landing Page", "Other"];
-const STATUSES = ["New", "In Progress", "Awaiting Client", "Complete"];
+// The public-facing stages now come from the server (PUBLIC_STAGES in
+// api/_public-ticket-intake.js) so one list maps every real ticket status.
+// The old local ["New", ...] named statuses the database has never had.
 
 // ─── SHARED COMPONENTS ──────────────────────────────────────────────────────
 
@@ -174,6 +175,9 @@ export function TicketIntake() {
   const [publicToken, setPublicToken] = useState("");
   const [failure, setFailure] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  // Honeypot. Rendered off-screen and never focusable, so a person cannot fill
+  // it by accident or by tabbing. The server refuses any submission that has it.
+  const [honeypot, setHoneypot] = useState("");
 
   const setField = (key, val) => setFields(prev => ({ ...prev, [key]: val }));
 
@@ -183,6 +187,14 @@ export function TicketIntake() {
     { key: "Custom Build", title: "Request a custom build", desc: "Need something unique? Describe what you need and we'll scope it out.", icon: null },
   ];
 
+  // DIAGNOSTIC ONLY. Neither of these is ever shown to anyone as a real
+  // reference or a real tracking link: the server mints both off the saved row
+  // and runTicketSubmit refuses to report success without them. They exist so
+  // the failure screen's mailto can quote an attempted id.
+  //
+  // Which is just as well - `TKT-100..999` is 900 values for a table that
+  // already holds 213 tickets, so as a real reference it would have collided
+  // constantly, and a token from Math.random is not a secret.
   const generateTicketId = () => {
     const num = Math.floor(Math.random() * 900) + 100;
     return `TKT-${num}`;
@@ -195,24 +207,31 @@ export function TicketIntake() {
     });
   };
 
-  // The reference and the tracking link are minted from the row the database
-  // hands back, and from nothing else. See src/publicTicketSubmit.js for why:
-  // this used to show the success screen unconditionally, so a rejected insert
-  // still told the person their request was received.
+  // The reference and the tracking link come off the row the SERVER saved, and
+  // from nothing else. See src/publicTicketSubmit.js for why: this used to show
+  // the success screen unconditionally, so a rejected insert still told the
+  // person their request was received.
+  //
+  // The write goes to /api/public-ticket, not to PostgREST. It cannot go to
+  // PostgREST: RLS on `tickets` has exactly one insert policy and it is for
+  // role `authenticated`, so a logged-out visitor is refused whatever the
+  // payload says. The route holds the service key and is the only door.
+  //
+  // There is no sendConfirmation. The old code invoked a Supabase edge function
+  // called `send-ticket-confirmation`; no such function is deployed in this
+  // project (checked 2026-07-30), so it never sent anything. A call that cannot
+  // work is not a feature, it is a comment that costs a round trip.
   const handleSubmit = async () => {
     setSubmitting(true);
     setFailure(null);
 
-    const db = supabase && {
-      // .select() is load-bearing. Without it supabase-js returns data: null on
-      // a successful insert too, and there is then no proof a row exists.
-      insert: (row) => supabase.from("tickets").insert([row]).select(),
-      sendConfirmation: (body) => supabase.functions.invoke("send-ticket-confirmation", { body }),
-    };
+    const db = makeIntakeDb({
+      fetchImpl: typeof fetch === "function" ? (...args) => fetch(...args) : undefined,
+    });
 
     const outcome = await runTicketSubmit({
       db,
-      form: { clientName, clientEmail, path, fields },
+      form: { clientName, clientEmail, path, fields, honeypot },
       makeRef: generateTicketId,
       makeToken: generateToken,
     });
@@ -475,6 +494,21 @@ export function TicketIntake() {
             ))}
           </div>
 
+          {/* Honeypot. Off-screen, not focusable, not announced to screen
+              readers, and autofill is turned off so a password manager has no
+              reason to touch it. A person cannot reach this field; a bot fills
+              every input it finds, and the server refuses anything that has it. */}
+          <input
+            type="text"
+            name={HONEYPOT_FIELD}
+            value={honeypot}
+            onChange={e => setHoneypot(e.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            style={{ position: "absolute", left: -9999, top: -9999, width: 1, height: 1, opacity: 0 }}
+          />
+
           <div style={{ marginTop: 32, display: "flex", gap: 12 }}>
             <PrimaryButton onClick={handleSubmit} disabled={submitting}>
               {submitting ? "Submitting…" : "Confirm & Submit"}
@@ -525,7 +559,13 @@ export function TicketIntake() {
           <div style={{ fontSize: 44, marginBottom: 20, color: tk.red }}>!</div>
           <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em", marginBottom: 10 }}>Your request was not submitted</h2>
           <p style={{ fontSize: 16, color: tk.textSub, marginBottom: 8, maxWidth: 520, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6 }}>
-            {failureMessage(failure?.reason)} Nobody on our team has seen it, so please use one of the options below.
+            {/* On a rate limit the server explains WHICH limit in plain
+                English, and that is more use than our generic line. Everything
+                else keeps the generic copy, because a database error message is
+                not something to put in front of a person. */}
+            {failure?.reason === "throttled" && failure?.detail
+              ? failure.detail
+              : failureMessage(failure?.reason)} Nobody on our team has seen it, so please use one of the options below.
           </p>
           <p style={{ fontSize: 14, color: tk.textMute, marginBottom: 32 }}>Your answers are still filled in, so nothing you typed is lost.</p>
 
@@ -551,7 +591,11 @@ export function TicketIntake() {
 
             <div style={{ fontSize: 14, fontWeight: 600, color: tk.text, marginBottom: 6 }}>Or try sending it again</div>
             <div style={{ fontSize: 14, color: tk.textSub, lineHeight: 1.6, marginBottom: 16 }}>
-              If this was a temporary connection problem, a second attempt may go through.
+              {/* Do not promise a retry will work when we already know it will
+                  not: a rate limit refuses the next attempt too. */}
+              {failure?.reason === "throttled"
+                ? "This one will be refused again until the limit resets, so email is the faster route right now."
+                : "If this was a temporary connection problem, a second attempt may go through."}
             </div>
             <button
               onClick={() => { setFailure(null); setStep(2); }}
@@ -804,90 +848,58 @@ export function ContentPortal() {
 }
 
 // ─── TICKET STATUS PAGE ─────────────────────────────────────────────────────
+//
+// /ticket/<token>, the link the confirmation screen hands out.
+//
+// WHAT THIS USED TO DO. It queried a `public_token` column and a
+// `ticket_messages` table. Neither existed: the column is added by
+// supabase/migrations/20260730T120000_public_ticket_intake.sql, and
+// `ticket_messages` has NEVER existed in this project
+// (to_regclass('public.ticket_messages') is null, checked 2026-07-30). So every
+// visit either 404'd into "Ticket not found" or, worse, when Supabase was
+// unconfigured, rendered a hardcoded demo ticket for "Demo Client" with three
+// invented messages - at a real URL, to a real person, about their real
+// request. That demo block is gone. A page that invents a status is the same
+// lie as a form that invents a success.
+//
+// WHAT IT DOES NOW. Reads /api/public-ticket?token=..., which returns an
+// allow-listed view of the row (api/_public-ticket-intake.js publicTicketView):
+// stage, subject, dates and the client-facing messages, and nothing else. The
+// thread comes from `tickets.messages`, the jsonb column api/tickets.js and the
+// client portal already use - no second message store.
+//
+// WHY THERE IS NO REPLY BOX. There used to be one, and it wrote to the table
+// that does not exist, so every message a person typed here was silently
+// discarded. Rather than build an unauthenticated write endpoint keyed on a
+// token that can be forwarded, pasted into a chat or sit in a browser history,
+// replies go by email, which reaches the same people and is already how support
+// answers. Read-only is the honest version of a page that was never writable.
 
 export function TicketStatus() {
   const { token } = useParams();
   const [ticket, setTicket] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [newMsg, setNewMsg] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sending, setSending] = useState(false);
-  const msgEndRef = useRef(null);
 
-  // Fetch ticket by token
   useEffect(() => {
+    let cancelled = false;
     async function load() {
-      if (!supabase) {
-        // Demo mode — show placeholder
-        setTicket({
-          ticket_id: "TKT-247",
-          public_token: token,
-          client_name: "Demo Client",
-          path: "Bug/Change",
-          status: "In Progress",
-          description: "Booking calendar not syncing with GHL",
-          submitted_at: new Date().toISOString(),
-          fields: { "Describe the item": "Booking Calendar", "Bug or Change": "Bug", "Description": "Calendar shows wrong availability." },
-        });
-        setMessages([
-          { id: 1, sender_role: "team", message: "Hi! We've received your ticket and are looking into the calendar sync issue. We'll update you shortly.", created_at: new Date(Date.now() - 86400000).toISOString() },
-          { id: 2, sender_role: "client", message: "Thanks — just wanted to add that it's affecting all three booking pages, not just the main one.", created_at: new Date(Date.now() - 43200000).toISOString() },
-          { id: 3, sender_role: "team", message: "Good to know. We've identified the issue — it's a timezone mismatch in the GHL webhook. Fix is in progress.", created_at: new Date(Date.now() - 3600000).toISOString() },
-        ]);
-        setLoading(false);
-        return;
-      }
-
       try {
-        const { data: ticketData, error: ticketErr } = await supabase
-          .from("tickets")
-          .select("*")
-          .eq("public_token", token)
-          .single();
-
-        if (ticketErr || !ticketData) { setError("Ticket not found."); setLoading(false); return; }
-        setTicket(ticketData);
-
-        const { data: msgData } = await supabase
-          .from("ticket_messages")
-          .select("*")
-          .eq("ticket_id", ticketData.ticket_id)
-          .order("created_at", { ascending: true });
-
-        setMessages(msgData || []);
-      } catch (err) {
-        setError("Unable to load ticket.");
+        const res = await fetch(`/api/public-ticket?token=${encodeURIComponent(token || "")}`);
+        const json = await res.json().catch(() => null);
+        if (cancelled) return;
+        // Anything other than a ticket the server handed back is "not found".
+        // There is no fallback that invents one.
+        if (!res.ok || !json || !json.data) setError("not_found");
+        else setTicket(json.data);
+      } catch {
+        if (!cancelled) setError("unreachable");
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
     load();
+    return () => { cancelled = true; };
   }, [token]);
-
-  const handleSendMessage = async () => {
-    if (!newMsg.trim()) return;
-    setSending(true);
-
-    const msg = {
-      ticket_id: ticket.ticket_id,
-      sender_role: "client",
-      message: newMsg.trim(),
-      created_at: new Date().toISOString(),
-    };
-
-    if (supabase) {
-      try {
-        const { data } = await supabase.from("ticket_messages").insert([msg]).select().single();
-        if (data) setMessages(prev => [...prev, data]);
-      } catch (_) {}
-    } else {
-      setMessages(prev => [...prev, { ...msg, id: Date.now() }]);
-    }
-
-    setNewMsg("");
-    setSending(false);
-    setTimeout(() => msgEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-  };
 
   if (loading) {
     return (
@@ -901,82 +913,108 @@ export function TicketStatus() {
     return (
       <Shell>
         <div style={{ textAlign: "center", padding: "80px 0" }}>
-          <div style={{ fontSize: 20, fontWeight: 600, color: tk.text, marginBottom: 8 }}>Ticket not found</div>
-          <div style={{ fontSize: 14, color: tk.textMute }}>This link may be invalid or expired.</div>
+          <div style={{ fontSize: 20, fontWeight: 600, color: tk.text, marginBottom: 8 }}>
+            {error === "unreachable" ? "We could not load this ticket" : "Ticket not found"}
+          </div>
+          <div style={{ fontSize: 14, color: tk.textMute, marginBottom: 24, lineHeight: 1.6 }}>
+            {error === "unreachable"
+              ? "Something went wrong on our side. Please try again in a moment."
+              : "This link may be wrong or expired. Nothing is lost: email us and we will find your request."}
+          </div>
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={{ fontSize: 14, color: tk.gold, textDecoration: "none" }}>
+            {SUPPORT_EMAIL}
+          </a>
         </div>
       </Shell>
     );
   }
 
-  const statusIndex = STATUSES.indexOf(ticket.status);
-  const isComplete = ticket.status === "Complete";
-  const submittedDate = ticket.submitted_at ? new Date(ticket.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+  const stages = ticket.stages || [];
+  const statusIndex = ticket.stageIndex;
+  const submittedDate = ticket.submittedAt
+    ? new Date(ticket.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "-";
+  const replySubject = `Re: support request ${ticket.reference}`;
+  const replyLink = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(replySubject)}`;
 
   return (
     <Shell>
       <div style={{ animation: "fadeUp 0.35s ease both" }}>
         {/* Ticket header */}
         <div style={{ marginBottom: 36 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: tk.textMute, fontFamily: "monospace" }}>{ticket.ticket_id}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: tk.textMute, fontFamily: "monospace" }}>{ticket.reference}</span>
             <span style={{ fontSize: 13, color: tk.textMute }}>Submitted {submittedDate}</span>
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 8 }}>{ticket.description || "Support ticket"}</h1>
-          <div style={{ fontSize: 14, color: tk.textSub }}>{ticket.path} request from {ticket.client_name}</div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 8 }}>{ticket.subject}</h1>
+          {ticket.path && <div style={{ fontSize: 14, color: tk.textSub }}>{ticket.path} request</div>}
         </div>
 
-        {/* Status tracker */}
-        <div style={{
-          background: tk.surfaceEl, borderRadius: 14, border: `1px solid ${tk.border}`,
-          padding: "28px 28px", marginBottom: 32,
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: tk.textMute, letterSpacing: "0.04em", marginBottom: 20 }}>STATUS</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-            {STATUSES.map((s, i) => {
-              const isActive = i === statusIndex;
-              const isPast = i < statusIndex;
-              return (
-                <div key={s} style={{ display: "flex", alignItems: "center", flex: 1 }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: "0 0 auto" }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: "50%",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 13, fontWeight: 600,
-                      background: isPast ? tk.green : isActive ? tk.gold : "transparent",
-                      color: isPast ? "#08080A" : isActive ? "#08080A" : tk.textMute,
-                      border: `2px solid ${isPast ? tk.green : isActive ? tk.gold : tk.borderStr}`,
-                      transition: "all 0.3s",
-                    }}>
-                      {isPast ? "✓" : i + 1}
-                    </div>
-                    <span style={{
-                      fontSize: 11, fontWeight: isActive ? 600 : 400,
-                      color: isActive ? tk.gold : isPast ? tk.green : tk.textMute,
-                      marginTop: 8, textAlign: "center", whiteSpace: "nowrap",
-                    }}>{s}</span>
-                  </div>
-                  {i < STATUSES.length - 1 && (
-                    <div style={{ flex: 1, height: 2, background: isPast ? tk.green : tk.borderStr, margin: "0 8px", marginBottom: 24, transition: "background 0.3s" }} />
-                  )}
-                </div>
-              );
-            })}
+        {/* Cancelled tickets get a plain statement, not a progress bar that
+            would imply the work is still moving. */}
+        {ticket.cancelled ? (
+          <div style={{
+            background: tk.surfaceEl, borderRadius: 14, border: `1px solid ${tk.border}`,
+            padding: "24px 28px", marginBottom: 32,
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: tk.text, marginBottom: 6 }}>This request was closed</div>
+            <div style={{ fontSize: 14, color: tk.textSub, lineHeight: 1.6 }}>
+              It is no longer being worked on. If that is not what you expected, reply by email and we will pick it back up.
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{
+            background: tk.surfaceEl, borderRadius: 14, border: `1px solid ${tk.border}`,
+            padding: "28px 28px", marginBottom: 32, overflowX: "auto",
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: tk.textMute, letterSpacing: "0.04em", marginBottom: 20 }}>STATUS</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 0, minWidth: 320 }}>
+              {stages.map((s, i) => {
+                const isActive = i === statusIndex;
+                const isPast = i < statusIndex;
+                return (
+                  <div key={s} style={{ display: "flex", alignItems: "center", flex: 1 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: "0 0 auto" }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 13, fontWeight: 600,
+                        background: isPast ? tk.green : isActive ? tk.gold : "transparent",
+                        color: isPast ? "#08080A" : isActive ? "#08080A" : tk.textMute,
+                        border: `2px solid ${isPast ? tk.green : isActive ? tk.gold : tk.borderStr}`,
+                        transition: "all 0.3s",
+                      }}>
+                        {isPast ? "✓" : i + 1}
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: isActive ? 600 : 400,
+                        color: isActive ? tk.gold : isPast ? tk.green : tk.textMute,
+                        marginTop: 8, textAlign: "center", whiteSpace: "nowrap",
+                      }}>{s}</span>
+                    </div>
+                    {i < stages.length - 1 && (
+                      <div style={{ flex: 1, height: 2, background: isPast ? tk.green : tk.borderStr, margin: "0 8px", marginBottom: 24, transition: "background 0.3s" }} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Complete state */}
-        {isComplete && (
+        {ticket.complete && (
           <div style={{
             background: tk.greenSoft, borderRadius: 14, border: `1px solid ${tk.green}20`,
             padding: "24px 28px", marginBottom: 32, textAlign: "center",
           }}>
             <div style={{ fontSize: 28, marginBottom: 12 }}>✓</div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: tk.green, marginBottom: 6 }}>Ticket Complete</div>
-            <div style={{ fontSize: 14, color: tk.textSub }}>This request has been completed and delivered. Check the messages below for any delivery notes from the BAM Business Team.</div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: tk.green, marginBottom: 6 }}>Ticket complete</div>
+            <div style={{ fontSize: 14, color: tk.textSub }}>This request has been completed. Check the messages below for any notes from the BAM Business Team.</div>
           </div>
         )}
 
-        {/* Messages thread */}
+        {/* Messages thread, read only */}
         <div style={{
           background: tk.surfaceEl, borderRadius: 14, border: `1px solid ${tk.border}`,
           overflow: "hidden",
@@ -986,14 +1024,16 @@ export function TicketStatus() {
           </div>
 
           <div style={{ maxHeight: 400, overflowY: "auto", padding: "16px 24px" }}>
-            {messages.length === 0 && (
+            {ticket.messages.length === 0 && (
               <div style={{ textAlign: "center", padding: "40px 0", color: tk.textMute, fontSize: 14 }}>No messages yet. The BAM Business Team will post updates here.</div>
             )}
-            {messages.map((msg, i) => {
-              const isTeam = msg.sender_role === "team";
-              const time = new Date(msg.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+            {ticket.messages.map((msg, i) => {
+              const isTeam = msg.from === "BAM";
+              const time = msg.at
+                ? new Date(msg.at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+                : "";
               return (
-                <div key={msg.id || i} style={{
+                <div key={i} style={{
                   display: "flex", flexDirection: "column",
                   alignItems: isTeam ? "flex-start" : "flex-end",
                   marginBottom: 16,
@@ -1006,38 +1046,25 @@ export function TicketStatus() {
                     <div style={{ fontSize: 12, fontWeight: 600, color: isTeam ? tk.gold : tk.textSub, marginBottom: 6 }}>
                       {isTeam ? "BAM Business Team" : "You"}
                     </div>
-                    <div style={{ fontSize: 14, color: tk.text, lineHeight: 1.6 }}>{msg.message}</div>
+                    <div style={{ fontSize: 14, color: tk.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{msg.body}</div>
                   </div>
-                  <span style={{ fontSize: 11, color: tk.textMute, marginTop: 4, padding: "0 4px" }}>{time}</span>
+                  {time && <span style={{ fontSize: 11, color: tk.textMute, marginTop: 4, padding: "0 4px" }}>{time}</span>}
                 </div>
               );
             })}
-            <div ref={msgEndRef} />
           </div>
 
-          {/* Reply box */}
-          {!isComplete && (
-            <div style={{ padding: "16px 24px", borderTop: `1px solid ${tk.border}`, display: "flex", gap: 10 }}>
-              <input
-                value={newMsg} onChange={e => setNewMsg(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                placeholder="Type a message…"
-                style={{
-                  flex: 1, padding: "12px 16px", borderRadius: 8,
-                  background: tk.bg, border: `1px solid ${tk.border}`,
-                  color: tk.text, fontSize: 14, fontFamily: "inherit", outline: "none",
-                }}
-                onFocus={e => e.currentTarget.style.borderColor = tk.goldBorder}
-                onBlur={e => e.currentTarget.style.borderColor = tk.border}
-              />
-              <button onClick={handleSendMessage} disabled={sending || !newMsg.trim()} style={{
-                padding: "12px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-                background: newMsg.trim() ? tk.gold : tk.textMute, color: "#08080A",
-                border: "none", cursor: newMsg.trim() ? "pointer" : "default",
-                fontFamily: "inherit", opacity: newMsg.trim() ? 1 : 0.3, transition: "all 0.15s",
-              }}>Send</button>
+          {/* Reply by email. Not a box that pretends to send. */}
+          <div style={{ padding: "16px 24px", borderTop: `1px solid ${tk.border}` }}>
+            <div style={{ fontSize: 13, color: tk.textSub, lineHeight: 1.6 }}>
+              Need to add something? Reply by email and quote <b style={{ color: tk.text, fontFamily: "monospace" }}>{ticket.reference}</b>.
             </div>
-          )}
+            <a href={replyLink} style={{
+              display: "inline-block", marginTop: 12, padding: "11px 22px", borderRadius: 8,
+              fontSize: 13, fontWeight: 600, background: tk.goldGhost,
+              border: `1px solid ${tk.goldBorder}`, color: tk.gold, textDecoration: "none",
+            }}>Email us about this ticket</a>
+          </div>
         </div>
       </div>
     </Shell>
