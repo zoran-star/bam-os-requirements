@@ -844,6 +844,36 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 📏📏📏 THE BEST FIND OF THE SESSION, AND IT IS ABOUT THE GUARD: **THE HOUSE-RULE-10 CHECKER WAS BLIND TO THE IDIOM THAT IS ABOUT TO BECOME THE HOUSE STYLE.**
+
+Found by #1669's author while pre-verifying its own rebase against a scratch merge of all three PRs.
+
+**#1670 adds a 304-line `api/stripe/_requirements.js` and it produced ZERO new hits.** That could mean the file is compliant, or that the checker cannot see it. **Those are very different and it checked which. It was both.**
+
+The file is genuinely a correct three-outcome implementation. **But the checker could not have seen it either way**, because it reaches Stripe through:
+
+```
+const doFetch = opts.fetchImpl || globalThis.fetch
+```
+
+**which is the ordinary, correct way to make a network call injectable for tests.** The seed matched `fetch(`, which matches neither `globalThis.fetch` (no paren) nor `doFetch(` (word boundary).
+
+**So it planted a `canCharge`-shaped collapse in that exact style. The checker scanned it and said nothing.**
+
+**⭐ STATE THE SHAPE PLAINLY, BECAUSE IT IS THE WHOLE LESSON: the precise bug this gate exists to catch was invisible to the gate, on the day the gate was written, in a pattern that is about to land in the tree and WILL be copied, because it is the right testability idiom.** A gate that is blind to good practice gets blinder every time someone writes good code. **Second instance tonight of the pattern appearing inside its own antidote**, after the CI control-discovery gap, and by some distance the sharper of the two.
+
+**Fixed in `387610f`:** seed widened to the bare word `fetch` against comment- and string-blanked source. **Zero new hits on the real tree and zero on the merged preview**, so it buys reach without noise, and `fetchImpl` / `doFetch` / `prefetch` still do not match, because **naming a variable after fetch is not making a call.** Sixth control `MUTATE=injected` added, **verified biting by reverting the seed to its day-one form.**
+
+**And it finished applying its own rule to itself:** it removed two hand-maintained counts it had left in its own checker header and workflow comment, **having argued one commit earlier that exactly those rot.**
+
+### ⚠️ A CAVEAT THAT MUST TRAVEL WITH "ALL THREE ARE GREEN"
+
+**The house-rule-10 workflow step exists only on #1669's branch, so neither #1671 nor #1670 has ever had this rule run against it in CI.** Their greens are real and they are **silent on this rule**. **Do not quote "all three green" as three independent confirmations.** The first CI run that actually enforces it is #1669's, last, which is exactly what the merge order produces. The equivalent was obtained locally via the scratch merge.
+
+**Rebase pre-verified rather than waited for:** the merged preview reads **27 functions across 252 files, HARMFUL 4 → 2, 2 STALE lines, 0 unaudited**, both merges clean. **So the rebase is a two-line deletion and nothing else**, and the remaining HARMFUL pair is `contactInRespondedStage` and `contactInRole`, both standing down per the orchestrator's routing.
+
+**Not independently re-run by the orchestrator.** Stated rather than implied - though a room reporting that its own gate is blind is the direction that needs the least scepticism.
+
 ## ✅ [PR #1671](https://github.com/zoran-star/bam-os-requirements/pull/1671): THE GMAIL GUARD FAILS CLOSED, AND IT FOUND A SECOND HALF NOBODY HAD NAMED
 
 `hasGmailMailbox` becomes `gmailMailboxState`, returning `yes` / `no` / `unknown`. 64 assertions, **6 negative controls, each PRINTING the banner**, and the `collapse` control restores the original bug verbatim and fails 26 assertions including *"the GHL email import is NOT called"*.
