@@ -195,13 +195,16 @@
   .tg-bad{background:var(--tint-red);color:var(--red)}
   .tg-park{background:var(--tint-grey);color:var(--grey)}
   .note2{border-radius:12px;padding:14px 16px;margin-bottom:11px;border:1px solid var(--line);background:var(--card)}
-  .note2 b{display:block;margin-bottom:4px;font-size:14px;color:var(--txt)}
+  /* Direct child ONLY: this is the note's title. A bold inside a paragraph must
+     stay inline, or every emphasised phrase breaks its own sentence in two. */
+  .note2 > b{display:block;margin-bottom:4px;font-size:14px;color:var(--txt)}
+  .note2 p b{color:var(--txt)}
   .note2 p{margin:0;font-size:13px;color:var(--dim);line-height:1.55}
   .note2 p+p{margin-top:7px}
-  .n-red{background:var(--tint-red);border-color:var(--red)} .n-red b{color:var(--red)}
-  .n-gold2{background:var(--tint-gold);border-color:var(--gold)} .n-gold2 b{color:var(--gold)}
-  .n-green{background:var(--tint-green);border-color:var(--green)} .n-green b{color:var(--green)}
-  .n-blue2{background:var(--tint-blue);border-color:var(--blue)} .n-blue2 b{color:var(--blue)}
+  .n-red{background:var(--tint-red);border-color:var(--red)} .n-red > b{color:var(--red)}
+  .n-gold2{background:var(--tint-gold);border-color:var(--gold)} .n-gold2 > b{color:var(--gold)}
+  .n-green{background:var(--tint-green);border-color:var(--green)} .n-green > b{color:var(--green)}
+  .n-blue2{background:var(--tint-blue);border-color:var(--blue)} .n-blue2 > b{color:var(--blue)}
   .cols{display:grid;gap:12px}
   @media(min-width:820px){.cols.c2{grid-template-columns:1fr 1fr}.cols.c3{grid-template-columns:repeat(3,1fr)}}
   /* the skill blocks on the onboarding page */
@@ -615,7 +618,7 @@
 <!-- ===================== PAGE 3: WHAT WE NEED ===================== -->
 <div id="page3" class="page"><div class="inner">
   <h1>Everything this sales system <span>needs to know</span></h1>
-  <div class="lead">This is the answer to "what do we have to get from a new academy before we can turn this on". Every blank in every message, every page and every agent reply pulls from one of the rows below. Three columns: what it is, where it gets used, where it is collected.</div>
+  <div class="lead">This is the answer to "what do we have to get from a new academy before we can turn this on". Every blank in every message, every page and every agent reply pulls from one of the rows below. Three columns: what it is, where it is used, where it is collected.</div>
 
   <div class="rule">
     <div class="rl">The rule · Zoran, 30 July 2026</div>
