@@ -18,6 +18,18 @@ Went to run it on his instruction and found it in production already. **Verified
 
 **Then probed the live endpoint rather than inferring from the schema**, because a green schema is not a working form: `POST /api/public-ticket` with an empty body returns **400 `A name is required.`**, not a 500. **So the handler loads.** ⚠️ **NOT proven by that probe: the INSERT itself, because validation short-circuits before the write.** `source='public_form'` is still 0 of 213 tickets. **The only thing that proves the write is one real submission**, and that creates a real ticket in the staff queue, so it is Zoran's call rather than something to do quietly.
 
+**📌 WHAT THE PUBLIC FORM ACTUALLY IS, because Zoran asked and the queue never said: it is a SECOND FRONT DOOR ONTO THE SAME `tickets` TABLE THE LIL ZORAN ICON ALREADY FEEDS.** Queried:
+
+| `source` | tickets | window | `client_id` NULL |
+|---|---|---|---|
+| `portal` (the in-portal Zoran icon) | **185** | 2026-04-24 to 2026-07-28 | 0 |
+| `asana_import` (one-off history) | 28 | 2026-03-23 to 2026-05-24 | 0 |
+| `public_form` | **0** | never | n/a |
+
+**Same table, same staff queue, three doors.** The difference that matters: **the icon always knows which academy you are (`client_id` set on all 185). The public form carries `client_id` NULL on purpose and its contact details are SELF-REPORTED and unverified.**
+
+**So the honest scoping question, which nobody has asked: the working door already exists for every client who can log in.** The public form's only real audience is **someone who CANNOT get into the portal**, which is a narrow but real case and is exactly when a person is most stuck. Worth naming before anyone invests further in it.
+
 ## 📏 THREE STALE-STATE TRAPS IN ONE EVENING, ALL DIFFERENT SHAPES, NONE OF THEM A WRONG DOCUMENT
 
 1. **A room's handover file read as proof it had stopped.** It was mid-build.
