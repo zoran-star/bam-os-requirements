@@ -102,6 +102,7 @@ async function sb(path, init = {}) {
 // required set out of clientVars()'s own source and fails when either list misses one.
 const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email", "address",
   "business_email", "tagline", "instagram_url", "phone", "online_programs_url", "referral_offer",
+  "stripe_portal_url",
   "website_setup", "community_group_url", "community_group_platform", "google_review_url",
   "ghl_location_id", "ghl_access_token", "ghl_refresh_token", "ghl_token_expires_at",
   "ghl_kpi_config", "booking_provider", "time_zone"];
@@ -112,11 +113,12 @@ const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email"
 // when a column may sit here, at CLIENT_COLS_PENDING in api/automations.js.
 //
 // ⚠️ INTENTIONALLY EMPTY, AND DELIBERATELY NOT DELETED. Empty because business_email
-// (20260729T210000) and tagline / instagram_url (20260729T230000) are applied and have
-// moved up into CLIENT_COLS. Kept because this list plus the retry below it is how the
-// NEXT column ships ahead of its migration, and the retry as written is safe at any
-// number of pending columns - a rebuilt-in-a-hurry one would not be. Full rationale at
-// CLIENT_COLS_PENDING in api/automations.js.
+// (20260729T210000), tagline / instagram_url (20260729T230000) and stripe_portal_url
+// (20260731T090000) are applied and have moved up into CLIENT_COLS. Kept because this
+// list plus the retry below it is how the NEXT column ships ahead of its migration, and
+// the retry as written is safe at any number of pending columns - a rebuilt-in-a-hurry
+// one would not be. Full rationale, including why the window it covers is meant to be
+// hours rather than weeks, at CLIENT_COLS_PENDING in api/automations.js.
 const CLIENT_COLS_PENDING = [];
 
 // Only an undefined-column error (PostgREST 42703) that NAMES a pending column earns

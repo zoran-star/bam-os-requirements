@@ -83,7 +83,7 @@ async function sb(path, init = {}) {
 const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email", "phone",
   "business_email", "tagline", "instagram_url",
   "address", "time_zone", "website_setup", "community_group_url", "community_group_platform",
-  "google_review_url", "online_programs_url", "referral_offer", "ghl_location_id",
+  "google_review_url", "online_programs_url", "referral_offer", "stripe_portal_url", "ghl_location_id",
   "ghl_access_token", "ghl_refresh_token", "ghl_token_expires_at", "ghl_kpi_config"];
 
 // ⚠️ THE ONE EXCEPTION TO THE RULE ABOVE, and the only thing that makes it safe:
@@ -99,11 +99,20 @@ const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email"
 //
 // ⚠️ INTENTIONALLY EMPTY, AND DELIBERATELY NOT DELETED.
 //
-// Empty because nothing is pending: business_email (20260729T210000) and
-// tagline / instagram_url (20260729T230000) are all applied to production and have
-// moved up into CLIENT_COLS. A column belongs here ONLY while its migration is
-// pending - this is a safety net, not a parking spot, and anything left here costs
-// one wasted 400 per uncached read for as long as it is wrong.
+// Empty because nothing is pending: business_email (20260729T210000), tagline /
+// instagram_url (20260729T230000) and stripe_portal_url (20260731T090000) are all
+// applied to production and have moved up into CLIENT_COLS. A column belongs here ONLY
+// while its migration is pending - this is a safety net, not a parking spot, and
+// anything left here costs one wasted 400 per uncached read for as long as it is wrong.
+//
+// ⚠️ AND THAT COST IS NOT A ROUNDING ERROR, which is the lesson stripe_portal_url paid
+// for. It shipped here first, correctly and with the retry working exactly as designed,
+// and the orchestrator's ruling on 31 Jul 2026 was still that the shape was wrong: the
+// retry logs a warning on EVERY send while it holds, and a warning that fires correctly
+// and forever is one people learn to scroll past. So this list is for the window
+// between writing a read and applying its migration, measured in hours, not for the
+// window between shipping a feature and someone getting round to the SQL. If the
+// migration cannot be applied first, that is the thing to fix.
 //
 // Not deleted because this list plus the retry below it IS how the next column ships
 // before its migration lands, and that is a recurring need, not a one-off. Deleting

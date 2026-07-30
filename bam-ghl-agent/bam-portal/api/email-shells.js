@@ -118,6 +118,12 @@ function locFromVars(vars = {}) {
     communityUrl: String(vars.location_community_url || ""),
     communityPlatform: String(vars.location_community_platform || ""),
     reviewUrl: String(vars.location_review_url || ""),
+    // The academy's own Stripe billing portal, where a MEMBER manages the membership
+    // they are paying for (clients.stripe_portal_url). Same terms as every other link
+    // fact: empty means the welcome email's manage-membership sentence does not render
+    // at all, and no academy can ever inherit another academy's billing portal - which
+    // would send one academy's parents to a page listing somebody else's subscriptions.
+    portalUrl: String(vars.location_portal_url || ""),
     // Member-facing facts. `phone` comes off the client row; `venue` and `schedule`
     // do NOT - they are separate tables, so a caller with database access fills
     // them in (see academyFacts in api/_academy-facts.js) exactly the way the
@@ -218,6 +224,20 @@ export function clientVars(client) {
     location_community_url: c.community_group_url || "",
     location_community_platform: communityPlatformLabel(c.community_group_platform),
     location_review_url: c.google_review_url || "",
+    // The academy's Stripe billing portal (clients.stripe_portal_url, migration
+    // 20260731T090000, applied BEFORE this code merged). It is named by all three main
+    // select lists - CLIENT_COLS in api/automations.js and api/agent-confirm.js,
+    // SENDER_COLS in api/_send.js - because a column read here and selected by nobody
+    // arrives undefined and renders as nothing, silently, which is the 29 Jul 2026
+    // regression. api/_email-select-coverage.test.mjs fails naming any list that
+    // forgets it.
+    //
+    // Every academy's value is NULL today, and that is a real state rather than a gap
+    // to fill in with something: no portal on file means the welcome email's
+    // manage-membership sentence does not render at all. NO FALLBACK, for a sharper
+    // reason than the other link facts here - a borrowed billing portal shows a parent
+    // somebody else's subscriptions.
+    location_portal_url: c.stripe_portal_url || "",
     // The footer's two identity facts (migration 20260729T230000, not applied yet).
     // Absent on a row read before it lands, which reads as "this academy has no
     // tagline / no Instagram" - the honest answer, and the same shape
@@ -349,7 +369,10 @@ export function scheduleText(week, venue) {
 // `location.domain` is the bare-domain form of location.website and belongs here for
 // the same reason: no domain on file means the academy has no site to name, so the
 // mention goes rather than rendering a naked "" where a web address should be.
-const LINK_TOKENS = ["location.website", "location.domain", "location.community_link", "location.review_link"];
+// `location.portal_link` joined on 31 Jul 2026 for the same reason as the review link:
+// it is a per-academy URL that most academies do not have on file yet, so its mention
+// has to leave with it.
+const LINK_TOKENS = ["location.website", "location.domain", "location.community_link", "location.review_link", "location.portal_link"];
 
 // The same rule, widened past links: any fact whose absence must take its mention
 // with it. The schedule and the venue joined on 28 Jul 2026 when the schedule SMS
@@ -425,6 +448,11 @@ export function resolveMergeVars(html, L, vars = {}) {
     // Review ask. No link on file means the CTA is removed outright, in plain
     // text here and as a button by dropEmptyShellLinks.
     "location.review_link": vars.location_review_url || L.reviewUrl || "",
+    // Self-serve billing. The designed welcome email gates its own sentence on the fact
+    // (see onboarding-emails.js); this token is the SAME fact for a plain-text step body,
+    // and it is in DROP_WHEN_EMPTY below so an academy with no portal on file drops the
+    // mention rather than texting a member a bare "" where a link should be.
+    "location.portal_link": vars.location_portal_url || L.portalUrl || "",
     "location_owner.first_name": vars.location_owner || L.ownerFirst || "",
     // Member-facing facts, for the welcome sequence. The schedule renders as plain
     // lines here (the SMS form); the welcome EMAIL builds a table from the same

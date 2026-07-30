@@ -278,7 +278,7 @@ const THINSENDER = [[
   `const SENDER_COLS = ["email_domain", "business_name",
   "business_email", "public_name", "owner_name", "website_setup", "address", "phone",
   "community_group_url", "community_group_platform", "google_review_url",
-  "online_programs_url", "referral_offer", "tagline", "instagram_url"];`,
+  "online_programs_url", "referral_offer", "tagline", "instagram_url", "stripe_portal_url"];`,
   `const SENDER_COLS = ["email_domain", "business_name", "business_email"];`]];
 // The pre-fix render, restored byte for byte: the row is read, the guard consults it,
 // and then the email is built from the caller's vars alone. Everything the three
