@@ -56,17 +56,39 @@ async function sb(path, init = {}) {
 // only, so this cron is scheduled at BOTH 15:00 and 16:00 UTC and this guard
 // picks the one that is 8am locally - 8am all year, either side of DST, with no
 // double send. Override per client with ghl_kpi_config.trial_summary.send_hour.
+//
+// hourCycle: "h23", NOT hour12: false - see the note on todayBoundsMs in
+// calendars-v15.js. `hour12: false` is a hint the engine resolves, and Node 20
+// resolves it to h24, so local midnight came back as 24 rather than 0. With the
+// default send hour of 8 that was invisible (24 and 0 both simply fail to equal
+// 8), but `ghl_kpi_config.trial_summary.send_hour = 0` would then never match
+// and that academy's summary would silently never send. Verified by execution on
+// Node 20: this returned 24 for Europe/London at 2026-12-15T00:00Z.
 const DEFAULT_SEND_HOUR = 8;
-function localHour(tz) {
-  return Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }).format(new Date()));
+export function localHour(tz, now = new Date()) {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }).format(now));
 }
 
 // Start/end epoch-ms of "today" in an IANA timezone (DST-safe).
-function dayWindow(tz) {
-  const now = new Date();
+//
+// This one ALSO asks for hourCycle "h23" now. It previously kept `hour12: false`
+// and repaired the value with `g("hour") === 24 ? 0`, on the reasoning that the
+// repair was complete so the hint did not need converting. That reasoning was
+// sound about this function and wrong about the codebase: leaving the hint in
+// place kept the pattern alive to be copied, and it was copied. The rule is now
+// the same everywhere, display included - there is no site where `hour12` is fine.
+//
+// The `g("hour") === 24 ? 0` guard is KEPT, but it is now BELT AND BRACES rather
+// than the fix. Under h23 the hour is always 00-23, so the branch is never taken
+// (proven by execution over a year-long sweep of every zone in clients.time_zone).
+// It stays because it costs nothing and still produces the right answer if the
+// cycle is ever wrong again - case 10 of api/_local-day.test.mjs proves that by
+// forcing h24 here and requiring the correct window anyway, and MUTATE=daywindow
+// proves the guard is not decorative.
+export function dayWindow(tz, now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
   }).formatToParts(now);
   const g = (t) => Number(parts.find((p) => p.type === t).value);
   const wallAsUtc = Date.UTC(g("year"), g("month") - 1, g("day"), g("hour") === 24 ? 0 : g("hour"), g("minute"), g("second"));
@@ -76,9 +98,15 @@ function dayWindow(tz) {
   return { start, end: start + 24 * 60 * 60 * 1000 };
 }
 
+// hourCycle: "h12", NOT hour12: true. Same rule, other direction: `hour12: true`
+// is the same unresolved hint and en-US happens to resolve it to h12, but h11 is
+// the other legal answer and h11 renders NOON as "0:00 PM". So the 12-hour form
+// carries a midday version of the same bug that h24 carries at midnight. Pinning
+// h12 is byte-identical to what this rendered before on every zone and instant
+// swept, and it removes the hint. The rule is: never `hour12`, either value.
 function fmtTime(iso, tz) {
   try {
-    return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
+    return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hourCycle: "h12" }).format(new Date(iso));
   } catch (_) { return ""; }
 }
 

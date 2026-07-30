@@ -77,6 +77,24 @@ function resolveTicketTitle(x) {
   return x.type === "error" ? "Error report" : x.type === "change" ? "Change request" : `${base} request`;
 }
 
+// A ticket from the PUBLIC form at /ticket has no academy behind it. Nothing
+// verifies the name and email the submitter typed, so api/public-ticket.js
+// leaves client_id NULL on purpose rather than guess an academy from an
+// unverified email address (which would push a stranger's ticket into a real
+// client's portal).
+//
+// NULL must not read as "we lost the academy". Every place that used to print
+// "Unknown client" for these now says what they actually are.
+function isPublicFormTicket(x) {
+  return !!x && x.source === "public_form";
+}
+
+function ticketAcademyLabel(x, fallback = "Unknown client") {
+  if (x && x.client && x.client.business_name) return x.client.business_name;
+  if (isPublicFormTicket(x)) return "Public form (no academy)";
+  return fallback;
+}
+
 function statusColor(status, t) {
   switch (status) {
     case "open":             return t.amber;
@@ -206,14 +224,14 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
   // available on every ticket tab. Options come from the tab's tickets.
   const ticketTitle = (x) => resolveTicketTitle(x);
   const completedAcademies = [...new Set(
-    visibleTickets.map(x => x.client?.business_name).filter(Boolean)
+    visibleTickets.map(x => ticketAcademyLabel(x, "")).filter(Boolean)
   )].sort((a, b) => a.localeCompare(b));
   const q = completedSearch.trim().toLowerCase();
   const matchesFilters = (x) => {
-    if (completedAcademy && (x.client?.business_name || "") !== completedAcademy) return false;
+    if (completedAcademy && ticketAcademyLabel(x, "") !== completedAcademy) return false;
     if (isManager && mineOnly && x.assigned_to !== me?.id) return false;
     if (!q) return true;
-    const hay = [ticketTitle(x), x.client?.business_name, x.assignee?.name, Object.values(x.fields || {}).filter(Boolean).join(" ")]
+    const hay = [ticketTitle(x), ticketAcademyLabel(x, ""), x.fields?.email, x.assignee?.name, Object.values(x.fields || {}).filter(Boolean).join(" ")]
       .filter(Boolean).join(" ").toLowerCase();
     return hay.includes(q);
   };
@@ -474,7 +492,7 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
   // Group client actions by client business_name
   const clientGroups = {};
   clientActionTickets.forEach(x => {
-    const name = x.client?.business_name || "Unknown client";
+    const name = ticketAcademyLabel(x);
     (clientGroups[name] = clientGroups[name] || []).push(x);
   });
   const clientNames = Object.keys(clientGroups).sort();
@@ -594,7 +612,7 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
 // from the Timeline Sensitive section while keeping the urgency visible.
 function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensitive, onPing, pingState }) {
   const title = resolveTicketTitle(ticket);
-  const clientName = ticket.client?.business_name || "Unknown";
+  const clientName = ticketAcademyLabel(ticket, "Unknown");
   const isUrgent = variant === "urgent";
   const redBg = dark ? "rgba(232,117,96,0.08)" : "rgba(232,117,96,0.10)";
   const redBorder = `${t.red || "#ED7969"}55`;
@@ -733,7 +751,7 @@ function TicketCard({ ticket, tokens: t, onOpen, completed }) {
         </div>
         <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 4 }}>{title}</div>
         <div style={{ fontSize: 13, color: t.textMute, marginBottom: 8 }}>
-          {ticket.client?.business_name || "Unknown client"}
+          {ticketAcademyLabel(ticket)}
           {ticket.assignee && <> · assigned to <b style={{ color: t.textSub }}>{ticket.assignee.name}</b></>}
         </div>
         {preview && <div style={{ fontSize: 13, color: t.textSub, lineHeight: 1.4 }}>{preview}</div>}
@@ -1030,7 +1048,20 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             />
           )}
           <div style={{ display: "flex", gap: 14, fontSize: 13, color: t.textMute, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <span>{ticket.client?.business_name || "Unknown client"}</span>
+            <span>{ticketAcademyLabel(ticket)}</span>
+            {/* The name and email below were typed into a public form by
+                someone we have not authenticated. Say so, next to them, rather
+                than letting them read like a client record. */}
+            {isPublicFormTicket(ticket) && (
+              <span
+                title="Submitted through the public form at /ticket. The name and email are self-reported and nothing has verified them."
+                style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase",
+                  color: t.amber || t.textSub, border: `1px solid ${t.amber || t.borderMed}55`,
+                  borderRadius: 5, padding: "2px 6px", cursor: "help",
+                }}
+              >Unverified contact</span>
+            )}
             {(ticket.client?.owner_name || ticket.fields?.owner_name) && (
               <span>Owner: {ticket.client?.owner_name || ticket.fields?.owner_name}</span>
             )}

@@ -75,13 +75,35 @@ const toArr = x => Array.isArray(x) ? x : (x && typeof x === "object" ? Object.v
 
 // [midnight today, midnight tomorrow) as epoch-ms in an IANA timezone, so
 // "trials today" matches the academy's local day, not the server's.
-function todayBoundsMs(tz) {
+//
+// hourCycle: "h23", NOT hour12: false. They are not synonyms, and the difference
+// is a whole day. `hour12: false` is a HINT the engine RESOLVES to a cycle, and
+// it does not resolve the same way everywhere: on the same ICU 78.2, Node 20
+// resolves it to h24 and renders midnight as hour "24", while Node 24 resolves
+// it to h23 and renders "00". The date and weekday are correct either way - only
+// the hour reads 24 - so this helper read +p.hour as 24, computed the zone's
+// offset as +24h instead of 0, and returned the WRONG DAY.
+//
+// This only bites when the offset in force at local midnight is exactly UTC+0,
+// because that is the only case where the instant being formatted lands on the
+// hour that renders as 24. That is not hypothetical: Europe/London (Elite Smart
+// Athletes) is UTC+0 from late October to late March, so for roughly five months
+// a year the Home dashboard's "trials today" and "today's schedule" would read
+// YESTERDAY on any runtime that resolves h24. Verified by execution on Node 20:
+// wrong for Europe/London on 2026-12-15 and on 2026-03-29, correct on Node 24.
+//
+// Asking for h23 fixes the value at the source rather than repairing it after
+// the fact with `% 24` at each read, so a future reader of a new `p.hour` cannot
+// reintroduce this by forgetting the guard. Do not put `hour12` back: per the
+// ECMA-402 spec `hour12` overrides `hourCycle`, so the two cannot coexist.
+//
+// `now` is injectable so this is testable without faking the clock.
+export function todayBoundsMs(tz, now = new Date()) {
   const tzOffsetMs = (d) => {
-    const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
       .formatToParts(d).reduce((a, x) => (a[x.type] = x.value, a), {});
     return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - d.getTime();
   };
-  const now = new Date();
   const p = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" })
     .formatToParts(now).reduce((a, x) => (a[x.type] = x.value, a), {});
   const guess = Date.UTC(+p.year, +p.month - 1, +p.day, 0, 0, 0);

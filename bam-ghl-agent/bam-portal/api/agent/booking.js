@@ -122,15 +122,12 @@ export function calendarForGroup(calendars, group) {
   return calendars.find(c => String(c.group || "").toLowerCase().replace(/\s+/g, "") === g) || null;
 }
 
-// "2026-07-07T19:00:00-04:00"-style local-offset ISO + local day key, matching
-// what the GHL free-slots API emitted so downstream consumers are unchanged.
-function localIsoParts(dateUtc, timeZone) {
-  const fmt = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZoneName: "longOffset" });
-  const parts = Object.fromEntries(fmt.formatToParts(new Date(dateUtc)).map(p => [p.type, p.value]));
-  const off = (parts.timeZoneName || "GMT+00:00").replace("GMT", "") || "+00:00";
-  const day = `${parts.year}-${parts.month}-${parts.day}`;
-  return { day, iso: `${day}T${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}:${parts.second}${off}` };
-}
+// The local-offset ISO builder now lives in api/_local-iso.js, because
+// api/website/availability.js needs the SAME one and used to carry a second copy
+// that no test could execute. Re-exported here so `localIsoParts` stays available
+// from this module for anything that already imports it from the agent surface.
+import { localIsoParts } from "../_local-iso.js";
+export { localIsoParts };
 
 // Portal slots for a group over the window. Occupancy comes from the shared
 // slot_spots_taken function via the bulk RPC; the booking RPC re-checks capacity

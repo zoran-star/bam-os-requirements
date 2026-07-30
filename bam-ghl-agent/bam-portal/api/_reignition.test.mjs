@@ -177,7 +177,7 @@ function dayStartUnderTest(now, tz) {
   if (MUTATE === "dst") {
     let parts;
     try {
-      parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz || "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+      parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz || "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
         .formatToParts(now).reduce((a, p) => (a[p.type] = p.value, a), {});
     } catch (_) { return startOfDayIso(now, "UTC"); }
     const h = Number(parts.hour === "24" ? "0" : parts.hour), m = Number(parts.minute), s = Number(parts.second);
@@ -717,7 +717,19 @@ console.log("\n── 4b. THE PACING DAY is a day, not a rolling 24 hours ──
   // admissions and the campaign paused) and 01:00 on fall-back (an hour of today's
   // admissions uncounted, so the pace could overshoot). Asserted by rendering the
   // answer back into the zone: it must read exactly 00:00:00 on the right date.
-  const localOf = (iso, tz) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, dateStyle: "short", timeStyle: "medium", hour12: false }).format(new Date(iso));
+  //
+  // hourCycle: "h23", NOT hour12: false. They are not synonyms at midnight, and
+  // the difference made this block fail in CI while passing on a dev machine.
+  // `hour12: false` is resolved by the engine, and Node 20 resolves it to h24
+  // while Node 24 resolves it to h23 - same ICU (78.2), different V8. Under h24
+  // midnight renders as hour 24, so all six assertions read "24:00:00" in CI and
+  // "00:00:00" locally FROM THE SAME CORRECT INSTANT. The boundary was never
+  // wrong; only this render helper was. h23 is requested explicitly, so it is
+  // the same string on both, and the assertion measures startOfDayIso rather
+  // than measuring whichever Node happens to be running it.
+  //
+  // Same hazard already documented at api/_academy-facts.js:73.
+  const localOf = (iso, tz) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, dateStyle: "short", timeStyle: "medium", hourCycle: "h23" }).format(new Date(iso));
   for (const [what, instant, tz, expect] of [
     ["New York, spring-forward day", "2026-03-08T18:00:00Z", "America/New_York", "2026-03-08, 00:00:00"],
     ["New York, fall-back day", "2026-11-01T18:00:00Z", "America/New_York", "2026-11-01, 00:00:00"],

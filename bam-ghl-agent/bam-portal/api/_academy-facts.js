@@ -61,16 +61,29 @@ export function safeTimeZone(timeZone) {
 // must not have its evening sessions described in Toronto time - that is the same bug
 // class as the trial confirmations, and it is why the zone is a parameter and has no
 // default.
+//
+// hourCycle: "h23", NOT hour12: false. `hour12` is a HINT the engine RESOLVES to a
+// cycle, and Node 20 resolves it to h24 (midnight renders "24") while Node 24
+// resolves it to h23 ("00"). A midnight class then read as hour 24, and this helper
+// is what describes class times to a parent. Do not put `hour12` back: per ECMA-402
+// it OVERRIDES `hourCycle`, so the two cannot coexist.
+//
+// This note lives ABOVE the signature on purpose. Case 4 of api/_local-day.test.mjs
+// pins that the function BODY contains no "hour12" at all, comments included, which
+// is a stricter and much cheaper rule than teaching the pin to parse comments.
 function localParts(iso, timeZone) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone, weekday: "short", hour: "numeric", minute: "numeric", hour12: false,
+    timeZone, weekday: "short", hour: "numeric", minute: "numeric", hourCycle: "h23",
   });
   const parts = Object.fromEntries(fmt.formatToParts(d).map((p) => [p.type, p.value]));
   const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.weekday);
   if (dow < 0) return null;
-  // en-US hour12:false renders midnight as "24" in some ICU versions.
+  // BELT AND BRACES, not the fix. h23 never renders 24, so under the cycle above
+  // this `% 24` is the identity - kept only to catch the value if the cycle is
+  // ever wrong again. Case 10 of api/_local-day.test.mjs proves it still bites by
+  // forcing h24 here and requiring the right answer anyway.
   const hour = Number(parts.hour) % 24;
   return { dow, hour, minute: Number(parts.minute) };
 }
