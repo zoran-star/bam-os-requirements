@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · all work complete, 3 PRs waiting on you",
+ "updated": "2026-07-30 · complete, 3 PRs waiting on you",
  "recentUpdates": [
+  "Everything is built and nothing is running. Three pull requests wait on you, in order: 1671, 1670, 1669",
+  "Four times tonight a clean-looking result turned out to be checking nothing. Understanding the rule prevented none of them",
+  "What caught all four was a second person examining the EVIDENCE rather than the conclusion. That is the best argument yet for never letting the builder be the tester",
   "All work is complete. Nothing is being built. Three pull requests are waiting on you and that is the whole list",
   "Last check closed: the agent read the real CI log instead of trusting its local run. Until it did, 'CI runs my safety checks' was a claim about its own laptop",
-  "The two agents corrected each other's EVIDENCE twice tonight, not each other's code. That is the harder and more useful kind",
-  "Best rule of the night, and it is testable rather than just wise: any check whose expected answer is 'nothing' has to be made to say 'something' once, or it is not evidence",
-  "It came from an agent diagnosing its own mistake more precisely than I had: it predicted an absence, saw an absence, and called that confirmation",
-  "All builds done. Merge the three in order, rotate the Stripe key, send Lij his list"
+  "The two agents corrected each other's EVIDENCE twice tonight, not each other's code. That is the harder and more useful kind"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",

@@ -844,6 +844,20 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 📏📏📏📏📏 THE WHOLE THREAD IN ONE SHAPE, and the closing instance is the most honest of the four
+
+Three separate times in one exchange, a clean-looking result turned out to be unexamined:
+
+1. A checker reported **zero hits on a file it structurally could not see.**
+2. "No new hits from my test file" **measured a file excluded from the scan.**
+3. "CI runs my controls" **was a claim about a laptop** until someone pulled the Actions log.
+
+**And then the fourth, volunteered unprompted by the agent that had just caught number two:** its own correction used `grep -rn "globalThis.fetch"`, where `.` is a regex wildcard - **the identical flaw it had just corrected in the other agent.** It never bit, only because no string like `globalThisXfetch` exists in the tree. **"My correction of them was right in substance and arrived by a method no more rigorous than theirs."**
+
+**Every one is the same shape, and it is the shape of the bug the PR fixes: an absence that could mean two different things, read as the reassuring one.** The fix ships with six mutations for exactly that reason - **a green run counts only once you have made it go red on demand.**
+
+**⭐ THE REASON THIS BELONGS IN THE FILE RATHER THAN IN A COMMIT MESSAGE: four instances, in one hour, among the two agents who had just articulated the rule most sharply, three of them caught only because the other agent checked rather than accepted.** Understanding the pattern did not prevent a single one. **What caught all four was a second party who examined the EVIDENCE rather than the conclusion.** That is a stronger argument for house rule 1 - the tester never built the thing - than any defect it has ever found, because here the thing being tested was not code. **It was somebody's reasoning about whether they had checked something.**
+
 ## 📏 THE LAST "WORKS ON MY LAPTOP" GAP, CLOSED BY READING THE ACTUAL RUNNER LOG
 
 #1669's author had verified its CI step locally and **never confirmed the real runner executes it.** It pulled the Actions log for `387610f` and read the output:
