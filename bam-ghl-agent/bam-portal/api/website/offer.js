@@ -59,6 +59,12 @@ async function getAllowedOrigins() {
 const TRAINING_INTAKE_DEFAULTS = [
   "Parent name", "Phone", "Email", "Emergency contact name", "Emergency contact phone",
 ];
+// The same defaults, split at the point where the academy's own athlete fields
+// belong. The enroll form collects the athlete's name itself, so its age /
+// grade / gender questions have to sit next to that name, not after the
+// emergency contact. Order: parent basics -> athlete -> emergency contact.
+const PARENT_BASICS = TRAINING_INTAKE_DEFAULTS.slice(0, 3);
+const EMERGENCY_CONTACT = TRAINING_INTAKE_DEFAULTS.slice(3);
 
 // Intake labels that are ALWAYS required, for every academy on the shared
 // sales-system preset (lowercased). Emergency contact added 2026-07-24 -
@@ -152,10 +158,17 @@ export function buildFields(offer, customDefs, section) {
     out.push(f);
   };
 
-  if (section === "onboarding") TRAINING_INTAKE_DEFAULTS.forEach(pushLabelField);
+  // Academy-level defs (offer_id null) are the athlete's own attributes; the
+  // offer-scoped ones are that offer's extra questions and stay at the end.
+  const defs = customDefs || [];
+  if (section === "onboarding") {
+    PARENT_BASICS.forEach(pushLabelField);
+    defs.filter((d) => d && !d.offer_id).forEach(pushDefField);
+    EMERGENCY_CONTACT.forEach(pushLabelField);
+  }
   legacySelected.forEach(pushLabelField);
   legacyCustom.forEach((c) => pushLabelField(typeof c === "string" ? c : (c && c.name)));
-  (customDefs || []).forEach(pushDefField);
+  defs.forEach(pushDefField);
 
   // Stable, unique keys for the form (label collisions already filtered above).
   return out.map((f, i) => ({ ...f, key: `${f.key}__${i}` }));

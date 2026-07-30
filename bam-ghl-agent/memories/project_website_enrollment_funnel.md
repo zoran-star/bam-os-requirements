@@ -81,6 +81,34 @@ from [[project_coachiq_integration]], now built. Offer-driven end to end.
   parents at enrollment?"). **Gap:** the offer builder has no per-question
   custom-field builder for onboarding intake yet (sales `info_collect` does).
 
+## Step-1 field order + the duplicate trap (2026-07-30)
+The enroll page renders TWO blocks and they can collide:
+1. **Core block, hardcoded in `enroll.jsx`** (parent first/last, parent email,
+   parent phone, athlete first/last). These drive `parent{}`/`athlete{}` on
+   checkout, so they are always asked.
+2. **Offer block** = `intake_fields` from `api/website/offer.js`, minus anything
+   whose label duplicates a core field (`CORE_SKIP` in `enroll.jsx`).
+
+**The trap:** `CORE_SKIP` matched labels by exact string, so GTA's
+`Athlete's First Name` never matched `athlete first name` and parents typed the
+athlete's name TWICE (live until 2026-07-30). Fixed by matching a normalized
+label - possessives dropped, punctuation flattened. If you add a core field,
+add every label shape to `CORE_SKIP`, and remember Detail Miami has its own copy
+of the same list.
+
+**Ordering** is set in `buildFields`: parent basics → academy-level custom defs
+(`offer_id` null: the athlete's own attributes) → emergency contact → legacy
+add-ons → offer-scoped defs. The athlete defs sit in the middle ON PURPOSE, so
+the offer's athlete questions land under the athlete's name in the form instead
+of after the emergency contact.
+
+**Do NOT archive the `athlete_first_name` / `athlete_last_name` academy defs to
+kill a duplicate.** They are academy-level, so they also feed the free-trial
+LEAD form (`lead_fields`) - archiving would stop the trial funnel collecting the
+athlete's name. Fix the renderer, not the data. Because the enroll form hides
+them, `api/website/checkout.js` now writes those two field values from the core
+athlete answer, so an enroll-only parent still gets them on their contact.
+
 ## BAM GTA state (2026-06-15)
 - Training offer `52a6285c-7832-44e1-b531-ab7ef9d8fc21` set **published**. Plans
   left **archived** per Zoran → funnel shows ONLY the live "Summer Unlimited"
