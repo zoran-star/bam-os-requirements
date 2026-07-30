@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · column applied, 1666 merge-ready",
+ "updated": "2026-07-30 · all three merged, three agents working",
  "recentUpdates": [
+  "All three merged. Setup steps fixed in three places, KPI links seeding themselves, and your Stripe manage link in the welcome email",
+  "Three agents now working in parallel: the Stripe message, the last hardcoded age split, and a check that stops this whole bug class recurring",
+  "Holding one database fix until the deploy finishes. Doing it early would just let the old code undo it",
   "Column added and verified: 47 academies, all empty, so the new link shows for nobody until someone sets it up. 1666 is ready to merge",
   "Turns out my call was right for a much bigger reason than I had. Doing it the other way round would have taken down EVERY message channel, texts included",
-  "Their builder turned that into a test, so the order is now a fact the code states rather than something someone has to remember",
-  "Ruled on the held PR. They offered me two options and both left something open forever, so I took a third that closes it",
-  "The real fix was one nullable database column. It was only unavailable because a paused build happened to own it, not because it was hard",
-  "What decided it was not speed. It would have logged a warning on every email we send, forever, and that is how a team learns to ignore warnings"
+  "Their builder turned that into a test, so the order is now a fact the code states rather than something someone has to remember"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
