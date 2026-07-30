@@ -1,19 +1,18 @@
 {
- "updated": "2026-07-30 · age routing approved, split into two builds",
+ "updated": "2026-07-30 · ticket migration was already done, phones confirmed",
  "recentUpdates": [
+  "The support form migration was ALREADY applied. Our own notes said it was pending, and that is what I told you. Corrected",
+  "Tested the live form rather than assuming: it answers properly instead of erroring. What is still unproven is whether it SAVES, and only a real submission shows that",
+  "Both business phone numbers confirmed by you, so they are real data now instead of numbers scraped off Google",
+  "Three different stale notes tripped us tonight, and not one of them was wrong. Each answered a question nobody had actually asked it",
   "You approved the age-routing plan AND caught a real bug in it: GTA's older group is 'ages 14 and up' with no top, so forcing a top number would have quietly locked out a 19-year-old",
-  "Split into two builds on purpose. Shipping them together would have replaced a leak with an outage for every academy including GTA",
-  "Good news: the business EMAIL work is already done and live. Only the phone half is left, and it is waiting on your two numbers",
-  "Worth a look: those two phone numbers are ALREADY in the database, taken off Google listings. Checking now whether either is being printed to parents",
-  "The class-routing bug is NOT where we thought. Nobody filters the times a parent is SHOWN by their kid's age, so the booking is precise and still wrong",
-  "That matters: a fix aimed at the old theory would ship, pass every test, and change nothing for San Jose"
+  "Split into two builds on purpose. Shipping them together would have replaced a leak with an outage for every academy including GTA"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
-   "Apply the public ticket migration? It is the ONLY thing left before the support form works. One word from you and it is done",
+   "Send one real test message through the support form? It is the only way to prove it SAVES. It will show up in the staff ticket queue",
    "Confirm the public names: GTA is now 'By Any Means Toronto' and San Jose is now 'By Any Means San Jose'. Our notes say both should be 'By Any Means Basketball'",
-   "Confirm the 2 business phone numbers (SJ 408-597-4327, GTA 289-816-6569). Both are ALREADY in the database off Google listings, so this stopped being theoretical",
    "Two San Jose data fixes for launch: allowlist its domain, and press the entry-point seed button. Both are data, not code",
    "Decide on 2 new preset leaks: GTA's gym door in every academy's confirmation text, and GTA's age groups baked into every AI",
    "Send Lij his ask-list. Still the biggest thing you own and the biggest San Jose unblock",

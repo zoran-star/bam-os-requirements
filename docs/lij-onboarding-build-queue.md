@@ -4,6 +4,28 @@ Live queue of everything the San Jose onboarding surfaces. Onboarding spans days
 
 **Started 2026-07-25.**
 
+## ✅ ZORAN CONFIRMED BOTH BUSINESS PHONE NUMBERS (2026-07-30). The gate is open.
+
+**BAM GTA `(289) 816-6569` · BAM San Jose `(408) 597-4327`.** Both already sit in `clients.phone`; they are now **confirmed data rather than unverified Google scrapes**, which closes the standing warning that a business phone is not a display field because it becomes the number printed to parents.
+
+**The `business_phone` half of the business-contact split is no longer waiting on him.** It stays queued behind the age-routing build, but its input exists.
+
+**The render question STILL stands and was not cancelled by the confirmation**, only de-escalated: does `clients.phone` reach a parent today? **"The number is correct" and "we know where the number appears" are different questions**, and only the second tells the next person what breaks when it changes.
+
+## ⚠️ THE PUBLIC TICKET MIGRATION WAS **ALREADY APPLIED**. ITS LEDGER ROW SAID PENDING, AND THAT ROW WAS WHAT I TOLD ZORAN.
+
+Went to run it on his instruction and found it in production already. **Verified COMPLETE rather than partial before believing it:** `tickets_source_check` allows `public_form`, `tickets.public_token` exists, and **all four indexes are present**. Ledger corrected in [#1658](https://github.com/zoran-star/bam-os-requirements/pull/1658), merged.
+
+**Then probed the live endpoint rather than inferring from the schema**, because a green schema is not a working form: `POST /api/public-ticket` with an empty body returns **400 `A name is required.`**, not a 500. **So the handler loads.** ⚠️ **NOT proven by that probe: the INSERT itself, because validation short-circuits before the write.** `source='public_form'` is still 0 of 213 tickets. **The only thing that proves the write is one real submission**, and that creates a real ticket in the staff queue, so it is Zoran's call rather than something to do quietly.
+
+## 📏 THREE STALE-STATE TRAPS IN ONE EVENING, ALL DIFFERENT SHAPES, NONE OF THEM A WRONG DOCUMENT
+
+1. **A room's handover file read as proof it had stopped.** It was mid-build.
+2. **A room's written "branch released" that had not released the ref.** Its worktree still held it.
+3. **A ledger row saying PENDING for work already applied.** It became the basis for what the orchestrator told Zoran.
+
+**Every one of these documents was ACCURATE about what it claimed.** Each was read as answering a question it never claimed to answer: has the work stopped, is the ref free, is the database changed. **This is the sharpest form of the project's named pattern yet, because there is nothing to correct in the artifact.** The rule earned: **when a document's answer would change what you DO, confirm the state itself, not the document about it.** Cheap in all three cases: ask the room, run `git worktree list`, query the schema.
+
 ## ✅ GATE 1 PASSED ON AGE ROUTING (Zoran, 2026-07-30). **AND HE CAUGHT A REAL DEFECT IN THE PLAN BY QUESTIONING IT.** Recorded in his name, at the room's request.
 
 The room proposed two numbers per class, youngest and oldest. **He asked "shouldn't the age be a range of actual ages included?"** and that question found the bug: **GTA's own second group is `ages 14 and up`. It has no top.** A mandatory top number would have made someone type 18, **silently locking out a 19-year-old and changing GTA's live behaviour on day one** - the exact thing his hard rule forbids. The plan would have shipped it.
