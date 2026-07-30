@@ -56,14 +56,28 @@ async function sb(path, init = {}) {
 // only, so this cron is scheduled at BOTH 15:00 and 16:00 UTC and this guard
 // picks the one that is 8am locally - 8am all year, either side of DST, with no
 // double send. Override per client with ghl_kpi_config.trial_summary.send_hour.
+//
+// hourCycle: "h23", NOT hour12: false - see the note on todayBoundsMs in
+// calendars-v15.js. `hour12: false` is a hint the engine resolves, and Node 20
+// resolves it to h24, so local midnight came back as 24 rather than 0. With the
+// default send hour of 8 that was invisible (24 and 0 both simply fail to equal
+// 8), but `ghl_kpi_config.trial_summary.send_hour = 0` would then never match
+// and that academy's summary would silently never send. Verified by execution on
+// Node 20: this returned 24 for Europe/London at 2026-12-15T00:00Z.
 const DEFAULT_SEND_HOUR = 8;
-function localHour(tz) {
-  return Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }).format(new Date()));
+export function localHour(tz, now = new Date()) {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }).format(now));
 }
 
 // Start/end epoch-ms of "today" in an IANA timezone (DST-safe).
-function dayWindow(tz) {
-  const now = new Date();
+//
+// This one keeps `hour12: false` and repairs the value with `g("hour") === 24 ? 0`.
+// That guard is correct and was proven so by execution on Node 20 (an h24 runtime):
+// when ICU renders the hour as 24 it still renders the CORRECT year, month and day,
+// so mapping only the hour back to 0 is a complete repair. It is left as-is rather
+// than converted to hourCycle because it is not broken, and MUTATE=daywindow below
+// proves the guard is load-bearing rather than decorative.
+export function dayWindow(tz, now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
