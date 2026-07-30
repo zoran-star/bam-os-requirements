@@ -858,7 +858,13 @@ NEW: sb(`             ${encodeURIComponent(offerId)}         `)
 
 **2. IT REJECTED THE STRONGER INVARIANT ON EVIDENCE.** *"Every line-anchored `function NAME` must survive blanking"* measures **1874 declarations, exactly ONE violation - and the violation is CORRECT**: `api/ghl/all-pipelines.js:131` declares a browser-side `saveNote` inside an HTML template literal wired to an `onblur` handler, so blanking it is right.
 
-**That makes it a heuristic, not a law, and shipping it means an exemption on its first run.** Its reasoning, which is the part to keep: **a gate red on day one gets switched off, and this repo has already paid that cost.** Left out deliberately, **with the measurement recorded in the file so nobody redoes the work to reach the same conclusion.** **Declining to build a check is a harder call than building one and it almost never gets credited.**
+**That makes it a heuristic, not a law, and shipping it means an exemption on its first run.** Left out deliberately, **with the measurement recorded in the file so nobody redoes the work to reach the same conclusion.** **Declining to build a check is a harder call than building one and it almost never gets credited.**
+
+**⚠️ CORRECTION TO WHAT I FIRST RECORDED HERE, from #1671's author, and it is the better argument.** I wrote that the reasoning to keep was *"a gate red on day one gets switched off"*. **That is a practical concern about adoption. The real objection is stronger: the counterexample proves the invariant FALSE AS STATED.** `saveNote` genuinely should be blanked, so *"every line-anchored `function NAME` must survive blanking"* is simply not true. **Shipping it with a carve-out would have encoded a wrong law plus a mystery for the next reader** - who would find the exemption, be unable to tell whether it marks a bug or a definition, and have no way to decide. **A rule with an exception you cannot classify is worse than no rule, independently of whether anyone switches it off.**
+
+**⚠️ AND A SECOND SHARPENING OF MY WORDING, same source: I called brace-balance "insufficient". It is not weak, it is INAPPLICABLE.** Erasing a balanced region leaves balance intact, so **balance is structurally incapable of detecting the dominant bug class**, and **catching the six was an accident of those two bugs also happening to break braces.** The general form, which is worth more than either fix in this thread:
+
+> **An invariant that cannot fail on the thing you are worried about is not a weak test of it. It is not a test of it.**
 
 **⚠️ AND IT CAUGHT ITSELF MISLABELLING BEFORE SENDING:** its first pass tagged those 230 as *"balanced swallows invisible to the invariant"*, which reads as 230 live bugs. **They are the opposite - blindness removed, not introduced.** The structural conclusion survived; the alarm did not. **Fifth time in this thread one of the two agents corrected its own EVIDENCE rather than its own code.**
 
