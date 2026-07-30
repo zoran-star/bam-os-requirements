@@ -858,6 +858,18 @@ The standing rule since that incident is that **"it is inert until someone confi
 
 **#1666 does not rest on that argument.** It uses `CLIENT_COLS_PENDING` plus the peel-off retry, which **already exists on main, is documented in place, and has its own committed suite** (`_pending-client-column.test.mjs`, which injects a synthetic pending column so the machinery stays provable even when the list is empty). **That is a mechanism, not a hope.** Orchestrator-verified: `clients.stripe_portal_url` genuinely does not exist in production, so the pending path is the one that runs.
 
+### ✅ APPLIED 2026-07-30: `clients.stripe_portal_url`. **AND THE BUILDER FOUND THAT MY RULING WAS RIGHT FOR A MUCH BIGGER REASON THAN MINE.**
+
+`20260731T090000_clients_stripe_portal_url.sql`, applied by the orchestrator, **verified by reading production back rather than by the success flag:** type `text`, **nullable YES**, **no default**, **47 rows and 0 non-NULL**, comment present verbatim. So when #1666 lands the link gates closed for all 47 academies, which is the state its suites already prove.
+
+**⭐ THE BUILDER REPLACED THE NOW-REDUNDANT RETRY TEST WITH A DEPLOY-ORDER ASSERTION, AND IT CHANGES THE SEVERITY OF THE WHOLE QUESTION: without the migration, the main-list select THROWS UN-RETRIED AND TAKES EVERY CHANNEL DOWN, INCLUDING SMS.**
+
+**I ruled migration-first to avoid a permanent warn line. Merge-first would have taken down every channel at every academy.** I would have reached the right answer for a far smaller reason. **Recorded as luck rather than foresight, because the difference matters: the rule that saved it was "additive migrations go first", applied out of tidiness, and it happened to be load-bearing.**
+
+**And the assertion is the real prize: it converts the sequencing from a convention someone has to remember into a fact the suite states.** Precisely the enroll incident's lesson pointed forward - the danger was never the feature, it was a reference firing regardless of config. **The order is now hard rather than stylistic, and it says so in the repo instead of in somebody's memory.**
+
+**Ledger row marked "orchestrator applying directly, not for `/pending-sql`"**, so nobody re-applies it.
+
 ### ✅ RULED ON #1666: **NEITHER OPTION. THE BLOCKER WAS ORGANISATIONAL, NOT TECHNICAL.**
 
 **The room answered the question honestly and priced it fairly: the peel-off is PER CALL, not cached.** Every `loadClient` concatenates the pending column, earns a `42703`, warns, and retries without it, at three sites, so **a single send can pay up to two failed round trips** for as long as the column stays pending. It also ruled out the obvious middle path with a real reason: **shipping with the pending list emptied would fail `_email-select-coverage`, and that suite exists because exactly that shipped on 29 Jul.**
