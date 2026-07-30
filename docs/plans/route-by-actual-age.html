@@ -133,7 +133,7 @@
     <div class="card">
       <span class="tag t-now">How it works now</span>
       <div class="step"><div class="n">1</div><p>Parent says their child is 9<span class="why">stored as free text, so "9", "nine" and "9 turning 10" are all possible</span></p></div>
-      <div class="step"><div class="n">2</div><p>Agent picks <b>"Group 1"</b> or <b>"Group 2"</b><span class="why">from GTA's age bands, 9 to 13 and 14 up, written into the system in seven places</span></p></div>
+      <div class="step"><div class="n">2</div><p>Agent picks <b>"Group 1"</b> or <b>"Group 2"</b><span class="why">GTA's bands, 9 to 13 and 14 up, are repeated in four places, and four more places assume GTA's class naming</span></p></div>
       <div class="step"><div class="n">3</div><p>System looks for those exact words in the calendar name<span class="why kill">San Jose's classes are called Beginner and Elementary, so nothing matches</span></p></div>
       <div class="step"><div class="n">4</div><p class="kill">No times shown &middot; or the first class booked</p></div>
     </div>
@@ -197,7 +197,9 @@
         <li><b>Two numbers per class</b> (<code>age_min</code>, <code>age_max</code>) added to the offer's Schedule section in <code>client-portal.html</code>, alongside the existing free-text <code>age</code> which stays for display.</li>
         <li><b>Carry the class onto the slot.</b> <code>schedule_slots.source_offer_class_key</code> already exists and is indexed, and <code>generate-slots.ts:199</code> already copies it template to slot. It is NULL everywhere because of <b>two</b> breaks in series, not one: <code>_offer-schedule.js</code> never puts it in the payload, and <code>templates.ts:93-147</code> would not read it if it did. Both ends need fixing or the pipe stays dry.</li>
         <li><b>Delete the name matching.</b> <code>groupOf()</code> and both call sites in <code>booking.js:142</code> and <code>:223</code>, plus the identical copies in <code>leads.js:580</code> and <code>miami-book.js:165</code>.</li>
-        <li><b>Remove all seven copies of GTA's age bands</b>: <code>prompt-structure.js:358</code> and <code>:288</code>, <code>agent-approvals.js:133</code>, <code>:135</code>, <code>:151</code>, <code>booking.js:104-105</code>, and <code>calendars-v15.js:184</code> <code>groupFromSlot()</code>, which reads the parenthetical as an age band and returns the days for any generated slot.</li>
+        <li><b>Remove the four places that repeat GTA's age numbers</b>: <code>prompt-structure.js:628</code> (the <code>booking_group</code> body) and the three tool schemas at <code>agent-approvals.js:133</code>, <code>:135</code>, <code>:151</code>.</li>
+        <li><b>Remove the four places that depend on GTA's class NAMING</b>, which carry no numbers and are the reason a smarter parser cannot help: <code>booking.js:102-106</code> <code>groupOf()</code> plus its two call sites at <code>:143</code> and <code>:222</code>, <code>calendars-v15.js:184</code> <code>groupFromSlot()</code>, and the inline <code>/group\s*\d+/i</code> at <code>leads.js:580</code> and <code>miami-book.js:168</code>.</li>
+        <li><b>Line numbers re-derived against this branch after PR #1656 merged</b>, which moved most of them. <b>One site I previously counted is already gone:</b> the <code>program</code> section's "Adult classes: Group 2 (older group) only" was deleted by that PR and now survives only in a comment explaining its own removal. Counting it was the exact false reading this project warns about, and it is corrected here rather than quietly dropped.</li>
         <li><b>Read the age as a number.</b> <code>athlete_age</code> arrives as free text; unparseable means the agent asks, never guesses.</li>
       </ul>
 

@@ -72,6 +72,8 @@ export type SlotTemplateMutation = Partial<{
   is_active: boolean;
   location_id: string | null;
   bookable_program_id: string;
+  source_offer_id: string | null;
+  source_offer_class_key: string | null;
 }>;
 
 export type ScheduleSlotInsert = {
