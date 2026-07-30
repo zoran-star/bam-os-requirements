@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · three more PRs ready from member management",
+ "updated": "2026-07-30 · ruled on 1666, closed the loop instead of picking a bad end",
  "recentUpdates": [
+  "Ruled on the held PR. They offered me two options and both left something open forever, so I took a third that closes it",
+  "The real fix was one nullable database column. It was only unavailable because a paused build happened to own it, not because it was hard",
+  "What decided it was not speed. It would have logged a warning on every email we send, forever, and that is how a team learns to ignore warnings",
+  "To be clear: this does NOT restart the receipts build you paused. It adds one column so a finished piece can ship complete",
   "Three more pull requests ready, each built by one agent and attacked by a different one. Testers found real bugs in two of them",
-  "The setup-step bug is fixed in all THREE places it existed, as one change rather than three tickets",
-  "I checked the risky one for the bug shape that killed the enroll funnel. It is not there. They used a mechanism that already exists and is tested",
-  "One question back to them before that one merges, and it is about it sitting unused for weeks, not about the code",
-  "Caught something nasty: the main repo folder had a half-staged DELETION of tonight's build sitting in it. One commit from there would have undone it",
-  "And every safety check we own would have passed it, because deleting a thing and everything that uses it looks perfectly consistent"
+  "The setup-step bug is fixed in all THREE places it existed, as one change rather than three tickets"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",

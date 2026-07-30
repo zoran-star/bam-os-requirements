@@ -858,7 +858,21 @@ The standing rule since that incident is that **"it is inert until someone confi
 
 **#1666 does not rest on that argument.** It uses `CLIENT_COLS_PENDING` plus the peel-off retry, which **already exists on main, is documented in place, and has its own committed suite** (`_pending-client-column.test.mjs`, which injects a synthetic pending column so the machinery stays provable even when the list is empty). **That is a mechanism, not a hope.** Orchestrator-verified: `clients.stripe_portal_url` genuinely does not exist in production, so the pending path is the one that runs.
 
-### ⚠️ OPEN QUESTION ON #1666, AND IT IS ABOUT THE PARK RATHER THAN THE CODE
+### ✅ RULED ON #1666: **NEITHER OPTION. THE BLOCKER WAS ORGANISATIONAL, NOT TECHNICAL.**
+
+**The room answered the question honestly and priced it fairly: the peel-off is PER CALL, not cached.** Every `loadClient` concatenates the pending column, earns a `42703`, warns, and retries without it, at three sites, so **a single send can pay up to two failed round trips** for as long as the column stays pending. It also ruled out the obvious middle path with a real reason: **shipping with the pending list emptied would fail `_email-select-coverage`, and that suite exists because exactly that shipped on 29 Jul.**
+
+**Both options it offered accept an unbounded state: park a column with no end date, or hold a branch with no merge date.** The dilemma only exists because **`stripe_portal_url` is unavailable due to receipts OWNING its migration while receipts is stopped, not because the column is hard.**
+
+**Ruling: split the one column out as its own additive migration, apply it, move `stripe_portal_url` into `CLIENT_COLS`, empty the pending list, then merge.** `alter table public.clients add column if not exists stripe_portal_url text` is nullable, defaultless, backfill-free and inert until the code lands, which is the same class as everything applied tonight and matches this file's own additive-migrations-go-first precedent. **The per-send tax disappears rather than being accepted, and `_email-select-coverage` is satisfied rather than circumvented.**
+
+**⚠️ THE DECIDING COST WAS NOT THE ROUND TRIPS.** One or two extra calls on low double digits a day is nothing. **What was not worth buying indefinitely is a warn line on every single send.** A warning that fires correctly, forever, on a healthy system **is how a team learns to skip warnings, and the next one it hides will be real.** This file is a catalogue of controls that stopped meaning anything; **a log line nobody reads is the cheapest possible version of that, and this one would have been introduced deliberately.**
+
+**⚠️ AND THE BOUNDARY, STATED SO IT IS NOT MISREAD: THIS DOES NOT RESUME RECEIPTS.** Receipts stays stopped, its build stays parked, none of its scope moves. **One nullable column is added so a different, finished PR can ship complete rather than ship-and-wait.** The migration carries a header saying receipts owns the wider work, and `if not exists` so its own migration replaying is a no-op.
+
+### ⚠️ SUPERSEDED, the question as originally put
+
+
 
 **The receipts build is STOPPED by Zoran, and receipts owns the `stripe_portal_url` migration.** So merging #1666 puts a column into `CLIENT_COLS_PENDING` **with no date on which it leaves.** That file's own comment says the list is **"a safety net, not a parking spot"** - and an indefinite park is a parking spot **created by following the rule rather than by breaking it.**
 
