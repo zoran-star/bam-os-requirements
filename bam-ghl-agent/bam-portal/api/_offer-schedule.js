@@ -16,7 +16,21 @@
 //             (int>=0, default 1), recurrence_rule ("WEEKLY:MO,WE"), location_id
 //             (uuid, must belong to client) OR default_location (free text),
 //             bookable_program_id (uuid; endpoint falls back to the client's
-//             first ACTIVE program if omitted), is_active, description.
+//             first ACTIVE program if omitted), is_active, description,
+//             source_offer_id (uuid) + source_offer_class_key (text) - the
+//             lineage back to the class this template came from.
+//
+// WHY THE LINEAGE MATTERS. Until 2026-07-30 the ONLY trace of which class a
+// template belonged to was the class TITLE, interpolated into payload.name. So
+// every consumer had to guess the class back out of a display string, and the
+// guessing only ever agreed for BAM GTA, whose class names were hand-tuned to
+// read "Group 1 (Elementary)". schedule_slots.source_offer_class_key and
+// slot_templates.source_offer_class_key already existed, indexed, and
+// runtime/schedule/generate-slots.ts already copied template -> slot; the value
+// was NULL on all 86 GTA slots because of two breaks in series, and this file
+// was the first of them.
+
+import { classKey, duplicateClassTitles } from "./agent/_class-routing.js";
 
 const DAY_TO_TOKEN = {
   su: "SU", sun: "SU", sunday: "SU",
@@ -116,8 +130,33 @@ export function offerToTemplatePayloads(offer, opts = {}) {
   if (capacity == null) warnings.push('offer has no "Max capacity per session" set - templates will fall back to the endpoint default (10); set capacity on the offer.');
   if (!classes.length) warnings.push("offer has no classes in its Schedule section - nothing to generate.");
 
+  // The offer's own id, carried onto every template as source_offer_id. All
+  // three callers (api/schedule/sync-offer.js, activate-booking.js,
+  // cron-activate-booking.js) load the offer with select=id,title,data, so it is
+  // always present in production. Guarded on the uuid shape anyway: the endpoint
+  // validates it with optionalUuid, and sending a non-uuid would 400 the WHOLE
+  // re-sync rather than just omitting one column.
+  const offerId = offer && offer.id != null ? String(offer.id).trim() : "";
+  const sourceOfferId = UUID_RE.test(offerId) ? offerId : null;
+  if (offerId && !sourceOfferId) {
+    warnings.push(`offer id "${offerId}" is not a uuid - templates will be created without source_offer_id (class routing will not be able to find the offer).`);
+  }
+
+  // Two classes sharing a title have no stable identity between them: the key
+  // that separates them is their POSITION, so reordering the two swaps every
+  // session already generated onto the other class, silently. There is nothing
+  // order-independent to key on (see api/agent/_class-routing.js), so the least
+  // dishonest thing available is to say so the moment it becomes true.
+  for (const dupe of duplicateClassTitles(classes)) {
+    warnings.push(`two or more classes are both called "${dupe}" - their sessions are told apart by the order the classes are listed in, so reordering them will point existing sessions at the wrong class. Give them distinct titles.`);
+  }
+
   classes.forEach((cls, ci) => {
     const title = (cls && (cls.title || cls.name)) || `Class ${ci + 1}`;
+    // Which class this is, in a form a machine can match. Derived from the title
+    // because a block_builder row carries no id; see api/agent/_class-routing.js
+    // for the derivation and for what happens when an owner renames a class.
+    const sourceClassKey = classKey(cls, ci, classes);
     if (String((cls && cls.consistent) || "").toLowerCase() === "no") {
       warnings.push(`"${title}" uses ad-hoc scheduling (not fixed weekly times) - can't auto-generate slots; skipped.`);
       return;
@@ -151,8 +190,10 @@ export function offerToTemplatePayloads(offer, opts = {}) {
         default_credit_cost: creditCost,
         recurrence_rule: recurrence,
         is_active: true,
+        source_offer_class_key: sourceClassKey,
         ...locationFields(row && row.location),
       };
+      if (sourceOfferId) payload.source_offer_id = sourceOfferId;
       if (capacity != null) payload.default_capacity = capacity;
       if (bookableProgramId) payload.bookable_program_id = bookableProgramId;
 
@@ -164,4 +205,4 @@ export function offerToTemplatePayloads(offer, opts = {}) {
 }
 
 // Exposed for tests.
-export const _internals = { normDay, normTime, dayLabel, locationFields };
+export const _internals = { normDay, normTime, dayLabel, locationFields, classKey };

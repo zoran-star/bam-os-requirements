@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Route by actual age</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --card2:#1e222b; --line:#2a2f3a;
+    --ink:#e8eaf0; --dim:#9aa3b2; --gold:#D4B65C;
+    --bad:#e5484d; --good:#3fb950; --warn:#d29922;
+    --r:12px;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f6f7f9; --card:#fff; --card2:#f0f2f5; --line:#dfe3ea;
+           --ink:#12151b; --dim:#5d6675; --gold:#8d7524; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:28px 20px 60px;background:var(--bg);color:var(--ink);
+       font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:-.02em}
+  .sub{color:var(--dim);font-size:15px;margin:0 0 26px}
+  h2{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);
+     margin:34px 0 12px;font-weight:700}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+  .lede{font-size:18px;line-height:1.5}
+  .lede b{color:var(--gold)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){ .grid2{grid-template-columns:1fr} }
+  .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;
+       text-transform:uppercase;padding:3px 9px;border-radius:999px;margin-bottom:10px}
+  .t-now{background:rgba(229,72,77,.15);color:var(--bad);border:1px solid rgba(229,72,77,.35)}
+  .t-new{background:rgba(63,185,80,.15);color:var(--good);border:1px solid rgba(63,185,80,.35)}
+  .step{display:flex;gap:10px;align-items:flex-start;margin:0 0 9px}
+  .n{flex:0 0 22px;height:22px;border-radius:999px;background:var(--card2);
+     border:1px solid var(--line);font-size:11px;font-weight:700;color:var(--dim);
+     display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .step p{margin:0;font-size:14.5px}
+  .step .why{color:var(--dim);font-size:13px;display:block;margin-top:2px}
+  .kill{color:var(--bad);font-weight:600}
+  .win{color:var(--good);font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:4px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);font-weight:700}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  code{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--card2);
+       padding:1px 6px;border-radius:5px;color:var(--ink)}
+  .rule{display:flex;gap:12px;align-items:center;background:var(--card2);
+        border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:9px}
+  .rule .cnt{flex:0 0 auto;font-size:19px;font-weight:800;color:var(--gold);
+             font-variant-numeric:tabular-nums;min-width:26px;text-align:center}
+  .rule .txt{font-size:14.5px}
+  .rule .txt b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);font-weight:700}
+  .banner{border-left:3px solid var(--gold);background:var(--card2);
+          border-radius:0 10px 10px 0;padding:14px 16px;margin:0 0 12px}
+  .banner.b-bad{border-left-color:var(--bad)}
+  .banner.b-ok{border-left-color:var(--good)}
+  .banner p{margin:0;font-size:14.5px}
+  .banner .h{font-weight:700;display:block;margin-bottom:3px}
+  .ask{background:var(--card2);border:1px dashed var(--line);border-radius:10px;padding:14px 16px}
+  .fld{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}
+  .fld span{font-size:13px;color:var(--dim);min-width:52px}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:7px;
+       padding:6px 11px;font-size:14px;font-variant-numeric:tabular-nums}
+  .box.old{color:var(--dim);text-decoration:line-through}
+  .box.new{border-color:var(--gold);color:var(--gold);font-weight:600}
+  details{margin-top:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:0}
+  summary{cursor:pointer;padding:13px 18px;font-size:13px;font-weight:700;
+          letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  details[open] summary{border-bottom:1px solid var(--line)}
+  .dbody{padding:16px 18px}
+  .dbody h3{font-size:14px;margin:16px 0 7px}
+  .dbody h3:first-child{margin-top:0}
+  .dbody ul{margin:0 0 4px;padding-left:19px;font-size:14px}
+  .dbody li{margin-bottom:5px}
+  .foot{color:var(--dim);font-size:12.5px;margin-top:30px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Put kids in the right class, by their actual age</h1>
+  <p class="sub">Gate 1 &middot; automation templating &middot; 30 July 2026</p>
+
+  <div class="card lede">
+    <p style="margin:0">Right now the sales agent works out which class a kid belongs in by <b>reading the name of the calendar</b> and looking for the words "Group 1" or "Group 2". That only works for BAM GTA, because GTA is the academy that named its classes that way. Every other academy gets nothing: <b>San Jose's agent cannot offer a single trial time</b>, and if a time reaches it another way it books whatever class it finds first. The fix is to stop reading names and <b>start using the child's age as a number</b>, against an age range the owner sets on each class.</p>
+  </div>
+
+  <h2>What breaks, and exactly when</h2>
+  <div class="banner b-ok">
+    <p><span class="h">This is not on fire today, and I am not going to tell you it is.</span>
+    <b>San Jose has zero sessions in the system right now</b>, for a duller reason already on your launch list: sessions cannot be generated until Stripe is connected. So its agent offers no times today regardless of any of this.</p>
+  </div>
+  <div class="banner b-bad">
+    <p><span class="h">It breaks the day San Jose's schedule is switched on, which is on the launch path.</span>
+    I ran the three real decision lines against San Jose's real classes (Beginner Tue 5-6pm, Elementary Tue 6-7pm, Pre-Season Wed + Fri 7-8pm). The moment those sessions exist:</p>
+  </div>
+  <table>
+    <tr><th>Academy</th><th>Times the agent offers a parent</th><th>What happens on a booking</th></tr>
+    <tr>
+      <td><b>BAM GTA</b></td>
+      <td class="win">works</td>
+      <td class="win">right class</td>
+    </tr>
+    <tr>
+      <td><b>San Jose</b>, once switched on</td>
+      <td class="kill">zero. The parent is shown nothing at all</td>
+      <td class="kill">books the first class in the list, whoever the child is</td>
+    </tr>
+  </table>
+  <div class="banner" style="margin-top:14px">
+    <p><span class="h">And GTA only works by coincidence.</span>
+    Its two sessions happen to be named <code>Group 1 (Elementary)</code> and <code>Group 2 (High School)</code>, which is the exact text the matching looks for. <b>It is not configured correctly, it is named correctly.</b> All 86 of its sessions are missing the field that would say which class they belong to.</p>
+  </div>
+  <div class="banner" style="margin-top:12px">
+    <p><span class="h">The same mistake, failing two opposite ways.</span>
+    Showing times fails <b>shut</b> (nothing appears). Booking fails <b>open</b> (it books anyway). That is why nobody has noticed: the half that goes wrong quietly is the half that writes to the database.</p>
+  </div>
+
+  <h2>The part I want you to look at hardest</h2>
+  <div class="banner b-bad">
+    <p><span class="h">A 9-year-old beginner in San Jose can be put in the Elementary class, and every single step behaves correctly.</span>
+    Beginner runs 5pm, Elementary runs 6pm. Nothing anywhere filters the times a parent is <em>offered</em> by the child's age, so 6pm is on the list. The parent picks it. The system books Elementary, accurately, at 6pm, exactly as asked. <b>Nothing is broken and the child is in the wrong class.</b></p>
+  </div>
+  <div class="banner b-ok">
+    <p><span class="h">Which means fixing the booking step alone would fix nothing.</span>
+    The age has to decide <em>which times get shown</em>, not just which class gets written at the end. I am flagging this because the shorter version of this build looks finished and is not.</p>
+  </div>
+
+  <h2>Before and after</h2>
+  <div class="grid2">
+    <div class="card">
+      <span class="tag t-now">How it works now</span>
+      <div class="step"><div class="n">1</div><p>Parent says their child is 9<span class="why">stored as free text, so "9", "nine" and "9 turning 10" are all possible</span></p></div>
+      <div class="step"><div class="n">2</div><p>Agent picks <b>"Group 1"</b> or <b>"Group 2"</b><span class="why">GTA's bands, 9 to 13 and 14 up, are repeated in four places, and four more places assume GTA's class naming</span></p></div>
+      <div class="step"><div class="n">3</div><p>System looks for those exact words in the calendar name<span class="why kill">San Jose's classes are called Beginner and Elementary, so nothing matches</span></p></div>
+      <div class="step"><div class="n">4</div><p class="kill">No times shown &middot; or the first class booked</p></div>
+    </div>
+    <div class="card">
+      <span class="tag t-new">How it would work</span>
+      <div class="step"><div class="n">1</div><p>Parent says their child is 9<span class="why">read as the number 9, and if it cannot be read the agent asks</span></p></div>
+      <div class="step"><div class="n">2</div><p>System checks the age against <b>every class's own age range</b><span class="why">Beginner 8 to 11, Elementary 11 to 14, Pre-Season 12 to 18</span></p></div>
+      <div class="step"><div class="n">3</div><p>Only the classes that fit are offered<span class="why win">a 9-year-old is shown Beginner's times, never Elementary's</span></p></div>
+      <div class="step"><div class="n">4</div><p class="win">Right class, by their real age</p></div>
+    </div>
+  </div>
+
+  <h2>The clearest picture of the whole problem</h2>
+  <div class="banner b-bad">
+    <p><span class="h">Your staff "who is coming today" panel shows each kid's age group. For San Jose it would show the day of the week.</span>
+    It works out the age group by reading whatever is in brackets in the class name. Somebody once renamed GTA's classes by hand so that the brackets hold the age group. But when the system generates classes by itself, which is what every new academy gets, <b>it puts the days in the brackets</b>.</p>
+  </div>
+  <table>
+    <tr><th>Class name</th><th>Age group your staff sees</th></tr>
+    <tr><td><code>Group 1 (Elementary)</code> &nbsp;<span style="color:var(--dim);font-size:12px">GTA, renamed by hand</span></td><td class="win">Elementary</td></tr>
+    <tr><td><code>Free Trial - Beginner (Tue)</code></td><td class="kill">Tue</td></tr>
+    <tr><td><code>Free Trial - Elementary (Tue)</code></td><td class="kill">Tue</td></tr>
+    <tr><td><code>Free Trial - Pre-Season Academy (Wed, Fri)</code></td><td class="kill">Wed, Fri</td></tr>
+  </table>
+  <div class="banner" style="margin-top:14px">
+    <p><span class="h">This is the whole build in one table.</span>
+    Nothing here is a typo or a bad regex. The class never carries <em>which class it is</em>, so seven different places each guess it from a piece of text, and they only agree for the one academy whose text was hand-tuned to make them agree. <b>That is why a smarter guesser cannot fix it and the class has to be carried properly.</b></p>
+  </div>
+
+  <h2>When it is not a clean match, your rule</h2>
+  <div class="rule"><div class="cnt">1</div><div class="txt"><b>One class fits</b>Book it. No question asked.</div></div>
+  <div class="rule"><div class="cnt">0</div><div class="txt"><b>No class fits</b>They are not qualified. The agent says so instead of booking them into something.</div></div>
+  <div class="rule"><div class="cnt">2+</div><div class="txt"><b>More than one fits</b>The agent asks <b>one</b> question and then books. San Jose really has this: a 9-year-old beginner fits two classes, because skill level is never asked on the form.</div></div>
+
+  <h2>The one new thing an owner types</h2>
+  <div class="ask">
+    <p style="margin:0 0 4px;font-size:14.5px">Each class already asks for an age. Today it is a free text box, so owners type <code>U10</code> or <code>Grades 5-8</code>. <b>A computer cannot route on that</b>, and a grade means different ages in Ontario than in California, so we cannot safely convert it for them.</p>
+    <div class="fld"><span>Today</span><div class="box old">Age: Grades 5-8</div></div>
+    <div class="fld"><span>Instead</span><div class="box new">Ages 11</div><span style="min-width:0">to</span><div class="box new">14</div></div>
+    <p style="margin:10px 0 0;font-size:13.5px;color:var(--dim)">Two numbers, once per class, while they are already filling in the schedule. Existing academies keep working until their owner sets them, and we show them what to fix.</p>
+  </div>
+
+  <h2>What a BAM GTA parent sees change</h2>
+  <div class="banner">
+    <p><span class="h">One thing, and it is the change you already approved.</span>
+    A GTA parent is currently shown <code>Training - Group 1 (Mon, Tue, Wed, Thu)</code>. "Group 1" is our internal filing label that leaked out to customers. They would see the real class name instead. <b>Nothing else about GTA changes</b>, and that is enforced by a test that fails if it does.</p>
+  </div>
+
+  <h2>How you will know it is really finished</h2>
+  <div class="banner b-ok">
+    <p><span class="h">There is already a machine that answers this, so it is not my opinion.</span>
+    A check runs over every shared default hunting for one academy's details leaking into everybody's. It currently prints one known exception it is knowingly letting through: <b>GTA's age bands</b>. <b>Done means that check reports zero deferred entries, with none of the seven copies parked on the exception list to buy a green result.</b> It cannot be gamed, because the exception list prints on every run, including a passing one.</p>
+  </div>
+
+  <details>
+    <summary>The build underneath &middot; open only if you want it</summary>
+    <div class="dbody">
+      <h3>What actually changes</h3>
+      <ul>
+        <li><b>One resolver</b>, <code>api/agent/_class-routing.js</code>, answers "which classes fit this age" and is the only thing allowed to answer it. Used by the agent, the free-trial website page, and DETAIL Miami's endpoint.</li>
+        <li><b>Two numbers per class</b> (<code>age_min</code>, <code>age_max</code>) added to the offer's Schedule section in <code>client-portal.html</code>, alongside the existing free-text <code>age</code> which stays for display.</li>
+        <li><b>Carry the class onto the slot.</b> <code>schedule_slots.source_offer_class_key</code> already exists and is indexed, and <code>generate-slots.ts:199</code> already copies it template to slot. It is NULL everywhere because of <b>two</b> breaks in series, not one: <code>_offer-schedule.js</code> never puts it in the payload, and <code>templates.ts:93-147</code> would not read it if it did. Both ends need fixing or the pipe stays dry.</li>
+        <li><b>Delete the name matching.</b> <code>groupOf()</code> and both call sites in <code>booking.js:142</code> and <code>:223</code>, plus the identical copies in <code>leads.js:580</code> and <code>miami-book.js:165</code>.</li>
+        <li><b>Remove the four places that repeat GTA's age numbers</b>: <code>prompt-structure.js:628</code> (the <code>booking_group</code> body) and the three tool schemas at <code>agent-approvals.js:133</code>, <code>:135</code>, <code>:151</code>.</li>
+        <li><b>Remove the four places that depend on GTA's class NAMING</b>, which carry no numbers and are the reason a smarter parser cannot help: <code>booking.js:102-106</code> <code>groupOf()</code> plus its two call sites at <code>:143</code> and <code>:222</code>, <code>calendars-v15.js:184</code> <code>groupFromSlot()</code>, and the inline <code>/group\s*\d+/i</code> at <code>leads.js:580</code> and <code>miami-book.js:168</code>.</li>
+        <li><b>Line numbers re-derived against this branch after PR #1656 merged</b>, which moved most of them. <b>One site I previously counted is already gone:</b> the <code>program</code> section's "Adult classes: Group 2 (older group) only" was deleted by that PR and now survives only in a comment explaining its own removal. Counting it was the exact false reading this project warns about, and it is corrected here rather than quietly dropped.</li>
+        <li><b>Read the age as a number.</b> <code>athlete_age</code> arrives as free text; unparseable means the agent asks, never guesses.</li>
+      </ul>
+
+      <h3>What must NOT change</h3>
+      <ul>
+        <li>GTA's rendered messages, byte for byte, except the class name replacing "Group 1". Locked by <code>_gta-message-lock</code> and <code>_gta-step-lock</code>.</li>
+        <li><code>{{appointment.entry_note}}</code> and the venue resolution chain. Two suites depend on it and its fixture was corrected today.</li>
+        <li>No per-academy branch anywhere. Age ranges are runtime facts on the class.</li>
+      </ul>
+
+      <h3>How a tester proves it</h3>
+      <ul>
+        <li>A committed suite on plain <code>node</code>, no network, no database, with a negative control that must print <code>NEGATIVE CONTROL PASSED</code>.</li>
+        <li>Cases: age 9 with San Jose's three classes returns Beginner only; age 30 returns nothing and marks unqualified; a 9-year-old of unknown skill returns two and triggers exactly one question; GTA's two classes still route 9-13 and 14+ identically to today.</li>
+        <li>The finish condition above: the shared-default identity gate prints zero deferred entries.</li>
+      </ul>
+
+      <h3>Said plainly, what I have not verified</h3>
+      <ul>
+        <li>The San Jose numbers come from replicating the three decision lines verbatim in a harness, because the real module cannot run without a database. Line-for-line faithful, but a replication.</li>
+        <li><b>Corrected after production was queried.</b> I first wrote this up as San Jose's agent being broken today. It is not: San Jose has <b>zero sessions and zero calendar entry points</b>, so its agent offers nothing for reasons already on the launch list. This defect is real but currently masked, and goes live when the schedule is generated. Confirmed in the same query: <code>source_offer_class_key</code> is NULL on all 86 GTA sessions.</li>
+        <li>Age ranges above are illustrative. <b>Lij has to supply the real ones.</b></li>
+        <li>I have not yet checked whether any academy other than GTA and San Jose would be disrupted by removing the name matching.</li>
+        <li><b>You once ruled the other way on a neighbouring question, and you should know that before approving.</b> On program pages you said of the same Group 1 / Group 2 mismatch: "the fix is a naming convention at onboarding, not code." That was about which marketing pages exist, not about booking. Your four decisions of 30 July are later and specific to booking, so I have followed them. But if you meant the naming-convention answer to cover this too, say so and this plan is wrong rather than incomplete.</li>
+      </ul>
+    </div>
+  </details>
+
+  <p class="foot">Zoran's four decisions of 30 July are taken as locked: route on real age as numbers, remove Group 1 and Group 2 entirely, show parents real class names, one shared resolver across all three booking paths.</p>
+
+</div>
+</body>
+</html>

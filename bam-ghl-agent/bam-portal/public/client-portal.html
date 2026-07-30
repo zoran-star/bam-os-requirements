@@ -31729,13 +31729,41 @@ const _bbOfferConfigs = {
     { id:'schedule', label:'Schedule', fields:[
       { key:'classes', type:'block_builder', label:'Classes', addLabel:'class', required:true,
         collapsible:true,
-        summaryKeys:['title','age','skill_level','gender'],
+        summaryKeys:['title','age','age_min','age_max','skill_level','gender'],
         hint:'Segment your schedule by class. Each class is defined by age, skill level, gender, plus its own weekly times.',
         subFields:[
           { key:'title', type:'text', label:'Title', required:true,
             hint:'e.g. "U10 Boys Beginner" or "Skills A"' },
           { key:'age', type:'text', label:'Age', required:true,
             hint:'e.g. "U10" or "Grades 5-8"' },
+          // The numbers the booking resolver routes on. The free-text `age`
+          // above stays because it is what parent-facing copy shows; these are
+          // for the machine, which cannot route on "Grades 5-8" - and a grade
+          // means different ages in Ontario than in California, so we must not
+          // convert it on the owner's behalf.
+          //
+          // THREE fields rather than two, deliberately. With a bare `age_max`,
+          // an empty box means both "no upper limit" and "not filled in yet",
+          // so an owner who tabs past it ships a beginners class that accepts a
+          // 40 year old and the screen looks identical to a correct one. The
+          // owner says whether there IS an oldest age before typing one.
+          //
+          // `dep` HIDES a field without clearing it, so an owner who types 18
+          // and then switches to "No upper limit" leaves 18 stranded in the row.
+          // classAgeRange() in api/agent/_class-routing.js treats the mode as
+          // the authority and ignores the stranded number (MUTATE=strandedmax).
+          //
+          // NOT `required`: _bbValidateOfferRequired hard-blocks the "done with
+          // Offers" gate, which would strand every existing academy mid-schedule
+          // until three new fields per class were filled. Mandatory-ness belongs
+          // on the arming gate, where it fires when the numbers start mattering.
+          { key:'age_min', type:'number', label:'Youngest age',
+            hint:'Inclusive. 8 means an 8 year old fits this class.' },
+          { key:'age_max_mode', type:'check_one', label:'Is there an oldest age?',
+            options:['Set an oldest age','No upper limit'] },
+          { key:'age_max', type:'number', label:'Oldest age',
+            dep:{ key:'age_max_mode', equals:'Set an oldest age' },
+            hint:'Inclusive. 11 means an 11 year old still fits this class.' },
           { key:'skill_level', type:'check_one', label:'Skill level',
             options:['Beginner','Intermediate','Advanced','All'] },
           { key:'gender', type:'check_many', label:'Gender',

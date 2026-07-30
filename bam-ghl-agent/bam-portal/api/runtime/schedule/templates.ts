@@ -108,6 +108,12 @@ async function validatedCreateMutation(body: Record<string, unknown>): Promise<S
   const locationId = optionalUuid(body.location_id, "location_id", errors);
   const bookableProgramId = optionalUuid(body.bookable_program_id, "bookable_program_id", errors);
   const isActive = parseOptionalBoolean(body.is_active, "is_active", errors);
+  // Lineage back to the offer class this template came from. Without these two
+  // the only record of which class a slot is is its display name, which is why
+  // every consumer ended up pattern-matching text. api/_offer-schedule.js emits
+  // them; generate-slots.ts already copies them template -> slot.
+  const sourceOfferId = optionalUuid(body.source_offer_id, "source_offer_id", errors);
+  const sourceOfferClassKey = optionalNullableString(body.source_offer_class_key, "source_offer_class_key", errors);
 
   assertTimeOrder(defaultStartTime, defaultEndTime, errors);
   validateLengths({
@@ -115,6 +121,7 @@ async function validatedCreateMutation(body: Record<string, unknown>): Promise<S
     slot_type: slotType,
     default_location: defaultLocation,
     recurrence_rule: recurrenceRule,
+    source_offer_class_key: sourceOfferClassKey,
   }, errors);
 
   if (Object.keys(errors).length > 0) throw new FieldValidationError(errors);
@@ -143,6 +150,8 @@ async function validatedCreateMutation(body: Record<string, unknown>): Promise<S
   if (recurrenceEndDate !== undefined) values.recurrence_end_date = recurrenceEndDate;
   if (locationId !== undefined) values.location_id = locationId;
   if (isActive !== undefined) values.is_active = isActive;
+  if (sourceOfferId !== undefined) values.source_offer_id = sourceOfferId;
+  if (sourceOfferClassKey !== undefined) values.source_offer_class_key = sourceOfferClassKey;
 
   return values;
 }
@@ -153,6 +162,7 @@ function validateLengths(
     slot_type?: string;
     default_location?: string | null;
     recurrence_rule?: string | null;
+    source_offer_class_key?: string | null;
   },
   errors: FieldErrors,
 ): void {
@@ -163,6 +173,9 @@ function validateLengths(
   }
   if (values.recurrence_rule && values.recurrence_rule.length > 500) {
     errors.recurrence_rule = "must be 500 characters or fewer";
+  }
+  if (values.source_offer_class_key && values.source_offer_class_key.length > 120) {
+    errors.source_offer_class_key = "must be 120 characters or fewer";
   }
 }
 

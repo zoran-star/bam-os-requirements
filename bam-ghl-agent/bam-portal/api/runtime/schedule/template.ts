@@ -138,6 +138,18 @@ async function validatedPatchMutation(
     ? requiredUuid(body.bookable_program_id, "bookable_program_id", errors)
     : undefined;
   const isActive = has("is_active") ? parseOptionalBoolean(body.is_active, "is_active", errors) : undefined;
+  // Same offer-class lineage the CREATE path accepts. It is needed here too and
+  // not only for symmetry: api/schedule/sync-offer.js dedupes templates on
+  // `recurrence|start|end` and SKIPS any that already exists, so a template
+  // created before 2026-07-30 can never gain its key through a re-sync. Every
+  // BAM GTA template is in exactly that state. A heal pass has to PATCH them,
+  // and without this it would have had to write to the table directly.
+  const sourceOfferId = has("source_offer_id")
+    ? optionalUuid(body.source_offer_id, "source_offer_id", errors)
+    : undefined;
+  const sourceOfferClassKey = has("source_offer_class_key")
+    ? optionalNullableString(body.source_offer_class_key, "source_offer_class_key", errors)
+    : undefined;
 
   assertTimeOrder(
     defaultStartTime ?? existing.default_start_time,
@@ -149,6 +161,7 @@ async function validatedPatchMutation(
     slot_type: slotType,
     default_location: defaultLocation,
     recurrence_rule: recurrenceRule,
+    source_offer_class_key: sourceOfferClassKey,
   }, errors);
 
   if (Object.keys(errors).length > 0) throw new FieldValidationError(errors);
@@ -178,6 +191,8 @@ async function validatedPatchMutation(
   if (recurrenceEndDate !== undefined) values.recurrence_end_date = recurrenceEndDate;
   if (locationId !== undefined) values.location_id = locationId;
   if (isActive !== undefined) values.is_active = isActive;
+  if (sourceOfferId !== undefined) values.source_offer_id = sourceOfferId;
+  if (sourceOfferClassKey !== undefined) values.source_offer_class_key = sourceOfferClassKey;
 
   return values;
 }
@@ -211,6 +226,7 @@ function validateLengths(
     slot_type?: string;
     default_location?: string | null;
     recurrence_rule?: string | null;
+    source_offer_class_key?: string | null;
   },
   errors: FieldErrors,
 ): void {
@@ -221,6 +237,9 @@ function validateLengths(
   }
   if (values.recurrence_rule && values.recurrence_rule.length > 500) {
     errors.recurrence_rule = "must be 500 characters or fewer";
+  }
+  if (values.source_offer_class_key && values.source_offer_class_key.length > 120) {
+    errors.source_offer_class_key = "must be 120 characters or fewer";
   }
 }
 
