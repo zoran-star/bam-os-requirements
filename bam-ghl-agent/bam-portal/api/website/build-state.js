@@ -25,7 +25,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 //   POST /api/website/build-state  { client_id, action:'set', build_status, staging_url? }
 //   POST /api/website/build-state  { client_id, action:'sign', key:'brand_ok'|'site_accepted', ok:true|false }
 //   POST /api/website/build-state  { client_id, action:'chunk', chunk:'deck'|..., status:'building'|'published' }
-//        staff marks a build chunk; publishing the deck unlocks core+templates
+//        staff marks a build chunk; publishing the deck unlocks core; templates/sales/onboarding also need their inputs (see setup-status.js chunk table)
 //        (their 'ready' fires on the next setup-status evaluation + Slack ping).
 //   POST /api/website/build-state  { client_id, action:'owner-sign', key:'brand_ok'|'site_accepted' }
 //        the OWNER path (client-portal onboarding flow) - stamps by:'owner'.
