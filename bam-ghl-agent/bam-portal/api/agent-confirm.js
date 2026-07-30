@@ -83,10 +83,44 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// public_name / community_group_* / google_review_url feed clientVars(), so the
+// confirm agent's location tokens render the academy's parent-facing identity.
+//
+// Naming a column PostgREST does not have 400s the WHOLE select, so a column joins
+// this list AFTER its migration is live, never in the same commit. See the same rule
+// spelled out in full at loadClient() in api/automations.js.
+const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email", "address",
+  "website_setup", "community_group_url", "community_group_platform", "google_review_url",
+  "ghl_location_id", "ghl_access_token", "ghl_refresh_token", "ghl_token_expires_at",
+  "ghl_kpi_config", "booking_provider", "time_zone"];
+
+// ⚠️ THE ONE EXCEPTION: asked for optimistically, and DROPPED on the single error that
+// means "its migration is not applied yet". The row then comes back without the key,
+// which is the state every consumer already handles. Full reasoning, and the rule for
+// when a column may sit here, at CLIENT_COLS_PENDING in api/automations.js.
+//   business_email - migration 20260729T210000_clients_business_email.sql
+const CLIENT_COLS_PENDING = ["business_email"];
+
+// Only an undefined-column error (PostgREST 42703) that NAMES a pending column earns
+// the retry. A transient 5xx must stay a throw, never a quietly degraded row.
+function pendingColsBlamedBy(err) {
+  const msg = String((err && err.message) || err || "");
+  if (!/42703|does not exist/i.test(msg)) return [];
+  return CLIENT_COLS_PENDING.filter((c) => msg.includes(c));
+}
+
 async function loadClient(clientId) {
-  // public_name / community_group_* / google_review_url feed clientVars(), so the
-  // confirm agent's location tokens render the academy's parent-facing identity.
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,public_name,owner_name,email,address,website_setup,community_group_url,community_group_platform,google_review_url,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config,booking_provider,time_zone&limit=1`);
+  const cols = CLIENT_COLS.concat(CLIENT_COLS_PENDING);
+  const read = (list) => sb(`clients?id=eq.${clientId}&select=${list.join(",")}&limit=1`);
+  let rows;
+  try {
+    rows = await read(cols);
+  } catch (e) {
+    const blamed = pendingColsBlamedBy(e);
+    if (!blamed.length) throw e;
+    console.warn(`[agent-confirm] loadClient: ${blamed.join(", ")} not in the schema yet (migration pending) - re-reading without ${blamed.length > 1 ? "them" : "it"}`);
+    rows = await read(cols.filter((c) => !CLIENT_COLS_PENDING.includes(c)));   // ALL of them, not just `blamed` - Postgres names only the first
+  }
   return Array.isArray(rows) && rows[0];
 }
 

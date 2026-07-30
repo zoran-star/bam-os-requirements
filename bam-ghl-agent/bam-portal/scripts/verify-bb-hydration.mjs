@@ -30,16 +30,16 @@
  * so the in-flight window can be opened and closed on demand. The fake query
  * builder is a LAZY THENABLE, like PostgREST's: every .then() fires a fresh
  * request. Saves are applied to the stored row by applyRpc(), transcribed from
- * supabase/migrations/20260729T210000_clients_business_email.sql (the CURRENT full
- * whitelist - it supersedes 20260725033015 and 20260727140000) - so if that
- * function's SQL changes, update applyRpc to match or these tests are checking the
- * wrong contract.
+ * supabase/migrations/20260729T230000_clients_tagline_instagram.sql (the CURRENT full
+ * whitelist - a superset of 20260729T210000, which supersedes 20260725033015 and
+ * 20260727140000) - so if that function's SQL changes, update applyRpc to match or
+ * these tests are checking the wrong contract.
  *
  * NEGATIVE CONTROL - the part that proves the suite has teeth
- * MUTATE=b1..b7 reverts one fix in the extracted source before running, so you can
+ * MUTATE=b1..b9 reverts one fix in the extracted source before running, so you can
  * confirm the suite FAILS without it rather than trusting that it passes with it.
- * Every one is a real regression, four caught in review and three from the
- * business/owner email split:
+ * Every one is a real regression: four caught in review, three from the business/owner
+ * email split, two from the email footer pair:
  *   b1  the loader assigning unconditionally, so a stale response resets a
  *       value a save had just established  -> section H1 goes red
  *   b2  storing the lazy builder instead of a settled promise, so "dedup"
@@ -57,8 +57,15 @@
  *   b7  the rating patch allowed to send half a pair, which the pair constraint
  *       rejects - aborting the whole UPDATE and losing whatever else was in it
  *                                          -> section K goes red
- * Expected: unmutated ALL PASS; b1 -> 5 failures, b2 -> 1, b3 -> 2, b4 -> 2,
- * b5 -> 5, b6 -> 4, b7 -> 1.
+ *   b8  tagline left out of the blank-guard list, so a save before the load NULLs the
+ *       academy's email-footer tagline     -> section O goes red
+ *   b9  the same for instagram_url, which removes the footer Instagram link
+ *                                          -> section O goes red
+ * b8 and b9 are the QUIET pair: unlike b5 nothing holds and nobody is told, the emails
+ * just go out two footer elements shorter. Each control drops one name and leaves the
+ * other, so neither can pass on the other's assertions.
+ * Measured 2026-07-29, unmutated ALL PASS; b1 -> 5 failures, b2 -> 1, b3 -> 2,
+ * b4 -> 2, b5 -> 5, b6 -> 4, b7 -> 1, b8 -> 4, b9 -> 4.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -107,6 +114,11 @@ const STORED = {
   // does not degrade the email, it HOLDS every send the academy makes.
   business_email: 'info@northside.example',
   email_domain: 'northside.example',
+  // The two facts that finish the black footer of every automation email. Blanked over,
+  // the emails keep sending and just come out shorter - which is why they are here:
+  // section O proves a save cannot do that before they have loaded.
+  tagline: 'Youth basketball training on the north side.',
+  instagram_url: 'https://instagram.com/northsidehoops',
   google_rating: '4.9',
   google_review_count: 67,
   google_rating_checked_at: '2026-07-29T18:38:11.990Z',
@@ -124,8 +136,10 @@ const STORED = {
 const COALESCE_COLS = ['business_name', 'owner_name', 'email'];                              // '' ignored
 // '' -> NULL. business_email joined this list in 20260729T210000: a blank CLEARS it,
 // which is a real choice ("we have no public address yet") and is why a blank written
-// before the load lands is so expensive - it holds every automation email.
-const NULLIF_COLS = ['legal_name', 'address', 'phone', 'entity_type', 'ein', 'time_zone', 'business_email'];
+// before the load lands is so expensive - it holds every automation email. tagline and
+// instagram_url joined in 20260729T230000, same CLEARS-on-blank rule.
+const NULLIF_COLS = ['legal_name', 'address', 'phone', 'entity_type', 'ein', 'time_zone',
+  'business_email', 'tagline', 'instagram_url'];
 const JSONB_COLS = ['brand_data', 'kpi_data'];                                               // replaced wholesale
 function applyRpc(row, patch) {
   for (const k of COALESCE_COLS) if (k in patch && patch[k] !== '' && patch[k] != null) row[k] = patch[k];
@@ -230,9 +244,21 @@ const MUT = {
   b3: [/patch = _bbDropUnloadedBlobs\(patch \|\| \{\}\);/, 'patch = (patch || {});'],
   b4: [/row\[k\] = patch\[k\] === '' \? null : patch\[k\];/,
        'row[k] = _BB_WHOLESALE_COLS.includes(k) ? { ...(row[k] || {}), ...patch[k] } : (patch[k] === \'\' ? null : patch[k]);'],
-  b5: [/'public_name', 'business_email'\]\)\);/, "'public_name']));"],
+  // Re-pointed when tagline + instagram_url joined the guard list: the array no longer
+  // ENDS at business_email, so the old `...'business_email']));` anchor matched nothing.
+  // The script fails loudly on a moved target rather than silently reverting nothing,
+  // which is how this was caught.
+  b5: [/'public_name', 'business_email',/, "'public_name',"],
   b6: [/if \(\(missing \|\| \[\]\)\.length > 1\) \{/, 'if (false) {'],
   b7: [/if \(!isFinite\(count\) \|\| count < 0 \|\| String\(count\) !== cv\) return null;/, 'if (count < 0) return null;'],
+  // The footer pair, one control each. Both target the same line and drop the OTHER
+  // name, so each control leaves exactly one column unguarded - a single control
+  // dropping both could pass on either one's assertions and hide the other.
+  // The `));` is load-bearing: the identical pair of names also ends _BB_GEN_COLS, and a
+  // non-global replace takes the FIRST match, which is that list. Anchoring on the call
+  // close keeps these pointed at the GUARD list.
+  b8: [/'tagline', 'instagram_url'\]\)\);/, "'instagram_url']));"],
+  b9: [/'tagline', 'instagram_url'\]\)\);/, "'tagline']));"],
 };
 let srcFinal = src;
 if (process.env.MUTATE) {
@@ -296,7 +322,8 @@ const flush = async () => {
 let fails = 0;
 const check = (ok, msg) => { if (!ok) fails++; console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${msg}`); };
 
-const GEN = ['business_name', 'legal_name', 'address', 'ein', 'business_email'];
+const GEN = ['business_name', 'legal_name', 'address', 'ein', 'business_email',
+  'tagline', 'instagram_url'];
 
 console.log('card-scoped columns present in CLIENT_SELECT_COLS?',
   /legal_name|\bein\b|,\s*address/.test(SELECT_COLS) ? 'YES (wrong)' : 'no (correct)');
@@ -657,6 +684,59 @@ const pN = rpcCalls[0]?.p_patch || {};
 check(!(PENDING_COL in pN), 'so a save still refuses to write it');
 check(pN.legal_name === STORED.legal_name, 'while the columns that DID load save normally');
 g._sb.from = realFrom2;
+
+// ── O. the email footer pair: tagline + instagram_url ──
+// The same hydrate-then-save contract as business_email, and it is here because the
+// FAILURE MODE IS QUIETER, not louder. A blanked business_email HOLDS every automation
+// email and texts the owner. A blanked tagline or Instagram link changes nothing an
+// owner would notice: the emails keep going out, two elements shorter, and the only
+// signal is a footer nobody is looking at. Silent damage needs the guard MORE, not
+// less, so both columns are in _BB_GEN_COLS and in the blank-guard list, and this
+// section is what says so. MUTATE=b8 / MUTATE=b9 drop one each from that list.
+console.log('\n── O. email footer tagline + Instagram ──');
+HYDRATION_OPEN = false; pending = [];
+bootRow();
+const panelO = { innerHTML: '' };
+api._bbRenderGeneralCard(panelO, { label: 'Business basics', desc: '' });
+DOM = domFromHtml(panelO.innerHTML, GEN.map(f => 'bb-gen-' + f));
+DOM['bb-gen-business_email-note'] = { textContent: '' };
+DOM['bb-gen-google-note'] = { textContent: '' };
+DOM['bb-gen-google_rating'] = inputEl(''); DOM['bb-gen-google_review_count'] = inputEl('');
+DOM['bb-gen-tax_label'] = inputEl(''); DOM['bb-gen-tax_pct'] = inputEl('');
+// The card has to actually SHOW them, or there is nothing for an owner to fix and the
+// columns are write-only. Asserted off the rendered markup, not off a hand-built DOM.
+check(/id="bb-gen-tagline"/.test(panelO.innerHTML), 'the card renders a tagline input');
+check(/id="bb-gen-instagram_url"/.test(panelO.innerHTML), 'the card renders an Instagram input');
+check(api._BB_GEN_COLS.includes('tagline') && api._BB_GEN_COLS.includes('instagram_url'),
+  'and both are in the card-scoped load, so they hydrate at all');
+const hydO = api._bbGenHydrate();                       // in flight, held
+rpcCalls = [];
+DOM['bb-gen-business_name'].value = 'Northside Hoops Academy!';   // owner types elsewhere
+api._bbGenChanged();
+const pO = rpcCalls[0]?.p_patch || {};
+console.log('  patch:', JSON.stringify(pO));
+check(!('tagline' in pO), 'unhydrated tagline NOT written');
+check(!('instagram_url' in pO), 'unhydrated instagram_url NOT written');
+const afterO = applyRpc({ ...STORED }, pO);
+check(afterO.tagline === STORED.tagline, 'stored tagline survives a save fired mid-flight');
+check(afterO.instagram_url === STORED.instagram_url, 'stored Instagram link survives it too');
+await flush(); await hydO;
+check(DOM['bb-gen-tagline'].value === STORED.tagline, 'tagline hydrated onto the screen');
+check(DOM['bb-gen-instagram_url'].value === STORED.instagram_url, 'Instagram link hydrated too');
+rpcCalls = [];
+api._bbGenChanged();
+const afterO2 = applyRpc({ ...STORED }, rpcCalls[0]?.p_patch || {});
+check(afterO2.tagline === STORED.tagline && afterO2.instagram_url === STORED.instagram_url,
+  'both SURVIVE a save made after the load landed');
+// The other half, same as business_email: once loaded, clearing IS an instruction.
+DOM['bb-gen-tagline'].value = '';
+DOM['bb-gen-instagram_url'].value = '';
+rpcCalls = [];
+api._bbGenChanged();
+const pO2 = rpcCalls[0]?.p_patch || {};
+const afterO3 = applyRpc({ ...STORED }, pO2);
+check('tagline' in pO2 && afterO3.tagline === null, 'a loaded tagline clears to NULL as asked');
+check('instagram_url' in pO2 && afterO3.instagram_url === null, 'and so does the Instagram link');
 
 console.log(fails ? `\nRESULT: ${fails} FAILURE(S)` : '\nRESULT: ALL PASS');
 

@@ -128,8 +128,16 @@ globalThis.fetch = async (url, init = {}) => {
   if (u === "https://api.resend.com/emails" && method === "POST") { WIRE = { channel: "email", subject: body.subject, html: body.html, from: body.from }; return json({ id: "stub-email" }); }
   if (u.includes("/conversations/messages") && method === "POST") { WIRE = { channel: "sms", text: body.message }; return json({ messageId: "stub-sms" }); }
   if (u === "https://api.resend.com/domains") return json({ data: VERIFIED_DOMAINS.map((name) => ({ name, status: "verified" })) });
-  if (u.includes("/rest/v1/clients?") && u.includes("select=business_email")) return json([{ business_email: SENDING_BUSINESS_EMAIL }]);
-  if (u.includes("/rest/v1/clients?") && u.includes("email_domain")) return json([{ email_domain: SENDING_DOMAIN, business_name: "stub" }]);
+  // The send path's ONE sender read: sending domain, academy name and public email in
+  // a single select. PROJECTED, deliberately - a column the select does not ask for is
+  // not in the answer, so business_email dropping out of _send.js's list would make
+  // every send here HOLD rather than pass quietly.
+  if (u.includes("/rest/v1/clients?") && u.includes("email_domain")) {
+    const sel = new URL(u).searchParams.get("select") || "";
+    const row = { email_domain: SENDING_DOMAIN, business_name: "stub" };
+    if (sel.split(",").includes("business_email")) row.business_email = SENDING_BUSINESS_EMAIL;
+    return json([row]);
+  }
   if (u.includes("/rest/v1/clients?") && u.includes("messaging_provider")) return json([{ messaging_provider: "ghl" }]);
   if (u.includes("/rest/v1/email_suppressions")) return json([]);      // nobody is suppressed
   if (u.includes("/rest/v1/email_events")) return json([]);            // send logging

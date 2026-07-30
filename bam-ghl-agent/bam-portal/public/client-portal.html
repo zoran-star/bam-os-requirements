@@ -26931,7 +26931,13 @@ function _bbDropUnloadedBlobs(patch) {
 // typed - see _bbGenRatingPatch). They ride the same load because they are read by
 // the same card at the same moment.
 const _BB_GEN_COLS = ['legal_name', 'address', 'ein', 'phone', 'public_name', 'tax_config',
-  'business_email', 'email_domain', 'google_rating', 'google_review_count', 'google_rating_checked_at'];
+  'business_email', 'email_domain', 'google_rating', 'google_review_count', 'google_rating_checked_at',
+  // The footer identity pair (migration 20260729T230000). Same card, same load, same
+  // blank guard as business_email - and for the same reason: a blank written over
+  // either one silently shortens the footer of every automation email the academy
+  // sends, and "the tagline disappeared" is not something an owner would connect to
+  // having opened this page.
+  'tagline', 'instagram_url'];
 
 const _BB_COL_INFLIGHT = {};   // one request per academy+column set, not per caller
 async function _bbHydrateClientCols(cols) {
@@ -27055,6 +27061,26 @@ function _bbRenderGeneralCard(panel, meta) {
         oninput="_bbGenChanged();_bbGenEmailNote()" placeholder="info@youracademy.com" />
       <div class="bb-field-hint">The address parents see, reply to and unsubscribe through. Not your personal inbox: that stays as your owner email under Staff. It has to be a real mailbox wired up to SEND (through Resend, which BAM sets up) and to RECEIVE (in Gmail), or your emails bounce and parent replies land nowhere.</div>
       <div class="bb-field-hint" id="bb-gen-business_email-note"></div>
+    </div>
+
+    <!-- The two facts that finish the black footer on every automation email: the
+         sentence under the wordmark, and the Instagram link beside the site and email
+         links. Both were hardcoded in code for ONE academy until 29 Jul 2026, so every
+         other academy has been sending a footer with a blank line and no Instagram and
+         had no way to fix it. Empty is still a real state and renders as nothing at
+         all: no sentence, and the Instagram link is removed rather than left dead. -->
+    <div class="bb-field">
+      <div class="bb-field-label">Email footer tagline</div>
+      <input id="bb-gen-tagline" type="text" class="bb-input" value="${v('tagline')}"
+        oninput="_bbGenChanged()" placeholder="Youth basketball training in your city" />
+      <div class="bb-field-hint">One line under your name at the bottom of every automation email. Say what you do and where, the way you would say it to a parent. Leave it empty and the line is left out.</div>
+    </div>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Instagram</div>
+      <input id="bb-gen-instagram_url" type="url" class="bb-input" value="${v('instagram_url')}"
+        oninput="_bbGenChanged()" placeholder="https://instagram.com/youracademy" />
+      <div class="bb-field-hint">The full link to your profile, not just the handle. It becomes the "Instagram" link in your email footer. Leave it empty and the link is removed instead of going nowhere.</div>
     </div>
 
     <div class="bb-field">
@@ -27331,9 +27357,17 @@ function _bbGenChanged() {
     // guard list for that to hold - a blank here does not "just fall back to the
     // owner email" any more, it holds every automation email the academy sends.
     business_email: document.getElementById('bb-gen-business_email')?.value || '',
+    // The footer pair. In the guard list below for the same reason as business_email:
+    // both load with _BB_GEN_COLS, so a save fired before that load lands would write
+    // a blank over a stored value, and here the damage is silent - the academy's emails
+    // keep sending, just with no tagline sentence and no Instagram link. Nobody would
+    // report that as a bug against this page.
+    tagline:       document.getElementById('bb-gen-tagline')?.value || '',
+    instagram_url: document.getElementById('bb-gen-instagram_url')?.value || '',
     // time_zone moved to Settings; do NOT read it here (the field is gone, so
     // reading it would save an empty value and wipe the saved zone).
-  }, ['business_name', 'legal_name', 'address', 'ein', 'public_name', 'business_email']));
+  }, ['business_name', 'legal_name', 'address', 'ein', 'public_name', 'business_email',
+      'tagline', 'instagram_url']));
 }
 
 const _ENTITY_PRESETS = ['LLC','Corp','Sole prop','Partnership','Non-profit'];

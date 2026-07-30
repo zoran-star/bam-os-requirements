@@ -42,7 +42,10 @@ async function sb(path, init = {}) {
     ...init,
     headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", ...(init.headers || {}) },
   });
-  if (!res.ok) throw new Error(`Supabase ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  // 400 chars, not 200: PostgREST's undefined-column body is what
+  // pendingColsBlamedBy() reads to tell "this column is not migrated yet" apart from
+  // a real outage, and a truncated body would turn a safe retry into a silent hold.
+  if (!res.ok) throw new Error(`Supabase ${res.status}: ${(await res.text()).slice(0, 400)}`);
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
 }
@@ -50,50 +53,68 @@ async function sb(path, init = {}) {
 const CLIENT_TTL = 30_000;
 const _clientCache = new Map(); // clientId -> { at, domain, name, businessEmail }
 
+// ONE row read, THREE facts. business_email rides the same query as email_domain
+// because they answer two halves of one question - can this go out AS the academy,
+// and can it carry the academy's own reply-to and unsubscribe address - and because
+// the send path must never ask twice for one row.
+const SENDER_COLS = ["email_domain", "business_name"];
+// ⚠️ PENDING MIGRATION, dropped on the one error that means "not applied yet" (see
+// the retry in clientSender). Same shape and same rule as CLIENT_COLS_PENDING in
+// api/automations.js, which is where the reasoning is written out in full. It matters
+// more here than anywhere: clientSender THROWING holds the send WITHOUT texting the
+// owner, so an unhandled 400 on this select would stop every academy's automation
+// email silently. Dropping the column instead degrades to "no business email", which
+// holds AND tells the owner. Move it into SENDER_COLS once the migration is applied.
+//   business_email - migration 20260729T210000_clients_business_email.sql
+const SENDER_COLS_PENDING = ["business_email"];
+
+// Only an undefined-column error (PostgREST 42703) that NAMES a pending column earns
+// the retry. A transient 5xx stays a throw: silently degrading to a row with no
+// business_email would hold an academy's email over an outage rather than over its
+// own missing data, and tell the owner to go fix a field that is already filled in.
+function pendingColsBlamedBy(err) {
+  const msg = String((err && err.message) || err || "");
+  if (!/42703|does not exist/i.test(msg)) return [];
+  return SENDER_COLS_PENDING.filter((c) => msg.includes(c));
+}
+
 // THROWS on a DB blip - the caller turns that into a hold WITHOUT an owner text.
+//
+// `businessEmail` is the academy's PUBLIC email (clients.business_email) - the footer
+// contact line, the footer Email link, and the unsubscribe destination. Resolved HERE,
+// at the one choke point every automation email passes through, because three callers
+// hand sendOn `vars: {}` on purpose (their tokens are already resolved: the confirm
+// agent's booking confirmation and same-day check-in, and the approvals inbox's
+// confirmation email). Reading it off the caller's vars would leave those three unable
+// to carry an unsubscribe link at all, which is precisely the state the hold below
+// exists to refuse.
 async function clientSender(clientId) {
   const hit = _clientCache.get(clientId);
   if (hit && Date.now() - hit.at < CLIENT_TTL) return hit;
-  const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=email_domain,business_name&limit=1`);
+  const cols = SENDER_COLS.concat(SENDER_COLS_PENDING);
+  const read = (list) => sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=${list.join(",")}&limit=1`);
+  let rows;
+  try {
+    rows = await read(cols);
+  } catch (e) {
+    const blamed = pendingColsBlamedBy(e);
+    if (!blamed.length) throw e;
+    console.warn(`[_send] clientSender: ${blamed.join(", ")} not in the schema yet (migration pending) - re-reading without ${blamed.length > 1 ? "them" : "it"}`);
+    rows = await read(cols.filter((c) => !SENDER_COLS_PENDING.includes(c)));   // ALL of them, not just `blamed` - Postgres names only the first
+  }
   const row = (Array.isArray(rows) && rows[0]) || {};
   const out = {
     at: Date.now(),
     domain: String(row.email_domain || "").trim().toLowerCase(),
     name: String(row.business_name || "").trim(),
-    businessEmail: await businessEmailOf(clientId),
+    // NO FALLBACK, ON PURPOSE. A column that is not there yet, a NULL, and an empty
+    // string are all the SAME answer here - "this academy has no public email" - and
+    // that answer HOLDS the send rather than borrowing clients.email (the owner's
+    // inbox, which is the bug the column removed). See guardrail 2 at the top.
+    businessEmail: String(row.business_email || "").trim(),
   };
   _clientCache.set(clientId, out);
   return out;
-}
-
-// The academy's PUBLIC email (clients.business_email) - the footer contact line, the
-// footer Email link, and the unsubscribe destination. Resolved HERE, at the one
-// choke point every automation email passes through, because three callers hand
-// sendOn `vars: {}` on purpose (their tokens are already resolved: the confirm
-// agent's booking confirmation and same-day check-in, and the approvals inbox's
-// confirmation email). Reading it off the caller's vars would leave those three
-// unable to carry an unsubscribe link at all, which is precisely the state the
-// hold below exists to refuse.
-//
-// ⚠️ SEPARATE QUERY, SEPARATE CATCH, AND TEMPORARY. Migration
-// 20260729T210000_clients_business_email.sql is not applied yet, and naming a column
-// that does not exist makes PostgREST 400 the WHOLE select - the rule written at
-// loadClient() in api/automations.js. Folded into the select above it would take the
-// sending domain down with it, and a domain failure holds WITHOUT texting the owner,
-// so every academy's email would stop silently. On its own it degrades to "no
-// business email", which holds and DOES tell the owner. Once that migration is
-// applied: add business_email to the select above, delete this function, and add the
-// column to the two loadClient select lists as well.
-// Never throws: an unreadable answer is the same as no answer, and both hold.
-async function businessEmailOf(clientId) {
-  try {
-    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=business_email&limit=1`);
-    const row = (Array.isArray(rows) && rows[0]) || {};
-    return String(row.business_email || "").trim();
-  } catch (e) {
-    console.error("[_send] business_email lookup failed (holding):", e.message);
-    return "";
-  }
 }
 
 const DOMAINS_TTL = 300_000;

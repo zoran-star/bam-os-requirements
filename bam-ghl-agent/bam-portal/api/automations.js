@@ -60,16 +60,77 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// ── the client row every automation renders from ─────────────────────────────
+// public_name / community_group_* / google_review_url / phone are the parent-facing
+// facts clientVars() renders from - without them every message silently falls
+// back to the internal name and drops its group, review and phone lines.
+//
+// online_programs_url and referral_offer joined the list on 28 Jul 2026, when
+// migration 20260727150000 was applied. Before that, naming a column that does not
+// exist yet makes PostgREST 400 the whole select and every automation stops - SMS
+// included, because this ONE read feeds every channel, not just email. A column goes
+// in this list AFTER its migration is live, never in the same commit.
+const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email", "phone",
+  "address", "time_zone", "website_setup", "community_group_url", "community_group_platform",
+  "google_review_url", "online_programs_url", "referral_offer", "ghl_location_id",
+  "ghl_access_token", "ghl_refresh_token", "ghl_token_expires_at", "ghl_kpi_config"];
+
+// ⚠️ THE ONE EXCEPTION TO THE RULE ABOVE, and the only thing that makes it safe:
+// columns listed HERE are asked for optimistically and DROPPED on the single error
+// that means "its migration is not applied yet" (see loadClient below). Nothing else
+// changes - the row comes back without the key, which is byte-identical to the state
+// every consumer already handles: an absent business_email HOLDS the email and texts
+// the owner (api/_send.js), and the SMS path never learns anything happened.
+//
+// Same per-column-fallback shape the Business Basics card already uses for exactly
+// this problem (_bbHydrateClientCols in public/client-portal.html): ask, and on the
+// column error ask again without the column that does not exist.
+//
+// A column belongs here ONLY while its migration is pending. Once it is applied,
+// MOVE it into CLIENT_COLS - this is a safety net, not a parking spot, and anything
+// left here costs one wasted 400 per uncached read for as long as it is wrong.
+//   business_email - migration 20260729T210000_clients_business_email.sql
+const CLIENT_COLS_PENDING = ["business_email"];
+
+// Does THIS error blame a pending column? Returns the blamed one(s) for the log,
+// but the RETRY DROPS THE WHOLE PENDING LIST - see why below.
+//
+// Deliberately NOT "retry on any failure": a transient 5xx must never quietly
+// downgrade the read to a row missing business_email, because that would hold an
+// academy's email for a reason that has nothing to do with its data. Only an
+// undefined-column error (PostgREST 42703) that NAMES a pending column earns a
+// retry; everything else stays a throw, exactly as before.
+//
+// ⚠️ WHY THE RETRY DROPS ALL OF THEM, NOT JUST THE NAMED ONE. Postgres reports only
+// the FIRST unknown column in a select - verified against prod: `select tagline,
+// instagram_url from clients` blames `tagline` and never mentions `instagram_url`.
+// So peeling off just the blamed column meant a SECOND pending column 400'd the
+// retry, and the retry's read is the last statement in the catch, so that throw
+// escapes loadClient. Its worker callers have no catch: every automation would stop,
+// SMS included - the exact incident this mechanism was written to prevent, through
+// the mechanism itself. It was safe for exactly one pending column and silently
+// lethal at two, which is the worst possible number to be safe up to.
+//
+// Dropping the whole list is safe for ANY number of pending columns and needs no
+// loop: by definition a pending column is one the code already degrades without.
+function pendingColsBlamedBy(err) {
+  const msg = String((err && err.message) || err || "");
+  if (!/42703|does not exist/i.test(msg)) return [];
+  return CLIENT_COLS_PENDING.filter((c) => msg.includes(c));
+}
+
 async function loadClient(clientId) {
-  // public_name / community_group_* / google_review_url / phone are the parent-facing
-  // facts clientVars() renders from - without them every message silently falls
-  // back to the internal name and drops its group, review and phone lines.
-  //
-  // online_programs_url and referral_offer joined the list on 28 Jul 2026, when
-  // migration 20260727150000 was applied. Before that, naming a column that does not
-  // exist yet makes PostgREST 400 the whole select and every automation stops. A
-  // column goes in this list AFTER its migration is live, never in the same commit.
-  const rows = await sb(`clients?id=eq.${clientId}&select=id,business_name,public_name,owner_name,email,phone,address,time_zone,website_setup,community_group_url,community_group_platform,google_review_url,online_programs_url,referral_offer,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const cols = CLIENT_COLS.concat(CLIENT_COLS_PENDING);
+  const read = (list) => sb(`clients?id=eq.${clientId}&select=${list.join(",")}&limit=1`);
+  let rows;
+  try {
+    rows = await read(cols);
+  } catch (e) {
+    const blamed = pendingColsBlamedBy(e);
+    if (!blamed.length) throw e;
+    console.warn(`[automations] loadClient: ${blamed.join(", ")} not in the schema yet (migration pending) - re-reading without ${blamed.length > 1 ? "them" : "it"}`);
+    rows = await read(cols.filter((c) => !CLIENT_COLS_PENDING.includes(c)));   // ALL of them, not just `blamed` - Postgres names only the first
+  }
   return Array.isArray(rows) && rows[0];
 }
 

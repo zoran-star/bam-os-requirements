@@ -41,6 +41,8 @@
 //      on purpose (their tokens are pre-resolved), so a guard that checked the row
 //      and rendered from the caller's vars would pass and still put an
 //      unsubscribe-less email on the wire.
+//   6. The address rides the sender select - ONE clients read, naming the column -
+//      not the separate temporary lookup that existed while the migration was pending.
 //
 // WHAT IT DOES NOT PROVE
 //   - That the stored address can actually SEND or RECEIVE. Nothing in this build
@@ -49,6 +51,10 @@
 //     bounces looks identical to a good one here.
 //   - That academies HAVE one. DETAIL Miami, Johnson Bball and everyone else are
 //     still empty, and empty now means their automation email holds.
+//   - That the column is READABLE in production. It is not: migration 20260729T210000
+//     is still unapplied as of 2026-07-29. What makes naming it safe anyway - the
+//     pending-column retry in api/_send.js and in both loadClient select lists - is
+//     proved in api/_pending-client-column.test.mjs, which simulates the 400.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // NEGATIVE CONTROLS. Each breaks ONE thing and must print NEGATIVE CONTROL PASSED:
@@ -109,6 +115,7 @@ let EVENTS = [];                 // email_events rows written
 let SENDING_DOMAIN = "";
 let BUSINESS_EMAIL = "";
 let PRIOR_EVENT_TYPES = [];      // types already stamped in the last 24h
+let SENDER_SELECTS = [];         // every `select=` the send path issued against clients
 
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
@@ -137,8 +144,27 @@ globalThis.fetch = async (url, init = {}) => {
     return json(hit ? [{ id: "prior-event" }] : []);
   }
   if (u.includes("/rest/v1/email_suppressions")) return json([]);       // nobody is suppressed
-  if (u.includes("/rest/v1/clients?") && u.includes("select=business_email")) return json([{ business_email: BUSINESS_EMAIL }]);
-  if (u.includes("/rest/v1/clients?") && u.includes("email_domain")) return json([{ email_domain: SENDING_DOMAIN, business_name: "stub" }]);
+  // The send path's ONE sender read: sending domain, academy name and public email off
+  // a single row, in a single select. PROJECTED on purpose - the answer carries only
+  // what the select asked for, so business_email dropping out of _send.js's column
+  // list means the send path never sees an address and every send below HOLDS. A stub
+  // that handed back the whole row regardless would let that change pass green.
+  if (u.includes("/rest/v1/clients?") && u.includes("email_domain")) {
+    const sel = new URL(u).searchParams.get("select") || "";
+    SENDER_SELECTS.push(sel);
+    const row = { email_domain: SENDING_DOMAIN, business_name: "stub" };
+    if (sel.split(",").map(s => s.trim()).includes("business_email")) row.business_email = BUSINESS_EMAIL;
+    return json([row]);
+  }
+  // The DELETED lookup. business_email used to be read by a second, separately-caught
+  // query of its own, because the migration was not applied and a 400 folded into the
+  // sender select would have taken the sending domain down with it. It is now one read
+  // with a pending-column retry (api/_send.js, and api/_pending-client-column.test.mjs
+  // proves the retry). Anything asking for it alone is that lookup coming back.
+  if (u.includes("/rest/v1/clients?") && u.includes("select=business_email")) {
+    SENDER_SELECTS.push("business_email");
+    return json([{ business_email: BUSINESS_EMAIL }]);
+  }
   if (u.includes("/rest/v1/clients?") && u.includes("messaging_provider")) return json([{ messaging_provider: "ghl" }]);
   // notifyOwners' own client read: V2 academy, no explicit prefs, GHL connected with
   // a token that is nowhere near expiry so no refresh call is attempted.
@@ -252,7 +278,7 @@ console.log("\n── 3. no business email, no unsubscribe: the send HOLDS ─�
 // of asking. So the send stops at the same gate the unverified-sending-domain check
 // uses - held, never sent generic, engine re-queues without burning an attempt.
 async function sendStep(client, { businessEmail, vars }) {
-  WIRE = null; SMS = []; EVENTS = [];
+  WIRE = null; SMS = []; EVENTS = []; SENDER_SELECTS = [];
   SENDING_DOMAIN = (client.website_setup || {}).domain || "";
   BUSINESS_EMAIL = businessEmail;
   const args = { channel: "email", clientId: client.id, toEmail: "parent@example.test", subject: "Your spot this week", body: BODY, vars };
@@ -352,6 +378,31 @@ console.log("\n── 5. the callers that pass vars:{} still get an unsubscribe 
   const blindNone = bare("novars-nomail");
   const r2 = await sendStep(blindNone, { businessEmail: "", vars: {} });
   ok(!!r2.held && WIRE === null, "and with no address on the row it holds, rather than sending one without");
+}
+
+// ─── 6. it comes off the sender row, in ONE read ──────────────────────────────
+console.log("\n── 6. the public email rides the sender select, not a lookup of its own ──");
+{
+  // While migration 20260729T210000 was unapplied, business_email was read by a
+  // SECOND query with a catch of its own: a 400 folded into the sender select would
+  // have taken the sending domain down with it, and a domain failure holds WITHOUT
+  // texting the owner - so every academy's email would have stopped silently. It is
+  // now one read plus a pending-column retry (api/_pending-client-column.test.mjs is
+  // where the retry is proven). Two reads of one row is two failure modes, and the
+  // second one used to swallow everything it saw.
+  const addr = "info@johnsonbball.example";
+  const one = bare("oneread");
+  const r = await sendStep(one, { businessEmail: addr, vars: {} });
+  ok(!!r.sent, "the send goes out (setup for the read checks)");
+  ok(SENDER_SELECTS.length === 1,
+    `the send path read the clients row ONCE for the sender (saw ${SENDER_SELECTS.length}: ${JSON.stringify(SENDER_SELECTS)})`);
+  ok(SENDER_SELECTS[0] !== "business_email",
+    "and not through the deleted separate business_email lookup");
+  const cols = String(SENDER_SELECTS[0] || "").split(",").map(s => s.trim());
+  ok(cols.includes("business_email"), `that one select NAMES business_email (${SENDER_SELECTS[0]})`);
+  ok(cols.includes("email_domain"), "alongside the sending domain it has always carried");
+  ok(WIRE && WIRE.html.includes(`href="mailto:${addr}?subject=Unsubscribe"`),
+    "and the address that read returned is the one on the wire");
 }
 
 console.log("");

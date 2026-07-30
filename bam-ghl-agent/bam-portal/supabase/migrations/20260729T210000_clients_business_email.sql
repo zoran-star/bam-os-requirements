@@ -171,15 +171,22 @@ update public.clients set business_email = 'elijah@byanymeanssanjose.com'
 --     a blank over anything.
 -- Neither state loses data. Both stop GTA's parent email. Apply this first.
 --
--- DELIBERATELY NOT IN THIS MIGRATION
--- 1) business_email is NOT added to the client SELECT lists in api/automations.js
---    or api/agent-confirm.js. The rule written at loadClient() there is explicit:
---    a column joins that list AFTER its migration is live, because naming a column
---    that does not exist 400s the whole select and stops every automation. The send
---    path reads business_email through its own separately-caught query
---    (clientSender in api/_send.js) so it degrades to "no business email" instead.
---    Once this is applied, that column can move into the two select lists and the
---    second query can go.
+-- WHERE THE COLUMN IS NAMED, AND WHY THAT IS SAFE UNAPPLIED
+-- 1) business_email IS now named in the client SELECT lists in api/automations.js and
+--    api/agent-confirm.js, and in clientSender's one row read in api/_send.js. The
+--    separate lookup that used to fetch it on its own is GONE.
+--    The rule at loadClient() has not been relaxed: a column joins the BASE list only
+--    after its migration is live, because naming a column that does not exist 400s
+--    the whole select and stops every automation, SMS included. business_email sits
+--    in the PENDING list instead (CLIENT_COLS_PENDING / SENDER_COLS_PENDING) - asked
+--    for optimistically, and dropped on the one error that means "not migrated yet",
+--    the same shape the Business Basics card already uses. Unapplied, the row simply
+--    comes back without the key, which is the state described above: the email HOLDS
+--    and the owner is texted. api/_pending-client-column.test.mjs simulates the 400
+--    and proves it, in both schema states.
+--    AFTER APPLYING THIS: move business_email out of both PENDING lists and into
+--    CLIENT_COLS / SENDER_COLS. The retry is a safety net, not a parking spot, and a
+--    column left there costs a wasted 400 per uncached read.
 -- 2) Nothing verifies the address sends or receives. See the note at the top.
 -- 3) Nothing CONSUMES google_rating / google_review_count. They are stored and
 --    displayed as a dated reading and nothing else. A reader shipped ahead of its

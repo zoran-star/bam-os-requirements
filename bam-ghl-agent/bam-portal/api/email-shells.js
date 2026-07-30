@@ -33,7 +33,6 @@ const LOCATIONS = {
     suffix: "GTA",
     locationTag: "OAKVILLE &middot; GTA",
     full: "By Any Means Toronto",
-    tagline: "Youth and high-school basketball training in Oakville and across the GTA.",
     siteUrl: "https://byanymeanstoronto.ca",
     siteLabel: "byanymeanstoronto.ca",
     // NO `email` HERE ANY MORE. It held "info@byanymeanstoronto.ca", which meant GTA
@@ -43,20 +42,40 @@ const LOCATIONS = {
     // 20260729T210000), so the row wins and the fix reaches every academy at once.
     // Re-adding it here would put GTA back on a private copy of a shared fact.
     //
-    // WHY THIS ENTRY STILL EXISTS AT ALL, i.e. what deleting it would break TODAY:
-    // `tagline` and `instagram`. locFromVars() hardcodes both to "" because there is
-    // NO COLUMN for either, so deleting this entry strips GTA's tagline line and its
-    // footer Instagram link out of every email it sends. That is a regression, not a
-    // cleanup. Two columns (clients.tagline, clients.instagram_url) plus their
-    // clientVars() lines are the whole remaining cost; add them, fill GTA's row, and
-    // this entry can go. Everything else it carries (suffix, locationTag, full, site,
-    // city, ownerFirst, the two content facts) already resolves from the row for
-    // every other academy.
-    // Left in the short form on purpose. This is the FOOTER instagram link on every
-    // email, so "canonicalising" it to the www/trailing-slash form the welcome email's
-    // general-page link was hand-written in changes a link in all ten templates to buy
-    // a byte-identical match in one. Same account either way.
-    instagram: "https://instagram.com/byanymeanstoronto",
+    // NO `tagline` OR `instagram` EITHER, as of migration 20260729T230000. They were
+    // the two fields with no column behind them at all - locFromVars() hardcoded both
+    // to "" - so they existed for GTA and for nobody else. They are now
+    // clients.tagline and clients.instagram_url, read through clientVars() below, and
+    // GTA's ten rendered emails are byte-identical across the move.
+    //
+    // WHY THIS ENTRY STILL EXISTS, MEASURED RATHER THAN GUESSED
+    // Deleting it was the goal of this change and it is NOT safe today. Rendering
+    // GTA's ten templates through the row-only path instead of this entry changes ALL
+    // TEN, and SIX fields are responsible - not the two that had no column:
+    //   tagline      10/10 templates  - now row-backed, fixed
+    //   instagram    10/10            - now row-backed, fixed
+    //   suffix       10/10  pinned "GTA". Derived from public_name it is
+    //                      "BASKETBALL", so the gold wordmark would read BY ANY MEANS
+    //                      BASKETBALL. A brand decision, not a refactor.
+    //   full         10/10  pinned "By Any Means Toronto"; the row's public_name is
+    //                      "By Any Means Basketball". Feeds {{ACADEMY_FULL}} (the
+    //                      footer reason sentence) and {{DOC_TITLE}}. The map and the
+    //                      row genuinely DISAGREE about GTA's parent-facing name and
+    //                      only the owner can settle which one parents should read.
+    //   locationTag   8/10  pinned "OAKVILLE &middot; GTA", hand-composed. The derived
+    //                      form is just the uppercased city - no row-backed path to
+    //                      this composite exists at all.
+    //   city          4/10  cityFromAddress() returns "" for GTA's stored address
+    //                      "2205 Rosemount Cres", which has no city in it.
+    // The remaining five (ownerFirst, siteUrl, siteLabel, onlineProgramsUrl,
+    // referralOffer) already resolve byte-identically from the row and could be
+    // dropped from here today with no render change. They are left for the same
+    // reason the entry is: one deletion, once, when all six are answered.
+    //
+    // So: the next person to try this needs a decision on GTA's wordmark word and its
+    // parent-facing name, plus somewhere for "OAKVILLE &middot; GTA" and a city to
+    // live. It is not a column away. Do not delete this entry to make a lint pass -
+    // that would silently rewrite ten live emails.
     city: "Oakville",
     ownerFirst: "Zoran",
     // OPTIONAL per-academy facts. Only GTA has these today, which is exactly why the
@@ -89,11 +108,24 @@ function locFromVars(vars = {}) {
     suffix: stripped !== name ? stripped.toUpperCase() : "",
     locationTag: vars.location_city ? String(vars.location_city).toUpperCase() : "",
     full: name,
-    tagline: "",
+    // The academy's own sentence under the wordmark, and its own Instagram. Both
+    // hardcoded to "" until 29 Jul 2026, which is why they rendered for BAM GTA (the
+    // one academy with a pinned entry above) and for nobody else. Now
+    // clients.tagline / clients.instagram_url, migration 20260729T230000.
+    //
+    // ⚠️ A client row read before that migration is applied simply has no such
+    // property, which reads as absent and renders as nothing: no tagline sentence, and
+    // dropEmptyShellLinks removes the empty Instagram anchor with its separator rather
+    // than shipping a link to nowhere. Nothing throws, nothing is borrowed - the
+    // footer is two elements shorter. That state is QUIET, so it is written up in the
+    // migration's "BEFORE YOU DEPLOY": the two columns must also join the loadClient
+    // select lists in api/automations.js and api/agent-confirm.js once it is live, or
+    // GTA keeps rendering without them.
+    tagline: String(vars.location_tagline || ""),
     siteUrl: site,
     siteLabel: site.replace(/^https?:\/\//i, ""),
     email: String(vars.location_email || ""),
-    instagram: "",
+    instagram: String(vars.location_instagram_url || ""),
     city: String(vars.location_city || ""),
     ownerFirst: String(vars.location_owner || ""),
     // Optional content facts. Absent (no column yet, or a NULL) means EMPTY, and the
@@ -144,10 +176,15 @@ function normalizeReferral(raw) {
 // facts (community group, review link) because they must only ever come from an
 // academy's own record, and it predates the phone / venue / schedule facts entirely.
 // Spreading the row underneath means those resolve for GTA exactly as they do for
-// everyone else, with no academy branch anywhere. It also turns the entry from an
-// OVERRIDE into a FALLBACK: the day a column exists for GTA's tagline and instagram,
-// filling it is all it takes, and the entry stops being read without anyone
-// remembering to delete it.
+// everyone else, with no academy branch anywhere.
+//
+// So a field STOPS being pinned the moment it is deleted from the entry, and that is
+// the mechanism this change used: `email`, then `tagline` and `instagram`, are gone
+// from the entry, so GTA's row now answers for all three exactly as every other
+// academy's does. Deleting a field from the entry is the unit of progress here - not
+// deleting the entry, which cannot happen until six fields have answers (the tally is
+// on the entry itself). Adding a column WITHOUT deleting the pinned field would change
+// nothing: the pin still wins.
 export function locFor(clientId, vars) {
   const pinned = LOCATIONS[clientId];
   return pinned ? { ...locFromVars(vars), ...pinned } : locFromVars(vars);
@@ -205,6 +242,13 @@ export function clientVars(client) {
     location_community_url: c.community_group_url || "",
     location_community_platform: communityPlatformLabel(c.community_group_platform),
     location_review_url: c.google_review_url || "",
+    // The footer's two identity facts (migration 20260729T230000, not applied yet).
+    // Absent on a row read before it lands, which reads as "this academy has no
+    // tagline / no Instagram" - the honest answer, and the same shape
+    // online_programs_url had before its own migration. NO fallback of any kind: an
+    // academy publishing another academy's Instagram is worse than publishing none.
+    location_tagline: c.tagline || "",
+    location_instagram_url: c.instagram_url || "",
   };
 }
 
