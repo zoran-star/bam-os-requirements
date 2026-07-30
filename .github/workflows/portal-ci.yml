@@ -154,6 +154,56 @@ jobs:
             exit 1
           fi
 
+      # A yes/no answer that crossed a network boundary must have THREE outcomes:
+      #   yes  ·  no, and here is why  ·  we could not ask
+      # Never let "no" and "could not ask" collapse into the same value.
+      #
+      # WHY A GATE. The rule already existed, written as the testimonials resolver
+      # contract ("can a caller tell 'no testimonials' apart from 'could not
+      # answer'?"), and it did not travel. The next place the shape appeared was
+      # api/stripe/connect.js: canCharge() turned a blip, an expired platform key
+      # and a genuinely unfinished Stripe account into one identical `false`, one
+      # identical stored status, and one identical sentence to an academy owner -
+      # "finish the remaining steps in Stripe" - from a function that had just
+      # discarded which steps. A rule in one file does not reach the next file. An
+      # enforced inventory does.
+      #
+      # 29 instances in api/ at creation, 4 judged HARMFUL. The counts print on
+      # EVERY run, green or red: a green run carrying 4 known-harmful entries is
+      # not the same green as one carrying none, and a step that hides that is
+      # telling a comfortable lie. New instances FAIL until somebody either fixes
+      # them or argues for them in writing, in the file.
+      #
+      # The five controls each plant a REAL mutation - a new offender that fetches
+      # directly, one that reaches the network only through an import, a correct
+      # three-outcome function that must NOT be flagged, a dead inventory line, and
+      # a rubber-stamp reason. Every one was checked against an actual weakening of
+      # the checker before this step was written, because a control wired into CI
+      # without that check converts a verdict into an institutional claim it has
+      # not earned.
+      #
+      # Controls come from the script's own MUT map, NOT from a grep of its prose.
+      # scripts/verify-live-pages.mjs and verify-testimonial-seed-drift.mjs write
+      # their controls as one pipe-separated MUTATE= line, so a grep finds only the
+      # first and the rest have never run in CI. Do not repeat that here.
+      - name: Network booleans must have three outcomes
+        run: |
+          npm run lint:network-booleans
+          controls=$(sed -n '/^const MUT = {/,/^};/p' scripts/check-network-booleans.mjs \
+                     | grep -oE '^  [A-Za-z][A-Za-z0-9_]*:' | tr -d ' :')
+          [ -n "$controls" ] || { echo "::error file=bam-ghl-agent/bam-portal/scripts/check-network-booleans.mjs::could not read the MUT control map - re-point this step at it"; exit 1; }
+          fail=0
+          for m in $controls; do
+            out=$(MUTATE="$m" node scripts/check-network-booleans.mjs 2>&1) || true
+            if printf '%s' "$out" | grep -q 'NEGATIVE CONTROL PASSED'; then
+              echo "  caught   check-network-booleans MUTATE=$m"
+            else
+              echo "::error file=bam-ghl-agent/bam-portal/scripts/check-network-booleans.mjs::MUTATE=$m did not report NEGATIVE CONTROL PASSED - the mutation changed nothing this gate noticed, or the control no longer exists and only its MUT map entry remains"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || { echo "A negative control is decorative."; exit 1; }
+
       # Every committed plain-node suite, discovered by GLOB rather than a list.
       #
       # WHY A GLOB. Before 2026-07-29 this workflow ran none of them. Seven suites

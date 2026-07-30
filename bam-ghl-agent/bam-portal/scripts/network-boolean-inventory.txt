@@ -1,0 +1,85 @@
+# NETWORK-BOOLEAN INVENTORY - every function in api/ that turns an answer from
+# across a network boundary into a bare boolean.
+#
+# THE RULE: a yes/no answer that crossed a network boundary must have THREE
+# outcomes, not two.
+#
+#     yes  ·  no, and here is why  ·  we could not ask
+#
+# Never let "no" and "could not ask" collapse into the same value. When they
+# collapse, an outage presents as a product answer: api/stripe/connect.js's
+# canCharge() told an academy owner to "finish the remaining steps in Stripe"
+# using a false that a network blip, an expired platform key and a genuinely
+# unfinished account all produce identically.
+#
+# HOW THIS FILE WORKS. scripts/check-network-booleans.mjs walks a call graph over
+# api/, finds every function that reaches the network and can return a bare
+# `true` or `false`, and requires each one to appear here. It FAILS on:
+#   * a hit with no line here            - a new unaudited collapse shipped
+#   * a line here matching no hit        - stale; delete it
+#   * a line with a stub reason          - a rubber stamp, worse than nothing
+#
+# STALE LINES FAIL ON PURPOSE. When you give an instance its third outcome, DELETE
+# ITS LINE IN THE SAME PULL REQUEST. An inventory that keeps lines for code that no
+# longer exists stops describing the tree, and then the counts printed on every run
+# are fiction. Same contract as scripts/testimonial-bypass-baseline.txt.
+#
+# THIS IS NOT AN APPROVAL LIST. A line records a JUDGEMENT that has been made and
+# can be argued with in review. HARMFUL lines print on every run, green or red,
+# for as long as they exist.
+#
+# FORMAT:  VERDICT | file::function | why
+#
+#   HARMFUL      the collapse produces a wrong outcome someone sees, or a wrong
+#                write. The line stays until the code gets a third outcome.
+#   BOUNDED      the collapse is real, and a STATED mechanism (a human approval
+#                gate, a redundant path, a safe direction) keeps the wrong answer
+#                off a person. Name the mechanism or it is not bounded.
+#   NO-COLLAPSE  the transport failure never becomes the boolean: it throws, or is
+#                returned as its own state. The booleans are genuine data answers.
+#
+# The shape done RIGHT in this repo, for reference: api/agent/_stage.js
+# computeQueue tracks `idsTrusted` alongside the ids, so a failed stage fetch is a
+# distinct state from a genuinely empty stage, and the reignition guards refuse to
+# cancel a park against an untrusted set. That is the third outcome, in this
+# codebase, written by someone who hit the bug.
+#
+# 29 entries at creation (2026-07-30), 4 of them HARMFUL.
+
+# ── HARMFUL ──────────────────────────────────────────────────────────────────
+
+HARMFUL | api/stripe/connect.js::canCharge | A blip, an expired platform key and a genuinely unfinished Stripe account all produce the same false, the same stored stripe_connect_status of onboarding, and the same sentence to the owner: "finish the remaining steps in Stripe". The function discarded WHICH steps before telling a human to go finish them. Being fixed separately; delete this line with the fix.
+HARMFUL | api/ghl/cron-import-history.js::hasGmailMailbox | A transient Supabase error returns false, which the caller reads as "no Gmail connected" and so runs the GHL email import on top of the Gmail 2-way sync. The comment directly above it says running both would double every email thread. A blip therefore duplicates an academy's whole email history, and nothing downstream can tell that it happened or which threads are the copies.
+HARMFUL | api/agent/_stage.js::contactInRespondedStage | The catch returns false, which the send path renders to staff as a 409 "no longer in the ... stage". That is a factual claim about the lead, produced by a GHL outage. It already misfired at scale on GTA once (2026-07-10) for a different reason, and the correct pattern sits forty lines below it in the same file: computeQueue's idsTrusted.
+HARMFUL | api/agent/_store.js::contactInRole | The store-side half of contactInRespondedStage, same collapse and same consequence: the GHL branch's catch turns any search failure into "this contact is not in that stage", and the caller states that to staff as fact. Fix these two together, since one delegates to the other.
+
+# ── BOUNDED ──────────────────────────────────────────────────────────────────
+
+BOUNDED | api/_email.js::isSuppressed | Documented fail-open at the site, and it console.errors before returning, so an operator reading logs CAN tell the two states apart even though the caller cannot. Worst case is one extra email to an address that may be suppressed; the Resend webhook stays the durable suppression source of truth.
+BOUNDED | api/agent-closing.js::isLiveMember | Fail-open is documented at the site: a false means the closing agent keeps drafting. The wrong answer reaches a DRAFT, not a lead, and every draft passes a human approval gate before it sends. The catch is silent though, so unlike isSuppressed there is no log line that separates a blip from a genuine non-member.
+BOUNDED | api/agent-confirm.js::isLiveMember | Same function and same reasoning as the agent-closing.js copy: fail-open into a human-approved draft, silent catch. Listed separately because it is a second copy, and a fix to one will not fix the other.
+BOUNDED | api/agent-followups.js::leadRepliedLiveGHL | A false means "no reply yet" and the queued nudge sends. Bounded because the nudge text itself was already human-approved, and two sibling checks cover the same question. This is the WEAKEST bounded line here: the siblings are not independent under a shared outage, so one Supabase incident blinds two of the three at once.
+BOUNDED | api/agent-followups.js::leadRepliedSince | The Supabase-mirror sibling of leadRepliedLiveGHL, same collapse and same bound. The mirror is already documented as untrustworthy on its own (the inbound webhook may not be firing), which is why the live GHL check exists at all.
+BOUNDED | api/agent-followups.js::leadRepliedStore | The Twilio-academy sibling. Same collapse, same human-approved-content bound. For a Twilio academy this is the ONLY one of the three that can see their inbound SMS, so its false is far less redundant than the other two: worth fixing first of the three.
+BOUNDED | api/agent/_mutes.js::isMuted | Documented fail-open with a console.error, so the states are separable in logs. A wrong false un-skips one draft, and that draft still needs a human to approve it before anybody receives it.
+BOUNDED | api/agent/_reignite.js::hasScheduledReignition | Collapses the other way on purpose: a DB error returns true, documented as fail-CLOSED, and logged. When we cannot prove a lead is unparked we draft nothing rather than double up on them, which was the actual incident (Mike Sandhu, 2026-07-23). Still two outcomes, but the wrong one costs a missed draft, not a message to a parent.
+BOUNDED | api/agent/_store.js::shadowUpsertOpportunity | This asks about a WRITE, not about the world: false means "the mirror row was not written", which is equally true whether the request failed or was rejected. The mirror is best-effort by design and gated on pipeline_shadow, so no caller treats false as a fact about the opportunity.
+BOUNDED | api/automations.js::isAutomationLive | Documented fail-closed. A blip returns false, which routes a lead onto the legacy GHL path rather than the newer portal automation. The safe direction is explicit and stated at the site: never flip a lead onto an unproven path because of a transient error.
+BOUNDED | api/email/_mailbox.js::hasActiveMailbox | A false sends the message through Resend or GHL instead of the academy's Gmail. The email still goes out, so the wrong answer changes the transport a parent sees in the From line, not whether they hear from the academy at all.
+BOUNDED | api/email/mailbox-connect.js::canManageClient | Authorization, so denying on uncertainty is the correct direction and the wrong answer costs a retry, not access. Noting the residual cost honestly: the user is told "unauthorized", so a Supabase outage is presented to a staff member as a permissions problem they cannot fix by waiting.
+BOUNDED | api/email/sync-gmail.js::verifyStaff | Same authorization class as canManageClient: fail-closed is correct, and the 401 text mislabels an outage as a permission problem. Both the fetch guard and the sb lookups collapse, so any Supabase incident locks staff out of Gmail sync with a misleading reason.
+BOUNDED | api/twilio/migration-status.js::isStaff | Authorization, fail-closed by way of a not-ok guard plus catch-to-null on the staff lookups. Denial is the safe direction; the cost is that the 401 says "unauthorized" when the truth is that Supabase could not be reached.
+BOUNDED | api/twilio/provision.js::isStaff | A second copy of the same isStaff, with the same fail-closed authorization reasoning. Listed separately because these four copies drift independently and a fix to one will not reach the others.
+BOUNDED | api/twilio/register-a2p.js::isStaff | A third copy of the same isStaff. Same fail-closed authorization reasoning, and the same note that a Supabase outage reads to staff as a permissions problem.
+BOUNDED | api/twilio/start-migration.js::isStaff | The fourth copy of the same isStaff. Same fail-closed authorization reasoning. Four near-identical copies is itself worth a cleanup, but that is a refactor, not this rule.
+BOUNDED | api/members.js::matchedAll | Drives the Price Match dot on the onboarding scorecard. Documented non-fatal at the site: a failure renders the step as not-done. Staff see a step that may in fact be complete, which is the safe direction for a checklist, and the next page load re-asks the question.
+BOUNDED | api/members.js::coachiqDone | The CoachIQ sibling of matchedAll, on the same onboarding scorecard with the same stated non-fatal contract. A wrong false shows staff an outstanding triage step that may already be clear, and it self-corrects on the next load.
+BOUNDED | api/sorter/cleanup.js::tryAdoptSub | Documented at the site as non-fatal: any Stripe hiccup just leaves the member on the manual path. False therefore means "not adopted", which is accurate either way, and a human still handles the member. No claim about the subscription reaches anyone.
+BOUNDED | api/website/availability.js::setCors | The catch is explicit that a DB hiccup is treated as not-allowed and the GET will 403. Correct security direction. The residual cost is diagnostic: to whoever debugs it the 403 is indistinguishable from a genuinely wrong allowed_domains setting, so an outage sends people to edit configuration that was already right.
+BOUNDED | api/website/ghl-lead.js::allowedOrigin | Same origin-allowlist class as setCors and the same safe direction. The 60-second originsCache means a blip can only bite while the cache is cold, which narrows the window but does not change the collapse.
+BOUNDED | api/website/checkout.js::maybeAttachAgreement | Best-effort by design so a storage failure never blocks payment setup, and false honestly means "no signed agreement stored". Noting the real cost: the audit row records agreement_saved false with no reason, so whoever later chases a missing legal agreement has nothing to separate a render failure from an upload failure.
+BOUNDED | api/website/leads.js::maybePortalRoute | Returns true meaning "routing handled", and the caller then SKIPS the GHL workflow enrol. Every inner step catches and logs its own failure, so it can return true having done nothing, and the lead then gets no first touch from either path. Bounded ONLY because portal_entry_routing is dormant; turning it on for an academy makes this live and it should be fixed first.
+
+# ── NO-COLLAPSE ──────────────────────────────────────────────────────────────
+
+NO-COLLAPSE | api/website/checkout.js::signupFeeAppliesTo | Reaches Supabase through this file's sb(), which THROWS on a non-ok response, and the function has no try/catch. A transport failure therefore propagates as an exception and never becomes a boolean. Its false only ever means the owner did not set this option to charge.
