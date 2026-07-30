@@ -37,6 +37,22 @@ San Jose's Beginner (6-12) and Elementary (9-12) overlap almost entirely and dif
 
 **📏 AND I NEARLY GOT THIS BACKWARDS, WHICH IS THE PART WORTH KEEPING.** My first read was that the card's *"it ticks itself"* was the lie - a reassuring sentence with no mechanism behind it, which is this project's signature failure and would have been the fourth instance this week. **I went looking for the cron that did not exist. It does exist**, narrow and well-commented, and the card is telling the truth. **The pattern is real often enough that it is now my default suspicion, and a default suspicion is exactly the thing that has to be checked rather than acted on.** Reversing it cost one grep; asserting it would have cost a room a day chasing a mechanism that was already there.
 
+## ⛔⛔ ZORAN ASKED "HOW DO YOU KNOW HE HAS TO DO THAT?" AND THE ANSWER IS THAT WE DO NOT. **NOTHING WE OWN HAS EVER LOOKED AT WHAT STRIPE IS WAITING FOR.**
+
+**What was actually verified:** his account is stored, status `onboarding`, and the message he saw is reachable ONLY from the `!chargeable` branch.
+
+**What was ASSUMED and stated to Zoran as though verified:** that the outstanding items are "business details, bank account, ID verification". **That is the portal's own generic prose (`client-portal.html:49291`), not his account's requirements.** Nobody has called Stripe about his account. **My error, and his question caught it.**
+
+**⚠️ THE MECHANISM UNDERNEATH, AND IT IS WORSE THAN THE WRONG COPY. `canCharge()` (`api/stripe/connect.js:94`) FETCHES THE ENTIRE STRIPE ACCOUNT OBJECT AND DISCARDS EVERYTHING EXCEPT `charges_enabled === true`.** Verified by search: **`requirements.currently_due` appears NOWHERE in `api/`.** So we tell an owner "finish the remaining steps" while holding the list of those steps in a response we already fetched and threw away.
+
+**⚠️ AND THE SAME DISCARD COLLAPSES TWO STATES THAT MUST NOT BE COLLAPSED.** `canCharge` returns `false` on ANY failure: `if (!r.ok) return false`, plus a catch returning false. **So a network blip, an expired platform key, or a 4xx from Stripe produces the IDENTICAL message and the IDENTICAL stored state as a genuinely incomplete account.** We cannot distinguish *"Stripe says this owner is not ready"* from *"our call to Stripe did not work"*.
+
+**That is a control failing closed while destroying the reason it failed** - safe, and uninformative in exactly the situation where the information is the whole point. Same family as the calendar diagnostic that crashed on a misconfigured calendar: **the thing built to help you debug is the thing that goes blank when there is something to debug.**
+
+**Both defects spawned as one build.** Scope: fix the copy, capture `requirements.currently_due` and `disabled_reason`, surface the real outstanding items, and keep cannot-reach-Stripe visibly different from not-ready. **Unmapped requirement codes must be SHOWN, not hidden: a silently dropped requirement is worse than an ugly one.**
+
+**📏 THE HONEST RESIDUAL, because this is the whole lesson: the ONLY place Lij's actual requirements exist today is inside his own Stripe dashboard.** Telling him to go read it is correct advice. **Telling him WHICH three things it will say was not something we knew.**
+
 **Correct advice for Lij, and it is the opposite of what the popup told him: do NOT reconnect. Finish the outstanding items in the Stripe dashboard. The portal ticks the step by itself the next time his action items load.**
 
 ## ✅ BUILD A SHIPPED AS [PR #1660](https://github.com/zoran-star/bam-os-requirements/pull/1660), AND THE CLASS AGE RANGES ARE SEEDED IN PRODUCTION (2026-07-30)

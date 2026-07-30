@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · 1660 merged, GTA slots keyed, second half building",
+ "updated": "2026-07-30 · we never look at what Stripe is waiting for",
  "recentUpdates": [
+  "Your question caught me out. I said Lij needs to finish business details, bank and ID. I did not know that. That was our generic wording, not his account",
+  "The real find: we ask Stripe about his account, get the full answer back, and throw away everything except yes or no. The list of what he owes is in there",
+  "Worse: if our call to Stripe simply fails, it looks EXACTLY like an owner who has not finished. We cannot tell those apart today",
+  "Both queued as one build. The only place Lij's actual list exists right now is his own Stripe dashboard",
   "1660 merged and every one of GTA's 86 class times is now tagged with which class it belongs to. 86 of 86, nothing missed",
-  "Second half of the age-routing build is running. It is being built to work whether or not that tagging has happened, on purpose",
-  "Design change worth knowing: 'two classes fit this kid' is the NORMAL case at San Jose, not a rare one. So the AI asking one question is the main path, not a fallback",
-  "Lij's Stripe DID connect. His account is saved on our side. Stripe just wants more from him before it will take payments",
-  "The message he saw was wrong: it told him to reconnect. He should not. The portal ticks the step itself once Stripe is happy",
-  "Nearly got that backwards. I assumed the reassuring 'it ticks itself' line was empty, went looking for the mechanism, and found it really is there"
+  "Second half of the age-routing build is running. It is being built to work whether or not that tagging has happened, on purpose"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
