@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>San Jose pre-flight: review everything</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF9F6;--card:#FFFFFF;--card2:#F3F1EB;--line:#E4E0D6;
+    --tx:#1A1917;--tx2:#54514A;--tx3:#8A857B;
+    --gold:#9A7A22;--goldbg:#FBF3DC;--goldln:#E5D097;
+    --green:#2A7A4E;--greenbg:#E8F4EC;--greenln:#B7DCC4;
+    --red:#B23A22;--redbg:#FBECE8;--redln:#EFC9BE;
+    --blue:#255F92;--bluebg:#E9F1F8;--blueln:#C2D9EB;
+    --grey:#8A857B;--greybg:#F1EFE9;
+    --ui:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--ui);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:44px 20px 100px}
+  h1{font-size:clamp(27px,4.4vw,40px);line-height:1.1;letter-spacing:-.025em;margin:0 0 9px;font-weight:800}
+  h1 span{color:var(--gold)}
+  .sub{color:var(--tx2);font-size:16px;margin:0 0 22px;max-width:76ch}
+  h2{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--gold);margin:46px 0 6px;font-weight:800}
+  .h2sub{color:var(--tx3);font-size:13.5px;margin:0 0 14px;max-width:80ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 1px 2px rgba(26,25,23,.04)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);font-weight:800;padding:0 12px 8px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:9px 12px 9px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--tx2)}
+  tr:last-child td{border-bottom:none}
+  td b{color:var(--tx)}
+  .m{font-family:var(--mono);font-size:12px;background:var(--greybg);padding:1px 6px;border-radius:5px;color:var(--tx);white-space:nowrap}
+  .pill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .p-rev{background:var(--greenbg);color:var(--green);border:1px solid var(--greenln)}
+  .p-work{background:var(--goldbg);color:var(--gold);border:1px solid var(--goldln)}
+  .p-not{background:var(--redbg);color:var(--red);border:1px solid var(--redln)}
+  .p-dec{background:var(--bluebg);color:var(--blue);border:1px solid var(--blueln)}
+  .hero{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:18px 0 4px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+  .stat .n{font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .stat .l{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-top:2px}
+  .g .n{color:var(--green)} .y .n{color:var(--gold)} .r .n{color:var(--red)} .b .n{color:var(--blue)}
+  .note{border-radius:12px;padding:13px 16px;font-size:13.5px;color:var(--tx2);margin-top:12px}
+  .note b{color:var(--tx)}
+  .n-warn{background:var(--redbg);border:1px solid var(--redln)}
+  .n-gold{background:var(--goldbg);border:1px solid var(--goldln)}
+  .foot{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);color:var(--tx3);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>San Jose pre-flight: <span>review everything</span></h1>
+  <p class="sub">Every piece of the free trial sales system as applied to BAM San Jose, assuming you have reviewed nothing. Every number on this page was measured against production or the repos today, not remembered. Legend: <span class="pill p-rev">review</span> built, needs your eyes &nbsp;<span class="pill p-work">needs work</span> built but incomplete &nbsp;<span class="pill p-not">not built</span> missing &nbsp;<span class="pill p-dec">decide</span> a call only a human can make.</p>
+
+  <div class="hero">
+    <div class="stat g"><div class="n">13</div><div class="l">messages seeded, all tokenized</div></div>
+    <div class="stat g"><div class="n">0</div><div class="l">approved - nothing can send</div></div>
+    <div class="stat y"><div class="n">6</div><div class="l">row facts still empty</div></div>
+    <div class="stat r"><div class="n">1</div><div class="l">funnel page missing entirely</div></div>
+  </div>
+
+  <div class="note n-warn"><b>The headline finding: San Jose has no free-trial page.</b> The site draft has home, about, programs, contact and enroll - but not the page the entire sales system enters through. Every automation below fires off that form. It has to be built before anything else on this list matters.</div>
+
+  <h2>1 - Website pages</h2>
+  <p class="h2sub">What exists in the site repo for <span class="m">bam-san-jose</span>, verified against the repo's main branch today.</p>
+  <div class="card scroll"><table>
+    <tr><th>Page</th><th>Status</th><th>What to review / do</th></tr>
+    <tr><td><b>Free-trial landing page</b></td><td><span class="pill p-not">not built</span></td><td>Does not exist. The primary entry of the sales system - the trial form automation fires from it. Build first.</td></tr>
+    <tr><td><b>Home</b> <span class="m">index.html</span></td><td><span class="pill p-rev">review</span></td><td>Draft exists. Copy, photos (placeholder assets still present), links.</td></tr>
+    <tr><td><b>About / Programs / Contact</b></td><td><span class="pill p-rev">review</span></td><td>Drafts exist. Contact page is the sales system's second entry (contact form automation).</td></tr>
+    <tr><td><b>Enroll</b></td><td><span class="pill p-rev">review</span></td><td>Draft exists - but it cannot take money until Stripe connects (section 6).</td></tr>
+    <tr><td><b>Brand board</b> + <b>agreement</b></td><td><span class="pill p-rev">review</span></td><td>Both exist. Brand board is one of your three formal approvals.</td></tr>
+    <tr><td><b>Publishing</b></td><td><span class="pill p-not">not done</span></td><td>Everything is in <span class="m">site-draft/</span>. The site is not live at byanymeanssanjose.com.</td></tr>
+  </table></div>
+
+  <h2>2 - Identity facts on the academy row</h2>
+  <p class="h2sub">These feed every email footer, the agent, and the website. Empty means the line silently disappears - never borrowed from another academy.</p>
+  <div class="card scroll"><table>
+    <tr><th>Fact</th><th>Value today</th><th>Status</th><th>Used by</th></tr>
+    <tr><td><b>Public name</b></td><td>By Any Means San Jose</td><td><span class="pill p-rev">review</span></td><td>Wordmark, every email, agent</td></tr>
+    <tr><td><b>Business email</b></td><td><span class="m">elijah@byanymeanssanjose.com</span></td><td><span class="pill p-dec">decide</span></td><td>Footer contact + unsubscribe. Currently the same as Lij's personal inbox - fine for a one-person academy, but it should be his choice, and it must end up connected to Resend + Gmail.</td></tr>
+    <tr><td><b>Business phone</b></td><td>(408) 597-4327</td><td><span class="pill p-rev">review</span></td><td>You confirmed it. Website, emails.</td></tr>
+    <tr><td><b>Address / city</b></td><td>1051 W San Fernando St, San Jose</td><td><span class="pill p-rev">review</span></td><td>City derives correctly. 2 venues on file.</td></tr>
+    <tr><td><b>Tagline</b></td><td>empty</td><td><span class="pill p-work">needs work</span></td><td>The one-line sentence under the wordmark in every email footer. Needs writing.</td></tr>
+    <tr><td><b>Instagram URL</b></td><td>empty</td><td><span class="pill p-work">needs work</span></td><td>Footer Instagram link in every email. Without it the link just drops.</td></tr>
+    <tr><td><b>Google review link</b></td><td>empty</td><td><span class="pill p-work">needs work</span></td><td>The agent's review pointer + the review-ask email. Google rating exists (5.0 from 22, dated) but there is nowhere to send a parent.</td></tr>
+    <tr><td><b>Community group</b></td><td>empty</td><td><span class="pill p-dec">decide</span></td><td>Welcome message invite line. Optional - decide whether SJ has one, or the line stays out.</td></tr>
+    <tr><td><b>Online programs / referral offer</b></td><td>empty</td><td><span class="pill p-dec">decide</span></td><td>Optional welcome-email blocks, currently GTA-only. Fine to leave empty.</td></tr>
+    <tr><td><b>Time zone</b></td><td>America/Los_Angeles</td><td><span class="pill p-rev">review</span></td><td>Confirmations render in Pacific time.</td></tr>
+  </table></div>
+
+  <h2>3 - Pipeline</h2>
+  <div class="card scroll"><table>
+    <tr><th>Item</th><th>Measured</th><th>Status</th><th>Notes</th></tr>
+    <tr><td><b>Stages stamped</b></td><td>5 of 5</td><td><span class="pill p-rev">review</span></td><td>Booking, Ghosted, Confirm, Closing, Nurture - from the preset, nobody edits these.</td></tr>
+    <tr><td><b>Stage registry (GHL map)</b></td><td>4 of 5 mapped</td><td><span class="pill p-work">needs work</span></td><td><b>Nurture is unmapped</b>, so the migration safety check refuses - correctly. Likely their GHL board has no Nurture column. Human decision, not a re-run.</td></tr>
+    <tr><td><b>Imported lead cards</b></td><td>65 open</td><td><span class="pill p-dec">decide</span></td><td>The 65 imports are in the portal store. Classifying them (direct / altered / quarantined) is the seeding design - the four questions still waiting on you.</td></tr>
+    <tr><td><b>Provider flags</b></td><td>all still GHL, shadow off</td><td><span class="pill p-rev">review</span></td><td>Correct for now. The flip happens only after the sales system is approved and sending; contacts + texting stay on GHL by design.</td></tr>
+  </table></div>
+
+  <h2>4 - Messages: 13 seeded, every one tokenized, none approved</h2>
+  <p class="h2sub">All 13 steps use tokens (<span class="m">location.name</span> etc.) - zero hardcoded academy names, measured today. Every automation is <b>approved: false</b>, so nothing can send until the owner approves. Review each rendered message in the approval surface, not the raw template.</p>
+  <div class="card scroll"><table>
+    <tr><th>Automation</th><th>Steps</th><th>Class</th><th>Status</th><th>What to check</th></tr>
+    <tr><td><b>Trial form reply</b></td><td>1 SMS</td><td>shared</td><td><span class="pill p-rev">review</span></td><td>The first thing a new lead receives.</td></tr>
+    <tr><td><b>Contact form reply</b></td><td>1 SMS</td><td>shared</td><td><span class="pill p-rev">review</span></td><td>-</td></tr>
+    <tr><td><b>Ghosted</b></td><td>2 SMS + 1 email</td><td>shared</td><td><span class="pill p-rev">review</span></td><td>The follow-up sequence for leads who go quiet.</td></tr>
+    <tr><td><b>Missed trial</b></td><td>1 SMS</td><td>shared</td><td><span class="pill p-rev">review</span></td><td>-</td></tr>
+    <tr><td><b>Nurture 1 + 2</b></td><td>2 emails</td><td>local</td><td><span class="pill p-rev">review</span></td><td>The global-brand story emails. Their claims (50+ countries, 502K subscribers) are BAM-brand facts - true for SJ as a BAM academy, but read them as Lij would.</td></tr>
+    <tr><td><b>Nurture 3 - testimonials</b></td><td>1 email</td><td>attributed</td><td><span class="pill p-rev">review</span></td><td>Now renders SJ's own 5 real quotes from the store (2 starred). No other academy's words can appear - mechanically enforced.</td></tr>
+    <tr><td><b>Nurture 4</b></td><td>1 email</td><td>shared</td><td><span class="pill p-rev">review</span></td><td>-</td></tr>
+    <tr><td><b>Member onboarding</b></td><td>3 SMS</td><td>shared</td><td><span class="pill p-work">needs work</span></td><td>SJ has the 3 welcome texts only. GTA's full member email set (story, era, training, review, testimonials) is the member-management build, which is parked - known, not a surprise.</td></tr>
+    <tr><td><b>Trial confirmation + reminder</b></td><td>confirm agent</td><td>-</td><td><span class="pill p-work">needs work</span></td><td>The confirm automations were never approved for SJ - today it sends ZERO booking confirmations. Needs review + approval like everything else.</td></tr>
+  </table></div>
+
+  <h2>5 - Agent brain: 9 facts, 3 cannot render yet</h2>
+  <p class="h2sub">Your rule: all of this is mandatory before the preset switches on. The brain-health strip shows exactly this list in the portal.</p>
+  <div class="card scroll"><table>
+    <tr><th>Fact</th><th>Feeds from</th><th>Status</th></tr>
+    <tr><td><b>Program, policies, selling points, qualification</b></td><td>The training offer (1 exists)</td><td><span class="pill p-rev">review</span> - open the offer and check each step is actually filled</td></tr>
+    <tr><td><b>Business info</b></td><td>Row + 2 venues</td><td><span class="pill p-rev">review</span></td></tr>
+    <tr><td><b>Social proof</b></td><td>5 testimonials, 5.0 from 22 reviews</td><td><span class="pill p-work">needs work</span> - quotes and rating render, but the review LINK is empty (section 2)</td></tr>
+    <tr><td><b>Pricing</b></td><td>Sellable prices</td><td><span class="pill p-not">blocked</span> - 0 sellable prices exist; blocked behind Stripe (section 6)</td></tr>
+    <tr><td><b>Schedule</b></td><td>Schedule slots</td><td><span class="pill p-not">not built</span> - 0 slots. The agent cannot say when sessions run, and the booking calendar is empty</td></tr>
+    <tr><td><b>Coaches</b></td><td>Team bios</td><td><span class="pill p-work">needs work</span> - 4 team members, 0 bios</td></tr>
+  </table></div>
+
+  <h2>6 - Transports and money</h2>
+  <div class="card scroll"><table>
+    <tr><th>Item</th><th>Today</th><th>Status</th><th>Notes</th></tr>
+    <tr><td><b>SMS / phone</b></td><td>GHL</td><td><span class="pill p-rev">review</span></td><td>By design - SJ launches on GHL transport, Lij owns his own Twilio later. Decided, nothing to build.</td></tr>
+    <tr><td><b>Email sending</b></td><td>GHL; Resend domain recorded but NOT verified</td><td><span class="pill p-work">needs work</span></td><td>Until byanymeanssanjose.com verifies in Resend, portal email holds. Setup task, then it flips itself.</td></tr>
+    <tr><td><b>Stripe</b></td><td>not connected</td><td><span class="pill p-not">not done</span></td><td>Blocks sellable prices, the enroll page, and the pricing fact. Lij action.</td></tr>
+  </table></div>
+
+  <h2>7 - Imports and seeding</h2>
+  <div class="card scroll"><table>
+    <tr><th>Item</th><th>Measured</th><th>Status</th><th>Notes</th></tr>
+    <tr><td><b>Contacts mirrored</b></td><td>547</td><td><span class="pill p-rev">review</span></td><td>In the portal, GHL still authoritative. Correct shape.</td></tr>
+    <tr><td><b>The 65 imported leads</b></td><td>on the board store</td><td><span class="pill p-dec">decide</span></td><td>Standing rule: nobody messages them without you naming who. Reignition is live and is their only door.</td></tr>
+    <tr><td><b>Pipeline seeding design</b></td><td>-</td><td><span class="pill p-not">not designed</span></td><td>The four questions (classification rule, altered-lead release, agent engagement, sign-off) are the last design piece. Waiting on you.</td></tr>
+  </table></div>
+
+  <h2>8 - The order I would review it in</h2>
+  <div class="card"><table>
+    <tr><td><b>1</b></td><td>Answer the four seeding questions (10 min, unblocks the last design)</td></tr>
+    <tr><td><b>2</b></td><td>Fill the empty row facts: tagline, Instagram, review link, community decision (15 min, in Business Basics)</td></tr>
+    <tr><td><b>3</b></td><td>Build the free-trial page (the missing entry point), then review all site pages</td></tr>
+    <tr><td><b>4</b></td><td>Lij: connect Stripe, then prices become sellable and the enroll page works</td></tr>
+    <tr><td><b>5</b></td><td>Enter the schedule (slots), add coach bios - the last two agent facts</td></tr>
+    <tr><td><b>6</b></td><td>Review all 13 rendered messages + the confirmations in the approval surface</td></tr>
+    <tr><td><b>7</b></td><td>Lij's three formal approvals: brand board, sales messages, accept website</td></tr>
+    <tr><td><b>8</b></td><td>Seed the pipeline (your classification), soak, then flip</td></tr>
+  </table></div>
+
+  <div class="note n-gold"><b>What is genuinely solid already:</b> all 13 messages tokenized with zero hardcoded names, nothing can send without owner approval, SJ's testimonial email carries its own 5 real quotes and can never carry another academy's, the pipeline safety check now refuses honestly instead of being bypassed, and the identity layer (name, phone, address, city, time zone) is correct on the row.</div>
+
+  <div class="foot">Measured against production and the site repo on 30 Jul 2026. Statuses reflect that moment; re-measure rather than trust this page after work lands.</div>
+
+</div>
+</body>
+</html>
