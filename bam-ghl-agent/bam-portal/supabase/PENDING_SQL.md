@@ -15,7 +15,7 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
 | Migration file | What it does | Blocked features until applied | Added |
 |---|---|---|---|
-| `20260730120000_agent_reply_status_dismissed.sql` | Adds `dismissed` to the status CHECK on `agent_ready_replies`, `agent_confirm_replies`, `agent_followups`, `agent_closing_replies`. Each keeps its OWN existing values (closing keeps `paused`) | **"Send nothing" on every Hawkeye reply card, on every academy.** It writes `status='dismissed'`, the CHECK rejects it, the card bounces back into the deck ~6s later with a raw Postgres error toast. Zero `dismissed` rows exist in prod - it has never once worked | 2026-07-30 (Claude session, PR #1648) |
+| `20260730T120000_public_ticket_intake.sql` | Widens `tickets_source_check` to allow `public_form`, adds `tickets.public_token` (unique where not null), adds 3 partial indexes the public-form rate limiter needs. All additive, no policy, no new table. | The PUBLIC support form at `/ticket`. It has NEVER created a ticket (213 exist, 0 from this form). Until this runs, `api/public-ticket.js` 500s on every submit and the form shows its honest "Your request was not submitted" screen with the email fallback - nothing lies, nothing is lost, nothing is saved. `/ticket/<token>` stays "Ticket not found". | 2026-07-30 |
 
 
 > **`20260729T230000` step 2, and it is not optional:** the moment that migration is
@@ -38,6 +38,7 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
 | Migration file | Applied | By |
 |---|---|---|
+| `20260730120000_agent_reply_status_dismissed.sql` | 2026-07-30 | Claude (Supabase MCP, at Zoran's request). Verified after applying: all four CHECKs allow `dismissed`, `agent_closing_replies` kept `paused`. |
 | `20260727150000_conversations_last_author_kind.sql` | 2026-07-30 | Claude (Supabase MCP, at Zoran's request). Cole's, not this session's. Verified the replacement trigger is a strict SUPERSET of the live one before running it (live set 3 fields, new sets those 3 plus `last_message_author_kind`), and that `author_staff_id` exists on `conversation_messages` - the table the trigger actually fires on. A missing column there would have failed every message insert |
 | `20260729T235000_public_name_and_city_from_the_row.sql` | 2026-07-30 | Claude (Supabase MCP). Data only. GTA `public_name` -> By Any Means Toronto, address gains Oakville so `cityFromAddress` parses it, San Jose -> By Any Means San Jose |
 | `20260729T230000_clients_tagline_instagram.sql` | 2026-07-30 | Claude (Supabase MCP). Verified `update_client_basics` ended at 24 settable columns, a strict superset of the 18 the live function had |

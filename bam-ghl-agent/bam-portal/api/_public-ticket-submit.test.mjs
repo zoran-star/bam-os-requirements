@@ -22,6 +22,29 @@
 // this suite mostly guards. The load-bearing assertion is not "the status
 // string is right", it is A FAILED WRITE CANNOT PRODUCE A SUCCESS.
 //
+// ─── WHAT CHANGED WHEN THE FORM WAS MADE TO WORK ────────────────────────────
+//
+// The write moved off the anon key and onto /api/public-ticket, because RLS on
+// `tickets` has no anonymous insert path and never did. Three things in this
+// file moved with it, and NONE of them is a relaxed assertion:
+//
+//   * ACCEPTED used to be `{ data: [{ id, status }] }`, which is no longer a
+//     shape the intake route can return. It now carries the reference and the
+//     token the SERVER minted, because that is what a saved row looks like.
+//   * "only then are the reference and token handed out" now checks they are
+//     the SERVER's values, and a new assertion checks the locally minted pair
+//     is NOT what a person is shown. Strictly more than it asserted before.
+//   * The component check on `.insert([row]).select()` is now a check that the
+//     component builds its db with makeIntakeDb and holds no supabase insert
+//     of its own - and the proof-of-row property it stood for moved from a
+//     regex into section 6, where makeIntakeDb is EXECUTED against a fake
+//     fetch rather than pattern-matched.
+//
+// The rule got stricter, not looser: a reference and a tracking link are shown
+// only if the SERVER named them. A locally invented reference points at no row
+// anyone can look up, and a locally invented token builds a link that 404s -
+// which is the same lie as a fake success, one click later.
+//
 // ─── NEGATIVE CONTROLS ──────────────────────────────────────────────────────
 //
 // Each writes a mutated copy of the real file next to it, imports that, and the
@@ -35,7 +58,11 @@
 //   MUTATE=refonfail     node api/_public-ticket-submit.test.mjs  # a failure hands out a ticket reference
 //   MUTATE=emailfatal    node api/_public-ticket-submit.test.mjs  # a bounced confirmation email un-does the ticket
 //   MUTATE=alwayssuccess node api/_public-ticket-submit.test.mjs  # the component shows screen 3 regardless
-//   MUTATE=noselect      node api/_public-ticket-submit.test.mjs  # the component drops .select(), so no row comes back
+//   MUTATE=localref      node api/_public-ticket-submit.test.mjs  # the LOCAL ref/token are shown instead of the server's
+//   MUTATE=norefcheck    node api/_public-ticket-submit.test.mjs  # a saved row with no reference counts as success
+//   MUTATE=echorequest   node api/_public-ticket-submit.test.mjs  # makeIntakeDb reports the REQUEST as the saved row
+//   MUTATE=ignorestatus  node api/_public-ticket-submit.test.mjs  # makeIntakeDb ignores the HTTP status
+//   MUTATE=directinsert  node api/_public-ticket-submit.test.mjs  # the component goes back to inserting via supabase-js
 
 import fs from "node:fs";
 import path from "node:path";
@@ -105,6 +132,22 @@ const MODULE_EDITS = {
                `  const failed = (reason, detail) => ({ ok: false, reason, detail: detail || "", row, ticketRef: ref, publicToken: token });`]],
   emailfatal:[[`    } catch (_) { /* best effort */ }`,
                `    } catch (e) { return failed("threw", (e && e.message) || String(e)); }`]],
+  // The locally minted pair - which exists only for the failure diagnostic -
+  // is shown to the person as if it were a real reference and a real link.
+  localref:  [[`  return { ok: true, ticketRef: savedRef, publicToken: savedToken, reason: "", detail: "", row, saved };`,
+               `  return { ok: true, ticketRef: ref, publicToken: token, reason: "", detail: "", row, saved };`]],
+  // A saved row that never named itself counts as proof anyway.
+  norefcheck:[[`  if (!savedRef || !savedToken) return failed("no_reference");`,
+               `  if (false) return failed("no_reference");`]],
+  // makeIntakeDb reports the thing it SENT as the thing that was saved. This is
+  // the original bug in its newest possible costume: every failure would look
+  // exactly like a success again.
+  echorequest:[[`      const saved = json && json.data;
+      if (!saved || !saved.id) return { data: [], error: null };
+      return { data: [saved], error: null };`,
+                `      return { data: [payload], error: null };`]],
+  // A 400 or a 429 is treated as a save.
+  ignorestatus:[[`      if (!res.ok) {`, `      if (false) {`]],
 };
 
 async function loadModule() {
@@ -118,8 +161,9 @@ async function loadModule() {
 // as text against the real file.
 const COMPONENT_EDITS = {
   alwayssuccess: [[`    if (!outcome.ok) {`, `    if (false && !outcome.ok) {`]],
-  noselect:      [[`      insert: (row) => supabase.from("tickets").insert([row]).select(),`,
-                   `      insert: (row) => supabase.from("tickets").insert([row]),`]],
+  // Back to inserting with the anon key, which RLS refuses for a logged-out
+  // visitor - the wall this whole route exists to get around.
+  directinsert:  [[`    const db = makeIntakeDb({`, `    const db = supabase && { insert: (row) => supabase.from("tickets").insert([row]) }; const _unused = ({`]],
 };
 
 function loadComponent() {
@@ -163,7 +207,22 @@ const RLS_DENIED = {
   data: null,
   error: { code: "42501", message: 'new row violates row-level security policy for table "tickets"' },
 };
-const ACCEPTED = { data: [{ id: "row-uuid", status: "open" }], error: null };
+// A rate limit. Nothing was saved, but "try again in a minute" is true here
+// and is not true of a rejected write, so it gets its own reason.
+const THROTTLED = {
+  data: null,
+  error: { code: "throttled", message: "You have sent several requests in the last hour, so this one was not submitted." },
+};
+
+// What api/public-ticket.js returns for a row it saved. The reference is
+// derived from the row's uuid and the token is 24 random bytes; the browser
+// mints neither, and cannot.
+const SERVER_REF = "TKT-9D3F21AB";
+const SERVER_TOKEN = "aGVsbG8tdGhpcy1pcy1hLXNlcnZlci10b2tlbg";
+const ACCEPTED = {
+  data: [{ id: "9d3f21ab-77c4-4f1e-b0a2-6e5c0f9d1234", reference: SERVER_REF, public_token: SERVER_TOKEN, status: "open" }],
+  error: null,
+};
 
 async function main() {
   console.log("\n── The public support form's submit path ──");
@@ -206,10 +265,27 @@ async function main() {
     // No error, but no row either - an unproven write. Must not mint anything.
     const out = await submit(mod, { insert: async () => ({ data: [], error: null }) });
     ok(out.ok === false && !out.ticketRef, "no error but zero rows back -> ok:false, no reference");
+    // The REASON matters, not only the refusal. Since a saved row must also
+    // name itself, `no_reference` would catch this case downstream by
+    // accident - so without this the zero-row branch could be deleted and the
+    // only thing left proving it existed would be a crash. (MUTATE=norow was
+    // reduced to exactly that on the first run of this change.)
+    ok(out.reason === "no_row", "...and is reported as `no_row`, not left to a later branch to trip over");
   }
   {
     const out = await submit(mod, { insert: async () => ({ data: null, error: null }) });
-    ok(out.ok === false && !out.ticketRef, "no error and data null (an insert with no .select()) -> ok:false");
+    ok(out.ok === false && !out.ticketRef, "no error and data null (a response with no row in it) -> ok:false");
+    ok(out.reason === "no_row", "...also reported as `no_row`");
+  }
+  {
+    // A rate limit. Refused like anything else - nothing saved, no reference -
+    // but reported distinctly so the screen can say something true about
+    // whether retrying will help.
+    const out = await submit(mod, { insert: async () => THROTTLED });
+    ok(out.ok === false && !out.ticketRef && !out.publicToken, "a rate limit -> ok:false, no reference, no link");
+    ok(out.reason === "throttled", "...reported as `throttled`, not as a broken write");
+    ok(out.detail === THROTTLED.error.message, "...carrying the server's own plain-language explanation");
+    ok(!/\u2014/.test(mod.failureMessage("throttled")), "...and its fallback copy has no em dash in it");
   }
   {
     // Supabase not configured at all. The old code showed the success screen
@@ -226,8 +302,25 @@ async function main() {
     const seen = [];
     const out = await submit(mod, { insert: async (row) => { seen.push(row); return ACCEPTED; } });
     ok(out.ok === true, "a row the database accepts -> ok:true");
-    ok(out.ticketRef === REF && out.publicToken === TOKEN, "...and only then are the reference and token handed out");
+    ok(out.ticketRef === SERVER_REF && out.publicToken === SERVER_TOKEN,
+      "...and only then are the reference and token handed out - the SERVER's, off the saved row");
+    ok(out.ticketRef !== REF && out.publicToken !== TOKEN,
+      "...never the locally minted pair, which names no row and builds a link that would 404");
     ok(seen.length === 1, "...from exactly one insert");
+  }
+  {
+    // The row came back, but it did not name itself. There is a ticket
+    // somewhere and no way to point anyone at it, which is not a success.
+    const noRef = { data: [{ id: "row-uuid", public_token: SERVER_TOKEN, status: "open" }], error: null };
+    const out = await submit(mod, { insert: async () => noRef });
+    ok(out.ok === false && !out.ticketRef, "a saved row with no reference -> ok:false, no reference");
+    ok(out.reason === "no_reference", "...reported as `no_reference`");
+  }
+  {
+    const noTok = { data: [{ id: "row-uuid", reference: SERVER_REF, status: "open" }], error: null };
+    const out = await submit(mod, { insert: async () => noTok });
+    ok(out.ok === false && !out.publicToken,
+      "a saved row with no tracking token -> ok:false, so no link is handed out that would 404");
   }
   {
     // The confirmation email is best effort. A bounced email is not a lost
@@ -238,7 +331,7 @@ async function main() {
       sendConfirmation: async () => { called++; throw new Error("edge function 500"); },
     });
     ok(called === 1, "the confirmation email is attempted on success");
-    ok(out.ok === true && out.ticketRef === REF, "...and a failing confirmation email does NOT un-do a saved ticket");
+    ok(out.ok === true && out.ticketRef === SERVER_REF, "...and a failing confirmation email does NOT un-do a saved ticket");
   }
   {
     let called = 0;
@@ -297,8 +390,13 @@ async function main() {
   {
     ok(/runTicketSubmit\(/.test(component),
       "PublicTicket.jsx submits through runTicketSubmit rather than its own inline insert");
-    ok(/\.insert\(\[row\]\)\.select\(\)/.test(component),
-      "...and asks for the inserted row back with .select(), or nothing could ever prove a write happened");
+    ok(/const db = makeIntakeDb\(\{/.test(component),
+      "...through the intake route (makeIntakeDb), because RLS gives a logged-out visitor no way to insert");
+    ok(!/supabase\.from\("tickets"\)/.test(component) && !/from "\.\/supabase"/.test(component),
+      "...and holds no direct tickets insert of its own, which the anon key would be refused anyway");
+    // What .select() used to stand for - a row must come BACK - is now checked
+    // by executing makeIntakeDb in section 6 rather than by matching text.
+    ok(/HONEYPOT_FIELD/.test(component), "the form carries the honeypot field the intake route refuses on");
     ok(/if \(!outcome\.ok\) \{[\s\S]{0,400}?setStep\(4\);\s*\n\s*return;/.test(component),
       "a failed outcome routes to the not-saved screen and returns");
     // The single most important line in the component: setStep(3) must be
@@ -313,6 +411,72 @@ async function main() {
     ok(/setTicketRef\(outcome\.ticketRef\)/.test(component) && !/setTicketRef\(ref\)/.test(component),
       "the reference shown comes from the outcome, not from an id minted before the insert was attempted");
   }
+  });
+
+  // ── 6. THE THING THAT DECIDES "SAVED" ─────────────────────────────────────
+  // makeIntakeDb is the only piece that ever sees the server's answer, so it
+  // is the only piece that can turn a failure into a success. It is EXECUTED
+  // here against a fake fetch - no network - rather than pattern-matched,
+  // because this is exactly where a text-shaped check would have missed the
+  // original bug too.
+  await section("A row is only a row if the server sent one back", async () => {
+    const fakeFetch = (status, body) => async (url, init) => {
+      fakeFetch.lastUrl = url; fakeFetch.lastInit = init;
+      return { ok: status >= 200 && status < 300, status, json: async () => body };
+    };
+    const payload = { client_name: "Marcus Reid", fields: { Description: "help" } };
+
+    {
+      const db = mod.makeIntakeDb({ fetchImpl: fakeFetch(200, { data: { id: "row-uuid", reference: "TKT-ABC", public_token: "tok" } }) });
+      const res = await db.insert(payload);
+      ok(!res.error && Array.isArray(res.data) && res.data.length === 1, "200 with a row -> that row, no error");
+      ok(res.data[0].reference === "TKT-ABC", "...and it is the SERVER's row");
+      ok(res.data[0].client_name === undefined, "...not the request echoed back");
+    }
+    {
+      // The single most dangerous response shape: a 200 that carries nothing.
+      const db = mod.makeIntakeDb({ fetchImpl: fakeFetch(200, { data: null }) });
+      const res = await db.insert(payload);
+      ok(!res.error && Array.isArray(res.data) && res.data.length === 0,
+        "200 with no row -> zero rows, which runTicketSubmit turns into no_row");
+    }
+    {
+      const db = mod.makeIntakeDb({ fetchImpl: fakeFetch(200, { data: { reference: "TKT-ABC" } }) });
+      const res = await db.insert(payload);
+      ok(res.data.length === 0, "200 with a row that has no id is not a row either");
+    }
+    for (const [status, body, label] of [
+      [400, { error: "That email address does not look right.", code: "bad_request" }, "a 400"],
+      [429, { error: "Too many requests.", code: "throttled" }, "a 429"],
+      [500, { error: "We could not save your request.", code: "server_error" }, "a 500"],
+      [503, { error: "Support intake is not configured.", code: "not_configured" }, "a 503"],
+    ]) {
+      const db = mod.makeIntakeDb({ fetchImpl: fakeFetch(status, body) });
+      const res = await db.insert(payload);
+      ok(res.error && res.error.code === body.code && !res.data, `${label} -> an error carrying the server's code, and no data`);
+      const out = await mod.runTicketSubmit({ db, form: FORM, makeRef: () => REF, makeToken: () => TOKEN });
+      ok(out.ok === false && !out.ticketRef && !out.publicToken, `${label} -> ok:false, no reference, no tracking link`);
+    }
+    {
+      // A body that is not JSON at all (an HTML error page from the edge).
+      const db = mod.makeIntakeDb({ fetchImpl: async () => ({ ok: false, status: 502, json: async () => { throw new Error("not json"); } }) });
+      const res = await db.insert(payload);
+      ok(!!res.error && !res.data, "a non-JSON error response is still an error, not a save");
+    }
+    {
+      const db = mod.makeIntakeDb({ fetchImpl: async () => ({ ok: true, status: 200, json: async () => { throw new Error("not json"); } }) });
+      const res = await db.insert(payload);
+      ok(Array.isArray(res.data) && res.data.length === 0, "a 200 whose body cannot be read proves nothing either");
+    }
+    {
+      const db = mod.makeIntakeDb({ fetchImpl: fakeFetch(200, { data: { id: "x", reference: "r", public_token: "t" } }) });
+      await db.insert(payload);
+      ok(fakeFetch.lastUrl === mod.INTAKE_ENDPOINT, `it posts to ${mod.INTAKE_ENDPOINT}`);
+      ok(fakeFetch.lastInit.method === "POST", "...with POST");
+      ok(JSON.parse(fakeFetch.lastInit.body).client_name === "Marcus Reid", "...carrying what the person typed");
+    }
+    ok(mod.makeIntakeDb({}) === null,
+      "with no fetch there is no db at all, which routes to not_configured rather than a fake success");
   });
 
   // ── report ────────────────────────────────────────────────────────────────
