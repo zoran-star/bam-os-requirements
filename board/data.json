@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · ticket migration was already done, phones confirmed",
+ "updated": "2026-07-30 · phone question answered by rendering, seventh leak copy found",
  "recentUpdates": [
+  "Phone question answered by actually rendering: your number DOES reach parents, in one line of the welcome email, and it has for ten months. Not a new leak",
+  "San Jose's number has never been sent to anyone, so its first welcome email is the first real test of it",
+  "A test that FAILED found a seventh copy of the age-groups bug. It failed for a better reason than it was written for, and reading why is what found it",
+  "Four times tonight a note or a test was read as answering a question it never claimed to answer. Not one of them was wrong",
   "The support form migration was ALREADY applied. Our own notes said it was pending, and that is what I told you. Corrected",
-  "Tested the live form rather than assuming: it answers properly instead of erroring. What is still unproven is whether it SAVES, and only a real submission shows that",
-  "Both business phone numbers confirmed by you, so they are real data now instead of numbers scraped off Google",
-  "Three different stale notes tripped us tonight, and not one of them was wrong. Each answered a question nobody had actually asked it",
-  "You approved the age-routing plan AND caught a real bug in it: GTA's older group is 'ages 14 and up' with no top, so forcing a top number would have quietly locked out a 19-year-old",
-  "Split into two builds on purpose. Shipping them together would have replaced a leak with an outage for every academy including GTA"
+  "Tested the live form rather than assuming: it answers properly instead of erroring. What is still unproven is whether it SAVES, and only a real submission shows that"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
