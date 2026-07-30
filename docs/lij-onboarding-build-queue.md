@@ -4,6 +4,48 @@ Live queue of everything the San Jose onboarding surfaces. Onboarding spans days
 
 **Started 2026-07-25.**
 
+## ✅ GATE 1 PASSED ON AGE ROUTING (Zoran, 2026-07-30). **AND HE CAUGHT A REAL DEFECT IN THE PLAN BY QUESTIONING IT.** Recorded in his name, at the room's request.
+
+The room proposed two numbers per class, youngest and oldest. **He asked "shouldn't the age be a range of actual ages included?"** and that question found the bug: **GTA's own second group is `ages 14 and up`. It has no top.** A mandatory top number would have made someone type 18, **silently locking out a 19-year-old and changing GTA's live behaviour on day one** - the exact thing his hard rule forbids. The plan would have shipped it.
+
+**Ruling: an INCLUSIVE range, and the top may be "no limit".** Overlaps are legal and route to his ask-one-question rule. **Gaps are the danger** (a 12-year-old fitting nothing) and the owner's screen must SHOW a gap rather than let it sit silently.
+
+**This is the fourth time his premise question beat the plan**, and it is worth naming the pattern rather than the instance: **he tests a design against the thing he actually runs, and our designs get tested against the thing we just read.**
+
+### The build is SPLIT, and the order is the point
+
+**A: carry the class onto the slot, with NO routing behaviour change.** Emit `source_offer_id` + `source_offer_class_key` from `_offer-schedule.js`, accept them in `templates.ts`, add the inclusive-range fields, and write the resolver as a pure tested function **that nothing calls yet**.
+
+**B: throw the switch.** Point all three booking paths at the resolver, delete `groupOf()`, remove all copies of GTA's bands.
+
+**Why, in the room's words and it is stronger than the rule it obeys: `source_offer_class_key` is NULL on all 86 GTA slots today, so shipping A and B together points the resolver at slots that carry no class, and every academy INCLUDING GTA starts failing to match. That replaces a leak with an outage.** A must land, deploy and backfill before B is safe. **The backfill is a production data write and is the orchestrator's, not the room's.**
+
+### Collision check on `public/client-portal.html`, run by content and NOT by title
+
+**Ten open PRs touch the file. ZERO touch the offer wizard's Schedule section.** No open PR contains a single `subFields`, `classes:`, `age_min` or `age_max` line. **#632 is the only one with a hunk in the same line range and it is a different surface** (the creative-request asset modal at 31526, Format and captions), adjacent line numbers in a monolith. Every one of the ten is at least two days stale. **Ruling: the room proceeds, additively, never restructuring the `subFields` array. Expect a rebase, not a conflict.**
+
+## ⚠️ CORRECTION TO THIS FILE: **THE BUSINESS-CONTACT BUILD IS HALF SHIPPED, AND THE QUEUE STILL DESCRIBES ALL OF IT AS PENDING** (orchestrator-queried, 2026-07-30)
+
+| column | state in production |
+|---|---|
+| `clients.business_email` | **EXISTS and populated.** GTA `info@byanymeanstoronto.ca`, San Jose `elijah@byanymeanssanjose.com` |
+| `clients.business_phone` | **DOES NOT EXIST** |
+
+**The email half is DONE**: the footer and unsubscribe read it, and Zoran's personal inbox is out of every GTA email. **The phone half is genuinely unbuilt**, stays with the templating room, and is gated on Zoran supplying two numbers. **Anyone reading the routing block further down this file will otherwise rebuild shipped work.**
+
+## ⛔⛔ AND THE SAME QUERY FOUND SOMETHING NOBODY WAS LOOKING FOR: **THE TWO UNCONFIRMED GOOGLE-SOURCED PHONE NUMBERS ARE ALREADY IN `clients.phone`.**
+
+| | `clients.phone` |
+|---|---|
+| BAM GTA | **(289) 816-6569** |
+| BAM San Jose | **(408) 597-4327** |
+
+**These are the exact two numbers this file records as "waiting on Zoran to confirm", and both were read off the academies' GOOGLE LISTINGS.** A previous orchestrator recorded handing them to a room as its own mistake, in these words: *"A business phone is not a display field; it becomes the number printed to parents."*
+
+**They are now sitting in the column this file says the coach contact line reads.** The last time that line was checked it did not render, and the recorded reason was *"the coach contact line did not render, `clients.phone` is empty"*. **It is not empty any more, and nothing connected the two facts.**
+
+**Routed to the templating room to answer BY RENDERING, not by reading, because it owns that path: does `clients.phone` reach a parent today, for either academy?** If no, this is latent and Zoran's "confirm two numbers" stays a design gate. **If yes, an unconfirmed number scraped off Google is already being printed to parents**, which is a different and more urgent thing. **Nothing is to be fixed on the strength of it until the render answers.**
+
 ## ⛔ THE AGE-ROUTING DEFECT IS ONE STAGE EARLIER THAN THIS FILE AND THE HANDOVER BOTH SAY (AUTOMATION TEMPLATING III, 2026-07-30, in its name. DB half orchestrator-verified.)
 
 **Both my brief and II's handover claimed San Jose's back-to-back classes make the `rows[0]` fallback a live misbooking. Read against the actual query, that claim does not hold, and the real defect is worse.**

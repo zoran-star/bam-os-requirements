@@ -1,21 +1,21 @@
 {
- "updated": "2026-07-30 · age-routing scoped, and the misbooking is not where anyone thought",
+ "updated": "2026-07-30 · age routing approved, split into two builds",
  "recentUpdates": [
+  "You approved the age-routing plan AND caught a real bug in it: GTA's older group is 'ages 14 and up' with no top, so forcing a top number would have quietly locked out a 19-year-old",
+  "Split into two builds on purpose. Shipping them together would have replaced a leak with an outage for every academy including GTA",
+  "Good news: the business EMAIL work is already done and live. Only the phone half is left, and it is waiting on your two numbers",
+  "Worth a look: those two phone numbers are ALREADY in the database, taken off Google listings. Checking now whether either is being printed to parents",
   "The class-routing bug is NOT where we thought. Nobody filters the times a parent is SHOWN by their kid's age, so the booking is precise and still wrong",
-  "That matters: a fix aimed at the old theory would ship, pass every test, and change nothing for San Jose",
-  "Checked in the database: San Jose has ZERO class times today, so this bites the day its schedule is generated, not now",
-  "GTA is the only academy the AI can book for at all, and only because its two class names happen to match a pattern in the code",
-  "MERGED. The gym door is gone: no academy tells a parent about a door in Oakville any more, and GTA's real door now comes from its own venue",
-  "Both database changes went in BEFORE the merge, so GTA never lost its door line for a second. Verified by reading the database back, not by trusting a success message"
+  "That matters: a fix aimed at the old theory would ship, pass every test, and change nothing for San Jose"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
    "Apply the public ticket migration? It is the ONLY thing left before the support form works. One word from you and it is done",
    "Confirm the public names: GTA is now 'By Any Means Toronto' and San Jose is now 'By Any Means San Jose'. Our notes say both should be 'By Any Means Basketball'",
+   "Confirm the 2 business phone numbers (SJ 408-597-4327, GTA 289-816-6569). Both are ALREADY in the database off Google listings, so this stopped being theoretical",
    "Two San Jose data fixes for launch: allowlist its domain, and press the entry-point seed button. Both are data, not code",
    "Decide on 2 new preset leaks: GTA's gym door in every academy's confirmation text, and GTA's age groups baked into every AI",
-   "Confirm 2 phone numbers (SJ business 408-597-4327, GTA 289-816-6569). They gate the design AND a risky migration behind it",
    "Send Lij his ask-list. Still the biggest thing you own and the biggest San Jose unblock",
    "File the Google Business Profile API application. Days to weeks, still unfiled",
    "SET UP TWILIO BITCH: 6 items, submit target Thursday, only 3 free attempts",
