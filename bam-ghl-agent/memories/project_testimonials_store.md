@@ -39,6 +39,26 @@ runs only the corpus half and reports itself DEGRADED - no Supabase secrets in
 Actions, deliberately. The FULL check (with env, store-quote half included)
 must be run locally before merging any PR that touches testimonial content.
 
+**LIVE STATE 2026-07-29 (end of day):** GTA store 5 rows/2 starred + 4.9/67;
+SAN JOSE store 5 rows/2 starred + 5.0/22 (its OWN listing). Consumers reading the
+store: GTA free-trial page, GTA homepage, GTA enroll flow, agent `social_proof`
+(all academies - the hardcoded Toronto link is DELETED), and `nurture-3` +
+`onboarding-testimonials` via the `{{location.testimonials}}` token. **SJ's
+nurture-3 step is now ENABLED** (its automation is still unapproved, which is a
+separate launch-day switch). Order mattered: the step was only flipped AFTER the
+store-backed template deployed, because flipping first would have sent GTA's
+"Parent of Adam" re-attributed to San Jose.
+
+**Render path:** `academyFacts` -> `location_testimonials` -> `email-shells`
+`testimonialsHtml()` -> `{{location.testimonials}}` token, in DROP_WHEN_EMPTY so
+an empty store drops the block AND its lead-in. Verified by
+`scripts/verify-nurture3-from-store.mjs` (in portal CI, no DB needed).
+
+**⚠️ The generated file `api/email-templates/nurture-emails.js` says "re-run the
+generator" and THE GENERATOR IS IN NEITHER REPO.** It is also not a byte copy of
+`bam-client-sites/system/emails/nurture/*.html` - replacing it wholesale from
+source broke a FOOTER_REASON guard. Edit both surgically and in step.
+
 **The skill:** repo-root `.claude/skills/testimonials/SKILL.md`. Filling the
 store is only half the build: free-trial cards, testimonial emails, agent
 social_proof and website review CTAs must all pull from the store/resolver, per

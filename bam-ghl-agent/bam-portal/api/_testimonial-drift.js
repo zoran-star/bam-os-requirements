@@ -94,6 +94,15 @@ export async function reconcileTestimonialDrift(sbReq) {
       }
     }
 
+    // ⛔ READ THIS BEFORE "FIXING" AN onboarding REPORT. Member-side
+    // testimonials are OUT OF SCOPE (Zoran, 2026-07-29: once a family has
+    // joined, they do not need convincing). The master deliberately ships SEVEN
+    // onboarding steps against GTA's EIGHT, and the missing one is the
+    // testimonials step. So an `onboarding` line here is INFORMATIONAL: it says
+    // "this academy could carry that step", NOT "promote it".
+    // Promoting it to close the gap would ship one academy's real parents to
+    // every academy, which is the original failure with extra steps. The gap is
+    // frozen pending Zoran's explicit "dropped, not deferred" ruling.
     if (st.rows > 0 && st.starred > 0 && tstSteps.length === 0) {
       reports.push(
         `${name} · ${a.automation_key} has NO testimonial step but the store has ${st.rows} row(s), ` +
