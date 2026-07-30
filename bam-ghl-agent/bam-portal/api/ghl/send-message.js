@@ -4,6 +4,7 @@ import { emailProvider, maybeSendEmailViaResend } from "../messaging/email-provi
 import { maybeSendEmailViaMailbox } from "../email/mailbox-send.js";
 import { maybeSendDmViaMeta } from "../meta/_dm.js";
 import { pickGhlToken } from "./_core.js";
+import { pendingHawkeyeCard, cancelParkedHawkeye, hawkContactIdFromPhone } from "../agent/_hawk-gate.js";
 // Vercel Serverless Function — GHL: send SMS or Email to an academy parent.
 //
 // POST /api/ghl/send-message
@@ -21,7 +22,18 @@ import { pickGhlToken } from "./_core.js";
 // Auth: caller must be staff OR belong to client_id via client_users.
 //
 // Returns: { ok, ghl_contact_id, ghl_conversation_id, ghl_message_id, sent_via }
+//          plus { canceled_parked: <n> } when the send retired n parked agent cards
 // Or:      { error, hint? }
+//
+// Hawkeye gate (see ../agent/_hawk-gate.js):
+//   - type SMS + the lead has a PENDING agent card  → 409
+//     { error: "hawkeye_pending", agent, card_id, contact_id }  → the UI reroutes
+//     staff into the Hawkeye deck. SMS only; email/DM sends are never blocked.
+//   - body flag `hawkeye_ack: true` skips that block (only _memberCareSendReply
+//     sets it - it IS a human-approved deck send riding this endpoint).
+//   - EVERY successful send, on every channel, cancels the lead's PARKED
+//     (approved + unsent) agent cards so a human reply can't be double-texted.
+//   - The gate fails open: any Supabase error or slow query lets the send through.
 //
 // Broken-case strategy:
 //   - clients.ghl_location_id missing  → 400 "academy not connected to GHL"
@@ -210,6 +222,37 @@ async function handler(req, res) {
   const inPhone     = body.contact_phone || body.phone || null;
   const inEmail     = body.contact_email || body.email || null;
 
+  // ── Hawkeye gate ───────────────────────────────────────────────────────────
+  // Sits here on purpose: after auth + client load + validation, but BEFORE the
+  // Meta / Twilio provider gates. Those run before the GHL contact lookup, so this
+  // is the only single spot that covers every provider path.
+  //
+  // `hawkCid` is the contact id the parked-card cleanup will use later. The
+  // phone-only paths (off-GHL Twilio sends carry a number, not a contact id)
+  // resolve it once here so sendOk below doesn't have to query again.
+  let hawkCid = inContactId ? String(inContactId) : null;
+  if (type === "SMS" && !body.hawkeye_ack) {
+    if (!hawkCid && inPhone) hawkCid = await hawkContactIdFromPhone(clientId, inPhone);
+    if (hawkCid) {
+      const card = await pendingHawkeyeCard(clientId, { contactId: hawkCid });
+      if (card) {
+        return res.status(409).json({
+          error: "hawkeye_pending", agent: card.agent, card_id: card.card_id, contact_id: card.contact_id,
+        });
+      }
+    }
+  }
+
+  // Every success return goes through here so the parked-card cleanup can never be
+  // forgotten on a new send path. Awaited, not fire-and-forget: Vercel kills work
+  // that starts after the response is sent.
+  const sendOk = async (payload, cid) => {
+    let target = cid ? String(cid) : hawkCid;
+    if (!target && inPhone) target = await hawkContactIdFromPhone(clientId, inPhone);
+    const n = target ? await cancelParkedHawkeye(clientId, target) : 0;
+    return res.status(200).json(n > 0 ? { ...payload, canceled_parked: n } : payload);
+  };
+
   // Provider gate (IG/FB DMs): Meta-spine academies reply via the Graph API +
   // own-store (dm_threads). Runs BEFORE the GHL contact lookup because a DM
   // thread has no phone/email and may have no GHL contact yet - the lookup
@@ -236,7 +279,7 @@ async function handler(req, res) {
       }).catch(() => {});
       if (!g.ok) { await logMeta({ status: "failed", error: g.error }); return res.status(502).json({ error: `Meta send failed: ${g.error}` }); }
       await logMeta({ status: "sent", ghl_message_id: g.mid || null });
-      return res.status(200).json({ ok: true, sent_via: "meta", message_id: g.mid || null });
+      return sendOk({ ok: true, sent_via: "meta", message_id: g.mid || null }, inContactId);
     }
   }
 
@@ -258,7 +301,7 @@ async function handler(req, res) {
       }).catch(() => {});
       if (!g.ok) { await logTw({ status: "failed", error: g.error }); return res.status(502).json({ error: `Twilio send failed: ${g.error}` }); }
       await logTw({ status: "sent", ghl_message_id: g.sid || null });
-      return res.status(200).json({ ok: true, sent_via: "twilio", message_id: g.sid || null });
+      return sendOk({ ok: true, sent_via: "twilio", message_id: g.sid || null }, inContactId);
     }
   }
 
@@ -297,7 +340,7 @@ async function handler(req, res) {
       if (g.handled) {
         if (!g.ok) { await logSend({ status: "failed", error: g.error }); return res.status(502).json({ error: `Twilio send failed: ${g.error}` }); }
         await logSend({ status: "sent", ghl_message_id: g.sid || null });
-        return res.status(200).json({ ok: true, sent_via: "twilio", message_id: g.sid || null });
+        return sendOk({ ok: true, sent_via: "twilio", message_id: g.sid || null }, contactId);
       }
     }
     // Provider gate (Email, HUMAN reply): academies with a connected mailbox send
@@ -313,7 +356,7 @@ async function handler(req, res) {
       if (g.handled) {
         if (!g.ok) { await logSend({ status: "failed", error: g.error }); return res.status(502).json({ error: `Mailbox send failed: ${g.error}` }); }
         await logSend({ status: "sent", ghl_message_id: g.id || null });
-        return res.status(200).json({ ok: true, sent_via: "gmail", message_id: g.id || null });
+        return sendOk({ ok: true, sent_via: "gmail", message_id: g.id || null }, contactId);
       }
     }
     // Provider gate (Email): Resend academies send via Resend + own-store.
@@ -326,7 +369,7 @@ async function handler(req, res) {
       if (g.handled) {
         if (!g.ok) { await logSend({ status: "failed", error: g.error }); return res.status(502).json({ error: `Resend send failed: ${g.error}` }); }
         await logSend({ status: "sent", ghl_message_id: g.id || null });
-        return res.status(200).json({ ok: true, sent_via: "resend", message_id: g.id || null });
+        return sendOk({ ok: true, sent_via: "resend", message_id: g.id || null }, contactId);
       }
     }
     const sendBody = type === "Email"
@@ -348,13 +391,13 @@ async function handler(req, res) {
     ghl_message_id:      sendResp.messageId      || null,
   });
 
-  return res.status(200).json({
+  return sendOk({
     ok: true,
     sent_via:            type,
     ghl_contact_id:      contactId,
     ghl_conversation_id: sendResp.conversationId || null,
     ghl_message_id:      sendResp.messageId      || null,
-  });
+  }, contactId);
 }
 
 export default withSentryApiRoute(handler);
