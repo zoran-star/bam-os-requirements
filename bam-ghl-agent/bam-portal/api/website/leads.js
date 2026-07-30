@@ -23,6 +23,7 @@ import { createOpp, moveStage, findOpenOpp, pipelineFlags, ROLE_MATCHERS } from 
 import { upsertPortalContact, writePortalFieldValues, contactProvider, resolveOrMintPortalContact } from "../_contacts.js";
 import { recordKpiEvent } from "../_kpi.js";
 import { cancelReignitions } from "../agent/_reignite.js";
+import { chooseSlotToBook, loadClassesFor, parentFacingClassName } from "../agent/_class-slots.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -571,17 +572,31 @@ async function handler(req, res) {
         }
         if (bookingProv === "portal") {
           // Book onto OUR slot via Luka's capacity-safe RPC (never a direct
-          // insert). Resolve the chosen time to a schedule_slots row, scoped to
-          // this calendar's "Group N" template family.
+          // insert). Resolve the chosen time to a schedule_slots row through the
+          // shared class resolver, so this path, the sales agent and DETAIL
+          // Miami's endpoint cannot give three different answers.
+          //
+          // The inline /group\s*\d+/ that used to scope this read the calendar
+          // label for BAM GTA's naming and resolved to null for every other
+          // academy in production, which is how "book whatever row comes back
+          // first" was the real behaviour everywhere else.
           const t = new Date(booking.start);
           if (isNaN(t.getTime())) throw new Error("invalid slot time");
           const slotRows = (await sbReq(
-            `schedule_slots?tenant_id=eq.${client.id}&is_cancelled=eq.false&start_time=eq.${encodeURIComponent(t.toISOString())}&select=id,name&limit=10`
+            `schedule_slots?tenant_id=eq.${client.id}&is_cancelled=eq.false&start_time=eq.${encodeURIComponent(t.toISOString())}&select=id,name,source_offer_class_key&limit=10`
           )) || [];
-          const groupMatch = /group\s*\d+/i.exec(calEp.label || "");
-          const groupPrefix = groupMatch ? groupMatch[0].toLowerCase().replace(/\s+/g, " ") : null;
-          const slot = slotRows.find(s => !groupPrefix || (s.name || "").toLowerCase().replace(/\s+/g, " ").includes(groupPrefix)) || slotRows[0];
-          if (!slot) throw new Error("slot not found for chosen time");
+          const classes = await loadClassesFor(sbReq, client.id);
+          const picked = chooseSlotToBook({
+            rows: slotRows, classes,
+            rawAge: fields?.athlete_age,
+            calendarLabel: calEp.label,
+          });
+          const slot = picked.slot;
+          if (!slot) throw new Error(picked.reason || "slot not found for chosen time");
+          // DECISION 3: the class's REAL name rides back to the site on the lead's
+          // fields, so a confirmation page can say "Beginner Academy" rather than
+          // our internal "Training - Beginner Academy (Tue)".
+          const className = parentFacingClassName(slot, classes);
           const rpcRes = await sbReq(`rpc/book_trial_slot`, {
             method: "POST",
             body: JSON.stringify({
@@ -596,13 +611,14 @@ async function handler(req, res) {
               p_offer_id: calEp.offer_id || null,
               p_ghl_contact_id: receipt.ghl_contact_id,
               p_source: "website",
-              p_metadata: { website_lead_id: leadId, calendar_key: booking.calendar_id, slot_name: slot.name },
+              p_metadata: { website_lead_id: leadId, calendar_key: booking.calendar_id, slot_name: slot.name, class_key: slot.source_offer_class_key || null, routed_by: picked.via },
             }),
           });
           const trialBookingId = typeof rpcRes === "string" ? rpcRes : (rpcRes && rpcRes.trial_booking_id) || null;
           if (!trialBookingId) throw new Error("trial booking failed");
           appointmentStatus = "booked";
           fields.trial_booking_id = trialBookingId;
+          if (className) fields.class_name = className;
           fields.booked_slot = booking.start;
           receipt.fields = fields;
         } else {

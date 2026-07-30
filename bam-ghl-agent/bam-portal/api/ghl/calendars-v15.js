@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "../website/availability.js";
 import { bookPortalTrial } from "../agent/booking.js";
+import { classIndex, classForCalendar, identifySlotClass, loadClassesFor } from "../agent/_class-slots.js";
 import { recordKpiEvent } from "../_kpi.js";
 // Multiple live GHL calls per request (calendars + events + appointment +
 // contact) — give it headroom past the default ~10s budget.
@@ -160,12 +161,13 @@ async function loadClient(clientId) {
 
 const TB_TO_GHL_STATUS = { BOOKED: "confirmed", SHOWED: "showed", NO_SHOW: "noshow", CANCELLED: "cancelled" };
 
-function groupPrefixOf(label) {
-  const m = /group\s*\d+/i.exec(String(label || ""));
-  return m ? m[0].toLowerCase().replace(/\s+/g, " ") : null;
-}
-const slotMatchesGroup = (slotName, prefix) =>
-  !prefix || String(slotName || "").toLowerCase().replace(/\s+/g, " ").includes(prefix);
+// groupPrefixOf() USED TO LIVE HERE and read /group\s*\d+/ off a calendar label -
+// BAM GTA's naming, which resolved to null for every other academy. It is replaced
+// by classForCalendar (api/agent/_class-slots.js), which matches the label against
+// the academy's OWN class titles. A calendar that names no class narrows nothing,
+// which is exactly what the regex did for everyone but GTA.
+const slotMatchesClass = (slot, classKeyWanted, idx) =>
+  !classKeyWanted || identifySlotClass(slot, idx).key === classKeyWanted;
 
 // Whole-years age from a DOB (null if missing / unparseable). Athlete DOB is only
 // present once the booking form captures it - falls back to the group band below.
@@ -179,16 +181,31 @@ function ageFromDob(dob) {
   if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
   return (a >= 0 && a < 120) ? a : null;
 }
-// The age band from a group slot name, e.g. "Group 1 (Elementary) - Weeknights"
-// -> "Elementary". The parenthetical is the academy's own age-group label.
-function groupFromSlot(name) {
-  const m = String(name || "").match(/\(([^)]+)\)/);
-  return m ? m[1].trim() : null;
+// The class a slot belongs to, for the staff "who is coming today" panel.
+//
+// This USED TO read the parenthetical out of the slot name and call it an age
+// band: "Group 1 (Elementary) - Weeknights" -> "Elementary". That only worked
+// because somebody hand-renamed BAM GTA's slots so the brackets happened to hold
+// the age group. The generator (api/_offer-schedule.js) puts the DAYS in the
+// brackets, so for any generated slot it returned "Tue" - and staff read a
+// weekday where they expected an age group. DETAIL Miami's 157 live slots are all
+// "Training - DETAIL Academy (Mon, Wed, Fri)", so this panel has been printing
+// "Mon, Wed, Fri" as an age band for that academy the whole time.
+//
+// It now answers with the class's real name, which is the thing it was always
+// trying to say.
+function classOfSlot(slot, idx) {
+  const hit = identifySlotClass(slot, idx);
+  const cls = hit.key ? idx.find((c) => c.key === hit.key) : null;
+  return cls ? cls.title : null;
 }
 
-async function portalCalendarEntries(clientId) {
+async function portalCalendarEntries(clientId, idx) {
   const rows = await sb(`entry_points?client_id=eq.${clientId}&type=eq.calendar&enabled=eq.true&select=key,label`);
-  return (Array.isArray(rows) ? rows : []).map(r => ({ key: r.key, label: r.label || r.key, prefix: groupPrefixOf(r.label) }));
+  const index = idx || classIndex(await loadClassesFor(sb, clientId));
+  return (Array.isArray(rows) ? rows : []).map(r => ({
+    key: r.key, label: r.label || r.key, classKey: classForCalendar(r.label, index), idx: index,
+  }));
 }
 
 // One drawer-shaped contact from the portal contacts store (custom-field ids
@@ -225,7 +242,7 @@ async function portalContactShape(clientId, ghlContactId) {
 // within [startMs, endMs). Emits GHL-events-shaped rows.
 async function portalBookingsInRange(clientId, entries, startMs, endMs, { includeCancelled = true } = {}) {
   const slots = (await sb(
-    `schedule_slots?tenant_id=eq.${clientId}&start_time=gte.${encodeURIComponent(new Date(startMs).toISOString())}&start_time=lt.${encodeURIComponent(new Date(endMs).toISOString())}&select=id,name,start_time,end_time&limit=1000`
+    `schedule_slots?tenant_id=eq.${clientId}&start_time=gte.${encodeURIComponent(new Date(startMs).toISOString())}&start_time=lt.${encodeURIComponent(new Date(endMs).toISOString())}&select=id,name,start_time,end_time,source_offer_class_key&limit=1000`
   )) || [];
   if (!slots.length) return [];
   const slotById = new Map(slots.map(s => [s.id, s]));
@@ -238,7 +255,7 @@ async function portalBookingsInRange(clientId, entries, startMs, endMs, { includ
     if (!includeCancelled && tb.status === "CANCELLED") continue;
     const s = slotById.get(tb.slot_id);
     if (!s) continue;
-    const entry = entries.find(e => slotMatchesGroup(s.name, e.prefix)) || entries[0];
+    const entry = entries.find(e => slotMatchesClass(s, e.classKey, e.idx || [])) || entries[0];
     events.push({
       id: tb.id,
       calendarId: entry ? entry.key : null,
@@ -252,6 +269,10 @@ async function portalBookingsInRange(clientId, entries, startMs, endMs, { includ
       parent: tb.parent_name || null,
       dob: tb.athlete_dob || null,
       slotName: s.name || null,
+      // The slot row + the class index ride along so the caller can name the
+      // CLASS rather than re-guessing it out of the name.
+      slot: s,
+      slotIdx: (entries[0] && entries[0].idx) || [],
     });
   }
   return events;
@@ -265,9 +286,9 @@ async function portalHandler(req, res, { client, clientId, action }) {
       const entries = await portalCalendarEntries(clientId);
       // capacity from the matching slot templates (falls back to null).
       let tpls = [];
-      try { tpls = (await sb(`slot_templates?tenant_id=eq.${clientId}&is_active=eq.true&select=name,default_capacity`)) || []; } catch (_) {}
+      try { tpls = (await sb(`slot_templates?tenant_id=eq.${clientId}&is_active=eq.true&select=name,default_capacity,source_offer_class_key`)) || []; } catch (_) {}
       const calendars = entries.map(e => {
-        const t = tpls.find(t => slotMatchesGroup(t.name, e.prefix));
+        const t = tpls.find(t => slotMatchesClass(t, e.classKey, e.idx || []));
         return { id: e.key, name: e.label, isActive: true, slotDuration: 60, slotDurationUnit: "mins", capacity: t ? t.default_capacity : null };
       }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
       return res.status(200).json({ calendars, timezone });
@@ -295,7 +316,7 @@ async function portalHandler(req, res, { client, clientId, action }) {
           athlete: ev.athlete || null,
           parent: ev.parent || null,
           age: ageFromDob(ev.dob),          // exact age once DOB is captured, else null
-          group: groupFromSlot(ev.slotName), // age-band fallback, e.g. "Elementary"
+          group: classOfSlot(ev.slot, ev.slotIdx || []), // the real class name, e.g. "Beginner Academy"
         }))
         .sort((a, b) => new Date(a.start || 0) - new Date(b.start || 0));
       return res.status(200).json({ trials, timezone });
@@ -367,8 +388,8 @@ async function portalHandler(req, res, { client, clientId, action }) {
       const entries = await portalCalendarEntries(clientId);
       const entry = entries.find(e => e.key === calId);
       let tpls = [];
-      try { tpls = (await sb(`slot_templates?tenant_id=eq.${clientId}&is_active=eq.true&select=name,default_capacity,default_start_time,default_end_time,recurrence_rule`)) || []; } catch (_) {}
-      const mine = tpls.filter(t => slotMatchesGroup(t.name, entry ? entry.prefix : null));
+      try { tpls = (await sb(`slot_templates?tenant_id=eq.${clientId}&is_active=eq.true&select=name,default_capacity,default_start_time,default_end_time,recurrence_rule,source_offer_class_key`)) || []; } catch (_) {}
+      const mine = tpls.filter(t => slotMatchesClass(t, entry ? entry.classKey : null, entry ? (entry.idx || []) : []));
       const DOW = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
       const openHours = mine.map(t => {
         const daysTok = String(t.recurrence_rule || "").replace(/^WEEKLY:/i, "").split(",").map(s => s.trim()).filter(Boolean);

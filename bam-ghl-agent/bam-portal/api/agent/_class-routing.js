@@ -6,10 +6,12 @@
 // give the SAME answer, and the only way to guarantee that is one function
 // they all call, cheap enough that none of them has an excuse to reimplement it.
 //
-// NOTHING CALLS THIS YET. It is build A: make the data available and settle the
-// rules. Build B wires it into the three call sites and deletes the calendar-name
-// matching (groupOf() in api/agent/booking.js) that it replaces. Until then this
-// file changes no behaviour for any academy.
+// WIRED IN BY BUILD B (2026-07-30). This file is still only the RULES - which
+// classes fit an age - and still knows nothing about slots, calendars or
+// bookings. api/agent/_class-slots.js is the layer that applies these answers to
+// real schedule_slots rows, and it is what the three booking paths call. The
+// calendar-name matching this replaced (groupOf() in api/agent/booking.js, and
+// the two inline /group\s*\d+/ copies in api/website/) is gone.
 //
 // ── The rules Zoran approved, 30 July 2026 ──────────────────────────────────
 //   Exactly one class fits  -> book it, ask nothing.

@@ -24,7 +24,9 @@ import { assemblePrompt } from "./agent/prompt-structure.js";
 import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
-import { loadCalendars, calendarForGroup, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial, passedTrialContactIds, upcomingBookedContactIds } from "./agent/booking.js";
+import { loadCalendars, calendarForClass, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial, passedTrialContactIds, upcomingBookedContactIds, loadClassesFor } from "./agent/booking.js";
+import { classIndex, classByName, classForCalendar, ageRoutingReadiness, buildQuestion } from "./agent/_class-slots.js";
+import { resolveClassesForAge } from "./agent/_class-routing.js";
 import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
@@ -130,9 +132,9 @@ const REPLY_TOOL = {
       recommend_unqualified: { type: "boolean", description: "True if the lead OPTED OUT of being contacted ('stop talking to me', 'leave me alone', 'don't contact me', 'remove me', 'stop texting') - a human confirms; approving removes them from the pipeline entirely (no nurture, no goodbye message, never contacted again). Leave 'reply' empty." },
       unqualified_reason: { type: "string", description: "If recommend_unqualified: short why - 'Opted out' for any stop/leave-me-alone request." },
       book:            { type: "boolean", description: "True if you are BOOKING the lead into a free trial — ONLY after ALL of: (1) they confirmed a specific day/time, (2) you verified that exact slot is open via check_availability, AND (3) they explicitly said yes to YOU booking it for them (you asked 'want me to book it for you?' and they agreed). Once you have already asked and the lead replies with any clear affirmative to that slot ('sure', 'yes', 'ok', 'sounds good', or thanking you for that day/time), condition (3) is met - set book=true; do NOT ask the book question again. If you have a time but have NOT yet gotten that yes, set book=false and make your reply the confirmation question instead. A human approves before it's created. Your 'reply' is the confirmation you'd send." },
-      book_group:      { type: "string", description: "If book: the group by athlete age — 'Group 1' (elementary, 9-13) or 'Group 2' (high school, 14+)." },
+      book_group:      { type: "string", description: "If book: the CLASS the athlete belongs in, written exactly as that class is named in your academy's schedule. Use check_availability to work out which class an athlete's age fits before you book. Never invent a class name and never use a generic label such as 'younger' or 'older'." },
       book_slot_at:    { type: "string", description: "If book: the EXACT ISO datetime of the open slot the lead confirmed (must be one of the open_slots from check_availability)." },
-      propose_group:   { type: "string", description: "If your reply OFFERS or SUGGESTS a specific session day/time to the lead WITHOUT booking yet: 'Group 1' (elementary, 9-13) or 'Group 2' (high school, 14+)." },
+      propose_group:   { type: "string", description: "If your reply OFFERS or SUGGESTS a specific session day/time to the lead WITHOUT booking yet: the CLASS that time belongs to, written exactly as that class is named in your academy's schedule." },
       propose_slot_at: { type: "string", description: "If your reply names a specific day/time to the lead (book=false): the EXACT ISO datetime of that open slot - it MUST come from check_availability. NEVER name a time in a reply that you have not verified as an open slot. This MUST be the SAME slot your 'reply' text names to the lead - never name one day/time in the message and put a different one here. When you offer a time, offer the NEAREST open slot from check_availability (the soonest upcoming one) unless the lead asked for a specific day. Empty when your reply names no specific time." },
       reignite_at:      { type: "string", description: "YYYY-MM-DD. ONLY when the lead wants to proceed but at a LATER date: the concrete day to re-engage (resolve vague timeframes; bare 'later' = ~30 days out). A human confirms before anything is scheduled." },
       reignite_message: { type: "string", description: "If reignite_at: the exact re-engagement text to open with on that date - warm, references what they told us, moves toward booking." },
@@ -141,26 +143,86 @@ const REPLY_TOOL = {
   },
 };
 
-// Read-only availability tool the agent can call mid-draft before proposing a booking.
+// Read-only availability tool the agent can call mid-draft before proposing a
+// booking. It takes the ATHLETE'S AGE, not a group: the whole point of build B
+// is that the age decides which class, and therefore which times the lead is
+// ever shown. Naming a class is optional and only needed to settle a tie.
 const CHECK_AVAILABILITY = {
   name: "check_availability",
-  description: "Check open free-trial slots for a group's calendar before you book. Pick the group by the athlete's age. Returns upcoming open ISO datetimes.",
+  description: "Check open free-trial slots before you book, for THIS athlete. Give the athlete's age and you get back only the times that belong to a class that athlete can actually join, plus which class each of them is. If more than one class fits, you also get back the ONE question to ask to tell them apart - ask it, then call this again with class_name.",
   input_schema: {
     type: "object",
     properties: {
-      group:       { type: "string", description: "'Group 1' (elementary, ages 9-13) or 'Group 2' (high school, 14+)." },
+      athlete_age: { type: "string", description: "The athlete's age, as you know it (a number is best; write what the parent told you). If you genuinely do not know it, ask the parent - never guess it." },
+      class_name:  { type: "string", description: "Optional. The class, named exactly as it is in your academy's schedule. Use this once you have asked the one question that tells two classes apart." },
       within_days: { type: "number", description: "How many days ahead to look (default 14)." },
     },
-    required: ["group"],
+    required: ["athlete_age"],
   },
 };
 
+// The order here is the build in miniature: work out the CLASS from the age
+// FIRST, and only then find the calendar. The old tool did the opposite - it was
+// handed a group, found that group's calendar, and read whatever was on it - so
+// the age never had a chance to narrow anything and a 9 year old was shown a
+// class that was never for them.
 async function runCheckAvailability(input, bookingCtx) {
   try {
-    const cal = calendarForGroup(bookingCtx.calendars, input.group);
-    if (!cal) return { error: `No calendar found for ${input.group}.` };
-    const { days } = await freeSlots(bookingCtx.token, cal.key, { days: input.within_days || 14, timezone: bookingCtx.timezone, clientId: bookingCtx.clientId, calLabel: cal.label });
-    return { group: input.group, calendar_id: cal.key, open_slots: summarizeSlots(days) };
+    const classes = bookingCtx.classes || [];
+    const idx = classIndex(classes);
+    const readiness = ageRoutingReadiness(classes);
+    let chosen = input.class_name ? classByName(input.class_name, idx) : null;
+    if (input.class_name && !chosen) {
+      return { error: `"${input.class_name}" is not one of this academy's classes. They are: ${idx.map(c => c.title).join(", ") || "(none set up yet)"}.` };
+    }
+
+    // No class named: let the age choose one. This is the ordinary path.
+    if (!chosen && readiness.armed) {
+      const r = resolveClassesForAge(input.athlete_age, classes);
+      if (r.status === "unknown_age") {
+        return { need_age: true, reason: "The athlete's age could not be read from what you gave me, so no time can be narrowed to them. Ask the parent for the age before you name any time." };
+      }
+      if (r.status === "unqualified") {
+        return { classes_that_fit: [], unqualified: true, reason: `No class at this academy is for a ${r.age} year old. Say so honestly - do not book them into the nearest one.` };
+      }
+      if (r.status === "multiple") {
+        const q = buildQuestion(r.matches, idx);
+        // Not a failure and not a fallback. For an academy whose classes differ
+        // by skill rather than age this is the normal answer for every athlete.
+        return {
+          classes_that_fit: r.matches.map(m => m.title),
+          ask_one_question: {
+            about: q.dimension || "which class",
+            age_cannot_separate_them: !!q.ages_overlap,
+            choices: q.options.map(o => ({ class_name: o.title, [q.dimension || "note"]: o.value })),
+            then: "Ask this one question, then call check_availability again with class_name set to the class they pick.",
+          },
+        };
+      }
+      chosen = idx.find(c => c.key === (r.matches[0] && r.matches[0].key)) || null;
+    }
+
+    const cal = calendarForClass(bookingCtx.calendars, chosen ? chosen.title : "", classes);
+    if (!cal) {
+      if (!bookingCtx.calendars || !bookingCtx.calendars.length) {
+        return { error: "This academy has no trial calendar set up yet - flag it to the admin instead of naming a time." };
+      }
+      // Several calendars and nothing to choose between them: the academy has
+      // not set ages on its classes yet, so the age cannot pick one. Ask rather
+      // than guess.
+      return { error: `Say which class first - this academy runs: ${idx.map(c => c.title).join(", ") || bookingCtx.calendars.map(c => c.label).join(", ")}. Then call check_availability again with class_name.` };
+    }
+
+    const res = await freeSlots(bookingCtx.token, cal.key, {
+      days: input.within_days || 14, timezone: bookingCtx.timezone,
+      clientId: bookingCtx.clientId, calLabel: cal.label,
+      athleteAge: input.athlete_age, classes,
+    });
+    return {
+      class_name: chosen ? chosen.title : null,
+      calendar_id: cal.key,
+      open_slots: summarizeSlots(res.days),
+    };
   } catch (e) { return { error: `availability check failed: ${e.message}` }; }
 }
 
@@ -292,15 +354,16 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   }
   const system = buildSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
   const calendars = await loadCalendars(sb, clientId);
-  const out = await runAgent(system, messages, { calendars, token, timezone: "America/Toronto", clientId });
+  const classes = await loadClassesFor(sb, clientId);
+  const out = await runAgent(system, messages, { calendars, classes, token, timezone: "America/Toronto", clientId });
   const agentMsgs = messages.filter(m => m.role === "agent");
   // A booking proposal: the agent set book=true with a concrete slot it verified.
-  const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForGroup(calendars, out.book_group) : null;
+  const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForClass(calendars, out.book_group, classes) : null;
   const book = !!(out.book && out.book_slot_at && bookCal);
   // A time PROPOSAL: the reply names a specific slot without booking yet. Zoran
   // approves every proposed time as a structured Hawkeye field (2026-07-10), so
   // the slot rides the card instead of living only in prose. Future + verified-open only.
-  const prop = await normalizeProposal(out, book, calendars, { token, clientId });
+  const prop = await normalizeProposal(out, book, calendars, { token, clientId, classes });
   return {
     conversation_id: conversationId,
     reply: out.reply || "",
@@ -343,13 +406,13 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
 async function normalizeProposal(out, book, calendars, verifyCtx) {
   const none = { group: null, slotAt: null, calendarId: null };
   if (book || !out || !out.propose_slot_at || !out.propose_group) return none;
-  const cal = calendarForGroup(calendars || [], out.propose_group);
+  const cal = calendarForClass(calendars || [], out.propose_group, (verifyCtx && verifyCtx.classes) || []);
   if (!cal) return none;
   const t = new Date(out.propose_slot_at).getTime();
   if (!Number.isFinite(t) || t <= Date.now()) return none;
   if (verifyCtx && verifyCtx.token) {
     try {
-      const { days } = await freeSlots(verifyCtx.token, cal.key, { days: 21, clientId: verifyCtx.clientId, calLabel: cal.label });
+      const { days } = await freeSlots(verifyCtx.token, cal.key, { days: 21, clientId: verifyCtx.clientId, calLabel: cal.label, classes: (verifyCtx && verifyCtx.classes) || [] });
       const open = [];
       for (const arr of Object.values(days || {})) for (const iso of (arr || [])) { const ms = new Date(iso).getTime(); if (Number.isFinite(ms)) open.push(ms); }
       if (!open.includes(t)) return none;
@@ -360,12 +423,12 @@ async function normalizeProposal(out, book, calendars, verifyCtx) {
 
 // Draft a cold OPENER for a Responded lead that entered with context but hasn't
 // messaged (no thread). Returns the structured proposal or throws.
-async function draftOpener(token, locationId, clientId, contactId, cfg, calendars) {
+async function draftOpener(token, locationId, clientId, contactId, cfg, calendars, classes) {
   const system = buildOpenerSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
-  const out = await runOpener(system, { calendars: calendars || [], token, timezone: "America/Toronto", clientId });
-  const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForGroup(calendars || [], out.book_group) : null;
+  const out = await runOpener(system, { calendars: calendars || [], classes: classes || [], token, timezone: "America/Toronto", clientId });
+  const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForClass(calendars || [], out.book_group, classes || []) : null;
   const book = !!(out.book && out.book_slot_at && bookCal);
-  const prop = await normalizeProposal(out, book, calendars, { token, clientId });
+  const prop = await normalizeProposal(out, book, calendars, { token, clientId, classes: classes || [] });
   return {
     reply: out.reply || "",
     reasoning: out.reasoning || "",
@@ -828,6 +891,7 @@ async function detectForClient(client) {
     }
     if (candidates.length) {
       const calendars = await loadCalendars(sb, client.id);
+      const classes = await loadClassesFor(sb, client.id);
       for (const contactId of candidates) {
         if (openers >= OPENER_CAP) break;
         // Never cold-open someone we've already engaged (any prior queue row).
@@ -844,7 +908,7 @@ async function detectForClient(client) {
         let d;
         // Phase C: a fresh cold-open lead = the "new_lead" booking entry point. Use
         // the academy's scripted opener when it's live+approved; else the AI opener.
-        try { d = scriptedBookingOpener(client, "new_lead", firstName) || await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
+        try { d = scriptedBookingOpener(client, "new_lead", firstName) || await draftOpener(token, locationId, client.id, contactId, cfg, calendars, classes); }
         catch (e) { reasons.push(`opener ${contactId}: draft threw - ${e.message}`); continue; }
         if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
         const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
@@ -876,6 +940,7 @@ async function detectForClient(client) {
     const rebookCandidates = [...rebookIds].filter(id => respondedIds.has(id) && !mutedSet.has(id) && !reignSet.has(id));
     if (rebookCandidates.length) {
       const calendars = await loadCalendars(sb, client.id);
+      const classes = await loadClassesFor(sb, client.id);
       for (const contactId of rebookCandidates) {
         if (rebookOpeners >= OPENER_CAP) break;
         // Dedupe: if a card is already waiting (pending/approved), leave it be.
@@ -1527,14 +1592,24 @@ async function handler(req, res) {
     // calendar's open slots for the next 2 weeks. Read-only.
     if (b.action === "book-options") {
       const cals = await loadCalendars(sb, clientId);
+      const calClasses = await loadClassesFor(sb, clientId);
+      const calIdx = classIndex(calClasses);
       const out = [];
       for (const c of cals) {
         let slots = [];
         try {
-          const byDay = await freeSlots(token, c.key, { clientId, calLabel: c.label, days: 14 });
-          slots = summarizeSlots(byDay, 24);
-        } catch (_) {}
-        out.push({ key: c.key, label: c.label, group: c.group || null, slots });
+          // `classes` is passed explicitly even though freeSlots would now load
+          // them itself: this picker already has them in hand for class_name
+          // below, and one read per request beats one per calendar.
+          const byDay = await freeSlots(token, c.key, { clientId, calLabel: c.label, days: 14, classes: calClasses });
+          slots = summarizeSlots(byDay.days, 24);
+        } catch (e) {
+          // This catch swallowed a TypeError for months and left the picker
+          // silently empty. It stays best-effort - one broken calendar must not
+          // blank the others - but it no longer does so without a word.
+          console.error(`book-options: ${c.key} slots unavailable:`, e.message);
+        }
+        out.push({ key: c.key, label: c.label, class_name: classForCalendar(c.label, calIdx) || null, slots });
       }
       return res.status(200).json({ calendars: out });
     }
@@ -1573,7 +1648,7 @@ async function handler(req, res) {
       let appt = null, trialBookingId = null, confirmationSent = false;
       if ((await bookingProviderOf(clientId)) === "portal") {
         try {
-          trialBookingId = await bookPortalTrial(clientId, { slotAtIso: startIso, group: row.book_group, contactId, contactName: row.contact_name, athleteName: (b.athlete_name || "").toString().trim() || null });
+          trialBookingId = await bookPortalTrial(clientId, { slotAtIso: startIso, className: row.book_group, contactId, contactName: row.contact_name, athleteName: (b.athlete_name || "").toString().trim() || null });
         } catch (e) { return res.status(502).json({ error: `book: ${e.message}` }); }
         // Tell the parent it's locked in. GHL academies get GHL's own calendar
         // notification (toNotify below); portal academies got NOTHING - the card's

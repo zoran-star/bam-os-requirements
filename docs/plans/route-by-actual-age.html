@@ -179,7 +179,8 @@
   <h2>What a BAM GTA parent sees change</h2>
   <div class="banner">
     <p><span class="h">One thing, and it is the change you already approved.</span>
-    A GTA parent is currently shown <code>Training - Group 1 (Mon, Tue, Wed, Thu)</code>. "Group 1" is our internal filing label that leaked out to customers. They would see the real class name instead. <b>Nothing else about GTA changes</b>, and that is enforced by a test that fails if it does.</p>
+    <b>CORRECTED after the build measured production.</b> This section originally said a GTA parent is shown <code>Training - Group 1 (Mon, Tue, Wed, Thu)</code>. That string is <b>DETAIL Miami's</b>, on all 157 of its sessions. GTA's were hand-named <code>Group 1 (Elementary)</code>, so the leaked-internal-label problem belongs to Miami and to every future academy, not to GTA. The claim was wrong in the plan and correct in the code's own comments, which is the right way round but worth saying out loud.</p>
+    <p style="margin:10px 0 0">GTA's real visible changes are two, both approved by Zoran on 30 July: the calendar invite title goes from <code>Group 1 (Elementary)</code> to <code>Group 1</code>, and the staff "Trials today" card's Group row goes from <code>Elementary</code> to <code>Group 1</code>. <b>Everything else about GTA is enforced unchanged by two locks that fail if it moves.</b></p>
   </div>
 
   <h2>How you will know it is really finished</h2>
