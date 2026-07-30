@@ -11,6 +11,7 @@
 // static location keys don't carry calendar scopes.
 
 import { withSentryApiRoute } from "../_sentry.js";
+import { localIsoParts } from "../_local-iso.js";
 
 import { RENEW_WINDOW_MS } from "../ghl/_agency.js";
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
@@ -218,14 +219,17 @@ async function handler(req, res) {
       const taken = await slotSpotsTakenBulk(client_id, list.map(s => s.id));
       // Emit local-offset ISO strings + local day keys (what GHL emitted), so
       // the site's picker + booking.start round-trip identically.
-      const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZoneName: "longOffset" });
+      //
+      // This used to build the string inline, with its own formatter that was a
+      // near-copy of api/agent/booking.js's. Two copies of a time helper is one
+      // copy too many: the inline one lived inside this Supabase-backed handler,
+      // so no test could execute it, and it was "covered" only by a text
+      // comparison against the other copy. It now calls the shared helper, which
+      // api/_local-day.test.mjs runs for real against the midnight instant.
       const out = {};
       for (const s of list) {
         if ((s.capacity - (taken.get(s.id) || 0)) <= 0) continue;
-        const parts = Object.fromEntries(fmt.formatToParts(new Date(s.start_time)).map(p => [p.type, p.value]));
-        const off = (parts.timeZoneName || "GMT-04:00").replace("GMT", "") || "+00:00";
-        const day = `${parts.year}-${parts.month}-${parts.day}`;
-        const iso = `${day}T${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}:${parts.second}${off}`;
+        const { day, iso } = localIsoParts(s.start_time, timezone);
         (out[day] = out[day] || []).push(iso);
       }
       res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
