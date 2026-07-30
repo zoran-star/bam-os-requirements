@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "./supabase";
+import { runTicketSubmit, failureMessage, supportMailto, SUPPORT_EMAIL } from "./publicTicketSubmit";
 
 // ─── TOKENS (client-facing dark only) ───────────────────────────────────────
 
@@ -164,13 +165,14 @@ function PrimaryButton({ onClick, children, disabled }) {
 // ─── TICKET INTAKE ──────────────────────────────────────────────────────────
 
 export function TicketIntake() {
-  const [step, setStep] = useState(0); // 0=path, 1=form, 2=review, 3=done
+  const [step, setStep] = useState(0); // 0=path, 1=form, 2=review, 3=done, 4=not saved
   const [path, setPath] = useState(null);
   const [fields, setFields] = useState({});
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [ticketRef, setTicketRef] = useState("");
   const [publicToken, setPublicToken] = useState("");
+  const [failure, setFailure] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   const setField = (key, val) => setFields(prev => ({ ...prev, [key]: val }));
@@ -193,44 +195,41 @@ export function TicketIntake() {
     });
   };
 
+  // The reference and the tracking link are minted from the row the database
+  // hands back, and from nothing else. See src/publicTicketSubmit.js for why:
+  // this used to show the success screen unconditionally, so a rejected insert
+  // still told the person their request was received.
   const handleSubmit = async () => {
     setSubmitting(true);
-    const ref = generateTicketId();
-    const token = generateToken();
-    setTicketRef(ref);
-    setPublicToken(token);
+    setFailure(null);
 
-    const ticketData = {
-      ticket_id: ref,
-      public_token: token,
-      client_name: clientName,
-      client_email: clientEmail,
-      path: path,
-      status: "New",
-      priority: "Medium",
-      description: path === "Bug/Change" ? (fields["Description"] || fields["Describe the item"] || "Support request")
-        : path === "Systems Menu" ? `Systems Menu: ${fields["Selected System"] || "—"}`
-        : (fields["Problem"] || "Custom build request"),
-      fields: fields,
-      submitted_at: new Date().toISOString(),
-      red_alert: false,
+    const db = supabase && {
+      // .select() is load-bearing. Without it supabase-js returns data: null on
+      // a successful insert too, and there is then no proof a row exists.
+      insert: (row) => supabase.from("tickets").insert([row]).select(),
+      sendConfirmation: (body) => supabase.functions.invoke("send-ticket-confirmation", { body }),
     };
 
-    if (supabase) {
-      try {
-        await supabase.from("tickets").insert([ticketData]);
-        // Trigger email via edge function
-        try {
-          await supabase.functions.invoke("send-ticket-confirmation", {
-            body: { email: clientEmail, ticketId: ref, token, clientName },
-          });
-        } catch (_) { /* email is best-effort */ }
-      } catch (err) {
-        console.error("Supabase insert error:", err);
-      }
-    }
+    const outcome = await runTicketSubmit({
+      db,
+      form: { clientName, clientEmail, path, fields },
+      makeRef: generateTicketId,
+      makeToken: generateToken,
+    });
 
     setSubmitting(false);
+
+    if (!outcome.ok) {
+      console.error("Ticket insert failed:", outcome.reason, outcome.detail);
+      setTicketRef("");
+      setPublicToken("");
+      setFailure(outcome);
+      setStep(4);
+      return;
+    }
+
+    setTicketRef(outcome.ticketRef);
+    setPublicToken(outcome.publicToken);
     setStep(3);
   };
 
@@ -513,6 +512,55 @@ export function TicketIntake() {
               }}>Copy</button>
             </div>
             <div style={{ fontSize: 12, color: tk.textMute, marginTop: 10 }}>Bookmark this link to check your ticket status anytime.</div>
+          </div>
+        </div>
+      )}
+
+      {/* ─ SCREEN 4: NOT SAVED ─
+          Deliberately offers no reference and no tracking link. There is no
+          ticket to reference. What it does offer is a route to a human that
+          does not need the database, carrying everything they already typed. */}
+      {step === 4 && (
+        <div style={{ animation: "fadeUp 0.35s ease both", textAlign: "center", paddingTop: 40 }}>
+          <div style={{ fontSize: 44, marginBottom: 20, color: tk.red }}>!</div>
+          <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em", marginBottom: 10 }}>Your request was not submitted</h2>
+          <p style={{ fontSize: 16, color: tk.textSub, marginBottom: 8, maxWidth: 520, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6 }}>
+            {failureMessage(failure?.reason)} Nobody on our team has seen it, so please use one of the options below.
+          </p>
+          <p style={{ fontSize: 14, color: tk.textMute, marginBottom: 32 }}>Your answers are still filled in, so nothing you typed is lost.</p>
+
+          <div style={{
+            background: tk.surfaceEl, borderRadius: 14, border: `1px solid ${tk.red}25`,
+            padding: "28px 32px", display: "inline-block", textAlign: "left", maxWidth: 520,
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: tk.text, marginBottom: 6 }}>Email it to us instead</div>
+            <div style={{ fontSize: 14, color: tk.textSub, lineHeight: 1.6, marginBottom: 16 }}>
+              This opens an email to {SUPPORT_EMAIL} with everything you just filled in, ready to send.
+            </div>
+            <a
+              href={supportMailto({
+                ref: failure?.row?.ticket_id, clientName, clientEmail, path, fields, reason: failure?.reason,
+              })}
+              style={{
+                display: "inline-block", padding: "14px 28px", borderRadius: 10, fontSize: 15, fontWeight: 600,
+                background: tk.gold, color: "#08080A", textDecoration: "none", fontFamily: "inherit",
+              }}
+            >Email support</a>
+
+            <div style={{ height: 1, background: tk.border, margin: "24px 0" }} />
+
+            <div style={{ fontSize: 14, fontWeight: 600, color: tk.text, marginBottom: 6 }}>Or try sending it again</div>
+            <div style={{ fontSize: 14, color: tk.textSub, lineHeight: 1.6, marginBottom: 16 }}>
+              If this was a temporary connection problem, a second attempt may go through.
+            </div>
+            <button
+              onClick={() => { setFailure(null); setStep(2); }}
+              style={{
+                padding: "13px 26px", borderRadius: 10, fontSize: 14, fontWeight: 600,
+                background: "transparent", border: `1px solid ${tk.borderStr}`,
+                color: tk.text, cursor: "pointer", fontFamily: "inherit",
+              }}
+            >Back to review and try again</button>
           </div>
         </div>
       )}
