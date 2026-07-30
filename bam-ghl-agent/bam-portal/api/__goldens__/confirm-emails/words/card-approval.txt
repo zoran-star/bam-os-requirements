@@ -1,0 +1,35 @@
+CALL SITE: api/agent-confirm.js fireCardEmail -> sendOn (owner ✓ on a queued card)
+RESULT: {"sent":true,"id":"stub-email"}
+EMAILS: 1
+
+FROM: BAM Toronto <info@byanymeanstoronto.ca>
+TO: maya@example.test
+SUBJECT: Your free trial is booked! 🏀
+PREHEADER: Your free trial is booked! 🏀
+
+Your free trial is booked! 🏀
+BY ANY MEANS TORONTO
+OAKVILLE
+Your free trial is booked! Here are some important details:
+Date & Time: Tue, Aug 4 at 7:00 PM
+Location: 1079 Linbrook Rd, Oakville, ON L6J 2L2
+Please bring a basketball if you have one. Prepare to be challenged, so come ready to work! After the trial, we'll chat to see if the program feels like a fit and talk next steps 👍
+You can add this to your calendar here:
+Apple: https://portal.byanymeansbusiness.com/api/ical?start=1785884400000&end=1785888000000&title=Free+Trial&location=1079+Linbrook+Rd%2C+Oakville%2C+ON+L6J+2L2
+Google: https://calendar.google.com/calendar/render?action=TEMPLATE&text=Free+Trial&dates=20260804T230000Z%2F20260805T000000Z&details=Your+free+trial+session.&location=1079+Linbrook+Rd%2C+Oakville%2C+ON+L6J+2L2
+BY ANY MEANS TORONTO
+Youth and high-school basketball training in Oakville and across the GTA.
+byanymeanstoronto.ca
+·
+Email
+·
+Instagram
+You're receiving this because you enquired about By Any Means Toronto.
+Unsubscribe
+
+--- LINKS ---
+https://byanymeanstoronto.ca
+mailto:info@byanymeanstoronto.ca
+https://instagram.com/byanymeanstoronto
+mailto:info@byanymeanstoronto.ca?subject=Unsubscribe
+

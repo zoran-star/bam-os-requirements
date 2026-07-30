@@ -69,6 +69,95 @@
 // throw to a 500, which its consumers already render as "section absent" -
 // acceptable for a marketing section, wrong for a seed decision.
 
+// ═══ DISPLAY TYPOGRAPHY: WHY THE STORED ROW IS NEVER TOUCHED ═══════════════
+//
+// ⛔ DO NOT "CLEAN" THE `testimonials` TABLE. There is no migration, no UPDATE
+// and no scrub-on-write behind this, on purpose. These rows are a REAL PARENT'S
+// WORDS. If anyone ever reads a row to answer "what did this family actually
+// say about us", the answer has to be the truth, byte for byte, not our house
+// style applied to someone else's sentence. The store is the record; this
+// function is the render.
+//
+// WHAT IT DOES. The repo bans the em dash from person-facing output (see the
+// root CLAUDE.md). That rule was written about OUR copy, and our copy is the
+// easy case. A parent typed one into a Google review, and that review now ships
+// on the free-trial page and inside the nurture-3 email. So the character is
+// substituted on the way OUT: long dashes become a hyphen, spaced so the
+// sentence still reads ("a trainer<em-dash>he's a mentor" renders as
+// "a trainer - he's a mentor", never "a trainer-he's").
+//
+// ⛔ TYPOGRAPHY ONLY. NEVER WORDS. This is deliberately incapable of changing,
+// reordering or dropping a word, and that is the property that makes editing
+// someone else's quote defensible at all:
+//   - the pattern matches ONLY spaces, tabs and four dash code points
+//     (U+2012 figure, U+2013 en, U+2014 em, U+2015 horizontal bar)
+//   - the replacement contains ONLY spaces and "-"
+// so no letter, digit or apostrophe can be added, removed or moved. Anything
+// that cannot be proved word-preserving that cheaply does NOT belong here. In
+// particular this is NOT a place to add a general rewriting, tidying or
+// "improve the grammar" pass over a customer's sentence.
+//
+// CONSIDERED AND DELIBERATELY LEFT ALONE: smart quotes (U+2018/19/1C/1D) and
+// the ellipsis (U+2026). None are present in any stored row today, none are
+// banned, and all render fine. Flattening a curly double quote would also nest
+// a straight quote inside the straight quotes the email already wraps a quote
+// in, which reads worse than leaving it. If a future row needs one of them,
+// add it here with the same one-character-for-one-character proof, and nowhere
+// else.
+//
+// WHY HERE AND NOT AT EACH RENDER SITE. This is THE seam. Four consumers
+// already read it (the website endpoint, the nurture-3 / onboarding-testimonials
+// email via api/_academy-facts.js, the agent's social_proof fact, the seed
+// path), and scripts/check-testimonial-hardcodes.mjs ENFORCES that a new
+// person-facing surface goes through this seam or the HTTP one in front of it.
+// So the seam is the only place with a coverage guarantee that survives
+// consumer #5 arriving. Doing it per renderer means three copies today, a
+// missed copy tomorrow, and an em dash reaching a parent through whichever
+// surface was written last.
+// It does NOT fork this module: the rule the header forbids is per-consumer
+// SHAPES (resolveForAgent/resolveForPage). This transform is identical for
+// every consumer, so it cannot grow variants.
+//
+// ⚠️ THE COST, STATED PLAINLY SO NOBODY IS SURPRISED BY IT. What this function
+// returns is now DISPLAY TEXT, not the archived sentence. Two consequences:
+//   1. An audit asking "what did this parent write" must read
+//      `testimonials.quote` directly. Never quote this resolver as evidence of
+//      what somebody said.
+//   2. scripts/snapshots/bam-gta.json is a CAPTURED COPY of this function's
+//      output, used by the GTA message lock. Changing the transform makes that
+//      snapshot stale, and a stale snapshot means the lock is green about a
+//      reality that moved. Re-take it deliberately, with the golden diff read
+//      by a human, never as a side effect.
+// Written as escapes on purpose: the literal characters must not appear in this
+// repo's source, and an escape cannot be mistaken for a typo either.
+const LONG_DASH_RUN = /[ \t]*[\u2012\u2013\u2014\u2015][ \t]*/g;
+const EN_DASH = "\u2013";
+
+/**
+ * Substitute banned dash characters for a hyphen, preserving every word.
+ * Display layer only - the stored row keeps the parent's exact text.
+ * @param {string} text
+ * @returns {string}
+ */
+export function normalizeTypography(text) {
+  const s = String(text == null ? "" : text);
+  return s.replace(LONG_DASH_RUN, (m, offset) => {
+    const dash = m.trim();
+    const tight = m.length === dash.length;
+    const before = offset > 0 ? s[offset - 1] : "";
+    const after = s[offset + m.length] === undefined ? "" : s[offset + m.length];
+    // A tight en dash between digits is a RANGE ("6<en-dash>8"), and a range
+    // reads wrong with spaces around the hyphen.
+    if (tight && dash === EN_DASH && /[0-9]/.test(before) && /[0-9]/.test(after)) return "-";
+    const atLineStart = offset === 0 || before === "\n";
+    const atLineEnd = after === "" || after === "\n";
+    if (atLineStart && atLineEnd) return "-";
+    if (atLineStart) return "- ";
+    if (atLineEnd) return " -";
+    return " - ";
+  });
+}
+
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
 
@@ -102,17 +191,23 @@ function compareRows(a, b) {
 
 // What each consumer receives per row. Manual rows NEVER carry rating/date -
 // enforced here as well as in the DB, deliberately twice.
+//
+// `quote` and `author` are the DISPLAY forms: same words as the stored row,
+// with long dashes substituted (see normalizeTypography above). The row itself
+// is never written to and never modified in place.
 function publicShape(row) {
+  const quote = normalizeTypography(row.quote);
+  const author = normalizeTypography(row.author) || "Parent";
   if (row.source === "google") {
     return {
-      quote: row.quote,
-      author: row.author || "Parent",
+      quote,
+      author,
       source: "google",
       rating: row.rating,
       date: row.review_created_at,
     };
   }
-  return { quote: row.quote, author: row.author || "Parent", source: "manual" };
+  return { quote, author, source: "manual" };
 }
 
 /**

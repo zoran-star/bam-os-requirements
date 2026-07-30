@@ -36,7 +36,7 @@
  * these tests are checking the wrong contract.
  *
  * NEGATIVE CONTROL - the part that proves the suite has teeth
- * MUTATE=b1..b9 reverts one fix in the extracted source before running, so you can
+ * MUTATE=b1..b10 reverts one fix in the extracted source before running, so you can
  * confirm the suite FAILS without it rather than trusting that it passes with it.
  * Every one is a real regression: four caught in review, three from the business/owner
  * email split, two from the email footer pair:
@@ -61,11 +61,21 @@
  *       academy's email-footer tagline     -> section O goes red
  *   b9  the same for instagram_url, which removes the footer Instagram link
  *                                          -> section O goes red
+ *   b10 locations.entry_note left out of the VENUE blank-guard list, so a save fired
+ *       before that row loaded - or against a database that has not run the
+ *       entry_note migration - NULLs the venue's entry directions, which is a parent
+ *       standing outside a building with no idea which door
+ *                                          -> section P goes red
  * b8 and b9 are the QUIET pair: unlike b5 nothing holds and nobody is told, the emails
  * just go out two footer elements shorter. Each control drops one name and leaves the
  * other, so neither can pass on the other's assertions.
+ * b10 is the first control on a table OTHER than clients. The Locations card writes
+ * PostgREST directly instead of going through update_client_basics, so it has its own
+ * guard and its own list - but the same invariant and the same one "loaded" signal:
+ * presence of the key on the cached row.
  * Measured 2026-07-29, unmutated ALL PASS; b1 -> 5 failures, b2 -> 1, b3 -> 2,
  * b4 -> 2, b5 -> 5, b6 -> 4, b7 -> 1, b8 -> 4, b9 -> 4.
+ * Measured 2026-07-30: b10 -> 1.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -169,6 +179,10 @@ function applyRatingTriple(row, patch) {
 
 // ── sandbox ──
 let DOM = {}, rpcCalls = [], selectCalls = [], HYDRATION_OPEN = false, pending = [], requests = 0;
+// The locations table is written DIRECTLY (PostgREST update), not through the
+// clients RPC, so it needs its own recorder. UPDATE_ERROR is how section P plays
+// "the migration has not been applied yet" without a database.
+let updateCalls = [], UPDATE_ERROR = null;
 // The fetch resolves from SNAPSHOT: what the DB held when the request went out.
 // Saves land in `db`. That is what makes a late response genuinely STALE.
 let SNAPSHOT = STORED;
@@ -197,6 +211,20 @@ const g = {
         };
         return chain;
       },
+      update: (patch) => {
+        const call = { patch, eqs: [] };
+        const chain = {
+          eq: (k, v) => { call.eqs.push([k, v]); return chain; },
+          then(onF, onR) {
+            updateCalls.push(call);
+            const out = { data: null, error: UPDATE_ERROR };
+            return new Promise((res, rej) => {
+              try { res(onF ? onF(out) : out); } catch (e) { rej(onR ? onR(e) : e); }
+            });
+          },
+        };
+        return chain;
+      },
     }),
   },
   document: {
@@ -204,6 +232,7 @@ const g = {
     querySelectorAll: () => [],
   },
   _obtScheduleRefresh: null,
+  _assetBankHtml: () => '<!-- assets -->',
   _bbAutoDone: () => {},
   _plToast: () => {},
   _bbRenderFromHash: () => {},
@@ -231,10 +260,19 @@ const src = [
   grab('_bbStaffOwnerChanged'), grab('_bbBrandHydrate'), grab('_bbBrandChanged'),
   grabConst('_BB_KPI_GROUPS'), grabConst('_BB_KPI_IDS'),
   grab('_bbKpisHydrate'), grab('_bbKpisChanged'),
+  // The Locations card. Same hydrate-then-save contract, different table: these
+  // write PostgREST directly instead of the clients RPC, and _bbLocations is the
+  // cache that stands in for CLIENT_ROWS. Section P.
+  'let _bbLocations = [];', grab('_bbLocationById'),
+  grabConst('_BB_LOC_GUARDED_COLS'), grab('_bbLocGuardBlanks'),
+  'const _bbLocSaveTimers = {};', grab('_bbLocFieldChanged'), grab('_bbSaveLocationField'),
+  grab('_bbRenderLocationsListInPanel'),
   'return { _bbRenderGeneralCard, _bbGenHydrate, _bbGenChanged, _bbStaffOwnerChanged,' +
   ' _bbBrandHydrate, _bbBrandChanged, _bbKpisHydrate, _bbKpisChanged, _BB_KPI_IDS, _BB_GEN_COLS,' +
   ' _bbSaveClientBasics, _bbHydrateClientCols, _bbGenEmailNote, _bbGenGoogleNote,' +
-  ' _bbGenRatingChanged, _bbGenRatingPatch };',
+  ' _bbGenRatingChanged, _bbGenRatingPatch,' +
+  ' _BB_LOC_GUARDED_COLS, _bbLocFieldChanged, _bbSaveLocationField,' +
+  ' _bbRenderLocationsListInPanel, setLocations: (rows) => { _bbLocations = rows; } };',
 ].join('\n');
 // Negative control: MUTATE=b1|b2|b3 reverts one fix in the extracted source, so
 // the suite proves it FAILS without it rather than just passing with it.
@@ -259,6 +297,10 @@ const MUT = {
   // close keeps these pointed at the GUARD list.
   b8: [/'tagline', 'instagram_url'\]\)\);/, "'instagram_url']));"],
   b9: [/'tagline', 'instagram_url'\]\)\);/, "'tagline']));"],
+  // The venue entry note, on the locations table. Empties the guard list so a save
+  // fired before the row loaded (or against a database that has not run the
+  // entry_note migration) writes NULL over an owner's real entry directions.
+  b10: [/const _BB_LOC_GUARDED_COLS = \['entry_note'\];/, "const _BB_LOC_GUARDED_COLS = [];"],
 };
 let srcFinal = src;
 if (process.env.MUTATE) {
@@ -737,6 +779,93 @@ const pO2 = rpcCalls[0]?.p_patch || {};
 const afterO3 = applyRpc({ ...STORED }, pO2);
 check('tagline' in pO2 && afterO3.tagline === null, 'a loaded tagline clears to NULL as asked');
 check('instagram_url' in pO2 && afterO3.instagram_url === null, 'and so does the Instagram link');
+
+// ── P. the venue entry note (locations.entry_note) ──
+// A different table, the same contract, and the first field on this card that an
+// owner edits in place. The morning-of trial confirmation used to end with a
+// hardcoded sentence describing BAM GTA's Linbrook door, sent by every academy on a
+// SHARED automation step; it now renders from this column on the venue the family is
+// actually booked into. Which makes a blank here expensive in a new way: NULL does
+// not degrade the message, it deletes a real instruction a parent needs on the
+// morning they are standing outside a building.
+//
+// Two reasons a blank can be written by accident, and both are guarded the same way:
+//   - the row has not loaded yet (_bbLoadLocations is the hydration path), or
+//   - the entry_note migration (20260730T160000) has not been applied, so the key is
+//     absent from every row this portal will ever cache.
+// In both cases the key is ABSENT from the cached venue, and absent means we know
+// nothing about it. MUTATE=b10 empties that guard list.
+console.log('\n── P. venue entry note: per venue, never blanked before it loads ──');
+const LOADED_VENUE = { id: 'loc-1', title: 'Linbrook', address: '1079 Linbrook Rd, Oakville, ON L6J 2L2',
+  notes: 'Entrance is on the left side.', entry_note: 'The gym entrance we use is at the front of the building, on the left side.' };
+const SECOND_VENUE = { id: 'loc-2', title: "Mildred's", address: '1080 Linbrook Rd, Oakville, ON L6J 2L1', notes: null, entry_note: null };
+// The SAME venue as it looks before its column exists: no entry_note key at all.
+const UNLOADED_VENUE = { id: 'loc-1', title: 'Linbrook', address: '1079 Linbrook Rd, Oakville, ON L6J 2L2', notes: 'Entrance is on the left side.' };
+
+// P1. the owner can actually see and set it, per venue, off the REAL renderer.
+api.setLocations([LOADED_VENUE, SECOND_VENUE]);
+const listEl = { innerHTML: '' };
+DOM = { 'bb-locations-list': listEl };
+api._bbRenderLocationsListInPanel();
+check(/id="bb-loc-entry_note-loc-1"/.test(listEl.innerHTML) && /id="bb-loc-entry_note-loc-2"/.test(listEl.innerHTML),
+  'the card renders an entry-note box on EVERY venue, not one per academy');
+check(listEl.innerHTML.includes('front of the building, on the left side'),
+  "and it shows the venue's saved note, so an owner can correct it");
+check(!/id="bb-loc-entry_note-loc-2"[^>]*>[^<]/.test(listEl.innerHTML),
+  "a venue with no note renders an EMPTY box (Mildred's is a second door we know nothing about)");
+
+// P2. the guard: unloaded key + blank box -> nothing goes to the wire at all.
+api.setLocations([UNLOADED_VENUE]);
+DOM = { 'bb-loc-entry_note-loc-1': inputEl('') };
+updateCalls = []; UPDATE_ERROR = null;
+api._bbLocFieldChanged('loc-1', 'entry_note');
+for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r));
+console.log('  updates sent:', JSON.stringify(updateCalls.map(c => c.patch)));
+check(updateCalls.length === 0, 'a blank box over an UNLOADED entry_note sends no update at all');
+
+// P3. and the guard is not just "never write": a typed value always saves.
+DOM['bb-loc-entry_note-loc-1'].value = 'Use the side door by the parking lot.';
+updateCalls = [];
+api._bbLocFieldChanged('loc-1', 'entry_note');
+for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r));
+check(updateCalls.length === 1 && updateCalls[0].patch.entry_note === 'Use the side door by the parking lot.',
+  'a note the owner actually typed still saves, unloaded or not');
+check(updateCalls[0].eqs.some(([k]) => k === 'id') && updateCalls[0].eqs.some(([k]) => k === 'client_id'),
+  'and it is scoped to one venue id AND one academy, so it cannot write across');
+
+// P4. loaded + blank: clearing IS an instruction, exactly like the clients row.
+api.setLocations([{ ...LOADED_VENUE }, { ...SECOND_VENUE }]);
+DOM = { 'bb-loc-entry_note-loc-1': inputEl('') };
+updateCalls = [];
+api._bbLocFieldChanged('loc-1', 'entry_note');
+for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r));
+check(updateCalls.length === 1 && updateCalls[0].patch.entry_note === null,
+  'a LOADED note clears to NULL when the owner means it');
+
+// P5. the cache mirrors what the write did, and only for the venue written.
+api.setLocations([{ ...LOADED_VENUE }, { ...SECOND_VENUE }]);
+DOM = { 'bb-loc-entry_note-loc-1': inputEl('Ring the buzzer at the blue door.') };
+updateCalls = []; UPDATE_ERROR = null;
+await api._bbSaveLocationField('loc-1', 'entry_note', 'Ring the buzzer at the blue door.');
+const listEl2 = { innerHTML: '' };
+DOM['bb-locations-list'] = listEl2;
+api._bbRenderLocationsListInPanel();
+check(listEl2.innerHTML.includes('Ring the buzzer at the blue door.'), "venue 1's note updated in the cache");
+check(!/id="bb-loc-entry_note-loc-2"[^>]*>[^<]/.test(listEl2.innerHTML),
+  'and venue 2 is untouched - one academy, two doors, two facts');
+
+// P6. the pre-migration failure is honest: the write fails, the cache does NOT
+// pretend it landed. Otherwise the box would show a saved note that is not stored.
+api.setLocations([{ ...LOADED_VENUE }]);
+UPDATE_ERROR = { message: 'column "entry_note" of relation "locations" does not exist' };
+const ok = await api._bbSaveLocationField('loc-1', 'entry_note', 'Side door.');
+UPDATE_ERROR = null;
+check(ok === false, 'a failed write reports failure');
+const listEl3 = { innerHTML: '' };
+DOM = { 'bb-locations-list': listEl3 };
+api._bbRenderLocationsListInPanel();
+check(listEl3.innerHTML.includes('front of the building') && !listEl3.innerHTML.includes('Side door.'),
+  'and the cache still holds the STORED note, not the one the write failed to save');
 
 console.log(fails ? `\nRESULT: ${fails} FAILURE(S)` : '\nRESULT: ALL PASS');
 

@@ -73,12 +73,49 @@ have lost the city from their body copy ("In a lot of Oakville programs" -> "In 
 of programs"). Measured, not reasoned about. With it, `{{location.city}}` and the tag
 render exactly what the pin used to supply, so those lines do not appear above.
 
-**Not changed, and worth knowing:** three of GTA's `automation_steps` rows hand-type
-the brand name into their copy (onboarding step 1's SMS, onboarding step 2's subject,
-`summer_special` step 0's SMS). After the migration GTA's shell says "By Any Means
-Toronto" while those three messages still say "By Any Means Basketball". That is live
-copy in the database, a separate owner-visible edit, and it is pinned by section 9 of
-`api/_email-identity-from-the-row.test.mjs` so it is recorded rather than discovered.
+### 5. The academy's name stopped being typed anywhere, 30 Jul 2026
+
+The two remaining places the name was typed instead of resolved, both approved by Zoran.
+**9 golden files moved, one line each, and nothing else** (read line by line, not
+re-captured on faith):
+
+| # | What a parent sees | Before | After | Golden files |
+|---|---|---|---|---|
+| a | the identity kicker above "A global basketball ecosystem" | `By Any Means Basketball · Est. 2015` | `By Any Means Toronto` | 6 |
+| b | the welcome SMS's first line | `welcome to By Any Means Basketball!` | `welcome to By Any Means Toronto!` | 1 |
+| c | the welcome email's SUBJECT | `Welcome to By Any Means Basketball 🏀` | `Welcome to By Any Means Toronto 🏀` | 1 |
+| d | the summer promo SMS's first line | `It's coach from By Any Means Basketball - we're just` | `It's coach from By Any Means Toronto - we're just` | 1 |
+
+**(a) came from a SHARED template, so it was never GTA's alone.** The kicker was typed
+into `nurture-1` in `api/email-templates/nurture-emails.js`, which every academy renders
+from, so every academy's nurture-1 carried BAM's name (confirmed by rendering San Jose's:
+its kicker said "By Any Means Basketball" under a wordmark reading SAN JOSE). It is now
+`{{ACADEMY_FULL}}`. **It moved SIX golden files, not two, because `onboarding-story` IS
+`nurture-1`** (`forMembers("nurture-1")` in `onboarding-emails.js`), so one line reaches
+two of GTA's emails. The step lock caught the second one; it was not predicted.
+
+`api/_shared-template-names.test.mjs` is the new guard: it renders all ten shared
+templates for two unrelated academies and fails on any line that is identical for both
+yet names an academy. `MUTATE=hardcode` restores this exact bug and must be caught.
+
+**"Est. 2015" was DROPPED from that line, and that is a deliberate content decision, not
+a rename.** No `clients` column holds a founding year and inventing one for a single line
+was rejected. Dropping it costs nothing here because **the same email states the year
+twice more and both survive**: the `EST. 2015` badge beside the gold wordmark two lines
+above it, and "Founded by Coleman Ayers in 2015" in the body. So this does NOT make
+`nurture-1` academy-neutral and must not be read that way - see the "WHAT IT DOES NOT
+PROVE" section of the new suite.
+
+**(b), (c) and (d) are database rows, not code**, and need migration `20260730T120000`
+(`supabase/PENDING_SQL.md`) to be applied. The snapshot below carries the tokenized
+values ahead of production so these goldens lock what GTA will send, exactly as change 4
+did. Section 9 of `api/_email-identity-from-the-row.test.mjs` used to assert these three
+rows still hand-typed the name; it now asserts they follow the row, which is the claim
+that matters - renaming the academy moves all three messages.
+
+**Deliberately NOT changed:** onboarding step 5's subject, "Where By Any Means came
+from". That names the brand family the origin story is about, not the academy;
+"Where By Any Means Toronto came from" would be false. Pinned in section 9.
 
 ## The fixture, and why it is not written down twice
 

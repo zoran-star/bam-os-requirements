@@ -3,19 +3,91 @@
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sales System Board</title>
 <style>
+  /* ── THEME ────────────────────────────────────────────────────────────────
+     Dark is the base. THE OS PREFERENCE IS HONOURED IN CSS, not in script, so a
+     flash of the wrong theme is impossible by construction: the first paint
+     already has the right palette, before any JavaScript has run. The inline
+     script further down only applies a REMEMBERED choice, which needs no media
+     query and therefore cannot be mistimed.
+     Four cases, all correct:
+       no saved choice + OS light -> the media block below
+       no saved choice + OS dark  -> this :root base
+       reader chose light         -> html[data-theme="light"] (media cannot apply)
+       reader chose dark          -> this :root base (excluded from the media block)
+     The light palette is written TWICE on purpose. Keep the two copies identical.
+     Every color on the page is a token here, including the few that used to be
+     literal hex inside component rules and inside the wire-drawing JS - a
+     literal would stay dark-mode in light mode. --is-dark is what the toggle
+     reads to learn the CURRENT theme, because with no saved choice there is no
+     attribute to read. */
   :root{
+    --is-dark:1;
     --bg:#101114; --grid:#1A1C21; --card:#181B21; --card2:#20242C; --line:#2E333D;
     --gold:#D4B65C; --blue:#6EA8D8; --green:#5CBF7A; --red:#E06C6C; --grey:#98A0AC;
     --orange:#E8A050; --purple:#B48CE0; --txt:#ECEEF2; --dim:#9AA1AD;
+    --on-gold:#1A1206;
+    --eng-agent-bg:#2A2517; --eng-auto-bg:#18222D;
+    --frame-ln:#4A4230; --frame-fill:rgba(212,182,92,.03); --nurture-ln:#4A3038;
+    --shadow:0 6px 22px rgba(0,0,0,.38); --shadow-sm:0 1px 2px rgba(0,0,0,.3);
+    --tint-gold:#2A2517; --tint-green:#16281D; --tint-red:#2A1A18; --tint-blue:#18222D; --tint-grey:#1E2128;
+  }
+  /* Light palette, copy 1 of 2: the reader's explicit choice. */
+  html[data-theme="light"]{
+    --is-dark:0;
+    --bg:#FAF9F6; --grid:#E2DED3; --card:#FFFFFF; --card2:#F3F1EB; --line:#E0DBD0;
+    --gold:#8C6D18; --blue:#1F567F; --green:#25704A; --red:#A8351F; --grey:#6B675F;
+    --orange:#8C5710; --purple:#5F4193; --txt:#1A1917; --dim:#54514A;
+    --on-gold:#FFFFFF;
+    --eng-agent-bg:#FBF3DC; --eng-auto-bg:#E9F1F8;
+    --frame-ln:#D8C89A; --frame-fill:rgba(140,109,24,.04); --nurture-ln:#E3C3BA;
+    --shadow:0 4px 16px rgba(26,25,23,.09); --shadow-sm:0 1px 2px rgba(26,25,23,.05);
+    --tint-gold:#FBF3DC; --tint-green:#E8F4EC; --tint-red:#FBECE8; --tint-blue:#E9F1F8; --tint-grey:#F1EFE9;
+  }
+  /* Light palette, copy 2 of 2: the OS preference, when no choice was made.
+     MUST stay identical to copy 1 above. */
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --is-dark:0;
+      --bg:#FAF9F6; --grid:#E2DED3; --card:#FFFFFF; --card2:#F3F1EB; --line:#E0DBD0;
+      --gold:#8C6D18; --blue:#1F567F; --green:#25704A; --red:#A8351F; --grey:#6B675F;
+      --orange:#8C5710; --purple:#5F4193; --txt:#1A1917; --dim:#54514A;
+      --on-gold:#FFFFFF;
+      --eng-agent-bg:#FBF3DC; --eng-auto-bg:#E9F1F8;
+      --frame-ln:#D8C89A; --frame-fill:rgba(140,109,24,.04); --nurture-ln:#E3C3BA;
+      --shadow:0 4px 16px rgba(26,25,23,.09); --shadow-sm:0 1px 2px rgba(26,25,23,.05);
+      --tint-gold:#FBF3DC; --tint-green:#E8F4EC; --tint-red:#FBECE8; --tint-blue:#E9F1F8; --tint-grey:#F1EFE9;
+    }
   }
   html,body{height:100%;overflow:hidden}
   body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;-webkit-user-select:none;user-select:none}
 
   /* tabs */
-  #tabs{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px}
-  #tabs button{border:none;background:transparent;color:var(--dim);font-weight:800;font-size:12px;letter-spacing:.8px;padding:8px 18px;border-radius:999px;cursor:pointer}
-  #tabs button.on{background:var(--gold);color:#1A1206}
+  #tabs{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px;box-shadow:var(--shadow-sm)}
+  #tabs button{border:none;background:transparent;color:var(--dim);font-weight:800;font-size:12px;letter-spacing:.8px;padding:8px 18px;border-radius:999px;cursor:pointer;white-space:nowrap}
+  #tabs button.on{background:var(--gold);color:var(--on-gold)}
   #tabs button:focus-visible{outline:2px solid var(--gold)}
+  /* Phones: the bar becomes a full-width scroller instead of overflowing off
+     both edges of the screen. Five tabs do not fit on a 375px viewport. */
+  @media(max-width:900px){
+    #tabs{left:8px;right:8px;transform:none;border-radius:12px;overflow-x:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    #tabs::-webkit-scrollbar{display:none}
+    #tabs button{flex:0 0 auto;padding:8px 12px;font-size:11px;letter-spacing:.4px}
+  }
+
+  /* theme switch - bottom LEFT, opposite the zoom controls, so it never
+     collides with the tab bar on a phone */
+  #theme{position:fixed;left:18px;bottom:18px;z-index:70}
+  #theme button{display:flex;align-items:center;gap:7px;height:42px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--txt);font-size:12px;font-weight:800;letter-spacing:.6px;cursor:pointer;box-shadow:var(--shadow-sm)}
+  #theme button:hover{border-color:var(--gold);color:var(--gold)}
+  #theme button:focus-visible{outline:2px solid var(--gold)}
+  #theme .dot{width:12px;height:12px;border-radius:999px;border:1.5px solid currentColor;background:linear-gradient(90deg,currentColor 50%,transparent 50%)}
+  /* Phones: shrink to the icon alone so the floating control covers as little
+     of the page underneath it as possible. */
+  @media(max-width:900px){
+    #theme{left:12px;bottom:12px}
+    #theme button{padding:0;width:40px;height:40px;justify-content:center;gap:0}
+    #theme #theme-lbl{display:none}
+  }
 
   #vp{position:fixed;inset:0;overflow:hidden;cursor:grab;touch-action:none;
       background-image:radial-gradient(circle,var(--grid) 1.4px,transparent 1.4px);background-size:26px 26px}
@@ -25,20 +97,20 @@
   #wires text{font-size:13px;font-weight:700;fill:var(--dim);paint-order:stroke;stroke:var(--bg);stroke-width:5px}
 
   /* pipeline frame */
-  .frame{position:absolute;border:2px dashed #4A4230;border-radius:22px;background:rgba(212,182,92,.03);pointer-events:none}
+  .frame{position:absolute;border:2px dashed var(--frame-ln);border-radius:22px;background:var(--frame-fill);pointer-events:none}
   .frame .flabel{position:absolute;top:-15px;left:26px;background:var(--bg);padding:2px 14px;border:1.5px solid var(--gold);border-radius:999px;color:var(--gold);font-size:12.5px;font-weight:800;letter-spacing:1.2px}
 
-  .node{position:absolute;background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:0 6px 22px rgba(0,0,0,.38);cursor:grab}
+  .node{position:absolute;background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);cursor:grab}
   .node:active{cursor:grabbing}
   .node h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.2px}
   .node .desc{font-size:12.5px;color:var(--dim);margin:5px 0 10px;line-height:1.4}
   .band{font-size:10.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
 
-  .stage{width:500px;border-color:#3A3F4B}
+  .stage{width:500px;border-color:var(--line)}
   .eng{display:flex;align-items:center;gap:8px;border-radius:10px;padding:8px 11px;font-size:12.5px;font-weight:700;margin:4px 0 8px}
   .eng small{font-weight:500;color:var(--dim)}
-  .eng-agent{background:#2A2517;border:1px solid var(--gold);color:var(--gold)}
-  .eng-auto{background:#18222D;border:1px dashed var(--blue);color:var(--blue)}
+  .eng-agent{background:var(--eng-agent-bg);border:1px solid var(--gold);color:var(--gold)}
+  .eng-auto{background:var(--eng-auto-bg);border:1px dashed var(--blue);color:var(--blue)}
   details{border-top:1px dashed var(--line);padding:6px 0}
   summary{font-size:11.5px;font-weight:800;letter-spacing:.6px;color:var(--dim);cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}
   summary::before{content:'▸';color:var(--gold);transition:transform .15s}
@@ -68,14 +140,15 @@
   #zoom button:focus-visible{outline:2px solid var(--gold)}
   .fit{font-size:11px !important;letter-spacing:.5px}
 
-  /* ===== page 2: building blocks ===== */
-  #page2{position:fixed;inset:0;overflow-y:auto;display:none;background:var(--bg);
+  /* ===== the scrolling pages (everything except THE FLOW canvas) ===== */
+  .page{position:fixed;inset:0;overflow-y:auto;display:none;background:var(--bg);
          background-image:radial-gradient(circle,var(--grid) 1.4px,transparent 1.4px);background-size:26px 26px;
          -webkit-user-select:text;user-select:text}
-  #page2 .inner{max-width:1060px;margin:0 auto;padding:84px 22px 80px}
-  #page2 h1{font-size:25px;font-weight:800;letter-spacing:-.3px;margin:0}
-  #page2 h1 span{color:var(--gold)}
-  #page2 .lead{color:var(--dim);font-size:13.5px;margin:8px 0 30px;max-width:640px;line-height:1.55}
+  .page .inner{max-width:1060px;margin:0 auto;padding:84px 22px 110px}
+  .page h1{font-size:25px;font-weight:800;letter-spacing:-.3px;margin:0}
+  .page h1 span{color:var(--gold)}
+  .page .lead{color:var(--dim);font-size:13.5px;margin:8px 0 30px;max-width:660px;line-height:1.55}
+  @media(max-width:900px){.page .inner{padding-top:74px}}
   .hier{background:var(--card);border:1.5px solid var(--gold);border-radius:18px;padding:20px;margin-bottom:34px}
   .hier .hlabel{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:1.2px;margin-bottom:14px}
   .hrow{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
@@ -93,11 +166,87 @@
   .comp p{margin:0;font-size:12.5px;color:var(--dim);line-height:1.55}
   .comp .ex{margin-top:9px;font-size:12px;background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;line-height:1.5}
   .comp .ex b{color:var(--gold)}
+
+  /* ===== shared furniture for the reference pages ===== */
+  .sec{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--gold);font-weight:800;margin:40px 0 5px}
+  .secsub{color:var(--dim);font-size:13px;margin:0 0 14px;line-height:1.55;max-width:78ch}
+  .box{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:14px}
+  .box.gold{border-color:var(--gold)}
+  .rule{background:var(--tint-gold);border:1.5px solid var(--gold);border-radius:16px;padding:18px 20px;margin-bottom:16px}
+  .rule .rl{font-size:10.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:6px}
+  .rule p{margin:0;font-size:15px;line-height:1.5;color:var(--txt);font-weight:600}
+  .rule p+p{margin-top:9px;font-size:13px;font-weight:400;color:var(--dim)}
+  /* tables: every one scrolls inside its own container so the page body never
+     scrolls sideways on a phone */
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.t{width:100%;border-collapse:collapse;font-size:13px;min-width:660px}
+  table.t th{text-align:left;padding:9px 11px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);font-weight:800;border-bottom:2px solid var(--line);white-space:nowrap}
+  table.t td{padding:9px 11px;border-bottom:1px solid var(--line);color:var(--dim);vertical-align:top;line-height:1.5}
+  table.t tr:last-child td{border-bottom:none}
+  table.t td.k{color:var(--txt);font-weight:700}
+  table.t td.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dim);white-space:nowrap}
+  table.t tr.grp td{background:var(--card2);color:var(--txt);font-weight:800;font-size:10.5px;letter-spacing:1px;text-transform:uppercase}
+  table.t tr.hi td{background:var(--tint-gold)}
+  table.t tr.bad td{background:var(--tint-red)}
+  .tag{display:inline-block;font-size:9.5px;letter-spacing:.7px;text-transform:uppercase;font-weight:800;padding:3px 8px;border-radius:5px;white-space:nowrap}
+  .tg-lock{background:var(--tint-gold);color:var(--gold)}
+  .tg-fork{background:var(--tint-blue);color:var(--blue)}
+  .tg-ok{background:var(--tint-green);color:var(--green)}
+  .tg-bad{background:var(--tint-red);color:var(--red)}
+  .tg-park{background:var(--tint-grey);color:var(--grey)}
+  .note2{border-radius:12px;padding:14px 16px;margin-bottom:11px;border:1px solid var(--line);background:var(--card)}
+  /* Direct child ONLY: this is the note's title. A bold inside a paragraph must
+     stay inline, or every emphasised phrase breaks its own sentence in two. */
+  .note2 > b{display:block;margin-bottom:4px;font-size:14px;color:var(--txt)}
+  .note2 p b{color:var(--txt)}
+  .note2 p{margin:0;font-size:13px;color:var(--dim);line-height:1.55}
+  .note2 p+p{margin-top:7px}
+  .n-red{background:var(--tint-red);border-color:var(--red)} .n-red > b{color:var(--red)}
+  .n-gold2{background:var(--tint-gold);border-color:var(--gold)} .n-gold2 > b{color:var(--gold)}
+  .n-green{background:var(--tint-green);border-color:var(--green)} .n-green > b{color:var(--green)}
+  .n-blue2{background:var(--tint-blue);border-color:var(--blue)} .n-blue2 > b{color:var(--blue)}
+  .cols{display:grid;gap:12px}
+  @media(min-width:820px){.cols.c2{grid-template-columns:1fr 1fr}.cols.c3{grid-template-columns:repeat(3,1fr)}}
+  /* the skill blocks on the onboarding page */
+  .sk{border:1.5px solid var(--line);border-radius:16px;background:var(--card);margin-bottom:14px;overflow:hidden}
+  .sk.on1{border-color:var(--gold)}
+  .sk .skh{padding:15px 20px 3px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .sk .skh .nm{font-size:17px;font-weight:800;color:var(--txt)}
+  .sk .fire{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;font-weight:800;color:var(--blue);padding:0 20px;margin-top:2px}
+  .sk .skb{padding:8px 20px 14px;font-size:13px;color:var(--dim);line-height:1.6}
+  .sk .skb p{margin:0 0 8px}
+  .sk .skb p:last-child{margin-bottom:0}
+  .sk .skb b{color:var(--txt)}
+  .rail{display:grid;grid-template-columns:1fr;border-top:1px solid var(--line);background:var(--card2)}
+  @media(min-width:760px){.rail.r4{grid-template-columns:repeat(4,1fr)}}
+  .rail>div{padding:10px 18px;border-bottom:1px solid var(--line)}
+  .rail>div:last-child{border-bottom:none}
+  @media(min-width:760px){.rail>div{border-bottom:none;border-right:1px solid var(--line)}.rail>div:last-child{border-right:none}}
+  .rail .rl2{font-size:9px;letter-spacing:1.1px;text-transform:uppercase;font-weight:800;color:var(--dim);margin-bottom:2px}
+  .rail .rv{font-size:12.5px;color:var(--txt);font-weight:600;line-height:1.45}
+  .kpi{font-size:30px;font-weight:800;line-height:1;letter-spacing:-.5px;color:var(--gold)}
+  .kpi.g{color:var(--green)} .kpi.r{color:var(--red)} .kpi.b{color:var(--blue)}
+  .lbl2{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim);font-weight:800;margin-bottom:7px}
+  .page a{color:var(--blue);font-weight:700}
+  .stamp{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.6px;border:1px solid var(--line);border-radius:999px;padding:3px 11px;color:var(--dim);margin-top:10px}
 </style>
+
+<script>
+/* Applies a REMEMBERED choice only, and runs before the page renders so the
+   choice is never painted over. The OS default needs nothing here: the
+   stylesheet handles it with a media query, which is why this cannot flash. */
+(function(){
+  var saved=null; try{ saved=localStorage.getItem('ssb-theme'); }catch(e){}
+  if(saved==='dark'||saved==='light') document.documentElement.setAttribute('data-theme',saved);
+})();
+</script>
 
 <div id="tabs">
   <button id="tab-flow" class="on">THE FLOW</button>
   <button id="tab-blocks">BUILDING BLOCKS</button>
+  <button id="tab-data">WHAT WE NEED</button>
+  <button id="tab-onb">ONBOARDING</button>
+  <button id="tab-next">BUILDING THE NEXT ONE</button>
 </div>
 
 <div id="vp"><div id="board">
@@ -109,34 +258,35 @@
 </div>
 
 <!-- ===== top info row ===== -->
-<div class="node hdr" id="hdr" style="left:80px;top:50px;width:430px;border-color:var(--gold)">
+<div class="node hdr" id="hdr" style="left:80px;top:125px;width:430px;border-color:var(--gold)">
   <h2>The Sales System <span>Board</span></h2>
-  <div style="display:inline-block;font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--green);border:1px solid var(--green);border-radius:999px;padding:3px 11px;margin:8px 0 2px">● LIVE IN PRODUCTION - GTA + San Jose</div>
+  <div style="display:inline-block;font-size:11px;font-weight:800;letter-spacing:.6px;color:var(--green);border:1px solid var(--green);border-radius:999px;padding:3px 11px;margin:8px 0 2px">● LIVE - GTA + San Jose · 30 JUL 2026</div>
   <div class="hint">
     <b style="color:var(--txt)">Drag any card</b> · drag the background to pan · pinch / scroll or + and - to zoom.<br>
     ▸ Every card has dropdowns - click the little arrows for full detail.<br>
-    The flow reads <b style="color:var(--gold)">left to right</b>: landing page → pipeline → member.
+    The flow reads <b style="color:var(--gold)">left to right</b>: landing page → pipeline → member.<br>
+    <b style="color:var(--txt)">New here?</b> Read the tabs in order. <b style="color:var(--gold)">WHAT WE NEED</b> is the list you collect from a new academy; <b style="color:var(--gold)">BUILDING THE NEXT ONE</b> is what you must not break.
   </div>
 </div>
 
-<div class="node panel" id="principle" style="left:570px;top:50px;width:640px;border-color:var(--gold)">
+<div class="node panel" id="principle" style="left:570px;top:125px;width:640px;border-color:var(--gold)">
   <div class="band" style="color:var(--gold)">WHO OWNS WHAT - THE THREE TIERS</div>
   <div class="item" style="border-color:var(--gold)"><b style="color:var(--gold)">1 · The machine - BAM's, shared</b> <span style="color:var(--green);font-size:10.5px;font-weight:800">● LIVE</span><br>
     <span class="sub">Stages, flow, agents + their voice, qualifications, KPIs. The routing now reads BAM's one master playbook directly - edit it once, every academy steers differently that same second. Never forked, no per-academy copies.</span></div>
   <div class="item" style="border-color:var(--blue)"><b style="color:var(--blue)">2 · The messages - seeded, then YOURS</b><br>
     <span class="sub">Drip texts + emails (copy, timing, steps), extra form questions. We tailor them at onboarding; after that they're yours. Master edits never overwrite yours.</span></div>
-  <div class="item" style="border-color:var(--orange)"><b style="color:var(--orange)">3 · Your facts - pulled live</b><br>
-    <span class="sub">Schedule, pricing, coaches, selling points. Change them in your settings → the agents update instantly.</span></div>
+  <div class="item" style="border-color:var(--orange)"><b style="color:var(--orange)">3 · Your facts - pulled live</b> <span style="color:var(--green);font-size:10.5px;font-weight:800">● ALL 9 LIVE</span><br>
+    <span class="sub">Schedule, pricing, policies, program, selling points, gyms, who qualifies, coaches, social proof. Change them in your settings → the agents read the change on their next message. Nine of nine now derive from the academy's own data; nothing is retyped per academy.</span></div>
 </div>
 
-<div class="node panel" id="guard" style="left:1230px;top:50px;width:540px;border-color:var(--grey)">
+<div class="node panel" id="guard" style="left:1230px;top:125px;width:540px;border-color:var(--grey)">
   <div class="band" style="color:var(--grey)">GUARDRAILS - ALWAYS ON</div>
   <div class="item">Complaint or something off-topic → a <b>human takes over</b>, instantly.</div>
   <div class="item"><b>Nobody sits untouched.</b> Every stage has an engine working it.</div>
   <div class="item">Marking someone <b style="color:var(--red)">Unqualified</b> always needs a reason from the Qualifications card.</div>
 </div>
 
-<div class="node panel" id="metrics" style="left:3040px;top:40px;width:440px;border-color:var(--green)">
+<div class="node panel" id="metrics" style="left:3040px;top:115px;width:440px;border-color:var(--green)">
   <div class="band" style="color:var(--green)">METRICS - what gets calculated</div>
   <div class="item"><b>Qualified trial close rate</b> ★ the health number<br><span class="sub">of good-fit trials that showed up, how many enrolled (GTA: ~31%)</span></div>
   <div class="item"><b>Won / Lost / Still deciding</b> <span class="sub">- feeds the close rate</span></div>
@@ -238,7 +388,7 @@
   <details><summary>WHAT THE AGENT KNOWS</summary><ul>
     <li>Everything on the <b>Agent Knowledge</b> card ↓</li>
     <li>The trainer's post-trial notes <span class="to">("thinking about it, deciding this weekend...")</span></li>
-    <li>Objection handling + sales strategies <span class="src">coming - Zoran + Mike session</span></li>
+    <li>Objection handling <span class="src">live now, one shared playbook for every academy</span></li>
   </ul></details>
   <details><summary>DATA SAVED HERE</summary><ul>
     <li><b>Post-trial form:</b> showed up? good fit? which trainer + their notes</li>
@@ -270,7 +420,7 @@
 </div>
 
 <!-- stage 5 nurture (below, the lost bench) -->
-<div class="node stage" id="st-nurture" style="left:1600px;top:940px;width:560px;border-color:#4A3038">
+<div class="node stage" id="st-nurture" style="left:1600px;top:940px;width:560px;border-color:var(--nurture-ln)">
   <div class="band" style="color:var(--red)">STAGE 5 - THE LOST BENCH</div>
   <h3>Nurture</h3>
   <div class="desc">"Not now" doesn't mean never. Leads here are <b style="color:var(--red)">marked Lost</b> - a slow drip keeps the door open.</div>
@@ -289,8 +439,8 @@
 
 <!-- member (way right) -->
 <div class="node term t-mem" id="t-member" style="left:3040px;top:470px">
-  <h3>Member 🏆</h3>
-  <div class="desc">They enrolled. Sales is done - the member-management system takes over from here <span class="src">(its own preset, confirmed later - onboarding data points live there)</span>.</div>
+  <h3>Member</h3>
+  <div class="desc">They enrolled. Sales is done - the member-management system takes over from here <span class="src">(its own skill, parked on purpose - see ONBOARDING)</span>.</div>
 </div>
 
 <!-- below the flow -->
@@ -326,25 +476,29 @@
 
 <div class="node panel" id="knowledge" style="left:740px;top:1420px;width:620px;border-color:var(--gold)">
   <div class="band" style="color:var(--gold)">AGENT KNOWLEDGE - what all 3 agents know</div>
-  <div class="desc" style="margin-top:0"><b style="color:var(--green)">● LIVE now:</b> every message the agents build reads these facts fresh from where they really live. Edit the offer, the agent knows it within a minute. Never retyped.</div>
-  <details open><summary>THE 7 FACTS THAT RENDER LIVE + WHERE EACH COMES FROM</summary><ul>
-    <li><b>Business info</b> (name, address, gyms) <span class="src">academy profile + locations</span></li>
-    <li><b>Schedule</b> (classes, days, times, gym) <span class="src">the offer</span></li>
-    <li><b>Program</b> (ages, co-ed, skill, group size, coach ratio) <span class="src">the offer</span></li>
-    <li><b>Pricing</b> + plans + how openly to share it <span class="src">the offer</span></li>
-    <li><b>Policies</b> (cancel, pause, makeup, parents watching) <span class="src">the offer</span></li>
-    <li><b>Selling points</b> <span class="src">the offer</span></li>
-    <li><b>Qualification criteria</b> (your gyms + age range) <span class="src">offer + locations</span></li>
+  <div class="desc" style="margin-top:0"><b style="color:var(--green)">● 9 OF 9 LIVE:</b> every message the agents build reads these facts fresh from where they really live. Edit the offer, the agent knows it within a minute. Never retyped. Coaches and social proof were the last two typed sections and both now derive.</div>
+  <details open><summary>THE 9 FACTS THAT RENDER LIVE + WHERE EACH IS EDITED</summary><ul>
+    <li><b>Program</b> (ages, co-ed, skill, group size, coach ratio) <span class="src">Offer - General info step</span></li>
+    <li><b>Schedule</b> (classes, days, times, gym) <span class="src">Offer - Schedule step</span></li>
+    <li><b>Pricing</b> (plans, terms, sign-up fee, discount codes) <span class="src">Offer - Pricing step</span></li>
+    <li><b>Policies</b> (cancel, pause, refunds, makeup, siblings, under-18) <span class="src">Offer - Policy step</span></li>
+    <li><b>Selling points</b> <span class="src">Offer - Value step</span></li>
+    <li><b>Business info</b> (name, gyms, directions, booking link) <span class="src">your Locations</span></li>
+    <li><b>Who qualifies</b> (your gyms + age range + skill levels) <span class="src">Offer General info + your Locations</span></li>
+    <li><b>Coaches</b> (name, title, bio) <span class="src">your Team - active staff with a title or bio</span></li>
+    <li><b>Social proof</b> (rating, up to 2 quotes, review link) <span class="src">your reviews + your Google review link</span></li>
   </ul></details>
-  <details><summary>COMING NEXT (still typed for now)</summary><ul>
-    <li><b>Coaches</b> + credentials + ratio <span class="src">← staff records (Build 4)</span></li>
-    <li><b>Reviews / social proof</b> <span class="src">← Google auto-pull (Build 5)</span></li>
+  <details><summary>WHAT HAPPENS WHEN A FACT IS MISSING</summary><ul>
+    <li><b>Pricing with no sellable prices yet:</b> the agent is told to quote NOTHING and flag the admin. Silence, never a guess.</li>
+    <li><b>No coach profiles</b> (San Jose today): the agent speaks about coaching in general terms and is explicitly forbidden to invent credentials.</li>
+    <li><b>No reviews:</b> the section is absent. An academy never borrows another academy's quotes.</li>
+    <li><b>Too sparse to trust:</b> a renderer returning nothing falls back to the shared default text, which is still GTA-shaped in a few sections. <b style="color:var(--red)">That is why the data is mandatory</b> - see WHAT WE NEED.</li>
   </ul></details>
   <details><summary>PLUS WHAT YOU TEACH IT</summary><ul>
     <li>Every "why" you type when changing a message in Hawkeye becomes a lesson</li>
     <li>Lessons get consolidated into the agents' knowledge regularly</li>
   </ul></details>
-  <div style="font-size:11.5px;color:var(--dim);margin-top:8px">Change something in your settings → every agent updates instantly.</div>
+  <div style="font-size:11.5px;color:var(--dim);margin-top:8px">Facts are cached for 60 seconds, so a settings change reaches every agent within a minute. Email identity (the name, address and reply-to parents see) is a separate list read off the academy's own record - see WHAT WE NEED.</div>
 </div>
 
 <div class="node panel" id="hawkeye" style="left:1420px;top:1460px;width:480px;border-color:var(--gold)">
@@ -361,7 +515,7 @@
 </div></div>
 
 <!-- ===================== PAGE 2: BUILDING BLOCKS ===================== -->
-<div id="page2"><div class="inner">
+<div id="page2" class="page"><div class="inner">
   <h1>What a sales system is <span>made of</span></h1>
   <div class="lead">A sales system preset is one complete playbook. Plug it into an academy and every piece below comes with it - already wired together. Here's each building block, from the top down.</div>
 
@@ -390,14 +544,14 @@
     <div class="hrow">
       <div class="hbox" style="border-color:var(--gold)"><b style="color:var(--gold)">1 · The machine - BAM's</b>Stages, flow, agents + voice, qualifications, KPIs. Edit once → every academy updates. Never forked.</div>
       <div class="hbox" style="border-color:var(--blue)"><b style="color:var(--blue)">2 · The messages - yours</b>Drip copy, timing, steps + extra form questions. Seeded tailored at onboarding, then the academy owns them.</div>
-      <div class="hbox" style="border-color:var(--orange)"><b style="color:var(--orange)">3 · Your facts - live</b>Schedule, pricing, coaches, selling points. Pulled from your settings the moment they change.</div>
+      <div class="hbox" style="border-color:var(--orange)"><b style="color:var(--orange)">3 · Your facts - live</b>All 9 of them, coaches and social proof included. Pulled from your settings the moment they change.</div>
     </div>
   </div>
 
   <div class="grid">
     <div class="comp"><div class="cb" style="color:var(--gold)">THE PACKAGE</div><h4>Sales system preset</h4>
       <p>The whole playbook as one package: stages, engines, funnel, qualifications and metrics. The MACHINE is one master shared by every academy - edit it once, everyone updates. The messages inside it are seeded, then each academy's own.</p>
-      <div class="ex"><b>Free trial</b> is preset #1. More presets later (e.g. discovery-call-first) - same blocks, different arrangement.</div></div>
+      <div class="ex"><b>Free trial</b> is the one running live. <b>Discovery call then trial</b> is already declared in the same file, unused so far. A new one is a declaration, not a copy - see BUILDING THE NEXT ONE.</div></div>
 
     <div class="comp"><div class="cb" style="color:var(--purple)">THE FRONT DOOR</div><h4>Funnel</h4>
       <p>The web path that turns a stranger into a lead: a landing page they visit, a form they fill, a calendar they book on. Every step is tracked so you see where people drop off.</p>
@@ -444,8 +598,16 @@
       <div class="ex">Close enough · right age · good fit for the program.</div></div>
 
     <div class="comp"><div class="cb" style="color:var(--orange)">THE BRAIN</div><h4>Agent knowledge</h4>
-      <p>Everything the agents know about the academy - pulled live from where each fact really lives (settings, the offer, staff records). Change it once, every agent updates. Never retyped.</p>
-      <div class="ex">Schedule, pricing, policies, coaches, selling points + the lessons you teach in Hawkeye.</div></div>
+      <p>Everything the agents know about the academy - pulled live from where each fact really lives (the offer, locations, the team, the reviews store). Change it once, every agent updates. Never retyped. <b style="color:var(--green)">All 9 facts derive today.</b></p>
+      <div class="ex">Program, schedule, pricing, policies, selling points, gyms, who qualifies, coaches, social proof + the lessons you teach in Hawkeye.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--gold)">CONTENT SAFETY</div><h4>Sync class</h4>
+      <p>Every automated message carries a class saying whether its words may travel to another academy: <b>shared</b>, <b>local</b> or <b>attributed</b>. Strictest wins, and anything unrecognised fails to the strictest. This is the mechanism that stops academy #4 sending another academy's parent quotes under its own name.</p>
+      <div class="ex">A step carrying real parents' words is <b>attributed</b> and never copies. Full explanation on BUILDING THE NEXT ONE.</div></div>
+
+    <div class="comp"><div class="cb" style="color:var(--purple)">THIRD FRONT DOOR</div><h4>Reignition</h4>
+      <p>A staff-run station attached to every sales system automatically, for waking an old roster back up. It is not on the flow diagram because it is stamped on first use rather than when a preset is applied. A reply out of it lands on the talking stage; running dry lands in nurture.</p>
+      <div class="ex">Attached to <b>both</b> presets in the registry today. A new sales system gets it by existing.</div></div>
 
     <div class="comp"><div class="cb" style="color:var(--green)">THE SCORE</div><h4>Metrics</h4>
       <p>The numbers the system calculates on its own, so you know if the machine is working - and where it leaks.</p>
@@ -453,10 +615,359 @@
   </div>
 </div></div>
 
+<!-- ===================== PAGE 3: WHAT WE NEED ===================== -->
+<div id="page3" class="page"><div class="inner">
+  <h1>Everything this sales system <span>needs to know</span></h1>
+  <div class="lead">This is the answer to "what do we have to get from a new academy before we can turn this on". Every blank in every message, every page and every agent reply pulls from one of the rows below. Three columns: what it is, where it is used, where it is collected.</div>
+
+  <div class="rule">
+    <div class="rl">The rule · Zoran, 30 July 2026</div>
+    <p>All of this data is MANDATORY before the sales system can be turned on for an academy. Not "nice to have", not "fill it in later". Every row on this page, collected and checked, before the switch.</p>
+    <p>The reason is that the system degrades <i>politely</i>. A missing link removes its own line, a missing schedule sends nothing at all, a missing coach list makes the agent vague. Nothing errors, nothing alerts, and a shorter message reads exactly like a correct one. That is why an absent fact has to be caught by a checklist before launch and cannot be caught afterwards.</p>
+  </div>
+
+  <div class="sec">A · The nine facts the AI agents read</div>
+  <p class="secsub">Each of these is a live VIEW onto something the academy already maintains. Nobody retypes them into the agent, and the agent re-reads them within a minute of a change. "Where it is collected" is the exact screen the owner edits.</p>
+  <div class="box scroll">
+    <table class="t">
+      <thead><tr><th>What it is</th><th>Where it is used</th><th>Where it is collected</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Program</td><td>Booking, Confirm and Closing agents. Ages, co-ed, skill levels, group sizes, coach ratio.</td><td>Offer - General info step</td></tr>
+        <tr><td class="k">Schedule</td><td>All 3 agents. Classes with days, times and which gym.</td><td>Offer - Schedule step</td></tr>
+        <tr><td class="k">Pricing</td><td>All 3 agents. Plans, prepaid terms, sign-up fee, discount codes.</td><td>Offer - Pricing step, <b>plus the sellable price catalog</b>. The agent reads only prices Stripe can actually bill, never the typed offer price, so a catalog that was never seeded means the agent quotes nothing.</td></tr>
+        <tr><td class="k">Policies</td><td>All 3 agents. Cancel, pause, refunds, makeups, siblings, parents watching, under-18, holidays.</td><td>Offer - Policy step</td></tr>
+        <tr><td class="k">Selling points</td><td>All 3 agents. What makes this academy different, program structure.</td><td>Offer - Value step</td></tr>
+        <tr><td class="k">Business info</td><td>All 3 agents. Name, each gym with its address and directions notes, the trial booking link, the sign-up link.</td><td>your Locations</td></tr>
+        <tr><td class="k">Who qualifies</td><td>All 3 agents, and the reason list behind marking somebody Unqualified.</td><td>Offer - General info AND your Locations (needs both)</td></tr>
+        <tr><td class="k">Coaches</td><td>All 3 agents, when a parent asks who is coaching.</td><td>your Team - any active staff member with a title or a bio</td></tr>
+        <tr><td class="k">Social proof</td><td>All 3 agents. The Google rating, up to two parent quotes, and where to leave a review.</td><td>your reviews (the testimonials store) + your Google review link, edited in the Offer Onboarding step</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec">B · The academy's own record, which every email and text reads</div>
+  <p class="secsub">The message templates are shared across academies, so every academy-specific word in them is a token filled from this record at send time. Since 29 July there is no per-academy exception list anywhere in the code: an identity value is either the academy's own or it is empty. Empty is safe. Another academy's is not.</p>
+  <div class="box scroll">
+    <table class="t">
+      <thead><tr><th>What it is</th><th>Where it is used</th><th>Where it is collected</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="3">Identity - nothing sends correctly without these</td></tr>
+        <tr><td class="k">Parent-facing name</td><td>Every email and text, the email header, the sign-off. The internal label ("BAM GTA") is deliberately NOT used - parents would read our shorthand back.</td><td>Business Basics, the name parents see</td></tr>
+        <tr><td class="k">Website domain</td><td>Every booking link, and the bare-domain form for texts that name the site rather than link it. No domain means those sentences are removed.</td><td>Website setup</td></tr>
+        <tr><td class="k">Reply-to email</td><td>Every email footer and the unsubscribe path. <b>Empty holds the send</b> rather than shipping an email with no way to unsubscribe. This must be an academy address, not the owner's personal inbox.</td><td>Business Basics</td></tr>
+        <tr><td class="k">Owner's first name</td><td>The ghosted sequence's third message, which is written as a note from the owner.</td><td>Business Basics</td></tr>
+        <tr><td class="k">Business address</td><td>The city is derived from it and used in copy. Also the fallback gym when no Locations exist.</td><td>Business Basics</td></tr>
+        <tr><td class="k">Time zone</td><td>Every confirmation and reminder that states a date or a time. A wrong zone sends a parent to the gym on the wrong hour.</td><td>Business Basics</td></tr>
+        <tr class="grp"><td colspan="3">Content facts - each one gates a specific block</td></tr>
+        <tr><td class="k">Coach phone number</td><td>Member-facing messages, so a parent can reach a human.</td><td>Business Basics</td></tr>
+        <tr><td class="k">Google review link</td><td>The review-ask CTA in emails, plus the agents' social proof answer. No link means the CTA is removed outright, as text and as a button.</td><td>Business Basics</td></tr>
+        <tr><td class="k">Community group link</td><td>The "join the group" line in the welcome sequence.</td><td>Business Basics</td></tr>
+        <tr><td class="k">Community group platform</td><td>Only names the group, so the copy can say "the WhatsApp group". Unknown renders "the group", which is still correct.</td><td>Business Basics</td></tr>
+        <tr><td class="k">Online programs link</td><td>The online-training block in the onboarding emails.</td><td>Business Basics, optional in practice</td></tr>
+        <tr><td class="k">Referral offer</td><td>The bring-a-friend block.</td><td>Business Basics, optional in practice</td></tr>
+        <tr><td class="k">Tagline</td><td>The email footer under the academy name.</td><td>Business Basics</td></tr>
+        <tr><td class="k">Instagram URL</td><td>The email footer social link.</td><td>Business Basics</td></tr>
+        <tr class="grp"><td colspan="3">Facts assembled from other records</td></tr>
+        <tr><td class="k">Training venue</td><td>The schedule text and the welcome email. Rides along with the schedule: an academy with a gym but no sessions entered sends neither, rather than an address on its own.</td><td>your Locations, the first one</td></tr>
+        <tr><td class="k">Weekly schedule</td><td>The schedule text a member is texted and the table a member is emailed. One fact, two presentations, so they cannot disagree.</td><td>your real sessions, collapsed into one typical week</td></tr>
+        <tr><td class="k">Approved parent quotes</td><td>The nurture testimonials email and the agents' social proof. Empty drops the whole block and its lead-in.</td><td>the testimonials store (run the testimonials skill during onboarding)</td></tr>
+        <tr><td class="k">Lead and athlete names</td><td>Every message, in the greeting.</td><td>whoever the message is going to, from the lead form</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note2 n-gold2">
+    <b>No fact, no output - and that is exactly why the checklist is mandatory</b>
+    <p>A missing bare link takes its whole line, plus any dangling lead-in above it ("here's the link:"). A missing link inside a sentence takes only that sentence, so the rest of the message survives. A missing schedule or venue takes its own heading with it. If the whole body resolves to nothing, the send is refused rather than an empty text going to a provider.</p>
+    <p>This is good engineering and a bad safety net. It means an academy launched with half this page blank will send messages that look completely normal and are quietly missing their booking link, their review ask and their reply-to address.</p>
+  </div>
+
+  <div class="sec">Where we actually stand today</div>
+  <p class="secsub">Measured against the live database on 30 July 2026, for the three academies that have a portal pipeline stamped. DETAIL Miami still has GoHighLevel in charge of its board (see BUILDING THE NEXT ONE), so its blanks are not blocking anything yet.</p>
+  <div class="box scroll">
+    <table class="t">
+      <thead><tr><th>Fact</th><th>BAM GTA</th><th>BAM San Jose</th><th>DETAIL Miami</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Parent-facing name</td><td>on file</td><td>on file</td><td class="mono">missing</td></tr>
+        <tr><td class="k">Website domain</td><td>on file</td><td>on file</td><td>on file</td></tr>
+        <tr><td class="k">Reply-to email</td><td>on file</td><td>on file</td><td class="mono">missing</td></tr>
+        <tr><td class="k">Time zone</td><td>on file</td><td>on file</td><td>on file</td></tr>
+        <tr><td class="k">Coach phone</td><td>on file</td><td>on file</td><td class="mono">missing</td></tr>
+        <tr><td class="k">Google review link</td><td>on file</td><td class="mono">missing</td><td class="mono">missing</td></tr>
+        <tr><td class="k">Community group</td><td>on file</td><td class="mono">missing</td><td class="mono">missing</td></tr>
+        <tr><td class="k">Tagline + Instagram</td><td>on file</td><td class="mono">missing</td><td class="mono">missing</td></tr>
+        <tr><td class="k">Gyms saved</td><td>2</td><td>2</td><td>1</td></tr>
+        <tr><td class="k">Classes in the schedule</td><td>2</td><td>3</td><td>1</td></tr>
+        <tr class="bad"><td class="k">Sellable prices</td><td>3</td><td><b>0 - the agent quotes nothing and flags the admin</b></td><td>9</td></tr>
+        <tr class="bad"><td class="k">Coaches with a title or bio</td><td>3</td><td><b>0 - the agent stays general</b></td><td><b>0</b></td></tr>
+        <tr><td class="k">Approved parent quotes</td><td>5</td><td>5</td><td class="mono">0</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note2 n-red">
+    <b>Read the two red rows as the cost of skipping the checklist</b>
+    <p>San Jose is live and cannot name a price, because its sellable price catalog was never seeded. Neither San Jose nor DETAIL has a single coach profile, so their agents are under instruction to speak about coaching only in general terms and to invent nothing. None of that shows up as an error anywhere. It shows up as an agent that is worse at selling.</p>
+  </div>
+
+  <div class="stamp">Sources: the fact source map and renderers in the agent code, the merge-token map in the email layer, and a live query of the academies table. Counted, not remembered.</div>
+</div></div>
+
+<!-- ===================== PAGE 4: ONBOARDING ===================== -->
+<div id="page4" class="page"><div class="inner">
+  <h1>Onboarding a new academy: <span>five skills, in order</span></h1>
+  <div class="lead">A skill is a build recipe our team runs. Each one fires when the owner finishes the step that feeds it, and the academy's Slack channel gets the exact skill to run. Staff runs it and workshops the result locally; the owner never sees a work-in-progress. The whole target is about 30 minutes of the owner's time.</div>
+
+  <div class="rule">
+    <div class="rl">The owner approves twice, and only twice</div>
+    <p>Their brand board, and their sales messages. Everything else our team approves in the workshop session.</p>
+    <p>What they approve on the messages screen is provably what sends: the approval page, the staff review and the real send all run the same rendering code, with a committed test holding them together.</p>
+  </div>
+
+  <div class="sec">The order, and why it is this order</div>
+  <p class="secsub">Each one names what it needs from the one before, so the sequence is an argument rather than a list.</p>
+
+  <div class="sk on1">
+    <div class="skh"><span class="nm">The branding deck</span><span class="tag tg-ok">exists</span></div>
+    <div class="fire">Fires when the owner submits their brand brief</div>
+    <div class="skb">
+      <p>Reads their old website and whatever branding assets they entered, then takes a pass at their brand with a staff member: colors, fonts, logo treatment. The output is their theme plus a one-page brand board published to their staging site.</p>
+      <p><b>Why it is first:</b> the owner approving that board is what releases everything below it. Every page, every email shell and every funnel wears this theme, so building any of them before the theme is settled means building them twice.</p>
+    </div>
+    <div class="rail r4">
+      <div><div class="rl2">Needs</div><div class="rv">Their brief and their old site. Nothing else.</div></div>
+      <div><div class="rl2">Produces</div><div class="rv">Their theme, and a brand board on staging.</div></div>
+      <div><div class="rl2">Who does the work</div><div class="rv">The skill drafts, a staff member workshops it.</div></div>
+      <div><div class="rl2">Human decision</div><div class="rv"><b>The owner approves the board.</b> This is approval one of two.</div></div>
+    </div>
+  </div>
+
+  <div class="sk">
+    <div class="skh"><span class="nm">The core site</span><span class="tag tg-ok">exists</span></div>
+    <div class="fire">Fires when the brand deck is published</div>
+    <div class="skb">
+      <p>Builds home, about, contact and programs. Pages scaffold from the shared kit already wearing their theme, and every word of copy comes from what the owner typed during onboarding: their story, their proof, their offers. Staff workshops it, then it goes to staging.</p>
+      <p><b>Why it is second:</b> it cannot start before the theme exists, and the sales funnel pages need a live site to live on.</p>
+    </div>
+    <div class="rail r4">
+      <div><div class="rl2">Needs</div><div class="rv">The published theme.</div></div>
+      <div><div class="rl2">Produces</div><div class="rv">A live site the funnels plug straight into.</div></div>
+      <div><div class="rl2">Who does the work</div><div class="rv">The skill scaffolds and writes, staff workshops.</div></div>
+      <div><div class="rl2">Human decision</div><div class="rv">Our team approves, in the session. <b>No second owner gate</b> - they already signed off the brand this site wears.</div></div>
+    </div>
+  </div>
+
+  <div class="sk">
+    <div class="skh"><span class="nm">The GoHighLevel migration</span><span class="tag tg-lock">to build</span></div>
+    <div class="fire">Fires once they are connected · skipped entirely if they have no GoHighLevel history</div>
+    <div class="skb">
+      <p>Brings what they already have out of GoHighLevel and into the portal: their contacts, their message history, and their live pipeline with every lead sorted into the right stage. Both systems keep running side by side afterwards, with GoHighLevel still in charge, so nothing can fall between them.</p>
+      <p><b>Why it sits here rather than inside the sales system:</b> it depends on nothing above it and nothing below it. It is the one stage that could run at any point, which is exactly why it is its own skill instead of being bolted on. Third place just gets the data in and verified well before anything needs it.</p>
+      <p><b>Seeded leads are quarantined by default.</b> San Jose alone had more than 65 old leads. A sales system switched on over the top of them would start texting people who enquired months ago, so releasing any of them is a deliberate act with a name attached.</p>
+    </div>
+    <div class="rail r4">
+      <div><div class="rl2">Needs</div><div class="rv">Nothing. Independent of every other skill.</div></div>
+      <div><div class="rl2">Produces</div><div class="rv">Their real people and history, in the portal, reconciled lead for lead.</div></div>
+      <div><div class="rl2">Who does the work</div><div class="rv">Staff only. It is a staff-operations tool; owners cannot reach it.</div></div>
+      <div><div class="rl2">Human decision</div><div class="rv">Two: how each old lead is classified into a stage, and <b>whether to release any quarantined lead</b>.</div></div>
+    </div>
+  </div>
+
+  <div class="sk on1">
+    <div class="skh"><span class="nm">The free trial sales system</span><span class="tag tg-lock">to build</span></div>
+    <div class="fire">Fires when the free-trial preset is chosen in the wizard</div>
+    <div class="skb">
+      <p><b>The whole sales system in one skill:</b> the funnel pages, the pipeline, the three AI agents, every automation, the ghosted and nurture sequences and the trial booking emails. It installs all of it switched off, then walks staff through a review of everything it made, rendered exactly as a parent will receive it.</p>
+      <p>Measured today, the free-trial preset installs <b>5 pipeline stages, 27 routes between them, 3 agents, 6 automations, 2 funnel forms and 1 calendar</b>. Ten messages belong to the sales system itself; the seven-to-eight member welcome messages it also installs belong to member management and stay dormant.</p>
+      <p>Of those ten messages, <b>two need a person</b> - the two nurture emails that tell the academy's own story. The skill drafts both from words the owner already typed. One more, the testimonials email, stays parked until the academy has real quotes of its own.</p>
+      <p><b>This is the skill that forks per sales system.</b> There will be one of these per sales system and they are allowed to differ. Nothing underneath them is allowed to.</p>
+    </div>
+    <div class="rail r4">
+      <div><div class="rl2">Needs</div><div class="rv">Their offer, a live site for the funnels, and everything on WHAT WE NEED.</div></div>
+      <div><div class="rl2">Produces</div><div class="rv">A sending sales system, and the go-ahead for the switchover.</div></div>
+      <div><div class="rl2">Who does the work</div><div class="rv">The skill builds and drafts, staff reviews every message.</div></div>
+      <div><div class="rl2">Human decision</div><div class="rv"><b>The owner approves the messages, and approving is what switches the system on.</b> Approval two of two.</div></div>
+    </div>
+  </div>
+
+  <div class="sk">
+    <div class="skh"><span class="nm">Member management</span><span class="tag tg-park">parked on purpose</span></div>
+    <div class="fire">Fires when pricing, policy and the enrollment form are in</div>
+    <div class="skb">
+      <p>The agreement, the enroll funnel, the member welcome sequence and the member emails: welcome, receipt, reschedule.</p>
+      <p><b>Held until the free-trial system is genuinely plug and play.</b> The pieces that exist today keep working exactly as they are; nothing new is designed here yet. This is a deliberate hold, not a backlog item that slipped.</p>
+    </div>
+    <div class="rail r4">
+      <div><div class="rl2">Needs</div><div class="rv">Pricing, policy, the enrollment form.</div></div>
+      <div><div class="rl2">Produces</div><div class="rv">Nothing yet.</div></div>
+      <div><div class="rl2">Who does the work</div><div class="rv">Not started.</div></div>
+      <div><div class="rl2">Human decision</div><div class="rv"><b>Zoran's call on when it starts.</b></div></div>
+    </div>
+  </div>
+
+  <div class="sec">The switchover: seeding and flipping are two different moments</div>
+  <p class="secsub">The migration seeds. The flip happens later, once the sales system is approved and actually sending, so there is never a window where neither system is handling their leads.</p>
+  <div class="box scroll">
+    <table class="t">
+      <thead><tr><th>What</th><th>Before</th><th>After the flip</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Pipeline</td><td class="mono">GoHighLevel</td><td class="mono">the portal</td><td>their board lives here now</td></tr>
+        <tr><td class="k">Bookings and calendar</td><td class="mono">GoHighLevel</td><td class="mono">the portal</td><td>real sessions, real capacity</td></tr>
+        <tr><td class="k">Email</td><td class="mono">GoHighLevel</td><td class="mono">the portal</td><td>sends from their own domain</td></tr>
+        <tr class="hi"><td class="k">Text messages</td><td class="mono">GoHighLevel</td><td class="mono"><b>stays on GoHighLevel</b></td><td>they keep their number</td></tr>
+        <tr class="hi"><td class="k">Contacts</td><td class="mono">GoHighLevel</td><td class="mono"><b>stays on GoHighLevel</b></td><td>texting needs it, see below</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note2 n-gold2" style="margin-top:13px">
+    <b>Contacts and texting travel together, and that is not a choice we get to make</b>
+    <p>GoHighLevel can only text a person it holds a contact record for, and replies only come back to us through that same record. So the moment contacts move to the portal, texting stops working for every new lead. Since academies keep their number, contacts stay put too. They are still fully copied into the portal and visible there, just not in charge.</p>
+    <p>DETAIL Miami already runs exactly like this, so it is a proven shape rather than a theory. BAM GTA is the only academy fully off GoHighLevel, and only because it moved its texting to its own number.</p>
+  </div>
+
+  <div class="sec">The 30 minutes, honestly</div>
+  <p class="secsub">Two clocks. The owner's clock can hit 30 minutes. The staff clock is estimates, and stays estimates until a first real run replaces them with measurements. Do not quote the staff numbers to anybody as fact.</p>
+  <div class="cols c2">
+    <div class="box">
+      <div class="lbl2">The owner's clock</div>
+      <div class="kpi">~30 min</div>
+      <div class="scroll" style="margin-top:10px"><table class="t" style="min-width:0">
+        <tr><td class="k">Brand card: logo, colors, fonts</td><td class="mono">~5</td></tr>
+        <tr><td class="k">Story brief</td><td class="mono">~10</td></tr>
+        <tr><td class="k">Offer and pricing</td><td class="mono">~10</td></tr>
+        <tr><td class="k">Approve the brand board</td><td class="mono">~2</td></tr>
+        <tr><td class="k">Approve their sales messages</td><td class="mono">~3</td></tr>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:12.5px;color:var(--dim)">They answer once and approve twice. Nothing else is asked of them.</p>
+    </div>
+    <div class="box">
+      <div class="lbl2">The staff and skill clock, spread across the same days</div>
+      <div class="kpi b">~85 min</div>
+      <div class="scroll" style="margin-top:10px"><table class="t" style="min-width:0">
+        <tr><td class="k">The branding deck</td><td class="mono">~10</td></tr>
+        <tr><td class="k">The core site</td><td class="mono">~20</td></tr>
+        <tr><td class="k">The GoHighLevel migration</td><td class="mono">~15</td></tr>
+        <tr><td class="k">The free trial sales system</td><td class="mono">~35</td></tr>
+        <tr><td class="k">Member management</td><td class="mono">parked</td></tr>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:12.5px;color:var(--dim)">The migration is zero for an academy with no GoHighLevel history. <b style="color:var(--txt)">These five figures are estimates carried over from the plan, not measurements.</b></p>
+    </div>
+  </div>
+
+  <div class="stamp">Skill definitions and the switchover table come from the settled onboarding plan. The preset contents (stages, routes, agents, automations, forms, calendars) and the message counts were measured against the code and the database on 30 July 2026.</div>
+</div></div>
+
+<!-- ===================== PAGE 5: BUILDING THE NEXT ONE ===================== -->
+<div id="page5" class="page"><div class="inner">
+  <h1>Building the <span>next sales system</span></h1>
+  <div class="lead">Read this page before you touch anything. It is the difference between a second sales system and 47 academies whose pipelines slowly stop resembling each other.</div>
+
+  <div class="rule">
+    <div class="rl">The rule</div>
+    <p>The SKILL forks per sales system. The machinery underneath it NEVER does.</p>
+    <p>"One client needs X" has exactly two valid answers: everyone gets X, or X becomes a runtime fact read off that academy's own record. There is no third answer. A per-academy branch in shared code is how one academy's needs become every academy's bug, and it is not reversible - once two academies have forked structures, no master edit can reach both.</p>
+  </div>
+
+  <div class="sec">What is locked, and what is allowed to differ</div>
+  <div class="box scroll">
+    <table class="t">
+      <thead><tr><th>The thing</th><th>Locked or forks</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="k">The sales system skill</td><td><span class="tag tg-fork">forks</span></td><td>One per sales system, by design. This is the only thing on this table that forks.</td></tr>
+        <tr><td class="k">The preset itself: stages, engines, entry sources, exits</td><td><span class="tag tg-lock">declared, not forked</span></td><td>A new sales system is a new key in the SAME registry file. It is data, not code. No migration, no template tables, no authoring UI.</td></tr>
+        <tr><td class="k">The compiler that turns a preset into board rows</td><td><span class="tag tg-lock">locked</span></td><td>One function serves every preset. If a new preset needs a different compiler, the preset is wrong.</td></tr>
+        <tr><td class="k">The flow graph the router reads</td><td><span class="tag tg-lock">locked</span></td><td>Read live from the master registry, not from per-academy rows. Edit the master, every academy steers differently on the next message. Per-academy rows survive only as pause overrides and an emergency fallback.</td></tr>
+        <tr><td class="k">The agents' behaviour and voice</td><td><span class="tag tg-lock">locked</span></td><td>Craft taught anywhere sharpens everyone. Three runtimes serve every mission.</td></tr>
+        <tr><td class="k">Agent templates: mission, price disclosure, price breakdown</td><td><span class="tag tg-lock">locked and reusable</span></td><td>Declared once per template and carried wherever that template is reused. Changing one line changes every academy running it, on the next message build.</td></tr>
+        <tr><td class="k">The nine fact renderers</td><td><span class="tag tg-lock">locked</span></td><td>Every academy's facts come out of the same nine functions. An academy-shaped renderer is a leak waiting to happen.</td></tr>
+        <tr><td class="k">The email and text shell, and every merge token</td><td><span class="tag tg-lock">locked</span></td><td>There is no per-academy identity map left anywhere in the send path. Deliberately: the function that resolves identity is handed an academy id it refuses to read, so the "no per-academy exception" claim stays testable.</td></tr>
+        <tr><td class="k">The sync class resolver</td><td><span class="tag tg-lock">locked</span></td><td>See below. It is the only thing standing between a new academy and another academy's parent quotes.</td></tr>
+        <tr><td class="k">The reignition station</td><td><span class="tag tg-lock">locked, auto-attached</span></td><td>Attached to every preset in the registry, so a new sales system gets it by existing. Only two of its four exits are adjustable, and a bad exit fails the build rather than shipping.</td></tr>
+        <tr><td class="k">Message copy, after seeding</td><td><span class="tag tg-fork">per academy</span></td><td>Seeded tailored, then the academy's own. Master edits never overwrite an academy's edits, and a re-seed only creates what is missing.</td></tr>
+        <tr><td class="k">The academy's facts</td><td><span class="tag tg-fork">per academy, always</span></td><td>This is the pressure valve. Anything that genuinely varies between academies belongs here, as a field on their own record, not as a branch in the code.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note2 n-red">
+    <b>The two things that mean you have gone wrong</b>
+    <p>Copying the preset registry file. Writing a condition on a specific academy's id. Either one means stop and pick one of the two valid answers above.</p>
+  </div>
+
+  <div class="sec">Sync class: whether a message's words may travel</div>
+  <p class="secsub">Every automated message step carries a class. Anyone authoring content for a new sales system has to understand this, because nothing else detects a wrong answer.</p>
+  <div class="cols c3">
+    <div class="box"><div class="lbl2">Least strict</div>
+      <div style="font-size:16px;font-weight:800;color:var(--green);margin-bottom:5px">shared</div>
+      <p style="margin:0;font-size:12.5px;color:var(--dim);line-height:1.6">Belongs to nobody. Generic copy: a nudge to pick a time, a last-call email. Copies to any academy untouched, and nobody reviews it. <b style="color:var(--txt)">24 of the 34 live steps.</b></p></div>
+    <div class="box"><div class="lbl2">Stricter</div>
+      <div style="font-size:16px;font-weight:800;color:var(--blue);margin-bottom:5px">local</div>
+      <p style="margin:0;font-size:12.5px;color:var(--dim);line-height:1.6">Authored for one academy. It would render fine anywhere, but the words are that academy's own account of itself: its story, how it trains. Never copied. <b style="color:var(--txt)">7 of 34.</b></p></div>
+    <div class="box"><div class="lbl2">Strictest</div>
+      <div style="font-size:16px;font-weight:800;color:var(--gold);margin-bottom:5px">attributed</div>
+      <p style="margin:0;font-size:12.5px;color:var(--dim);line-height:1.6">Carries real people's words. Never travels, under any circumstances. <b style="color:var(--txt)">3 of 34.</b></p></div>
+  </div>
+  <div class="box" style="margin-top:13px">
+    <div class="lbl2">How it resolves</div>
+    <p style="margin:0 0 9px;font-size:13.5px;color:var(--txt);font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">attributed &gt; local &gt; shared · strictest wins · unknown fails closed</p>
+    <p style="margin:0;font-size:13px;color:var(--dim);line-height:1.6">A step's real class is the strictest of two things: the class written on the step itself, and the class of the shared template its body points at. Because the strictest wins, a step can only ever make its content <b style="color:var(--txt)">stricter</b>. An academy, a bad seed, or a form that forgets to send the field cannot downgrade an attributed template by writing "shared" on the row.</p>
+    <p style="margin:9px 0 0;font-size:13px;color:var(--dim);line-height:1.6">Anything unrecognised - a typo, a template key nobody declared - resolves to <b style="color:var(--txt)">attributed</b>, the strictest. That direction is chosen on purpose: a wrong "shared" is the exact bug this exists to prevent, while a wrong "attributed" only blocks a copy that somebody can then unblock by declaring the key.</p>
+  </div>
+  <div class="note2 n-gold2">
+    <b>The real example: the testimonials email</b>
+    <p>Until 29 July that email had real parent quotes written into the template, attributed by a city variable. Whichever academy sent it claimed those parents as its own. It is now built from a token that pulls each academy's own approved quotes, so the template itself carries nobody's words and is technically safe to copy.</p>
+    <p><b>It is still marked attributed anyway</b>, and that is the instructive part. The class does two jobs: it gates copying, and a drift checker watches every attributed step to catch an academy sending quotes it does not own. Relaxing the class would quietly switch that watchman off. So the class stays strict until the coupling is dealt with properly. <b>Do not "correct" a class by reading the template's current text</b> - the copy changes, the decision about who owns the content does not.</p>
+  </div>
+
+  <div class="sec">Two presets, side by side</div>
+  <p class="secsub">Both already exist in the same registry file. Free trial is live; discovery call is declared and unused. What differs between them is the whole lesson: a new sales system is a declaration, not a fork.</p>
+  <div class="box scroll">
+    <table class="t">
+      <thead><tr><th></th><th>Free trial (live)</th><th>Discovery call then trial (declared)</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Stage anchors stamped</td><td>5</td><td>6</td></tr>
+        <tr><td class="k">Routes compiled</td><td>27</td><td>30</td></tr>
+        <tr><td class="k">Stages</td><td>Booking, Ghosted, Confirm, Closing, Nurture</td><td>Booking, Ghosted, <b>Call Confirm</b>, Trial Confirm, Closing, Nurture</td></tr>
+        <tr><td class="k">Agents</td><td>trial booking, trial confirm, closing</td><td><b>call booking, call confirm</b>, trial confirm, closing</td></tr>
+        <tr class="hi"><td class="k">Reused with no change at all</td><td class="mono">-</td><td><b>trial confirm, closing</b>, both drips, both forms, the trial calendar, the whole compiler</td></tr>
+        <tr><td class="k">Automations</td><td>trial form, contact form, missed trial, ghosted, nurture, onboarding</td><td>identical, the same six</td></tr>
+        <tr><td class="k">Funnel forms</td><td>free trial, contact</td><td>identical</td></tr>
+        <tr><td class="k">Calendars</td><td>free trial</td><td>discovery call <b>and</b> free trial</td></tr>
+        <tr><td class="k">Reignition station</td><td>attached</td><td>attached</td></tr>
+        <tr class="bad"><td class="k">Qualifications declared</td><td>close enough, right age, good fit</td><td><b>none yet - a real gap</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note2 n-green">
+    <b>What that table proves</b>
+    <p>A second sales system costs one extra stage, one extra calendar and two new agent missions. Zero new machinery, zero migrations, zero per-academy code, zero database template rows. That is what "locked underneath" buys.</p>
+    <p><b>And one honest finding from measuring it:</b> the discovery-call preset declares no qualifications, so anything reading its contents gets an empty list where free trial returns three. Whoever ships it has to add them. Found while checking this page, not previously written down.</p>
+  </div>
+
+  <div class="sec">Two real failures, both from this month</div>
+  <p class="secsub">Constraints are easier to remember as consequences.</p>
+  <div class="note2 n-red">
+    <b>One academy's review link inside everybody's agent</b>
+    <p><b>What happened:</b> the social-proof section of the shared agent structure contained a literal line, "Google Reviews:" followed by BAM GTA's link. It sat in the structure every academy's agent is built from. Nothing overrode it, because that section had no renderer and <b>0 of 47 academies had a stored override</b>. San Jose, DETAIL Miami and Next Level all pointed parents at a Toronto academy's review page.</p>
+    <p><b>Why:</b> a default that names one academy is a default every other academy serves.</p>
+    <p><b>What prevents it now:</b> that section's shared body is empty and stays empty, and the content is rendered per academy from its own quotes and its own review link. An academy with no reviews now says nothing about reviews. Verified on 30 July: still 0 stored overrides, and only 1 of 47 academies has a review link on file, so the honest reading is that the leak is fixed and the data is missing.</p>
+  </div>
+  <div class="note2 n-red">
+    <b>DETAIL Miami's board went blind</b>
+    <p><b>What happened:</b> on 8 July its pipeline was flipped to the portal after a clean reconcile of 49 open leads. GoHighLevel workflows still owned lead creation, so the portal never heard about a new website lead, and the portal write that moves a card silently does nothing when the card is not in the store. Every new website lead was invisible on the board. Rolled back to GoHighLevel the same hour.</p>
+    <p><b>Why:</b> reconciling the leads that already exist says nothing about who creates the next one. It was a green check that could not fail.</p>
+    <p><b>What prevents it now:</b> the flip refuses on five named conditions - dual-write was never on, the store is empty, the stage registry was never seeded, the registry is only partly seeded, or there is real drift - and it recomputes the reconcile itself rather than trusting a passed-in result. A rollback to GoHighLevel is always allowed and instant. <b>The honest gap: none of those five checks asks who owns lead creation.</b> That is still a human check before every flip, and it is the check that would have caught this one.</p>
+  </div>
+
+  <div class="stamp">Locked-versus-forks and the sync class rules come from the code. The step counts, the two preset comparisons and the review-link numbers were measured on 30 July 2026. The two failures are drawn from the build records for those dates.</div>
+</div></div>
+
 <div id="zoom">
   <button id="z-out" aria-label="Zoom out">−</button>
   <button id="z-fit" class="fit" aria-label="Fit board">FIT</button>
   <button id="z-in" aria-label="Zoom in">+</button>
+</div>
+
+<div id="theme">
+  <button id="theme-btn" aria-label="Switch between light and dark"><span class="dot"></span><span id="theme-lbl">LIGHT</span></button>
 </div>
 
 <script>
@@ -492,9 +1003,19 @@
   }
   function dirv(side,k){ return side==='top'?[0,-k]:side==='bottom'?[0,k]:side==='left'?[-k,0]:[k,0]; }
 
+  // Wire + arrowhead colors are resolved from the LIVE tokens rather than
+  // written as hex here. An SVG marker cannot inherit a CSS variable, so the
+  // literals this used to carry would have stayed dark-mode after a theme
+  // switch. draw() re-runs on toggle.
+  function tokenColors(){
+    const cs=getComputedStyle(document.documentElement);
+    const pick=(n)=>cs.getPropertyValue(n).trim();
+    return {'var(--gold)':pick('--gold'),'var(--grey)':pick('--grey'),'var(--green)':pick('--green'),'var(--red)':pick('--red'),'var(--purple)':pick('--purple')};
+  }
+
   function draw(){
     let html='<defs>';
-    const cols={'var(--gold)':'#D4B65C','var(--grey)':'#98A0AC','var(--green)':'#5CBF7A','var(--red)':'#E06C6C','var(--purple)':'#B48CE0'};
+    const cols=tokenColors();
     let mi=0, mids={};
     for(const c in cols){ mids[c]='m'+(mi++); html+='<marker id="'+mids[c]+'" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="'+cols[c]+'"/></marker>'; }
     html+='</defs>';
@@ -580,17 +1101,56 @@
   document.getElementById('z-fit').onclick=fit;
 
   // ---- tabs ----
-  const p2=document.getElementById('page2'), zoomBox=document.getElementById('zoom');
-  const tF=document.getElementById('tab-flow'), tB=document.getElementById('tab-blocks');
-  function show(which){
-    const flow=which==='flow';
+  // One canvas tab plus four scrolling reference pages.
+  const zoomBox=document.getElementById('zoom');
+  const TABS=[
+    {btn:'tab-flow',  page:null},                 // the canvas
+    {btn:'tab-blocks',page:'page2'},
+    {btn:'tab-data',  page:'page3'},
+    {btn:'tab-onb',   page:'page4'},
+    {btn:'tab-next',  page:'page5'},
+  ];
+  function show(i){
+    const flow=!TABS[i].page;
     vp.style.display=flow?'block':'none';
     zoomBox.style.display=flow?'flex':'none';
-    p2.style.display=flow?'none':'block';
-    tF.classList.toggle('on',flow); tB.classList.toggle('on',!flow);
+    TABS.forEach((t,j)=>{
+      const b=document.getElementById(t.btn);
+      b.classList.toggle('on',j===i);
+      // On a phone the tab bar is a horizontal scroller, so the tab you just
+      // picked can sit off-screen. Pull it into view.
+      if(j===i && b.scrollIntoView) b.scrollIntoView({block:'nearest',inline:'nearest'});
+      if(t.page){ const el=document.getElementById(t.page); el.style.display=(j===i)?'block':'none'; if(j===i) el.scrollTop=0; }
+    });
     if(flow){ fit(); draw(); }
   }
-  tF.onclick=()=>show('flow'); tB.onclick=()=>show('blocks');
+  TABS.forEach((t,i)=>{ document.getElementById(t.btn).onclick=()=>show(i); });
+
+  // ---- theme ----
+  // The initial value was already applied before paint by the inline script in
+  // the head. This only handles the toggle, remembers the choice, and redraws the
+  // wires so their resolved colors follow the theme.
+  const tBtn=document.getElementById('theme-btn'), tLbl=document.getElementById('theme-lbl');
+  // Asked of the STYLESHEET, not of an attribute: with no saved choice there is
+  // no attribute, and the OS preference is resolved in CSS.
+  const isDark=()=>getComputedStyle(document.documentElement).getPropertyValue('--is-dark').trim()!=='0';
+  function syncThemeLabel(){ tLbl.textContent = isDark() ? 'LIGHT' : 'DARK'; } // names the theme it switches TO
+  tBtn.onclick=()=>{
+    const next = isDark() ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme',next);
+    try{ localStorage.setItem('ssb-theme',next); }catch(e){}
+    syncThemeLabel();
+    draw();
+  };
+  syncThemeLabel();
+  // The reader may flip their OS theme while this is open. With no saved choice
+  // the palette follows along in CSS, so only the wires and the label need
+  // telling (an SVG marker fill cannot inherit a variable).
+  if(window.matchMedia){
+    const mq=window.matchMedia('(prefers-color-scheme: light)');
+    const onOS=()=>{ syncThemeLabel(); draw(); };
+    if(mq.addEventListener) mq.addEventListener('change',onOS); else if(mq.addListener) mq.addListener(onOS);
+  }
 
   document.querySelectorAll('details').forEach(d=>d.addEventListener('toggle',()=>requestAnimationFrame(draw)));
   window.addEventListener('resize',()=>{ if(vp.style.display!=='none') fit(); });

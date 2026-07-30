@@ -70,7 +70,18 @@ async function sb(path, init = {}) {
 // exist yet makes PostgREST 400 the whole select and every automation stops - SMS
 // included, because this ONE read feeds every channel, not just email. A column goes
 // in this list AFTER its migration is live, never in the same commit.
+//
+// business_email, tagline and instagram_url joined on 30 Jul 2026, when their
+// migrations (20260729T210000 and 20260729T230000) were confirmed applied to
+// production. They were READ by clientVars() from the day they were written and
+// SELECTED by nobody, so all three arrived undefined and rendered as nothing: BAM GTA
+// sent live automation emails with no tagline sentence under the wordmark and no
+// footer Instagram link. Three columns went missing the same way in one day, which is
+// why the gap is now a CHECK and not a habit - api/_email-select-coverage.test.mjs
+// derives the required set from clientVars()'s own source and fails when this list
+// does not cover it.
 const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email", "phone",
+  "business_email", "tagline", "instagram_url",
   "address", "time_zone", "website_setup", "community_group_url", "community_group_platform",
   "google_review_url", "online_programs_url", "referral_offer", "ghl_location_id",
   "ghl_access_token", "ghl_refresh_token", "ghl_token_expires_at", "ghl_kpi_config"];
@@ -86,11 +97,24 @@ const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email"
 // this problem (_bbHydrateClientCols in public/client-portal.html): ask, and on the
 // column error ask again without the column that does not exist.
 //
-// A column belongs here ONLY while its migration is pending. Once it is applied,
-// MOVE it into CLIENT_COLS - this is a safety net, not a parking spot, and anything
-// left here costs one wasted 400 per uncached read for as long as it is wrong.
-//   business_email - migration 20260729T210000_clients_business_email.sql
-const CLIENT_COLS_PENDING = ["business_email"];
+// ⚠️ INTENTIONALLY EMPTY, AND DELIBERATELY NOT DELETED.
+//
+// Empty because nothing is pending: business_email (20260729T210000) and
+// tagline / instagram_url (20260729T230000) are all applied to production and have
+// moved up into CLIENT_COLS. A column belongs here ONLY while its migration is
+// pending - this is a safety net, not a parking spot, and anything left here costs
+// one wasted 400 per uncached read for as long as it is wrong.
+//
+// Not deleted because this list plus the retry below it IS how the next column ships
+// before its migration lands, and that is a recurring need, not a one-off. Deleting
+// it means rebuilding it under time pressure next time, and the version that gets
+// rebuilt in a hurry is the one that peels off only the column PostgREST NAMED -
+// which is lethal at two pending columns (see the retry's comment). The retry is
+// safe at any number of pending columns as written. Add a column name here, note its
+// migration file on a comment line, and move it into CLIENT_COLS the day it lands.
+// api/_pending-client-column.test.mjs proves the machinery still works by injecting a
+// synthetic pending column, so it stays provable with this list empty.
+const CLIENT_COLS_PENDING = [];
 
 // Does THIS error blame a pending column? Returns the blamed one(s) for the log,
 // but the RETRY DROPS THE WHOLE PENDING LIST - see why below.

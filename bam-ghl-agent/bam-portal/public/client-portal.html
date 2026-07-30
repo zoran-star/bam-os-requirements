@@ -28687,12 +28687,69 @@ function _bbRenderLocationsListInPanel() {
         <button class="bb-block-remove" onclick="_bbDeleteLocation('${loc.id}')" title="Delete location">Remove</button>
       </div>
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div class="bb-field" style="margin:0">
+          <div class="bb-field-label">Special entry note</div>
+          <textarea class="bb-textarea" id="bb-loc-entry_note-${loc.id}"
+            oninput="_bbLocFieldChanged('${loc.id}', 'entry_note')"
+            placeholder="e.g. The gym entrance we use is at the front of the building, on the left side.">${_bbEscapeHtml(loc.entry_note || '')}</textarea>
+          <div class="bb-field-hint">Sent word for word to parents on the morning of their trial at this venue, so write it as a full sentence. Leave it empty and we say nothing about the door.</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
         <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Photos</div>
         ${_assetBankHtml('location_id', loc.id, { category: 'photo' })}
       </div>
     </div>
   `).join('');
   if (_bbLocations.length) _bbAutoDone('locations');   // auto-complete once a location exists
+}
+
+// ─── PER-VENUE SAVE ─────────────────────────────────────────────────────
+// The Business Blueprint's hydrate-then-save hazard, on the locations table.
+// _bbLoadLocations() is the hydration path (one select('*') per academy, cached
+// in _bbLocations), and these boxes auto-save on every keystroke, so a save that
+// lands before the row has loaded would write a blank over a real value - the
+// same production incident that produced _bbGuardBlanks and
+// scripts/verify-bb-hydration.mjs for the clients row.
+//
+// entry_note makes it concrete rather than theoretical: it ships AHEAD of its
+// migration (20260730T160000), so against a database that has not run that
+// migration yet the key is ABSENT from every cached location row. Absent means we
+// know nothing about it, and what we know nothing about we must not overwrite.
+//
+// Presence of the key ON THE CACHED ROW is the one "loaded" signal, exactly as it
+// is for the clients row. A value the owner actually typed still saves, and
+// clearing a LOADED note still clears it.
+const _BB_LOC_GUARDED_COLS = ['entry_note'];
+function _bbLocGuardBlanks(patch, loc, keys) {
+  (keys || []).forEach(k => {
+    const blank = patch[k] === '' || patch[k] === null || patch[k] === undefined;
+    if (blank && !(k in (loc || {}))) delete patch[k];
+  });
+  return Object.keys(patch).length ? patch : null;
+}
+
+const _bbLocSaveTimers = {};
+function _bbLocFieldChanged(locationId, key) {
+  const el = document.getElementById('bb-loc-' + key + '-' + locationId);
+  if (!el) return;
+  const val = (el.value || '').trim();
+  clearTimeout(_bbLocSaveTimers[locationId + '|' + key]);
+  _bbLocSaveTimers[locationId + '|' + key] = setTimeout(() => _bbSaveLocationField(locationId, key, val), 600);
+}
+
+async function _bbSaveLocationField(locationId, key, val) {
+  if (!_sb || !CLIENT_ID || !locationId) return false;
+  const loc = _bbLocationById(locationId);
+  const patch = _bbLocGuardBlanks({ [key]: val === '' ? null : val }, loc, _BB_LOC_GUARDED_COLS);
+  if (!patch) return false;
+  const { error } = await _sb.from('locations').update(patch).eq('id', locationId).eq('client_id', CLIENT_ID);
+  // Pre-migration the column does not exist and this is the one thing that CAN
+  // fail here. Say so in the console and leave the cache alone, so the box keeps
+  // what was typed rather than pretending it saved.
+  if (error) { console.warn('location save: ' + key + ' did not save - ' + error.message); return false; }
+  Object.keys(patch).forEach(k => { if (loc) loc[k] = patch[k]; });
+  return true;
 }
 
 async function _bbDeleteLocation(locationId) {
@@ -30631,7 +30688,7 @@ function _confirmAutosRender() {
     : 'Scripted texts that fire when a lead books a trial (the confirmation also sends a matching email with calendar links). The moment they reply, the AI confirm agent takes over. Once you approve the sequence, these scripted touches send automatically (fixed, pre-approved copy). The AI agent\'s own replies still wait for your ✓ in Hawkeye.';
   const tokenHint = isClosing
     ? 'Tokens (filled in automatically): <code>{{contact.first_name}}</code>'
-    : 'Tokens (filled in automatically): <code>{{contact.first_name}}</code> <code>{{appointment.start_time}}</code> <code>{{appointment.only_start_time}}</code> <code>{{appointment.only_start_date}}</code> <code>{{appointment.meeting_location}}</code> <code>{{appointment.add_to_google_calendar}}</code> <code>{{appointment.add_to_ical_outlook}}</code>';
+    : 'Tokens (filled in automatically): <code>{{contact.first_name}}</code> <code>{{appointment.start_time}}</code> <code>{{appointment.only_start_time}}</code> <code>{{appointment.only_start_date}}</code> <code>{{appointment.meeting_location}}</code> <code>{{appointment.entry_note}}</code> <code>{{appointment.add_to_google_calendar}}</code> <code>{{appointment.add_to_ical_outlook}}</code><br>{{appointment.entry_note}} is the special entry note on the venue this trial is booked into (Business Blueprint &gt; Locations). No note on that venue and the whole line goes, so nothing is sent about the door.';
   host.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden">
       <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
@@ -34539,6 +34596,15 @@ function _bbOpenAddLocationModal(onSaved) {
           <div class="bb-field-label">Notes</div>
           <textarea class="bb-textarea" id="bb-loc-add-notes" placeholder="Parking, entrance, special instructions…"></textarea>
         </div>
+        <!-- The entry note is NOT the notes box above it. Notes is what your agent
+             knows about this venue and quotes mid-conversation; this one sentence is
+             sent verbatim to a parent on the morning of their trial. Empty is fine
+             and sends nothing at all. -->
+        <div class="bb-field">
+          <div class="bb-field-label">Special entry note</div>
+          <textarea class="bb-textarea" id="bb-loc-add-entry_note" placeholder="e.g. The gym entrance we use is at the front of the building, on the left side."></textarea>
+          <div class="bb-field-hint">Sent word for word to parents on the morning of their trial, so write it as a full sentence. Leave it empty and we say nothing about the door.</div>
+        </div>
       </div>
       <div class="bb-loc-form-foot">
         <button class="btn-secondary-bb" onclick="_bbCloseAddLocationModal()">Cancel</button>
@@ -34586,12 +34652,20 @@ async function _bbSaveNewLocation() {
   if (!title) return alert('Title is required');
   const address = (document.getElementById('bb-loc-add-address')?.value || '').trim() || null;
   const notes = (document.getElementById('bb-loc-add-notes')?.value || '').trim() || null;
+  const entry_note = (document.getElementById('bb-loc-add-entry_note')?.value || '').trim() || null;
   const btn = document.getElementById('bb-loc-add-save');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  const { data, error } = await _sb.from('locations').insert({
-    client_id: CLIENT_ID, title, address, notes,
-    sort_order: _bbLocations.length
-  }).select().single();
+  const row = { client_id: CLIENT_ID, title, address, notes, sort_order: _bbLocations.length };
+  // entry_note ships ahead of its migration (20260730T160000). Naming a column
+  // PostgREST does not have rejects the WHOLE insert, so an unapplied migration
+  // would stop an owner adding a location at all. Only send it when there is
+  // something to say; the edit box on the saved row picks it up afterwards.
+  if (entry_note) row.entry_note = entry_note;
+  let { data, error } = await _sb.from('locations').insert(row).select().single();
+  if (error && entry_note) {
+    delete row.entry_note;
+    ({ data, error } = await _sb.from('locations').insert(row).select().single());
+  }
   if (btn) { btn.disabled = false; btn.textContent = 'Save location'; }
   if (error) return alert("Couldn't save location - " + error.message);
   _bbLocations.push(data);

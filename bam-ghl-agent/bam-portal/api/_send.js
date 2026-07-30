@@ -9,7 +9,7 @@
 import { ghl } from "./ghl/_core.js";
 import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 import { sendEmail } from "./_email.js";
-import { renderStepMessage, unsubscribeFor } from "./email-shells.js";
+import { renderStepMessage, unsubscribeFor, clientVars } from "./email-shells.js";
 import { notifyOwners } from "./_notify-owners.js";
 
 // ── the academy-identity guardrails (email only) ────────────────────────────
@@ -51,22 +51,47 @@ async function sb(path, init = {}) {
 }
 
 const CLIENT_TTL = 30_000;
-const _clientCache = new Map(); // clientId -> { at, domain, name, businessEmail }
+const _clientCache = new Map(); // clientId -> { at, domain, name, businessEmail, client }
 
-// ONE row read, THREE facts. business_email rides the same query as email_domain
-// because they answer two halves of one question - can this go out AS the academy,
-// and can it carry the academy's own reply-to and unsubscribe address - and because
-// the send path must never ask twice for one row.
-const SENDER_COLS = ["email_domain", "business_name"];
-// ⚠️ PENDING MIGRATION, dropped on the one error that means "not applied yet" (see
-// the retry in clientSender). Same shape and same rule as CLIENT_COLS_PENDING in
-// api/automations.js, which is where the reasoning is written out in full. It matters
-// more here than anywhere: clientSender THROWING holds the send WITHOUT texting the
-// owner, so an unhandled 400 on this select would stop every academy's automation
-// email silently. Dropping the column instead degrades to "no business email", which
-// holds AND tells the owner. Move it into SENDER_COLS once the migration is applied.
-//   business_email - migration 20260729T210000_clients_business_email.sql
-const SENDER_COLS_PENDING = ["business_email"];
+// ONE row read, EVERY academy fact an email renders from. Two groups, ONE list and one
+// query, because the send path must never ask twice for one row:
+//   sender identity  - can this go out AS the academy (email_domain), and under what
+//                      display name (business_name)
+//   clientVars()     - everything the shell and the copy render: the public email, the
+//                      parent-facing name, the site, the footer tagline and Instagram,
+//                      the city, the phone, the community / review links, the optional
+//                      content facts. Every column clientVars(client) reads is here.
+//
+// THE SECOND GROUP IS WHY THE FOOTER IS NOT BLANK. Three callers hand sendOn
+// `vars: {}` on purpose (their merge tokens are resolved before the call), so until
+// 30 Jul 2026 their emails rendered the tagline, the Instagram link and everything
+// else clientVars supplies as EMPTY - only location_email was substituted here. The
+// render now starts from THIS row for every caller (see sendOn), so those columns have
+// to be on it.
+//
+// ⚠️ A column read by clientVars() and missing from this list arrives undefined and
+// renders as nothing, silently - that is the exact regression of 29 Jul 2026, one layer
+// down. api/_email-select-coverage.test.mjs derives the required set from clientVars()'s
+// own source and fails naming any column this list does not cover.
+// business_email moved up from SENDER_COLS_PENDING on 30 Jul 2026, once migration
+// 20260729T210000 was confirmed applied to production.
+const SENDER_COLS = ["email_domain", "business_name",
+  "business_email", "public_name", "owner_name", "website_setup", "address", "phone",
+  "community_group_url", "community_group_platform", "google_review_url",
+  "online_programs_url", "referral_offer", "tagline", "instagram_url"];
+// ⚠️ INTENTIONALLY EMPTY, AND DELIBERATELY NOT DELETED. A column listed here is asked
+// for optimistically and dropped on the one error that means "its migration is not
+// applied yet" (see the retry in clientSender). Same shape and same rule as
+// CLIENT_COLS_PENDING in api/automations.js, which is where the reasoning is written
+// out in full.
+//
+// It matters more here than anywhere, which is why the mechanism stays: clientSender
+// THROWING holds the send WITHOUT texting the owner, so an unhandled 400 on this
+// select would stop every academy's automation email silently. Dropping the column
+// instead degrades to "no business email", which holds AND tells the owner. The next
+// column that needs to ship ahead of its migration goes here, with its migration file
+// on a comment line, and moves into SENDER_COLS the day that migration lands.
+const SENDER_COLS_PENDING = [];
 
 // Only an undefined-column error (PostgREST 42703) that NAMES a pending column earns
 // the retry. A transient 5xx stays a throw: silently degrading to a row with no
@@ -84,10 +109,15 @@ function pendingColsBlamedBy(err) {
 // contact line, the footer Email link, and the unsubscribe destination. Resolved HERE,
 // at the one choke point every automation email passes through, because three callers
 // hand sendOn `vars: {}` on purpose (their tokens are already resolved: the confirm
-// agent's booking confirmation and same-day check-in, and the approvals inbox's
-// confirmation email). Reading it off the caller's vars would leave those three unable
-// to carry an unsubscribe link at all, which is precisely the state the hold below
-// exists to refuse.
+// agent's scripted booking confirmation and same-day check-in, and the two approval
+// surfaces' confirmation email). Reading it off the caller's vars would leave those
+// unable to carry an unsubscribe link at all, which is precisely the state the hold
+// below exists to refuse.
+//
+// `client` is the WHOLE row, kept for the same reason and used the same way: sendOn
+// turns it into the base merge vars every email renders from (clientVars). The address
+// was resolved here first only because it is the one with a hold attached; the tagline
+// and the Instagram link had no guard to make anybody notice they were missing.
 async function clientSender(clientId) {
   const hit = _clientCache.get(clientId);
   if (hit && Date.now() - hit.at < CLIENT_TTL) return hit;
@@ -112,6 +142,11 @@ async function clientSender(clientId) {
     // that answer HOLDS the send rather than borrowing clients.email (the owner's
     // inbox, which is the bug the column removed). See guardrail 2 at the top.
     businessEmail: String(row.business_email || "").trim(),
+    // The row itself, exactly as it came back. Projected by SENDER_COLS, so a column
+    // that list forgot is ABSENT here rather than null - which reads to clientVars as
+    // "this academy has no tagline" and renders as nothing. Same shape, same silence,
+    // as the loadClient regression this list is built to avoid repeating.
+    client: row,
   };
   _clientCache.set(clientId, out);
   return out;
@@ -136,7 +171,7 @@ async function verifiedDomains() {
 }
 
 // Resolve the From header for one academy.
-//   { from, businessEmail }     -> safe to send
+//   { from, businessEmail, baseVars } -> safe to send
 //   { hold:true, notify:true }  -> domain missing / unverified (owner gets the text)
 //   { hold:true, notify:false } -> transient blip: fail CLOSED, but do NOT ping the
 //                                  owner over something they cannot fix.
@@ -144,6 +179,10 @@ async function verifiedDomains() {
 // by the same caller for the same reason: an email that cannot go out AS the academy
 // and an email that cannot carry the academy's own reply-to / unsubscribe address are
 // two halves of one question.
+// `baseVars` is clientVars(row) - the SAME object the From display name is chosen from
+// and the SAME object the body is rendered from, built once. One resolution path: the
+// name on the envelope and the footer inside it cannot disagree about which academy
+// this is, whatever the caller passed.
 async function fromFor(clientId, vars) {
   if (!clientId) return { hold: true, notify: false };
   let row;
@@ -156,13 +195,19 @@ async function fromFor(clientId, vars) {
   if (!verified.has(row.domain)) return { hold: true, notify: true };
 
   const businessEmail = row.businessEmail;
+  const baseVars = clientVars(row.client);
   const addr = `info@${row.domain}`;
   // BYTE-IDENTITY, by domain match and nothing else (no client-id, no academy-name
   // hardcode): the academy that already owns the legacy address keeps the legacy
   // string verbatim, so its parents see zero header drift.
-  if (addr === LEGACY_ADDR) return { from: LEGACY_FROM, businessEmail };
-  const name = String((vars && vars.location_name) || row.name || "").replace(/[<>"]/g, "").trim();
-  return { from: name ? `${name} <${addr}>` : addr, businessEmail };
+  if (addr === LEGACY_ADDR) return { from: LEGACY_FROM, businessEmail, baseVars };
+  // The academy's PARENT-FACING name (clientVars resolves public_name, falling back to
+  // business_name), not the internal label. `row.name` is business_name - "BAM San
+  // Jose", our own shorthand - and it was what the three `vars: {}` callers put in the
+  // From header while the worker sent "By Any Means San Jose" from the same row. Same
+  // bug as the blank footer, one header up: the caller's vars were the only source.
+  const name = String((vars && vars.location_name) || baseVars.location_name || "").replace(/[<>"]/g, "").trim();
+  return { from: name ? `${name} <${addr}>` : addr, businessEmail, baseVars };
 }
 
 // ── owner heads-up, once per academy per 24h ────────────────────────────────
@@ -265,13 +310,27 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
       if (sender.notify) await noticeHeldOnce(clientId, "domain");
       return { held: "sending domain not set" };
     }
-    // SECOND HARD GUARDRAIL: the academy's own public email, rendered from the value
-    // resolved above rather than from whatever the caller happened to pass. That
-    // substitution is the guard being CONNECTED to its outcome: three callers send
-    // `vars: {}` deliberately (tokens pre-resolved), so a check against the row plus
-    // a render from the vars would pass and still put an email on the wire with no
-    // unsubscribe link in it.
-    const renderVars = { ...(vars || {}), location_email: sender.businessEmail };
+    // THE ACADEMY'S OWN ROW IS THE BASE. Every email rendered here starts from
+    // clientVars(the row this send just read) and the caller's vars go ON TOP, so a
+    // caller that supplies a value still wins and a caller that supplies nothing still
+    // gets the whole academy: name, site, city, owner, phone, community and review
+    // links, the optional content facts, and the footer's tagline and Instagram.
+    //
+    // ONE resolution path for every sender, which is the point. Until 30 Jul 2026 only
+    // location_email was substituted here, so the three callers that pass `vars: {}`
+    // deliberately (the confirm agent's scripted booking confirmation and same-day
+    // check-in, and the two approval surfaces' confirmation email) shipped a footer
+    // with a blank tagline and no Instagram link - live, at an academy that has both on
+    // its row. Nothing threw, nothing was logged, and the one field with a guard behind
+    // it was the one field that was fine. The fix is not another substitution per
+    // caller; it is that there is no per-caller resolution left to get wrong.
+    //
+    // location_email stays FORCED LAST, after the caller's vars, and that is not
+    // redundancy with the base: it is the SECOND HARD GUARDRAIL staying connected to its
+    // outcome. The address checked below is the address rendered, whatever the caller
+    // passed - so a check against the row and a render from the vars can never describe
+    // two different emails.
+    const renderVars = { ...(sender.baseVars || {}), ...(vars || {}), location_email: sender.businessEmail };
     // No public email means no unsubscribe destination, and an email with NO
     // unsubscribe path is worse than the bug this replaced (which pointed it at the
     // owner's personal inbox). So it HOLDS, exactly like an unverified sending
