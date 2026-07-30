@@ -451,16 +451,15 @@ async function handler(req, res) {
     return res.status(500).json({ error: `submission failed: ${e.message}` });
   }
 
-  // 1b. Tell Meta, server side. The browser fired a Lead pixel with this same
-  // event_id, so Meta dedupes the pair; when the pixel is blocked this is the
-  // only copy that lands. Sent here rather than at the return statements so it
-  // happens on every success path. Best-effort, and deliberately not awaited
-  // into the response contract: a Meta outage must never fail a real lead.
-  try {
+  // Server-side copies of this submission's Meta conversions. The browser fires
+  // the same events with the same event ids, so Meta dedupes each pair; when the
+  // pixel is blocked (a large share of mobile ad traffic) this is the only copy
+  // that lands. Always best-effort - a Meta outage must never fail a real lead.
+  const capiEvent = (eventName, eventId) => {
     const [firstName, ...restName] = String(name || "").trim().split(/\s+/);
-    await sendMetaEvent(client, {
-      eventName: "Lead",
-      eventId: typeof b.event_id === "string" ? b.event_id.slice(0, 80) : undefined,
+    return sendMetaEvent(client, {
+      eventName,
+      eventId: typeof eventId === "string" ? eventId.slice(0, 80) : undefined,
       eventSourceUrl: source_url || undefined,
       ...requestContext(req),
       fbc: fbcFromClick(
@@ -471,10 +470,12 @@ async function handler(req, res) {
       email, phone,
       firstName, lastName: restName.join(" "),
       customData: { content_name: form_type },
-    });
-  } catch (e) {
-    console.error("[leads] capi", e instanceof Error ? e.message : e);
-  }
+    }).catch((e) => console.error(`[leads] capi ${eventName}`, e instanceof Error ? e.message : e));
+  };
+
+  // 1b. Lead - fired here rather than at the return statements so it covers
+  // every success path.
+  await capiEvent("Lead", b.event_id);
 
   // 2. Deliver — sync to the client's GHL when configured.
   const ghlLocName = client.ghl_kpi_config?.ghl_location;
@@ -695,6 +696,13 @@ async function handler(req, res) {
     }
 
     if (appointmentStatus) {
+      // Schedule = a trial slot was actually taken, which is what the ads
+      // optimise on. Nothing used to fire it: Meta saw 4 Schedules in 28 days
+      // against 61 Leads, far under the ~50/week it needs to leave the learning
+      // phase, so delivery was optimising close to blind. Only on a real
+      // booking, and only with the id the browser pixel used, so the two copies
+      // dedupe into one conversion.
+      if (appointmentStatus === "booked") await capiEvent("Schedule", b.schedule_event_id);
       await recordKpiLeadEvent(client.id, leadId, form_type, fields, { name, email, phone, contactId: kpiContactId });
       return res.status(200).json({ ok: true, id: leadId, ghl: ghlStatus, appointment: appointmentStatus });
     }
