@@ -27,3 +27,4 @@ dist-ssr
 ghl-keys.json
 .vercel
 .env*.local
+.mutant-*

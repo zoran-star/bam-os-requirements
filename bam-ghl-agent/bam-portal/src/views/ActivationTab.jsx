@@ -111,7 +111,7 @@ export default function ActivationTab({ client, tokens: t, session }) {
           {row(it.website_build.auto_ok, "Automated readiness", it.website_build.auto_ok ? "Last run passed (pages + offer endpoint)" : "Run it - checks staging pages + the offer endpoint")}
           {/* Build chunks (WS3): triggers fire server-side (setup-status evaluates
               on every owner visit + pings the client Slack channel); staff mark
-              building/published here. Publishing the deck unlocks core+templates
+              building/published here. Publishing the deck unlocks core; templates/sales/onboarding also need their inputs (setup-status.js chunk table)
               on the next evaluation. */}
           {Object.keys(it.website_build.chunks || {}).length > 0 || it.website_build.build_status ? (
             <div style={{ margin: "8px 0 2px" }}>

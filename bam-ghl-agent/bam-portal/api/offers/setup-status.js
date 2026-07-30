@@ -35,6 +35,64 @@ async function sb(path, init = {}) {
 }
 const count = (rows) => Array.isArray(rows) ? rows.length : 0;
 
+// ── Build-chunk triggers ─────────────────────────────────────────────────────
+//
+// A chunk trigger must imply its PREREQUISITES, not just its signal. A chunk
+// that fires on a signal that does not imply what the build needs sends staff to
+// build on missing inputs. Two instances of this shape were found independently
+// (sales on preset-alone, templates on deck-alone); check any new chunk row
+// against this before adding it.
+//
+// A THIRD turned up the moment the rule above was applied deliberately rather
+// than tripped over: `onboarding` had prices + policy + fields but no deck, and
+// its funnel emails are built on the published brand exactly like the sales
+// ones (Zoran, 2026-07-30). Which is the argument for the rule. Two of these
+// were found by accident, a week apart; the third was found by asking.
+//
+// The signal that flips a chunk is rarely the whole list of things the skill
+// opens on its first step. Ask of every row: if ONLY this condition is true and
+// nothing else, can the skill finish? If not, the missing inputs belong in the
+// condition. Row by row:
+//
+//   deck        the brief plus the story ARE the deck's inputs.
+//   core        the site is built on the published deck's brand.
+//   templates   the member transactional emails quote PRICES and POLICY, so the
+//               published deck alone is not enough to write them.
+//   sales       the funnel is built on the published deck's brand too, so the
+//               preset stamp alone is not enough to start it.
+//   onboarding  the published deck too (same reason as sales), plus prices,
+//               policy and the onboarding fields it collects.
+//   agreement   the policy it states and the legal name it is signed under.
+//
+// Pure and side-effect free on purpose: api/_chunk-triggers.test.mjs invokes this
+// exact function, so a condition cannot be loosened without the suite seeing it.
+export const chunkTriggerDefs = (sig, deckPublished) => [
+  ["deck",       "Branding deck",              !!(sig.brief_submitted && sig.story)],
+  ["core",       "Core site pages",            !!deckPublished],
+  ["templates",  "Email templates",            !!(deckPublished && sig.prices > 0 && sig.policy)],
+  ["sales",      "Sales funnel + emails",      !!(sig.preset && deckPublished)],
+  ["onboarding", "Onboarding funnel + emails", !!(deckPublished && sig.prices > 0 && sig.policy && sig.onb_fields > 0)],
+  ["agreement",  "Branded agreement",          !!(sig.policy && sig.legal_name)],
+];
+
+// Promotion is ONE-WAY. A row is rewritten only when it is `waiting` or has no
+// status at all, so TIGHTENING a trigger can never demote a chunk that already
+// reached ready / building / published: a false condition takes the `else` and
+// the stored row is carried through untouched. Nothing here ever writes a lower
+// status. building/published are staff-set via build-state action:'chunk'.
+export function promoteChunks(existing, defs) {
+  const chunks = { ...(existing || {}) };
+  const fired = [];
+  for (const [key, label, ready] of defs) {
+    const cur = chunks[key] || { status: "waiting" };
+    if (ready && (cur.status === "waiting" || !cur.status)) {
+      chunks[key] = { ...cur, status: "ready", ready_at: new Date().toISOString() };
+      fired.push(label);
+    } else if (!chunks[key]) chunks[key] = cur;
+  }
+  return { chunks, fired };
+}
+
 async function resolveUser(req) {
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!token) throw Object.assign(new Error("no token"), { status: 401 });
@@ -101,28 +159,13 @@ async function handler(req, res) {
     // The flow calls setup-status whenever the owner is active, so evaluating
     // here means triggers fire exactly when their inputs land - no cron, no
     // client wiring. Transitions are one-way (waiting → ready) and idempotent;
-    // team pings go to the academy's staff Slack channel. building/published
-    // are staff-set via build-state action:'chunk'.
+    // team pings go to the academy's staff Slack channel. The trigger table and
+    // the one-way promotion both live at module scope (chunkTriggerDefs /
+    // promoteChunks above) so the committed suite can invoke the real thing.
     const evaluateChunks = async (sig) => {
       const ws = cRow.website_setup || {};
-      const chunks = { ...(ws.chunks || {}) };
-      const deckPublished = (chunks.deck || {}).status === "published";
-      const CHUNK_DEFS = [
-        ["deck",       "Branding deck",              !!(sig.brief_submitted && sig.story)],
-        ["core",       "Core site pages",            deckPublished],
-        ["templates",  "Email templates",            deckPublished],
-        ["sales",      "Sales funnel + emails",      !!sig.preset],
-        ["onboarding", "Onboarding funnel + emails", !!(sig.prices > 0 && sig.policy && sig.onb_fields > 0)],
-        ["agreement",  "Branded agreement",          !!(sig.policy && sig.legal_name)],
-      ];
-      const fired = [];
-      for (const [key, label, ready] of CHUNK_DEFS) {
-        const cur = chunks[key] || { status: "waiting" };
-        if (ready && (cur.status === "waiting" || !cur.status)) {
-          chunks[key] = { ...cur, status: "ready", ready_at: new Date().toISOString() };
-          fired.push(label);
-        } else if (!chunks[key]) chunks[key] = cur;
-      }
+      const deckPublished = ((ws.chunks || {}).deck || {}).status === "published";
+      const { chunks, fired } = promoteChunks(ws.chunks, chunkTriggerDefs(sig, deckPublished));
       if (fired.length) {
         await sb(`clients?id=eq.${enc(clientId)}`, {
           method: "PATCH", headers: { Prefer: "return=minimal" },
