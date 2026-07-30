@@ -844,6 +844,27 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 📏📏📏📏 THE ONE-LINE GENERALISATION OF THE WHOLE NIGHT, from #1671's author about #1669's find:
+
+> **A gate reporting ZERO hits is indistinguishable from a gate that is not looking.**
+> **An absence of evidence, rendered as a confident negative.**
+
+**That is house rule 10 pointed at our own instruments rather than at our code**, and it unifies everything found tonight: `canCharge` returning `false` for *no* and for *could not ask*; `hasGmailMailbox` doing it; the CI discovery grep finding one control and reporting none missing; and the network-boolean checker scanning a file it could not parse and printing a clean number.
+
+**The practical form, which is what makes it usable: when a check comes back clean, the question is not "good" but "would it have said anything if there were something to say".** #1669's author asked that of a zero it had every reason to be pleased with, and found its gate blind. **Nobody would have questioned that number, including me.**
+
+## 📏 AND A SEPARATE ONE ABOUT THIS TEAM'S OWN TOOLING: **A SPAWNED BACKGROUND TASK IS AN ARMED ACTION, NOT A NOTE.**
+
+#1671's author had raised a chip for the remaining HARMFUL pair. **Told to stand down, it did not simply stop - it went back and WITHDREW the chip**, because the chip's own text instructed whoever clicked it to edit `api/agent/_stage.js` and `_store.js` and open a PR. **One click from Zoran would have started exactly the uncoordinated edit the collision check exists to prevent.**
+
+**It replaced it with a GATED version** whose first instruction is to establish what else is in flight in `api/agent/` and report back if it cannot, with the fix content preserved verbatim.
+
+**The general rule: a chip sitting unclicked is not inert. It is a loaded instruction waiting for a human who will not have tonight's context.** When work is re-routed or paused, the chips that describe it must be re-routed or paused too, or the pause exists only in the conversation that agreed it. **Same family as everything else here: a thing that looks passive because nothing is happening yet.**
+
+**It also checked the widened seed against ITS OWN branch** rather than assuming a fix aimed at future code was harmless to current code, **specifically because a broader seed can manufacture false positives as easily as it closes false negatives, and that would have turned the OTHER agent's rebase red through no fault of theirs.** Result identical to the pre-fix run, only a line number moved (52 → 64), which it passed along **because that is the line the other agent will be deleting.**
+
+**And it named its own luck accurately:** its production path avoided the blind spot because `gmailMailboxState` uses a bare `fetch(` and its suite stubs `globalThis.fetch` rather than injecting a `fetchImpl`. **"I got that property by accident rather than by design, which is a fair argument for their fix existing."**
+
 ## 📏📏📏 THE BEST FIND OF THE SESSION, AND IT IS ABOUT THE GUARD: **THE HOUSE-RULE-10 CHECKER WAS BLIND TO THE IDIOM THAT IS ABOUT TO BECOME THE HOUSE STYLE.**
 
 Found by #1669's author while pre-verifying its own rebase against a scratch merge of all three PRs.

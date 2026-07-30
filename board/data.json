@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · the guard was blind to the very bug it guards",
+ "updated": "2026-07-30 · all three ready, order set, waiting on you",
  "recentUpdates": [
+  "The line that sums up tonight: a check reporting zero problems looks exactly like a check that is not looking at anything",
+  "One agent withdrew its own suggestion chip when told to stand down, because a chip sitting there is a loaded instruction, not a note. One click would have started the exact clash we were avoiding",
+  "All three PRs green and coordinated between the agents themselves. Merge 1671, then 1670, then 1669",
   "Best catch of the night, and it is about our own safety check: it could not SEE the bug it exists to catch, in the exact coding style that is about to become standard here",
   "The agent found that by testing its own tool against a planted bug instead of trusting a clean result. Fixed and proven",
-  "Honest caveat it volunteered: 'all three green' is NOT three confirmations. Only the last one actually runs the new rule",
-  "All three still ready. Merge 1671, then 1670, then 1669",
-  "All three fixes are built and green. Merge in order: 1671, then 1670, then 1669",
-  "The Miami fix found a second hole nobody had named: an unreadable answer from the database was ALSO being read as a confident 'no Gmail here'"
+  "Honest caveat it volunteered: 'all three green' is NOT three confirmations. Only the last one actually runs the new rule"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
