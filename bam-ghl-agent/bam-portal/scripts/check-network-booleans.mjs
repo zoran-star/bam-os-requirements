@@ -530,7 +530,7 @@ if (unaudited.length) {
 
 if (stale.length) {
   failed = true;
-  console.error(`\n${stale.length} STALE inventory line(s) - the function no longer returns a bare boolean, or was renamed or deleted. Delete the line in the same change that fixed the code, or the counts above are fiction:\n`);
+  console.error(`\n${stale.length} STALE inventory line(s) - the function no longer returns a bare boolean, or was renamed or deleted. Delete the line, or the counts above are fiction. If you just rebased onto a merged fix, deleting the line here IS the rest of that fix:\n`);
   for (const e of stale) console.error(`::error file=bam-ghl-agent/bam-portal/scripts/network-boolean-inventory.txt,line=${e.line}::${e.id} no longer matches anything in api/. Delete this line.`);
   for (const e of stale) console.error(`  network-boolean-inventory.txt:${e.line}  ${e.id}`);
 }

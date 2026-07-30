@@ -44,7 +44,19 @@
 # cancel a park against an untrusted set. That is the third outcome, in this
 # codebase, written by someone who hit the bug.
 #
-# 29 entries at creation (2026-07-30), 4 of them HARMFUL.
+# Baseline when this file was created, 2026-07-30: 29 entries, 4 of them HARMFUL.
+# That is a HISTORICAL note and is deliberately never updated. Do not read it as
+# a current count and do not "correct" it as entries come and go - the live
+# numbers are printed by the check on every single run, which is the only place
+# they can be right. A count maintained by hand in prose is a count that is wrong
+# the first time somebody forgets, and then quoted for a year.
+#
+# CROSS-PR NOTE. The code fix and the line deletion cannot always ride in one PR:
+# a branch that fixes an instance may predate this file, and a branch that holds
+# this file may predate the fix. Deleting a line before its fix has merged turns
+# the holder's own CI red, because the collapse is still there on that branch.
+# So the edit belongs in whichever PR merges SECOND, after it rebases. The check
+# catches that case before the merge, which is the point of it.
 
 # ── HARMFUL ──────────────────────────────────────────────────────────────────
 
