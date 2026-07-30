@@ -254,6 +254,19 @@ const welcome = (L) => shellHead("You're in. Everything you need to get started 
 `
   + scheduleBlock(L)
   + `      <tr><td style="padding:18px 36px 8px;">`
+  // Self-serve billing. Zoran's order, 31 Jul 2026: a member should never have to email
+  // us to change a card. The destination is the ACADEMY's own Stripe billing portal
+  // (clients.stripe_portal_url), so this is one line in the master template that every
+  // academy renders with its own link - there is no BAM GTA literal here and there is
+  // nowhere to put one.
+  //
+  // GATED ON THE FACT, exactly like quickStart's optional items and the group-chat CTA
+  // above: no URL on file means the WHOLE sentence is absent, not a sentence with a dead
+  // anchor in it and not an orphan lead-in. dropEmptyShellLinks would strip a bare empty
+  // anchor if one ever got this far, but it cannot know that the words around it stop
+  // making sense without their link, so the fact gates the sentence and the sweep stays
+  // the backstop it already is.
+  + (L && L.portalUrl ? P(`Manage your membership or update your card any time in your ${LINK(L.portalUrl, "billing portal")}.`) : "")
   + P("See you on the court,<br><b style=\"color:#0A0A0A;\">The {{location.name}} Team</b>", 4)
   + `      </td></tr>`
   + MEMBER_FOOT;

@@ -79,19 +79,21 @@ const SENDER_COLS = ["email_domain", "business_name",
   "business_email", "public_name", "owner_name", "website_setup", "address", "phone",
   "community_group_url", "community_group_platform", "google_review_url",
   "online_programs_url", "referral_offer", "tagline", "instagram_url"];
-// ⚠️ INTENTIONALLY EMPTY, AND DELIBERATELY NOT DELETED. A column listed here is asked
-// for optimistically and dropped on the one error that means "its migration is not
-// applied yet" (see the retry in clientSender). Same shape and same rule as
-// CLIENT_COLS_PENDING in api/automations.js, which is where the reasoning is written
-// out in full.
+// A column listed here is asked for optimistically and dropped on the one error that
+// means "its migration is not applied yet" (see the retry in clientSender). Same shape
+// and same rule as CLIENT_COLS_PENDING in api/automations.js, which is where the
+// reasoning is written out in full.
 //
 // It matters more here than anywhere, which is why the mechanism stays: clientSender
 // THROWING holds the send WITHOUT texting the owner, so an unhandled 400 on this
 // select would stop every academy's automation email silently. Dropping the column
-// instead degrades to "no business email", which holds AND tells the owner. The next
-// column that needs to ship ahead of its migration goes here, with its migration file
-// on a comment line, and moves into SENDER_COLS the day that migration lands.
-const SENDER_COLS_PENDING = [];
+// instead degrades to "no business email", which holds AND tells the owner.
+//
+// PENDING TODAY: stripe_portal_url. clientVars() reads it for the welcome email's
+// manage-membership line (Zoran, 31 Jul 2026) and the send path renders from THIS
+// row, so it has to be asked for here too - and its migration, owned by the member
+// -management build, is not applied. It moves into SENDER_COLS the day that lands.
+const SENDER_COLS_PENDING = ["stripe_portal_url"];
 
 // Only an undefined-column error (PostgREST 42703) that NAMES a pending column earns
 // the retry. A transient 5xx stays a throw: silently degrading to a row with no

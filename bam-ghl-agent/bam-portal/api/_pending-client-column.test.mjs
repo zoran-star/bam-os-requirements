@@ -256,8 +256,42 @@ async function moduleWithLoadClient(rel, edits = []) {
 // INJECT is not a mutation - it is the harness. It puts a column that exists in no
 // schema into the (intentionally empty) pending list, so the mechanism has something
 // to be aimed at. ONE for sections 2-4, TWO for section 5.
-const INJECT_ONE = (c) => [[`const ${c} = [];`, `const ${c} = [${JSON.stringify(SYNTH_A)}];`]];
-const INJECT_TWO = (c) => [[`const ${c} = [];`, `const ${c} = [${JSON.stringify(SYNTH_A)}, ${JSON.stringify(SYNTH_B)}];`]];
+//
+// ⚠️ THE PINS ARE DERIVED, NOT `= [];` (31 Jul 2026). Every pin in this file used to
+// assume the pending arrays were EMPTY, which held for exactly as long as the mechanism
+// went unused. The first time a column actually had to ship ahead of its migration
+// (stripe_portal_url, for the welcome email's manage-membership link) all of them broke
+// at once - i.e. this suite was pinned to the mechanism being idle, and went down the
+// moment it was needed, which is the worst possible time for a safety net's test to
+// stop running. So the pin is now whatever the file DECLARES today, read out of the
+// source, and the injection APPENDS to it. A declaration this cannot read is reported
+// as NEGATIVE CONTROL FAILED, never as a pass.
+function pendingDecl(rel, name) {
+  const src = fs.readFileSync(path.join(HERE, rel), "utf8");
+  const m = new RegExp(`const ${name} = (\\[[^\\]]*\\]);`).exec(src);
+  if (!m) return null;
+  try { return { rel, name, text: m[0], list: JSON.parse(m[1]) }; } catch (_) { return null; }
+}
+const fmtList = (arr) => `[${arr.map((c) => JSON.stringify(c)).join(", ")}]`;
+function inject(rel, name, extra) {
+  const d = pendingDecl(rel, name);
+  if (!d) {
+    controlBroken = `this suite cannot read the pending list ${name} out of api/${rel}. It must stay a `
+      + `plain single-line array literal (const ${name} = ["a_column"];) because the injection below `
+      + "rewrites that exact line - and an injection that silently fails to apply looks precisely like "
+      + "a mechanism that worked.";
+    throw new Error(controlBroken);
+  }
+  return [[d.text, `const ${name} = ${fmtList([...d.list, ...extra])};`]];
+}
+// The MAIN list's text, for the both-lists check in section 1. Multi-line, so it is
+// matched as text rather than parsed.
+function mainListText(src, name) {
+  const i = src.indexOf(`const ${name} = [`);
+  return i < 0 ? "" : src.slice(i, src.indexOf("];", i));
+}
+const INJECT_ONE = (rel, c) => inject(rel, c, [SYNTH_A]);
+const INJECT_TWO = (rel, c) => inject(rel, c, [SYNTH_A, SYNTH_B]);
 
 // The mutations, expressed against the real source text.
 //   nocolumn   - the three columns leave the MAIN lists. The select stops asking for
@@ -302,16 +336,16 @@ function mutFor(constName) {
 }
 // Injection is SKIPPED under noinject (that is the whole control) and under nocolumn,
 // whose claim is about the real main lists and which has nothing to say about pending.
-const injectOne = (c) => (MUTATE === "noinject" ? [] : INJECT_ONE(c)).concat(mutFor(c));
-const injectTwo = (c) => (MUTATE === "noinject" ? [] : INJECT_TWO(c)).concat(mutFor(c));
+const injectOne = (rel, c) => (MUTATE === "noinject" ? [] : INJECT_ONE(rel, c)).concat(mutFor(c));
+const injectTwo = (rel, c) => (MUTATE === "noinject" ? [] : INJECT_TWO(rel, c)).concat(mutFor(c));
 
 // The REAL modules, unmutated except by `nocolumn`. Section 1 and section 3a use these.
 const realEdits = MUTATE === "nocolumn" ? NOCOLUMN : [];
 const REAL_A = await moduleWithLoadClient("automations.js", realEdits);
 const REAL_C = await moduleWithLoadClient("agent-confirm.js", realEdits);
 // Copies with ONE synthetic pending column.
-const INJ_A = await moduleWithLoadClient("automations.js", injectOne("CLIENT_COLS_PENDING"));
-const INJ_C = await moduleWithLoadClient("agent-confirm.js", injectOne("CLIENT_COLS_PENDING"));
+const INJ_A = await moduleWithLoadClient("automations.js", injectOne("automations.js", "CLIENT_COLS_PENDING"));
+const INJ_C = await moduleWithLoadClient("agent-confirm.js", injectOne("agent-confirm.js", "CLIENT_COLS_PENDING"));
 
 // _send.js is reached through its public door (sendOn), so no export is appended.
 async function sendModule(edits) {
@@ -341,7 +375,7 @@ const NOSENDER = [[
   `  "business_email", "public_name", "owner_name",`,
   `  "public_name", "owner_name",`]];
 const { sendOn: sendReal } = await sendModule(MUTATE === "nocolumn" ? NOSENDER : []);
-const { sendOn: sendInj } = await sendModule(injectOne("SENDER_COLS_PENDING"));
+const { sendOn: sendInj } = await sendModule(injectOne("_send.js", "SENDER_COLS_PENDING"));
 
 const reset = () => { CLIENT_SELECTS = []; FORCE_ERROR = null; MISSING_IN_PROD = []; WIRE = null; SMS = []; EVENTS = []; };
 const REAL_LOADERS = [["api/automations.js", REAL_A.__loadClient], ["api/agent-confirm.js", REAL_C.__loadClient]];
@@ -361,22 +395,89 @@ for (const [label, loadClient] of REAL_LOADERS) {
   }
   // The point of business_email: it must not be the owner's inbox, in any state.
   ok(!!row && row.business_email !== ACADEMY.email, `${label}: business_email is not clients.email`);
-  ok(CLIENT_SELECTS.length === 1, `${label}: ONE read, no retry - nothing is pending (saw ${CLIENT_SELECTS.length})`);
+  ok(CLIENT_SELECTS.length === 1, `${label}: ONE read, no retry, when the schema has everything the list asks for (saw ${CLIENT_SELECTS.length})`);
   // The rest of the list still has to be there. A "safe" change that quietly dropped
   // the parent-facing facts would hold nothing and break every message's identity.
   ok(!!row && row.public_name === ACADEMY.public_name && row.business_name === ACADEMY.business_name,
     `${label}: the parent-facing identity columns came back too`);
 }
 {
-  // The pending arrays are EMPTY in the shipped source, and still PRESENT. Both halves
-  // matter: a non-empty one costs a wasted 400 per uncached read, and a deleted one
-  // gets rebuilt badly the next time a column has to ship ahead of its migration.
-  const files = [["automations.js", "CLIENT_COLS_PENDING"], ["agent-confirm.js", "CLIENT_COLS_PENDING"], ["_send.js", "SENDER_COLS_PENDING"]];
-  for (const [f, c] of files) {
+  // The pending arrays are PRESENT, READABLE and AGREED.
+  //
+  // "EMPTY" was the assertion until 31 Jul 2026, and it was never the real requirement -
+  // it was a description of a quiet week. The requirement is that the mechanism is
+  // intact and that the three lists say the same thing, and that survives the mechanism
+  // being used. (What "empty" was really guarding, a column left parked after its
+  // migration lands, is not visible from here at all: nothing in this process knows the
+  // schema. What IS visible is a column in the main list AND the pending list, which is
+  // the same mistake one step further along - and that is checked below.)
+  //
+  // AGREED matters on its own. clientVars() turns ONE row into the merge vars every
+  // message renders from, and all three of these paths render from their own read of
+  // that row. A column pending in the worker's list and absent from the send path's is
+  // a fact that renders on one surface and blank on the other, which is the 29 Jul
+  // regression wearing different clothes.
+  const files = [["automations.js", "CLIENT_COLS_PENDING", "CLIENT_COLS"], ["agent-confirm.js", "CLIENT_COLS_PENDING", "CLIENT_COLS"], ["_send.js", "SENDER_COLS_PENDING", "SENDER_COLS"]];
+  const lists = [];
+  for (const [f, c, mainName] of files) {
     const src = fs.readFileSync(path.join(HERE, f), "utf8");
-    ok(src.includes(`const ${c} = [];`), `api/${f}: ${c} is present and EMPTY`);
+    const d = pendingDecl(f, c);
+    ok(!!d, `api/${f}: ${c} is present and is a single-line array literal (${d ? fmtList(d.list) : "unreadable"})`);
     ok(new RegExp(`function pendingColsBlamedBy`).test(src), `api/${f}: the retry's gate function is still there`);
+    if (!d) continue;
+    lists.push(d.list);
+    // A column in BOTH lists reads as handled and is not: the retry drops the pending
+    // copy, the main copy asks for it anyway, and the select dies on the second read.
+    const main = mainListText(src, mainName);
+    const both = d.list.filter((x) => main.includes(JSON.stringify(x)));
+    ok(both.length === 0, both.length
+      ? `api/${f}: ${both.join(", ")} is in BOTH ${mainName} and ${c} - the retry cannot save a column the main list also asks for`
+      : `api/${f}: nothing sits in both ${mainName} and ${c}`);
   }
+  const distinct = new Set(lists.map((l) => JSON.stringify(l)));
+  ok(lists.length === files.length && distinct.size === 1,
+    `all three pending lists agree on what is pending (${[...distinct].join("  vs  ")})`);
+}
+
+// ─── 1b. the SHIPPED pending column, against a schema that does not have it ──
+// Section 2 injects a SYNTHETIC column, because for most of this suite's life there was
+// no real one to aim at. There is one now, and it deserves its own pass: the shipped
+// list, on the shipped modules, against a stub schema that does NOT carry it - which is
+// production today, until the member-management build's migration for
+// clients.stripe_portal_url lands. The synthetic run proves the mechanism; this one
+// proves the mechanism is aimed at the right column and is load-bearing right now. If
+// it goes red, every automation email is failing at its first select.
+const SHIPPED_PENDING = (pendingDecl("automations.js", "CLIENT_COLS_PENDING") || { list: [] }).list;
+if (SHIPPED_PENDING.length) {
+  console.log(`\n── 1b. the SHIPPED pending column(s) [${SHIPPED_PENDING.join(", ")}], absent from the schema ──`);
+  for (const [label, loadClient] of REAL_LOADERS) {
+    reset();
+    MISSING_IN_PROD = [...SHIPPED_PENDING];
+    let row = null, threw = null;
+    try { row = await loadClient(ACADEMY.id); } catch (e) { threw = e; }
+    ok(!threw, `${label}: the REAL select survives production as it stands today${threw ? ` (threw ${threw.message})` : ""}`);
+    ok(!!row && SHIPPED_PENDING.every((c) => !(c in row)), `${label}: the pending column is ABSENT from the row, not faked as null`);
+    ok(!!row && MOVED_UP.every((c) => row[c] === ACADEMY[c]), `${label}: and every applied column still arrives through the retry`);
+    ok(CLIENT_SELECTS.length === 2, `${label}: one read plus exactly one retry (saw ${CLIENT_SELECTS.length})`);
+  }
+  // The send path, where the same 400 would be silent: clientSender throwing holds the
+  // email WITHOUT texting the owner, so an unhandled 400 here stops every academy's
+  // automation email and tells nobody.
+  //
+  // A DISTINCT client id, because clientSender caches its row per id for CLIENT_TTL and
+  // the stub answers any id with the same academy. Reusing ACADEMY.id here would warm
+  // that cache and leave section 4 measuring ZERO reads, which would look like a select
+  // that stopped naming business_email.
+  reset();
+  MISSING_IN_PROD = [...SHIPPED_PENDING];
+  const r = await sendReal({ channel: "email", clientId: `${ACADEMY.id}-pending-probe`, toEmail: "parent@example.test",
+    subject: "Your spot this week", body: "Hi {{contact.first_name}}, see you at training.", vars: {} });
+  ok(!!r.sent, `api/_send.js: the send still goes out with the pending column missing (${JSON.stringify(r)})`);
+  ok(WIRE && WIRE.html.includes(`href="mailto:${ACADEMY.business_email}?subject=Unsubscribe"`),
+    "api/_send.js: and the wire still carries the academy's own unsubscribe");
+  const sends = CLIENT_SELECTS.filter((s) => s.includes("email_domain"));
+  ok(sends.length === 2, `api/_send.js: one sender read plus one retry (saw ${sends.length})`);
+  reset();
 }
 
 // ─── 2. a pending column production does not have takes NOTHING down ─────────
@@ -491,8 +592,8 @@ const sendVia = async (send, clientId) => {
 // ─── 5. TWO pending columns, which is where the first version died ───────────
 console.log("\n── 5. a SECOND pending column does not take the select down ──");
 {
-  const A2 = await moduleWithLoadClient("automations.js", injectTwo("CLIENT_COLS_PENDING"));
-  const C2 = await moduleWithLoadClient("agent-confirm.js", injectTwo("CLIENT_COLS_PENDING"));
+  const A2 = await moduleWithLoadClient("automations.js", injectTwo("automations.js", "CLIENT_COLS_PENDING"));
+  const C2 = await moduleWithLoadClient("agent-confirm.js", injectTwo("agent-confirm.js", "CLIENT_COLS_PENDING"));
   for (const [label, loadClient] of [["api/automations.js", A2.__loadClient], ["api/agent-confirm.js", C2.__loadClient]]) {
     reset();
     MISSING_IN_PROD = [SYNTH_A, SYNTH_B];   // the schema has NEITHER

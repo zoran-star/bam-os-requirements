@@ -111,13 +111,16 @@ const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email"
 // which is the state every consumer already handles. Full reasoning, and the rule for
 // when a column may sit here, at CLIENT_COLS_PENDING in api/automations.js.
 //
-// ⚠️ INTENTIONALLY EMPTY, AND DELIBERATELY NOT DELETED. Empty because business_email
-// (20260729T210000) and tagline / instagram_url (20260729T230000) are applied and have
-// moved up into CLIENT_COLS. Kept because this list plus the retry below it is how the
-// NEXT column ships ahead of its migration, and the retry as written is safe at any
-// number of pending columns - a rebuilt-in-a-hurry one would not be. Full rationale at
+// business_email (20260729T210000) and tagline / instagram_url (20260729T230000) are
+// applied and have moved up into CLIENT_COLS. This list plus the retry below it is how
+// a column ships ahead of its migration, and the retry as written is safe at any number
+// of pending columns - a rebuilt-in-a-hurry one would not be. Full rationale at
 // CLIENT_COLS_PENDING in api/automations.js.
-const CLIENT_COLS_PENDING = [];
+//
+// PENDING TODAY: stripe_portal_url, read by clientVars() for the welcome email's
+// manage-membership line (Zoran, 31 Jul 2026). Its migration is owned by the member
+// -management build and is not applied yet. Moves up into CLIENT_COLS the day it lands.
+const CLIENT_COLS_PENDING = ["stripe_portal_url"];
 
 // Only an undefined-column error (PostgREST 42703) that NAMES a pending column earns
 // the retry. A transient 5xx must stay a throw, never a quietly degraded row.
