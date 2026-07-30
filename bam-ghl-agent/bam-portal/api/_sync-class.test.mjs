@@ -7,6 +7,23 @@
 //
 //   node api/_sync-class.test.mjs        # exits non-zero on any failure
 //
+// NEGATIVE CONTROLS (the CORE-TOKEN GUARD at the bottom of this file). Both are
+// in-process: nothing is written to disk, so a crashed run cannot leave a
+// mutated master body behind for the next person to commit.
+//
+//   MUTATE=customtoken   plants {{contact.tshirt_size}} - an academy-added custom
+//                        key - in a real master template body, the way such a
+//                        token actually arrives: somebody writes it because it
+//                        renders for the academy in front of them.
+//   MUTATE=blindvocab    reverts the GUARD rather than the body: the resolvability
+//                        detector says every token resolves. A detector that
+//                        answers yes to everything makes the sweep unfailable, so
+//                        the vocabulary anchors have to be what catches it.
+//
+// A control counts as caught ONLY if this file prints NEGATIVE CONTROL PASSED,
+// and "caught" is a DELTA - the guard runs twice in one process, and a mutation
+// passes only by producing a failure the pristine run did not have.
+//
 // Same plain-node style as api/_fees.test.mjs / api/_offer-schedule.test.mjs
 // (vitest.config.ts only includes api/_runtime, api/runtime, api/parent,
 // api/client - these api/*.test.mjs files are run directly).
@@ -595,6 +612,210 @@ console.log("\n── NO GTA LITERAL IN ANY CANONICAL DEFAULT (bodies + subjects
   }
   ok(offenders.length === 0,
     `no literal step body or subject carries GTA identity${offenders.length ? " - " + offenders.join(" | ") : ""}`);
+}
+
+console.log("\n── THE CORE-TOKEN GUARD: a MASTER body may only speak the CORE vocabulary ──");
+//
+// WHAT THIS ADDS THAT NOTHING ABOVE COVERS. Everything before this point asks
+// whether a shared body carries one academy's CONTENT. This asks a different
+// question about the same bodies: whether a shared body carries one academy's
+// SCHEMA. Those fail in opposite directions and neither check sees the other's
+// bug.
+//
+// The shape of the failure it exists for: an academy adds its own custom field -
+// `tshirt_size`, `jersey_number`, `medical_notes` - and somebody writes
+// {{contact.tshirt_size}} into a MASTER body because it renders correctly for the
+// academy in front of them. It renders correctly for exactly that academy and for
+// nobody else, and the failure is not a blank. resolveMergeVars substitutes the
+// keys it knows and LEAVES THE REST ALONE, so every other academy's parent is
+// emailed the literal characters "{{contact.tshirt_size}}". A leak that renders
+// as a visible template tag in a stranger's inbox is the cheapest possible bug to
+// prevent and there was nothing preventing it.
+//
+// WHAT "CORE" MEANS HERE, AND WHY IT IS PROBED RATHER THAN LISTED. The core
+// vocabulary is not a list in this file - a list would be a second source of
+// truth that drifts from the resolver the week after it is written. It is
+// whatever api/email-shells.js resolveMergeVars can actually resolve, measured by
+// ASKING IT: hand it the token and see whether the token survives. A token that
+// comes back intact is not in the vocabulary, which is precisely the condition
+// that puts template braces in a parent's email. Render over grep, again.
+//
+// That resolvable set is built from exactly three sources, and they are the same
+// three for every academy on the shared preset:
+//   clientVars(client)   the academy's own row: name, site, domain, owner, city,
+//                        phone, community group, review link
+//   academy facts        venue, weekly schedule, testimonials
+//   contact basics       first / full name, and the athlete's name - which is the
+//                        rendering side of the CORE FIELD MANIFEST seeded by
+//                        api/offers/seed-core-fields.js
+// An academy-added custom key belongs to none of them, and that is the whole
+// distinction: core is what EVERY academy is guaranteed to have.
+//
+// THE UPPERCASE TOKENS ARE A DIFFERENT LAYER, not an exemption. {{ACADEMY_FULL}},
+// {{SITE_URL}}, {{UNSUBSCRIBE}} and friends are the email SHELL's placeholders,
+// filled by renderEmail after the merge pass. They are allowed here and then
+// immediately made to prove themselves: the full-render assertion below fails if
+// ANY brace pair survives renderEmail, so "it is a shell placeholder" cannot
+// become a way to smuggle an unresolvable token past this gate.
+{
+  const TOKEN_RE = /\{\{\s*([^}]+?)\s*\}\}/g;
+  const tokensIn = (s) => [...String(s == null ? "" : s).matchAll(TOKEN_RE)].map((m) => m[1]);
+  const isShellPlaceholder = (t) => /^[A-Z][A-Z0-9_]*$/.test(t);
+
+  // A FULLY CONFIGURED academy that is nobody real. Fully configured on purpose:
+  // with a fact missing, its token resolves to empty and vanishes, which looks
+  // exactly like resolving - so a half-filled fixture would report unresolvable
+  // tokens as fine. Everything the core vocabulary can carry is present here.
+  const FULL = {
+    ...NON_GTA,
+    business_email: "info@byanymeanssanjose.com",
+    phone: "(408) 597-4327",
+    community_group_url: "https://chat.whatsapp.com/SANJOSEINVITE",
+    community_group_platform: "whatsapp",
+    google_review_url: "https://g.page/r/SANJOSEREVIEW/review",
+    tagline: "Tagline goes here",
+    instagram_url: "https://www.instagram.com/bamsanjose/",
+  };
+  const CORE_VARS = {
+    ...clientVars(FULL),
+    first_name: "Jordan", full_name: "Jordan Rivers",
+    // The athlete's name is the rendering side of the core manifest's
+    // athlete_first_name / athlete_last_name.
+    athlete: "Alex Rivers", athlete_first: "Alex",
+    location_venue: "500 Innovation Way, San Jose, CA 95110",
+    location_schedule: [{ day: "Mondays", groups: [{ name: "Varsity", time: "6-7pm" }] }],
+    location_testimonials: [{ author: "Q Parent", quote: "z".repeat(60) }],
+    next_session: "Our next session is Tue 6pm. ",
+  };
+  const CID = "00000000-0000-4000-8000-00000000cafe";
+  const CORE_L = locFor(CID, CORE_VARS);
+
+  // THE DETECTOR. Swapped out by MUTATE=blindvocab.
+  const realResolves = (token) => !resolveMergeVars(`{{${token}}}`, CORE_L, CORE_VARS).includes("{{");
+
+  // THE MASTER BODIES. `plant` is the seam the leak-planting control uses, so the
+  // control travels the same code path a real leak would rather than a parallel one.
+  function collectMasterBodies(plant) {
+    const out = [];
+    const push = (path, body) => { if (String(body || "").trim()) out.push({ path, body: String(body) }); };
+    // Master EMAIL templates. A template may be a FUNCTION of the location config
+    // (onboarding-welcome, onboarding-review), so it is CALLED - reading its source
+    // instead would scan branches the academy never receives and miss the ones it does.
+    for (const [name, set] of [["nurture", NURTURE], ["onboarding", ONBOARDING_TEMPLATES]]) {
+      for (const [key, t] of Object.entries(set)) {
+        push(`${name}:${key}`, typeof t === "function" ? t(CORE_L, CORE_VARS) : t);
+      }
+    }
+    // CANONICAL_DEFAULTS: the literal step bodies and subjects, where a hand-typed
+    // token is most likely to be introduced.
+    for (const [key, def] of Object.entries(CANONICAL_DEFAULTS)) {
+      for (const s of canonicalSteps(def)) {
+        push(`canonical:${key}[${s.position}].body`, s.body);
+        push(`canonical:${key}[${s.position}].subject`, s.subject);
+      }
+    }
+    return plant ? plant(out) : out;
+  }
+
+  // The two mutations, in-process. Nothing is written to disk, so a crashed run
+  // cannot leave a mutated master body behind for someone to commit.
+  const GUARD_MUTATIONS = {
+    // A REAL LEAK, planted the way one arrives: a custom key an academy added,
+    // typed into a master body because it rendered fine for that academy.
+    customtoken: {
+      plant: (bodies) => bodies.map((b, i) =>
+        i === 0 ? { ...b, body: b.body + "\n\nSize: {{contact.tshirt_size}}" } : b),
+      resolves: null,
+    },
+    // THE GUARD ITSELF, REVERTED: the detector says everything resolves. This is
+    // the control for the control - with it, the sweep above cannot fail, so the
+    // positive/negative vocabulary anchors have to be what catches it.
+    blindvocab: { plant: null, resolves: () => true },
+  };
+  const GM = process.env.MUTATE ? GUARD_MUTATIONS[process.env.MUTATE] : null;
+  if (process.env.MUTATE && !GM) {
+    console.error(`unknown MUTATE=${process.env.MUTATE}. Known: ${Object.keys(GUARD_MUTATIONS).join(", ")}`);
+    process.exit(1);
+  }
+
+  function runGuard({ plant, resolves }) {
+    const results = [];
+    const gok = (c, m) => { results.push({ ok: !!c, label: m }); };
+
+    const bodies = collectMasterBodies(plant);
+    const allTokens = new Set();
+    for (const b of bodies) for (const t of tokensIn(b.body)) allTokens.add(t);
+
+    // A sweep over nothing passes everything. Anchor the enumeration first.
+    gok(bodies.length >= 15, `walked ${bodies.length} master bodies (templates + canonical step bodies and subjects)`);
+    gok(allTokens.size >= 8, `found ${allTokens.size} distinct {{tokens}} in them`);
+
+    // THE VOCABULARY ANCHORS. Positive: the core keys really do resolve, so the
+    // detector is not simply saying no to everything. Negative: an academy-added
+    // custom key really does NOT, so it is not simply saying yes to everything.
+    for (const t of ["contact.first_name", "contact.fullName", "contact.athletes_full_name",
+                     "contact.athlete_first_name", "location.name", "location.city",
+                     "location.website", "location.venue", "location.schedule"]) {
+      gok(resolves(t), `CORE token {{${t}}} resolves (clientVars / academy facts / contact basics)`);
+    }
+    for (const t of ["contact.tshirt_size", "contact.jersey_number", "contact.medical_notes"]) {
+      gok(!resolves(t), `an ACADEMY-ADDED key {{${t}}} does NOT resolve, so putting one in a master body is a real failure and not a harmless no-op`);
+    }
+
+    // THE SWEEP.
+    const offenders = [];
+    for (const { path, body } of bodies) {
+      for (const t of new Set(tokensIn(body))) {
+        if (isShellPlaceholder(t)) continue;   // the shell's layer; proved below
+        if (resolves(t)) continue;
+        offenders.push(`${path}: {{${t}}}`);
+      }
+    }
+    gok(offenders.length === 0,
+      `every {{token}} in every MASTER body resolves from the CORE vocabulary${offenders.length
+        ? " - a parent at another academy would be emailed these braces verbatim:\n       " + offenders.join("\n       ") : ""}`);
+
+    // AND THE SHELL PLACEHOLDERS ARE NOT A LOOPHOLE. Render every master email
+    // template through the real path and fail on ANY surviving brace pair.
+    const survived = [];
+    for (const key of [...Object.keys(NURTURE), ...Object.keys(ONBOARDING_TEMPLATES)]) {
+      const html = renderEmail({ clientId: CID, subject: "Test", body: `template:${key}`, vars: CORE_VARS });
+      const left = [...new Set(tokensIn(html))];
+      if (left.length) survived.push(`${key}: ${left.join(", ")}`);
+    }
+    gok(survived.length === 0,
+      `no token of ANY kind survives a full renderEmail of a master template${survived.length ? "\n       " + survived.join("\n       ") : ""}`);
+
+    return results;
+  }
+
+  const guardBase = runGuard({ plant: null, resolves: realResolves });
+  const guardBaseRed = new Set(guardBase.filter((r) => !r.ok).map((r) => r.label));
+  const guardShown = GM ? runGuard({ plant: GM.plant, resolves: GM.resolves || realResolves }) : guardBase;
+  for (const r of guardShown) ok(r.ok, r.label);
+
+  // A KNOWN GAP, PRINTED ON EVERY RUN INCLUDING A GREEN ONE, because a guard that
+  // goes quiet about what it cannot express is how a gap becomes a decision nobody
+  // made. `athlete_age` is one of the THREE core fields seeded onto every academy
+  // by api/offers/seed-core-fields.js, and it has NO merge token: there is no
+  // {{contact.athlete_age}} in resolveMergeVars. So the guard is correct to reject
+  // it, and the consequence is that a master body cannot say a word about the
+  // athlete's age even though every academy on the preset now stores it. Clearing
+  // it means adding the token to resolveMergeVars' map and feeding it at send time,
+  // not weakening this check.
+  const ageToken = realResolves("contact.athlete_age");
+  ok(!ageToken,
+    "documented gap: {{contact.athlete_age}} does NOT resolve, so the core field `athlete_age` is storable but unspeakable in a master body "
+    + "(if this line ever goes red the token was added - delete the line, not the guard)");
+
+  if (process.env.MUTATE) {
+    const nw = guardShown.filter((r) => !r.ok && !guardBaseRed.has(r.label));
+    console.log("");
+    console.log(nw.length
+      ? `✅ NEGATIVE CONTROL PASSED: MUTATE=${process.env.MUTATE} produced ${nw.length} failure(s) the pristine run did not have:\n   - ${nw.slice(0, 3).map((r) => r.label.split("\n")[0].slice(0, 140)).join("\n   - ")}`
+      : `❌ NEGATIVE CONTROL FAILED: MUTATE=${process.env.MUTATE} broke a real guarantee and added no new failure. That check is decorative.`);
+    process.exit(nw.length ? 0 : 1);
+  }
 }
 
 console.log(`\n${fail ? "❌" : "✅ ALL PASS"}: ${pass} passed, ${fail} failed`);
