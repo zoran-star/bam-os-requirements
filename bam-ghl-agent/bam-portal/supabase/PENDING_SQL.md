@@ -15,6 +15,7 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
 | Migration file | What it does | Blocked features until applied | Added |
 |---|---|---|---|
+| `20260730120000_agent_reply_status_dismissed.sql` | Adds `dismissed` to the status CHECK on `agent_ready_replies`, `agent_confirm_replies`, `agent_followups`, `agent_closing_replies`. Each keeps its OWN existing values (closing keeps `paused`) | **"Send nothing" on every Hawkeye reply card, on every academy.** It writes `status='dismissed'`, the CHECK rejects it, the card bounces back into the deck ~6s later with a raw Postgres error toast. Zero `dismissed` rows exist in prod - it has never once worked | 2026-07-30 (Claude session, PR #1648) |
 
 
 > **`20260729T230000` step 2, and it is not optional:** the moment that migration is
