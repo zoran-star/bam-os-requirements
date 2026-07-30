@@ -761,7 +761,11 @@ His words: *"testimonials will be displayed, which is on the websites and the fi
 
 **⚠️ THIS MAY RESOLVE THE 7-VERSUS-8 ONBOARDING GAP BY DELETION RATHER THAN BY CLOSING IT, WHICH NOBODY ANTICIPATED.** The master ships SEVEN onboarding steps against GTA's EIGHT; the missing one is `onboarding-testimonials`, held absent-on-purpose, with a standing rule that **only the testimonial connection may close it.** Zoran's ruling implies that step **should not exist at all** - it shows testimonials to people who have already converted, which he has just called unnecessary.
 
-**⛔ DO NOT DELETE ANYTHING ON THIS INFERENCE.** The gap has a hard standing rule around it and deleting a step from the master is not reversible by a data change. **Get his explicit yes on "the onboarding testimonials step is dropped, not deferred" before anyone touches `ONBOARDING_DEFAULT` or GTA's eighth step.** Until then it stays held exactly as it is. **This is recorded as the likely resolution, not as the decision.**
+**✅ HE GAVE THAT EXPLICIT YES ON 2026-07-30: "members don't need the testimonials email."** See the member-management ruling at the top of this file. **The inference recorded here turned out to be right, and it was still right NOT to act on it** - the value of holding was never that the guess was wrong, it was that a guess and a ruling are different things when the action is irreversible.
+
+**⛔ AND NOTHING GETS DELETED EVEN NOW.** The master already ships 7; closing the gap by ruling means it **stops being a to-do**, not that anything is removed. `ONBOARDING_DEFAULT` is untouched and GTA keeps its eighth step. **The tripwire in the reconciler stays and matters MORE now**, because a future reader will still see 7 against 8 and there is no longer an open workstream that would explain it to them.
+
+**Superseded, kept for the reasoning:** ~~Get his explicit yes before anyone touches `ONBOARDING_DEFAULT` or GTA's eighth step. This is recorded as the likely resolution, not as the decision.~~
 
 **⚠️ CORRECTED BY ZORAN MINUTES LATER: THE ENROLL FLOWS CARRY TESTIMONIALS TOO.** *"actually you are right - the enroll flows will also have the testimonials too"*. **That makes sense and it sharpens the rule rather than muddying it: the dividing line is not sales-versus-member, it is DECIDING versus DECIDED.** A parent in the enroll flow is committing money and is still deciding, so testimonials belong there. A member three weeks in has decided, so they do not.
 
@@ -839,6 +843,46 @@ The room built `scripts/check-testimonial-hardcodes.mjs` (in PR #1640), **proved
 Zoran's bar is *"not done until every consumer pulls from the store"*. **The failure mode is a consumer that LOOKS converted.** A free-trial page rendering from the resolver **but silently falling back to its hardcoded array when the store is empty** passes every visual check and is still hardcoded. So does a seed-time step that resolves to nothing and emits the old literal. **Both read as converted on inspection. Neither is.**
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
+
+## ✅✅ MEMBER MANAGEMENT PLAN APPROVED (Zoran, 2026-07-30). **FIVE RULINGS, AND THE FIRST CLOSES THE OLDEST FROZEN ITEM IN THIS FILE.**
+
+Plan at `~/.claude/plans/elegant-floating-wolf.md`. Room file live at `board/rooms/member-management.json`.
+
+### 1. ⛔ THE 7-VERSUS-8 GAP IS **CLOSED BY RULING**, NOT DEFERRED, AND NOT BY DELETION
+
+His words: **"members don't need the testimonials email."** That is the explicit *"dropped, not deferred"* this file has been holding out for since 2026-07-29.
+
+**What changes: nothing in code, and that is the point.** The master **stays at SEVEN steps permanently.** `ONBOARDING_DEFAULT` is not edited. GTA's live eighth step **stays untouched** under his GTA-never-changes rule, recorded as a deliberate GTA-only divergence. **The gap simply stops being a to-do.**
+
+**⚠️ THE TRIPWIRE STAYS, AND IT IS NOW MORE VALUABLE RATHER THAN LESS.** [#1645](https://github.com/zoran-star/bam-os-requirements/pull/1645) made the reconciler say in place that an onboarding line is informational and that promoting the step is *"the original failure with extra steps"*. **Closed-by-ruling does NOT mean safe-to-promote.** A future reader still sees a master with 7 against a reference academy with 8, and **now there is no open workstream that would ever explain it to them.** Re-word the STATUS from "frozen pending ruling" to "closed by ruling"; **do not soften the warning.**
+
+### 2. GTA's legacy `/cancel` skill is RETIRED. Cancellations are portal-only.
+
+The Google Sheet stays readable as history. The repo-root `/cancel` skill gets deprecated as part of the member-management build. **⚠️ That skill is installed and lists Stripe + Sheet + Asana steps, so anyone invoking it after the portal path lands would be running a second, divergent cancellation route.** Deprecating it IS the fix, not housekeeping.
+
+### 3. NO parent-facing failed-payment email, ever. Also no automated reschedule notice, and no goodbye email on cancel.
+
+Staff chase a failed payment with the existing payment-link action. The owner messages the chat for a reschedule. **Three messages deliberately NOT built, which is worth recording as loudly as three built**, because the next person to notice their absence will read it as a gap.
+
+### 4. Receipts become a PORTAL receipt system. His words: *"something we also have to plan out and build to be in the portal."* **Own gate 1 before any build.**
+
+### 5. Authored member emails (`training` / `story` / `era`) are HARD-SPLIT into member management. **He stated it twice.**
+
+**The sales system NEVER writes member emails; member management NEVER depends on sales having run.** This is the four-skill independence rule holding under pressure, and it is the reason the gather sits in the branding deck rather than in either consumer.
+
+### Scope, confirmed: ONE `/member-management` skill, TWO legs
+
+**Leg A**, a new academy, 7 steps. **Leg B**, migration for an academy that already has members: price match, archived pricing, seed members from Stripe or CSV, `link-ghl`, then an Excel round-trip with the owner.
+
+**Most machinery already exists** (Pricing Sorter, `link-ghl`, take-over, `setup-monthly`). **New builds:** archived-pricing pass, Stripe-first member discovery, the Excel round-trip, core intake fields seeded by preset (**locked item 17**), enroll pricing fully data-driven, KPI ties seeded by the skill, and the templates-chunk trigger re-key.
+
+**⭐ AND THE ROOM SPOTTED THAT THE TRIGGER RE-KEY IS THE SAME CLASS AS A BUG ALREADY IN THIS FILE:** the templates chunk fires at deck publish but needs prices and policy, exactly like `setup-status.js:114` firing the `sales` chunk on `!!sig.preset` alone rather than on `deckPublished`. **Two instances of "a chunk fires on a signal that does not imply its prerequisites", found by two rooms independently.** They should be fixed as one shape, not two tickets.
+
+### ORCHESTRATOR COLLISION RULING for the three surfaces they flagged
+
+- **`presets.js` (item 17's core intake fields): CLEAR.** Checked by content: nothing AUTOMATION TEMPLATING III has pushed touches it, and build B's scope is the three booking paths, `groupOf()` and the copies of GTA's age bands. **Take it, but it is the shared sales preset file, so the no-fork guardrail bites hardest there: intake fields go in for EVERY academy on the preset or they are a runtime fact, never a San Jose branch.**
+- **`public/client-portal.html`: proceed ADDITIVELY, expect a rebase.** III's offer-wizard change already landed on main in #1660. **Ten open PRs touch that file and none touch the offer wizard's Schedule section.** Never restructure; add.
+- **`bam-client-sites`: fresh worktree off `origin/main`, always.** Its main checkout has been PARKED on a stale branch with uncommitted edits since 29 June. Check against SJ PRs **#115 (enroll funnel, DO NOT MERGE)**, #100 and #103 before touching the enroll path.
 
 ## 📏📏 HOUSE RULE 10, PROMOTED 2026-07-30 FROM THE CONTRACT DIRECTLY BELOW. **THE RULE ALREADY EXISTED. IT WAS WRITTEN FOR ONE BUILD, SO IT DID NOT TRAVEL.**
 
