@@ -1,20 +1,19 @@
 {
- "updated": "2026-07-30 · names ruled, city-branded per academy",
+ "updated": "2026-07-30 · Lij's ask-list drafted and ready to send",
  "recentUpdates": [
+  "Lij's ask-list is drafted and ready for you to send. 9 items, Stripe first, and it does NOT ask for anything we already have",
+  "Checked his record before writing it: his reviews, both gym addresses, his domain and his business number are all done. The old list still asked for all of them",
+  "New ask nobody had: how a family actually gets in the door at each of his two gyms. That line goes out the morning of a first session",
+  "Public form: nothing anywhere links to it, so nobody can reach it without typing the URL. Parked, not built on further",
   "You ruled the public names: each academy is branded by its city. By Any Means Toronto and By Any Means San Jose. Notes updated so nobody changes them back",
-  "What still holds from the old rule: the internal label (BAM GTA, BAM San Jose) must never reach a parent. That was always the real bug",
-  "Phone question answered by actually rendering: your number DOES reach parents, in one line of the welcome email, and it has for ten months. Not a new leak",
-  "San Jose's number has never been sent to anyone, so its first welcome email is the first real test of it",
-  "A test that FAILED found a seventh copy of the age-groups bug. It failed for a better reason than it was written for, and reading why is what found it",
-  "Four times tonight a note or a test was read as answering a question it never claimed to answer. Not one of them was wrong"
+  "What still holds from the old rule: the internal label (BAM GTA, BAM San Jose) must never reach a parent. That was always the real bug"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
-   "Send one real test message through the support form? It is the only way to prove it SAVES. It will show up in the staff ticket queue",
    "Two San Jose data fixes for launch: allowlist its domain, and press the entry-point seed button. Both are data, not code",
    "Decide on 2 new preset leaks: GTA's gym door in every academy's confirmation text, and GTA's age groups baked into every AI",
-   "Send Lij his ask-list. Still the biggest thing you own and the biggest San Jose unblock",
+   "SEND LIJ HIS ASK-LIST. Drafted and waiting for you at docs/plans/lij-ask-list.md. Stripe is item 1 and it gates his prices, checkout and class times",
    "File the Google Business Profile API application. Days to weeks, still unfiled",
    "SET UP TWILIO BITCH: 6 items, submit target Thursday, only 3 free attempts",
    "Meta CAPI token: 60% of GTA ad traffic is invisible until it exists",
