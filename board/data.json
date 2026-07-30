@@ -1,17 +1,21 @@
 {
- "updated": "2026-07-29 · alignment step off, GTA reviews running",
+ "updated": "2026-07-30 · preset audit, 2 new blockers",
  "recentUpdates": [
-  "You switched off the data-model alignment step. Adopted, and I dropped the Luka chase from your list",
-  "Testimonials migration cleared to apply. GTA's reviews are being pulled now via your Chrome owner view",
-  "One thing I will not decide for you: CLAUDE.md still tells every session to use that step. Cole reads that file too",
-  "Your Chrome idea beat both options they offered: no API key, no billing, no Google approval, not capped at 5 reviews",
-  "It also killed the 30 minute cost. Staff paste a link, no owner chasing",
-  "New question for later: at academy 10 or 50, someone needs owner access to each listing for this to work",
-  "You ruled: business contact splits from owner contact, for email AND phone. Routed to the templating chat"
+  "Audit found 2 NEW leaks nobody had: every academy's trial-confirmation text describes GTA's gym door, and the AI carries GTA's age groups permanently",
+  "The 30 vs 85 minute thing resolves: both are ours. 30 is the OWNER's time, 85 is staff time. Your question was about staff, so 85 is right",
+  "Honest verdict on 85: plausible best case, but nobody can know until it is run once. San Jose can no longer be that test",
+  "6 PRs merged: CI resurrected, the clock bug class closed for good, 'Send nothing' fixed, public ticket form given a real route",
+  "One migration waits on you: the public ticket intake. Until it applies, the form still cannot save a ticket",
+  "None of this was on the list this morning. It came out of one subagent reporting what it noticed",
+  "'Send nothing' now works. It never has, on any academy, since it was built"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
+   "Decide on 2 new preset leaks: GTA's gym door in every academy's confirmation text, and GTA's age groups baked into every AI",
+   "Apply the public ticket migration, or tell me to. It is the last thing between people and a working support form",
+   "Confirm 2 phone numbers (SJ business 408-597-4327, GTA 289-816-6569). They gate the design AND a risky migration behind it",
+   "Merge client-sites #167 (the skills) and #1645 (a tripwire comment). Last two of this workstream",
    "Send Lij his ask-list. Still the biggest thing you own and the biggest San Jose unblock",
    "File the Google Business Profile API application. Days to weeks, still unfiled",
    "SET UP TWILIO BITCH: 6 items, submit target Thursday, only 3 free attempts",
@@ -19,7 +23,8 @@
    "Tell me what the 'Vercel deployment guide for Ant' chat is, it is unmapped",
    "Decide on PR #1546 (stage rename, open since 21 July). It collides with 2 live builds. Rebase and merge, or accept a bigger rebase later",
    "Cole's inbox migration is still pending and deliberately unapplied. Tell me when you want it run",
-   "Double-check San Jose's business number against GHL: is it 408-597-4327?"
+   "Confirm real parent quotes are exempt from the no-em-dash rule. Two of GTA's five contain them",
+   "Decide: build a heartbeat so we can tell a dead scheduled job from a quiet day? 33 jobs, none watched"
   ],
   "chat": "MISTER_ORCHESTRATOR II"
  },
@@ -696,9 +701,9 @@
   {
    "name": "TESTIMONIAL CONNECTION",
    "sidebar": "TESTIMONIAL CONNECTION",
-   "state": "white",
-   "one": "Gate 1 passed. Building the gather step, then hand-seeding GTA, then San Jose",
-   "column": "reviews",
+   "state": "done",
+   "one": "CLOSED. Both academies seeded from their own reviews, rendering on sites, enroll and the agent",
+   "column": "done",
    "actions": [],
    "blockedBy": null
   },
@@ -894,6 +899,13 @@
    "state": "done",
    "column": "done",
    "one": "Fixed and merged. Funnel verified live. Safe to archive"
+  },
+  {
+   "name": "Hawkeye inbox routing for contacts",
+   "sidebar": "Hawkeye inbox routing for contacts",
+   "state": "white",
+   "column": "unsorted",
+   "one": "Replying from the normal inbox taught Hawkeye nothing. Building the redirect and the SMS block"
   }
  ],
  "journey": {

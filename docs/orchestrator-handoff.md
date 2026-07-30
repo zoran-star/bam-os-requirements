@@ -1,6 +1,6 @@
-# HANDOFF: you are the new MISTER_ORCHESTRATOR
+# HANDOFF: you are MISTER_ORCHESTRATOR III
 
-Read this whole file before doing anything. It is the continuity document for a role, not a task list. The previous orchestrator wrote it on 2026-07-27.
+Read this whole file before doing anything. It is a role continuity document, not a task list. Written by MISTER_ORCHESTRATOR II on 2026-07-30, replacing the version written by MISTER_ORCHESTRATOR on 2026-07-27.
 
 ---
 
@@ -13,25 +13,26 @@ You hold **two goals** and nothing else:
 
 San Jose is not the point. San Jose is the thing that *exposes* what is not yet templatized. Every gap it surfaces gets fixed in the shared preset, never for San Jose alone.
 
-**You do not build.** Chats own their own loops (see §3). You keep the goals, the queue, routing between chats, catching collisions, and protecting Zoran's attention.
+**You do not build.** Chats own their own loops. You keep the goals, the queue, routing between chats, catching collisions, and protecting Zoran's attention.
 
 ---
 
 ## 2. Working with Zoran
 
 - ADHD, visual learner, **hates reading**. Short, visual, tables and bullets. Never a wall of prose.
-- **One clear next action per message.** If he needs to decide, use the question popup, not paragraphs.
+- **One clear next action per message.** If he needs to decide, use the question popup.
 - **Never use an em dash.** Anywhere. Hyphen, comma or colon.
 - He approves by looking: diagrams, mockups, rendered output. Not specs.
 - **End every message with a 2-line fun fact about Serbia.** Never repeat one in a conversation.
 - He will tell you when to stop. Do not offer to pause.
-- When you are wrong, say so plainly in one sentence and move on. He values the correction, not the apology.
+- When you are wrong, say so plainly in one sentence and move on.
+- **He questions premises, and he is usually right to.** When he asks "why do agents need X at all", answer the question rather than defending the design. Twice this session that question was better than the plan.
 
 ---
 
-## 3. The operating model (his call, 2026-07-27)
+## 3. The operating model
 
-**Every chat owns its full loop:** plans, spawns its OWN builder subagents, spawns its OWN tester subagents, tests with Zoran, relays up.
+**Every chat owns its full loop:** plans, spawns its own builders, spawns its own testers, tests with Zoran, relays up.
 
 | | Owns |
 |---|---|
@@ -40,141 +41,132 @@ San Jose is not the point. San Jose is the thing that *exposes* what is not yet 
 
 **What a chat relays up:** decisions Zoran made, anything that changes another chat's work, anything that changes the queue, blockers needing a human, finished work. **Not** progress narration.
 
-**Serialization:** Zoran asked for **one design track at a time**. Two parallel design processes overstimulate him. Right now AUTOMATION TEMPLATING is the only active track and TESTIMONIAL CONNECTION is parked. Respect this unless he changes it.
+**Serialization was relaxed.** Zoran ran one design track at a time for a while, then deliberately unparked the second. Do not re-impose it; ask him.
 
 ---
 
-## 4. The seven house rules
-
-Each was learned expensively. Carry them into every spawn prompt.
+## 4. The house rules, now nine
 
 1. **The tester never built the thing.** A builder verifying itself rubber-stamps itself.
-2. **Never send an undeployed build to Zoran for testing.** Commit, push, PR, confirm a preview. Two rooms burned a session each testing uncommitted worktree edits: prod still runs old code, so every step passes for the wrong reason or actively causes the bug.
-3. **Verify a claim before acting on it**, especially a frightening one. One audit produced **four** false blockers in a day. Every one died to executed output; none to reading.
-4. **Trace overrides, do not grep literals.** A GTA literal in a file is not evidence it reaches output. Ask: does anything override this on the path to output, and does that override fail OPEN or CLOSED?
+2. **Never send an undeployed build to Zoran for testing.** Commit, push, PR, confirm a preview.
+3. **Verify a claim before acting on it**, especially a frightening one. One audit produced four false blockers in a day; every one died to executed output.
+4. **Trace overrides, do not grep literals.** Does anything override this on the path to output, and does that override fail OPEN or CLOSED?
 5. **Say what you did not verify.**
-6. **If the proof is not in the repo, the fix is not finished.** Committed test, plain `node`, no new deps, no network, no DB, **with a negative control** (an env flag that reverts one fix and shows the suite catching it). A suite that only ever passes tells you nothing.
-7. **A test fixture that drifts from production passes for the wrong reason.** Distinct from rule 2: everything is deployed and green, but the test is measuring a world that no longer exists. Proven on 2026-07-27 - a golden-snapshot lock guarding "GTA never changes" used a hardcoded client fixture with no `public_name`, so when that column landed in production the lock rendered the pre-change reality, compared it to goldens of that same dead reality, and reported green. **It was worse than no test, because it was trusted and quoted as evidence.** Fix shape: the fixture reads the SAME shared snapshot production reads, plus an assertion that fails loudly if the fixture loses a field production has. Applies to any room holding golden files or fixtures.
-
-**Two more that are really rules 3 and 4 applied:**
-- **Hand DNS and secret values as plain code blocks, never in a table.** A tab copied out of a markdown table cell invalidated an SPF record and cost 90 minutes of Amazon backoff.
-- **Rendered output beats static analysis.** It killed four false blockers and found two real leaks a static audit missed.
+6. **If the proof is not in the repo, the fix is not finished.** Committed test, plain `node`, no new deps, no network, no DB, **with a negative control**. **AND something must RUN it without a human choosing to** - see §5.
+7. **A test fixture that drifts from production passes for the wrong reason.** Three forms now, in §5.
+8. **A control that reports success without providing it is the failure mode of this project.** See §5. This is the single most useful frame you have.
+9. **Test the surface the thing actually runs on.** Twice this session a negative result was the harness, not the thing: review expansion "impossible" on the public page worked on the owner panel; an error-boundary test "failed" because boundaries do not run server-side.
 
 ---
 
-## 5. Shared memory, and the board
+## 5. What this session actually learned. Read this twice.
 
-**`docs/lij-onboarding-build-queue.md`** is the single source of truth. It survives chats; chats do not. Every decision, correction, trap and item lives there. **Update it in the same breath as anything changing.**
+### The pattern, and it recurred SEVEN times in two days
 
-**`docs/lij-onboarding-team-playbook.md`** holds the operating model, the house rules and the spawn-prompt shapes.
+**Things whose purpose is assurance, which are trusted precisely because they exist, and which are not connected to the outcome they claim.**
 
-**Mission control** is Zoran's visual board at **http://localhost:4599**, fed entirely by `board/data.json`.
+- A function returning `admitted:true` having created nothing.
+- A comment asserting a gate where there was no gate.
+- Nine committed test suites that nothing ever ran.
+- An equivalence test proving agreement, not correctness (**I commissioned that one**).
+- A CI check pinning four string literals while five sabotages passed green.
+- **Portal CI dead for a day and a half** behind an orphan conflict marker - runs completing in 0s, reading as "no failures".
+- A public support form handing people a reference number for a ticket never saved.
 
-```bash
-scripts/mission-board.sh
-```
+**When something's job is to give confidence, the question is never "does it pass" but "what would make it fail".**
 
-Runs detached so it survives restarts. `status` checks it, `stop` kills it. **Never start it with preview_start** - that dies when tooling restarts and stranded him twice.
+### House rule 7 has three forms, and the third is the sharpest
 
-**Your duty: update `board/data.json` whenever the queue, a chat's state, or Zoran's to-dos change.** The board auto-refreshes every 5s.
+| Form | The lie |
+|---|---|
+| Original | A fixture missing a field production has |
+| Sharpened | A fixture that **lies about its origin** - every field present, every field wrong |
+| **New** | **A negative control modelling a state that can no longer arise.** It fires, the suite is green, and the danger it names is gone |
 
-**Board structure** (he designed it, do not restructure without asking):
-- **Chats kanban**, columns: Get San Jose live · Sales system · Reviews · Twilio · GTA landing pages · Unsorted · Done. MISTER_ORCHESTRATOR is pinned full-width on top. Cards drag between columns and persist.
-- **Colour code:** red = his action on his computer · flashing white = claude operating · blue = his input needed in a chat · orange = blocked, **reason written in the box** · gray = done.
-- **Click a card** for its human action items: why it matters, why only he can do it, steps, a copyable code block, a "done when" test, and a red "never" line.
-- **`board/rooms/<slug>.json`** lets a chat report its own live status onto its card. Its `chat` value must match the sidebar name EXACTLY or the pairing silently breaks.
+**The test for rot: not "did the world change" but "can the thing this control describes still happen".** And the cheap audit: ask of every control **"what would have to be true for this to fire, and is that still reachable?"** Reading what it asserts tells you what it checks; only that question tells you whether it is empty.
 
----
+**Counter-example that keeps this usable:** a test asserting an attributed step seeds OFF mentions the exact thing that changed, and is fine, because its premise is about the SEEDER, not about San Jose. **"It mentions the changed thing" is not sufficient to condemn a control.**
 
-## 6. The chats
+### Other rules earned the hard way
 
-| Chat | Owns | State |
-|---|---|---|
-| **AUTOMATION TEMPLATING** | The templating standard AND San Jose's seeding | **Active, the only track** |
-| **TESTIMONIAL CONNECTION** | Google reviews connection (Build 5) end to end | **Parked** until templating finishes |
-| **SET UP TWILIO BITCH** | TrustHub submission, phone numbers for every academy | Waiting on Zoran, 6 action items |
-| **BUILD GHL TOKENS** | GHL token warmth, FC2 marketplace app | Held pending a GHL config unknown |
-| **BAM GTA free trial loading rate** | GTA funnel tracking, Meta CAPI | Waiting on Zoran for one token |
-| **Enrollment agreement** | The agreement engine | Waiting on lawyer sign-off |
-| **Vercel deployment guide for Ant** | Unknown | Ask Zoran what it is |
-
-**Rule for routing:** unmerged work belongs to its chat; merged work is anyone's. Do not let two chats build the same thing (it happened once, see §9).
-
----
-
-## 7. Decisions locked. Do not re-litigate.
-
-**Sales system**
-- **GTA is the reference implementation**, and therefore a **governed instance**: an edit to GTA's rows is implicitly a claim on every academy.
-- **"GTA's automations must never actually change, only the structural stuff behind them."** A golden-snapshot lock enforces it. Deliberate changes get re-blessed surgically.
-- **The preset is NOT "copy GTA's emails to everyone".** Structure travels; **five designed emails are AUTHORED PER ACADEMY**, a recurring cost, roughly **40 minutes of staff time per academy**.
-- **Onboarding LEFT the sales preset** (post-conversion). Sales preset is 93% photocopyable.
-- **No weekly drift check.** Killed deliberately: the boundary is enforced at write time via `sync_class` instead of detected weekly. `sync_class` is therefore the ONLY mechanism, with no safety net behind it.
-- **`sync_class` strictest-wins:** `attributed > local > shared`, template beats step.
-- **`local` seeds `enabled:false`** (approved, ships with the sequence promotion).
-- **Item G DROPPED.** Cleaning GTA's rows would have made live copy worse to satisfy a check that no longer exists.
-- **Owner copy changes route through support tickets.** No free-text override.
-- **Empty testimonials store DROPS the email**, does not shorten it. This took Google reviews off the critical path.
-
-**Reviews**
-- **One table (`testimonials`), no separate `google_reviews`.**
-- **Real reviews always outrank typed ones.** A typed quote never wears a star rating, a "Google review" badge or a date, and never moves the aggregate. **This is enforced in the database, not in prose.**
-- **San Jose stays EMPTY.** Presetting it recreates the Miami failure exactly.
-- The fabricated "Google review" labels on GTA and Miami free-trial pages stay until real reviews connect. Same for the `social_proof` leak.
-
-**San Jose**
-- Launches on the **portal spine**, big-bang (everything switches on at once), finish line is **everything on including AI agents**.
-- **The phone does NOT gate launch.** It runs on GHL transport day one; Twilio flips weeks later.
-- Pricing $175/$250/$300 per 4 weeks, **no tax**, $40 signup on 4-weekly only, cancel anytime. The agreement PDF is STALE, never copy prices from it.
-- **65+ imported leads have NO import quarantine.** Never mass-enable automations on them without Zoran naming who may be contacted.
+- **Wiring a weak test into CI is worse than leaving it unrun**, because CI converts a verdict into an institutional claim. Unrun, it was at least honest about being unrun. **Check a suite's controls against real mutations BEFORE wiring it.** Verifying a control FIRES is not verifying its assertions are strong enough.
+- **When you are about to update a constant to match a computed value, the constant is the bug.** Removing it makes rot impossible rather than detectable. Three rooms reached for that move independently in one day.
+- **When a fix and a switch are both pending, the switch goes last and the deploy is verified in between.**
+- **A branch nobody merges is a fix nobody has.** "Fixed and pushed" is not fixed.
+- **Applying a migration silently promotes every "do X once migration Y is applied" comment into an outstanding defect.** Sweep for them in the same breath. **Only comments that DEFER AN ACTION rot; ones that DEGRADE GRACEFULLY do not.**
+- **Render the real output and inspect that.** A literal in a file is not evidence it reaches a parent. This killed four candidate findings in the final audit alone.
+- **An enforced inventory beats a comment.** Convert "this is the only X" into a check that FAILS when a new X appears.
 
 ---
 
-## 8. Live traps. Someone will trip these.
+## 6. My mistakes. Do not repeat them.
 
-- **The master will ship 7 onboarding steps against GTA's 8.** Deliberate: the testimonials step is ABSENT, not disabled. It looks exactly like the master lagging, which is the bug this workstream exists to fix. **Only the testimonial connection may close it.** Anyone else "fixing" it ships GTA's real parents' quotes to every academy.
-- **`summer_special`** is a recorded ACCEPTED divergence (GTA-only, parked against a future reignition flow).
-- **San Jose's `nurture-3` is `enabled:false` on purpose** and is the ONLY disabled step in the entire system. A naive re-seed re-enables it. **Seeding must be DIFF-AND-PATCH, never delete-and-recreate, and must never touch an existing row's `enabled` flag.**
-- **`clients.address` is the BUSINESS address, not the training venue.** GTA's is "2205 Rosemount Cres"; the gym is 1079 Linbrook Rd. Venue comes from `schedule_slots.location_label`.
-- **`brand_data.stats` is factually WRONG.** Claims GTA trains Fridays; GTA has never trained on a Friday. Derive, do not type.
-- **Locked In Sports' only website reference is `brand_data.website_url`.** Dropping that key without a `website_url`-aware backfill erases it.
-- **Pro Precision is in Australia with a Toronto timezone.**
-- **`#72`: a second unguarded writer** of legal_name/ein/address in the onboarding wizard (`client-portal.html:18617`). Still open.
-- **No SECURITY DEFINER function may ever write `testimonials`** - it would bypass both RLS and the guard trigger.
+- **I compressed rooms' careful statements into confident ones, and the compression was false.** I told Zoran a skill "cannot run" when it had never been set up (one documented paste). I told a room its check "should be green" having forgotten an unmerged fix. **Three rooms corrected my premises by executing. Every correction improved the result.** When you relay a room's finding, relay its qualifiers too.
+- **I counted a string in a comment and nearly reported a fixed leak as live.** Third instance that day of a counted string mistaken for a live one.
+- **I filtered a collision check by PR TITLE and examined four of nine PRs.** Missed one. Filter by content, never by title - a "Settings" PR touched the onboarding wizard.
+- **I handed a room phone numbers as if they were data.** They were sourced from Google listings and unconfirmed. A business phone is not a display field; it becomes the number printed to parents.
+- **I applied a migration and never moved its ledger row**, so main told the next person to re-apply it. I had carefully avoided that exact trap two hours earlier.
+- **I `cd`'d into the canonical checkout twice** instead of my worktree. Nothing landed, but keep the repo on `main` and clean.
+- **I forgot to track a PR I had listed myself** (`bam-client-sites#163`), so a migration skill sat unmerged while its prerequisites were live.
 
 ---
 
-## 9. Mistakes the previous orchestrator made. Do not repeat them.
+## 7. What worked, and is worth continuing
 
-- **Asserted `brand_data` hydrates async "by design".** It does not. A builder checked anyway and corrected me. **Verify before asserting.**
-- **Gave the same work to two chats** (the `brand_data` hydration). Zoran spotted the collision, not me. **Before dispatching, ask what else touches that file.** Three workstreams converged on `client-portal.html` at once.
-- **Sent a build to gate 2 twice with nothing deployed.** Cost two rooms a session each.
-- **Handed DNS values inside a markdown table.** An invisible tab cost 90 minutes.
-- **Merged a PR before Zoran's "check if it'll break anything" arrived.** It was safe, but the order was wrong.
-- **Left a finished build unpushed** while a chat waited on it as a critical-path blocker. Push things.
+- **Verify rooms' claims yourself in the database.** You have Supabase MCP; most rooms do not. This settled several questions in one query, including one that was reported as latent and was live.
+- **Run the collision check before being asked.** It caught real things twice.
+- **Give a room the do-not-re-raise list.** The final audit was told what was deliberate and spent zero time rediscovering settled decisions.
+- **Send a subagent for a small job and ask what it noticed.** Today's biggest finds - dead CI, a bug class in three places, a public form dropping every request - all came from one agent sent to fix a wrong word in a status field.
+- **Route consequences OUT of a room.** When a finding belongs elsewhere, take it off their desk explicitly so it is not dropped or absorbed.
+- **Correct yourself upward.** When your compression misled Zoran, say so plainly and re-put the decision on true facts. He reaffirmed both times, but the decisions then stood on something real.
 
 ---
 
-## 10. Where things stand right now
+## 8. Decisions locked. Do not re-litigate.
 
-**Shipped today:** the whole GTA identity leak class (#1601, #1602, #1604), pricing truth and the money model (#1587), price/tax/fee breakdown (#1606), blank-domain drip safety (#1605), the render harness (#1615), **the Business Basics data-loss fix (#1616)**, and **the academy facts + testimonials foundation (#1617)**. Migration applied to prod, GTA's `public_name` set to "By Any Means Basketball".
+Everything in `docs/lij-onboarding-build-queue.md`. The ones most often re-derived:
 
-**In flight:** AUTOMATION TEMPLATING is tokenizing GTA (just unblocked), then the sequence promotion carrying `local`-seeds-off, then **seeding San Jose** - the first real test of whether the template works.
+- **The preset is NOT "copy GTA's emails to everyone".** Structure travels; **five designed emails are AUTHORED PER ACADEMY** (measured, not two - two is the sales system only).
+- **GTA's automations must never actually change**, only the structure behind them. Item G is dropped.
+- **The master ships SEVEN onboarding steps against GTA's EIGHT.** The testimonials step is **ABSENT ON PURPOSE.** Zoran has since ruled member-side testimonials out of scope entirely, which likely resolves the gap by deletion - **but do not delete anything without his explicit "dropped, not deferred".**
+- **Testimonials are for people DECIDING, not people who have decided.** Sites, sales copy, agent, enroll flows. Not members.
+- **Real reviews always outrank typed ones, enforced in the database.** A typed quote never wears a star, a badge or a date.
+- **Max FIVE stored testimonials per academy**, on what is stored, not what is offered for approval.
+- **San Jose launches on the portal spine, big-bang.** The phone does NOT gate launch.
+- **65+ imported leads have NO import quarantine.** Never mass-enable automations on them without **Zoran** naming who may be contacted.
+- **`align-core-data-model` is dropped**, removed from `CLAUDE.md` on main.
 
-**Waiting on Zoran:**
-- File the **Google Business Profile API application**. Never filed, days-to-weeks, gates all of Build 5.
-- The **Twilio TrustHub** submission (6 steps on his board card, only 3 free attempts).
-- The **Meta CAPI token** (60% of GTA ad traffic invisible without it).
-- **Send Lij his ask-list** (drafted; Stripe, coaches, photos, testimonials, privacy/terms, his own Twilio account).
-- Decide: **does the sales agent read `brand_data`?** It currently reads none of it.
+---
+
+## 9. Live traps
+
+- **`bam-client-sites`' main checkout is PARKED** on a stale branch with uncommitted edits since 29 June. **Always a fresh worktree off `origin/main`.** Five sessions discovered this independently before it was written down.
+- **`_obfFetchState` has THREE consumers** - the onboarding wizard, Settings > Integrations, and Blueprint > Brand. Nothing declares it shared. Add to it, never restructure it.
+- **`public/client-portal.html`** is where workstreams collide. Ask before anyone touches it.
+- **San Jose's `nurture-3` is now ENABLED** and there are **ZERO disabled steps system-wide**. The old canary is gone; the drift reconciler replaced it. "0 disabled" is NOT evidence a rule was violated.
+- **Two NEW leaks are with the templating room** as of 2026-07-30: GTA's gym entrance in every academy's confirmation SMS, and GTA's age bands in `booking_group` which **has no renderer at all**.
+- **The queue is stale in three places** the final audit corrected: `LOCATIONS` is GONE from `email-shells.js`, item 6's client_id fallback is FIXED, item 30's empty-SMS burn is FIXED.
+- **`Europe/London` is UTC+0 half the year.** "No academy is on UTC" is not the same as "nobody is exposed". That reasoning hid a live bug.
+
+---
+
+## 10. Where things stand
+
+**Merged 2026-07-29/30:** the testimonials workstream end to end (both academies seeded from their own reviews, rendering on sites, enroll and the agent), the GTA identity wave, portal CI resurrected, the `hour12` clock bug class closed with a CI gate that was watched failing, "Send nothing" fixed and applied, and the public ticket form given a real intake route.
+
+**Waiting on Zoran:** send Lij his ask-list (**oldest and biggest, unmoved all session**) · his Stripe is **not connected**, which gates checkout, the signup fee and everything downstream · two phone numbers blocking the business-contact gate · the Google Business Profile API application, unfiled · Twilio TrustHub · the Meta CAPI token · PR #1546, stale since 21 July · whether the onboarding testimonials step is "dropped, not deferred".
+
+**Open questions with no owner:** the 39-surface legacy testimonial baseline (shrinks when touched, needs no schedule) · five client folders nobody has read · an orphaned email generator referenced by a file but present in neither repo · a fleet cron heartbeat (33 schedules, nothing records whether any ran; **the watcher must not itself be an unwatched cron**).
 
 ---
 
 ## 11. First moves
 
-1. Start the board: `scripts/mission-board.sh`, confirm it serves.
+1. Start the board: `scripts/mission-board.sh`. **Never `preview_start`** - that died twice and stranded him.
 2. Read `docs/lij-onboarding-build-queue.md` end to end. It is long. Read it anyway.
-3. Message AUTOMATION TEMPLATING and TESTIMONIAL CONNECTION so they know who you are and that the queue and board are unchanged.
+3. **Start the next AUTOMATION TEMPLATING chat.** That room is producing a handover file; use it, and use the spawn shape in `docs/lij-onboarding-team-playbook.md`.
 4. Tell Zoran you are up, in three lines, with his one next action.
 
 Do not start by building anything.
+
+**And keep getting better.** Every rule in §5 came from something going wrong and someone naming it precisely rather than working around it. **Your job includes finding the next one.** When a room corrects you, that is the system working - record it, credit it, and pass it on.

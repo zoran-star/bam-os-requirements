@@ -148,6 +148,411 @@ Rendering San Jose for review surfaced what no test would have: **every one of i
 
 **⚠️ ORCHESTRATOR CHECK ON RULE 2, stated plainly rather than left for a room to discover: THERE IS NO PORTAL PREVIEW FOR THIS PR.** Vercel's `bam-portal` build reports "Canceled by Ignored Build Step" while 59 of the 106 changed files live in `bam-ghl-agent/bam-portal`. So **Zoran's gate on #1627 CANNOT be a click-through of the deployed portal.** It is a review of the rendered messages plus the committed suite. Anyone who later plans a hands-on test script against a preview URL for this PR will find nothing running the new code.
 
+## 🎯 THE TESTIMONIALS STORE HAS ITS FIRST REAL DATA (2026-07-29). GTA SEEDED AND VERIFIED.
+
+**Zoran approved "the first 5" in chat; written via service role and verified by query.** 5 rows for BAM GTA, all `source='manual'`, **verbatim from his owner view**: Kristina Carrera (1,100 chars, STARRED), Sabeen S (1,031 chars, STARRED), Wendy Huang, Nicholas Cui, Ason Black. Aggregate on GTA's row: `google_rating=4.9`, `google_review_count=67`, `checked_at` stamped at write time.
+
+**Post-write assertion: 5 rows, 2 starred, ZERO rule violations** - no rating, no `external_id`, no non-manual source on any row. **The store obeys the hierarchy by construction rather than by anyone remembering.** This is the first time the Miami failure class has been structurally impossible rather than merely forbidden.
+
+**⚠️ ONE INFERENCE MADE ON ZORAN'S BEHALF, CORRECTLY FLAGGED RATHER THAN BURIED: he picked the five but did NOT pick the leads.** Zero starred would leave the store in the **rows-but-none-starred** state, which holds the testimonials email OFF. So the room starred the two long detailed reviews and told him it is one word to flip. **Do not read "2 starred" as his explicit editorial choice.** It is a sensible default, surfaced, awaiting his confirmation.
+
+**Not written:** Mohamad Halwani's truncated review (unapprovable until expanded, correctly). Two rating-only reviews had no text. **Coverage stated plainly to him: 10 of 67 read, newest first**, which oversupplies his own 5-cap.
+
+## ⛔ SAN JOSE BLOCKED ON GOOGLE ACCOUNT ACCESS - AND THE AT-SCALE RISK BIT AT ACADEMY #2, NOT #50
+
+**The signed-in browser account is `info@byanymeanstoronto.ca`, and Business Profile Manager shows it manages EXACTLY ONE listing: By Any Means Basketball, Oakville. It does NOT manage By Any Means San Jose.** The room stopped rather than falling back to the public page, which is the skill's own rule working as designed.
+
+**This is the owner-access-at-scale item that was flagged hours earlier as "a problem at academy #10 or #50". It is a problem at academy #2.** That is a useful early warning rather than a failure: the assumption that BAM staff can read any academy's reviews is false today and would have been discovered later and more expensively.
+
+**Three unblocks, any one of which works:** Zoran signs into whichever Google account owns the SJ listing · Lij runs the same flow himself · **or that account adds a BAM account as a MANAGER on the listing.**
+
+**📌 THE ASK-LIST TEMPLATE NEEDS A CORRECTION, not just an addition.** It currently asks for the owner's *"Google Business link"*. **A link is not enough - the skill needs MANAGER ACCESS on the listing**, because the public page truncates reviews and the owner panel is the only surface that expands them. **Every future academy must grant a BAM account manager access at onboarding, or the review step cannot run.** That is now known before academy #3 rather than after.
+
+## ✅ MIGRATION APPLIED + THE TRUNCATION WALL IS BEATEN (2026-07-29). Two new Zoran rulings.
+
+**Applied and verified by reading `pg_constraint` back, not by the success flag:** `clients.google_rating` numeric(2,1), `google_review_count` integer, `google_rating_checked_at` timestamptz, plus `..._range_check`, `..._count_check` and `..._pair_check` (both-or-neither) exactly as proposed. Memory note written.
+
+**🔑 THE REUSABLE FINDING, and it beats what either the orchestrator or the room managed: THE OWNER SURFACE DEFEATS THE TRUNCATION WALL.** The wall I hit at 10-of-67-with-9-truncated was **the PUBLIC page in a non-owner browser.** Signed in as owner, two routes exist and one works cleanly:
+- `business.google.com/reviews` paginates all reviews (10/25/50 per page), but its "More" links still resist automation.
+- **The search-page owner panel, the modal behind "Read reviews", has a "View full review" control that expands to FULL text and DOES work by click.** Two long reviews the public page truncated were captured complete.
+
+**Standing instruction for San Jose and every academy after: drive the OWNER PANEL, click "View full review" per candidate, and never touch the public Maps page.** In the skill and the memory note.
+
+**GTA run state:** nothing written yet by design. **7 COMPLETE candidates + 1 marked TRUNCATED and not-approvable**, aggregate confirmed from the owner panel at **4.9 from 67**. Two reviews were rating-only with no text. **10 of 67 read, deliberately not paged further**, and coverage is stated plainly to Zoran rather than implied as complete.
+
+### TWO NEW ZORAN RULINGS
+
+1. **MAX FIVE stored testimonials per academy.** His words: *"make sure people dont get more than 5 reviews we dont need more than 5"*. **The cap is on what is STORED, not on what is presented for approval.** The resolver and any card UI should assume <= 5 rows per academy.
+2. **⚠️ THE BUILD IS NOT DONE UNTIL EVERY CONSUMER PULLS FROM THE STORE.** His words: *"make sure that the build of this into the skill properly updates the entire sales system and the websites and where everythign is pulled from properly"*. Written as a hard finish condition: free-trial page cards render from `testimonials` **via the resolver, not hardcoded arrays** · the aggregate renders from the `clients` columns, **never typed into markup** · testimonial emails resolve at seed time · agent `social_proof` renders from the store plus `google_review_url` · website review CTAs point at the academy's own link or vanish. **ONE resolver feeds all of them.**
+
+**⚠️ THIS PULLS `bam-client-sites` INTO SCOPE**, because the GTA free-trial page swap (fabricated cards → real store-backed cards) is now explicitly the testimonials room's work.
+
+## ⛔⛔ PRESET LEAK AUDIT (2026-07-30, RENDERED not grepped). **TWO NEW BLOCKERS, NEITHER IN THIS FILE, BOTH ORCHESTRATOR-VERIFIED ON MAIN.**
+
+Method: rendered the preset for a hypothetical blank academy ("Northside Hoops") through the **real** `stepEnabled()` / `resolveSyncClass()` seeder rather than turning every step on. **That correction killed four candidate findings before they reached the report** - see the killed list below, and do not re-raise them.
+
+### 🚨 BLOCKER A: **THE TRIAL-CONFIRMATION SMS SHIPS GTA'S GYM ENTRANCE TO EVERY ACADEMY'S PARENTS.** `api/agent/confirm-automations.js:94`
+
+Verified on main. The `same_day` default template ends with the literal:
+```
+F.Y.I the gym entrance we use is at the front of the building, on the left side.
+```
+**And the sharp part is what the render showed: for a blank academy the real Location line DROPPED OUT (no address on file) and the borrowed door SURVIVED.** So the message tells a parent nothing about where to go, then confidently describes a door at a building that is GTA's.
+
+`getConfirmAutomations()` falls back to `def.template` whenever an academy has no stored override, **which a new academy never has.** Trigger: any academy that approves `confirm_initial_automations` with one trial booked. **This is the money path, on the morning of a booked trial.**
+
+### 🚨 BLOCKER B: **`booking_group` CARRIES GTA'S AGE BANDS AND HAS NO RENDERER AT ALL.** `api/agent/prompt-structure.js:354-358`
+
+Verified: the body hardcodes `Group 1 (Elementary / younger): ages 9 to 13` and `Group 2 (High School / older): ages 14 and up`, and **`booking_group` appears ZERO times in `fact-render.js`** - it is not one of the nine renderable facts. **Filling in the offer never clears it.** Only a hand-written `agent_prompt_sections` row displaces it. **Every academy after GTA carries GTA's age split permanently.** Structurally worse than the `social_proof` leak, which at least had a renderer coming.
+
+### ⚠️ AND THE RECORD UNDERSTATED QUEUE ITEM 5. **Six of nine `academy_config` sections fall back to GTA per-section, INDEPENDENTLY.**
+
+Item 5 frames this as "no Training offer = the whole brain falls back". **Executed, it is per section:** an academy that HAS a training offer still gets **seven of nine** GTA sections, because `set(key, body)` skips any renderer returning null. Thresholds proven individually (adding just an address flips `business_info` and `qualification_config`; nothing else moves). Leaking: `business_info` (GTA's street address + trial link), `schedule`, `program` (ages 9+, groups of 6-12), `qualification_config` ("near Oakville/GTA?"), `policies`, `selling_points`. **Safe: `coaches`, `pricing`, `social_proof`.**
+
+### WHY BOTH BLOCKERS SURVIVED EVERY PREVIOUS WAVE
+The render-leak gate (`_sync-class.test.mjs:164`) is scoped to **email templates declared `shared`**. `_social-proof.test.mjs` asserts only the absence of the review **link**. **Nothing anywhere asserts that `prompt-structure.js` or `confirm-automations.js` defaults are free of identity values.** Zoran's requested "test asserting no default body contains an identity value" exists **one literal wide, for one section of nine.**
+
+### FRICTION found
+- **The preset declares two qualifications and seeds no way to collect them.** `presets.js:181-185` says location and age are "collected on the free-trial form"; executed `buildFields` for a new academy returns **`[]`** for the sales form. GTA has those fields only from a **GTA-only migration**. So the `marked_unqualified` exits have no data to fire on.
+- **The free-trial page's calendar binding fails OPEN to GTA's two calendar IDs** when the offer fetch 403s or class labels do not match `/elementary|group\s*1/i`. **Traced the next hop: it fails CLOSED** (`availability.js` requires an `entry_points` row), so no cross-academy booking - but the parent's calendar step is silently dead. **The naming-convention dependency is recorded nowhere.**
+- **CTAs vanish when `website_setup.domain` is empty but `email_domain` is set.** Two different columns. Wider than item 30 records: four messages plus the email half.
+- `scripts/apply-preset.mjs --list` **crashes** (`p.transitions.length`, removed by the station model).
+
+### ✅ STATUS CORRECTIONS TO THIS FILE, all verified by the auditor
+- **`LOCATIONS` is GONE from `email-shells.js` on main.** Item 31's central mechanism is CLOSED, with a prohibition block replacing it. **This file still reads as if it is live.**
+- **Item 6's "GTA client_id baked as fallback" is FIXED** (`window.LEADS_CLIENT_ID || '{{CLIENT_ID}}'`). Only the copy half remains.
+- **Item 30's "missed_trial#0 renders to EMPTY SMS and burns 3 attempts" is FIXED** by the empty-after-merge skip.
+- **All 21 portal suites pass on main** once `node_modules` is installed.
+
+### KILLED CANDIDATES - do not re-raise
+`onboarding-training` signing off "The By Any Means GTA Team", `nurture-1/2` and `onboarding-story/era` carrying Coleman Ayers and the camps list (**all `local`, all seed OFF**) · `onboarding-review` and the schedule SMS rendering empty (**`_send.js` skips them**) · the confirm agent's location chain (**reads stored overrides only**) · GTA's uuid as `DEFAULT_CLIENT_ID` in five endpoints (**every one gated by `actor.canActOn`, 403 for a tenant**).
+
+**Not verified by the auditor:** anything requiring a live DB (no service key), so `check-automation-divergence.mjs` never ran. The enroll/checkout money path, `bam-client-sites` per-client folders, and the Stripe/GHL/Twilio surfaces were not covered.
+
+## ⏱️ THE 85-MINUTE QUESTION, ANSWERED ON EVIDENCE (2026-07-30)
+
+**The 30-versus-85 discrepancy resolves: both numbers are ours, in the same file, measuring different people's clocks.** `docs/plans/skills-pipeline.html` says verbatim: *"Two clocks. Yours is the owner's, and it can hit 30. The staff clock is estimates until San Jose's first real run replaces them with measurements."*
+
+| Clock | Total | Contents |
+|---|---|---|
+| **Owner's** | ~30 min | brand card 5 · story brief 10 · offer + pricing 10 · approve brand board 2 · approve sales messages 3 |
+| **Staff + skill** | ~85 min | branding deck 10 · core site 20 · GHL migration 15 · sales system 35 (member mgmt parked) |
+
+**"After the client has input their info" IS the staff clock, so 85 is the right comparison. The target never moved.**
+
+**VERDICT: nobody can know until it has been run once end to end, and the auditor refused to manufacture a figure.** Two of the four skills merged 2026-07-29 and **neither has ever been run against any academy.**
+- **85 minutes of hands-on staff work, spread across days, is a plausible BEST case** - and the least likely branch, since it needs four unbounded workshop loops to each converge first time.
+- **85 minutes of WALL CLOCK is not achievable and was never proposed.**
+- **"Fully onboarded" is not achievable at any duration today: skill 5 (member management) DOES NOT EXIST as a file in either repo.**
+
+**⚠️ MEASURED CORRECTION: the authored-email cost is FIVE slots, not two.** Executed over `CANONICAL_DEFAULTS`: 14 steps, 8 `shared`, **5 `local`**, 1 `attributed`. "Two emails per academy" is true **of the sales system only**; fully onboarded adds `onboarding-training`, `-story` and `-era`, all `local`, all seeded OFF, all needing a human. **The 85 legitimately hides this by parking skill 5.**
+
+**THE WAITS, which do not shrink with practice and are not in any budget:** two owner approvals (hours to days each, and they gate downstream chunks) · at least four PR reviews and deploys · **Resend DNS verification, ~90 min MEASURED for San Jose** · Stripe Connect (unbounded, owner-side, SJ still `not_connected`) · domain publish + `allowed_domains` · `cron-activate-booking` (10 min floor) · owner-view Google access · **Twilio A2P 10 to 15 days and currently blocked** · legal review. **The pipeline is structurally serial through two owner approvals and four merges.**
+
+**Most likely to blow the budget:** `/sales-system` phase 5's render-review loop · `/ghl-migration` step 7 reconcile-until-clean (**never once true for any academy**, and `--force` is forbidden) · `/site-build` step 2 (no loop escape, no automation) · the testimonial gather added AFTER the 10-minute estimate was written · **the 13-action launch switch list, costed nowhere**.
+
+**⚠️ AND A SEQUENCING BUG: `setup-status.js:114` fires the `sales` chunk on `!!sig.preset` alone, not on `deckPublished`** - so the pipeline can tell staff to run `/sales-system` before the deck and core site exist.
+
+**⛔ SAN JOSE IS NO LONGER USABLE AS THE STOPWATCH.** It was **seeded by hand before `/sales-system` existed**, so timing it now measures repair, not the skill. GTA predates the skills entirely. **The first clean measurement is academy number three, run through all four skills from a standing start.**
+
+## 🎯🎯 FINISH LINE CROSSED (2026-07-29): **SAN JOSE IS SEEDED WITH ITS OWN REAL REVIEWS AND `nurture-3` RENDERS FROM THE STORE.**
+
+**Orchestrator-verified in production:**
+
+| | GTA | San Jose |
+|---|---|---|
+| Stored testimonials | **5** (2 starred) | **5** (2 starred) |
+| Aggregate | **4.9 / 67** | **5.0 / 22** |
+| Source of every row | `manual` | `manual` |
+| `nurture-3` step | enabled, `attributed` | **enabled**, `attributed` |
+| Automation approved | true (live) | **false** (launch-day switch, untouched) |
+
+San Jose's five are from its **OWN** listing: Aaron Rufin, Christy Hang-Munoz, Rochelle Seto, Josh Cheng, Carolyn Nolasco Glenn Fernandez. **Zoran supplied three as screenshots after the public page defeated five automation approaches**; two were already complete.
+
+**⚠️ AND THE ORIGINAL PROBLEM WAS WORSE THAN "NOT WIRED".** GTA's `nurture-3` was **ENABLED and sending**, with a real parent's quote attributed `Parent of Adam, {{location.city}}` - **so the city variable re-attributed one academy's family to whichever academy sent it**, while GTA's five real reviews sat unused. `#1644` + `client-sites #168` removed the last hardcoded testimonial in the estate.
+
+## 📏 THE ORDER WAS THE ENTIRE POINT: **WHEN A FIX AND A SWITCH ARE BOTH PENDING, THE SWITCH GOES LAST AND THE DEPLOY IS VERIFIED IN BETWEEN.**
+
+San Jose's step was flipped **only after** the store-backed template deployed. **Flipping first would have sent GTA's "Parent of Adam" re-attributed to San Jose - the exact failure two days of work existed to prevent, one click away the entire time.** Verified in strict order, each before the next: deployed main carries the token and facts wiring · the reconciler passes against LIVE post-flip rows · **SJ's `nurture-3` rendered through the real `renderEmail` against its live store rows, five blocks, zero GTA leakage, no Google badge on a typed quote.**
+
+## 📏📏 HOUSE RULE 7, THIRD FORM AND THE SHARPEST YET: **A NEGATIVE CONTROL THAT MODELS A STATE WHICH CAN NO LONGER ARISE PASSES FOR THE WRONG REASON. CONTROLS ROT EXACTLY LIKE FIXTURES.**
+
+Found by the testimonials room when the orchestrator asked it to check whether anything asserted a disabled-step count. **Nothing did. But the ask uncovered two faults in its own test suite, eight hours after it helped sharpen rule 7.**
+
+1. **Its fixture had drifted from production.** `testimonial-seed-drift.prod.json` snapshotted a world where San Jose had ZERO testimonials and its `nurture-3` was OFF. **Production is now the opposite on both counts.** Re-snapshotted from post-flip production, with a header telling the next person to re-snapshot rather than hand-patch.
+
+2. **⭐ THE SHARPER ONE. Its STRONGEST mutation was `sj-enabled` - "someone re-enables San Jose's held `nurture-3`" - the exact one-click disaster this whole workstream feared. That flip has now happened, deliberately and safely. So the mutation modelled a state that can no longer arise that way: it would have kept passing, kept looking like the best assertion in the suite, and been testing nothing real.**
+
+**This is a genuinely new failure mode, distinct from both earlier forms of rule 7:**
+
+| Form | The lie |
+|---|---|
+| Original | A fixture missing a field production has → passes on an incomplete world |
+| Sharpened | A fixture that LIES ABOUT ITS ORIGIN → every field present, every field wrong |
+| **New** | **A negative control modelling an IMPOSSIBLE state → the control fires, the suite goes green, and the danger it named is no longer the danger** |
+
+**The general rule: when the world changes, re-check the CONTROLS, not just the fixtures.** A control is an assertion about what can go wrong, and **assumptions about what can go wrong rot faster than assumptions about what is true.**
+
+**Redesigned around dangers reachable from the CURRENT state** - a store emptied under a live step, per academy and both together, plus the two report-only states. Verified: `sj-store-emptied`, `gta-store-emptied`, `all-stores-emptied` all exit 1; `sj-unstarred` and `gta-step-dropped` report and exit 0; real production passes.
+
+## 🔑 THE TEST FOR WHETHER A CONTROL HAS ROTTED (templating room, 2026-07-29). **THIS IS THE REUSABLE PART - carry it into every room.**
+
+> **Not "did the world change" but "can the thing this control describes still happen".**
+>
+> And the cheap way to run the audit: ask of every control **"what would have to be true for this to fire, and is that still reachable?"** - **reading what it asserts tells you what it checks; only that question tells you whether the check is empty.**
+
+**Demonstrated on a case that LOOKS like a hit and is not.** `api/_sync-class.test.mjs:343` asserts `stepEnabled({ body: "template:nurture-3" }) === false`. Same string, same academy, apparently the exact premise that changed today. **It survives, because its premise is about the SEEDER, not about San Jose:** when the preset is seeded onto a NEW academy, an `attributed` step must arrive DISABLED, or academy #4 sends GTA's testimonials on day one under its own name. **That danger is exactly as live as it was this morning.** Zoran enabling San Jose's row afterwards is a deliberate human act on an existing row - **a different operation from seeding.**
+
+**So "the world changed" is not sufficient to condemn a control, and "it mentions the changed thing" is not either.**
+
+## ⚠️ AND ONE REAL HIT, ninety minutes old: **`scripts/snapshots/bam-san-jose.json` IS DRIFTED AND ITS NOTE IS ACTIVELY MISLEADING.**
+
+It still carries `nurture-3` at `enabled: false`, and its committed `_note` reads: *"THE THING TO WATCH: the nurture step at position 2 is enabled:false. That is Zoran's deliberate hold on the testimonials email, not drift."*
+
+**Production is now `enabled: true` with five testimonials.** So the note **tells the next reader that a re-seed flipping that step to true has FAILED, when true is now the correct production value.** That sentence would send somebody hunting a bug that does not exist. **The fixture form and the control form of rule 7 in one artifact.**
+
+**How thin the margin was, in the room's own words: the note was true when it was copied forward, and it did not re-verify the thing it was asserting.** Written an hour before it was already wrong.
+
+**Fix deliberately deferred and correctly so:** two agents are mid-build and one may touch the GTA snapshot, so editing snapshots now risks clobbering them. **It lands when they finish:** step goes to `enabled: true`, and the note **keeps the RULE** (a re-seed never flips enablement, because seeding is diff-and-patch never delete-and-recreate) **while dropping the false claim that San Jose currently illustrates it.** **The rule was always the point; San Jose was only the illustration.**
+
+**Clean on the other three facts**, and the fourth is immune by construction: removing the "8 facts" constant rather than updating it means **nothing asserts a fact COUNT anywhere**, so there is nothing there to rot.
+
+**⚠️ ORCHESTRATOR CONSEQUENCE, ROUTED: TODAY'S CHANGES MAY HAVE INVALIDATED OTHER ROOMS' CONTROLS TOO.** There are now negative controls across at least nine committed suites plus **62 on the owner approval gate and 9 on reignition**. Several were written against a world where the fabricated quotes existed in source, San Jose had no testimonials, `social_proof` had no renderer, or San Jose's step was held. **Every one of those four facts changed today.** Any control asserting them now models an impossible state and will pass while testing nothing. **This is not hypothetical - it happened to the sharpest control in the estate within hours.**
+
+## ✅ AND THE CANARY WAS REPLACED, NOT LOST - the framing worth keeping
+
+**The disabled-step canary only ever IMPLIED that a live step was not quoting borrowed content. The reconciler checks it DIRECTLY.** So losing the signal is an upgrade rather than a gap. Recorded in the reconciler header and the memory note, **placed where someone reading a disabled-step count will hit it rather than where they would have to go looking**, and stating explicitly that the hold was **released on purpose** once its precondition shipped, so **"0 disabled steps" is NOT evidence the never-flip-enabled rule was violated.**
+
+## ⚠️⚠️ AN INVARIANT THIS FILE ASSERTS REPEATEDLY IS NOW OBSOLETE: **THERE ARE ZERO DISABLED STEPS IN THE ENTIRE SYSTEM.**
+
+Orchestrator-verified: `select count(*) from automation_steps where enabled = false` returns **0**.
+
+**This file states in several places that "San Jose's `nurture-3` is the ONLY disabled step in the entire system across all 46 academies."** That was true all day and **it is no longer true.** It was used as a canary in multiple verifications today, including mine - every migration check I ran reported "1 disabled step" as evidence the held step was still held.
+
+**So: anything that asserts a disabled-step count, or uses one as a canary, is now wrong.** The seeder rule it protected - **never touch an existing row's `enabled` flag** - is unchanged and still correct. **What is gone is the cheap external signal that the rule was being honoured.** Any test, guard or report leaning on it needs re-basing on something durable, and nobody should read "0 disabled" as "the hold was violated": the hold was deliberately released after its precondition shipped.
+
+## ⚠️ AN ORPHANED PIPELINE, FOUND BY RUNNING: **A GENERATED TEMPLATE SAYS "RE-RUN THE GENERATOR TO REFRESH" AND THE GENERATOR IS IN NEITHER REPO.**
+
+Replacing the generated template wholesale from its source HTML **broke a guard** (`expected exactly one FOOTER_REASON.enquired`), because **the generated file is not a byte copy of its source.** Its header instructs a future maintainer to re-run a generator **that does not exist anywhere.** Both files are now kept in step by the same surgical edit, documented in place. **This is a real pipeline gap with an owner who is not the testimonials room.** Logged; not assigned.
+
+**Also caught: extending the guard corpus with "Parent of Adam" immediately found a SECOND copy** in a `sync-classes.js` comment, updated rather than exempted because its rationale was stale. **The class stays `attributed` deliberately - relaxing it to `shared` would silently stop the drift check watching that step.** That coupling was documented on request and is now load-bearing for the first time.
+
+## ✅ A TRIPWIRE ON THE 7-VS-8 GAP ([#1645](https://github.com/zoran-star/bam-os-requirements/pull/1645), one comment)
+
+The live reconciler reported that **San Jose's onboarding has no testimonial step** - which is CORRECT, since member-side testimonials are out of scope and the gap is frozen pending Zoran's "dropped, not deferred" ruling. **But the report reads like a to-do.** A future reader finding it and helpfully promoting the step is **the realistic path by which that gap gets closed wrongly**, shipping one academy's parents to every academy. **The reconciler now says in place that an onboarding line is informational and that promoting it is the original failure with extra steps.** The standing rule has a tripwire instead of only a warning.
+
+## ✅ ALL FIVE MERGED 2026-07-29 (Zoran authorised the batch). Verified on main, not read off merge output.
+
+**#1642** (social_proof renderer + the leak fix) · **#1641** (drift reconciler + cron + heartbeat) · **client-sites #166** (enroll testimonials) · **client-sites #165** (CI hardcode guard) · **client-sites #163** (the two onboarding skills, `/sales-system` and `/ghl-migration`).
+
+**Verified on `origin/main`:** `social_proof` body is `""`, `renderSocialProof` present, `brain_health.total` reads `FACT_KEYS.length`. **The templating room re-counted the literal with comments STRIPPED and got 0 live occurrences** - removing the ambiguity from the measurement rather than trusting its own comment not to confuse it. **The Toronto review link is closed in production.**
+
+**⚠️ ORCHESTRATOR OMISSION, caught by the room checking my list against reality: `#163` was open and I had not tracked it as needing a merge.** I had listed it earlier when warning about open PRs, then failed to carry it as an action. **So the migration PREREQUISITES were in production while the runbook that drives them sat in a PR** - the same "a branch nobody merges is a fix nobody has" mistake, one repo over, four hours later. Now merged. **Nothing was displaced by the evening's work; the skill was never blocked, only unchased.**
+
+## 📏 THE MOST TRANSFERABLE LINE OF THE DAY: **WHEN YOU ARE ABOUT TO UPDATE A CONSTANT TO MATCH A COMPUTED VALUE, THE CONSTANT IS THE BUG.**
+
+We specified flipping the brain-health strip from 8 to 9. The room found `live` was **already** computed from `FACT_KEYS.length` while `total` was the literal - **so our specified fix would have produced "9 of 8 facts live" the moment a tenth fact was wired.** A wrong number in the product is worse than a stale comment. It removed the constant instead.
+
+**And it declined the credit for foresight, correctly: the fix was obvious once both numbers were on the same screen.** That is worth recording, because it means the lesson is a habit of LOOKING rather than a flash of insight anyone has to hope for. **Third independent instance in one day of replacing a value that will silently rot with something derived** - the dated Google rating, the heartbeat's `checked_at`, and this.
+
+## ⚠️ THE HARDCODE CHECK JUDGES WHICHEVER TREE THE NEIGHBOURING REPO IS PARKED ON (orchestrator-executed 2026-07-29)
+
+**Run from the portal, `check-testimonial-hardcodes.mjs` reports `FAIL - 14 hardcoded testimonial string(s)`** in `bam-client-sites/clients/bam-gta/gta/components.jsx` and `freetrial.jsx` - Marcus T., Priya S., Dwayne R. and the fabricated quotes. **But #164 merged and removed those.** It resolves `bam-client-sites` as a **sibling working directory**, and that checkout is the parked one on `feat/global-components-free-trial`, a month stale.
+
+**So a local run's sites-half verdict describes whatever the neighbour is checked out on, not `origin/main`.**
+
+**⚠️ THIS UNDERMINES AN ORCHESTRATOR RULING.** I ruled that CI stays degraded and **the FULL check runs locally before merging any testimonial-touching PR.** If a local run reads a stale sibling, that rule yields a confident verdict about the wrong tree. **My error.** The minimum fix: **the check must print which ref it measured**, so its output cannot be misread. Better: resolve against `origin/main` explicitly, or refuse to run when the sibling is not on a clean `main`.
+
+**⚠️ AND A VERIFICATION TO RE-CONFIRM, NOT AN ACCUSATION:** the room reported the check "FAILS with 14 hits against `origin/main`'s bam-gta pages". **I got the same 14 from the PARKED tree.** The match may be coincidence, since the parked tree also carries the old cards. **Nobody can tell from outside which tree was measured** - which is the whole problem. If it was the sibling, the both-directions proof for the sites half needs redoing.
+
+**In CI both halves are fine:** in `bam-client-sites` the repo IS the checkout, and the portal invocation pins a nonexistent sites path deliberately. **The fragility is local runs - exactly where the ruling told people to rely on it.**
+
+**✅ Settled by the same run, and it closes a worry:** the templating room preserved the removed GTA review link inside an explanatory comment and flagged it as a possible permanent false positive. **ZERO hits inside `api/agent`. It does not trip either half** - the corpus is quote-shaped and a comment about a link is not. **Its concern was reasonable and is unfounded.** Also confirmed working: `(2 active exemption(s): detail-miami, supreme-hoops-training)` prints on every run, as requested.
+
+## 📏 THE THIRD COUNTED-STRING NEAR-MISS OF THE DAY, and the trade behind it
+
+The templating room's comment preserving the removed literal **makes that file permanently unsearchable for that literal.** I counted `share.google` occurrences, got 1, and nearly reported the leak as still live - **the fix and the evidence-of-the-fix are indistinguishable to a counter.** Third instance in one evening, after the em-dash guardrail firing on a code comment and the room's own harness failures.
+
+**The trade is still right and both of us agree:** a bare "do not add an example link" would not stop the next person's helpful edit the way seeing the actual damage does. **But anyone auditing for that string must read meaning rather than count matches**, and that belongs written wherever a hardcode corpus is maintained.
+
+## ✅ [PR #1642](https://github.com/zoran-star/bam-os-requirements/pull/1642) IS OPEN: the `social_proof` per-academy renderer and the leak fix. 17 commits, level with main, green. **The leak fix is the last commit (`ff849d8`) and depends on nothing else on the branch**, so it is cleanly cherry-pickable if review drags - flagged by hash in the PR body. **The room's own framing of its slip is worth keeping: "a branch nobody merges is a fix nobody has."**
+
+## ✅ THE ENROLL CONSUMER IS BUILT ([bam-client-sites #166](https://github.com/zoran-star/bam-client-sites/pull/166), 2026-07-29)
+
+**A fact that changes the framing: GTA's enroll page had NO testimonial section at all.** Checked before touching it. **So this is a NEW surface, not a conversion of a fabricated one** - nothing dishonest was there to remove, and the 39-surface baseline is unaffected. **The enroll work ADDS proof where there was none, rather than replacing bad proof.**
+
+**Placement: inside the PLAN step, below the plan cards** - the deciding moment, where a parent has seen prices and is choosing. **Aggregate plus ONE quote** (top of hierarchy order), not three: GTA's two strongest quotes are 1,000+ characters and three would bury the plan cards. **Choosing N is allowed by the resolver contract; re-sorting and re-filtering are not, and neither was done.** That is the contract being used correctly rather than bent.
+
+**⛔ THE REQUIREMENT THAT MATTERED - A FAILED TESTIMONIAL FETCH CANNOT BREAK CHECKOUT - WAS PROVEN, NOT ASSERTED.** Three independent defences: the fetch cannot reject into render · every read is guarded so any unexpected shape renders null · an error boundary wraps the strip so even a render-time bug unmounts **only the strip**. **Eight cases run against the real component, and Pay Now survived all eight:** endpoint 500, network rejection, garbage JSON, null testimonials, a quote that is a number, a half aggregate, a valid payload, and a planted render-time throw. **The strip is a sibling of the plan card, so it is not in the pricing or payment code path at all.**
+
+## 📏 NEW RULE, EARNED TWICE IN ONE DAY: **TEST THE SURFACE THE THING ACTUALLY RUNS ON.**
+
+The enroll boundary case initially **"failed"** in the harness, and the reason was that **React error boundaries do not run during server-side rendering.** Reporting that as a failure would have been wrong; skipping it would have shipped an unproven claim. **Re-run client-side in jsdom, the way the page actually runs, it passes.**
+
+**That is the same lesson as the review truncation**: I declared expansion impossible from the PUBLIC page, and it worked fine on the OWNER panel. **Both failures were the harness or the surface, not the thing being tested.** Two instances in one day, from two different directions: **before believing a negative result, check you are testing the surface it really runs on.**
+
+**⚠️ AND THE DECISION NOT TO SHIP THE HARNESS IS THE RIGHT ONE, for a reason this file keeps recording:** `bam-client-sites` has **no test runner, no React, no jsdom**, so a behavioural harness there **could not run in its own repo** and would become decorative - the exact thing the CI gap taught us. Instead the PR ships `scripts/check-enroll-trust-safety.mjs`, dependency-free, asserting the five properties the proof rested on, and **proven to FAIL when the boundary is bypassed** (removed it, watched it go red). **Reproduction instructions for the full harness are in the PR body rather than pretended at in code.**
+
+## 📊 THE HONEST SIZE OF "POPULATES EVERYWHERE": **39 RENDER-CAPABLE SURFACES ACROSS 14 ACADEMIES.** Both earlier counts were wrong.
+
+The orchestrator counted **9** folders with testimonial content. The testimonials room said **~13**. **The real figure, produced by a detector rather than a grep, is 39 surfaces across 14 academies**, recorded in `scripts/testimonial-bypass-baseline.txt`.
+
+**This reframes the job entirely, and it is the most useful correction of the day: it is not "wire four surfaces". It is "build ONE seam, plus a queue of legacy pages that convert whenever they are next touched".** The baseline **may only SHRINK** - it is a ratchet, not a todo list, so nothing has to be converted on a schedule and nothing can quietly go backwards.
+
+**GTA's two converted files are deliberately ABSENT from the baseline**, so they must keep using the seam or the check fails. That is the difference between a baseline and an excuse list.
+
+## ✅ THE BYPASS RATCHET: **THE ANSWER TO THE UNCATCHABLE CASE.**
+
+Both the orchestrator and the room had identified the hole: **a corpus check cannot catch a NOVEL invention nobody has seen** - the Supreme Hoops class, three freshly invented quotes with invented names. **The ratchet closes it: it detects testimonial-SHAPED markup and FAILS when the file does not reference a seam.** So a new page with freshly invented quotes fails **even though no corpus could know its text.**
+
+**Consumer #5 is now safe by construction rather than by anyone remembering this thread.** That is exactly what Zoran asked for when he said "templatizable so it can easily be populated to anything we decide to create".
+
+**Verified three ways, not asserted:** passes against real main · **fails on a planted page carrying a novel invented quote** · reports the shrink path when a baseline file starts using the resolver. **First run produced 11 false positives (CSS, markdown, `vercel.json` containing the word) and they were fixed by scoping the detector to render-capable files, NOT by padding the baseline.** Padding would have made the ratchet decorative on its first day.
+
+## ✅ THE FOUR TEMPLATIZABLE REQUIREMENTS, SCORED HONESTLY BY THE ROOM
+
+1. **One canonical shape** - was already true, now stated in capitals in the header, with the fork reasoning spelled out. Verified by import that no `resolveForAgent` / `resolveForPage` exists.
+2. **Contract where a new consumer finds it** - was partial, now done. The header opens *"ADDING A NEW CONSUMER: READ THIS, YOU DO NOT NEED TO ASK ANYONE"*.
+3. **Two seams named** - was NOT explicit, now is, **stated as prohibitions in both directions**: never the database from outside, never an HTTP hop from inside.
+4. **The consumer inventory** - **was the real gap, now built.** See the ratchet above.
+
+## 📍 CONSUMER STATUS (2026-07-29 evening)
+
+| Consumer | State |
+|---|---|
+| Free-trial pages + homepages | **DONE for GTA, live and verified.** Fabricated names gone, "4.9 ACROSS 67 GOOGLE REVIEWS", zero fake per-card stars, source labels read "Parent" not "Google review" |
+| Agent `social_proof` | Shape handed to the templating room. **Not the testimonials room's to attach** |
+| Sales-side copy (`nurture-3`) | **NEXT.** Needs seed-time coordination with the templating room against the throw-propagation contract |
+| Enroll flows | Added back by Zoran, see below |
+| Member / onboarding | **OUT.** 7-vs-8 gap untouched in either direction |
+
+**Also open: `bam-client-sites` #165**, the CI guard for that repo, **proven green against the new main before it was opened** - the sequencing the orchestrator asked for, followed.
+
+**⚠️ #164's `guardrails` FAILURE WAS PRE-EXISTING, NOT A FALSE POSITIVE - a correction to the orchestrator's wording.** The em dash at `components.jsx:4` was **introduced 2026-06-23 by the detail-miami merch commit**, a month before the PR, verified by blame. The PR's own diff added **zero** em dashes. **It surfaced because the file was touched, not because anything new was wrong** - which is a different thing from a false positive and worth distinguishing.
+
+**⚠️ THE EM DASHES ARE LIVE ON GTA'S PAGE RIGHT NOW, not a policy hypothetical.** Kristina's "Adrian—my kid" and Sabeen's "ideas—and what" are rendering to parents on byanymeanstoronto.ca today. **The room's recommendation, which the orchestrator shares: verbatim wins for a quote, because a quote is attributed speech and editing a parent's punctuation makes it no longer what they wrote.** The em-dash rule governs OUR copy. **If Zoran rules the other way, the honest options are drop the quote or ask the parent - never silently retype it.**
+
+## ✅ SCOPE NARROWED (Zoran, 2026-07-29): **TESTIMONIALS ARE A SALES-SIDE FACT. MEMBERS DO NOT NEED TO SEE THEM.**
+
+His words: *"testimonials will be displayed, which is on the websites and the files in the copy to get people to come in. And then once they come in, they're not gonna need to see the testimonials anymore. We will set up an opportunity for them to get testimonials once we actually connect the API, but we don't have to worry about that right now."*
+
+**Three things this settles:**
+
+| Purpose | Ruling |
+|---|---|
+| **DISPLAY testimonials to prospects** - websites, sales copy, the agent | **BUILD NOW.** This is the whole point |
+| **DISPLAY testimonials to people who already joined** | **NOT NEEDED.** They are already in |
+| **ASK members to leave a review** | **DEFERRED to the API era.** Not now |
+
+**⚠️ THIS MAY RESOLVE THE 7-VERSUS-8 ONBOARDING GAP BY DELETION RATHER THAN BY CLOSING IT, WHICH NOBODY ANTICIPATED.** The master ships SEVEN onboarding steps against GTA's EIGHT; the missing one is `onboarding-testimonials`, held absent-on-purpose, with a standing rule that **only the testimonial connection may close it.** Zoran's ruling implies that step **should not exist at all** - it shows testimonials to people who have already converted, which he has just called unnecessary.
+
+**⛔ DO NOT DELETE ANYTHING ON THIS INFERENCE.** The gap has a hard standing rule around it and deleting a step from the master is not reversible by a data change. **Get his explicit yes on "the onboarding testimonials step is dropped, not deferred" before anyone touches `ONBOARDING_DEFAULT` or GTA's eighth step.** Until then it stays held exactly as it is. **This is recorded as the likely resolution, not as the decision.**
+
+**⚠️ CORRECTED BY ZORAN MINUTES LATER: THE ENROLL FLOWS CARRY TESTIMONIALS TOO.** *"actually you are right - the enroll flows will also have the testimonials too"*. **That makes sense and it sharpens the rule rather than muddying it: the dividing line is not sales-versus-member, it is DECIDING versus DECIDED.** A parent in the enroll flow is committing money and is still deciding, so testimonials belong there. A member three weeks in has decided, so they do not.
+
+**So the consumer list is FOUR again, but a different four:** free-trial pages and homepages · the agent's `social_proof` · sales-side copy · **the enroll flows.** What stays OUT is showing testimonials to people who have already joined, and asking members for reviews (deferred to the API era).
+
+**⚠️ THE ENROLL FLOWS ARE A DIFFERENT SURFACE WITH A DIFFERENT OWNER, so this is not a free addition.** Per the standing ruling, **`/enroll` is the membership signup flow and is explicitly NEVER part of the sales systems** - the sales preset's entry is the free-trial funnel. The real enroll funnel is `byanymeanstoronto.ca/enroll`, which lives in **`bam-client-sites`** (`gta/enroll.jsx`) and posts to `api/website/checkout.js`. **It is also the funnel that was DEAD for four days this week** from the `planFee` crash. **Whoever wires testimonials into it must check against the open San Jose enroll PR (#115, marked DO NOT MERGE) rather than assuming symmetry with GTA.**
+
+**Previously recorded, now superseded: "populates everywhere" is THREE consumers, not four.** Free-trial pages and homepages · the agent's `social_proof` · sales-side testimonial copy. **The member-management consumer slot is out of scope.** Skill 4 (member management, the orchestrator's backlog item) therefore **no longer has a testimonials dependency**, which also removes the cross-skill ordering worry that drove the gather into the branding deck skill. That placement stays correct for the other reasons Zoran gave (every sales system reads them; the seeder needs them populated first).
+
+**THE FINISH LINE, in his words: get it to a point where he can just RUN IT FOR SAN JOSE in the testimonial connection chat.** That is the definition of done for this workstream: collection built, population built, then one run for San Jose in that room.
+
+## ⛔⛔ LIVE CROSS-ACADEMY LEAK: **EVERY ACADEMY'S AGENT CARRIES GTA'S GOOGLE REVIEW LINK. 0 OF 47 HAVE AN OVERRIDE.** (found by the templating room, database half verified by the orchestrator, 2026-07-29)
+
+`prompt-structure.js:259` carries a hardcoded `social_proof` body containing **a GTA-specific Google review link, in the shared prompt structure every academy's agent is built from.**
+
+**The room verified the code chain by reading it:** `ACADEMY_ORDER` includes `social_proof` so the section is always emitted · `pick(k)` falls back to the static `SECTIONS` body when no override supplies the key · `derivedFactOverrides` sets exactly eight keys and **`social_proof` is deliberately not one of them** (`fact-render.js:496` says so). **It correctly flagged that it could NOT verify the database half - whether any academy has a stored `agent_prompt_sections` row for `social_proof` - and said so rather than guessing.**
+
+**✅ ORCHESTRATOR VERIFIED THE DATABASE HALF. It is the worst case:**
+
+| Fact | Value |
+|---|---|
+| Clients with a `social_proof` override row | **0 of 47** |
+| Clients with ANY `agent_prompt_sections` override at all | **1** (GTA, the stale pricing note, item 33) |
+| Academies on v2, where the agents run | **4**: BAM GTA (active), **BAM San Jose (active)**, DETAIL Miami (onboarding), Next Level Training Academy (onboarding) |
+| Of those, academies with their OWN `google_review_url` | **1** (GTA only) |
+
+**So every academy inherits GTA's review link, and San Jose is `status=active` on v2 - the most exposed non-GTA case.** The concrete consequence: **a San Jose parent asking about reviews is pointed at a Toronto academy's Google page.**
+
+**NOT VERIFIED, and must not be claimed:** whether San Jose's or Miami's agents are actually replying to real people today. **Reachable and replying are different things**, and nobody has established which.
+
+**The fix is the line the `social_proof` renderer deletes anyway** (`prompt-structure.js:255-259`). **Emptying it makes `social_proof` absent for everyone, which IS the designed no-fact-no-output state and is strictly better than a wrong link.** The trade: GTA's agent stops citing reviews until the renderer lands, because nothing reads `clients.google_review_url` yet. **That is a change to GTA's live agent output, which is why it went to Zoran rather than being ruled internally.**
+
+## 📏 THE PATTERN, INSTANCE SIX: **A HARDCODED DEFAULT IN A SHARED STRUCTURE IS A LEAK WITH NO SEED STEP BETWEEN IT AND A PARENT.**
+
+This is the same shape as the very first blocker in this file (item 1, the `LOCATIONS` fallback to GTA) and it survived the entire identity-leak wave that shipped as #1601, #1602 and #1604. **It survived because `social_proof` was deliberately excluded from the eight rendered facts, so every leak audit that checked the fact renderers found nothing to fix.** The exclusion that made it safe to defer is the same exclusion that hid it.
+
+**⚠️ THE BUILDER'S OWN REASON FOR NOT ATTACHING THE RENDERER YET IS WORTH RECORDING AS A RULE:** `api/_testimonials.js` and `resolveTestimonials` **do not exist in the repo yet**. Attaching a renderer that imports an uncommitted module means `fact-render.js` stops loading and **everything importing it goes down with it.** The room had done exactly that earlier the same day - committed `api/automations.js` carrying an import of an uncommitted `_sales-approval.js`, pushed it, and **the whole automations API could not load on that branch**, caught only because an unrelated dry-run failed. **Never commit an import ahead of the module it imports.** Same family as the enroll incident: a reference that fires regardless of whether the feature is configured.
+
+## ⛔⛔ A FOURTH ACADEMY SHIPS FABRICATED TESTIMONIALS, AND THE CORPUS IS NOT A CLOSED SET (2026-07-29). NEEDS ZORAN.
+
+**Found by the hardcode check on its FIRST real run**, which is the check earning its cost immediately.
+
+**`clients/supreme-hoops-training/index.html:203-207` (and its `.dc.html`) ships THREE INVENTED testimonials with invented names**, one of them literally "Marcus T." with a different quote from Miami's. **Orchestrator-verified on `origin/main`.** This is **not** GTA's text rewritten like Miami - it is **freshly invented**, same failure class, different mechanism. Untouched by the room, correctly: un-ruled content is Zoran's call, and the check staying red on those files is the check working.
+
+**⚠️ ORCHESTRATOR SWEEP, AND THE SCOPE IS MUCH BIGGER THAN EITHER OF US SAID. The room estimated "~13 client folders". There are 28, and NINE carry testimonial or review-card content:**
+
+| folder | state |
+|---|---|
+| `bam-gta` | **now REAL** (5 stored rows, swap in PR) |
+| `detail-miami` | **FABRICATED** - GTA's quotes rewritten with Miami names + invented 5.0. Zoran ruled LEAVE until connected |
+| `supreme-hoops-training` | **FABRICATED, freshly invented.** New find, unruled |
+| `bam-san-jose` | draft site, lives in open PRs not main |
+| `danny-cooper-basketball` (3 files) · `defy-the-odds` · `prime-by-design` · `probound-training` (2 files) · `sage-hoops` | **UNEXAMINED. Not asserted fabricated - nobody has looked.** |
+
+**So the honest position: 2 of 9 confirmed fabricated, 1 now honest, 1 in draft, and FIVE that nobody has read.** The "fabricated corpus" was treated as a closed set of GTA's three quotes plus Miami's rewrites. **It is not closed, and the check can only catch what is in its corpus**, so a fresh invention at a tenth academy would pass today.
+
+**✅ ZORAN RULED 2026-07-29: SUPREME HOOPS STAYS, SAME AS MIAMI.** Leave the three invented cards until Google reviews connect. **So it joins Miami as a marked exemption in the check, flagged for deletion when the ruling changes** - the same pattern the room already used for Miami, not a silent carve-out.
+
+**⚠️ EXEMPTIONS NOW NUMBER TWO, AND THEY MUST BE COUNTED RATHER THAN LISTED.** Every exemption removes real coverage from the check. **Two is fine; a third should be an alarm rather than an entry.** The check should print how many exemptions are active on every run, so the number is visible to whoever reads a green result. **A green check with five exemptions is not the same green as a green check with none, and nothing currently tells them apart.**
+
+**📌 STILL UNDECIDED, deliberately not re-asked: the five unexamined folders** (`danny-cooper-basketball`, `defy-the-odds`, `prime-by-design`, `probound-training`, `sage-hoops`). Zoran ruled on Supreme Hoops but the sweep was bundled into an option he did not take, so it is **undecided rather than declined**. **Nobody has read them and nobody should assume they are clean.** One-line backlog item, not queued for work.
+
+**⚠️ NOTE ON THE CHECK'S OWN LIMIT, important:** it scans for (a) the known fabricated corpus as distinctive fragments and (b) any quote currently in the store appearing verbatim in source. **Neither catches a NEW invention nobody has seen.** That is not a defect, it is the boundary of what a corpus check can do - **but it means "the check is green" must never be read as "no academy has fabricated reviews".**
+
+## ⚖️ ORCHESTRATOR RULING ON WIRING THE CHECK INTO CI
+
+The room built `scripts/check-testimonial-hardcodes.mjs` (in PR #1640), **proved it both directions before trusting it** (PASS against the swapped branch, **FAIL with 14 hits against `origin/main`'s bam-gta pages**), made degraded runs self-report rather than pass blind, and made a store-fetch failure FAIL rather than pass with half a corpus. **Per this week's rule it deliberately did NOT wire it into CI**, leaving the placement decision to the orchestrator. Correct.
+
+**My ruling, in two halves, because the repos differ:**
+1. **Wire the PORTAL half now**, into `portal-ci.yml` alongside the nine suites. That half is clean, so it gates without blocking anything.
+2. **HOLD the `bam-client-sites` half until Zoran rules on Supreme Hoops.** `bam-client-sites` has **no test CI at all** (only `deploy-by-any-means.yml`), so wiring it means adding a workflow - and **wiring it today would turn that repo's CI RED on Supreme Hoops while eleven PRs are actively in flight there.** Miami is exempt by ruling; Supreme Hoops is not. **Do not red-line an actively shipping repo to enforce a rule its content has not yet been given.**
+
+## 📏 THE FINISH CONDITION NEEDS A CHECK, NOT A CHECKLIST (templating room, 2026-07-29)
+
+Zoran's bar is *"not done until every consumer pulls from the store"*. **The failure mode is a consumer that LOOKS converted.** A free-trial page rendering from the resolver **but silently falling back to its hardcoded array when the store is empty** passes every visual check and is still hardcoded. So does a seed-time step that resolves to nothing and emits the old literal. **Both read as converted on inspection. Neither is.**
+
+**So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
+
+## ⚠️ RESOLVER CONTRACT: **THREE STATES MUST STAY DISTINGUISHABLE, NOT TWO**
+
+The templating room will check the resolver against this the moment it lands: **can a seed-time caller tell "this academy has NO testimonials" apart from "the resolver could not answer"?**
+
+If not, **the drop rule silently becomes "drop on any error"** - a **different rule** from the one Zoran approved. He approved *empty store means the email is dropped*. He did not approve *a failed lookup means the email is dropped*. **The first is a product decision; the second is an outage that presents as a feature.**
+
+This is the testimonials room's own earlier principle applied one level up - it insisted zero rows must be distinguishable from rows-but-none-starred, because one means we never asked and the other means they chose not to feature any. **Three states now: no rows · rows-but-none-starred · cannot-answer.**
+
+## 📌 SMALL BUT LIVE: when the `social_proof` renderer lands, **the brain-health strip's "8 facts" becomes wrong.** `social_proof` is currently the one agent fact of nine with no renderer (`api/agent/fact-render.js:509`), which is why the strip reads 8. **That is a live assertion in the product, not a comment**, and it must change in the same breath as the renderer.
+
+## ⚠️ A SECOND STALE-CHECKOUT INCIDENT, CAUGHT BY THE ROOM CHECKING ITSELF (2026-07-29)
+
+The templating room's earlier `/sales-system` work had **already reached `bam-client-sites` before the standing rule arrived**, and it was in exactly the shape the rule exists to prevent: **the worktree was sitting on LOCAL `main`, 46 commits behind origin, with its commit stranded there unpushed**, and the new `/ghl-migration` file untracked. **Committing to a stale local `main` in a shared repo is the same class of mistake as the parked checkout, just less visible.**
+
+**Fixed properly rather than pushed from where it was:** fresh worktree off `origin/main`, stranded commit cherry-picked clean, new skill added, **[bam-client-sites PR #163](https://github.com/zoran-star/bam-client-sites/pull/163)** opened. **Nothing was committed to `main` anywhere and the parked checkout was not touched.**
+
+**That makes TWO distinct stale-state traps in one repo in one day**, found by two different routes. The standing rule below is not paranoia.
+
+## ⛔ STANDING TRAP, NOW FORMALLY RECORDED: **THE `bam-client-sites` CHECKOUT IS PARKED AND HAS BEEN SINCE 29 JUNE. NEVER WORK IN IT.**
+
+`/Users/zoransavic/bam-client-sites` sits on branch **`feat/global-components-free-trial`**, last commit **2026-06-29**, **with uncommitted changes** (`emails/nurture/1-recognition.html`). **Five separate sessions have independently discovered this and each routed around it** by creating a fresh worktree off `origin/main`. That is the correct move and it is now the standing instruction rather than something each session rediscovers.
+
+**Rule: any work in `bam-client-sites` uses a FRESH WORKTREE off `origin/main`. Never the main checkout, never `git checkout` in it, never stash or clean it** - the uncommitted work there belongs to somebody and nobody has established whom.
+
+**It also has 10 open PRs**, including five San Jose ones (#115 enroll funnel DO-NOT-MERGE, #104 free-trial funnel + sales emails, #103 draft agreement, #101 core site draft, #100 transactional emails) and #141 from today. **Anything touching GTA's or San Jose's free-trial page must be checked against those first.**
+
+**📌 Worth one decision from Zoran, not urgent:** that checkout has been dirty for a month and every session pays a small tax routing around it. Committing, stashing or abandoning it once removes the friction permanently.
+
 ## 📋 THE AGGREGATE FIELD SHAPE (testimonials room, 2026-07-29). For the templating room's single card pass.
 
 | column | type | notes |
@@ -162,7 +567,15 @@ Rendering San Jose for review surfaced what no test would have: **every one of i
 
 **⚠️ THE HONESTY RISK CHANGED SHAPE, and the room caught it rather than declaring victory.** Zoran ruled the skill should pull reviews via **Claude in Chrome** from his own signed-in owner view - no API key, no billing, no Google approval, and not capped at the 5 reviews the Places API returns. **But a browser reading is not a sync. It is a POINT-IN-TIME SNAPSHOT that goes stale silently the moment the next review lands.** So the risk moved from "a human typed it and the card implies we verified it" to **"we did fetch it, which makes it look current when it may be weeks old"**. Written into the column comments rather than left for the card to get right.
 
-## ⛔ SUPERSEDED BY ZORAN (2026-07-29): **`align-core-data-model` IS OFF ENTIRELY FOR THIS WORKSTREAM, NOT JUST FOR THREE COLUMNS.**
+## ⚠️ ORCHESTRATOR ERROR, CORRECTED BY THE TEMPLATING ROOM: **THE SKILL IS NOT UNRUNNABLE. IT IS UN-SET-UP, AND THE REMEDY IS ONE DOCUMENTED PASTE.**
+
+I told Zoran *"the skill cannot run at all"* and he made a repo-wide decision on that framing. **The accurate version: `fc-core-srvc` is absent, but the skill points at `core-service-reference-setup.md`, which EXISTS at `/Users/zoransavic/core-service-reference-setup.md` and contains a ready-made block that clones it as a read-only sibling.** Orchestrator-verified: the file is there, dated 18 Jun, and carries both the paste-to-agent instruction and the manual `git clone` commands.
+
+**So the true statement is: nobody ever did the one-time setup.** "Cannot run" was wrong; "has never been set up, and the setup is one paste" is right. That is a materially different premise, and it was surfaced by the room checking my claim rather than accepting it. **The correction has been put back to Zoran** so his decision stands on a true basis rather than my compression of it.
+
+**The wider lesson, which is the same one this file keeps recording:** I reported a blocker without checking whether it had a documented remedy. **A thing that has never been set up looks identical to a thing that cannot work**, and only one of them is worth changing a rule over.
+
+## ⏸ ZORAN'S RULING (2026-07-29), now re-put to him on corrected facts: **`align-core-data-model` IS OFF FOR THIS WORKSTREAM.**
 
 His words: **"ignore fc core services and align data model and tell mister orchestrator to do the same"**.
 
@@ -727,7 +1140,7 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 | # | Item | Severity | Status | Notes |
 |---|---|---|---|---|
 | 62 | SJ has **0 entry_points and 0 funnels**: the one-click entry-point seeding leg never ran for it (mechanism exists and is idempotent, `client-portal.html:18904-18914`). One button press, not a structural hole | FRICTION | switch-list item | Found by the parity scout |
-| 25 | GO-LIVE SWITCH LIST for SJ: approve `confirm_initial_automations` + enable drips (seeded, dormant) + re-enable nurture step 3 once real testimonials land + publish website + Stripe connect + verify domain + **set `clients.email_domain`** (else every SJ email HOLDS) + **set owner phone numbers** (else every guardrail alert is silent) + seed price catalog then enter the $40 signup fee + **re-run the one-click entry-point seed (item 62)** + **re-seed onboarding from the corrected master once #58/#59/#53 land (owned by the orchestrator, NOT the workshop room)** | BLOCKER at launch | checklist | Each dormant-by-design thing must be flipped ON launch day; owner = orchestrator to walk Zoran through it |
+| 25 | GO-LIVE SWITCH LIST for SJ: approve `confirm_initial_automations` + enable drips (seeded, dormant) + re-enable nurture step 3 once real testimonials land + publish website + Stripe connect + verify domain + **set `clients.email_domain`** (else every SJ email HOLDS) + **set owner phone numbers** (else every guardrail alert is silent) + seed price catalog then enter the $40 signup fee + **re-run the one-click entry-point seed (item 62)** + **re-seed onboarding from the corrected master once #58/#59/#53 land (owned by the orchestrator, NOT the workshop room)** + **⚠️ ADDED 2026-07-29: VERIFY THE CRONS SAN JOSE DEPENDS ON ACTUALLY RAN, rather than inferring health from silence.** Nothing records whether any of the ~33 scheduled jobs ran, so **a dead cron and a healthy quiet estate look identical.** The trap is specific and already half-recorded here: this file says SJ "sends ZERO confirmations because the confirm automations were never approved" - **if the confirmations cron had silently stopped instead, the symptom is the same and the fix is completely different.** On launch day, confirm by evidence (a send, a job row, a heartbeat) that confirmations, drips and admissions each ran at least once. **Orchestrator's, needs no build** + **set `clients.allowed_domains` (currently NULL, so SJ's own site gets a 403 from the portal API)** | BLOCKER at launch | checklist | Each dormant-by-design thing must be flipped ON launch day; owner = orchestrator to walk Zoran through it |
 | 26 | **GHL token warmth: SJ launches ON GHL transport, so this is now LAUNCH-CRITICAL, not just hygiene.** Stored "agency" token is really a LOCATION token so it cannot mint sub-account tokens; 14 of ~30 academies already cold. Human-only fix: reconfigure the FC2 marketplace app (distribution Agency AND Sub-Account, add oauth.write + oauth.readonly, drop the junk scopes) then run agency connect once, choosing the AGENCY on the consent screen. Code (PR #1555, #1591) already automates re-minting once a valid agency token exists | BLOCKER at launch | Zoran, checklist on the board (HOLD until FC2 distribution unknown resolves) | **SJ token status 2026-07-26 16:56 UTC: HEALTHY, not cold.** 14.5h left, refresh token present, no error, contact sync ran 2 min prior, and it already self-refreshed once today, proving the refresh grant works for SJ. It should self-renew again tonight even if FC2 is never fixed. **But the refresh grant is SINGLE-USE: if any one refresh response is ever lost, SJ's refresh token dies and it goes cold with NO recovery.** That is precisely what killed the other 14. FC2 agency-mint is the durable fix that removes the single point of failure | Meta-token precedent: tokens have quietly died before. GHL TOKENS session owns the machinery |
 
 **ALL FOUR PRs MERGED 2026-07-26:** #1601 (canonical no-hardcode preset), #1587 (pricing truth + money model T/S/C), #1602 (per-academy confirmation timezones), #1603 (memory notes). Main now carries the whole identity + pricing wave.
@@ -751,7 +1164,7 @@ Scout sweep completed 2026-07-25. Every row has file:line evidence in the Scout 
 |---|---|---|---|---|
 | 27 | SJ portal-spine migration: flip all 5 rails off GHL (contact/email/booking/messaging/pipeline), pipeline shadow -> live, bookings to schedule_slots/trial_bookings | BLOCKER | queued | Calendar-off-GHL machinery exists (PR #1424) + Detail Miami handoff is prior art. Needs its own plan + rooms |
 | 28 | SJ phone / Twilio | **NOT a launch blocker** | DECIDED 2026-07-26 | See the phone decisions block below. Launch runs on GHL transport; Twilio flips later |
-| 39 | **SJ has NO phone numbers on ANY user** (all 4 `client_users` rows null, incl. owner Lij), and `staff_notify_phone` is null. Every owner-notification guardrail we build is INOPERATIVE for SJ: `notifyOwners` returns sent:0, so the tz alert and the domain-hold alert silently never reach Lij. Same for BAM NY | BLOCKER at launch | switch-list item | Data fix, not code. Both guardrails correctly roll back their stamp, so nothing is muted, but nobody is told either |
+| 39 | ✅ **RETIRED 2026-07-29, orchestrator-verified. STALE - somebody fixed it.** Elijah De Guzman IS on `client_users` with a phone, so San Jose's owner-notification guardrails are **operative**, not silent. **Do not re-fix this.** ⚠️ **But a REAL finding replaces it: at BOTH academies only the OWNER has a phone.** GTA has 5 `client_users` rows and only Zoran carries one; San Jose has 4 and only Elijah does. **`staff_notify_phone` is null at both.** So anything designed to alert "the team" by text reaches exactly one person per academy. That is a design fact worth knowing before anyone builds team-wide SMS alerting. ~~ORIGINAL: SJ has NO phone numbers on ANY user~~ (all 4 `client_users` rows null, incl. owner Lij), and `staff_notify_phone` is null. Every owner-notification guardrail we build is INOPERATIVE for SJ: `notifyOwners` returns sent:0, so the tz alert and the domain-hold alert silently never reach Lij. Same for BAM NY | BLOCKER at launch | switch-list item | Data fix, not code. Both guardrails correctly roll back their stamp, so nothing is muted, but nobody is told either |
 | 40 | **Lij's email mismatch**: `client_users.email` = elijah@3dsportsprep.com vs `clients.email` = elijah@byanymeanssanjose.com. **Zoran: byanymeanssanjose.com is CANONICAL.** NOT changed yet - that row has a linked auth user (`user_id` set), so changing the email may be his portal login. Confirm the auth path before updating, or he gets locked out | FRICTION | needs safe change | Phone now set on that row: +1 (408) 425-7251 (Zoran supplied for the record; do NOT fire test SMS at Lij mid-onboarding) |
 | 42 | Resend has NOT verified byanymeanssanjose.com. Until it does, every SJ email correctly HOLDS under the new guardrail | BLOCKER at launch | switch-list item | Independently blocks the auto-release half of the gate-2 test |
 | 41 | Lij has NO title and NO bio in `client_users` (has_title false, has_bio false), so the agent speaks generically about coaches by design | FRICTION | on his ask-list | Filling title + bio turns it into real credentials |
