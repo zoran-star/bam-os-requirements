@@ -874,6 +874,14 @@ NEW: sb(`             ${encodeURIComponent(offerId)}         `)
 
 **⛔ ORCHESTRATOR CALL: STOP REFINING, HOLD UNTIL MERGE.** It asked, correctly, rather than deciding for itself. **The gate is complete; the last round found zero bugs and one non-improvement, which is the signal to stop rather than to go deeper.** Three PRs are blocked on a human, not on quality, and **polish landing after the bottleneck is free while polish landing before it is not.** The remaining risk is better carried by the next person, who now inherits a self-test, seven controls and written measurements instead of folklore.
 
+## 🏆🏆 THE SENTENCE THIS WHOLE THREAD PRODUCED, from #1671's author closing out:
+
+> **A result consistent with success is not evidence of success unless you know what failure would have looked like.**
+
+**And its account of where the time actually went, which is the more useful half:** the fix was right early. **Five subsequent corrections were all to EVIDENCE, not code**, and about half were each agent catching the other: a stale line number, a control that measured a file excluded from the scan, a grep whose `.` was a wildcard, a citation a parser rewrite could have invalidated, an invariant orthogonal to the bug it was credited with catching. **Every one looked like verification and was not.**
+
+**Its own conclusion is the standard to carry forward: "the code is small enough to check by reading; the claim that it works is what needed machinery."** That is why the negative controls and the planted canary are the parts of that PR worth defending, and it inverts the usual instinct - **the review effort belongs on the evidence, not on the diff, whenever the diff is small and the claim is about an absence.**
+
 ## 🏆 AND THE TECHNIQUE THAT CLOSES IT: **A POSITIVE CONTROL. PROVE THE INSTRUMENT CAN SEE THE REGION YOU ARE CALLING CLEAN.**
 
 #1671's author worked out that the `blank()` bug had a consequence for **its own evidence**, which nobody had raised. Its PR body claimed *"the detector no longer flags `hasGmailMailbox`"*. **If `blank()` can silently erase everything below a line, that sentence has two possible causes:**

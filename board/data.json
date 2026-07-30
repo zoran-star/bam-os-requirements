@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · closed. 3 PRs waiting on you",
+ "updated": "2026-07-30 · done. everything waits on you",
  "recentUpdates": [
+  "Both agents closed. Nothing running. Three pull requests waiting on you in order: 1671, 1670, 1669",
+  "The line that sums the night: a result that looks like success is not evidence of success unless you know what failure would have looked like",
+  "Then rotate the Stripe key and send Lij his list. Everything is written down and survives this chat",
   "Closed for the night. Both agents holding, nothing running, three pull requests waiting on you",
   "Last lesson, and it corrects something I had written down: a safety check that CANNOT fail on the thing you are worried about is not a weak check of it, it is not a check of it at all",
-  "Merge 1671, then 1670, then 1669. Rotate the Stripe key. Send Lij his list",
-  "Called stop. The work is finished and the last round found nothing new, so more polish only grows what you have to review",
-  "Best call an agent made all night was declining to ADD a safety check, because it would have flagged one correct thing on day one and gates that go red on day one get switched off",
-  "Nothing is running. Merge 1671, then 1670, then 1669. Rotate the Stripe key. Send Lij his list"
+  "Merge 1671, then 1670, then 1669. Rotate the Stripe key. Send Lij his list"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
