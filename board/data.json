@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · San Jose is one blocker, not three",
+ "updated": "2026-07-30 · caught a staged revert of tonight's build",
  "recentUpdates": [
+  "Caught something nasty: the main repo folder had a half-staged DELETION of tonight's build sitting in it. One commit from there would have undone it",
+  "And every safety check we own would have passed it, because deleting a thing and everything that uses it looks perfectly consistent",
+  "Fixed, with a recovery point saved first in case I was wrong. Your untracked files are untouched",
+  "Sharper worry found: copying GTA's free trial page to a new academy would point THAT academy's parents at GTA's calendar",
   "San Jose's remaining blockers are ONE blocker wearing three hats. Stripe unlocks prices, prices unlock class times, class times unlock the calendar",
-  "So nobody should pick up 'generate San Jose's class times' yet. It cannot work until Stripe flips",
-  "Good news: the moment Stripe flips, age routing works for San Jose with no code change. His ages are already in and correct",
-  "One test settles whether the Stripe stall is Lij's paperwork or our bug: does his Stripe dashboard list anything outstanding, or does it say he is done?",
-  "DONE. A kid is now routed to a class by their real age, live and tested against production. GTA's age groups are gone from every academy's AI",
-  "Merged in the right order, five minutes apart, website first. Backwards would have failed real bookings silently"
+  "So nobody should pick up 'generate San Jose's class times' yet. It cannot work until Stripe flips"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",

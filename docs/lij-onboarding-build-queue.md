@@ -844,6 +844,30 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## ⛔⛔ THE CANONICAL CHECKOUT HELD A STAGED REVERT OF TONIGHT'S BUILD, AND EVERY GUARD WE OWN WOULD HAVE PASSED IT (2026-07-30, FIXED)
+
+`/Users/zoransavic/bam-os-requirements` was on `main` at `ef6bab8`, six behind origin, **with an index staging the DELETION of `api/agent/_class-routing.js`, its test suite, and three plan files**, plus staged reversions of `offer.js`, `checkout.js`, `leads.js`, `client-portal.html`, `PENDING_SQL.md` and two memory notes. **A commit from that checkout would have reverted the shared class resolver on `main`.**
+
+**⚠️ AND IT WOULD HAVE SHIPPED GREEN, WHICH IS THE PART TO REMEMBER.** In the finding room's words: **deleting a module and its only importers is internally consistent, so the eslint gate stays green**, and **the GTA locks check rendered OUTPUT, which does not change when routing silently reverts to the old code path.** Every guard this workstream built would have waved it through. **A guard that watches output cannot see a change that restores the previous output.**
+
+**Fixed by the orchestrator, with a recovery point taken FIRST:** `git stash create` produced `44bf928`, tagged `recovery/canonical-2026-07-30`, then `reset --hard origin/main`. Now clean on `main` at `33c487d`. **Three untracked paths survived untouched** (`docs/notification-inventory.html`, `docs/onboarding/`, and `whiteboard/`, which holds a `NOTION_TOKEN` and is a separate known cleanup item).
+
+**📏 THE HABIT WORTH KEEPING: the room verified nothing unique would be lost, and it was right. "I checked and nothing unique would be lost" and "nothing unique CAN be lost" are different guarantees, and the second costs one command.** For any destructive fix, make the mistake recoverable before deciding it is unnecessary to.
+
+**The room correctly did NOT reset it itself**, because a hard reset yanks the rug from under any session sitting in that checkout, and that judgement is exactly what the come-to-the-orchestrator rule is for.
+
+## ⛔ CROSS-TENANT: GTA'S FREE-TRIAL PAGE PICKS CALENDARS BY REGEX AND FALLS BACK TO GTA'S OWN CALENDAR IDS. **RATED ABOVE EVERYTHING ELSE OUTSTANDING.**
+
+`clients/bam-gta/gta/freetrial.jsx:691-693` matches entry-point labels against `/elementary|group\s*1/i` and `/high|group\s*2/i`, and **falls back to GTA's two hardcoded GHL calendar ids at `:21-22` when nothing matches.** Another academy's labels will not match, both lookups return null, and **the page keeps GTA's calendar ids: academy #3's parents pointed at academy #1's calendar.** Same shape as every leak this track closed, except **cross-tenant rather than cosmetic.**
+
+**⚠️ ORCHESTRATOR CORRECTION TO THE TRIGGER CONDITION, AND IT MAKES IT WORSE.** The finding says it is dormant because *"San Jose has no free-trial page yet"*. **It has one: [bam-client-sites #104](https://github.com/zoran-star/bam-client-sites/pull/104).** But I diffed that PR's added lines for calendar-id-shaped strings and for the label regex and found **neither**, so **San Jose's page does not pick calendars GTA's way.**
+
+**So the trigger is not "a new academy gets a free-trial page". It is "someone copies GTA's `freetrial.jsx`"** - which is precisely what cloning the reference implementation for academy #4 means, and precisely what this workstream keeps telling people to do. **Easier to do by accident than the original framing, therefore worse.**
+
+**Not verified, stated rather than implied:** I searched #104's ADDED lines for those two shapes. I did not read the whole page.
+
+**⚠️ AND THE UNBLOCK HAS A TRAP IN IT.** The site cannot route by age today because the public offer payload exposes only `title`, `age` (free text) and `weekly_times`. The fix is three lines in `api/website/offer.js:361` passing `age_min` / `age_max` / `age_max_mode` through raw. **It must also carry the `configured` flag**, because `classAgeRange()` treats a class with neither bound as *unconfigured* and unconfigured **deliberately matches everyone**, so academies did not go dark when the field shipped. **If the site treats unconfigured as fail-closed while the server treats it as matches-everyone, the site goes dark for every academy that has not filled the fields in.** GTA is filled in; academy #3 will not be. **House rule 10 at the payload boundary: *fetch failed* and *present but unconfigured* must stay distinguishable.** Portal PR first, deploy verified, then the site.
+
 ## ⛔⛔ SAN JOSE'S REMAINING BLOCKERS ARE **ONE BLOCKER WEARING THREE HATS.** Stop treating them as parallel work.
 
 Framed by AUTOMATION TEMPLATING III on its way out, and it corrects how this file reads:
