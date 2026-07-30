@@ -1,17 +1,18 @@
 {
- "updated": "2026-07-30 · age routing ready, two PRs waiting on you IN ORDER",
+ "updated": "2026-07-30 · emergency contacts collected but unreadable",
  "recentUpdates": [
+  "Found and verified: we REQUIRE an emergency contact at signup, store it nowhere a coach can read, and have done since June. 18 real families affected at GTA",
+  "Nothing is lost. Every answer is still in the audit log. But a coach standing over a hurt kid cannot get to it, which is the only moment that counts",
+  "Not a quick fix: done naively it would put 'emergency contact' on the free trial form, so strangers enquiring get asked for it. Being planned properly",
   "Age routing is built and green. Two pull requests are waiting on you and the ORDER matters",
   "The website one goes first. Backwards, GTA's page keeps accepting 8 year olds while the portal starts refusing them, and those bookings fail with nobody told",
-  "My fourth slip tonight, same shape: I told a room a build was unpushed by checking the wrong branch. It caught it",
-  "Member management has 4 builds running at once, plus the age-routing switch in the other room. Both checked, neither is standing on the other",
-  "Your Stripe manage link goes into the welcome email. That edits a LIVE GTA email, so the safety lock gets deliberately updated rather than quietly bypassed",
-  "One caution passed on: updating that lock freezes everything it currently says, not just the new line. A room nearly got caught by that earlier this week"
+  "My fourth slip tonight, same shape: I told a room a build was unpushed by checking the wrong branch. It caught it"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
    "MERGE IN THIS ORDER: client-sites #174 first, wait for it to deploy, THEN portal #1661. Backwards breaks trial bookings silently",
+   "Want the 18 GTA emergency contacts pulled into a readable list for coaches as a stopgap? It is minors' family data, so your call, not mine",
    "Tell Lij: do NOT reconnect Stripe. Finish the remaining items in his Stripe dashboard and the portal ticks itself",
    "SEND LIJ HIS ASK-LIST. Drafted at docs/plans/lij-ask-list.md. Stripe is item 1 and he is already part way through it",
    "Two San Jose data fixes for launch: allowlist its domain, and press the entry-point seed button. Both are data, not code",

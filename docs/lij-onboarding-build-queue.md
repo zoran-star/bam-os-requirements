@@ -844,6 +844,28 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 🚨🚨 EMERGENCY CONTACT IS REQUIRED, COLLECTED, AND THEN DROPPED. AT EVERY ACADEMY. LIVE TODAY. **BLOCKER before San Jose launch.**
+
+Found by MEMBER MANAGEMENT by rendering, **orchestrator-verified in production independently**.
+
+`buildFields` has BLOCKED signup without an emergency contact since 2026-07-24. But `writePortalFieldValues` needs a `custom_field_defs` row to store the answer, and:
+
+| Fact | Value |
+|---|---|
+| `custom_field_defs` rows, all academies | **23** |
+| Of those, ANY emergency field | **0** |
+| Academies with defs at all | 3 |
+| `member_audit_log` intake rows | **34** |
+| **Intake rows carrying an emergency contact** | **18**, 2026-06-16 to 2026-07-25 |
+
+**So 18 real families have typed an emergency contact for a minor, and no coach can read any of them.**
+
+**⚠️ THE PRECISE FRAMING, BECAUSE IT CHANGES WHAT TO DO: THE DATA IS NOT LOST, IT IS UNREACHABLE.** Every answer survives in `member_audit_log.args.intake`. Nothing needs recovering; it needs a surface. **But the operational consequence in the only moment that matters is identical: a coach standing over an injured child cannot get the number.** "Recoverable by an engineer with database access" is not a safety answer.
+
+**⚠️ AND IT IS NOT A ONE-LINER, WHICH IS WHY IT IS RECORDED RATHER THAN FIXED IN PASSING.** Minting `custom_field_defs` naively would **win `buildFields`' label de-dupe, relocate the block, override its required flag, and leak the emergency contact onto the FREE-TRIAL LEAD FORM**, because academy-level defs feed `lead_fields`. **Asking a stranger enquiring about a trial for their child's emergency contact is a worse bug than the one being fixed.** Owned by MEMBER MANAGEMENT as its own small build.
+
+**📏 THE SHAPE, AND IT IS THE HOUSE PATTERN WEARING ITS BLUNTEST FORM: A REQUIRED FIELD IS AN ASSURANCE.** Making it mandatory is the product promising someone that this information is held. **The requirement was enforced; the storage was never connected.** Nine instances of assurance-without-connection in this file, and this is the first where the thing being assured is a child's safety rather than a correctness property.
+
 ## 🚨 MERGE ORDER FOR THE AGE-ROUTING SWITCH. **THE SITE GOES FIRST. GETTING THIS BACKWARDS BREAKS BOOKINGS SILENTLY.**
 
 Two PRs, both green, both waiting on Zoran:
