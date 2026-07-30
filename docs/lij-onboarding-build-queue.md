@@ -4,6 +4,27 @@ Live queue of everything the San Jose onboarding surfaces. Onboarding spans days
 
 **Started 2026-07-25.**
 
+## ✅ [PR #1660](https://github.com/zoran-star/bam-os-requirements/pull/1660) MERGED AND THE GTA SLOT BACKFILL IS DONE (2026-07-30). BUILD B IS RUNNING.
+
+`main` is `24a4cd6`. The room verified **CI ran against the actual PR head `696343a` rather than an earlier commit** before merging, which is the check that makes a green tick mean anything.
+
+**Backfill run by the orchestrator, verified by reading back rather than by a row count.** The count IS the check, because GTA has exactly two distinct slot names and anything short of a full sweep means a name nobody has seen exists, and such a slot would be **invisible to age routing**:
+
+| | keyed | left NULL |
+|---|---|---|
+| `schedule_slots` | **86 of 86** (43 `group-1`, 43 `group-2`) | 0 |
+| `slot_templates` | **4 of 4** (2 and 2) | 0 |
+
+**`source_offer_id` is deliberately left NULL on those rows and that is NOT an incomplete backfill.** The class key is what routing needs; the offer id is lineage, and **guessing it would be inventing provenance.** Recorded here so nobody later reads its absence as unfinished work.
+
+**⚠️ AND THE ROOM DREW THE RIGHT LINE ON WHAT THE BACKFILL IS FOR: it is a prerequisite for the switch being USEFUL, not for it being SAFE.** Build B was briefed that its code must behave correctly whether or not the backfill has run - a NULL class key must not make a slot vanish from a parent's options and must not be silently mis-routed - **and that is a negative control rather than an assumption.** A build that only works after a human remembers to run some SQL is the same shape as a test nobody runs.
+
+## ⭐ THE "MORE THAN ONE FITS" BRANCH IS THE NORMAL CASE, NOT AN EDGE CASE
+
+San Jose's Beginner (6-12) and Elementary (9-12) overlap almost entirely and differ by **skill**, so **every 9 to 12 year old returns two classes, every time.** This is the first evidence that Zoran's ask-one-question branch is the **ordinary path for a real academy** rather than a rare fallback, and it must be built as such.
+
+**It also means the question is not always about age.** San Jose's is *"has your child played before?"*. Lij's ask-list now asks him to word it himself.
+
 ## 🟡 LIJ CONNECTED STRIPE 2026-07-30. IT WORKED. **THE MESSAGE HE SAW TOLD HIM IT FAILED AND GAVE HIM THE WRONG NEXT STEP.**
 
 **Production state, queried:** San Jose is no longer `not_connected`. `stripe_connect_account_id = acct_1Tz08nLhm4hK898M`, `stripe_connect_status = 'onboarding'`, `connected_at` NULL. **His OAuth succeeded and his account is stored. Nothing he did was lost.** Stripe reports `charges_enabled:false` because he has outstanding requirements on Stripe's side (business details, bank account, ID verification).
