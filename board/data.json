@@ -1,16 +1,17 @@
 {
- "updated": "2026-07-30 · all merged, deployed, San Jose's stuck step fixed",
+ "updated": "2026-07-30 · rotate that Stripe key",
  "recentUpdates": [
+  "ROTATE YOUR STRIPE KEY. The retired cancel skill had a live one pasted in it. Deleting the file does not undo it having been readable",
+  "Good news on that: I checked and it never reached the repo or its history, and it is gone from the file now",
+  "Receipts is rebuilding and no longer needs the column I added tonight, so that whole question closed itself within the hour",
   "All three merged and deployed. San Jose's stuck setup step is reset, done AFTER the deploy landed, which took eleven and a half minutes",
   "The class ages now reach the websites. San Jose's Beginner and Elementary both used to read 'Elementary School'. They are now 6-12 and 9-12 and finally tell apart",
-  "A collision was caught by the ROOM, not by me. Two builders were about to edit the same page. One stood down, nothing lost",
-  "All three merged. Setup steps fixed in three places, KPI links seeding themselves, and your Stripe manage link in the welcome email",
-  "Three agents now working in parallel: the Stripe message, the last hardcoded age split, and a check that stops this whole bug class recurring",
-  "Holding one database fix until the deploy finishes. Doing it early would just let the old code undo it"
+  "A collision was caught by the ROOM, not by me. Two builders were about to edit the same page. One stood down, nothing lost"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
+   "ROTATE THE STRIPE KEY that was pasted in the old /cancel skill. It was readable by every agent session. Deleting the file is not the same as rotating",
    "Want the 18 GTA emergency contacts pulled into a readable list for coaches as a stopgap? It is minors' family data, so your call, not mine",
    "Tell Lij: do NOT reconnect Stripe. Finish the remaining items in his Stripe dashboard and the portal ticks itself",
    "Two of our own safety checks cannot be SEEN by CI, so nothing runs them. Want that fixed? It is the check that guards the other checks",

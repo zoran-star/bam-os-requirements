@@ -844,6 +844,32 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 🔑 THE RETIRED `/cancel` SKILL HELD A LIVE STRIPE KEY. **DELETING IT IS NOT ROTATING IT.** Needs Zoran.
+
+The room retired `~/.claude/skills/cancel` to a deprecation stub on Zoran's order, and reported that **the old flow had a live Stripe key pasted into it**, so the retirement doubled as hygiene.
+
+**✅ ORCHESTRATOR-VERIFIED, AND THE GOOD NEWS FIRST:**
+
+| check | result |
+|---|---|
+| Long key-shaped string in tracked files on `origin/main` | **none** |
+| Same, across ALL git history (`log -S`, five candidate commits) | **none** - every hit is the bare token `sk_live_` with nothing after it, so prose or a placeholder |
+| Long key-shaped string in the current stub | **none** |
+
+**So it was never committed to the shared repo, and it is gone from the file.**
+
+**⛔ BUT THAT IS NOT THE EXPOSURE, AND THE RETIREMENT DOES NOT CLOSE IT.** That file lived in `~/.claude/skills/`, which **every agent session reads.** A secret does not need to reach git to be exposed; it needs to be readable, and this one was readable by every session that loaded skills, for as long as it sat there. **This repo also runs `/showtime` and `/savedat`, which upload session transcripts to the staff portal.**
+
+**Recommendation to Zoran, one action: ROTATE THAT STRIPE KEY.** Not because it is in the repo - it is not, verified both ways - but because **removal and rotation are different operations, and only one of them helps once a value has been read.** A key deleted from a file it was never supposed to be in is still a key that was in that file.
+
+**📏 AND THE GENERAL FORM IS WORTH MORE THAN THE INSTANCE: a secret's blast radius is who could READ it, not where it was STORED.** Every audit this file records has asked "is it in the repo". **That is the wrong question for anything in `~/.claude/`, which is exactly where agent tooling accumulates and exactly where nobody looks.** No sweep of that directory has ever been run.
+
+## ✅ RECEIPTS IS UNPARKED (Zoran, 2026-07-30), which retroactively closes the #1666 park question
+
+Rebuilding fresh on current main, **and `stripe_portal_url` is out of its spec because the migration already landed.** So the column I applied has a real consumer coming rather than an indefinite park, which was the entire basis of the ruling. **The ruling was right for the reason given AND the reason evaporated within the hour**, which is worth recording because it means the cost of being careful there was close to zero.
+
+**Also on his orders:** build 10 (the emergency-contact required-collected-dropped defect) is being built **by the room that found it**, and `bam-client-sites` **[#176](https://github.com/zoran-star/bam-client-sites/pull/176)** retires `/email-templates` into a signpost to member management.
+
 ## ✅ ALL THREE MEMBER-MANAGEMENT PRs MERGED (2026-07-30 22:32) AND THE HELD DATA STEP IS DONE
 
 `#1664` 22:32:40 · `#1665` 22:32:48 · `#1666` 22:32:56. Main `5637772`.
