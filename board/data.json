@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · #1656 merged, gym-door leak closed in production",
+ "updated": "2026-07-30 · age-routing scoped, and the misbooking is not where anyone thought",
  "recentUpdates": [
+  "The class-routing bug is NOT where we thought. Nobody filters the times a parent is SHOWN by their kid's age, so the booking is precise and still wrong",
+  "That matters: a fix aimed at the old theory would ship, pass every test, and change nothing for San Jose",
+  "Checked in the database: San Jose has ZERO class times today, so this bites the day its schedule is generated, not now",
+  "GTA is the only academy the AI can book for at all, and only because its two class names happen to match a pattern in the code",
   "MERGED. The gym door is gone: no academy tells a parent about a door in Oakville any more, and GTA's real door now comes from its own venue",
-  "Both database changes went in BEFORE the merge, so GTA never lost its door line for a second. Verified by reading the database back, not by trusting a success message",
-  "Member management chat spawned. Tied to the offer, recurring prices first, San Jose onboards onto it once it is templatized",
-  "One thing left between a person and a working support form: the public ticket database change. Say the word and I run it",
-  "Heads up: GTA and San Jose's public names have BOTH changed in the database and our notes still say the old ones. One line from you settles it",
-  "TWO San Jose launch blockers found and verified: its own site is locked out of the portal, and its funnel would capture leads into a void"
+  "Both database changes went in BEFORE the merge, so GTA never lost its door line for a second. Verified by reading the database back, not by trusting a success message"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
@@ -720,13 +720,13 @@
   {
    "name": "AUTOMATION TEMPLATING III",
    "sidebar": "AUTOMATION TEMPLATING III",
-   "state": "orange",
+   "state": "white",
    "column": null,
-   "one": "Planning the age-routing fix off main while it waits. Already enlarged the job from four copies to six",
+   "one": "Building the fix that shows a parent only the class times their kid's age actually fits",
    "builds": [
     "t-convergence"
    ],
-   "blockedBy": "AUTOMATION TEMPLATING II still holds the branch"
+   "blockedBy": null
   },
   {
    "name": "MEMBER MANAGEMENT TEMPLATING",

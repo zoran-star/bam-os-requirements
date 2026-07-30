@@ -4,6 +4,38 @@ Live queue of everything the San Jose onboarding surfaces. Onboarding spans days
 
 **Started 2026-07-25.**
 
+## ⛔ THE AGE-ROUTING DEFECT IS ONE STAGE EARLIER THAN THIS FILE AND THE HANDOVER BOTH SAY (AUTOMATION TEMPLATING III, 2026-07-30, in its name. DB half orchestrator-verified.)
+
+**Both my brief and II's handover claimed San Jose's back-to-back classes make the `rows[0]` fallback a live misbooking. Read against the actual query, that claim does not hold, and the real defect is worse.**
+
+All three booking paths resolve the slot with an **exact** `start_time=eq.<iso>` match. SJ runs Beginner 5-6pm and Elementary 6-7pm, **different start times**, so the query returns ONE row and `rows[0]` is the only row and the correct class. **`rows[0]` needs two classes at the SAME start time to misbook, which San Jose does not have.**
+
+**The actual failure: NOTHING FILTERS THE TIMES A PARENT IS OFFERED BY THE ATHLETE'S AGE.** A 9-year-old beginner is shown 6pm, picks it, and is booked into Elementary **correctly and precisely**. **Every layer behaves as written and the child is still in the wrong class.**
+
+**⚠️ THE SCOPING CONSEQUENCE, which is the whole value of the correction: a build aimed at the `rows[0]` fallback would ship, pass, look complete and fix nothing for San Jose.** The resolver must filter the OFFERED TIMES, not only the final write. **Same shape as `reference_assurance_without_connection.md`.**
+
+**SECOND FINDING, read not executed, and the two halves fail in OPPOSITE directions.** For an academy off GTA's naming: `booking.js:142` (list path) falls back to the RAW calendar label when `groupOf()` returns null, so the filter matches nothing and the agent offers **zero times**, failing CLOSED. `booking.js:223` (write path) falls through to `|| rows[0]`, failing OPEN.
+
+**✅ ORCHESTRATOR-VERIFIED IN PRODUCTION, AND IT IS MASKED. DO NOT FILE IT AS A LAUNCH BLOCKER TODAY.**
+
+| Fact | Value |
+|---|---|
+| **BAM San Jose `schedule_slots`** | **ZERO** |
+| BAM GTA slot names | exactly two, `Group 1 (Elementary)` and `Group 2 (High School)`, 43 each |
+| `source_offer_class_key` populated on ANY GTA slot | **false, all 86** |
+
+**San Jose's agent offers zero times right now for a duller reason than the naming mismatch: it has no slots at all**, because generation refuses without a bookable programme, which needs Stripe. **The naming defect is real and becomes live the moment San Jose's slots are generated, which is on the launch path.** Recorded as a launch-path item, not as a live blocker, because a blocker that dies on inspection costs more than it buys.
+
+**Two facts that fell out of the same query, both previously read rather than measured:** `source_offer_class_key` is NULL on **all 86** GTA slots, so the pipe genuinely does run end to end with the inlet valve capped. And **GTA is the only academy the current routing works for, by coincidence of naming** - both its slot names match the regex, and those same names are the internal labels leaking to parents, which is Zoran's decision 3 arriving as data.
+
+**Acceptance criterion for the build, agreed with the room: DONE when the identity gate reports ZERO deferred entries, with none of the six copies parked in the allowlist to buy a green suite.**
+
+## 📏 A ROOM SAYING "RELEASED" IS NOT THE REF BEING RELEASED (2026-07-30, twice in one evening)
+
+II told both the orchestrator and its successor **in writing** that it had released `claude/tokenize-academy-name`. **Its worktree was still holding the branch checked out minutes later**, so `git` would still have refused the successor. Detached by the orchestrator.
+
+**Paired with the opposite error the same evening** (the orchestrator reading a handover FILE as proof a room had stopped, while it was mid-build), the general shape is: **a room's statement about its own state and the state itself are two different things, and they fail in both directions.** Neither party was unreasonable to believe the other. **The cheap habit that catches both: look at `git worktree list` before you need the branch, not after.**
+
 ## ✅ [PR #1656](https://github.com/zoran-star/bam-os-requirements/pull/1656) MERGED 2026-07-30 19:10 UTC, ON ZORAN'S INSTRUCTION. BOTH MIGRATIONS APPLIED FIRST, AND THE ORDER WAS THE CORRECTION.
 
 **Nine commits. The gym-door leak is now closed in production**, along with the name tokenizing, the four-confirmation-email footer fix, the shared-default fallback removal and the identity gate.
