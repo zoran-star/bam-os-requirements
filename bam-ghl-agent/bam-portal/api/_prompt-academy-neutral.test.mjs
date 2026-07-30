@@ -74,15 +74,18 @@
 //   MUTATE=hollow node api/_prompt-academy-neutral.test.mjs  # emptied section filled with a neutral-sounding placeholder
 //   MUTATE=deaf   node api/_prompt-academy-neutral.test.mjs  # pick() ignores overrides, so a configured academy loses its own facts
 //   MUTATE=count  node api/_prompt-academy-neutral.test.mjs  # brain-health total written down again instead of derived
-//   MUTATE=group  node api/_prompt-academy-neutral.test.mjs  # booking_group EMPTIED - the regression that looks like a fix
+//   MUTATE=group  node api/_prompt-academy-neutral.test.mjs  # GTA's age bands PUT BACK into booking_group
 //
-// `group` is the only control that mutates by DELETING, and it is the one most
-// worth understanding. Emptying `booking_group` is what a future session will
-// reach for while "finishing the job" of clearing GTA data out of this file. It
-// is a regression: "Group 1"/"Group 2" are the argument values check_availability
-// and book_group take, so an agent that never learns the vocabulary cannot route
-// to a calendar at all. Section 9 exists to fail on it. See that section and the
-// section's own comment in prompt-structure.js for the derivation gap.
+// `group` is worth understanding, because it guards the section this file used to
+// make an exception for. Until build B (2026-07-30) `booking_group` carried BAM
+// GTA's bands - "Group 1 (Elementary / younger): ages 9 to 13" - and could not be
+// emptied, because those tokens were the argument values the booking tools took
+// and this was the only prose that taught them. Build A made the ages real data
+// on each class and build B gave the section a renderer, so its body is now the
+// not-configured instruction and the numbers come from each academy's own offer.
+// The regression to fear has FLIPPED: it is no longer emptying this section, it
+// is a future session putting GTA's numbers BACK because "the agent needs to know
+// the ages". That is what this control replants, and section 9 fails on it.
 //
 // Every MUTATE except `count` rewrites `api/agent/prompt-structure.js` ON DISK,
 // imports the mutated module, and restores the file through exit/signal handlers
@@ -219,20 +222,23 @@ const REPLANT = {
   pol:   (s) => refill(s, "Policies", "Cancel/pause: Pause and cancel anytime\nMakeup/reschedule: Reschedule through the booking app\nUnder-18 policy: Parent must book the trial. Athletes can be dropped off (parent does not need to stay)."),
   sell:  (s) => refill(s, "Selling points", "These are the key differentiators for this academy.\n\n- Science-based approach to basketball training\n- Drills maximize time-on-task, so athletes spend more time training"),
 
-  // The INVERSE control, and the only one here that mutates by DELETING. It
-  // empties `booking_group`, which is the thing a future session is most likely
-  // to do while "finishing the job" of clearing GTA data out of this file.
-  // Emptying it is a regression, not a fix: "Group 1"/"Group 2" are the argument
-  // values check_availability and book_group take, so an agent that never learns
-  // the vocabulary cannot route to a calendar at all. Section 9 must go red here.
+  // Puts BAM GTA's routing bands BACK into `booking_group` - the exact body this
+  // section carried until build B, and the exact thing a future session reaches
+  // for when it notices the agent is no longer told any ages in the shared
+  // default. It is a regression: those numbers are GTA's, they ship to all 47
+  // academies, and each academy's own numbers already reach its agent through
+  // renderBookingGroup. Section 9 must go red here. Anchored on the
+  // not-configured body rather than on an empty one, because this section is
+  // deliberately never empty - silence about which class reads as "use your
+  // judgement", which is the guessing the whole build removes.
   group: (s) => {
-    const at = s.indexOf(`"label": "Booking - which group / calendar",`);
+    const at = s.indexOf(`"label": "Booking - which class",`);
     if (at < 0) bail("no booking_group section");
-    const b = s.indexOf(`"body": "Pick the group by the athlete's age`, at);
+    const anchor = `"body": BOOKING_GROUP_NOT_CONFIGURED`;
+    const b = s.indexOf(anchor, at);
     if (b < 0) bail("booking_group's body no longer matches the anchor");
-    const end = s.indexOf(`"\n  }`, b);
-    if (end < 0) bail("could not find the end of booking_group's body");
-    return s.slice(0, b) + `"body": ""` + s.slice(end + 1);
+    const planted = "Pick the group by the athlete's age:\n- Group 1 (Elementary / younger): ages 9 to 13, younger calendar.\n- Group 2 (High School / older): ages 14 and up, older calendar.";
+    return s.slice(0, b) + `"body": ${JSON.stringify(planted)}` + s.slice(b + anchor.length);
   },
 
   // pick() stops honouring overrides, so a configured academy silently falls back
@@ -489,32 +495,54 @@ console.log("\n── 8. an academy with no offer carries none of the removed VA
   }
 }
 
-console.log("\n── 9. booking_group is deliberately NOT empty, because it routes ──");
+console.log("\n── 9. booking_group routes on the ACADEMY'S OWN ages, not on GTA's ──");
 {
-  // The exception, guarded in the opposite direction from everything above.
-  // booking_group does carry GTA's ages, and emptying it is a REGRESSION: the
-  // "Group 1"/"Group 2" tokens are the argument values check_availability and
-  // book_group take (api/agent-approvals.js -> calendarForGroup in
-  // api/agent/booking.js), and this section is the only prose that teaches them.
-  // An agent that never learns the vocabulary cannot verify a slot or book at
-  // all, which is a worse failure than a wrong age band. Full reasoning and the
-  // derivation gap are in the section's own comment.
+  // This section used to be the file's one knowing exception: it carried BAM
+  // GTA's bands and could not be emptied, because "Group 1"/"Group 2" were the
+  // argument values the booking tools took and this was the only prose teaching
+  // them. Build B closed that gap - the tools now take an AGE and a real class
+  // name, and renderBookingGroup (api/agent/fact-render.js) renders each
+  // academy's own classes and their own age numbers. So the assertions here have
+  // inverted: the shared default must now carry NO academy's numbers, while a
+  // configured academy must still be told exactly how to route.
   const entry = SECTIONS.find((s) => s.key === "booking_group");
-  ok(!!entry && String(entry.body || "").trim() !== "",
-    "booking_group still has a body (emptying it removes routing without removing the leak)");
-  const prompt = assemblePrompt(SPARSE, "booking");
-  const sec = sectionOf(prompt, "booking_group") || "";
-  ok(sec.includes("Group 1") && sec.includes("Group 2"),
-    "the booking agent is still taught the exact group tokens calendarForGroup matches on");
+  const body = String((entry && entry.body) || "");
+  ok(!!entry, "booking_group's ENTRY survives, so it keeps its label and its row in the training UI");
+
+  ok(!/group\s*1|group\s*2/i.test(body),
+    "booking_group's shared default no longer teaches GTA's group vocabulary");
+  ok(!/\d/.test(body.replace(/[^\d]/g, "")) || !/\bages?\b/i.test(body),
+    "booking_group's shared default states no age band at all");
+  ok(!/ages 9 to 13|ages 14 and up/.test(body),
+    "and specifically not GTA's two bands, which is what it used to ship to all 47 academies");
+
+  // Not empty, and that is a decision rather than an oversight. Which class to
+  // book is a DECISION the agent must make before it can book anybody, so an
+  // empty body reads as "use your judgement" - the guessing this build removes.
+  ok(body.trim() !== "",
+    "booking_group is NOT empty: an academy with no classes is told to book nobody, not left to judge");
+  const sparseSec = sectionOf(assemblePrompt(SPARSE, "booking"), "booking_group") || "";
+  ok(/do not book|book nobody|flag the/i.test(sparseSec),
+    "an academy with no classes is told to name no class, name no time, and flag the admin");
+
+  // The other half: a configured academy is still taught how to route, and the
+  // numbers it is taught are ITS OWN. Without this, "no leak" could be bought by
+  // deleting routing, which is exactly the trade this section used to be stuck in.
+  const configured = assemblePrompt(
+    { booking_group: "- Beginner Academy: ages 6 to 12, Beginner level\n- Pre-Season Academy: ages 12 to 18" },
+    "booking",
+  );
+  const liveSec = sectionOf(configured, "booking_group") || "";
+  ok(liveSec.includes("Beginner Academy") && liveSec.includes("ages 6 to 12"),
+    "a configured academy's OWN classes and OWN age numbers reach its booking agent");
+  ok(!/group\s*1|group\s*2/i.test(liveSec),
+    "and GTA's vocabulary does not ride along with them");
+
   ok(!sectionKeysForAgent("confirm").includes("booking_group")
     && !sectionKeysForAgent("closing").includes("booking_group"),
-    "and only the BOOKING agent gets it - confirm and closing never route");
-  // Honesty: this is the one place a GTA value knowingly survives, so the suite
-  // says so out loud rather than letting a green run imply otherwise.
-  ok(/ages 9 to 13|ages 14 and up/.test(sec),
-    "NOTE: booking_group knowingly still carries GTA's age bands - a named gap, not a clean result");
-  ok(!EMPTIED.includes("booking_group"),
-    "booking_group is excluded from the emptied list on purpose, not by oversight");
+    "only the BOOKING agent gets it - confirm and closing never route");
+  ok(FACT_KEYS.includes("booking_group"),
+    "booking_group is a RENDERED fact now, so an academy filling in its offer clears it itself");
 }
 
 restore();

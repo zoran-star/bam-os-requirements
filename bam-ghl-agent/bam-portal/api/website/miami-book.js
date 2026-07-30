@@ -160,18 +160,27 @@ async function handler(req, res) {
       ep = eps?.[0] || null;
     } catch (_) {}
 
-    let slot = null;
+    let slot = null, picked = null, classes = [];
     try {
       const slotRows = (await sb(
-        `schedule_slots?tenant_id=eq.${MIAMI_CLIENT_UUID}&is_cancelled=eq.false&start_time=eq.${encodeURIComponent(t.toISOString())}&select=id,name&limit=10`
+        `schedule_slots?tenant_id=eq.${MIAMI_CLIENT_UUID}&is_cancelled=eq.false&start_time=eq.${encodeURIComponent(t.toISOString())}&select=id,name,source_offer_class_key&limit=10`
       )) || [];
-      const groupMatch = /group\s*\d+/i.exec(ep?.label || '');
-      const groupPrefix = groupMatch ? groupMatch[0].toLowerCase().replace(/\s+/g, ' ') : null;
-      slot = slotRows.find(s => !groupPrefix || (s.name || '').toLowerCase().replace(/\s+/g, ' ').includes(groupPrefix)) || slotRows[0] || null;
+      // Was an inline /group\s*\d+/ on the calendar label, which is BAM GTA's
+      // naming convention. DETAIL's label is "Free Trial - MS / HS Academy", so
+      // it always resolved to null and this always took the first row. The shared
+      // resolver replaces it; DETAIL's one class carries no age numbers, so the
+      // arming gate leaves this academy on exactly the behaviour it has today.
+      classes = await loadClassesFor(sb, MIAMI_CLIENT_UUID);
+      picked = chooseSlotToBook({
+        rows: slotRows, classes,
+        rawAge: (req.body && (req.body.athlete_age || req.body.age)) || undefined,
+        calendarLabel: ep?.label || '',
+      });
+      slot = picked.slot;
     } catch (e) {
       return res.status(502).json({ error: 'Failed to book appointment', detail: String(e.message).slice(0, 200) });
     }
-    if (!slot) return res.status(409).json({ error: 'That time is no longer available - please pick another time.' });
+    if (!slot) return res.status(409).json({ error: (picked && picked.reason) || 'That time is no longer available - please pick another time.' });
 
     let rpcRes;
     try {

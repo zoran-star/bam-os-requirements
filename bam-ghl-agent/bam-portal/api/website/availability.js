@@ -2,7 +2,12 @@
 // client websites (e.g. the BAM GTA free-trial page).
 //
 //   GET /api/website/availability?client_id=<uuid>&calendar=<ghl calendar id>&days=<n>
+//                                 [&athlete_age=<the child's age>]
 //     → { timezone, days: { "2026-06-12": ["2026-06-12T16:00:00-04:00", ...], ... } }
+//
+//   athlete_age is OPTIONAL and only narrows portal-booking academies. Send it
+//   and the parent is offered ONLY the times belonging to a class that child can
+//   actually join. Omit it and every time is offered, exactly as before.
 //
 // The calendar id must be one of the client's entry_points rows of type
 // "calendar" — websites can only read calendars the academy has exposed.
@@ -12,6 +17,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { localIsoParts } from "../_local-iso.js";
+import { routeSlots, loadClassesFor } from "../agent/_class-slots.js";
 
 import { RENEW_WINDOW_MS } from "../ghl/_agency.js";
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
@@ -202,20 +208,38 @@ async function handler(req, res) {
 
   // ── booking_provider='portal': serve OUR slots (schedule_slots), GHL never
   // consulted. Same response shape as the GHL branch, so client sites keep
-  // working unchanged. The entry point's "Group N" label picks which template
-  // family this calendar maps to; occupancy comes from the shared
+  // working unchanged. Which slots belong to this calendar, and which of those
+  // are for this athlete, are both answered by the shared class resolver
+  // (api/agent/_class-slots.js); occupancy comes from the shared
   // slot_spots_taken function via the bulk RPC. The booking RPC re-checks
   // capacity transactionally, so a stale read can't overbook.
   if (client.booking_provider === "portal") {
     try {
-      const groupMatch = /group\s*\d+/i.exec(calEp.label || "");
-      const groupPrefix = groupMatch ? groupMatch[0].toLowerCase().replace(/\s+/g, " ") : null;
       const nowIso = new Date().toISOString();
       const endIso = new Date(Date.now() + days * 24 * 3600 * 1000).toISOString();
       const slots = (await sbReq(
-        `schedule_slots?tenant_id=eq.${client_id}&is_cancelled=eq.false&start_time=gte.${encodeURIComponent(nowIso)}&start_time=lte.${encodeURIComponent(endIso)}&select=id,name,start_time,capacity&order=start_time.asc&limit=500`
+        `schedule_slots?tenant_id=eq.${client_id}&is_cancelled=eq.false&start_time=gte.${encodeURIComponent(nowIso)}&start_time=lte.${encodeURIComponent(endIso)}&select=id,name,start_time,capacity,source_offer_class_key&order=start_time.asc&limit=500`
       )) || [];
-      const list = slots.filter(s => !groupPrefix || (s.name || "").toLowerCase().replace(/\s+/g, " ").includes(groupPrefix));
+      // WHY THE AGE IS READ HERE AND NOT ONLY AT THE BOOKING. This endpoint is
+      // the list of times a parent is SHOWN. A time that should never have been
+      // on the list is booked correctly, precisely, and into the wrong class, and
+      // every layer behaves as written. Filtering the offer is the fix; filtering
+      // only the write would leave the misbooking exactly where it is.
+      //
+      // `athlete_age` is OPTIONAL and the site has to start sending it. Without
+      // it the age cannot narrow anything and every time is shown, which is what
+      // this endpoint did before - so an old site keeps working unchanged rather
+      // than going dark. The inline /group\s*\d+/ that used to filter here read
+      // BAM GTA's calendar naming and returned null for every other academy in
+      // production, so removing it changes nothing for anyone but GTA, whose
+      // classes now narrow it by name through the shared resolver.
+      const classes = await loadClassesFor(sbReq, client_id);
+      const route = routeSlots({
+        slots, classes,
+        rawAge: req.query.athlete_age,
+        calendarLabel: calEp.label,
+      });
+      const list = route.slots;
       const taken = await slotSpotsTakenBulk(client_id, list.map(s => s.id));
       // Emit local-offset ISO strings + local day keys (what GHL emitted), so
       // the site's picker + booking.start round-trip identically.

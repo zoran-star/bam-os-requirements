@@ -55,12 +55,12 @@
 // 2026-07-30), so the correct state for an unconfigured academy is NO schedule,
 // not somebody else's schedule.
 //
-// ONE fact default was deliberately NOT emptied: `booking_group`. It is a fact
-// wearing a behaviour section's clothes, it has no renderer, and emptying it
-// removes routing without removing the leak. Its own comment carries the full
-// reasoning and the derivation gap it is blocked on. Do not "finish the job" by
-// emptying it without reading that first.
-import { PRICING_NOT_CONFIGURED } from "./fact-render.js";
+// A NINTH went in build B (2026-07-30): `booking_group`, which had been the one
+// deliberate exception because it carried BAM GTA's age bands AND had no renderer,
+// so emptying it would have removed routing without removing the leak. It now has
+// a renderer (renderBookingGroup) and its body is the not-configured instruction
+// rather than one academy's numbers. Its own comment carries the full history.
+import { PRICING_NOT_CONFIGURED, BOOKING_GROUP_NOT_CONFIGURED } from "./fact-render.js";
 
 // ── Pricing disclosure (tier 1, BAM master) ──────────────────────────────────
 // HOW OPENLY an agent may discuss price is sales craft, not an academy fact. It
@@ -577,55 +577,46 @@ export const SECTIONS = [
     "key": "booking_group",
     "tag": "booking_group",
     "layer": "goal",
-    "label": "Booking - which group / calendar",
-    // ⚠️ DELIBERATELY NOT EMPTIED (2026-07-30), and this is the one exception in
-    // this file. It DOES carry BAM GTA's ages (9 to 13, 14 and up). It was left
-    // anyway. Read this before "finishing the job".
+    "label": "Booking - which class",
+    // ⚠️ THE GTA AGE BANDS ARE GONE FROM HERE (build B, 2026-07-30), and this
+    // comment replaces the one that explained why they had to stay. Read it
+    // before putting anything academy-specific back.
     //
-    // WHAT IT ACTUALLY DRIVES. This is not descriptive text. "Group 1" / "Group
-    // 2" are the literal argument values of three machine surfaces the agent
-    // calls: check_availability's `group`, and propose_reply's `book_group` and
-    // `propose_group` (api/agent-approvals.js). calendarForGroup
-    // (api/agent/booking.js) matches the emitted string against calendars keyed
-    // by groupOf(label), and portalFreeSlots filters schedule_slots by the same
-    // token. Emit anything else and the tool returns "No calendar found" - the
-    // agent cannot check availability, cannot propose a verified slot, and
-    // cannot book. This section is the only prose that teaches that vocabulary.
+    // WHAT THIS BODY USED TO BE. "Pick the group by the athlete's age: Group 1
+    // (Elementary / younger): ages 9 to 13. Group 2 (High School / older): ages
+    // 14 and up." Those are BAM GTA's numbers and BAM GTA's vocabulary, and they
+    // shipped to every academy on the roster.
     //
-    // WHY EMPTYING IT DOES NOT EVEN REMOVE THE LEAK. The identical GTA bands are
-    // written into all THREE of those tool-schema descriptions ("'Group 1'
-    // (elementary, 9-13) or 'Group 2' (high school, 14+)"), and tool schemas go
-    // to the model in the same request as this prompt. Emptying this body deletes
-    // one of four copies. The agent would still read GTA's ages, just with the
-    // routing instruction gone: strictly worse on both axes, which is what makes
-    // this different from the four sections emptied above.
+    // WHY IT COULD NOT SIMPLY BE EMPTIED BEFORE. It was not descriptive text.
+    // "Group 1"/"Group 2" were the literal argument values three machine surfaces
+    // took, and this was the only prose that taught them, so emptying the body
+    // deleted ROUTING while leaving the same bands written into three tool
+    // schemas in api/agent-approvals.js. One of four copies gone, and the agent
+    // unable to book. That is why it was a named gap rather than a hole to punch.
     //
-    // WHY IT IS NOT DERIVABLE YET, which is the real finding. groupOf() decides
-    // an academy's grouping by REGEX ON ITS CALENDAR LABEL (/group 1|elementary|
-    // younger/ and /group 2|high school|older/). Measured 2026-07-30: of the six
-    // trial calendars in production, only BAM GTA's two match. CH3 Training's
-    // "Free Trial: Youth (Grades 5-8)" and "Free Trial: HS/College (Grades
-    // 9-12+)" both resolve to null, as does DETAIL Miami's "Free Trial - MS / HS
-    // Academy". So the two-bucket contract is not a general mechanism that needs
-    // per-academy ages poured into it - it is GTA's own label convention wearing
-    // machinery's clothes, and routing is ALREADY dead for every other academy,
-    // prompt or no prompt.
+    // WHAT CLOSED THE GAP. Build A put age_min / age_max_mode / age_max on each
+    // class and source_offer_class_key on each slot, so an academy's own classes
+    // can now answer "which class does a 9 year old belong in" as numbers. Build
+    // B replaced groupOf() with classForCalendar (api/agent/_class-slots.js),
+    // rewrote the three tool schemas to take an AGE and a real class name, and
+    // gave this section the renderer it never had: renderBookingGroup in
+    // api/agent/fact-render.js, which is now the tenth entry in FACT_KEYS. An
+    // academy that fills in its offer clears this section itself - which is what
+    // "derivable" means and what no amount of rewording here could have achieved.
     //
-    // WHAT WOULD MAKE IT DERIVABLE. An academy needs a real, stored mapping from
-    // each bookable calendar to the age band it serves. That does not exist in
-    // any table today: offers.data.schedule.classes[].age carries a band but has
-    // no link to entry_points/schedule_slots, and nothing carries the reverse. The
-    // fix is a per-calendar age band on the calendar row (or a class-to-calendar
-    // link), after which this section renders from the academy's own groups and
-    // the three tool descriptions are generated from the same source instead of
-    // restating GTA's. Until then this is a GAP TO NAME, not a hole to punch
-    // (Zoran's standing rule: all academy data is mandatory before a sales system
-    // is turned on, and a fact that cannot be derived yet gets named).
+    // WHY THE BODY IS THE NOT-CONFIGURED TEXT RATHER THAN EMPTY. The eight
+    // sections emptied above are facts an agent can simply not state. This one is
+    // a DECISION the agent has to make before it can book anybody, so silence
+    // here reads as "use your judgement" - which is precisely the guessing this
+    // whole build removes. An academy with no classes is told, in words, to name
+    // no class, name no time, book nobody, and flag the admin. Same shape and
+    // same reasoning as PRICING_NOT_CONFIGURED.
     //
-    // Do not empty this without doing that work, and do not "fix" it by
-    // softening the ages here while agent-approvals.js still states them - that
-    // splits one wrong answer into two disagreeing ones.
-    "body": "Pick the group by the athlete's age (use the age from the form if you have it):\n- Group 1 (Elementary / younger): ages 9 to 13, younger calendar.\n- Group 2 (High School / older): ages 14 and up, older calendar.\nIf the age is truly unknown, ask once before booking. Never guess the group."
+    // The ENTRY stays so the section keeps its label and its row in the training
+    // UI (api/agent-train.js maps over SECTIONS). Never put an age, a group
+    // number or an example class name in this body: the numbers ARE the decision,
+    // and there is no such thing as a safe default one.
+    "body": BOOKING_GROUP_NOT_CONFIGURED
   },
 
   // ─────────────────────────────────────────────────────────────────────────

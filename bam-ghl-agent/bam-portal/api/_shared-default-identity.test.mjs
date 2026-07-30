@@ -409,33 +409,31 @@ function bodyContains(raw, value) {
 // the run rather than passing quietly. That is deliberate: when someone finally
 // makes booking_group derivable, this file has to be updated in the same change,
 // not left holding a permission for something that no longer happens.
+//
+// ── THE TWO DEFERRED ENTRIES ARE GONE (build B, 2026-07-30) ─────────────────
+// This list used to open with booking_group/gta-group-vocabulary and its second
+// half, which knowingly permitted "Group 1 (Elementary)" and "Group 2 (High
+// School)" to ship to all 47 academies. Their `clears_when` asked for a stored
+// mapping from a bookable calendar to the ages it serves, so that the section
+// could render from each academy's own classes and the tool schemas could be
+// generated from the same source.
+//
+// That is what was built. age_min / age_max_mode / age_max now live on each class
+// and source_offer_class_key on each slot (build A); groupOf() and the two inline
+// /group\s*\d+/ copies are gone, replaced by one shared resolver (build B); the
+// three tool schemas take an age and a real class name; and booking_group has a
+// renderer, renderBookingGroup, so it is the tenth entry in FACT_KEYS and an
+// academy filling in its offer clears it itself.
+//
+// The entries are DELETED rather than kept as a record, because the staleness
+// rule below is what makes this list honest: an entry whose target no longer
+// exists FAILS the run, so a permission cannot outlive the thing it permitted.
+// The history is here, in a comment, where it cannot silently grant anything.
+//
+// If GTA's bands are ever put back into a shared default, the detector catches
+// them with no entry to hide behind - "Group 1 (Elementary)" is derived straight
+// off GTA's snapshot and is one of the BANNED_ANCHORS. MUTATE=bands proves it.
 const ALLOWLIST = [
-  {
-    id: "booking_group/gta-group-vocabulary",
-    kind: "DEFERRED",
-    value: "Group 1 (Elementary)",
-    path: /SECTIONS\[key=booking_group\]\.body|assemblePrompt\(booking\)/,
-    reason:
-      "booking_group is BAM GTA's grouping wearing machinery's clothes. The body also states GTA's " +
-      "age bands (ages 9 to 13, ages 14 and up) and ships to every academy. It is the ONE fact " +
-      "section with no renderer: it is not in FACT_KEYS, so an academy filling in its offer can " +
-      "never clear it. Emptying it is worse than leaving it, because 'Group 1'/'Group 2' are the " +
-      "literal argument values of check_availability and book_group and the only prose that teaches " +
-      "them, so an emptied body deletes routing while the same bands stay written into three tool " +
-      "schemas in api/agent-approvals.js.",
-    clears_when:
-      "a per-calendar age band exists on the calendar row (or a class-to-calendar link), after which " +
-      "this section renders from the academy's own groups and the tool schemas generate from the same " +
-      "source. Tracked as a separate build. Until then this is a named gap, not a clean result.",
-  },
-  {
-    id: "booking_group/gta-group-vocabulary-2",
-    kind: "DEFERRED",
-    value: "Group 2 (High School)",
-    path: /SECTIONS\[key=booking_group\]\.body|assemblePrompt\(booking\)/,
-    reason: "The second half of the same body. Same reasoning, same tracked build.",
-    clears_when: "see booking_group/gta-group-vocabulary.",
-  },
   ...["$315.27", "$279.00", "$36.27", "HST (13%)"].map((value, i) => ({
     id: `pricing_disclosure/receipt-${i + 1}`,
     kind: "NOT_A_LEAK",
@@ -802,20 +800,39 @@ const REPLANT = {
       "door"),
     landed: (CA) => (CA.DEFAULT_CONFIRM_AUTOMATIONS.steps.find((x) => x.key === "same_day")?.template || "").includes("gym entrance"),
   },
-  // Not a leak: the allowlist's own guard. Emptying booking_group leaves its two
-  // DEFERRED entries with nothing to except, and a stale entry must break the run.
+  // Not a leak: the allowlist's own guard. An entry whose target has gone is a
+  // permission for something that no longer happens, and it must break the run
+  // rather than pass quietly.
+  //
+  // This used to model emptying booking_group, whose two DEFERRED entries would
+  // then have had nothing to except. Those entries are gone, so that state can no
+  // longer arise and a control for it would prove nothing. It now models an edit
+  // that CAN still happen and is written down as a proposal at the constant
+  // itself: making the RECEIPT's numbers obviously non-real so the example can
+  // only teach layout. Do that without touching this file and four NOT_A_LEAK
+  // entries are left pointing at a value nobody ships.
   stale: {
     file: "ps",
     edit: (s) => {
-      const at = s.indexOf(`"label": "Booking - which group / calendar",`);
-      if (at < 0) bail("no booking_group section");
-      const b = s.indexOf(`"body": "Pick the group by the athlete's age`, at);
-      if (b < 0) bail("booking_group's body no longer matches the anchor");
-      const end = s.indexOf(`"\n  }`, b);
-      if (end < 0) bail("could not find the end of booking_group's body");
-      return s.slice(0, b) + `"body": ""` + s.slice(end + 1);
+      const from = `"Total: $315.27 every 4 weeks",`;
+      if (!s.includes(from)) bail("the RECEIPT's total no longer matches the anchor");
+      return s.replace(from, `"Total: $100.00 every 4 weeks",`);
     },
-    landed: (PS) => String(PS.SECTIONS.find((x) => x.key === "booking_group")?.body || "").trim() === "",
+    landed: (PS) => !JSON.stringify(PS.SECTIONS).includes("$315.27"),
+  },
+  // The regression this build's own removal makes possible: a future session
+  // notices the shared default no longer names any ages, decides the agent
+  // "needs to know them", and puts BAM GTA's back. There is no allowlist entry
+  // left to hide behind, so the detector must catch it on the value alone.
+  bands: {
+    file: "ps",
+    edit: (s) => {
+      const anchor = `"body": BOOKING_GROUP_NOT_CONFIGURED`;
+      if (!s.includes(anchor)) bail("booking_group's body no longer matches the anchor");
+      const planted = "Pick the group by the athlete's age:\n- Group 1 (Elementary / younger): ages 9 to 13.\n- Group 2 (High School / older): ages 14 and up.";
+      return s.replace(anchor, `"body": ${JSON.stringify(planted)}`);
+    },
+    landed: (PS) => String(PS.SECTIONS.find((x) => x.key === "booking_group")?.body || "").includes("Group 1"),
   },
   // In-process, not on disk: the comment stripper eats the whole file.
   blindstrip: { inProcess: true },

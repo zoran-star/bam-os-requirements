@@ -109,6 +109,70 @@ export function renderSchedule(data, locations) {
   return lines.length ? lines.join("\n") : null;
 }
 
+// ── which class to book into ────────────────────────────────────────────────
+// THE TENTH FACT, and the reason it took until build B to exist.
+//
+// `booking_group` was the ONE fact default that could not be emptied: it carried
+// BAM GTA's age bands (9 to 13, 14 and up) and shipped them to all 47 academies,
+// and yet deleting it made things WORSE rather than better. "Group 1"/"Group 2"
+// were the literal argument values three tool schemas took, and this section was
+// the only prose that taught them, so an emptied body deleted routing while the
+// same bands stayed written into api/agent-approvals.js. It had no renderer, so
+// an academy filling in its offer could never clear it. That is what a named gap
+// looks like: not a hole to punch, a thing that has to be built.
+//
+// What made it derivable is build A: age_min / age_max_mode / age_max on each
+// class, and source_offer_class_key on each slot. The agent now works in the
+// academy's REAL class names, which come from here, and the routing RULES below
+// name no academy, no number and no group.
+//
+// THE RULES ARE PART OF THE RENDER, not a separate prose section, because a
+// rendered fact REPLACES the default body (pick() in prompt-structure.js) - so
+// craft left behind in the body would simply vanish for every academy that has
+// an offer, which is every academy this matters for.
+const BOOKING_ROUTING_RULES = [
+  "Work out which class the athlete belongs in from their AGE, as a number, before you offer any time. Use check_availability - give it the age and it returns only the times that athlete can actually be booked into.",
+  "- Exactly one class fits: book it. Ask nothing further about which class.",
+  "- No class fits: they are not qualified for this academy. Say so honestly and kindly. Never book them into the closest one.",
+  "- More than one class fits: ask ONE question that tells those classes apart, then book. check_availability tells you what the difference actually is. It is often skill level rather than age, and when the classes overlap on age, asking about age again cannot separate them and wastes the parent's time.",
+  "- You cannot read the age: ask the parent for it. This is NOT the same as no class fitting - one of those turns a customer away and the other does not.",
+  "Always name a class exactly as it is written below. Never invent a class, never use a group number, and never use a vague label like 'the younger group'.",
+].join("\n");
+
+// The fact-absent state. Same job as PRICING_NOT_CONFIGURED: an academy with no
+// classes must be SILENT about which class, not fall back to somebody else's.
+export const BOOKING_GROUP_NOT_CONFIGURED = [
+  "No classes are set up for this academy yet, so there is nothing to book an athlete into and no way to tell which class they belong in.",
+  "Do not name a class, do not name a session time, and do not book. Tell the lead you will come back to them with times, and flag the conversation to the admin.",
+].join("\n");
+
+// Pure: offers.data JSON in -> the routing section for THIS academy.
+export function renderBookingGroup(data) {
+  const classes = arr(data && data.schedule && data.schedule.classes);
+  const lines = [];
+  for (const c of classes) {
+    const title = (c && (c.title || c.name)) || null;
+    if (!title) continue;
+    const min = c.age_min == null || String(c.age_min).trim() === "" ? null : String(c.age_min).trim();
+    const openTop = String(c.age_max_mode || "").trim().toLowerCase() === "no upper limit";
+    const max = openTop ? null : (c.age_max == null || String(c.age_max).trim() === "" ? null : String(c.age_max).trim());
+    let ages;
+    if (min && max) ages = `ages ${min} to ${max}`;
+    else if (min && openTop) ages = `ages ${min} and up`;
+    else if (min) ages = `ages ${min} and up`;
+    else if (max) ages = `up to age ${max}`;
+    // An academy that has not set ages says so, rather than being given a band
+    // it never chose. The age numbers are what the whole thing routes on, so a
+    // guess here is the one thing worse than an admission.
+    else ages = "ages not set - ask the admin before booking anyone into it";
+    const extra = c.skill_level && String(c.skill_level).trim().toLowerCase() !== "all"
+      ? `, ${String(c.skill_level).trim()} level` : "";
+    lines.push(`- ${title}: ${ages}${extra}`);
+  }
+  if (!lines.length) return null;
+  return `${BOOKING_ROUTING_RULES}\n\nThis academy's classes:\n${lines.join("\n")}`;
+}
+
 // ── pricing ──────────────────────────────────────────────────────────────────
 // The numbers come from the academy's ROUTABLE, ACTIVE `offer_prices` rows -
 // what api/website/checkout.js can actually sell - NOT from
@@ -560,6 +624,11 @@ export const FACT_SOURCES = {
   business_info:        { label: "Rendered from: your Locations",                          jump: "locations" },
   qualification_config: { label: "Rendered from: Offer - General info and your Locations", jump: "offer:general_info+locations" },
   coaches:              { label: "Rendered from: your Team",                               jump: "team" },
+  // The TENTH fact (build B, 30 July 2026). It renders the academy's own classes
+  // and the age range on each, which is what the agent routes on. Adding it here
+  // is what moves the brain-health strip from 9 to 10 - the total is derived from
+  // this map, never written down.
+  booking_group:        { label: "Rendered from: Offer - Schedule step (each class's ages)", jump: "offer:schedule" },
   // The review link lives on the clients row, edited in the offer's Onboarding
   // step (the `__google_review__` field) beside the community group, because an
   // academy has one review link, not one per offer. When a Reviews card exists
@@ -640,6 +709,7 @@ export async function derivedFactOverrides(clientId, sbFn, opts = {}) {
     set("selling_points", renderSellingPoints(data));
     set("qualification_config", renderQualification(data, client, locations));
     set("coaches",        renderCoaches(staff));
+    set("booking_group",  renderBookingGroup(data));
 
     // social_proof is the only fact that needs its own read, so it gets its own
     // catch - and that catch is LOAD-BEARING, not defensive habit.

@@ -98,28 +98,59 @@ export async function upcomingBookedContactIds(clientId) {
   } catch (_) { return new Set(); }
 }
 
-// Normalize a calendar label to a group key the agent uses.
-function groupOf(label) {
-  const s = String(label || "").toLowerCase();
-  if (/group\s*1|elementary|younger/.test(s)) return "Group 1";
-  if (/group\s*2|high\s*school|older/.test(s)) return "Group 2";
-  return null;
-}
+// groupOf() USED TO LIVE HERE, and its removal is the point of build B.
+//
+// It read a calendar label and returned "Group 1" or "Group 2" by matching
+// /group 1|elementary|younger/ and /group 2|high school|older/. That is BAM
+// GTA's own label convention wearing machinery's clothes: measured 2026-07-30,
+// of the six trial calendars in production only GTA's two matched, and CH3
+// Training's and DETAIL Miami's both resolved to null. So the "two-bucket
+// contract" was never a general mechanism - it was one academy's naming, and
+// every other academy was already routing on nothing.
+//
+// It is replaced by classForCalendar (api/agent/_class-slots.js), which matches
+// the label against the academy's OWN class titles from its training offer. An
+// academy that calls its classes "Group 1" and "Group 2" gets exactly the
+// narrowing it always had, because the words now come from that academy's data
+// instead of from this file. Never reintroduce a vocabulary here.
+import {
+  classIndex, classForCalendar, classByName, loadClassesFor,
+  routeSlots, chooseSlotToBook, parentFacingClassName,
+} from "./_class-slots.js";
+export { loadClassesFor };
 
-// [{ key, label, group }] for the academy's trial calendars.
+// [{ key, label }] for the academy's trial calendars.
 export async function loadCalendars(sb, clientId) {
   try {
     const rows = await sb(`entry_points?client_id=eq.${clientId}&type=eq.calendar&select=key,label`);
     return (Array.isArray(rows) ? rows : [])
-      .map(r => ({ key: r.key, label: r.label, group: groupOf(r.label) }))
+      .map(r => ({ key: r.key, label: r.label }))
       .filter(c => c.key);
   } catch (_) { return []; }
 }
 
-export function calendarForGroup(calendars, group) {
-  if (!Array.isArray(calendars) || !calendars.length) return null;
-  const g = String(group || "").toLowerCase().replace(/\s+/g, "");
-  return calendars.find(c => String(c.group || "").toLowerCase().replace(/\s+/g, "") === g) || null;
+/**
+ * The calendar that serves a named CLASS. Replaces calendarForGroup.
+ *
+ * `className` is the academy's real class name, as it appears on its own offer
+ * and in its own schedule - which is what the agent now works in. Matching is
+ * done by looking for that class's title inside each calendar's label, so GTA's
+ * "Booking Calendar: Group 1 (Elementary)" still resolves for its "Group 1"
+ * class and nothing about GTA moves.
+ *
+ * A single-calendar academy always resolves to that calendar: when there is only
+ * one door, the class does not choose it.
+ */
+export function calendarForClass(calendars, className, classes) {
+  const cals = Array.isArray(calendars) ? calendars.filter(c => c && c.key) : [];
+  if (!cals.length) return null;
+  const idx = classIndex(classes);
+  const cls = classByName(className, idx);
+  if (cls) {
+    const hit = cals.find(c => classForCalendar(c.label, idx) === cls.key);
+    if (hit) return hit;
+  }
+  return cals.length === 1 ? cals[0] : null;
 }
 
 // The local-offset ISO builder now lives in api/_local-iso.js, because
@@ -129,34 +160,40 @@ export function calendarForGroup(calendars, group) {
 import { localIsoParts } from "../_local-iso.js";
 export { localIsoParts };
 
-// Portal slots for a group over the window. Occupancy comes from the shared
-// slot_spots_taken function via the bulk RPC; the booking RPC re-checks capacity
-// transactionally, so a stale read can't overbook.
-async function portalFreeSlots(clientId, groupLabel, { days = 14, timezone = "America/Toronto", startMs } = {}) {
+// Portal slots the athlete may be OFFERED over the window. Occupancy comes from
+// the shared slot_spots_taken function via the bulk RPC; the booking RPC
+// re-checks capacity transactionally, so a stale read can't overbook.
+//
+// THIS is the half of the fix that matters. The write path below was already
+// precise - it resolves an exact start_time - so a child booked into the wrong
+// class got there by being SHOWN a time that was never for them. Filtering here
+// is what stops that, and a build that only fixed the write would have looked
+// finished and changed nothing.
+async function portalFreeSlots(clientId, { days = 14, timezone = "America/Toronto", startMs, calLabel, athleteAge, classes } = {}) {
   const start = startMs || Date.now();
   const nowIso = new Date(start).toISOString();
   const endIso = new Date(start + days * 24 * 3600 * 1000).toISOString();
   const slots = (await sbFetch(
-    `schedule_slots?tenant_id=eq.${encodeURIComponent(clientId)}&is_cancelled=eq.false&start_time=gte.${encodeURIComponent(nowIso)}&start_time=lte.${encodeURIComponent(endIso)}&select=id,name,start_time,capacity&order=start_time.asc&limit=500`
+    `schedule_slots?tenant_id=eq.${encodeURIComponent(clientId)}&is_cancelled=eq.false&start_time=gte.${encodeURIComponent(nowIso)}&start_time=lte.${encodeURIComponent(endIso)}&select=id,name,start_time,capacity,source_offer_class_key&order=start_time.asc&limit=500`
   )) || [];
-  const g = String(groupOf(groupLabel) || groupLabel || "").toLowerCase();
-  const list = slots.filter(s => !g || (s.name || "").toLowerCase().includes(g));
-  const taken = await slotSpotsTakenBulk(clientId, list.map(s => s.id));
+  const route = routeSlots({ slots, classes, rawAge: athleteAge, calendarLabel: calLabel });
+  const taken = await slotSpotsTakenBulk(clientId, route.slots.map(s => s.id));
   const out = {};
-  for (const s of list) {
+  for (const s of route.slots) {
     if ((s.capacity - (taken.get(s.id) || 0)) <= 0) continue;
     const { day, iso } = localIsoParts(s.start_time, timezone);
     (out[day] = out[day] || []).push(iso);
   }
-  return { timezone, days: out };
+  return { timezone, days: out, routing: route };
 }
 
-// Open slots for a calendar over the next `days`. Returns { timezone, days:{ date:[iso,...] } }.
+// Open slots for a calendar over the next `days`. Returns { timezone, days:{ date:[iso,...] }, routing }.
 // Pass clientId (+ the calendar's label) to make this provider-aware; portal
-// academies never touch GHL here.
-export async function freeSlots(token, calendarId, { days = 14, timezone = "America/Toronto", startMs, clientId, calLabel } = {}) {
+// academies never touch GHL here. Pass athleteAge + the academy's classes to
+// have the OFFER narrowed to the classes that athlete actually belongs in.
+export async function freeSlots(token, calendarId, { days = 14, timezone = "America/Toronto", startMs, clientId, calLabel, athleteAge, classes } = {}) {
   if (clientId && (await bookingProviderOf(clientId)) === "portal") {
-    return portalFreeSlots(clientId, calLabel || "", { days, timezone, startMs });
+    return portalFreeSlots(clientId, { days, timezone, startMs, calLabel: calLabel || "", athleteAge, classes });
   }
   const start = startMs || Date.now();
   const end = start + days * 24 * 3600 * 1000;
@@ -168,7 +205,9 @@ export async function freeSlots(token, calendarId, { days = 14, timezone = "Amer
   if (!r.ok) throw new Error(json.message || json.error || `GHL ${r.status}`);
   const out = {};
   for (const [k, v] of Object.entries(json)) if (v && Array.isArray(v.slots)) out[k] = v.slots;
-  return { timezone, days: out };
+  // GHL owns the calendar for these academies, so there is nothing here to route:
+  // the slots come back already scoped to whichever GHL calendar was asked for.
+  return { timezone, days: out, routing: null };
 }
 
 // The contact's next upcoming booked appointment (the trial the confirm agent is
@@ -185,11 +224,18 @@ export async function nextAppointment(token, contactId, { nowMs = Date.now(), cl
       const ids = tbs.map(t => t.slot_id).filter(Boolean);
       if (!ids.length) return null;
       const slots = (await sbFetch(
-        `schedule_slots?id=in.(${ids.map(encodeURIComponent).join(",")})&is_cancelled=eq.false&start_time=gt.${encodeURIComponent(new Date(nowMs).toISOString())}&select=name,start_time,end_time,location_label&order=start_time.asc&limit=1`
+        `schedule_slots?id=in.(${ids.map(encodeURIComponent).join(",")})&is_cancelled=eq.false&start_time=gt.${encodeURIComponent(new Date(nowMs).toISOString())}&select=name,start_time,end_time,location_label,source_offer_class_key&order=start_time.asc&limit=1`
       )) || [];
       const s = slots[0];
       if (!s) return null;
-      return { startTime: s.start_time, endTime: s.end_time, address: s.location_label || null, calendarId: null, title: s.name || "Free Trial", status: "confirmed" };
+      // DECISION 3 (Zoran, 30 July 2026). This `title` becomes the event title in
+      // the add-to-calendar links the trial confirmation sends, so it is read by
+      // a parent, in their own calendar, for as long as they keep the event. It
+      // used to be the raw slot name - our internal filing label - which for
+      // DETAIL Miami reads "Training - DETAIL Academy (Mon, Wed, Fri)". It is now
+      // the class's real name.
+      const classTitle = parentFacingClassName(s, await loadClassesFor(sbFetch, clientId));
+      return { startTime: s.start_time, endTime: s.end_time, address: s.location_label || null, calendarId: null, title: classTitle || "Free Trial", status: "confirmed" };
     } catch (_) { return null; }
   }
   try {
@@ -212,15 +258,23 @@ export async function nextAppointment(token, contactId, { nowMs = Date.now(), cl
 // scoped to the group, enriches parent details from the contacts store, and
 // returns the trial_booking id. Throws with a human message on failure
 // (no slot at that time / slot full) so callers surface it to staff.
-export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, contactId, contactName, athleteName }) {
+// `className` is the academy's real class name (the value the agent now emits in
+// book_group). `athleteAge` narrows by age when the academy is armed for it.
+export async function bookPortalTrial(clientId, { slotAtIso, group, className, calLabel, contactId, contactName, athleteName, athleteAge, classes }) {
   const t = new Date(slotAtIso);
   if (isNaN(t.getTime())) throw new Error("invalid slot time");
   const rows = (await sbFetch(
-    `schedule_slots?tenant_id=eq.${encodeURIComponent(clientId)}&is_cancelled=eq.false&start_time=eq.${encodeURIComponent(t.toISOString())}&select=id,name&limit=10`
+    `schedule_slots?tenant_id=eq.${encodeURIComponent(clientId)}&is_cancelled=eq.false&start_time=eq.${encodeURIComponent(t.toISOString())}&select=id,name,source_offer_class_key&limit=10`
   )) || [];
-  const g = String(group || groupOf(calLabel) || "").toLowerCase().trim();
-  const slot = rows.find(s => !g || (s.name || "").toLowerCase().includes(g)) || rows[0];
-  if (!slot) throw new Error("no portal slot at that time");
+  const cls = Array.isArray(classes) ? classes : await loadClassesFor(sbFetch, clientId);
+  // `group` is the legacy argument name of the same value; the column it comes
+  // from still carries it, so both spellings are accepted and mean "the class".
+  const picked = chooseSlotToBook({
+    rows, classes: cls, rawAge: athleteAge,
+    calendarLabel: calLabel, className: className || group || null,
+  });
+  const slot = picked.slot;
+  if (!slot) throw new Error(picked.reason || "no portal slot at that time");
   let c = {};
   try {
     const cr = await sbFetch(`contacts?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name,email,phone,athlete_name&limit=1`);
@@ -253,7 +307,10 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, calLabel, co
       p_offer_id: oppOfferId,
       p_ghl_contact_id: contactId,
       p_source: "staff",
-      p_metadata: { via: "agent-confirm-book", slot_name: slot.name },
+      // How the slot was chosen rides along, so an unidentified slot (one with no
+      // source_offer_class_key that no class title matched) is recorded rather
+      // than silently indistinguishable from a clean age match.
+      p_metadata: { via: "agent-confirm-book", slot_name: slot.name, class_key: slot.source_offer_class_key || null, routed_by: picked.via },
     }),
   });
   const id = typeof r === "string" ? r : (r && r.trial_booking_id) || null;
