@@ -15,7 +15,6 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
 | Migration file | What it does | Blocked features until applied | Added |
 |---|---|---|---|
-| `20260730T120000_public_ticket_intake.sql` | Widens `tickets_source_check` to allow `public_form`, adds `tickets.public_token` (unique where not null), adds 3 partial indexes the public-form rate limiter needs. All additive, no policy, no new table. | The PUBLIC support form at `/ticket`. It has NEVER created a ticket (213 exist, 0 from this form). Until this runs, `api/public-ticket.js` 500s on every submit and the form shows its honest "Your request was not submitted" screen with the email fallback - nothing lies, nothing is lost, nothing is saved. `/ticket/<token>` stays "Ticket not found". | 2026-07-30 |
 
 
 > **`20260729T230000` step 2 - DONE 2026-07-30.** The follow-up this note demanded is
@@ -41,6 +40,7 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
 | Migration file | Applied | By |
 |---|---|---|
+| `20260730T120000_public_ticket_intake.sql` | on or before 2026-07-30 | **Author unknown - found ALREADY APPLIED while going to run it.** Its row sat in PENDING, so this file was telling every reader that the public support form was still one SQL statement away from working. Verified complete rather than partial before moving it: `tickets_source_check` allows `public_form`, `tickets.public_token` exists, and all four indexes are present (`tickets_public_token_key`, `_recent_idx`, `_ip_idx`, `_email_idx`). Endpoint probed live afterwards: `POST /api/public-ticket` with an empty body returns **400 `A name is required.`**, not a 500, so the handler loads. **Not proven by that probe: the INSERT itself, because validation short-circuits before the write.** |
 | `20260730T160000_locations_entry_note.sql` | 2026-07-30 | Claude (Supabase MCP, orchestrator, on Zoran's instruction to merge #1656). **Applied BEFORE the merge deliberately**, and the ordering is the point: the column is additive and the pre-merge code never read it, so applying it first is inert, while merging first would have left GTA with no entry sentence until the SQL ran. The leak ends at the merge either way, so migration-first removes the window at no cost. Verified by read-back rather than the success flag: exactly ONE row seeded (GTA, 1079 Linbrook Rd), and GTA's second venue plus both San Jose venues correctly NULL |
 | `20260730T120000_step_rows_render_the_academy_name.sql` | 2026-07-30 | Claude (Supabase MCP, orchestrator). **All three md5 guards verified matching production BEFORE applying**, so the update was known to hit all three rows rather than silently hitting none. Verified after: all three carry `{{location.name}}`, zero literals left, and `scripts/snapshots/bam-gta.json` already carried the tokenized form for exactly those three rows, so production has caught up to the snapshot rather than drifting from it |
 | `20260730120000_agent_reply_status_dismissed.sql` | 2026-07-30 | Claude (Supabase MCP, at Zoran's request). Verified after applying: all four CHECKs allow `dismissed`, `agent_closing_replies` kept `paused`. |
