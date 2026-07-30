@@ -31,7 +31,7 @@
 // PROVES it still bites, by running this function with the cycle forced to h24 and
 // requiring the correct answer anyway. MUTATE=isoguard proves it is not decorative.
 export function localIsoParts(dateUtc, timeZone) {
-  const fmt = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23", timeZoneName: "longOffset" });
+  const fmt = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZoneName: "longOffset" });
   const parts = Object.fromEntries(fmt.formatToParts(new Date(dateUtc)).map(p => [p.type, p.value]));
   const off = (parts.timeZoneName || "GMT+00:00").replace("GMT", "") || "+00:00";
   const day = `${parts.year}-${parts.month}-${parts.day}`;
