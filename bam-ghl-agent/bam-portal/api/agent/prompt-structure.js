@@ -26,12 +26,40 @@
 // and prices; Shig Hoops (V2, no training offer, no stored row) was carrying
 // GTA's "$185 to $565" ladder because of exactly that. Fact-section defaults must
 // stay academy-agnostic - say what the agent should do when the data is missing,
-// never invent the data (Zoran 2026-07-24). Four fact defaults are now EMPTY for
-// that reason (business_info, coaches, social_proof, qualification_config); each
-// carries a comment saying what was removed and why it must not come back, and
-// `api/_prompt-academy-neutral.test.mjs` renders real prompts for all three agents
-// to prove no academy's name, address, city, domain or credential claim reaches
-// another academy's agent. Run it after any edit to a fact body.
+// never invent the data (Zoran 2026-07-24). EIGHT fact defaults are now EMPTY for
+// that reason; each carries a comment saying what was removed and why it must not
+// come back, and `api/_prompt-academy-neutral.test.mjs` renders real prompts for
+// all three agents to prove it. Run it after any edit to a fact body.
+//
+// The eight went in two rounds, and the SECOND round is the one worth
+// understanding, because it is the harder case.
+//   Round 1 (business_info, coaches, social_proof, qualification_config) removed
+//   bodies that NAMED BAM GTA: its business name, its Linbrook Rd address, its
+//   byanymeanstoronto.ca link, its Google review link, its "certified by By Any
+//   Means" credential claim, its "near Oakville/GTA" service area. A leak you can
+//   read off the page.
+//   Round 2 (schedule, program, policies, selling_points) removed bodies that name
+//   NOBODY and were left behind for exactly that reason - and they were the more
+//   dangerous half. GTA's week of class times, its "ages 9 and up", its
+//   cancellation terms and its five differentiators are unmarked, plausible, and
+//   completely wrong for anyone else, so nothing about the output looked off.
+//   A leak that names an academy gets caught by a parent who reads the address.
+//   A leak that names nobody gets BELIEVED, and a parent shows up on a Tuesday
+//   the academy does not run.
+//
+// The measurement that made round 2 non-optional: 32 of 47 academies have no
+// training offer AND no stored override rows, so derivedFactOverrides returns {}
+// and pick() falls through to these defaults for every one of them. That is not
+// an edge case, it is the majority of the roster and every academy on its first
+// day. All academy data is MANDATORY before a sales system is turned on (Zoran
+// 2026-07-30), so the correct state for an unconfigured academy is NO schedule,
+// not somebody else's schedule.
+//
+// ONE fact default was deliberately NOT emptied: `booking_group`. It is a fact
+// wearing a behaviour section's clothes, it has no renderer, and emptying it
+// removes routing without removing the leak. Its own comment carries the full
+// reasoning and the derivation gap it is blocked on. Do not "finish the job" by
+// emptying it without reading that first.
 import { PRICING_NOT_CONFIGURED } from "./fact-render.js";
 
 // ── Pricing disclosure (tier 1, BAM master) ──────────────────────────────────
@@ -61,6 +89,39 @@ import { PRICING_NOT_CONFIGURED } from "./fact-render.js";
 // The agent HOLDS all three parts in every disclosure mode, because it needs
 // them to answer "is that before or after tax" correctly. The mode governs only
 // what it volunteers.
+//
+// ── AUDITED 2026-07-30, LEFT AS IS, and here is the verdict ──────────────────
+// Asked during the round that emptied the eight fact defaults: is this receipt
+// brand craft, or is it one academy's fact?
+//
+// It is CRAFT BY ROLE and one academy's fact BY CONTENT, and both halves are
+// true at once. Its ROLE is to demonstrate a SHAPE - three lines, total last -
+// which is genuinely academy-agnostic, is the entire point of the BREAKDOWN axis
+// added 2026-07-26, and is not derivable from any academy's data because it is a
+// layout, not a value. Deleting it would delete the teaching. But its NUMBERS
+// are not illustrative: verified against production, $315.27 is BAM GTA's live
+// `Summer Unlimited - Monthly` offer_prices row to the cent, $279.00 is its
+// pre-tax base, and "HST (13%)" is GTA's clients.tax_config verbatim.
+//
+// It is left in place because, unlike the eight, it is guarded by rules that are
+// actually adjacent to it rather than merely elsewhere: ITEMIZE_RULES on the very
+// next line says every line comes from your pricing section exactly as written
+// and forbids doing arithmetic or working backwards from a total, and an academy
+// with no catalog renders PRICING_NOT_CONFIGURED, which tells the agent to quote
+// nothing at all. Two independent instructions have to fail before a number here
+// is spoken.
+//
+// THE RESIDUAL RISK, stated plainly rather than waved off, because "guarded by a
+// rule" is the exact shape of assurance that gets trusted for existing rather
+// than for working. Nothing TESTS that a real agent never emits $315.27, and the
+// tax NAME is the weakest part: HST does not exist in California, so a San Jose
+// agent imitating the label rather than the layout would state a foreign tax
+// regime with total confidence. The cheap hardening is to keep the three-line
+// shape and make the numbers obviously non-real with a generic tax label, so the
+// illustration can only teach layout. That is a change to shared tier-1 sales
+// craft that ships to all 47 academies, so it is Zoran's call and a separate
+// pass, not a quiet edit smuggled in on a fact-removal ticket. Do not delete
+// this constant without replacing the shape it teaches.
 const RECEIPT = [
   "Plan: $279.00",
   "HST (13%): $36.27",
@@ -265,7 +326,30 @@ export const SECTIONS = [
     "tag": "schedule",
     "layer": "location",
     "label": "Schedule",
-    "body": "MONDAYS\nYounger group: 7-8pm\nOlder group: 8-9pm\n\nTUESDAYS\nYounger group: 7-8pm\nOlder group: 8-9pm\n\nWEDNESDAYS\nYounger group: 7-8pm\nOlder group: 8-9pm\n\nTHURSDAYS\nYounger group: 7-8pm\nOlder group: 8-9pm\n\nSATURDAYS\nYounger group: 11:30-12:30pm\nOlder group: 12:30-1:30pm\n\nHoliday schedule: We run on holidays."
+    // EMPTY ON PURPOSE, and it must stay empty. This body used to be BAM GTA's
+    // actual operating week - Mon/Tue/Wed/Thu 7-8pm and 8-9pm, Saturday
+    // 11:30-12:30 and 12:30-1:30, plus "Holiday schedule: We run on holidays."
+    // It names no academy, which is exactly why it survived the round that
+    // removed the bodies that did, and exactly what made it worse. An address
+    // in the wrong city is a leak a parent can spot; a class time in the wrong
+    // city is a leak a parent ACTS on. The 32 academies with no training offer
+    // were all telling parents to come Tuesday at 7.
+    //
+    // "We run on holidays" is the sharpest line in it: an operating commitment,
+    // stated flatly, on behalf of academies that were never asked. renderSchedule
+    // (api/agent/fact-render.js) derives the real week per academy from
+    // offer.data.schedule.classes with the academy's own location names and its
+    // own year-round/seasonal answer, but derivedFactOverrides returns {} for an
+    // academy with no training offer, and pick() then fell through to here.
+    //
+    // The ENTRY stays so the section keeps its label and its row in the training
+    // UI (api/agent-train.js maps over SECTIONS); only the leaking literal is
+    // gone. Empty is the right answer, not a plausible sample week: a sample week
+    // is indistinguishable from a real one to the model reading it, so it would
+    // ship the same wrong Tuesday with a clearer conscience. An academy with no
+    // schedule must have NO schedule, which is the fact-absent state the
+    // brain-health nudge chip exists for. Never put example days or times here.
+    "body": ""
   },
   {
     "key": "coaches",
@@ -318,14 +402,69 @@ export const SECTIONS = [
     "tag": "selling_points",
     "layer": "location",
     "label": "Selling points",
-    "body": "These are the key differentiators for this academy. Weave them into responses when there is a natural opening. Only highlight one per message. Forcing multiple selling points into a single reply feels like a sales pitch.\n\n- Science-based approach to basketball training\n- Positive, encouraging environment for all athletes\n- Small group sizes so athletes get more individual attention\n- Drills maximize time-on-task, so athletes spend more time training and less time standing in line\n- Focus on individual skill development (not team stuff)"
+    // EMPTY ON PURPOSE, and it must stay empty. This body used to be BAM GTA's
+    // five curated differentiators - science-based approach, positive
+    // environment, small groups, time-on-task drills, individual skill
+    // development - handed to every academy as its own answer to "what makes you
+    // different". A differentiator that every academy shares is a contradiction
+    // in terms, and this is the section `core_behavior` and `objection_handling`
+    // both point at ("use the selling points") when a parent is comparing us to
+    // the program down the road.
+    //
+    // THIS ONE WAS ALSO STALE, which is the part that makes it more than a leak.
+    // Build 3 (Zoran 2026-07-23) moved GTA's bullets INTO its offer `value` step
+    // so the owner edits them where they live; renderSellingPoints
+    // (api/agent/fact-render.js) reads them back from data.value. The copy here
+    // was never deleted, so it went on serving 32 academies while no longer
+    // agreeing with the source it was copied from. A stale copy of one academy's
+    // marketing is worse than a fresh one: it cannot be corrected by fixing the
+    // thing everyone believes is the source.
+    //
+    // The framing sentences went with the bullets ON PURPOSE. "Weave them in, one
+    // per message" is real craft, but craft belongs in a behaviour section, and
+    // `core_behavior` + `objection_handling` already carry it. Leaving the
+    // wrapper here would have made the section present-but-hollow, which reads as
+    // configured to the brain-health strip and stops the owner ever being nudged
+    // to fill it in - the exact failure MUTATE=hollow exists to catch.
+    //
+    // The ENTRY stays so the section keeps its label and its row in the training
+    // UI; only the leaking literal is gone. Never put an example differentiator
+    // here: it is the one section whose whole job is to be unlike everyone else's.
+    "body": ""
   },
   {
     "key": "program",
     "tag": "program",
     "layer": "offer",
     "label": "Program",
-    "body": "Ages: 9 and up\nSkill levels: All skill levels (beginners welcome, advanced players placed in appropriate group)\nGroup sizes: 6-12 players\nCoach ratio: At least 2 coaches per session\nCo-ed or gendered: Co-ed only\nPrivate training: Available for current members only\nCamps/clinics: None currently\nAdult classes: Group 2 (older group) only"
+    // EMPTY ON PURPOSE, and it must stay empty. This body used to be BAM GTA's
+    // program shape: "Ages: 9 and up", "Group sizes: 6-12 players", "At least 2
+    // coaches per session", "Co-ed only", private training for members only, no
+    // camps, and "Adult classes: Group 2 (older group) only".
+    //
+    // AGE IS THE WHOLE PROBLEM HERE. The architecture note at the top of this
+    // file says age lives EXACTLY ONCE, in `program`. Two behaviour sections lean
+    // on that promise by reference - `qualification` says to check the athlete is
+    // "within the program's age range", `objection_handling` tells the agent to
+    // quote "the program's minimum age" to a parent of a too-young kid. With this
+    // default in place, both resolved to 9 for every unconfigured academy, so an
+    // agent turned away an 8-year-old on a number its academy never set. The
+    // renderer's own comment records that GTA once had THREE different answers
+    // for age (stored "6 and up", offer "9-17", this default "9 and up"); this
+    // was the third one, still shipping to everybody else.
+    //
+    // "Adult classes: Group 2 (older group) only" additionally hardcodes GTA's
+    // two-bucket grouping as a fact about every academy's adult offering.
+    //
+    // renderProgram (api/agent/fact-render.js) derives all of this per academy
+    // from offers.data.general_info, but derivedFactOverrides returns {} without
+    // a training offer, and pick() then fell through to here.
+    //
+    // The ENTRY stays so the section keeps its label and its row in the training
+    // UI; only the leaking literal is gone. Empty is correct rather than a
+    // neutral-sounding age band: there is no such thing as a safe default minimum
+    // age, because the number itself is the decision. Never put an age here.
+    "body": ""
   },
   {
     "key": "pricing",
@@ -339,7 +478,32 @@ export const SECTIONS = [
     "tag": "policies",
     "layer": "offer",
     "label": "Policies",
-    "body": "Cancel/pause: Pause and cancel anytime\nMakeup/reschedule: Reschedule through the booking app\nParent watching: Parents are welcome to watch\nUnder-18 policy: Parent must book the trial. Athletes can be dropped off (parent does not need to stay).\nFlexibility: Can offer a second free trial if the lead is unsure after the first"
+    // EMPTY ON PURPOSE, and it must stay empty. This body used to be BAM GTA's
+    // terms: "Pause and cancel anytime", reschedule through the booking app,
+    // parents welcome to watch, parent must book but the athlete can be dropped
+    // off, and a second free trial if they are unsure.
+    //
+    // These are CONTRACTUAL, which sets this section apart from the other three
+    // emptied alongside it. A wrong class time wastes a parent's evening; "pause
+    // and cancel anytime" told on behalf of an academy that requires 30 days
+    // written notice is the agent making a commitment the academy has to either
+    // honour or renege on, and it is the single line `objection_handling` sends
+    // the agent to when a parent balks at commitment. The under-18 drop-off rule
+    // is the same shape with a child in it: an academy that requires a parent to
+    // stay had its agent telling parents they could leave.
+    //
+    // renderPolicies (api/agent/fact-render.js) derives all of it per academy
+    // from offers.data.policy - real notice periods, real pause limits, real
+    // refund windows - but derivedFactOverrides returns {} for an academy with no
+    // training offer, and pick() then fell through to here.
+    //
+    // The ENTRY stays so the section keeps its label and its row in the training
+    // UI; only the leaking literal is gone. Empty is correct and a "reasonable"
+    // sample policy would be the worst possible content for this section: the
+    // permissive reading is the one a parent will hold us to. The standing rule
+    // in `boundaries` - only share what exists in the config, flag rather than
+    // invent - already covers the empty case. Never put terms here.
+    "body": ""
   },
   {
     "key": "qualification_config",
@@ -414,6 +578,53 @@ export const SECTIONS = [
     "tag": "booking_group",
     "layer": "goal",
     "label": "Booking - which group / calendar",
+    // ⚠️ DELIBERATELY NOT EMPTIED (2026-07-30), and this is the one exception in
+    // this file. It DOES carry BAM GTA's ages (9 to 13, 14 and up). It was left
+    // anyway. Read this before "finishing the job".
+    //
+    // WHAT IT ACTUALLY DRIVES. This is not descriptive text. "Group 1" / "Group
+    // 2" are the literal argument values of three machine surfaces the agent
+    // calls: check_availability's `group`, and propose_reply's `book_group` and
+    // `propose_group` (api/agent-approvals.js). calendarForGroup
+    // (api/agent/booking.js) matches the emitted string against calendars keyed
+    // by groupOf(label), and portalFreeSlots filters schedule_slots by the same
+    // token. Emit anything else and the tool returns "No calendar found" - the
+    // agent cannot check availability, cannot propose a verified slot, and
+    // cannot book. This section is the only prose that teaches that vocabulary.
+    //
+    // WHY EMPTYING IT DOES NOT EVEN REMOVE THE LEAK. The identical GTA bands are
+    // written into all THREE of those tool-schema descriptions ("'Group 1'
+    // (elementary, 9-13) or 'Group 2' (high school, 14+)"), and tool schemas go
+    // to the model in the same request as this prompt. Emptying this body deletes
+    // one of four copies. The agent would still read GTA's ages, just with the
+    // routing instruction gone: strictly worse on both axes, which is what makes
+    // this different from the four sections emptied above.
+    //
+    // WHY IT IS NOT DERIVABLE YET, which is the real finding. groupOf() decides
+    // an academy's grouping by REGEX ON ITS CALENDAR LABEL (/group 1|elementary|
+    // younger/ and /group 2|high school|older/). Measured 2026-07-30: of the six
+    // trial calendars in production, only BAM GTA's two match. CH3 Training's
+    // "Free Trial: Youth (Grades 5-8)" and "Free Trial: HS/College (Grades
+    // 9-12+)" both resolve to null, as does DETAIL Miami's "Free Trial - MS / HS
+    // Academy". So the two-bucket contract is not a general mechanism that needs
+    // per-academy ages poured into it - it is GTA's own label convention wearing
+    // machinery's clothes, and routing is ALREADY dead for every other academy,
+    // prompt or no prompt.
+    //
+    // WHAT WOULD MAKE IT DERIVABLE. An academy needs a real, stored mapping from
+    // each bookable calendar to the age band it serves. That does not exist in
+    // any table today: offers.data.schedule.classes[].age carries a band but has
+    // no link to entry_points/schedule_slots, and nothing carries the reverse. The
+    // fix is a per-calendar age band on the calendar row (or a class-to-calendar
+    // link), after which this section renders from the academy's own groups and
+    // the three tool descriptions are generated from the same source instead of
+    // restating GTA's. Until then this is a GAP TO NAME, not a hole to punch
+    // (Zoran's standing rule: all academy data is mandatory before a sales system
+    // is turned on, and a fact that cannot be derived yet gets named).
+    //
+    // Do not empty this without doing that work, and do not "fix" it by
+    // softening the ages here while agent-approvals.js still states them - that
+    // splits one wrong answer into two disagreeing ones.
     "body": "Pick the group by the athlete's age (use the age from the form if you have it):\n- Group 1 (Elementary / younger): ages 9 to 13, younger calendar.\n- Group 2 (High School / older): ages 14 and up, older calendar.\nIf the age is truly unknown, ask once before booking. Never guess the group."
   },
 

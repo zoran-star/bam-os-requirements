@@ -51,7 +51,8 @@ export function resolveClientTz(client) {
 //   {{appointment.start_time}}            "Tue, Jun 30 at 7:00 PM"
 //   {{appointment.only_start_time}}       "7:00 PM"
 //   {{appointment.only_start_date}}       "Tuesday, June 30, 2026"
-//   {{appointment.meeting_location}}      academy address
+//   {{appointment.meeting_location}}      the booked venue's address
+//   {{appointment.entry_note}}            the booked venue's own entry directions
 //   {{appointment.add_to_google_calendar}} Google Calendar URL we build
 //   {{appointment.add_to_ical_outlook}}   /api/ical link we host (.ics)
 // {{contact.first_name}} is left for the send engine to fill.
@@ -91,7 +92,10 @@ export const DEFAULT_CONFIRM_AUTOMATIONS = {
 "Time: {{appointment.only_start_time}}\n\n" +
 "Date: {{appointment.only_start_date}}\n\n" +
 "Location: {{appointment.meeting_location}}\n\n" +
-"F.Y.I the gym entrance we use is at the front of the building, on the left side.",
+// The entry note is the VENUE's fact, on its own line so it can leave without a
+// trace. It used to be a hardcoded sentence describing BAM GTA's Linbrook door,
+// sent by every academy on this shared step. See DROP_WHEN_EMPTY below.
+"{{appointment.entry_note}}",
     },
   ],
 };
@@ -205,10 +209,62 @@ export function buildIcalUrl({ startMs, endMs, title, location }) {
   return `${PORTAL_BASE}/api/ical?${p.toString()}`;
 }
 
+// NO FACT, NO OUTPUT - the appointment-token half of the rule.
+//
+// The same mechanism as DROP_WHEN_EMPTY in api/email-shells.js, which is where
+// {{location.venue}} and {{location.schedule}} take their own mention with them
+// when the academy has no such fact. It is reimplemented here rather than reused
+// because the two run in the wrong order to share: resolveApptTokens() runs FIRST
+// (api/agent-confirm.js: resolveMergeVars(resolveApptTokens(tpl, ...), ...)), so
+// every {{appointment.*}} token is already substituted by the time email-shells
+// sees the text, and its helper is not exported anyway.
+//
+// The behaviour it copies, exactly:
+//   a BARE mention (the whole line is the token)      -> drop the line, and drop a
+//        dangling lead-in above it that ends in ":".
+//   a mention INSIDE prose                            -> drop only that SENTENCE,
+//        keep the rest of the line.
+//
+// entry_note is the only member. The dangling-LABEL stripper below is a different
+// rule for a different shape ("Location:" with nothing after it) and both are
+// needed: an academy with neither an address nor an entry note has to lose the
+// Location line AND the door sentence, which is the exact case that used to send a
+// parent nothing about where to go followed by a confident description of BAM GTA's
+// door in Oakville.
+const DROP_WHEN_EMPTY = ["appointment.entry_note"];
+const tokenRe = (name) => new RegExp("\\{\\{\\s*" + name.replace(/\./g, "\\.") + "\\s*\\}\\}");
+function dropEmptyMentions(text, emptyTokens) {
+  if (!emptyTokens.length) return String(text);
+  const EMPTY = new RegExp(emptyTokens.map((t) => tokenRe(t).source).join("|"));
+  const BARE = new RegExp("^\\s*\\S*(?:" + emptyTokens.map((t) => tokenRe(t).source).join("|") + ")\\S*\\s*$");
+  const lines = String(text).split("\n");
+  const out = [];
+  for (const line of lines) {
+    if (!EMPTY.test(line)) { out.push(line); continue; }
+    const bare = BARE.test(line);
+    let kept = "";
+    if (!bare) {
+      kept = line
+        .split(/(?<=[.!?])\s+/)
+        .filter((sentence) => !EMPTY.test(sentence))
+        .join(" ")
+        .trim();
+    }
+    if (kept) { out.push(kept); continue; }
+    // Nothing survives on this line: drop it, and drop a dangling lead-in
+    // ("Here's how to get in:") immediately above it.
+    let j = out.length - 1;
+    while (j >= 0 && !out[j].trim()) j--;
+    if (j >= 0 && /:\s*$/.test(out[j])) out.splice(j, out.length - j);
+  }
+  return out.join("\n");
+}
+
 // Replace the {{appointment.*}} tokens with values WE resolve. Leaves
 // {{contact.*}} / {{location.*}} for the send engine. ctx: { startMs, endMs,
-// location, title, tz }. ctx.tz is the academy's zone (resolveClientTz); omit it
-// and the times render in America/Toronto exactly as they always have.
+// location, entryNote, title, tz }. ctx.tz is the academy's zone
+// (resolveClientTz); omit it and the times render in America/Toronto exactly as
+// they always have.
 export function resolveApptTokens(template, ctx = {}) {
   const cal = { startMs: ctx.startMs, endMs: ctx.endMs, title: ctx.title || "Free Trial", location: ctx.location || "" };
   const tz = validTz(ctx.tz);
@@ -217,10 +273,18 @@ export function resolveApptTokens(template, ctx = {}) {
     "appointment.only_start_time": ctx.startMs ? fmtTime(ctx.startMs, tz) : "",
     "appointment.only_start_date": ctx.startMs ? fmtDate(ctx.startMs, tz) : "",
     "appointment.meeting_location": ctx.location || "",
+    // How a family gets in the door at the venue they are ACTUALLY booked into
+    // (locations.entry_note, set per venue in Business Blueprint > Locations).
+    // The caller hands it over only when it belongs to the same venue whose
+    // address is being sent - see fireScriptedStep in api/agent-confirm.js.
+    // Empty for every academy that has not written one, and then its line goes.
+    "appointment.entry_note": String(ctx.entryNote || "").trim(),
     "appointment.add_to_google_calendar": ctx.startMs ? buildGoogleCalUrl(cal) : "",
     "appointment.add_to_ical_outlook": ctx.startMs ? buildIcalUrl(cal) : "",
   };
-  let out = String(template || "").replace(/\{\{\s*(appointment\.\w+)\s*\}\}/g, (_, k) => (k in map ? map[k] : ""));
+  // Mentions go BEFORE substitution, while the token is still there to find.
+  let out = dropEmptyMentions(String(template || ""), DROP_WHEN_EMPTY.filter((t) => !map[t]));
+  out = out.replace(/\{\{\s*(appointment\.\w+)\s*\}\}/g, (_, k) => (k in map ? map[k] : ""));
   // Never send a dangling label: if a token above resolved empty, its line is
   // now just "Location:" (etc) - drop that whole line and collapse the gap.
   out = out.replace(/^[ \t]*(?:Location|Date & Time|Date|Time|Apple|Google)[ \t]*:[ \t]*$\n?/gim, "");

@@ -1,0 +1,110 @@
+{
+  "_note": "SNAPSHOT OF PRODUCTION `testimonials`, taken 2026-07-30. Real parents' words, byte-exact as stored, including the em dashes three of them typed. That is the point: api/_testimonial-typography.test.mjs proves those characters never reach a parent-facing render while every WORD survives. Do NOT tidy this file - a cleaned fixture would make the suite pass for the wrong reason.",
+  "_captured": "2026-07-30",
+  "clients": {
+    "bam_gta": "39875f07-0a4b-4429-a201-2249bc1f24df",
+    "bam_san_jose": "5576acf0-acd3-4c05-9f9f-ebfde8618154"
+  },
+  "testimonials": [
+    {
+      "client_id": "39875f07-0a4b-4429-a201-2249bc1f24df",
+      "author": "Kristina Carrera",
+      "source": "manual",
+      "rating": null,
+      "starred": true,
+      "review_created_at": null,
+      "created_at": "2026-07-29T00:00:03Z",
+      "quote": "We had a great experience with By Any Means Basketball. My kid enjoyed every training session and looked forward to coming each week.\nThe training is engaging and well structured. The coaches do an excellent job of keeping the kids involved by incorporating games and challenges into the sessions. What stood out to us was that the trainers actively participate in the games with the kids, creating a fun and energetic environment while still teaching important basketball skills.\nThe coaches are young, approachable, and genuinely listen to the kids. They also take time at the end of each session to have meaningful conversations with the group, which helps build confidence and teamwork.\nSince joining, my kid has improved his layups and gained confidence attacking the basket from the wing, getting open, receiving the ball, and finishing plays. It was great to see both his skills and confidence grow.\nA special shoutout to Adrian\u2014my kid always enjoyed training with him and thought he was a cool coach. Thank you to the group for creating such a positive learning environment for young players!"
+    },
+    {
+      "client_id": "39875f07-0a4b-4429-a201-2249bc1f24df",
+      "author": "Sabeen S",
+      "source": "manual",
+      "rating": null,
+      "starred": true,
+      "review_created_at": null,
+      "created_at": "2026-07-29T00:00:02Z",
+      "quote": "BAM has been an exceptional experience for our son. He's not naturally the most athletic kid, but he's incredibly creative, talkative, and full of ideas\u2014and what really impressed us is how well the coaches understood that and used his personality to keep him engaged and motivated rather than trying to fit him into a one-size-fits-all program.\n\nThis is one activity he genuinely looks forward to every single week. Every time I pick him up, he is absolutely buzzing with energy & happiness. We joke about what they must be putting in the air because he comes out so energized\u2014but honestly, it's just a reflection of how amazing the team is.\n\nThe coaches are young, energetic, relatable, and really know how to connect with this generation of kids. They create an environment that's motivating, positive, and fun while still delivering exceptional training. For us, that combination has made all the difference. Highly recommend BAM to any parent looking for a basketball program that truly knows how to bring out the best in kids."
+    },
+    {
+      "client_id": "39875f07-0a4b-4429-a201-2249bc1f24df",
+      "author": "Wendy Huang",
+      "source": "manual",
+      "rating": null,
+      "starred": false,
+      "review_created_at": null,
+      "created_at": "2026-07-29T00:00:01Z",
+      "quote": "Very valuable session for players who wanna develop the right mindset and games, would definitely recommend by any means for basketball training."
+    },
+    {
+      "client_id": "39875f07-0a4b-4429-a201-2249bc1f24df",
+      "author": "Nicholas Cui",
+      "source": "manual",
+      "rating": null,
+      "starred": false,
+      "review_created_at": null,
+      "created_at": "2026-07-29T00:00:00Z",
+      "quote": "Zoran and team are super patient and skilled coaches! They pay close attention to the kids and really focus on skill building. Great job all around."
+    },
+    {
+      "client_id": "39875f07-0a4b-4429-a201-2249bc1f24df",
+      "author": "Ason Black",
+      "source": "manual",
+      "rating": null,
+      "starred": false,
+      "review_created_at": null,
+      "created_at": "2026-07-28T23:59:59Z",
+      "quote": "Great program for developing players to take their game to the next level. Great facility"
+    },
+    {
+      "client_id": "5576acf0-acd3-4c05-9f9f-ebfde8618154",
+      "author": "Aaron Rufin",
+      "source": "manual",
+      "rating": null,
+      "starred": true,
+      "review_created_at": null,
+      "created_at": "2026-07-29T00:00:04Z",
+      "quote": "My son's been with BAM for the past two months and has already been seeing major improvements in his game. BAM is very different from some of the other training programs I've seen. Many programs will teach set moves and maybe spend the last 10-15 minutes on live work. Coach Elijah ensures the kids get a lot of live work in which ensures the player is able to read and react making the game of basketball more intuitive. In the short amount of time that my son has been with BAM, his confidence and capability of attacking the paint and finishing through contact has improved. There are many skilled kids in the class which has also helped my son defensively. Coach Elijah has done a tremendous job and I look forward to seeing more growth and development in my son as he proceeds with BAM."
+    },
+    {
+      "client_id": "5576acf0-acd3-4c05-9f9f-ebfde8618154",
+      "author": "Christy Hang-Munoz",
+      "source": "manual",
+      "rating": null,
+      "starred": true,
+      "review_created_at": null,
+      "created_at": "2026-07-29T00:00:03Z",
+      "quote": "Over the last four months, my son Christopher has experienced significant growth under Coach Elijah's guidance. Enrolling Christopher with By Any Means in San Jose has proven to be one of the best decisions we have made for him. Coach Elijah customizes workouts to align with each player's specific age, skill level, and objectives. He not only enhances skills but also boosts the players' confidence. What I value most about the coach is his patience in clarifying the how, why, and when of movement on the court. Additionally, he records videos of the players, highlighting their strengths and areas for improvement. This level of attention is something that is seldom observed in many other training sessions."
+    },
+    {
+      "client_id": "5576acf0-acd3-4c05-9f9f-ebfde8618154",
+      "author": "Rochelle Seto",
+      "source": "manual",
+      "rating": null,
+      "starred": false,
+      "review_created_at": null,
+      "created_at": "2026-07-29T00:00:02Z",
+      "quote": "Coach Elijah has been an absolute game-changer for both our high school and elementary school athletes. His ability to connect with players of different ages and skill levels is truly impressive. Whether it's refining advanced techniques for high schoolers or building strong fundamentals for younger players, Coach Elijah brings unmatched energy, expertise, and dedication to every session.\n\nOur high school player has seen major improvements in footwork, shooting consistency, and court awareness. Coach Elijah pushes them to compete at a higher level while also preparing them mentally for the demands of varsity and college-level play.\n\nFor our elementary school athlete, he creates a fun and supportive environment that builds confidence and a strong foundation. His patience and encouragement make every player feel seen and motivated to improve.\n\nCoach Elijah is more than a trainer\u2014he's a mentor who genuinely cares about each athlete's growth on and off the court. If you're looking for someone who combines technical skill, professionalism, and heart, Coach Elijah is the one. Highly recommended!"
+    },
+    {
+      "client_id": "5576acf0-acd3-4c05-9f9f-ebfde8618154",
+      "author": "Josh Cheng",
+      "source": "manual",
+      "rating": null,
+      "starred": false,
+      "review_created_at": null,
+      "created_at": "2026-07-29T00:00:01Z",
+      "quote": "Coach Elijah really understands how kids grow and develop with basketball.  I can see my kids steadily improve week by week day by day based on the principles that they are learning both in basketball and in life."
+    },
+    {
+      "client_id": "5576acf0-acd3-4c05-9f9f-ebfde8618154",
+      "author": "Carolyn Nolasco Glenn Fernandez",
+      "source": "manual",
+      "rating": null,
+      "starred": false,
+      "review_created_at": null,
+      "created_at": "2026-07-29T00:00:00Z",
+      "quote": "Elijah has been an extremely critical part of our son's basketball development journey. He has a great program that caters to players of all skill levels and pushes athletes to improve in all aspects including ball handling, shooting, defense and self confidence. Highly recommend!"
+    }
+  ]
+}

@@ -401,12 +401,17 @@ async function trialAppts(token, contactId) {
   } catch (_) { return []; }
 }
 
-// The gym address for a contact's trial, from the OFFER tied to their pipeline
-// card: offers.data.general_info.location holds a Business Blueprint locations id
-// (set in the offer wizard's "Primary location" picker). This is the owner-managed
+// The VENUE for a contact's trial, from the OFFER tied to their pipeline card:
+// offers.data.general_info.location holds a Business Blueprint locations id (set
+// in the offer wizard's "Primary location" picker). This is the owner-managed
 // source of truth for where sessions happen - clients.address is the business's
 // registered address and sent families to the wrong building (2026-07-04).
-async function offerLocationAddress(clientId, contactId) {
+//
+// Returns the venue ROW, not just its address, so the address a parent is sent and
+// the entry directions they are sent come from THE SAME venue by construction. They
+// used to come from two places: the address from here, the door from a hardcoded
+// sentence describing BAM GTA's Linbrook gym. One lookup makes a repeat impossible.
+async function offerLocationVenue(clientId, contactId) {
   try {
     const opps = await sb(`opportunities?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.open&select=offer_id&limit=1`);
     const offerId = opps && opps[0] && opps[0].offer_id;
@@ -414,8 +419,22 @@ async function offerLocationAddress(clientId, contactId) {
     const offs = await sb(`offers?id=eq.${encodeURIComponent(offerId)}&select=data&limit=1`);
     const locId = offs && offs[0] && offs[0].data && offs[0].data.general_info && offs[0].data.general_info.location;
     if (!locId) return null;
-    const locs = await sb(`locations?id=eq.${encodeURIComponent(locId)}&select=address&limit=1`);
-    return (locs && locs[0] && String(locs[0].address || "").trim()) || null;
+    // entry_note ships AHEAD of its migration (20260730T160000). Naming a column
+    // PostgREST does not have 400s the WHOLE select, and this select is load
+    // bearing: losing it drops the venue out of the address chain and sends
+    // families back to the registered business address, which is the exact
+    // regression fixed on 2026-07-04. So ask again without it rather than let one
+    // pending column undo that. Same per-column retry as _bbHydrateClientCols.
+    let row = null;
+    try {
+      const withNote = await sb(`locations?id=eq.${encodeURIComponent(locId)}&select=address,entry_note&limit=1`);
+      row = (withNote && withNote[0]) || null;
+    } catch (_) {
+      const legacy = await sb(`locations?id=eq.${encodeURIComponent(locId)}&select=address&limit=1`);
+      row = (legacy && legacy[0]) || null;
+    }
+    if (!row) return null;
+    return { address: String(row.address || "").trim(), entryNote: String(row.entry_note || "").trim() };
   } catch (_) { return null; }
 }
 
@@ -560,14 +579,26 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
   // clientVars: academy identity from the client row, so location tokens resolve
   // to this academy's own values (or empty) - never the LOCATIONS-map fallback.
   const vars = { first_name: parentFirst || info.firstName, full_name: info.fullName, ...clientVars(client) };
+  // The offer's Blueprint primary location, fetched ONCE: the address and the entry
+  // directions below are two facts off this one row, never two lookups.
+  const venue = await offerLocationVenue(client.id, contactId);
+  const venueAddress = (venue && venue.address) || "";
+  // Address chain: the booked slot's own address (portal slots often have no
+  // location_label) -> the OFFER's Blueprint primary location (owner-managed,
+  // where sessions actually happen) -> the Brain's business_info "Location:"
+  // line -> the academy's required BB General address (clients.address).
+  const location = (appt && appt.address) || venueAddress || addressFromOverrides(cfg && cfg.overrides) || String(client.address || "").trim();
   const apptCtx = {
     startMs: trialMs,
     endMs: appt && appt.endTime ? new Date(appt.endTime).getTime() : null,
-    // Address chain: the booked slot's own address (portal slots often have no
-    // location_label) -> the OFFER's Blueprint primary location (owner-managed,
-    // where sessions actually happen) -> the Brain's business_info "Location:"
-    // line -> the academy's required BB General address (clients.address).
-    location: (appt && appt.address) || (await offerLocationAddress(client.id, contactId)) || addressFromOverrides(cfg && cfg.overrides) || String(client.address || "").trim(),
+    location,
+    // The entry note describes THIS venue's own door, so it rides along only when
+    // the address we are sending IS that venue's address. If the GHL appointment
+    // carries a different building, or the address fell through to the business's
+    // registered one, we do not know that building's entrance and say nothing -
+    // which is the whole point. A formatting difference also fails this test and
+    // suppresses the note; that is the safe direction to be wrong in.
+    entryNote: venueAddress && location === venueAddress ? venue.entryNote : "",
     title: (appt && appt.title) || "Free Trial",
     tz,
   };

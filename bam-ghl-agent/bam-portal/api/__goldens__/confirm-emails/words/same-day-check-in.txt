@@ -1,0 +1,4 @@
+CALL SITE: api/agent-confirm.js fireScriptedStep -> sendOn (the morning_of check-in)
+RESULT: sent
+EMAILS: 0
+SMS: "Hi Maya, just wanted to check in to see if we're good to go for your trial today.\n\nLooking forward to seeing you, after the session we will chat to see if the program is a good fit 👍\n\nHere are the details:\n\nTime: 7:00 PM\n\nDate: Tuesday, August 4, 2026\n\nLocation: 1079 Linbrook Rd, Oakville, ON L6J 2L2\n\nThe gym entrance we use is at the front of the building, on the left side."
