@@ -42,11 +42,31 @@
 // the title. That matches the house precedent: offer_prices.source_offer_price_key
 // is `${title}|${term}`, minted the same way from a block_builder row's title.
 //
-// CONSEQUENCE, and it is a real one: RENAMING A CLASS MINTS A NEW KEY. Slots
-// already generated keep the old key and no longer point at any class in the
-// offer. Nothing repairs that today, because api/schedule/sync-offer.js dedupes
-// templates on `recurrence|start|end` and SKIPS any template that already exists,
-// so a re-sync never revisits the key. A heal pass is needed and does not exist.
+// TWO CONSEQUENCES. Both are real, and the second is worse than the first.
+//
+// 1. RENAMING A CLASS MINTS A NEW KEY. Slots already generated keep the old key
+//    and no longer point at any class in the offer. Nothing repairs that today,
+//    because api/schedule/sync-offer.js dedupes templates on
+//    `recurrence|start|end` and SKIPS any template that already exists, so a
+//    re-sync never revisits the key. A heal pass is needed and does not exist.
+//    This failure is at least DETECTABLE: the key matches nothing.
+//
+// 2. REORDERING TWO CLASSES THAT SHARE A TITLE SWAPS THEIR KEYS, SILENTLY. The
+//    collision suffix is assigned by array position, so with two classes both
+//    titled "Skills", dragging one above the other turns `skills` into
+//    `skills-2` and vice versa. Every slot already generated now points at the
+//    OTHER class. Nothing matches nothing, so nothing looks wrong, and the age
+//    range the routing reads is the wrong one.
+//
+//    WHY IT IS NOT FIXED HERE. There is nothing order-independent to key on. A
+//    class row carries no id, and the only other candidate - hashing the row's
+//    remaining fields - trades a rare silent swap for a GUARANTEED orphan every
+//    time an owner adds a weekly time or edits the age text, which is a far more
+//    common action. That is a worse trade, so this is documented rather than
+//    papered over. What IS done: offerToTemplatePayloads emits a warning the
+//    moment two classes share a title, so the hazard is visible at the point it
+//    is created, and the fix an owner can act on ("give them distinct titles")
+//    is stated there. See duplicateClassTitles below.
 
 const KEY_MAX = 60;
 
@@ -80,6 +100,28 @@ export function classKey(cls, index, classes) {
     if ((slug(titleOf(all[i], i)) || `class-${i + 1}`) === base) seen += 1;
   }
   return seen === 0 ? base : `${base}-${seen + 1}`;
+}
+
+/**
+ * The titles that more than one class shares, which is the only condition under
+ * which reordering can swap two keys (consequence 2 in the header). Returned so
+ * the payload builder can warn about it at the moment it happens, since the
+ * defect itself cannot be fixed without an id the wizard does not mint.
+ *
+ * @returns {string[]} the offending titles as the owner typed them, in order.
+ */
+export function duplicateClassTitles(classes) {
+  const all = Array.isArray(classes) ? classes : [];
+  const byKey = new Map();
+  all.forEach((c, i) => {
+    const title = (c && (c.title || c.name)) || `Class ${i + 1}`;
+    const k = slug(title) || `class-${i + 1}`;
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k).push(title);
+  });
+  const out = [];
+  for (const titles of byKey.values()) if (titles.length > 1) out.push(titles[0]);
+  return out;
 }
 
 // ── reading the age range off a class ───────────────────────────────────────
@@ -166,7 +208,23 @@ export function parseAthleteAge(raw) {
   // California, so it cannot be converted safely. Ask instead of guessing.
   if (/\bgrades?\b/i.test(text)) return { ok: false, reason: "ambiguous_grade", text };
   // "U10" is a BAND (under 10), not this athlete's age. Same treatment.
-  if (/\bu\s?-?\s?\d+\b/i.test(text)) return { ok: false, reason: "ambiguous_band", text };
+  //
+  // THREE SPELLINGS, and the first version of this caught only one of them.
+  // "U10" was guarded; "under 10" and "u12s" both sailed through and were read
+  // as a 10 and a 12 year old - a child who could be six, routed with total
+  // confidence and no question asked. Each alternative below is a real spelling
+  // a parent types:
+  //   \bunder\b        "under 10", and also "10 and under", where the number
+  //                    comes FIRST and no u-prefix rule would ever see it.
+  //   \bu ?-? ?\d+     "U10", "u 10", "U-10", and "u12s" - the trailing \b is
+  //                    deliberately absent, because it was the plural s on
+  //                    "u12s" that defeated the original.
+  //   \d+ ?-? ?u\b     "12u", the reversed American youth-sports spelling.
+  //                    Not in the brief; added because San Jose is in
+  //                    California, where it is the usual way to write it.
+  if (/\bunder\b|\bu\s?-?\s?\d+|\d+\s?-?\s?u\b/i.test(text)) {
+    return { ok: false, reason: "ambiguous_band", text };
+  }
 
   // First integer wins: "9 turning 10" is a 9 year old today. The sign is part
   // of the match on purpose - without it "-4" reads as a 4 year old.
@@ -293,8 +351,16 @@ export function ageCoverageGaps(classes) {
     if (r.max !== null) bounds.push(r.max);
   }
   if (!bounds.length) return [];
-  const lo = Math.min(...bounds);
-  const hi = Math.max(...bounds);
+  // CLAMP BEFORE LOOPING. The bounds are whatever an owner typed into a number
+  // box, and a fat-fingered age_max of 999999999 made this loop a year at a time
+  // across a billion of them: 4.3 seconds, and a reported "gap" spanning a
+  // billion years. The patch file proposes rendering this inline as the owner
+  // types, so that is a frozen browser tab while they are mid-keystroke.
+  // AGE_CEILING is the same 120 parseAthleteAge already refuses to read past, so
+  // nothing above it is reachable by a real athlete and no answer changes.
+  const clamp = (n) => Math.min(Math.max(n, 0), AGE_CEILING);
+  const lo = clamp(Math.min(...bounds));
+  const hi = clamp(Math.max(...bounds));
 
   const covered = (age) => ranges.some((r) =>
     (r.min === null || age >= r.min) && (r.max === null || age <= r.max));
@@ -308,9 +374,9 @@ export function ageCoverageGaps(classes) {
       open = age;
     }
   }
-  // An unclosed run reaches `hi`, which is a bound of some class, so it is
-  // covered - the run cannot still be open here. Guarded anyway rather than
-  // relying on that argument staying true.
+  // A run can still be open at `hi` now that `hi` is clamped: a class banded
+  // 200-300 no longer contributes a covered age inside the window, so the hole
+  // below it runs to the ceiling. Close it rather than dropping it.
   if (open !== null) gaps.push({ from: open, to: hi });
   return gaps;
 }

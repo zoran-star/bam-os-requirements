@@ -42,6 +42,19 @@
 //     hidden age_max box outranks the owner's explicit "no upper limit". An owner
 //     who types 18 and then switches the toggle really does leave that 18 in the
 //     row, so this is a state that can still arise, not a hypothetical.
+//     BUT IT CANNOT ARISE YET, and nobody should cite it as if it could: the
+//     age_max_mode field does not exist until the deferred wizard patch
+//     (docs/plans/route-by-actual-age-clientportal.patch.md) lands, so today no
+//     stored class carries one. It pins the right rule ahead of the field that
+//     will produce it. It is not evidence about live data.
+//   MUTATE=narrowband   api/agent/_class-routing.js: put back the age-band guard
+//     that caught only "U10". "under 10" and "u12s" then read as a confident 10
+//     and 12, which is what shipped in the first cut of this build.
+//   MUTATE=noclamp      api/agent/_class-routing.js: stop clamping the gap scan
+//     to a human lifespan, so a fat-fingered age_max walks a billion years. An
+//     owner mistyping a number box is a state that can always arise.
+//   MUTATE=nodupewarn   api/_offer-schedule.js: stop warning when two classes
+//     share a title, leaving the reorder-swaps-keys hazard completely silent.
 //   MUTATE=nokey        api/_offer-schedule.js: stop putting
 //     source_offer_class_key in the template payload. This is the first of the
 //     two breaks that left the column NULL on all 86 BAM GTA slots.
@@ -113,10 +126,22 @@ const M_ROUTING = {
     "  const max = openTop ? null : intOrNull(c.age_max);",
     "  const max = intOrNull(c.age_max);",
   ]],
+  narrowband: [[
+    `  if (/\\bunder\\b|\\bu\\s?-?\\s?\\d+|\\d+\\s?-?\\s?u\\b/i.test(text)) {`,
+    `  if (/\\bu\\s?-?\\s?\\d+\\b/i.test(text)) {`,
+  ]],
+  noclamp: [[
+    "  const lo = clamp(Math.min(...bounds));\n  const hi = clamp(Math.max(...bounds));",
+    "  const lo = Math.min(...bounds);\n  const hi = Math.max(...bounds);",
+  ]],
 };
 const M_OFFER = {
   nokey: [["        source_offer_class_key: sourceClassKey,\n", ""]],
   noofferid: [["      if (sourceOfferId) payload.source_offer_id = sourceOfferId;\n", ""]],
+  nodupewarn: [[
+    "  for (const dupe of duplicateClassTitles(classes)) {",
+    "  for (const dupe of []) {",
+  ]],
 };
 
 let routing, offerSchedule;
@@ -137,7 +162,7 @@ try {
 
 const {
   resolveClassesForAge, parseAthleteAge, classFitsAge, classAgeRange,
-  classKey, ageCoverageGaps,
+  classKey, duplicateClassTitles, ageCoverageGaps,
 } = routing;
 const { offerToTemplatePayloads } = offerSchedule;
 
@@ -149,14 +174,29 @@ const { offerToTemplatePayloads } = offerSchedule;
 // / "Group 2 (High School / older): ages 14 and up"), and the titles are its
 // two real calendar labels.
 //
-// ONE HONEST CAVEAT: the age_min / age_max FIELDS do not exist on GTA's offer
-// row yet - nobody has typed them, because the input that collects them has not
-// shipped. So this fixture is GTA's real, live, currently-in-production age
-// policy expressed in the new fields, not a dump of GTA's current offer data.
-// What it pins is that the new mechanism reproduces the old policy exactly.
+// THE CAVEAT, AND IT IS BIGGER THAN IT FIRST LOOKED. Production was queried on
+// 2026-07-30. NEITHER academy has any numeric age data at all:
+//
+//   BAM GTA    Group 1              age: "Elementary School"     min NULL  max NULL
+//   BAM GTA    Group 2              age: "High School"           min NULL  max NULL
+//   San Jose   Beginner Academy     age: "Elementary School"     min NULL  max NULL
+//   San Jose   Elementary Academy   age: "Elementary School"     min NULL  max NULL
+//   San Jose   Pre-Season Academy   age: "Middle / High School"  min NULL  max NULL
+//
+// So the `age` strings in this fixture are NOT what is stored - the stored value
+// is a school-stage label. GTA's real bands, 9 to 13 and 14 and up, exist in
+// exactly ONE place in the whole system: the hardcoded prompt text at
+// api/agent/prompt-structure.js that build B is scheduled to delete. Deleting it
+// before someone types those numbers into the offer destroys the only record of
+// them. That is build B's problem, not build A's, but it is written here because
+// this fixture is the second-closest thing to a record and should not be
+// mistaken for the first.
+//
+// What this fixture pins is that the new mechanism reproduces the old policy
+// exactly. It is not evidence that any academy is configured.
 const GTA = [
-  { title: "Group 1 (Elementary)",  age: "9 to 13",   age_min: 9,  age_max_mode: "Set an oldest age", age_max: 13 },
-  { title: "Group 2 (High School)", age: "14 and up", age_min: 14, age_max_mode: "No upper limit" },
+  { title: "Group 1 (Elementary)",  age: "Elementary School", age_min: 9,  age_max_mode: "Set an oldest age", age_max: 13 },
+  { title: "Group 2 (High School)", age: "High School",       age_min: 14, age_max_mode: "No upper limit" },
 ];
 
 // San Jose. INVENTED FIXTURE - NOT SAN JOSE'S REAL CONFIGURATION.
@@ -168,10 +208,18 @@ const GTA = [
 // because anyone believes them. Do not quote these numbers at San Jose, do not
 // seed them, and do not treat a passing run here as evidence San Jose is
 // configured. Replace them with Lij's real answers when they arrive.
+//
+// The `age` strings ARE real, and they are the best argument in this file for
+// the whole build: TWO of San Jose's three classes carry the IDENTICAL text
+// "Elementary School". The existing field cannot tell Beginner Academy from
+// Elementary Academy at all, so no amount of smarter parsing could ever route
+// between them. It is also the real-world case behind the ask-one-question rule,
+// because a 9 year old whose skill level nobody asked for genuinely does belong
+// to either.
 const SJ_INVENTED = [
-  { title: "Beginner",           age: "8-11",  age_min: 8,  age_max: 11 },
-  { title: "Elementary",         age: "11-14", age_min: 11, age_max: 14 },
-  { title: "Pre-Season Academy", age: "12-18", age_min: 12, age_max: 18 },
+  { title: "Beginner",           age: "Elementary School",    age_min: 8,  age_max: 11 },
+  { title: "Elementary",         age: "Elementary School",    age_min: 11, age_max: 14 },
+  { title: "Pre-Season Academy", age: "Middle / High School", age_min: 12, age_max: 18 },
 ];
 
 const titles = (r) => r.matches.map((m) => m.title);
@@ -238,6 +286,16 @@ section("unqualified is not the same as unreadable", () => {
   // Both are "we cannot book yet", but only one of them is the family's answer.
   ok(r30.status !== rNine.status,
     "age 30 and \"nine\" never collapse to the same status");
+
+  // The live shape of the same failure. An age band is not an age, and the
+  // damage is that the system BELIEVES it read one, so the caller books instead
+  // of asking. Against GTA's real bands, "under 10" used to land a child of
+  // unknown age in Group 1.
+  const rUnder = resolveClassesForAge("under 10", GTA);
+  ok(rUnder.status === "unknown_age" && rUnder.reason === "ambiguous_band",
+    `"under 10" against GTA -> unknown_age, NOT a confident Group 1 booking (got ${rUnder.status})`);
+  const rU12 = resolveClassesForAge("u12s", GTA);
+  ok(rU12.status === "unknown_age", `"u12s" against GTA -> unknown_age (got ${rU12.status})`);
 });
 
 section("reading a free-text age box", () => {
@@ -253,8 +311,24 @@ section("reading a free-text age box", () => {
   // California, so it cannot be converted. Ask.
   ok(parseAthleteAge("Grade 5").ok === false && parseAthleteAge("Grade 5").reason === "ambiguous_grade",
     `"Grade 5" -> ambiguous_grade, never silently read as 5`);
-  // "U10" is a band, not this child's age.
+  // "U10" is a band, not this child's age. THE FIRST VERSION OF THIS GUARD
+  // CAUGHT ONLY THIS SPELLING. "under 10" and "u12s" both got through and were
+  // read as a 10 and a 12 year old, so the agent booked a child who could have
+  // been six, confidently, without asking. Every spelling below is now pinned.
   ok(parseAthleteAge("U10").reason === "ambiguous_band", `"U10" -> ambiguous_band, never read as 10`);
+  ok(parseAthleteAge("u-10").reason === "ambiguous_band", `"u-10" -> ambiguous_band`);
+  ok(parseAthleteAge("u 10").reason === "ambiguous_band", `"u 10" -> ambiguous_band`);
+  ok(parseAthleteAge("under 10").reason === "ambiguous_band",
+    `"under 10" -> ambiguous_band, never read as 10 (the child could be six)`);
+  ok(parseAthleteAge("u12s").reason === "ambiguous_band",
+    `"u12s" -> ambiguous_band; the plural s used to defeat the word boundary`);
+  ok(parseAthleteAge("10 and under").reason === "ambiguous_band",
+    `"10 and under" -> ambiguous_band, with the number FIRST`);
+  ok(parseAthleteAge("12u").reason === "ambiguous_band",
+    `"12u" -> ambiguous_band, the American youth-sports spelling San Jose would use`);
+  // ...and the guard must not swallow ordinary answers that merely contain a u.
+  ok(parseAthleteAge("just turned 10").age === 10, `"just turned 10" is still read as 10`);
+  ok(parseAthleteAge("10 years old").age === 10, `"10 years old" is still read as 10`);
   ok(parseAthleteAge("300").reason === "out_of_range", `"300" -> out_of_range (a typo, so ask)`);
   ok(parseAthleteAge("-4").ok === false, `"-4" is not an age`);
 });
@@ -322,6 +396,26 @@ section("a gap between classes is detectable", () => {
   const r = resolveClassesForAge(9, [{ title: "Backwards", age_min: 14, age_max: 9 }]);
   ok(r.status === "unqualified" && r.problems.length === 1,
     "a min above the max fits nobody and is reported in problems, not swallowed");
+
+  // A fat-fingered age_max used to make this walk a year at a time across a
+  // billion of them: 4.3 seconds, and a "gap" spanning a billion years. The
+  // patch file proposes rendering this inline as the owner types, so that is a
+  // frozen tab mid-keystroke. Bounds are clamped to the same ceiling
+  // parseAthleteAge already refuses to read past.
+  const FAT = [{ title: "Beginner", age_min: 8, age_max: 11 }, { title: "Oops", age_min: 13, age_max: 999999999 }];
+  const t0 = Date.now();
+  const fatGaps = ageCoverageGaps(FAT);
+  const ms = Date.now() - t0;
+  ok(ms < 100, `a nine-digit age_max returns in ${ms}ms, not seconds`);
+  ok(fatGaps.length === 1 && fatGaps[0].from === 12 && fatGaps[0].to === 12,
+    `...and still reports the real gap at 12 (got ${JSON.stringify(fatGaps)})`);
+  ok(fatGaps.every((g) => g.to <= 120), "no gap is ever reported beyond a human lifespan");
+  // The other direction: a band entirely above the ceiling contributes nothing
+  // reachable, so the hole below it runs to the ceiling rather than to 300.
+  const HIGH = [{ title: "Kids", age_min: 8, age_max: 11 }, { title: "Typo", age_min: 200, age_max: 300 }];
+  const highGaps = ageCoverageGaps(HIGH);
+  ok(highGaps.length === 1 && highGaps[0].from === 12 && highGaps[0].to === 120,
+    `an out-of-range band is clamped, not chased to 300 (got ${JSON.stringify(highGaps)})`);
 });
 
 section("the academy has no classes at all", () => {
@@ -346,6 +440,25 @@ section("the per-class key, derived from the title", () => {
   ok(classKey(dup[0], 0, dup) === "beginner", "first of a duplicate title keeps the bare key");
   ok(classKey(dup[1], 1, dup) === "beginner-2", "second gets -2");
   ok(classKey(dup[2], 2, dup) === "beginner-3", "and case/whitespace variants collide rather than pretending to differ");
+
+  // KNOWN DEFECT, PINNED SO IT STAYS KNOWN. Two classes sharing a title are told
+  // apart by POSITION, so reordering them swaps their keys and points every
+  // session already generated at the other class. Silently: nothing fails to
+  // match, the routing just reads the wrong age range. There is no
+  // order-independent identity to key on (a class row has no id, and hashing the
+  // rest of the row orphans on every ordinary edit), so it is documented in the
+  // module header and warned about below rather than fixed. This assertion
+  // exists so that anyone who DOES fix it has to come here and delete it.
+  const skillsA = { title: "Skills", marker: "A" };
+  const skillsB = { title: "Skills", marker: "B" };
+  const before = [skillsA, skillsB];
+  const after = [skillsB, skillsA];
+  ok(classKey(skillsA, 0, before) === "skills" && classKey(skillsA, 1, after) === "skills-2",
+    "the SAME class gets a DIFFERENT key after a reorder - the documented, unfixed swap");
+
+  ok(duplicateClassTitles(dup).length === 1 && duplicateClassTitles(dup)[0] === "Beginner",
+    "duplicateClassTitles names the offending title once, so the hazard is reportable");
+  ok(duplicateClassTitles(cs).length === 0, "distinct titles report nothing");
 
   const blank = [{}, { title: "   " }];
   ok(classKey(blank[0], 0, blank) === "class-1", "an untitled class still gets a key");
@@ -406,6 +519,20 @@ section("offerToTemplatePayloads carries the class onto the template", () => {
   ok(bad.templates[0].payload.source_offer_class_key === "a",
     "...and the class key still ships - the two are independent");
   ok(bad.warnings.some((w) => /not a uuid/i.test(w)), "...and it warns rather than going quiet");
+
+  // Two classes with the same title cannot be told apart except by their order,
+  // and reordering them re-points existing sessions at the wrong class. It
+  // cannot be fixed without an id the wizard does not mint, so it is at least
+  // said out loud at the moment it becomes true.
+  const twins = offerToTemplatePayloads({ id: OFFER_ID, title: "T", data: { schedule: { classes: [
+    { title: "Skills", consistent: "Yes", weekly_times: [{ days: ["Mon"], start: "17:00", end: "18:00" }] },
+    { title: "Skills", consistent: "Yes", weekly_times: [{ days: ["Tue"], start: "17:00", end: "18:00" }] },
+  ] } } }, { clientId: "c-1" });
+  ok(twins.warnings.some((w) => /both called "Skills"/.test(w) && /reordering/.test(w)),
+    "two classes sharing a title warn, and the warning says what reordering will do");
+  ok(twins.templates[0].payload.source_offer_class_key === "skills"
+    && twins.templates[1].payload.source_offer_class_key === "skills-2",
+    "...and they still get distinct keys, so the sync itself is not blocked");
 });
 
 section("classAgeRange normalizes what an owner typed", () => {

@@ -30,7 +30,7 @@
 // was NULL on all 86 GTA slots because of two breaks in series, and this file
 // was the first of them.
 
-import { classKey } from "./agent/_class-routing.js";
+import { classKey, duplicateClassTitles } from "./agent/_class-routing.js";
 
 const DAY_TO_TOKEN = {
   su: "SU", sun: "SU", sunday: "SU",
@@ -140,6 +140,15 @@ export function offerToTemplatePayloads(offer, opts = {}) {
   const sourceOfferId = UUID_RE.test(offerId) ? offerId : null;
   if (offerId && !sourceOfferId) {
     warnings.push(`offer id "${offerId}" is not a uuid - templates will be created without source_offer_id (class routing will not be able to find the offer).`);
+  }
+
+  // Two classes sharing a title have no stable identity between them: the key
+  // that separates them is their POSITION, so reordering the two swaps every
+  // session already generated onto the other class, silently. There is nothing
+  // order-independent to key on (see api/agent/_class-routing.js), so the least
+  // dishonest thing available is to say so the moment it becomes true.
+  for (const dupe of duplicateClassTitles(classes)) {
+    warnings.push(`two or more classes are both called "${dupe}" - their sessions are told apart by the order the classes are listed in, so reordering them will point existing sessions at the wrong class. Give them distinct titles.`);
   }
 
   classes.forEach((cls, ci) => {
