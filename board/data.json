@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · complete. 3 PRs waiting on you",
+ "updated": "2026-07-30 · told the agents to stop. everything waits on you",
  "recentUpdates": [
+  "Called stop. The work is finished and the last round found nothing new, so more polish only grows what you have to review",
+  "Best call an agent made all night was declining to ADD a safety check, because it would have flagged one correct thing on day one and gates that go red on day one get switched off",
+  "Nothing is running. Merge 1671, then 1670, then 1669. Rotate the Stripe key. Send Lij his list",
   "Final piece: rather than argue nothing was wrong, the agent PLANTED a bug in the exact file, watched the checker find it, and removed it. Proof instead of reassurance",
   "Both agents are finished. Nothing is running. Three pull requests wait on you in order: 1671, 1670, 1669",
-  "Then: rotate the Stripe key, and send Lij his list. Everything else is written down and survives this chat",
-  "The new safety check turned its own rule on itself and found TWO real bugs. One made it silently blind to half a file while still reporting all clear",
-  "Nothing was actually hidden, but that is now measured rather than assumed, and it was luck",
-  "This is the answer the whole night was circling: not 'look harder', but a tool that tests its own output every single run"
+  "Then: rotate the Stripe key, and send Lij his list. Everything else is written down and survives this chat"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",

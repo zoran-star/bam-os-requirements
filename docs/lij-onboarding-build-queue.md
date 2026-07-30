@@ -844,6 +844,26 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 📏 TWO JUDGEMENT CALLS WORTH MORE THAN THE FIXES, AND NEITHER WAS A FIX
+
+**1. IT PROVED ITS OWN NEW INVARIANT INSUFFICIENT INSTEAD OF DECLARING VICTORY ON IT.** Diffing `blank()` before and after across all 251 files: **236 blanked differently, only 6 were brace-unbalanced.** The other 230 were the old version erasing `${...}` interpolation **CODE**:
+
+```
+RAW: sb(`offers?id=eq.${encodeURIComponent(offerId)}&sel=data`)
+OLD: sb(`                                                    `)
+NEW: sb(`             ${encodeURIComponent(offerId)}         `)
+```
+
+**Balance structurally cannot see that, because erasing a BALANCED region leaves balance intact.** So the old scanner was blind to everything inside a template interpolation across 230 files, and **a check that catches the bug you found is not the same as a check that catches the bug class.** Hit count unmoved, so nothing was hiding there **on this tree, today.**
+
+**2. IT REJECTED THE STRONGER INVARIANT ON EVIDENCE.** *"Every line-anchored `function NAME` must survive blanking"* measures **1874 declarations, exactly ONE violation - and the violation is CORRECT**: `api/ghl/all-pipelines.js:131` declares a browser-side `saveNote` inside an HTML template literal wired to an `onblur` handler, so blanking it is right.
+
+**That makes it a heuristic, not a law, and shipping it means an exemption on its first run.** Its reasoning, which is the part to keep: **a gate red on day one gets switched off, and this repo has already paid that cost.** Left out deliberately, **with the measurement recorded in the file so nobody redoes the work to reach the same conclusion.** **Declining to build a check is a harder call than building one and it almost never gets credited.**
+
+**⚠️ AND IT CAUGHT ITSELF MISLABELLING BEFORE SENDING:** its first pass tagged those 230 as *"balanced swallows invisible to the invariant"*, which reads as 230 live bugs. **They are the opposite - blindness removed, not introduced.** The structural conclusion survived; the alarm did not. **Fifth time in this thread one of the two agents corrected its own EVIDENCE rather than its own code.**
+
+**⛔ ORCHESTRATOR CALL: STOP REFINING, HOLD UNTIL MERGE.** It asked, correctly, rather than deciding for itself. **The gate is complete; the last round found zero bugs and one non-improvement, which is the signal to stop rather than to go deeper.** Three PRs are blocked on a human, not on quality, and **polish landing after the bottleneck is free while polish landing before it is not.** The remaining risk is better carried by the next person, who now inherits a self-test, seven controls and written measurements instead of folklore.
+
 ## 🏆 AND THE TECHNIQUE THAT CLOSES IT: **A POSITIVE CONTROL. PROVE THE INSTRUMENT CAN SEE THE REGION YOU ARE CALLING CLEAN.**
 
 #1671's author worked out that the `blank()` bug had a consequence for **its own evidence**, which nobody had raised. Its PR body claimed *"the detector no longer flags `hasGmailMailbox`"*. **If `blank()` can silently erase everything below a line, that sentence has two possible causes:**
