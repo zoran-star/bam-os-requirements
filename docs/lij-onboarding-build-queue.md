@@ -844,6 +844,41 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## ⛔⛔ HOUSE RULE 10'S ENFORCEMENT FOUND **29 INSTANCES, NOT 6**, AND **FOUR ARE HARMFUL**. [PR #1669](https://github.com/zoran-star/bam-os-requirements/pull/1669)
+
+`scripts/check-network-booleans.mjs` plus a 29-entry inventory, wired into `portal-ci.yml`, plain node, no deps.
+
+**⭐ THE LOAD-BEARING DECISION WAS FOLLOWING THE CALL GRAPH.** A `fetch`-only scan found **6** functions. Following calls through module-local functions and relative imports found **29**. **The 23 it missed are every Supabase-backed predicate in the agent stack**, which reach the network through `sb()` and `ghl()` wrappers rather than calling `fetch` themselves. `MUTATE=indirect` exists to stop that silently regressing. **A detector that looks for the network primitive misses every codebase that wraps it, which is every mature codebase.**
+
+**It did not pad to go green.** The first run produced 3 apparent false positives; it read all three, found them genuinely networky, and **fixed two real detector bugs instead** (method calls like `x.has(y)` read as calls to a module function `has`, and question-names used as an independent trigger). **Verdict counts print on every run, green or red.**
+
+**Controls proven against real sabotage before wiring**, including one the author added after noticing its first four left the rubber-stamp guard untested: `stub` fails if the minimum reason length is set to 0. **That was the cheapest way to defeat the entire gate and nothing was watching it.**
+
+### 🚨 THE WORST ONE, ORCHESTRATOR-VERIFIED, AND IT IS LIVE AND AHEAD OF US
+
+**`api/ghl/cron-import-history.js::hasGmailMailbox`** returns `false` on a transient Supabase error, which reads as *"no Gmail connected"*, so **the GHL email import runs on top of the Gmail two-way sync.** The comment directly above it says running both **doubles every email thread**, and nothing downstream can tell it happened or which threads are the copies.
+
+| Fact | Value |
+|---|---|
+| Academies with an active Gmail mailbox | **1: DETAIL Miami** |
+| Miami's `ghl_history_imported_at` | **NULL** |
+| The cron's candidate filter | `ghl_history_imported_at=is.null` |
+
+**So DETAIL Miami is simultaneously the only academy the guard protects and one of the academies the cron is still targeting.** The exposure is **one-shot and in the future, not in the past**: the next successful run either skips the email import correctly, or duplicates Miami's entire email history and then stamps the marker, removing it from the candidate pool so it never retries. **A blip during one specific cron run silently doubles a live academy's inbox, permanently.**
+
+**The fix direction is unambiguous and is the rule itself: when we cannot tell whether Gmail is connected, DO NOT run the email import.** Skipping is recoverable by re-running; duplicating is not recoverable at all.
+
+### The other three, all stop-and-report, none touched
+
+- **`api/agent/_stage.js::contactInRespondedStage`** and **`api/agent/_store.js::contactInRole`** - the catch returns `false`, which the send path renders to staff as a 409 *"no longer in the ... stage"*. **A GHL outage becomes a factual claim about a lead.** The correct pattern sits 40 lines below in the same file (`computeQueue`'s `idsTrusted`).
+- **`api/website/leads.js::maybePortalRoute`** returns `true` meaning *handled* even when every inner step failed, and the caller then skips the GHL enrol, so **the lead gets no first touch from either path.** BOUNDED only because `portal_entry_routing` is dormant. **Turning it on for any academy makes it live.**
+
+### ⚠️ MERGE-ORDER COUPLING, FLAGGED BEFORE ANYONE HITS IT
+
+**Stale inventory entries fail by design.** When the Stripe fix lands, `canCharge` stops matching and this check goes RED until its inventory line is deleted. **Whichever PR merges second owns that one-line delete.** The error message says so, but both builds were told in advance rather than discovering it.
+
+**Not verified, stated plainly by its author:** the check never runs against live services, so **every verdict is a reading of code and call sites, not an observation of production.** The `BOUNDED` verdicts that lean on *"a human approves this draft"* are the ones most worth a second opinion.
+
 ## 🔑 THE RETIRED `/cancel` SKILL HELD A LIVE STRIPE KEY. **DELETING IT IS NOT ROTATING IT.** Needs Zoran.
 
 The room retired `~/.claude/skills/cancel` to a deprecation stub on Zoran's order, and reported that **the old flow had a live Stripe key pasted into it**, so the retirement doubled as hygiene.
@@ -879,6 +914,10 @@ Rebuilding fresh on current main, **and `stripe_portal_url` is out of its spec b
 **`ready_at` was DROPPED rather than left beside `waiting`**, matching the shape San Jose's `onboarding` chunk already uses. **A timestamp asserting a thing was ready, sitting on a chunk that is waiting, is a small lie that outlives everyone who knows why it is there.**
 
 **Deliberately not touched: San Jose's `core` and `sales` chunks are ALSO `ready`** (both stamped 2026-07-23). Only `templates` was named, so only `templates` was changed. **Flagged to the room rather than assumed either way.**
+
+**✅ ANSWERED, AND THEY ARE NOT STRANDED. LEAVE THEM.** The chunk tester established it from a production read during its own pass: **San Jose's deck IS published**, so `core`'s condition (`deckPublished`) and `sales`'s NEW condition (`preset AND deckPublished`) both hold legitimately today. **`templates` was the only chunk whose tightened condition (prices > 0) San Jose fails**, which is why it alone was named. **No further guarded writes. Do not re-open this.**
+
+**✅ AND DROPPING `ready_at` WAS CONFIRMED RIGHT, with a framing better than mine:** a timestamp asserting a thing was ready, sitting on a chunk that is waiting, is **a stored value that outlives its truth** - the same family as the constant-versus-computed lesson this file keeps re-learning. **Leave it dropped.**
 
 **`clients.stripe_portal_url` is live and #1666 is deployed.** All 47 academies NULL, so the manage-membership link renders for nobody, and stays that way until receipts resumes.
 
