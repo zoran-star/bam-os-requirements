@@ -483,6 +483,23 @@ if (window.__MOCK__) (() => {
     }
     if (p === '/api/agent-confirm') return act === 'list-ready' ? { ready: HAWK_CONFIRM } : { ok: true };
     if (p === '/api/agent-closing') return act === 'list-ready' ? { ready: HAWK_CLOSING } : { ok: true };
+    // The Hawkeye send gate, mirrored from api/agent/_hawk-gate.js so the whole
+    // redirect loop is testable offline: SMS to a contact with a pending card 409s
+    // (booking -> confirm -> closing priority), email is never blocked, and
+    // hawkeye_ack walks through. CONVOS seeds lead-3 (booking) and lead-9 (closing)
+    // as flagged rows; every other conversation sends normally.
+    if (p === '/api/ghl/send-message') {
+      let b = {}; try { b = JSON.parse((init && init.body) || '{}'); } catch (_) {}
+      const cid = String(b.contact_id || b.contactId || '');
+      const isSms = String(b.type || 'SMS').toUpperCase() === 'SMS';
+      if (isSms && cid && !b.hawkeye_ack) {
+        for (const [rows, agent] of [[HAWK_BOOKING, 'booking'], [HAWK_CONFIRM, 'confirm'], [HAWK_CLOSING, 'closing']]) {
+          const card = rows.find(r => r.status === 'pending' && String(r.ghl_contact_id || '') === cid);
+          if (card) return { __status: 409, error: 'hawkeye_pending', agent, card_id: card.id, contact_id: cid };
+        }
+      }
+      return { ok: true, sent_via: isSms ? 'twilio' : 'resend', message_id: 'mock-' + Date.now() };
+    }
     if (p === '/api/members') {
       // Member detail drawer (?id=...): single-member shape for openMemberPopup.
       const mid = q.get('id');
@@ -591,7 +608,11 @@ if (window.__MOCK__) (() => {
       const u = new URL(raw, location.origin);
       if (u.origin === location.origin && u.pathname.startsWith('/api/')) {
         const body = mockApi(u, init) || { ...DEFAULT_API };
-        return Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        // A mock handler can ask for a real HTTP status (the Hawkeye 409 needs one -
+        // the client branches on r.status, not on the body alone).
+        const status = Number(body.__status) || 200;
+        if (body.__status) delete body.__status;
+        return Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
       }
     } catch (_) { /* fall through to real fetch */ }
     return _realFetch(input, init);
@@ -9639,6 +9660,12 @@ Then the call to action."]</div>
       }
       .v15ib-chip { font-size:10px; color:var(--text-mute); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:2px 9px; display:inline-flex; align-items:center; gap:5px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .v15ib-chip::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--gold); flex:0 0 auto; }
+      /* Hawkeye chip on an inbox row: this lead has a card waiting in the deck.
+         Mirrors Home's .hm-ib-hawk, minus the hover-hide rule (a v15 row has no
+         hover action bar to yield to). Always visible - mobile has no hover. */
+      .v15ib-hawk { flex:none; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(212,182,92,.35); background:rgba(212,182,92,.12); color:var(--gold,#D4B65C); border-radius:999px; width:26px; height:22px; padding:0; cursor:pointer; transition:background .12s, border-color .12s; }
+      .v15ib-hawk svg { width:13px; height:13px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+      .v15ib-hawk:hover { background:rgba(212,182,92,.24); border-color:rgba(212,182,92,.55); }
       /* Segmented filter (All / Members / Leads / Spam / Unread) */
       .v15ib-cls-row {
         display:inline-flex; gap:2px; background:var(--bg); border:1px solid var(--border);
@@ -10972,7 +10999,7 @@ Then the call to action."]</div>
           </div>
           <input id="ib-search" class="ib-search" type="text" placeholder="Search by name or content..." oninput="_ibSetSearch(this.value)">
           <div class="ib-actions">
-            <button id="ib-approve-btn" class="ib-act ib-act-hawk" onclick="_apxOpen()" title="Hawkeye - approve every agent's drafted messages (Booking / Confirm / Closing tabs inside)">Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
+            <button id="ib-approve-btn" class="ib-act ib-act-hawk" onclick="_hk2Open()" title="Hawkeye - approve every agent's drafted messages (Booking / Confirm / Closing tabs inside)">Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
             <button class="ib-act ib-act-new" onclick="_ibComposeNew()" title="New message"><span class="ib-act-label">New</span><span class="ib-act-icon">+</span></button>
             <button class="ib-act ib-act-refresh" onclick="fetchAndRenderInbox()" title="Refresh">↻</button>
           </div>
@@ -16019,6 +16046,9 @@ async function _v15calSendMsg() {
       body: JSON.stringify({ client_id: CLIENT_ID, type: _V15CAL.msgType, contact_phone: c.phone || undefined, contact_email: c.email || undefined, contact_name: c.name || undefined, message: text, subject: _V15CAL.msgType === 'Email' ? subject : undefined }),
     });
     const j = await _safeJson(r);
+    // No contact id on a calendar row - the server matched the phone to a lead with
+    // a Hawkeye card waiting, so the reply belongs in the deck.
+    if (_hawkGate409(r.status, j, null)) { if (btn) { btn.disabled = false; btn.textContent = 'Send'; } return; }
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     if (btn) { btn.textContent = 'Sent ✓'; }
     const ta = document.getElementById('v15cal-msg-text'); if (ta) ta.value = '';
@@ -16327,6 +16357,10 @@ async function openV15Inbox() {
     // Load the member roster in the background so the Member pill appears even
     // if the staff hasn't opened the Members tab yet; repaint the list once it lands.
     _ibEnsureMembers().then(() => { _IB_MEMBER_IDX = null; try { _v15ibRenderList(); } catch (_) {} });
+    // Load the Hawkeye index in the background and repaint once it lands, so the eye
+    // chips appear and opening a flagged row redirects instead of sending staff into
+    // a thread the deck already owns.
+    _hawkIdxEnsure().then(() => { try { _v15ibRenderList(); } catch (_) {} }).catch(() => {});
   } catch (e) {
     // Keep showing the old data if we had it; only blank to an error otherwise.
     if (!hadData) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox - ${escapeHTML(e.message || String(e))}</div>`;
@@ -16684,7 +16718,7 @@ function _v15ibRenderAll() {
         <span style="flex:1"></span>
         ${needsReplyCount > 0 ? `<span class="v15ib-progress" role="button" style="cursor:pointer" title="Show unread" onclick="_v15ibTab('unread')">${_ibProgressRing(needsReplyCount, totalPeople)}</span>` : ''}
         <button class="v15ib-filter-toggle${hasActiveFilters ? ' has-filters' : ''}" onclick="_V15IB.filtersOpen=!_V15IB.filtersOpen;document.getElementById('v15ib-filter-drawer').classList.toggle('open')">Filters${hasActiveFilters ? ' *' : ''}</button>
-        <button id="v15ib-approve-btn" onclick="_apxOpen()" class="v15ib-act-btn" data-tip="Review agent drafts before they send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Hawkeye<span id="v15-apx-count" class="v15ib-act-count"></span></button>
+        <button id="v15ib-approve-btn" onclick="_hk2Open()" class="v15ib-act-btn" data-tip="Review agent drafts before they send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Hawkeye<span id="v15-apx-count" class="v15ib-act-count"></span></button>
         <button id="v15ib-vmx-btn" onclick="_vmxOpen()" class="v15ib-act-btn" style="display:none" data-tip="Listen to voicemails from leads"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Voicemail<span id="v15-vmx-count" class="v15ib-act-count"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-act-btn" data-tip="Text multiple contacts at once"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Broadcast</button>
         <button class="v15ib-mute-btn" id="ib-mute-btn2" onclick="_ibToggleMute()" title="Toggle sounds" style="background:none;border:1px solid var(--border-med);border-radius:6px;padding:5px 8px;cursor:pointer;color:var(--text-mute);display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:12px;font-weight:600">
@@ -16955,6 +16989,16 @@ function _v15ibConvRow(c, idx) {
   const isActive = _V15IB.active && _V15IB.active.convId === c.id;
   // Checkbox
   const checked = _V15IB.selected.has(c.id) ? ' checked' : '';
+  // Hawkeye: this lead's reply belongs to the deck. Clicking the row redirects
+  // anyway - the chip makes that visible BEFORE the click, and jumps to the card.
+  let hawkChip = '';
+  try {
+    const hkAgent = _hawkPendingFor(c.contactId, c.id);
+    if (hkAgent) {
+      const hkCid = c.contactId ? String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '') : '';
+      hawkChip = `<button type="button" class="v15ib-hawk" title="Hawkeye has an action waiting" onclick="event.stopPropagation();_hk2Open('${hkAgent}'${hkCid ? `,'${hkCid}'` : ''})">${_HV2_ICONS.eye}</button>`;
+    }
+  } catch (_) {}
 
   return `<div class="v15ib-conv ${unread ? 'unread' : ''}${repliedClass}${hotClass}${isActive ? ' v15ib-active' : ''}${needsReply ? ' unread' : ''}" style="${stagger}" data-conv-id="${escapeHTML(c.id)}" onclick='${_V15IB.multiSelect ? `_v15ibToggleSelect("${c.id}",event)` : `_v15ibOpenSplit(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")},${JSON.stringify(c.lastMessageType || c.channel || "")})`}'>
     <span class="v15ib-swipe-bg left">Read</span>
@@ -16969,12 +17013,18 @@ function _v15ibConvRow(c, idx) {
       <div class="v15ib-prev">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
       ${chip}
     </div>
+    ${hawkChip}
     <div style="flex:none;align-self:flex-start;font-size:10px;white-space:nowrap;padding-top:2px;color:var(--text-mute)" class="${timeClass}">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
   </div>`;
 }
 
 // #1: Split-pane open - load thread in right pane instead of replacing list
 function _v15ibOpenSplit(convId, contactId, phone, email, name, channel) {
+  // Hawkeye owns this lead: jump straight into the deck on their card (it shows the
+  // full thread and teaches the agent when the reply is edited). Zoran's call -
+  // instant redirect, not a warning. Silently no-ops when the index is unloaded.
+  const hk = _hawkPendingFor(contactId, convId);
+  if (hk) { _hk2Open(hk, contactId); return; }
   // On mobile, fall back to full-screen thread
   if (window.innerWidth <= 900) {
     _v15ibOpen(convId, contactId, phone, email, name, channel);
@@ -17046,6 +17096,9 @@ async function _v15ibPollTick() {
   if (!a || (!split && !full)) { _v15ibStopThreadPoll(); return; }
   const vis = (split && split.offsetParent !== null) || (full && full.offsetParent !== null);
   if (!vis) return;
+  // Keep the Hawkeye index warm while the inbox sits open - a card can appear at any
+  // time. The 30s TTL means this is one extra fetch every 5 ticks, not every tick.
+  _hawkIdxEnsure().catch(() => {});
   try {
     const token = await _mreqAuthToken();
     const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(a.convId)}`, { headers: { Authorization: 'Bearer ' + token } });
@@ -17207,6 +17260,9 @@ async function _v15ibSendSplit() {
       }),
     });
     const j = await _safeJson(r);
+    // Hawkeye has a card waiting on this lead: the reply belongs in the deck, where
+    // editing it teaches the agent. Hand the composer back and open the deck.
+    if (_hawkGate409(r.status, j, a.contactId)) { if (btn) { btn.disabled = false; btn.textContent = 'Send'; } return; }
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     _SFX.whoosh();
     // Send button micro-animation: pulse + checkmark
@@ -17369,7 +17425,13 @@ async function _ibSendCompose() {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify(payload),
     });
-    if (!r.ok) { const j = await _safeJson(r); throw new Error(j.error || 'Send failed'); }
+    if (!r.ok) {
+      const j = await _safeJson(r);
+      // No contact id here - the server resolved the lead from the typed number and
+      // found a card waiting, so route this reply into the deck.
+      if (_hawkGate409(r.status, j, null)) { document.getElementById('v15ib-compose-overlay')?.remove(); return; }
+      throw new Error(j.error || 'Send failed');
+    }
     _SFX.whoosh();
     document.getElementById('v15ib-compose-overlay')?.remove();
     // Refresh inbox to show the new conversation
@@ -17721,6 +17783,10 @@ function _ibCloseContactDrawer() {
 }
 
 async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
+  // Same instant redirect as the desktop split view - mobile is not a second-class
+  // path here. Fails open when the shared index hasn't loaded.
+  const hk = _hawkPendingFor(contactId, convId);
+  if (hk) { _hk2Open(hk, contactId); return; }
   _V15IB.active = { convId, contactId, phone, email, name, channel: channel || '' };
   _V15IB.pending = [];
   // Mark read: remember the conversation's newest-message time as of now, then
@@ -17932,6 +17998,9 @@ async function _v15ibSend() {
       }),
     });
     const j = await _safeJson(r);
+    // Hawkeye has a card waiting on this lead - same treatment as the desktop
+    // composer: keep the draft, hand the button back, open the deck.
+    if (_hawkGate409(r.status, j, a.contactId)) { if (btn) { btn.disabled = false; btn.textContent = 'Send'; } return; }
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     _V15IB.pending = [];
     _SFX.whoosh();
@@ -20854,6 +20923,7 @@ async function _contactsSendMsg() {
       body: JSON.stringify({ client_id: CLIENT_ID, type: _CDRAWER.msgType, contact_id: c.ghl_contact_id || undefined, contact_phone: c.phone || undefined, contact_email: c.email || undefined, contact_name: c.name || undefined, message: text, subject: _CDRAWER.msgType === 'Email' ? subject : undefined }),
     });
     const j = await _safeJson(r);
+    if (_hawkGate409(r.status, j, c.ghl_contact_id)) { if (btn) { btn.disabled = false; btn.textContent = 'Send'; } return; }
     if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
     const ta = document.getElementById('cd-msg-text'); if (ta) ta.value = '';
     if (btn) { btn.textContent = 'Sent ✓'; btn.style.background = '#3a7d44'; btn.style.color = '#fff'; setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = 'Send'; btn.style.background = 'var(--gold)'; btn.style.color = '#0B0B0D'; } }, 1600); }
@@ -22299,6 +22369,10 @@ function _hmMsgPeekClose() { document.getElementById('hm-peek-ov')?.remove(); }
 async function _hmMsgPeek(convId, focusReply) {
   const c = (window._hmIbById || {})[convId];
   if (!c) return switchView('v15inbox');
+  // Third conversation-open surface: Home's peek gets the same instant redirect, so
+  // there is no back door into a flagged lead's thread.
+  const hk = _hawkPendingFor(c.contactId, convId);
+  if (hk) { _hmMsgPeekClose(); _hk2Open(hk, c.contactId); return; }
   _hmMsgPeekClose();
   try { hapticTap('LIGHT'); } catch (_) {}
   const name = _ccCapName((c.contactName || 'Conversation').split(' ').slice(0, 3).join(' '));
@@ -22373,6 +22447,10 @@ async function _hmMsgPeekSend(convId) {
       body: JSON.stringify({ client_id: CLIENT_ID, type: 'SMS', contactId: c.contactId, message: text }),
     });
     const j = await _safeJson(r);
+    // Checked before the throw on purpose: the catch below queues an offline retry,
+    // and a Hawkeye block is not a network failure - put the draft back in the box
+    // and send staff to the deck instead.
+    if (_hawkGate409(r.status, j, c.contactId)) { if (inp) inp.value = text; return; }
     if (!r.ok) throw new Error((j && j.error) || 'send failed');
     try { _SFX.sent(); hapticTap('MEDIUM'); } catch (_) {}
     const box = document.getElementById('hm-peek-thread');
@@ -22571,6 +22649,14 @@ async function _sendQueueFlush() {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({ client_id: p.client_id, type: 'SMS', contactId: p.contactId, message: p.message }),
       });
+      if (r.status === 409) {
+        // Hawkeye took this lead over while the device was offline. Drop the queued
+        // text (re-queueing would retry forever) and say so - do NOT yank staff into
+        // the deck from a background flush they didn't ask for.
+        _hawkIdxClear();
+        _apxToast('A queued reply was held back - Hawkeye has an action waiting on that lead.', false);
+        continue;
+      }
       if (!r.ok) throw new Error('send failed');
     } catch (_) { _sendQueuePush(p); }
   }
@@ -22679,6 +22765,44 @@ function _hmHawkIndex(res) {
   return idx;
 }
 
+// ── Hawkeye routing index (shared by Home + the inbox) ───────────────────────
+// Every reply surface needs the same answer to "does this lead have a card waiting
+// in the deck?", so the queue fetch is cached once for 30s and read synchronously
+// from there. Without this, replying from the inbox teaches Hawkeye nothing: the
+// teach-on-edit signal and the draft-vs-final audit only fire inside the deck.
+//
+// FAIL OPEN: an unloaded or stale index means "no card", and the send goes through.
+// The real gate is the server's 409 (api/agent/_hawk-gate.js) - this layer only
+// saves staff the round trip.
+async function _hawkIdxEnsure(maxAge = 30000) {
+  const cur = window._hawkIdx;
+  if (cur && (Date.now() - cur.at) < maxAge) return cur;
+  try {
+    const idx = _hmHawkIndex(await _hmHawkFetch());
+    if (!idx) return null;
+    window._hawkIdx = { byContact: idx.byContact, byConv: idx.byConv, at: Date.now() };
+  } catch (_) { return window._hawkIdx || null; }
+  return window._hawkIdx;
+}
+// Anything that changes the queues (a deck action, a 409) must drop the cache, or
+// the inbox keeps redirecting on a card that is already resolved.
+function _hawkIdxClear() { window._hawkIdx = null; window._hmHawkP = null; }
+// Sync read - null when the index hasn't loaded yet (fail open, by design).
+function _hawkPendingFor(contactId, convId) {
+  const idx = window._hawkIdx;
+  if (!idx) return null;
+  return (convId && idx.byConv[String(convId)]) || (contactId && idx.byContact[String(contactId)]) || null;
+}
+// Shared handler for the server's 409. Returns true when it consumed the response,
+// so each caller can reset its own busy state and bail.
+function _hawkGate409(status, j, contactId) {
+  if (status !== 409 || !j || j.error !== 'hawkeye_pending') return false;
+  _hawkIdxClear();
+  _apxToast('Hawkeye has a reply waiting for this lead - review it in the deck.', false);
+  try { _hk2Open(j.agent || null, contactId || j.contact_id || null); } catch (_) {}
+  return true;
+}
+
 // The same person can surface as more than one conversation row - own-store
 // academies merge SMS + email + social + DM threads server-side, and GHL can
 // return more than one thread per contact. Collapse to ONE row per contact so
@@ -22721,13 +22845,14 @@ async function _hmLoadInboxPreview() {
   body._loaded = true;
   try {
     const token = await _mreqAuthToken();
-    const [r, hawkRes] = await Promise.all([
+    // Same cached index the inbox routing reads, so Home's eye chips and the
+    // inbox redirect can never disagree about who has a card waiting.
+    const [r, hawk] = await Promise.all([
       fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }),
-      _hmHawkFetch().catch(() => null),
+      _hawkIdxEnsure().catch(() => null),
     ]);
     const j = await _safeJson(r);
     if (!r.ok || !j.conversations) throw new Error('no data');
-    const hawk = _hmHawkIndex(hawkRes);
     const hawkAgentFor = c => hawk ? (hawk.byConv[String(c.id || '')] || (c.contactId && hawk.byContact[String(c.contactId)]) || null) : null;
     const all = _hmDedupeConvos(j.conversations || []);
     const convos = all.slice(0, 8);
@@ -42787,6 +42912,7 @@ async function _plMsgSend() {
       body: JSON.stringify({ client_id: CLIENT_ID, contact_id: t.contactId, type, message, subject, attachments }),
     });
     const json = await _safeJson(r);
+    if (_hawkGate409(r.status, json, t.contactId)) return;   // finally re-enables the button
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     if (textEl) textEl.value = '';
     _IB_PENDING_FILES = [];
@@ -44352,6 +44478,9 @@ function _hawkDefer({ btn, cardId, label, run, restore }) {
 async function _hawkFlush() {
   const e = _HAWK_PENDING; if (!e) return;
   _HAWK_PENDING = null; clearInterval(e.timer); _hawkUndoPill();
+  // A deck action just changed the queues, so the shared routing index is stale -
+  // drop it or the inbox keeps rerouting on a card that no longer exists.
+  try { _hawkIdxClear(); } catch (_) {}
   try { await e.run(); _hawkSalesFeedRefresh(); } catch (err) { _apxToast(_apxErr(err), false); try { e.restore(); } catch (_) {} }
 }
 // After a Hawkeye action commits, the home Sales card's "Recent movement" feed
@@ -44990,6 +45119,7 @@ async function _ibSendReply() {
       }),
     });
     const json = await _safeJson(r);
+    if (_hawkGate409(r.status, json, t.contactId || (t.convo && t.convo.contactId))) return;
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     // Optimistic append so the staff sees their reply immediately
     t.messages.push({
@@ -45135,6 +45265,7 @@ async function _ibComposeSend() {
       body: JSON.stringify({ client_id: CLIENT_ID, contact_id: c.id, type, message, subject, attachments }),
     });
     const json = await _safeJson(r);
+    if (_hawkGate409(r.status, json, c.id)) return;
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     _IB_PENDING_FILES = [];
     closeInboxDrawer();
@@ -49893,6 +50024,7 @@ async function _memberInboxSend() {
       body: JSON.stringify({ client_id: i.clientId || CLIENT_ID, contact_id: i.contactId, type, message, subject }),
     });
     const json = await _safeJson(r);
+    if (_hawkGate409(r.status, json, i.contactId)) return;   // finally re-enables the button
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     if (textEl) textEl.value = '';
     const sec = document.getElementById('member-inbox-section');
@@ -50039,7 +50171,10 @@ async function _memberCareSendReply(cardId) {
     const subject = type === 'Email' ? `Message from ${(_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.business_name) || 'us'}` : undefined;
     const r = await fetch('/api/ghl/send-message', {
       method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: i.clientId, contact_id: i.contactId, type, message, subject }),
+      // hawkeye_ack: this IS a human-approved agent-card send, it just rides
+      // send-message. Without the flag a member with a pending sales card would
+      // deadlock - the gate would bounce the very reply a human just approved.
+      body: JSON.stringify({ client_id: i.clientId, contact_id: i.contactId, type, message, subject, hawkeye_ack: true }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
@@ -51752,6 +51887,17 @@ async function _plSend() {
       }),
     });
     const json = await _safeJson(res);
+    // A closing card plus a payment link is the exact conflict this gate exists
+    // for: the agent has a drafted close waiting and staff is about to text the
+    // same parent something different. Unlock the composer and open the deck.
+    if (res.status === 409 && json && json.error === 'hawkeye_pending') {
+      _plLockCard(false);
+      if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
+      _plStatus('Hawkeye has a reply waiting for this parent - review it in the deck first.', 'err');
+      _hawkIdxClear();
+      try { _hk2Open(json.agent || null, json.contact_id || null); } catch (_) {}
+      return;
+    }
     if (!res.ok) throw new Error((json.error || ('HTTP ' + res.status)) + (json.hint ? ' - ' + json.hint : ''));
     // Job done: the card becomes a checkmark, then closes itself.
     _plShowSent(isSms ? 'Text' : 'Email', name);
@@ -60552,6 +60698,7 @@ async function _ccQuickSend(inp, contactId) {
       body: JSON.stringify({ client_id: CLIENT_ID, type: 'SMS', contactId, message: text }),
     });
     const j = await _safeJson(r);
+    if (_hawkGate409(r.status, j, contactId)) { box.remove(); return; }
     if (!r.ok) throw new Error((j && j.error) || 'send failed');
     try { _SFX.sent(); hapticTap('MEDIUM'); } catch (_) {}
     box.innerHTML = '<div class="cc-mem-good" style="padding:4px 0">' + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + 'Sent.</div>';
