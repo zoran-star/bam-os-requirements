@@ -110,6 +110,14 @@ const MUTATE = process.env.MUTATE || "";
 let WIRE = null;
 const VERIFIED_DOMAINS = ["byanymeanstoronto.ca", "byanymeanssanjose.com"];
 let SENDING_DOMAIN = VERIFIED_DOMAINS[0];
+// The academy's PUBLIC email (clients.business_email), which the send path resolves
+// for itself: it is the footer contact line, the {{SUPPORT_EMAIL}} link and the
+// unsubscribe destination, and an email that cannot carry one is HELD rather than
+// sent. Set per academy in sendSide() from the same snapshot the surface renders
+// from, so the two sides are comparing the same academy's address. If it disagreed
+// with the snapshot, the compare below would report it as a difference - which is
+// the correct alarm, not a nuisance.
+let SENDING_BUSINESS_EMAIL = "";
 
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
@@ -120,7 +128,16 @@ globalThis.fetch = async (url, init = {}) => {
   if (u === "https://api.resend.com/emails" && method === "POST") { WIRE = { channel: "email", subject: body.subject, html: body.html, from: body.from }; return json({ id: "stub-email" }); }
   if (u.includes("/conversations/messages") && method === "POST") { WIRE = { channel: "sms", text: body.message }; return json({ messageId: "stub-sms" }); }
   if (u === "https://api.resend.com/domains") return json({ data: VERIFIED_DOMAINS.map((name) => ({ name, status: "verified" })) });
-  if (u.includes("/rest/v1/clients?") && u.includes("email_domain")) return json([{ email_domain: SENDING_DOMAIN, business_name: "stub" }]);
+  // The send path's ONE sender read: sending domain, academy name and public email in
+  // a single select. PROJECTED, deliberately - a column the select does not ask for is
+  // not in the answer, so business_email dropping out of _send.js's list would make
+  // every send here HOLD rather than pass quietly.
+  if (u.includes("/rest/v1/clients?") && u.includes("email_domain")) {
+    const sel = new URL(u).searchParams.get("select") || "";
+    const row = { email_domain: SENDING_DOMAIN, business_name: "stub" };
+    if (sel.split(",").includes("business_email")) row.business_email = SENDING_BUSINESS_EMAIL;
+    return json([row]);
+  }
   if (u.includes("/rest/v1/clients?") && u.includes("messaging_provider")) return json([{ messaging_provider: "ghl" }]);
   if (u.includes("/rest/v1/email_suppressions")) return json([]);      // nobody is suppressed
   if (u.includes("/rest/v1/email_events")) return json([]);            // send logging
@@ -191,9 +208,12 @@ function academy(file) {
   const client = snap.client;
   const facts = snap.facts || {};
   return {
-    // The INTERNAL name, deliberately: GTA and San Jose now share a public_name
-    // ("By Any Means Basketball" - the name is the brand, the city lives in the
-    // domain), so labelling by that would print the same academy twice.
+    // The INTERNAL name, deliberately. GTA and San Jose briefly shared a public_name
+    // ("By Any Means Basketball"), so labelling by that printed the same academy twice.
+    // Migration 20260729T235000 split them again (the name drives the gold wordmark, so
+    // the shared bare brand made both wordmarks read BASKETBALL), but business_name is
+    // still the right label here: it is what STAFF call each academy, it is guaranteed
+    // distinct, and it does not move when an owner edits their public-facing name.
     label: client.business_name || file,
     client, facts,
     // EXACTLY the spread api/automations.js uses at send time and on the approval
@@ -229,6 +249,7 @@ function approvalSide(step, ac) {
 async function sendSide(step, ac) {
   WIRE = null;
   SENDING_DOMAIN = ac.domain || VERIFIED_DOMAINS[0];
+  SENDING_BUSINESS_EMAIL = ac.client.business_email || "";
   const common = { clientId: ac.client.id, subject: step.subject, body: step.body, vars: ac.vars };
   const r = String(step.channel).toLowerCase() === "email"
     ? await sendOn({ channel: "email", toEmail: "parent@example.test", ...common })

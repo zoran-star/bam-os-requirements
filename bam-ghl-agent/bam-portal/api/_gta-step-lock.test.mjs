@@ -71,16 +71,15 @@
 // missing, and `name` proves it notices "BAM GTA" reaching a parent. If one reports
 // FAILED, the lock is decorative there and should not be quoted as evidence.
 //
-// `domain` also has to bypass the hardcoded LOCATIONS entry, and that is worth knowing
-// rather than hiding: BAM GTA is the ONE academy with an entry in that map, so blanking
-// its website_setup.domain changes nothing - locFor() falls straight back to the
-// hardcoded siteUrl. GTA's identity is therefore still half-pinned in code, which is a
-// real gap in "GTA as if it was created FROM the template" and is filed as its own
-// queue item. It is NOT fixed here: that entry also carries GTA's tagline, instagram,
-// online-programs URL and referral offer, and the columns that would replace them
-// (migration 20260727150000) are not applied, so deleting it today would silently
-// shorten GTA's welcome email. The control models a NORMAL academy instead, by
-// resolving through locFromVars the way every non-GTA academy already does.
+// `domain` USED to need a workaround here, and the workaround is gone, which is the one
+// thing worth recording about it. BAM GTA was the ONE academy with an entry in a
+// hardcoded LOCATIONS map in api/email-shells.js, so blanking its website_setup.domain
+// changed nothing - locFor() fell straight back to the pinned siteUrl - and the control
+// had to render under a DIFFERENT client id to model a normal academy. That map was
+// deleted on 29 Jul 2026 (api/_email-identity-from-the-row.test.mjs is the suite that
+// says so, migration 20260729T235000 is the data half). GTA now resolves through
+// locFromVars like everybody else, so the control blanks the row and renders under
+// GTA's OWN id, and the lock catches it. Re-verified after the deletion, not assumed.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -115,13 +114,13 @@ function mutatedBody(body) {
 
 const CLIENT = mutatedClient();
 const VARS_USED = MUTATE ? { ...clientVars(CLIENT), ...FACTS, first_name: "Maya", full_name: "Maya Alvarez", athlete: "Jordan Alvarez" } : VARS;
-// MUTATE=domain renders under an id with NO LOCATIONS entry, so identity resolves
-// through locFromVars the way it does for every academy that is not GTA. Without
-// this, GTA's hardcoded entry would supply the very site the control just blanked
-// and the control would prove nothing. See the header: that override is a real gap,
-// filed separately, deliberately not fixed here. It now applies to email as well as
-// SMS (both channels go through one function), which only makes the control louder.
-const RENDER_CLIENT_ID = MUTATE === "domain" ? "00000000-0000-0000-0000-000000000000" : CLIENT.id;
+// ALWAYS GTA'S OWN ID, including under MUTATE=domain. Until 29 Jul 2026 that control had
+// to render under a stranger's id, because GTA's pinned LOCATIONS entry would have
+// supplied the very site the control had just blanked and the control would have proved
+// nothing. The pin is gone, so the id no longer changes anything for any academy - and
+// rendering under GTA's real id is now the STRONGER form, because it is the id a pin
+// would be keyed by.
+const RENDER_CLIENT_ID = CLIENT.id;
 
 // The hidden preheader - the line an inbox shows NEXT TO the subject. It is derived
 // from the subject inside renderEmail, and wordsOf() strips it (it lives in a
@@ -295,25 +294,32 @@ function fixtureProblems(rendered) {
   //
   //    It was written to answer "is this actually GTA's render", because the
   //    parent-facing name stopped being able to on 28 Jul 2026: BAM San Jose's
-  //    public_name is now the identical string, by Zoran's ruling that the name is the
-  //    brand and the city lives in the domain. So "the output contains By Any Means
-  //    Basketball" no longer tells the two academies apart.
+  //    public_name became the identical string, by a ruling that the name is the brand
+  //    and the city lives in the domain. (That ruling was reversed on 29 Jul 2026 by
+  //    migration 20260729T235000 - the name now drives the gold wordmark, so the bare
+  //    brand made every academy's wordmark read BY ANY MEANS BASKETBALL. San Jose is
+  //    "By Any Means San Jose" again. The name CAN discriminate once that is applied;
+  //    it cannot today, because production still holds the old value on both rows.)
   //
-  //    IT DOES NOT ANSWER THAT EITHER, and a negative control proved it rather than
+  //    IT STILL DOES NOT ANSWER THAT, and a negative control proved it rather than
   //    anyone reasoning about it. Swapping GTA's whole row and facts for San Jose's
-  //    and re-rendering leaves BOTH needles in the output:
-  //      - the domain, because GTA is the one academy with a hardcoded LOCATIONS entry
-  //        and the email footer takes its site from there, not from the row. That is
-  //        queue item 31.
+  //    and re-rendering leaves BOTH needles in the output. The REASON changed on
+  //    29 Jul 2026 and was re-measured, not assumed:
+  //      - the domain. This used to be the hardcoded LOCATIONS entry supplying the
+  //        email footer's site instead of the row. That entry is DELETED and the footer
+  //        now follows the row. The domain survives the swap because FOUR SMS bodies
+  //        hand-type it: onboarding step 1 and all three summer_special steps.
   //      - "Coach Zoran", because GTA's onboarding step 1 SMS is STILL a hand-typed
   //        wall of GTA literals (the WhatsApp invite, the online-programs URL, three
   //        Instagram handles, the merch shop, the phone number). Templating the
   //        welcome EMAIL did not touch it; it is the same content in SMS form.
   //
-  //    So no row-based check can discriminate until both of those are fixed, and the
-  //    control that tried was deleted rather than left passing for a weaker reason.
-  //    What survives is worth keeping: if either needle DISAPPEARS, something that
-  //    used to carry GTA's identity has stopped, which is a real staleness signal.
+  //    So both needles now trace to typed COPY rather than to pinned identity, which is
+  //    a smaller and more tractable gap - but it is still a gap, so no row-based check
+  //    can discriminate yet and the control that tried was deleted rather than left
+  //    passing for a weaker reason. What survives is worth keeping: if either needle
+  //    DISAPPEARS, something that used to carry BAM GTA's identity has stopped, which
+  //    is a real staleness signal.
   const IDENTITY = [
     ["its own domain", (GTA.website_setup || {}).domain],
     ["its owner's first name", String(GTA.owner_name || "").trim().split(/\s+/)[0]],

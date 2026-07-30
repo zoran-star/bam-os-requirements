@@ -1,2 +1,2 @@
 EMPTY: false
-TEXT: "Hi Maya, it's coach from By Any Means Basketball.\n\nI saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?\n\nHere's the link to the calendar again: https://byanymeanstoronto.ca/free-trial"
+TEXT: "Hi Maya, it's coach from By Any Means Toronto.\n\nI saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial?\n\nHere's the link to the calendar again: https://byanymeanstoronto.ca/free-trial"

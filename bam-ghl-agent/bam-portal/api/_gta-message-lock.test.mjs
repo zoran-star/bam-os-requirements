@@ -164,9 +164,11 @@ function fixtureProblems(renders) {
 
   // 1. The snapshot carries the parent-facing name at all.
   if (!pub) {
-    out.push("STALE FIXTURE: scripts/snapshots/bam-gta.json has no `public_name`. Production has one "
-      + '("By Any Means Basketball"). Without it clientVars() falls back to business_name and every '
-      + "golden below locks the WRONG name while still passing. Re-capture the snapshot.");
+    out.push("STALE FIXTURE: scripts/snapshots/bam-gta.json has no `public_name`. Production has one. "
+      + "Without it clientVars() falls back to business_name and every golden below locks the WRONG "
+      + "name while still passing - and since 29 Jul 2026 it also locks the wrong gold WORDMARK, "
+      + "because the wordmark word is public_name with the brand prefix stripped. Re-capture the "
+      + "snapshot; the value the goldens expect is in that file's own `_note`.");
     return out;
   }
 
@@ -189,10 +191,12 @@ function fixtureProblems(renders) {
   //     matching check in _gta-step-lock.test.mjs before trusting this for more than
   //     it claims: it is a staleness check, NOT proof that the right academy was
   //     rendered. The parent-facing name stopped being able to prove that on 28 Jul
-  //     2026 (San Jose renders the identical string now), and a negative control
-  //     showed the domain and owner cannot prove it either while GTA has a hardcoded
-  //     LOCATIONS entry. What this does catch is a fact that has silently stopped
-  //     rendering.
+  //     2026 (San Jose was given the identical string), and a negative control showed
+  //     the domain and owner could not prove it either while GTA had a hardcoded
+  //     LOCATIONS entry. That entry is gone as of 29 Jul 2026 and the names diverge
+  //     again, so the note over there has been re-measured rather than left standing -
+  //     the remaining leak is hand-typed SMS copy, not pinned identity. What this does
+  //     catch, unchanged, is a fact that has silently stopped rendering.
   const all = renders.join("\n");
   for (const [what, needle] of [
     ["its own domain", (GTA.website_setup || {}).domain],
@@ -203,6 +207,44 @@ function fixtureProblems(renders) {
       out.push(`LOST FACT: nothing rendered here contains ${what} (${JSON.stringify(needle)}). `
         + "Something that used to carry BAM GTA's identity has stopped rendering.");
     }
+  }
+
+  // 3c. The academy's PUBLIC email is on the row, is what clientVars resolves
+  //     location_email to, and REACHES a parent - and the OWNER's address does not.
+  //     Added for the same reason as public_name in (1): until 29 Jul 2026 this fact
+  //     came from a hardcoded LOCATIONS entry in email-shells.js, so it rendered
+  //     correctly for GTA and for nobody else. Now it comes from
+  //     clients.business_email, and the snapshot is what stands in for that column
+  //     here. If a re-capture drops it, every golden below still MATCHES - both sides
+  //     move together - while every locked email quietly loses its footer contact
+  //     line and its unsubscribe destination. That is precisely the class of silent
+  //     staleness this section exists for. The same reasoning now covers `public_name`
+  //     and `address` (migration 20260729T235000): both are ahead of production in the
+  //     snapshot, and unlike the columns above they CHANGE these goldens rather than
+  //     preserving them. That file's `_note` says so at length.
+  const biz = GTA.business_email;
+  const owner = GTA.email;
+  if (!biz) {
+    out.push("STALE FIXTURE: scripts/snapshots/bam-gta.json has no `business_email`. That column "
+      + "(migration 20260729T210000) is now the ONLY source of the footer contact address and the "
+      + "unsubscribe mailto. Without it these goldens lock emails with NO unsubscribe path, and they "
+      + "still pass. Re-add it, or re-capture once the migration is applied.");
+  } else {
+    if (vars.location_email !== biz) {
+      out.push(`STALE FIXTURE: clientVars() resolves location_email to ${JSON.stringify(vars.location_email)}, `
+        + `but the snapshot's business_email is ${JSON.stringify(biz)}.`);
+    }
+    if (!renders.some((h) => h.includes(`mailto:${biz}?subject=Unsubscribe`))) {
+      out.push(`LOST FACT: no rendered GTA email points its unsubscribe at ${JSON.stringify(biz)}. `
+        + "Either the unsubscribe link stopped rendering or it is pointing somewhere else.");
+    }
+  }
+  // The bug in one line: the owner's personal inbox must appear NOWHERE in a
+  // parent-facing email. This is the assertion that would have caught the original.
+  if (owner && renders.some((h) => h.includes(owner))) {
+    out.push(`OWNER EMAIL PUBLISHED: ${JSON.stringify(owner)} is clients.email - the address WE contact `
+      + "the owner on - and it appears in a rendered parent-facing email. That is the bug "
+      + "clients.business_email was added to remove: no public field may fall back to it.");
   }
 
   // 4. And the INTERNAL label is not leaking the other way. "BAM GTA" is our own

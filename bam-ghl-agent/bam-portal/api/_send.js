@@ -9,14 +9,21 @@
 import { ghl } from "./ghl/_core.js";
 import { maybeSendSmsViaProvider } from "./messaging/provider.js";
 import { sendEmail } from "./_email.js";
-import { renderStepMessage } from "./email-shells.js";
+import { renderStepMessage, unsubscribeFor } from "./email-shells.js";
 import { notifyOwners } from "./_notify-owners.js";
 
-// ── the from-address guardrail (email only) ─────────────────────────────────
-// Every automation email goes out as the ACADEMY's own verified sender, resolved
-// from its client row at runtime - never a hardcoded academy. If that academy has
-// no usable sending domain the email is HELD (it never reaches Resend, nothing
-// generic goes out in its place) and the owner is texted, at most once per 24h.
+// ── the academy-identity guardrails (email only) ────────────────────────────
+// TWO conditions, both resolved from the academy's own client row at runtime and
+// both fail CLOSED. An email that cannot satisfy either is HELD: it never reaches
+// Resend, nothing generic goes out in its place, and the owner is texted at most
+// once per 24h (one cooldown per reason - see HOLD_NOTICES).
+//   1. no verified SENDING DOMAIN  -> it cannot go out as the academy
+//   2. no BUSINESS EMAIL           -> it cannot carry the academy's own contact
+//      address or unsubscribe destination. clients.business_email, never
+//      clients.email: that one is the OWNER's inbox, and publishing it to parents
+//      as the reply-and-unsubscribe address is the bug the column removed.
+// Nothing here falls back to another academy, to a generic BAM address, or to the
+// owner. A fallback would make an unconfigured academy look configured.
 // Mirrors resolveEmail() in api/messaging/email-provider.js (the human 1:1 lane),
 // which stays untouched, and adds the Resend "is it actually verified" check.
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -35,21 +42,77 @@ async function sb(path, init = {}) {
     ...init,
     headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", ...(init.headers || {}) },
   });
-  if (!res.ok) throw new Error(`Supabase ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  // 400 chars, not 200: PostgREST's undefined-column body is what
+  // pendingColsBlamedBy() reads to tell "this column is not migrated yet" apart from
+  // a real outage, and a truncated body would turn a safe retry into a silent hold.
+  if (!res.ok) throw new Error(`Supabase ${res.status}: ${(await res.text()).slice(0, 400)}`);
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
 }
 
 const CLIENT_TTL = 30_000;
-const _clientCache = new Map(); // clientId -> { at, domain, name }
+const _clientCache = new Map(); // clientId -> { at, domain, name, businessEmail }
+
+// ONE row read, THREE facts. business_email rides the same query as email_domain
+// because they answer two halves of one question - can this go out AS the academy,
+// and can it carry the academy's own reply-to and unsubscribe address - and because
+// the send path must never ask twice for one row.
+const SENDER_COLS = ["email_domain", "business_name"];
+// ⚠️ PENDING MIGRATION, dropped on the one error that means "not applied yet" (see
+// the retry in clientSender). Same shape and same rule as CLIENT_COLS_PENDING in
+// api/automations.js, which is where the reasoning is written out in full. It matters
+// more here than anywhere: clientSender THROWING holds the send WITHOUT texting the
+// owner, so an unhandled 400 on this select would stop every academy's automation
+// email silently. Dropping the column instead degrades to "no business email", which
+// holds AND tells the owner. Move it into SENDER_COLS once the migration is applied.
+//   business_email - migration 20260729T210000_clients_business_email.sql
+const SENDER_COLS_PENDING = ["business_email"];
+
+// Only an undefined-column error (PostgREST 42703) that NAMES a pending column earns
+// the retry. A transient 5xx stays a throw: silently degrading to a row with no
+// business_email would hold an academy's email over an outage rather than over its
+// own missing data, and tell the owner to go fix a field that is already filled in.
+function pendingColsBlamedBy(err) {
+  const msg = String((err && err.message) || err || "");
+  if (!/42703|does not exist/i.test(msg)) return [];
+  return SENDER_COLS_PENDING.filter((c) => msg.includes(c));
+}
 
 // THROWS on a DB blip - the caller turns that into a hold WITHOUT an owner text.
+//
+// `businessEmail` is the academy's PUBLIC email (clients.business_email) - the footer
+// contact line, the footer Email link, and the unsubscribe destination. Resolved HERE,
+// at the one choke point every automation email passes through, because three callers
+// hand sendOn `vars: {}` on purpose (their tokens are already resolved: the confirm
+// agent's booking confirmation and same-day check-in, and the approvals inbox's
+// confirmation email). Reading it off the caller's vars would leave those three unable
+// to carry an unsubscribe link at all, which is precisely the state the hold below
+// exists to refuse.
 async function clientSender(clientId) {
   const hit = _clientCache.get(clientId);
   if (hit && Date.now() - hit.at < CLIENT_TTL) return hit;
-  const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=email_domain,business_name&limit=1`);
+  const cols = SENDER_COLS.concat(SENDER_COLS_PENDING);
+  const read = (list) => sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=${list.join(",")}&limit=1`);
+  let rows;
+  try {
+    rows = await read(cols);
+  } catch (e) {
+    const blamed = pendingColsBlamedBy(e);
+    if (!blamed.length) throw e;
+    console.warn(`[_send] clientSender: ${blamed.join(", ")} not in the schema yet (migration pending) - re-reading without ${blamed.length > 1 ? "them" : "it"}`);
+    rows = await read(cols.filter((c) => !SENDER_COLS_PENDING.includes(c)));   // ALL of them, not just `blamed` - Postgres names only the first
+  }
   const row = (Array.isArray(rows) && rows[0]) || {};
-  const out = { at: Date.now(), domain: String(row.email_domain || "").trim().toLowerCase(), name: String(row.business_name || "").trim() };
+  const out = {
+    at: Date.now(),
+    domain: String(row.email_domain || "").trim().toLowerCase(),
+    name: String(row.business_name || "").trim(),
+    // NO FALLBACK, ON PURPOSE. A column that is not there yet, a NULL, and an empty
+    // string are all the SAME answer here - "this academy has no public email" - and
+    // that answer HOLDS the send rather than borrowing clients.email (the owner's
+    // inbox, which is the bug the column removed). See guardrail 2 at the top.
+    businessEmail: String(row.business_email || "").trim(),
+  };
   _clientCache.set(clientId, out);
   return out;
 }
@@ -73,10 +136,14 @@ async function verifiedDomains() {
 }
 
 // Resolve the From header for one academy.
-//   { from }                    -> safe to send
+//   { from, businessEmail }     -> safe to send
 //   { hold:true, notify:true }  -> domain missing / unverified (owner gets the text)
 //   { hold:true, notify:false } -> transient blip: fail CLOSED, but do NOT ping the
 //                                  owner over something they cannot fix.
+// `businessEmail` rides along because it comes off the same row read and is needed
+// by the same caller for the same reason: an email that cannot go out AS the academy
+// and an email that cannot carry the academy's own reply-to / unsubscribe address are
+// two halves of one question.
 async function fromFor(clientId, vars) {
   if (!clientId) return { hold: true, notify: false };
   let row;
@@ -88,55 +155,72 @@ async function fromFor(clientId, vars) {
   catch (e) { console.error("[_send] Resend domain list failed (holding):", e.message); return { hold: true, notify: false }; }
   if (!verified.has(row.domain)) return { hold: true, notify: true };
 
+  const businessEmail = row.businessEmail;
   const addr = `info@${row.domain}`;
   // BYTE-IDENTITY, by domain match and nothing else (no client-id, no academy-name
   // hardcode): the academy that already owns the legacy address keeps the legacy
   // string verbatim, so its parents see zero header drift.
-  if (addr === LEGACY_ADDR) return { from: LEGACY_FROM };
+  if (addr === LEGACY_ADDR) return { from: LEGACY_FROM, businessEmail };
   const name = String((vars && vars.location_name) || row.name || "").replace(/[<>"]/g, "").trim();
-  return { from: name ? `${name} <${addr}>` : addr };
+  return { from: name ? `${name} <${addr}>` : addr, businessEmail };
 }
 
 // ── owner heads-up, once per academy per 24h ────────────────────────────────
 const HOLD_NOTICE_COOLDOWN_MS = 24 * 3600000;
-const HOLD_NOTICE_MESSAGE =
-  "Heads up: your automation emails are on hold because your academy's sending domain is not set up yet. Ping BAM staff to finish email setup, then held emails go out on their own.";
-const _holdClaims = new Map(); // clientId -> ms claimed in THIS process
+// One entry per REASON a send can hold. Each carries its own email_events type and
+// its own cooldown, because they are different problems with different fixes: one is
+// BAM staff finishing email setup, the other is the owner typing an address into
+// their own portal. Sharing a dedupe key would mean an academy that hit the domain
+// hold this morning is silently muted about the missing public email this afternoon.
+const HOLD_NOTICES = {
+  domain: {
+    type: "domain_hold_notice",
+    message: "Heads up: your automation emails are on hold because your academy's sending domain is not set up yet. Ping BAM staff to finish email setup, then held emails go out on their own.",
+  },
+  business_email: {
+    type: "business_email_hold_notice",
+    message: "Heads up: your automation emails are on hold because your academy's public email is not set yet. That address is what parents see and what their unsubscribe link uses, so we will not send without it. Add it in your portal under Business blueprint > Business basics and held emails go out on their own.",
+  },
+};
+const _holdClaims = new Map(); // clientId|reason -> ms claimed in THIS process
 
-// Deduped through an email_events row (type 'domain_hold_notice') stamped BEFORE
-// the text fires, so a crash between the two can only under-notify for one cycle,
-// never spam. Best-effort and never throws.
-async function noticeHeldOnce(clientId) {
+// Deduped through an email_events row (one type per reason, see HOLD_NOTICES)
+// stamped BEFORE the text fires, so a crash between the two can only under-notify
+// for one cycle, never spam. Best-effort and never throws.
+async function noticeHeldOnce(clientId, reason = "domain") {
   try {
     if (!clientId) return;
+    const notice = HOLD_NOTICES[reason];
+    if (!notice) return;
+    const claimKey = clientId + "|" + reason;
     // Claim SYNCHRONOUSLY, before the first await - one engine pass holds many
     // jobs for the same academy, and set any later they all read an empty stamp
     // and the owner gets texted once per held job.
-    const prev = _holdClaims.get(clientId);
+    const prev = _holdClaims.get(claimKey);
     if (prev && Date.now() - prev < HOLD_NOTICE_COOLDOWN_MS) return;
-    _holdClaims.set(clientId, Date.now());
+    _holdClaims.set(claimKey, Date.now());
 
     const sinceIso = new Date(Date.now() - HOLD_NOTICE_COOLDOWN_MS).toISOString();
     let recent;
     try {
-      recent = await sb(`email_events?client_id=eq.${encodeURIComponent(clientId)}&type=eq.domain_hold_notice&created_at=gte.${sinceIso}&select=id&limit=1`);
-    } catch (_) { _holdClaims.delete(clientId); return; }
+      recent = await sb(`email_events?client_id=eq.${encodeURIComponent(clientId)}&type=eq.${notice.type}&created_at=gte.${sinceIso}&select=id&limit=1`);
+    } catch (_) { _holdClaims.delete(claimKey); return; }
     if (Array.isArray(recent) && recent.length) return; // another instance already texted
 
     let stampId = null;
     try {
       const ins = await sb(`email_events`, {
         method: "POST", headers: { Prefer: "return=representation" },
-        body: JSON.stringify([{ client_id: clientId, type: "domain_hold_notice" }]),
+        body: JSON.stringify([{ client_id: clientId, type: notice.type }]),
       });
       stampId = (Array.isArray(ins) && ins[0] && ins[0].id) || null;
-    } catch (_) { _holdClaims.delete(clientId); return; }
+    } catch (_) { _holdClaims.delete(claimKey); return; }
 
-    const r = await notifyOwners(clientId, "settings_alert", HOLD_NOTICE_MESSAGE);
+    const r = await notifyOwners(clientId, "settings_alert", notice.message);
     // Nobody actually got it (no owner phone on file): give the stamp back, so a
     // recipient-less academy is not silently muted for the next 24h.
     if (!r || !r.sent) {
-      _holdClaims.delete(clientId);
+      _holdClaims.delete(claimKey);
       if (stampId) { try { await sb(`email_events?id=eq.${stampId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }); } catch (_) {} }
     }
   } catch (_) { /* a notifier problem must never break the send path */ }
@@ -151,9 +235,10 @@ async function noticeHeldOnce(clientId) {
 // resolved here (email tokens resolve inside renderEmail).
 // Returns { sent:true, id } on success, { skipped:reason } when nothing went out
 // (e.g. a suppressed email address), { held:reason } when an email could not go
-// out AS THE ACADEMY (see the guardrail above - the engine re-queues those without
-// burning an attempt), and THROWS on a hard failure so the worker can retry /
-// record the error.
+// out AS THE ACADEMY or could not carry the academy's own unsubscribe address (see
+// the two guardrails above - the engine re-queues those without burning an
+// attempt), and THROWS on a hard failure so the worker can retry / record the
+// error.
 // A step body that resolves to nothing once merge fields are filled. Reported as
 // a SKIP (the engine advances past it) rather than a failure, because there is
 // no message to send and no retry that could change that.
@@ -177,15 +262,36 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
     // sending domain = the email HOLDS. There is deliberately NO fallback sender.
     const sender = await fromFor(clientId, vars);
     if (!sender.from) {
-      if (sender.notify) await noticeHeldOnce(clientId);
+      if (sender.notify) await noticeHeldOnce(clientId, "domain");
       return { held: "sending domain not set" };
+    }
+    // SECOND HARD GUARDRAIL: the academy's own public email, rendered from the value
+    // resolved above rather than from whatever the caller happened to pass. That
+    // substitution is the guard being CONNECTED to its outcome: three callers send
+    // `vars: {}` deliberately (tokens pre-resolved), so a check against the row plus
+    // a render from the vars would pass and still put an email on the wire with no
+    // unsubscribe link in it.
+    const renderVars = { ...(vars || {}), location_email: sender.businessEmail };
+    // No public email means no unsubscribe destination, and an email with NO
+    // unsubscribe path is worse than the bug this replaced (which pointed it at the
+    // owner's personal inbox). So it HOLDS, exactly like an unverified sending
+    // domain: nothing generic goes out in its place, the engine re-queues without
+    // burning an attempt, and the owner is texted at most once per 24h.
+    //
+    // sendOn takes no unsubscribeUrl and renderStepMessage cannot carry one, so on
+    // THIS path "no business email" and "no unsubscribe" are the same condition. If
+    // either ever grows that parameter it has to reach BOTH the check and the render,
+    // or the check stops describing what goes out.
+    if (!unsubscribeFor({ clientId, vars: renderVars })) {
+      await noticeHeldOnce(clientId, "business_email");
+      return { held: "no business email, so no unsubscribe link" };
     }
     // Wrap the step's text in the academy's branded shell so every automation
     // email is on-brand (the step body carries only the message copy). Subject
     // can carry merge tokens too, so resolve it against the same vars.
     // ONE RENDER PATH: this is the SAME call the owner's approval surface makes,
     // so the email an owner approved is byte-for-byte the email that goes out.
-    const msg = renderStepMessage({ channel: "email", clientId, subject, body: text, vars });
+    const msg = renderStepMessage({ channel: "email", clientId, subject, body: text, vars: renderVars });
     if (msg.empty) return { skipped: EMPTY_AFTER_MERGE };
     const r = await sendEmail({ to: toEmail, subject: msg.subject, html: msg.html, from: sender.from, clientId });
     if (r && r.skipped) return { skipped: r.skipped };

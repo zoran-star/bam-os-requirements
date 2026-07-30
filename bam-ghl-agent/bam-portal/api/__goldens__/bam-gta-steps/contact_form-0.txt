@@ -1,2 +1,2 @@
 EMPTY: false
-TEXT: "Hi Maya,\n\nIt's coach from By Any Means Basketball. Just saw you filled in the form for extra info, is there anything I can help with?"
+TEXT: "Hi Maya,\n\nIt's coach from By Any Means Toronto. Just saw you filled in the form for extra info, is there anything I can help with?"

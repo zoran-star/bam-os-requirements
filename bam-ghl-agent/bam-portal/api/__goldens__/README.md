@@ -25,7 +25,7 @@ The **words** goldens were generated from `origin/main` at `477a604` - GTA's out
 it was in production on 27 Jul 2026, before the automation-templating wave. They are
 the production truth and only move on a deliberate, owner-approved copy change.
 
-Owner-approved changes so far, all on 27 Jul 2026:
+Owner-approved changes so far. Changes 1-3 are 27 Jul 2026:
 
 1. The footer reason on `onboarding-story`, `-era` and `-testimonials` went from
    "you enquired about" to "you joined". Those three go to people who have already
@@ -35,10 +35,50 @@ Owner-approved changes so far, all on 27 Jul 2026:
 2. `onboarding-welcome` got its "online programs" and "bring a friend" items back,
    now gated on a per-academy fact rather than deleted.
 3. `{{location.name}}` started rendering the academy's PARENT-FACING name. GTA's
-   `public_name` is "By Any Means Basketball"; "BAM GTA" is our internal label and
-   was leaking into customer copy. `nurture-1` and `onboarding-story` moved by three
-   lines each - the only two templates that use the token. `nurture-2/3/4` and the
-   other six are byte-identical, which is the proof nothing else came with it.
+   `public_name` was "By Any Means Basketball" (see change 4); "BAM GTA" is our
+   internal label and was leaking into customer copy. `nurture-1` and
+   `onboarding-story` moved by three lines each - the only two templates that use the
+   token. `nurture-2/3/4` and the other six are byte-identical, which is the proof
+   nothing else came with it.
+
+### 4. The email layer's last academy-specific hardcode, 29 Jul 2026
+
+`api/email-shells.js` carried a `LOCATIONS` map keyed by client id with exactly one
+entry, BAM GTA's, pinning its email identity over whatever its `clients` row said. It
+is **deleted**, so every academy now renders from its own row. The data half is
+migration `20260729T235000` (GTA's `public_name`, GTA's `address`, San Jose's
+`public_name`); it is **not applied yet** - see `supabase/PENDING_SQL.md`.
+
+Approved by Zoran including the visible cost. **All 37 step + words goldens and the 10
+markup goldens were re-taken**, and every one of the 133 changed lines is one of these
+three changes and nothing else (verified line by line, not re-captured on faith):
+
+| What a parent sees | Before | After | Golden files |
+|---|---|---|---|
+| the gold wordmark word | `BY ANY MEANS GTA` | `BY ANY MEANS TORONTO` | 33 |
+| the small line beside it | `OAKVILLE · GTA` | `OAKVILLE` | 27 |
+| the academy's name in copy, the `<title>` and the footer reason | `By Any Means Basketball` | `By Any Means Toronto` | 16 |
+
+**Why the wordmark had to move.** The wordmark word and the full name BOTH derive from
+`public_name` (the word is the name with the "By Any Means" prefix stripped). Keeping
+both of the old strings - a `GTA` wordmark AND a "By Any Means Toronto" full name -
+would have needed a pinned suffix column, which is the hardcode again wearing a
+database column. One field drives everything; no overrides.
+
+**A fourth change that is deliberately invisible.** GTA's `address` gained its city
+(`2205 Rosemount Cres` -> `2205 Rosemount Cres, Oakville, ON`). `cityFromAddress()`
+returns `""` for a bare street line, and the pin used to cover for that. Without the
+address fix, **8 of the 10 templates would have lost their location tag** and 4 would
+have lost the city from their body copy ("In a lot of Oakville programs" -> "In a lot
+of programs"). Measured, not reasoned about. With it, `{{location.city}}` and the tag
+render exactly what the pin used to supply, so those lines do not appear above.
+
+**Not changed, and worth knowing:** three of GTA's `automation_steps` rows hand-type
+the brand name into their copy (onboarding step 1's SMS, onboarding step 2's subject,
+`summer_special` step 0's SMS). After the migration GTA's shell says "By Any Means
+Toronto" while those three messages still say "By Any Means Basketball". That is live
+copy in the database, a separate owner-visible edit, and it is pinned by section 9 of
+`api/_email-identity-from-the-row.test.mjs` so it is recorded rather than discovered.
 
 ## The fixture, and why it is not written down twice
 

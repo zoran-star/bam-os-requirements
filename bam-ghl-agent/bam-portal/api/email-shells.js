@@ -21,45 +21,49 @@ const TEMPLATES = { ...NURTURE_TEMPLATES, ...ONBOARDING_TEMPLATES };
 // ./email-templates/_shell.js so the designed templates in that folder ride the SAME
 // markup instead of each keeping a copy of the header/footer.
 
-// Per-location strings. Same design, each location's own identity, keyed by
-// client_id. An academy WITHOUT an entry here gets its identity derived from
-// RUNTIME vars (the client row) via locFromVars - identity fields fail to EMPTY,
-// never to another academy's config. (The old `|| LOCATIONS[GTA_ID]` fallback
-// leaked GTA's site + owner into every unwired academy's sends - San Jose would
-// have texted "byanymeanstoronto.ca" and signed "coach Zoran", 2026-07-25.)
-const LOCATIONS = {
-  // BAM GTA
-  "39875f07-0a4b-4429-a201-2249bc1f24df": {
-    suffix: "GTA",
-    locationTag: "OAKVILLE &middot; GTA",
-    full: "By Any Means Toronto",
-    tagline: "Youth and high-school basketball training in Oakville and across the GTA.",
-    siteUrl: "https://byanymeanstoronto.ca",
-    siteLabel: "byanymeanstoronto.ca",
-    email: "info@byanymeanstoronto.ca",
-    // Left in the short form on purpose. This is the FOOTER instagram link on every
-    // email, so "canonicalising" it to the www/trailing-slash form the welcome email's
-    // general-page link was hand-written in changes a link in all ten templates to buy
-    // a byte-identical match in one. Same account either way.
-    instagram: "https://instagram.com/byanymeanstoronto",
-    city: "Oakville",
-    ownerFirst: "Zoran",
-    // OPTIONAL per-academy facts. Only GTA has these today, which is exactly why the
-    // welcome email's "online programs" and "bring a friend" items render for GTA and
-    // for nobody else. They are read straight off this config by the template - no
-    // academy branch anywhere - and an academy that has neither simply sends a shorter
-    // email. They live here, beside GTA's other identity strings, because that is
-    // where GTA's facts already live and because clients.online_programs_url /
-    // clients.referral_offer (migration 20260727150000) is not applied yet; once it is,
-    // filling those columns is what turns these on for anyone else.
-    onlineProgramsUrl: "https://byanymeanstoronto.ca/online-programs",
-    referralOffer: {
-      lead: "Bring a friend",
-      body: "to training and you both get a free month plus some merch",
-      merchUrl: "https://byanymeansgsc.com",
-    },
-  },
-};
+// THERE IS NO PER-ACADEMY MAP HERE ANY MORE, AND ADDING ONE BACK IS THE REGRESSION.
+//
+// Until 29 Jul 2026 this file carried a LOCATIONS object keyed by client id with
+// exactly one entry, BAM GTA's, pinning its email identity. It was the last
+// academy-specific literal in the email layer, and it shrank one field at a time:
+// `email` became clients.business_email (migration 20260729T210000), `tagline` and
+// `instagram` became clients.tagline / clients.instagram_url (20260729T230000), and
+// the last four went the same way (20260729T235000) - not by growing four more
+// columns, but because all four traced to ONE cause:
+//
+//   suffix       the gold wordmark word, derived by stripping "By Any Means" / "BAM "
+//                off public_name. GTA's public_name was the bare brand "By Any Means
+//                Basketball", so the derived word was BASKETBALL and the pin said GTA.
+//   full         the parent-facing name. Also public_name. Pin said "By Any Means
+//                Toronto"; the row said "By Any Means Basketball".
+//   locationTag  the small line beside the wordmark, derived as the uppercased city.
+//                Pin said "OAKVILLE &middot; GTA", hand-composed.
+//   city         cityFromAddress() found none in the stored "2205 Rosemount Cres".
+//
+// suffix and full BOTH come from public_name, so keeping the old look exactly (a "GTA"
+// wordmark AND a "By Any Means Toronto" full name) needed a pinned suffix - a
+// per-academy override, which is this map again wearing a database column. Zoran's
+// ruling: ONE field drives everything, no overrides. public_name is now "By Any Means
+// Toronto", the wordmark reads TORONTO, the tag reads OAKVILLE, and the address carries
+// its city. He accepted that visible cost; it is the price of no academy branch.
+//
+// So EVERY academy's identity is now derived from its own clients row by locFromVars()
+// below, and identity fields fail to EMPTY - never to another academy's values. (The
+// `|| LOCATIONS[GTA_ID]` fallback that predated even the one-entry map leaked GTA's
+// site and owner into every unwired academy's sends: San Jose would have texted
+// "byanymeanstoronto.ca" and signed "coach Zoran", 2026-07-25.)
+//
+// ⛔ DO NOT REINTRODUCE A PER-CLIENT-ID BRANCH HERE, in any spelling - a map, a
+// switch, a `if (clientId === ...)`, a JSON file keyed by id. The whole point is that
+// there is nowhere left for one academy's facts to hide from the rest.
+// api/_email-identity-from-the-row.test.mjs fails if one appears, by rendering under
+// GTA's real client id with an empty row and checking that NOTHING of GTA's comes out.
+//
+// The two OPTIONAL content facts that used to live in GTA's entry (the welcome email's
+// "online programs" item and its "bring a friend" referral offer) are
+// clients.online_programs_url and clients.referral_offer (migration 20260727150000,
+// applied). They resolve through clientVars() like everything else, and an academy
+// with neither simply sends a shorter email - no academy branch anywhere.
 
 // Build a location config from runtime vars (see clientVars below). Everything
 // unknown is EMPTY: the shell drops empty links/lines instead of borrowing
@@ -69,25 +73,48 @@ function locFromVars(vars = {}) {
   const site = String(vars.location_website || "");
   // "BAM San Jose" / "By Any Means San Jose" -> gold wordmark suffix "SAN JOSE";
   // a name without the brand prefix keeps the plain "BY ANY MEANS" wordmark.
+  //
+  // THE WORDMARK AND THE FULL NAME ARE ONE FIELD, and that is a decision rather than a
+  // limitation (29 Jul 2026, Zoran). An academy that wants a different word in gold
+  // changes its public_name; there is no second field to disagree with the first. This
+  // is what BAM GTA's pinned "GTA" suffix used to buy at the price of an academy
+  // branch, and it is why its wordmark now reads TORONTO.
   const stripped = name.replace(/^\s*(?:by\s+any\s+means|bam)\s+/i, "");
   return {
     suffix: stripped !== name ? stripped.toUpperCase() : "",
+    // The small line beside the wordmark: just the academy's own city, uppercased.
+    // GTA's pin composed "OAKVILLE &middot; GTA" by hand; nothing on any row produces a
+    // composite like that, so the derived form is what every academy including GTA now
+    // renders. A row with no parseable city renders no tag at all.
     locationTag: vars.location_city ? String(vars.location_city).toUpperCase() : "",
     full: name,
-    tagline: "",
+    // The academy's own sentence under the wordmark, and its own Instagram. Both
+    // hardcoded to "" until 29 Jul 2026, which is why they rendered for BAM GTA (the
+    // one academy that had a pinned entry) and for nobody else. Now
+    // clients.tagline / clients.instagram_url, migration 20260729T230000.
+    //
+    // ⚠️ A client row read before that migration is applied simply has no such
+    // property, which reads as absent and renders as nothing: no tagline sentence, and
+    // dropEmptyShellLinks removes the empty Instagram anchor with its separator rather
+    // than shipping a link to nowhere. Nothing throws, nothing is borrowed - the
+    // footer is two elements shorter. That state is QUIET, so it is written up in the
+    // migration's "BEFORE YOU DEPLOY": the two columns must also join the loadClient
+    // select lists in api/automations.js and api/agent-confirm.js once it is live, or
+    // GTA keeps rendering without them.
+    tagline: String(vars.location_tagline || ""),
     siteUrl: site,
     siteLabel: site.replace(/^https?:\/\//i, ""),
     email: String(vars.location_email || ""),
-    instagram: "",
+    instagram: String(vars.location_instagram_url || ""),
     city: String(vars.location_city || ""),
     ownerFirst: String(vars.location_owner || ""),
     // Optional content facts. Absent (no column yet, or a NULL) means EMPTY, and the
     // blocks that depend on them do not render at all. See onboarding-emails.js.
     onlineProgramsUrl: String(vars.online_programs_url || ""),
     referralOffer: normalizeReferral(vars.referral_offer),
-    // Link facts. Deliberately NOT added to the hardcoded LOCATIONS entry above -
-    // they only ever come from the academy's own row, so no academy can inherit
-    // another's group invite or review link.
+    // Link facts. These never had any home but the academy's own row - not even back
+    // when GTA had a pinned entry - so no academy can inherit another's group invite
+    // or review link. Every field here is now on those terms.
     communityUrl: String(vars.location_community_url || ""),
     communityPlatform: String(vars.location_community_platform || ""),
     reviewUrl: String(vars.location_review_url || ""),
@@ -121,22 +148,22 @@ function normalizeReferral(raw) {
   return { lead, body, merchUrl: String(r.merch_url || r.merchUrl || "").trim() };
 }
 
-// An academy's location config. For an academy with no hardcoded entry this is
-// entirely its own row (locFromVars). For one WITH an entry - only BAM GTA today -
-// the hardcoded values still win, but any fact the entry does not carry falls
-// through to the row instead of being undefined.
+// An academy's location config: entirely its own row, for every academy, with no
+// exceptions and nowhere to put one.
 //
-// That fall-through is the point. The hardcoded entry deliberately omits the link
-// facts (community group, review link) because they must only ever come from an
-// academy's own record, and it predates the phone / venue / schedule facts entirely.
-// Spreading the row underneath means those resolve for GTA exactly as they do for
-// everyone else, with no academy branch anywhere. It also turns the entry from an
-// OVERRIDE into a FALLBACK: the day a column exists for GTA's tagline and instagram,
-// filling it is all it takes, and the entry stops being read without anyone
-// remembering to delete it.
+// `clientId` IS STILL A PARAMETER AND IS DELIBERATELY NOT READ. That is not an
+// oversight to tidy up - it is the guarantee, in a shape that can be tested. Callers
+// pass the id (they all have it), and the fact that passing GTA's real id changes
+// nothing about the result is exactly what "the pin is gone" means. Keeping the
+// parameter is what lets api/_email-identity-from-the-row.test.mjs render under GTA's
+// own client id against an empty row and assert that nothing of GTA's comes back; drop
+// the parameter and that assertion becomes unexpressible.
+//
+// If you find yourself wanting to read it, read the ⛔ block at the top of this file
+// first. A per-client-id lookup here is the one thing this whole change removed.
 export function locFor(clientId, vars) {
-  const pinned = LOCATIONS[clientId];
-  return pinned ? { ...locFromVars(vars), ...pinned } : locFromVars(vars);
+  void clientId;
+  return locFromVars(vars);
 }
 
 // The runtime identity vars for a clients row - the academy facts the resolver
@@ -161,7 +188,19 @@ export function clientVars(client) {
     // stay a hardcoded literal, which is the one thing keeping the row academy-specific.
     location_domain: domain || "",
     location_owner: c.owner_name ? String(c.owner_name).trim().split(/\s+/)[0] : "",
-    location_email: c.email || "",
+    // The email a PARENT sees, replies to and unsubscribes through. This used to read
+    // `c.email`, which is the OWNER's address - so every academy published the person
+    // WE contact as the address parents contact, and pointed the unsubscribe mailto at
+    // it. BAM GTA's is zoran@byanymeansbball.com, a personal inbox; DETAIL Miami's and
+    // Johnson Bball's are both Mike's. GTA only looked right because of the pinned
+    // entry this file used to carry, which no other academy had.
+    //
+    // NO FALLBACK TO c.email. Not "for now", not "until academies fill it in". Falling
+    // back is the bug, and it also hides the bug: a field that renders something reads
+    // as configured. Empty here drops the footer contact line and the footer Email
+    // link, and the send path HOLDS the email rather than shipping one with no
+    // unsubscribe path (see unsubscribeFor below and api/_send.js).
+    location_email: c.business_email || "",
     location_city: cityFromAddress(c.address),
     // The number a MEMBER reaches the coaches on. Not the same thing as
     // clients.address, which is the business address and not the gym - the venue
@@ -179,6 +218,13 @@ export function clientVars(client) {
     location_community_url: c.community_group_url || "",
     location_community_platform: communityPlatformLabel(c.community_group_platform),
     location_review_url: c.google_review_url || "",
+    // The footer's two identity facts (migration 20260729T230000, not applied yet).
+    // Absent on a row read before it lands, which reads as "this academy has no
+    // tagline / no Instagram" - the honest answer, and the same shape
+    // online_programs_url had before its own migration. NO fallback of any kind: an
+    // academy publishing another academy's Instagram is worse than publishing none.
+    location_tagline: c.tagline || "",
+    location_instagram_url: c.instagram_url || "",
   };
 }
 
@@ -359,9 +405,10 @@ export function resolveMergeVars(html, L, vars = {}) {
     "contact.athlete_full_name": vars.athlete || "your athlete",
     "contact.athlete_first_name": _athFirst || "your athlete",
     "contact.athletes_first_name": _athFirst || "your athlete",
-    // vars overrides first: for an academy without its own LOCATIONS entry, L is
-    // already derived from these same vars (locFromVars), so identity can only
-    // ever be the academy's own values - or EMPTY. Never another academy's.
+    // vars first, then L - and since 29 Jul 2026 the two can no longer disagree: L is
+    // derived from these same vars (locFromVars) for EVERY academy, with no per-client
+    // map left to override them. Identity can only ever be the academy's own values, or
+    // EMPTY. Never another academy's.
     "location.city": vars.location_city || L.city || "",
     "location.name": vars.location_name || L.full || "",
     "location.website": vars.location_website || L.siteUrl || "",
@@ -608,10 +655,24 @@ export function renderStepMessage({ channel, clientId, subject, body, vars } = {
   throw new Error(`renderStepMessage: unknown channel '${channel}'`);
 }
 
+// The unsubscribe destination this email WILL carry, resolved the one way, so the
+// send path can ask the question before it sends and get the same answer the render
+// gives. Empty means the rendered email has NO unsubscribe path at all - which is
+// worse than one pointing at the wrong inbox, so api/_send.js HOLDS on empty rather
+// than sending. Asking that question of `clients.business_email` directly instead of
+// through here would be a second opinion about the same email, and the two would
+// drift the first time an explicit unsubscribeUrl was passed.
+export function unsubscribeFor({ clientId, unsubscribeUrl, vars } = {}) {
+  const explicit = String(unsubscribeUrl || "").trim();
+  if (explicit) return explicit;
+  const L = locFor(clientId, vars);
+  return L.email ? `mailto:${L.email}?subject=Unsubscribe` : "";
+}
+
 export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars, footerReason, docTitle } = {}) {
   const L = locFor(clientId, vars);
   const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
-  const unsub = unsubscribeUrl || (L.email ? `mailto:${L.email}?subject=Unsubscribe` : "");
+  const unsub = unsubscribeFor({ clientId, unsubscribeUrl, vars });
   const raw = templateBody({ clientId, body, vars });
   const shellArgs = { pre, unsub, reason: footerReason, title: docTitle };
   let html;
