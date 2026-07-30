@@ -844,6 +844,16 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 📏 RE-BLESSING A GTA LOCK: THE RULE, BECAUSE TWO ROOMS NOW WANT TO DO IT (2026-07-30)
+
+Zoran ordered the Stripe manage/cancel link into GTA's live `onboarding-welcome` email, which means a **deliberate re-bless** of `_gta-message-lock` / `_gta-step-lock`. That is legitimate and there is precedent: `trial_form` step 0 was re-blessed on his order in July under the framing **"the re-bless is deliberate, not drift."** Say that in the commit, name whose order it was, and name what changed. **A re-bless that does not explain itself is indistinguishable from a lock quietly going stale.**
+
+**⛔ THE TRAP, AND A ROOM ALREADY GOT CAUGHT BY IT.** A lock caught another agent removing GTA's door line, and the room **correctly REFUSED to re-bless**, because that suite stubs the database empty so the entry note rendered blank: blessing would have locked in *"GTA sends no entry note"* immediately before a migration seeded exactly that. **The change in front of them was fine; the fixture underneath was not.**
+
+**THE RULE: a re-bless freezes everything the fixture currently says, not only the line you are adding. Prove the delta is EXACTLY your change before blessing. If the diff contains a second thing, that second thing gets reviewed by nobody.**
+
+**⚠️ AND TONIGHT MADE THAT LIVE:** the step-rows migration I applied changed **onboarding step 2's email SUBJECT**, which is the very message member management is about to edit. **Checked: `scripts/snapshots/bam-gta.json` already carried the tokenized form for exactly those three rows, so production caught UP to the snapshot rather than drifting from it, and the locks are in step.** Told the room to verify that itself rather than take my word, because it is a different room's suite.
+
 ## ✅✅ MEMBER MANAGEMENT PLAN APPROVED (Zoran, 2026-07-30). **FIVE RULINGS, AND THE FIRST CLOSES THE OLDEST FROZEN ITEM IN THIS FILE.**
 
 Plan at `~/.claude/plans/elegant-floating-wolf.md`. Room file live at `board/rooms/member-management.json`.

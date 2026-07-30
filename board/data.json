@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · member management approved, oldest frozen item closed",
+ "updated": "2026-07-30 · 5 builds in flight across two rooms",
  "recentUpdates": [
+  "Member management has 4 builds running at once, plus the age-routing switch in the other room. Both checked, neither is standing on the other",
+  "Your Stripe manage link goes into the welcome email. That edits a LIVE GTA email, so the safety lock gets deliberately updated rather than quietly bypassed",
+  "One caution passed on: updating that lock freezes everything it currently says, not just the new line. A room nearly got caught by that earlier this week",
   "You approved the member management plan. Your ruling that members don't need the testimonials email closes the oldest frozen question in the file",
   "Nothing gets deleted to close it. The master already ships 7 steps and GTA keeps its 8th. It just stops being a to-do",
-  "Three messages deliberately NOT built: no failed-payment email to parents, no reschedule notice, no goodbye email. Recorded so nobody 'fixes' it later",
-  "Receipts become a portal system and get their own plan before anyone builds",
-  "Both live builds checked for collisions. They are clear of each other",
-  "Answer to 'how do we stop this happening again': we already HAD the rule. It was written inside one build, so nothing carried it to the next place the same bug appeared"
+  "Three messages deliberately NOT built: no failed-payment email to parents, no reschedule notice, no goodbye email. Recorded so nobody 'fixes' it later"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
