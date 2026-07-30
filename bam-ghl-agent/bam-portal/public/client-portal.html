@@ -9639,6 +9639,12 @@ Then the call to action."]</div>
       }
       .v15ib-chip { font-size:10px; color:var(--text-mute); background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:2px 9px; display:inline-flex; align-items:center; gap:5px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .v15ib-chip::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--gold); flex:0 0 auto; }
+      /* Hawkeye chip on an inbox row: this lead has a card waiting in the deck.
+         Mirrors Home's .hm-ib-hawk, minus the hover-hide rule (a v15 row has no
+         hover action bar to yield to). Always visible - mobile has no hover. */
+      .v15ib-hawk { flex:none; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(212,182,92,.35); background:rgba(212,182,92,.12); color:var(--gold,#D4B65C); border-radius:999px; width:26px; height:22px; padding:0; cursor:pointer; transition:background .12s, border-color .12s; }
+      .v15ib-hawk svg { width:13px; height:13px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+      .v15ib-hawk:hover { background:rgba(212,182,92,.24); border-color:rgba(212,182,92,.55); }
       /* Segmented filter (All / Members / Leads / Spam / Unread) */
       .v15ib-cls-row {
         display:inline-flex; gap:2px; background:var(--bg); border:1px solid var(--border);
@@ -10972,7 +10978,7 @@ Then the call to action."]</div>
           </div>
           <input id="ib-search" class="ib-search" type="text" placeholder="Search by name or content..." oninput="_ibSetSearch(this.value)">
           <div class="ib-actions">
-            <button id="ib-approve-btn" class="ib-act ib-act-hawk" onclick="_apxOpen()" title="Hawkeye - approve every agent's drafted messages (Booking / Confirm / Closing tabs inside)">Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
+            <button id="ib-approve-btn" class="ib-act ib-act-hawk" onclick="_hk2Open()" title="Hawkeye - approve every agent's drafted messages (Booking / Confirm / Closing tabs inside)">Hawkeye <span id="apx-count" style="font-weight:800"></span></button>
             <button class="ib-act ib-act-new" onclick="_ibComposeNew()" title="New message"><span class="ib-act-label">New</span><span class="ib-act-icon">+</span></button>
             <button class="ib-act ib-act-refresh" onclick="fetchAndRenderInbox()" title="Refresh">↻</button>
           </div>
@@ -16330,6 +16336,10 @@ async function openV15Inbox() {
     // Load the member roster in the background so the Member pill appears even
     // if the staff hasn't opened the Members tab yet; repaint the list once it lands.
     _ibEnsureMembers().then(() => { _IB_MEMBER_IDX = null; try { _v15ibRenderList(); } catch (_) {} });
+    // Load the Hawkeye index in the background and repaint once it lands, so the eye
+    // chips appear and opening a flagged row redirects instead of sending staff into
+    // a thread the deck already owns.
+    _hawkIdxEnsure().then(() => { try { _v15ibRenderList(); } catch (_) {} }).catch(() => {});
   } catch (e) {
     // Keep showing the old data if we had it; only blank to an error otherwise.
     if (!hadData) host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load inbox - ${escapeHTML(e.message || String(e))}</div>`;
@@ -16687,7 +16697,7 @@ function _v15ibRenderAll() {
         <span style="flex:1"></span>
         ${needsReplyCount > 0 ? `<span class="v15ib-progress" role="button" style="cursor:pointer" title="Show unread" onclick="_v15ibTab('unread')">${_ibProgressRing(needsReplyCount, totalPeople)}</span>` : ''}
         <button class="v15ib-filter-toggle${hasActiveFilters ? ' has-filters' : ''}" onclick="_V15IB.filtersOpen=!_V15IB.filtersOpen;document.getElementById('v15ib-filter-drawer').classList.toggle('open')">Filters${hasActiveFilters ? ' *' : ''}</button>
-        <button id="v15ib-approve-btn" onclick="_apxOpen()" class="v15ib-act-btn" data-tip="Review agent drafts before they send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Hawkeye<span id="v15-apx-count" class="v15ib-act-count"></span></button>
+        <button id="v15ib-approve-btn" onclick="_hk2Open()" class="v15ib-act-btn" data-tip="Review agent drafts before they send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Hawkeye<span id="v15-apx-count" class="v15ib-act-count"></span></button>
         <button id="v15ib-vmx-btn" onclick="_vmxOpen()" class="v15ib-act-btn" style="display:none" data-tip="Listen to voicemails from leads"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Voicemail<span id="v15-vmx-count" class="v15ib-act-count"></span></button>
         <button onclick="_v15ibMassSend()" class="v15ib-act-btn" data-tip="Text multiple contacts at once"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Broadcast</button>
         <button class="v15ib-mute-btn" id="ib-mute-btn2" onclick="_ibToggleMute()" title="Toggle sounds" style="background:none;border:1px solid var(--border-med);border-radius:6px;padding:5px 8px;cursor:pointer;color:var(--text-mute);display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:12px;font-weight:600">
@@ -16958,6 +16968,16 @@ function _v15ibConvRow(c, idx) {
   const isActive = _V15IB.active && _V15IB.active.convId === c.id;
   // Checkbox
   const checked = _V15IB.selected.has(c.id) ? ' checked' : '';
+  // Hawkeye: this lead's reply belongs to the deck. Clicking the row redirects
+  // anyway - the chip makes that visible BEFORE the click, and jumps to the card.
+  let hawkChip = '';
+  try {
+    const hkAgent = _hawkPendingFor(c.contactId, c.id);
+    if (hkAgent) {
+      const hkCid = c.contactId ? String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '') : '';
+      hawkChip = `<button type="button" class="v15ib-hawk" title="Hawkeye has an action waiting" onclick="event.stopPropagation();_hk2Open('${hkAgent}'${hkCid ? `,'${hkCid}'` : ''})">${_HV2_ICONS.eye}</button>`;
+    }
+  } catch (_) {}
 
   return `<div class="v15ib-conv ${unread ? 'unread' : ''}${repliedClass}${hotClass}${isActive ? ' v15ib-active' : ''}${needsReply ? ' unread' : ''}" style="${stagger}" data-conv-id="${escapeHTML(c.id)}" onclick='${_V15IB.multiSelect ? `_v15ibToggleSelect("${c.id}",event)` : `_v15ibOpenSplit(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")},${JSON.stringify(c.lastMessageType || c.channel || "")})`}'>
     <span class="v15ib-swipe-bg left">Read</span>
@@ -16972,12 +16992,18 @@ function _v15ibConvRow(c, idx) {
       <div class="v15ib-prev">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
       ${chip}
     </div>
+    ${hawkChip}
     <div style="flex:none;align-self:flex-start;font-size:10px;white-space:nowrap;padding-top:2px;color:var(--text-mute)" class="${timeClass}">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
   </div>`;
 }
 
 // #1: Split-pane open - load thread in right pane instead of replacing list
 function _v15ibOpenSplit(convId, contactId, phone, email, name, channel) {
+  // Hawkeye owns this lead: jump straight into the deck on their card (it shows the
+  // full thread and teaches the agent when the reply is edited). Zoran's call -
+  // instant redirect, not a warning. Silently no-ops when the index is unloaded.
+  const hk = _hawkPendingFor(contactId, convId);
+  if (hk) { _hk2Open(hk, contactId); return; }
   // On mobile, fall back to full-screen thread
   if (window.innerWidth <= 900) {
     _v15ibOpen(convId, contactId, phone, email, name, channel);
@@ -17049,6 +17075,9 @@ async function _v15ibPollTick() {
   if (!a || (!split && !full)) { _v15ibStopThreadPoll(); return; }
   const vis = (split && split.offsetParent !== null) || (full && full.offsetParent !== null);
   if (!vis) return;
+  // Keep the Hawkeye index warm while the inbox sits open - a card can appear at any
+  // time. The 30s TTL means this is one extra fetch every 5 ticks, not every tick.
+  _hawkIdxEnsure().catch(() => {});
   try {
     const token = await _mreqAuthToken();
     const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(a.convId)}`, { headers: { Authorization: 'Bearer ' + token } });
@@ -17733,6 +17762,10 @@ function _ibCloseContactDrawer() {
 }
 
 async function _v15ibOpen(convId, contactId, phone, email, name, channel) {
+  // Same instant redirect as the desktop split view - mobile is not a second-class
+  // path here. Fails open when the shared index hasn't loaded.
+  const hk = _hawkPendingFor(contactId, convId);
+  if (hk) { _hk2Open(hk, contactId); return; }
   _V15IB.active = { convId, contactId, phone, email, name, channel: channel || '' };
   _V15IB.pending = [];
   // Mark read: remember the conversation's newest-message time as of now, then
@@ -22315,6 +22348,10 @@ function _hmMsgPeekClose() { document.getElementById('hm-peek-ov')?.remove(); }
 async function _hmMsgPeek(convId, focusReply) {
   const c = (window._hmIbById || {})[convId];
   if (!c) return switchView('v15inbox');
+  // Third conversation-open surface: Home's peek gets the same instant redirect, so
+  // there is no back door into a flagged lead's thread.
+  const hk = _hawkPendingFor(c.contactId, convId);
+  if (hk) { _hmMsgPeekClose(); _hk2Open(hk, c.contactId); return; }
   _hmMsgPeekClose();
   try { hapticTap('LIGHT'); } catch (_) {}
   const name = _ccCapName((c.contactName || 'Conversation').split(' ').slice(0, 3).join(' '));
