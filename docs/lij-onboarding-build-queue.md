@@ -141,6 +141,16 @@ Not part of #1656. **The public support form at `/ticket` has NEVER created a ti
 
 **This is house rule 7's third form arriving in the queue file itself rather than in a test:** an assertion whose premise can no longer arise, sitting in the document everyone treats as the source of truth.
 
+## ✅ RULED BY ZORAN 2026-07-30: **BOTH ARE CORRECT. THE PARENT-FACING NAME IS CITY-BRANDED PER ACADEMY. THIS SUPERSEDES THE 28 JULY RULING.**
+
+`BAM GTA` renders **"By Any Means Toronto"**. `BAM San Jose` renders **"By Any Means San Jose"**. Asked directly, with the 28 July ruling quoted back at him, he chose to keep both.
+
+**So the 28 July ruling is SUPERSEDED, not violated, and nobody should "fix" either value back.** What survives from it unchanged is the thing it was actually protecting against: **`business_name` ("BAM GTA", "BAM San Jose") is the INTERNAL label and must never reach a parent.** That was the original bug. A city in the parent-facing name is now deliberate; the internal shorthand still is not.
+
+**⚠️ AND THE STANDING INSTRUCTION KEEPS ITS CONCLUSION BUT LOSES ITS REASON, WHICH IS WORSE THAN IT SOUNDS.** This file says *"never use the parent-facing name as the identity discriminator, because GTA and San Jose render the identical string."* **They now render DIFFERENT strings, so that reason is dead.** Keep using `email_domain` or `owner_name` anyway - a discriminator that happens to work today is not the same as one that is guaranteed - **but do not quote the identical-string reason at anyone, because the next person who checks it will find it false and may discard the rule with it.** A rule whose stated reason is falsifiable gets discarded the first time someone verifies it.
+
+**Superseded, kept for the record:** what follows was written before he ruled.
+
 **What I have NOT established, and will not assert:** why they moved. The shape strongly suggests a deliberate later wave giving each academy its own city-branded public name (GTA to Toronto, San Jose to San Jose), and migration `20260730T120000`'s header states GTA's move to "By Any Means Toronto" came from `20260729T235000` and was deliberate. **San Jose's move is not documented anywhere I can find.** It is not the internal label ("BAM San Jose"), so it is not the original bug returning; it is a third value. **One confirmation from Zoran settles it. Nobody should "fix" either value back on the strength of the old ruling.**
 
 From the identity gate the templating room shipped in `ec9b843`. **83 banned values DERIVED at runtime from the two committed academy snapshots across 19 named fields, against 284 default bodies found by WALKING the exported structures rather than naming sections.** Snapshot a third academy and coverage widens with no edit; add a section tomorrow and it is covered the day it lands. **Every previous check was one literal wide, which is why five identity leaks passed all of them.**

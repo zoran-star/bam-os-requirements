@@ -1,18 +1,17 @@
 {
- "updated": "2026-07-30 · phone question answered by rendering, seventh leak copy found",
+ "updated": "2026-07-30 · names ruled, city-branded per academy",
  "recentUpdates": [
+  "You ruled the public names: each academy is branded by its city. By Any Means Toronto and By Any Means San Jose. Notes updated so nobody changes them back",
+  "What still holds from the old rule: the internal label (BAM GTA, BAM San Jose) must never reach a parent. That was always the real bug",
   "Phone question answered by actually rendering: your number DOES reach parents, in one line of the welcome email, and it has for ten months. Not a new leak",
   "San Jose's number has never been sent to anyone, so its first welcome email is the first real test of it",
   "A test that FAILED found a seventh copy of the age-groups bug. It failed for a better reason than it was written for, and reading why is what found it",
-  "Four times tonight a note or a test was read as answering a question it never claimed to answer. Not one of them was wrong",
-  "The support form migration was ALREADY applied. Our own notes said it was pending, and that is what I told you. Corrected",
-  "Tested the live form rather than assuming: it answers properly instead of erroring. What is still unproven is whether it SAVES, and only a real submission shows that"
+  "Four times tonight a note or a test was read as answering a question it never claimed to answer. Not one of them was wrong"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
    "Send one real test message through the support form? It is the only way to prove it SAVES. It will show up in the staff ticket queue",
-   "Confirm the public names: GTA is now 'By Any Means Toronto' and San Jose is now 'By Any Means San Jose'. Our notes say both should be 'By Any Means Basketball'",
    "Two San Jose data fixes for launch: allowlist its domain, and press the entry-point seed button. Both are data, not code",
    "Decide on 2 new preset leaks: GTA's gym door in every academy's confirmation text, and GTA's age groups baked into every AI",
    "Send Lij his ask-list. Still the biggest thing you own and the biggest San Jose unblock",
