@@ -139,6 +139,48 @@ async function stripeFetch(path, stripeAccount) {
   return res.json();
 }
 
+// ─── Parent receipts (api/_member-receipts.js) ────────────────────────────────
+// DYNAMICALLY imported, behind a cache, and every failure is swallowed. That is
+// not defensive habit - it is the difference between two outcomes:
+//
+//   a static `import { maybeSendPaymentReceipt } from "../_member-receipts.js"`
+//   that throws at MODULE LOAD (a syntax error, a bad import inside it, a missing
+//   export in something it pulls in) takes this whole file down. Every Stripe event
+//   for every academy then 500s: no activations, no plan syncs, no cancellations
+//   mirrored, no failed-payment flags. A receipt feature is not worth that risk.
+//
+//   this shape instead disables RECEIPTS and leaves the webhook exactly as it was.
+//
+// The same reasoning is why receiptsFor() never rethrows and why every exported
+// function in the receipts module catches its own errors: a guard that can throw is
+// not a guard, it is one more thing that can break the thing it was meant to protect.
+let _receipts = null;
+let _receiptsLoadFailed = false;
+async function receiptsModule() {
+  if (_receipts || _receiptsLoadFailed) return _receipts;
+  try {
+    _receipts = await import("../_member-receipts.js");
+  } catch (e) {
+    _receiptsLoadFailed = true;
+    console.error("[webhook] receipts module failed to load - receipts are OFF, everything else is unaffected:", (e && e.message) || e);
+  }
+  return _receipts;
+}
+
+// Fire the parent's payment receipt. Non-fatal by construction: the module's own
+// entry point never throws, and this wrapper catches anyway.
+async function sendPaymentReceipt(member, inv, connectedAccount) {
+  try {
+    const mod = await receiptsModule();
+    if (!mod || typeof mod.maybeSendPaymentReceipt !== "function") return { skipped: "receipts module unavailable" };
+    const { sendOn } = await import("../_send.js");
+    return await mod.maybeSendPaymentReceipt({ sb, sendOn, member, invoice: inv, stripeFetch, connectedAccount });
+  } catch (e) {
+    console.error("[webhook] receipt attempt failed (non-fatal):", (e && e.message) || e);
+    return { error: String((e && e.message) || e).slice(0, 200) };
+  }
+}
+
 async function stripePost(path, body, stripeAccount) {
   const stripeSecret = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   const headers = { Authorization: `Bearer ${stripeSecret}`, "Content-Type": "application/x-www-form-urlencoded" };
@@ -640,6 +682,15 @@ async function handleSubCreated(event, connectedAccount, res) {
 // ─────────────────────────────────────────────────────────
 // Sub cancelled in Stripe (outside the portal). Mirror what /cancel
 // does: insert a cancellations row, delete the members row.
+//
+// ⛔ DELIBERATELY NO GOODBYE EMAIL HERE. Zoran ruled 2026-07-30: staff handles the
+// conversation when somebody leaves. Do not add one.
+//
+// Same reasoning as the failed-payment note above, and the same reason it is
+// written at the handler rather than in a doc: this is where an automated
+// "sorry to see you go" would go, and it is the last message an academy would ever
+// want a machine to write. The cancellation is recorded, the owner is notified, and
+// a person picks it up from there.
 async function handleSubDeleted(event, connectedAccount, res) {
   const sub = event.data && event.data.object;
   if (!sub) return res.status(200).json({ skipped: "no sub object" });
@@ -783,6 +834,17 @@ async function handleSubUpdated(event, connectedAccount, res) {
 // ─────────────────────────────────────────────────────────
 // Card declined / past due. Flag the member with status='payment_failed'
 // so staff sees them surfaced under the "Issues" filter.
+//
+// ⛔ DELIBERATELY NO PARENT-FACING EMAIL HERE. Zoran ruled 2026-07-30: staff chase
+// a failed payment personally, with the payment link. Do not add one.
+//
+// This is a decision, not an oversight, and it is written here because this is
+// exactly where somebody building out the receipt system would reach for the
+// obvious next email ("your payment didn't go through"). The academy already gets
+// told - notifyOwners('payment_failure') and the owner's push, both below - and a
+// human then decides how to have that conversation. An automated dunning email
+// would arrive before the human does and set the wrong tone for the exact moment
+// the relationship is most fragile.
 async function handleInvoiceFailed(event, connectedAccount, res) {
   const inv = event.data && event.data.object;
   if (!inv) return res.status(200).json({ skipped: "no invoice" });
@@ -1030,6 +1092,38 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
     if (Array.isArray(r) && r[0]) member = r[0];
   }
   if (!member) return res.status(200).json({ skipped: "no member match for invoice" });
+
+  // ══ THE PARENT'S RECEIPT ══════════════════════════════════════════════════
+  // Money moved and we know whose it was. Everything below this line is about
+  // what STATE the member should now be in (activate / recover from a failed
+  // payment / re-converge access); none of it changes what the receipt says, so
+  // the receipt is issued here.
+  //
+  // WHY HERE AND NOT AFTER THE LAST `return`. handleInvoiceSucceeded has six
+  // terminal paths and every one of them ENDS by writing the HTTP response. On
+  // Vercel the invocation can be frozen once the response is sent, so work
+  // awaited after a `res.json()` is work that may simply not happen - a receipt
+  // system that silently drops receipts under load is worse than none. This is
+  // the single point every completing path passes through while the response is
+  // still ahead of us, which buys the same coverage with none of that risk. The
+  // one path it does not cover is "no member matched", which has nobody to send
+  // a receipt to.
+  //
+  // THE DOUBLE-FIRE. Stripe sends BOTH invoice.payment_succeeded AND
+  // invoice.paid for one payment (see the dispatch above - both map here), so
+  // this line runs TWICE, milliseconds apart, for every single payment. That is
+  // fine and it is designed for: the receipt row's unique partial index on
+  // (client_id, stripe_invoice_id) WHERE kind='payment' rejects the second
+  // insert, the module reads the 23505 and returns "already receipted" without
+  // sending. The guard is in Postgres, not in a read up here that would lose the
+  // race about half the time.
+  //
+  // Awaited (so a slow Resend cannot outlive the invocation) but never fatal:
+  // maybeSendPaymentReceipt catches everything and sendPaymentReceipt catches
+  // again. An academy with receipt_mode NULL - which is every academy until the
+  // data migration runs - does nothing at all, and a V1 academy is refused
+  // before any read.
+  await sendPaymentReceipt(member, inv, connectedAccount);
 
   // ── Portal-native onboarding: first paid invoice on a PORTAL-OWNED sub ──
   // The parent just paid on the funnel → flip to live and fire the downstream
