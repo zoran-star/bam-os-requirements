@@ -652,11 +652,18 @@ async function handler(req, res) {
     // writePortalFieldValues matches each intake key to a custom_field_defs row
     // by its portal key (captures brand-new wizard questions with no ghl id).
     try {
-      if (intake && Object.keys(intake).length) {
+      // The form asks for the athlete's name in its own core block, so the
+      // academy's athlete_first_name / athlete_last_name fields are hidden
+      // there. Fill them from the core answer instead, or an enroll-only
+      // parent would have those contact fields blank (the free-trial form
+      // fills them; a parent who skips the trial never hits it). No-ops for an
+      // academy without those defs. intake wins if it did send them.
+      const fieldValues = { athlete_first_name: athlete.first, athlete_last_name: athlete.last, ...intake };
+      if (Object.values(fieldValues).some((v) => String(v || "").trim())) {
         // athlete_name is what lets the phone (household) match tell "the other
         // parent of the same kid" from "a sibling on the same number".
         const contactId = await resolveOrMintPortalContact(clientId, { email: parentEmail, phone: parentPhone, name: parentName, athlete_name: athleteName });
-        if (contactId) await writePortalFieldValues(clientId, contactId, null, intake);
+        if (contactId) await writePortalFieldValues(clientId, contactId, null, fieldValues);
       }
     } catch { /* non-fatal - the member + payment are already saved */ }
 
