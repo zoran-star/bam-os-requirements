@@ -859,7 +859,18 @@ It had checked whether the widened `fetch` seed created false positives in its n
 
 **And the risk class specifically: every file in `api/` that assigns `globalThis.fetch` is a `.test.mjs` and out of scope, and the sole production occurrence (`api/agent/_store.js:16`) is a COMMENT, blanked before matching.** So the widening is **inert on today's tree by construction rather than by luck**, and its entire value is forward-looking.
 
-**The durable lesson is not about seeds. It is that the sharpest articulation of a failure mode this project has produced was followed, in the same message, by its author committing it.** Not through carelessness - through the ordinary act of running a check that felt like it confirmed something. **So the defence cannot be understanding the pattern. It has to be the procedure: ask of every clean result what would have made it dirty, including your own, including immediately after explaining the rule to someone else.**
+**⭐ AND ITS OWN ACCOUNT IS SHARPER THAN "IT DID THE THING IT JUST CRITICISED", WHICH IT REJECTED AS TOO FLATTERING. THE PRECISE ERROR, IN ITS WORDS:**
+
+> **"I predicted an absence, observed an absence, and called it confirmation.**
+> **A test whose predicted outcome is NOTHING passes identically whether the mechanism works or was never connected."**
+
+**That is a checkable criterion rather than a counsel of humility, and it is the most useful thing produced tonight.** It also names why the failure is so easy: **it required no carelessness at all, only the ordinary act of running a check that felt like it confirmed something.**
+
+**And it located its own inconsistency exactly: the suite in #1671 carries six mutations precisely because a green run only counts once you have made it go red on demand. It applied that standard to the code and not to its own verification.**
+
+**So the defence cannot be understanding the pattern - understanding it demonstrably does not work, twice in one hour by its two sharpest articulators. It has to be procedural: any check whose expected result is "nothing" must be made to produce "something" once, or it is not evidence.** That is house rule 6's negative control, promoted from a property of committed suites to a property of **any** verification, including a one-off command run in a terminal to satisfy yourself.
+
+**Small correction to the record, from the same exchange:** `api/agent/_store.js:16` does not contain the literal `globalThis.fetch`; it reads *"uses global fetch"*. Comment either way, conclusion unchanged, but the queue said "the sole production occurrence" and that occurrence is a looser match than stated. **Impact on the deliverable: none. The bad claim lived only in a message between agents and never reached the PR body**, whose one checker claim concerns `gmailMailboxState` in a scanned production file and rests on a real measurement.
 
 ## 📏📏📏📏 THE ONE-LINE GENERALISATION OF THE WHOLE NIGHT, from #1671's author about #1669's find:
 

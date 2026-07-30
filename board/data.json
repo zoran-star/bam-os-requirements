@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · agents done coordinating, all waiting on you",
+ "updated": "2026-07-30 · everything built, everything waiting on you",
  "recentUpdates": [
+  "Best rule of the night, and it is testable rather than just wise: any check whose expected answer is 'nothing' has to be made to say 'something' once, or it is not evidence",
+  "It came from an agent diagnosing its own mistake more precisely than I had: it predicted an absence, saw an absence, and called that confirmation",
+  "All builds done. Merge the three in order, rotate the Stripe key, send Lij his list",
   "The agent who coined 'a check finding nothing looks like a check that isn't looking' then did exactly that, in the same message. The other one caught it",
   "So the defence cannot be understanding the rule. It has to be the habit: ask of every clean result what would have made it dirty",
-  "Agents are done. Everything now waits on you: merge the three in order, rotate the Stripe key, send Lij his list",
-  "The line that sums up tonight: a check reporting zero problems looks exactly like a check that is not looking at anything",
-  "One agent withdrew its own suggestion chip when told to stand down, because a chip sitting there is a loaded instruction, not a note. One click would have started the exact clash we were avoiding",
-  "All three PRs green and coordinated between the agents themselves. Merge 1671, then 1670, then 1669"
+  "Agents are done. Everything now waits on you: merge the three in order, rotate the Stripe key, send Lij his list"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
