@@ -64,9 +64,20 @@ export const TEMPLATE_SYNC_CLASS = Object.freeze({
   // render fine anywhere. Rendering safely is not the test; authorship is.
   "nurture-1": "local",
   "nurture-2": "local",
-  // REAL PARENT + ATHLETE QUOTES ("Parent of Adam, {{location.city}}"). The
-  // quotes are real and were given to ONE academy; {{location.city}} silently
-  // re-attributes them to whichever academy sends. Never copy.
+  // Testimonials. UNTIL 2026-07-29 this template carried real parent quotes
+  // hardcoded, attributed by city variable, so whichever academy sent it claimed
+  // them as its own - which is why the class is "attributed".
+  //
+  // It now renders "{{location.testimonials}}" from that academy's OWN store, so
+  // the TEMPLATE itself no longer carries anyone's words and is structurally
+  // copyable. The class is deliberately LEFT as "attributed" rather than relaxed
+  // to "shared", for two reasons, and both need the templating room before it
+  // changes:
+  //   1. the class gates their seeder's copy behaviour, and
+  //   2. scripts/check-testimonial-seed-drift.mjs KEYS ON `attributed` to catch
+  //      an academy sending quotes it does not own. Relaxing this silently makes
+  //      that check stop watching this step - the coupling is documented in
+  //      api/_testimonial-drift.js and must be settled there, not here.
   "nurture-3": "attributed",
   // Generic scarcity / last-call copy. Belongs to no one.
   "nurture-4": "shared",

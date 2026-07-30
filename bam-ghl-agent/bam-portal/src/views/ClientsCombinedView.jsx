@@ -3024,7 +3024,7 @@ function ClientProfileTab({ client, tokens, session, setTab }) {
 
   if (err) return <div style={{ color: "#e08b7e", padding: "8px 0" }}>{err}</div>;
   if (!calls) return <div style={{ color: t.textMute, fontSize: 13, padding: "8px 0" }}>Loading profile…</div>;
-  if (!calls.length) return <div style={{ color: t.textMute, fontSize: 13, padding: "8px 0" }}>No onboarding-call data for this academy (the 7-call sequence runs on V1.5/V2 clients).</div>;
+  if (!calls.length) return <div style={{ color: t.textMute, fontSize: 13, padding: "8px 0" }}>The 7 onboarding calls have not been seeded for this academy yet. Open the Onboarding tab to load the checklist, then reopen Profile.</div>;
 
   const doneCount = calls.filter(c => c.completed_at).length;
   const label = { fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: t.textMute, marginBottom: 3 };

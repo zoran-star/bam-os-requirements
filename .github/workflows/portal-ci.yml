@@ -233,3 +233,10 @@ jobs:
       # and says so in its output rather than passing silently.
       - name: No hardcoded testimonials in email templates or agent defaults
         run: node scripts/check-testimonial-hardcodes.mjs /nonexistent-no-sites-checkout-in-ci
+
+      # nurture-3 (and the member email derived from it) must render each
+      # academy's OWN quotes from the store, and must render NOTHING when the
+      # store is empty. Renders the real template through the real renderEmail;
+      # no database needed, rows are injected.
+      - name: nurture-3 renders from the testimonials store
+        run: node scripts/verify-nurture3-from-store.mjs

@@ -96,11 +96,23 @@ const REF_CASES = [
 for (const body of REF_CASES) {
   const key = templateRefKey(body);
   const html = renderEmail({ clientId: "x", subject: "s", body });
-  // A real parent quote from the nurture-3 design. Its presence in the rendered
-  // output proves the template was expanded and the testimonial actually went
-  // out. (Checked against the quote, not the headline: the headline has a
-  // typographic apostrophe and matching on it silently never fires.)
-  const sentTemplate = html.includes("The style of training is like no other");
+  // Did the named template actually expand? Anchored on the template's own LEAD-IN,
+  // which is BAM copy and survives whatever the quotes do.
+  //
+  // It used to be anchored on a parent quote - "The style of training is like no
+  // other" - and that ROTTED the moment the quotes became data. PR #1644 moved
+  // nurture-3's testimonials into the store, so a render with no store rows drops the
+  // quote block entirely: the template expanded perfectly and this check said it had
+  // not. Three assertions went red on `main` for a template that was working fine.
+  //
+  // The lesson, and why this comment is long: an anchor must be something the code
+  // OWNS, never something the code CARRIES. Content belongs to somebody else - real
+  // families' words most of all - so anchoring on it turns an unrelated content edit
+  // into a fake renderer failure. The lead-in is ours; the quotes never were.
+  //
+  // Not the headline: it carries a typographic apostrophe, so matching on it silently
+  // never fires.
+  const sentTemplate = html.includes("I will let some of our families and athletes do the talking");
   ok(!!key === sentTemplate,
     `matcher agrees with renderEmail for ${JSON.stringify(body.slice(0, 34))} (ref=${key || "none"}, sent template=${sentTemplate})`);
 }

@@ -222,8 +222,8 @@ function dueLabel(d) {
 // your Scaling Manager" step stays as-is). STRICT ORDER: call N can only be
 // marked done once call N-1 is done. The SM enters structured per-topic data
 // (saved to onboarding_calls, one row per client per call) and marks the call
-// complete by hand - no Fathom / post-call-flow integration. Clients see the
-// call progress on their checklist but can't toggle or edit anything.
+// complete by hand - no Fathom / post-call-flow integration. Staff-only: the
+// calls never render on the client checklist (see staff_only below).
 // profile_section: the section name this call's data appears under on the
 // staff Client Profile tab (STAFF-ONLY - no client-side surface, Zoran
 // 2026-07-26) - the profile is a READ/EDIT VIEW over these same
@@ -351,13 +351,14 @@ const ONBOARDING_STEPS = [
   // (Zoran, 2026-07-26: the whole scaling program is invisible client-side) -
   // hidden from clients like trigger_buildout; the SM works the sequence from
   // the staff Onboarding tab and call N unlocks when call N-1 is done.
-  // Tier "program": only clients ON the scaling program - i.e. a payment
-  // model has been set in the Commissions tab (Cole's call, 2026-07-25).
-  // Setting payment terms is the one switch that turns the call sequence
-  // (and the staff Profile tab content) on for a client; V1 stays excluded.
+  // NO TIER GATE (Zoran, 2026-07-29): the sequence runs for EVERY client,
+  // legacy V1 included. It used to require a payment model in the Commissions
+  // tab (tier "program", Cole's call 2026-07-25), which meant nobody ever saw
+  // it - 0 of 47 clients had payment terms set. Touching V1 is deliberate and
+  // safe here: the steps are staff_only, so V1 academies see nothing new.
   ...SM_CALLS.map(c => ({
     key: c.key, title: c.title, sort: 11 + c.step, sm_call: c.step,
-    tier: "program", staff_toggle_only: true, staff_only: true,
+    staff_toggle_only: true, staff_only: true,
   })),
   // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
   // Sits right AFTER the SM call — the build gets scoped on that call.
@@ -406,16 +407,13 @@ const ONBOARDING_STAFF_TOGGLE_ONLY = new Set(ONBOARDING_STEPS.filter(s => s.staf
 // Which steps apply to a client of a given tier (no `tier` = all tiers).
 //   tier "v15"     → V1.5 academies only
 //   tier "v2v15"   → V2 or V1.5 academies (everything except legacy V1)
-//   tier "program" → on the scaling program: payment_model set (Commissions
-//                    tab) AND not legacy V1. Removing the payment model
-//                    removes the call items again (their onboarding_calls
-//                    data survives and comes back if re-enabled).
-function onboardingStepsForTier({ isV15, isV2, onProgram }) {
+// The SM call sequence used to have its own tier ("program", payment_model set)
+// - dropped 2026-07-29, it now runs untiered for every client.
+function onboardingStepsForTier({ isV15, isV2 }) {
   return ONBOARDING_STEPS.filter(s => {
     if (!s.tier) return true;
     if (s.tier === "v15") return isV15;
     if (s.tier === "v2v15") return isV2 || isV15;
-    if (s.tier === "program") return (isV2 || isV15) && onProgram;
     return false;
   });
 }
@@ -423,15 +421,6 @@ function onboardingStepsForTier({ isV15, isV2, onProgram }) {
 async function loadClientSignals(clientId) {
   const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS},v15_access,v2_access,stripe_connect_account_id`);
   const signals = (Array.isArray(rows) && rows[0]) || {};
-  // payment_model gates the SM call sequence ("program" tier). The column
-  // ships with the commission migration - queried separately and tolerated
-  // missing so a code deploy ahead of the SQL can't break the checklist.
-  try {
-    const p = await sb(`clients?id=eq.${clientId}&select=payment_model`);
-    signals.payment_model = (Array.isArray(p) && p[0] && p[0].payment_model) || null;
-  } catch (_) {
-    signals.payment_model = null;
-  }
   return signals;
 }
 
@@ -509,8 +498,7 @@ async function syncOnboardingItems(clientId, tracker, calls) {
   signals = await backfillStripeWhenChargeable(clientId, signals);
   const isV15 = signals.v15_access === true;
   const isV2 = signals.v2_access === true;
-  const onProgram = !!signals.payment_model;
-  const steps = onboardingStepsForTier({ isV15, isV2, onProgram });
+  const steps = onboardingStepsForTier({ isV15, isV2 });
   // Ticket-derived steps mirror the systems onboarding ticket (load once).
   if (steps.some(s => s.ticket_derived) && !tracker) tracker = await loadSystemsTrackerState(clientId);
   // SM call steps mirror their onboarding_calls row (load once).
