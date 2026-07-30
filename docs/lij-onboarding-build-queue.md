@@ -844,6 +844,26 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## ✅ MEMBER MANAGEMENT: THREE PRs OPEN, EACH BUILT AND ADVERSARIALLY TESTED BY SEPARATE AGENTS (2026-07-30)
+
+- **[#1664](https://github.com/zoran-star/bam-os-requirements/pull/1664) chunk triggers.** All **three** instances of the fires-without-prerequisites shape fixed as **one named change**, including the onboarding chunk on Zoran's ruling. **POST-MERGE DATA STEP, ORCHESTRATOR'S:** reset San Jose's stranded templates-ready chunk to `waiting`, **only after the deploy reports success**, because the old code would re-promote it.
+- **[#1665](https://github.com/zoran-star/bam-os-requirements/pull/1665) KPI ties.** Seeds `kpi_offer_links` per offer, catalog-basis first, **refuses on conflict, never overwrites.** One documented live assumption: PostgREST's ignore-duplicates response shape. **Reporting-only blast radius; watch the first real apply.**
+- **[#1666](https://github.com/zoran-star/bam-os-requirements/pull/1666) welcome-email manage link.** Gated on `clients.stripe_portal_url`. **Renders for nobody today. GTA goldens ZERO delta, so NO re-bless happened at all.**
+
+**📏 THE RE-BLESS DISCIPLINE HELD, AND THE GOOD OUTCOME WAS THAT IT WAS NOT NEEDED.** The room proved the fixture **RESOLVES the venue chain including `entry_note`** before touching anything, which was the exact trap flagged hours earlier, and then found its change produced no golden delta at all. **A re-bless that turns out to be unnecessary is the best possible result of that check.**
+
+### ✅ I WENT LOOKING FOR THE ENROLL INCIDENT'S SHAPE IN #1666 AND IT IS NOT THERE
+
+The standing rule since that incident is that **"it is inert until someone configures it" is not a safety argument on its own**, because the `planFee` reference fired regardless of config and 500'd ten academies for four days.
+
+**#1666 does not rest on that argument.** It uses `CLIENT_COLS_PENDING` plus the peel-off retry, which **already exists on main, is documented in place, and has its own committed suite** (`_pending-client-column.test.mjs`, which injects a synthetic pending column so the machinery stays provable even when the list is empty). **That is a mechanism, not a hope.** Orchestrator-verified: `clients.stripe_portal_url` genuinely does not exist in production, so the pending path is the one that runs.
+
+### ⚠️ OPEN QUESTION ON #1666, AND IT IS ABOUT THE PARK RATHER THAN THE CODE
+
+**The receipts build is STOPPED by Zoran, and receipts owns the `stripe_portal_url` migration.** So merging #1666 puts a column into `CLIENT_COLS_PENDING` **with no date on which it leaves.** That file's own comment says the list is **"a safety net, not a parking spot"** - and an indefinite park is a parking spot **created by following the rule rather than by breaking it.**
+
+**The deciding fact, asked of the room rather than assumed: does the peel-off retry cost a failed PostgREST round trip on EVERY `loadClient` call, or is the pending set resolved once and cached?** Cheap or cached, merge it. **A failed query per send means merging today buys a permanent tax on the send path for a feature that renders for nobody**, and #1666 should wait for receipts to resume. **A branch nobody merges is a fix nobody has; a merged feature nobody can use is not a fix either.**
+
 ## ⛔⛔ THE CANONICAL CHECKOUT HELD A STAGED REVERT OF TONIGHT'S BUILD, AND EVERY GUARD WE OWN WOULD HAVE PASSED IT (2026-07-30, FIXED)
 
 `/Users/zoransavic/bam-os-requirements` was on `main` at `ef6bab8`, six behind origin, **with an index staging the DELETION of `api/agent/_class-routing.js`, its test suite, and three plan files**, plus staged reversions of `offer.js`, `checkout.js`, `leads.js`, `client-portal.html`, `PENDING_SQL.md` and two memory notes. **A commit from that checkout would have reverted the shared class resolver on `main`.**
