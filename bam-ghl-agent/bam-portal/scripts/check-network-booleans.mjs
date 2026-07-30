@@ -92,6 +92,21 @@
 //     so a network call reached only that way is not seen.
 //   * It cannot tell a good verdict from a lazy one. That is review's job. What
 //     it CAN do is refuse an empty one, and force a new instance to be argued.
+//   * The blank() self-test below proves the scanner is not DESYNCED. It does not
+//     prove the scanner is not OVER-blanking, and those are different: erasing a
+//     brace-balanced region leaves the balance intact. This is measured, not
+//     assumed. Diffing blank() before and after the two fixes over all 251 files,
+//     236 changed and only 6 of them were brace-unbalanced; the other 230 were the
+//     old version wrongly erasing `${...}` interpolation CODE, which the balance
+//     check is structurally incapable of seeing. The hit count did not move, so
+//     nothing was hiding in an interpolation on this tree - today.
+//     The obvious stronger invariant, "every line-anchored `function NAME` must
+//     survive blanking", was built and measured before being rejected: 1874
+//     declarations, one violation, and that violation is CORRECT - api/ghl/
+//     all-pipelines.js:131 declares a browser-side saveNote inside an HTML
+//     template literal, so blanking it is right. An invariant that needs an
+//     exemption on its first run is a gate that gets switched off, which this
+//     repo has already paid for. Left out deliberately, recorded here instead.
 //
 // ── RUN IT ───────────────────────────────────────────────────────────────────
 //
