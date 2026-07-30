@@ -89,7 +89,19 @@ async function sb(path, init = {}) {
 // Naming a column PostgREST does not have 400s the WHOLE select, so a column joins
 // this list AFTER its migration is live, never in the same commit. See the same rule
 // spelled out in full at loadClient() in api/automations.js.
+//
+// THIS LIST HAS TO COVER EVERY COLUMN clientVars() READS, not just the ones somebody
+// remembered. It feeds the same clientVars() the worker does (the confirm step's SMS
+// and its confirmation email resolve their tokens off it), so a column missing here
+// renders empty in a parent's confirmation exactly the way it does in an automation.
+// Six were missing on 30 Jul 2026 and three of them were live regressions:
+// business_email, tagline and instagram_url (blank footer sentence, no Instagram
+// link), plus phone, online_programs_url and referral_offer, whose migrations had
+// long since landed and which the worker's list already carried. The gap is now a
+// derived CHECK rather than a habit - api/_email-select-coverage.test.mjs reads the
+// required set out of clientVars()'s own source and fails when either list misses one.
 const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email", "address",
+  "business_email", "tagline", "instagram_url", "phone", "online_programs_url", "referral_offer",
   "website_setup", "community_group_url", "community_group_platform", "google_review_url",
   "ghl_location_id", "ghl_access_token", "ghl_refresh_token", "ghl_token_expires_at",
   "ghl_kpi_config", "booking_provider", "time_zone"];
@@ -98,8 +110,14 @@ const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email"
 // means "its migration is not applied yet". The row then comes back without the key,
 // which is the state every consumer already handles. Full reasoning, and the rule for
 // when a column may sit here, at CLIENT_COLS_PENDING in api/automations.js.
-//   business_email - migration 20260729T210000_clients_business_email.sql
-const CLIENT_COLS_PENDING = ["business_email"];
+//
+// ⚠️ INTENTIONALLY EMPTY, AND DELIBERATELY NOT DELETED. Empty because business_email
+// (20260729T210000) and tagline / instagram_url (20260729T230000) are applied and have
+// moved up into CLIENT_COLS. Kept because this list plus the retry below it is how the
+// NEXT column ships ahead of its migration, and the retry as written is safe at any
+// number of pending columns - a rebuilt-in-a-hurry one would not be. Full rationale at
+// CLIENT_COLS_PENDING in api/automations.js.
+const CLIENT_COLS_PENDING = [];
 
 // Only an undefined-column error (PostgREST 42703) that NAMES a pending column earns
 // the retry. A transient 5xx must stay a throw, never a quietly degraded row.

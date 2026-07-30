@@ -49,11 +49,13 @@
 //     api/_email-identity-from-the-row.test.mjs.
 //   - That instagram_url points at a live profile, or that the tagline is any good.
 //     Nothing here or anywhere else checks either.
-//   - That the SEND path reads the two columns. It does not yet: they are absent from
-//     the loadClient select lists in api/automations.js and api/agent-confirm.js until
-//     the migration is applied, which is written up in that migration's "BEFORE YOU
-//     DEPLOY". Section 6 asserts what that interim actually renders, so the degraded
-//     state is a described outcome rather than a surprise.
+//   - That the SEND path reads the two columns. It does now (30 Jul 2026), but this
+//     suite is not what says so: it renders from rows it builds itself, so it is green
+//     whether or not any select list names them - which is precisely how the
+//     regression below got past it. That claim belongs to
+//     api/_email-select-coverage.test.mjs, which derives the required columns from
+//     clientVars()'s own source and renders from the row loadClient actually returns.
+//     Section 6 here keeps the RENDERED shape of the regression on file.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // NEGATIVE CONTROLS. Each breaks ONE thing and must print NEGATIVE CONTROL PASSED:
@@ -287,25 +289,37 @@ console.log("\n── 5. locFor takes no notice of the client id, for any field 
     "(and both are GTA's real values, so the equality above is not two blanks agreeing)");
 }
 
-// ─── 6. the pre-select-list interim, described rather than discovered ────────
-// The two columns are NOT in the loadClient select lists yet (they cannot be: naming a
-// column before its migration is applied 400s the whole select and stops every
-// automation). So until that follow-up lands, a send reads a row without them. This is
-// what that renders - asserted, so it is a known outcome and not a surprise in
-// somebody's inbox.
-console.log("\n── 6. what a send renders before the columns join the select lists ──");
+// ─── 6. THE REGRESSION THAT SHIPPED, kept on file as rendered bytes ─────────
+// THIS SECTION USED TO DESCRIBE A FUTURE. It was written on 29 Jul 2026 as "what a send
+// renders before the columns join the select lists", on the understanding that the
+// follow-up would land with the migration. The migration landed on 30 Jul and the
+// follow-up did not, so for a day BAM GTA sent LIVE automation emails in exactly the
+// shape asserted below: no sentence under the wordmark, no Instagram link. Three
+// columns were read by clientVars() and selected by nobody - business_email went the
+// same way, and it is not in this section because this suite only owns two of them.
+//
+// The columns are in the select lists now. This section stays because the shape is
+// worth being able to recognise, and it is written as history rather than as a
+// prediction: the assertions are unchanged, the story around them is not.
+//
+// ⚠️ THIS SECTION IS NOT WHAT CATCHES A RECURRENCE, and it never could have been: it
+// builds the row by hand, so it is green whatever any select list says. The suite that
+// closes the loop is api/_email-select-coverage.test.mjs - it derives the required
+// column set from clientVars()'s own source, measures what the code actually asks
+// Postgres for, and renders from the row loadClient really returns.
+console.log("\n── 6. the regression that shipped, as bytes (business_email went the same way) ──");
 {
-  // GTA's row as loadClient returns it TODAY: every column that list names, and neither
-  // of the two new ones.
+  // GTA's row the way loadClient returned it on 30 Jul 2026: every column that list
+  // named, and neither of the two this suite owns.
   const asLoaded = { ...GTA };
   delete asLoaded.tagline;
   delete asLoaded.instagram_url;
   const html = renderEmail({ clientId: GTA.id, subject: "s", body: BODY, vars: { ...FAMILY, ...clientVars(asLoaded) } });
-  ok(taglineOf(html) === "", "no tagline sentence (the documented interim regression)");
+  ok(taglineOf(html) === "", "no tagline sentence (what GTA's parents actually received)");
   ok(igHrefOf(html) === null, "and no footer Instagram link");
-  ok(!html.includes('href=""') && !html.includes("{{TAGLINE}}"), "but nothing dead or raw ships in their place");
+  ok(!html.includes('href=""') && !html.includes("{{TAGLINE}}"), "but nothing dead or raw shipped in their place");
   ok(html.includes(`href="mailto:${GTA.business_email}?subject=Unsubscribe"`),
-    "and the send is NOT held: everything else about the email is unaffected");
+    "and the send was NOT held: everything else about the email was fine, which is why it was quiet");
 }
 
 console.log("");

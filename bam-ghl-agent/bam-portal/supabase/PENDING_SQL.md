@@ -15,23 +15,27 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
 | Migration file | What it does | Blocked features until applied | Added |
 |---|---|---|---|
+| `20260730T120000_step_rows_render_the_academy_name.sql` | Data only, BAM GTA only. The three `automation_steps` rows that hand-typed "By Any Means Basketball" now carry `{{location.name}}`: onboarding step 1's SMS body, onboarding step 2's email SUBJECT, `summer_special` step 0's SMS body. Each update is guarded on an md5 of the exact current field value, so a re-run is inert and a later owner edit in the Sales step editor survives untouched | Nothing is blocked, but GTA keeps sending the WRONG NAME until it is applied. `public_name` became "By Any Means Toronto" on 2026-07-30, so today these three messages say "By Any Means Basketball" while the shell around them says Toronto. Onboarding step 2 is the visible one: its email body header reads TORONTO while its subject line reads Basketball, in the same message | 2026-07-30 |
 
 
-> **`20260729T230000` step 2, and it is not optional:** the moment that migration is
-> live, add `tagline` and `instagram_url` to `CLIENT_COLS` in `loadClient()` in
-> `api/automations.js` (the send worker, the owner approval surface and the Sales step
-> preview all read that one row) and in `api/agent-confirm.js`. Until it is done, GTA's
-> live emails are missing both footer facts. `api/_tagline-instagram.test.mjs` section 6
-> asserts exactly what that interim renders.
+> **`20260729T230000` step 2 - DONE 2026-07-30.** The follow-up this note demanded is
+> shipped: `business_email`, `tagline` and `instagram_url` are in `CLIENT_COLS` in
+> `api/automations.js` and `api/agent-confirm.js`, and `business_email` is in
+> `SENDER_COLS` in `api/_send.js`. All three had been READ by `clientVars()` and
+> SELECTED by nobody, so GTA's live automation emails went out with no tagline sentence
+> and no footer Instagram link until the lists caught up.
 >
-> **Do NOT shortcut it via `CLIENT_COLS_PENDING`.** That retry is safe for ONE pending
-> column and these would be the second and third. Postgres names only the first unknown
-> column in a select (verified against prod 2026-07-29: `select tagline, instagram_url
-> from clients` reports only `tagline`), and the retry is single-shot with the re-read
-> outside the `try` - so with `business_email` also pending, the second read 400s
-> uncaught and `loadClient` throws, stopping every automation including SMS. Loop the
-> retry until nothing is blamed and extend `api/_pending-client-column.test.mjs` to two
-> pending columns first, or just apply the migration and do step 2 properly.
+> Both `*_COLS_PENDING` lists and `SENDER_COLS_PENDING` are now EMPTY and stay in the
+> code on purpose - that is the mechanism for the next column that has to ship ahead of
+> its migration. It is safe at any number of pending columns as written (the retry drops
+> the whole list, because Postgres names only the FIRST unknown column in a select), and
+> `api/_pending-client-column.test.mjs` keeps proving that by injecting a synthetic
+> pending column rather than depending on a real one being unapplied.
+>
+> The class of bug is now a check: `api/_email-select-coverage.test.mjs` derives the
+> required column set from `clientVars()`'s own source and fails when a select list does
+> not cover it, and `api/_tagline-instagram.test.mjs` section 6 renders the pre-fix and
+> post-fix row shapes side by side.
 
 ## ✅ APPLIED (most recent first)
 

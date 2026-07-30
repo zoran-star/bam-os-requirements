@@ -57,16 +57,22 @@ const _clientCache = new Map(); // clientId -> { at, domain, name, businessEmail
 // because they answer two halves of one question - can this go out AS the academy,
 // and can it carry the academy's own reply-to and unsubscribe address - and because
 // the send path must never ask twice for one row.
-const SENDER_COLS = ["email_domain", "business_name"];
-// ⚠️ PENDING MIGRATION, dropped on the one error that means "not applied yet" (see
-// the retry in clientSender). Same shape and same rule as CLIENT_COLS_PENDING in
-// api/automations.js, which is where the reasoning is written out in full. It matters
-// more here than anywhere: clientSender THROWING holds the send WITHOUT texting the
-// owner, so an unhandled 400 on this select would stop every academy's automation
-// email silently. Dropping the column instead degrades to "no business email", which
-// holds AND tells the owner. Move it into SENDER_COLS once the migration is applied.
-//   business_email - migration 20260729T210000_clients_business_email.sql
-const SENDER_COLS_PENDING = ["business_email"];
+// business_email moved up from SENDER_COLS_PENDING on 30 Jul 2026, once migration
+// 20260729T210000 was confirmed applied to production.
+const SENDER_COLS = ["email_domain", "business_name", "business_email"];
+// ⚠️ INTENTIONALLY EMPTY, AND DELIBERATELY NOT DELETED. A column listed here is asked
+// for optimistically and dropped on the one error that means "its migration is not
+// applied yet" (see the retry in clientSender). Same shape and same rule as
+// CLIENT_COLS_PENDING in api/automations.js, which is where the reasoning is written
+// out in full.
+//
+// It matters more here than anywhere, which is why the mechanism stays: clientSender
+// THROWING holds the send WITHOUT texting the owner, so an unhandled 400 on this
+// select would stop every academy's automation email silently. Dropping the column
+// instead degrades to "no business email", which holds AND tells the owner. The next
+// column that needs to ship ahead of its migration goes here, with its migration file
+// on a comment line, and moves into SENDER_COLS the day that migration lands.
+const SENDER_COLS_PENDING = [];
 
 // Only an undefined-column error (PostgREST 42703) that NAMES a pending column earns
 // the retry. A transient 5xx stays a throw: silently degrading to a row with no

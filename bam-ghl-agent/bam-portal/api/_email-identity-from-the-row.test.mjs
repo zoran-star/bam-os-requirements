@@ -63,22 +63,19 @@
 //      SJ had no pinned entry and never did - which is why the migration fixes both.
 //
 // WHAT IT DOES NOT PROVE
-//   - That the migration has been APPLIED. It has not (see supabase/PENDING_SQL.md).
-//     The fixtures here are the committed snapshots, which carry the post-migration
-//     values ahead of production and say so in their own `_note`. Until it is applied,
-//     production's GTA row still says "By Any Means Basketball" / "2205 Rosemount
-//     Cres", so a real send renders a BASKETBALL wordmark and no city or tag at all.
-//     Section 8 asserts exactly that interim, so it is a described outcome rather
-//     than a surprise in somebody's inbox.
+//   - Nothing here depends on whether a migration is applied; the fixtures are the
+//     committed snapshots. 20260729T235000 WAS applied on 2026-07-30 (see the APPLIED
+//     table in supabase/PENDING_SQL.md), so production's GTA row now holds
+//     "By Any Means Toronto" and the parsable address, and section 8's interim window
+//     is closed. Section 8 is kept because it still describes what a row WITHOUT
+//     those values renders, which is what any academy that has not filled in
+//     public_name gets - it just is no longer GTA's present tense.
 //   - That "By Any Means Toronto" is the right name or TORONTO the right word. That is
 //     Zoran's call and nothing in the repo can check it.
-//   - Anything about the OTHER hardcodes. Three of GTA's automation_step rows still
-//     carry the brand name hand-typed into the copy (onboarding step 1's SMS,
-//     onboarding step 2's subject, summer_special step 0's SMS), so after this
-//     migration GTA's emails say "By Any Means Toronto" while those three messages
-//     still say "By Any Means Basketball". Section 9 pins that disagreement so it is
-//     recorded rather than discovered, and it is NOT fixed here: editing live copy in
-//     the database is a separate, owner-visible change.
+//   - Anything about the templates' own copy. Section 9 covers the automation_steps
+//     ROWS; a name hardcoded inside a shared email TEMPLATE is a different bug with a
+//     different blast radius (every academy at once, not one), and it is
+//     api/_shared-template-names.test.mjs that covers that.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // NEGATIVE CONTROLS. Each breaks ONE thing and must print NEGATIVE CONTROL PASSED:
@@ -105,7 +102,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { renderEmail, clientVars, locFor } from "./email-shells.js";
+import { renderEmail, clientVars, locFor, renderStepMessage } from "./email-shells.js";
 
 const MUTATE = process.env.MUTATE || "";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -337,11 +334,12 @@ console.log("\n── 7. the resolved location config agrees, for any id at all 
   }
 }
 
-// ─── 8. the interim before the migration is applied, described not discovered ─
-// 20260729T235000 is not applied (supabase/PENDING_SQL.md). Until it is, a real send
-// reads production's row: the bare brand and the city-less address. This is what that
-// renders, asserted, so the window is a known outcome.
-console.log("\n── 8. what a send renders BEFORE the migration is applied ──");
+// ─── 8. a row WITHOUT the migration's values, described not discovered ───────
+// 20260729T235000 was applied on 2026-07-30, so this is no longer GTA's present tense.
+// It is kept because it is still a live shape: an academy holding the bare brand as its
+// public_name and a city-less street address renders exactly this, and that is what
+// every academy that has not filled those in would get.
+console.log("\n── 8. what a send renders from a row WITHOUT the migration's values ──");
 {
   const asProdHoldsIt = { ...GTA, public_name: PRE_MIGRATION_NAME, address: PRE_MIGRATION_ADDRESS };
   const html = renderEmail({ clientId: GTA_ID, subject: "s", body: BODY, vars: { ...FAMILY, ...clientVars(asProdHoldsIt) } });
@@ -365,30 +363,73 @@ console.log("\n── 8. what a send renders BEFORE the migration is applied ─
     "and the send is NOT held: everything else about the email is unaffected");
 }
 
-// ─── 9. the three step rows that still hand-type the brand name ─────────────
-// Recorded, not fixed. After the migration GTA's SHELL says "By Any Means Toronto"
-// while these three messages still say "By Any Means Basketball", because the string
-// is typed into the automation_steps rows rather than merged from the row. Editing
-// live copy is a separate, owner-visible change. If somebody templates them, this
-// section fails and should be deleted - which is the point.
-console.log("\n── 9. copy that still hand-types the brand name (a known, separate gap) ──");
+// ─── 9. no step row hand-types the brand name any more ───────────────────────
+// This section used to assert the OPPOSITE. Three of GTA's automation_steps rows typed
+// "By Any Means Basketball" into their copy, so after 20260729T235000 the shell said
+// "By Any Means Toronto" while the message inside said Basketball - worst of all on
+// onboarding step 2, whose email BODY header and SUBJECT LINE disagreed with each other
+// in the same inbox. It was recorded rather than fixed because editing live copy is an
+// owner-visible change. Zoran asked for it on 2026-07-30; migration 20260730T120000 is
+// the data half and this section is now its proof.
+//
+// The claim is NOT "the rows contain a token". It is that the NAME FOLLOWS THE ROW:
+// renaming the academy moves all three messages, which is the only thing that makes
+// this a repair rather than a re-typing.
+console.log("\n── 9. the step rows merge the academy name instead of typing it ──");
 {
   const gtaSnap = snap("bam-gta.json");
-  const typed = [];
+  const steps = [];
   for (const a of gtaSnap.automations || []) {
-    for (const s of a.steps || []) {
-      if (`${s.subject || ""}|${s.body || ""}`.includes(PRE_MIGRATION_NAME)) typed.push(`${a.automation_key}-${s.position}`);
-    }
+    for (const s of a.steps || []) steps.push({ key: `${a.automation_key}-${s.position}`, ...s });
   }
-  ok(typed.join(",") === "onboarding-1,onboarding-2,summer_special-0",
-    `exactly three step rows still hand-type ${JSON.stringify(PRE_MIGRATION_NAME)}: ${typed.join(", ") || "(none)"}`);
-  // And the rendered proof that it reaches a parent, so this is not a claim about the
-  // fixture but about the message. api/__goldens__/bam-gta-steps holds the exact bytes.
-  const welcomeSms = (gtaSnap.automations.find((a) => a.automation_key === "onboarding") || {}).steps
-    .find((s) => s.position === 1);
-  const rendered = renderEmail({ clientId: GTA_ID, subject: "s", body: welcomeSms.body, vars: varsFor(GTA) });
-  ok(rendered.includes(PRE_MIGRATION_NAME),
-    `onboarding step 1's copy still says ${JSON.stringify(PRE_MIGRATION_NAME)} when rendered, while the shell around it says ${JSON.stringify(GTA_NAME)}`);
+  // 1) NOTHING types it any more. Whole-fixture sweep, not a check of three known rows,
+  //    so a fourth row acquiring the literal tomorrow fails here too.
+  const typed = steps.filter((s) => `${s.subject || ""}|${s.body || ""}`.includes(PRE_MIGRATION_NAME))
+    .map((s) => s.key);
+  ok(typed.length === 0,
+    `no step row hand-types ${JSON.stringify(PRE_MIGRATION_NAME)} any more${typed.length ? `: ${typed.join(", ")}` : ""}`);
+
+  // 2) The three that used to type it now carry the merge token. Asserted per row and
+  //    NOT as "these are the only rows with the token" - contact_form-0, ghosted-2 and
+  //    trial_form-0 already merged it before any of this, and they are the pattern
+  //    these three are joining rather than an exception to it.
+  const tokenised = new Set(steps
+    .filter((s) => `${s.subject || ""}|${s.body || ""}`.includes("{{location.name}}"))
+    .map((s) => s.key));
+  for (const key of ["onboarding-1", "onboarding-2", "summer_special-0"]) {
+    ok(tokenised.has(key), `${key} carries {{location.name}} instead of a typed name`);
+  }
+
+  // 3) THE ACTUAL GUARANTEE: rendered through the real send path, each of the three
+  //    says GTA's row name - and renaming the row moves all three. A hardcode cannot
+  //    satisfy the second half, which is why both halves are asserted.
+  //    onboarding-2's name lives in its SUBJECT, so it is rendered through
+  //    renderStepMessage (what api/_send.js sendOn() calls) rather than renderEmail:
+  //    a subject is not a body and does not have to behave like one.
+  const RENAMED = "Northside Hoops Academy";
+  const stepOf = (key) => steps.find((s) => s.key === key);
+  const renderedFor = (client, key) => {
+    const s = stepOf(key);
+    const m = renderStepMessage({ channel: s.channel, clientId: client.id, subject: s.subject, body: s.body, vars: varsFor(client) });
+    return m.channel === "sms" ? m.text : `${m.subject}\n${m.html}`;
+  };
+  for (const key of ["onboarding-1", "onboarding-2", "summer_special-0"]) {
+    const asIs = renderedFor(GTA, key);
+    ok(asIs.includes(GTA_NAME) && !asIs.includes(PRE_MIGRATION_NAME),
+      `${key} renders ${JSON.stringify(GTA_NAME)} and not the old name`);
+    const renamed = renderedFor({ ...GTA, public_name: RENAMED }, key);
+    ok(renamed.includes(RENAMED) && !renamed.includes(GTA_NAME),
+      `${key} follows the row: renaming it to ${JSON.stringify(RENAMED)} moves the message`);
+  }
+
+  // 4) onboarding step 5's subject, "Where By Any Means came from", is deliberately
+  //    NOT tokenised - it names the brand family the origin story is about, not the
+  //    academy. "Where Northside Hoops Academy came from" would be a different and
+  //    false claim. Pinned so the exception is a decision on the record rather than
+  //    a row somebody missed.
+  const story = stepOf("onboarding-5");
+  ok(story.subject === "Where By Any Means came from",
+    "onboarding step 5's subject still names the brand family, on purpose");
 }
 
 console.log("");

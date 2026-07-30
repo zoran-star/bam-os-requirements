@@ -26,18 +26,50 @@
 // which is byte-identical to the state every consumer already handles.
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// WHAT IT PROVES, in BOTH schema states, against the real modules
-//   1. All three selects NAME business_email, and post-migration the value lands on
-//      the row / on the wire.
-//   2. PRE-migration (production as of 2026-07-29) the select does NOT go down: the
-//      row still comes back with every other column, and business_email is ABSENT
-//      from it rather than faked as null - which is what keeps the downstream hold
-//      behaviour exactly what it was.
+// ⚠️ WHY THIS SUITE NOW INJECTS A SYNTHETIC PENDING COLUMN (30 Jul 2026)
+//
+// All three migrations are applied. business_email, tagline and instagram_url have
+// moved up into the MAIN select lists, and both `*_COLS_PENDING` arrays plus
+// `SENDER_COLS_PENDING` are EMPTY - intentionally empty, and intentionally not
+// deleted, because that list plus its retry is how the NEXT column ships ahead of its
+// migration.
+//
+// A suite that proved the retry works BY POINTING AT business_email would now be
+// proving nothing: with the list empty there is no column to drop and every path it
+// used to exercise is dead. Deleting the suite instead would leave the mechanism live
+// and unproven until the day somebody needs it under pressure - which is exactly when
+// the version that peels off only the column PostgREST NAMED gets written back in.
+//
+// So the pending list is INJECTED. Sections 2, 3b and 5 run against copies of the real
+// files whose pending array holds one (or two) columns that exist in NO schema:
+// SYNTH_A / SYNTH_B below. Everything else about those copies is the shipped code -
+// the shipped select list and the shipped retry, byte for byte. What is under test is
+// the MECHANISM, which is what it always was; only the column it is aimed at is now
+// this suite's own rather than a real one that happens to be unapplied.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// WHAT IT PROVES
+//   1. The three columns that regressed are in the MAIN lists now, on the real
+//      modules, with no retry involved - one read, and the values land on the row.
+//      And both pending arrays are EMPTY, so nothing is paying the wasted-400 cost.
+//   2. With a column in the pending list that production does NOT have, the select
+//      does not go down: the row still comes back with every other column, and the
+//      pending column is ABSENT from it rather than faked as null.
 //   3. The retry is NARROW. A transient 5xx, and a 42703 blaming a column that is NOT
-//      pending, both still THROW. A retry-on-anything would hold an academy's email
-//      over an outage and text its owner to go fix a field they already filled in.
-//   4. The downstream behaviour is unchanged in both states: pre-migration a send
-//      HOLDS and the owner IS texted; post-migration it goes out carrying the address.
+//      pending, both still THROW. With the pending list EMPTY that means every 42703
+//      throws, which is the correct answer now: a 42703 today is a typo or a column
+//      added ahead of its own migration, not a state to degrade past.
+//   4. The send path's guarantees, which are the ones with a parent on the other end:
+//      a readable business_email SENDS and the address is on the wire; an EMPTY one
+//      HOLDS, stamps the hold and texts the owner; and a pending column that is NOT
+//      business_email holds nothing at all.
+//   5. TWO pending columns do not take the select down. Postgres reports only the
+//      FIRST unknown column in a select, so peeling off just the blamed one leaves the
+//      retry asking for a column that still does not exist - and the retry's read is
+//      the last statement in the catch, so that throw ESCAPES loadClient, whose worker
+//      callers have no catch. Every automation stops, SMS included: the exact incident
+//      this mechanism prevents, through the mechanism itself. Safe at one and lethal
+//      at two, which is the worst possible number to be safe up to.
 //
 // WHAT IT DOES NOT PROVE
 //   - That the REST of either loadClient list matches the real schema. A typo in
@@ -45,18 +77,27 @@
 //     say so: api/_arming-gate.test.mjs owns the schema-accurate clients stub, but
 //     the loadClient callers it drives swallow the failure. That gap is older than
 //     this change and is not closed by it.
-//   - That the migration is applied. It is not. This suite is exactly why shipping
-//     ahead of it is survivable, not a claim that it landed.
+//   - That the main lists COVER what the email layer reads. That is the bug that
+//     actually shipped, and it has its own suite:
+//     api/_email-select-coverage.test.mjs derives the required set from clientVars()'s
+//     source and renders the result. Section 1 here only checks the three columns by
+//     name, which is the instance, not the class.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // NEGATIVE CONTROLS. Each breaks ONE thing and must print NEGATIVE CONTROL PASSED:
 //
-//   MUTATE=nocolumn   node api/_pending-client-column.test.mjs  # business_email out
-//                                                              # of all three lists
-//   MUTATE=noretry    node api/_pending-client-column.test.mjs  # the pending-column
-//                                                              # retry removed, so a
+//   MUTATE=nocolumn   node api/_pending-client-column.test.mjs  # the three columns
+//                                                              # leave the MAIN lists -
+//                                                              # the live regression of
+//                                                              # 29 Jul, restored
+//   MUTATE=noinject   node api/_pending-client-column.test.mjs  # the pending list stays
+//                                                              # empty while production
+//                                                              # still lacks the column,
+//                                                              # i.e. the mechanism is
+//                                                              # not used at all
+//   MUTATE=noretry    node api/_pending-client-column.test.mjs  # the retry removed, so a
 //                                                              # 400 kills the select
-//   MUTATE=peelone   node api/_pending-client-column.test.mjs  # retry drops only the
+//   MUTATE=peelone    node api/_pending-client-column.test.mjs  # retry drops only the
 //                                                              # column Postgres NAMED,
 //                                                              # lethal at two pending
 //   MUTATE=blindretry node api/_pending-client-column.test.mjs  # retry on ANY error,
@@ -83,14 +124,27 @@ const ok = (cond, label) => {
   else { fail++; failures.push(label); console.log("  ❌ " + label); }
 };
 
-// ─── the schema switch ───────────────────────────────────────────────────────
-// "pre" is production as of 2026-07-29: migration 20260729T210000 is written, sitting
-// in supabase/PENDING_SQL.md, and NOT applied. "post" is after it lands. Every claim
-// below is made in both states, because a change that is only correct in one of them
-// is a change that breaks on the way in or on the way out.
-let SCHEMA = "post";
+// ─── the synthetic pending columns ───────────────────────────────────────────
+// Deliberately not real column names, and deliberately not plausible ones. Whatever
+// ships next goes in the real pending list with its migration file on a comment line;
+// these two exist ONLY so the mechanism has something to be aimed at that no schema
+// will ever quietly start having. If either ever becomes a real column, this suite
+// stops testing anything and section 2 will say so by passing for the wrong reason -
+// so pick another name rather than adding one of these to `clients`.
+const SYNTH_A = "not_a_real_column_a";
+const SYNTH_B = "not_a_real_column_b";
+
+// The three columns that regressed on 29 Jul 2026: read by clientVars(), named in no
+// select list, so they arrived undefined and rendered as nothing.
+const MOVED_UP = ["business_email", "tagline", "instagram_url"];
+
+// ─── the stubbed wire ────────────────────────────────────────────────────────
 let CLIENT_SELECTS = [];        // every clients select the code under test issued
 let FORCE_ERROR = null;         // { status, body } - stands in for an outage
+let MISSING_IN_PROD = [];       // columns the stub schema does NOT have
+let WIRE = null;                // what reached Resend
+let SMS = [];                   // owner notifications that went out
+let EVENTS = [];                // email_events rows written
 
 // PostgREST's own 42703 body, because that exact string is what the retry reads to
 // tell "this migration has not landed" apart from "the database is unwell". A
@@ -118,19 +172,17 @@ const ACADEMY = {
   email_domain: "northside.example",
   v2_access: true, v15_access: false, notification_prefs: {},
   onboarding_setup: { owner_phone: "+15550001111" },
-  // The value under test. Present in the FIXTURE in both schema states; whether the
-  // code can READ it is what SCHEMA decides.
+  // The three that moved up into the main lists on 30 Jul 2026. Present in the fixture
+  // so section 1 can say they LAND, not merely that they were asked for.
   business_email: "info@northside.example",
+  tagline: "Skills training for Northside athletes.",
+  instagram_url: "https://instagram.com/northsidehoops",
 };
-// Which pending columns production does NOT have. `let`, because section 5 widens it
-// to two to prove the retry survives a SECOND pending column - the case that was
-// silently lethal before the whole-list drop landed.
-let PENDING_IN_PROD = ["business_email"];
-
-// ─── the stubbed wire ────────────────────────────────────────────────────────
-let WIRE = null;                 // what reached Resend
-let SMS = [];                    // owner notifications that went out
-let EVENTS = [];                 // email_events rows written
+// The same academy with NO public email on file, which is the real-world shape of the
+// hold: an owner who has not typed the address into their portal yet. Nothing to do
+// with schema state, which is the point - this guarantee has to survive the pending
+// list being empty.
+const NO_PUBLIC_EMAIL_ID = "acad-no-public-email";
 
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
@@ -143,11 +195,13 @@ globalThis.fetch = async (url, init = {}) => {
     const cols = sel.split(",").map((s) => s.trim()).filter(Boolean);
     CLIENT_SELECTS.push(sel);
     if (FORCE_ERROR) return new Response(FORCE_ERROR.body, { status: FORCE_ERROR.status, headers: { "content-type": "application/json" } });
-    if (SCHEMA === "pre") {
-      const missing = cols.find((c) => PENDING_IN_PROD.includes(c));
-      if (missing) return pgUndefinedColumn(missing);
-    }
-    return json([Object.fromEntries(cols.filter((c) => c in ACADEMY).map((c) => [c, ACADEMY[c]]))]);
+    // Postgres names only the FIRST unknown column in a select. `find` walks the
+    // select in order, which is what makes section 5's claim faithful rather than
+    // convenient: a stub that listed all of them would let `peelone` pass.
+    const missing = cols.find((c) => MISSING_IN_PROD.includes(c));
+    if (missing) return pgUndefinedColumn(missing);
+    const row = u.includes(`id=eq.${NO_PUBLIC_EMAIL_ID}`) ? { ...ACADEMY, business_email: "" } : ACADEMY;
+    return json([Object.fromEntries(cols.filter((c) => c in row).map((c) => [c, row[c]]))]);
   }
 
   if (u === "https://api.resend.com/emails" && method === "POST") { WIRE = { subject: body.subject, html: body.html, from: body.from }; return json({ id: "stub-email" }); }
@@ -198,16 +252,29 @@ async function moduleWithLoadClient(rel, edits = []) {
   } finally { try { fs.unlinkSync(tmp); } catch (_) { /* best effort */ } }
 }
 
-// The three mutations, expressed against the real source text.
-//   nocolumn   - business_email leaves the pending list. The select stops asking for
-//                it, the row never carries it, and every academy's email holds forever
-//                with no way to fix it. This is the "did the change even happen" check.
+// ─── the edits ───────────────────────────────────────────────────────────────
+// INJECT is not a mutation - it is the harness. It puts a column that exists in no
+// schema into the (intentionally empty) pending list, so the mechanism has something
+// to be aimed at. ONE for sections 2-4, TWO for section 5.
+const INJECT_ONE = (c) => [[`const ${c} = [];`, `const ${c} = [${JSON.stringify(SYNTH_A)}];`]];
+const INJECT_TWO = (c) => [[`const ${c} = [];`, `const ${c} = [${JSON.stringify(SYNTH_A)}, ${JSON.stringify(SYNTH_B)}];`]];
+
+// The mutations, expressed against the real source text.
+//   nocolumn   - the three columns leave the MAIN lists. The select stops asking for
+//                them, they never reach the row, and the footer of every automation
+//                email loses its tagline, its Instagram link and its contact address.
+//                This is the bug that shipped, restored. One pin covers both files:
+//                they share the line the three were added on.
+//   noinject   - the pending list is left EMPTY while production still lacks the
+//                column, i.e. the mechanism exists and is not used. The 400 is
+//                unhandled and the whole select dies. This is the control that says the
+//                injection below is load-bearing and not decoration.
 //   noretry    - the retry is removed and the original error rethrown. This is the
-//                shipped-without-a-net version: pre-migration it 400s the whole select.
+//                shipped-without-a-net version.
 //   blindretry - the retry fires on ANY error. Looks strictly safer. It is not: an
 //                outage now silently returns a row with no business_email, which holds
 //                the academy's email and texts its owner about a field that is fine.
-const NOCOLUMN = (constName) => [[`const ${constName} = ["business_email"];`, `const ${constName} = [];`]];
+const NOCOLUMN = [[`"business_email", "tagline", "instagram_url",`, ``]];
 const NORETRY = [[
   "    const blamed = pendingColsBlamedBy(e);\n    if (!blamed.length) throw e;",
   "    const blamed = [];\n    if (!blamed.length) throw e;"]];
@@ -226,42 +293,34 @@ const PEELONE = (constName) => [[
   `rows = await read(cols.filter((c) => !${constName}.includes(c)));`,
   `rows = await read(cols.filter((c) => !blamed.includes(c)));`]];
 
-function editsFor(constName) {
-  if (MUTATE === "nocolumn") return NOCOLUMN(constName);
+// The mutation that applies to a copy whose pending list is being injected.
+function mutFor(constName) {
   if (MUTATE === "noretry") return NORETRY;
   if (MUTATE === "blindretry") return BLINDRETRY(constName);
   if (MUTATE === "peelone") return PEELONE(constName);
   return [];
 }
+// Injection is SKIPPED under noinject (that is the whole control) and under nocolumn,
+// whose claim is about the real main lists and which has nothing to say about pending.
+const injectOne = (c) => (MUTATE === "noinject" ? [] : INJECT_ONE(c)).concat(mutFor(c));
+const injectTwo = (c) => (MUTATE === "noinject" ? [] : INJECT_TWO(c)).concat(mutFor(c));
 
-// Modules whose pending list holds TWO columns, for section 5.
-//
-// NOCOLUMN is deliberately excluded rather than composed: it rewrites the same const
-// line TWO does, so applying both leaves the second pinned to text the first already
-// replaced - and this suite treats a pin that cannot find its target as a FAILURE,
-// not a pass, which is why the clash surfaced loudly instead of scoring green. Its
-// claim ("the column is in the real lists") is about the real modules anyway, so
-// section 5 has nothing to add to it.
-const TWO = (constName) => [[`const ${constName} = ["business_email"];`,
-                             `const ${constName} = ["business_email", "instagram_url"];`]];
-const SKIP_SECTION_5 = MUTATE === "nocolumn";
-function twoColEdits(constName) {
-  return TWO(constName).concat(editsFor(constName));
-}
+// The REAL modules, unmutated except by `nocolumn`. Section 1 and section 3a use these.
+const realEdits = MUTATE === "nocolumn" ? NOCOLUMN : [];
+const REAL_A = await moduleWithLoadClient("automations.js", realEdits);
+const REAL_C = await moduleWithLoadClient("agent-confirm.js", realEdits);
+// Copies with ONE synthetic pending column.
+const INJ_A = await moduleWithLoadClient("automations.js", injectOne("CLIENT_COLS_PENDING"));
+const INJ_C = await moduleWithLoadClient("agent-confirm.js", injectOne("CLIENT_COLS_PENDING"));
 
-const AUTOMATIONS = await moduleWithLoadClient("automations.js", editsFor("CLIENT_COLS_PENDING"));
-const CONFIRM = await moduleWithLoadClient("agent-confirm.js", editsFor("CLIENT_COLS_PENDING"));
-
-// _send.js is reached through its public door (sendOn), so no export is appended -
-// only the mutations, and only when there is one to apply.
-async function sendModule() {
-  const edits = MUTATE === "nocolumn" ? NOCOLUMN("SENDER_COLS_PENDING") : editsFor("SENDER_COLS_PENDING");
+// _send.js is reached through its public door (sendOn), so no export is appended.
+async function sendModule(edits) {
   if (!edits.length) return import("./_send.js");
   const abs = path.join(HERE, "_send.js");
   let src = fs.readFileSync(abs, "utf8");
   for (const [find, repl] of edits) {
     if (!src.includes(find)) {
-      controlBroken = `MUTATE=${MUTATE} is pinned to text that is no longer in api/_send.js:\n\n${find}\n\nRe-point it or delete it.`;
+      controlBroken = `${MUTATE ? `MUTATE=${MUTATE}` : "This suite"} is pinned to text that is no longer in api/_send.js:\n\n${find}\n\nRe-point it or delete it.`;
       throw new Error(controlBroken);
     }
     src = src.split(find).join(repl);
@@ -271,60 +330,89 @@ async function sendModule() {
   try { return await import(pathToFileURL(tmp).href); }
   finally { try { fs.unlinkSync(tmp); } catch (_) { /* best effort */ } }
 }
-const { sendOn } = await sendModule();
+// nocolumn also drops business_email out of SENDER_COLS, because that is the same
+// regression on the send path: the address the footer and the unsubscribe are built
+// from stops arriving.
+const NOSENDER = [[
+  `const SENDER_COLS = ["email_domain", "business_name", "business_email"];`,
+  `const SENDER_COLS = ["email_domain", "business_name"];`]];
+const { sendOn: sendReal } = await sendModule(MUTATE === "nocolumn" ? NOSENDER : []);
+const { sendOn: sendInj } = await sendModule(injectOne("SENDER_COLS_PENDING"));
 
-const reset = () => { CLIENT_SELECTS = []; FORCE_ERROR = null; WIRE = null; SMS = []; EVENTS = []; };
-const LOADERS = [
-  ["api/automations.js", AUTOMATIONS.__loadClient],
-  ["api/agent-confirm.js", CONFIRM.__loadClient],
-];
+const reset = () => { CLIENT_SELECTS = []; FORCE_ERROR = null; MISSING_IN_PROD = []; WIRE = null; SMS = []; EVENTS = []; };
+const REAL_LOADERS = [["api/automations.js", REAL_A.__loadClient], ["api/agent-confirm.js", REAL_C.__loadClient]];
+const INJ_LOADERS = [["api/automations.js", INJ_A.__loadClient], ["api/agent-confirm.js", INJ_C.__loadClient]];
 
-// ─── 1. post-migration: the column is asked for, and it arrives ───────────────
-console.log("\n── 1. both loadClient selects NAME business_email, and it lands on the row ──");
-SCHEMA = "post";
-for (const [label, loadClient] of LOADERS) {
+// ─── 1. the three columns are in the MAIN lists, and nothing is pending ──────
+console.log("\n── 1. business_email / tagline / instagram_url are in the MAIN select lists ──");
+for (const [label, loadClient] of REAL_LOADERS) {
   reset();
   let row = null, threw = null;
   try { row = await loadClient(ACADEMY.id); } catch (e) { threw = e; }
   ok(!threw, `${label}: the select succeeds${threw ? ` (threw ${threw.message})` : ""}`);
   const asked = String(CLIENT_SELECTS[0] || "").split(",").map((s) => s.trim());
-  ok(asked.includes("business_email"), `${label}: the select list NAMES business_email`);
-  ok(!!row && row.business_email === ACADEMY.business_email,
-    `${label}: and the academy's public email is on the returned row`);
-  // The point of the column: it must not be the owner's inbox, in any state.
-  ok(!!row && row.business_email !== ACADEMY.email, `${label}: which is not clients.email`);
-  ok(CLIENT_SELECTS.length === 1, `${label}: one read, no retry needed (saw ${CLIENT_SELECTS.length})`);
+  for (const c of MOVED_UP) {
+    ok(asked.includes(c), `${label}: the select list NAMES ${c}`);
+    ok(!!row && row[c] === ACADEMY[c], `${label}: and ${c} lands on the returned row`);
+  }
+  // The point of business_email: it must not be the owner's inbox, in any state.
+  ok(!!row && row.business_email !== ACADEMY.email, `${label}: business_email is not clients.email`);
+  ok(CLIENT_SELECTS.length === 1, `${label}: ONE read, no retry - nothing is pending (saw ${CLIENT_SELECTS.length})`);
   // The rest of the list still has to be there. A "safe" change that quietly dropped
   // the parent-facing facts would hold nothing and break every message's identity.
   ok(!!row && row.public_name === ACADEMY.public_name && row.business_name === ACADEMY.business_name,
     `${label}: the parent-facing identity columns came back too`);
 }
+{
+  // The pending arrays are EMPTY in the shipped source, and still PRESENT. Both halves
+  // matter: a non-empty one costs a wasted 400 per uncached read, and a deleted one
+  // gets rebuilt badly the next time a column has to ship ahead of its migration.
+  const files = [["automations.js", "CLIENT_COLS_PENDING"], ["agent-confirm.js", "CLIENT_COLS_PENDING"], ["_send.js", "SENDER_COLS_PENDING"]];
+  for (const [f, c] of files) {
+    const src = fs.readFileSync(path.join(HERE, f), "utf8");
+    ok(src.includes(`const ${c} = [];`), `api/${f}: ${c} is present and EMPTY`);
+    ok(new RegExp(`function pendingColsBlamedBy`).test(src), `api/${f}: the retry's gate function is still there`);
+  }
+}
 
-// ─── 2. pre-migration: a 400 on the pending column takes NOTHING down ─────────
-console.log("\n── 2. with the migration UNAPPLIED the select survives, minus that one key ──");
-SCHEMA = "pre";
-for (const [label, loadClient] of LOADERS) {
+// ─── 2. a pending column production does not have takes NOTHING down ─────────
+console.log(`\n── 2. with ${SYNTH_A} in the pending list and absent from the schema, the select survives ──`);
+for (const [label, loadClient] of INJ_LOADERS) {
   reset();
+  MISSING_IN_PROD = [SYNTH_A];
   let row = null, threw = null;
   try { row = await loadClient(ACADEMY.id); } catch (e) { threw = e; }
   ok(!threw, `${label}: the 400 does NOT propagate${threw ? ` (threw ${threw.message})` : ""}`);
   ok(!!row, `${label}: a row still comes back (this is the SMS path staying up)`);
-  ok(!!row && !("business_email" in row),
-    `${label}: business_email is ABSENT from the row, not faked as null or as clients.email`);
+  ok(!!row && !(SYNTH_A in row), `${label}: ${SYNTH_A} is ABSENT from the row, not faked as null`);
   ok(!!row && row.public_name === ACADEMY.public_name && row.ghl_access_token === ACADEMY.ghl_access_token,
     `${label}: every other column is intact, so nothing else degraded`);
+  // And the columns that DID move up are unaffected by a retry happening around them.
+  ok(!!row && MOVED_UP.every((c) => row[c] === ACADEMY[c]),
+    `${label}: business_email, tagline and instagram_url still arrive through the retry`);
   ok(CLIENT_SELECTS.length === 2,
     `${label}: exactly one retry, not a per-column crawl (saw ${CLIENT_SELECTS.length} reads)`);
   const second = String(CLIENT_SELECTS[1] || "").split(",").map((s) => s.trim());
-  ok(!second.includes("business_email"), `${label}: the retry drops ONLY the column PostgREST named`);
-  ok(second.includes("public_name") && second.includes("ghl_kpi_config"),
+  ok(!second.includes(SYNTH_A), `${label}: the retry drops the pending column`);
+  ok(second.includes("public_name") && second.includes("ghl_kpi_config") && second.includes("tagline"),
     `${label}: and keeps everything else it was already asking for`);
 }
 
-// ─── 3. the retry is narrow: an outage is still an outage ─────────────────────
-console.log("\n── 3. only a 42703 naming a PENDING column earns the retry ──");
-SCHEMA = "post";
-for (const [label, loadClient] of LOADERS) {
+// ─── 3. the retry is narrow ──────────────────────────────────────────────────
+console.log("\n── 3a. on the REAL modules, with nothing pending, EVERY 42703 throws ──");
+for (const [label, loadClient] of REAL_LOADERS) {
+  // With the pending list empty there is nothing to degrade past, and that is the
+  // right answer: a 42703 today means a typo in the list or a column added ahead of
+  // its own migration. Both are bugs to see, not states to survive.
+  reset();
+  FORCE_ERROR = { status: 400, body: JSON.stringify({ code: "42703", message: "column clients.tagline does not exist" }) };
+  let threw = null;
+  try { await loadClient(ACADEMY.id); } catch (e) { threw = e; }
+  ok(!!threw, `${label}: a 42703 blaming tagline THROWS rather than silently dropping it`);
+  ok(CLIENT_SELECTS.length === 1, `${label}: and is not retried (saw ${CLIENT_SELECTS.length})`);
+}
+console.log(`\n── 3b. with ${SYNTH_A} pending, only a 42703 NAMING it earns the retry ──`);
+for (const [label, loadClient] of INJ_LOADERS) {
   // A transient 5xx. Retrying here would hand back a row with no business_email and
   // hold the academy's email over a database blip - then text the owner to go fill in
   // a field that is already filled in. Fail closed and LOUD instead.
@@ -347,73 +435,76 @@ for (const [label, loadClient] of LOADERS) {
 }
 reset();
 
-// ─── 4. the send path: same two states, unchanged behaviour ───────────────────
-console.log("\n── 4. api/_send.js: pre-migration HOLDS and tells the owner, post-migration sends ──");
+// ─── 4. the send path, where a parent is on the other end ────────────────────
+console.log("\n── 4. api/_send.js: a readable public email SENDS, an empty one HOLDS ──");
 const BODY = "Hi {{contact.first_name}},\n\nJordan's spot is held for this week.\n\nSee you at training.";
-const sendFor = async (clientId) => {
+const sendVia = async (send, clientId) => {
   reset();
-  return sendOn({ channel: "email", clientId, toEmail: "parent@example.test", subject: "Your spot this week", body: BODY, vars: {} });
+  return send({ channel: "email", clientId, toEmail: "parent@example.test", subject: "Your spot this week", body: BODY, vars: {} });
 };
 {
-  SCHEMA = "post";
-  const r = await sendFor("post-migration-academy");
-  ok(!!r.sent, `with the column readable the send goes out (${JSON.stringify(r)})`);
+  const r = await sendVia(sendReal, ACADEMY.id);
+  ok(!!r.sent, `with business_email in SENDER_COLS the send goes out (${JSON.stringify(r)})`);
   const asked = String(CLIENT_SELECTS[0] || "").split(",").map((s) => s.trim());
   ok(asked.includes("business_email") && asked.includes("email_domain"),
     `the sender select names business_email alongside the sending domain (${CLIENT_SELECTS[0]})`);
+  ok(CLIENT_SELECTS.length === 1, `and needs no retry to get it (saw ${CLIENT_SELECTS.length})`);
   ok(WIRE && WIRE.html.includes(`href="mailto:${ACADEMY.business_email}?subject=Unsubscribe"`),
     "and the bytes on the wire carry it as the unsubscribe");
   ok(WIRE && !WIRE.html.includes(ACADEMY.email), "and the owner's inbox is nowhere in it");
 }
 {
-  // Production TODAY. This is the state that must be survivable, and "survivable"
-  // means EXACTLY what it meant before the fold: the email holds, nothing generic
-  // goes out, and the owner is told which field to fill in. A hold that does not
-  // notify - which is what an uncaught 400 in clientSender would produce - looks
-  // identical from the outside and leaves the academy silent indefinitely.
-  SCHEMA = "pre";
-  const r = await sendFor("pre-migration-academy");
-  ok(!!r.held, `with the migration unapplied the send HOLDS (${JSON.stringify(r)})`);
+  // THE HOLD, which is the guarantee with the sharpest edge and the one least allowed
+  // to move. An academy with no public email on file cannot carry an unsubscribe
+  // destination, and an email with no unsubscribe path is worse than the bug this
+  // replaced. So it HOLDS: nothing generic goes out, the hold is stamped, and the
+  // owner is told which field to fill in. This has nothing to do with schema state,
+  // which is exactly why it still has to be asserted with the pending list empty.
+  const r = await sendVia(sendReal, NO_PUBLIC_EMAIL_ID);
+  ok(!!r.held, `an EMPTY business_email HOLDS the send (${JSON.stringify(r)})`);
   ok(/unsubscribe/i.test(String(r.held || "")), "for the business-email reason, not the sending-domain one");
   ok(WIRE === null, "nothing reached Resend");
   ok(EVENTS.some((e) => e.type === "business_email_hold_notice"), "the hold was stamped as the business-email hold");
   ok(SMS.some((m) => /public email/i.test(m)), "and the owner WAS texted about the missing public email");
   ok(!SMS.some((m) => m.includes(ACADEMY.email)), "without being pointed at their own inbox");
-  ok(CLIENT_SELECTS.filter((s) => s.includes("email_domain")).length === 2,
-    `the sender read retried once and stopped (saw ${CLIENT_SELECTS.filter((s) => s.includes("email_domain")).length})`);
+}
+{
+  // A pending column that is NOT business_email must hold NOTHING. Before the fold,
+  // business_email itself was the pending column, so "pending" and "held" were the
+  // same state and the distinction could not be tested. Now it can: the retry fires,
+  // the row comes back without the synthetic column, and the send goes out normally.
+  reset();
+  MISSING_IN_PROD = [SYNTH_A];
+  const r = await sendInj({ channel: "email", clientId: ACADEMY.id, toEmail: "parent@example.test", subject: "Your spot this week", body: BODY, vars: {} });
+  ok(!!r.sent, `with ${SYNTH_A} pending the send still goes out - a pending column holds nothing (${JSON.stringify(r)})`);
+  ok(WIRE && WIRE.html.includes(`href="mailto:${ACADEMY.business_email}?subject=Unsubscribe"`),
+    "and still carries the academy's own unsubscribe");
+  const sends = CLIENT_SELECTS.filter((s) => s.includes("email_domain"));
+  ok(sends.length === 2, `the sender read retried once and stopped (saw ${sends.length})`);
+  ok(!String(sends[1] || "").includes(SYNTH_A), "and the retry dropped the pending column");
 }
 
-// ─── 5. TWO pending columns, which is where the first version died ────────────
+// ─── 5. TWO pending columns, which is where the first version died ───────────
 console.log("\n── 5. a SECOND pending column does not take the select down ──");
-if (SKIP_SECTION_5) console.log("  (skipped under MUTATE=nocolumn - see the note on TWO)");
-else
-// This is not hypothetical. A second migration adding `tagline` and `instagram_url`
-// landed the same evening, and the obvious next step - park them in the pending list
-// beside business_email - would have stopped every automation. Postgres names only
-// the first unknown column, so peeling off just the named one leaves the retry
-// asking for a column that still does not exist, and that second throw escapes.
 {
-  const A2 = await moduleWithLoadClient("automations.js", twoColEdits("CLIENT_COLS_PENDING"));
-  const C2 = await moduleWithLoadClient("agent-confirm.js", twoColEdits("CLIENT_COLS_PENDING"));
-  const prev = PENDING_IN_PROD;
-  PENDING_IN_PROD = ["business_email", "instagram_url"];   // production has NEITHER
-  SCHEMA = "pre";
+  const A2 = await moduleWithLoadClient("automations.js", injectTwo("CLIENT_COLS_PENDING"));
+  const C2 = await moduleWithLoadClient("agent-confirm.js", injectTwo("CLIENT_COLS_PENDING"));
   for (const [label, loadClient] of [["api/automations.js", A2.__loadClient], ["api/agent-confirm.js", C2.__loadClient]]) {
     reset();
+    MISSING_IN_PROD = [SYNTH_A, SYNTH_B];   // the schema has NEITHER
     let row = null, threw = null;
     try { row = await loadClient(ACADEMY.id); } catch (e) { threw = e; }
     ok(!threw, `${label}: TWO missing columns still do not propagate${threw ? ` (threw ${threw.message})` : ""}`);
     ok(!!row, `${label}: a row comes back, so the worker and SMS stay up`);
     const last = String(CLIENT_SELECTS[CLIENT_SELECTS.length - 1] || "").split(",").map((s) => s.trim());
-    ok(!last.includes("business_email") && !last.includes("instagram_url"),
+    ok(!last.includes(SYNTH_A) && !last.includes(SYNTH_B),
       `${label}: the retry drops the WHOLE pending list, not just the one Postgres named`);
-    ok(last.includes("public_name") && last.includes("ghl_access_token"),
+    ok(last.includes("public_name") && last.includes("ghl_access_token") && last.includes("business_email"),
       `${label}: and keeps every column that does exist`);
     ok(CLIENT_SELECTS.length === 2,
       `${label}: still exactly one retry, no per-column crawl (saw ${CLIENT_SELECTS.length})`);
   }
-  PENDING_IN_PROD = prev;
-  SCHEMA = "post";
+  reset();
 }
 
 console.log("");
