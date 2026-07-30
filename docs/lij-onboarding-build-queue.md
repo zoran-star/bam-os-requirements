@@ -844,6 +844,22 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 🚨 MERGE ORDER FOR THE AGE-ROUTING SWITCH. **THE SITE GOES FIRST. GETTING THIS BACKWARDS BREAKS BOOKINGS SILENTLY.**
+
+Two PRs, both green, both waiting on Zoran:
+- **[bam-client-sites #174](https://github.com/zoran-star/bam-client-sites/pull/174)** "Free trial: training starts at 9, and stop refusing anyone for being too old"
+- **[portal #1661](https://github.com/zoran-star/bam-os-requirements/pull/1661)** "Route trial bookings by the athlete's actual age (build B: the switch)"
+
+**#174 must DEPLOY before #1661 merges.** Otherwise there is a window where **GTA's free-trial page still accepts 8 year olds while the portal has started refusing them, and those bookings fail silently.** A parent completes the form and nothing tells them it did not work.
+
+**This is the switch-goes-last rule for the third time in one week**, and the third different pairing: a fix and a switch (testimonials), a migration and a merge (the entry note), and now two repos. **The general form is worth stating once: when two deploys must both happen, the one that WIDENS what is accepted goes first, and the one that NARROWS it goes second.** Narrow-first always creates a window where something already in flight has nowhere to land.
+
+## ⚠️ ORCHESTRATOR ERROR, FOURTH OF THE NIGHT AND THE SAME SHAPE: **I TOLD A ROOM BUILD B WAS UNPUSHED. IT WAS OPEN AS A PR.**
+
+I checked `claude/route-by-actual-age`, found it 0 ahead of main, and reported that to MEMBER MANAGEMENT as "B is unpushed". **B is on `claude/route-by-actual-age-switch`.** I inferred a room's state from the branch I had TOLD it to use rather than from what it did.
+
+**Same shape as the other three tonight, and by now that is the point rather than a coincidence:** a handover file read as a stop, a written "released" that had not released the ref, a ledger row claiming pending work already done, and now a branch answering a question about a different branch. **Every one was an accurate artifact read as answering something it never claimed.** The collision answer was unaffected, which is exactly why it is worth recording: the habit failed and got away with it.
+
 ## 📏 RE-BLESSING A GTA LOCK: THE RULE, BECAUSE TWO ROOMS NOW WANT TO DO IT (2026-07-30)
 
 Zoran ordered the Stripe manage/cancel link into GTA's live `onboarding-welcome` email, which means a **deliberate re-bless** of `_gta-message-lock` / `_gta-step-lock`. That is legitimate and there is precedent: `trial_form` step 0 was re-blessed on his order in July under the framing **"the re-bless is deliberate, not drift."** Say that in the commit, name whose order it was, and name what changed. **A re-bless that does not explain itself is indistinguishable from a lock quietly going stale.**

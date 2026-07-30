@@ -1,16 +1,17 @@
 {
- "updated": "2026-07-30 · 5 builds in flight across two rooms",
+ "updated": "2026-07-30 · age routing ready, two PRs waiting on you IN ORDER",
  "recentUpdates": [
+  "Age routing is built and green. Two pull requests are waiting on you and the ORDER matters",
+  "The website one goes first. Backwards, GTA's page keeps accepting 8 year olds while the portal starts refusing them, and those bookings fail with nobody told",
+  "My fourth slip tonight, same shape: I told a room a build was unpushed by checking the wrong branch. It caught it",
   "Member management has 4 builds running at once, plus the age-routing switch in the other room. Both checked, neither is standing on the other",
   "Your Stripe manage link goes into the welcome email. That edits a LIVE GTA email, so the safety lock gets deliberately updated rather than quietly bypassed",
-  "One caution passed on: updating that lock freezes everything it currently says, not just the new line. A room nearly got caught by that earlier this week",
-  "You approved the member management plan. Your ruling that members don't need the testimonials email closes the oldest frozen question in the file",
-  "Nothing gets deleted to close it. The master already ships 7 steps and GTA keeps its 8th. It just stops being a to-do",
-  "Three messages deliberately NOT built: no failed-payment email to parents, no reschedule notice, no goodbye email. Recorded so nobody 'fixes' it later"
+  "One caution passed on: updating that lock freezes everything it currently says, not just the new line. A room nearly got caught by that earlier this week"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
+   "MERGE IN THIS ORDER: client-sites #174 first, wait for it to deploy, THEN portal #1661. Backwards breaks trial bookings silently",
    "Tell Lij: do NOT reconnect Stripe. Finish the remaining items in his Stripe dashboard and the portal ticks itself",
    "SEND LIJ HIS ASK-LIST. Drafted at docs/plans/lij-ask-list.md. Stripe is item 1 and he is already part way through it",
    "Two San Jose data fixes for launch: allowlist its domain, and press the entry-point seed button. Both are data, not code",
@@ -718,9 +719,9 @@
   {
    "name": "AUTOMATION TEMPLATING III",
    "sidebar": "AUTOMATION TEMPLATING III",
-   "state": "white",
+   "state": "blue",
    "column": null,
-   "one": "First half merged. Building the switch that actually routes a kid by their real age",
+   "one": "Both halves built and green. Waiting on you to merge them, website first",
    "builds": [
     "t-convergence"
    ],
