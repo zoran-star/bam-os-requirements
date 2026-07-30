@@ -1094,7 +1094,10 @@ function localDateTimeParts(iso: string, timeZone: string): Record<string, strin
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    // hourCycle: "h23", NOT hour12: false. The hint resolves to h24 on Node 20,
+    // which renders local midnight as "24" and would make this helper compute a
+    // midnight expectation that is a day out.
+    hourCycle: "h23",
   }).formatToParts(new Date(iso));
   return Object.fromEntries(parts.map((part) => [part.type, part.value]));
 }

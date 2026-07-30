@@ -111,8 +111,20 @@ export function rosterProgress({ roster = [], enrollments = [], steps = [], next
 // instant into the zone's wall clock and reading that clock back as if it were
 // UTC; the gap between the two IS the offset in force at that instant, which is
 // what makes the DST arithmetic below work.
+//
+// hourCycle: "h23", NOT hour12: false. `hour12` is a HINT the engine RESOLVES:
+// Node 20 resolves it to h24 and renders local midnight as "24", Node 24 resolves
+// it to h23 and renders "00". Reading 24 here makes the offset come back 24 hours
+// out, which moves the pacing day by a whole day. Do not put `hour12` back: per
+// ECMA-402 it OVERRIDES `hourCycle`, so the two cannot coexist.
+//
+// The `p.hour === "24" ? "0"` below is now BELT AND BRACES rather than the fix.
+// h23 never renders 24, so the branch is never taken; it is kept because it costs
+// nothing and still catches the value if the cycle is ever wrong again. Case 10 of
+// api/_local-day.test.mjs proves it still bites, by forcing h24 here and requiring
+// the correct answer anyway.
 function offsetMsAt(instant, tz) {
-  const p = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
     .formatToParts(instant).reduce((a, x) => (a[x.type] = x.value, a), {});
   const asUtc = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour === "24" ? "0" : p.hour), Number(p.minute), Number(p.second));
   return asUtc - instant.getTime();

@@ -116,6 +116,44 @@ jobs:
             exit 1
           fi
 
+      # `hour12` is banned in portal source. Everywhere, display included.
+      #
+      # WHY A GREP GATE AND NOT JUST TESTS. `hour12` is a HINT the engine RESOLVES,
+      # and the same ICU resolves it differently on different V8s: Node 20 gives
+      # h24 (local midnight renders "24"), Node 24 gives h23 ("00"). So on an h23
+      # runtime the mistake is INVISIBLE to any behavioural assertion - a suite can
+      # be fully green on a developer's Node 24 laptop and the code still be a day
+      # out on the Node 20 that runs here. Reading the source is the only check
+      # that works on every runtime.
+      #
+      # It bit three separate times in one day: it turned this workflow red, it put
+      # Europe/London's dashboard a day behind for the five months a year London is
+      # UTC+0, and it would have silently stopped the trial-summary cron for any
+      # academy that chose a midnight send hour. Each was fixed as an instance
+      # while the pattern stayed in the tree, which is why it kept coming back.
+      #
+      # NO ALLOWLIST. The alternative on the table was a sanctioned exception list
+      # for display-only uses; Zoran chose the flat ban, because `hour12: true` is
+      # the same unresolved hint pointing the other way (h11 is legal and renders
+      # NOON as "0:00 PM") and because a flat ban also means no user is ever shown
+      # "24:00". Test files are out of scope for the scan and only because
+      # api/_local-day.test.mjs's whole job is to pin this string's ABSENCE, so it
+      # has to be able to write it.
+      #
+      # Same rule as every other gate here: the script self-tests before it trusts
+      # a clean run, and MUTATE=probe proves that self-test bites. A control counts
+      # as caught ONLY when the run SAYS "NEGATIVE CONTROL PASSED".
+      - name: No hour12 in portal source
+        run: |
+          npm run lint:no-hour12
+          out=$(MUTATE=probe npm run --silent lint:no-hour12 2>&1) || true
+          if printf '%s' "$out" | grep -q 'NEGATIVE CONTROL PASSED'; then
+            echo "  caught   check-no-hour12 MUTATE=probe"
+          else
+            echo "::error file=bam-ghl-agent/bam-portal/scripts/check-no-hour12.mjs::MUTATE=probe did not report NEGATIVE CONTROL PASSED - the gate's self-test no longer proves it can see an hour12"
+            exit 1
+          fi
+
       # Every committed plain-node suite, discovered by GLOB rather than a list.
       #
       # WHY A GLOB. Before 2026-07-29 this workflow ran none of them. Seven suites

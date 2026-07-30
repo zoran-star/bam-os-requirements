@@ -177,7 +177,7 @@ function dayStartUnderTest(now, tz) {
   if (MUTATE === "dst") {
     let parts;
     try {
-      parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz || "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+      parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz || "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
         .formatToParts(now).reduce((a, p) => (a[p.type] = p.value, a), {});
     } catch (_) { return startOfDayIso(now, "UTC"); }
     const h = Number(parts.hour === "24" ? "0" : parts.hour), m = Number(parts.minute), s = Number(parts.second);

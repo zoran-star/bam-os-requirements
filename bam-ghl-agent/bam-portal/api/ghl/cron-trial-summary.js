@@ -71,16 +71,24 @@ export function localHour(tz, now = new Date()) {
 
 // Start/end epoch-ms of "today" in an IANA timezone (DST-safe).
 //
-// This one keeps `hour12: false` and repairs the value with `g("hour") === 24 ? 0`.
-// That guard is correct and was proven so by execution on Node 20 (an h24 runtime):
-// when ICU renders the hour as 24 it still renders the CORRECT year, month and day,
-// so mapping only the hour back to 0 is a complete repair. It is left as-is rather
-// than converted to hourCycle because it is not broken, and MUTATE=daywindow below
-// proves the guard is load-bearing rather than decorative.
+// This one ALSO asks for hourCycle "h23" now. It previously kept `hour12: false`
+// and repaired the value with `g("hour") === 24 ? 0`, on the reasoning that the
+// repair was complete so the hint did not need converting. That reasoning was
+// sound about this function and wrong about the codebase: leaving the hint in
+// place kept the pattern alive to be copied, and it was copied. The rule is now
+// the same everywhere, display included - there is no site where `hour12` is fine.
+//
+// The `g("hour") === 24 ? 0` guard is KEPT, but it is now BELT AND BRACES rather
+// than the fix. Under h23 the hour is always 00-23, so the branch is never taken
+// (proven by execution over a year-long sweep of every zone in clients.time_zone).
+// It stays because it costs nothing and still produces the right answer if the
+// cycle is ever wrong again - case 10 of api/_local-day.test.mjs proves that by
+// forcing h24 here and requiring the correct window anyway, and MUTATE=daywindow
+// proves the guard is not decorative.
 export function dayWindow(tz, now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
   }).formatToParts(now);
   const g = (t) => Number(parts.find((p) => p.type === t).value);
   const wallAsUtc = Date.UTC(g("year"), g("month") - 1, g("day"), g("hour") === 24 ? 0 : g("hour"), g("minute"), g("second"));
@@ -90,9 +98,15 @@ export function dayWindow(tz, now = new Date()) {
   return { start, end: start + 24 * 60 * 60 * 1000 };
 }
 
+// hourCycle: "h12", NOT hour12: true. Same rule, other direction: `hour12: true`
+// is the same unresolved hint and en-US happens to resolve it to h12, but h11 is
+// the other legal answer and h11 renders NOON as "0:00 PM". So the 12-hour form
+// carries a midday version of the same bug that h24 carries at midnight. Pinning
+// h12 is byte-identical to what this rendered before on every zone and instant
+// swept, and it removes the hint. The rule is: never `hour12`, either value.
 function fmtTime(iso, tz) {
   try {
-    return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
+    return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hourCycle: "h12" }).format(new Date(iso));
   } catch (_) { return ""; }
 }
 

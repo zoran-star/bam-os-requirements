@@ -11,8 +11,21 @@ export const QUIET_START_MIN = 8 * 60;        // 08:00
 export const QUIET_END_MIN = 21 * 60 + 30;    // 21:30
 
 // Minutes-since-local-midnight for `date` in `tz`.
+//
+// hourCycle: "h23", NOT hour12: false, here and in tzOffsetMinutes below.
+// `hour12` is a HINT the engine RESOLVES: Node 20 resolves it to h24 and renders
+// local midnight as "24", Node 24 resolves it to h23 and renders "00". Read as 24
+// and midnight becomes minute 1440, which is outside the window in the same
+// direction as 0 - so this function looked right while nextSendableTime, which
+// asks WHICH DAY, was a day out. Do not put `hour12` back: per ECMA-402 it
+// OVERRIDES `hourCycle`, so the two cannot coexist.
+//
+// The `% 24` is now BELT AND BRACES rather than the fix: h23 never renders 24, so
+// it is the identity. Kept because it costs nothing and still catches the value if
+// the cycle is ever wrong again; case 10 of api/_local-day.test.mjs proves it
+// still bites by forcing h24 and requiring the correct answer anyway.
 function localMinutes(date, tz) {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date);
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
   const h = Number(parts.find(p => p.type === "hour").value) % 24;
   const m = Number(parts.find(p => p.type === "minute").value);
   return h * 60 + m;
@@ -21,7 +34,7 @@ function localMinutes(date, tz) {
 // UTC offset (minutes to ADD to UTC to get local) for `tz` at the instant `date`.
 function tzOffsetMinutes(date, tz) {
   const m = {};
-  for (const p of new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(date)) m[p.type] = p.value;
+  for (const p of new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(date)) m[p.type] = p.value;
   const asUTC = Date.UTC(Number(m.year), Number(m.month) - 1, Number(m.day), Number(m.hour) % 24, Number(m.minute), Number(m.second));
   return (asUTC - date.getTime()) / 60000;
 }
