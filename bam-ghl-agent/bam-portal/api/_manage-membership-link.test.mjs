@@ -41,20 +41,24 @@
 //   4. It is DATA, not a pin: a second academy renders ITS OWN portal, GTA's appears
 //      nowhere in it, and editing a row changes the link.
 //   5. THE WIRE. The real loadClient in api/automations.js actually ASKS Postgres for
-//      stripe_portal_url, so the fact will arrive the day the migration lands - and
-//      against a schema that does NOT have it (production today) the select survives on
-//      the pending-column retry and the academy simply sends the shorter email.
+//      stripe_portal_url, in its MAIN select list, so the fact arrives - measured off
+//      the URL that reached the wire, then rendered from the row that came back. Plus
+//      the DEPLOY-ORDER constraint that follows from it being a main-list column:
+//      without the migration, that select 400s and THROWS.
 //   6. The plain-text form of the same fact, {{location.portal_link}}, is in
 //      DROP_WHEN_EMPTY, so an academy with no portal drops the mention rather than
 //      texting a member a bare gap where a link should be.
 //
 // WHAT IT DOES NOT PROVE
-//   - That clients.stripe_portal_url exists. It does not, yet; its migration belongs to
-//     the member-management build. Everything here is about behaving correctly on both
-//     sides of that migration, which is the only thing this build can be responsible
-//     for. The day it lands, section 5's stub schema is what stops describing reality -
-//     and api/_pending-client-column.test.mjs section 1 is where the column being left
-//     in the pending list after that shows up.
+//   - That clients.stripe_portal_url exists in production. Nothing in this process can
+//     see the real schema; section 5's stub answers whatever it is asked. Migration
+//     20260731T090000 adds the column and is applied BEFORE this code merges, which is
+//     a sequencing promise a suite cannot keep - section 5b records what breaks if it
+//     is not kept, which is the most a test can do about it.
+//   - The pending-column RETRY. This column does not use it any more: it is in the MAIN
+//     select lists, so a 42703 naming it correctly throws. The retry mechanism is proved
+//     generically, against synthetic columns, in api/_pending-client-column.test.mjs
+//     sections 2-5. It is deliberately not re-proved here.
 //   - That the URL is a real Stripe portal, or that it belongs to the academy whose row
 //     it is on. Nothing in the render can know that; it is an owner-entered fact.
 //   - Anything about BAM GTA's live welcome email today. GTA has no portal URL, so the
@@ -79,8 +83,8 @@
 //        worst outcome available here and the reason there is no fallback: a parent
 //        would land on a billing page that is not their academy's.
 //   MUTATE=noselect  node api/_manage-membership-link.test.mjs
-//        stripe_portal_url leaves the pending list in api/automations.js, so the column
-//        is never asked for. The template is perfect and the fact never arrives - the
+//        stripe_portal_url leaves CLIENT_COLS in api/automations.js, so the column is
+//        never asked for. The template is perfect and the fact never arrives - the
 //        29 Jul regression, restored, and the one this suite exists for.
 //   MUTATE=notoken   node api/_manage-membership-link.test.mjs
 //        location.portal_link leaves DROP_WHEN_EMPTY, so a plain-text body keeps the
@@ -188,8 +192,8 @@ const NOTOKEN = [[
   `"location.review_link", "location.portal_link"]`,
   `"location.review_link"]`]];
 const NOSELECT = [[
-  `const CLIENT_COLS_PENDING = ["stripe_portal_url"];`,
-  `const CLIENT_COLS_PENDING = [];`]];
+  `"referral_offer", "stripe_portal_url", "ghl_location_id",`,
+  `"referral_offer", "ghl_location_id",`]];
 
 // email-shells.js is the door to the template, so a template mutation needs BOTH files
 // copied: the template, and a shells copy whose import points at that copy. Anything
@@ -311,7 +315,7 @@ console.log("\n── 4. every academy renders its OWN portal, and never another
 // select list, because everything above hands clientVars a row that already has it.
 // Production does not. So this drives the REAL loadClient against a stubbed wire and
 // measures the select that reached it, then renders the row that came back.
-console.log("\n── 5. the real loadClient asks Postgres for the column, and survives not having it ──");
+console.log("\n── 5. the real loadClient asks Postgres for the column, in its MAIN select ──");
 {
   let SELECTS = [];
   let MISSING = [];
@@ -336,33 +340,44 @@ console.log("\n── 5. the real loadClient asks Postgres for the column, and s
     throw new Error(`UNSTUBBED CALL: ${u}`);
   };
 
-  // (a) THE MIGRATION HAS LANDED. The column exists, so the first read succeeds and the
-  //     value has to travel row -> select -> vars -> email with nobody carrying it by
-  //     hand. This is the day-it-lands rehearsal.
+  // (a) THE COLUMN IS IN THE MAIN LIST. One read, no retry, and the value travels
+  //     row -> select -> vars -> email with nobody carrying it by hand.
   SELECTS = []; MISSING = [];
   let row = null, threw = null;
   try { row = await AUTOMATIONS.__probe(GTA.id); } catch (e) { threw = e; }
   ok(!threw, `loadClient succeeds${threw ? ` (threw ${threw.message})` : ""}`);
   ok(String(SELECTS[0] || "").split(",").map((s) => s.trim()).includes("stripe_portal_url"),
     "the select NAMES stripe_portal_url, so the fact can actually arrive");
-  ok(!!row && row.stripe_portal_url === GTA_PORTAL, "and it lands on the row loadClient returns");
+  ok(SELECTS.length === 1, `and gets it in ONE read - it is a main-list column, not a pending one (saw ${SELECTS.length})`);
+  ok(!!row && row.stripe_portal_url === GTA_PORTAL, "it lands on the row loadClient returns");
   const live = welcomeFor(row);
   ok(live.includes(`<a href="${GTA_PORTAL}"`),
     "END TO END: the row loadClient returns renders the link, with nothing hand-fed in between");
+  // The value is NULL on every academy the day the migration lands, and that state has
+  // to travel the same route and produce the shorter email rather than anything odd.
+  SELECTS = [];
+  const nullRow = await AUTOMATIONS.__probe(GTA.id);
+  const nulled = welcomeFor({ ...nullRow, stripe_portal_url: null });
+  ok(!nulled.includes(LEAD) && !nulled.includes('href=""'),
+    "and a NULL on that same row renders the shorter email - which is every academy on day one");
 
-  // (b) PRODUCTION TODAY. The column does not exist. The select must NOT go down - that
-  //     read feeds every channel, so an unhandled 400 stops SMS too - and the email must
-  //     simply be shorter.
+  // (b) DEPLOY ORDER, recorded rather than assumed.
+  //
+  //     This is NOT a test of the pending-column retry - this column does not use it,
+  //     and the mechanism is proved generically against synthetic columns in
+  //     api/_pending-client-column.test.mjs sections 2-5. It is the consequence of NOT
+  //     using it: a main-list column that does not exist 400s, and a 42703 naming a
+  //     non-pending column correctly THROWS rather than degrading. That read feeds every
+  //     channel, so the throw stops SMS too.
+  //
+  //     Which is exactly why migration 20260731T090000 is applied BEFORE this code
+  //     merges. The ordering is a promise no suite can keep; what a suite can do is make
+  //     the cost of breaking it explicit instead of leaving it in a comment.
   SELECTS = []; MISSING = ["stripe_portal_url"];
   row = null; threw = null;
   try { row = await AUTOMATIONS.__probe(GTA.id); } catch (e) { threw = e; }
-  ok(!threw, `with the column absent from the schema the select still succeeds${threw ? ` (threw ${threw.message})` : ""}`);
-  ok(!!row, "a row still comes back, so the worker and the SMS path stay up");
-  ok(!!row && !("stripe_portal_url" in row), "the column is ABSENT from it rather than faked as null");
-  ok(SELECTS.length === 2, `one read plus exactly one pending-column retry (saw ${SELECTS.length})`);
-  const today = row ? welcomeFor(row) : "";
-  ok(!today.includes(LEAD) && !today.includes('href=""'),
-    "and today's email is simply the shorter one: no sentence, no dead anchor");
+  ok(!!threw, "without the migration the select THROWS - loudly, not silently degraded");
+  ok(!row && SELECTS.length === 1, `and is not retried, because the column is not pending (saw ${SELECTS.length} read)`);
 }
 
 // ─── 6. the plain-text form drops its mention ────────────────────────────────

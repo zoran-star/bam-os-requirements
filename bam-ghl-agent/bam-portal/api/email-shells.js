@@ -224,15 +224,19 @@ export function clientVars(client) {
     location_community_url: c.community_group_url || "",
     location_community_platform: communityPlatformLabel(c.community_group_platform),
     location_review_url: c.google_review_url || "",
-    // The academy's Stripe billing portal (migration for clients.stripe_portal_url is
-    // NOT APPLIED YET - it is owned by the member-management build). A row read before
-    // it lands simply has no such property, which reads as absent and renders as
-    // nothing: the welcome email's manage-membership sentence does not appear. Nothing
-    // throws. The column is asked for through the PENDING list in all three select
-    // sites (CLIENT_COLS_PENDING in api/automations.js and api/agent-confirm.js,
-    // SENDER_COLS_PENDING in api/_send.js), so the 42703 it earns until the migration
-    // lands is caught and retried without it rather than taking the select down.
-    // NO FALLBACK, for the same reason as every other link fact here.
+    // The academy's Stripe billing portal (clients.stripe_portal_url, migration
+    // 20260731T090000, applied BEFORE this code merged). It is named by all three main
+    // select lists - CLIENT_COLS in api/automations.js and api/agent-confirm.js,
+    // SENDER_COLS in api/_send.js - because a column read here and selected by nobody
+    // arrives undefined and renders as nothing, silently, which is the 29 Jul 2026
+    // regression. api/_email-select-coverage.test.mjs fails naming any list that
+    // forgets it.
+    //
+    // Every academy's value is NULL today, and that is a real state rather than a gap
+    // to fill in with something: no portal on file means the welcome email's
+    // manage-membership sentence does not render at all. NO FALLBACK, for a sharper
+    // reason than the other link facts here - a borrowed billing portal shows a parent
+    // somebody else's subscriptions.
     location_portal_url: c.stripe_portal_url || "",
     // The footer's two identity facts (migration 20260729T230000, not applied yet).
     // Absent on a row read before it lands, which reads as "this academy has no

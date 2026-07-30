@@ -260,7 +260,8 @@ async function moduleWithLoadClient(rel, edits = []) {
 // ⚠️ THE PINS ARE DERIVED, NOT `= [];` (31 Jul 2026). Every pin in this file used to
 // assume the pending arrays were EMPTY, which held for exactly as long as the mechanism
 // went unused. The first time a column actually had to ship ahead of its migration
-// (stripe_portal_url, for the welcome email's manage-membership link) all of them broke
+// (stripe_portal_url, for the welcome email's manage-membership link - since moved into
+// the main lists by migration 20260731T090000) all of them broke
 // at once - i.e. this suite was pinned to the mechanism being idle, and went down the
 // moment it was needed, which is the worst possible time for a safety net's test to
 // stop running. So the pin is now whatever the file DECLARES today, read out of the
@@ -404,13 +405,15 @@ for (const [label, loadClient] of REAL_LOADERS) {
 {
   // The pending arrays are PRESENT, READABLE and AGREED.
   //
-  // "EMPTY" was the assertion until 31 Jul 2026, and it was never the real requirement -
-  // it was a description of a quiet week. The requirement is that the mechanism is
-  // intact and that the three lists say the same thing, and that survives the mechanism
-  // being used. (What "empty" was really guarding, a column left parked after its
-  // migration lands, is not visible from here at all: nothing in this process knows the
-  // schema. What IS visible is a column in the main list AND the pending list, which is
-  // the same mistake one step further along - and that is checked below.)
+  // "EMPTY" was the assertion until 31 Jul 2026. All three lists ARE empty again today,
+  // so it would still pass - but it was never the real requirement, it was a description
+  // of a quiet week, and it broke the one afternoon a column genuinely had to ship ahead
+  // of its migration. The requirement is that the mechanism is intact and that the three
+  // lists say the same thing, and that survives the mechanism being USED. (What "empty"
+  // was really guarding, a column left parked after its migration lands, is not visible
+  // from here at all: nothing in this process knows the schema. What IS visible is a
+  // column in the main list AND the pending list, which is the same mistake one step
+  // further along - and that is checked below.)
   //
   // AGREED matters on its own. clientVars() turns ONE row into the merge vars every
   // message renders from, and all three of these paths render from their own read of
@@ -440,14 +443,22 @@ for (const [label, loadClient] of REAL_LOADERS) {
 }
 
 // ─── 1b. the SHIPPED pending column, against a schema that does not have it ──
-// Section 2 injects a SYNTHETIC column, because for most of this suite's life there was
-// no real one to aim at. There is one now, and it deserves its own pass: the shipped
-// list, on the shipped modules, against a stub schema that does NOT carry it - which is
-// production today, until the member-management build's migration for
-// clients.stripe_portal_url lands. The synthetic run proves the mechanism; this one
-// proves the mechanism is aimed at the right column and is load-bearing right now. If
-// it goes red, every automation email is failing at its first select.
+// Section 2 injects a SYNTHETIC column, which proves the MECHANISM. This section is the
+// other question: whichever REAL column is pending right now, does the shipped list
+// actually carry the academy through production as it stands today? If it goes red,
+// every automation email is failing at its first select.
+//
+// ⚠️ IT IS DORMANT WHENEVER THE PENDING LIST IS EMPTY, which is most of the time and is
+// the case today (stripe_portal_url shipped pending on 31 Jul 2026 and moved into the
+// main lists the same day, once migration 20260731T090000 was applied ahead of the
+// merge). A section that silently does not run is the kind of green nobody should be
+// reading as coverage, so the ELSE branch SAYS SO on every run rather than leaving the
+// output looking identical either way.
 const SHIPPED_PENDING = (pendingDecl("automations.js", "CLIENT_COLS_PENDING") || { list: [] }).list;
+if (!SHIPPED_PENDING.length) {
+  console.log("\n── 1b. SKIPPED: no column is pending today, so there is no real one to aim at ──");
+  console.log("     (the mechanism itself is covered against synthetic columns in sections 2-5)");
+}
 if (SHIPPED_PENDING.length) {
   console.log(`\n── 1b. the SHIPPED pending column(s) [${SHIPPED_PENDING.join(", ")}], absent from the schema ──`);
   for (const [label, loadClient] of REAL_LOADERS) {

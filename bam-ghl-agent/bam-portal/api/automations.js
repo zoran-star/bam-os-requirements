@@ -83,7 +83,7 @@ async function sb(path, init = {}) {
 const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email", "phone",
   "business_email", "tagline", "instagram_url",
   "address", "time_zone", "website_setup", "community_group_url", "community_group_platform",
-  "google_review_url", "online_programs_url", "referral_offer", "ghl_location_id",
+  "google_review_url", "online_programs_url", "referral_offer", "stripe_portal_url", "ghl_location_id",
   "ghl_access_token", "ghl_refresh_token", "ghl_token_expires_at", "ghl_kpi_config"];
 
 // ⚠️ THE ONE EXCEPTION TO THE RULE ABOVE, and the only thing that makes it safe:
@@ -97,29 +97,33 @@ const CLIENT_COLS = ["id", "business_name", "public_name", "owner_name", "email"
 // this problem (_bbHydrateClientCols in public/client-portal.html): ask, and on the
 // column error ask again without the column that does not exist.
 //
-// ⚠️ THIS IS A SAFETY NET, NOT A PARKING SPOT.
+// ⚠️ INTENTIONALLY EMPTY, AND DELIBERATELY NOT DELETED.
 //
-// business_email (20260729T210000) and tagline / instagram_url (20260729T230000) are
+// Empty because nothing is pending: business_email (20260729T210000), tagline /
+// instagram_url (20260729T230000) and stripe_portal_url (20260731T090000) are all
 // applied to production and have moved up into CLIENT_COLS. A column belongs here ONLY
-// while its migration is pending: anything left here after its migration lands costs
-// one wasted 400 per uncached read for as long as it is wrong.
+// while its migration is pending - this is a safety net, not a parking spot, and
+// anything left here costs one wasted 400 per uncached read for as long as it is wrong.
 //
-// This list plus the retry below it IS how a column ships before its migration lands,
-// and that is a recurring need, not a one-off. The version that gets rebuilt in a hurry
-// is the one that peels off only the column PostgREST NAMED - which is lethal at two
-// pending columns (see the retry's comment). The retry is safe at any number of pending
-// columns as written. Add a column name here, note its migration file on a comment
-// line, and move it into CLIENT_COLS the day it lands.
+// ⚠️ AND THAT COST IS NOT A ROUNDING ERROR, which is the lesson stripe_portal_url paid
+// for. It shipped here first, correctly and with the retry working exactly as designed,
+// and the orchestrator's ruling on 31 Jul 2026 was still that the shape was wrong: the
+// retry logs a warning on EVERY send while it holds, and a warning that fires correctly
+// and forever is one people learn to scroll past. So this list is for the window
+// between writing a read and applying its migration, measured in hours, not for the
+// window between shipping a feature and someone getting round to the SQL. If the
+// migration cannot be applied first, that is the thing to fix.
 //
-// PENDING TODAY:
-//   stripe_portal_url  the academy's Stripe billing portal, read by clientVars() in
-//                      api/email-shells.js for the welcome email's manage-membership
-//                      line (Zoran, 31 Jul 2026). Its migration is owned by the member
-//                      -management build and is NOT APPLIED, so every read of this
-//                      select earns one 42703 and one retry until it is - which is the
-//                      documented cost of shipping the read first. Move it into
-//                      CLIENT_COLS the day that migration lands.
-const CLIENT_COLS_PENDING = ["stripe_portal_url"];
+// Not deleted because this list plus the retry below it IS how the next column ships
+// before its migration lands, and that is a recurring need, not a one-off. Deleting
+// it means rebuilding it under time pressure next time, and the version that gets
+// rebuilt in a hurry is the one that peels off only the column PostgREST NAMED -
+// which is lethal at two pending columns (see the retry's comment). The retry is
+// safe at any number of pending columns as written. Add a column name here, note its
+// migration file on a comment line, and move it into CLIENT_COLS the day it lands.
+// api/_pending-client-column.test.mjs proves the machinery still works by injecting a
+// synthetic pending column, so it stays provable with this list empty.
+const CLIENT_COLS_PENDING = [];
 
 // Does THIS error blame a pending column? Returns the blamed one(s) for the log,
 // but the RETRY DROPS THE WHOLE PENDING LIST - see why below.

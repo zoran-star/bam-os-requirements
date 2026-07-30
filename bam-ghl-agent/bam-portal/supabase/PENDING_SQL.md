@@ -15,6 +15,7 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
 | Migration file | What it does | Blocked features until applied | Added |
 |---|---|---|---|
+| `20260731T090000_clients_stripe_portal_url.sql` | Adds `clients.stripe_portal_url text` (nullable, no backfill). ONLY the column - the `receipts` build owns the wider receipt system and will declare it again; `IF NOT EXISTS` so whichever runs second is a no-op | The welcome email's manage-membership link (PR #1666). **Must be applied BEFORE that PR merges**: the code reads the column from the MAIN select lists (`CLIENT_COLS` in `api/automations.js` + `api/agent-confirm.js`, `SENDER_COLS` in `api/_send.js`), so merging first would 400 the clients read that feeds EVERY channel, SMS included. Additive and unread until the merge, so applying first is inert | 2026-07-31. **The orchestrator is applying this one directly**, per Zoran's 2026-07-31 ruling that the pending-column retry (one wasted 400 plus a warning line on every send, forever) is not an acceptable substitute for shipping the column. Not for `/pending-sql` |
 
 
 > **`20260729T230000` step 2 - DONE 2026-07-30.** The follow-up this note demanded is
