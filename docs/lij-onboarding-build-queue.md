@@ -4,6 +4,41 @@ Live queue of everything the San Jose onboarding surfaces. Onboarding spans days
 
 **Started 2026-07-25.**
 
+## 📏 NEW RULE, EARNED 2026-07-30 EVENING: **AN ALLOWLIST THAT GOES QUIET TURNS A KNOWN PROBLEM INTO AN UNKNOWN ONE.**
+
+From the identity gate the templating room shipped in `ec9b843`. **83 banned values DERIVED at runtime from the two committed academy snapshots across 19 named fields, against 284 default bodies found by WALKING the exported structures rather than naming sections.** Snapshot a third academy and coverage widens with no edit; add a section tomorrow and it is covered the day it lands. **Every previous check was one literal wide, which is why five identity leaks passed all of them.**
+
+**The design property worth stealing everywhere: the allowlist distinguishes NOT_A_LEAK from DEFERRED, and every DEFERRED entry PRINTS ON EVERY RUN INCLUDING A GREEN ONE.** So a green suite cannot be read as "no leaks". It reads as "no leaks except the ones we are knowingly shipping, and here they are."
+
+This is the strongest form yet of the enforced-inventory antidote, and it closes a gap the antidote had: **an inventory that fails on divergence still says nothing about what we deliberately ship broken.** Applies directly to the two live exemptions in `check-testimonial-hardcodes.mjs`, which already print their count for the same reason.
+
+**`booking_group` is the only DEFERRED entry**, and its reason is recorded in the gate's OUTPUT rather than in a comment somebody has to go and find. **That makes the route-by-actual-age build's finish condition mechanical: it is done when the gate has zero DEFERRED entries**, not when someone judges the leak closed.
+
+## ⚠️ THE `booking_group` LEAK IS SIX COPIES, NOT FOUR (AUTOMATION TEMPLATING III, 2026-07-30, in its name)
+
+**The orchestrator briefed it as "three tool schemas, four copies total". Executed against `main`, it is six:**
+
+| file:line | copy |
+|---|---|
+| `api/agent/prompt-structure.js:358` | the `booking_group` body itself |
+| `api/agent-approvals.js:133` | `book_group` tool schema |
+| `api/agent-approvals.js:135` | `propose_group` tool schema |
+| `api/agent-approvals.js:151` | `group` tool schema |
+| `api/agent/booking.js:104-105` | the regex deciding the group from a calendar NAME |
+| `api/agent/prompt-structure.js:288` | the `program` body: "Adult classes: Group 2 (older group) only" |
+
+**The sixth is the interesting one and it is a different kind:** it sits in the `program` section, which **does** have a renderer, so a per-academy fact can PARTIALLY displace it while the other five cannot be displaced at all. **A half-displaced copy is worse than an undisplaced one**, because the academy looks configured. The room is confirming it by RENDERING rather than reading before it reaches the plan, which is the right order.
+
+**Confirmed as briefed:** `booking_group` appears ZERO times in `fact-render.js`.
+
+## ⚠️ ORCHESTRATOR ERROR, SAME EVENING: **I TREATED A HANDOVER DOCUMENT AS PROOF A ROOM HAD STOPPED.**
+
+I read AUTOMATION TEMPLATING II's handover file, concluded it was finished, and **detached its worktree to free the branch for its successor while it was mid-build.** Zoran corrected me. The branch is back with it; its HEAD had never moved off `2cffb75`, so both uncommitted files survived, and the successor's worktree was clean and was removed.
+
+**A handover file is a room saying what it INTENDS to hand over. It is not the room saying it has stopped.** The only thing that establishes that is asking the room. **This is house rule 8 applied to a document rather than a test: a thing trusted because it exists, not because it was connected to the outcome it claims** - and I did it to a room's own artifact, hours after inheriting the rule that names it.
+
+**Consequence that outlived the error, and it is the useful half: PR #1656 has grown since anyone looked at it.** It is now NINE commits (`ec9b843` added after the handover was written), so **the PR being held for the venue-entry-note migration is no longer the PR that was last reviewed.** Anyone reasoning about its merge order must re-read it. Found by III checking my description of II against the remote rather than accepting it.
+
 ## ORCHESTRATOR HANDOVER 2026-07-30 evening. MISTER_ORCHESTRATOR III holds the role.
 
 Nothing moved. This file, `board/data.json` and `board/rooms/*.json` stay in worktree `agent-teams-access-6ba23e`, the board still serves on port 4599, every room keeps the same paths and the same house rules. Role continuity doc: [orchestrator-handoff.md](orchestrator-handoff.md).

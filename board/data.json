@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · orchestrator III up, templating II still building",
+ "updated": "2026-07-30 · templating II shipped the identity gate, III is planning behind it",
  "recentUpdates": [
-  "MISTER_ORCHESTRATOR III is up. Same queue file, same board, same house rules. Nothing changed for any chat",
-  "AUTOMATION TEMPLATING III is spawned and briefed, holding until II finishes its current build",
-  "My error, corrected: I read II's handover file and assumed it had stopped. It is still building. Branch given back, nothing lost",
+  "The identity gate is in: it checks 284 default messages against 83 real academy values, and widens by itself when a new academy is snapshotted",
+  "Best part: it PRINTS what we knowingly ship broken, on every green run. A green result can no longer be misread as no leaks",
+  "Exactly one thing is on that knowingly-broken list: GTA's age groups. That is now the next build, and its finish line is that list hitting zero",
+  "III checked my brief against the code and found SIX copies of those age groups, not four. One of them can be half-fixed, which is worse than not fixed",
   "TWO San Jose launch blockers found and verified: its own site is locked out of the portal, and its funnel would capture leads into a void",
-  "San Jose's 5 real testimonials are correct and would still fail to show in production, because its domain is not allowlisted",
-  "Templating handed over. A chip is open for the next orchestrator, whose first job is starting its successor"
+  "San Jose's 5 real testimonials are correct and would still fail to show in production, because its domain is not allowlisted"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
@@ -722,7 +722,7 @@
    "sidebar": "AUTOMATION TEMPLATING III",
    "state": "orange",
    "column": null,
-   "one": "Briefed and waiting. Next up: route a kid to a class by real age instead of GTA's age groups",
+   "one": "Planning the age-routing fix off main while it waits. Already enlarged the job from four copies to six",
    "builds": [
     "t-convergence"
    ],
@@ -902,7 +902,7 @@
    "sidebar": "AUTOMATION TEMPLATING II",
    "state": "white",
    "column": null,
-   "one": "Still building: the gate that catches one academy's identity inside any shared default"
+   "one": "Shipped the identity gate over every shared default. Pull request is now 9 commits and the newest is unreviewed"
   },
   {
    "name": "GTA enroll funnel bug",
