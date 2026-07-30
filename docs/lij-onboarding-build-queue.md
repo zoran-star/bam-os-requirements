@@ -4,7 +4,44 @@ Live queue of everything the San Jose onboarding surfaces. Onboarding spans days
 
 **Started 2026-07-25.**
 
-## 📏 NEW RULE, EARNED 2026-07-30 EVENING: **AN ALLOWLIST THAT GOES QUIET TURNS A KNOWN PROBLEM INTO AN UNKNOWN ONE.**
+## ✅ [PR #1656](https://github.com/zoran-star/bam-os-requirements/pull/1656) MERGED 2026-07-30 19:10 UTC, ON ZORAN'S INSTRUCTION. BOTH MIGRATIONS APPLIED FIRST, AND THE ORDER WAS THE CORRECTION.
+
+**Nine commits. The gym-door leak is now closed in production**, along with the name tokenizing, the four-confirmation-email footer fix, the shared-default fallback removal and the identity gate.
+
+**Applied by the orchestrator BEFORE the merge, verified by reading production back rather than by trusting the success flag:**
+- `20260730T160000_locations_entry_note.sql` - **exactly ONE row seeded** (GTA, 1079 Linbrook Rd). GTA's second venue (Mildred's) and BOTH San Jose venues correctly NULL, exactly as the migration's own comments promised.
+- `20260730T120000_step_rows_render_the_academy_name.sql` - **all three md5 guards checked against production BEFORE applying**, so the update was known to hit all three rows rather than silently hitting none. After: all three carry `{{location.name}}`, zero literals left.
+
+**⚠️ MERGE-ORDER CORRECTION, AGAINST THE TEMPLATING ROOM'S FRAMING AND AGAINST MY OWN AMBIGUOUS WORDING THAT CAUSED IT.** The room read my note as "merge, verify the deploy, then apply the migration", and defended the resulting gap as a deliberate trade: *"until the migration lands NO academy sends an entry sentence, including GTA. The alternative was 26 academies describing a door in Oakville, so silence is the better failure."*
+
+**The trade is real but it is AVOIDABLE, and it was avoided.** `locations.entry_note` is purely additive and **the pre-merge code never read the column**, so applying it first is completely inert. **The leak ends at the MERGE in either order**, because that is when the code that stops sending GTA's door deploys. So migration-first has the identical leak duration AND no window where GTA loses its own entry sentence. **Migration-first strictly dominates; there was nothing to trade.**
+
+**This is already the house precedent and I should have said so plainly rather than in shorthand.** The ledger's own row for `20260729T210000_clients_business_email.sql` reads *"Applied BEFORE the merge deliberately: the code drops GTA's hardcoded email, so deploying first would have held every academy's automation email."* Same shape, same answer, five days apart. **The general rule: when the migration is additive and the pre-merge code cannot read it, migration-first is free. Only reach for the "which failure is better" question when the two genuinely cannot be ordered.**
+
+**Ledger rows MOVED to APPLIED in [#1657](https://github.com/zoran-star/bam-os-requirements/pull/1657), merged.** This is the duty a previous orchestrator recorded failing: applying a migration and leaving its row in PENDING, so main goes on telling the next person to re-apply it.
+
+**✅ POST-MIGRATION SWEEP DONE**, per the standing duty that applying a migration promotes every "do X once migration Y is applied" comment into an outstanding defect. **Four hits, three of them the graceful kind that do not rot. One real, and it is stale in the HARMLESS direction:** `api/_entry-note.test.mjs:88` says *"a green run here means 'once the migration lands' and not 'today'"*. **The migration has now landed, so that caveat is wrong and it UNDERSTATES the suite.** A comment that undersells a control is not a defect, but it invites the next reader to distrust a check that is now fully live. One-line fix, not scheduled.
+
+**Checked and clean, rather than assumed:** `scripts/snapshots/bam-gta.json` already carried the tokenized form for exactly those three rows, so **production caught UP to the snapshot rather than drifting from it.** Applying that migration did not desynchronize the GTA message lock; it synchronized it.
+
+## ⛔ STILL PENDING AND DELIBERATELY UNTOUCHED: `20260730T120000_public_ticket_intake.sql`
+
+Not part of #1656. **The public support form at `/ticket` has NEVER created a ticket - 213 exist, ZERO from that form** - and `api/public-ticket.js` 500s on every submit until this runs. Nothing lies and nothing is lost (the form shows an honest failure screen with an email fallback), but **it is the last thing standing between a person and a working support form.** Needs one word from Zoran.
+
+## ⚠️⚠️ THE PARENT-FACING NAMES HAVE BOTH MOVED, AND THIS FILE STILL ASSERTS THE OLD ONES (orchestrator-queried from production, 2026-07-30 evening)
+
+| | this file says | **production, queried tonight** |
+|---|---|---|
+| BAM GTA `public_name` | "By Any Means Basketball" | **"By Any Means Toronto"** |
+| BAM San Jose `public_name` | "By Any Means Basketball" | **"By Any Means San Jose"** |
+
+**Both halves of the 2026-07-28 ruling are now false on the ground.** That ruling said San Jose's `public_name` is `"By Any Means Basketball"`, the same string GTA renders, with the city living in the domain and the footer.
+
+**The consequence that matters, because it is quoted as a standing instruction in this file:** *"the name is no longer a discriminator between GTA and San Jose, they now render the identical string, never use the parent-facing name as the identity discriminator in an assertion."* **The two names now differ again**, so anything reasoning from that sentence is reasoning from a dead world. **The instruction is still SAFE to follow (using `email_domain` or `owner_name` remains correct), but its stated REASON is wrong**, and a reason that is wrong is how a rule gets discarded by the next person who checks it.
+
+**This is house rule 7's third form arriving in the queue file itself rather than in a test:** an assertion whose premise can no longer arise, sitting in the document everyone treats as the source of truth.
+
+**What I have NOT established, and will not assert:** why they moved. The shape strongly suggests a deliberate later wave giving each academy its own city-branded public name (GTA to Toronto, San Jose to San Jose), and migration `20260730T120000`'s header states GTA's move to "By Any Means Toronto" came from `20260729T235000` and was deliberate. **San Jose's move is not documented anywhere I can find.** It is not the internal label ("BAM San Jose"), so it is not the original bug returning; it is a third value. **One confirmation from Zoran settles it. Nobody should "fix" either value back on the strength of the old ruling.**
 
 From the identity gate the templating room shipped in `ec9b843`. **83 banned values DERIVED at runtime from the two committed academy snapshots across 19 named fields, against 284 default bodies found by WALKING the exported structures rather than naming sections.** Snapshot a third academy and coverage widens with no edit; add a section tomorrow and it is covered the day it lands. **Every previous check was one literal wide, which is why five identity leaks passed all of them.**
 

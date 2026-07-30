@@ -1,21 +1,21 @@
 {
- "updated": "2026-07-30 · templating II shipped the identity gate, III is planning behind it",
+ "updated": "2026-07-30 · #1656 merged, gym-door leak closed in production",
  "recentUpdates": [
-  "The identity gate is in: it checks 284 default messages against 83 real academy values, and widens by itself when a new academy is snapshotted",
-  "Best part: it PRINTS what we knowingly ship broken, on every green run. A green result can no longer be misread as no leaks",
-  "Exactly one thing is on that knowingly-broken list: GTA's age groups. That is now the next build, and its finish line is that list hitting zero",
-  "III checked my brief against the code and found SIX copies of those age groups, not four. One of them can be half-fixed, which is worse than not fixed",
-  "TWO San Jose launch blockers found and verified: its own site is locked out of the portal, and its funnel would capture leads into a void",
-  "San Jose's 5 real testimonials are correct and would still fail to show in production, because its domain is not allowlisted"
+  "MERGED. The gym door is gone: no academy tells a parent about a door in Oakville any more, and GTA's real door now comes from its own venue",
+  "Both database changes went in BEFORE the merge, so GTA never lost its door line for a second. Verified by reading the database back, not by trusting a success message",
+  "Member management chat spawned. Tied to the offer, recurring prices first, San Jose onboards onto it once it is templatized",
+  "One thing left between a person and a working support form: the public ticket database change. Say the word and I run it",
+  "Heads up: GTA and San Jose's public names have BOTH changed in the database and our notes still say the old ones. One line from you settles it",
+  "TWO San Jose launch blockers found and verified: its own site is locked out of the portal, and its funnel would capture leads into a void"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
+   "Apply the public ticket migration? It is the ONLY thing left before the support form works. One word from you and it is done",
+   "Confirm the public names: GTA is now 'By Any Means Toronto' and San Jose is now 'By Any Means San Jose'. Our notes say both should be 'By Any Means Basketball'",
    "Two San Jose data fixes for launch: allowlist its domain, and press the entry-point seed button. Both are data, not code",
    "Decide on 2 new preset leaks: GTA's gym door in every academy's confirmation text, and GTA's age groups baked into every AI",
-   "Apply the public ticket migration, or tell me to. It is the last thing between people and a working support form",
    "Confirm 2 phone numbers (SJ business 408-597-4327, GTA 289-816-6569). They gate the design AND a risky migration behind it",
-   "Merge client-sites #167 (the skills) and #1645 (a tripwire comment). Last two of this workstream",
    "Send Lij his ask-list. Still the biggest thing you own and the biggest San Jose unblock",
    "File the Google Business Profile API application. Days to weeks, still unfiled",
    "SET UP TWILIO BITCH: 6 items, submit target Thursday, only 3 free attempts",
@@ -729,6 +729,14 @@
    "blockedBy": "AUTOMATION TEMPLATING II still holds the branch"
   },
   {
+   "name": "MEMBER MANAGEMENT TEMPLATING",
+   "sidebar": "MEMBER MANAGEMENT TEMPLATING",
+   "state": "white",
+   "column": null,
+   "one": "Just spawned. Planning what to templatize, starting with the recurring-price system GTA and San Jose both run",
+   "blockedBy": null
+  },
+  {
    "name": "SET UP TWILIO BITCH",
    "sidebar": "SET UP TWILIO BITCH",
    "state": "red",
@@ -900,9 +908,9 @@
   {
    "name": "AUTOMATION TEMPLATING II",
    "sidebar": "AUTOMATION TEMPLATING II",
-   "state": "white",
-   "column": null,
-   "one": "Shipped the identity gate over every shared default. Pull request is now 9 commits and the newest is unreviewed"
+   "state": "done",
+   "column": "done",
+   "one": "Finished and handed over cleanly. Its pull request is merged and the branch is released"
   },
   {
    "name": "GTA enroll funnel bug",
