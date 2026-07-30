@@ -41,8 +41,11 @@ import {
   classIndex, classForCalendar, classByName, identifySlotClass, slotClassKey,
   ageRoutingReadiness, routeSlots, chooseSlotToBook, buildQuestion,
   distinguishingFields, agesOverlap, parentFacingClassName, classesOf, loadClassesFor,
+  pickTrainingOffer,
 } from "./agent/_class-slots.js";
 import { classKey } from "./agent/_class-routing.js";
+import { summarizeSlots } from "./agent/booking.js";
+import { renderBookingGroup } from "./agent/fact-render.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REAL = path.join(HERE, "agent", "_class-slots.js");
@@ -320,6 +323,105 @@ console.log("\n── 11. the loader survives a bad day ──");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+console.log("\n── 12. narrowing by NOTHING is not the same as narrowing to NOTHING ──");
+{
+  // The regression an independent tester found in the Hawkeye Book-it picker.
+  // "No narrowing" was spelled as "the set of every key this academy has", which
+  // is EMPTY when the classes failed to load or were never passed - so every
+  // keyed slot was excluded and the picker offered nothing. Measured on GTA's
+  // real slots as offered=0, excluded=2.
+  for (const [label, classes] of [["never passed", undefined], ["failed to load", []]]) {
+    const r = routeSlots({ slots: GTA_SLOTS, classes, rawAge: 9 });
+    eq(idsOf(r.slots), ["g1-mon", "g2-mon"], `classes ${label}: every time is still offered, not none`);
+    eq(r.excluded, [], `classes ${label}: nothing is excluded on the strength of a list we do not have`);
+    ok(!r.armed, `classes ${label}: and the academy is correctly NOT armed`);
+  }
+  // Only a READ age that matched no class may empty the list.
+  eq(routeSlots({ slots: GTA_SLOTS, classes: GTA, rawAge: 8 }).slots, [],
+    "an age we DID read that fits nothing is the one case that offers nothing");
+  // The calendar still narrows on its own, with or without an age.
+  eq(idsOf(routeSlots({ slots: GTA_SLOTS, classes: GTA, rawAge: "?", calendarLabel: GTA_CALS[1].label }).slots),
+    ["g2-mon"], "a calendar narrows to its class even when nothing else does");
+}
+
+console.log("\n── 13. summarizeSlots takes either shape, and nonsense from neither ──");
+{
+  const days = { "2026-08-03": ["2026-08-03T19:00:00-04:00"], "2026-08-04": ["2026-08-04T19:00:00-04:00"] };
+  eq(summarizeSlots(days, 24).length, 2, "the bare day map, as three callers pass it");
+  eq(summarizeSlots({ timezone: "America/Toronto", days, routing: null }, 24).length, 2,
+    "and freeSlots' whole envelope, as the Book-it picker passed it - it used to throw into a bare catch");
+  eq(summarizeSlots({ timezone: "America/Toronto", days, routing: null }, 24), summarizeSlots(days, 24),
+    "both shapes give the SAME answer, which is what makes accepting both safe");
+  eq(summarizeSlots({ "2026-08-03": "not-a-list" }, 24), [],
+    "a day whose value is not a list yields nothing - a string must never be iterated into characters");
+  eq(summarizeSlots(null), [], "and nothing at all is an empty list, not a throw");
+}
+
+console.log("\n── 14. a class name that matches two classes matches neither ──");
+{
+  // classKey() gives colliding titles distinct keys by POSITION, so the two are
+  // real and separate rows - but their TITLE cannot tell them apart, and .find
+  // silently returned the first.
+  const twins = [
+    { title: "Skills", age_min: 8, age_max: 11, age_max_mode: "Set an oldest age" },
+    { title: "Skills", age_min: 12, age_max: 15, age_max_mode: "Set an oldest age" },
+  ];
+  const idx = classIndex(twins);
+  eq(idx.map((c) => c.key), ["skills", "skills-2"], "the two rows do get distinct keys");
+  eq(classByName("Skills", idx), null, "but the shared TITLE resolves to neither, rather than to whichever came first");
+  eq(classByName("skills-2", idx).key, "skills-2", "the KEY still resolves, because keys are unambiguous by construction");
+  eq(classByName("Group 1", classIndex(GTA)).key, "group-1", "and a title only one class has is unaffected");
+}
+
+console.log("\n── 15. which training offer the classes come from ──");
+{
+  // DETAIL Miami, as production has it: nine training offers, exactly one with
+  // classes, and it wins today only because it happens to sit at sort_order -1.
+  // The populated offer is given the LAST id on purpose. With it first, "chosen
+  // for having classes" and "chosen for sorting first" produce the same answer
+  // and the assertion cannot tell them apart.
+  const miami = [
+    { id: "z9", sort_order: -1, data: { schedule: { classes: MIAMI } } },
+    ...["a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8"].map((id) => ({ id, sort_order: 0, data: {} })),
+  ];
+  eq(pickTrainingOffer(miami).id, "z9", "Miami's one populated offer is chosen");
+  const flattened = miami.map((o) => ({ ...o, sort_order: 0 }));
+  eq(pickTrainingOffer(flattened).id, "z9",
+    "and it is STILL chosen when sort_order is normalised to 0, though it now sorts LAST - it wins for having classes, not for sorting first");
+  eq(pickTrainingOffer([...flattened].reverse()).id, "z9", "regardless of the order the database returns them in");
+
+  // GAME Winner: four offers, ALL populated. Nothing in the data can say which,
+  // so the requirement is only that the answer never moves.
+  const gw = [
+    { id: "w4", sort_order: 0, data: { schedule: { classes: [{ title: "D" }] } } },
+    { id: "w1", sort_order: 0, data: { schedule: { classes: [{ title: "A" }] } } },
+    { id: "w3", sort_order: 0, data: { schedule: { classes: [{ title: "C" }] } } },
+  ];
+  eq(pickTrainingOffer(gw).id, "w1", "an all-populated tie breaks on id, deterministically");
+  eq(pickTrainingOffer([...gw].reverse()).id, "w1", "and gives the same answer whatever order they arrive in");
+  eq(pickTrainingOffer([]), null, "no training offers is no offer");
+  eq(pickTrainingOffer([{ id: "x", sort_order: 0, data: {} }]).id, "x",
+    "one offer with no classes is still returned - the caller then correctly reads zero classes");
+
+  const loaded = await loadClassesFor(async () => flattened, "c1");
+  eq(loaded.length, 1, "loadClassesFor lands on the populated offer end to end");
+}
+
+console.log("\n── 16. the fact and the routing read the classes the SAME way ──");
+{
+  // Two readers of one fact disagreeing is the divergence this build exists to
+  // remove, so the legacy top-level shape is asserted through BOTH of them.
+  const legacy = { classes: GTA };
+  eq(classesOf(legacy).length, 2, "the resolver reads the older top-level data.classes shape");
+  ok(ageRoutingReadiness(classesOf(legacy)).armed, "and arms that academy");
+  const rendered = renderBookingGroup(legacy);
+  ok(!!rendered && rendered.includes("Group 1: ages 9 to 13"),
+    "and the agent's own booking fact renders the same classes, rather than saying none are set up");
+  const modern = renderBookingGroup({ schedule: { classes: GTA } });
+  eq(rendered, modern, "both offer shapes render byte-identically, which is what one reader buys");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // NEGATIVE CONTROLS
 // ─────────────────────────────────────────────────────────────────────────────
 // A control writes a MUTATED COPY of the real module beside it, imports that,
@@ -328,14 +430,28 @@ console.log("\n── 11. the loader survives a bad day ──");
 // state that can genuinely arise: four of the six are the shortcuts a future
 // session would reach for, and two are the shape this build's own predecessor
 // had.
+//
+// Most mutate api/agent/_class-slots.js. Three do not, and say so with `src`,
+// because the bug they model does not live there: two readers of one fact can
+// only diverge if they are two different files.
 const CONTROLS = {
-  // THE ONE THAT MATTERS MOST. Fix only the write path and leave the offer
-  // unfiltered. Every write-side test still passes, the build looks finished, and
-  // a 9 year old is still shown the 8pm class, picks it, and is booked into it
-  // correctly and precisely.
+  // MUTATE=offer. THE ONE THAT MATTERS MOST. Fix only the write path and leave
+  // the offer unfiltered. Every write-side test still passes, the build looks
+  // finished, and a 9 year old is still shown the 8pm class, picks it, and is
+  // booked into it correctly and precisely.
+  //
+  // RE-ANCHORED after the eligible-is-null fix, which deleted the line this used
+  // to edit. It went STALE rather than passing, which is the mechanism working:
+  // the most consequential control in this file was silently disarmed by an
+  // unrelated bug fix, and the harness said so instead of printing a banner.
+  // Anchor it on the assignment that means "no narrowing" so any future change to
+  // that idea trips this again.
   offer: (s) => s.replace(
-    "  if (calClass) eligible = new Set([...eligible].filter((k) => k === calClass));",
-    "  if (calClass) eligible = new Set([...eligible].filter((k) => k === calClass));\n  eligible = new Set(idx.map((c) => c.key));",
+    "  let eligible = null;",
+    "  let eligible = null;\n  const _unfiltered = true;",
+  ).replace(
+    "    if (eligible === null || eligible.has(id.key)) offered.push(s);",
+    "    if (_unfiltered || eligible === null || eligible.has(id.key)) offered.push(s);",
   ),
   // MUTATE=gate. The arming gate deleted: every academy routes by age whether or
   // not its owner has set any. DETAIL Miami's one class is unconfigured, so it
@@ -377,6 +493,55 @@ const CONTROLS = {
     "    dimension: top ? top.field : null,",
     "    dimension: \"age\",",
   ),
+  // MUTATE=nonarrow. The Book-it picker regression, at its root: "narrow by
+  // nothing" spelled as the set of all known keys, which is empty when the
+  // classes did not load, so every keyed slot was excluded.
+  nonarrow: (s) => s.replace(
+    "  let eligible = null;",
+    "  let eligible = new Set(idx.map((c) => c.key));",
+  ),
+  // MUTATE=namedupe. classByName back to .find, so two classes sharing a title
+  // resolve to whichever the array happens to hold first.
+  namedupe: (s) => s.replace(
+    "  const exact = index.filter((c) => norm(c.title) === n);\n  if (exact.length === 1) return exact[0];\n  if (exact.length > 1) return null;",
+    "  const exact = index.find((c) => norm(c.title) === n);\n  if (exact) return exact;",
+  ),
+  // MUTATE=offerpick. The offer choice back to "first in order", dropping the
+  // prefer-classes rule. Miami then answers with one of its eight empty offers
+  // the moment anybody normalises sort_order, and the academy silently has no
+  // classes.
+  offerpick: (s) => s.replace(
+    "  return ordered.find((o) => classesOf(o.data).length > 0) || ordered[0];",
+    "  return ordered[0];",
+  ),
+  // MUTATE=envelope. summarizeSlots back to accepting only the bare day map. The
+  // envelope then throws "slots is not iterable" into a bare catch, which is
+  // exactly how the picker stayed empty without anyone noticing.
+  envelope: {
+    src: "booking",
+    // BOTH halves revert, and the first attempt at this control reverted only
+    // the first. The `Array.isArray` guard on its own turned the envelope into an
+    // empty list instead of a throw, so the control reported nothing wrong while
+    // the picker would still have been silently empty. A control has to restore
+    // the whole original shape or it measures the half it happened to pick.
+    edit: (s) => s.replace(
+      `  const src = (slotsByDay && typeof slotsByDay === "object" && slotsByDay.days && typeof slotsByDay.days === "object")\n    ? slotsByDay.days : slotsByDay;`,
+      "  const src = slotsByDay;",
+    ).replace(
+      "  for (const [, slots] of Object.entries(src || {})) { if (!Array.isArray(slots)) continue; for (const iso of slots) flat.push(iso); }",
+      "  for (const [, slots] of Object.entries(src || {})) for (const iso of slots) flat.push(iso);",
+    ),
+  },
+  // MUTATE=tworeaders. renderBookingGroup back to reading data.schedule.classes
+  // itself. The routing and the agent's own fact then disagree about the same
+  // academy.
+  tworeaders: {
+    src: "fact-render",
+    edit: (s) => s.replace(
+      "  const classes = classesOf(data);",
+      "  const classes = arr(data && data.schedule && data.schedule.classes);",
+    ),
+  },
 };
 
 // Each control's proof: run these against the mutant and at least one must throw.
@@ -402,6 +567,44 @@ function checkCaught(M) {
       const r = M.routeSlots({ slots: SJ_SLOTS, classes: SJ, rawAge: 9 });
       if (r.decision !== "multiple" || r.slots.length !== 2) {
         throw new Error(`a 9 year old in San Jose got ${r.slots.length} option(s) and decision=${r.decision} - one class was chosen for them`);
+      }
+    },
+    nonarrow: () => {
+      const r = M.routeSlots({ slots: GTA_SLOTS, classes: [], rawAge: 9 });
+      if (r.slots.length !== 2) {
+        throw new Error(`with the classes unavailable the parent is offered ${r.slots.length} of 2 times - an empty list of classes excluded every slot instead of narrowing by nothing`);
+      }
+    },
+    namedupe: () => {
+      const twins = [{ title: "Skills" }, { title: "Skills" }];
+      const hit = M.classByName("Skills", M.classIndex(twins));
+      if (hit !== null) throw new Error(`a title two classes share resolved to "${hit.key}" instead of to nothing`);
+    },
+    offerpick: () => {
+      // The populated offer sorts LAST by id, which is the whole point: a fixture
+      // where it also sorts first cannot tell "chosen for having classes" apart
+      // from "chosen for sorting first", and the first version of this control
+      // could not.
+      const flattened = [
+        { id: "z9", sort_order: 0, data: { schedule: { classes: MIAMI } } },
+        ...["a1", "a2"].map((id) => ({ id, sort_order: 0, data: {} })),
+      ];
+      const picked = M.pickTrainingOffer(flattened);
+      if (M.classesOf(picked.data).length === 0) {
+        throw new Error(`an offer with NO classes was chosen (${picked.id}) while a populated one was available, so the academy reads as having none`);
+      }
+    },
+    envelope: () => {
+      const days = { "2026-08-03": ["x"] };
+      let threw = null;
+      try { M.summarizeSlots({ timezone: "America/Toronto", days, routing: null }, 24); }
+      catch (e) { threw = e.message; }
+      if (threw) throw new Error(`freeSlots' own return value throws "${threw}" - straight into a bare catch, which is how the picker stayed empty`);
+    },
+    tworeaders: () => {
+      const legacy = { classes: GTA };
+      if (M.renderBookingGroup(legacy) === null) {
+        throw new Error("the agent is told no classes are set up for an academy the resolver arms and routes - two readers of one fact, disagreeing");
       }
     },
     agequestion: () => {
@@ -439,24 +642,35 @@ function checkCaught(M) {
   );
 }
 
+// Every mutant is written into api/agent/ whatever it is a copy of, so its own
+// relative imports still resolve, and is removed through handlers registered
+// before the write.
+const SOURCES = {
+  "class-slots": "_class-slots.js",
+  "booking": "booking.js",
+  "fact-render": "fact-render.js",
+};
+
 if (MUTATE) {
-  const edit = CONTROLS[MUTATE];
-  if (!edit) { console.error(`unknown MUTATE=${MUTATE}. Known: ${Object.keys(CONTROLS).join(", ")}`); process.exit(1); }
-  const src = fs.readFileSync(REAL, "utf8");
+  const control = CONTROLS[MUTATE];
+  if (!control) { console.error(`unknown MUTATE=${MUTATE}. Known: ${Object.keys(CONTROLS).join(", ")}`); process.exit(1); }
+  const edit = typeof control === "function" ? control : control.edit;
+  const srcKey = typeof control === "function" ? "class-slots" : control.src;
+  const srcFile = path.join(HERE, "agent", SOURCES[srcKey]);
+  const src = fs.readFileSync(srcFile, "utf8");
   const mutated = edit(src);
   if (mutated === src) {
-    console.log(`  ⚠️  MUTATE=${MUTATE}: the anchor it edits is gone - the control is stale.`);
+    console.log(`  ⚠️  MUTATE=${MUTATE}: the anchor it edits is gone from ${SOURCES[srcKey]} - the control is stale.`);
     process.exit(1);
   }
-  // Written into the same directory so its own relative import of the resolver
-  // still resolves, and removed through exit handlers registered before the write.
-  const tmp = path.join(HERE, "agent", `_class-slots.__mutant_${MUTATE}__.js`);
+  const tmpName = `__mutant_${MUTATE}__.js`;
+  const tmp = path.join(HERE, "agent", tmpName);
   const clean = () => { try { fs.unlinkSync(tmp); } catch (_) {} };
   process.on("exit", clean);
   process.on("SIGINT", () => { clean(); process.exit(130); });
   process.on("uncaughtException", (e) => { clean(); console.error(e); process.exit(1); });
   fs.writeFileSync(tmp, mutated);
-  const M = await import(`./agent/_class-slots.__mutant_${MUTATE}__.js`);
+  const M = await import(`./agent/${tmpName}`);
   let caught = null;
   try { checkCaught(M); } catch (e) { caught = e.message; }
   clean();

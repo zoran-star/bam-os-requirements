@@ -170,13 +170,19 @@ export { localIsoParts };
 // is what stops that, and a build that only fixed the write would have looked
 // finished and changed nothing.
 async function portalFreeSlots(clientId, { days = 14, timezone = "America/Toronto", startMs, calLabel, athleteAge, classes } = {}) {
+  // LOAD THE CLASSES WHEN THE CALLER DID NOT PASS THEM, the same way
+  // bookPortalTrial already does. A caller that forgets is not a hypothetical:
+  // the Hawkeye Book-it picker forgot, and the academy read as having no classes
+  // at all. Defaulting to a fresh read means the worst a forgetful caller gets is
+  // one extra query, never a wrong answer.
+  const cls = Array.isArray(classes) ? classes : await loadClassesFor(sbFetch, clientId);
   const start = startMs || Date.now();
   const nowIso = new Date(start).toISOString();
   const endIso = new Date(start + days * 24 * 3600 * 1000).toISOString();
   const slots = (await sbFetch(
     `schedule_slots?tenant_id=eq.${encodeURIComponent(clientId)}&is_cancelled=eq.false&start_time=gte.${encodeURIComponent(nowIso)}&start_time=lte.${encodeURIComponent(endIso)}&select=id,name,start_time,capacity,source_offer_class_key&order=start_time.asc&limit=500`
   )) || [];
-  const route = routeSlots({ slots, classes, rawAge: athleteAge, calendarLabel: calLabel });
+  const route = routeSlots({ slots, classes: cls, rawAge: athleteAge, calendarLabel: calLabel });
   const taken = await slotSpotsTakenBulk(clientId, route.slots.map(s => s.id));
   const out = {};
   for (const s of route.slots) {
@@ -331,9 +337,20 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, className, c
 }
 
 // Flatten free-slots into a short, model-friendly list of upcoming open times.
+//
+// Takes EITHER freeSlots' whole return value or just its `days` map, because one
+// caller passed the whole envelope and the difference was invisible: the object
+// has string and object values, `for...of` a string silently iterates its
+// characters, and `for...of` an object throws "slots is not iterable" straight
+// into a bare catch. The Hawkeye Book-it picker was empty for months on that.
+// Accepting both removes the trap rather than fixing the one caller who fell in.
 export function summarizeSlots(slotsByDay, max = 25) {
+  const src = (slotsByDay && typeof slotsByDay === "object" && slotsByDay.days && typeof slotsByDay.days === "object")
+    ? slotsByDay.days : slotsByDay;
   const flat = [];
-  for (const [, slots] of Object.entries(slotsByDay || {})) for (const iso of slots) flat.push(iso);
+  // A day whose value is not a list is skipped rather than iterated: the point of
+  // this guard is that a wrong shape must produce nothing, never nonsense.
+  for (const [, slots] of Object.entries(src || {})) { if (!Array.isArray(slots)) continue; for (const iso of slots) flat.push(iso); }
   flat.sort();
   return flat.slice(0, max);
 }

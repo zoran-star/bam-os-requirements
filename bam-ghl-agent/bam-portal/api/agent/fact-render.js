@@ -20,6 +20,14 @@
 // academy has such an offer the agent treats it as not-currently-offered.
 
 import { resolveFee, applyFee, taxFee } from "../_fees.js";
+// The SAME reader the routing uses. renderBookingGroup used to reach into
+// data.schedule.classes itself, which agreed with _class-slots.js for every offer
+// in production and disagreed for the older top-level data.classes shape: the
+// agent would have been told "no classes are set up, book nobody" while the
+// resolver armed that academy and routed it happily. Two readers of one fact
+// disagreeing is the exact divergence this build exists to remove, so there is
+// now one reader.
+import { classesOf } from "./_class-slots.js";
 import { resolveTestimonials } from "../_testimonials.js";
 
 // ── tiny helpers ─────────────────────────────────────────────────────────────
@@ -148,7 +156,7 @@ export const BOOKING_GROUP_NOT_CONFIGURED = [
 
 // Pure: offers.data JSON in -> the routing section for THIS academy.
 export function renderBookingGroup(data) {
-  const classes = arr(data && data.schedule && data.schedule.classes);
+  const classes = classesOf(data);
   const lines = [];
   for (const c of classes) {
     const title = (c && (c.title || c.name)) || null;

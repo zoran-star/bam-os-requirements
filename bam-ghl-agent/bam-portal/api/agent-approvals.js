@@ -1592,14 +1592,23 @@ async function handler(req, res) {
     // calendar's open slots for the next 2 weeks. Read-only.
     if (b.action === "book-options") {
       const cals = await loadCalendars(sb, clientId);
-      const calIdx = classIndex(await loadClassesFor(sb, clientId));
+      const calClasses = await loadClassesFor(sb, clientId);
+      const calIdx = classIndex(calClasses);
       const out = [];
       for (const c of cals) {
         let slots = [];
         try {
-          const byDay = await freeSlots(token, c.key, { clientId, calLabel: c.label, days: 14 });
-          slots = summarizeSlots(byDay, 24);
-        } catch (_) {}
+          // `classes` is passed explicitly even though freeSlots would now load
+          // them itself: this picker already has them in hand for class_name
+          // below, and one read per request beats one per calendar.
+          const byDay = await freeSlots(token, c.key, { clientId, calLabel: c.label, days: 14, classes: calClasses });
+          slots = summarizeSlots(byDay.days, 24);
+        } catch (e) {
+          // This catch swallowed a TypeError for months and left the picker
+          // silently empty. It stays best-effort - one broken calendar must not
+          // blank the others - but it no longer does so without a word.
+          console.error(`book-options: ${c.key} slots unavailable:`, e.message);
+        }
         out.push({ key: c.key, label: c.label, class_name: classForCalendar(c.label, calIdx) || null, slots });
       }
       return res.status(200).json({ calendars: out });

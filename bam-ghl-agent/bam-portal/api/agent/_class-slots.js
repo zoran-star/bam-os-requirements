@@ -91,13 +91,67 @@ export function classIndex(classes) {
  * stub. Returns [] on any failure: a lookup hiccup must never look like "this
  * academy has no classes", which would arm nothing and change nothing.
  */
+/**
+ * WHICH training offer an academy's classes come from, when it has more than one.
+ *
+ * Measured in production 2026-07-30, and the numbers are why this is a function
+ * rather than a LIMIT 1:
+ *   DETAIL Miami                    9 training offers, exactly ONE with classes
+ *   GAME Winner Athletics Facility  4 training offers, ALL with classes
+ *   X Basketball Academy            2 training offers, both with classes
+ *
+ * `order=sort_order.asc&limit=1` answered both cases by luck. Miami's one real
+ * offer happens to sit at sort_order -1 so it sorted first; normalise that column
+ * to 0 and PostgREST returns an arbitrary one of nine, eight of them empty, and
+ * the academy silently has no classes. GAME Winner's four are ALL at 0 already,
+ * so which one wins is whatever order the database felt like returning.
+ *
+ * TWO RULES, in this order, and the second is the one that matters:
+ *   1. Deterministic. Ties on sort_order break on id, so the same data gives the
+ *      same answer on every call. An arbitrary answer that is stable is still a
+ *      bad answer, but an arbitrary answer that MOVES is a bug nobody can
+ *      reproduce.
+ *   2. Prefer an offer that actually has classes. An offer with none cannot route
+ *      anybody, so choosing it can only ever produce a wrong answer; choosing a
+ *      populated one can at worst produce a debatable one. This is what makes
+ *      Miami correct on purpose rather than by luck.
+ *
+ * Rule 2 does NOT disambiguate GAME Winner, where all four are populated. Nothing
+ * in the data can: the academy genuinely has four training offers and has never
+ * said which one its trials belong to. Rule 1 gives that a stable answer and the
+ * real fix is an academy saying which offer its booking calendar serves.
+ *
+ * KNOWN DIVERGENCE, stated rather than left to be discovered. derivedFactOverrides
+ * in api/agent/fact-render.js selects the offer for the OTHER nine facts with its
+ * own `order=sort_order.asc&limit=1` and no id tiebreak. For GAME Winner and X
+ * Basketball the prompt's facts and this routing can therefore come from
+ * different offers. Both callers should use this function; changing the nine-fact
+ * loader moves two academies' rendered prompts, so it is a separate change with
+ * its own before-and-after rather than one smuggled in here.
+ */
+export function pickTrainingOffer(rows) {
+  const list = (Array.isArray(rows) ? rows : []).filter(Boolean);
+  if (!list.length) return null;
+  const ordered = [...list].sort((a, b) => {
+    const sa = Number(a.sort_order), sb = Number(b.sort_order);
+    const na = Number.isFinite(sa) ? sa : 0, nb = Number.isFinite(sb) ? sb : 0;
+    if (na !== nb) return na - nb;
+    return String(a.id || "").localeCompare(String(b.id || ""));
+  });
+  return ordered.find((o) => classesOf(o.data).length > 0) || ordered[0];
+}
+
 export async function loadClassesFor(sbFn, clientId) {
   try {
     if (!clientId || typeof sbFn !== "function") return [];
+    // All of them, not the first: which one is right cannot be decided by a LIMIT.
+    // An academy has a handful of training offers at most (nine is the live
+    // maximum), so this is one small read, not a scan.
     const rows = await sbFn(
-      `offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=data&order=sort_order.asc&limit=1`
+      `offers?client_id=eq.${encodeURIComponent(clientId)}&type=eq.training&select=id,sort_order,data&order=sort_order.asc,id.asc`
     );
-    return classesOf(Array.isArray(rows) && rows[0] ? rows[0].data : null);
+    const offer = pickTrainingOffer(rows);
+    return classesOf(offer ? offer.data : null);
   } catch (_) { return []; }
 }
 
@@ -207,8 +261,25 @@ export function classByName(name, idx) {
   const index = Array.isArray(idx) ? idx : [];
   const n = norm(name);
   if (!n) return null;
-  const exact = index.find((c) => norm(c.title) === n);
-  if (exact) return exact;
+  // AN EXACT TITLE CAN STILL BE AMBIGUOUS, which is the hazard this used to walk
+  // straight past. Two classes may share a title - the key that separates them is
+  // their POSITION in the array, so "Skills" and "Skills" become `skills` and
+  // `skills-2` - and matching with .find silently returned whichever came first.
+  // That is worse than the reorder hazard documented in _class-routing.js: the
+  // reorder needs someone to drag a row, this needed nothing at all, and the
+  // agent naming "Skills" would have been routed into an arbitrary one of them
+  // with total confidence.
+  //
+  // Two titles that match means we do not know which, and not knowing is
+  // reported as not knowing - the same answer a name matching zero classes gets,
+  // and the same answer identifySlotClass gives an ambiguous slot name. The fix
+  // an owner can act on is stated where the ambiguity is created, by
+  // duplicateClassTitles in api/_offer-schedule.js: give them distinct titles.
+  const exact = index.filter((c) => norm(c.title) === n);
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) return null;
+  // A KEY is unambiguous by construction - classKey() appends -2, -3 precisely so
+  // that colliding titles get distinct keys - so this branch needs no such guard.
   const byKey = index.find((c) => c.key === String(name || "").trim());
   if (byKey) return byKey;
   const hits = index.filter((c) => norm(c.title).includes(n) || n.includes(norm(c.title)));
@@ -353,22 +424,36 @@ export function routeSlots({ slots, classes, rawAge, calendarLabel } = {}) {
     decision = resolved.status;
   }
 
-  // Which class keys are eligible. Not armed, or an age we could not read, means
-  // we narrow by nothing: showing a parent everything is the behaviour that
-  // predates this build, and it is the right thing to fall back to.
-  let eligible = new Set(idx.map((c) => c.key));
+  // Which class keys are eligible. NULL means NARROW BY NOTHING, and it is a
+  // distinct value from the empty set on purpose.
+  //
+  // THIS DISTINCTION IS LOAD-BEARING, and getting it wrong shipped a real
+  // regression. "No narrowing" used to be spelled as "the set of every key this
+  // academy has", which reads as equivalent and is not: an academy whose classes
+  // failed to load has NO keys, so that set was EMPTY, so every keyed slot was
+  // excluded and the parent was offered nothing. A caller that simply forgot to
+  // pass `classes` got silence rather than a fallback - measured on the Hawkeye
+  // Book-it picker as offered=0, excluded=2 against BAM GTA's real slots.
+  //
+  // Not armed, an academy with no classes, and an age we could not read must all
+  // mean "show everything", because each of them is a state where we know less
+  // than the parent does. Only a READ age that matched no class may empty the
+  // list, and that is the empty set below.
+  let eligible = null;
   if (resolved && (resolved.status === "single" || resolved.status === "multiple")) {
     eligible = new Set(resolved.matches.map((m) => m.key));
   } else if (resolved && resolved.status === "unqualified") {
     eligible = new Set();
   }
-  if (calClass) eligible = new Set([...eligible].filter((k) => k === calClass));
+  if (calClass) {
+    eligible = eligible === null ? new Set([calClass]) : new Set([...eligible].filter((k) => k === calClass));
+  }
 
   const offered = [], excluded = [], unidentified = [];
   for (const s of rows) {
     const id = identifySlotClass(s, idx);
     if (!id.key) { unidentified.push(s); offered.push(s); continue; }
-    if (eligible.has(id.key)) offered.push(s);
+    if (eligible === null || eligible.has(id.key)) offered.push(s);
     else excluded.push(s);
   }
 
