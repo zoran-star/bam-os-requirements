@@ -4022,10 +4022,21 @@ async function handleMetaMachine(req, res) {
     };
   })();
   const nSess = (step) => (sess[step] ? sess[step].size : 0);
+  // AD-ONLY counts. The card's first two steps (CLICKED, LOADED) come from
+  // Meta and are ad traffic by definition, but these later steps used to count
+  // EVERY session - organic and direct included. That made the funnel read
+  // "212 clicked -> 8 booked" when the ads had actually produced 3, and any
+  // cost-per-booked-trial computed off it was roughly 2.5x too flattering.
+  // Same population all the way down now; the blended numbers ship alongside
+  // as *_all so nothing is lost.
+  const nAdSess = (step) => (sess[step] ? [...sess[step]].filter((s) => adVisitors.has(s)).length : 0);
   const visitors = nSess("page_view");
-  const formStarted = nSess("form_started");
-  const sawCalendar = nSess("calendar_viewed");
-  const bookedSessions = nSess("confirmed");
+  const formStarted = nAdSess("form_started");
+  const sawCalendar = nAdSess("calendar_viewed");
+  const bookedSessions = nAdSess("confirmed");
+  const formStartedAll = nSess("form_started");
+  const sawCalendarAll = nSess("calendar_viewed");
+  const bookedSessionsAll = nSess("confirmed");
   const pct = (num, den) => (den > 0 ? _r2((num / den) * 100) : null);
 
   const kpiList = Array.isArray(kpiRows) ? kpiRows : [];
@@ -4174,7 +4185,11 @@ async function handleMetaMachine(req, res) {
       clicks_comparable: clicksComparable,   // Meta clicks on days beacons were live
       lpv_comparable: lpvComparable,         // Meta landing-page-views, same day window
       link_clicks: win.clicks, landing_page_views: win.lpv,   // full-window Meta totals
+      // form_started / saw_calendar / booked_sessions are AD TRAFFIC ONLY, to
+      // match the Meta-sourced CLICKED and LOADED steps above them. The *_all
+      // twins carry the blended figure for anywhere that wants total demand.
       visitors, ad_visitors: adVisitors.size, form_started: formStarted, saw_calendar: sawCalendar, booked_sessions: bookedSessions,
+      form_started_all: formStartedAll, saw_calendar_all: sawCalendarAll, booked_sessions_all: bookedSessionsAll,
       // median seconds to move between the beacon-tracked micro-steps (null when
       // the sample is too thin). No timing for clicked->loaded: Meta gives no
       // per-session click/page-load timestamps.
@@ -4186,7 +4201,8 @@ async function handleMetaMachine(req, res) {
       // median page-load ms (full load event) + LCP/TTFB + per-source split from
       // the page_view beacon. null until beacons start arriving (no backfill).
       load: loadPerf,
-      visitors_to_form_pct: pct(formStarted, visitors),
+      // Ad visitors -> ad form starts. Both sides are the same population now.
+      visitors_to_form_pct: pct(formStarted, adVisitors.size),
       clicks_to_leads_pct: clicksToLeadsPct,
       band: mmPctBand(clicksToLeadsPct, MM_C2L_GREEN, MM_C2L_GOLD),
       abandonment_pct: abandonmentPct, abandonment_band: abandonBand,
