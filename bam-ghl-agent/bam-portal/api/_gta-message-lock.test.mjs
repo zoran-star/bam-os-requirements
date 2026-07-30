@@ -164,9 +164,11 @@ function fixtureProblems(renders) {
 
   // 1. The snapshot carries the parent-facing name at all.
   if (!pub) {
-    out.push("STALE FIXTURE: scripts/snapshots/bam-gta.json has no `public_name`. Production has one "
-      + '("By Any Means Basketball"). Without it clientVars() falls back to business_name and every '
-      + "golden below locks the WRONG name while still passing. Re-capture the snapshot.");
+    out.push("STALE FIXTURE: scripts/snapshots/bam-gta.json has no `public_name`. Production has one. "
+      + "Without it clientVars() falls back to business_name and every golden below locks the WRONG "
+      + "name while still passing - and since 29 Jul 2026 it also locks the wrong gold WORDMARK, "
+      + "because the wordmark word is public_name with the brand prefix stripped. Re-capture the "
+      + "snapshot; the value the goldens expect is in that file's own `_note`.");
     return out;
   }
 
@@ -189,10 +191,12 @@ function fixtureProblems(renders) {
   //     matching check in _gta-step-lock.test.mjs before trusting this for more than
   //     it claims: it is a staleness check, NOT proof that the right academy was
   //     rendered. The parent-facing name stopped being able to prove that on 28 Jul
-  //     2026 (San Jose renders the identical string now), and a negative control
-  //     showed the domain and owner cannot prove it either while GTA has a hardcoded
-  //     LOCATIONS entry. What this does catch is a fact that has silently stopped
-  //     rendering.
+  //     2026 (San Jose was given the identical string), and a negative control showed
+  //     the domain and owner could not prove it either while GTA had a hardcoded
+  //     LOCATIONS entry. That entry is gone as of 29 Jul 2026 and the names diverge
+  //     again, so the note over there has been re-measured rather than left standing -
+  //     the remaining leak is hand-typed SMS copy, not pinned identity. What this does
+  //     catch, unchanged, is a fact that has silently stopped rendering.
   const all = renders.join("\n");
   for (const [what, needle] of [
     ["its own domain", (GTA.website_setup || {}).domain],
@@ -214,7 +218,10 @@ function fixtureProblems(renders) {
   //     here. If a re-capture drops it, every golden below still MATCHES - both sides
   //     move together - while every locked email quietly loses its footer contact
   //     line and its unsubscribe destination. That is precisely the class of silent
-  //     staleness this section exists for.
+  //     staleness this section exists for. The same reasoning now covers `public_name`
+  //     and `address` (migration 20260729T235000): both are ahead of production in the
+  //     snapshot, and unlike the columns above they CHANGE these goldens rather than
+  //     preserving them. That file's `_note` says so at length.
   const biz = GTA.business_email;
   const owner = GTA.email;
   if (!biz) {

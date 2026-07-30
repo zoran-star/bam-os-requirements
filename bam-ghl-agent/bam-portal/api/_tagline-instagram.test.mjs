@@ -9,13 +9,15 @@
 // ({{INSTAGRAM_URL}}). There was NO COLUMN for either, so locFromVars() - the function
 // that derives an academy's identity from its own clients row - hardcoded both to "".
 // The only place they existed was the LOCATIONS map in api/email-shells.js, keyed by
-// client id, with one entry: BAM GTA's. So GTA's footer was complete and every other
-// academy sent a footer with a blank line and no Instagram, with no field anywhere in
-// the portal that could fix it.
+// client id, with one entry: BAM GTA's (deleted 29 Jul 2026 - see section 5). So GTA's
+// footer was complete and every other academy sent a footer with a blank line and no
+// Instagram, with no field anywhere in the portal that could fix it.
 //
 // The fix is clients.tagline + clients.instagram_url (migration 20260729T230000), the
 // two pinned fields deleted from GTA's entry, and both read through clientVars(). This
-// suite is what says the values now come from the ROW and not from code.
+// suite is what says the values now come from the ROW and not from code. (The entry
+// itself is gone as of the same day, once the last four fields had row-backed answers -
+// api/_email-identity-from-the-row.test.mjs covers that.)
 //
 // WHY IT RENDERS INSTEAD OF GREPPING. Standing rule in this repo: a literal-grep leak
 // audit gives false answers, because a string can be absent from the file it was moved
@@ -33,16 +35,18 @@
 //      so neither can stand in for the other.
 //   3. No dead anchor is left where a missing Instagram link was, and no raw
 //      {{placeholder}} is left showing.
-//   4. The LOCATIONS map no longer answers for either field: rendering under GTA's real
+//   4. No per-client-id lookup answers for either field: rendering under GTA's real
 //      client id with an EMPTY row produces neither value. That is the render-level
-//      form of "the pin is gone" and it holds however the map is spelled.
+//      form of "the pin is gone" and it holds however a replacement is spelled.
 //
 // WHAT IT DOES NOT PROVE
-//   - That the map is DELETED. It is not, and this suite would be lying if it implied
-//     otherwise. The entry still pins suffix, locationTag, full, city, siteUrl,
-//     siteLabel, ownerFirst, onlineProgramsUrl and referralOffer. Section 4 proves it
-//     no longer pins THESE TWO, and section 5 records what the entry still decides so
-//     the next person does not have to re-measure it.
+//   - Much about the map's DELETION, which happened later the same day (29 Jul 2026)
+//     once migration 20260729T235000 answered the last four pinned fields from
+//     clients.public_name and clients.address. Section 5 used to record what the entry
+//     still decided; it now holds the one guard that survives the deletion - locFor()
+//     ignoring the client id - and the full treatment of the deletion, including the
+//     visible change it made to GTA's emails, is in
+//     api/_email-identity-from-the-row.test.mjs.
 //   - That instagram_url points at a live profile, or that the tagline is any good.
 //     Nothing here or anywhere else checks either.
 //   - That the SEND path reads the two columns. It does not yet: they are absent from
@@ -68,9 +72,9 @@
 // the same seam api/_business-email.test.mjs uses and for the same reason - it is the
 // only input renderEmail takes. `blank` produces byte-for-byte what locFromVars would
 // produce if it went back to hardcoding "", because that function reads nothing else;
-// `pin` produces byte-for-byte what a LOCATIONS entry carrying these two fields
-// produces, because locFor() spreads the pin over the row exactly this way. If either
-// ever reports FAILED, this suite is decorative.
+// `pin` produces byte-for-byte what a per-client-id entry carrying these two fields
+// would produce, because they are read straight off the vars with no derivation in
+// between. If either ever reports FAILED, this suite is decorative.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -91,9 +95,10 @@ const ok = (cond, label) => {
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 // The same production snapshots the GTA locks read, so "what GTA looks like today" has
-// one answer across every suite. GTA is deliberately not the only academy here: it is
-// the one with a pinned entry, so a bug that only shows up when identity resolves from
-// the row would hide behind it.
+// one answer across every suite. GTA is deliberately not the only academy here: it was
+// the one WITH a pinned entry, so for as long as that entry existed a bug in the
+// row-derived path could hide behind it. It no longer can, and a second academy is
+// still the cheapest way to keep proving that.
 const snap = (f) => JSON.parse(fs.readFileSync(path.join(SNAPSHOTS, f), "utf8"));
 const GTA = snap("bam-gta.json").client;
 const SJ = snap("bam-san-jose.json").client;
@@ -217,6 +222,9 @@ console.log("\n── 3. the resolved location config says the same thing ──
 }
 
 // ─── 4. the pin is gone for THESE TWO fields ─────────────────────────────────
+// (It is now gone for ALL of them - section 5 - but this is the check that was written
+// when it was gone for only these two, and it still earns its place: it is the only one
+// here that renders under GTA's OWN id against a row that carries nothing.)
 // Rendered, not grepped, and rendered under GTA's REAL client id - the only key any
 // per-academy map is keyed by. An EMPTY row must produce an empty footer even there. If
 // anything anywhere still pins these two for GTA, this is what notices.
@@ -232,29 +240,51 @@ console.log("\n── 4. GTA's real client id no longer pins either fact ──"
   // spelling, which is why the render checks above are the real assertion.
   ok(!/^\s*tagline:\s*"/m.test(SHELLS_SRC), "no tagline literal is left in email-shells.js");
   ok(!/^\s*instagram:\s*"http/m.test(SHELLS_SRC), "no instagram literal is left in email-shells.js");
+  ok(!SHELLS_SRC.split("\n").some((l) => l.includes(GTA.id) && !l.trim().startsWith("//")),
+    "(source) GTA's client id appears in no executable line of email-shells.js at all");
 }
 
-// ─── 5. what the LOCATIONS entry STILL decides for GTA ───────────────────────
-// This suite must not read as "the hardcode is gone". Six fields blocked deleting that
-// entry and only two of them were these; the other four have no byte-identical
-// row-backed path. Rather than assert nothing about them, assert the DISAGREEMENT is
-// still there, so the day somebody resolves it this section fails and gets updated
-// instead of quietly describing history.
-console.log("\n── 5. the entry still decides four other fields (queue item 31 is NOT closed) ──");
+// ─── 5. the entry is GONE, and nothing may put one back ──────────────────────
+// THIS SECTION USED TO ASSERT THE OPPOSITE, AND THAT IS THE POINT OF IT.
+//
+// Until 29 Jul 2026 it asserted that four fields (suffix, full, locationTag, city)
+// STILL disagreed between the pinned entry and the row - deliberately, so that the day
+// somebody resolved the disagreement this section would fail and force an update
+// instead of quietly describing history. That day arrived in the same sitting: the map
+// was deleted outright and migration 20260729T235000 answered all four from
+// clients.public_name and clients.address. See
+// api/_email-identity-from-the-row.test.mjs for the full treatment of that half.
+//
+// What is left here is the guard that OUTLIVES the change: locFor() must return the
+// same config whatever client id it is handed. That is the render-level definition of
+// "no per-academy override exists", it holds however a replacement is spelled (a map, a
+// switch, a JSON file, an `overrides` column), and it is the exact regression this
+// whole task removed. It is asserted for the two fields THIS suite owns and for the
+// four that used to be pinned, because a reintroduced pin would most likely arrive by
+// the same route it left.
+console.log("\n── 5. locFor takes no notice of the client id, for any field ──");
 {
-  const pinned = locFor(GTA.id, varsFor(GTA));
-  const row = locFor("00000000-0000-0000-0000-000000000000", varsFor(GTA));
-  for (const [field, why] of [
-    ["suffix", 'the gold wordmark word: "GTA" pinned vs "BASKETBALL" from public_name'],
-    ["full", 'the parent-facing name: "By Any Means Toronto" pinned vs the row\'s public_name'],
-    ["locationTag", 'the header line "OAKVILLE &middot; GTA", a hand-composed string with no column'],
-    ["city", "the city, which cityFromAddress() cannot find in GTA's stored address"],
+  const v = varsFor(GTA);
+  const underOwnId = locFor(GTA.id, v);
+  const underOther = locFor("00000000-0000-0000-0000-000000000000", v);
+  for (const [field, was] of [
+    ["tagline", "the footer sentence, pinned until migration 20260729T230000"],
+    ["instagram", "the footer Instagram link, pinned until the same migration"],
+    ["suffix", 'the gold wordmark word, pinned "GTA" until 20260729T235000'],
+    ["full", 'the parent-facing name, pinned "By Any Means Toronto" until the same'],
+    ["locationTag", 'the header line, pinned "OAKVILLE &middot; GTA" until the same'],
+    ["city", 'the city, pinned "Oakville" until the same'],
   ]) {
-    ok(pinned[field] !== row[field], `still pinned: ${field} - ${why}`);
+    ok(JSON.stringify(underOwnId[field]) === JSON.stringify(underOther[field]),
+      `${field} is the row's, not the id's - ${was}`);
   }
-  for (const field of ["siteUrl", "siteLabel", "ownerFirst", "onlineProgramsUrl"]) {
-    ok(pinned[field] === row[field], `already row-identical: ${field} (could be unpinned today)`);
-  }
+  // And the whole config, not just the fields anybody thought to list.
+  ok(JSON.stringify(underOwnId) === JSON.stringify(underOther),
+    "and the ENTIRE resolved config is identical under GTA's id and a stranger's");
+  // The two values this suite owns are the row's, positively - so the check above
+  // cannot be satisfied by both sides being empty.
+  ok(underOwnId.tagline === GTA_TAGLINE && underOwnId.instagram === GTA_IG,
+    "(and both are GTA's real values, so the equality above is not two blanks agreeing)");
 }
 
 // ─── 6. the pre-select-list interim, described rather than discovered ────────

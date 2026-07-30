@@ -12,7 +12,9 @@
 // GTA email published it to parents and pointed their unsubscribes at it. DETAIL
 // Miami and Johnson Bball both carry mike@byanymeansbball.com. GTA was saved from
 // LOOKING wrong only by a hardcoded LOCATIONS entry in email-shells.js, which no
-// other academy has - a per-academy patch over a shared bug.
+// other academy had - a per-academy patch over a shared bug. (That entry is gone
+// entirely as of 29 Jul 2026; api/_email-identity-from-the-row.test.mjs is the suite
+// that says so.)
 //
 // The fix is clients.business_email (migration 20260729T210000) with NO FALLBACK,
 // and the no-fallback half is the part that needs a test. A fallback would have been
@@ -186,8 +188,10 @@ const { renderEmail, renderStepMessage, clientVars, unsubscribeFor, locFor } = a
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 // Two REAL academies, from the same production snapshots the GTA locks read. Two on
-// purpose: GTA is the one academy with a hardcoded LOCATIONS entry, so a bug that
-// only appears when identity resolves from the client row would hide behind it.
+// purpose: GTA WAS the one academy with a hardcoded LOCATIONS entry, so for as long as
+// that entry existed a bug that only appears when identity resolves from the client row
+// would hide behind it. The entry is gone (29 Jul 2026) and a second academy is still
+// the cheapest way to keep proving that.
 const snap = (f) => JSON.parse(fs.readFileSync(path.join(SNAPSHOTS, f), "utf8"));
 const GTA = snap("bam-gta.json").client;
 const SJ = snap("bam-san-jose.json").client;
@@ -215,7 +219,7 @@ const BODY = "Hi {{contact.first_name}},\n\nJordan's spot is held for this week.
 
 // The ONE seam the mutations act on: how a caller turns a client row into vars.
 // MUTATE=fallback restores the exact expression that shipped
-// (`c.business_email || c.email`); MUTATE=borrow restores the LOCATIONS-hardcode
+// (`c.business_email || c.email`); MUTATE=borrow restores the per-client-id-hardcode
 // shape, where an academy with nothing of its own inherits GTA's address.
 function varsFor(client) {
   const v = { ...FAMILY, ...clientVars(client) };
@@ -244,7 +248,7 @@ for (const c of [GTA, SJ]) {
 }
 {
   // The two academies must not be interchangeable. GTA's address in San Jose's email
-  // is the leak the hardcoded LOCATIONS entry used to guarantee for everyone else.
+  // is the leak the old per-client-id fallback used to guarantee for everyone else.
   const gtaHtml = emailFor(GTA), sjHtml = emailFor(SJ);
   ok(!sjHtml.includes(GTA.business_email), "San Jose's email contains NO trace of GTA's address");
   ok(!gtaHtml.includes(SJ.business_email), "and GTA's contains none of San Jose's");

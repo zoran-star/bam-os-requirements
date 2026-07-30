@@ -208,9 +208,12 @@ function academy(file) {
   const client = snap.client;
   const facts = snap.facts || {};
   return {
-    // The INTERNAL name, deliberately: GTA and San Jose now share a public_name
-    // ("By Any Means Basketball" - the name is the brand, the city lives in the
-    // domain), so labelling by that would print the same academy twice.
+    // The INTERNAL name, deliberately. GTA and San Jose briefly shared a public_name
+    // ("By Any Means Basketball"), so labelling by that printed the same academy twice.
+    // Migration 20260729T235000 split them again (the name drives the gold wordmark, so
+    // the shared bare brand made both wordmarks read BASKETBALL), but business_name is
+    // still the right label here: it is what STAFF call each academy, it is guaranteed
+    // distinct, and it does not move when an owner edits their public-facing name.
     label: client.business_name || file,
     client, facts,
     // EXACTLY the spread api/automations.js uses at send time and on the approval
