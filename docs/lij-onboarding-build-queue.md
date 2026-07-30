@@ -844,6 +844,34 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## ✅ [PR #1670](https://github.com/zoran-star/bam-os-requirements/pull/1670): STRIPE NOW ANSWERS IN THREE STATES, AND IT FOUND A BRANCH NOTHING CAN EVER REACH
+
+`api/stripe/_requirements.js` becomes the single place anything asks Stripe about a connected account. **`canCharge()` is gone.** `readStripeAccount()` returns `ready` · `not_ready` **plus which items** · `unreachable`, and **only `ready` may tick the step**, so the stored row is byte-identical to before in every case, asserted including that an unreachable Stripe never writes `connected`.
+
+**The alert no longer opens with "connection failed" and never says "then reconnect."** There was no non-error channel, so one was added rather than reusing `error`; **anything the browser does not recognise still falls through to the failure wording, so it cannot fail open**, and a genuinely broken callback still reads as a failure. The three hardcoded example requirements are gone; the card renders that account's real `currently_due` / `past_due`, shows `pending_verification` separately as *Stripe is reviewing*, and surfaces `requirements.errors` in Stripe's own words. **Unmapped codes render verbatim and mapped ones carry their raw code in the title attribute, so nothing is ever the label alone.** 56 checks, 8 negative controls, each verified caught through CI's own discovery loop.
+
+### 🚨 AND THE FIND BEYOND ITS BRIEF, ORCHESTRATOR-VERIFIED THREE WAYS: **`stripe_connect_status = 'disabled'` HAS NO PRODUCER.**
+
+| check | result |
+|---|---|
+| Clients in `disabled` today | **0** (31 `not_connected`, 11 `connected`, 5 `onboarding`) |
+| Code that writes `'disabled'` | **none** |
+| `account.*` events handled in `api/stripe/webhook.js` | **none** |
+
+**The portal renders a complete UI branch for that state** - *"Stripe access was revoked. Reconnect to resume billing actions."* - **and nothing in the system can ever produce it.**
+
+**The consequence is not cosmetic: an academy that revokes BAM's access inside its own Stripe dashboard stays `connected` in our system forever, and every billing action fails at the moment a real person uses it.** Eleven academies are `connected` today. **The fix is `account.application.deauthorized`.**
+
+**This is the signature failure of this project in its purest form yet: a state whose entire purpose is to tell you something has gone wrong, rendered convincingly, wired to nothing.** Ten instances now. **It is also the first one found in a branch that has never executed, which is why no test and no audit could have caught it by observation.**
+
+**Also noted, not raised as a defect:** there is no `account.updated` webhook either, so the tick still depends on a human loading the Members tab or the checklist. **A webhook would flip it the moment Stripe clears an academy and would remove the per-load Stripe call entirely.** And `requirements.eventually_due` is deliberately discarded (it does not block charges), though a *coming up* section would stop an academy being surprised by a deadline.
+
+### ⚠️ MERGE-ORDER COUPLING BETWEEN #1669 AND #1670, WHICH THE ORCHESTRATOR NOW OWNS
+
+**#1670 deletes `canCharge`. #1669's inventory carries an entry for `canCharge` marked HARMFUL, and stale entries fail by design.** So they cannot both merge unchanged.
+
+**Order: #1669 FIRST, then #1670 rebases and deletes that one inventory line.** The reverse leaves #1669 describing a function that no longer exists at the moment it lands. **Neither agent can fix this alone, because each PR is correct about the world it was written against** - which is a small, honest example of exactly the staleness the inventory exists to catch, arriving before the inventory has even merged.
+
 ## ⛔⛔ HOUSE RULE 10'S ENFORCEMENT FOUND **29 INSTANCES, NOT 6**, AND **FOUR ARE HARMFUL**. [PR #1669](https://github.com/zoran-star/bam-os-requirements/pull/1669)
 
 `scripts/check-network-booleans.mjs` plus a 29-entry inventory, wired into `portal-ci.yml`, plain node, no deps.
