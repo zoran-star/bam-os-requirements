@@ -682,5 +682,49 @@ if (MUTATE) {
   process.exit(0);
 }
 
+// Every module this build rewired must actually LOAD.
+//
+// ⚠️ READ THIS BEFORE TRUSTING IT. I added this block believing it would have
+// caught the bug that prompted it: build B shipped `loadClassesFor is not
+// defined` into api/website/miami-book.js, which would have thrown on every
+// DETAIL Miami booking. Then I broke it to check, which is the house rule, and
+// IT DID NOT CATCH IT. The suite stayed green with the import deleted.
+//
+// The reason, verified rather than reasoned: an undefined identifier inside a
+// handler is a RUNTIME ReferenceError, not an import-time one. The module
+// imports perfectly happily and only throws when the line executes. So:
+//
+//   THIS CHECK DOES catch  - an unresolvable import path, a renamed or deleted
+//                            module, and anything that throws at module top
+//                            level. Verified by breaking each.
+//   THIS CHECK DOES NOT    - undefined identifiers. That is `npm run
+//        catch               lint:api-no-undef`, which DID catch the real bug,
+//                            in CI, having been built for exactly this after it
+//                            took the enrollment funnel down for TEN academies
+//                            on 2026-07-25.
+//
+// The block stays because the class it does cover is real and nothing else here
+// covers it. But it is NOT the guard against the miami-book bug, and writing it
+// up as one would have been this project's own named failure mode - something
+// whose whole purpose is confidence, trusted because it exists, never wired to
+// the outcome it claims. I nearly shipped exactly that, in the commit fixing an
+// instance of it. Do not quote this block as protection against a ReferenceError.
+console.log("\n── every rewired endpoint still loads ──");
+for (const mod of [
+  "./agent/_class-slots.js",
+  "./agent/_class-routing.js",
+  "./agent/booking.js",
+  "./agent-approvals.js",
+  "./agent/fact-render.js",
+  "./ghl/calendars-v15.js",
+  "./website/availability.js",
+  "./website/leads.js",
+  "./website/miami-book.js",
+]) {
+  let err = null;
+  try { await import(mod); } catch (e) { err = e && e.message ? e.message : String(e); }
+  ok(err === null, `${mod} imports${err ? ` (${err.split("\n")[0]})` : ""}`);
+}
+
 console.log(`\n${fail ? "❌" : "✅"} ${pass} passed, ${fail} failed.`);
 if (fail) { for (const f of failed) console.log("   - " + f); process.exit(1); }

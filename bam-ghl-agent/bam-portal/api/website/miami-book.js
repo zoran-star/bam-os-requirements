@@ -6,6 +6,7 @@
 import { withSentryApiRoute } from '../_sentry.js';
 import { getClientGhlToken } from './availability.js';
 import { findOpenOpp, moveStage } from '../agent/_store.js';
+import { chooseSlotToBook, loadClassesFor } from '../agent/_class-slots.js';
 
 const ALLOWED_CALENDARS = new Set([
   '290AH08i2I7Ts3yzd4W0', // Free Trial - Elementary Academy
