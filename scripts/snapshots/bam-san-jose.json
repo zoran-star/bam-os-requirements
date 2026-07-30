@@ -1,5 +1,5 @@
 {
-  "_note": "BEFORE snapshot of BAM San Jose, captured from production. Pinned deliberately so a preset re-seed has something honest to be diffed against. THE THING TO WATCH: the nurture step at position 2 (template:nurture-3) is enabled:false. That is Zoran's deliberate hold on the testimonials email, not drift. A re-seed that flips it back to true has failed, which is why re-seeding is diff-and-patch and never delete-and-recreate. Every automation is approved:false, so nothing sends until Lij approves it. The facts block is EMPTY of sessions on purpose: San Jose has zero schedule_slots rows, so its schedule block does not render and its schedule SMS resolves to the venue line alone.",
+  "_note": "BEFORE snapshot of BAM San Jose, captured from production. Pinned deliberately so a preset re-seed has something honest to be diffed against. THE THING TO WATCH: the nurture step at position 2 (template:nurture-3) is enabled:false. That is Zoran's deliberate hold on the testimonials email, not drift. A re-seed that flips it back to true has failed, which is why re-seeding is diff-and-patch and never delete-and-recreate. Every automation is approved:false, so nothing sends until Lij approves it. The facts block is EMPTY of sessions on purpose: San Jose has zero schedule_slots rows, so its schedule block does not render and its schedule SMS resolves to the venue line alone. `business_email` is ahead of production until migration 20260729T210000 is applied (it seeds this exact value). It happens to equal `email` here, which is a coincidence of Lij using one address for both, not a fallback: one is the OWNER's inbox and the other is the academy's public address, and nothing copies either into the other.",
   "_captured": "2026-07-28, re-captured from production. The 2026-07-27 version had drifted in exactly the two rows this workstream then changed: ghosted steps 0 and 1 carried bodies production did not have. A stale BEFORE-state is worse than no before-state, because it makes a seeding diff lie in the reassuring direction - a fabricated baseline that already resembles the after-state shows a small clean diff and reads as success. Verified body by body by md5 against production after re-capture. public_name set to 'By Any Means Basketball' on 2026-07-28 by Zoran's call: the parent-facing name is the BRAND and the city lives in the domain and the footer, so it is the same string GTA uses. business_name stays 'BAM San Jose', which is the internal label and is what staff see.",
   "client": {
     "id": "5576acf0-acd3-4c05-9f9f-ebfde8618154",
@@ -7,6 +7,7 @@
     "legal_name": "3D Prep LLC",
     "owner_name": "Elijah De Guzman",
     "email": "elijah@byanymeanssanjose.com",
+    "business_email": "elijah@byanymeanssanjose.com",
     "phone": "(408) 597-4327",
     "address": "1051 W San Fernando St, San Jose, CA 95126",
     "time_zone": "America/Los_Angeles",
