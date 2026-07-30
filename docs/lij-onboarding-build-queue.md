@@ -840,6 +840,22 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 📏📏 HOUSE RULE 10, PROMOTED 2026-07-30 FROM THE CONTRACT DIRECTLY BELOW. **THE RULE ALREADY EXISTED. IT WAS WRITTEN FOR ONE BUILD, SO IT DID NOT TRAVEL.**
+
+Zoran asked what stops the Stripe bug happening again. **The answer is not a new rule. We had this one, scoped to a single resolver, and nothing carried it to the next place the same shape appeared.**
+
+> **A yes/no answer that crossed a network boundary must have THREE outcomes, not two: yes · no, and here is why · we could not ask.**
+> **Never let "no" and "could not ask" collapse into the same value.**
+
+The contract below states it for testimonials: collapsing them turns *"empty store means the email is dropped"* (a product decision Zoran approved) into *"a failed lookup means the email is dropped"* (an outage presenting as a feature). **`canCharge()` is the identical shape at `api/stripe/connect.js:94`** - a network blip, an expired platform key and a genuinely unfinished Stripe account all become bare `false` - and it was written without anyone connecting the two.
+
+**⚠️ SO THE DURABLE FIX IS NOT "SURFACE THE STRIPE REQUIREMENTS". That fixes one instance.** Two things are needed and only the second stops recurrence:
+
+1. **The rule lives in the playbook now**, not inside one build's contract. **A rule written as a build artifact dies with the build.**
+2. **An ENFORCED INVENTORY, because a rule in a document is a comment and this file records repeatedly that a comment is not a gate.** The check: inventory every place in `api/` where a fetch to an external service is reduced to a boolean via `catch { return false }` or `if (!r.ok) return false`, and **FAIL when a new one appears that has not been audited.** Same antidote already used for the render paths and the testimonial hardcodes: **convert "this is the only X" into a check that fails when a new X shows up.**
+
+**The tell for finding these: a function whose name asks a question (`canCharge`, `isX`, `hasY`) and whose body contains a `fetch`.** Every one of those is a candidate, because the name promises an answer about the world and the implementation can only promise an answer about our ability to reach it.
+
 ## ⚠️ RESOLVER CONTRACT: **THREE STATES MUST STAY DISTINGUISHABLE, NOT TWO**
 
 The templating room will check the resolver against this the moment it lands: **can a seed-time caller tell "this academy has NO testimonials" apart from "the resolver could not answer"?**
