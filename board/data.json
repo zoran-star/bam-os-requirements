@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · age routing LIVE, templating track closed",
+ "updated": "2026-07-30 · San Jose is one blocker, not three",
  "recentUpdates": [
+  "San Jose's remaining blockers are ONE blocker wearing three hats. Stripe unlocks prices, prices unlock class times, class times unlock the calendar",
+  "So nobody should pick up 'generate San Jose's class times' yet. It cannot work until Stripe flips",
+  "Good news: the moment Stripe flips, age routing works for San Jose with no code change. His ages are already in and correct",
+  "One test settles whether the Stripe stall is Lij's paperwork or our bug: does his Stripe dashboard list anything outstanding, or does it say he is done?",
   "DONE. A kid is now routed to a class by their real age, live and tested against production. GTA's age groups are gone from every academy's AI",
-  "Merged in the right order, five minutes apart, website first. Backwards would have failed real bookings silently",
-  "Proof it works: age 8 gets nothing, 13 gets everything, and a parent who types 'nine' still sees all the times instead of being turned away",
-  "Seven loose ends handed back to me. Two are sharp: one page still splits classes at age 14 by hand, and two of our safety checks are invisible to CI",
-  "Found and verified: we REQUIRE an emergency contact at signup, store it nowhere a coach can read, and have done since June. 18 real families affected at GTA",
-  "Nothing is lost. Every answer is still in the audit log. But a coach standing over a hurt kid cannot get to it, which is the only moment that counts"
+  "Merged in the right order, five minutes apart, website first. Backwards would have failed real bookings silently"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",

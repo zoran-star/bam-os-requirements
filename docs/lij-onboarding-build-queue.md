@@ -844,6 +844,33 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## ⛔⛔ SAN JOSE'S REMAINING BLOCKERS ARE **ONE BLOCKER WEARING THREE HATS.** Stop treating them as parallel work.
+
+Framed by AUTOMATION TEMPLATING III on its way out, and it corrects how this file reads:
+
+```
+stripe connected -> prices exist -> slots generate -> calendars exist -> age routing runs
+```
+
+**San Jose has 0 `schedule_slots` and 0 calendar `entry_points`.** Those are not three items to pick up in parallel. **Anyone who takes "generate San Jose's slots" before Stripe flips will spend a session discovering it cannot work.**
+
+**⚠️ AND THE QUEUE HAS BEEN READING THE STRIPE STATE WRONG.** It says San Jose is `not_connected`, which reads as *nobody has started*. **Production says `stripe_connect_status = 'onboarding'` with an account id present and `connected_at` NULL.** So the flow was BEGUN, Stripe issued an account, and it stalled partway. **Different problem, different fix, and it means Lij has already done some of the work and may reasonably believe he finished.** For contrast: GTA `connected` since 2026-05-24, DETAIL Miami since 2026-06-18.
+
+**✅ THE GOOD NEWS, AND IT IS LOAD-BEARING FOR THE LAUNCH PLAN: when Stripe flips and San Jose moves to portal booking, age routing works with NO code change.** All three of its classes carry numbers, so the arming gate passes it. Its `booking_provider` is still `ghl`, so none of that runs today. **Nothing in the templating track blocks San Jose.**
+
+### 🔑 III ASKED THE ONE QUESTION I HAD LEFT OPEN, AND THE HONEST ANSWER IS THAT WE CANNOT TELL
+
+> *"Is the error on OUR side (a bad return URL, an expired account link, a Connect config problem) or is Stripe holding a requirement? If it is ours, Lij could complete every form and it would still never flip."*
+
+**That is exactly the right question and we cannot answer it from here, because `canCharge()` returns bare `false` for both cases.** This is house rule 10's live instance biting the very investigation that produced the rule: **a control that failed closed while destroying the reason, in the one situation where the reason is the entire question.**
+
+**⭐ THE PRACTICAL RESOLUTION, WHICH TURNS THE AMBIGUITY INTO A ONE-STEP TEST LIJ CAN RUN:**
+
+- **Lij opens his Stripe dashboard.** If it lists outstanding requirements, the answer is his paperwork and there is nothing for us to fix.
+- **If Stripe shows his account as complete and able to accept payments, the fault is OURS**, and it escalates immediately, because he would then be able to fill in every form forever without it ever flipping.
+
+**Either way he takes the same first action, which is why this is safe to send him before we know the answer.** What must NOT happen is telling him to reconnect: the portal card is right that the step ticks itself via `backfillStripeWhenChargeable`, and the alert telling him to reconnect is the queued defect.
+
 ## 🎯🎯 AGE ROUTING IS LIVE (2026-07-30). **AUTOMATION TEMPLATING III IS CLOSED.** The `booking_group` leak is GONE, not parked.
 
 **Merged in the order that mattered, orchestrator-verified by timestamp:** [client-sites #174](https://github.com/zoran-star/bam-client-sites/pull/174) at **21:45:06**, deploy confirmed live in the served bundle, then [portal #1661](https://github.com/zoran-star/bam-os-requirements/pull/1661) at **21:50:32**. `main` is `33c487d`. **Portal-first would have opened a window where GTA's page still accepted 8 year olds and their bookings failed silently.**
