@@ -844,6 +844,36 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 🏆 AND THE TECHNIQUE THAT CLOSES IT: **A POSITIVE CONTROL. PROVE THE INSTRUMENT CAN SEE THE REGION YOU ARE CALLING CLEAN.**
+
+#1671's author worked out that the `blank()` bug had a consequence for **its own evidence**, which nobody had raised. Its PR body claimed *"the detector no longer flags `hasGmailMailbox`"*. **If `blank()` can silently erase everything below a line, that sentence has two possible causes:**
+
+1. **The fix landed.**
+2. **The scanner cannot see that region of the file.**
+
+**Those produce byte-identical output, and the PR rested on the reassuring one.**
+
+**So it planted a bare-boolean collapse next to `gmailMailboxState`, in the same file, and made the checker find it:**
+
+```
+::error api/ghl/cron-import-history.js,line=121::probeCanary() reaches the
+network and returns a bare boolean.
+```
+
+**Caught, at line 121, in the exact region of the exact file the PR changes.** Reverted immediately, and **the control and its output went into the PR body**, because a reviewer reading *"the detector no longer flags it"* deserves to know that was **tested rather than hoped.**
+
+**This is the general answer to an absence-shaped claim, and it is cheap: do not argue that nothing is there. Put something there, watch the instrument find it, take it away.** House rule 6's negative control turned inside out - **a negative control proves your test would catch a regression; a positive control proves your instrument is pointed at the right place at all.** The estate has plenty of the first and, until tonight, none of the second.
+
+## 📏 AND THE ARGUMENT AGAINST FIXTURES, IN ONE LINE
+
+On why `blank()`'s two bugs surfaced at all: the invariant was asserted **over all 251 real files**, not over cases the author chose.
+
+> **"Fixtures encode what the author already imagined."**
+
+**The regex-versus-division check landed on the `n` of `return`. That is not a sloppy heuristic - it is a correct-looking one, wrong at a boundary nobody would think to test**, and therefore a boundary no hand-written fixture would ever contain. **This is house rule 7 arriving from the opposite direction: the usual failure is a fixture drifting away from production; this is a fixture that could never have reached it.**
+
+**And the sizing, stated so nobody over-reads the unchanged hit count:** it means no collapse currently lives below line 89 of that one file. **It says nothing about tomorrow.** The failure was **silent, unbounded in extent, and biased toward under-reporting**, which is precisely what makes a broken gate worse than no gate: **it prints "every network boolean in api/ is accounted for" while blind to a third of a file.**
+
 ## 🏆 THE THREAD RESOLVES INTO A MECHANISM, NOT A MORAL: **ASSERT A STRUCTURAL INVARIANT OF YOUR TOOL'S OUTPUT, OVER THE REAL TREE, EVERY RUN.**
 
 #1669's author took "right answer, unproven method" and pointed it at the one piece of its own checker it had never directly verified: **`blank()`, which strips comments and strings before anything else runs.** Everything downstream matches against its output, so **when it desyncs the scan does not error. It goes quiet and reports FEWER hits with total confidence.**
