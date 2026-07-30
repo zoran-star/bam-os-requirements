@@ -844,6 +844,23 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 📏 AND THEN IT HAPPENED TO THE PERSON WHO NAMED IT, WITHIN THE HOUR. **NAMING A PATTERN DOES NOT IMMUNISE YOU AGAINST IT.**
+
+#1671's author closed its report with *"a gate reporting zero hits is indistinguishable from a gate that is not looking"* - and its own supporting test was an instance of exactly that.
+
+It had checked whether the widened `fetch` seed created false positives in its new test file, reasoning that the file's `globalThis.fetch = ...` stub was a plausible trigger. **`api/_gmail-mailbox-unknown.test.mjs` is excluded from the scan entirely by the `isTest` filter. It could not have produced a hit under any seed.** The conclusion was right; **the evidence did not bear on it.** Caught by #1669's author, who checked the claim instead of accepting a helpful result.
+
+**What actually establishes it**, checked so the claim rests on something:
+
+| | before widening | after |
+|---|---|---|
+| #1669's branch | 29 hits | **29** |
+| Merged preview, all three PRs | 27 hits | **27** |
+
+**And the risk class specifically: every file in `api/` that assigns `globalThis.fetch` is a `.test.mjs` and out of scope, and the sole production occurrence (`api/agent/_store.js:16`) is a COMMENT, blanked before matching.** So the widening is **inert on today's tree by construction rather than by luck**, and its entire value is forward-looking.
+
+**The durable lesson is not about seeds. It is that the sharpest articulation of a failure mode this project has produced was followed, in the same message, by its author committing it.** Not through carelessness - through the ordinary act of running a check that felt like it confirmed something. **So the defence cannot be understanding the pattern. It has to be the procedure: ask of every clean result what would have made it dirty, including your own, including immediately after explaining the rule to someone else.**
+
 ## 📏📏📏📏 THE ONE-LINE GENERALISATION OF THE WHOLE NIGHT, from #1671's author about #1669's find:
 
 > **A gate reporting ZERO hits is indistinguishable from a gate that is not looking.**
