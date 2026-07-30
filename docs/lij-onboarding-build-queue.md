@@ -844,6 +844,34 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## ✅ ALL THREE MEMBER-MANAGEMENT PRs MERGED (2026-07-30 22:32) AND THE HELD DATA STEP IS DONE
+
+`#1664` 22:32:40 · `#1665` 22:32:48 · `#1666` 22:32:56. Main `5637772`.
+
+**The data step waited for the deploy and it mattered: `Vercel - bam-portal` sat `pending` for ELEVEN AND A HALF MINUTES** on that commit. Acting on the merge would have let the old code re-promote the chunk, which is what the room warned about. **San Jose's stranded chunk, guarded on its current value and verified by read-back:** `templates: ready (ready_at 2026-07-23)` → `{"status":"waiting"}`.
+
+**`ready_at` was DROPPED rather than left beside `waiting`**, matching the shape San Jose's `onboarding` chunk already uses. **A timestamp asserting a thing was ready, sitting on a chunk that is waiting, is a small lie that outlives everyone who knows why it is there.**
+
+**Deliberately not touched: San Jose's `core` and `sales` chunks are ALSO `ready`** (both stamped 2026-07-23). Only `templates` was named, so only `templates` was changed. **Flagged to the room rather than assumed either way.**
+
+**`clients.stripe_portal_url` is live and #1666 is deployed.** All 47 academies NULL, so the manage-membership link renders for nobody, and stays that way until receipts resumes.
+
+## ⚠️ COLLISION CAUGHT FROM THE ROOM'S SIDE, WHICH IS THE HALF THAT USUALLY FAILS
+
+The orchestrator had spawned a builder for GTA's `freetrial.jsx` hardcoded `>= 14`. **AUTOMATION TEMPLATING III then received a direct instruction from Zoran on the same file, and surfaced the clash rather than racing or assuming seniority** - it offered to stand ITS OWN build down and asked for a decision.
+
+**Ruling: III takes it, the orchestrator's builder was killed mid-run with nothing committed.** Three grounds: Zoran instructed it directly, its scope is better (**both defects in one pass on one function**, rather than touching that file twice), and it shipped the prerequisite. **The catching of collisions only works if rooms surface them, and this one was surfaced against the room's own direct instruction from Zoran.**
+
+**Scope approved, including the calendar bug, which outranks the age derivation.** One extra constraint sent with it: **check whether the fix is "match better" or "stop falling back at all", because a WRONG calendar is worse than no calendar** - a parent books a real slot at the wrong academy and everyone downstream believes it. **House rule 10 at the calendar boundary: cannot-determine and no-times-available must not be the same outcome.**
+
+## ✅ [#1668](https://github.com/zoran-star/bam-os-requirements/pull/1668) MERGED AND DEPLOYED: the class age fields cross the wire, `age_configured` included
+
+Verified against the live endpoint rather than the merge. GTA `9-13` and `14-nolimit`; San Jose `6-12`, `9-12`, `12-18`; **all five `configured=true`. Group 2 publishes NO maximum rather than an invented one**, and `MUTATE=interpret` fails the suite if anyone ever fills one in.
+
+**⭐ THE SINGLE BEST PIECE OF EVIDENCE THIS WHOLE WORKSTREAM HAS PRODUCED, and it is one comparison:** San Jose's Beginner and Elementary **both read `age: "Elementary School"`.** That identical string is what every site and every automation had to work from. **They are now 6-12 and 9-12 and distinguishable for the first time.**
+
+**And the deploy was verified the strongest available way:** the room watched for the FIELD to appear in the live response rather than for a status that correlates with it. **Watching for the thing you actually need beats watching for the signal that usually accompanies it**, and that is a better rule than the one it was given.
+
 ## ✅ MEMBER MANAGEMENT: THREE PRs OPEN, EACH BUILT AND ADVERSARIALLY TESTED BY SEPARATE AGENTS (2026-07-30)
 
 - **[#1664](https://github.com/zoran-star/bam-os-requirements/pull/1664) chunk triggers.** All **three** instances of the fires-without-prerequisites shape fixed as **one named change**, including the onboarding chunk on Zoran's ruling. **POST-MERGE DATA STEP, ORCHESTRATOR'S:** reset San Jose's stranded templates-ready chunk to `waiting`, **only after the deploy reports success**, because the old code would re-promote it.

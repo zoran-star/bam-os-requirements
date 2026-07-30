@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-30 · all three merged, three agents working",
+ "updated": "2026-07-30 · all merged, deployed, San Jose's stuck step fixed",
  "recentUpdates": [
+  "All three merged and deployed. San Jose's stuck setup step is reset, done AFTER the deploy landed, which took eleven and a half minutes",
+  "The class ages now reach the websites. San Jose's Beginner and Elementary both used to read 'Elementary School'. They are now 6-12 and 9-12 and finally tell apart",
+  "A collision was caught by the ROOM, not by me. Two builders were about to edit the same page. One stood down, nothing lost",
   "All three merged. Setup steps fixed in three places, KPI links seeding themselves, and your Stripe manage link in the welcome email",
   "Three agents now working in parallel: the Stripe message, the last hardcoded age split, and a check that stops this whole bug class recurring",
-  "Holding one database fix until the deploy finishes. Doing it early would just let the old code undo it",
-  "Column added and verified: 47 academies, all empty, so the new link shows for nobody until someone sets it up. 1666 is ready to merge",
-  "Turns out my call was right for a much bigger reason than I had. Doing it the other way round would have taken down EVERY message channel, texts included",
-  "Their builder turned that into a test, so the order is now a fact the code states rather than something someone has to remember"
+  "Holding one database fix until the deploy finishes. Doing it early would just let the old code undo it"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
