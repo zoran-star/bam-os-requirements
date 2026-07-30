@@ -187,7 +187,6 @@ jobs:
         working-directory: bam-ghl-agent
         run: node bam-portal/scripts/verify-client-portal-ui.mjs
 
-<<<<<<< HEAD
       # Business Blueprint hydration guards. Separate from the suites above because
       # it lives in scripts/ and runs from the parent directory.
       #
