@@ -4,6 +4,38 @@ Live queue of everything the San Jose onboarding surfaces. Onboarding spans days
 
 **Started 2026-07-25.**
 
+## ✅ BUILD A SHIPPED AS [PR #1660](https://github.com/zoran-star/bam-os-requirements/pull/1660), AND THE CLASS AGE RANGES ARE SEEDED IN PRODUCTION (2026-07-30)
+
+**A changes NO routing behaviour**, verified by diff: `booking.js`, `leads.js`, `miami-book.js`, `prompt-structure.js`, `agent-approvals.js`, `calendars-v15.js` all unmoved. 29 suites green, **all 9 negative controls PRINT the banner** (not merely exit non-zero), tsc/lint/syntax clean, and the room re-ran every one itself rather than taking its builder's word.
+
+**The independent tester found four defects and they were bounced back. The sharpest is worth keeping as a class:** the guard meant to stop an age BAND being read as an age let **`"under 10"` and `"u12s"`** through as a confident age, so the caller would BOOK instead of asking. The fix also catches the number-first spellings **`"10 and under"` and `"12u"`**, one of which is the standard American youth-sports form **in the state San Jose is in**. A validator that is correct in one country's notation and silently wrong in another's is the same family as the timezone bugs.
+
+### Seeded by the orchestrator, verified by read-back
+
+| academy | class | age_min | age_max | source |
+|---|---|---|---|---|
+| BAM GTA | Group 1 | 9 | 13 | **Zoran confirmed** |
+| BAM GTA | Group 2 | 14 | **no limit** | **Zoran confirmed** |
+| BAM San Jose | Beginner Academy | 6 | 12 | grades 1-6, **unconfirmed by Lij** |
+| BAM San Jose | Elementary Academy | 9 | 12 | grades 4-6, **unconfirmed by Lij** |
+| BAM San Jose | Pre-Season Academy | 12 | 18 | grades 7-12, **unconfirmed by Lij** |
+
+**Zoran's call: use the proposed San Jose ranges NOW and ask Lij later**, rather than holding the build. **San Jose's numbers are not invented** - they are Lij's own grade bands, which were sitting in `locations.notes`. Added to his ask-list as a confirmation rather than a question, so nothing waits on it.
+
+**Read before writing, not after:** exactly ONE offer per academy carries a `schedule.classes` array, with titles and counts matching the guards exactly, and zero classes already carried an age field. **Verified after: all five seeded, array ORDER preserved, values stored as STRINGS.**
+
+**⚠️ TWO PROPERTIES OF THAT SQL THAT MUST SURVIVE ANY RE-RUN.** `ORDER BY ord` is **not cosmetic**: class keys are derived from the title and disambiguated by ARRAY POSITION, so rebuilding the array in a different order silently RE-KEYS the classes and points future slots at the wrong one. And the values are **strings on purpose**, because the wizard's block builder stores what a text input gives it and the resolver coerces; writing JSON numbers would diverge from what the UI will write. **The write is INERT until build B.**
+
+### ⭐ THE SAN JOSE FINDING THAT IS NOT ABOUT AGE AT ALL
+
+**San Jose's Beginner and Elementary overlap almost entirely on age and differ by SKILL.** Age alone will ALWAYS return two matches for a 9 to 12 year old, so **San Jose's one clarifying question is "has your child played before?", not an age question.** Zoran's ask-one-question rule survives contact with a real academy, but the question is not the one anybody assumed. **Also: San Jose serves 6 year olds where GTA starts at 9**, so "our age range" was never a shared fact.
+
+### ⛔ WHAT STILL GATES BUILD B
+
+1. **The age numbers must be in** (done) or deleting the prompt text destroys GTA's only record of its bands.
+2. **86 GTA slots + 4 templates need `source_offer_class_key` backfilled.** SQL comes after #1660 merges and deploys, because the PATCH endpoint that makes a clean backfill possible ships in it. **Orchestrator's to run.**
+3. **AN ARMING-GATE RULE, found by the tester and flagged early on purpose: refuse to switch an academy to age routing while ANY of its classes reads `configured:false`.** An unconfigured class matches EVERY age by design, so GTA would return `multiple` for every athlete and **start asking a question where it used to route silently.** That is house rule 1 broken by omission, and it is build B scope.
+
 ## ✅ ZORAN CONFIRMED BOTH BUSINESS PHONE NUMBERS (2026-07-30). The gate is open.
 
 **BAM GTA `(289) 816-6569` · BAM San Jose `(408) 597-4327`.** Both already sit in `clients.phone`; they are now **confirmed data rather than unverified Google scrapes**, which closes the standing warning that a business phone is not a display field because it becomes the number printed to parents.

@@ -54,7 +54,21 @@ These get used when a parent asks what training actually looks like, and how man
 
 ---
 
-## 6. How people get in the door
+## 6. Check the ages on your three programs
+
+We read these off your own schedule notes and entered them, so nothing is waiting on you. We just want you to confirm we read them right:
+
+- Beginner Academy, grades 1 to 6, so ages 6 to 12
+- Elementary Academy, grades 4 to 6, so ages 9 to 12
+- Pre-Season Academy, grades 7 to 12, so ages 12 to 18
+
+These decide which session a parent gets offered when they book, so a wrong number puts a kid in the wrong group.
+
+One thing we noticed: Beginner and Elementary cover almost the same ages and really differ by experience, not age. So when two sessions fit, we will ask the parent whether their child has played before. **Tell us how you would rather word that question** and we will use your wording.
+
+---
+
+## 7. How people get in the door
 
 You have two locations on file:
 
@@ -67,7 +81,7 @@ This goes into the text a parent gets the morning of their first session. If you
 
 ---
 
-## 7. Privacy policy and terms for your site
+## 8. Privacy policy and terms for your site
 
 We need the actual content, or your go-ahead to draft it and have you check it.
 
@@ -75,7 +89,7 @@ Two reasons: your website needs them, and you cannot get a texting campaign appr
 
 ---
 
-## 8. Your own Twilio account
+## 9. Your own Twilio account
 
 This is for texting and calling long term. Set up the account under your business and we will handle the wiring.
 
@@ -87,7 +101,7 @@ That switch happens weeks **after** you go live, not before. Nothing about it de
 
 ---
 
-## 9. Texting sign-up wording, plus 2 sample texts
+## 10. Texting sign-up wording, plus 2 sample texts
 
 For the texting approval: what people agree to when they hand you their number on your forms, and two examples of the kind of message you would send.
 

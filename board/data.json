@@ -1,17 +1,18 @@
 {
- "updated": "2026-07-30 · Lij's ask-list drafted and ready to send",
+ "updated": "2026-07-30 · age ranges live, first half of the routing build open",
  "recentUpdates": [
+  "First half of the age-routing build is open as a pull request. It deliberately changes no booking behaviour yet",
+  "Your GTA age ranges are now in the system, plus San Jose's read off Lij's own schedule notes. Nothing acts on them until the second half",
+  "A test caught something good: 'under 10' and 'u12s' were being read as a confident age. '12u' is the standard American spelling, in the state San Jose is in",
+  "San Jose's real problem is not age at all. Two of its programs cover the same ages and differ by EXPERIENCE, so the question to ask a parent is 'has your child played before?'",
   "Lij's ask-list is drafted and ready for you to send. 9 items, Stripe first, and it does NOT ask for anything we already have",
-  "Checked his record before writing it: his reviews, both gym addresses, his domain and his business number are all done. The old list still asked for all of them",
-  "New ask nobody had: how a family actually gets in the door at each of his two gyms. That line goes out the morning of a first session",
-  "Public form: nothing anywhere links to it, so nobody can reach it without typing the URL. Parked, not built on further",
-  "You ruled the public names: each academy is branded by its city. By Any Means Toronto and By Any Means San Jose. Notes updated so nobody changes them back",
-  "What still holds from the old rule: the internal label (BAM GTA, BAM San Jose) must never reach a parent. That was always the real bug"
+  "Checked his record before writing it: his reviews, both gym addresses, his domain and his business number are all done. The old list still asked for all of them"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
    "Two San Jose data fixes for launch: allowlist its domain, and press the entry-point seed button. Both are data, not code",
+   "Merge PR #1660 when you are happy. It is the safe half: no booking behaviour changes, 29 test suites green",
    "Decide on 2 new preset leaks: GTA's gym door in every academy's confirmation text, and GTA's age groups baked into every AI",
    "SEND LIJ HIS ASK-LIST. Drafted and waiting for you at docs/plans/lij-ask-list.md. Stripe is item 1 and it gates his prices, checkout and class times",
    "File the Google Business Profile API application. Days to weeks, still unfiled",
