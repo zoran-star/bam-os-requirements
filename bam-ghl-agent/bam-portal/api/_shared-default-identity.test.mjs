@@ -125,6 +125,16 @@
 //   * Casing and spelling evasion: a body writing "ByAnyMeansToronto.ca" or
 //     "Oakvile" is not caught. The matcher normalises punctuation and case for
 //     multiword values, nothing more.
+//   * A RETIRED value of a live field is invisible to the identity half. The
+//     link that actually leaked, share.google/yel2SPxIMKzjsJG9c, is not on GTA's
+//     row any more (the row now says g.page/r/...), so MUTATE=review is caught
+//     only by the structural "no URL in a shared default" rule, while
+//     MUTATE=reviewnow is caught by both. A snapshot is a photograph of today.
+//   * An IANA timezone identifier is excluded by construction (see deIana), so a
+//     future default hardcoding one is invisible here. DEFAULT_TZ in
+//     confirm-automations.js is such a value: it is documented as a fallback and
+//     is not even GTA's stored zone, but it is a shared default pinned to one
+//     region and nothing in this file will ever say so.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -586,13 +596,17 @@ const COMMENT_ONLY = [
 // satisfied by a stripper that removes EVERYTHING, and a stripper that returns
 // "" turns the whole source sweep into a check that can never fail. MUTATE=
 // blindstrip is the control for it, and it caught precisely that hole here.
-// These anchors are code and copy that must survive stripping.
+// These anchors are code AND copy: code alone would still pass for a stripper
+// that ate every string literal, which is the half that matters here. They are
+// chosen to be things no negative control in this file edits, so a control's
+// delta reports what it actually broke rather than collateral.
 const MUST_SURVIVE_STRIPPING = [
   ["prompt-structure.js", "export const SECTIONS"],
   ["prompt-structure.js", "export function assemblePrompt"],
-  ["prompt-structure.js", "Pick the group by the athlete's age"],
+  ["prompt-structure.js", "SINGLE SOURCE OF TRUTH for every academy fact"],
   ["confirm-automations.js", "export const DEFAULT_CONFIRM_AUTOMATIONS"],
-  ["confirm-automations.js", "{{appointment.entry_note}}"],
+  ["confirm-automations.js", "export function getConfirmAutomations"],
+  ["confirm-automations.js", "Your free trial is booked!"],
 ];
 
 function runSuite({ PS, CA, srcPS, srcCA, blindStrip }) {
