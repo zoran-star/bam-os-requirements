@@ -18,6 +18,9 @@
 // this endpoint only reports what the DB already says is routable.
 
 import { withSentryApiRoute } from "../_sentry.js";
+// Pure, no network and no database. It is the single owner of what a class's
+// age bounds MEAN, and this endpoint reads it rather than re-deriving them.
+import { classAgeRange } from "../agent/_class-routing.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -361,6 +364,38 @@ async function handler(req, res) {
       groups: (Array.isArray(scheduleData.classes) ? scheduleData.classes : []).map((cls) => ({
         title: cls && cls.title ? String(cls.title) : null,
         age: cls && cls.age ? String(cls.age) : null,
+        // The NUMERIC age range, so a client site can stop hardcoding one
+        // academy's class boundary. `age` above stays and is unchanged: it is
+        // free text an owner typed ("Elementary School", "Grades 5-8"), it is
+        // what parent-facing copy shows, and it carries no reliable numeric
+        // meaning - a grade is a different age in Ontario than in California,
+        // which is exactly why nothing may machine-convert it.
+        //
+        // Passed through RAW. api/agent/_class-routing.js `classAgeRange()`
+        // owns every rule about what these mean (both ends inclusive, "No
+        // upper limit" beats a number left stranded in age_max when the owner
+        // switched the toggle, neither bound set means unconfigured). A
+        // consumer should port that function rather than re-derive it, or the
+        // two repos drift and the drift is silent.
+        age_min: cls && cls.age_min != null ? String(cls.age_min) : null,
+        age_max: cls && cls.age_max != null ? String(cls.age_max) : null,
+        age_max_mode: cls && cls.age_max_mode != null ? String(cls.age_max_mode) : null,
+        // ⚠️ WHY `configured` CROSSES THE WIRE, and it is not a convenience.
+        // An unconfigured class matches EVERY age by design, so academies did
+        // not go dark the day the fields shipped. A site that cannot tell
+        // "the offer fetch failed" from "the classes are present but nobody
+        // has typed ages yet" has to guess, and both guesses are wrong: fail
+        // closed and the page goes dark for every academy that has not filled
+        // the fields in, which on day one is all of them except BAM GTA; fail
+        // open and it shows a calendar the server will then refuse to book.
+        // With this flag the site fails CLOSED on a failed fetch and DEFERS TO
+        // THE SERVER when the classes are simply unconfigured.
+        //
+        // Read from classAgeRange() rather than recomputed here. The first
+        // draft of this line inlined the same three-way test, which would have
+        // been a second definition of "configured" in the exact commit whose
+        // comment warns a consumer not to make one.
+        age_configured: classAgeRange(cls).configured,
         weekly_times: (cls && Array.isArray(cls.weekly_times) ? cls.weekly_times : []).map((wt) => ({
           days: (wt && wt.days) || [],
           start: (wt && wt.start) || null,
