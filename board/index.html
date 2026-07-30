@@ -89,7 +89,11 @@ section>h2::after{content:"";flex:1;height:1px;background:var(--line)}
 .jnote{margin-top:10px;font-size:12px;color:var(--mut);font-style:italic}
 
 /* kanban */
-.kanban{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;align-items:start}
+.kanban{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(300px,1fr);gap:14px;align-items:start;
+  overflow-x:auto;overflow-y:visible;padding-bottom:12px;scrollbar-width:thin}
+.kanban::-webkit-scrollbar{height:10px}
+.kanban::-webkit-scrollbar-thumb{background:var(--line)}
+.kanban::-webkit-scrollbar-thumb:hover{background:var(--gold)}
 .kcol{border:1px solid var(--line);background:rgba(0,0,0,.14);padding:12px;display:flex;flex-direction:column;gap:10px;min-height:150px}
 .kcol.over{border-color:var(--gold);background:rgba(212,182,92,.06)}
 .kcol .khead{border-bottom:1px solid var(--line);padding-bottom:8px}
@@ -560,7 +564,8 @@ function render(d){
     return base;
   });
 
-  const hq = live.find(c => c.name === "MISTER_ORCHESTRATOR");
+  const HQ_NAME = (d.orchestrator && d.orchestrator.chat) || "MISTER_ORCHESTRATOR";
+  const hq = live.find(c => c.name === HQ_NAME);
   $("hqSlot").innerHTML = hq ? `
     <div class="hq">
       <h3>${esc(hq.sidebar || hq.name)}</h3>
@@ -574,7 +579,7 @@ function render(d){
     </div>` : "";
 
   $("kanban").innerHTML = (d.columns || []).map(col => {
-    const items = live.filter(c => c.name !== "MISTER_ORCHESTRATOR" && c.column === col.id)
+    const items = live.filter(c => c.name !== HQ_NAME && c.column === col.id)
                       .sort((a,b) => (a._ord ?? 999) - (b._ord ?? 999));
     return `<div class="kcol" data-col="${esc(col.id)}">
       <div class="khead">

@@ -187,6 +187,36 @@ Rendering San Jose for review surfaced what no test would have: **every one of i
 
 **⚠️ THIS PULLS `bam-client-sites` INTO SCOPE**, because the GTA free-trial page swap (fabricated cards → real store-backed cards) is now explicitly the testimonials room's work.
 
+## 📄 TEMPLATING HANDOFF FOR A COLD CONTEXT: **`docs/handoffs/automation-templating-2026-07-30.md`** on branch **`claude/tokenize-academy-name`**
+
+**A NEW DATED FILE, not an overwrite.** The 2026-07-29 handoff is 326 lines of earlier history the room had not read, and **clobbering something unread is the mistake this week kept punishing.** Both exist; the new one says it supersedes. **Written to be loaded COLD into a fresh chat**, assuming nothing.
+
+**⚠️ TWO CORRECTIONS TO THE AUDIT ABOVE, because the audit describes `main` and that branch has moved past it:**
+- **All nine fact-section defaults are already EMPTY on that branch.** The "seven of nine still leaking" figure is **true of `main` only**.
+- **The gym-door literal is GONE.** It is now `{{appointment.entry_note}}`, resolved from the booked venue's own row, GTA seeded and San Jose empty.
+
+**`booking_group` is reclassified and the distinction matters:** it was filed as a *deferred product decision*; it is actually **blocked on a build**, because nothing is arriving to replace it. **It cannot be emptied, only made derivable.** Different queue entry, different owner.
+
+## ⛔ TWO SAN JOSE LAUNCH BLOCKERS NOBODY HAD FLAGGED, ORCHESTRATOR-VERIFIED IN PRODUCTION
+
+| Fact | Value |
+|---|---|
+| San Jose `allowed_domains` | **NULL** |
+| San Jose `entry_points` | **0** |
+| BAM GTA `entry_points` | **7** |
+| San Jose testimonials now stored | **5** |
+
+1. **`allowed_domains` is NULL, so San Jose's own site gets a 403 from the portal API** - and it now holds five real testimonials that would therefore **fail to render in production**. The work is done and the data is right; the door is shut.
+2. **ZERO `entry_points` rows means a lead would land in the table and NOTHING would tag or route it.** GTA has seven. This is queue item 62 ("the one-click entry-point seeding leg never ran"), and it is worse than "one button press" reads: **until it is pressed, the free-trial funnel captures leads into a void.**
+
+Both belong on item 25's launch switch list and both are data, not code.
+
+## 📏 THE CONFIRM-EMAIL LOCK CAUGHT A CHANGE IT WAS NOT WRITTEN FOR, ON ITS FIRST REAL TEST - AND THE ROOM CORRECTLY REFUSED TO BLESS IT
+
+A lock built hours earlier caught **another agent removing the door line**. The room did **NOT** re-bless the golden, because **that suite stubs the database empty, so the entry note renders blank** - blessing would have locked in *"GTA sends no entry note"* **right before the migration seeds exactly that.**
+
+**Second instance of the fixture-drift trap in one day**, caught before it landed rather than after. This is house rule 7 working preventively for the second time, and it is the strongest evidence yet that the rule has become a habit rather than a scar.
+
 ## ⛔⛔ PRESET LEAK AUDIT (2026-07-30, RENDERED not grepped). **TWO NEW BLOCKERS, NEITHER IN THIS FILE, BOTH ORCHESTRATOR-VERIFIED ON MAIN.**
 
 Method: rendered the preset for a hypothetical blank academy ("Northside Hoops") through the **real** `stepEnabled()` / `resolveSyncClass()` seeder rather than turning every step on. **That correction killed four candidate findings before they reached the report** - see the killed list below, and do not re-raise them.

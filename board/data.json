@@ -1,17 +1,18 @@
 {
- "updated": "2026-07-30 · preset audit, 2 new blockers",
+ "updated": "2026-07-30 · templating handed over",
  "recentUpdates": [
+  "TWO San Jose launch blockers found and verified: its own site is locked out of the portal, and its funnel would capture leads into a void",
+  "San Jose's 5 real testimonials are correct and would still fail to show in production, because its domain is not allowlisted",
+  "Templating handed over. A chip is open for the next orchestrator, whose first job is starting its successor",
   "Audit found 2 NEW leaks nobody had: every academy's trial-confirmation text describes GTA's gym door, and the AI carries GTA's age groups permanently",
   "The 30 vs 85 minute thing resolves: both are ours. 30 is the OWNER's time, 85 is staff time. Your question was about staff, so 85 is right",
   "Honest verdict on 85: plausible best case, but nobody can know until it is run once. San Jose can no longer be that test",
-  "6 PRs merged: CI resurrected, the clock bug class closed for good, 'Send nothing' fixed, public ticket form given a real route",
-  "One migration waits on you: the public ticket intake. Until it applies, the form still cannot save a ticket",
-  "None of this was on the list this morning. It came out of one subagent reporting what it noticed",
-  "'Send nothing' now works. It never has, on any academy, since it was built"
+  "6 PRs merged: CI resurrected, the clock bug class closed for good, 'Send nothing' fixed, public ticket form given a real route"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
+   "Two San Jose data fixes for launch: allowlist its domain, and press the entry-point seed button. Both are data, not code",
    "Decide on 2 new preset leaks: GTA's gym door in every academy's confirmation text, and GTA's age groups baked into every AI",
    "Apply the public ticket migration, or tell me to. It is the last thing between people and a working support form",
    "Confirm 2 phone numbers (SJ business 408-597-4327, GTA 289-816-6569). They gate the design AND a risky migration behind it",
@@ -889,9 +890,9 @@
   {
    "name": "AUTOMATION TEMPLATING II",
    "sidebar": "AUTOMATION TEMPLATING II",
-   "state": "white",
+   "state": "done",
    "column": "sales",
-   "one": "Reignition bounced back to its builder. Sales skill and owner approval still under test"
+   "one": "Handed over. Handoff written for a cold start. Successor starts from it"
   },
   {
    "name": "GTA enroll funnel bug",
