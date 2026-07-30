@@ -54,6 +54,7 @@
 //   MUTATE=reconnect    the message goes back to "then reconnect"
 //   MUTATE=errorchannel the callback reports pending as an error again
 //   MUTATE=dropunmapped a requirement code with no mapping is silently dropped
+//   MUTATE=droperrors   Stripe's own rejection reason is discarded again
 //   MUTATE=collapse     unreachable is reported as not_ready (the old two-state
 //                       collapse: "we could not ask" told as "you are not ready")
 //   MUTATE=tickonfail   unreachable counts as ready, so a failed call would tick
@@ -107,6 +108,13 @@ const ACCOUNT_NOT_READY = {
     ],
     past_due: ["external_account"],
     pending_verification: ["individual.id_number"],
+    // Stripe telling us WHY something already submitted was thrown out. Without
+    // it the owner re-uploads the same rejected file and waits again.
+    errors: [{
+      requirement: "individual.verification.document",
+      code: "verification_document_not_readable",
+      reason: "The uploaded file is not readable. Upload a clearer photo of the document.",
+    }],
     disabled_reason: "requirements.past_due",
   },
 };
@@ -139,6 +147,9 @@ const REQ_EDITS = {
   dropunmapped: [[
     "    const d = describeRequirement(code);\n    const hit = byLabel.get(d.label);",
     "    const d = describeRequirement(code);\n    if (!d.mapped) continue;\n    const hit = byLabel.get(d.label);"]],
+  droperrors: [[
+    "  const problems = (Array.isArray(req.errors) ? req.errors : []).map(e => ({",
+    "  const problems = [].map(e => ({"]],
   collapse: [[
     '  const unreachable = (error) => ({\n    outcome: "unreachable",',
     '  const unreachable = (error) => ({\n    outcome: "not_ready",']],
@@ -397,7 +408,7 @@ async function main() {
   const live = async (account, failure = null) => {
     STRIPE_ACCOUNT = account; STRIPE_ACCOUNT_FAILS = failure;
     const s = await readStripeAccount("acct_1Tz08nLhm4hK898M", "sk_test_stub_platform_key");
-    return { outcome: s.outcome, reachable: s.reachable, needs: s.needs, reviewing: s.reviewing, disabled_reason: s.disabled_reason };
+    return { outcome: s.outcome, reachable: s.reachable, needs: s.needs, reviewing: s.reviewing, problems: s.problems, disabled_reason: s.disabled_reason };
   };
   const base = { status: "onboarding", account_id: "acct_1Tz08nLhm4hK898M" };
   const cardNotReady = renderModal(html, { ...base, live: await live(ACCOUNT_NOT_READY) });
@@ -428,6 +439,8 @@ async function main() {
     ok(cardNotReady.includes(code), "no requirement code is lost when items collapse",
       `${code} does not appear anywhere in the rendered card, so collapsing the three date-of-birth codes onto one line lost it.`);
   }
+  ok(cardNotReady.includes("The uploaded file is not readable"), "Stripe's own rejection reason reaches the owner",
+    `Stripe returned requirements.errors saying the uploaded document is not readable, and the card does not say so anywhere. Without it the owner sees "photo ID document" asked for again and re-uploads the same rejected file.\n    Rendered:\n${cardNotReady}`);
   ok(/Stripe is reviewing/.test(cardNotReady) && /government ID number/.test(cardNotReady),
     "pending_verification is shown separately",
     "individual.id_number was in pending_verification. Something Stripe is checking is not something the owner has to go and do, and the card must not mix them.");
@@ -507,7 +520,7 @@ function checkMembersWiring() {
   if (at < 0) return ok(false, "members.js still produces stripe.live",
     "no `stripeLive = {` in api/members.js. If the producer moved, re-point this check at it - without it the Stripe card can go blank and every render in this file still passes, because the renders are fed by hand.");
   const block = members.slice(at, members.indexOf("};", at));
-  for (const field of ["outcome", "reachable", "needs", "reviewing", "disabled_reason"]) {
+  for (const field of ["outcome", "reachable", "needs", "reviewing", "problems", "disabled_reason"]) {
     ok(new RegExp(`\\b${field}\\s*:`).test(block), "members.js still produces stripe.live",
       `_stripeOnboardingBody in public/client-portal.html reads live.${field}, and api/members.js no longer puts it on the payload. The card would render without it and say nothing.`);
   }

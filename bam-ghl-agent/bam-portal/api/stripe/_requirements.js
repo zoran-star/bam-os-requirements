@@ -208,6 +208,7 @@ export async function readStripeAccount(acctId, platformSecret, opts = {}) {
     disabled_reason: null,
     needs: [],
     reviewing: [],
+    problems: [],
   });
 
   if (!acctId) return unreachable("no connected account id");
@@ -228,6 +229,18 @@ export async function readStripeAccount(acctId, platformSecret, opts = {}) {
   }
 
   const req = (a && a.requirements) || {};
+  // requirements.errors is Stripe telling us WHY something already submitted
+  // was rejected ("The document is unreadable"). Without it an owner who
+  // uploaded an ID that Stripe threw out just sees the same item asked for
+  // again, with nothing to act on. `reason` is Stripe's own sentence and is
+  // passed through verbatim; when there is none, the machine code is shown
+  // rather than an empty line, the same rule as the requirement codes.
+  const problems = (Array.isArray(req.errors) ? req.errors : []).map(e => ({
+    requirement: (e && e.requirement) || null,
+    label: (e && (e.reason || e.code)) || "Stripe rejected something and did not say what",
+    what: e && e.requirement ? describeRequirement(e.requirement).label : null,
+    code: (e && e.code) || null,
+  }));
   // currently_due is what blocks charges today; past_due is the subset Stripe
   // has already chased. Union, because an academy needs to see both and Stripe
   // does not always repeat one inside the other.
@@ -242,6 +255,7 @@ export async function readStripeAccount(acctId, platformSecret, opts = {}) {
     disabled_reason: describeDisabledReason(req.disabled_reason),
     needs: describeRequirements(due),
     reviewing: describeRequirements(req.pending_verification || []),
+    problems,
   };
 }
 

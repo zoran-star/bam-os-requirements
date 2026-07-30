@@ -49343,14 +49343,23 @@ function _stripeOnboardingBody(stripe) {
   if (live && live.outcome === 'not_ready') {
     const needs = _stripeNeedsList(live.needs);
     const reviewing = _stripeNeedsList(live.reviewing);
+    // Stripe's own sentence about something already submitted and thrown out
+    // ("The document is unreadable"). Without it the owner just sees the same
+    // item asked for again and re-uploads the same rejected file.
+    const problems = Array.isArray(live.problems) && live.problems.length
+      ? `<div style="font-size:11px;font-weight:700;color:#c4634f;letter-spacing:0.5px;text-transform:uppercase;margin:12px 0 6px">Stripe rejected what you sent</div>
+         <ul style="margin:0 0 14px;padding-left:18px;font-size:13px;line-height:1.6;color:var(--text)">` +
+        live.problems.map(p => `<li>${escapeHTML(p.label || '')}${p.what ? ` <span style="color:var(--text-mute)">(${escapeHTML(p.what)})</span>` : ''}</li>`).join('') + `</ul>`
+      : '';
     const why = (!needs && live.disabled_reason)
       ? `<div style="${P}">${escapeHTML(live.disabled_reason.label || '')}</div>`
       : '';
-    const nothingNamed = (!needs && !reviewing && !why)
+    const nothingNamed = (!needs && !reviewing && !why && !problems)
       ? `<div style="${S}">Stripe did not name an outstanding item, which usually means a check is still running on their side.</div>`
       : '';
     return `<div style="${P}">Your Stripe account is linked, but Stripe says it <b>cannot accept payments yet</b>.</div>
             ${why}
+            ${problems}
             ${needs ? `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:12px 0 6px">Stripe still needs</div>${needs}` : ''}
             ${reviewing ? `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:12px 0 6px">Stripe is reviewing</div>${reviewing}` : ''}
             ${nothingNamed}

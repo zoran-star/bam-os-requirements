@@ -707,9 +707,10 @@ async function handler(req, res) {
             checked_at: new Date().toISOString(),
             needs: s.needs,
             reviewing: s.reviewing,
+            problems: s.problems,
             disabled_reason: s.disabled_reason,
           };
-        } catch (_) { stripeLive = { outcome: "unreachable", reachable: false, checked_at: new Date().toISOString(), needs: [], reviewing: [], disabled_reason: null }; }
+        } catch (_) { stripeLive = { outcome: "unreachable", reachable: false, checked_at: new Date().toISOString(), needs: [], reviewing: [], problems: [], disabled_reason: null }; }
       }
 
       // CoachIQ config (for the "Set up CoachIQ" member-card invite).
