@@ -844,6 +844,25 @@ Zoran's bar is *"not done until every consumer pulls from the store"*. **The fai
 
 **So the finish condition must be a CHECK THAT FAILS when a hardcoded testimonial string reappears anywhere**, not a list somebody ticks off. Same enforced-inventory antidote this file keeps recording. **Cheap with one converted consumer, expensive at five.** Handed to the testimonials room before it builds rather than in review.
 
+## 🏆 THE THREAD RESOLVES INTO A MECHANISM, NOT A MORAL: **ASSERT A STRUCTURAL INVARIANT OF YOUR TOOL'S OUTPUT, OVER THE REAL TREE, EVERY RUN.**
+
+#1669's author took "right answer, unproven method" and pointed it at the one piece of its own checker it had never directly verified: **`blank()`, which strips comments and strings before anything else runs.** Everything downstream matches against its output, so **when it desyncs the scan does not error. It goes quiet and reports FEWER hits with total confidence.**
+
+**It asserted the invariant that must hold: blanking replaces characters in place and never touches a real brace, so blanked source must stay brace-balanced. SIX of 251 files failed, from two independent bugs.**
+
+| File | Bug |
+|---|---|
+| `api/contacts.js:250` | A template literal nested inside another template's `${...}`. The scanner ended the string at the inner backtick and read the trailing `{"` as live code |
+| `api/store/inventory.js:88` | `return /^https:\/\/[^\s"'<>]+$/i` - regex-versus-division was decided on the last CHARACTER (`n` of `return`), so the regex went undetected and the `"` inside its character class opened a phantom string that **blanked everything from line 89 to end of file** |
+
+**The hit count is unchanged at 29, so neither bug was hiding a real collapse - but that is now a measurement rather than an assumption, and it was luck.** A collapse below line 89 of `inventory.js` would have been **invisible while the gate printed "every network boolean in api/ is accounted for."**
+
+**⭐ WHY THIS IS THE ANSWER AND NOT JUST ANOTHER INSTANCE.** Every earlier instance tonight was caught by a person looking harder. **That does not scale and it demonstrably fails, four times in an hour, among the people most alert to it.** This one is caught by **an assertion about the tool's own output, run over the real tree on every execution.** It does not require anyone to be suspicious on the right day.
+
+**The general form, for anything that preprocesses before it inspects:** a scanner, a stripper, a parser, a renderer. **Find a property its output must have if it is working, assert it against real inputs continuously, and you convert "cannot see this region" from a silent zero into a failure.** Kept as a permanent self-test, plus a seventh control (`MUTATE=nestedtemplate`) hiding a collapse behind both real constructs **so the capability stays tested even if those exact lines get refactored away.** Both halves verified to bite: flattening template scanning fails the self-test on 5 files, reverting regex detection fails it on 1, **each before the control even runs.**
+
+**The author's own statement of it, which needs no improvement:** *"My gate's failure mode was the same as the bug it polices. It could not distinguish 'no collapses here' from 'cannot see this region,' and it reported the first. I wrote three paragraphs about that distinction and then shipped a scanner that failed it."*
+
 ## 📏📏📏📏📏 THE WHOLE THREAD IN ONE SHAPE, and the closing instance is the most honest of the four
 
 Three separate times in one exchange, a clean-looking result turned out to be unexamined:
