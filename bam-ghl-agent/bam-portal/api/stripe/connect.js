@@ -97,6 +97,7 @@ function verifyState(state) {
 // the same message. readStripeAccount() (api/stripe/_requirements.js) answers
 // with three outcomes and keeps the reason. Only "ready" ticks the step, so
 // what gets STORED is unchanged; what the owner is told is not.
+// ─────────────────────────────────────────────────────────
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
