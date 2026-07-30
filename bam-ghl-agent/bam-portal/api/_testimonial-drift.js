@@ -39,6 +39,23 @@
 // Keying on sync_class rather than scanning bodies for "testimonial" is not a
 // preference: the text search finds ZERO steps, because the bodies are
 // `template:nurture-3` and `template:onboarding-testimonials`.
+//
+// ⛔ HISTORICAL NOTE FOR ANYONE READING A DISABLED-STEP COUNT, because this WILL
+// look wrong later. Until 2026-07-29, San Jose's `nurture-3` was the ONLY
+// disabled step across every academy, and that single disabled step was used all
+// day as a canary: migration checks reported "1 disabled step" as evidence the
+// hold was intact. The hold existed because the template carried GTA's parents
+// hardcoded and re-attributed them by city.
+//
+// THAT PRECONDITION SHIPPED. nurture-3 now renders each academy's own quotes
+// from this store, so the hold was DELIBERATELY RELEASED and there are now ZERO
+// disabled steps system-wide.
+//
+// So: "0 disabled steps" is NOT evidence that anyone violated the never-flip-an-
+// existing-row rule. That rule is unchanged. What is gone is the cheap external
+// signal that it was being honoured, and this check is what replaced it - it
+// watches the thing the canary only implied, namely whether a live step is
+// quoting a store that cannot support it.
 
 // The steps that quote the store. Bodies are template references, so exact.
 export const TESTIMONIAL_BODIES = ["template:nurture-3", "template:onboarding-testimonials"];

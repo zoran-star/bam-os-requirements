@@ -7,10 +7,11 @@
 // automations or store change shape, re-snapshot it rather than patching it.
 //
 //   node scripts/verify-testimonial-seed-drift.mjs                    → PASS (exit 0)
-//   MUTATE=sj-enabled ...        San Jose's held nurture-3 turned on  → FAIL (exit 1)
-//   MUTATE=gta-store-empty ...   live steps, emptied store            → FAIL (exit 1)
-//   MUTATE=gta-no-step ...       quotes exist, step dropped at seed   → REPORT, exit 0
-//   MUTATE=gta-none-starred ...  rows but none featured               → REPORT, exit 0
+//   MUTATE=sj-store-emptied ...   SJ's store wiped under a live step  → FAIL (exit 1)
+//   MUTATE=gta-store-emptied ...  GTA's store wiped under live steps  → FAIL (exit 1)
+//   MUTATE=all-stores-emptied ... both wiped                          → FAIL (exit 1)
+//   MUTATE=sj-unstarred ...       rows but none featured              → REPORT, exit 0
+//   MUTATE=gta-step-dropped ...   quotes exist, step dropped at seed  → REPORT, exit 0
 //
 // The two mutations that FAIL are the ones that would send a real parent's
 // words from an academy that did not earn them. The two that only REPORT are
@@ -19,12 +20,31 @@
 import { readFileSync } from 'node:fs';
 const fx = JSON.parse(readFileSync(new URL('./__fixtures__/testimonial-seed-drift.prod.json', import.meta.url)));
 const mutate = process.env.MUTATE;
-if (mutate === 'sj-enabled') {
-  fx.steps.find(s => s.automation_id === '88cc6556-79bb-4de8-93d1-c51a23f5fc10' && s.body === 'template:nurture-3').enabled = true;
-}
-if (mutate === 'gta-store-empty') fx.testimonials = [];
-if (mutate === 'gta-no-step') fx.steps = fx.steps.filter(s => s.sync_class !== 'attributed' || s.automation_id !== '49cfe3da-27cd-4a34-b8f0-eb145c8b97ca');
-if (mutate === 'gta-none-starred') fx.testimonials = fx.testimonials.map(t => ({ ...t, starred: false }));
+const SJ_NURTURE = '88cc6556-79bb-4de8-93d1-c51a23f5fc10';
+const GTA_NURTURE = '49cfe3da-27cd-4a34-b8f0-eb145c8b97ca';
+const SJ = '5576acf0-acd3-4c05-9f9f-ebfde8618154';
+const GTA = '39875f07-0a4b-4429-a201-2249bc1f24df';
+
+// ⚠️ THE MUTATIONS CHANGED ON 2026-07-29 AND THE REASON MATTERS.
+// The old set included "someone re-enables San Jose's held nurture-3", because
+// that step was the only disabled step in the system and re-enabling it would
+// have sent GTA's parents under San Jose's name. THAT HOLD WAS DELIBERATELY
+// RELEASED once nurture-3 rendered from the store, so the danger it modelled can
+// no longer arise that way - and a mutation that models an impossible state
+// passes for the wrong reason. There are now ZERO disabled steps system-wide.
+//
+// ⛔ DO NOT READ "0 disabled steps" AS EVIDENCE THE HOLD WAS VIOLATED. It was
+// released on purpose, after its precondition shipped. The rule it protected
+// (never flip an existing row's enabled flag without a reason) is unchanged;
+// what is gone is the cheap external signal that it was being honoured.
+//
+// So the mutations now model dangers that ARE still reachable from the current
+// state: a store emptied underneath a live step, either academy.
+if (mutate === 'sj-store-emptied') fx.testimonials = fx.testimonials.filter(t => t.client_id !== SJ);
+if (mutate === 'gta-store-emptied') fx.testimonials = fx.testimonials.filter(t => t.client_id !== GTA);
+if (mutate === 'all-stores-emptied') fx.testimonials = [];
+if (mutate === 'sj-unstarred') fx.testimonials = fx.testimonials.map(t => t.client_id === SJ ? { ...t, starred: false } : t);
+if (mutate === 'gta-step-dropped') fx.steps = fx.steps.filter(s => !(s.automation_id === GTA_NURTURE && s.sync_class === 'attributed'));
 
 process.env.SUPABASE_URL = 'https://fixture.test';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'k';

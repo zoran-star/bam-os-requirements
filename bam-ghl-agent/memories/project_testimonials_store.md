@@ -49,6 +49,15 @@ separate launch-day switch). Order mattered: the step was only flipped AFTER the
 store-backed template deployed, because flipping first would have sent GTA's
 "Parent of Adam" re-attributed to San Jose.
 
+**⛔ ZERO DISABLED STEPS IS NORMAL NOW.** Until 2026-07-29 San Jose's nurture-3
+was the ONLY disabled step across all academies and was used as a canary ("1
+disabled step" = the hold is intact). The hold existed because the template
+carried GTA's parents hardcoded. That precondition shipped, so the hold was
+deliberately RELEASED. **"0 disabled" does NOT mean the never-flip-enabled rule
+was violated.** The drift reconciler replaced the canary: it watches whether a
+live step quotes a store that cannot support it, which is what the canary only
+implied.
+
 **Render path:** `academyFacts` -> `location_testimonials` -> `email-shells`
 `testimonialsHtml()` -> `{{location.testimonials}}` token, in DROP_WHEN_EMPTY so
 an empty store drops the block AND its lead-in. Verified by
