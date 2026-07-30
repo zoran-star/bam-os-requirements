@@ -1,14 +1,12 @@
 {
- "updated": "2026-07-30 · orchestrator III up, templating successor spawned",
+ "updated": "2026-07-30 · orchestrator III up, templating II still building",
  "recentUpdates": [
   "MISTER_ORCHESTRATOR III is up. Same queue file, same board, same house rules. Nothing changed for any chat",
-  "AUTOMATION TEMPLATING III spawned. Its branch was freed first, so it can pick up exactly where the last one stopped",
-  "Its first job: kill the last live leak, where every academy's AI carries GTA's age groups and nothing can ever clear it",
+  "AUTOMATION TEMPLATING III is spawned and briefed, holding until II finishes its current build",
+  "My error, corrected: I read II's handover file and assumed it had stopped. It is still building. Branch given back, nothing lost",
   "TWO San Jose launch blockers found and verified: its own site is locked out of the portal, and its funnel would capture leads into a void",
   "San Jose's 5 real testimonials are correct and would still fail to show in production, because its domain is not allowlisted",
-  "Templating handed over. A chip is open for the next orchestrator, whose first job is starting its successor",
-  "Audit found 2 NEW leaks nobody had: every academy's trial-confirmation text describes GTA's gym door, and the AI carries GTA's age groups permanently",
-  "The 30 vs 85 minute thing resolves: both are ours. 30 is the OWNER's time, 85 is staff time. Your question was about staff, so 85 is right"
+  "Templating handed over. A chip is open for the next orchestrator, whose first job is starting its successor"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
@@ -722,13 +720,13 @@
   {
    "name": "AUTOMATION TEMPLATING III",
    "sidebar": "AUTOMATION TEMPLATING III",
-   "state": "white",
+   "state": "orange",
    "column": null,
-   "one": "Just spawned. Planning the fix that routes a kid to a class by their real age instead of GTA's age groups",
+   "one": "Briefed and waiting. Next up: route a kid to a class by real age instead of GTA's age groups",
    "builds": [
     "t-convergence"
    ],
-   "blockedBy": null
+   "blockedBy": "AUTOMATION TEMPLATING II still holds the branch"
   },
   {
    "name": "SET UP TWILIO BITCH",
@@ -902,9 +900,9 @@
   {
    "name": "AUTOMATION TEMPLATING II",
    "sidebar": "AUTOMATION TEMPLATING II",
-   "state": "done",
-   "column": "sales",
-   "one": "Handed over. Handoff written for a cold start. Successor starts from it"
+   "state": "white",
+   "column": null,
+   "one": "Still building: the gate that catches one academy's identity inside any shared default"
   },
   {
    "name": "GTA enroll funnel bug",
