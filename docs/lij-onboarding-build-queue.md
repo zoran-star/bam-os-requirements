@@ -4,6 +4,20 @@ Live queue of everything the San Jose onboarding surfaces. Onboarding spans days
 
 **Started 2026-07-25.**
 
+## 🟡 LIJ CONNECTED STRIPE 2026-07-30. IT WORKED. **THE MESSAGE HE SAW TOLD HIM IT FAILED AND GAVE HIM THE WRONG NEXT STEP.**
+
+**Production state, queried:** San Jose is no longer `not_connected`. `stripe_connect_account_id = acct_1Tz08nLhm4hK898M`, `stripe_connect_status = 'onboarding'`, `connected_at` NULL. **His OAuth succeeded and his account is stored. Nothing he did was lost.** Stripe reports `charges_enabled:false` because he has outstanding requirements on Stripe's side (business details, bank account, ID verification).
+
+**What he was shown:** *"Stripe connection failed - Stripe connected, but it cannot accept payments yet. Finish the remaining steps in Stripe, then reconnect."*
+
+**⚠️ "then reconnect" is WRONG, and our own code says so in three places.** The portal card for this exact state (`client-portal.html:49291`) says *"This step ticks itself as soon as Stripe says you can take payments - **you do not need to reconnect**"* and buttons through to the Stripe dashboard. `backfillStripeWhenChargeable()` (`action-items.js:435`) is the real mechanism: it re-checks Stripe for the narrow case "account stored, not yet chargeable" and flips the status to `connected` by itself. And the comment at `:49287` names the hazard outright: *"sending someone back through OAuth when the real blocker is inside Stripe just loops them."*
+
+**So the message the owner sees at the moment of failure contradicts the card, contradicts the mechanism, and recommends the exact loop the code warns against.** One line, `api/stripe/connect.js:310`. Spawned as its own fix.
+
+**📏 AND I NEARLY GOT THIS BACKWARDS, WHICH IS THE PART WORTH KEEPING.** My first read was that the card's *"it ticks itself"* was the lie - a reassuring sentence with no mechanism behind it, which is this project's signature failure and would have been the fourth instance this week. **I went looking for the cron that did not exist. It does exist**, narrow and well-commented, and the card is telling the truth. **The pattern is real often enough that it is now my default suspicion, and a default suspicion is exactly the thing that has to be checked rather than acted on.** Reversing it cost one grep; asserting it would have cost a room a day chasing a mechanism that was already there.
+
+**Correct advice for Lij, and it is the opposite of what the popup told him: do NOT reconnect. Finish the outstanding items in the Stripe dashboard. The portal ticks the step by itself the next time his action items load.**
+
 ## ✅ BUILD A SHIPPED AS [PR #1660](https://github.com/zoran-star/bam-os-requirements/pull/1660), AND THE CLASS AGE RANGES ARE SEEDED IN PRODUCTION (2026-07-30)
 
 **A changes NO routing behaviour**, verified by diff: `booking.js`, `leads.js`, `miami-book.js`, `prompt-structure.js`, `agent-approvals.js`, `calendars-v15.js` all unmoved. 29 suites green, **all 9 negative controls PRINT the banner** (not merely exit non-zero), tsc/lint/syntax clean, and the room re-ran every one itself rather than taking its builder's word.
