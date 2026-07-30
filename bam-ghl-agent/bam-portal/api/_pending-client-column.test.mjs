@@ -333,9 +333,13 @@ async function sendModule(edits) {
 // nocolumn also drops business_email out of SENDER_COLS, because that is the same
 // regression on the send path: the address the footer and the unsubscribe are built
 // from stops arriving.
+// (SENDER_COLS grew on 30 Jul 2026 to cover every column clientVars reads, because the
+// send path now RENDERS from that row - see api/_email-select-coverage.test.mjs section
+// 6. This pin still takes out exactly one column, business_email, which is the one with
+// a hold attached and the one this suite is about.)
 const NOSENDER = [[
-  `const SENDER_COLS = ["email_domain", "business_name", "business_email"];`,
-  `const SENDER_COLS = ["email_domain", "business_name"];`]];
+  `  "business_email", "public_name", "owner_name",`,
+  `  "public_name", "owner_name",`]];
 const { sendOn: sendReal } = await sendModule(MUTATE === "nocolumn" ? NOSENDER : []);
 const { sendOn: sendInj } = await sendModule(injectOne("SENDER_COLS_PENDING"));
 

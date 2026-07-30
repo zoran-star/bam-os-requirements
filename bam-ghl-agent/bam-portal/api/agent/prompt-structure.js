@@ -26,7 +26,12 @@
 // and prices; Shig Hoops (V2, no training offer, no stored row) was carrying
 // GTA's "$185 to $565" ladder because of exactly that. Fact-section defaults must
 // stay academy-agnostic - say what the agent should do when the data is missing,
-// never invent the data (Zoran 2026-07-24).
+// never invent the data (Zoran 2026-07-24). Four fact defaults are now EMPTY for
+// that reason (business_info, coaches, social_proof, qualification_config); each
+// carries a comment saying what was removed and why it must not come back, and
+// `api/_prompt-academy-neutral.test.mjs` renders real prompts for all three agents
+// to prove no academy's name, address, city, domain or credential claim reaches
+// another academy's agent. Run it after any edit to a fact body.
 import { PRICING_NOT_CONFIGURED } from "./fact-render.js";
 
 // ── Pricing disclosure (tier 1, BAM master) ──────────────────────────────────
@@ -235,7 +240,25 @@ export const SECTIONS = [
     "tag": "business_info",
     "layer": "location",
     "label": "Business info",
-    "body": "Name: By Any Means Basketball (BAM GTA)\nLocation: 1079 Linbrook Rd, Oakville, ON L6J 2L2\nDirections: The doors are on the front of the building to the left.\nYears running: 2 years\nTrial booking link: byanymeanstoronto.ca/free-trial"
+    // EMPTY ON PURPOSE, and it must stay empty. This body used to be BAM GTA's
+    // whole identity - its business name, its gym address on Linbrook Rd, the
+    // directions to that gym's door, and its byanymeanstoronto.ca booking link -
+    // sitting in the structure EVERY academy's agent is built from.
+    // renderBusinessInfo (api/agent/fact-render.js) derives it per academy from
+    // the clients row + that academy's own locations, but derivedFactOverrides
+    // returns {} for an academy with no training offer, and then pick() fell
+    // through to here: a sparse academy's agent gave parents a Toronto address
+    // and sent them to a Toronto booking page.
+    //
+    // The ENTRY stays so the section keeps its label and its row in the training
+    // UI (api/agent-train.js maps over SECTIONS); only the leaking literal is
+    // gone. Empty is the right answer, not a neutral example address: all
+    // academy data is MANDATORY before a sales system is turned on (Zoran
+    // 2026-07-30), so an academy without it must have NO business info rather
+    // than somebody else's, which is the fact-absent state the brain-health
+    // nudge chip exists for. Never put a sample name, address, or link here - a
+    // default that names one academy is a default every other academy serves.
+    "body": ""
   },
   {
     "key": "schedule",
@@ -249,7 +272,24 @@ export const SECTIONS = [
     "tag": "coaches",
     "layer": "location",
     "label": "Coaches",
-    "body": "All coaches are certified by By Any Means and have played at the college or professional level."
+    // EMPTY ON PURPOSE, and it must stay empty. This body used to be
+    //     "All coaches are certified by By Any Means and have played at the
+    //      college or professional level."
+    // which names one academy's brand and asserts one academy's credentials.
+    // renderCoaches (api/agent/fact-render.js) already calls this out as "a
+    // GTA-specific, and for other academies FALSE, credential claim" and emits a
+    // neutral do-not-invent instruction when no coach profiles exist - but only
+    // for an academy that HAS a training offer, because derivedFactOverrides
+    // returns {} without one. Everyone else fell through to here, so DETAIL
+    // Miami's and Next Level's agents were telling parents their coaches are
+    // certified by a company they have no relationship with.
+    //
+    // The ENTRY stays so the section keeps its label and its row in the training
+    // UI; only the leaking literal is gone. Nothing replaces it, not even a
+    // softened claim: a credential is a fact about real people, and the standing
+    // "only share information that exists in your academy config, flag rather
+    // than make it up" rule in `boundaries` already covers the empty case.
+    "body": ""
   },
   {
     "key": "social_proof",
@@ -306,7 +346,26 @@ export const SECTIONS = [
     "tag": "qualification_config",
     "layer": "offer",
     "label": "Who qualifies",
-    "body": "Qualify leads on these dimensions:\n- Location proximity: Are they in or near Oakville/GTA?\n- Athlete age: Athlete must be within the program's age range (see program)\n- Program fit: All skill levels accepted - place them in the right group for their level\n\nInterest level is NOT a qualification. Leads who aren't interested are never marked unqualified - they get moved to Nurture. Unqualified means they cannot be a customer (too far, wrong age, not a fit) and it removes them from the pipeline entirely."
+    // EMPTY ON PURPOSE, and it must stay empty. This body used to open with
+    //     "- Location proximity: Are they in or near Oakville/GTA?"
+    // which is one academy's geography deciding who counts as a lead for all of
+    // them. renderQualification (api/agent/fact-render.js) was written to kill
+    // exactly this - its comment names "the hardcoded near Oakville/GTA default
+    // leaking to other academies, the exact bug that would have had San Jose's
+    // agent qualifying Bay Area parents by Ontario geography" - but the renderer
+    // only runs for an academy that HAS a training offer. Without one,
+    // derivedFactOverrides returns {} and pick() fell through to this default,
+    // so the bug the renderer replaced was still shipping underneath it.
+    //
+    // The ENTRY stays so the section keeps its label and its row in the training
+    // UI; only the leaking literal is gone. An academy with no offer and no
+    // locations now renders no qualification rules at all, which is correct: the
+    // three criteria are worthless without this academy's own values in them,
+    // and inventing a service area is how a lead 3000km away gets qualified.
+    // The academy-agnostic HALF of these rules (interest is not a qualification,
+    // unqualified vs nurture) already lives in the `qualification` behaviour
+    // section, so nothing is lost by this being empty. Never name a city here.
+    "body": ""
   },
   {
     "key": "followup_triggers",

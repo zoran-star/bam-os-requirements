@@ -40,8 +40,11 @@
 //      does NOT find `clients.email` (which clientVars deliberately never reads, and
 //      which is named in a comment two lines away - so if comment-stripping breaks,
 //      this says so instead of quietly widening the set), and it is not empty.
-//   2. Both loadClient selects and clientSender's select COVER their derived set, on
-//      the real modules, measured from the URL that reached the wire.
+//   2. Both loadClient selects AND the send path's own select COVER that derived set, on
+//      the real modules, measured from the URL that reached the wire. The send path is
+//      in that list as of 30 Jul 2026 because it now RENDERS from its own row read (see
+//      6), so a column missing from SENDER_COLS blanks a footer exactly the way a column
+//      missing from CLIENT_COLS did.
 //   3. POST-FIX, RENDERED: GTA's row as loadClient returns it today carries all three,
 //      and the footer of a real email carries its tagline, its Instagram link, its
 //      contact address and its unsubscribe.
@@ -50,44 +53,72 @@
 //      thing that makes its green mean anything.
 //   5. The live send path and the approval preview are compared, because they diverged:
 //      sendOn substitutes location_email from its OWN row read, so the wire kept its
-//      unsubscribe while the preview - which does not substitute - lost it. The tagline
-//      and Instagram were gone from BOTH.
+//      unsubscribe while the preview - which does not substitute - lost it.
+//   6. THE `vars: {}` SENDERS. Three call sites hand sendOn no vars at all on purpose
+//      (their merge tokens are resolved before the call): api/agent-confirm.js
+//      fireScriptedStep (the scripted booking confirmation AND the same-day check-in),
+//      api/agent-confirm.js fireCardEmail, and api/agent-approvals.js's confirmation
+//      email. Their emails now carry the academy's whole footer, because sendOn renders
+//      from clientVars(its own row) with the caller's vars on top. Asserted on the BYTES
+//      THAT REACHED THE WIRE, against a client row that really has a tagline and an
+//      Instagram URL, plus the pre-fix render alongside it showing both blank - so the
+//      green means the suite would have caught the bug it was written for.
+//      The class check is DERIVED, not a list: every value clientVars() puts in the
+//      full-vars email must also be in the vars:{} email. Three columns went missing the
+//      same way in one day; a hand-written list of footer fields would have missed them
+//      the same way twice.
 //
 // WHAT IT DOES NOT PROVE
 //   - That the select lists match the real schema. A typo in `google_review_url` would
 //     400 identically and nothing here would say so; the stub answers whatever it is
 //     asked. That gap is older than this change (see the same note in
-//     api/_pending-client-column.test.mjs) and is not closed by it.
+//     api/_pending-client-column.test.mjs) and is not closed by it. (The 15 columns in
+//     SENDER_COLS were checked against production's information_schema by hand on
+//     30 Jul 2026, which is a one-time check and not a standing one.)
 //   - Anything about columns read OUTSIDE clientVars(). `time_zone`, the ghl_* tokens
 //     and `booking_provider` are read directly by their callers, so the derived set
 //     does not cover them and a regression there would look exactly like this one did.
-//   - That the three confirm-agent callers that pass sendOn `vars: {}` render a tagline
-//     or an Instagram link. They do NOT, and that is unchanged by this fix: sendOn
-//     substitutes only location_email. Section 5 asserts that state rather than
-//     implying it away.
+//   - Anything about the SMS branch of sendOn, which still renders from the caller's
+//     vars alone and reads no client row. Every SMS caller passes clientVars today; a
+//     future one that does not would send an academy-less text and nothing here would
+//     say so.
+//   - That an EMPTY value from the caller falls through to the row. It deliberately does
+//     not: the caller's vars win even when they are blank, so the approval preview and
+//     the wire stay byte-identical (section 5 records the one field that is exempt, and
+//     why). A caller with a thin select therefore still ships blanks - on BOTH surfaces,
+//     which is what section 2 is for.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // NEGATIVE CONTROLS. Each breaks ONE thing and must print NEGATIVE CONTROL PASSED:
 //
-//   MUTATE=nocols    node api/_email-select-coverage.test.mjs  # the three columns leave
-//                                                             # CLIENT_COLS in both
-//                                                             # loadClient files - the
-//                                                             # live regression, restored
-//   MUTATE=nosender  node api/_email-select-coverage.test.mjs  # business_email leaves
-//                                                             # SENDER_COLS, so the send
-//                                                             # path loses the address it
-//                                                             # substitutes
-//   MUTATE=blindset  node api/_email-select-coverage.test.mjs  # the DERIVED set is
-//                                                             # emptied, which would make
-//                                                             # section 2 vacuously green
-//   MUTATE=borrow    node api/_email-select-coverage.test.mjs  # a row missing the facts
-//                                                             # inherits GTA's, the shape
-//                                                             # a fallback would have
+//   MUTATE=nocols     node api/_email-select-coverage.test.mjs  # the three columns leave
+//                                                              # CLIENT_COLS in both
+//                                                              # loadClient files - the
+//                                                              # live regression, restored
+//   MUTATE=nosender   node api/_email-select-coverage.test.mjs  # business_email leaves
+//                                                              # SENDER_COLS, so the send
+//                                                              # path loses the address it
+//                                                              # substitutes
+//   MUTATE=thinsender node api/_email-select-coverage.test.mjs  # SENDER_COLS shrinks back
+//                                                              # to the three identity
+//                                                              # columns, so the row the
+//                                                              # send renders from has no
+//                                                              # tagline or Instagram
+//   MUTATE=novarsbase node api/_email-select-coverage.test.mjs  # the render drops the row
+//                                                              # base and uses only the
+//                                                              # caller's vars - the shape
+//                                                              # that shipped, restored
+//   MUTATE=blindset   node api/_email-select-coverage.test.mjs  # the DERIVED set is
+//                                                              # emptied, which would make
+//                                                              # section 2 vacuously green
+//   MUTATE=borrow     node api/_email-select-coverage.test.mjs  # a row missing the facts
+//                                                              # inherits GTA's, the shape
+//                                                              # a fallback would have
 //
-// `nocols` and `nosender` are source edits against the real files, and a pin that
-// cannot find its target is reported as NEGATIVE CONTROL FAILED, never as a pass.
-// `blindset` attacks this suite's OWN extractor, because a coverage check whose required
-// set can silently become empty is decorative.
+// `nocols`, `nosender`, `thinsender` and `novarsbase` are source edits against the real
+// files, and a pin that cannot find its target is reported as NEGATIVE CONTROL FAILED,
+// never as a pass. `blindset` attacks this suite's OWN extractor, because a coverage
+// check whose required set can silently become empty is decorative.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -122,6 +153,19 @@ const ROW = { ...GTA, email_domain: (GTA.website_setup && GTA.website_setup.doma
 // The three that regressed. Named here because the CONTROLS act on them, not because
 // the coverage check needs a list - that one is derived.
 const REGRESSED = ["business_email", "tagline", "instagram_url"];
+
+// A second academy, same shape, different facts. Section 6 sends as this one to show the
+// footer follows the ROW rather than a value that happens to be GTA's. Its sending domain
+// stays GTA's so the send clears the verified-domain gate, which is a different question
+// than whose footer this is.
+const ALT_ID = "alt-academy-0000-0000-000000000000";
+const ALT = {
+  ...ROW,
+  id: ALT_ID,
+  public_name: "Northside Hoops",
+  tagline: "Guard skills for Northside athletes, all year.",
+  instagram_url: "https://instagram.com/northsidehoops",
+};
 
 // ─── the derived required set ────────────────────────────────────────────────
 // Every `c.<column>` clientVars() reads, out of its own source. Comments are stripped
@@ -192,11 +236,15 @@ globalThis.fetch = async (url, init = {}) => {
     const sel = new URL(u).searchParams.get("select") || "";
     CLIENT_SELECTS.push(sel);
     const cols = sel.split(",").map((s) => s.trim()).filter(Boolean);
+    // A SECOND academy, by id, for section 6: the send path reads the row itself now, so
+    // "the footer is this academy's own" has to be shown by CHANGING the academy and
+    // watching the footer change. One row would prove a pin just as well as data.
+    const src = u.includes(`id=eq.${ALT_ID}`) ? ALT : ROW;
     // PROJECTED, which is the whole point: a column the select did not name is not on
     // the row that comes back. That is what turned three schema columns into three
     // blank lines in a parent's inbox, and it is what this stub has to reproduce
     // faithfully or none of the render sections mean anything.
-    return json([Object.fromEntries(cols.filter((c) => c in ROW).map((c) => [c, ROW[c]]))]);
+    return json([Object.fromEntries(cols.filter((c) => c in src).map((c) => [c, src[c]]))]);
   }
   if (u === "https://api.resend.com/emails" && method === "POST") { WIRE = { subject: body.subject, html: body.html, from: body.from }; return json({ id: "stub-email" }); }
   if (u === "https://api.resend.com/domains") return json({ data: [{ name: ROW.email_domain, status: "verified" }] });
@@ -217,9 +265,27 @@ globalThis.fetch = async (url, init = {}) => {
 //
 // One pin covers both files: they share the line the three columns were added on.
 const NOCOLS = [[`"business_email", "tagline", "instagram_url",`, ``]];
+// business_email alone leaves the send path's select: the address it substitutes and
+// holds on stops arriving, so every send below holds instead of going out.
 const NOSENDER = [[
-  `const SENDER_COLS = ["email_domain", "business_name", "business_email"];`,
-  `const SENDER_COLS = ["email_domain", "business_name"];`]];
+  `  "business_email", "public_name", "owner_name",`,
+  `  "public_name", "owner_name",`]];
+// The whole clientVars half leaves it - SENDER_COLS back to the three identity columns
+// it carried before 30 Jul 2026. The send still goes out and still carries its
+// unsubscribe; it is the FOOTER that empties, which is the failure mode that shipped and
+// the reason a coverage check has to cover this list too.
+const THINSENDER = [[
+  `const SENDER_COLS = ["email_domain", "business_name",
+  "business_email", "public_name", "owner_name", "website_setup", "address", "phone",
+  "community_group_url", "community_group_platform", "google_review_url",
+  "online_programs_url", "referral_offer", "tagline", "instagram_url"];`,
+  `const SENDER_COLS = ["email_domain", "business_name", "business_email"];`]];
+// The pre-fix render, restored byte for byte: the row is read, the guard consults it,
+// and then the email is built from the caller's vars alone. Everything the three
+// `vars: {}` senders put on the wire loses its academy.
+const NOVARSBASE = [[
+  `const renderVars = { ...(sender.baseVars || {}), ...(vars || {}), location_email: sender.businessEmail };`,
+  `const renderVars = { ...(vars || {}), location_email: sender.businessEmail };`]];
 
 let copyCount = 0;
 async function copyOf(rel, edits, appendExport) {
@@ -242,8 +308,12 @@ async function copyOf(rel, edits, appendExport) {
 const colEdits = MUTATE === "nocols" ? NOCOLS : [];
 const AUTOMATIONS = await copyOf("automations.js", colEdits, "loadClient");
 const CONFIRM = await copyOf("agent-confirm.js", colEdits, "loadClient");
-const { sendOn } = MUTATE === "nosender" ? await copyOf("_send.js", NOSENDER, null) : await import("./_send.js");
-const { renderEmail, clientVars } = await import("./email-shells.js");
+const SEND_EDITS = MUTATE === "nosender" ? NOSENDER
+  : MUTATE === "thinsender" ? THINSENDER
+  : MUTATE === "novarsbase" ? NOVARSBASE
+  : [];
+const { sendOn } = SEND_EDITS.length ? await copyOf("_send.js", SEND_EDITS, null) : await import("./_send.js");
+const { renderEmail, renderStepMessage, clientVars } = await import("./email-shells.js");
 
 const LOADERS = [
   ["api/automations.js", AUTOMATIONS.__probe],
@@ -277,6 +347,19 @@ for (const [label, loadClient] of LOADERS) {
     missing.length
       ? `api/_send.js: clientSender ASKS FOR NEITHER of: ${missing.join(", ")}`
       : `api/_send.js: clientSender covers all ${SENDER_NEEDS.size} columns it reads`);
+  // THE SAME CHECK THE TWO loadClient LISTS GET, and for the same reason: since
+  // 30 Jul 2026 the send path RENDERS from this row (clientVars of it is the base every
+  // email is built on, see section 6), so a column clientVars reads and this select does
+  // not name arrives undefined and renders as nothing. Identical failure, identical
+  // silence, one layer down - and the same derived set, so tomorrow's column is covered
+  // without anybody remembering this list exists.
+  const missingVars = [...VARS_NEEDS].filter((c) => !asked.has(c)).sort();
+  ok(missingVars.length === 0,
+    missingVars.length
+      ? `api/_send.js: the send path renders from this row and ASKS FOR NEITHER of ${missingVars.length} column(s) clientVars reads: ${missingVars.join(", ")} - they render as nothing for every caller that passes no vars`
+      : `api/_send.js: its select also covers all ${VARS_NEEDS.size} columns clientVars reads`);
+  ok(CLIENT_SELECTS.filter((s) => s.includes("email_domain")).length === 1,
+    "and it is still ONE read of the clients row per send, not one per fact");
 }
 
 // ─── the render seam ─────────────────────────────────────────────────────────
@@ -377,9 +460,88 @@ console.log("\n── 5. what the wire carried vs what the owner was shown ─�
   ok(WIRE && unsubOf(WIRE.html) === `mailto:${GTA.business_email}?subject=Unsubscribe`,
     "(recording the divergence) the WIRE kept its unsubscribe, because sendOn substitutes location_email from its own read");
   ok(WIRE && taglineOf(WIRE.html) === "" && igHrefOf(WIRE.html) === null,
-    "but the tagline and Instagram were gone from the wire too - sendOn substitutes neither");
+    "but the tagline and Instagram were gone from the wire too");
   ok(unsubOf(emailFor(AS_LOADED_PREFIX)) === null,
     "while the approval preview had no unsubscribe at all, so the two surfaces disagreed");
+  // AND THEY STILL WOULD BE, which is a decision rather than a leftover. sendOn now
+  // renders from clientVars(its own row), but the CALLER'S VARS WIN - including the
+  // empty ones. A worker whose select dropped `tagline` passes location_tagline:"" and
+  // that empty value is what renders, so the approval preview an owner said yes to and
+  // the email that goes out stay byte-identical. Repairing it here instead would make
+  // the wire quietly better than the preview, and the two surfaces are supposed to be
+  // the same email. The thin select is caught in section 2, where it belongs; only
+  // location_email is exempt, because a hold hangs off it (see the comment in sendOn).
+  ok(WIRE && taglineOf(WIRE.html) === taglineOf(emailFor(AS_LOADED_PREFIX)),
+    "the caller's EMPTY value still wins over the row, so the wire matches the preview rather than out-rendering it");
+}
+
+// ─── 6. the senders that pass NO vars at all ─────────────────────────────────
+// api/agent-confirm.js fireScriptedStep (the scripted booking confirmation AND the
+// same-day check-in ride the same call), api/agent-confirm.js fireCardEmail, and
+// api/agent-approvals.js's confirmation email all call sendOn with `vars: {}` on
+// purpose: their merge tokens are resolved into the body before the call, so there is
+// nothing left to pass. Until 30 Jul 2026 sendOn substituted ONE var into that empty
+// object - location_email, the field with a hold attached - and rendered the rest of the
+// academy from nothing. Live, at an academy whose row carries both, every one of those
+// emails went out with a blank tagline and no Instagram link.
+console.log("\n── 6. a `vars: {}` sender still puts the whole academy on the wire ──");
+{
+  // What those callers actually hand over: finished text, no tokens, no vars.
+  const RESOLVED = "Hi Maya,\n\nJordan's spot is booked for Tuesday at 7:00 PM.\n\nSee you at training.";
+  const SUBJ = "Your free trial is booked!";
+  // `html` is a STRING always, "" when nothing reached the wire. A send that holds is a
+  // legitimate outcome to assert about (MUTATE=nosender produces exactly that), and a
+  // suite that throws on it reports NEGATIVE CONTROL FAILED for a control that worked.
+  const send = async (clientId, vars) => {
+    reset();
+    const r = await sendOn({ channel: "email", clientId, toEmail: "parent@example.test", subject: SUBJ, body: RESOLVED, vars });
+    return { r, html: (WIRE && WIRE.html) || "" };
+  };
+
+  const blind = await send(ROW.id, {});
+  ok(!!blind.r.sent && !!blind.html, `the vars:{} send goes out (${JSON.stringify(blind.r)})`);
+  ok(taglineOf(blind.html) === GTA.tagline, `the WIRE carries the academy's tagline: ${JSON.stringify(GTA.tagline)}`);
+  ok(igHrefOf(blind.html) === GTA.instagram_url, `and its Instagram link: ${GTA.instagram_url}`);
+  ok(blind.html.includes(`<a href="mailto:${GTA.business_email}"`), "and its footer contact line");
+  ok(unsubOf(blind.html) === `mailto:${GTA.business_email}?subject=Unsubscribe`, "and its unsubscribe, which is the one that never broke");
+  ok(!blind.html.includes(GTA.email), "and the owner's personal inbox is nowhere in it");
+
+  // THE SAME SEND, PRE-FIX, side by side. `{ location_email }` alone IS what sendOn used
+  // to build for these callers, byte for byte, so this is the email GTA's parents got -
+  // not a description of it. If this ever renders a tagline, the section above is
+  // asserting something that was never broken.
+  const preFix = renderStepMessage({ channel: "email", clientId: ROW.id, subject: SUBJ, body: RESOLVED, vars: { location_email: GTA.business_email } });
+  ok(taglineOf(preFix.html) === "", "PRE-FIX, the same send rendered NO tagline sentence");
+  ok(igHrefOf(preFix.html) === null, "PRE-FIX, no footer Instagram anchor at all");
+  ok(unsubOf(preFix.html) === `mailto:${GTA.business_email}?subject=Unsubscribe`,
+    "PRE-FIX, the unsubscribe was fine - the one field with a guard behind it was the one field nobody had to notice");
+  ok(preFix.html !== blind.html, "so the wire changed, and this suite would have said so");
+
+  // THE CLASS, DERIVED. Not "tagline and Instagram are back" - three columns went
+  // missing the same way in one day, and a hand-written list of footer fields would have
+  // missed all three the same way. The requirement is: whatever clientVars() puts into
+  // an email when the caller spells it all out, a caller that spells out NOTHING gets
+  // too. The expected set comes from clientVars()'s own output on the real row.
+  const spelled = await send(ROW.id, clientVars(AS_LOADED));
+  ok(!!spelled.r.sent && !!spelled.html && spelled.html === blind.html,
+    "byte-for-byte, the vars:{} email IS the email a caller that passed every identity var gets");
+  const full = clientVars(AS_LOADED);
+  const rendered = Object.entries(full).filter(([, v]) => typeof v === "string" && v.trim() && spelled.html.includes(v));
+  ok(rendered.length >= 4,
+    `${rendered.length} of clientVars()'s values actually reach the email, so this check has something to measure (${rendered.map(([k]) => k).join(", ")})`);
+  const dropped = rendered.filter(([, v]) => !blind.html.includes(v)).map(([k]) => k).sort();
+  ok(dropped.length === 0,
+    dropped.length
+      ? `a vars:{} sender DROPS ${dropped.length} of them: ${dropped.join(", ")}`
+      : `and a vars:{} sender drops none of them`);
+
+  // Data, not a pin: a different academy's row, the same empty vars, its own footer.
+  const other = await send(ALT_ID, {});
+  ok(!!other.r.sent, "another academy's vars:{} send also goes out");
+  ok(taglineOf(other.html) === ALT.tagline && igHrefOf(other.html) === ALT.instagram_url,
+    "and carries ITS tagline and ITS Instagram, so the footer is read from the row and not from anywhere else");
+  ok(!other.html.includes(GTA.tagline) && !other.html.includes(GTA.instagram_url),
+    "with no trace of GTA's in it");
 }
 
 console.log("");
