@@ -18,3 +18,14 @@ Decided 2026-07-12 (Zoran): the repo has exactly **two** canonical design system
 Every design-system CSS file carries a header comment stating which row it is. The full map also lives in repo-root `CLAUDE.md` under "Design systems". If a system is added, moved, or retired, update that table + the file headers in the same commit.
 
 Watch-out: the two GTA-staff copies (`prototype/bam-gta-phase1/...` vs `bam-ghl-agent/bam-gta-staff/...`) have identical themes but diverged app code; the `bam-ghl-agent` one gets the recent work. Neither is deployed (no vercel.json); both are reference apps.
+
+## Staff-side legibility bump (2026-07-28, Cam)
+Muted text failed WCAG in BOTH staff token systems: JS `bam-ghl-agent/
+bam-portal/src/tokens/tokens.js` T.dark.textMute #48484A (2.1:1) /
+T.light.textMute #AEAEB2 (2.2:1), and V2 `design-system/tokens.css`
+--text-mute light #A5A19A (2.6:1). All bumped to ~4.2:1 equivalents
+(#74747A / #7C7C80 / #7C786F / #807C74). DELIBERATELY NOT mirrored to
+client-portal.html's :root - Cam scoped this to the internal tool;
+DESIGN.md carries the do-not-remirror warning. Open for Zoran: light-mode
+gold-as-TEXT on V2 surfaces (2.3:1) - a --gold-text variant would fix it
+without touching gold fills.

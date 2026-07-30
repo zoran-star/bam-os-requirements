@@ -10,7 +10,7 @@ export const T = {
     borderStr:  "rgba(255,255,255,0.14)",
     text:       "#EDEDEC",
     textSub:    "#8E8E93",
-    textMute:   "#48484A",
+    textMute:   "#74747A",   // was #48484A - 2.1:1 on surface, unreadable; now 4.1:1
     accent:     "#D4CF8A",
     accentGhost:"rgba(212,207,138,0.06)",
     accentBorder:"rgba(212,207,138,0.15)",
@@ -41,7 +41,7 @@ export const T = {
     borderStr:  "rgba(0,0,0,0.14)",
     text:       "#1C1C1E",
     textSub:    "#636366",
-    textMute:   "#AEAEB2",
+    textMute:   "#7C7C80",   // was #AEAEB2 - 2.2:1 on white, unreadable; now 4.2:1
     accent:     "#6B6220",
     accentGhost:"rgba(107,98,32,0.05)",
     accentBorder:"rgba(107,98,32,0.12)",
