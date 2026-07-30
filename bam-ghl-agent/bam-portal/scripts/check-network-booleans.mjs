@@ -112,6 +112,8 @@
 //   MUTATE=stale         plants an inventory line for a function that is gone
 //   MUTATE=stub          plants a rubber-stamp entry with no real reason
 //   MUTATE=injected      plants one reached through an INJECTED fetch impl
+//   MUTATE=nestedtemplate  hides a collapse behind the two constructs that
+//                          really did desync this scanner
 //
 // Each was checked against a real weakening of THIS FILE before it was wired
 // into CI, because a control that cannot fail is decoration. Killing the call
@@ -119,6 +121,9 @@
 // regex fails `newoffender`; deleting the stale rule fails `stale`; setting
 // MIN_REASON to 0 fails `stub`; narrowing the seed back to `fetch(` fails
 // `injected`, which is not hypothetical - that WAS the seed, and it was blind.
+// Flattening template scanning, or reverting regex detection to the last
+// character, fails the blank() self-test on the REAL tree (5 and 1 files
+// respectively) before `nestedtemplate` even runs - both were real bugs here.
 //
 // The MUT map below is the source of truth for that list. CI reads the map, not
 // this prose, for exactly the reason above.
@@ -145,6 +150,7 @@ const MUT = {
   stale: "plant an inventory line whose function does not exist",
   stub: "plant a rubber-stamp entry - a verdict with no real reason",
   injected: "plant one that reaches the network through an INJECTED fetch",
+  nestedtemplate: "hide a collapse BEHIND a nested template literal and a keyword-regex",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -174,36 +180,118 @@ function* walk(dir) {
 // Blank out comments and string/template/regex literals, preserving offsets and
 // newlines so line numbers and brace matching stay true. Without this, a `fetch(`
 // inside a doc comment or an error message makes a pure function look networky.
+//
+// A template literal's ${...} holds CODE, and that code can hold another
+// template literal. That is not a hypothetical: api/contacts.js:250 is
+//
+//     path += `&tags=cs.${encodeURIComponent(`{"${tag.replace(/"/g, "")}"}`)}`;
+//
+// A flat scanner that ends a backtick string at "the next backtick" ends this
+// one INSIDE the interpolation, then reads the remaining `{"` as live code. The
+// brace never closes, every scope after it in the file is off by one, and
+// functions below get mis-attributed or dropped - a SILENT under-report, which
+// is the same failure this whole gate exists to catch. Six of 251 api/ files
+// were desynced this way. Found by asserting brace balance over the real tree,
+// not by reading the code, and the assertion is now a permanent control
+// (MUTATE=nestedtemplate).
+//
+// So code and template scanning are mutually recursive: a template blanks its
+// literal chunks and hands each ${...} back to the code scanner, which blanks
+// comments and strings inside it and returns at the matching brace.
 export function blank(src) {
   const out = src.split("");
   const n = src.length;
   const kill = (a, b) => { for (let k = a; k < b && k < n; k++) if (out[k] !== "\n") out[k] = " "; };
-  let i = 0, prev = "";
-  while (i < n) {
-    const c = src[i], d = src[i + 1];
-    if (c === "/" && d === "/") { let j = i; while (j < n && src[j] !== "\n") j++; kill(i, j); i = j; continue; }
-    if (c === "/" && d === "*") { let j = src.indexOf("*/", i + 2); j = j < 0 ? n : j + 2; kill(i, j); i = j; continue; }
-    if (c === '"' || c === "'" || c === "`") {
-      let j = i + 1;
-      while (j < n) { if (src[j] === "\\") { j += 2; continue; } if (src[j] === c) break; j++; }
-      kill(i + 1, j); i = j + 1; prev = "s"; continue;
+
+  // Is the `/` at idx the start of a regex literal, or a division sign? Deciding
+  // this on the last non-space CHARACTER is not enough, and that cost a whole
+  // file: api/store/inventory.js:88 is
+  //
+  //     return /^https:\/\/[^\s"'<>]+$/i.test(s) ? s : null;
+  //
+  // where the last character before the slash is `n`, so the regex went
+  // undetected, the `"` inside its character class opened a phantom string, and
+  // everything from there to the next quote LATER IN THE FILE was blanked away -
+  // functions and all. A regex is legal after these keywords, so look back at the
+  // whole word, not one letter.
+  const REGEX_OK_AFTER = new Set([
+    "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
+    "throw", "case", "do", "else", "yield", "await",
+  ]);
+  function regexAllowedAt(idx) {
+    let j = idx - 1;
+    while (j >= 0 && /\s/.test(src[j])) j--;
+    if (j < 0) return true;                                   // start of file
+    const ch = src[j];
+    if (/[=(,:[!&|?{};+\-*%<>~^]/.test(ch)) return true;      // after an operator
+    if (/[A-Za-z0-9_$]/.test(ch)) {                           // after a word
+      let k = j;
+      while (k >= 0 && /[A-Za-z0-9_$]/.test(src[k])) k--;
+      return REGEX_OK_AFTER.has(src.slice(k + 1, j + 1));
     }
-    if (c === "/" && /[=(,:[!&|?{};+\-*%<>~^]/.test(prev || "(")) {
-      let j = i + 1, closed = false, inClass = false;
-      while (j < n) {
-        const ch = src[j];
-        if (ch === "\\") { j += 2; continue; }
-        if (ch === "\n") break;
-        if (ch === "[") inClass = true;
-        else if (ch === "]") inClass = false;
-        else if (ch === "/" && !inClass) { closed = true; break; }
-        j++;
-      }
-      if (closed) { kill(i + 1, j); i = j + 1; prev = "r"; continue; }
-    }
-    if (!/\s/.test(c)) prev = c;
-    i++;
+    return false;   // after ) ] ` or a quote: division, not a regex
   }
+
+  // src[start] is the opening backtick. Returns the index just past the close.
+  function scanTemplate(start) {
+    let j = start + 1;
+    let chunk = j;                       // start of the current literal run
+    while (j < n) {
+      const ch = src[j];
+      if (ch === "\\") { j += 2; continue; }
+      if (ch === "`") { kill(chunk, j); return j + 1; }
+      if (ch === "$" && src[j + 1] === "{") {
+        kill(chunk, j);                  // blank the literal text before the hole
+        j = scanCode(j + 2, true);       // the hole is code, so scan it as code
+        chunk = j;
+        continue;
+      }
+      j++;
+    }
+    kill(chunk, n);                      // unterminated template; blank the rest
+    return n;
+  }
+
+  // Scans code from `start`. When `untilCloseBrace`, stops after the brace that
+  // closes the interpolation it was called for, and returns that index.
+  function scanCode(start, untilCloseBrace) {
+    let i = start, depth = 0;
+    while (i < n) {
+      const c = src[i], d = src[i + 1];
+      // Braces are counted BEFORE anything else, but only ever on a brace
+      // character - comments, strings and templates are consumed whole below, so
+      // a `}` inside one is never seen here.
+      if (untilCloseBrace) {
+        if (c === "{") depth++;
+        else if (c === "}") { if (depth === 0) return i + 1; depth--; }
+      }
+      if (c === "/" && d === "/") { let j = i; while (j < n && src[j] !== "\n") j++; kill(i, j); i = j; continue; }
+      if (c === "/" && d === "*") { let j = src.indexOf("*/", i + 2); j = j < 0 ? n : j + 2; kill(i, j); i = j; continue; }
+      if (c === "`") { i = scanTemplate(i); continue; }
+      if (c === '"' || c === "'") {
+        let j = i + 1;
+        while (j < n) { if (src[j] === "\\") { j += 2; continue; } if (src[j] === c) break; j++; }
+        kill(i + 1, j); i = j + 1; continue;
+      }
+      if (c === "/" && regexAllowedAt(i)) {
+        let j = i + 1, closed = false, inClass = false;
+        while (j < n) {
+          const ch = src[j];
+          if (ch === "\\") { j += 2; continue; }
+          if (ch === "\n") break;
+          if (ch === "[") inClass = true;
+          else if (ch === "]") inClass = false;
+          else if (ch === "/" && !inClass) { closed = true; break; }
+          j++;
+        }
+        if (closed) { kill(i + 1, j); i = j + 1; continue; }
+      }
+      i++;
+    }
+    return n;
+  }
+
+  scanCode(0, false);
   return out.join("");
 }
 
@@ -430,6 +518,41 @@ const sources = new Map();
 for (const f of walk(API)) sources.set(f, fs.readFileSync(f, "utf8"));
 const realFileCount = sources.size;
 
+// ── Self-test: can this scanner still SEE the files it is scanning? ──────────
+//
+// blank() is the foundation. Every downstream decision - where a function starts
+// and ends, what its own text is, whether it names fetch - is made against its
+// output. So when blank() desyncs, the scan does not error, it goes QUIET: whole
+// regions stop being code as far as this gate is concerned, and it reports fewer
+// hits with total confidence. A gate that under-reports in silence is the exact
+// failure it was built to catch.
+//
+// That is not a worry, it is a finding. Six of 251 files were desynced on the day
+// this shipped, by two separate bugs (a nested template literal, and a regex
+// literal after `return` whose character class held a quote - which blanked
+// everything from there to the next quote LATER IN THE FILE). Neither was
+// visible from reading the code, and both produced a confident green.
+//
+// The invariant that caught them, kept: blanking replaces characters in place and
+// never touches a real brace, so blanked source MUST stay brace-balanced. It is
+// cheap - the files are already in memory - and it is checked on every run.
+const desynced = [];
+for (const [file, raw] of sources) {
+  const b = blank(raw);
+  let depth = 0, min = 0;
+  for (const ch of b) {
+    if (ch === "{") depth++;
+    else if (ch === "}") { depth--; if (depth < min) min = depth; }
+  }
+  if (depth !== 0 || min < 0) desynced.push({ file, depth, min });
+}
+if (desynced.length) {
+  console.error(`\nSELF-TEST FAILED: blank() desynced on ${desynced.length} file(s). Brace depth does not return to zero, so function boundaries after the bad spot are wrong and this scan is UNDER-REPORTING. Do not trust a green run until this is fixed:\n`);
+  for (const d of desynced) console.error(`  ${path.relative(PORTAL, d.file)}  final depth ${d.depth}, minimum ${d.min}`);
+  console.error(`\nUsual causes: a template literal nested inside another template's \${...}, or a regex literal this scanner read as division (see regexAllowedAt) whose contents then opened a phantom string.`);
+  process.exit(1);
+}
+
 // ── Planted mutations. These are REAL files fed to the REAL scan, at a real path
 // so relative-import resolution behaves exactly as it does in production.
 const PLANT_DIR = path.join(API, "__mutation__");
@@ -437,6 +560,7 @@ const PLANTED_DIRECT = path.join(PLANT_DIR, "planted-direct.js");
 const PLANTED_INDIRECT = path.join(PLANT_DIR, "planted-indirect.js");
 const PLANTED_COMPLIANT = path.join(PLANT_DIR, "planted-compliant.js");
 const PLANTED_INJECTED = path.join(PLANT_DIR, "planted-injected.js");
+const PLANTED_NESTED = path.join(PLANT_DIR, "planted-nested-template.js");
 
 if (MUTATE === "newoffender") {
   sources.set(PLANTED_DIRECT, `
@@ -488,6 +612,33 @@ export async function isAccountReady(acctId, opts = {}) {
   }
 }
 `);
+}
+
+// A collapse hiding BEHIND the two constructs that actually desynced this
+// scanner: a template literal nested in another template's ${...} (as at
+// api/contacts.js:250) and a regex after `return` whose character class contains
+// a quote (as at api/store/inventory.js:88). Both are copied from real lines. If
+// blank() mishandles either, the scanner loses its place and never sees the
+// offender below them - silently, which is the whole point.
+if (MUTATE === "nestedtemplate") {
+  sources.set(PLANTED_NESTED, [
+    'export function tagPath(tag) {',
+    '  return `&tags=cs.${encodeURIComponent(`{"${String(tag)}"}`)}`;',
+    '}',
+    'export function cleanImage(v) {',
+    '  const s = String(v || "").trim();',
+    '  return /^https:\\/\\/[^\\s"\'<>]+$/i.test(s) ? s : null;',
+    '}',
+    'export async function isStoreLive(clientId) {',
+    '  try {',
+    '    const r = await fetch("https://example.invalid/store/" + clientId);',
+    '    if (!r.ok) return false;',
+    '    return (await r.json()).live === true;',
+    '  } catch (_) {',
+    '    return false;',
+    '  }',
+    '}',
+  ].join('\n'));
 }
 
 if (MUTATE === "compliant") {
@@ -587,9 +738,10 @@ if (MUTATE) {
     newoffender: "api/__mutation__/planted-direct.js::isAcademyPaid",
     indirect: "api/__mutation__/planted-indirect.js::hasQuietHours",
     injected: "api/__mutation__/planted-injected.js::isAccountReady",
+    nestedtemplate: "api/__mutation__/planted-nested-template.js::isStoreLive",
   }[MUTATE];
 
-  if (MUTATE === "newoffender" || MUTATE === "indirect" || MUTATE === "injected") {
+  if (MUTATE === "newoffender" || MUTATE === "indirect" || MUTATE === "injected" || MUTATE === "nestedtemplate") {
     if (unaudited.includes(plantedId)) {
       console.log(`\nNEGATIVE CONTROL PASSED - MUTATE=${MUTATE} planted ${plantedId} and the check reported it as unaudited.`);
       process.exit(0);
