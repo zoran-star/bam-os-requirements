@@ -2,7 +2,13 @@
 
 The one-pager (`business/business/summary.html`, live at `/summary`) and the main deck
 (`business/business/fullcontrol-investor-playbook.html`, live at `/playbook`) were rewritten
-from "here's the plan" to "the product is live". Zoran to confirm before anything goes external.
+from "here's the plan" to "the product is real". Zoran to confirm before anything goes external.
+
+Two framing decisions from Cole (2026-07-31), keep them in any future edit:
+- **"Beta testing", not "live/production"** - the product claims say beta with real operators.
+- **Not raising now.** These docs put FullControl on investors' radar for when the round opens,
+  which happens on the strength of real MRR ("the round opens on the back of that curve").
+  Investment section is future-tense; CTA invites following the build, not booking a pitch.
 
 ## The narrative shift
 
