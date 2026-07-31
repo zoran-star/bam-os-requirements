@@ -20,7 +20,7 @@
 // runs - nothing here may throw at the caller.
 
 import { routeTransition } from "./_router.js";
-import { sbRest, resolveStage, moveStage, findOpenOpp, contactInRole } from "./_store.js";
+import { sbRest, resolveStage, moveStage, findOpenOpp, contactRoleState } from "./_store.js";
 
 export async function bounceCancelledTrialToRebook({ clientId, contactId, trialBookingId, source } = {}) {
   try {
@@ -37,11 +37,15 @@ export async function bounceCancelledTrialToRebook({ clientId, contactId, trialB
       } catch (_) { /* unknown start time - proceed */ }
     }
     // Only a lead the confirm agent is still working (Scheduled-Trial) bounces.
-    // contactInRole reads the portal store; a GHL-provider academy (no token
-    // threaded here) safely returns false and the lead is left alone.
-    let inStage = false;
-    try { inStage = await contactInRole({ clientId, contactId, role: "scheduled_trial" }); } catch (_) {}
-    if (!inStage) return { bounced: false, reason: "not-in-scheduled-trial" };
+    // contactRoleState reads the portal store; a GHL-provider academy (no token
+    // threaded here) cannot be asked, so it reports stage-unknown and the lead is
+    // left alone. The two non-bounces stay TELLABLE APART in the returned reason:
+    // "we checked and they are not there" is a finished decision, "we could not
+    // check" is a bounce still owed, and reading them as one reason is what made
+    // this whole class of bug invisible.
+    const st = await contactRoleState({ clientId, contactId, role: "scheduled_trial" });
+    if (!st.trusted) return { bounced: false, reason: "stage-unknown", detail: st.reason };
+    if (!st.inStage) return { bounced: false, reason: "not-in-scheduled-trial" };
     const context = "They cancelled their booked trial in the calendar - reach out and find them a new time.";
     // Persistent context note FIRST (contact memory reads active notes as the
     // team's guidance), the "Entry:" trigger note LAST so the rebook pass fires

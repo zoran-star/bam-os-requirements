@@ -1,7 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
-import { respondedStage, contactInRespondedStage, scheduledTrialStage, interestedStage, nurtureStage } from "../agent/_stage.js";
+import { respondedStage, contactStageState, scheduledTrialStage, interestedStage, nurtureStage } from "../agent/_stage.js";
 import { markReopened } from "../agent/_reopen.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, memberCareAgentMode, modeIsOn } from "../agent/_mode.js";
@@ -390,7 +390,12 @@ async function handler(req, res) {
       const creds = await pickGhlToken(client);
       if (creds) {
         const rs = await respondedStage(creds.token, creds.locationId);
-        if (rs && await contactInRespondedStage(creds.token, creds.locationId, String(contactId), rs)) {
+        // Notify only on a real yes. "We could not ask" is logged rather than
+        // silently treated as "not a Responded lead", so a missing notify during
+        // a GHL blip is explainable afterwards instead of invisible.
+        const st = rs ? await contactStageState(creds.token, creds.locationId, String(contactId), rs) : null;
+        if (st && !st.trusted) console.warn(`ghl inbound-webhook notify: stage unchecked for contact ${contactId} - no notify sent (${st.reason})`);
+        if (st && st.inStage === true) {
           const who = pick(p, ["full_name", "fullName", "contactName", "name", "first_name"]) || "a lead";
           await sendSms({ client, toPhone: cfg.agent_notify_phone, message: `🤖 New chat to approve - ${who} just replied (${client.business_name || "academy"}). Portal → Inbox → 👁 Hawkeye.`, contactName: "BAM Agent" });
         }

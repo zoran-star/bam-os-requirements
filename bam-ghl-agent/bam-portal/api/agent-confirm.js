@@ -34,7 +34,7 @@ import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { nextAppointment, passedTrialContactIds, upcomingBookedContactIds, bookingProviderOf } from "./agent/booking.js";
 import {
-  scheduledTrialStage, contactInRespondedStage, computeConfirmQueue,
+  scheduledTrialStage, contactStageState, computeConfirmQueue,
   scheduledTrialContactIdSetCached, peekScheduledTrialIdSet, respondedStage, nurtureStage, toIso,
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
@@ -267,8 +267,10 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
   const tz = resolveClientTz({ time_zone: opts.tz });   // academy clock for every trial time we quote
   const sts = opts.sts || await scheduledTrialStage(token, locationId, { clientId, sb });
   if (!sts) return { error: "No Scheduled-Trial stage found in the Training Pipeline." };
-  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, sts, { clientId, sb, role: "scheduled_trial" }))) {
-    return { error: "This lead isn't in the Scheduled-Trial stage - the confirm agent only works booked leads." };
+  if (!opts.skipStageGuard) {
+    const st = await contactStageState(token, locationId, contactId, sts, { clientId, sb, role: "scheduled_trial" });
+    if (!st.trusted) return { error: "We couldn't check whether this lead is still in the Scheduled-Trial stage, so nothing was drafted. Try again in a moment.", unchecked: true, detail: st.reason };
+    if (!st.inStage) return { error: "This lead isn't in the Scheduled-Trial stage - the confirm agent only works booked leads." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
   // conversationId MUST live at function scope: the return below references it,
@@ -1312,18 +1314,21 @@ async function handler(req, res) {
       if (await isMuted(clientId, b.contact_id, "confirm")) return res.status(200).json({ error: "muted", muted: true });
       const cfg = await loadConfig(clientId);
       const d = await draftForContact(token, locationId, clientId, b.contact_id, cfg, { tz: client.time_zone });
-      if (d.error) return res.status(200).json({ error: d.error });
+      if (d.error) return res.status(200).json({ error: d.error, ...(d.unchecked ? { unchecked: true, detail: d.detail || null } : {}) });
       if (d.skip) return res.status(200).json({ skip: d.skip });
       return res.status(200).json(d);
     }
 
     if (b.action === "send") {
       if (!b.contact_id || !b.reply || !String(b.reply).trim()) return res.status(400).json({ error: "contact_id and reply required" });
-      // HARD GUARD: only send to a lead still in the Scheduled-Trial stage.
+      // HARD GUARD: only send to a lead still in the Scheduled-Trial stage. Three
+      // outcomes: the 409 is a claim about the lead and is only made when we got
+      // a real answer; not being able to ask is a 503 that says exactly that.
       const sts = await scheduledTrialStage(token, locationId, { clientId, sb });
-      if (!sts || !(await contactInRespondedStage(token, locationId, b.contact_id, sts, { clientId, sb, role: "scheduled_trial" }))) {
-        return res.status(409).json({ error: "This lead is no longer in the Scheduled-Trial stage - not sending." });
-      }
+      if (!sts) return res.status(409).json({ error: "This academy's Training Pipeline has no Scheduled-Trial stage, so there's nothing to send from." });
+      const stSend = await contactStageState(token, locationId, b.contact_id, sts, { clientId, sb, role: "scheduled_trial" });
+      if (!stSend.trusted) return res.status(503).json({ error: "We couldn't check whether this lead is still in the Scheduled-Trial stage, so nothing was sent. Try again in a moment.", unchecked: true, detail: stSend.reason });
+      if (!stSend.inStage) return res.status(409).json({ error: "This lead is no longer in the Scheduled-Trial stage - not sending." });
       // A reignite_due card is a DELIBERATE scheduled re-engagement - it must fire
       // on its date even though the old booked trial (the reason they were parked)
       // ran. Exempt it from the passed-trial -> form-card handoff guard (#10).

@@ -27,7 +27,7 @@ import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForClass, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial, passedTrialContactIds, upcomingBookedContactIds, loadClassesFor } from "./agent/booking.js";
 import { classIndex, classByName, classForCalendar, ageRoutingReadiness, buildQuestion } from "./agent/_class-slots.js";
 import { resolveClassesForAge } from "./agent/_class-routing.js";
-import { respondedStage, contactInRespondedStage, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
+import { respondedStage, contactStageState, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
 import { sendOn } from "./_send.js";
@@ -332,8 +332,12 @@ async function threadMessages(token, conversationId) {
 async function draftForContact(token, locationId, clientId, contactId, cfg, opts = {}) {
   const rs = opts.rs || await respondedStage(token, locationId, { clientId, sb });
   if (!rs) return { error: "No Responded stage found in the Training Pipeline." };
-  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, rs, { clientId, sb }))) {
-    return { error: "This lead isn't in the Responded stage - the bot only replies to Responded-stage leads." };
+  if (!opts.skipStageGuard) {
+    const st = await contactStageState(token, locationId, contactId, rs, { clientId, sb });
+    // "We could not check" is its own answer. Saying "isn't in the Responded
+    // stage" here would state a fact about the lead that we never established.
+    if (!st.trusted) return { error: "We couldn't check whether this lead is still in the Responded stage, so nothing was drafted. Try again in a moment.", unchecked: true, detail: st.reason };
+    if (!st.inStage) return { error: "This lead isn't in the Responded stage - the bot only replies to Responded-stage leads." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
   // conversationId MUST live at function scope: the return below references it,
@@ -1292,7 +1296,7 @@ async function handler(req, res) {
       if (await isMuted(clientId, b.contact_id, "booking")) return res.status(200).json({ error: "muted", muted: true });
       const cfg = await loadConfig(clientId);
       const d = await draftForContact(token, locationId, clientId, b.contact_id, cfg);
-      if (d.error) return res.status(200).json({ error: d.error });
+      if (d.error) return res.status(200).json({ error: d.error, ...(d.unchecked ? { unchecked: true, detail: d.detail || null } : {}) });
       return res.status(200).json(d);
     }
 
@@ -1304,10 +1308,14 @@ async function handler(req, res) {
         return res.status(400).json({ error: "That's an internal note, not a message - write the reply you want to send." });
       }
       // HARD GUARD: refuse to send unless the lead is still in the Responded stage.
+      // THREE outcomes. A 409 asserting the lead moved on is a fact about a real
+      // parent, so it is only ever sent when we actually asked and got an answer;
+      // "we could not ask" is a 503 that says so and asks for a retry.
       const rsSend = await respondedStage(token, locationId, { clientId, sb });
-      if (!rsSend || !(await contactInRespondedStage(token, locationId, b.contact_id, rsSend, { clientId, sb }))) {
-        return res.status(409).json({ error: "This lead is no longer in the Responded stage - not sending." });
-      }
+      if (!rsSend) return res.status(409).json({ error: "This academy's Training Pipeline has no Responded stage, so there's nothing to send from." });
+      const stSend = await contactStageState(token, locationId, b.contact_id, rsSend, { clientId, sb });
+      if (!stSend.trusted) return res.status(503).json({ error: "We couldn't check whether this lead is still in the Responded stage, so nothing was sent. Try again in a moment.", unchecked: true, detail: stSend.reason });
+      if (!stSend.inStage) return res.status(409).json({ error: "This lead is no longer in the Responded stage - not sending." });
       // Proposal cards: the deck passes the FINAL picked slot so a picker change
       // is recorded on the row - the structured proposed time stays truthful.
       const propPatch = {};

@@ -42,7 +42,11 @@
 # computeQueue tracks `idsTrusted` alongside the ids, so a failed stage fetch is a
 # distinct state from a genuinely empty stage, and the reignition guards refuse to
 # cancel a park against an untrusted set. That is the third outcome, in this
-# codebase, written by someone who hit the bug.
+# codebase, written by someone who hit the bug. The same shape at the scale of one
+# lead is api/agent/_stage.js contactStageState and api/agent/_store.js
+# contactRoleState: { inStage, trusted, reason }, where inStage is null whenever
+# trusted is false, so a caller that reads only the answer cannot turn an outage
+# back into "this lead moved on".
 #
 # Baseline when this file was created, 2026-07-30: 29 entries, 4 of them HARMFUL.
 # That is a HISTORICAL note and is deliberately never updated. Do not read it as
@@ -60,8 +64,11 @@
 
 # ── HARMFUL ──────────────────────────────────────────────────────────────────
 
-HARMFUL | api/agent/_stage.js::contactInRespondedStage | The catch returns false, which the send path renders to staff as a 409 "no longer in the ... stage". That is a factual claim about the lead, produced by a GHL outage. It already misfired at scale on GTA once (2026-07-10) for a different reason, and the correct pattern sits forty lines below it in the same file: computeQueue's idsTrusted.
-HARMFUL | api/agent/_store.js::contactInRole | The store-side half of contactInRespondedStage, same collapse and same consequence: the GHL branch's catch turns any search failure into "this contact is not in that stage", and the caller states that to staff as fact. Fix these two together, since one delegates to the other.
+# (contactInRespondedStage and contactInRole were the last two, and are gone: they
+# are now contactStageState / contactRoleState, which return { inStage, trusted,
+# reason } and never a bare boolean. Their proof is api/_stage-guard-unknown.test.mjs.
+# Nothing goes under this heading unless it earns it - do not add a line here to
+# describe the absence of lines.)
 
 # ── BOUNDED ──────────────────────────────────────────────────────────────────
 

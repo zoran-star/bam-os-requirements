@@ -222,22 +222,48 @@ const isClosedStatus = (s) => s === "won" || s === "lost" || s === "abandoned";
 const _pipelineFlagCache = new Map();   // clientId -> { at, shadow, provider }
 const PIPELINE_FLAG_TTL_MS = 30000;
 
-// { shadow, provider } for an academy. Pass an override (e.g. a client row already
-// loaded by the caller) to skip the read entirely. Defaults to the dormant values
-// on any miss/error, so a Supabase blip can never accidentally enable the path.
-export async function pipelineFlags(clientId, override) {
+// { shadow, provider, trusted } for an academy. Pass an override (e.g. a client
+// row already loaded by the caller) to skip the read entirely.
+//
+// `trusted` is house rule 10 applied to the flag read itself: false means we could
+// not READ this academy's flags, so `provider` is the dormant default rather than
+// its actual setting. Every existing caller wants dormant-on-error and keeps it
+// through pipelineFlags() below; a caller about to state a FACT about a lead
+// (contactRoleState) reads `trusted` and refuses to guess, because on a
+// provider='portal' academy a failed flag read silently routes the question to
+// live GHL, whose answer for that academy may be a stale "not in the stage".
+//
+// A failed read is deliberately NOT cached. The old code cached the dormant
+// default for the full TTL, so one blip kept answering from the default for 30
+// seconds after Supabase was healthy again, and "try again in a moment" would not
+// have been true. Successes cache exactly as before.
+export async function pipelineFlagsState(clientId, override) {
   if (override && typeof override.shadow !== "undefined") {
-    return { shadow: !!override.shadow, provider: override.provider || "ghl" };
+    return { shadow: !!override.shadow, provider: override.provider || "ghl", trusted: true, reason: "the caller supplied the flags" };
   }
-  if (!clientId) return { shadow: false, provider: "ghl" };
+  if (!clientId) return { shadow: false, provider: "ghl", trusted: true, reason: "no client id, so there is nothing to look up" };
   const hit = _pipelineFlagCache.get(clientId);
-  if (hit && (Date.now() - hit.at) < PIPELINE_FLAG_TTL_MS) return { shadow: hit.shadow, provider: hit.provider };
-  let shadow = false, provider = "ghl";
+  if (hit && (Date.now() - hit.at) < PIPELINE_FLAG_TTL_MS) return { shadow: hit.shadow, provider: hit.provider, trusted: true, reason: "read from the flag cache" };
+  let rows;
   try {
-    const rows = await sbRest(`clients?id=eq.${encodeURIComponent(clientId)}&select=pipeline_shadow,pipeline_provider&limit=1`);
-    if (rows && rows[0]) { shadow = !!rows[0].pipeline_shadow; provider = rows[0].pipeline_provider || "ghl"; }
-  } catch (_) { /* stay dormant on error */ }
+    rows = await sbRest(`clients?id=eq.${encodeURIComponent(clientId)}&select=pipeline_shadow,pipeline_provider&limit=1`);
+  } catch (e) {
+    return { shadow: false, provider: "ghl", trusted: false, reason: `the pipeline flag read failed: ${(e && e.message) || e}` };
+  }
+  // A 200 with an empty body (sbRest returns null) or a PostgREST error object is
+  // not a list of zero clients, it is no answer at all. `[]` IS an answer: that
+  // academy has no row, so the dormant default is its real setting.
+  if (!Array.isArray(rows)) return { shadow: false, provider: "ghl", trusted: false, reason: "the pipeline flag read returned no readable answer" };
+  const shadow = !!(rows[0] && rows[0].pipeline_shadow);
+  const provider = (rows[0] && rows[0].pipeline_provider) || "ghl";
   _pipelineFlagCache.set(clientId, { at: Date.now(), shadow, provider });
+  return { shadow, provider, trusted: true, reason: `pipeline_provider=${provider}` };
+}
+
+// The flags alone, dormant on any miss or error - the contract every existing
+// caller was written against, unchanged.
+export async function pipelineFlags(clientId, override) {
+  const { shadow, provider } = await pipelineFlagsState(clientId, override);
   return { shadow, provider };
 }
 
@@ -827,32 +853,76 @@ export async function queueOpps(opts = {}) {
   return out;
 }
 
-// 6. contactInRole - boolean: is this contact's open opp in the given stage?
+// ── 6. contactRoleState - is this contact's open opp in the given stage? ─────
+//
+// THREE outcomes, not two (house rule 10). The same shape as computeQueue's
+// idsTrusted in _stage.js: the answer travels with the flag that says whether it
+// is an answer at all.
+//
+//     { inStage: true | false | null, trusted: boolean, reason: string }
+//
+// inStage is null whenever trusted is false, and that is deliberate. The function
+// this replaced returned a bare boolean whose catch was `return false`, so a GHL
+// timeout, an expired token and a lead who genuinely moved on all produced the
+// same value - and the send path rendered it to staff as a 409 reading "no longer
+// in the ... stage", a factual claim about a real parent manufactured by an
+// outage. A caller that reads only `inStage` now gets null, which is not "no".
+//
 //   ghl:    GET /opportunities/search?contact_id&pipeline_id then match the stage id
-//           (mirrors api/agent/_stage.js contactInRespondedStage).
+//           (mirrors api/agent/_stage.js contactStageState).
 //   portal: SELECT exists by stage_role.
-export async function contactInRole(opts = {}) {
+export const stageYes = (why) => ({ inStage: true, trusted: true, reason: why });
+export const stageNo = (why) => ({ inStage: false, trusted: true, reason: why });
+export const stageUnknown = (why) => ({ inStage: null, trusted: false, reason: why });
+
+export async function contactRoleState(opts = {}) {
   const { clientId, sb, ghl, token, locationId, contactId, stage, role } = opts;
-  if (!contactId) return false;
-  const { provider } = await oppFlags(clientId, opts);
+  if (!contactId) return stageNo("no contact id was supplied, so there is no opportunity to look for");
+
+  // Which store owns the answer. A failed flag read is NOT "assume GHL" here:
+  // on a provider='portal' academy that would silently ask a different system
+  // and report its answer as this one's.
+  let provider = opts.provider;
+  if (provider == null) {
+    const flags = await pipelineFlagsState(clientId);
+    if (!flags.trusted) return stageUnknown(`could not read which pipeline this academy is on, so the stage was never checked (${flags.reason})`);
+    provider = flags.provider;
+  }
 
   if (provider === "portal") {
     const r = role || (stage && stage.role);
-    if (!r) return false;
-    const rows = await sbRest(
-      `opportunities?client_id=eq.${encodeURIComponent(clientId)}` +
-      `&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.open` +
-      `&stage_role=eq.${encodeURIComponent(r)}&select=id&limit=1`
-    );
-    return Array.isArray(rows) && rows.length > 0;
+    if (!r) return stageNo("no stage role was supplied, so there is no stage to check membership of");
+    let rows;
+    try {
+      rows = await sbRest(
+        `opportunities?client_id=eq.${encodeURIComponent(clientId)}` +
+        `&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.open` +
+        `&stage_role=eq.${encodeURIComponent(r)}&select=id&limit=1`
+      );
+    } catch (e) {
+      return stageUnknown(`the portal opportunity read failed: ${(e && e.message) || e}`);
+    }
+    // Not a row array (an empty body, a PostgREST error object, a missing service
+    // key) is no answer - and specifically not an answer of zero rows.
+    if (!Array.isArray(rows)) return stageUnknown("the portal opportunity read returned no readable answer");
+    return rows.length > 0
+      ? stageYes(`an open opportunity for this contact is in the ${r} stage`)
+      : stageNo(`this contact has no open opportunity in the ${r} stage`);
   }
 
   // provider === 'ghl': today's contact+pipeline search, match the stage id.
   const ghlFn = ghl || ghlDefault;
+  let d;
   try {
     const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, pipeline_id: stage && stage.pipelineId, limit: "20" });
-    const d = await ghlFn("GET", `/opportunities/search?${params}`, { token });
-    const opps = d.opportunities || d.data || [];
-    return opps.some(o => (o.pipelineStageId || o.stageId) === (stage && stage.stageId) && String((o && o.status) || "open").toLowerCase() === "open");
-  } catch (_) { return false; }
+    d = await ghlFn("GET", `/opportunities/search?${params}`, { token });
+  } catch (e) {
+    return stageUnknown(`the GHL opportunity search failed: ${(e && e.message) || e}`);
+  }
+  const opps = d && (Array.isArray(d.opportunities) ? d.opportunities : (Array.isArray(d.data) ? d.data : null));
+  if (!opps) return stageUnknown("the GHL opportunity search returned no readable list of opportunities");
+  const label = (stage && stage.stageName) || (role || (stage && stage.role)) || "that";
+  return opps.some(o => (o.pipelineStageId || o.stageId) === (stage && stage.stageId) && String((o && o.status) || "open").toLowerCase() === "open")
+    ? stageYes(`an open opportunity for this contact is in the ${label} stage`)
+    : stageNo(`this contact has no open opportunity in the ${label} stage`);
 }
