@@ -1,17 +1,17 @@
 {
- "updated": "2026-07-31 · Stripe design handed to member management",
+ "updated": "2026-07-31 · webhook DONE, and a Stripe finding that changes onboarding",
  "recentUpdates": [
+  "The Stripe webhook click is DONE, verified against Stripe directly: 13 events, the revocation one subscribed. It then PROVED itself on a real event",
+  "Lij's real Stripe is controlled by CoachIQ, and Stripe blocks us from connecting to accounts another app controls. Not our bug, not fixable our end",
+  "That generalises: 'did you set Stripe up yourself, or through another app?' belongs on the ask-list BEFORE anyone clicks connect",
+  "San Jose is back to not-connected on a different account, so anything saying its price scan is unblocked is stale",
   "Handed the whole Stripe design to the member management chat with everything: the finding, all five places it lives, and the production numbers",
-  "Best fact for that conversation: GTA's members are ALREADY owned by the portal, 46 of 47. So it is not a new build, it is making GTA's shape repeatable",
-  "And GTA itself has 5 members with no contact link, which is exactly the gap contact matching closes",
-  "Nobody else has members at all, so there is no backfill problem, only a first-run problem",
-  "All four harmful bugs are now fixed. The inventory reads HARMFUL 0 for the first time",
-  "Checked all five onboarding skills: NONE of them mentions Stripe, price match or contact match. It is in no skill at all"
+  "Best fact for that conversation: GTA's members are ALREADY owned by the portal, 46 of 47. So it is not a new build, it is making GTA's shape repeatable"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
-   "DO THIS NOW: portal Stripe view, run ensure-webhook-events. Deploy is live and I verified the endpoint responds. One click",
+   "Ask Lij: is his Stripe his OWN account, or CoachIQ's? If CoachIQ's, members have to be moved and it becomes a launch-date item",
    "ROTATE THE STRIPE KEY that was pasted in the old /cancel skill. It was readable by every agent session. Deleting the file is not the same as rotating",
    "Want the 18 GTA emergency contacts pulled into a readable list for coaches as a stopgap? It is minors' family data, so your call, not mine",
    "Tell Lij: do NOT reconnect Stripe. Finish the remaining items in his Stripe dashboard and the portal ticks itself",
