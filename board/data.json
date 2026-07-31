@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-31 · 1546 closed, last harmful bug now building",
+ "updated": "2026-07-31 · bugs become subagents, not chips",
  "recentUpdates": [
+  "New standing rule from you: bugs get handled by a background agent from the chat that found them, never a chip that opens a new chat",
+  "Written into the playbook and memory so it outlives this conversation, and the rooms have been told",
+  "The catch it creates: a chip quietly deferred the 'is anyone else in this file' question to you. An agent does not, so that check now happens before spawning",
+  "Lij's Stripe is CONNECTED as of 13:46. Website verification was the missing piece and our system picked it up by itself",
   "1546 closed with the evidence in the comment. It had blocked three builds over ten days on a clash already resolved elsewhere",
-  "That freed the last of the four harmful bugs, where a GHL outage currently tells staff a lead 'is no longer in that stage' as if it were a fact. Now building",
-  "Still owed by you: the one Stripe click in the portal, the key rotation, and Lij's list",
-  "DEPLOY LANDED and I checked the new button is actually there, not just that the deploy said success. Safe to click now",
-  "Go to the portal's Stripe view and run ensure-webhook-events. Without it the revocation fix is code Stripe never calls",
-  "That is the last thing standing between tonight's work and it actually being wired up"
+  "That freed the last of the four harmful bugs, where a GHL outage currently tells staff a lead 'is no longer in that stage' as if it were a fact. Now building"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",

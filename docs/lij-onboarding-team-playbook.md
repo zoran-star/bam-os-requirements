@@ -120,6 +120,20 @@ Append to the shared context block:
 
 ---
 
+## ⛔ BUGS BECOME SUBAGENTS, NEVER CHIPS (Zoran, 2026-07-31)
+
+His words: *"instead of doing suggested tasks to open new chats for bugs, can you make it just a subagent that does it automatically - one thing is make sure its being done in this chat and no other sub chats."*
+
+**When a bug or small fix is found in passing, spawn it as a background subagent from the chat that found it. Do not raise a suggested-task chip.**
+
+**Why, and it is not only preference: a chip is a loaded instruction waiting for a human who will not have the context.** Clicking it opens a whole new chat that must be re-briefed from nothing, and an unclicked chip looks passive while being anything but. **This bit on 2026-07-30**, when an agent had to withdraw its own chip after being stood down, because one click would have started exactly the uncoordinated edit a collision check had just prevented.
+
+**What moves with the rule:**
+- **The collision check moves EARLIER, to the moment of spawning.** The thing that made chips feel safe was that they deferred the collision question to a human. A subagent does not defer it, so it must be answered first. **Run it by content, never by title.**
+- **Spawned agents must not raise chips either**, and their spawn prompts should say so. Several came from agents rather than from a room. **A finding comes back up as a report; whoever holds the thread decides whether it becomes a subagent.**
+
+**Chips remain correct for a genuinely separate WORKSTREAM a human must choose to begin** - a new design track, a new academy, a new phase. **The rule is about bugs and small fixes.**
+
 ## Rooms: where Zoran's interactive loops live (decided 2026-07-26)
 
 The orchestrator chat never hosts a long back-and-forth loop. When a build needs Zoran's workshop (gate 1) or his hands-on test (gate 2), the orchestrator spawns a DISPOSABLE ROOM: a pre-briefed chat chip (via spawn_task) named "Design: <build>" or "Test: <build>". Zoran clicks it, works the loop there, the room reports its outcome back to the orchestrator session, and Zoran archives it. Rooms carry full context in their spawn prompt (plan file path, queue item, decisions already locked); the queue file stays the single memory. One build in flight = 1-2 rooms open, ever. Background agents (scout, builder, tester) stay invisible inside the orchestrator session.
