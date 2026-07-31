@@ -11098,6 +11098,12 @@ Then the call to action."]</div>
           .plo2-cfg{position:absolute;top:6px;right:7px;width:15px;height:15px;cursor:pointer;opacity:.8}
           .plo2-cfg:hover{opacity:1}
           .plo2-cfg svg{width:100%;height:100%;display:block}
+          /* No pipeline configuration on mobile, EVER (Zoran 2026-07-31):
+             the stage-config affordances hide under 768px unconditionally -
+             any preset, any view, any mount order. Static rule on purpose:
+             it must hold even before (or without) the mobile Sales cards.
+             Desktop untouched. */
+          @media(max-width:768px){.plo2-cfg,.plo-gear{display:none !important}}
           .plo2-casc{margin-top:14px;width:100%}
           .plo2-panel{border-radius:16px;background:var(--surface);border:1px solid var(--border);padding:15px}
           .plo2-phead{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-bottom:11px;display:flex;align-items:center;gap:8px;font-weight:700}
@@ -62122,9 +62128,14 @@ function _pipStyle() {
     + '.pip-crow .eye svg{width:14px;height:14px}'
     + '.pip-note{padding:12px 16px 14px 24px;font-size:12px;color:var(--text-mute);font-weight:600}'
     + '.pip-load{padding:14px 16px;font-size:12.5px;color:var(--text-mute)}'
-    /* pipeline config is desktop-only: hide the stage-config affordances the
-       shared pill strip renders (the open-pill config icon + stage gears). */
-    + '.plo2-cfg,.plo-gear{display:none !important}'
+    /* This card IS the mobile pipeline: once it mounts (.pip-live, same
+       pattern as .spc-live) the legacy strip below - its own Hawkeye bar,
+       the stage pill grid, the stuck list, the movement feed - folds away.
+       Academies without the preset never get .pip-live, so they keep the
+       strip; desktop keeps it everywhere. (Pipeline config affordances are
+       hidden on mobile unconditionally by the static .plo2-cfg/.plo-gear
+       rule in the head styles, independent of this card.) */
+    + '#cc-sales-mount.pip-live .cc-sal-pipe{display:none}'
     + '}'
     + '@media(max-width:768px) and (prefers-reduced-motion:reduce){.pip-casc{transition:none}}';
   document.head.appendChild(st);
@@ -62144,6 +62155,7 @@ async function _pipMount() {
   const spc = document.getElementById('spc-card');
   if (spc && spc.parentElement === mount) spc.insertAdjacentElement('afterend', card);
   else mount.prepend(card);
+  mount.classList.add('pip-live');   // the card replaces the legacy strip on mobile
   _pipLoad();
 }
 
