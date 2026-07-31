@@ -61183,6 +61183,10 @@ function _fcStyle() {
 // Open the FC shell. Called instead of openCommandCenter when the flag is on.
 function _fcOpen() {
   _fcStyle();
+  // The cc stylesheet carries the focus-page + member-agent (.mma-*) styles
+  // the AI bar hands off to. Injecting it does NOT enter cc-mode (all cc
+  // layout rules are scoped to body.cc-mode / #view-cc).
+  try { _ccStyle(); } catch (_) {}
   document.body.classList.add('fcui-mode');
   // Build shell chrome once
   if (!document.getElementById('fcui-side')) _fcBuildSide();
@@ -61476,11 +61480,93 @@ function _fcHomeLoad() {
   const kpiBtn = document.getElementById('hm-kpi-btn');
   if (kpiBtn) kpiBtn.addEventListener('click', function (e) { e.stopPropagation(); _hmOpenKpiPicker(); });
 }
-// Phase stubs (filled by later build phases; guarded so phase 1 runs clean).
-function _fcPriorityLoad() { if (typeof _fcPriorityLoad2 === 'function') return _fcPriorityLoad2(); }
-function _fcAiInit() { if (typeof _fcAiInit2 === 'function') return _fcAiInit2(); }
-function _fcAiTyping() {}
-function _fcAiGo(q) { if (typeof _fcAiGo2 === 'function') return _fcAiGo2(q); }
+// ── "Your #1 priority" hero card: the single highest-value next move.
+// Demo seed wins when present; otherwise the top pending Hawkeye card
+// (booking > closing > confirm order of the deck), else all-clear. ──
+async function _fcPriorityLoad() {
+  const t = document.getElementById('fcui-pri-t');
+  const c = document.getElementById('fcui-pri-c');
+  const cta = document.getElementById('fcui-pri-cta');
+  if (!t) return;
+  const demo = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.priority;
+  const paint = (title, sub, btnLabel, go) => {
+    t.textContent = title;
+    if (c) c.textContent = sub || '';
+    if (cta) cta.innerHTML = btnLabel ? `<button type="button" class="fcui-pri-btn" onclick="${go}">${escapeHTML(btnLabel)} &rarr;</button>` : '';
+  };
+  if (demo && (typeof _fcActive !== 'function' || _fcActive())) {
+    paint(demo.title, demo.sub, demo.cta || 'Open conversation', demo.go || '_hv2OpenHawkeye()');
+    return;
+  }
+  try {
+    const [rd, cf, cl] = await _hmHawkFetch();
+    const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
+    const pick = pend(rd)[0] || pend(cl)[0] || pend(cf)[0];
+    if (pick) {
+      const name = (typeof _ccHawkCleanName === 'function' ? _ccHawkCleanName(pick.contact_name) : (pick.contact_name || 'a lead'));
+      const agent = pend(rd).includes(pick) ? 'booking' : pend(cl).includes(pick) ? 'closing' : 'confirm';
+      const cid = String(pick.ghl_contact_id || '').replace(/[^A-Za-z0-9_-]/g, '');
+      paint('Follow up with ' + name,
+        _hmStripEm(pick.summary || pick.reasoning || 'The agent drafted the next move, it just needs your eyes.'),
+        'Open conversation', `_hk2Open('${agent}'${cid ? `,'${cid}'` : ''})`);
+      return;
+    }
+    paint('Nothing is waiting on you', 'Every agent queue is clear. Good moment to check the pipeline.', 'Open Sales', "switchView('pipelines')");
+  } catch (_) {
+    paint('Nothing is waiting on you', 'Every agent queue is clear right now.', 'Open Sales', "switchView('pipelines')");
+  }
+}
+// ── AI task bar: "Hey {name}" + typed prompt rotation. Submits into the
+// EXISTING member-agent machinery (openMembersFocus + _mmaSend), so a typed
+// task gets a real answer. ──
+function _fcAiInit() {
+  const hey = document.getElementById('fcui-ai-hey');
+  const first = (typeof _hv2FirstName === 'function' ? _hv2FirstName() : '');
+  if (hey) hey.textContent = first ? 'Hey ' + first + ',' : 'Hey,';
+  if (!first) setTimeout(() => {
+    const f2 = (typeof _hv2FirstName === 'function' ? _hv2FirstName() : '');
+    const h2 = document.getElementById('fcui-ai-hey');
+    if (h2 && f2) h2.textContent = 'Hey ' + f2 + ',';
+  }, 1800);
+  const el = document.getElementById('fcui-ai-ph');
+  if (!el || el._typing) return;
+  el._typing = true;
+  const prompts = [
+    'give me a task...',
+    'who needs a follow-up today?',
+    'pull up a member for me...',
+    'how is my MRR looking?',
+    'who is at risk of churning?',
+  ];
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = prompts[0]; return; }
+  let p = 0, i = 0, dir = 1;
+  (function tick() {
+    if (!el.isConnected) { el._typing = false; return; }
+    const text = prompts[p];
+    i += dir;
+    el.textContent = text.slice(0, Math.max(0, i)) || ' ';
+    let wait = dir > 0 ? 40 : 12;
+    if (dir > 0 && i >= text.length) { dir = -1; wait = 2600; }
+    else if (dir < 0 && i <= 0) { dir = 1; p = (p + 1) % prompts.length; wait = 420; }
+    el._typeT = setTimeout(tick, wait);
+  })();
+}
+function _fcAiTyping(inp) {
+  document.getElementById('fcui-aibar')?.classList.toggle('typing', !!(inp && inp.value));
+}
+function _fcAiGo(q) {
+  q = String(q || '').trim();
+  const inp = document.getElementById('fcui-ai-in');
+  if (!q) { if (inp) inp.focus(); return; }
+  if (inp) { inp.value = ''; _fcAiTyping(inp); }
+  try {
+    openMembersFocus();
+    setTimeout(() => {
+      const i = document.getElementById('mma-input');
+      if (i) { i.value = q; _mmaSend(); }
+    }, 350);
+  } catch (e) { console.error('[fcui] ai submit', e); }
+}
 function _fcScoreLoad() { _hmLoadScoreboard(); }
 function _fcMilesLoad() { if (typeof _fcMilesLoad2 === 'function') return _fcMilesLoad2(); }
 function _fcActivityLoad() { if (typeof _fcActivityLoad2 === 'function') return _fcActivityLoad2(); }
