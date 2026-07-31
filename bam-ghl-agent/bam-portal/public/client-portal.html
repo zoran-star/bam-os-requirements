@@ -12780,6 +12780,10 @@ Then the call to action."]</div>
       .v15ib-fab-m { display: none; }
       .v15ib-msheet-only { display: none; }
       .v15ib-agent-line { display: none; }
+      .v15ib-mfilters { display: none; }
+      .v15ib-mdir { display: none; }
+      .v15ib-vm-pip { display: none; }
+      .v15ib-prev-vm { display: none; }
 
       @media (max-width: 768px) {
         /* header: Mass appears; heavy desktop actions go */
@@ -12796,35 +12800,118 @@ Then the call to action."]</div>
         #view-v15inbox #v15ib-bc-btn,
         #view-v15inbox #ib-mute-btn2,
         #view-v15inbox .v15ib-overflow,
+        #view-v15inbox .v15ib-filter-toggle,
         #view-v15inbox .v15ib-check { display: none !important; }
-        #view-v15inbox .v15ib-search { max-width: none !important; }
+        /* the toolbar's flex spacer goes too, so search + Filters is ONE
+           full-width unit with no dead space on its right */
+        #view-v15inbox .v15ib-tb-spacer { display: none !important; }
+        #view-v15inbox .v15ib-search { max-width: none !important; min-width: 0 !important; }
 
-        /* filter drawer -> bottom sheet */
-        #view-v15inbox .v15ib-filter-drawer.open {
+        /* the kicker returns as the page title ("Inbox", 19/800); the § mark
+           stays desktop-only markup and is hidden here */
+        #view-v15inbox .v15ib-focus-head .topbar-kicker {
+          display: inline-block !important;
+          font-size: 19px; font-weight: 800; letter-spacing: -.01em;
+          text-transform: none; color: var(--text);
+        }
+        #view-v15inbox .v15ib-focus-head .v15ib-kick-mark { display: none; }
+
+        /* search owns the row; Filters folds INTO the field as a chip */
+        #view-v15inbox .v15ib-search {
+          border: 1px solid var(--border-med); background: var(--surface);
+          border-radius: var(--r-md); gap: 6px; padding: 2px 6px 2px 0;
+        }
+        #view-v15inbox .v15ib-search input,
+        #view-v15inbox .v15ib-search input:focus { border: none; background: none; font-size: 13.5px; }
+        #view-v15inbox .v15ib-search-clear { position: static; transform: none; }
+        .v15ib-mfilters {
+          display: inline-flex; align-items: center; gap: 5px; flex: none;
+          padding: 6px 10px; border: none; border-radius: var(--r-sm);
+          background: var(--surface-hov); color: var(--text-sub);
+          font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+        }
+        .v15ib-mfilters svg { width: 12px; height: 12px; }
+        .v15ib-mfilters b {
+          background: var(--gold); color: var(--on-gold);
+          border-radius: var(--r-full); padding: 0 5px;
+          font-size: 10px; font-family: var(--font-num, inherit);
+        }
+
+        /* the desktop compose modal must clear the focus overlay (z 10050) */
+        .v15ib-compose-overlay { z-index: 10080; }
+
+        /* filter sheet: the drawer node is PORTALED to document.body while
+           open (the focus overlay's transform makes fixed resolve against the
+           card), so these rules ride on .msheet-open, unscoped */
+        .v15ib-filter-drawer.msheet-open {
           position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 10070;
-          background: var(--bg); border-radius: 18px 18px 0 0;
+          background: var(--bg); border-radius: var(--r-lg) var(--r-lg) 0 0;
           border-top: 1px solid var(--border-str);
           box-shadow: 0 -12px 40px rgba(0,0,0,.35);
           padding: 18px 16px calc(24px + env(safe-area-inset-bottom));
           max-height: 75vh; overflow-y: auto;
           display: flex; flex-wrap: wrap; gap: 7px; align-content: flex-start;
         }
+        #v15ib-msheet-scrim { position: fixed; inset: 0; z-index: 10069; background: rgba(0,0,0,.5); }
         .v15ib-msheet-only.v15ib-msec {
           display: block; width: 100%; margin-top: 6px;
           font-size: 10px; font-weight: 800; letter-spacing: .11em; color: var(--text-mute);
         }
         .v15ib-msheet-only.v15ib-mrow { display: flex; flex-wrap: wrap; gap: 7px; width: 100%; }
-        #view-v15inbox .v15ib-filter-drawer.open .v15ib-chan {
-          padding: 8px 13px; font-size: 12.5px; border-radius: 999px;
+        .v15ib-msheet-only.v15ib-mtitle { display: block; width: 100%; font-size: 16px; font-weight: 800; color: var(--text); }
+        .v15ib-msheet-only.v15ib-chan { display: inline-flex; }
+        .v15ib-msheet-only.v15ib-mclear {
+          display: block; width: 100%; margin-top: 16px; padding: 12px;
+          border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--border-med);
+          color: var(--text); text-align: center; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+        }
+        .v15ib-filter-drawer.msheet-open .v15ib-chan {
+          padding: 8px 13px; font-size: 12.5px; border-radius: var(--r-full);
+        }
+        /* active sheet chips read solid gold (pills recipe, section 5) */
+        .v15ib-filter-drawer.msheet-open .v15ib-chan.on {
+          background: var(--gold); border-color: var(--gold); color: var(--on-gold); font-weight: 700;
         }
         /* pipeline stage filtering stays a desktop tool */
-        #view-v15inbox .v15ib-filter-drawer.open .v15ib-sel { display: none; }
+        .v15ib-filter-drawer.msheet-open .v15ib-sel { display: none; }
         /* the split pane's empty state is desktop furniture (keyboard hints) */
         #view-v15inbox .v15ib-empty-state { display: none; }
 
         /* rows: dot only (no gold left edge), no pipeline chip, agent line on */
         #view-v15inbox .v15ib-conv.unread { border-left-color: transparent; background: none; }
         #view-v15inbox .v15ib-conv .v15ib-chip { display: none; }
+        /* unread = one gold dot in its own left gutter (corner dot goes) */
+        #view-v15inbox .v15ib-conv .v15ib-unread-dot { display: none; }
+        #view-v15inbox .v15ib-conv { padding-left: 26px; }
+        #view-v15inbox .v15ib-conv.unread::before {
+          content: ''; position: absolute; left: 10px; top: 50%; margin-top: -3.5px;
+          width: 7px; height: 7px; border-radius: var(--r-full); background: var(--gold);
+        }
+        /* direction arrow moves from the name line to the snippet */
+        #view-v15inbox .v15ib-name .v15ib-dir { display: none; }
+        .v15ib-mdir { display: inline; margin-right: 3px; opacity: .65; font-weight: 700; }
+        /* read rows: quieter name, still legible */
+        #view-v15inbox .v15ib-conv:not(.unread) .v15ib-name { font-weight: 600; color: var(--text-sub); }
+        /* hairline row separators */
+        #view-v15inbox .v15ib-list .v15ib-conv { border-bottom: 1px solid var(--border); }
+        /* last row clears the compose FAB + the Zoran orb */
+        #view-v15inbox #v15ib-body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+        /* time tiers on tokens (shared hexes stay - desktop untouched) */
+        #view-v15inbox .v15ib-time-urgent { color: var(--red) !important; }
+        #view-v15inbox .v15ib-time-warm { color: var(--amber) !important; }
+        /* swipe reveal reads gold here (shared green hex stays for desktop) */
+        #view-v15inbox .v15ib-swipe-bg.left { background: var(--gold); color: var(--on-gold); }
+        /* voicemail rows: phone pip on the avatar corner + transcript snippet */
+        .v15ib-vm-pip {
+          display: flex; position: absolute; right: -2px; bottom: -2px;
+          width: 17px; height: 17px; border-radius: var(--r-full);
+          background: var(--text-sub); color: var(--bg);
+          align-items: center; justify-content: center;
+          border: 2px solid var(--surface);
+        }
+        .v15ib-vm-pip svg { width: 9px; height: 9px; }
+        #view-v15inbox .v15ib-prev-vm { display: inline; }
+        #view-v15inbox .v15ib-prev-std.has-vm { display: none; }
         .v15ib-agent-line {
           display: inline-flex; align-items: center; gap: 5px; margin-top: 4px;
           font-size: 10.5px; font-weight: 700; color: var(--text-sub);
@@ -12864,6 +12951,104 @@ Then the call to action."]</div>
           display: block !important; z-index: 10060;
           bottom: calc(20px + env(safe-area-inset-bottom));
         }
+
+        /* ── Mobile compose: a full page docked on document.body (fixed
+           elements drift inside the transformed focus overlay) ── */
+        #v15ib-compose-m {
+          position: fixed; inset: 0; z-index: 10080; background: var(--bg);
+          overflow-y: auto; -webkit-overflow-scrolling: touch;
+          padding-bottom: calc(30px + env(safe-area-inset-bottom));
+        }
+        .ibm-top { padding: calc(10px + env(safe-area-inset-top)) 14px 0; }
+        .ibm-crumb { font-size: 10px; font-weight: 700; letter-spacing: .14em; color: var(--text-mute); font-family: var(--font-mono, inherit); }
+        .ibm-crumb span { color: var(--gold); }
+        .ibm-hd { display: flex; align-items: center; gap: 10px; padding: 9px 0 4px; }
+        .ibm-back {
+          flex: none; padding: 7px 12px 7px 9px; border-radius: var(--r-sm);
+          border: 1px solid var(--border-med); background: var(--surface);
+          color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+        }
+        .ibm-hd h1 { flex: 1; margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+        .ibm-sec { padding: 16px 14px 7px; font-size: 10px; font-weight: 800; letter-spacing: .11em; color: var(--text-mute); }
+        .ibm-srch {
+          display: flex; align-items: center; gap: 9px; margin: 0 14px; padding: 9px 12px;
+          border-radius: var(--r-sm); border: 1px solid var(--border-med); background: var(--surface);
+        }
+        .ibm-srch svg { width: 15px; height: 15px; color: var(--text-mute); flex: none; }
+        .ibm-srch input { flex: 1; min-width: 0; border: none; background: none; outline: none; font: inherit; font-size: 13.5px; color: var(--text); }
+        .ibm-srch input::placeholder { color: var(--text-mute); }
+        .ibm-res {
+          display: flex; align-items: center; gap: 11px; width: 100%; padding: 10px 14px;
+          border: none; border-bottom: 1px solid var(--border); background: var(--surface);
+          text-align: left; font: inherit; cursor: pointer;
+        }
+        .ibm-av {
+          width: 36px; height: 36px; border-radius: var(--r-full); background: var(--surface-hov);
+          flex: none; display: flex; align-items: center; justify-content: center;
+          font-size: 12px; font-weight: 800; color: var(--text-sub);
+        }
+        .ibm-av.is-member { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--gold); }
+        .ibm-res .nm { display: block; font-size: 13.5px; font-weight: 700; color: var(--text); }
+        .ibm-res .sb { display: block; font-size: 11.5px; color: var(--text-mute); margin-top: 1px; }
+        .ibm-none { padding: 12px 14px; font-size: 12.5px; color: var(--text-mute); }
+        .ibm-chip {
+          display: inline-flex; align-items: center; gap: 8px; margin: 10px 14px 0;
+          padding: 7px 8px 7px 12px; border-radius: var(--r-full);
+          background: var(--gold-sheen); border: 1px solid var(--accent-border);
+          font-size: 13px; font-weight: 700; color: var(--text);
+        }
+        .ibm-chip button {
+          width: 20px; height: 20px; border-radius: var(--r-full); border: none; padding: 0;
+          background: var(--surface); display: flex; align-items: center; justify-content: center;
+          font-size: 13px; color: var(--text-mute); cursor: pointer;
+        }
+        .ibm-block {
+          margin: 12px 14px 0; padding: 12px 13px; border-radius: var(--r-md);
+          background: var(--gold); color: var(--on-gold);
+          font-size: 12.5px; font-weight: 700; line-height: 1.5;
+        }
+        .ibm-block button {
+          display: block; margin-top: 8px; padding: 8px 12px; border-radius: var(--r-sm);
+          border: none; background: rgba(0,0,0,.12); color: var(--on-gold);
+          font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;
+        }
+        .ibm-seg { display: flex; gap: 7px; padding: 0 14px; }
+        .ibm-seg button {
+          flex: 1; padding: 10px; border-radius: var(--r-sm); border: 1px solid var(--border-med);
+          background: var(--surface); text-align: center; font: inherit; font-size: 13px;
+          font-weight: 700; color: var(--text-sub); cursor: pointer;
+        }
+        .ibm-seg button.on { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
+        .ibm-input {
+          display: block; width: calc(100% - 28px); margin: 0 14px; padding: 11px 12px;
+          border-radius: var(--r-sm); border: 1px solid var(--border-med); background: var(--surface);
+          color: var(--text); font: inherit; font-size: 13.5px; outline: none; box-sizing: border-box;
+        }
+        .ibm-input:focus { border-color: var(--gold); }
+        .ibm-area { min-height: 120px; resize: vertical; line-height: 1.5; }
+        .ibm-files { padding: 6px 14px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+        .ibm-files:empty { display: none; }
+        .ibm-file {
+          font-size: 11px; font-weight: 600; color: var(--text-sub); background: var(--surface);
+          border: 1px solid var(--border); border-radius: var(--r-full); padding: 3px 10px;
+          max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ibm-meta { display: flex; align-items: center; gap: 10px; padding: 9px 14px 0; }
+        .ibm-attach {
+          display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px;
+          border-radius: var(--r-sm); border: 1px solid var(--border-med); background: var(--surface);
+          font-size: 12px; font-weight: 700; color: var(--text-sub); cursor: pointer;
+        }
+        .ibm-attach svg { width: 13px; height: 13px; }
+        .ibm-count { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--text-mute); font-family: var(--font-mono, inherit); }
+        .ibm-send {
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          margin: 18px 14px 0; width: calc(100% - 28px); padding: 14px;
+          border-radius: var(--r-md); border: none; background: var(--gold); color: var(--on-gold);
+          font: inherit; font-size: 14.5px; font-weight: 800; cursor: pointer;
+        }
+        .ibm-send svg { width: 17px; height: 17px; }
+        .ibm-send[disabled] { opacity: .4; cursor: default; }
       }
     </style>
 
@@ -13008,7 +13193,7 @@ Then the call to action."]</div>
       <div class="modal-card mm-modal-card v15ib-focus-card" onclick="event.stopPropagation()">
         <div class="v15ib-focus-head">
           <button type="button" class="mm-back-btn" onclick="closeV15InboxFocus()">‹ Back</button>
-          <span class="topbar-kicker">§ Inbox</span>
+          <span class="topbar-kicker"><span class="v15ib-kick-mark">§ </span>Inbox</span>
           <div class="v15ib-focus-head-actions">
             <button id="inbox-contacts-btn" onclick="switchView('contacts')" style="display:none;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;align-items:center;gap:7px">Contacts</button>
             <!-- Sound toggle + "Talk to BAM Business" removed (Zoran 2026-07-31):
@@ -16809,6 +16994,11 @@ _V15IB.selected = new Set();
 _V15IB.filtersOpen = false;
 _V15IB.noteMode = false;
 _V15IB.renderLimit = 30;        // #4: virtual scroll - render N at a time
+// Mobile filter sheet lanes (only settable from the sheet under 768px)
+_V15IB.needsReplyOnly = false;  // "Needs reply" chip
+_V15IB.fAgent = '';             // '' | booking | confirm | closing | none
+_V15IB.vmOnly = false;          // "Voicemail" chip
+_V15IB.msheetOpen = false;      // sheet is portaled onto document.body
 
 // #12: Search filter
 function _v15ibSetSearch(q) {
@@ -16972,11 +17162,77 @@ function _v15ibFiltered() {
       if (!cp || cp.pipelineId !== _V15IB.fPipeline) return false;
       if (_V15IB.fStage && cp.stageId !== _V15IB.fStage) return false;
     }
+    // Mobile sheet lanes. Same definition as the toolbar's needs-reply count.
+    if (_V15IB.needsReplyOnly && !(_ibPriorityLane(c) === 'needs-reply' && !_ibIsSystemSender(c))) return false;
+    if (_V15IB.vmOnly && !_ibIsVoicemailConv(c)) return false;
+    // Agent lane reads the Hawkeye index; before it loads, filter nothing
+    // (fail open, same contract as _hawkPendingFor).
+    if (_V15IB.fAgent && window._hawkIdx) {
+      let hk = null; try { hk = _hawkPendingFor(c.contactId, c.id); } catch (_) {}
+      if (_V15IB.fAgent === 'none' ? !!hk : hk !== _V15IB.fAgent) return false;
+    }
     return true;
   });
 }
 
 function _v15ibClearPipe() { _V15IB.fPipeline = ''; _V15IB.fStage = ''; _v15ibRenderAll(); }
+
+// ── Mobile filter sheet (under 768px) ───────────────────────────────────────
+// The focus overlay's .content is transformed, so position:fixed inside it
+// resolves against the card, not the viewport. While the sheet is open the
+// drawer node is PORTALED onto document.body (styles ride on .msheet-open,
+// which survives the move); every _v15ibRenderAll re-portals the fresh node.
+function _ibSheetPortal() {
+  document.querySelectorAll('body > .v15ib-filter-drawer.msheet-open').forEach(n => n.remove());
+  const d = document.getElementById('v15ib-filter-drawer');
+  if (!d) return;
+  d.classList.add('msheet-open');
+  document.body.appendChild(d);
+}
+function _ibSheetOpen() {
+  if (_V15IB.msheetOpen) return;
+  _V15IB.msheetOpen = true;
+  _v15ibRenderAll();   // fresh chip states; ends by portaling the drawer out
+  if (!document.getElementById('v15ib-msheet-scrim')) {
+    const s = document.createElement('div');
+    s.id = 'v15ib-msheet-scrim';
+    s.onclick = _ibSheetClose;
+    document.body.appendChild(s);
+  }
+}
+function _ibSheetClose() {
+  if (!_V15IB.msheetOpen) return;
+  _V15IB.msheetOpen = false;
+  document.getElementById('v15ib-msheet-scrim')?.remove();
+  document.querySelectorAll('body > .v15ib-filter-drawer.msheet-open').forEach(n => n.remove());
+  _v15ibRenderAll();   // rebuilds the drawer back in its toolbar slot
+}
+function _ibMNeedsReply() { _V15IB.needsReplyOnly = !_V15IB.needsReplyOnly; _v15ibRenderAll(); }
+function _ibMAgent(v) { _V15IB.fAgent = _V15IB.fAgent === v ? '' : v; _v15ibRenderAll(); }
+function _ibMVm() { _V15IB.vmOnly = !_V15IB.vmOnly; _v15ibRenderAll(); }
+function _ibMFiltersClear() {
+  _V15IB.fClass = ''; _V15IB.unreadOnly = false; _V15IB.readOnly = false; _V15IB.sentOnly = false;
+  _V15IB.failedOnly = false; _V15IB.fChannels = []; _V15IB.fPipeline = ''; _V15IB.fStage = '';
+  _V15IB.needsReplyOnly = false; _V15IB.fAgent = ''; _V15IB.vmOnly = false;
+  _v15ibRenderAll();
+}
+
+// ── Voicemail ↔ conversation matching ───────────────────────────────────────
+// Repo rule: phones match on the LAST 10 DIGITS, never raw equality.
+function _ibPhone10(v) { return String(v || '').replace(/\D+/g, '').slice(-10); }
+function _ibVmRowFor(c) {
+  const rows = (typeof _VMX !== 'undefined' && _VMX && _VMX.rows) || [];
+  if (!rows.length || !c) return null;
+  const p10 = _ibPhone10(c.phone);
+  if (p10.length < 10) return null;
+  return rows.find(v => _ibPhone10(v.contact_phone) === p10) || null;
+}
+function _ibIsVoicemailConv(c) {
+  if (!c) return false;
+  const t = String(c.lastMessageType || c.channel || '').toLowerCase();
+  if (/call|voicemail/.test(t)) return true;
+  return !!_ibVmRowFor(c);
+}
 
 function _v15ibRenderAll() {
   const host = document.getElementById('v15inbox-content');
@@ -17039,6 +17295,13 @@ function _v15ibRenderAll() {
   const stageOpts = curPipe ? `<option value="">All stages</option>` + (curPipe.stages || []).map(s => `<option value="${escapeHTML(s.id)}" ${_V15IB.fStage === s.id ? 'selected' : ''}>${escapeHTML(_plStageLabel(s))}</option>`).join('') : '';
   const hasActiveFilters = _V15IB.fChannels.length > 0 || _V15IB.fPipeline;
 
+  // Mobile Filters chip: badge counts EVERY active filter, incl. sheet lanes
+  const isMobileIB = window.innerWidth <= 768;
+  const mActiveCount = (_V15IB.fClass ? 1 : 0) + (_V15IB.unreadOnly ? 1 : 0) + (_V15IB.failedOnly ? 1 : 0)
+    + _V15IB.fChannels.length + (_V15IB.fPipeline ? 1 : 0) + (_V15IB.needsReplyOnly ? 1 : 0)
+    + (_V15IB.fAgent ? 1 : 0) + (_V15IB.vmOnly ? 1 : 0);
+  const vmRowCount = ((typeof _VMX !== 'undefined' && _VMX && _VMX.rows) || []).length;
+
   // Needs-reply count for progress indicator
   const needsReplyCount = _V15IB.convos.filter(c => _ibPriorityLane(c) === 'needs-reply' && !_ibIsSystemSender(c)).length;
 
@@ -17059,11 +17322,12 @@ function _v15ibRenderAll() {
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <div class="v15ib-search" style="flex:1;min-width:180px;max-width:320px">
           <svg class="v15ib-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-          <input type="text" placeholder="Search..." oninput="_v15ibSetSearch(this.value)" id="v15ib-search-input" value="${escapeHTML(_V15IB.searchQuery)}">
+          <input type="text" placeholder="${isMobileIB ? 'Search messages' : 'Search...'}" oninput="_v15ibSetSearch(this.value)" id="v15ib-search-input" value="${escapeHTML(_V15IB.searchQuery)}">
           <button class="v15ib-search-clear ${_V15IB.searchQuery ? 'show' : ''}" onclick="document.getElementById('v15ib-search-input').value='';_v15ibSetSearch('')">x</button>
+          <button type="button" class="v15ib-mfilters" onclick="_ibSheetOpen()" aria-label="Filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="17" x2="14" y2="17"/></svg>Filters${mActiveCount ? `<b>${mActiveCount}</b>` : ''}</button>
         </div>
         ${clsRow}
-        <span style="flex:1"></span>
+        <span class="v15ib-tb-spacer" style="flex:1"></span>
         ${needsReplyCount > 0 ? `<span class="v15ib-progress" role="button" style="cursor:pointer" title="Show unread" onclick="_v15ibTab('unread')">${_ibProgressRing(needsReplyCount, totalPeople)}</span>` : ''}
         <button class="v15ib-filter-toggle${hasActiveFilters ? ' has-filters' : ''}" onclick="_V15IB.filtersOpen=!_V15IB.filtersOpen;document.getElementById('v15ib-filter-drawer').classList.toggle('open')">Filters${hasActiveFilters ? ' *' : ''}</button>
         <button id="v15ib-approve-btn" onclick="_hk2Open()" class="v15ib-act-btn" data-tip="Review agent drafts before they send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Hawkeye<span id="v15-apx-count" class="v15ib-act-count"></span></button>
@@ -17089,23 +17353,34 @@ function _v15ibRenderAll() {
       </div>
       ${chanTabRow}
       <div class="v15ib-filter-drawer ${_V15IB.filtersOpen ? 'open' : ''}" id="v15ib-filter-drawer">
+        <div class="v15ib-msheet-only v15ib-mtitle">Filters</div>
         <div class="v15ib-msheet-only v15ib-msec">WHO</div>
         <div class="v15ib-msheet-only v15ib-mrow">
-          <button onclick="_v15ibTab('')" class="v15ib-chan${_V15IB.fClass === '' && !_V15IB.unreadOnly ? ' on' : ''}">All <span style="opacity:.6">${totalPeople}</span></button>
-          <button onclick="_v15ibTab('member')" class="v15ib-chan${_V15IB.fClass === 'member' ? ' on' : ''}">Members <span style="opacity:.6">${clsCounts.member + clsCounts.member_family}</span></button>
-          <button onclick="_v15ibTab('lead')" class="v15ib-chan${_V15IB.fClass === 'lead' ? ' on' : ''}">Leads <span style="opacity:.6">${clsCounts.lead}</span></button>
-          <button onclick="_v15ibTab('spam')" class="v15ib-chan${_V15IB.fClass === 'spam' ? ' on' : ''}">Spam <span style="opacity:.6">${clsCounts.spam + autoSpamCount}</span></button>
+          <button onclick="_v15ibTab('');_v15ibRenderAll()" class="v15ib-chan${_V15IB.fClass === '' && !_V15IB.unreadOnly ? ' on' : ''}">All <span style="opacity:.6">${totalPeople}</span></button>
+          <button onclick="_v15ibTab('member');_v15ibRenderAll()" class="v15ib-chan${_V15IB.fClass === 'member' ? ' on' : ''}">Members <span style="opacity:.6">${clsCounts.member + clsCounts.member_family}</span></button>
+          <button onclick="_v15ibTab('lead');_v15ibRenderAll()" class="v15ib-chan${_V15IB.fClass === 'lead' ? ' on' : ''}">Leads <span style="opacity:.6">${clsCounts.lead}</span></button>
+          ${(clsCounts.spam + autoSpamCount) > 0 ? `<button onclick="_v15ibTab('spam');_v15ibRenderAll()" class="v15ib-chan${_V15IB.fClass === 'spam' ? ' on' : ''}">Spam <span style="opacity:.6">${clsCounts.spam + autoSpamCount}</span></button>` : ''}
         </div>
         <div class="v15ib-msheet-only v15ib-msec">STATE</div>
         <div class="v15ib-msheet-only v15ib-mrow">
-          <button onclick="_v15ibTab('unread')" class="v15ib-chan${_V15IB.unreadOnly ? ' on' : ''}">Unread${unreadCount ? ` <span style="opacity:.6">${unreadCount}</span>` : ''}</button>
-          <button onclick="_v15ibSetFailed(!_V15IB.failedOnly);_v15ibRebuildBar()" class="v15ib-chan${_V15IB.failedOnly ? ' on' : ''}">Failed to send</button>
+          <button onclick="_v15ibTab('unread');_v15ibRenderAll()" class="v15ib-chan${_V15IB.unreadOnly ? ' on' : ''}">Unread${unreadCount ? ` <span style="opacity:.6">${unreadCount}</span>` : ''}</button>
+          <button onclick="_ibMNeedsReply()" class="v15ib-chan${_V15IB.needsReplyOnly ? ' on' : ''}">Needs reply${needsReplyCount ? ` <span style="opacity:.6">${needsReplyCount}</span>` : ''}</button>
+          <button onclick="_v15ibSetFailed(!_V15IB.failedOnly);_v15ibRenderAll()" class="v15ib-chan${_V15IB.failedOnly ? ' on' : ''}">Failed to send</button>
         </div>
         <div class="v15ib-msheet-only v15ib-msec">CHANNEL</div>
         ${chanBtns}
+        ${vmRowCount ? `<button onclick="_ibMVm()" class="v15ib-msheet-only v15ib-chan${_V15IB.vmOnly ? ' on' : ''}">Voicemail <span style="opacity:.6">${vmRowCount}</span></button>` : ''}
+        <div class="v15ib-msheet-only v15ib-msec">AGENT</div>
+        <div class="v15ib-msheet-only v15ib-mrow">
+          <button onclick="_ibMAgent('booking')" class="v15ib-chan${_V15IB.fAgent === 'booking' ? ' on' : ''}">Booking agent</button>
+          <button onclick="_ibMAgent('confirm')" class="v15ib-chan${_V15IB.fAgent === 'confirm' ? ' on' : ''}">Confirm agent</button>
+          <button onclick="_ibMAgent('closing')" class="v15ib-chan${_V15IB.fAgent === 'closing' ? ' on' : ''}">Closing agent</button>
+          <button onclick="_ibMAgent('none')" class="v15ib-chan${_V15IB.fAgent === 'none' ? ' on' : ''}">Not in one</button>
+        </div>
         <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel" style="max-width:160px;padding:5px 8px;font-size:11px;border-radius:6px">${pipeOpts}</select>
         ${curPipe ? `<select onchange="_v15ibSetStage(this.value)" class="v15ib-sel" style="max-width:140px;padding:5px 8px;font-size:11px;border-radius:6px">${stageOpts}</select>` : ''}
         ${hasActiveFilters ? `<button onclick="_v15ibClearPipe();_V15IB.fChannels=[];_v15ibRenderAll()" style="background:none;border:none;color:var(--text-mute);font-size:11px;cursor:pointer;text-decoration:underline">Clear</button>` : ''}
+        <button type="button" onclick="_ibMFiltersClear()" class="v15ib-msheet-only v15ib-mclear">Clear all filters</button>
       </div>
       <button type="button" class="v15ib-fab" onclick="_ibShowCompose()" aria-label="New message"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
     </div>
@@ -17118,6 +17393,8 @@ function _v15ibRenderAll() {
       <div class="v15ib-split-thread" id="v15ib-thread-pane">${emptyState}</div>
     </div>`;
   _v15ibRenderList();
+  // Mobile sheet open across a re-render: portal the fresh drawer back out
+  if (_V15IB.msheetOpen) { try { _ibSheetPortal(); } catch (_) {} }
   _apxRefreshCount();
   _acxRefreshCount();
   _aclxRefreshCount();
@@ -17337,6 +17614,16 @@ function _v15ibConvRow(c, idx) {
   const classBadges = _ibClassBadges(c);
   const dirArrow = _ibDirArrow(c);
   const timeClass = _ibTimeUrgency(c);
+  // Mobile-only: the arrow leads the snippet instead of trailing the name
+  // (both spans render always; CSS swaps them at 768px, desktop unchanged).
+  const mdir = String(c.lastMessageDirection || '').toLowerCase();
+  const mDirArrow = mdir === 'inbound' ? '<span class="v15ib-mdir">←</span>'
+    : mdir === 'outbound' ? '<span class="v15ib-mdir">→</span>' : '';
+  // Voicemail rows (call-type last message OR a phone10 match into _VMX):
+  // mobile shows a phone pip on the avatar + the transcript in quotes.
+  const vmRow = _ibVmRowFor(c);
+  const isVm = !!vmRow || /call|voicemail/.test(String(c.lastMessageType || c.channel || '').toLowerCase());
+  const vmTxt = vmRow ? String(vmRow.voicemail_transcript || '').trim() : '';
   // Replied fade
   const dir = String(c.lastMessageDirection || '').toLowerCase();
   const repliedClass = (!unread && dir === 'outbound') ? ' replied' : '';
@@ -17364,16 +17651,17 @@ function _v15ibConvRow(c, idx) {
   } catch (_) {}
 
   return `<div class="v15ib-conv ${unread ? 'unread' : ''}${repliedClass}${hotClass}${isActive ? ' v15ib-active' : ''}${needsReply ? ' unread' : ''}" style="${stagger}" data-conv-id="${escapeHTML(c.id)}" onclick='${_V15IB.multiSelect ? `_v15ibToggleSelect("${c.id}",event)` : `_v15ibOpenSplit(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")},${JSON.stringify(c.lastMessageType || c.channel || "")})`}'>
-    <span class="v15ib-swipe-bg left">Read</span>
+    <span class="v15ib-swipe-bg left">${unread ? 'Read' : 'Unread'}</span>
     <div class="v15ib-check${checked}" onclick="_v15ibToggleSelect('${c.id}',event)"></div>
     <div style="position:relative;flex:none">
       <div class="v15ib-avatar${(_ibMemberOf(c) || c.classification === 'member' || c.classification === 'member_family') ? ' is-member' : ''}" style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;${_ibAvatarStyle(smart.display)}">${escapeHTML(_ibInitials(smart.display))}</div>
       ${unread ? '<span class="v15ib-unread-dot" style="position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:var(--gold);border:2px solid var(--surface)"></span>' : ''}
+      ${isVm ? '<span class="v15ib-vm-pip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>' : ''}
     </div>
     <div style="flex:1;min-width:0">
       <div class="v15ib-name">${escapeHTML(smart.display)}${memTag}${chTag}${classBadges}${dirArrow}</div>
       ${smart.sub ? `<div class="v15ib-name-sub">${escapeHTML(smart.sub)}</div>` : ''}
-      <div class="v15ib-prev">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
+      <div class="v15ib-prev">${mDirArrow}<span class="v15ib-prev-std${vmTxt ? ' has-vm' : ''}">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</span>${vmTxt ? `<span class="v15ib-prev-vm">"${escapeHTML(vmTxt)}"</span>` : ''}</div>
       ${chip}${agentLine}
     </div>
     ${hawkChip}
@@ -17753,6 +18041,9 @@ function _ibInitScrollShadows(el) {
 
 // #25: Quick compose modal
 function _ibShowCompose() {
+  // Phones get the full-screen compose page (per the mobile inbox mockup);
+  // the desktop modal below stays byte-identical.
+  if (window.innerWidth <= 768) { _ibShowComposeM(); return; }
   if (document.getElementById('v15ib-compose-overlay')) return;
   const overlay = document.createElement('div');
   overlay.id = 'v15ib-compose-overlay';
@@ -17805,6 +18096,193 @@ async function _ibSendCompose() {
   }
 }
 
+// ── Mobile compose: full-screen page (under 768px) ──────────────────────────
+// Own fixed element docked on document.body (fixed elements drift inside the
+// transformed focus overlay). Recipient comes from a contact search over the
+// loaded conversations - never a free-typed number - so the Hawkeye hold can
+// be shown BEFORE the send; the server 409 stays as the backstop.
+let _IBM = null;
+function _ibShowComposeM() {
+  if (document.getElementById('v15ib-compose-m')) return;
+  _IBM = { picked: null, hawk: null, channel: 'sms', attachments: [] };
+  const page = document.createElement('div');
+  page.id = 'v15ib-compose-m';
+  page.innerHTML = `
+    <div class="ibm-top">
+      <div class="ibm-crumb">FOCUS &middot; <span>INBOX</span> &middot; LIVE</div>
+      <div class="ibm-hd">
+        <button type="button" class="ibm-back" onclick="_ibmClose()">&lsaquo; Back</button>
+        <h1>New message</h1>
+      </div>
+    </div>
+    <div class="ibm-sec">TO</div>
+    <div class="ibm-srch" id="ibm-to-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="ibm-to" placeholder="Search name, phone or email" oninput="_ibmSearch(this.value)" autocomplete="off">
+    </div>
+    <div id="ibm-picked"></div>
+    <div id="ibm-results"></div>
+    <div class="ibm-sec">SEND AS</div>
+    <div class="ibm-seg">
+      <button type="button" class="on" id="ibm-seg-sms" onclick="_ibmChan('sms')">SMS</button>
+      <button type="button" id="ibm-seg-email" onclick="_ibmChan('email')">Email</button>
+    </div>
+    <div id="ibm-subject-wrap" style="display:none">
+      <div class="ibm-sec">SUBJECT</div>
+      <input class="ibm-input" id="ibm-subject" placeholder="Subject" oninput="_ibmCount()">
+    </div>
+    <div class="ibm-sec">MESSAGE</div>
+    <textarea class="ibm-input ibm-area" id="ibm-body" placeholder="Type your message..." oninput="_ibmCount()"></textarea>
+    <div class="ibm-files" id="ibm-files"></div>
+    <div class="ibm-meta">
+      <label class="ibm-attach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.05l-8.5 8.5a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 1 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>Attach<input type="file" multiple style="display:none" onchange="_ibmPickFiles(this)"></label>
+      <span class="ibm-count" id="ibm-count">0 / 160 &middot; 1 SMS</span>
+    </div>
+    <button type="button" class="ibm-send" id="ibm-send" disabled onclick="_ibmSend()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg>
+      <span id="ibm-send-label">Send</span>
+    </button>`;
+  document.body.appendChild(page);
+  // Warm the Hawkeye index so the pick-time hold check has data; if a pick
+  // already happened by the time it lands, re-run it so the block card shows.
+  try { _hawkIdxEnsure().then(() => { if (_IBM && _IBM.picked) _ibmPick(_IBM.picked.id); }).catch(() => {}); } catch (_) {}
+  setTimeout(() => document.getElementById('ibm-to')?.focus(), 60);
+}
+function _ibmClose() {
+  document.getElementById('v15ib-compose-m')?.remove();
+  _IBM = null;
+}
+function _ibmSearch(q) {
+  const box = document.getElementById('ibm-results');
+  if (!box || !_IBM) return;
+  q = String(q || '').trim().toLowerCase();
+  if (_IBM.picked || q.length < 1) { box.innerHTML = ''; return; }
+  // One row per person - the list can hold the same contact on two channels.
+  const seen = new Set(); const out = [];
+  for (const c of (_V15IB.convos || [])) {
+    const hay = ((c.contactName || '') + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase();
+    if (!hay.includes(q)) continue;
+    const key = c.contactId || _ibPhone10(c.phone) || String(c.email || '').toLowerCase() || c.id;
+    if (seen.has(key)) continue;
+    seen.add(key); out.push(c);
+    if (out.length >= 8) break;
+  }
+  box.innerHTML = out.map(c => {
+    const smart = _ibSmartName(c);
+    const isMem = !!(_ibMemberOf(c) || c.classification === 'member' || c.classification === 'member_family');
+    const sub = [c.phone, c.email, isMem ? 'Member' : ''].filter(Boolean).join(' · ');
+    return `<button type="button" class="ibm-res" onclick='_ibmPick(${JSON.stringify(String(c.id))})'>
+      <span class="ibm-av${isMem ? ' is-member' : ''}">${escapeHTML(_ibInitials(smart.display))}</span>
+      <span style="flex:1;min-width:0"><span class="nm">${escapeHTML(smart.display)}</span><span class="sb">${escapeHTML(sub)}</span></span>
+    </button>`;
+  }).join('') || '<div class="ibm-none">No matches.</div>';
+}
+function _ibmPick(convId) {
+  if (!_IBM) return;
+  const c = (_V15IB.convos || []).find(x => String(x.id) === String(convId));
+  if (!c) return;
+  _IBM.picked = c;
+  const box = document.getElementById('ibm-results'); if (box) box.innerHTML = '';
+  const to = document.getElementById('ibm-to'); if (to) to.value = '';
+  const wrap = document.getElementById('ibm-to-wrap'); if (wrap) wrap.style.display = 'none';
+  const smart = _ibSmartName(c);
+  // Hawkeye hold: same rule as the thread - staff answers the card, not here.
+  let hk = null;
+  try { hk = _hawkPendingFor(c.contactId, c.id); } catch (_) {}
+  _IBM.hawk = hk || null;
+  let hawkCard = '';
+  if (hk) {
+    const cid = c.contactId ? String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '') : '';
+    hawkCard = `<div class="ibm-block">Hawkeye is holding ${escapeHTML(smart.display)}. Answer the card first so the agent and you are not both replying.
+      <button type="button" onclick="_ibmClose();_hk2Open('${hk}'${cid ? `,'${cid}'` : ''})">Open in Hawkeye &rsaquo;</button></div>`;
+  }
+  const picked = document.getElementById('ibm-picked');
+  if (picked) picked.innerHTML = `<span class="ibm-chip">${escapeHTML(smart.display)}<button type="button" onclick="_ibmClear()" aria-label="Remove recipient">×</button></span>` + hawkCard;
+  _ibmCount();
+}
+function _ibmClear() {
+  if (!_IBM) return;
+  _IBM.picked = null; _IBM.hawk = null;
+  const picked = document.getElementById('ibm-picked'); if (picked) picked.innerHTML = '';
+  const wrap = document.getElementById('ibm-to-wrap'); if (wrap) wrap.style.display = '';
+  const to = document.getElementById('ibm-to'); if (to) { to.value = ''; to.focus(); }
+  _ibmCount();
+}
+function _ibmChan(k) {
+  if (!_IBM) return;
+  _IBM.channel = k;
+  document.getElementById('ibm-seg-sms')?.classList.toggle('on', k === 'sms');
+  document.getElementById('ibm-seg-email')?.classList.toggle('on', k === 'email');
+  const sw = document.getElementById('ibm-subject-wrap');
+  if (sw) sw.style.display = k === 'email' ? '' : 'none';
+  _ibmCount();
+}
+function _ibmCount() {
+  if (!_IBM) return;
+  const v = document.getElementById('ibm-body')?.value || '';
+  const el = document.getElementById('ibm-count');
+  if (el) el.textContent = _IBM.channel === 'sms'
+    ? `${v.length} / 160 · ${Math.max(1, Math.ceil(v.length / 160))} SMS`
+    : `${v.length} characters`;
+  const btn = document.getElementById('ibm-send');
+  if (btn) btn.disabled = !_IBM.picked || !v.trim() || !!_IBM.hawk;
+}
+// Attach reuses the thread pipeline: upload to the message-attachments bucket,
+// send the public URLs (api/ghl/send-message accepts `attachments`).
+async function _ibmPickFiles(input) {
+  if (!_IBM) return;
+  const files = Array.from(input.files || []); input.value = '';
+  for (const file of files) {
+    try {
+      const clean = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+      const path = `${CLIENT_ID}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${clean}`;
+      const { error } = await _sb.storage.from('message-attachments').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+      if (error) throw error;
+      const { data } = _sb.storage.from('message-attachments').getPublicUrl(path);
+      if (data?.publicUrl) _IBM.attachments.push({ url: data.publicUrl, name: file.name });
+    } catch (e) { alert("Couldn't attach " + file.name + ' - ' + (e.message || e)); }
+  }
+  const host = document.getElementById('ibm-files');
+  if (host && _IBM) host.innerHTML = _IBM.attachments.map(a => `<span class="ibm-file">${escapeHTML(a.name)}</span>`).join('');
+}
+async function _ibmSend() {
+  if (!_IBM || !_IBM.picked || _IBM.hawk) return;
+  const c = _IBM.picked;
+  const text = (document.getElementById('ibm-body')?.value || '').trim();
+  const subject = (document.getElementById('ibm-subject')?.value || '').trim();
+  if (!text) return;
+  const type = _IBM.channel === 'email' ? 'Email' : 'SMS';
+  if (type === 'Email' && !subject) { alert('Email needs a subject.'); return; }
+  const btn = document.getElementById('ibm-send');
+  const lbl = document.getElementById('ibm-send-label');
+  if (btn) btn.disabled = true;
+  if (lbl) lbl.textContent = 'Sending...';
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        client_id: CLIENT_ID, type,
+        contactId: c.contactId || undefined, phone: c.phone || undefined, email: c.email || undefined,
+        message: text, subject: subject || undefined,
+        attachments: _IBM.attachments.length ? _IBM.attachments.map(a => a.url) : undefined,
+      }),
+    });
+    const j = await _safeJson(r);
+    // Server 409 backstop: Hawkeye owns this lead - route into the deck.
+    if (_hawkGate409(r.status, j, c.contactId || null)) { _ibmClose(); return; }
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _SFX.whoosh();
+    _ibmClose();
+    openV15Inbox();   // refresh the list so the new thread shows
+  } catch (e) {
+    _SFX.buzz();
+    alert('Send failed: ' + (e.message || e));
+    if (lbl) lbl.textContent = 'Send';
+    _ibmCount();      // re-enables per the normal rules
+  }
+}
+
 // #7: Mobile swipe gesture handler
 function _ibInitSwipe() {
   if (!('ontouchstart' in window)) return;
@@ -17812,6 +18290,8 @@ function _ibInitSwipe() {
     let startX = 0, startY = 0, dx = 0, horiz = null, lastX = 0, lastT = 0, vx = 0;
     el.addEventListener('touchstart', e => {
       const t = e.touches[0];
+      // Safari's back gesture owns the left 30px - never contest it.
+      if (t.clientX < 30) { dx = 0; horiz = false; return; }
       startX = t.clientX; startY = t.clientY; dx = 0; horiz = null; vx = 0; lastX = t.clientX; lastT = e.timeStamp;
       el.style.transition = 'none';
     }, { passive: true });
@@ -27383,6 +27863,10 @@ function openV15InboxFocus() {
   }
 }
 function closeV15InboxFocus() {
+  // Mobile-only leftovers: the filter sheet + compose page live on
+  // document.body, so the overlay close doesn't take them along.
+  try { _ibSheetClose(); } catch (_) {}
+  try { _ibmClose(); } catch (_) {}
   if (typeof _mmCloseFocus === 'function') _mmCloseFocus('view-v15inbox');
   else {
     const m = document.getElementById('view-v15inbox');
@@ -44669,6 +45153,10 @@ async function _vmxRefreshCount() {
     _VMX.rows = j.voicemails || [];
     btn.style.display = '';
     _vmxBadge();
+    // The mobile inbox reads _VMX.rows (voicemail chip in the filter sheet +
+    // row pips/transcripts) - repaint the list now that they exist. No-op
+    // when the inbox isn't rendered.
+    if (document.getElementById('v15ib-body')) { try { _v15ibRenderList(); } catch (_) {} }
   } catch (_) { /* keep hidden on error - refreshed on next inbox render */ }
 }
 
@@ -60790,21 +61278,32 @@ function _ccFocusHud(modalId) {
     : modalId === 'view-blueprint' ? 'BLUEPRINT'
     : modalId === 'view-calendar' ? 'CALENDAR'
     : modalId === 'view-support' ? 'SUPPORT'
+    // Phones only (Zoran 2026-07-31): desktop keeps its historical label so
+    // the desktop HUD stays pixel-identical.
+    : (modalId === 'view-v15inbox' && window.innerWidth <= 768) ? 'INBOX'
     : 'MARKETING';
-  _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE');
+  const goldWord = (modalId === 'view-v15inbox' && window.innerWidth <= 768) ? 'INBOX' : null;
+  _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE', goldWord);
   _ccFocusWallpaper(modalId);
 }
-function _ccHudType(hud, text) {
+function _ccHudType(hud, text, goldWord) {
   const span = hud.querySelector('.cc-hud-txt');
   if (!span) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { span.textContent = text; return; }
+  // Optional: once the line is fully typed, gold one word (mobile inbox crumb
+  // only - every other caller omits goldWord and behaves exactly as before).
+  const finish = () => {
+    if (goldWord && text.includes(goldWord)) {
+      span.innerHTML = escapeHTML(text).replace(goldWord, '<span style="color:var(--gold)">' + goldWord + '</span>');
+    }
+  };
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { span.textContent = text; finish(); return; }
   span.textContent = '';
   let i = 0;
   clearInterval(hud._typeT);
   hud._typeT = setInterval(() => {
     i++;
     span.textContent = text.slice(0, i);
-    if (i >= text.length) clearInterval(hud._typeT);
+    if (i >= text.length) { clearInterval(hud._typeT); finish(); }
   }, 16);
 }
 
