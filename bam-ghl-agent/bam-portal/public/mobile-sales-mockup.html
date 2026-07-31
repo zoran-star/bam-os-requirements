@@ -73,9 +73,56 @@ h1{margin:6px 16px 14px;font-size:22px;font-weight:800;letter-spacing:-.01em}
 .trow .st.form{background:var(--gold);color:var(--ink)}
 .tt-none{padding:14px 16px;font-size:12.5px;color:var(--text-mute)}
 
-/* next-card placeholder */
-.ghost{margin:0 14px;border:1.5px dashed var(--border-str);border-radius:16px;
-  padding:15px;font-size:12px;font-weight:600;color:var(--text-mute);text-align:center}
+/* ── pipeline card: full-width stage rows, tap cascades open below ── */
+.stg{display:flex;align-items:center;gap:10px;width:100%;padding:14px 16px;
+  border-top:1px solid var(--border);position:relative}
+#pipecard .stg:first-child{border-top:none}
+.stg .sb{flex:1;min-width:0}
+.stg .sn{display:block;font-size:14.5px;font-weight:800}
+.stg .sa{display:inline-flex;align-items:center;gap:5px;margin-top:3px;
+  font-size:10.5px;font-weight:700;color:var(--text-sub)}
+.stg .sa svg{width:11px;height:11px;color:var(--gold)}
+.stg .sa.quiet{color:var(--text-mute)}
+.stg .hk{flex:none;display:inline-flex;align-items:center;gap:4px;
+  background:var(--gold);color:var(--ink);border-radius:999px;padding:3px 9px;
+  font-size:11px;font-weight:800}
+.stg .hk::before{content:'';width:11px;height:11px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6'%3E%3Cpath d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6'%3E%3Cpath d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E") center/contain no-repeat}
+.stg .sc{flex:none;font-size:18px;font-weight:800;color:var(--text-sub);min-width:26px;text-align:right}
+.stg .ch{flex:none;font-size:12px;color:var(--text-mute);transition:transform .2s}
+.stg.open .ch{transform:rotate(180deg)}
+.stg.open .sn{color:var(--gold)}
+
+.casc{max-height:0;overflow:hidden;transition:max-height .28s cubic-bezier(.32,.72,0,1);
+  background:var(--surface-el)}
+.casc.open{max-height:1400px}
+.crow{display:flex;align-items:center;gap:11px;width:100%;padding:10px 16px 10px 24px}
+.crow .av{flex:none;width:34px;height:34px;border-radius:50%;background:var(--surface-hov);
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--text-sub)}
+.crow .av.gold{background:var(--gold);color:var(--ink)}
+.crow .b{flex:1;min-width:0}
+.crow .n{display:block;font-size:13.5px;font-weight:700}
+.crow .s{display:block;font-size:11px;color:var(--text-mute);margin-top:1px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .eye{flex:none;width:30px;height:30px;border-radius:9px;background:var(--gold);color:var(--ink);
+  display:flex;align-items:center;justify-content:center}
+.crow .eye svg{width:14px;height:14px}
+.cmore{padding:9px 16px 13px 24px;font-size:11.5px;font-weight:700;color:var(--gold)}
+/* hawkeye bar at the top of the card */
+.hawkbar{display:flex;align-items:center;gap:9px;width:100%;padding:12px 16px;
+  background:var(--gold);color:var(--ink);font-size:13.5px;font-weight:800}
+.hawkbar .hb-eye{display:flex;width:18px;height:18px}
+.hawkbar .hb-eye svg{width:18px;height:18px}
+.hawkbar .hb-n{margin-left:auto;font-size:12px;font-weight:800;opacity:.85}
+.hawkbar .hb-ch{font-size:16px}
+/* a stage with hawkeye actions lights up like the real board */
+.stg.alert{background:var(--gold-sheen);box-shadow:inset 3px 0 0 var(--gold)}
+/* a cascaded lead with a hawkeye action lights up too */
+.crow.alert{background:var(--gold-sheen);box-shadow:inset 3px 0 0 var(--gold)}
+.crow .dir{font-style:normal;font-weight:800;color:var(--gold);margin-right:5px}
+.crow .sa-ic,.stg .sa-ic{width:11px;height:11px;margin-right:5px;vertical-align:-1px;color:var(--gold);flex:none}
+.stg .sa .sa-ic{margin-right:0}
 
 /* ── focus overlay: qualified trials ── */
 #focus{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;overflow-y:auto}
@@ -102,6 +149,19 @@ h1{margin:6px 16px 14px;font-size:22px;font-weight:800;letter-spacing:-.01em}
 .qrow .chev{flex:none;color:var(--text-mute);font-size:14px}
 .cnote{margin:18px 16px;padding:12px 14px;border:1.5px dashed var(--border-str);border-radius:12px;
   font-size:12px;color:var(--text-mute);font-weight:600;text-align:center}
+
+/* hawkeye card stub */
+#hawkstub{position:fixed;inset:0;z-index:115;background:var(--bg);display:none;overflow-y:auto}
+#hawkstub.on{display:block}
+.hs-tag{display:inline-flex;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
+.hs-bub{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--border)}
+.hs-bub.gold{background:var(--gold-sheen);border-color:var(--accent-border)}
+.hs-bub .bh{font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--text-mute);margin-bottom:4px}
+.hs-bub .bt{font-size:13.5px;font-weight:600;line-height:1.45}
+.hs-actions{display:flex;gap:9px;margin-top:16px}
+.hs-approve{flex:1;padding:13px;border-radius:12px;background:var(--gold);color:var(--ink);text-align:center;font-size:13.5px;font-weight:800}
+.hs-edit{flex:1;padding:13px;border-radius:12px;border:1px solid var(--border-med);background:var(--surface);text-align:center;font-size:13.5px;font-weight:700}
+#hawkstub .cname{text-align:left;margin-top:0}
 
 /* ── contact stub ── */
 #contact{position:fixed;inset:0;z-index:110;background:var(--bg);display:none;overflow-y:auto}
@@ -195,7 +255,69 @@ h1{margin:6px 16px 14px;font-size:22px;font-weight:800;letter-spacing:-.01em}
   </div>
 </div>
 
-<div class="ghost">Next card: the pipelines + Hawkeye. Later.</div>
+<!-- PIPELINE + HAWKEYE CARD - real free_trial stages, display order per Zoran -->
+<div class="pcard" id="pipecard">
+
+  <button class="hawkbar" onclick="openHawk('Jordan Price','Booking agent','What time do U12 trials run on Saturdays?')">
+    <span class="hb-eye"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+    Hawkeye
+    <span class="hb-n num">3 actions waiting</span>
+    <span class="hb-ch">&rsaquo;</span>
+  </button>
+
+<button class="stg" onclick="casc(this)"><span class="sb"><span class="sn">Nurture</span><span class="sa quiet"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Nurture drip</span></span><span class="sc num">7</span><span class="ch">&#9662;</span></button>
+<div class="casc">
+<button class="crow" onclick="event.stopPropagation();openContact('Dalia Wahba','3 of 14')"><span class="av">DW</span><span class="b"><span class="n">Dalia Wahba</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>3 of 14</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Omar Haddad','9 of 14')"><span class="av">OH</span><span class="b"><span class="n">Omar Haddad</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>9 of 14</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Lena Kovac','1 of 14')"><span class="av">LK</span><span class="b"><span class="n">Lena Kovac</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>1 of 14</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Priya Batra','6 of 14')"><span class="av">PB</span><span class="b"><span class="n">Priya Batra</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>6 of 14</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Rui Duarte','12 of 14')"><span class="av">RD</span><span class="b"><span class="n">Rui Duarte</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>12 of 14</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Aisha Jalloh','4 of 14')"><span class="av">AJ</span><span class="b"><span class="n">Aisha Jalloh</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>4 of 14</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Ken Tanaka','8 of 14')"><span class="av">KT</span><span class="b"><span class="n">Ken Tanaka</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 of 14</span></span></button>
+</div>
+<button class="stg" onclick="casc(this)"><span class="sb"><span class="sn">Ghosted</span><span class="sa quiet"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Ghosted automation</span></span><span class="sc num">4</span><span class="ch">&#9662;</span></button>
+<div class="casc">
+<button class="crow" onclick="event.stopPropagation();openContact('Marta Silva','1 of 3')"><span class="av">MS</span><span class="b"><span class="n">Marta Silva</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>1 of 3</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Dev Anand','3 of 3')"><span class="av">DA</span><span class="b"><span class="n">Dev Anand</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>3 of 3</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Bo Williams','2 of 3')"><span class="av">BW</span><span class="b"><span class="n">Bo Williams</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>2 of 3</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Carla Vega','2 of 3')"><span class="av">CV</span><span class="b"><span class="n">Carla Vega</span><span class="s"><svg class="sa-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>2 of 3</span></span></button>
+</div>
+<button class="stg alert" onclick="casc(this)"><span class="sb"><span class="sn">Booking</span><span class="sa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/></svg>Booking agent</span></span><span class="hk num">2</span><span class="sc num">12</span><span class="ch">&#9662;</span></button>
+<div class="casc">
+<button class="crow alert" onclick="event.stopPropagation();openContact('Jordan Price','What time do U12 trials run on Saturdays?')"><span class="av">JP</span><span class="b"><span class="n">Jordan Price</span><span class="s"><i class="dir">&#8592;</i>What time do U12 trials run on Saturdays?</span></span><span class="eye" onclick="event.stopPropagation();openHawk('Jordan Price','Booking agent','What time do U12 trials run on Saturdays?')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span></button>
+<button class="crow alert" onclick="event.stopPropagation();openContact('Sana Malik','Is there parking at the Oakville gym?')"><span class="av">SM</span><span class="b"><span class="n">Sana Malik</span><span class="s"><i class="dir">&#8592;</i>Is there parking at the Oakville gym?</span></span><span class="eye" onclick="event.stopPropagation();openHawk('Sana Malik','Booking agent','Is there parking at the Oakville gym?')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Chris Okoye','Here is what a first session looks like')"><span class="av">CO</span><span class="b"><span class="n">Chris Okoye</span><span class="s"><i class="dir">&#8594;</i>Here is what a first session looks like</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Tessa Ng','Sent her the booking link this morning')"><span class="av">TN</span><span class="b"><span class="n">Tessa Ng</span><span class="s"><i class="dir">&#8594;</i>Sent her the booking link this morning</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Gabe Fontaine','Welcome! Grabbing you the trial details now')"><span class="av">GF</span><span class="b"><span class="n">Gabe Fontaine</span><span class="s"><i class="dir">&#8594;</i>Welcome! Grabbing you the trial details now</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Ines Marino','Which days do the younger kids train?')"><span class="av">IM</span><span class="b"><span class="n">Ines Marino</span><span class="s"><i class="dir">&#8592;</i>Which days do the younger kids train?</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Yusuf Ali','Any chance of a Sunday session?')"><span class="av">YA</span><span class="b"><span class="n">Yusuf Ali</span><span class="s"><i class="dir">&#8592;</i>Any chance of a Sunday session?</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Hana Brik','Just checking you saw the booking link')"><span class="av">HB</span><span class="b"><span class="n">Hana Brik</span><span class="s"><i class="dir">&#8594;</i>Just checking you saw the booking link</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Sam Cole','Booked! We will text the details')"><span class="av">SC</span><span class="b"><span class="n">Sam Cole</span><span class="s"><i class="dir">&#8594;</i>Booked! We will text the details</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Lior Peretz','Asked for a weekend option')"><span class="av">LP</span><span class="b"><span class="n">Lior Peretz</span><span class="s"><i class="dir">&#8592;</i>Asked for a weekend option</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Farah Rahim','Thanks, thinking about it')"><span class="av">FR</span><span class="b"><span class="n">Farah Rahim</span><span class="s"><i class="dir">&#8592;</i>Thanks, thinking about it</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Dan Kim','Sent the trial details, waiting on a day pick')"><span class="av">DK</span><span class="b"><span class="n">Dan Kim</span><span class="s"><i class="dir">&#8594;</i>Sent the trial details, waiting on a day pick</span></span></button>
+</div>
+<button class="stg" onclick="casc(this)"><span class="sb"><span class="sn">Confirm</span><span class="sa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/></svg>Confirm agent</span></span><span class="sc num">5</span><span class="ch">&#9662;</span></button>
+<div class="casc">
+<button class="crow" onclick="event.stopPropagation();openContact('Nia Charles','See you tonight at 7, Linbrook gym!')"><span class="av">NC</span><span class="b"><span class="n">Nia Charles</span><span class="s"><i class="dir">&#8594;</i>See you tonight at 7, Linbrook gym!</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Marcus Webb','See you at 8 tonight, Linbrook gym!')"><span class="av">MW</span><span class="b"><span class="n">Marcus Webb</span><span class="s"><i class="dir">&#8594;</i>See you at 8 tonight, Linbrook gym!</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Eli Sanders','Reminder: trial tomorrow at 7 PM')"><span class="av">ES</span><span class="b"><span class="n">Eli Sanders</span><span class="s"><i class="dir">&#8594;</i>Reminder: trial tomorrow at 7 PM</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Jade Roberts','Confirmed for Saturday 11:30')"><span class="av">JR</span><span class="b"><span class="n">Jade Roberts</span><span class="s"><i class="dir">&#8592;</i>Confirmed for Saturday 11:30</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Andre Boyd','We will be there, thanks!')"><span class="av">AB</span><span class="b"><span class="n">Andre Boyd</span><span class="s"><i class="dir">&#8592;</i>We will be there, thanks!</span></span></button>
+</div>
+<button class="stg alert" onclick="casc(this)"><span class="sb"><span class="sn">Closing</span><span class="sa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/></svg>Closing agent</span></span><span class="hk num">1</span><span class="sc num">9</span><span class="ch">&#9662;</span></button>
+<div class="casc">
+<button class="crow alert" onclick="event.stopPropagation();openContact('Deja Simmons','She loved it! What are the membership options?')"><span class="av">DS</span><span class="b"><span class="n">Deja Simmons</span><span class="s"><i class="dir">&#8592;</i>She loved it! What are the membership options?</span></span><span class="eye" onclick="event.stopPropagation();openHawk('Deja Simmons','Closing agent','She loved it! What are the membership options?')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Nico Reyes','Following up on how the trial went')"><span class="av">NR</span><span class="b"><span class="n">Nico Reyes</span><span class="s"><i class="dir">&#8594;</i>Following up on how the trial went</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Tyler Moss','Here is the pricing breakdown you asked for')"><span class="av">TM</span><span class="b"><span class="n">Tyler Moss</span><span class="s"><i class="dir">&#8594;</i>Here is the pricing breakdown you asked for</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Zara Hussain','Great session yesterday, here is the next step')"><span class="av">ZH</span><span class="b"><span class="n">Zara Hussain</span><span class="s"><i class="dir">&#8594;</i>Great session yesterday, here is the next step</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Victor Osei','Thinking it over, will confirm by Friday')"><span class="av">VO</span><span class="b"><span class="n">Victor Osei</span><span class="s"><i class="dir">&#8592;</i>Thinking it over, will confirm by Friday</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Maya Brooks','Does the monthly include both weekdays?')"><span class="av">MB</span><span class="b"><span class="n">Maya Brooks</span><span class="s"><i class="dir">&#8592;</i>Does the monthly include both weekdays?</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Cody Lam','Sent the sibling discount details')"><span class="av">CL</span><span class="b"><span class="n">Cody Lam</span><span class="s"><i class="dir">&#8594;</i>Sent the sibling discount details</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Rosa Santos','We are in! How do we sign up?')"><span class="av">RS</span><span class="b"><span class="n">Rosa Santos</span><span class="s"><i class="dir">&#8592;</i>We are in! How do we sign up?</span></span></button>
+<button class="crow" onclick="event.stopPropagation();openContact('Kofi Dogbe','Asked to switch to the Saturday group first')"><span class="av">KD</span><span class="b"><span class="n">Kofi Dogbe</span><span class="s"><i class="dir">&#8592;</i>Asked to switch to the Saturday group first</span></span></button>
+</div>
+
 
 <!-- ═══ FOCUS: QUALIFIED TRIALS ═══ -->
 <div id="focus">
@@ -263,6 +385,22 @@ h1{margin:6px 16px 14px;font-size:22px;font-weight:800;letter-spacing:-.01em}
   <div class="cnote" style="margin-top:10px">+ 5 more open rows in the real thing</div>
 </div>
 
+<!-- HAWKEYE CARD STUB -->
+<div id="hawkstub">
+  <div class="chd">
+    <button class="back" onclick="closeHawk()">&lsaquo; Back</button>
+    <div class="hs-tag" id="h-agent">Booking agent</div>
+    <div class="cname" id="h-name">Jordan Price</div>
+    <div class="hs-bub"><div class="bh">LAST MESSAGE</div><div class="bt" id="h-msg">...</div></div>
+    <div class="hs-bub gold"><div class="bh">PROPOSED REPLY</div><div class="bt">Saturdays run 11:30 for U12 - want me to hold a spot for this week?</div></div>
+    <div class="hs-actions">
+      <button class="hs-approve">Approve and send</button>
+      <button class="hs-edit">Edit reply</button>
+    </div>
+  </div>
+  <div class="cnote">This is the REAL Hawkeye card in the build - the eye always lands here, focused on this lead.</div>
+</div>
+
 <!-- ═══ CONTACT STUB ═══ -->
 <div id="contact">
   <div class="chd">
@@ -318,6 +456,15 @@ h1{margin:6px 16px 14px;font-size:22px;font-weight:800;letter-spacing:-.01em}
 
 <script>
 function theme(){ const r=document.documentElement; r.dataset.theme = r.dataset.theme==='dark'?'light':'dark'; }
+// One cascade open at a time: tapping a stage opens its list right below it
+// and pushes everything after it down; tapping again closes it.
+function casc(btn){
+  const panel = btn.nextElementSibling;
+  const wasOpen = panel.classList.contains('open');
+  document.querySelectorAll('#pipecard .casc.open').forEach(p=>p.classList.remove('open'));
+  document.querySelectorAll('#pipecard .stg.open').forEach(b=>b.classList.remove('open'));
+  if(!wasOpen){ panel.classList.add('open'); btn.classList.add('open'); }
+}
 function openFocus(){ document.getElementById('focus').classList.add('on'); window.scrollTo(0,0); }
 function closeFocus(){ document.getElementById('focus').classList.remove('on'); }
 function openContact(n, sub){
@@ -327,6 +474,13 @@ function openContact(n, sub){
   document.getElementById('contact').classList.add('on');
 }
 function closeContact(){ document.getElementById('contact').classList.remove('on'); }
+function openHawk(n, agent, msg){
+  document.getElementById('h-name').textContent = n;
+  document.getElementById('h-agent').textContent = agent;
+  document.getElementById('h-msg').textContent = msg;
+  document.getElementById('hawkstub').classList.add('on');
+}
+function closeHawk(){ document.getElementById('hawkstub').classList.remove('on'); }
 function openPtf(){ document.getElementById('ptf').classList.add('on'); window.scrollTo(0,0); }
 function closePtf(){ document.getElementById('ptf').classList.remove('on'); }
 function seg(el){ [...el.parentElement.children].forEach(b=>b.classList.remove('on')); el.classList.add('on'); }
