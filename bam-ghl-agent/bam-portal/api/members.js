@@ -28,6 +28,7 @@ import { syncMemberAccessNonFatal } from "./_runtime/access-sync-portal.js";
 import { buildCancellationSnapshot, stripeLifetimeSpend } from "./_runtime/cancellation-snapshot.js";
 import { smsProvider } from "./messaging/provider.js";
 import { emailProvider } from "./messaging/email-provider.js";
+import { readStripeAccount } from "./stripe/_requirements.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -730,6 +731,35 @@ async function handler(req, res) {
         } catch (_) { /* non-fatal */ }
       }
 
+      // ── What Stripe is actually waiting on ────────────────────────────────
+      // The Stripe card used to be able to say "there are still steps to finish
+      // inside Stripe (business details, bank account, or ID verification)" and
+      // those three were PROSE - a guess printed for every academy, whatever
+      // their account actually needed. Stripe returns the real list in
+      // requirements.currently_due and we were already throwing it away.
+      //
+      // Narrow on purpose, the same narrowness as backfillStripeWhenChargeable
+      // in api/action-items.js: one Stripe call for an academy mid-setup, none
+      // for a connected one and none for an academy that has never connected.
+      // Non-fatal - if the call fails the card says so (`reachable:false`)
+      // rather than inventing a reason, and the roster still renders.
+      let stripeLive = null;
+      if (targetClient?.stripe_connect_account_id && targetClient?.stripe_connect_status !== "connected") {
+        try {
+          const key = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+          const s = await readStripeAccount(targetClient.stripe_connect_account_id, key);
+          stripeLive = {
+            outcome: s.outcome,                 // ready | not_ready | unreachable
+            reachable: s.reachable,
+            checked_at: new Date().toISOString(),
+            needs: s.needs,
+            reviewing: s.reviewing,
+            problems: s.problems,
+            disabled_reason: s.disabled_reason,
+          };
+        } catch (_) { stripeLive = { outcome: "unreachable", reachable: false, checked_at: new Date().toISOString(), needs: [], reviewing: [], problems: [], disabled_reason: null }; }
+      }
+
       // CoachIQ config (for the "Set up CoachIQ" member-card invite).
       let coachiq = { enabled: false, signup_url: null };
       if (targetClientId) {
@@ -748,6 +778,8 @@ async function handler(req, res) {
           client_id: targetClientId,
           status: targetClient?.stripe_connect_status || "not_connected",
           account_id: targetClient?.stripe_connect_account_id || null,
+          // null when we did not ask (never connected, or already connected).
+          live: stripeLive,
         },
         ghl: {
           client_id:   targetClientId,

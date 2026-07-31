@@ -49284,6 +49284,92 @@ function renderStripeConnectButton(stripe) {
     </button>`;
 }
 
+// Render one list of Stripe requirement items. Each item arrives from
+// /api/members already in plain English (api/stripe/_requirements.js owns the
+// mapping, so there is exactly one copy of it and the browser does not carry a
+// second) and always carries the raw Stripe codes that produced it.
+//
+// NOTHING IS HIDDEN. The raw codes go in the title attribute for every item,
+// and an item Stripe named in a way we have no mapping for shows its code on
+// screen. An ugly line an owner can read out to Stripe support beats a missing
+// one - a silently dropped requirement is exactly how "finish the remaining
+// steps" became a dead end.
+function _stripeNeedsList(items) {
+  if (!Array.isArray(items) || !items.length) return '';
+  return `<ul style="margin:0 0 14px;padding-left:18px;font-size:13px;line-height:1.6;color:var(--text)">` +
+    items.map(it => {
+      const codes = (it.codes || []).join(', ');
+      // Only when the label does not already carry the code: the unmapped
+      // label is "Stripe asks for: <code>", so printing it again underneath
+      // is noise, and noise is what makes people stop reading the list.
+      const label = it.label || '';
+      const raw = (!it.mapped && codes && !label.includes(codes))
+        ? `<div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--text-mute);word-break:break-all">${escapeHTML(codes)}</div>`
+        : '';
+      return `<li title="${escapeHTML(codes)}">${escapeHTML(label)}${raw}</li>`;
+    }).join('') + `</ul>`;
+}
+
+// The body of the Stripe card while an academy is mid-setup. Four different
+// things can be true here and they must not collapse into one paragraph:
+//
+//   no account_id      the OAuth never finished. Starting it again is the fix.
+//   we could not ask   our call to Stripe failed. We do NOT know whether their
+//                      account is ready, and saying "you are not ready" would
+//                      be inventing a fact. Different words, deliberately.
+//   Stripe said no     show the items Stripe named. This is the whole point.
+//   Stripe said yes    the tick is on its way; still no reason to reconnect.
+//
+// `live` is null on an older response or when nothing was asked, which falls
+// back to the previous generic wording rather than showing an empty list.
+function _stripeOnboardingBody(stripe) {
+  const P = 'font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5';
+  const S = 'font-size:12px;color:var(--text-mute);margin-bottom:14px;line-height:1.5';
+  const NO_RECONNECT = 'This step ticks itself as soon as Stripe says you can take payments - you do not need to reconnect.';
+
+  if (!stripe.account_id) {
+    return `<div style="${P};margin-bottom:14px">Stripe connection didn't finish - start the connect flow again to complete it.</div>`;
+  }
+  const live = stripe.live || null;
+
+  if (live && live.reachable === false) {
+    return `<div style="${P}">Your Stripe account is linked. We <b>could not reach Stripe just now</b> to check whether payments are switched on, so this is about our check, not about your account.</div>
+            <div style="${S}">Open your Stripe dashboard to see where it stands, or reopen this card in a minute to try again. ${NO_RECONNECT}</div>`;
+  }
+  if (live && live.outcome === 'ready') {
+    return `<div style="${P}">Your Stripe account is linked and Stripe says it <b>can accept payments</b>. Nothing is outstanding.</div>
+            <div style="${S}">${NO_RECONNECT}</div>`;
+  }
+  if (live && live.outcome === 'not_ready') {
+    const needs = _stripeNeedsList(live.needs);
+    const reviewing = _stripeNeedsList(live.reviewing);
+    // Stripe's own sentence about something already submitted and thrown out
+    // ("The document is unreadable"). Without it the owner just sees the same
+    // item asked for again and re-uploads the same rejected file.
+    const problems = Array.isArray(live.problems) && live.problems.length
+      ? `<div style="font-size:11px;font-weight:700;color:#c4634f;letter-spacing:0.5px;text-transform:uppercase;margin:12px 0 6px">Stripe rejected what you sent</div>
+         <ul style="margin:0 0 14px;padding-left:18px;font-size:13px;line-height:1.6;color:var(--text)">` +
+        live.problems.map(p => `<li>${escapeHTML(p.label || '')}${p.what ? ` <span style="color:var(--text-mute)">(${escapeHTML(p.what)})</span>` : ''}</li>`).join('') + `</ul>`
+      : '';
+    const why = (!needs && live.disabled_reason)
+      ? `<div style="${P}">${escapeHTML(live.disabled_reason.label || '')}</div>`
+      : '';
+    const nothingNamed = (!needs && !reviewing && !why && !problems)
+      ? `<div style="${S}">Stripe did not name an outstanding item, which usually means a check is still running on their side.</div>`
+      : '';
+    return `<div style="${P}">Your Stripe account is linked, but Stripe says it <b>cannot accept payments yet</b>.</div>
+            ${why}
+            ${problems}
+            ${needs ? `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:12px 0 6px">Stripe still needs</div>${needs}` : ''}
+            ${reviewing ? `<div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin:12px 0 6px">Stripe is reviewing</div>${reviewing}` : ''}
+            ${nothingNamed}
+            <div style="${S}">Finish those in your Stripe dashboard. ${NO_RECONNECT}</div>`;
+  }
+  // live === null: we have not asked Stripe on this response.
+  return `<div style="${P}">Your Stripe account is linked, but Stripe says it <b>cannot accept payments yet</b> - there are still steps to finish inside Stripe.</div>
+          <div style="${S}">Open your Stripe dashboard for the outstanding items. ${NO_RECONNECT}</div>`;
+}
+
 function openStripeConnectModal() {
   const host = document.getElementById('stripe-modal-host');
   if (!host) return;
@@ -49311,16 +49397,21 @@ function openStripeConnectModal() {
       ` : ''}`;
     primaryBtn = `<button onclick="connectStripe()" style="background:transparent;color:var(--text);border:1px solid var(--border);padding:8px 16px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Reconnect / switch account</button>`;
   } else if (status === 'onboarding') {
-    // Two ways to land here: the OAuth never finished (no account_id), or it DID
+    // Several ways to land here: the OAuth never finished (no account_id), it DID
     // finish but Stripe still has outstanding requirements so the account cannot
-    // charge yet. Those need different instructions - sending someone back through
-    // OAuth when the real blocker is inside Stripe just loops them.
-    bodyHtml = stripe.account_id
-      ? `<div style="font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5">Your Stripe account is linked, but Stripe says it <b>cannot accept payments yet</b> - there are still steps to finish inside Stripe (business details, bank account, or ID verification).</div>
-         <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px;line-height:1.5">Finish those in your Stripe dashboard. This step ticks itself as soon as Stripe says you can take payments - you do not need to reconnect.</div>`
-      : `<div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Stripe connection didn't finish - start the connect flow again to complete it.</div>`;
+    // charge yet, or our own check of Stripe failed and we know nothing. Those
+    // need different instructions - sending someone back through OAuth when the
+    // real blocker is inside Stripe just loops them, and telling them their
+    // account is incomplete when our request timed out is simply untrue.
+    // _stripeOnboardingBody names the real outstanding items from Stripe.
+    bodyHtml = _stripeOnboardingBody(stripe);
+    // "Finish in Stripe" promises there is something to finish. When our own
+    // check failed, or Stripe already said yes, there may be nothing - so the
+    // button opens the dashboard without claiming why.
+    const _live = stripe.live || null;
+    const _openOnly = _live && (_live.reachable === false || _live.outcome === 'ready');
     primaryBtn = stripe.account_id
-      ? `<a href="https://dashboard.stripe.com/" target="_blank" rel="noopener" style="display:inline-block;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;text-decoration:none">Finish in Stripe</a>`
+      ? `<a href="https://dashboard.stripe.com/" target="_blank" rel="noopener" style="display:inline-block;background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;text-decoration:none">${_openOnly ? 'Open Stripe dashboard' : 'Finish in Stripe'}</a>`
       : `<button onclick="connectStripe()" style="background:var(--gold,#D4B65C);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Continue setup</button>`;
   } else if (status === 'disabled') {
     bodyHtml = `<div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Stripe access was revoked. Reconnect to resume billing actions.</div>`;
@@ -49403,6 +49494,13 @@ function _stripeConnectReturnCheck() {
   }
   if (sc === 'connected') {
     setTimeout(() => alert('Stripe connected.'), 100);
+  } else if (sc === 'pending') {
+    // NOT a failure. The handshake worked and the account is stored; Stripe
+    // just has not switched payments on yet, or we could not reach Stripe to
+    // ask. Leading with "connection failed" over a connection that succeeded
+    // is what sent Elijah back through OAuth looking for a problem that was
+    // never in the connection. api/stripe/connect.js writes the detail.
+    setTimeout(() => alert(msg || 'Stripe is connected. Payments are not switched on yet - open the Stripe card on the Members tab for the outstanding items.'), 100);
   } else {
     alert('Stripe connection failed' + (msg ? ' - ' + msg : ''));
   }

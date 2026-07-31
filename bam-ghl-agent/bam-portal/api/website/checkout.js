@@ -30,7 +30,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { renderAgreementPdf, uploadAgreementPdf, uploadSignaturePng, buildClauses } from "../_lib/agreement-pdf.js";
 import { requiredConsentKeys } from "../_lib/agreement-version.js";
 import { applyDiscountToCents, normCode, couponFromPromo, couponCoversKey } from "../_coupon-guardrails.js";
-import { resolveOrMintPortalContact, writePortalFieldValues } from "../_contacts.js";
+import { resolveOrMintPortalContact, writePortalFieldValues, ensureStorageOnlyDefs } from "../_contacts.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -660,6 +660,16 @@ async function handler(req, res) {
       // academy without those defs. intake wins if it did send them.
       const fieldValues = { athlete_first_name: athlete.first, athlete_last_name: athlete.last, ...intake };
       if (Object.values(fieldValues).some((v) => String(v || "").trim())) {
+        // The emergency contact is a CODE block on the enroll form, not a def,
+        // so no academy had a row for it and every answer this form REQUIRED
+        // was written to nothing. Mint the storage-only defs before the write so
+        // the answer has somewhere to land - idempotent, so on every enrollment
+        // after the first (and after the backfill migration) this is a no-op
+        // insert that changes nothing. It runs BEFORE writePortalFieldValues on
+        // purpose: that function resolves keys against the defs that exist at
+        // the moment it reads them, so minting after it would store nothing
+        // until the NEXT enrollment.
+        await ensureStorageOnlyDefs(clientId);
         // athlete_name is what lets the phone (household) match tell "the other
         // parent of the same kid" from "a sibling on the same number".
         const contactId = await resolveOrMintPortalContact(clientId, { email: parentEmail, phone: parentPhone, name: parentName, athlete_name: athleteName });

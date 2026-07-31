@@ -21,6 +21,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 // Pure, no network and no database. It is the single owner of what a class's
 // age bounds MEAN, and this endpoint reads it rather than re-deriving them.
 import { classAgeRange } from "../agent/_class-routing.js";
+import { STORAGE_ONLY_DEF_KEYS as CONTACT_STORAGE_ONLY_DEF_KEYS } from "../_contacts.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -67,7 +68,7 @@ const TRAINING_INTAKE_DEFAULTS = [
 // grade / gender questions have to sit next to that name, not after the
 // emergency contact. Order: parent basics -> athlete -> emergency contact.
 const PARENT_BASICS = TRAINING_INTAKE_DEFAULTS.slice(0, 3);
-const EMERGENCY_CONTACT = TRAINING_INTAKE_DEFAULTS.slice(3);
+export const EMERGENCY_CONTACT = TRAINING_INTAKE_DEFAULTS.slice(3);
 
 // Intake labels that are ALWAYS required, for every academy on the shared
 // sales-system preset (lowercased). Emergency contact added 2026-07-24 -
@@ -77,9 +78,47 @@ const REQUIRED_INTAKE_LABELS = new Set([
   "emergency contact name", "emergency contact phone",
 ]);
 
-function fieldKey(label) {
+export function fieldKey(label) {
   return String(label).toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
+
+// Defs that exist ONLY so an answer has somewhere to land, for a question this
+// file already renders from code. They must never be rendered AS defs.
+//
+// WHY AN EXPLICIT LIST AND NOT A CLEVER DEF SHAPE. The first design tried to
+// find a value combination that custom_field_defs could carry which
+// writePortalFieldValues would find and buildFields would never render. There
+// isn't one, and the reason is structural rather than a missing trick: all three
+// readers - this file, api/_contacts.js and api/custom-fields.js - select on the
+// SAME `client_id + archived=false` pair. Everything that hides a row from one
+// hides it from the others:
+//   archived: true      buildFields never sees it, and neither does the storage
+//                       write NOR the Members drawer. Nothing lands, nothing shows.
+//   offer_id: <other>   dropped for THIS offer, rendered on that other offer's
+//                       forms, needs a second offer to exist, and the offer_id FK
+//                       to offers(id) forbids a sentinel id. A semantic lie.
+//   label: ""           skipped by the early return below, and then shows as a
+//                       blank row in the Members drawer and in field settings -
+//                       which defeats the entire point, since the goal is for a
+//                       coach to READ it.
+// So the honest version is a named exclusion at the one choke point, which is
+// what this is: two keys, imported from the module that owns the storage, not
+// re-typed here.
+//
+// FOUR CONSEQUENCES THIS SKIP PREVENTS, all of which a rendered def would cause:
+//   1. RELOCATION. Academy-level defs are pushed BEFORE the emergency block, and
+//      the de-dupe below is by lowercased LABEL - so the def would win and the
+//      emergency questions would jump up into the athlete section.
+//   2. REQUIRED OVERRIDE. A rendered def takes `required` from its own row
+//      (cfDefToField), not from REQUIRED_INTAKE_LABELS, so a def seeded
+//      required:false would quietly make a REQUIRED question optional.
+//   3. LEAD-FORM LEAK. coreDefs are spread into `lead_fields` too, so the free
+//      trial form would start asking a stranger for their emergency contact.
+//   4. REORDER. Anything pushed before EMERGENCY_CONTACT shifts the block, and
+//      the "__<index>" suffix on every submitted key shifts with it.
+// api/_emergency-contact-storage.test.mjs asserts all four against the rendered
+// form rather than against this comment.
+const STORAGE_ONLY_DEF_KEYS = new Set(CONTACT_STORAGE_ONLY_DEF_KEYS);
 
 // Infer a concrete input type (+ options) from a question label. The offer
 // builder only stores labels, so the funnel derives how to render each one.
@@ -153,6 +192,11 @@ export function buildFields(offer, customDefs, section) {
     out.push(f);
   };
   const pushDefField = (def) => {
+    // The one def-rendering choke point, so this single line covers BOTH loops
+    // (academy-level and offer-scoped) and BOTH sections (intake and lead).
+    // Keyed, not labelled: an academy is free to relabel its stored field and it
+    // still must not render.
+    if (def && STORAGE_ONLY_DEF_KEYS.has(String(def.key || ""))) return;
     const f = cfDefToField(def);
     if (!f.label) return;
     const k = f.label.toLowerCase();
