@@ -283,6 +283,103 @@ function coerceValue(type, v) {
   return s;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STORAGE-ONLY INTAKE FIELDS
+// ─────────────────────────────────────────────────────────────────────────────
+// THE BUG THIS EXISTS FOR. The membership enroll form asks every parent for an
+// emergency contact and REQUIRES it (REQUIRED_INTAKE_LABELS in
+// api/website/offer.js, owner ruling: required for every academy on the preset).
+// The answer was then thrown away. Not by an error - by a gap: those two
+// questions are a CODE BLOCK in buildFields, not custom_field_defs rows, and
+// writePortalFieldValues resolves a submitted answer to a def BY KEY. No academy
+// had the key (verified 2026-07-31: 0 emergency defs across every academy), so
+// every emergency contact ever collected fell straight through. It survived only
+// inside member_audit_log.args.intake, which is an audit trail nobody reads off a
+// member's record - 18 enrollments, 13 members, back to 2026-06-16.
+//
+// A required field with nowhere to land is the worst shape a field can have: the
+// form is asking parents for something in an emergency's name and the coach who
+// would need it cannot see it.
+//
+// WHAT A "STORAGE-ONLY" DEF IS. A custom_field_defs row that exists so a value
+// has somewhere to go, for a question the FORM already renders from code. It is
+// a real def in every other respect - the Members drawer reads it, a coach can
+// edit it inline (api/custom-fields.js returns every offer_id-null def with its
+// value) - it simply must never be RENDERED as a def, or the enroll form would
+// ask the same question twice. api/website/offer.js skips these keys at its one
+// def-rendering choke point; see STORAGE_ONLY_DEF_KEYS there and the four
+// consequences that skip prevents.
+//
+// WHY THE DEF LIVES HERE AND THE SKIP LIVES THERE. This module owns storage, so
+// the manifest is here and offer.js imports the keys. The other direction would
+// make a core storage lib depend on an API route module (offer.js pulls in
+// _sentry.js and a handler), which nothing else in this file does.
+//
+// THE KEYS ARE DERIVED FROM THE FORM'S LABELS AND MUST STAY THAT WAY.
+// buildFields submits `fieldKey("Emergency contact name")` =
+// "emergency_contact_name" (plus a "__<index>" suffix that writePortalFieldValues
+// strips - the index is NOT stable, production has shipped both __3/__4 and
+// __6/__7 as the academy's other fields moved around it). Rename the LABEL in
+// offer.js and the submitted key changes with it, silently orphaning these rows.
+// That is not left to memory: api/_emergency-contact-storage.test.mjs asserts
+// EMERGENCY_CONTACT.map(fieldKey) equals these keys, so a label rename fails the
+// suite and the person renaming has to decide what happens to the stored answers.
+export const STORAGE_ONLY_INTAKE_DEFS = [
+  { key: "emergency_contact_name",  label: "Emergency contact name",  type: "text",  position: 100 },
+  { key: "emergency_contact_phone", label: "Emergency contact phone", type: "phone", position: 101 },
+];
+export const STORAGE_ONLY_DEF_KEYS = STORAGE_ONLY_INTAKE_DEFS.map((d) => d.key);
+
+// Make sure this academy has the storage-only defs, so the answers the enroll
+// form is ALREADY collecting have a row to land in.
+//
+// Idempotent by construction: ignore-duplicates against the (client_id, key)
+// unique index, so a second call writes nothing and an academy that already has
+// the key keeps ITS row - label, type and required flag included. It never
+// PATCHes and never deletes.
+//
+// ARCHIVED ROWS ARE LEFT ARCHIVED, and that is a real decision rather than an
+// oversight. ignore-duplicates matches on the KEY, so an academy that archived
+// its emergency field stays archived and its answers keep falling through. That
+// is correct: archiving is a deliberate act by an owner, and a storage helper
+// that silently un-archived a field would be overriding them on a money path. It
+// is also visible - the field is absent from the drawer, which is what archiving
+// means. The form-level requirement is a separate question and a separate owner
+// decision; nothing here should quietly settle it.
+//
+// Best-effort, like everything else in this file: it swallows its own errors and
+// returns false rather than throwing, because it is called from the enrollment
+// path and no field definition is worth failing a payment over.
+export async function ensureStorageOnlyDefs(clientId, sbPost = post) {
+  try {
+    if (!SB_URL || !SB_KEY || !clientId) return false;
+    await sbPost(
+      "custom_field_defs?on_conflict=client_id,key",
+      STORAGE_ONLY_INTAKE_DEFS.map((d) => ({
+        client_id: clientId,
+        key: d.key,
+        label: d.label,
+        type: d.type,
+        options: [],
+        position: d.position,
+        required: false,
+        archived: false,
+        // ACADEMY-LEVEL on purpose (offer_id null, section null). An offer-scoped
+        // def would be invisible on the contact record for anyone who bought a
+        // different offer, and emergency contact belongs to the person, not the
+        // purchase.
+        offer_id: null,
+        section: null,
+      })),
+      "resolution=ignore-duplicates,return=minimal",
+    );
+    return true;
+  } catch (e) {
+    console.error("[ensureStorageOnlyDefs] non-fatal:", e?.message || e);
+    return false;
+  }
+}
+
 // Close the write loop: on a form submit, write the collected custom-field
 // values straight into portal contact_field_values, keyed by custom_field_defs.
 // Two ways a submission key resolves to a def:
