@@ -187,6 +187,17 @@ export const PRESETS = {
     // not a station, but part of what the preset stamps. The worker enrolls
     // automation_key 'onboarding' when a member activates (api/automations.js).
     postConversion: [automation("onboarding")],
+    // Owner/staff SMS events this preset brings with it. Declared HERE, not in a
+    // global list in the portal, for the same reason automations and forms are:
+    // a preset owns what it brings, and an academy that has not applied it must
+    // not be offered a switch for a thing it does not run.
+    //
+    // notifyOwners(clientId, key, msg) is the sender; clients.notification_prefs
+    // holds the per-teammate opt-in under this key. The owner always receives it.
+    notifications: [
+      { key: "free_trial_booked", label: "Free trial booked",
+        hint: "A family books, cancels or moves a free trial" },
+    ],
     stages: [
       { role: "responded", label: "Booking", position: 0,
         entry: {
@@ -437,6 +448,15 @@ export function presetEntrySources(presetKey) {
   return list;
 }
 
+// Every owner/staff SMS event the preset brings. The portal's notification pill
+// row renders from THIS, so a preset-owned event can never end up as a switch in
+// the UI with no preset behind it (or, worse, behind it but not wired - which is
+// exactly how calendar_booking sat ON for BAM GTA sending nothing).
+export function presetNotifications(presetKey) {
+  const p = PRESETS[presetKey];
+  return (p && Array.isArray(p.notifications)) ? p.notifications : [];
+}
+
 // UI-facing summary of everything the preset stamps - the "Choose the preset"
 // step renders its chips from this, so the UI never hardcodes preset contents.
 export function presetContents(presetKey) {
@@ -461,6 +481,7 @@ export function presetContents(presetKey) {
     agents: stages.filter((s) => s.engine && s.engine.kind === "agent")
       .map((s) => ({ template: s.engine.template, mission: (AGENT_TEMPLATES[s.engine.template] || {}).mission || "" })),
     automations: presetAutomationKeys(presetKey),
+    notifications: presetNotifications(presetKey),
     forms: presetEntrySources(presetKey).filter((x) => x.kind === "website-form").map((x) => ({ key: x.key, label: x.label })),
     calendars: presetEntrySources(presetKey).filter((x) => x.kind === "calendar").map((x) => ({ ref: x.ref, label: x.label })),
   };

@@ -10,6 +10,7 @@ import { createRuntimeSupabaseClient } from "../_runtime/supabase.js";
 import type { HeaderValue, RuntimeApiRequest, RuntimeApiResponse } from "../runtime/_types.js";
 import { isUuid, parseDateOnly } from "../runtime/schedule/_shared.js";
 import { bounceCancelledTrialToRebook } from "../agent/_rebook.js";
+import { notifyTrialBooked } from "../_notify-trial-booked.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -195,6 +196,9 @@ async function createTrialBooking(req: RuntimeApiRequest) {
         .eq("status", "scheduled");
     } catch { /* best-effort - never block a booking */ }
   }
+  // Owner/staff text. Awaited so a serverless freeze after the response cannot
+  // drop it; non-throwing, so it cannot cost the family their booking.
+  await notifyTrialBooked({ clientId: request.clientId, trialBookingId: data, kind: "booked" });
   return { trial_booking_id: data, status: "BOOKED" };
 }
 
@@ -218,6 +222,9 @@ async function cancelTrialBooking(req: RuntimeApiRequest) {
       trialBookingId: booking.id,
       source: "website-cancel",
     });
+    // The FAMILY cancelled, so the academy needs to hear it. (Staff-initiated
+    // cancels elsewhere deliberately stay silent - see _notify-trial-booked.js.)
+    await notifyTrialBooked({ clientId: booking.tenant_id, trialBookingId: booking.id, kind: "cancelled" });
   }
   return {
     trial_booking_id: booking.id,
@@ -238,8 +245,12 @@ async function rescheduleTrialBooking(req: RuntimeApiRequest) {
   });
 
   if (error) throw publicRpcError(error.message);
+  // The RPC may hand back a NEW booking id; notify on whichever row now holds
+  // the slot, so the text carries the time they moved TO, not the one they left.
+  const resultingId = typeof data === "string" ? data : booking.id;
+  await notifyTrialBooked({ clientId: booking.tenant_id, trialBookingId: resultingId, kind: "rescheduled" });
   return {
-    trial_booking_id: typeof data === "string" ? data : booking.id,
+    trial_booking_id: resultingId,
     status: "BOOKED",
     slot_id: request.newSlotId,
   };

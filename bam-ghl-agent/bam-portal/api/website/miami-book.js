@@ -7,6 +7,7 @@ import { withSentryApiRoute } from '../_sentry.js';
 import { getClientGhlToken } from './availability.js';
 import { findOpenOpp, moveStage } from '../agent/_store.js';
 import { chooseSlotToBook, loadClassesFor } from '../agent/_class-slots.js';
+import { notifyTrialBooked } from '../_notify-trial-booked.js';
 
 const ALLOWED_CALENDARS = new Set([
   '290AH08i2I7Ts3yzd4W0', // Free Trial - Elementary Academy
@@ -209,6 +210,8 @@ async function handler(req, res) {
     }
     const trialBookingId = typeof rpcRes === 'string' ? rpcRes : (rpcRes && rpcRes.trial_booking_id) || null;
     if (!trialBookingId) return res.status(502).json({ error: 'Failed to book appointment' });
+
+    await notifyTrialBooked({ clientId: MIAMI_CLIENT_UUID, trialBookingId, kind: 'booked' });
 
     // No GHL appointment fires on a portal booking, so Detail's GHL nurture
     // workflows get no AppointmentCreate stop signal - stamp the booked tag on

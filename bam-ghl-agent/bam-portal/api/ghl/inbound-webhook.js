@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken, sendSms, ghl } from "./_core.js";
 import { notifyOwners } from "../_notify-owners.js";
+import { trialBookingEventForGhlCalendar, formatSlotTime } from "../_notify-trial-booked.js";
 import { respondedStage, contactStageState, scheduledTrialStage, interestedStage, nurtureStage } from "../agent/_stage.js";
 import { markReopened } from "../agent/_reopen.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
@@ -158,7 +159,7 @@ async function handler(req, res) {
   try {
     const rows = await sb(
       `clients?ghl_location_id=eq.${encodeURIComponent(String(locationId))}` +
-      `&select=id,business_name,v15_access,v2_access,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_location_id,ghl_kpi_config&limit=1`
+      `&select=id,business_name,v15_access,v2_access,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_location_id,ghl_kpi_config,time_zone&limit=1`
     );
     client = Array.isArray(rows) && rows[0];
   } catch (e) {
@@ -194,15 +195,22 @@ async function handler(req, res) {
         } catch (_) { /* best-effort - details are a bonus */ }
       }
       const startRaw = a.startTime || a.start_time || a.selectedSlot || a.appointmentStartTime || null;
-      let when = "";
-      if (startRaw) { const d = new Date(startRaw); if (!isNaN(d.getTime())) when = d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }); }
+      // In the ACADEMY's timezone. This used to render in the server's (UTC on
+      // Vercel), so a Toronto owner read a booking time three hours off and had
+      // no way to tell - the string carried no zone.
+      const when = formatSlotTime(startRaw, client.time_zone);
       const what = a.title || a.calendarName || a.calendar || "appointment";
+      // Free-trial calendars land on the preset's own pill; everything else
+      // (BAM's Coach Cert calendar, say) keeps the generic booking event.
+      const apptCalId = a.calendarId || a.calendar_id || null;
+      const eventKey = await trialBookingEventForGhlCalendar(client.id, apptCalId);
+      const head = eventKey === "calendar_booking" ? "📅 New booking" : "📅 New free trial booked";
       const lines = [
-        `📅 New booking - ${what}`,
+        `${head} - ${what}`,
         cName ? `Who: ${cName}${cPhone ? " · " + cPhone : ""}${cEmail ? " · " + cEmail : ""}` : "",
         when ? `When: ${when}` : "",
       ].filter(Boolean);
-      notifyOwners(client.id, "calendar_booking", lines.join("\n")).catch(() => {});
+      notifyOwners(client.id, eventKey, lines.join("\n")).catch(() => {});
     } catch (e) { console.error("ghl inbound-webhook appointment error:", e.message); }
 
     // A booking is a hard exit from the sales drip: a lead who books a trial

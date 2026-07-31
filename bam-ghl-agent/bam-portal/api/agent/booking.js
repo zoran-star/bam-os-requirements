@@ -117,6 +117,7 @@ import {
   classIndex, classForCalendar, classByName, loadClassesFor,
   routeSlots, chooseSlotToBook, parentFacingClassName,
 } from "./_class-slots.js";
+import { notifyTrialBooked } from "../_notify-trial-booked.js";
 export { loadClassesFor };
 
 // [{ key, label }] for the academy's trial calendars.
@@ -333,6 +334,10 @@ export async function bookPortalTrial(clientId, { slotAtIso, group, className, c
       });
     } catch (_) {}
   }
+  // A trial the agent locked in on the family's behalf is still news to the
+  // owner - the staff member approving a Book-it card is not the person who
+  // needs to know a Tuesday slot just filled. Non-throwing.
+  await notifyTrialBooked({ clientId, trialBookingId: id, kind: "booked" });
   return id;
 }
 
