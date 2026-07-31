@@ -60,8 +60,6 @@
 
 # ── HARMFUL ──────────────────────────────────────────────────────────────────
 
-HARMFUL | api/stripe/connect.js::canCharge | A blip, an expired platform key and a genuinely unfinished Stripe account all produce the same false, the same stored stripe_connect_status of onboarding, and the same sentence to the owner: "finish the remaining steps in Stripe". The function discarded WHICH steps before telling a human to go finish them. Being fixed separately; delete this line with the fix.
-HARMFUL | api/ghl/cron-import-history.js::hasGmailMailbox | A transient Supabase error returns false, which the caller reads as "no Gmail connected" and so runs the GHL email import on top of the Gmail 2-way sync. The comment directly above it says running both would double every email thread. A blip therefore duplicates an academy's whole email history, and nothing downstream can tell that it happened or which threads are the copies.
 HARMFUL | api/agent/_stage.js::contactInRespondedStage | The catch returns false, which the send path renders to staff as a 409 "no longer in the ... stage". That is a factual claim about the lead, produced by a GHL outage. It already misfired at scale on GTA once (2026-07-10) for a different reason, and the correct pattern sits forty lines below it in the same file: computeQueue's idsTrusted.
 HARMFUL | api/agent/_store.js::contactInRole | The store-side half of contactInRespondedStage, same collapse and same consequence: the GHL branch's catch turns any search failure into "this contact is not in that stage", and the caller states that to staff as fact. Fix these two together, since one delegates to the other.
 
