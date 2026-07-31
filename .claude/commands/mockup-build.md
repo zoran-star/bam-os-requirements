@@ -72,3 +72,12 @@ instruction). Update the relevant memory note in the same pass.
   (`display:none !important`) - out-important it deliberately, never by accident.
 - Verify in `?mock=1` at 375px AND desktop width before calling anything done.
 - A `<button>` inside a `<button>` self-closes at parse time and breaks layout.
+- Headless scroll probes LIE while entrance animations are parked: in the
+  browser pane `document.timeline` may never tick, leaving overlays at
+  `translateY(100%)` and making backdrops artificially scrollable, so a broken
+  scroller "passes". Force `el.getAnimations().forEach(a => a.finish())`
+  before ANY scroll verification (cost a real phone a frozen inbox, 2026-07-31).
+- The v15 inbox split: under 900px the list scroller is turned OFF
+  (`overflow:visible`) expecting an ancestor to scroll, but the focus card and
+  its `.content` are `overflow:hidden` at every width. Any mobile surface that
+  becomes the primary scroller needs its own `overflow-y:auto` restored.
