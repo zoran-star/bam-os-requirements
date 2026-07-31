@@ -22246,7 +22246,7 @@ function renderHomeV2() {
       </div>
       <div class="hm-bubble">
         <div class="hv2-mid">
-          <div class="hv2-panel">
+          <div class="hv2-panel" id="hv2-sched-panel">
             <div class="hv2-ph">
               <span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.calendar} Today's schedule</span>
               <span class="hm-trial-pill" id="hm-trial-pill" style="display:none"></span>
@@ -22276,7 +22276,7 @@ function renderHomeV2() {
           </div>
         </div>
       </div>
-      <div class="hm-bubble">
+      <div class="hm-bubble" id="hv2-nav-bubble">
         <div class="hv2-nav">
           ${_hv2NavCard('mega', 'Marketing', 'Campaigns, leads and content', 'marketing', 0.12)}
           ${_hv2NavCard('trend', 'Sales', 'Pipeline, agents and trials', 'pipelines', 0.18)}
@@ -60146,6 +60146,25 @@ function _ccStyle() {
     'html.mm-focus-open #member-drawer-backdrop{z-index:9590 !important}' +
     /* quick links widget (home rail) */
     '.cc-res-widget{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:14px 16px}' +
+    // Two-up Contacts/Calendar mini cards - the mobile stand-in for Quick links.
+    '.cc-mini-row{display:none;gap:10px}' +
+    '.cc-mini-card{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:15px 10px;font:inherit;font-size:13px;font-weight:700;color:var(--text);cursor:pointer}' +
+    '.cc-mini-card svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
+    '@media (max-width:768px){' +
+      // Mobile home diet (Zoran 2026-07-31): KPI scorecard, the three big nav
+      // cards, the Hawkeye activity feed and Quick links all go. Contacts +
+      // Calendar mini cards take the rail spot. Card order: Actions, Inbox,
+      // then Today's schedule.
+      '#home-v2 .hm-score{display:none !important}' +
+      '#home-v2 #hv2-nav-bubble{display:none !important}' +
+      '#home-v2 #hm-rail-bottom{display:none !important}' +
+      '#home-v2 .cc-res-widget{display:none !important}' +
+      '#home-v2 .cc-mini-row{display:flex}' +
+      '#home-v2 .hv2-mid{display:flex;flex-direction:column}' +
+      '#home-v2 #hv2-acts-panel{order:1}' +
+      '#home-v2 #hv2-inbox-panel{order:2}' +
+      '#home-v2 #hv2-sched-panel{order:3}' +
+    '}' +
     '.cc-res-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:10px}' +
     '.cc-res-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}' +
     '.cc-res-btn{display:flex;align-items:center;gap:8px;background:transparent;border:1px solid var(--border-med);border-radius:8px;padding:9px 11px;font:inherit;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:border-color .12s,color .12s;text-align:left}' +
@@ -61087,6 +61106,16 @@ function _ccMountHome(host) {
     try { _hv2Style(); hv.style.display = 'block'; renderHomeV2(); } catch (e) { console.error('[cc] home', e); }
     // Quick links widget - fills the empty right-rail spot under Hawkeye.
     const rail = hv.querySelector('.hm-right');
+    // Mobile home (Zoran 2026-07-31): the Quick links card gives way to two
+    // mini cards on one row - Contacts + Calendar. Desktop keeps Quick links;
+    // the media query below decides which of the two renders.
+    if (rail && !document.getElementById('cc-mini-row')) {
+      rail.insertAdjacentHTML('beforeend', `
+        <div class="cc-mini-row" id="cc-mini-row">
+          <button type="button" class="cc-mini-card" onclick="_ccOpenClassic('contacts')">${_ccIcons().contacts}<span>Contacts</span></button>
+          <button type="button" class="cc-mini-card" onclick="_calOpenRight()">${_ccIcons().cal}<span>Calendar</span></button>
+        </div>`);
+    }
     if (rail && !document.getElementById('cc-res-widget')) {
       rail.insertAdjacentHTML('beforeend', `
         <div class="cc-res-widget" id="cc-res-widget">
