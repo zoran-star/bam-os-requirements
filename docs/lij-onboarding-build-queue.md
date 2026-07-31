@@ -874,6 +874,26 @@ NEW: sb(`             ${encodeURIComponent(offerId)}         `)
 
 **⛔ ORCHESTRATOR CALL: STOP REFINING, HOLD UNTIL MERGE.** It asked, correctly, rather than deciding for itself. **The gate is complete; the last round found zero bugs and one non-improvement, which is the signal to stop rather than to go deeper.** Three PRs are blocked on a human, not on quality, and **polish landing after the bottleneck is free while polish landing before it is not.** The remaining risk is better carried by the next person, who now inherits a self-test, seven controls and written measurements instead of folklore.
 
+## 🚨 [PR #1676](https://github.com/zoran-star/bam-os-requirements/pull/1676) CARRIES A **MANDATORY DEPLOY-DAY STEP.** MERGING IT WITHOUT THAT STEP SHIPS THE EXACT PATTERN IT FIXES.
+
+**`POST /api/stripe/ensure-webhook-events` must run AFTER the merge**, or the handler is **tested and never called** - perfect code, passing suite, negative controls, and Stripe never sends the event.
+
+**The room did the thing that makes this durable rather than a note: the subscription check is DERIVED FROM THE SWITCH**, handles both case shapes, resolves constants, and **hard-fails on unresolvables. So a fourth orphan of this kind is now impossible rather than merely warned about.** The pre-existing `checkout.session.completed` gap rides along, add-only.
+
+**⚠️ ORCHESTRATOR DUTY, WRITTEN DOWN SO IT CANNOT EVAPORATE: this step is owned, not assumed.** Whoever merges #1676 runs it, confirms the subscription exists afterwards **by reading Stripe's event list rather than the endpoint's success response**, and says so. **A step that lives only in a PR body is exactly the shape this file has catalogued nine times.**
+
+## ✅ THE MEMBER-MANAGEMENT BUILD WAVE IS COMPLETE. Two PRs left, then the phase changes.
+
+- **[#1675](https://github.com/zoran-star/bam-os-requirements/pull/1675) billing cadence as data.** Three adversarial rounds. San Jose's 12/24-week ruling is expressible, **GTA byte-identical by construction rather than by checking**, and the fee-as-subscription money bug is killed **with the real Stripe request bytes asserted**. Migration inert and ledgered. CLEAN.
+- **[#1676](https://github.com/zoran-star/bam-os-requirements/pull/1676) deauthorization.** PASS after two rounds, **fail-direction verified repo-wide: no transient failure anywhere can produce `disabled`.** Both routed constraints honoured verbatim. CI still running at time of writing.
+
+**NEXT PHASE, per Zoran's ruling: San Jose in bits, learn, THEN write the `/member-management` skill.** Not the other way round. **Gated on two unlocks that are both his:**
+
+1. **GTA's HST number** - releases the receipts ON switch, whose seed migration is held.
+2. **San Jose's Stripe Connect onboarding completing** - status was `onboarding` with an account id when last read, and **the bit-1 price scan needs `connected`.**
+
+**That second one is the same first domino recorded earlier: Stripe unlocks prices, prices unlock slots, slots unlock calendars, calendars unlock age routing.** It is now also gating the member-management phase, so **it blocks two workstreams rather than one.**
+
 ## 📏 THE PATTERN GOES ONE LAYER FURTHER OUT THAN ANYONE HAD TAKEN IT: **A WEBHOOK SUBSCRIPTION IS ALSO AN ASSURANCE WITHOUT A CONNECTION.**
 
 MEMBER MANAGEMENT took the Stripe deauthorization build with both routed constraints, and **added one nobody had:**
