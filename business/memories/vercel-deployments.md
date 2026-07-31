@@ -3,8 +3,24 @@
 ## Production
 The repo root deploys to Vercel project **`bam-os-requirements`** under `zoran-stars-projects`. The whole repo root deploys, with rewrites configured in `/vercel.json` at the repo root:
 
+## ⚠️ info.fullcntrl.io lives on a SEPARATE project (found 2026-07-31)
+
+The public investor domain `info.fullcntrl.io` is NOT on this monorepo's project. It is attached
+to Cole's own Vercel project **`fullcontrol-investor`** (team `bam-coaches`, account coleman-1815),
+which deploys from the private repo **`coleman-ayers/fullcontrol-investor`** - a STALE May 1 copy
+of the investor summary. That is why monorepo edits to `/summary` never showed on the domain and
+why `/summary` / `/playbook` / `/projections` 404 there.
+
+Plan (Cole, 2026-07-31): move the domain onto the monorepo project so one copy serves everything.
+The root rewrite `/` -> summary.html was added to `vercel.json` so the bare domain keeps working
+after the move. To move: remove `info.fullcntrl.io` from the `fullcontrol-investor` project, add it
+to `bam-os-requirements` (zoran-stars-projects) under Settings -> Domains. DNS already points at
+Vercel, so no DNS change should be needed. After the move, archive `coleman-ayers/fullcontrol-investor`
+so the stale copy can't come back. Remote sessions cannot push to that repo (cross-owner).
+
 | Path | Destination |
 |---|---|
+| `/` | `/business/business/summary.html` (so the bare domain lands on the one-pager) |
 | `/summary` | `/business/business/summary.html` (investor summary) |
 | `/playbook` | `/business/business/fullcontrol-investor-playbook.html` (fixed 2026-07-31; previously pointed at a nonexistent root file and 404'd) |
 | `/investor` | `/prototypes/fc-company/index.html` (⚠️ BROKEN: that path does not exist in the repo - restore the file or retarget the rewrite) |
