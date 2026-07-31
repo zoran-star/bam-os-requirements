@@ -14,7 +14,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import crypto from "node:crypto";
 import { pickGhlToken, sendSms, ghl } from "../ghl/_core.js";
 import { notifyOwners } from "../_notify-owners.js";
-import { respondedStage, contactInRespondedStage, interestedStage, nurtureStage, isRealInbound } from "../agent/_stage.js";
+import { respondedStage, contactStageState, interestedStage, nurtureStage, isRealInbound } from "../agent/_stage.js";
 import { markReopened } from "../agent/_reopen.js";
 import { moveStage, pipelineFlags } from "../agent/_store.js";
 import { agentMode, memberCareAgentMode, modeIsOn } from "../agent/_mode.js";
@@ -239,7 +239,11 @@ async function handler(req, res) {
         const creds = await pickGhlToken(client);
         if (creds) {
           const rs = await respondedStage(creds.token, creds.locationId);
-          if (rs && await contactInRespondedStage(creds.token, creds.locationId, String(ghlContactId), rs)) {
+          // Notify on a real yes only; "we could not ask" is logged, not silently
+          // read as "this lead is not in Responded".
+          const st = rs ? await contactStageState(creds.token, creds.locationId, String(ghlContactId), rs) : null;
+          if (st && !st.trusted) console.warn(`twilio inbound notify: stage unchecked for contact ${ghlContactId} - no notify sent (${st.reason})`);
+          if (st && st.inStage === true) {
             await sendSms({ client, toPhone: k.agent_notify_phone, message: `🤖 New chat to approve - ${thread?.contact_name || "a lead"} just replied (${client.business_name || "academy"}). Portal → Inbox → 👁 Hawkeye.`, contactName: "BAM Agent" });
           }
         }

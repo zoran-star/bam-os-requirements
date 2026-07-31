@@ -3,7 +3,7 @@
 // reminder cron, and the inbound-webhook notify hook so the "responded-only"
 // rule is defined in exactly one place.
 import { ghl } from "../ghl/_core.js";
-import { resolveStage, queueOpps, contactInRole, pipelineFlags } from "./_store.js";
+import { resolveStage, queueOpps, contactRoleState, pipelineFlags, pipelineFlagsState, stageYes, stageNo, stageUnknown } from "./_store.js";
 
 // A message that starts with the exact text 'Liked' (an iMessage/IG tapback,
 // e.g. `Liked "see you tonight!"`) is NOT a real reply: no agent wakes on it
@@ -121,29 +121,54 @@ export async function nurtureStage(token, locationId, ctx = {}) {
   return resolveStage(ctx.sb, ghl, { clientId: ctx.clientId, token, locationId, role: "nurture" });
 }
 
-export async function contactInRespondedStage(token, locationId, contactId, rs, ctx = {}) {
+// Is this contact's open opportunity still in stage `rs`? THREE outcomes, never
+// two (house rule 10): { inStage: true | false | null, trusted, reason }, the same
+// answer-plus-trust shape computeQueue uses for idsTrusted below.
+//
+// This used to be contactInRespondedStage, returning a bare boolean whose catch
+// was `return false`. Every send path renders that false to staff as a 409 saying
+// the lead "is no longer in the ... stage", so a GHL blip became a stated fact
+// about a real parent that the person reading it had no way to tell from the
+// truth. The rename is deliberate: a caller left on the old name fails loudly at
+// import instead of silently reading an always-truthy object as "yes".
+//
+// Callers MUST branch on `trusted` before `inStage`. "We could not check" is not
+// a send and it is not a refusal to send: it is try again in a moment.
+export async function contactStageState(token, locationId, contactId, rs, ctx = {}) {
   // Portal route: delegate the membership check to the store. Engages only when a
   // ctx { clientId, sb } is threaded in AND the academy is on provider='portal'.
-  // The stage ROLE comes from ctx.role: despite the name, this helper also guards
-  // Confirm (scheduled_trial) and Closing (done_trial) drafts/sends. It used to
-  // hardcode "responded", which made EVERY portal-academy Confirm/Closing send 409
-  // "no longer in the ... stage" (caught live on GTA 2026-07-10). The GHL route
+  // The stage ROLE comes from ctx.role: despite the old name, this helper also
+  // guards Confirm (scheduled_trial) and Closing (done_trial) drafts/sends. It used
+  // to hardcode "responded", which made EVERY portal-academy Confirm/Closing send
+  // 409 "no longer in the ... stage" (caught live on GTA 2026-07-10). The GHL route
   // below is role-agnostic (matches the stage id), so only this branch needs it.
   if (ctx && ctx.clientId) {
-    let provider = "ghl";
-    try { provider = (await pipelineFlags(ctx.clientId)).provider; } catch (_) { provider = "ghl"; }
-    if (provider === "portal") {
+    // A failed flag read is NOT "assume GHL" here. On a provider='portal' academy
+    // that quietly asks GHL a question only the portal store can answer, and its
+    // stale "not in the stage" is the same false claim by another route.
+    const flags = await pipelineFlagsState(ctx.clientId);
+    if (!flags.trusted) return stageUnknown(`could not read which pipeline this academy is on, so the stage was never checked (${flags.reason})`);
+    if (flags.provider === "portal") {
       const role = ctx.role || "responded";
-      return contactInRole({ clientId: ctx.clientId, sb: ctx.sb, contactId, stage: { ...rs, role }, role });
+      return contactRoleState({ clientId: ctx.clientId, sb: ctx.sb, contactId, stage: { ...rs, role }, role, provider: "portal" });
     }
   }
-  // GHL route - byte-identical to the pre-seam body.
+  // GHL route - same request as before; only the shape of the answer changed.
+  let d;
   try {
     const params = new URLSearchParams({ location_id: locationId, contact_id: contactId, pipeline_id: rs.pipelineId, limit: "20" });
-    const d = await ghl("GET", `/opportunities/search?${params}`, { token });
-    const opps = d.opportunities || d.data || [];
-    return opps.some(o => (o.pipelineStageId || o.stageId) === rs.stageId && isOpenOpp(o));
-  } catch (_) { return false; }
+    d = await ghl("GET", `/opportunities/search?${params}`, { token });
+  } catch (e) {
+    return stageUnknown(`the GHL opportunity search failed: ${(e && e.message) || e}`);
+  }
+  // A 200 carrying neither list is no answer, and specifically not an answer of
+  // zero opportunities - the quieter half of the same collapse.
+  const opps = d && (Array.isArray(d.opportunities) ? d.opportunities : (Array.isArray(d.data) ? d.data : null));
+  if (!opps) return stageUnknown("the GHL opportunity search returned no readable list of opportunities");
+  const label = rs.stageName || ctx.role || "that";
+  return opps.some(o => (o.pipelineStageId || o.stageId) === rs.stageId && isOpenOpp(o))
+    ? stageYes(`an open opportunity for this contact is in the ${label} stage`)
+    : stageNo(`this contact has no open opportunity in the ${label} stage`);
 }
 
 // GHL returns lastMessageDate as a Unix epoch in MILLISECONDS (e.g. 1782158616605),

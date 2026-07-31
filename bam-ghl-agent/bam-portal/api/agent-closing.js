@@ -32,7 +32,7 @@ import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import {
-  doneTrialStage, contactInRespondedStage, computeClosingQueue,
+  doneTrialStage, contactStageState, computeClosingQueue,
   doneTrialContactIdSetCached, peekDoneTrialIdSet, nurtureStage, toIso,
 } from "./agent/_stage.js";
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
@@ -259,8 +259,10 @@ async function threadMessages(token, conversationId) {
 async function draftForContact(token, locationId, clientId, contactId, cfg, opts = {}) {
   const dts = opts.dts || await doneTrialStage(token, locationId, { clientId, sb });
   if (!dts) return { error: "No Done-Trial stage found in the Training Pipeline." };
-  if (!opts.skipStageGuard && !(await contactInRespondedStage(token, locationId, contactId, dts, { clientId, sb, role: "done_trial" }))) {
-    return { error: "This lead isn't in the Done-Trial stage - the closing agent only works good-fit attendees." };
+  if (!opts.skipStageGuard) {
+    const st = await contactStageState(token, locationId, contactId, dts, { clientId, sb, role: "done_trial" });
+    if (!st.trusted) return { error: "We couldn't check whether this lead is still in the Done-Trial stage, so nothing was drafted. Try again in a moment.", unchecked: true, detail: st.reason };
+    if (!st.inStage) return { error: "This lead isn't in the Done-Trial stage - the closing agent only works good-fit attendees." };
   }
   // Twilio academies: read the thread from the own-store (no GHL conversation).
   // conversationId MUST live at function scope: the returns below reference it,
@@ -1134,7 +1136,7 @@ async function handler(req, res) {
       const cfg = await loadConfig(clientId);
       cfg.strategy = closingFollowupStrategy(client);
       const d = await draftForContact(token, locationId, clientId, b.contact_id, cfg);
-      if (d.error) return res.status(200).json({ error: d.error });
+      if (d.error) return res.status(200).json({ error: d.error, ...(d.unchecked ? { unchecked: true, detail: d.detail || null } : {}) });
       if (d.skip) return res.status(200).json({ skip: d.skip });
       return res.status(200).json(d);
     }
@@ -1148,9 +1150,10 @@ async function handler(req, res) {
     if (b.action === "approve-plan") {
       if (!b.contact_id || !Array.isArray(b.edits) || !b.edits.length) return res.status(400).json({ error: "contact_id and edits required" });
       const dtsP = await doneTrialStage(token, locationId, { clientId, sb });
-      if (!dtsP || !(await contactInRespondedStage(token, locationId, b.contact_id, dtsP, { clientId, sb, role: "done_trial" }))) {
-        return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not scheduling." });
-      }
+      if (!dtsP) return res.status(409).json({ error: "This academy's Training Pipeline has no Done-Trial stage, so there's nothing to schedule from." });
+      const stPlan = await contactStageState(token, locationId, b.contact_id, dtsP, { clientId, sb, role: "done_trial" });
+      if (!stPlan.trusted) return res.status(503).json({ error: "We couldn't check whether this lead is still in the Done-Trial stage, so nothing was scheduled. Try again in a moment.", unchecked: true, detail: stPlan.reason });
+      if (!stPlan.inStage) return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not scheduling." });
       let planRows = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(b.contact_id)}&status=eq.pending&select=id,step_key,followup_not_before,send_after&order=created_at.asc`);
       planRows = (Array.isArray(planRows) ? planRows : []).filter(r => (r.step_key || "").startsWith("followup_"));
       if (!planRows.length) return res.status(404).json({ error: "no pending follow-up plan for this lead" });
@@ -1201,11 +1204,14 @@ async function handler(req, res) {
       if (/^\((agent escalated|post-trial review needed)/i.test(String(b.reply).trim())) {
         return res.status(400).json({ error: "That's an internal note, not a message - write the reply you want to send." });
       }
-      // HARD GUARD: only send to a lead still in the Done-Trial stage.
+      // HARD GUARD: only send to a lead still in the Done-Trial stage. The 409 is
+      // a claim about the lead, so it is only made on a real answer; not being
+      // able to ask is a 503 that says so.
       const dts = await doneTrialStage(token, locationId, { clientId, sb });
-      if (!dts || !(await contactInRespondedStage(token, locationId, b.contact_id, dts, { clientId, sb, role: "done_trial" }))) {
-        return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not sending." });
-      }
+      if (!dts) return res.status(409).json({ error: "This academy's Training Pipeline has no Done-Trial stage, so there's nothing to send from." });
+      const stSend = await contactStageState(token, locationId, b.contact_id, dts, { clientId, sb, role: "done_trial" });
+      if (!stSend.trusted) return res.status(503).json({ error: "We couldn't check whether this lead is still in the Done-Trial stage, so nothing was sent. Try again in a moment.", unchecked: true, detail: stSend.reason });
+      if (!stSend.inStage) return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not sending." });
       // Quiet hours: hold an after-hours approval until morning.
       if (!withinQuietHours(new Date(), quietTz(client))) {
         const sendAfter = nextSendableTime(new Date(), quietTz(client)).toISOString();
@@ -1293,9 +1299,10 @@ async function handler(req, res) {
       }
       // HARD GUARD: only send to a lead still in the Done-Trial stage.
       const dts = await doneTrialStage(token, locationId, { clientId, sb });
-      if (!dts || !(await contactInRespondedStage(token, locationId, row.ghl_contact_id, dts, { clientId, sb, role: "done_trial" }))) {
-        return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not sending." });
-      }
+      if (!dts) return res.status(409).json({ error: "This academy's Training Pipeline has no Done-Trial stage, so there's nothing to send from." });
+      const stReady = await contactStageState(token, locationId, row.ghl_contact_id, dts, { clientId, sb, role: "done_trial" });
+      if (!stReady.trusted) return res.status(503).json({ error: "We couldn't check whether this lead is still in the Done-Trial stage, so nothing was sent. Try again in a moment.", unchecked: true, detail: stReady.reason });
+      if (!stReady.inStage) return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not sending." });
       if (row.ghl_contact_id && await isMuted(clientId, row.ghl_contact_id, "closing")) {
         return res.status(409).json({ error: "bot is muted on this lead - not sending." });
       }
@@ -1339,9 +1346,10 @@ async function handler(req, res) {
       // same case as the detector's O6 guard). A stale enroll card must not text
       // a sign-up link at someone who already left the stage or already pays.
       const dtsE = await doneTrialStage(token, locationId, { clientId, sb });
-      if (!dtsE || !(await contactInRespondedStage(token, locationId, contactId, dtsE, { clientId, sb, role: "done_trial" }))) {
-        return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not sending the link." });
-      }
+      if (!dtsE) return res.status(409).json({ error: "This academy's Training Pipeline has no Done-Trial stage, so there's nothing to send the link from." });
+      const stEnroll = await contactStageState(token, locationId, contactId, dtsE, { clientId, sb, role: "done_trial" });
+      if (!stEnroll.trusted) return res.status(503).json({ error: "We couldn't check whether this lead is still in the Done-Trial stage, so the sign-up link wasn't sent. Try again in a moment.", unchecked: true, detail: stEnroll.reason });
+      if (!stEnroll.inStage) return res.status(409).json({ error: "This lead is no longer in the Done-Trial stage - not sending the link." });
       if (await isLiveMember(clientId, contactId, token)) {
         return res.status(409).json({ error: "This lead is already a paying member - no sign-up link needed." });
       }
