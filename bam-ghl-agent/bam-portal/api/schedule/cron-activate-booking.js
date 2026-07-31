@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { offerToTemplatePayloads } from "../_offer-schedule.js";
+import { withTempStaff } from "./_temp-staff.js";
 export const maxDuration = 90; // waits on one sync-offer invocation (itself up to 60s)
 
 // Unattended executor for activation-checklist step 2 (calendar cutover):
@@ -26,7 +27,6 @@ export const maxDuration = 90; // waits on one sync-offer invocation (itself up 
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 const PORTAL = "https://portal.byanymeansbusiness.com";
 
 async function sb(path, init = {}) {
@@ -41,31 +41,12 @@ async function sb(path, init = {}) {
 
 // Same disposable-staff pattern as make-sellable.js / sync-offer.js: sync-offer
 // authenticates staff via the staff table, so the cron mints a temp staff
-// session to drive it and deletes it in finally.
-async function withTempStaff(fn) {
-  if (!ANON_KEY) throw new Error("cron activation needs the anon key to mint a staff session");
-  const email = "booking-activate+cron@bam.local";
-  const pass = `Ba-cron-${SUPABASE_SERVICE_KEY.slice(-8)}`;
-  let userId = null, staffId = null;
-  try {
-    const created = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-      method: "POST", headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password: pass, email_confirm: true }),
-    }).then(r => r.json());
-    userId = created.id || created.user?.id;
-    if (!userId) throw new Error(`temp staff user create failed: ${created.msg || created.error_description || created.message || "no id"}`);
-    const staffRow = await sb(`staff`, { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify([{ name: "Booking Activate (temp)", role: "admin", email, user_id: userId }]) });
-    staffId = staffRow?.[0]?.id;
-    const signin = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: "POST", headers: { apikey: ANON_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ email, password: pass }),
-    }).then(r => r.json());
-    if (!signin.access_token) throw new Error("temp staff sign-in failed");
-    return await fn(signin.access_token);
-  } finally {
-    if (staffId) await sb(`staff?id=eq.${staffId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }).catch(() => {});
-    if (userId) await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, { method: "DELETE", headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }).catch(() => {});
-  }
-}
+// session to drive it and deletes it in finally (shared _temp-staff.js).
+const TEMP_STAFF = {
+  email: "booking-activate+cron@bam.local",
+  password: `Ba-cron-${SUPABASE_SERVICE_KEY.slice(-8)}`,
+  name: "Booking Activate (temp)",
+};
 
 async function runActivation(a) {
   const report = { client_id: a.client_id, offer_id: a.offer_id };
@@ -94,7 +75,7 @@ async function runActivation(a) {
 
     // Execute the real sync through the deployed orchestrator (templates +
     // dedupe + deactivations + 365d slot generation live in ONE place there).
-    const result = await withTempStaff(async (staffToken) => {
+    const result = await withTempStaff(TEMP_STAFF, async (staffToken) => {
       const r = await fetch(`${PORTAL}/api/schedule/sync-offer`, {
         method: "POST",
         headers: { Authorization: `Bearer ${staffToken}`, "Content-Type": "application/json" },
