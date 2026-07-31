@@ -6,8 +6,9 @@ The repo root deploys to Vercel project **`bam-os-requirements`** under `zoran-s
 | Path | Destination |
 |---|---|
 | `/summary` | `/business/business/summary.html` (investor summary) |
-| `/playbook` | `/fullcontrol-investor-playbook.html` |
-| `/investor` | `/prototypes/fc-company/index.html` |
+| `/playbook` | `/business/business/fullcontrol-investor-playbook.html` (fixed 2026-07-31; previously pointed at a nonexistent root file and 404'd) |
+| `/investor` | `/prototypes/fc-company/index.html` (⚠️ BROKEN: that path does not exist in the repo - restore the file or retarget the rewrite) |
+| `/projections` | `/business/fc-projections.html` |
 
 To edit the live investor summary: edit `business/business/summary.html`, push to `main`, Vercel auto-deploys.
 

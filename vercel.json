@@ -1,7 +1,7 @@
 {
   "rewrites": [
     { "source": "/investor", "destination": "/prototypes/fc-company/index.html" },
-    { "source": "/playbook", "destination": "/fullcontrol-investor-playbook.html" },
+    { "source": "/playbook", "destination": "/business/business/fullcontrol-investor-playbook.html" },
     { "source": "/summary", "destination": "/business/business/summary.html" },
     { "source": "/projections", "destination": "/business/fc-projections.html" }
   ]
