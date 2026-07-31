@@ -1,18 +1,18 @@
 {
- "updated": "2026-07-31 · build wave complete, 2 PRs + a deploy step",
+ "updated": "2026-07-31 · all merged. one click owed after the deploy",
  "recentUpdates": [
+  "All merged, including billing cadence and the Stripe revocation fix. Every price still bills exactly as before, verified in the database",
+  "One click owed once the deploy lands: turning on the Stripe event in the portal. Without it that fix is code Stripe never calls",
+  "I am watching the deploy and will tell you the moment it is safe to click",
   "Member management's build wave is COMPLETE. Two pull requests left: billing cadence, and the Stripe revocation fix",
   "One of them has a mandatory step AFTER merging, or the code is perfect and Stripe never calls it. I own running it and confirming it took",
-  "Next phase is your ruling: onboard San Jose in pieces, learn, THEN write the skill. Not the other way round",
-  "Both gated on you: GTA's HST number, and Lij finishing his Stripe setup, which now blocks two workstreams instead of one",
-  "Member management took the Stripe revocation fix, and added a check nobody had: does Stripe actually SEND us that event, or is the code perfect and never called",
-  "That is the same trap one level further out. A dashboard setting we cannot see from the code, that no test could ever catch"
+  "Next phase is your ruling: onboard San Jose in pieces, learn, THEN write the skill. Not the other way round"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
+   "AFTER I say the deploy landed: open the portal's Stripe view and run the ensure-webhook-events action. One click, not optional",
    "CLOSE PR #1546 rather than merge it. The rename already shipped, production has zero old rows, and closing it unblocks the last harmful bug",
-   "Merge #1675 and #1676? The second needs a step run straight after merging, which I will do and confirm",
    "ROTATE THE STRIPE KEY that was pasted in the old /cancel skill. It was readable by every agent session. Deleting the file is not the same as rotating",
    "Want the 18 GTA emergency contacts pulled into a readable list for coaches as a stopgap? It is minors' family data, so your call, not mine",
    "Tell Lij: do NOT reconnect Stripe. Finish the remaining items in his Stripe dashboard and the portal ticks itself",
