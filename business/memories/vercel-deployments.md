@@ -11,7 +11,13 @@ which deploys from the private repo **`coleman-ayers/fullcontrol-investor`** - a
 of the investor summary. That is why monorepo edits to `/summary` never showed on the domain and
 why `/summary` / `/playbook` / `/projections` 404 there.
 
-Plan (Cole, 2026-07-31): move the domain onto the monorepo project so one copy serves everything.
+✅ DONE 2026-07-31: Zoran added `info.fullcntrl.io` to the `bam-os-requirements` project (Valid
+Configuration, Production). The domain now serves the monorepo copies: `/` and `/summary` = the
+one-pager, plus `/playbook` and `/projections`. Still to do: pause/delete the old
+`fullcontrol-investor` Vercel project and archive its repo so the stale May 1 copy can't be
+shared by accident.
+
+Original plan for reference: move the domain onto the monorepo project so one copy serves everything.
 The root rewrite `/` -> summary.html was added to `vercel.json` so the bare domain keeps working
 after the move. To move: remove `info.fullcntrl.io` from the `fullcontrol-investor` project, add it
 to `bam-os-requirements` (zoran-stars-projects) under Settings -> Domains. DNS already points at
