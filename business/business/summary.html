@@ -484,6 +484,14 @@ footer {
 .tl-note p { font-size:12px; color:rgba(245,241,232,0.5); line-height:1.55; margin:0; }
 .tl-note strong { color:var(--paper); }
 
+
+/* All-in-one chip grid */
+.aio-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }
+.aio-card { background:var(--ink-2); border:1px solid var(--line-dark); border-radius:6px; padding:14px 14px 12px; }
+.aio-lbl { font-family:var(--mono); font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:9px; }
+.aio-chips { display:flex; flex-wrap:wrap; gap:5px; }
+.aio-chip { font-size:11px; color:rgba(245,241,232,0.75); border:1px solid var(--line-dark-2); border-radius:999px; padding:3px 9px; white-space:nowrap; }
+
 /* Mobile prototype nudge */
 .proto-mobile-nudge { display: none; background: var(--ink-2); border: 1px solid var(--line-dark); border-radius: 4px; padding: 20px 24px; margin-top: 16px; text-align: center; }
 .proto-mobile-nudge p { font-size: 13px; color: rgba(245,241,232,0.6); line-height: 1.6; margin: 0; }
@@ -886,6 +894,21 @@ footer {
     </div>
   </div>
 
+
+  <div class="section-kicker" style="margin-top:40px">Everything the all-in-one covers</div>
+  <p style="margin-bottom:16px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">Every task below is something an operator does by hand today, forgets about, or pays someone else to manage. One system handles all of it.</p>
+  <div class="aio-grid">
+<div class="aio-card"><div class="aio-lbl">Scheduling</div><div class="aio-chips"><span class="aio-chip">Sessions & classes</span><span class="aio-chip">Coach staffing</span><span class="aio-chip">Attendance</span><span class="aio-chip">Capacity & waitlists</span><span class="aio-chip">Makeup credits</span><span class="aio-chip">Session notes</span></div></div>
+<div class="aio-card"><div class="aio-lbl">Members</div><div class="aio-chips"><span class="aio-chip">360&deg; member profiles</span><span class="aio-chip">Health scores</span><span class="aio-chip">At-risk flags</span><span class="aio-chip">Pauses & resumes</span><span class="aio-chip">Streaks & milestones</span></div></div>
+<div class="aio-card"><div class="aio-lbl">Sales & Leads</div><div class="aio-chips"><span class="aio-chip">Lead capture & pipeline</span><span class="aio-chip">AI sales agents</span><span class="aio-chip">Trial booking</span><span class="aio-chip">Post-trial follow-up</span><span class="aio-chip">Cold-lead reignition</span></div></div>
+<div class="aio-card"><div class="aio-lbl">Billing & Payments</div><div class="aio-chips"><span class="aio-chip">Auto-billing</span><span class="aio-chip">Failed-payment recovery</span><span class="aio-chip">Credits & extensions</span><span class="aio-chip">Refunds & discounts</span></div></div>
+<div class="aio-card"><div class="aio-lbl">Marketing & Ads</div><div class="aio-chips"><span class="aio-chip">Meta ads management</span><span class="aio-chip">Cost-per-lead tracking</span><span class="aio-chip">Budget pacing</span><span class="aio-chip">Underperformance alerts</span></div></div>
+<div class="aio-card"><div class="aio-lbl">Content</div><div class="aio-chips"><span class="aio-chip">Content planning</span><span class="aio-chip">Production pipeline</span><span class="aio-chip">Performance tracking</span></div></div>
+<div class="aio-card"><div class="aio-lbl">Comms</div><div class="aio-chips"><span class="aio-chip">Two-way inbox</span><span class="aio-chip">Mass messaging</span><span class="aio-chip">Announcements</span><span class="aio-chip">Automated reminders</span></div></div>
+<div class="aio-card"><div class="aio-lbl">Member App</div><div class="aio-chips"><span class="aio-chip">Self-serve booking</span><span class="aio-chip">Payments & history</span><span class="aio-chip">Account management</span></div></div>
+<div class="aio-card"><div class="aio-lbl">Strategy & AI</div><div class="aio-chips"><span class="aio-chip">KPI dashboard</span><span class="aio-chip">Member lifetime value</span><span class="aio-chip">AI insights & forecasts</span><span class="aio-chip">Strategic recommendations</span></div></div>
+  </div>
+
   <div class="section-kicker" style="margin-top:32px">See it in motion</div>
   <p style="margin-bottom:14px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">The interactive prototype below shows the destination. The real product is in beta testing: our own academies run their sales, onboarding, and client operations on it every day. Live demo on request.</p>
   <div class="proto-frame">
@@ -1005,14 +1028,14 @@ footer {
       <div style="font-family:var(--display);font-size:32px;font-weight:700;color:var(--gold);line-height:1;flex-shrink:0;min-width:32px">1</div>
       <div>
         <h3 style="font-size:16px;font-weight:600;color:var(--paper);margin:0 0 8px">Developer Capacity</h3>
-        <p style="font-size:14px;color:rgba(245,241,232,0.6);line-height:1.65;margin:0">Luka moves to full-time. Right now, the build happens around other commitments. That's the first constraint the round&nbsp;removes.</p>
+        <p style="font-size:14px;color:rgba(245,241,232,0.6);line-height:1.65;margin:0">Luka moves to full-time - and that's the whole engineering line item. AI-accelerated development keeps our dev costs a fraction of a typical SaaS build, so the round buys focus, not headcount.</p>
       </div>
     </div>
     <div style="display:flex;gap:20px;align-items:flex-start;background:var(--ink-2);border:1px solid var(--line-dark);border-radius:6px;padding:24px">
       <div style="font-family:var(--display);font-size:32px;font-weight:700;color:var(--gold);line-height:1;flex-shrink:0;min-width:32px">2</div>
       <div>
         <h3 style="font-size:16px;font-weight:600;color:var(--paper);margin:0 0 8px">Hyper-Launch Marketing</h3>
-        <p style="font-size:14px;color:rgba(245,241,232,0.6);line-height:1.65;margin:0">The network is already primed. The round fuels the pre-launch build-up and the post-launch push so when we open the doors, we fill the room. One shot to make a first impression on one million people. We're not leaving that to chance.</p>
+        <p style="font-size:14px;color:rgba(245,241,232,0.6);line-height:1.65;margin:0">Where most of the round goes. The network is already primed - this fuels the pre-launch build-up and the post-launch push so when we open the doors, we fill the room. One shot to make a first impression on one million people. We're not leaving that to chance.</p>
       </div>
     </div>
   </div>
