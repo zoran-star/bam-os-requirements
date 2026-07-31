@@ -12768,6 +12768,105 @@ Then the call to action."]</div>
       }
     </style>
 
+    <!-- ══ Mobile inbox (under 768px) ══════════════════════════════════════
+         The desktop inbox toolbar carries five rows of chrome a phone cannot
+         afford. Under 768px: search + Filters is the whole toolbar, the class
+         segments and state pills move INTO the filter drawer (which becomes a
+         bottom sheet), the pipeline chip yields to the agent line, members get
+         a gold avatar ring, compose docks bottom-left and the Zoran orb
+         bottom-right. Desktop is untouched. -->
+    <style>
+      .v15ib-mass-btn { display: none; }
+      .v15ib-fab-m { display: none; }
+      .v15ib-msheet-only { display: none; }
+      .v15ib-agent-line { display: none; }
+
+      @media (max-width: 768px) {
+        /* header: Mass appears; heavy desktop actions go */
+        .v15ib-mass-btn {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-med);
+          background: var(--surface); color: var(--text-mute);
+          font: inherit; font-size: 12.5px; font-weight: 700; opacity: .5;
+        }
+        #view-v15inbox .v15ib-cls-row,
+        #view-v15inbox .v15ib-progress,
+        #view-v15inbox #v15ib-approve-btn,
+        #view-v15inbox #v15ib-vmx-btn,
+        #view-v15inbox #v15ib-bc-btn,
+        #view-v15inbox #ib-mute-btn2,
+        #view-v15inbox .v15ib-overflow,
+        #view-v15inbox .v15ib-check { display: none !important; }
+        #view-v15inbox .v15ib-search { max-width: none !important; }
+
+        /* filter drawer -> bottom sheet */
+        #view-v15inbox .v15ib-filter-drawer.open {
+          position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 10070;
+          background: var(--bg); border-radius: 18px 18px 0 0;
+          border-top: 1px solid var(--border-str);
+          box-shadow: 0 -12px 40px rgba(0,0,0,.35);
+          padding: 18px 16px calc(24px + env(safe-area-inset-bottom));
+          max-height: 75vh; overflow-y: auto;
+          display: flex; flex-wrap: wrap; gap: 7px; align-content: flex-start;
+        }
+        .v15ib-msheet-only.v15ib-msec {
+          display: block; width: 100%; margin-top: 6px;
+          font-size: 10px; font-weight: 800; letter-spacing: .11em; color: var(--text-mute);
+        }
+        .v15ib-msheet-only.v15ib-mrow { display: flex; flex-wrap: wrap; gap: 7px; width: 100%; }
+        #view-v15inbox .v15ib-filter-drawer.open .v15ib-chan {
+          padding: 8px 13px; font-size: 12.5px; border-radius: 999px;
+        }
+        /* pipeline stage filtering stays a desktop tool */
+        #view-v15inbox .v15ib-filter-drawer.open .v15ib-sel { display: none; }
+        /* the split pane's empty state is desktop furniture (keyboard hints) */
+        #view-v15inbox .v15ib-empty-state { display: none; }
+
+        /* rows: dot only (no gold left edge), no pipeline chip, agent line on */
+        #view-v15inbox .v15ib-conv.unread { border-left-color: transparent; background: none; }
+        #view-v15inbox .v15ib-conv .v15ib-chip { display: none; }
+        .v15ib-agent-line {
+          display: inline-flex; align-items: center; gap: 5px; margin-top: 4px;
+          font-size: 10.5px; font-weight: 700; color: var(--text-sub);
+        }
+        .v15ib-agent-line svg { width: 11px; height: 11px; color: var(--gold); }
+        /* member = gold ring on the avatar (reads down the column, costs no width) */
+        #view-v15inbox .v15ib-avatar.is-member {
+          box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--gold);
+        }
+        #view-v15inbox .v15ib-conv .v15ib-member-pill { display: none; }
+        /* Hawkeye: a real gold button on the right edge of the row */
+        #view-v15inbox .v15ib-hawk {
+          width: 34px; height: 34px; border-radius: 10px;
+          background: var(--gold); color: #131416; border: none;
+          display: flex; align-items: center; justify-content: center;
+          flex: none; align-self: center;
+        }
+        #view-v15inbox .v15ib-hawk svg { width: 16px; height: 16px; }
+
+        /* compose docks bottom-left; the Zoran orb owns bottom-right */
+        #view-v15inbox .v15ib-fab { display: none !important; }
+        #view-v15inbox .v15ib-fab-m {
+          display: flex; position: fixed;
+          left: 16px; bottom: calc(20px + env(safe-area-inset-bottom));
+          width: 54px; height: 54px; border-radius: 999px; z-index: 10060;
+          background: var(--gold); color: #131416; border: none;
+          align-items: center; justify-content: center; cursor: pointer;
+          box-shadow: 0 6px 18px rgba(200,168,78,.4);
+        }
+        #view-v15inbox .v15ib-fab-m svg { width: 22px; height: 22px; }
+        /* An older rule hides the orb (display:none !important) whenever the
+           v15 inbox is open so it can't cover the desktop composer. On mobile
+           Zoran wants the orb ON the inbox list (it IS the support door now),
+           so out-important that rule here; this block loads later in the
+           cascade. Thread-view overlap gets handled when that page is designed. */
+        body:has(#view-v15inbox.mm-open) #admin-fb-wrap {
+          display: block !important; z-index: 10060;
+          bottom: calc(20px + env(safe-area-inset-bottom));
+        }
+      }
+    </style>
+
     <div class="view" id="view-assets">
       <div class="topbar">
         <div>
@@ -12912,17 +13011,20 @@ Then the call to action."]</div>
           <span class="topbar-kicker">§ Inbox</span>
           <div class="v15ib-focus-head-actions">
             <button id="inbox-contacts-btn" onclick="switchView('contacts')" style="display:none;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;align-items:center;gap:7px">Contacts</button>
-            <button class="v15ib-mute-btn" id="ib-mute-btn" onclick="_ibToggleMute()" title="Toggle sounds">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path id="ib-mute-waves" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-              <span id="ib-mute-label">Sound on</span>
+            <!-- Sound toggle + "Talk to BAM Business" removed (Zoran 2026-07-31):
+                 the Zoran orb is the support door now, and sounds live in the
+                 desktop overflow. V1's own inbox (view-inbox) is untouched. -->
+            <button class="v15ib-mass-btn" id="v15ib-mass-btn" disabled title="Mass message - coming soon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg>
+              Mass
             </button>
-            <button class="inbox-talk-btn" onclick="switchView('messages')" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px">Talk to BAM Business</button>
           </div>
         </div>
         <div class="content">
           <div id="v15inbox-content"></div>
         </div>
       </div>
+      <button type="button" class="v15ib-fab-m" onclick="_ibShowCompose()" aria-label="New message"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
     </div>
 
   <!-- ── Calendars (V1.5): focus-mode overlay ──
@@ -16966,7 +17068,7 @@ function _v15ibRenderAll() {
         <button class="v15ib-filter-toggle${hasActiveFilters ? ' has-filters' : ''}" onclick="_V15IB.filtersOpen=!_V15IB.filtersOpen;document.getElementById('v15ib-filter-drawer').classList.toggle('open')">Filters${hasActiveFilters ? ' *' : ''}</button>
         <button id="v15ib-approve-btn" onclick="_hk2Open()" class="v15ib-act-btn" data-tip="Review agent drafts before they send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Hawkeye<span id="v15-apx-count" class="v15ib-act-count"></span></button>
         <button id="v15ib-vmx-btn" onclick="_vmxOpen()" class="v15ib-act-btn" style="display:none" data-tip="Listen to voicemails from leads"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Voicemail<span id="v15-vmx-count" class="v15ib-act-count"></span></button>
-        <button onclick="_v15ibMassSend()" class="v15ib-act-btn" data-tip="Text multiple contacts at once"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Broadcast</button>
+        <button onclick="_v15ibMassSend()" id="v15ib-bc-btn" class="v15ib-act-btn" data-tip="Text multiple contacts at once"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Broadcast</button>
         <button class="v15ib-mute-btn" id="ib-mute-btn2" onclick="_ibToggleMute()" title="Toggle sounds" style="background:none;border:1px solid var(--border-med);border-radius:6px;padding:5px 8px;cursor:pointer;color:var(--text-mute);display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:12px;font-weight:600">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path id="ib-mute-waves2" d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
         </button>
@@ -16982,13 +17084,24 @@ function _v15ibRenderAll() {
             <button class="v15ib-overflow-item" onclick="_ibShowCompose();this.closest('.v15ib-overflow-menu').classList.remove('open')">New message</button>
             <button class="v15ib-overflow-item" onclick="_v15ibMassSend();this.closest('.v15ib-overflow-menu').classList.remove('open')">Broadcast</button>
             <button class="v15ib-overflow-item" onclick="_ibToggleMute();this.closest('.v15ib-overflow-menu').classList.remove('open')">Toggle sounds</button>
-            <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-            <button class="v15ib-overflow-item" onclick="switchView('messages');this.closest('.v15ib-overflow-menu').classList.remove('open')">Talk to BAM Business</button>
           </div>
         </div>
       </div>
       ${chanTabRow}
       <div class="v15ib-filter-drawer ${_V15IB.filtersOpen ? 'open' : ''}" id="v15ib-filter-drawer">
+        <div class="v15ib-msheet-only v15ib-msec">WHO</div>
+        <div class="v15ib-msheet-only v15ib-mrow">
+          <button onclick="_v15ibTab('')" class="v15ib-chan${_V15IB.fClass === '' && !_V15IB.unreadOnly ? ' on' : ''}">All <span style="opacity:.6">${totalPeople}</span></button>
+          <button onclick="_v15ibTab('member')" class="v15ib-chan${_V15IB.fClass === 'member' ? ' on' : ''}">Members <span style="opacity:.6">${clsCounts.member + clsCounts.member_family}</span></button>
+          <button onclick="_v15ibTab('lead')" class="v15ib-chan${_V15IB.fClass === 'lead' ? ' on' : ''}">Leads <span style="opacity:.6">${clsCounts.lead}</span></button>
+          <button onclick="_v15ibTab('spam')" class="v15ib-chan${_V15IB.fClass === 'spam' ? ' on' : ''}">Spam <span style="opacity:.6">${clsCounts.spam + autoSpamCount}</span></button>
+        </div>
+        <div class="v15ib-msheet-only v15ib-msec">STATE</div>
+        <div class="v15ib-msheet-only v15ib-mrow">
+          <button onclick="_v15ibTab('unread')" class="v15ib-chan${_V15IB.unreadOnly ? ' on' : ''}">Unread${unreadCount ? ` <span style="opacity:.6">${unreadCount}</span>` : ''}</button>
+          <button onclick="_v15ibSetFailed(!_V15IB.failedOnly);_v15ibRebuildBar()" class="v15ib-chan${_V15IB.failedOnly ? ' on' : ''}">Failed to send</button>
+        </div>
+        <div class="v15ib-msheet-only v15ib-msec">CHANNEL</div>
         ${chanBtns}
         <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel" style="max-width:160px;padding:5px 8px;font-size:11px;border-radius:6px">${pipeOpts}</select>
         ${curPipe ? `<select onchange="_v15ibSetStage(this.value)" class="v15ib-sel" style="max-width:140px;padding:5px 8px;font-size:11px;border-radius:6px">${stageOpts}</select>` : ''}
@@ -17220,7 +17333,7 @@ function _v15ibConvRow(c, idx) {
     : /call|voice|phone/i.test(chLbl) ? '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>'
     : '<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 8.5-8.5 8.38 8.38 0 0 1 3.8.9 8.5 8.5 0 0 1 4.7 7.6z"/>';
   const chTag = chIcon ? `<span class="v15ib-chtag" title="${escapeHTML(chLbl)}"><svg viewBox="0 0 24 24">${chSvg}</svg></span>` : '';
-  const memTag = _ibMemberOf(c) ? `<span style="margin-left:4px">${_ibMemberPill(true)}</span>` : '';
+  const memTag = _ibMemberOf(c) ? `<span class="v15ib-member-pill" style="margin-left:4px">${_ibMemberPill(true)}</span>` : '';
   const classBadges = _ibClassBadges(c);
   const dirArrow = _ibDirArrow(c);
   const timeClass = _ibTimeUrgency(c);
@@ -17237,12 +17350,16 @@ function _v15ibConvRow(c, idx) {
   const checked = _V15IB.selected.has(c.id) ? ' checked' : '';
   // Hawkeye: this lead's reply belongs to the deck. Clicking the row redirects
   // anyway - the chip makes that visible BEFORE the click, and jumps to the card.
-  let hawkChip = '';
+  let hawkChip = '', agentLine = '';
   try {
     const hkAgent = _hawkPendingFor(c.contactId, c.id);
     if (hkAgent) {
       const hkCid = c.contactId ? String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '') : '';
       hawkChip = `<button type="button" class="v15ib-hawk" title="Hawkeye has an action waiting" onclick="event.stopPropagation();_hk2Open('${hkAgent}'${hkCid ? `,'${hkCid}'` : ''})">${_HV2_ICONS.eye}</button>`;
+      // Mobile-only label: which agent is working this lead. Replaces the
+      // pipeline chip there (Zoran 2026-07-31). Desktop keeps the chip.
+      const agentLabel = ({ booking: 'Booking agent', confirm: 'Confirm agent', closing: 'Closing agent' })[hkAgent] || 'Agent';
+      agentLine = `<div class="v15ib-agent-line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/></svg>${agentLabel}</div>`;
     }
   } catch (_) {}
 
@@ -17250,14 +17367,14 @@ function _v15ibConvRow(c, idx) {
     <span class="v15ib-swipe-bg left">Read</span>
     <div class="v15ib-check${checked}" onclick="_v15ibToggleSelect('${c.id}',event)"></div>
     <div style="position:relative;flex:none">
-      <div style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;${_ibAvatarStyle(smart.display)}">${escapeHTML(_ibInitials(smart.display))}</div>
+      <div class="v15ib-avatar${(_ibMemberOf(c) || c.classification === 'member' || c.classification === 'member_family') ? ' is-member' : ''}" style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;${_ibAvatarStyle(smart.display)}">${escapeHTML(_ibInitials(smart.display))}</div>
       ${unread ? '<span class="v15ib-unread-dot" style="position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:var(--gold);border:2px solid var(--surface)"></span>' : ''}
     </div>
     <div style="flex:1;min-width:0">
       <div class="v15ib-name">${escapeHTML(smart.display)}${memTag}${chTag}${classBadges}${dirArrow}</div>
       ${smart.sub ? `<div class="v15ib-name-sub">${escapeHTML(smart.sub)}</div>` : ''}
       <div class="v15ib-prev">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
-      ${chip}
+      ${chip}${agentLine}
     </div>
     ${hawkChip}
     <div style="flex:none;align-self:flex-start;font-size:10px;white-space:nowrap;padding-top:2px;color:var(--text-mute)" class="${timeClass}">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
@@ -17721,7 +17838,12 @@ function _ibInitSwipe() {
         try { hapticTap('LIGHT'); } catch (_) {}
         const convId = el.dataset.convId;
         const conv = (_V15IB.convos || []).find(c => c.id === convId);
-        if (conv) { conv.unreadCount = conv.unreadCount > 0 ? 0 : 1; _v15ibRenderList(); }
+        if (conv) {
+          conv.unreadCount = conv.unreadCount > 0 ? 0 : 1;
+          // Persist, or the flip silently reverts on the next load.
+          try { _v15ibPersistRead(conv.id, conv.unreadCount > 0 ? 'unread' : 'read'); } catch (_) {}
+          _v15ibRenderList();
+        }
       }
       dx = 0; horiz = null;
     });
@@ -21927,12 +22049,6 @@ function _hv2Style() {
     '#home-v2 .hm-ai-overdue{border-left:3px solid #F07060 !important}' +
     '#home-v2 .hm-ai-today{border-left:3px solid #F0B84A !important}' +
 
-    // ── Toggle tabs (Action Items / Inbox) ──
-    '#home-v2 .hm-toggle-tabs{display:flex;gap:0;background:var(--surface-alt,rgba(255,255,255,.04));border-radius:8px;padding:2px;border:1px solid var(--border)}' +
-    '#home-v2 .hm-toggle-tab{font-family:inherit;font-size:11.5px;font-weight:600;color:var(--text-mute);background:none;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}' +
-    '#home-v2 .hm-toggle-tab svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
-    '#home-v2 .hm-toggle-tab.active{color:var(--text);background:rgba(212,182,92,.12)}' +
-    '#home-v2 .hm-toggle-tab:hover:not(.active){color:var(--text-sub)}' +
     // Inbox preview rows
     '#home-v2 .hm-ib-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;position:relative}' +
     '#home-v2 .hm-ib-row:hover{background:rgba(212,182,92,.04)}' +
@@ -22138,18 +22254,25 @@ function renderHomeV2() {
             <div id="hv2-sched-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
             <button class="hv2-pf" onclick="switchView('v15cal')">Open the calendar ›</button>
           </div>
-          <div class="hv2-panel" style="animation-delay:.06s" id="hv2-toggle-panel">
+          <!-- Actions and Inbox are two panels, not one panel with a tab
+               toggle (Zoran 2026-07-31). Under the toggle, whichever tab you
+               were not on was invisible, so waiting action items could sit on
+               Home with nothing on screen saying they existed. -->
+          <div class="hv2-panel" style="animation-delay:.06s" id="hv2-acts-panel">
             <div class="hv2-ph">
-              <div class="hm-toggle-tabs" id="hm-toggle-tabs">
-                <button class="hm-toggle-tab" data-tab="acts" onclick="_hmToggleTab('acts')">${_HV2_ICONS.check} Actions</button>
-                <button class="hm-toggle-tab active" data-tab="inbox" onclick="_hmToggleTab('inbox')">${_HV2_ICONS.inbox || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>'} Inbox</button>
-              </div>
+              <span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.check} Actions</span>
               <span class="hv2-pill" id="hv2-acts-n" style="display:none"></span>
+            </div>
+            <div id="hv2-acts-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
+            <button class="hv2-pf" onclick="switchView('action-items')">Open action items ›</button>
+          </div>
+          <div class="hv2-panel" style="animation-delay:.09s" id="hv2-inbox-panel">
+            <div class="hv2-ph">
+              <span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.inbox || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>'} Inbox</span>
               <span class="hv2-pill" id="hv2-inbox-n" style="display:none"></span>
             </div>
-            <div id="hv2-acts-body" style="display:none"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
             <div id="hv2-inbox-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
-            <button class="hv2-pf" id="hv2-toggle-footer" onclick="switchView('v15inbox')">Open inbox ›</button>
+            <button class="hv2-pf" onclick="switchView('v15inbox')">Open inbox ›</button>
           </div>
         </div>
       </div>
@@ -22540,7 +22663,7 @@ async function _hv2ActsLoad() {
     const j = await _safeJson(r);
     if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
     const open = (Array.isArray(j.items) ? j.items : []).filter(i => !i.completed_at);
-    if (pill) { pill._count = open.length; pill.textContent = open.length; pill.style.display = (open.length > 0 && window._hmActiveTab === 'acts') ? '' : 'none'; }
+    if (pill) { pill._count = open.length; pill.textContent = open.length; pill.style.display = open.length > 0 ? '' : 'none'; }
     if (!body) return;
     if (!open.length) {
       // UX #9: Empty state CTA for action items
@@ -22580,33 +22703,11 @@ async function _hv2ActsLoad() {
   }
 }
 // ── Toggle: Action Items / Inbox ──
-const _HM_TOGGLE_KEY = 'hm_panel_tab';
-window._hmActiveTab = 'inbox'; // default tab
-function _hmToggleTab(tab) {
-  const actsBody = document.getElementById('hv2-acts-body');
-  const ibBody = document.getElementById('hv2-inbox-body');
-  const footer = document.getElementById('hv2-toggle-footer');
-  const actsPill = document.getElementById('hv2-acts-n');
-  const ibPill = document.getElementById('hv2-inbox-n');
-  if (!actsBody || !ibBody) return;
-  const tabs = document.querySelectorAll('#hm-toggle-tabs .hm-toggle-tab');
-  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  // Store active tab so loaders know which pill to show
-  window._hmActiveTab = tab;
-  if (tab === 'inbox') {
-    actsBody.style.display = 'none'; ibBody.style.display = '';
-    if (actsPill) actsPill.style.display = 'none';
-    if (ibPill && ibPill._count > 0) ibPill.style.display = '';
-    if (footer) { footer.textContent = 'Open inbox \u203A'; footer.onclick = () => switchView('v15inbox'); }
-    if (!ibBody._loaded) _hmLoadInboxPreview();
-  } else {
-    actsBody.style.display = ''; ibBody.style.display = 'none';
-    if (ibPill) ibPill.style.display = 'none';
-    if (actsPill && actsPill._count > 0) actsPill.style.display = '';
-    if (footer) { footer.textContent = 'Open action items \u203A'; footer.onclick = () => switchView('action-items'); }
-  }
-  try { localStorage.setItem(_HM_TOGGLE_KEY, tab); } catch (_) {}
-}
+// The Actions/Inbox toggle is retired: they are two panels now, both always
+// rendered. window._hmActiveTab is kept as a harmless constant because other
+// surfaces still read it; nothing writes it any more.
+window._hmActiveTab = 'inbox';
+
 // #4: System notification patterns — group these senders into an accordion
 const _HM_SYSTEM_SENDERS = /^(facebook|meta|google|stripe|square|twilio|mailchimp|quickbooks|zapier|intuit|paypal)/i;
 
@@ -23115,7 +23216,7 @@ async function _hmLoadInboxPreview() {
       convos.push(f);
     }
     const unreadCount = convos.filter(c => c.unreadCount > 0).length;
-    if (pill) { pill._count = unreadCount; pill.textContent = unreadCount; pill.style.display = (unreadCount > 0 && window._hmActiveTab === 'inbox') ? '' : 'none'; }
+    if (pill) { pill._count = unreadCount; pill.textContent = unreadCount; pill.style.display = unreadCount > 0 ? '' : 'none'; }
     if (!convos.length) {
       body.innerHTML = '<div class="hm-empty-cta"><span class="hm-empty-msg">No recent conversations.</span></div>';
       return;
@@ -23146,13 +23247,10 @@ async function _hmLoadInboxPreview() {
     body.innerHTML = '<div style="padding:14px 16px;font-size:12.5px;color:var(--text-mute)">Couldn\'t load inbox.</div>';
   }
 }
-// Restore saved tab preference on load
+// Both panels are on screen, so both load. Kept under the old name so the
+// existing boot call site does not need to change.
 function _hmRestoreToggle() {
-  try {
-    const saved = localStorage.getItem(_HM_TOGGLE_KEY);
-    if (saved === 'acts') _hmToggleTab('acts');
-    else _hmLoadInboxPreview(); // default: inbox, load it
-  } catch (_) { _hmLoadInboxPreview(); }
+  try { _hmLoadInboxPreview(); } catch (_) {}
 }
 // ── Right rail: live scoreboard ──
 // ── KPI ring configuration ──
@@ -23680,7 +23778,7 @@ function _hmRefreshLive() {
   const now = Date.now();
   if (window._hmLiveLast && now - window._hmLiveLast < 3000) return;
   window._hmLiveLast = now;
-  if (window._hmActiveTab === 'inbox') { try { _hmLoadInboxPreview(); } catch (_) {} }
+  try { _hmLoadInboxPreview(); } catch (_) {}
   try { _hmLoadRailBottom(); } catch (_) {}
 }
 function _hmBindLiveRefresh() {
