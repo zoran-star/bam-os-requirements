@@ -9,7 +9,7 @@
 // so every BAM location reuses the same design with its own name / site / handle.
 // Brand: gold #E2DD9F, black #000000 / surface #0A0A0A, Anton (display) + Inter Tight.
 
-import { FRAME, FOOTER_REASON } from "./email-templates/_shell.js";
+import { FRAME, FOOTER_REASON, stripUnsubscribe } from "./email-templates/_shell.js";
 import { TEMPLATES as NURTURE_TEMPLATES } from "./email-templates/nurture-emails.js";
 import { ONBOARDING_TEMPLATES } from "./email-templates/onboarding-emails.js";
 
@@ -540,8 +540,12 @@ function bodyToHtml(body) {
 // Fill the shell identity placeholders (UPPERCASE) in a frame or a full designed
 // template - both carry the same placeholder set since the templates were
 // tokenized (2026-07-25, the canonical no-hardcode build).
-function fillShell(html, L, { pre, unsub, reason, title }) {
-  return html
+function fillShell(html, L, { pre, unsub, reason, title, noUnsubscribe }) {
+  // BEFORE the placeholder pass, because the anchor is matched on {{UNSUBSCRIBE}}
+  // itself - see stripUnsubscribe in email-templates/_shell.js. Unset (every caller
+  // that existed before receipts) this is a no-op and the output is unchanged.
+  const src = noUnsubscribe ? stripUnsubscribe(html) : html;
+  return src
     // Both of these are only still here if the template did NOT declare its own.
     // {{FOOTER_REASON}} goes first: the sentence it expands to itself contains
     // {{ACADEMY_FULL}}, which the pass below then fills.
@@ -589,8 +593,12 @@ function dropEmptyShellLinks(html) {
 // _shell.js shellHead/shellFoot) and those win - the template knows its audience.
 // Unset, they fall back to what production has always sent: the "enquired about"
 // reason and the academy name as the title.
+// `noUnsubscribe` is the third, and it is for TRANSACTIONAL mail only: a receipt for
+// money that already moved carries no opt-out link at all (the reasoning is written
+// out at stripUnsubscribe in email-templates/_shell.js). Unset, the footer is exactly
+// what it has always been - the flag has no effect anywhere it is not passed.
 //   renderEmail({ clientId, subject, body, preheader?, unsubscribeUrl?, vars?,
-//                 footerReason?, docTitle? }) -> html
+//                 footerReason?, docTitle?, noUnsubscribe? }) -> html
 // The message CONTENT a body resolves to, before any shell is wrapped around it:
 // the template expanded if the body is a "template:<key>" ref, then merge tokens
 // filled. Separated out so the send path can ask "does this resolve to anything at
@@ -662,7 +670,12 @@ export function templateBody({ clientId, body, vars } = {}) {
 // filled in - every sentence it had depended on a fact nobody has entered yet.
 // The send path skips such a step (it is a no-op, not a failure); the approval
 // surface shows it as "nothing to send yet" instead of an empty bubble.
-export function renderStepMessage({ channel, clientId, subject, body, vars } = {}) {
+// `footerReason` / `noUnsubscribe` are carried straight through to renderEmail for a
+// caller whose message is not lead nurture - today that is the member receipts in
+// api/_member-receipts.js and nothing else. BOTH DEFAULT TO UNSET, and unset means
+// byte-for-byte the email production has always sent: a step row that passes neither
+// (every sales drip, every confirmation, the welcome email) cannot move.
+export function renderStepMessage({ channel, clientId, subject, body, vars, footerReason, noUnsubscribe } = {}) {
   const v = vars || {};
   // The same trim the send path has always applied before rendering.
   const text = String(body || "").trim();
@@ -672,7 +685,7 @@ export function renderStepMessage({ channel, clientId, subject, body, vars } = {
     // reaches the inbox and seeds the preheader inside renderEmail.
     const subj = resolveMergeVars(String(subject || ""), L, v);
     const empty = !templateBody({ clientId, body: text, vars: v }).trim();
-    return { channel: "email", subject: subj, empty, html: empty ? "" : renderEmail({ clientId, subject: subj, body: text, vars: v }) };
+    return { channel: "email", subject: subj, empty, html: empty ? "" : renderEmail({ clientId, subject: subj, body: text, vars: v, footerReason, noUnsubscribe }) };
   }
   if (channel === "sms") {
     // GHL does not process merge tokens on raw /conversations/messages sends, so
@@ -697,12 +710,12 @@ export function unsubscribeFor({ clientId, unsubscribeUrl, vars } = {}) {
   return L.email ? `mailto:${L.email}?subject=Unsubscribe` : "";
 }
 
-export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars, footerReason, docTitle } = {}) {
+export function renderEmail({ clientId, subject, body, preheader, unsubscribeUrl, vars, footerReason, docTitle, noUnsubscribe } = {}) {
   const L = locFor(clientId, vars);
   const pre = String(preheader || subject || "").replace(/[<>]/g, "").slice(0, 140);
   const unsub = unsubscribeFor({ clientId, unsubscribeUrl, vars });
   const raw = templateBody({ clientId, body, vars });
-  const shellArgs = { pre, unsub, reason: footerReason, title: docTitle };
+  const shellArgs = { pre, unsub, reason: footerReason, title: docTitle, noUnsubscribe };
   let html;
   if (/^\s*<(?:!doctype|html)/i.test(raw)) {
     html = fillShell(raw, L, shellArgs);
