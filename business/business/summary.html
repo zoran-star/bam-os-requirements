@@ -487,42 +487,46 @@ footer {
 
 
 
-/* All-in-one chip grid (hover/tap to reveal) */
-.aio-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
-.aio-card { background:var(--ink-2); border:1px solid var(--line-dark); border-radius:6px; padding:13px 14px; cursor:pointer; transition:border-color .2s; }
-.aio-card:hover { border-color:var(--gold-3); }
-.aio-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.aio-lbl { font-family:var(--mono); font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); }
-.aio-n { font-family:var(--mono); font-size:9px; color:rgba(245,241,232,0.35); }
-.aio-agent { font-family:var(--mono); font-size:8.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--gold-hi); border:1px solid var(--gold-3); border-radius:999px; padding:2px 7px; white-space:nowrap; }
-.aio-chips { display:flex; flex-wrap:wrap; gap:5px; max-height:0; overflow:hidden; opacity:0; margin-top:0; transition:max-height .28s ease, opacity .22s ease, margin-top .22s ease; }
-.aio-card:hover .aio-chips, .aio-card.open .aio-chips { max-height:220px; opacity:1; margin-top:10px; }
-.aio-chip { font-size:11px; color:rgba(245,241,232,0.75); border:1px solid var(--line-dark-2); border-radius:999px; padding:3px 9px; white-space:nowrap; }
-.aio-flow { margin-top:14px; border:1px solid rgba(232,197,71,0.25); background:rgba(232,197,71,0.04); border-radius:6px; padding:14px 16px; font-size:13px; color:rgba(245,241,232,0.7); line-height:1.65; }
-.aio-flow-lbl { display:block; font-family:var(--mono); font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:6px; }
-
-
-/* Agent web constellation */
-.aio-web { margin-top:18px; border:1px solid var(--line-dark); background:var(--ink-2); border-radius:6px; padding:18px 16px 16px; }
-.aio-web svg { width:100%; height:auto; display:block; }
-.w-spoke { stroke:rgba(245,241,232,0.10); stroke-width:1; transition:stroke .4s; }
-.w-spoke.on { stroke:var(--gold); stroke-width:1.4; stroke-dasharray:4 5; animation:webdash 1.2s linear infinite; }
-@keyframes webdash { to { stroke-dashoffset:-9; } }
-.w-node circle { fill:var(--ink); stroke:rgba(245,241,232,0.35); stroke-width:1.2; transition:all .35s; }
-.w-node text { font-family:var(--mono); font-size:11px; fill:rgba(245,241,232,0.5); letter-spacing:0.06em; transition:fill .35s; }
-.w-node.on circle { fill:var(--gold); stroke:var(--gold); }
-.w-node.on text { fill:var(--gold-hi); }
-.w-hub circle { fill:rgba(232,197,71,0.10); stroke:var(--gold); stroke-width:1.4; }
-.w-hub-t1 { font-family:var(--display); font-size:14px; font-weight:600; fill:var(--gold); }
-.w-hub-t2 { font-family:var(--mono); font-size:7.5px; letter-spacing:0.12em; fill:rgba(232,197,71,0.7); text-transform:uppercase; }
-.w-ex-pills { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 10px; }
-.w-pill { font-family:var(--mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(245,241,232,0.55); background:none; border:1px solid var(--line-dark-2); border-radius:999px; padding:5px 12px; cursor:pointer; transition:all .25s; }
-.w-pill.on, .w-pill:hover { color:var(--gold-hi); border-color:var(--gold-3); }
-.w-cap { font-size:13px; color:rgba(245,241,232,0.7); line-height:1.65; min-height:44px; }
-.w-cap b { color:var(--gold); font-weight:600; }
 /* Team without photos */
 .team-headplain { margin-bottom:6px; }
 .team-tag-plain { font-family:var(--mono); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-2); margin-top:3px; }
+
+
+/* Agent web - one interactive constellation */
+.aio-web { margin-top:8px; border:1px solid var(--line-dark); background:var(--ink-2); border-radius:6px; padding:14px 16px 16px; }
+.aio-web svg { width:100%; height:auto; display:block; }
+.w-mesh { stroke:rgba(245,241,232,0.07); stroke-width:1; transition:stroke .35s; }
+.w-mesh.on { stroke:rgba(232,197,71,0.45); }
+.w-spoke { stroke:rgba(245,241,232,0.12); stroke-width:1; transition:stroke .35s; }
+.w-spoke.on { stroke:var(--gold); stroke-width:1.3; }
+.w-pathseg { stroke:var(--gold); stroke-width:1.6; stroke-dasharray:5 5; animation:webdash 1s linear infinite; }
+@keyframes webdash { to { stroke-dashoffset:-10; } }
+.w-node { cursor:pointer; }
+.w-node .w-dotc { fill:var(--ink); stroke:rgba(245,241,232,0.4); stroke-width:1.3; transition:all .3s; }
+.w-node:hover .w-dotc { stroke:var(--gold); }
+.w-node.on .w-dotc, .w-node.sel .w-dotc { fill:var(--gold); stroke:var(--gold); }
+.w-nlbl { font-family:var(--mono); font-size:12.5px; fill:rgba(245,241,232,0.55); letter-spacing:0.05em; transition:fill .3s; }
+.w-node:hover .w-nlbl, .w-node.on .w-nlbl, .w-node.sel .w-nlbl { fill:var(--gold-hi); }
+.w-step { font-family:var(--mono); font-size:11px; font-weight:700; fill:var(--gold); }
+.w-beta-ring { fill:none; stroke:var(--gold); stroke-width:1; opacity:.55; animation:betapulse 2.4s ease-out infinite; transform-origin:center; transform-box:fill-box; }
+@keyframes betapulse { 0% { transform:scale(.7); opacity:.7; } 70% { transform:scale(1.35); opacity:0; } 100% { opacity:0; } }
+.w-beta-t { font-family:var(--mono); font-size:8.5px; letter-spacing:0.1em; fill:var(--gold-2); }
+.w-hub circle { fill:rgba(232,197,71,0.10); stroke:var(--gold); stroke-width:1.4; }
+.w-hub-t1 { font-family:var(--display); font-size:15px; font-weight:600; fill:var(--gold); }
+.w-hub-t2 { font-family:var(--mono); font-size:7px; letter-spacing:0.14em; fill:rgba(232,197,71,0.75); }
+#w-dot { fill:var(--gold-hi); filter:drop-shadow(0 0 4px rgba(232,197,71,0.9)); }
+.w-ex-pills { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 10px; }
+.w-pill { font-family:var(--mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(245,241,232,0.55); background:none; border:1px solid var(--line-dark-2); border-radius:999px; padding:6px 13px; cursor:pointer; transition:all .25s; }
+.w-pill:hover { color:var(--gold-hi); border-color:var(--gold-3); }
+.w-pill.on { color:var(--ink); background:var(--gold); border-color:var(--gold); font-weight:700; }
+.w-cap { font-size:13px; color:rgba(245,241,232,0.7); line-height:1.6; min-height:46px; }
+.w-cap b { color:var(--gold); font-weight:600; }
+.w-proof { margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--gold-2); }
+.w-chippanel { margin-top:14px; border-top:1px solid var(--line-dark); padding-top:12px; min-height:74px; }
+.w-cp-lbl { font-family:var(--mono); font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; }
+.w-cp-chips { display:flex; flex-wrap:wrap; gap:5px; }
+.aio-chip { font-size:11px; color:rgba(245,241,232,0.75); border:1px solid var(--line-dark-2); border-radius:999px; padding:3px 9px; white-space:nowrap; }
+@media (max-width:640px){ .w-nlbl { font-size:15px; } .w-beta-t { font-size:10.5px; } }
 
 /* Mobile prototype nudge */
 .proto-mobile-nudge { display: none; background: var(--ink-2); border: 1px solid var(--line-dark); border-radius: 4px; padding: 20px 24px; margin-top: 16px; text-align: center; }
@@ -894,51 +898,60 @@ footer {
 
 
 
-  <div class="section-kicker" style="margin-top:40px">Everything the all-in-one covers</div>
-  <p style="margin-bottom:14px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">Nine areas, one system. Hover or tap an area to see what it handles.</p>
-  <div class="aio-grid">
-    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Scheduling</span><span class="aio-n">6</span></div><div class="aio-chips"><span class="aio-chip">Sessions & classes</span><span class="aio-chip">Coach staffing</span><span class="aio-chip">Attendance</span><span class="aio-chip">Capacity & waitlists</span><span class="aio-chip">Makeup credits</span><span class="aio-chip">Session notes</span></div></div>
-    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Members</span><span class="aio-agent">agent next</span></div><div class="aio-chips"><span class="aio-chip">360&deg; member profiles</span><span class="aio-chip">Health scores</span><span class="aio-chip">At-risk flags</span><span class="aio-chip">Pauses & resumes</span><span class="aio-chip">Streaks & milestones</span></div></div>
-    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Sales & Leads</span><span class="aio-agent">Hawkeye &middot; in beta</span></div><div class="aio-chips"><span class="aio-chip">Lead capture & pipeline</span><span class="aio-chip">AI sales agents</span><span class="aio-chip">Trial booking</span><span class="aio-chip">Post-trial follow-up</span><span class="aio-chip">Cold-lead reignition</span></div></div>
-    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Billing & Payments</span><span class="aio-n">4</span></div><div class="aio-chips"><span class="aio-chip">Auto-billing</span><span class="aio-chip">Failed-payment recovery</span><span class="aio-chip">Credits & extensions</span><span class="aio-chip">Refunds & discounts</span></div></div>
-    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Marketing & Ads</span><span class="aio-agent">agent next</span></div><div class="aio-chips"><span class="aio-chip">Meta ads management</span><span class="aio-chip">Cost-per-lead tracking</span><span class="aio-chip">Budget pacing</span><span class="aio-chip">Underperformance alerts</span></div></div>
-    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Content</span><span class="aio-n">3</span></div><div class="aio-chips"><span class="aio-chip">Content planning</span><span class="aio-chip">Production pipeline</span><span class="aio-chip">Performance tracking</span></div></div>
-    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Comms</span><span class="aio-n">4</span></div><div class="aio-chips"><span class="aio-chip">Two-way inbox</span><span class="aio-chip">Mass messaging</span><span class="aio-chip">Announcements</span><span class="aio-chip">Automated reminders</span></div></div>
-    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Member App</span><span class="aio-n">3</span></div><div class="aio-chips"><span class="aio-chip">Self-serve booking</span><span class="aio-chip">Payments & history</span><span class="aio-chip">Account management</span></div></div>
-    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Strategy & AI</span><span class="aio-n">4</span></div><div class="aio-chips"><span class="aio-chip">KPI dashboard</span><span class="aio-chip">Member lifetime value</span><span class="aio-chip">AI insights & forecasts</span><span class="aio-chip">Strategic recommendations</span></div></div>
-  </div>
 
+  <div class="section-kicker" style="margin-top:40px">Everything the all-in-one covers</div>
+  <p style="margin-bottom:14px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">Nine areas, one brain. Tap an area for what it handles, or watch a real handoff play across the web.</p>
   <div class="aio-web">
-    <svg viewBox="0 0 860 380" role="img" aria-label="FullControl agent web: nine areas connected through one AI brain">
-      <line class="w-spoke" id="sp-sched" x1="430" y1="190" x2="430" y2="50"/>
-      <line class="w-spoke" id="sp-mem" x1="430" y1="190" x2="649" y2="83"/>
-      <line class="w-spoke" id="sp-sales" x1="430" y1="190" x2="765" y2="166"/>
-      <line class="w-spoke" id="sp-bill" x1="430" y1="190" x2="724" y2="260"/>
-      <line class="w-spoke" id="sp-mkt" x1="430" y1="190" x2="546" y2="322"/>
-      <line class="w-spoke" id="sp-cont" x1="430" y1="190" x2="314" y2="322"/>
-      <line class="w-spoke" id="sp-comms" x1="430" y1="190" x2="136" y2="260"/>
-      <line class="w-spoke" id="sp-app" x1="430" y1="190" x2="95" y2="166"/>
-      <line class="w-spoke" id="sp-strat" x1="430" y1="190" x2="211" y2="83"/>
-      <g class="w-hub"><circle cx="430" cy="190" r="26"/><text x="430" y="188" text-anchor="middle" class="w-hub-t1">FC</text><text x="430" y="203" text-anchor="middle" class="w-hub-t2">one brain</text></g>
-      <g class="w-node" id="nd-sched"><circle cx="430" cy="50" r="5"/><text x="430" y="34" text-anchor="middle">Scheduling</text></g>
-      <g class="w-node" id="nd-mem"><circle cx="649" cy="83" r="5"/><text x="649" y="67" text-anchor="middle">Members</text></g>
-      <g class="w-node" id="nd-sales"><circle cx="765" cy="166" r="5"/><text x="765" y="150" text-anchor="middle">Sales & Leads</text></g>
-      <g class="w-node" id="nd-bill"><circle cx="724" cy="260" r="5"/><text x="724" y="284" text-anchor="middle">Billing</text></g>
-      <g class="w-node" id="nd-mkt"><circle cx="546" cy="322" r="5"/><text x="546" y="346" text-anchor="middle">Marketing</text></g>
-      <g class="w-node" id="nd-cont"><circle cx="314" cy="322" r="5"/><text x="314" y="346" text-anchor="middle">Content</text></g>
-      <g class="w-node" id="nd-comms"><circle cx="136" cy="260" r="5"/><text x="136" y="284" text-anchor="middle">Comms</text></g>
-      <g class="w-node" id="nd-app"><circle cx="95" cy="166" r="5"/><text x="95" y="150" text-anchor="middle">Member App</text></g>
-      <g class="w-node" id="nd-strat"><circle cx="211" cy="83" r="5"/><text x="211" y="67" text-anchor="middle">Strategy & AI</text></g>
-      </svg>
+    <svg id="w-svg" viewBox="0 0 860 445" role="img" aria-label="FullControl agent web: nine connected areas around one AI brain">
+      <line class="w-mesh" id="e-sched-mem" x1="430" y1="60" x2="642" y2="96"/>
+      <line class="w-mesh" id="e-sched-app" x1="430" y1="60" x2="105" y2="188"/>
+      <line class="w-mesh" id="e-sched-sales" x1="430" y1="60" x2="755" y2="188"/>
+      <line class="w-mesh" id="e-mem-bill" x1="642" y1="96" x2="716" y2="292"/>
+      <line class="w-mesh" id="e-mem-comms" x1="642" y1="96" x2="144" y2="293"/>
+      <line class="w-mesh" id="e-mem-strat" x1="642" y1="96" x2="218" y2="96"/>
+      <line class="w-mesh" id="e-sales-mkt" x1="755" y1="188" x2="543" y2="361"/>
+      <line class="w-mesh" id="e-sales-comms" x1="755" y1="188" x2="144" y2="293"/>
+      <line class="w-mesh" id="e-bill-app" x1="716" y1="292" x2="105" y2="188"/>
+      <line class="w-mesh" id="e-bill-strat" x1="716" y1="292" x2="218" y2="96"/>
+      <line class="w-mesh" id="e-mkt-cont" x1="543" y1="361" x2="317" y2="361"/>
+      <line class="w-mesh" id="e-mkt-strat" x1="543" y1="361" x2="218" y2="96"/>
+      <line class="w-mesh" id="e-cont-comms" x1="317" y1="361" x2="144" y2="293"/>
+      <line class="w-mesh" id="e-app-comms" x1="105" y1="188" x2="144" y2="293"/>
+      <line class="w-spoke" id="sp-sched" x1="430" y1="215" x2="430" y2="60"/>
+      <line class="w-spoke" id="sp-mem" x1="430" y1="215" x2="642" y2="96"/>
+      <line class="w-spoke" id="sp-sales" x1="430" y1="215" x2="755" y2="188"/>
+      <line class="w-spoke" id="sp-bill" x1="430" y1="215" x2="716" y2="292"/>
+      <line class="w-spoke" id="sp-mkt" x1="430" y1="215" x2="543" y2="361"/>
+      <line class="w-spoke" id="sp-cont" x1="430" y1="215" x2="317" y2="361"/>
+      <line class="w-spoke" id="sp-comms" x1="430" y1="215" x2="144" y2="293"/>
+      <line class="w-spoke" id="sp-app" x1="430" y1="215" x2="105" y2="188"/>
+      <line class="w-spoke" id="sp-strat" x1="430" y1="215" x2="218" y2="96"/>
+      <g class="w-hub"><circle cx="430" cy="215" r="30"/><text x="430" y="212" text-anchor="middle" class="w-hub-t1">FC</text><text x="430" y="229" text-anchor="middle" class="w-hub-t2">ONE BRAIN</text></g>
+      <g class="w-node" id="nd-sched" data-id="sched"><circle class="w-dotc" cx="430" cy="60" r="7"/><text class="w-nlbl" x="430" y="40" text-anchor="middle">Scheduling</text></g>
+      <g class="w-node" id="nd-mem" data-id="mem"><circle class="w-dotc" cx="642" cy="96" r="7"/><text class="w-nlbl" x="642" y="76" text-anchor="middle">Members</text></g>
+      <g class="w-node" id="nd-sales" data-id="sales"><circle class="w-beta-ring" cx="755" cy="188" r="13"/><circle class="w-dotc" cx="755" cy="188" r="7"/><text class="w-nlbl" x="755" y="168" text-anchor="middle">Sales & Leads</text><text class="w-beta-t" x="755" y="234" text-anchor="middle">HAWKEYE &middot; IN BETA</text></g>
+      <g class="w-node" id="nd-bill" data-id="bill"><circle class="w-dotc" cx="716" cy="292" r="7"/><text class="w-nlbl" x="716" y="322" text-anchor="middle">Billing</text></g>
+      <g class="w-node" id="nd-mkt" data-id="mkt"><circle class="w-dotc" cx="543" cy="361" r="7"/><text class="w-nlbl" x="543" y="391" text-anchor="middle">Marketing</text></g>
+      <g class="w-node" id="nd-cont" data-id="cont"><circle class="w-dotc" cx="317" cy="361" r="7"/><text class="w-nlbl" x="317" y="391" text-anchor="middle">Content</text></g>
+      <g class="w-node" id="nd-comms" data-id="comms"><circle class="w-dotc" cx="144" cy="293" r="7"/><text class="w-nlbl" x="144" y="323" text-anchor="middle">Comms</text></g>
+      <g class="w-node" id="nd-app" data-id="app"><circle class="w-dotc" cx="105" cy="188" r="7"/><text class="w-nlbl" x="105" y="168" text-anchor="middle">Member App</text></g>
+      <g class="w-node" id="nd-strat" data-id="strat"><circle class="w-dotc" cx="218" cy="96" r="7"/><text class="w-nlbl" x="218" y="76" text-anchor="middle">Strategy & AI</text></g>
+      <circle id="w-dot" r="4.5" style="display:none"/>
+    </svg>
     <div class="w-ex-pills">
-      <button type="button" class="w-pill on" onclick="_webPick(0,this)">The quiet lead</button>
-      <button type="button" class="w-pill" onclick="_webPick(1,this)">Trial to member</button>
-      <button type="button" class="w-pill" onclick="_webPick(2,this)">Ad dollar to revenue</button>
+      <button type="button" class="w-pill on" onclick="_webPick(0,event)">The quiet lead</button>
+      <button type="button" class="w-pill" onclick="_webPick(1,event)">Trial to member</button>
+      <button type="button" class="w-pill" onclick="_webPick(2,event)">Ad dollar to revenue</button>
     </div>
     <div class="w-cap" id="w-cap"></div>
+    <div class="w-proof">This exact loop runs in beta today - every handoff owner-approved.</div>
+    <div class="w-chippanel">
+      <div class="w-cp-lbl" id="w-cp-lbl"></div>
+      <div class="w-cp-chips" id="w-cp-chips"></div>
+    </div>
   </div>
 
-  <div class="section-kicker" style="margin-top:32px">See it in motion</div>
+<div class="section-kicker" style="margin-top:32px">See it in motion</div>
   <p style="margin-bottom:14px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">The interactive prototype below shows the destination. The real product is in beta testing: our own academies run their sales, onboarding, and client operations on it every day. Live demo on request.</p>
   <div class="proto-frame">
     <div class="proto-topbar">
@@ -1127,29 +1140,94 @@ footer {
   })();
 </script>
 
+
 <script>
 (function(){
+  var POS={sched:[430,60],mem:[642,96],sales:[755,188],bill:[716,292],mkt:[543,361],cont:[317,361],comms:[144,293],app:[105,188],strat:[218,96]};
+  var CHIPS={
+    sched:['Sessions & classes','Coach staffing','Attendance','Capacity & waitlists','Makeup credits','Session notes'],
+    mem:['360\u00b0 member profiles','Health scores','At-risk flags','Pauses & resumes','Streaks & milestones'],
+    sales:['Lead capture & pipeline','AI sales agents','Trial booking','Post-trial follow-up','Cold-lead reignition'],
+    bill:['Auto-billing','Failed-payment recovery','Credits & extensions','Refunds & discounts'],
+    mkt:['Meta ads management','Cost-per-lead tracking','Budget pacing','Underperformance alerts'],
+    cont:['Content planning','Production pipeline','Performance tracking'],
+    comms:['Two-way inbox','Mass messaging','Announcements','Automated reminders'],
+    app:['Self-serve booking','Payments & history','Account management'],
+    strat:['KPI dashboard','Member lifetime value','AI insights & forecasts','Strategic recommendations']
+  };
+  var NAMES={sched:'Scheduling',mem:'Members',sales:'Sales & Leads',bill:'Billing & Payments',mkt:'Marketing & Ads',cont:'Content',comms:'Comms',app:'Member App',strat:'Strategy & AI'};
   var EX=[
-    {cap:'<b>The quiet lead.</b> A lead goes silent &rarr; Hawkeye drafts the re-engage &rarr; the owner taps approve &rarr; the trial books itself &rarr; the Confirm agent runs the reminders &rarr; the athlete shows up.', nodes:['sales','comms','sched','mem']},
-    {cap:'<b>Trial to member.</b> The trial ends &rarr; post-trial form &rarr; enroll link sends &rarr; payment lands &rarr; auto-billing switches on &rarr; the member app unlocks booking.', nodes:['sched','sales','bill','app']},
-    {cap:'<b>Ad dollar to revenue.</b> The campaign runs &rarr; leads land in the pipeline &rarr; Hawkeye works every one &rarr; the dashboard shows cost per signed member, not per click.', nodes:['mkt','sales','strat','bill']}
+    {cap:'<b>The quiet lead.</b> A lead goes silent \u2192 Hawkeye drafts the re-engage \u2192 the owner taps approve \u2192 the trial books itself \u2192 the Confirm agent runs the reminders \u2192 the athlete shows up.', nodes:['sales','comms','sched','mem']},
+    {cap:'<b>Trial to member.</b> The trial ends \u2192 post-trial form \u2192 enroll link sends \u2192 payment lands \u2192 auto-billing switches on \u2192 the member app unlocks booking.', nodes:['sched','sales','bill','app']},
+    {cap:'<b>Ad dollar to revenue.</b> The campaign runs \u2192 leads land in the pipeline \u2192 Hawkeye works every one \u2192 the dashboard shows cost per signed member, not per click.', nodes:['mkt','sales','strat','bill']}
   ];
-  var timers=[], cycle=null, cur=0;
-  function activate(i){
-    cur=i;
+  var NS='http://www.w3.org/2000/svg';
+  var svg=document.getElementById('w-svg'), dot=document.getElementById('w-dot');
+  var timers=[], cycle=null, cur=0, raf=null, segEls=[], stepEls=[];
+  function clearPlay(){
     timers.forEach(clearTimeout); timers=[];
-    document.querySelectorAll('.w-node.on,.w-spoke.on').forEach(function(el){el.classList.remove('on');});
-    document.querySelectorAll('.w-pill').forEach(function(p,j){p.classList.toggle('on', j===i);});
-    var cap=document.getElementById('w-cap'); if(cap) cap.innerHTML=EX[i].cap;
-    EX[i].nodes.forEach(function(id,j){
-      timers.push(setTimeout(function(){
-        var n=document.getElementById('nd-'+id), s=document.getElementById('sp-'+id);
-        if(n) n.classList.add('on'); if(s) s.classList.add('on');
-      }, 260*j));
-    });
+    if(raf) cancelAnimationFrame(raf); raf=null;
+    segEls.forEach(function(e){e.remove();}); segEls=[];
+    stepEls.forEach(function(e){e.remove();}); stepEls=[];
+    dot.style.display='none';
+    document.querySelectorAll('.w-node.on,.w-spoke.on,.w-mesh.on').forEach(function(el){el.classList.remove('on');});
   }
-  window._webPick=function(i,btn){ activate(i); if(cycle){clearInterval(cycle);} cycle=setInterval(function(){activate((cur+1)%EX.length);},8000); };
-  var boot=function(){ activate(0); cycle=setInterval(function(){activate((cur+1)%EX.length);},8000); };
+  function showChips(id){
+    document.querySelectorAll('.w-node.sel').forEach(function(el){el.classList.remove('sel');});
+    var nd=document.getElementById('nd-'+id); if(nd) nd.classList.add('sel');
+    document.getElementById('w-cp-lbl').textContent=NAMES[id]+' handles';
+    document.getElementById('w-cp-chips').innerHTML=CHIPS[id].map(function(c){return '<span class="aio-chip">'+c+'</span>';}).join('');
+  }
+  function travel(pts,idx){
+    if(idx>=pts.length-1){ dot.style.display='none'; return; }
+    var p1=pts[idx], p2=pts[idx+1], t0=null, DUR=700;
+    var seg=document.createElementNS(NS,'line');
+    seg.setAttribute('class','w-pathseg');
+    seg.setAttribute('x1',p1[0]); seg.setAttribute('y1',p1[1]); seg.setAttribute('x2',p2[0]); seg.setAttribute('y2',p2[1]);
+    svg.insertBefore(seg, svg.querySelector('.w-hub')); segEls.push(seg);
+    dot.style.display='';
+    function step(ts){
+      if(!t0) t0=ts;
+      var k=Math.min(1,(ts-t0)/DUR);
+      dot.setAttribute('cx', p1[0]+(p2[0]-p1[0])*k);
+      dot.setAttribute('cy', p1[1]+(p2[1]-p1[1])*k);
+      if(k<1){ raf=requestAnimationFrame(step); } else { travel(pts,idx+1); }
+    }
+    raf=requestAnimationFrame(step);
+  }
+  function activate(i){
+    cur=i; clearPlay();
+    document.querySelectorAll('.w-pill').forEach(function(p,j){p.classList.toggle('on', j===i);});
+    document.getElementById('w-cap').innerHTML=EX[i].cap;
+    var ids=EX[i].nodes, pts=ids.map(function(id){return POS[id];});
+    ids.forEach(function(id,j){
+      timers.push(setTimeout(function(){
+        var n=document.getElementById('nd-'+id); if(n) n.classList.add('on');
+        var s=document.getElementById('sp-'+id); if(s) s.classList.add('on');
+        var st=document.createElementNS(NS,'text');
+        st.setAttribute('class','w-step');
+        st.setAttribute('x',POS[id][0]+12); st.setAttribute('y',POS[id][1]-10);
+        st.textContent=(j+1);
+        svg.appendChild(st); stepEls.push(st);
+      }, 700*j));
+    });
+    dot.setAttribute('cx',pts[0][0]); dot.setAttribute('cy',pts[0][1]);
+    travel(pts,0);
+    showChips(ids[0]);
+  }
+  function rearm(){ if(cycle) clearInterval(cycle); cycle=setInterval(function(){activate((cur+1)%EX.length);},9000); }
+  window._webPick=function(i,ev){ if(ev) ev.preventDefault(); activate(i); rearm(); };
+  function boot(){
+    document.querySelectorAll('.w-node').forEach(function(n){
+      n.addEventListener('click',function(){ showChips(n.dataset.id); if(cycle){clearInterval(cycle); cycle=null;} clearPlay();
+        var id=n.dataset.id;
+        document.querySelectorAll('.w-mesh').forEach(function(m){ m.classList.toggle('on', m.id.indexOf('-'+id)>=0 && (m.id.split('-')[1]===id||m.id.split('-')[2]===id)); });
+        var s=document.getElementById('sp-'+id); if(s) s.classList.add('on');
+        document.querySelectorAll('.w-pill').forEach(function(p){p.classList.remove('on');});
+      });
+    });
+    activate(0); rearm();
+  }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
 })();
 </script>
