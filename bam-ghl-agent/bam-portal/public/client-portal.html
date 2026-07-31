@@ -23325,8 +23325,13 @@ function _hv2UnifiedSchedule(trials, slots, tz) {
       const lowFill = s.capacity && fill < 60;
       const trialId = 'st-' + i;
 
+      // FCUI pilot: class rows get a per-class dot color (mockup purple maps
+      // to gold - no purple in this system). Shipped layout keeps the blue.
+      const dotColor = (typeof _fcActive === 'function' && _fcActive())
+        ? ['var(--green)', 'var(--green)', 'var(--blue)', 'var(--gold)'][i % 4]
+        : '#7fb0d8';
       html += `<div onclick="_calOpenRight()" style="${_HV_ROW}${isPast ? ';opacity:.5' : ''}${isNext ? ';border-left:3px solid var(--gold)' : ''}">
-        <span class="hv2-dot" style="background:#7fb0d8"></span>
+        <span class="hv2-dot" style="background:${dotColor}"></span>
         <div style="flex:1;min-width:0">
           <div style="${_HV_TITLE}">${escapeHTML(s.name || 'Session')}${hasTrials ? `<span class="hm-sched-trial-tag" onclick="event.stopPropagation();_hvToggleTrial('${trialId}')">${sessionTrials.length} trial${sessionTrials.length > 1 ? 's' : ''} &#9662;</span>` : ''}</div>
           <div style="${_HV_SUB}">${escapeHTML(_hvTime(s.start, tz))}${cd && cd !== 'done' ? ` <span class="hm-sched-countdown${cd === 'now' ? ' now' : ''}" id="hm-cd-${i}">in ${cd}</span>` : ''}</div>
@@ -61147,6 +61152,11 @@ function _fcStyle() {
     'body.fcui-mode .main{margin-left:240px}' +
     /* banners live in .main above the views: compact alert restyle */
     'body.fcui-mode #ghl-banner,body.fcui-mode #action-banner,body.fcui-mode #completed-banner{margin:10px 24px 0;border-radius:var(--r-md);border:1px solid var(--accent-border) !important;background:var(--gold-sheen) !important;padding:9px 14px !important;font-size:12.5px !important}' +
+    /* the support orb must stay reachable on the FC shell (some modes force-
+       hide it); the support focus page still owns the screen when open */
+    'body.fcui-mode:not(:has(#view-support.mm-open)) #admin-fb-wrap{display:block !important}' +
+    /* never show the command-center speed-dial "+" dock under the flag */
+    'body.fcui-mode .cc-dock{display:none !important}' +
     '}' +
     /* the FC sidebar */
     '#fcui-side{position:fixed;left:0;top:0;bottom:0;width:240px;z-index:80;display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--border);font-family:var(--font-ui);padding:18px 14px calc(14px + env(safe-area-inset-bottom))}' +
@@ -61343,9 +61353,12 @@ function _fcOpen() {
   if (!document.getElementById('fcui-side')) _fcBuildSide();
   if (!document.getElementById('view-fcui')) {
     const main = document.querySelector('.main');
+    // Header lives directly in .main (above the banners + every view), so the
+    // GHL / action / completed banners read as compact alerts UNDER it.
+    main.insertAdjacentHTML('afterbegin', _fcHeadHtml());
     const v = document.createElement('div');
     v.className = 'view'; v.id = 'view-fcui';
-    v.innerHTML = _fcHeadHtml() + '<div id="fcui-col"></div>';
+    v.innerHTML = '<div id="fcui-col"></div>';
     main.appendChild(v);
     _fcBindKeys();
   }
@@ -61363,7 +61376,7 @@ function _fcHeadHtml() {
   return `<div id="fcui-head">
     <div class="fcui-greet"><b id="fcui-greet-t">${part}</b><span id="fcui-greet-d">${escapeHTML(dateStr)}</span></div>
     <label class="fcui-search">${I.search}<input id="fcui-search-in" type="text" placeholder="Search members, classes, or ask anything..." onkeydown="if(event.key==='Enter')_fcAiGo(this.value)"><span class="fcui-kbd">&#8984;K</span></label>
-    <button type="button" class="fcui-loc" id="fcui-loc" onclick="_fcLocToggle(event)">${I.pin}<b id="fcui-loc-t">All Locations</b>${I.chev}<div class="fcui-loc-pop" id="fcui-loc-pop"></div></button>
+    <div class="fcui-loc" id="fcui-loc" role="button" tabindex="0" onclick="_fcLocToggle(event)" onkeydown="if(event.key==='Enter')_fcLocToggle(event)">${I.pin}<b id="fcui-loc-t">All Locations</b>${I.chev}<div class="fcui-loc-pop" id="fcui-loc-pop"></div></div>
     <div class="fcui-chips" id="fcui-chips"></div>
   </div>`;
 }
