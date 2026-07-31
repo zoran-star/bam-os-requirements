@@ -36,6 +36,18 @@
 //      refund_of, and go under BOTH modes.
 //   9. A HELD SEND STILL WRITES THE ROW (and a failed one keeps it). The record of
 //      money moving does not depend on the academy having finished its email setup.
+//  9d. THE FOOTER A MEMBER READS. A receipt says the parent JOINED (the shell's own
+//      FOOTER_REASON.joined, not new copy) and never that they enquired, and it
+//      carries NO unsubscribe: no anchor, no empty href, no orphan "Unsubscribe"
+//      word, no dangling separator. All THREE send paths - a paid invoice, a refund
+//      confirmation and a staff resend - and the two params are pinned at both real
+//      call sites, so a site that quietly stops passing them fails. In the same
+//      section: BYTE IDENTITY. All ten BAM GTA templates are rendered through the
+//      real renderEmail with none of the new params and compared to the committed
+//      markup goldens - the same goldens api/_gta-message-lock.test.mjs holds, which
+//      were generated from origin/main. A change to the shared shell that moved a
+//      sales drip, a confirmation or the welcome email by one byte fails HERE too,
+//      not only in that lock.
 //  10. THE WIRE. api/stripe/webhook.js actually CALLS the module from inside
 //      handleInvoiceSucceeded, awaited, with no conditional return in front of it;
 //      api/members.js actionRefund calls it after the audit write; the resend
@@ -94,6 +106,17 @@
 //   MUTATE=alwaysok   a resend reports success whatever happened to the email, so a
 //                     HELD send reads as "Done." and staff believe a parent has a
 //                     receipt nobody sent. This is the bug as it shipped.
+//   MUTATE=enquired   RECEIPT_FOOTER stops passing footerReason, so the shell falls
+//                     back to its lead-nurture default and every receipt tells a
+//                     paying member they "enquired about" the academy. This is the
+//                     defect exactly as it shipped on 31 Jul 2026.
+//   MUTATE=unsubback  RECEIPT_FOOTER stops passing noUnsubscribe, so the unsubscribe
+//                     anchor comes back and a parent is offered an opt-out from the
+//                     record of their own payment.
+//   MUTATE=resendfoot only the RESEND site drops the pair. A new receipt is correct
+//                     and the copy staff send when a parent says "I never got it" is
+//                     the old broken one - the per-site failure that a single
+//                     end-to-end check on the payment path would never see.
 //   MUTATE=noagent    the list_receipts dispatcher branch is deleted from
 //                     api/members-agent.js. The tool is still declared, the prompt
 //                     still describes it, and it silently returns "unknown tool" -
@@ -289,6 +312,16 @@ const MODULE_EDITS = {
   // Every resend reports success, whatever happened to the email. This is the bug
   // as it actually shipped: a 200 read as "Done." over a send that was HELD.
   alwaysok: [[`    return { ok: status === "sent", receipt_id: receipt.id`, `    return { ok: true, receipt_id: receipt.id`]],
+  // The two halves of the receipt footer, broken one at a time. Both are pinned to
+  // the ONE object every send site spreads, so each control changes exactly one of
+  // the two claims and leaves the other true.
+  enquired: [[`const RECEIPT_FOOTER = { footerReason: FOOTER_REASON.joined, noUnsubscribe: true };`,
+    `const RECEIPT_FOOTER = { noUnsubscribe: true };`]],
+  unsubback: [[`const RECEIPT_FOOTER = { footerReason: FOOTER_REASON.joined, noUnsubscribe: true };`,
+    `const RECEIPT_FOOTER = { footerReason: FOOTER_REASON.joined };`]],
+  // Per-SITE, not per-object: the resend stops spreading it and nothing else changes.
+  resendfoot: [[`subject: msg.subject, body: msg.body, vars: varsFor(member), ...RECEIPT_FOOTER,`,
+    `subject: msg.subject, body: msg.body, vars: varsFor(member),`]],
   rowgone: [[`      method: "PATCH", headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ email_status: status, sent_at: sentAt }),`, `      method: status === "sent" ? "PATCH" : "DELETE", headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ email_status: status, sent_at: sentAt }),`]],
@@ -738,6 +771,130 @@ console.log("\n── 9c. the Members agent, EXECUTED ──");
     "and NOTHING was executed - no row, no email, until a human confirms");
 
   globalThis.fetch = prevFetch;
+}
+
+console.log("\n── 9d. the footer a MEMBER reads ──");
+// THE LIVE DEFECT, 31 Jul 2026. Receipts went on for BAM GTA's 35 paying members and
+// every one ended "You're receiving this because you enquired about By Any Means
+// Toronto." with an Unsubscribe link under it. Both halves are wrong and they are
+// wrong differently: the first is a false statement about how somebody came to be a
+// member, the second offers to opt a parent out of the record of their own payment.
+//
+// The copy is NOT retyped here. Both the sentence and the anchor are read out of
+// api/email-templates/_shell.js, so this section cannot drift from the shell it is
+// making a claim about, and re-wording the shell's sentence does not silently make
+// this pass against the old words.
+{
+  const { FOOTER_REASON, SHELL_FOOT } = await import("./email-templates/_shell.js");
+  const { renderEmail, renderStepMessage, clientVars } = await import("./email-shells.js");
+  const ACADEMY = "By Any Means Toronto";              // the fixture's public_name
+  const JOINED = FOOTER_REASON.joined.replace("{{ACADEMY_FULL}}", ACADEMY);
+  const ENQUIRED = FOOTER_REASON.enquired.replace("{{ACADEMY_FULL}}", ACADEMY);
+
+  // The footer's reason paragraph, whole. Taken by locating the sentence and walking
+  // out to its own <p>, so the assertion below is about EVERYTHING in that paragraph
+  // - which is how "no orphan word, no dangling separator" is checked rather than
+  // asserted. A `<a href="">` or a stranded "&middot;" left behind by a sloppy strip
+  // would still be inside these bounds.
+  function reasonParagraph(html) {
+    const s = String(html || "");
+    const i = s.indexOf("You're receiving this because");
+    if (i < 0) return "";
+    const start = s.lastIndexOf("<p ", i);
+    const end = s.indexOf("</p>", i);
+    return start < 0 || end < 0 ? "" : s.slice(start, end + 4);
+  }
+  const innerOf = (p) => String(p).replace(/^<p\b[^>]*>/, "").replace(/<\/p>$/, "");
+
+  // Everything a receipt's footer must be, checked the same way for all three send
+  // paths. `where` names the path so a failure says WHICH one regressed.
+  function assertReceiptFooter(html, where) {
+    const para = reasonParagraph(html);
+    const inner = innerOf(para).trim();
+    ok(inner === JOINED,
+      `${where}: the footer is the shell's JOINED sentence and nothing else (saw ${JSON.stringify(inner.slice(0, 120))})`);
+    ok(!String(html).includes(ENQUIRED), `${where}: and never tells a paying member they enquired`);
+    // The unsubscribe, refused four ways - the four shapes a half-done removal leaves.
+    ok(!/>\s*Unsubscribe\s*</i.test(html), `${where}: no unsubscribe anchor`);
+    ok(!/href=""/.test(html), `${where}: and no empty href where one used to be`);
+    ok(!/Unsubscribe/i.test(textOf(html)), `${where}: no orphan "Unsubscribe" word anywhere a parent can read`);
+    ok(!/&middot;|·/.test(inner) && !/<a\b/i.test(inner),
+      `${where}: and nothing dangling in the paragraph the anchor came out of`);
+  }
+
+  // ── the three send paths, driven end to end ────────────────────────────────
+  SENT = [];
+  const { member: pm } = seed({ tag: "foot-pay" });
+  await payFor(pm, invoice("in_foot", MONTHLY(), 22600, { charge: "ch_foot" }));
+  ok(SENT.length === 1, `a payment receipt reached the transport (saw ${SENT.length})`);
+  assertReceiptFooter((lastEmail() || {}).html, "payment receipt");
+
+  SENT = [];
+  await RECEIPTS.sendRefundReceipt({ sb, sendOn, member: pm, chargeId: "ch_foot", refund: { id: "re_foot", amount: 22600, currency: "cad" } });
+  ok(SENT.length === 1, `a refund confirmation reached the transport (saw ${SENT.length})`);
+  assertReceiptFooter((lastEmail() || {}).html, "refund confirmation");
+
+  // The resend re-RENDERS, which is why it is a third path and not a repeat: it goes
+  // back through renderReceipt and the shell, so it can carry the old footer even
+  // when the two sends above are fixed. That is MUTATE=resendfoot.
+  SENT = [];
+  const issued = DB.member_receipts.filter((r) => r.client_id === pm.client_id && r.kind === "payment")[0];
+  const rs = issued ? await RECEIPTS.resendReceipt({ sb, sendOn, member: pm, receiptId: issued.id }) : {};
+  ok(rs.ok === true && SENT.length === 1, `a staff resend reached the transport (saw ${JSON.stringify(rs.email_status)})`);
+  assertReceiptFooter((lastEmail() || {}).html, "staff resend");
+
+  // ── the wiring, structurally ───────────────────────────────────────────────
+  // Reading the rendered footer proves the CURRENT three paths are right. It cannot
+  // prove a FOURTH send site added later carries the pair, and the module's own
+  // source is where that is visible. Comments stripped first: this file's own header
+  // and the module's both name RECEIPT_FOOTER in prose.
+  const codeOnly = (s) => s
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + " ".repeat(m.length - p.length));
+  const modSrc = codeOnly(fs.readFileSync(path.join(HERE, "_member-receipts.js"), "utf8"));
+  ok(/const RECEIPT_FOOTER = \{ footerReason: FOOTER_REASON\.joined, noUnsubscribe: true \};/.test(modSrc),
+    "the module declares ONE footer object, taking the sentence from the shell rather than retyping it");
+  ok(/import \{ FOOTER_REASON \} from "\.\/email-templates\/_shell\.js";/.test(modSrc),
+    "imported from the shell, so re-wording there reaches the receipt");
+  const calls = modSrc.match(/\bsendOn\(\{[\s\S]*?\}\);/g) || [];
+  ok(calls.length === 2, `every sendOn() site in the module is accounted for (saw ${calls.length}, expected the 2 that serve all 3 paths)`);
+  ok(calls.every((c) => c.includes("...RECEIPT_FOOTER")),
+    `and every one of them spreads it (saw ${calls.filter((c) => !c.includes("...RECEIPT_FOOTER")).length} that do not)`);
+
+  // ── the suppression is a suppression, not a deletion ───────────────────────
+  // If somebody "fixed" this by deleting the anchor from the shared shell, every
+  // assertion above would still pass and every sales drip would silently lose its
+  // unsubscribe link. So the shell must STILL carry it.
+  ok(/<a href="\{\{UNSUBSCRIBE\}\}"[^>]*>Unsubscribe<\/a>/.test(SHELL_FOOT),
+    "the shared shell still HAS an unsubscribe anchor - receipts suppress it, they do not delete it for everybody");
+
+  // ── BYTE IDENTITY: nothing that is not a receipt moved ─────────────────────
+  // A plain body through the untouched path: still the lead-nurture sentence, still
+  // the link. This is the default every existing caller of sendOn gets.
+  const plain = renderStepMessage({
+    channel: "email", clientId: pm.client_id, subject: "Still coming?",
+    body: "Hi {{contact.first_name}}, still keen to come down?",
+    vars: clientVars(DB.clients.find((c) => c.id === pm.client_id)),
+  });
+  ok(plain.html.includes(ENQUIRED), "a NON-receipt email still carries the enquired sentence - the default did not move");
+  ok(/>Unsubscribe</.test(plain.html) && plain.html.includes("mailto:info@byanymeanstoronto.ca?subject=Unsubscribe"),
+    "and still carries its unsubscribe link, pointed at the academy's own address");
+
+  // The real thing: all ten BAM GTA templates against the committed markup goldens.
+  // Those files were generated from origin/main, so this is a literal before/after
+  // byte comparison of production's own emails - the sales drips, the confirmations
+  // and the welcome email - across this change. Rendered through the SAME fixture
+  // api/_gta-message-lock.test.mjs uses, imported from it rather than copied, so
+  // there is one answer to "what does GTA's row look like".
+  const LOCK = await import("./_gta-message-lock.test.mjs");
+  const moved = [];
+  for (const key of LOCK.KEYS) {
+    const goldenPath = path.join(HERE, "__goldens__", "bam-gta", "markup", `${key}.html`);
+    if (!fs.existsSync(goldenPath)) { moved.push(`${key} (no golden)`); continue; }
+    if (fs.readFileSync(goldenPath, "utf8") !== LOCK.renderWith(renderEmail, key)) moved.push(key);
+  }
+  ok(LOCK.KEYS.length === 10, `all ten GTA templates are in the set being compared (saw ${LOCK.KEYS.length})`);
+  ok(moved.length === 0, `and every one is BYTE-IDENTICAL to its committed golden (moved: ${moved.join(", ") || "none"})`);
 }
 
 console.log("\n── 10. THE WIRE ──");

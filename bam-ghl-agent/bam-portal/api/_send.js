@@ -298,7 +298,17 @@ const EMPTY_AFTER_MERGE = "empty after merge fields resolved";
 // no Google review link renders three paragraphs asking for a review and no way to
 // leave one).
 
-export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, subject, body, ghlToken, vars } = {}) {
+// `footerReason` / `noUnsubscribe` (email only) are the TRANSACTIONAL pair, threaded
+// to renderStepMessage -> renderEmail -> fillShell and nowhere else. A caller that
+// passes neither - every sales drip, every confirmation, the welcome email - gets the
+// byte-identical email it got before they existed. Today the only caller that passes
+// them is api/_member-receipts.js, and the reasoning for each is written where it
+// belongs: FOOTER_REASON.joined and stripUnsubscribe in api/email-templates/_shell.js.
+//
+// ⚠️ NEITHER IS A PERMISSION. `noUnsubscribe` changes what the footer RENDERS. It does
+// not lift the business-email hold below, and it must never be made to - see the note
+// there.
+export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, subject, body, ghlToken, vars, footerReason, noUnsubscribe } = {}) {
   const text = String(body || "").trim();
   if (!text) throw new Error("sendOn: empty body");
 
@@ -342,6 +352,29 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
     // THIS path "no business email" and "no unsubscribe" are the same condition. If
     // either ever grows that parameter it has to reach BOTH the check and the render,
     // or the check stops describing what goes out.
+    //
+    // ⚠️ ONE CALLER NOW RENDERS WITHOUT AN UNSUBSCRIBE, and the hold STILL applies to
+    // it. A receipt passes `noUnsubscribe` (31 Jul 2026), so for that caller the
+    // sentence above is no longer the whole truth: the render carries no opt-out link
+    // whether or not the academy has a public email. The hold is kept anyway, because
+    // the unsubscribe was only ever HALF its reason - read guardrail 2 at the top of
+    // this file. clients.business_email is ALSO the footer's contact line and the
+    // footer's mailto "Email" link, and with no address on the row those are dropped
+    // by dropEmptyShellLinks. Lifting the hold would send a paying parent a receipt
+    // for their own money with no way to reach the academy that took it, which is a
+    // worse document than a nurture email with the same gap.
+    //
+    // It is also the wrong shape of change. `noUnsubscribe` is a RENDERING flag any
+    // future caller may set to fix a footer sentence; making it bypass a fail-closed
+    // identity guard would silently hand that caller the right to send as an academy
+    // that is not set up. If receipts ever genuinely need to send without a public
+    // email, that is its own explicit parameter with its own proof, not a side effect
+    // of this one.
+    //
+    // The cost today is nothing and it is visible: a held receipt still WRITES its row
+    // (api/_member-receipts.js writeAndSend), is labelled email_status 'held', texts
+    // the owner at most once per 24h, and can be resent the moment the address is
+    // filled in. A receipt sent with a hollow footer would be none of those things.
     if (!unsubscribeFor({ clientId, vars: renderVars })) {
       await noticeHeldOnce(clientId, "business_email");
       return { held: "no business email, so no unsubscribe link" };
@@ -351,7 +384,7 @@ export async function sendOn({ channel, clientId, contactId, toEmail, toPhone, s
     // can carry merge tokens too, so resolve it against the same vars.
     // ONE RENDER PATH: this is the SAME call the owner's approval surface makes,
     // so the email an owner approved is byte-for-byte the email that goes out.
-    const msg = renderStepMessage({ channel: "email", clientId, subject, body: text, vars: renderVars });
+    const msg = renderStepMessage({ channel: "email", clientId, subject, body: text, vars: renderVars, footerReason, noUnsubscribe });
     if (msg.empty) return { skipped: EMPTY_AFTER_MERGE };
     const r = await sendEmail({ to: toEmail, subject: msg.subject, html: msg.html, from: sender.from, clientId });
     if (r && r.skipped) return { skipped: r.skipped };

@@ -375,7 +375,7 @@ const CALL_SITES = [
 // in this file's header from rotting. Counted per file, comments stripped first.
 const OTHER_SEND_SITES = {
   "automations.js": { count: 1, why: "the automation engine's own send, from an automation_steps row. Locked by api/_gta-step-lock.test.mjs (the row) and api/_approval-render.test.mjs (preview equals send)." },
-  "_member-receipts.js": { count: 2, why: "the member receipt system's two sends - a new receipt (writeAndSend, used by both the paid-invoice and the refund path) and a staff-requested resend. Both render through renderReceipt() in the same file, and api/_member-receipts.test.mjs owns the words: it pins the receipt copy, proves the total-alone fallback, proves the portal line drops with no URL, and proves a held send still writes the row. Gated OFF for every academy until clients.receipt_mode is set." },
+  "_member-receipts.js": { count: 2, why: "the member receipt system's two sends - a new receipt (writeAndSend, used by both the paid-invoice and the refund path) and a staff-requested resend. Both render through renderReceipt() in the same file, and api/_member-receipts.test.mjs owns the words: it pins the receipt copy, proves the total-alone fallback, proves the portal line drops with no URL, proves a held send still writes the row, and pins the transactional FOOTER these two sends are the only callers to ask for (the joined sentence, and no unsubscribe anchor at all). Gated OFF for every academy until clients.receipt_mode is set." },
 };
 
 // Blank out comments while preserving length and newlines, so a call named in prose

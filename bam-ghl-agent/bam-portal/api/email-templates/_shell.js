@@ -124,3 +124,28 @@ export function shellHead(preheader, title) {
 export function shellFoot(reason = FOOTER_REASON.enquired) {
   return SHELL_FOOT.replace("{{FOOTER_REASON}}", reason);
 }
+
+// ── the unsubscribe, and the one kind of email that must not carry it ────────
+//
+// A TRANSACTIONAL email - a receipt for money that already moved - is not a
+// commercial message and gets no unsubscribe link. CAN-SPAM exempts transactional
+// and relationship messages from the opt-out requirement, and CASL does not treat a
+// receipt for a completed transaction as a commercial electronic message. Offering
+// to unsubscribe somebody from the record of their own payment is not a courtesy:
+// it implies the document is marketing, and it implies there is something to opt out
+// of that we would then have to honour by NOT sending a receipt.
+//
+// This is a whole-anchor removal, not an empty href. Leaving `<a href="">` behind
+// would put a dead, underlined "Unsubscribe" in the footer, which is the same claim
+// with the link broken. The leading \s* takes the newline and indent that exist only
+// to separate the anchor from the reason sentence, so the paragraph closes straight
+// after the sentence with nothing dangling.
+//
+// Matched on the PLACEHOLDER, so it must run BEFORE {{UNSUBSCRIBE}} is filled - see
+// fillShell() in api/email-shells.js. That is deliberate: it can only ever match the
+// shell's own anchor, never a link a template or a staff-written body put there.
+export const UNSUBSCRIBE_ANCHOR = /\s*<a href="\{\{UNSUBSCRIBE\}\}"[^>]*>Unsubscribe<\/a>/g;
+
+export function stripUnsubscribe(html) {
+  return String(html).replace(UNSUBSCRIBE_ANCHOR, "");
+}

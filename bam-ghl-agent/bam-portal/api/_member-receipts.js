@@ -50,6 +50,31 @@
 // See supabase/migrations/20260731T190000_member_receipts.sql.
 
 import { resolveFee, applyFee, taxFee } from "./_fees.js";
+import { FOOTER_REASON } from "./email-templates/_shell.js";
+
+// ── WHAT EVERY RECEIPT'S FOOTER SAYS, AND WHAT IT DOES NOT OFFER ─────────────
+//
+// Spread onto every sendOn() call in this file - all three of them (a payment, a
+// refund, a staff resend) - so no receipt can leave here with the shell's DEFAULT
+// footer. That default is written for lead nurture and it says two things that are
+// false on a receipt:
+//
+//   "You're receiving this because you enquired about <academy>."
+//     A member did not enquire. They paid. FOOTER_REASON.joined is the sentence the
+//     shell has always carried for somebody who has joined, and it is used verbatim
+//     rather than reworded - the shell owns that copy, not this file.
+//
+//   [Unsubscribe]
+//     Offered on the record of the parent's own payment. A receipt is transactional,
+//     so it carries no opt-out at all (CAN-SPAM exempts transactional and
+//     relationship messages; CASL does not treat a receipt for a completed
+//     transaction as a commercial electronic message). The anchor is removed whole,
+//     not blanked - see stripUnsubscribe in api/email-templates/_shell.js.
+//
+// ONE object, spread at every site, because the failure this fixes is per-site: the
+// system went live on 31 Jul 2026 with all three sites passing neither, and a resend
+// that re-rendered with the wrong footer would be the same defect issued twice.
+const RECEIPT_FOOTER = { footerReason: FOOTER_REASON.joined, noUnsubscribe: true };
 
 export const RECEIPT_KINDS = ["payment", "refund"];
 export const RECEIPT_MODES = ["recurring", "first_only"];
@@ -266,8 +291,9 @@ function taxLineLabel(fee, taxConfig) {
 //
 // Plain text with a little inline markup, handed to sendOn() -> renderStepMessage
 // -> renderEmail, which wraps it in the ACADEMY'S OWN branded shell (wordmark,
-// tagline, footer, unsubscribe). So there is no second email design here and no way
-// for a receipt to go out looking like a different academy's mail.
+// tagline, footer). So there is no second email design here and no way for a receipt
+// to go out looking like a different academy's mail. The one thing a receipt does NOT
+// inherit from the shell's defaults is its footer - see RECEIPT_FOOTER above.
 //
 // {{location.portal_link}} is the manage-membership line and it is deliberately a
 // TOKEN rather than a value we paste in: the token is in DROP_WHEN_EMPTY in
@@ -421,9 +447,11 @@ async function writeAndSend({ sb, sendOn, client, member, row, vars }) {
   const msg = renderReceipt(inserted);
   let status = "failed", sentAt = null, note = null;
   try {
+    // SEND SITE 1 AND 2. Both the paid invoice and the refund confirmation reach the
+    // wire here, so RECEIPT_FOOTER covers both from one place.
     const r = await sendOn({
       channel: "email", clientId: client.id, toEmail: member.parent_email,
-      subject: msg.subject, body: msg.body, vars,
+      subject: msg.subject, body: msg.body, vars, ...RECEIPT_FOOTER,
     });
     if (r && r.sent) { status = "sent"; sentAt = new Date().toISOString(); }
     // A HELD send is the academy-identity guardrail in api/_send.js doing its job
@@ -666,9 +694,12 @@ export async function resendReceipt({ sb, sendOn, member, receiptId } = {}) {
     const msg = renderReceipt(receipt);
     let status = "failed", sentAt = null, note = null;
     try {
+      // SEND SITE 3. A resend re-renders the stored row, so it re-renders the FOOTER
+      // too - a resend that dropped RECEIPT_FOOTER would reissue the original defect
+      // on a document staff believe they are simply sending again.
       const r = await sendOn({
         channel: "email", clientId: member.client_id, toEmail: member.parent_email,
-        subject: msg.subject, body: msg.body, vars: varsFor(member),
+        subject: msg.subject, body: msg.body, vars: varsFor(member), ...RECEIPT_FOOTER,
       });
       if (r && r.sent) { status = "sent"; sentAt = new Date().toISOString(); }
       else if (r && r.held) { status = "held"; note = r.held; }
