@@ -1,5 +1,6 @@
-import { withSentryApiRoute } from "../_sentry.js";
+import { withSentryApiRoute, captureApiMessage } from "../_sentry.js";
 import { applyPreset, buildPresetRows, PRESETS, presetContents } from "../agent/presets.js";
+import { seedCoreFields } from "./seed-core-fields.js";
 
 // Stamp a sales-pipeline preset onto an offer from the portal (Gap #2, phase 2B;
 // station-model manifest since 2026-07-14).
@@ -159,7 +160,42 @@ async function handler(req, res) {
           });
         } catch (_) { /* stamp is best-effort - the pipeline rows are already in */ }
 
-        return res.status(200).json({ ok: true, preset: presetKey, stages: r.stages, transitions: r.transitions, automations: r.automations || [], stamp });
+        // The CORE athlete fields the preset's enroll form assumes exist. Seeded
+        // HERE rather than as a fifth leg in the front end's chain: it needs no
+        // offer, it is the same auth this request already resolved, and a leg
+        // the browser has to remember to call is a leg an academy onboarded any
+        // other way silently never gets. Add-if-absent by key, never an
+        // overwrite - see api/offers/seed-core-fields.js.
+        //
+        // Best-effort, like the stamp above it. The pipeline rows are already
+        // written by this point, and failing the whole apply because one field
+        // definition did not insert would turn a complete setup into a red
+        // error the owner cannot act on. It reports what it did either way, and
+        // re-applying picks the missing fields up.
+        //
+        // AND IT TELLS SOMEBODY. Fail-open without telemetry is the worse bug,
+        // not the safer one, and it is invisible from every direction at once:
+        // this catch swallows the throw so withSentryApiRoute never sees it, the
+        // wizard caller (public/client-portal.html _obfApplyPreset) discards the
+        // response body, and setup-status counts only section=sales/onboarding
+        // defs while these are section:null - so a failed insert leaves the
+        // button green, the response unread and the academy's enroll form
+        // missing all three fields forever. That is precisely the silent gap
+        // this whole build exists to close, reintroduced one level up. The
+        // Sentry message is the ONLY signal that the fields did not land, so it
+        // carries the academy id: an alert nobody can act on is not an alert.
+        let coreFields = null;
+        try { coreFields = await seedCoreFields(clientId, sb); }
+        catch (e) {
+          coreFields = { error: e.message || String(e) };
+          captureApiMessage("core field seeding failed on preset apply", {
+            level: "error",
+            tags: { client_id: clientId, preset: presetKey },
+            extra: { offer_id: offerId, error: coreFields.error },
+          });
+        }
+
+        return res.status(200).json({ ok: true, preset: presetKey, stages: r.stages, transitions: r.transitions, automations: r.automations || [], stamp, core_fields: coreFields });
       } catch (e) {
         const msg = e.message || String(e);
         const needsForce = /force:\s*true|Re-run with force|nondeterministic/.test(msg);
