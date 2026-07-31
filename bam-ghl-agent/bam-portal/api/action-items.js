@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { notifyOwners } from "./_notify-owners.js";
+import { readStripeAccount } from "./stripe/_requirements.js";
 // Vercel Serverless Function — Action Items (v1)
 //
 // A shared per-client to-do list. Visible to the academy team (client portal)
@@ -432,17 +433,21 @@ async function loadClientSignals(clientId) {
 // the step ticks on its own - no reconnect needed.
 // Only runs for the narrow case "account stored, not yet chargeable", so it costs
 // one Stripe call for a client who is mid-setup and none for everyone else.
+//
+// UNCHANGED BEHAVIOUR, one shared reader. It used to make the Stripe call
+// itself and treat "Stripe answered no" and "the call failed" as the same
+// thing. readStripeAccount tells them apart, and only "ready" ticks the step,
+// so this self-heal ticks in exactly the same cases it always did. The reason
+// is no longer discarded here either - what the owner READS about it comes
+// from api/members.js, which reads the same account for the Stripe card.
 async function backfillStripeWhenChargeable(clientId, signals) {
   const acct = signals.stripe_connect_account_id;
   if (!acct || signals.stripe_connect_connected_at) return signals;
   const key = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   if (!key) return signals;
   try {
-    const r = await fetch(`https://api.stripe.com/v1/accounts/${encodeURIComponent(acct)}`, {
-      headers: { Authorization: `Bearer ${key}` },
-    });
-    const a = await r.json();
-    if (!r.ok || a.charges_enabled !== true) return signals; // still cannot charge - leave the step open
+    const status = await readStripeAccount(acct, key);
+    if (status.outcome !== "ready") return signals; // not ready, or we could not ask - leave the step open
     const nowIso = new Date().toISOString();
     await sb(`clients?id=eq.${clientId}`, {
       method: "PATCH", headers: { Prefer: "return=minimal" },

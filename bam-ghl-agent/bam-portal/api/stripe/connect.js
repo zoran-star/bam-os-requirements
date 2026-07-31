@@ -30,6 +30,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 //   SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY
 
 import crypto from "node:crypto";
+import { readStripeAccount, connectReturnMessage } from "./_requirements.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -89,20 +90,14 @@ function verifyState(state) {
 // charges_enabled is Stripe's own answer to "will a charge on this account
 // succeed". details_submitted alone is not enough (an account can submit and
 // still be blocked), so we gate the onboarding tick on charges_enabled.
-// On any error we return false: better to leave the step open than to tick it
-// for an academy that cannot get paid.
-async function canCharge(acctId, platformSecret) {
-  try {
-    const r = await fetch(`https://api.stripe.com/v1/accounts/${encodeURIComponent(acctId)}`, {
-      headers: { Authorization: `Bearer ${platformSecret}` },
-    });
-    const a = await r.json();
-    if (!r.ok) return false;
-    return a.charges_enabled === true;
-  } catch (_) {
-    return false;
-  }
-}
+//
+// This used to be a local helper that returned a bare boolean and swallowed
+// every failure into `false`, which meant a network blip, an expired platform
+// key and a genuinely incomplete account all wrote the same row and produced
+// the same message. readStripeAccount() (api/stripe/_requirements.js) answers
+// with three outcomes and keeps the reason. Only "ready" ticks the step, so
+// what gets STORED is unchanged; what the owner is told is not.
+// ─────────────────────────────────────────────────────────
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -160,9 +155,23 @@ async function resolveUser(req) {
 
 // The browser hits the callback as a top-level navigation from Stripe — no
 // Bearer header. Send it back to the Members tab with a status flag.
+//
+// THREE flags, not two. `connected` and `error` were the whole vocabulary, so
+// "you are connected, Stripe just has not switched payments on yet" had to
+// borrow `error` and the portal announced "Stripe connection failed" over a
+// connection that had in fact succeeded and been stored. `pending` is that
+// third case: nothing failed, there is simply something left to do inside
+// Stripe (or we could not reach Stripe to find out). _stripeConnectReturnCheck
+// in public/client-portal.html reads it; anything it does not recognise still
+// falls through to the failure wording, so the flag cannot fail open.
 function redirectBack(res, status, msg) {
   const params = new URLSearchParams({ stripe_connect: status });
-  if (msg) params.set("msg", String(msg).slice(0, 160));
+  // 300, raised from 160. The cap exists so a stray error string cannot bloat
+  // the URL; at 160 it also chopped the useful message - the list of what
+  // Stripe is waiting on did not fit, so the owner got the generic sentence
+  // instead. connectReturnMessage() builds to 280 and adds items only while
+  // the whole sentence still fits, so nothing here is ever truncated mid-word.
+  if (msg) params.set("msg", String(msg).slice(0, 300));
   res.setHeader("Location", `/client-portal.html?${params.toString()}#members`);
   return res.status(302).end();
 }
@@ -257,8 +266,8 @@ async function handleCallback(req, res) {
   if (!stripeSecret) return redirectBack(res, "error", "STRIPE_CONNECT_SECRET_KEY (or STRIPE_SECRET_KEY) not configured");
 
   // Exchange code for the connected-account id (`stripe_user_id` = acct_...).
-  // (canCharge is defined below - it asks Stripe whether this account can really
-  // take a live payment before we call the connection "done".)
+  // (readStripeAccount, imported above, asks Stripe whether this account can
+  // really take a live payment before we call the connection "done".)
   // For Standard accounts we don't store the returned `access_token` — we use
   // the platform key + `Stripe-Account: acct_...` header for all later writes.
   let tok;
@@ -289,7 +298,8 @@ async function handleCallback(req, res) {
   // account" onboarding step, so we only stamp it once Stripe says the account
   // can actually charge. Otherwise we store the account and leave them on
   // "onboarding" - the step stays open until they finish in Stripe.
-  const chargeable = await canCharge(acctId, stripeSecret);
+  const status = await readStripeAccount(acctId, stripeSecret);
+  const chargeable = status.outcome === "ready";
 
   try {
     await sb(`clients?id=eq.${encodeURIComponent(payload.client_id)}`, {
@@ -306,8 +316,13 @@ async function handleCallback(req, res) {
     return redirectBack(res, "error", `db write: ${e.message}`);
   }
 
+  // Not chargeable is NOT a failed connection: the account is stored, the
+  // handshake worked, and the Members tab now shows what Stripe is waiting on.
+  // Two sub-cases and they must stay apart - "Stripe says there is an item
+  // outstanding" and "we could not ask Stripe" are different facts about the
+  // world, and connectReturnMessage() words them differently.
   if (!chargeable) {
-    return redirectBack(res, "error", "Stripe connected, but it cannot accept payments yet. Finish the remaining steps in Stripe, then reconnect.");
+    return redirectBack(res, "pending", connectReturnMessage(status));
   }
   return redirectBack(res, "connected");
 }
