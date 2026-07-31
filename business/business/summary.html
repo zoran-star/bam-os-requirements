@@ -485,12 +485,21 @@ footer {
 .tl-note strong { color:var(--paper); }
 
 
-/* All-in-one chip grid */
-.aio-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }
-.aio-card { background:var(--ink-2); border:1px solid var(--line-dark); border-radius:6px; padding:14px 14px 12px; }
-.aio-lbl { font-family:var(--mono); font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:9px; }
-.aio-chips { display:flex; flex-wrap:wrap; gap:5px; }
+
+
+/* All-in-one chip grid (hover/tap to reveal) */
+.aio-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+.aio-card { background:var(--ink-2); border:1px solid var(--line-dark); border-radius:6px; padding:13px 14px; cursor:pointer; transition:border-color .2s; }
+.aio-card:hover { border-color:var(--gold-3); }
+.aio-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.aio-lbl { font-family:var(--mono); font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); }
+.aio-n { font-family:var(--mono); font-size:9px; color:rgba(245,241,232,0.35); }
+.aio-agent { font-family:var(--mono); font-size:8.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--gold-hi); border:1px solid var(--gold-3); border-radius:999px; padding:2px 7px; white-space:nowrap; }
+.aio-chips { display:flex; flex-wrap:wrap; gap:5px; max-height:0; overflow:hidden; opacity:0; margin-top:0; transition:max-height .28s ease, opacity .22s ease, margin-top .22s ease; }
+.aio-card:hover .aio-chips, .aio-card.open .aio-chips { max-height:220px; opacity:1; margin-top:10px; }
 .aio-chip { font-size:11px; color:rgba(245,241,232,0.75); border:1px solid var(--line-dark-2); border-radius:999px; padding:3px 9px; white-space:nowrap; }
+.aio-flow { margin-top:14px; border:1px solid rgba(232,197,71,0.25); background:rgba(232,197,71,0.04); border-radius:6px; padding:14px 16px; font-size:13px; color:rgba(245,241,232,0.7); line-height:1.65; }
+.aio-flow-lbl { display:block; font-family:var(--mono); font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:6px; }
 
 /* Mobile prototype nudge */
 .proto-mobile-nudge { display: none; background: var(--ink-2); border: 1px solid var(--line-dark); border-radius: 4px; padding: 20px 24px; margin-top: 16px; text-align: center; }
@@ -895,19 +904,22 @@ footer {
   </div>
 
 
+
+
   <div class="section-kicker" style="margin-top:40px">Everything the all-in-one covers</div>
-  <p style="margin-bottom:16px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">Every task below is something an operator does by hand today, forgets about, or pays someone else to manage. One system handles all of it.</p>
+  <p style="margin-bottom:14px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">Nine areas, one system. Hover or tap an area to see what it handles.</p>
   <div class="aio-grid">
-<div class="aio-card"><div class="aio-lbl">Scheduling</div><div class="aio-chips"><span class="aio-chip">Sessions & classes</span><span class="aio-chip">Coach staffing</span><span class="aio-chip">Attendance</span><span class="aio-chip">Capacity & waitlists</span><span class="aio-chip">Makeup credits</span><span class="aio-chip">Session notes</span></div></div>
-<div class="aio-card"><div class="aio-lbl">Members</div><div class="aio-chips"><span class="aio-chip">360&deg; member profiles</span><span class="aio-chip">Health scores</span><span class="aio-chip">At-risk flags</span><span class="aio-chip">Pauses & resumes</span><span class="aio-chip">Streaks & milestones</span></div></div>
-<div class="aio-card"><div class="aio-lbl">Sales & Leads</div><div class="aio-chips"><span class="aio-chip">Lead capture & pipeline</span><span class="aio-chip">AI sales agents</span><span class="aio-chip">Trial booking</span><span class="aio-chip">Post-trial follow-up</span><span class="aio-chip">Cold-lead reignition</span></div></div>
-<div class="aio-card"><div class="aio-lbl">Billing & Payments</div><div class="aio-chips"><span class="aio-chip">Auto-billing</span><span class="aio-chip">Failed-payment recovery</span><span class="aio-chip">Credits & extensions</span><span class="aio-chip">Refunds & discounts</span></div></div>
-<div class="aio-card"><div class="aio-lbl">Marketing & Ads</div><div class="aio-chips"><span class="aio-chip">Meta ads management</span><span class="aio-chip">Cost-per-lead tracking</span><span class="aio-chip">Budget pacing</span><span class="aio-chip">Underperformance alerts</span></div></div>
-<div class="aio-card"><div class="aio-lbl">Content</div><div class="aio-chips"><span class="aio-chip">Content planning</span><span class="aio-chip">Production pipeline</span><span class="aio-chip">Performance tracking</span></div></div>
-<div class="aio-card"><div class="aio-lbl">Comms</div><div class="aio-chips"><span class="aio-chip">Two-way inbox</span><span class="aio-chip">Mass messaging</span><span class="aio-chip">Announcements</span><span class="aio-chip">Automated reminders</span></div></div>
-<div class="aio-card"><div class="aio-lbl">Member App</div><div class="aio-chips"><span class="aio-chip">Self-serve booking</span><span class="aio-chip">Payments & history</span><span class="aio-chip">Account management</span></div></div>
-<div class="aio-card"><div class="aio-lbl">Strategy & AI</div><div class="aio-chips"><span class="aio-chip">KPI dashboard</span><span class="aio-chip">Member lifetime value</span><span class="aio-chip">AI insights & forecasts</span><span class="aio-chip">Strategic recommendations</span></div></div>
+    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Scheduling</span><span class="aio-n">6</span></div><div class="aio-chips"><span class="aio-chip">Sessions & classes</span><span class="aio-chip">Coach staffing</span><span class="aio-chip">Attendance</span><span class="aio-chip">Capacity & waitlists</span><span class="aio-chip">Makeup credits</span><span class="aio-chip">Session notes</span></div></div>
+    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Members</span><span class="aio-agent">agent next</span></div><div class="aio-chips"><span class="aio-chip">360&deg; member profiles</span><span class="aio-chip">Health scores</span><span class="aio-chip">At-risk flags</span><span class="aio-chip">Pauses & resumes</span><span class="aio-chip">Streaks & milestones</span></div></div>
+    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Sales & Leads</span><span class="aio-agent">Hawkeye &middot; in beta</span></div><div class="aio-chips"><span class="aio-chip">Lead capture & pipeline</span><span class="aio-chip">AI sales agents</span><span class="aio-chip">Trial booking</span><span class="aio-chip">Post-trial follow-up</span><span class="aio-chip">Cold-lead reignition</span></div></div>
+    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Billing & Payments</span><span class="aio-n">4</span></div><div class="aio-chips"><span class="aio-chip">Auto-billing</span><span class="aio-chip">Failed-payment recovery</span><span class="aio-chip">Credits & extensions</span><span class="aio-chip">Refunds & discounts</span></div></div>
+    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Marketing & Ads</span><span class="aio-agent">agent next</span></div><div class="aio-chips"><span class="aio-chip">Meta ads management</span><span class="aio-chip">Cost-per-lead tracking</span><span class="aio-chip">Budget pacing</span><span class="aio-chip">Underperformance alerts</span></div></div>
+    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Content</span><span class="aio-n">3</span></div><div class="aio-chips"><span class="aio-chip">Content planning</span><span class="aio-chip">Production pipeline</span><span class="aio-chip">Performance tracking</span></div></div>
+    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Comms</span><span class="aio-n">4</span></div><div class="aio-chips"><span class="aio-chip">Two-way inbox</span><span class="aio-chip">Mass messaging</span><span class="aio-chip">Announcements</span><span class="aio-chip">Automated reminders</span></div></div>
+    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Member App</span><span class="aio-n">3</span></div><div class="aio-chips"><span class="aio-chip">Self-serve booking</span><span class="aio-chip">Payments & history</span><span class="aio-chip">Account management</span></div></div>
+    <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Strategy & AI</span><span class="aio-n">4</span></div><div class="aio-chips"><span class="aio-chip">KPI dashboard</span><span class="aio-chip">Member lifetime value</span><span class="aio-chip">AI insights & forecasts</span><span class="aio-chip">Strategic recommendations</span></div></div>
   </div>
+  <div class="aio-flow"><span class="aio-flow-lbl">And they work together</span>Every area shares one brain. The agents hand work to each other: Hawkeye closes a trial &rarr; billing takes the payment &rarr; the schedule fills the spot &rarr; the member app checks the athlete in &rarr; the owner approves instead of operating. That handoff is the product.</div>
 
   <div class="section-kicker" style="margin-top:32px">See it in motion</div>
   <p style="margin-bottom:14px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">The interactive prototype below shows the destination. The real product is in beta testing: our own academies run their sales, onboarding, and client operations on it every day. Live demo on request.</p>
