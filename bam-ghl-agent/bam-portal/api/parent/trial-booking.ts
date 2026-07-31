@@ -8,6 +8,7 @@ import {
 import { eq, rpc, sb } from "./_supabase.js";
 import type { ParentApiRequest, ParentApiResponse } from "./_types.js";
 import { bounceCancelledTrialToRebook } from "../agent/_rebook.js";
+import { notifyTrialBooked } from "../_notify-trial-booked.js";
 
 type TrialBookingRequest = {
   academy_id: string;
@@ -63,6 +64,8 @@ async function handler(req: ParentApiRequest, res: ParentApiResponse) {
       p_student_id: student.id,
     });
 
+    await notifyTrialBooked({ clientId: request.academy_id, trialBookingId, kind: "booked" });
+
     return res.status(200).json({
       academy_id: request.academy_id,
       slot_id: request.slot_id,
@@ -101,6 +104,8 @@ async function cancelParentTrialBooking(context: ParentReadContext, trialBooking
       trialBookingId: booking.id,
       source: "parent-app-cancel",
     });
+    // Family-initiated cancel: the academy hears about it.
+    await notifyTrialBooked({ clientId: booking.tenant_id, trialBookingId: booking.id, kind: "cancelled" });
   }
 
   return {

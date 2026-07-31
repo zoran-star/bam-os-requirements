@@ -24,6 +24,7 @@ import { upsertPortalContact, writePortalFieldValues, contactProvider, resolveOr
 import { recordKpiEvent } from "../_kpi.js";
 import { cancelReignitions } from "../agent/_reignite.js";
 import { chooseSlotToBook, loadClassesFor, parentFacingClassName } from "../agent/_class-slots.js";
+import { notifyTrialBooked } from "../_notify-trial-booked.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -616,6 +617,7 @@ async function handler(req, res) {
           });
           const trialBookingId = typeof rpcRes === "string" ? rpcRes : (rpcRes && rpcRes.trial_booking_id) || null;
           if (!trialBookingId) throw new Error("trial booking failed");
+          await notifyTrialBooked({ clientId: client.id, trialBookingId, kind: "booked" });
           appointmentStatus = "booked";
           fields.trial_booking_id = trialBookingId;
           if (className) fields.class_name = className;

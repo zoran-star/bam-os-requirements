@@ -96,7 +96,10 @@ if (window.__MOCK__) (() => {
         files: [], client_action_request: null, user_guide: null, messages: [], submitted_at: iso(12), updated_at: iso(9) },
     ],
     offers: [
-      { id: 'of-1', client_id: CID, title: 'Youth Academy U12', sort_order: 1, status: 'live', created_at: iso(50) },
+      // The preset stamp apply-preset writes. The Team card reads it to decide
+      // which preset-owned notification pills this academy should see.
+      { id: 'of-1', client_id: CID, title: 'Youth Academy U12', sort_order: 1, status: 'live', created_at: iso(50),
+        data: { sales: { preset_key: 'free_trial', preset_version: 1 } } },
       { id: 'of-2', client_id: CID, title: 'Elite Training U16', sort_order: 2, status: 'live', created_at: iso(50) },
       { id: 'of-3', client_id: CID, title: 'Summer Camps', sort_order: 3, status: 'live', created_at: iso(30) },
     ],
@@ -472,6 +475,14 @@ if (window.__MOCK__) (() => {
     let act = '';
     try { act = JSON.parse((init && init.body) || '{}').action || ''; } catch (_) {}
     // ── Hawkeye (agent approval queues; action rides in the POST body) ──
+    // The sales-preset manifest. The Team card's notification pills render the
+    // preset's own events from this, so without it the styling loop shows only
+    // the tier pills and a preset-owned pill can never be eyeballed offline.
+    if (p === '/api/offers/apply-preset' && q.get('action') === 'list') {
+      return { ok: true, presets: [{ key: 'free_trial', label: 'Free Trial', contents: { key: 'free_trial', notifications: [
+        { key: 'free_trial_booked', label: 'Free trial booked', hint: 'A family books, cancels or moves a free trial' },
+      ] } }] };
+    }
     if (p === '/api/agent-config') return act === 'get-mode' ? { mode: 'approve' } : { ok: true };
     if (p === '/api/agent-followups') return act === 'list' ? { followups: HAWK_FU } : { ok: true };
     if (p === '/api/agent-approvals') {
@@ -28034,7 +28045,6 @@ async function _bbRenderStaffCard(panel, meta) {
 // ── Owner/staff SMS notification prefs (V1.5/V2) — which teammates get texted
 // (from the academy's GHL number) for each event. Stored on clients.notification_prefs. ──
 let _BB_NOTIF_PREFS = null;
-let _BB_NOTIF_LOADED = false;
 let _BB_NOTIF_STAFF = [];
 let _bbNotifSaveTimer = null;
 const _NOTIF_EVENTS = [
@@ -28047,21 +28057,69 @@ const _NOTIF_EVENTS = [
   { key:'action_item',           label:'New action item',                hint:'A new onboarding / action item is created', tier:'crm' },
   { key:'post_trial_escalation', label:'Post-trial follow-up due',       hint:'A trial needs a follow-up decision', tier:'crm' },
 ];
+// Events the academy's SALES PRESET brings, on top of the tier list above.
+// Loaded from the preset manifest (api/agent/presets.js -> apply-preset), never
+// hardcoded here: a pill must exist because a preset declares it and something
+// sends it. `calendar_booking` above is the cautionary tale - it rendered for
+// every CRM academy including ones whose bookings never went through GHL, so
+// BAM GTA had it switched ON for 25 bookings that texted nobody.
+let _BB_NOTIF_PRESET_EVENTS = [];
+
+// Prefs + the preset's own events, loaded once per session. Both renderers
+// (the panel and the per-person pills) go through here so neither can draw a
+// pill row from half-loaded state.
+//
+// The PROMISE is memoized, not a boolean. A boolean flipped before the awaits
+// lets a second concurrent caller sail past and render its pills off empty
+// state - every pill drawn OFF, which reads as "nobody is subscribed" and is
+// one click away from actually saving that.
+let _bbNotifLoadPromise = null;
+function _bbNotifEnsureLoaded() {
+  if (!_bbNotifLoadPromise) _bbNotifLoadPromise = _bbNotifLoad();
+  return _bbNotifLoadPromise;
+}
+async function _bbNotifLoad() {
+  try {
+    const { data } = await _sb.from('clients').select('notification_prefs').eq('id', CLIENT_ID).single();
+    _BB_NOTIF_PREFS = (data && data.notification_prefs) || {};
+  } catch (_) { _BB_NOTIF_PREFS = {}; }
+  try {
+    // Which preset this academy actually stamped onto an offer...
+    const { data: offers } = await _sb.from('offers').select('data').eq('client_id', CLIENT_ID).neq('status', 'archived');
+    const keys = (offers || []).map(o => o && o.data && o.data.sales && o.data.sales.preset_key).filter(Boolean);
+    if (!keys.length) return;
+    // ...and what that preset says it notifies about.
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/offers/apply-preset?action=list', { headers: { Authorization: 'Bearer ' + token } });
+    const j = await res.json().catch(() => ({}));
+    const seen = new Set();
+    const out = [];
+    for (const p of (j.presets || [])) {
+      if (!keys.includes(p.key)) continue;
+      for (const ev of ((p.contents && p.contents.notifications) || [])) {
+        if (!ev || !ev.key || seen.has(ev.key)) continue;
+        seen.add(ev.key);
+        out.push({ key: ev.key, label: ev.label, hint: ev.hint || '', tier: 'preset' });
+      }
+    }
+    _BB_NOTIF_PRESET_EVENTS = out;
+  } catch (_) { _BB_NOTIF_PRESET_EVENTS = []; }
+}
+
+// The pills this academy should see: its tier events plus its preset's events.
+function _bbNotifEvents() {
+  const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const tiered = _NOTIF_EVENTS.filter(e => e.tier === 'crm' || (e.tier === 'v2' && isV2));
+  return [..._BB_NOTIF_PRESET_EVENTS, ...tiered];
+}
 async function _bbRenderNotifPanel(teammates, canManage) {
   const host = document.getElementById('bb-notif-panel');
   if (!host) return;
   const crm = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) || (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
   if (!crm || !canManage) { host.innerHTML = ''; return; }
   _BB_NOTIF_STAFF = teammates || [];
-  if (!_BB_NOTIF_LOADED) {
-    try {
-      const { data } = await _sb.from('clients').select('notification_prefs').eq('id', CLIENT_ID).single();
-      _BB_NOTIF_PREFS = (data && data.notification_prefs) || {};
-    } catch (_) { _BB_NOTIF_PREFS = {}; }
-    _BB_NOTIF_LOADED = true;
-  }
-  const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
-  const events = _NOTIF_EVENTS.filter(e => e.tier === 'crm' || (e.tier === 'v2' && isV2));
+  await _bbNotifEnsureLoaded();
+  const events = _bbNotifEvents();
   const rows = events.map(ev => {
     const sel = Array.isArray(_BB_NOTIF_PREFS[ev.key]) ? _BB_NOTIF_PREFS[ev.key] : [];
     const chips = _BB_NOTIF_STAFF.map(s => {
@@ -28148,13 +28206,7 @@ async function _bbStaffRefreshList() {
   // Load the academy's prefs once so each card can render its own event pills.
   const _canManageAll = (myRow?.role === 'owner' || _IS_BAM_STAFF === true);
   _BB_NOTIF_STAFF = data || [];
-  if (_canManageAll && !_BB_NOTIF_LOADED) {
-    try {
-      const { data: cprefs } = await _sb.from('clients').select('notification_prefs').eq('id', CLIENT_ID).single();
-      _BB_NOTIF_PREFS = (cprefs && cprefs.notification_prefs) || {};
-    } catch (_) { _BB_NOTIF_PREFS = {}; }
-    _BB_NOTIF_LOADED = true;
-  }
+  if (_canManageAll) await _bbNotifEnsureLoaded();
   // Clients row = source of the owner's Primary contact (owner_name/email/phone).
   // phone is card-scoped (not in CLIENT_SELECT_COLS), so load it through the
   // shared loader BEFORE rendering - same one call the Business Basics card
@@ -28366,8 +28418,7 @@ async function _bbStaffRefreshList() {
 // academy's notification_prefs (loaded in _bbStaffRefreshList) and toggles this
 // person in/out of each event. Replaces the old event x person matrix panel.
 function _bbStaffNotifPillsHtml(personId, hasPhone) {
-  const isV2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
-  const events = _NOTIF_EVENTS.filter(e => e.tier === 'crm' || (e.tier === 'v2' && isV2));
+  const events = _bbNotifEvents();
   const prefs = _BB_NOTIF_PREFS || {};
   return events.map(ev => {
     const on = Array.isArray(prefs[ev.key]) && prefs[ev.key].includes(personId);
