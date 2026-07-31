@@ -61192,11 +61192,11 @@ function _fcStyle() {
     '.fcui-user-gear:hover{color:var(--text)}' +
     '.fcui-user-gear svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;display:block}' +
     /* header bar */
-    '#fcui-head{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:14px;padding:12px 24px;background:var(--bg);border-bottom:1px solid var(--border)}' +
+    '#fcui-head{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:12px;padding:12px 24px;background:var(--bg);border-bottom:1px solid var(--border)}' +
     '.fcui-greet{flex:none}' +
     '.fcui-greet b{display:block;font-family:var(--font-num);font-size:16.5px;font-weight:800;color:var(--text);line-height:1.15}' +
     '.fcui-greet span{display:block;font-size:11px;color:var(--text-mute)}' +
-    '.fcui-search{flex:0 1 250px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:8px 12px;min-width:140px}' +
+    '.fcui-search{flex:0 1 210px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:8px 12px;min-width:130px}' +
     '.fcui-search svg{width:14px;height:14px;stroke:var(--text-mute);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}' +
     '.fcui-search input{flex:1;min-width:0;background:none;border:none;outline:none;font:inherit;font-size:12.5px;color:var(--text)}' +
     '.fcui-search input::placeholder{color:var(--text-mute)}' +
@@ -61209,11 +61209,11 @@ function _fcStyle() {
     '.fcui-loc-pop.open{display:block}' +
     '.fcui-loc-opt{display:block;width:100%;text-align:left;background:none;border:none;font:inherit;font-size:12.5px;font-weight:600;color:var(--text-sub);padding:8px 10px;border-radius:var(--r-sm);cursor:pointer}' +
     '.fcui-loc-opt:hover{background:var(--gold-sheen);color:var(--text)}' +
-    '.fcui-chips{flex:1;display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none}' +
-    '.fcui-chips>span:first-child{margin-left:auto}' +
-    '.fcui-chips::-webkit-scrollbar{display:none}' +
-    '.fcui-chip{flex:none;display:inline-flex;align-items:baseline;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:6px 10px;font-size:11px;color:var(--text-mute);white-space:nowrap}' +
-    '.fcui-chip b{font-family:var(--font-num);font-size:12.5px;font-weight:800;color:var(--text)}' +
+    /* Chips never clip: the row is allowed to wrap (a chip drops fully
+       visible to a second line on tight widths) instead of overflowing. */
+    '.fcui-chips{flex:1 1 auto;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px 8px;overflow:visible;min-width:0}' +
+    '.fcui-chip{flex:none;display:inline-flex;align-items:baseline;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:5px 9px;font-size:10.5px;color:var(--text-mute);white-space:nowrap}' +
+    '.fcui-chip b{font-family:var(--font-num);font-size:12px;font-weight:800;color:var(--text)}' +
     '.fcui-chip .dot{align-self:center;width:6px;height:6px;border-radius:var(--r-full);flex:none}' +
     /* dashboard column */
     '#fcui-col{max-width:1500px;margin:0 auto;padding:22px 24px 90px;width:100%}' +
@@ -61320,6 +61320,12 @@ function _fcStyle() {
     '.fcui-msgp-chip{flex:none;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--r-full);padding:6px 12px;font:inherit;font-size:11.5px;font-weight:700;color:var(--text-sub);cursor:pointer;white-space:nowrap;transition:border-color var(--t-fast)}' +
     '.fcui-msgp-chip:hover{border-color:var(--gold)}' +
     '.fcui-msgp-chip.on{background:var(--gold);border-color:var(--gold);color:var(--on-gold)}' +
+    '.fcui-msgp-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 18px 10px;flex:none}' +
+    '.fcui-msgp-sortw{display:inline-flex;align-items:center;gap:7px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)}' +
+    '#fcui-msgp-sort{font:inherit;font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text);background:var(--surface);border:1px solid var(--border-med);border-radius:var(--r-sm);padding:6px 8px;outline:none;cursor:pointer}' +
+    '#fcui-msgp-sort:focus{border-color:var(--gold)}' +
+    '.fcui-msgp-markall{background:none;border:none;font:inherit;font-size:12px;font-weight:700;color:var(--gold);cursor:pointer;padding:6px 8px;border-radius:var(--r-sm)}' +
+    '.fcui-msgp-markall:hover{background:var(--gold-sheen)}' +
     '.fcui-msgp-list{flex:1;overflow-y:auto;padding:0 10px}' +
     '.fcui-msgp-row{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);padding:12px 8px;font:inherit;cursor:pointer}' +
     '.fcui-msgp-row:hover{background:var(--gold-sheen)}' +
@@ -61363,6 +61369,7 @@ function _fcOpen() {
     _fcBindKeys();
   }
   _fcShowHome();
+  _fcInitNavSync();
   _fcChipsLoad();
   _fcMsgPreviewLoad();
   _fcUserFill();
@@ -61445,11 +61452,34 @@ function _fcShowHome() {
 }
 function _fcSyncNav(name) {
   if (!_fcActive()) return;
-  const map = { home: 'home', calendar: 'calendar', v15cal: 'calendar', marketing: 'marketing', assets: 'assets', pipelines: 'pipelines', members: 'members' };
+  const map = { home: 'home', fcui: 'home', calendar: 'calendar', v15cal: 'calendar', marketing: 'marketing', assets: 'assets', pipelines: 'pipelines', members: 'members' };
   const key = map[name] || '';
   document.querySelectorAll('#fcui-side .fcui-nav-item').forEach(b => {
     b.classList.toggle('on', !!key && b.dataset.view === key);
   });
+}
+// The sidebar highlight must track the VISIBLE view whatever changed it -
+// sidebar clicks, deep links, or an overlay's own Back button (the calendar
+// focus closes via _mmCloseFocus, which never goes through switchView). A
+// MutationObserver on the views' class attributes derives the truth from
+// the DOM: an open calendar overlay wins, else the .view.active id.
+function _fcSyncFromDom() {
+  if (typeof _fcActive !== 'function' || !_fcActive()) return;
+  const cal = document.getElementById('view-calendar');
+  if (cal && cal.classList.contains('mm-open')) { _fcSyncNav('calendar'); return; }
+  const act = document.querySelector('.view.active');
+  _fcSyncNav(act ? act.id.replace('view-', '') : '');
+}
+function _fcInitNavSync() {
+  if (window._fcNavObs) return;
+  const obs = new MutationObserver(() => { try { _fcSyncFromDom(); } catch (_) {} });
+  window._fcNavObs = obs;
+  document.querySelectorAll('.view').forEach(v => obs.observe(v, { attributes: true, attributeFilter: ['class'] }));
+  // #view-calendar is NOT a .view - it is a focus overlay (modal-backdrop
+  // mm-focus-page) whose Back button toggles mm-open without touching any
+  // .view. Watch it explicitly or the Schedule highlight sticks after Back.
+  const cal = document.getElementById('view-calendar');
+  if (cal) obs.observe(cal, { attributes: true, attributeFilter: ['class'] });
 }
 function _fcUserFill() {
   const nm = ((document.getElementById('userName') || {}).textContent || '').trim();
@@ -61504,7 +61534,7 @@ async function _fcChipsLoad() {
   if (!host) return;
   const chip = (v, l, dot) => `<span class="fcui-chip">${dot ? `<span class="dot" style="background:${dot}"></span>` : ''}<b>${escapeHTML(String(v))}</b><span>${escapeHTML(l)}</span></span>`;
   const demo = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.chips;
-  if (demo) { host.innerHTML = demo.map(c => chip(c.v, c.l, c.dot)).join(''); host.scrollLeft = host.scrollWidth; return; }
+  if (demo) { host.innerHTML = demo.map(c => chip(c.v, c.l, c.dot)).join(''); return; }
   const parts = [];
   const acts = window._hmHawkTotal;
   if (typeof acts === 'number') parts.push(chip(acts, acts === 1 ? 'action waiting' : 'actions waiting', 'var(--green)'));
@@ -61517,7 +61547,6 @@ async function _fcChipsLoad() {
     }
   } catch (_) {}
   host.innerHTML = parts.join('');
-  host.scrollLeft = host.scrollWidth;   // rightmost chips stay visible when tight
   if (typeof acts !== 'number') setTimeout(_fcChipsLoad, 4000);   // hawkeye count lands async
 }
 // Sidebar messages preview: unread count + newest unread snippet (v15 inbox).
@@ -61541,6 +61570,28 @@ async function _fcMsgPreviewLoad() {
   }
 }
 function _fcMsgOpen() { _fcMsgPanelOpen(); }
+// Mark every conversation read: optimistic in-memory clear (badges + rows),
+// then the SAME read-marking call the inbox uses on thread open, one per
+// unread GHL conversation. The in-app BAM thread has no read endpoint, so
+// its dot clears in-memory only (matches how the panel loaded it).
+async function _fcMsgMarkAllRead(btn) {
+  const rows = window._fcMsgRows || [];
+  const unread = rows.filter(c => (c.unreadCount || 0) > 0);
+  if (!unread.length) return;
+  unread.forEach(c => { c.unreadCount = 0; });
+  if (window._fcConvs) window._fcConvs.forEach(c => { c.unreadCount = 0; });
+  _fcMsgPanelRender();
+  if (btn) { btn.textContent = 'All read'; setTimeout(() => { btn.textContent = 'Mark all read'; }, 1800); }
+  try {
+    const token = await _mreqAuthToken();
+    for (const c of unread.filter(x => !x._inApp).slice(0, 30)) {
+      fetch(`/api/ghl/inbox?action=mark-read&client_id=${encodeURIComponent(CLIENT_ID)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ conversation_id: c.id }),
+      }).catch(() => {});
+    }
+  } catch (_) {}
+}
 // ── Messages panel: right-side drawer (the one V2 detail idiom) over the
 // v15 inbox data + the in-app BAM thread. Channel chips filter; every row
 // carries a LEAD/MEMBER tag (when known) + its channel tag. Rows open the
@@ -61565,6 +61616,16 @@ async function _fcMsgPanelOpen() {
             <button type="button" class="fcui-msgp-x" onclick="_fcMsgPanelClose()" aria-label="Close"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           </div>
           <div class="fcui-msgp-chips" id="fcui-msgp-chips"></div>
+          <div class="fcui-msgp-tools">
+            <label class="fcui-msgp-sortw">Sort
+              <select id="fcui-msgp-sort" onchange="window._fcMsgSortV=this.value;_fcMsgPanelRender()">
+                <option value="recent">Most recent</option>
+                <option value="unread">Unread first</option>
+                <option value="name">Name A-Z</option>
+              </select>
+            </label>
+            <button type="button" class="fcui-msgp-markall" onclick="_fcMsgMarkAllRead(this)">Mark all read</button>
+          </div>
           <div class="fcui-msgp-list" id="fcui-msgp-list"><div class="req-empty" style="padding:18px"><span class="req-spin"></span> Loading...</div></div>
           <button type="button" class="fcui-msgp-foot" onclick="_fcMsgPanelClose();switchView('v15inbox')">Open full inbox &rsaquo;</button>
         </div>
@@ -61610,8 +61671,16 @@ function _fcMsgPanelRender() {
     if (f === 'In-App') return !!c._inApp;
     return _fcMsgChannel(c) === f;
   };
-  const shown = rows.filter(match).sort((a, b) =>
-    ((b.unreadCount > 0) - (a.unreadCount > 0)) || (new Date(b.lastMessageDate || 0) - new Date(a.lastMessageDate || 0)));
+  const sortV = window._fcMsgSortV || 'recent';
+  const sel = document.getElementById('fcui-msgp-sort');
+  if (sel && sel.value !== sortV) sel.value = sortV;
+  const nameOf = c => String(c.contactName || c.fullName || '').trim().toLowerCase();
+  const byDate = (a, b) => new Date(b.lastMessageDate || 0) - new Date(a.lastMessageDate || 0);
+  const shown = rows.filter(match).sort((a, b) => {
+    if (sortV === 'name') return nameOf(a).localeCompare(nameOf(b)) || byDate(a, b);
+    if (sortV === 'unread') return ((b.unreadCount > 0) - (a.unreadCount > 0)) || byDate(a, b);
+    return byDate(a, b);
+  });
   const unread = rows.filter(c => (c.unreadCount || 0) > 0).length;
   if (sub) sub.textContent = rows.length + (rows.length === 1 ? ' conversation' : ' conversations') + (unread ? ', ' + unread + ' unread' : '');
   const n = document.getElementById('fcui-msgs-n');
