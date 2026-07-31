@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-31 · 1671 and 1670 merged, 1669 rebasing",
+ "updated": "2026-07-31 · both chips blocked, and by real things",
  "recentUpdates": [
+  "Straight answer: no, neither of those two chips is running. I checked why, and both are genuinely blocked",
+  "The Stripe one would have collided with your receipts build, which is already in that file. Handed to that room instead of spawning a rival",
+  "The other is blocked by PR 1546, open since 21 July, untouched, and now in the way of its THIRD build. That one needs your call",
   "Merged 1671 and 1670. The Miami email risk is closed and Stripe now tells owners what it actually wants",
   "1669 is rebasing behind them, then it merges and the new safety check goes live across the whole API",
-  "Still yours: rotate the Stripe key, and send Lij his list",
-  "Both agents closed. Nothing running. Three pull requests waiting on you in order: 1671, 1670, 1669",
-  "The line that sums the night: a result that looks like success is not evidence of success unless you know what failure would have looked like",
-  "Then rotate the Stripe key and send Lij his list. Everything is written down and survives this chat"
+  "Still yours: rotate the Stripe key, and send Lij his list"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
