@@ -301,6 +301,9 @@ if (window.__MOCK__) (() => {
       draft_message: 'No problem at all! Let me find Jade another time - does Saturday morning or Tuesday evening work better?',
       reasoning: 'The booked slot fell through, so this goes back to the booking flow to pick a new time. The old booking gets released.' },
     { id: 'cfx-3', kind: 'post_trial', status: 'pending', contact_name: 'Leo Sanders', ghl_contact_id: 'lead-7', ghl_conversation_id: 'cv-cfx-3', athlete_name: 'Eli Sanders',
+      // trial_at matches today's 7pm mock slot (Eli is seeded into its roster
+      // below) so the mobile sales card + calendar show a live FORM chip offline.
+      trial_at: (() => { const d = new Date(); d.setHours(19, 0, 0, 0); return d.toISOString(); })(),
       summary: 'Trial was Sunday. How did it go?',
       reasoning: 'Eli\'s trial session finished. Fill in whether he showed and if he\'s a fit - that decides which follow-up sequence runs.' },
     { id: 'cfx-4', kind: 'confirm_lost', status: 'pending', contact_name: 'Dana Whitfield', ghl_contact_id: 'lead-17',
@@ -496,9 +499,14 @@ if (window.__MOCK__) (() => {
       const to = q.get('to') ? new Date(q.get('to')) : new Date(t0.getTime() + 42 * 864e5);
       const slots = [];
       for (let d = new Date(from); d < to; d.setDate(d.getDate() + 1)) {
+        const isToday = d.getFullYear() === t0.getFullYear() && d.getMonth() === t0.getMonth() && d.getDate() === t0.getDate();
         for (const c of CLASSES) {
           let hh = null, mm = 0;
-          if (c.days.includes(d.getDay())) { hh = c.h; mm = c.m; }
+          // The sales preset card renders TODAY's roster, so today is always the
+          // two evening sessions whatever the weekday (Fri/Sat/Sun included) -
+          // deterministic times keep the FORM-chip seed below matchable.
+          if (isToday) { hh = c.h; mm = c.m; }
+          else if (c.days.includes(d.getDay())) { hh = c.h; mm = c.m; }
           else if (d.getDay() === 6) { hh = c.sat[0]; mm = c.sat[1]; }
           if (hh == null) continue;
           const st = new Date(d); st.setHours(hh, mm, 0, 0);
@@ -512,15 +520,43 @@ if (window.__MOCK__) (() => {
             ghl_contact_id: 'lead-' + ((s + k) % 7 + 1), name: names[(s + k) % names.length],
             athlete_name: names[(s + k) % names.length], parent_name: 'Parent ' + (((s + k) % 7) + 1), status: 'BOOKED',
           });
+          // Seed today's rosters so every sales-card chip is exercisable offline:
+          // Eli (lead-7) SHOWED with a pending post_trial card above -> FORM chip;
+          // Jade SHOWED with her form already done -> SHOWED chip. Unshifted so
+          // they win the card's per-contact dedupe over the hashed BOOKED rows.
+          if (isToday && hh === 19) {
+            att.unshift({ ghl_contact_id: 'lead-7', name: 'Eli Sanders', athlete_name: 'Eli Sanders', parent_name: 'Leo Sanders', status: 'SHOWED' });
+          }
+          if (isToday && hh === 20) {
+            att.unshift({ ghl_contact_id: 'lead-8', name: 'Jade Roberts', athlete_name: 'Jade Roberts', parent_name: 'Tia Roberts', status: 'SHOWED' });
+          }
           slots.push({
             id: 'slot-' + st.getTime() + '-' + c.name.slice(6, 7), name: c.name,
             start: st.toISOString(), end: new Date(st.getTime() + 36e5).toISOString(),
-            capacity: 12, spots_taken: n, spots_left: 12 - n,
+            capacity: 12, spots_taken: att.length, spots_left: 12 - att.length,
             program: c.name, venue: 'Linbrook', attendees: att,
           });
         }
       }
       return { provider: 'portal', timezone: 'America/New_York', slots };
+    }
+    // Sales preset card KPIs (mobile Sales section): 6 of 15 qualified closed,
+    // 4 sales this week, plus the per-row payload the qualified-trials focus
+    // overlay renders. Contact ids reuse OPPS leads so row taps open contacts.
+    if (p === '/api/sales-kpis') {
+      const closed_rows = [
+        ['Zaire Thompson', 'Rochelle Thompson', 'lead-4', 19, 16], ['Luca Bianchi', 'Sofia Bianchi', 'lead-5', 17, 11],
+        ['Amari Grant', 'Denise Grant', 'lead-6', 13, 12], ['Ravi Patel', 'Meera Patel', 'lead-1', 10, 5],
+        ['Kaya Osei', 'Femi Osei', 'lead-3', 9, 3], ['Jordan Wu', 'Mei Wu', 'lead-2', 6, 1],
+      ].map(r => ({ athlete: r[0], parent: r[1], contact_id: r[2], trial_at: iso(r[3]), converted_at: iso(r[4]) }));
+      const open_rows = [
+        ['Eli Sanders', 'Leo Sanders', 'lead-7', 0], ['Nico Reyes', 'Carmen Reyes', 'lead-9', 4],
+        ['Tyler Moss', 'Renee Moss', 'lead-10', 7], ['Sana Malik', 'Iram Malik', 'lead-11', 11],
+        ['Deja Adams', 'Sasha Adams', 'lead-13', 14], ['Arjun Patel', 'Kira Patel', 'lead-14', 18],
+        ['Jade Roberts', 'Tia Roberts', 'lead-8', 21], ['Mia Lin', 'Grace Lin', 'lead-15', 24],
+        ['Chidi Okafor', 'Tom Okafor', 'lead-16', 28],
+      ].map(r => ({ athlete: r[0], parent: r[1], contact_id: r[2], trial_at: iso(r[3]) }));
+      return { qualified: 15, closed: 6, sales_week: 4, closed_rows, open_rows };
     }
     if (p === '/api/agent-config') return act === 'get-mode' ? { mode: 'approve' } : { ok: true };
     if (p === '/api/agent-followups') return act === 'list' ? { followups: HAWK_FU } : { ok: true };
@@ -61631,6 +61667,254 @@ function _ccMountHome(host) {
   }
 }
 
+// ═══ Mobile Sales: the free-trial preset card (Zoran's 2026-07-31 mockup) ═══
+// Rides on top of #cc-sales-mount as the FIRST card of the MOBILE Sales view,
+// only when the academy runs the free-trial sales preset (an offer stamped
+// with data.sales.preset_key === 'free_trial'). Three stats over today's trial
+// roster; the middle stat opens the qualified-trials focus overlay. Every
+// entry point is gated behind _spcOn(), so desktop Sales renders untouched.
+let _SPC = { rows: [], trialsN: null, tz: 'America/Toronto', forms: new Set(), kpi: null };
+let _SPC_PRESET_P = null;
+
+function _spcOn() { return window.matchMedia('(max-width: 768px)').matches; }
+
+// Does any live offer carry the free-trial preset stamp? Same offers read the
+// Team notification pills do (_bbNotifLoad: offers.data.sales.preset_key),
+// memoized so Sales can re-mount without re-querying.
+function _spcHasPreset() {
+  if (!_SPC_PRESET_P) _SPC_PRESET_P = (async () => {
+    try {
+      const { data } = await _sb.from('offers').select('data').eq('client_id', CLIENT_ID).neq('status', 'archived');
+      return (data || []).some(o => o && o.data && o.data.sales && o.data.sales.preset_key === 'free_trial');
+    } catch (_) { return false; }
+  })();
+  return _SPC_PRESET_P;
+}
+
+function _spcStyle() {
+  if (document.getElementById('spc-style')) return;
+  const st = document.createElement('style'); st.id = 'spc-style';
+  st.textContent = '@media(max-width:768px){'
+    + '.spc-card{font-family:var(--font-ui);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-card);margin-bottom:14px}'
+    /* Stats row. The LEFT stat is the list's headline: left-aligned over the
+       times below, with a gold notch riding ON the separator (the row's
+       border-bottom is the card's only separator). */
+    + '.spc-kpis{display:grid;grid-template-columns:1.1fr 1.2fr 1fr;position:relative;border-bottom:1px solid var(--border)}'
+    + '.spc-kpi{padding:14px 10px 12px;text-align:center;position:relative;background:none;border:none;font:inherit;color:inherit}'
+    + '.spc-kpi.lead{text-align:left;padding-left:16px}'
+    + '.spc-kpi.lead::after{content:"";position:absolute;left:16px;bottom:-1px;width:38px;height:3px;border-radius:2px 2px 0 0;background:var(--gold)}'
+    + '.spc-kpi+.spc-kpi{border-left:1px solid var(--border)}'
+    + '.spc-kpi .v{display:block;font-family:var(--font-num);font-size:23px;font-weight:800;line-height:1.1;color:var(--text)}'
+    + '.spc-kpi .v small{font-size:13px;font-weight:700;color:var(--text-mute)}'
+    + '.spc-kpi .l{display:block;margin-top:3px;font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}'
+    + '.spc-kpi.tap{cursor:pointer}'
+    + '.spc-kpi.tap .v{color:var(--gold)}'
+    + '.spc-kpi .meter{display:block;width:44px;height:3px;border-radius:2px;background:var(--border-med);margin:6px auto 0;overflow:hidden}'
+    + '.spc-kpi .meter i{display:block;height:100%;background:var(--gold)}'
+    + '.spc-kpi .chev{position:absolute;top:8px;right:8px;font-size:11px;color:var(--text-mute)}'
+    /* Trials: single-line rows, NO separators between them - the stat above is
+       the header, whitespace does the dividing. Times align under the count. */
+    + '.spc-tlist{padding:6px 0 10px}'
+    + '.spc-trow{display:flex;align-items:center;gap:11px;width:100%;padding:9px 16px;background:none;border:none;font:inherit;color:inherit;text-align:left;cursor:pointer}'
+    + '.spc-trow .tm{flex:none;width:62px;font-family:var(--font-num);font-size:13px;font-weight:800;white-space:nowrap;color:var(--text-sub)}'
+    + '.spc-trow .n{flex:1;min-width:0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.spc-trow .st{flex:none;font-size:10px;font-weight:800;letter-spacing:.05em;border-radius:var(--r-full);padding:4px 10px}'
+    + '.spc-trow .st.booked{background:var(--gold-sheen);border:1px solid var(--accent-border);color:var(--gold)}'
+    + '.spc-trow .st.showed{background:transparent;border:1px solid var(--green);color:var(--green)}'
+    + '.spc-trow .st.form{background:var(--gold);border:1px solid var(--gold);color:var(--on-gold)}'
+    + '.spc-note{padding:14px 16px;font-size:12.5px;color:var(--text-mute)}'
+    /* Focus overlay: qualified trials. Docked on <body>, NOT inside .content -
+       focus modes transform .content, which would hijack position:fixed. The
+       contacts modal is raised to 10060 by _calOpenContact, so stay under it. */
+    + '#spc-focus{position:fixed;inset:0;z-index:10055;background:var(--bg);font-family:var(--font-ui);display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}'
+    + '#spc-focus.on{display:block}'
+    + '.spc-fhd{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--border);padding:12px 16px 10px;z-index:5}'
+    + '.spc-fhd .back{display:inline-flex;align-items:center;padding:7px 13px 7px 10px;border-radius:var(--r-sm);border:1px solid var(--border-med);background:var(--surface);font:inherit;color:inherit;font-size:13px;font-weight:700;margin-bottom:10px;cursor:pointer}'
+    + '.spc-fhd .t{font-size:19px;font-weight:800;letter-spacing:-.01em;color:var(--text)}'
+    + '.spc-fhd .sub{font-size:12px;color:var(--text-mute);font-weight:600;margin-top:2px}'
+    + '.spc-fbar{height:6px;border-radius:3px;background:var(--border-med);margin:10px 0 2px;overflow:hidden}'
+    + '.spc-fbar i{display:block;height:100%;background:var(--gold);border-radius:3px}'
+    + '.spc-fsec{padding:16px 16px 7px;font-size:10px;font-weight:800;letter-spacing:.11em;color:var(--text-mute)}'
+    + '.spc-qrow{display:flex;align-items:center;gap:11px;width:100%;padding:11px 16px;border:none;border-bottom:1px solid var(--border);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}'
+    + '.spc-qrow .av{flex:none;width:36px;height:36px;border-radius:var(--r-full);background:var(--surface-hov);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--text-sub)}'
+    + '.spc-qrow.closed .av{background:var(--gold);color:var(--on-gold)}'
+    + '.spc-qrow .b{flex:1;min-width:0}'
+    + '.spc-qrow .n{display:block;font-size:14px;font-weight:700;color:var(--text)}'
+    + '.spc-qrow .s{display:block;font-size:11.5px;color:var(--text-mute);margin-top:1px;font-weight:600}'
+    + '.spc-qrow .tag{flex:none;font-size:10px;font-weight:800;letter-spacing:.05em;border-radius:var(--r-full);padding:3px 9px}'
+    + '.spc-qrow .tag.won{background:var(--gold);color:var(--on-gold)}'
+    + '.spc-qrow .tag.open{border:1px solid var(--border-med);color:var(--text-mute)}'
+    + '.spc-qrow .chev{flex:none;color:var(--text-mute);font-size:14px}'
+    + '}';
+  document.head.appendChild(st);
+}
+
+async function _spcMount() {
+  if (!_spcOn()) return;                       // MOBILE ONLY - desktop untouched
+  if (!(await _spcHasPreset())) return;        // no free-trial preset, no card
+  const mount = document.getElementById('cc-sales-mount');
+  if (!mount || document.getElementById('spc-card')) return;
+  _spcStyle();
+  const card = document.createElement('div');
+  card.className = 'spc-card'; card.id = 'spc-card';
+  card.innerHTML = _spcKpisHTML()
+    + '<div class="spc-tlist" id="spc-tlist"><div class="req-empty" style="padding:12px 16px"><span class="req-spin"></span> Loading trials…</div></div>';
+  mount.prepend(card);
+  _spcLoadTrials();
+  _spcLoadKpis();
+}
+
+function _spcKpisHTML() {
+  const k = _SPC.kpi;
+  const trials = _SPC.trialsN == null ? '-' : String(_SPC.trialsN);
+  const mid = k
+    ? '<button type="button" class="spc-kpi tap" onclick="_spcOpenFocus()">'
+      + '<span class="chev">&rsaquo;</span>'
+      + '<span class="v">' + k.closed + '<small> of ' + k.qualified + '</small></span>'
+      + '<span class="l">Qualified closed</span>'
+      + '<span class="meter"><i style="width:' + (k.qualified ? Math.round(k.closed / k.qualified * 100) : 0) + '%"></i></span></button>'
+    : '<div class="spc-kpi"><span class="v">-</span><span class="l">Qualified closed</span></div>';
+  return '<div class="spc-kpis" id="spc-kpis">'
+    + '<div class="spc-kpi lead"><span class="v">' + trials + '</span><span class="l">Trials today</span></div>'
+    + mid
+    + '<div class="spc-kpi"><span class="v">' + (k ? k.sales_week : '-') + '</span><span class="l">Sales this week</span></div>'
+    + '</div>';
+}
+function _spcPaintKpis() {
+  const el = document.getElementById('spc-kpis');
+  if (el) el.outerHTML = _spcKpisHTML();
+}
+
+function _spcTime(startIso) {
+  try { return new Date(startIso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: _SPC.tz }); }
+  catch (_) { try { return new Date(startIso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); } catch (_) { return ''; } }
+}
+
+// Today's trials: /api/website/calendars for [today 00:00, tomorrow), flattened
+// to one row per attendee (trial booking). FORM chips come from the confirm
+// agent's pending post_trial cards, matched contact-id + slot-start exactly like
+// the mobile calendar's _magLoadForms. Forms are additive: if that call fails
+// there are just no FORM chips, never a broken card.
+async function _spcLoadTrials() {
+  try {
+    const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    const token = await _mreqAuthToken();
+    const url = '/api/website/calendars?client_id=' + encodeURIComponent(CLIENT_ID)
+      + '&from=' + encodeURIComponent(d0.toISOString())
+      + '&to=' + encodeURIComponent(new Date(d0.getTime() + 86400000).toISOString());
+    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (j.timezone) _SPC.tz = j.timezone;
+    _SPC.forms = new Set();
+    try {
+      const f = await _apxPost('/api/agent-confirm', 'list-ready', {});
+      for (const row of (f.ready || [])) {
+        if (row.kind !== 'post_trial' || row.status !== 'pending') continue;
+        if (!row.ghl_contact_id || !row.trial_at) continue;
+        _SPC.forms.add(String(row.ghl_contact_id) + '|' + new Date(row.trial_at).getTime());
+      }
+    } catch (_) { /* no FORM chips, still a working card */ }
+    const rows = [];
+    const seen = new Set();
+    for (const s of (j.slots || [])) {
+      const ms = new Date(s.start).getTime();
+      for (const a of (s.attendees || [])) {
+        const cid = a.ghl_contact_id ? String(a.ghl_contact_id) : '';
+        const form = !!(cid && _SPC.forms.has(cid + '|' + ms));
+        const status = String(a.status || 'BOOKED').toUpperCase();
+        if (!form && (status === 'CANCELLED' || status === 'NO_SHOW')) continue;
+        const key = (cid || String(a.name || '')) + '|' + ms;   // one row per booking
+        if (seen.has(key)) continue;
+        seen.add(key);
+        rows.push({ ms, start: s.start, cid, name: a.athlete_name || a.name || 'Trial', status, form });
+      }
+    }
+    rows.sort((a, b) => a.ms - b.ms);
+    _SPC.rows = rows;
+    _SPC.trialsN = rows.length;
+    _spcPaintKpis();
+    const host = document.getElementById('spc-tlist');
+    if (!host) return;
+    if (!rows.length) { host.innerHTML = '<div class="spc-note">No trials today</div>'; return; }
+    host.innerHTML = rows.map((t, i) => {
+      const chip = t.form ? '<span class="st form">FORM &rsaquo;</span>'
+        : (t.status === 'SHOWED' || t.status === 'CONVERTED') ? '<span class="st showed">SHOWED</span>'
+        : '<span class="st booked">BOOKED</span>';
+      return '<button type="button" class="spc-trow" onclick="_spcRowTap(' + i + ')">'
+        + '<span class="tm">' + escapeHTML(_spcTime(t.start)) + '</span>'
+        + '<span class="n">' + escapeHTML(t.name) + '</span>' + chip + '</button>';
+    }).join('');
+  } catch (e) {
+    _SPC.trialsN = null; _SPC.rows = [];
+    _spcPaintKpis();
+    const host = document.getElementById('spc-tlist');
+    if (host) host.innerHTML = '<div class="spc-note">Couldn\'t load today\'s trials: ' + escapeHTML(e.message || String(e)) + '</div>';
+  }
+}
+
+// FORM rows go to the real post-trial form: it lives inline on the Hawkeye
+// confirm card for that contact (submits via /api/ghl/post-trial), the same
+// route the mobile calendar's FORM DUE rows take (_magGoHawkeye). Everything
+// else opens the real contact card, same path as the calendar roster.
+function _spcRowTap(i) {
+  const t = _SPC.rows[i]; if (!t) return;
+  if (t.form) { try { _hk2Open('confirm', t.cid || undefined); } catch (_) {} return; }
+  if (t.cid) { try { _calOpenContact(t.cid, t.name); } catch (_) {} }
+}
+
+async function _spcLoadKpis() {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sales-kpis?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _SPC.kpi = {
+      closed: Number(j.closed) || 0, qualified: Number(j.qualified) || 0, sales_week: Number(j.sales_week) || 0,
+      closed_rows: Array.isArray(j.closed_rows) ? j.closed_rows : [], open_rows: Array.isArray(j.open_rows) ? j.open_rows : [],
+    };
+  } catch (_) { _SPC.kpi = null; }   // cells stay '-' and untappable, card still renders
+  _spcPaintKpis();
+}
+
+function _spcOpenFocus() {
+  const k = _SPC.kpi; if (!k) return;
+  let ov = document.getElementById('spc-focus');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'spc-focus'; document.body.appendChild(ov); }
+  const pct = k.qualified ? Math.round(k.closed / k.qualified * 100) : 0;
+  const openN = Math.max(0, k.qualified - k.closed);
+  const d = (v) => { try { return new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (_) { return ''; } };
+  const initials = (n) => String(n || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const row = (r, i, closed) => {
+    const nm = r.athlete || r.parent || 'Athlete';
+    const sub = closed
+      ? ['Trial ' + d(r.trial_at), r.converted_at ? 'joined ' + d(r.converted_at) : ''].filter(Boolean).join(' · ')
+      : 'Trial ' + d(r.trial_at);
+    return '<button type="button" class="spc-qrow' + (closed ? ' closed' : '') + '" onclick="_spcFocusTap(' + (closed ? 1 : 0) + ',' + i + ')">'
+      + '<span class="av">' + escapeHTML(initials(nm)) + '</span>'
+      + '<span class="b"><span class="n">' + escapeHTML(nm) + '</span><span class="s">' + escapeHTML(sub) + '</span></span>'
+      + '<span class="tag ' + (closed ? 'won">MEMBER' : 'open">OPEN') + '</span><span class="chev">&rsaquo;</span></button>';
+  };
+  ov.innerHTML =
+    '<div class="spc-fhd">'
+    + '<button type="button" class="back" onclick="_spcCloseFocus()">&lsaquo; Sales</button>'
+    + '<div class="t">Qualified trials</div>'
+    + '<div class="sub">Last 30 days &middot; showed up and marked a good fit</div>'
+    + '<div class="spc-fbar"><i style="width:' + pct + '%"></i></div>'
+    + '<div class="sub"><b style="color:var(--gold);font-family:var(--font-num)">' + k.closed + ' closed</b> &middot; ' + openN + ' still open</div>'
+    + '</div>'
+    + (k.closed_rows.length ? '<div class="spc-fsec">CLOSED &middot; ' + k.closed_rows.length + '</div>' + k.closed_rows.map((r, i) => row(r, i, true)).join('') : '')
+    + (k.open_rows.length ? '<div class="spc-fsec">STILL OPEN &middot; ' + k.open_rows.length + '</div>' + k.open_rows.map((r, i) => row(r, i, false)).join('') : '')
+    + (!k.closed_rows.length && !k.open_rows.length ? '<div class="spc-note">No qualified trials in the last 30 days</div>' : '');
+  ov.classList.add('on');
+}
+function _spcCloseFocus() { const ov = document.getElementById('spc-focus'); if (ov) ov.classList.remove('on'); }
+function _spcFocusTap(closed, i) {
+  const k = _SPC.kpi; if (!k) return;
+  const r = (closed ? k.closed_rows : k.open_rows)[i]; if (!r || !r.contact_id) return;
+  try { _calOpenContact(String(r.contact_id), r.athlete || r.parent || 'Contact'); } catch (_) {}
+}
+
 // SALES (skeleton): quick stats + jump-offs, per the Figma (pipeline cards,
 // hawkeye actions, quick stats). PLOP-IN SLOT - Zoran's new Sales section
 // replaces the contents of #cc-sales-mount.
@@ -61668,6 +61952,9 @@ function _ccMountSales(host) {
         <div class="cc-sal-feed" id="cc-sal-feed"></div>
       </div>
     </div>`;
+  // Mobile-only free-trial preset card rides on top of the mount (Zoran's
+  // 2026-07-31 mockup). No-ops on desktop and for academies without the preset.
+  try { _spcMount(); } catch (_) {}
   _ccLoadTrialsCount();
   _ccSalesLoad();
   if (!window._ccSalHawkT) window._ccSalHawkT = setInterval(_ccSalesHawk, 8000);
