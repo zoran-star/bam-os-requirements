@@ -732,8 +732,46 @@ if (window.__MOCK__) (() => {
       }
       return { ok: true, card: c || null };
     }
-    if (p === '/api/action-items') return { items: [], team: [], sm: null, mktg: null, ads: null, review_ready: false };
-    if (p === '/api/kpis-v15') return { ...DEFAULT_API };
+    if (p === '/api/action-items') return {
+      items: [
+        { id: 'ai-1', title: '2 content pieces pending review', due_date: new Date(NOW).toISOString().slice(0, 10), completed_at: null, created_at: iso(0, 6) },
+        { id: 'ai-2', title: '1 failed payment (Jake Rivera)', due_date: new Date(NOW - 86400e3).toISOString().slice(0, 10), completed_at: null, created_at: iso(1) },
+        { id: 'ai-3', title: '3 leads need follow-up', due_date: null, completed_at: null, created_at: iso(0, 9) },
+        { id: 'ai-4', title: '4pm Intermediate class: 3/12 spots filled', due_date: new Date(NOW).toISOString().slice(0, 10), completed_at: null, created_at: iso(0, 3) },
+      ],
+      team: [], sm: null, mktg: null, ads: null, review_ready: false,
+    };
+    // Home KPI endpoint: enough signal for the win card + scoreboard to demo
+    // rich (marketing today carries 2 trials booked -> "+2 trials booked today").
+    if (p === '/api/kpis-v15') {
+      const sec = q.get('section');
+      if (sec === 'marketing') return { ...DEFAULT_API, leads: 12, trials_booked: 2, joined: 6, cancelled: 1 };
+      if (sec === 'revenue') return { ...DEFAULT_API, net: 1240, mrr: 8200, stripe_ok: true };
+      if (sec === 'members') return { ...DEFAULT_API, roster: { live: 42 }, cancelled: { count: 1 }, payments: [] };
+      return { ...DEFAULT_API };
+    }
+    // V2 spine schedule for the FC Home "Today's Schedule" panel: 4 named
+    // classes with fills (13/15, 11/15, 8/12, 1/1). Rolls to tomorrow when
+    // the demo runs late in the evening so the list is not all dimmed-past.
+    if (p === '/api/ghl/calendars-v15') {
+      const act2 = q.get('action');
+      if (act2 === 'trials-today') return { trials: [], timezone: undefined };
+      if (act2 === 'slots-today') {
+        const base = new Date(NOW);
+        if (base.getHours() >= 17) base.setDate(base.getDate() + 1);
+        const at = (h, m2) => { const d = new Date(base); d.setHours(h, m2 || 0, 0, 0); return d.toISOString(); };
+        return {
+          timezone: undefined,
+          slots: [
+            { id: 'sl-1', name: 'Elite Training', start: at(9), capacity: 15, booked: 13 },
+            { id: 'sl-2', name: 'Group Training', start: at(11), capacity: 15, booked: 11 },
+            { id: 'sl-3', name: 'Beginner', start: at(16), capacity: 12, booked: 8 },
+            { id: 'sl-4', name: 'Individual Session', start: at(17), capacity: 1, booked: 1 },
+          ],
+        };
+      }
+      return { ...DEFAULT_API };
+    }
     // ── V2 ticket rail (support focus mode + the product-feedback intake) ──
     // create pushes into T so the new row shows up when the rail re-reads _sb.
     if (p === '/api/v2-tickets') {
@@ -758,6 +796,54 @@ if (window.__MOCK__) (() => {
     }
     return null;
   }
+  // ── FCUI Home pilot demo seed (?mock=1 + the fcui flag) ──────────────────
+  // Everything the FC Home reads when it wants the pilot to demo rich:
+  // header chips, hero copy, radials, milestones/streaks, activity events,
+  // weekly challenge, toasts. Fictional names only; no em dashes anywhere.
+  window.__MOCK_FCUI__ = {
+    chips: [
+      { v: '7', l: 'actions vs 5.2 avg', dot: 'var(--green)' },
+      { v: '47', l: 'AI actions' },
+      { v: '12d', l: 'streak', dot: 'var(--amber)' },
+      { v: '$8.2k', l: 'MRR', dot: 'var(--gold)' },
+      { v: '42', l: 'members', dot: 'var(--blue)' },
+    ],
+    bestThing: {
+      v: '+2 trials booked today',
+      c: 'Mia Thompson and Sofia Reyes both confirmed. Your Saturday pipeline is the strongest it has been in 3 weeks.',
+    },
+    priority: {
+      title: 'Follow up with Ava Martinez',
+      sub: 'She finished her trial yesterday and asked about membership options. Highest close probability in your pipeline.',
+      cta: 'Open conversation',
+      go: "_hk2Open('closing')",
+    },
+    radials: [
+      { key: 'fcnewmem', label: 'New Members', color: '#4CC76A', pct: 60, val: '6', target: '10' },
+      { key: 'fcmrrg', label: 'MRR Growth', color: '#D4B65C', pct: 82, val: '8.2%', target: '10%' },
+      { key: 'fcclasses', label: 'Classes Filled', color: '#5A8FB8', pct: 75, val: '18', target: '24' },
+      { key: 'fctrials', label: 'Trials Booked', color: '#F0B84A', pct: 67, val: '4', target: '6' },
+    ],
+    milestones: [
+      { name: 'Jaylen Brooks', line: 'Hit 50 sessions', when: '2 days ago', kind: 'trophy' },
+      { name: 'Carlos Martinez', line: '4-week streak', when: '3 days ago', kind: 'streak' },
+      { name: 'Mia Thompson', line: '12-day streak', when: '5 days ago', kind: 'streak' },
+      { name: 'Ava Chen', line: 'Hit 10 sessions', when: '1 week ago', kind: 'trophy' },
+    ],
+    challenge: {
+      title: 'You are 2 members away from your best month ever.',
+      sub: 'Draft a follow-up to your 3 unconverted trials?',
+      task: 'Draft a follow-up to my 3 unconverted trials',
+    },
+    activity: [
+      { b: 'New lead:', t: 'James Park inquired via Instagram DM about the teen competitive program.', when: '2h ago', color: 'var(--gold)' },
+      { b: 'Payment received:', t: 'Carlos Martinez, $175/mo membership started.', when: '5h ago', color: 'var(--green)' },
+      { b: 'Session reminder:', t: '3 athletes expected for the 4pm Intermediate group.', when: 'Today, 3:30pm', dim: true, color: 'var(--text-mute)' },
+    ],
+    mrrToast: 'MRR crossed $8k',
+    trialToast: '+1 trial booked: Sofia Reyes, Saturday 9:00 AM',
+  };
+
   const _realFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     try {
@@ -22972,6 +23058,16 @@ function _hv2BootType() {
   })();
 }
 async function _hv2WinLoad() {
+  // FCUI pilot demo seed: exact hero copy for the pilot walkthrough. Gated on
+  // the FC shell being active - plain ?mock=1 with the flag off keeps the
+  // shipped win-card behavior untouched.
+  if (typeof _fcActive === 'function' && _fcActive() && window.__MOCK_FCUI__ && window.__MOCK_FCUI__.bestThing) {
+    const seed = window.__MOCK_FCUI__.bestThing;
+    const v0 = document.getElementById('hv2-win-v'), c0 = document.getElementById('hv2-win-c');
+    if (v0) v0.textContent = seed.v;
+    if (c0) c0.textContent = seed.c;
+    return;
+  }
   _hv2BootType();
   const now = new Date(), today = _hv2Ymd(now);
   const yd = new Date(now); yd.setDate(yd.getDate() - 1); const yday = _hv2Ymd(yd);
@@ -61090,7 +61186,7 @@ function _fcStyle() {
     '.fcui-greet{flex:none}' +
     '.fcui-greet b{display:block;font-family:var(--font-num);font-size:16.5px;font-weight:800;color:var(--text);line-height:1.15}' +
     '.fcui-greet span{display:block;font-size:11px;color:var(--text-mute)}' +
-    '.fcui-search{flex:0 1 280px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:8px 12px;min-width:150px}' +
+    '.fcui-search{flex:0 1 250px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:8px 12px;min-width:140px}' +
     '.fcui-search svg{width:14px;height:14px;stroke:var(--text-mute);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}' +
     '.fcui-search input{flex:1;min-width:0;background:none;border:none;outline:none;font:inherit;font-size:12.5px;color:var(--text)}' +
     '.fcui-search input::placeholder{color:var(--text-mute)}' +
@@ -61103,9 +61199,10 @@ function _fcStyle() {
     '.fcui-loc-pop.open{display:block}' +
     '.fcui-loc-opt{display:block;width:100%;text-align:left;background:none;border:none;font:inherit;font-size:12.5px;font-weight:600;color:var(--text-sub);padding:8px 10px;border-radius:var(--r-sm);cursor:pointer}' +
     '.fcui-loc-opt:hover{background:var(--gold-sheen);color:var(--text)}' +
-    '.fcui-chips{flex:1;display:flex;align-items:center;justify-content:flex-end;gap:8px;overflow-x:auto;scrollbar-width:none}' +
+    '.fcui-chips{flex:1;display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none}' +
+    '.fcui-chips>span:first-child{margin-left:auto}' +
     '.fcui-chips::-webkit-scrollbar{display:none}' +
-    '.fcui-chip{flex:none;display:inline-flex;align-items:baseline;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:7px 12px;font-size:11.5px;color:var(--text-mute);white-space:nowrap}' +
+    '.fcui-chip{flex:none;display:inline-flex;align-items:baseline;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:6px 10px;font-size:11px;color:var(--text-mute);white-space:nowrap}' +
     '.fcui-chip b{font-family:var(--font-num);font-size:12.5px;font-weight:800;color:var(--text)}' +
     '.fcui-chip .dot{align-self:center;width:6px;height:6px;border-radius:var(--r-full);flex:none}' +
     /* dashboard column */
@@ -61394,7 +61491,7 @@ async function _fcChipsLoad() {
   if (!host) return;
   const chip = (v, l, dot) => `<span class="fcui-chip">${dot ? `<span class="dot" style="background:${dot}"></span>` : ''}<b>${escapeHTML(String(v))}</b><span>${escapeHTML(l)}</span></span>`;
   const demo = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.chips;
-  if (demo) { host.innerHTML = demo.map(c => chip(c.v, c.l, c.dot)).join(''); return; }
+  if (demo) { host.innerHTML = demo.map(c => chip(c.v, c.l, c.dot)).join(''); host.scrollLeft = host.scrollWidth; return; }
   const parts = [];
   const acts = window._hmHawkTotal;
   if (typeof acts === 'number') parts.push(chip(acts, acts === 1 ? 'action waiting' : 'actions waiting', 'var(--green)'));
@@ -61407,6 +61504,7 @@ async function _fcChipsLoad() {
     }
   } catch (_) {}
   host.innerHTML = parts.join('');
+  host.scrollLeft = host.scrollWidth;   // rightmost chips stay visible when tight
   if (typeof acts !== 'number') setTimeout(_fcChipsLoad, 4000);   // hawkeye count lands async
 }
 // Sidebar messages preview: unread count + newest unread snippet (v15 inbox).
@@ -61535,7 +61633,7 @@ function _fcToast(iconSvg, text, tone) {
   document.getElementById('fcui-toast')?.remove();
   const color = tone === 'green' ? 'var(--green)' : 'var(--gold)';
   document.body.insertAdjacentHTML('beforeend',
-    `<div id="fcui-toast" style="position:fixed;right:22px;bottom:calc(22px + env(safe-area-inset-bottom));z-index:9600;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:10px 16px;font-family:var(--font-ui);font-size:12.5px;font-weight:700;color:var(--text);box-shadow:var(--shadow-hover,0 10px 30px rgba(0,0,0,.14))">` +
+    `<div id="fcui-toast" style="position:fixed;right:22px;bottom:calc(104px + env(safe-area-inset-bottom));z-index:9600;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:10px 16px;font-family:var(--font-ui);font-size:12.5px;font-weight:700;color:var(--text);box-shadow:var(--shadow-hover,0 10px 30px rgba(0,0,0,.14))">` +
     `<span style="display:inline-flex;color:${color}">${iconSvg || ''}</span><span>${escapeHTML(text)}</span></div>`);
   const el = document.getElementById('fcui-toast');
   if (el) {
