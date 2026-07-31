@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Sales preset card mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F8F7F5; --surface:#FFFFFF; --surface-el:#FAFAF8; --surface-hov:#F0EFEC;
+  --border:rgba(0,0,0,0.07); --border-med:rgba(0,0,0,0.12); --border-str:rgba(0,0,0,0.18);
+  --text:#1C1B18; --text-sub:#6E6B63; --text-mute:#807C74;
+  --gold:#C8A84E; --gold-sheen:rgba(200,168,78,0.06); --accent-border:rgba(200,168,78,0.28);
+  --ink:#1C1B18; --green:#4E9B5E; --red:#B4462F;
+}
+[data-theme="dark"]{
+  --bg:#131416; --surface:#1B1D1F; --surface-el:#232629; --surface-hov:#2B2E32;
+  --border:rgba(255,255,255,0.08); --border-med:rgba(255,255,255,0.12); --border-str:rgba(255,255,255,0.2);
+  --text:#F0EDE8; --text-sub:#A5A19A; --text-mute:#7C786F;
+  --gold:#D4B65C; --gold-sheen:rgba(212,182,92,0.08); --accent-border:rgba(212,182,92,0.28);
+  --ink:#131416; --green:#6FBF73; --red:#E0785E;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;border:none;background:none;padding:0;text-align:left;cursor:pointer}
+.num{font-family:Nunito,'Plus Jakarta Sans',sans-serif}
+
+.sw{position:sticky;top:0;z-index:90;display:flex;gap:6px;align-items:center;
+  padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
+.sw button{flex:none;padding:6px 12px;border-radius:999px;border:1px solid var(--border-med);font-size:12px;font-weight:600}
+.sw .sp{margin-left:auto}
+
+.crumb{padding:14px 16px 0;font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--text-mute)}
+.crumb span{color:var(--gold)}
+h1{margin:6px 16px 14px;font-size:22px;font-weight:800;letter-spacing:-.01em}
+
+/* ── the preset card: no title row, no footer ── */
+.pcard{margin:0 14px 14px;background:var(--surface);border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+
+/* Stats row. The LEFT stat is the list's headline: left-aligned over the
+   times below, with a gold notch riding ON the separator to say
+   "this one continues underneath". The other two stay centered. */
+.kpis{display:grid;grid-template-columns:1.1fr 1.2fr 1fr;position:relative;
+  border-bottom:1px solid var(--border)}
+.kpi{padding:14px 10px 12px;text-align:center;position:relative}
+.kpi.lead{text-align:left;padding-left:16px}
+.kpi.lead::after{content:'';position:absolute;left:16px;bottom:-1px;width:38px;height:3px;
+  border-radius:2px 2px 0 0;background:var(--gold)}
+.kpi + .kpi{border-left:1px solid var(--border)}
+.kpi .v{display:block;font-size:23px;font-weight:800;line-height:1.1}
+.kpi .v small{font-size:13px;font-weight:700;color:var(--text-mute)}
+.kpi .l{display:block;margin-top:3px;font-size:9.5px;font-weight:800;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--text-mute)}
+.kpi.tap{cursor:pointer}
+.kpi.tap .v{color:var(--gold)}
+.kpi .meter{display:block;width:44px;height:3px;border-radius:2px;background:var(--border-med);margin:6px auto 0;overflow:hidden}
+.kpi .meter i{display:block;height:100%;width:40%;background:var(--gold)}
+.kpi .chev{position:absolute;top:8px;right:8px;font-size:11px;color:var(--text-mute)}
+
+/* Trials: single-line rows, NO separators between them - the stat above is
+   the header, whitespace does the dividing. Times align under the "3". */
+.tlist{padding:6px 0 10px}
+.trow{display:flex;align-items:center;gap:11px;width:100%;padding:9px 16px}
+.trow .tm{flex:none;width:62px;font-size:13px;font-weight:800;white-space:nowrap;color:var(--text-sub)}
+.trow .n{flex:1;min-width:0;font-size:14px;font-weight:700;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow .st{flex:none;font-size:10px;font-weight:800;letter-spacing:.05em;border-radius:999px;padding:4px 10px}
+.trow .st.booked{background:var(--gold-sheen);border:1px solid var(--accent-border);color:var(--gold)}
+.trow .st.form{background:var(--gold);color:var(--ink)}
+.tt-none{padding:14px 16px;font-size:12.5px;color:var(--text-mute)}
+
+/* next-card placeholder */
+.ghost{margin:0 14px;border:1.5px dashed var(--border-str);border-radius:16px;
+  padding:15px;font-size:12px;font-weight:600;color:var(--text-mute);text-align:center}
+
+/* ── focus overlay: qualified trials ── */
+#focus{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;overflow-y:auto}
+#focus.on{display:block}
+.fhd{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--border);
+  padding:12px 16px 10px;z-index:5}
+.fhd .back{display:inline-flex;align-items:center;padding:7px 13px 7px 10px;border-radius:10px;
+  border:1px solid var(--border-med);background:var(--surface);font-size:13px;font-weight:700;margin-bottom:10px}
+.fhd .t{font-size:19px;font-weight:800;letter-spacing:-.01em}
+.fhd .sub{font-size:12px;color:var(--text-mute);font-weight:600;margin-top:2px}
+.fbar{height:6px;border-radius:3px;background:var(--border-med);margin:10px 0 2px;overflow:hidden}
+.fbar i{display:block;height:100%;width:40%;background:var(--gold);border-radius:3px}
+.fsec{padding:16px 16px 7px;font-size:10px;font-weight:800;letter-spacing:.11em;color:var(--text-mute)}
+.qrow{display:flex;align-items:center;gap:11px;width:100%;padding:11px 16px;border-bottom:1px solid var(--border)}
+.qrow .av{flex:none;width:36px;height:36px;border-radius:50%;background:var(--surface-hov);
+  display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--text-sub)}
+.qrow.closed .av{background:var(--gold);color:var(--ink)}
+.qrow .b{flex:1;min-width:0}
+.qrow .n{display:block;font-size:14px;font-weight:700}
+.qrow .s{display:block;font-size:11.5px;color:var(--text-mute);margin-top:1px;font-weight:600}
+.qrow .tag{flex:none;font-size:10px;font-weight:800;letter-spacing:.05em;border-radius:999px;padding:3px 9px}
+.qrow .tag.won{background:var(--gold);color:var(--ink)}
+.qrow .tag.open{border:1px solid var(--border-med);color:var(--text-mute)}
+.qrow .chev{flex:none;color:var(--text-mute);font-size:14px}
+.cnote{margin:18px 16px;padding:12px 14px;border:1.5px dashed var(--border-str);border-radius:12px;
+  font-size:12px;color:var(--text-mute);font-weight:600;text-align:center}
+
+/* ── contact stub ── */
+#contact{position:fixed;inset:0;z-index:110;background:var(--bg);display:none;overflow-y:auto}
+#contact.on{display:block}
+.chd{padding:14px 16px}
+.chd .back{display:inline-flex;align-items:center;padding:7px 13px 7px 10px;border-radius:10px;
+  border:1px solid var(--border-med);background:var(--surface);font-size:13px;font-weight:700;margin-bottom:16px}
+.cavatar{width:64px;height:64px;border-radius:50%;background:var(--surface-hov);margin:0 auto;
+  display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:var(--text-sub)}
+.cname{text-align:center;font-size:19px;font-weight:800;margin-top:10px}
+.csub{text-align:center;font-size:12.5px;color:var(--text-mute);font-weight:600;margin-top:2px}
+
+/* ── post-trial form ── */
+#ptf{position:fixed;inset:0;z-index:120;background:var(--bg);display:none;overflow-y:auto}
+#ptf.on{display:block}
+.pt-hd{padding:14px 16px 4px}
+.pt-hd .back{display:inline-flex;align-items:center;padding:7px 13px 7px 10px;border-radius:10px;
+  border:1px solid var(--border-med);background:var(--surface);font-size:13px;font-weight:700;margin-bottom:14px}
+.pt-hd .t{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.pt-hd .sub{font-size:12.5px;color:var(--text-mute);font-weight:600;margin-top:3px}
+.pt-sec{padding:18px 16px 8px;font-size:10px;font-weight:800;letter-spacing:.11em;color:var(--text-mute)}
+.pt-seg{display:flex;gap:8px;padding:0 16px}
+.pt-seg button{flex:1;padding:13px;border-radius:12px;border:1px solid var(--border-med);
+  background:var(--surface);text-align:center;font-size:14px;font-weight:700;color:var(--text-sub)}
+.pt-seg button.on{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+.pt-seg button.no.on{background:var(--surface-hov);border-color:var(--border-str);color:var(--text)}
+.pt-chips{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px}
+.pt-chips button{padding:9px 15px;border-radius:999px;border:1px solid var(--border-med);
+  background:var(--surface);font-size:13px;font-weight:700;color:var(--text-sub)}
+.pt-chips button.on{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+.pt-area{display:block;width:calc(100% - 32px);margin:0 16px;min-height:84px;padding:12px;
+  border-radius:12px;border:1px solid var(--border-med);background:var(--surface);color:var(--text);
+  font:inherit;font-size:13.5px;outline:none;resize:vertical}
+.pt-tgl{display:flex;align-items:center;gap:11px;margin:0 16px;padding:13px 14px;
+  border:1px solid var(--border-med);border-radius:12px;background:var(--surface)}
+.pt-tgl .tx{flex:1}
+.pt-tgl .tt{display:block;font-size:13.5px;font-weight:700}
+.pt-tgl .ts{display:block;font-size:11.5px;color:var(--text-mute);font-weight:600;margin-top:1px}
+.pt-sw{flex:none;width:46px;height:27px;border-radius:999px;background:var(--gold);position:relative}
+.pt-sw i{position:absolute;top:3px;right:3px;width:21px;height:21px;border-radius:50%;background:#fff}
+.pt-submit{display:flex;align-items:center;justify-content:center;gap:8px;
+  margin:20px 16px 30px;width:calc(100% - 32px);padding:15px;border-radius:12px;
+  background:var(--gold);color:var(--ink);font-size:14.5px;font-weight:800}
+</style>
+</head>
+<body>
+
+<div class="sw">
+  <button aria-selected="true">Sales</button>
+  <button class="sp" onclick="theme()">◐</button>
+</div>
+
+<div class="crumb">FOCUS &middot; <span>SALES</span> &middot; LIVE</div>
+<h1>Sales</h1>
+
+<!-- ═══ THE PRESET CARD - stats only, left stat flows into the list ═══ -->
+<div class="pcard">
+  <div class="kpis">
+    <div class="kpi lead">
+      <span class="v num">3</span>
+      <span class="l">Trials today</span>
+    </div>
+    <button class="kpi tap" onclick="openFocus()">
+      <span class="chev">›</span>
+      <span class="v num">6<small> of 15</small></span>
+      <span class="l">Qualified closed</span>
+      <span class="meter"><i></i></span>
+    </button>
+    <div class="kpi">
+      <span class="v num">4</span>
+      <span class="l">Sales this week</span>
+    </div>
+  </div>
+
+  <div class="tlist">
+    <button class="trow" onclick="openContact('Nia Charles','Dionne Charles · Elementary')">
+      <span class="tm num">7:00 PM</span>
+      <span class="n">Nia Charles</span>
+      <span class="st booked">BOOKED</span>
+    </button>
+    <button class="trow" onclick="openContact('Marcus Webb','Alicia Webb · High School')">
+      <span class="tm num">8:00 PM</span>
+      <span class="n">Marcus Webb</span>
+      <span class="st booked">BOOKED</span>
+    </button>
+    <button class="trow" onclick="openPtf()">
+      <span class="tm num">8:00 PM</span>
+      <span class="n">Deja Simmons</span>
+      <span class="st form">FORM ›</span>
+    </button>
+  </div>
+</div>
+
+<div class="ghost">Next card: the pipelines + Hawkeye. Later.</div>
+
+<!-- ═══ FOCUS: QUALIFIED TRIALS ═══ -->
+<div id="focus">
+  <div class="fhd">
+    <button class="back" onclick="closeFocus()">‹ Sales</button>
+    <div class="t">Qualified trials</div>
+    <div class="sub">Last 30 days &middot; showed up and marked a good fit</div>
+    <div class="fbar"><i></i></div>
+    <div class="sub"><b class="num" style="color:var(--gold)">6 closed</b> &middot; 9 still open</div>
+  </div>
+
+  <div class="fsec">CLOSED &middot; 6</div>
+  <button class="qrow closed" onclick="openContact('Zaire Thompson','Rochelle Thompson')">
+    <span class="av">ZT</span>
+    <span class="b"><span class="n">Zaire Thompson</span><span class="s">Trial Jul 12 &middot; joined Jul 15 &middot; Steady monthly</span></span>
+    <span class="tag won">MEMBER</span><span class="chev">›</span>
+  </button>
+  <button class="qrow closed" onclick="openContact('Luca Bianchi','Sofia Bianchi')">
+    <span class="av">LB</span>
+    <span class="b"><span class="n">Luca Bianchi</span><span class="s">Trial Jul 14 &middot; joined Jul 20 &middot; Summer unlimited</span></span>
+    <span class="tag won">MEMBER</span><span class="chev">›</span>
+  </button>
+  <button class="qrow closed" onclick="openContact('Amari Grant','Denise Grant')">
+    <span class="av">AG</span>
+    <span class="b"><span class="n">Amari Grant</span><span class="s">Trial Jul 18 &middot; joined Jul 19 &middot; Steady monthly</span></span>
+    <span class="tag won">MEMBER</span><span class="chev">›</span>
+  </button>
+  <button class="qrow closed" onclick="openContact('Ravi Patel','Meera Patel')">
+    <span class="av">RP</span>
+    <span class="b"><span class="n">Ravi Patel</span><span class="s">Trial Jul 21 &middot; joined Jul 26 &middot; Steady monthly</span></span>
+    <span class="tag won">MEMBER</span><span class="chev">›</span>
+  </button>
+  <button class="qrow closed" onclick="openContact('Kaya Osei','Femi Osei')">
+    <span class="av">KO</span>
+    <span class="b"><span class="n">Kaya Osei</span><span class="s">Trial Jul 22 &middot; joined Jul 28 &middot; Summer unlimited</span></span>
+    <span class="tag won">MEMBER</span><span class="chev">›</span>
+  </button>
+  <button class="qrow closed" onclick="openContact('Jordan Wu','Mei Wu')">
+    <span class="av">JW</span>
+    <span class="b"><span class="n">Jordan Wu</span><span class="s">Trial Jul 25 &middot; joined Jul 30 &middot; Steady monthly</span></span>
+    <span class="tag won">MEMBER</span><span class="chev">›</span>
+  </button>
+
+  <div class="fsec">STILL OPEN &middot; 9</div>
+  <button class="qrow" onclick="openContact('Deja Simmons','Tara Simmons')">
+    <span class="av">DS</span>
+    <span class="b"><span class="n">Deja Simmons</span><span class="s">Trial today &middot; closing agent on it</span></span>
+    <span class="tag open">IN CLOSING</span><span class="chev">›</span>
+  </button>
+  <button class="qrow" onclick="openContact('Nico Reyes','Carmen Reyes')">
+    <span class="av">NR</span>
+    <span class="b"><span class="n">Nico Reyes</span><span class="s">Trial Jul 27 &middot; follow-up 2 of 3 sent</span></span>
+    <span class="tag open">IN CLOSING</span><span class="chev">›</span>
+  </button>
+  <button class="qrow" onclick="openContact('Tyler Moss','Renee Moss')">
+    <span class="av">TM</span>
+    <span class="b"><span class="n">Tyler Moss</span><span class="s">Trial Jul 24 &middot; asked about pricing</span></span>
+    <span class="tag open">IN CLOSING</span><span class="chev">›</span>
+  </button>
+  <button class="qrow" onclick="openContact('Sana Malik','Iram Malik')">
+    <span class="av">SM</span>
+    <span class="b"><span class="n">Sana Malik</span><span class="s">Trial Jul 20 &middot; gone quiet, day 9</span></span>
+    <span class="tag open">GHOSTED</span><span class="chev">›</span>
+  </button>
+  <div class="cnote" style="margin-top:10px">+ 5 more open rows in the real thing</div>
+</div>
+
+<!-- ═══ CONTACT STUB ═══ -->
+<div id="contact">
+  <div class="chd">
+    <button class="back" onclick="closeContact()">‹ Back</button>
+    <div class="cavatar" id="c-av">NC</div>
+    <div class="cname" id="c-name">Nia Charles</div>
+    <div class="csub" id="c-sub">Dionne Charles &middot; Elementary</div>
+  </div>
+  <div class="cnote">This opens the REAL contact page in the build - full history, messages, trial status.</div>
+</div>
+
+<!-- ═══ POST-TRIAL FORM ═══ -->
+<div id="ptf">
+  <div class="pt-hd">
+    <button class="back" onclick="closePtf()">‹ Sales</button>
+    <div class="t">Post-trial: Deja Simmons</div>
+    <div class="sub">High School &middot; 8:00 PM trial &middot; parent Tara Simmons</div>
+  </div>
+
+  <div class="pt-sec">DID DEJA SHOW UP?</div>
+  <div class="pt-seg">
+    <button class="on" onclick="seg(this)">Showed up</button>
+    <button class="no" onclick="seg(this)">No-show</button>
+  </div>
+
+  <div class="pt-sec">GOOD FIT FOR THE PROGRAM?</div>
+  <div class="pt-seg">
+    <button class="on" onclick="seg(this)">Good fit</button>
+    <button class="no" onclick="seg(this)">Not a fit</button>
+  </div>
+
+  <div class="pt-sec">WHO RAN THE SESSION?</div>
+  <div class="pt-chips">
+    <button class="on" onclick="chip(this)">Coach D</button>
+    <button onclick="chip(this)">Coach Mike</button>
+    <button onclick="chip(this)">Coach J</button>
+  </div>
+
+  <div class="pt-sec">NOTES</div>
+  <textarea class="pt-area" placeholder="Strong handle, needs work on the left. Mom asked about the summer schedule."></textarea>
+
+  <div class="pt-sec">AFTER SUBMIT</div>
+  <div class="pt-tgl">
+    <span class="tx">
+      <span class="tt">Send the sign-up text</span>
+      <span class="ts">Tara gets the membership link right away</span>
+    </span>
+    <span class="pt-sw"><i></i></span>
+  </div>
+
+  <button class="pt-submit" onclick="closePtf()">Submit &middot; moves Deja to Done Trial</button>
+</div>
+
+<script>
+function theme(){ const r=document.documentElement; r.dataset.theme = r.dataset.theme==='dark'?'light':'dark'; }
+function openFocus(){ document.getElementById('focus').classList.add('on'); window.scrollTo(0,0); }
+function closeFocus(){ document.getElementById('focus').classList.remove('on'); }
+function openContact(n, sub){
+  document.getElementById('c-name').textContent = n;
+  document.getElementById('c-sub').textContent = sub;
+  document.getElementById('c-av').textContent = n.split(' ').map(w=>w[0]).slice(0,2).join('');
+  document.getElementById('contact').classList.add('on');
+}
+function closeContact(){ document.getElementById('contact').classList.remove('on'); }
+function openPtf(){ document.getElementById('ptf').classList.add('on'); window.scrollTo(0,0); }
+function closePtf(){ document.getElementById('ptf').classList.remove('on'); }
+function seg(el){ [...el.parentElement.children].forEach(b=>b.classList.remove('on')); el.classList.add('on'); }
+function chip(el){ [...el.parentElement.children].forEach(b=>b.classList.remove('on')); el.classList.add('on'); }
+</script>
+</body>
+</html>
