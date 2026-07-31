@@ -23943,6 +23943,11 @@ function _hmSetRing(key, pct) {
   const clamped = Math.min(Math.max(pct, 0), 100);
   const offset = arcLen - (arcLen * clamped / 100);
   requestAnimationFrame(() => { el.style.strokeDashoffset = offset.toFixed(1); });
+  // FCUI pilot radial cards carry a % readout in the ring's center (the
+  // overlay only exists in the fcui score-grid markup, so this is gated by
+  // element presence and never touches the shipped layout).
+  const pctEl = document.getElementById('hm-ringpct-' + key);
+  if (pctEl) pctEl.textContent = Math.round(clamped) + '%';
 }
 
 // Calculate ring fill % based on mode
@@ -23970,8 +23975,19 @@ function _hmRenderScoreGrid() {
   const grid = document.getElementById('hm-score-grid');
   if (!grid) return;
   const selected = _hmGetSelectedKpis();
+  // FCUI pilot: radial-card variant (big ring, % in the middle, label + value
+  // stacked under). Same ids, so _hmLoadScoreboard/_hmSetRing fill both.
+  const fc = (typeof _fcActive === 'function' && _fcActive());
   grid.innerHTML = selected.map(key => {
     const kpi = _HM_KPI_CATALOG.find(k => k.key === key) || { key, label: key, color: '#D4B65C' };
+    if (fc) return `<div class="hm-stat" data-stat="${kpi.key}" onclick="_hmStatTap(this)">
+      <div class="fcui-ringbox">${_hmRingHtml(kpi.key, kpi.color)}<span class="fcui-ringpct" id="hm-ringpct-${kpi.key}"></span></div>
+      <div class="hm-stat-info">
+        <div class="hm-stat-lab">${escapeHTML(kpi.label)}</div>
+        <div class="hm-stat-val hm-stat-skel" id="hm-s-${kpi.key}">&nbsp;</div>
+        <div class="hm-stat-trend" id="hm-s-${kpi.key}-t"></div>
+      </div>
+    </div>`;
     return `<div class="hm-stat" data-stat="${kpi.key}" onclick="_hmStatTap(this)">
       ${_hmRingHtml(kpi.key, kpi.color)}
       <div class="hm-stat-info">
@@ -61140,16 +61156,22 @@ function _fcStyle() {
     '.fcui-mp-head{display:flex;align-items:baseline;gap:9px;margin-bottom:12px}' +
     '.fcui-mp-head b{font-family:var(--font-num);font-size:15px;font-weight:800;color:var(--text)}' +
     '.fcui-mp-head span{font-size:11.5px;color:var(--text-mute)}' +
-    '.fcui-radials{display:grid;grid-template-columns:repeat(4,minmax(160px,220px));gap:16px}' +
-    '.fcui-radials .hm-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;position:relative}' +
-    '.fcui-radials .hm-stat-ring{position:relative;width:86px;height:86px}' +
-    '.fcui-radials .hm-stat-ring svg{width:86px;height:86px}' +
+    '.fcui-customize{margin-left:auto;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-mute);font-size:12px;font-weight:700;white-space:nowrap;padding:4px 8px;border-radius:var(--r-sm);transition:color var(--t-fast)}' +
+    '.fcui-customize:hover{color:var(--text)}' +
+    '.fcui-customize svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    'body.fcui-mode #home-v2 .hm-score-grid{display:grid;grid-template-columns:repeat(4,minmax(160px,230px));gap:16px}' +
+    'body.fcui-mode #home-v2 .hm-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px 14px 16px;margin:0;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;position:relative;transition:transform var(--t-med) var(--es,ease),box-shadow var(--t-med)}' +
+    'body.fcui-mode #home-v2 .hm-stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover,0 10px 30px rgba(0,0,0,.1))}' +
+    '.fcui-ringbox{position:relative;flex:none}' +
+    'body.fcui-mode #home-v2 .hm-stat-ring{width:86px;height:86px}' +
+    'body.fcui-mode #home-v2 .hm-stat-ring svg{width:86px;height:86px;transform:rotate(135deg)}' +
     '.fcui-ringpct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-num);font-size:17px;font-weight:800;color:var(--text)}' +
-    '.fcui-radials .hm-stat-info{text-align:center}' +
-    '.fcui-radials .hm-stat-lab{font-size:12px;font-weight:700;color:var(--text)}' +
-    '.fcui-radials .hm-stat-val{font-family:var(--font-num);font-size:13px;font-weight:800;color:var(--text-sub);margin-top:2px}' +
-    '.fcui-radials .hm-stat-val .of{color:var(--text-mute);font-weight:700}' +
-    '.fcui-radials .hm-stat-trend{font-size:10.5px;color:var(--text-mute)}' +
+    'body.fcui-mode #home-v2 .hm-stat-info{text-align:center}' +
+    'body.fcui-mode #home-v2 .hm-stat-lab{font-size:12px;font-weight:700;color:var(--text);text-transform:none;letter-spacing:0}' +
+    'body.fcui-mode #home-v2 .hm-stat-val{font-family:var(--font-num);font-size:13.5px;font-weight:800;color:var(--text-sub);margin-top:2px}' +
+    'body.fcui-mode #home-v2 .hm-stat-val .of{color:var(--text-mute);font-weight:700}' +
+    'body.fcui-mode #home-v2 .hm-stat-trend{font-size:10.5px;color:var(--text-mute)}' +
+    '@media(max-width:1100px){body.fcui-mode #home-v2 .hm-score-grid{grid-template-columns:repeat(2,1fr)}}' +
     /* milestones + activity */
     '.fcui-miles-row{display:flex;align-items:center;gap:12px;margin:8px 14px;padding:10px 14px;border-radius:var(--r-md);background:var(--gold-sheen)}' +
     '.fcui-miles-ic{flex:none;width:30px;height:30px;border-radius:var(--r-full);background:var(--gold-glow);color:var(--gold);display:flex;align-items:center;justify-content:center}' +
@@ -61162,7 +61184,7 @@ function _fcStyle() {
     '.fcui-chal{display:flex;align-items:center;gap:14px;background:var(--gold-sheen);border:1px solid var(--accent-border);border-radius:var(--r-lg);padding:15px 18px;margin-bottom:12px}' +
     '.fcui-chal-orb{flex:none;width:34px;height:34px;border-radius:var(--r-md);background:var(--gold);color:var(--on-gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-num);font-size:14px;font-weight:900}' +
     '.fcui-chal-tx{flex:1;min-width:0}' +
-    '.fcui-chal-tx .fcui-eyebrow{margin-bottom:2px}' +
+    '.fcui-chal-lab{display:block;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mute);margin-bottom:2px}' +
     '.fcui-chal-tx b{display:block;font-size:13.5px;font-weight:800;color:var(--text)}' +
     '.fcui-chal-tx i{display:block;font-style:normal;font-size:12px;color:var(--text-sub);margin-top:2px}' +
     '.fcui-chal-btn{flex:none;background:var(--gold);color:var(--on-gold);border:none;border-radius:var(--r-sm);padding:9px 16px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}' +
@@ -61448,7 +61470,7 @@ function _fcRenderHome(host) {
     <div>
       <div class="fcui-mp-head">
         <b>Monthly Progress</b><span>vs. last month as baseline</span>
-        <div class="hm-score-gear" id="hm-kpi-btn" title="Customize KPIs" role="button" tabindex="0" style="margin-left:auto;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-mute);font-size:12px;font-weight:700">${I.gear}<span>Customize</span></div>
+        <div class="fcui-customize" id="hm-kpi-btn" title="Customize KPIs" role="button" tabindex="0">${I.gear}<span>Customize</span></div>
       </div>
       <div class="hm-score-grid fcui-radials" id="hm-score-grid"></div>
     </div>
@@ -61567,9 +61589,98 @@ function _fcAiGo(q) {
     }, 350);
   } catch (e) { console.error('[fcui] ai submit', e); }
 }
-function _fcScoreLoad() { _hmLoadScoreboard(); }
-function _fcMilesLoad() { if (typeof _fcMilesLoad2 === 'function') return _fcMilesLoad2(); }
-function _fcActivityLoad() { if (typeof _fcActivityLoad2 === 'function') return _fcActivityLoad2(); }
+// ── Monthly Progress radials. Demo seed paints the four mockup radials
+// directly; real academies keep the existing scoreboard loader (same ring
+// component, fcui card variant of the grid markup). ──
+function _fcScoreLoad() {
+  const demo = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.radials;
+  const grid = document.getElementById('hm-score-grid');
+  if (demo && grid) {
+    grid.innerHTML = demo.map(r => `<div class="hm-stat" data-stat="fc-${r.key}">
+      <div class="fcui-ringbox">${_hmRingHtml(r.key, r.color)}<span class="fcui-ringpct" id="hm-ringpct-${r.key}"></span></div>
+      <div class="hm-stat-info">
+        <div class="hm-stat-lab">${escapeHTML(r.label)}</div>
+        <div class="hm-stat-val">${escapeHTML(r.val)} <span class="of">/ ${escapeHTML(r.target)}</span></div>
+      </div>
+    </div>`).join('');
+    setTimeout(() => demo.forEach(r => _hmSetRing(r.key, r.pct)), 80);
+    return;
+  }
+  _hmLoadScoreboard();
+}
+// ── Member Milestones & Streaks. Demo rows from the seed; real academies
+// surface month-anniversaries from the roster (the only milestone signal the
+// portal tracks today). Card hides itself when there is nothing to show. ──
+async function _fcMilesLoad() {
+  const card = document.getElementById('fcui-miles'), body = document.getElementById('fcui-miles-body');
+  if (!card || !body) return;
+  const I = _fcIcons();
+  const row = m => `<div class="fcui-miles-row">
+    <span class="fcui-miles-ic${m.kind === 'streak' ? ' hot' : ''}">${m.kind === 'streak' ? I.flame : I.trophy}</span>
+    <div style="min-width:0"><b>${escapeHTML(m.name)}</b><i>${escapeHTML(m.line)}</i></div>
+    <span class="fcui-miles-when">${escapeHTML(m.when || '')}</span>
+  </div>`;
+  const demo = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.milestones;
+  if (demo && demo.length) { body.innerHTML = demo.map(row).join(''); card.style.display = ''; return; }
+  try {
+    const roster = (typeof _ccEnsureMembers === 'function') ? await _ccEnsureMembers() : [];
+    const rows = [];
+    for (const m of roster) {
+      if (m.status !== 'live') continue;
+      const t = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
+      if (!(t > 0)) continue;
+      for (const mo of [3, 6, 12, 18, 24]) {
+        const anniv = new Date(t); anniv.setMonth(anniv.getMonth() + mo);
+        const days = Math.ceil((anniv.getTime() - Date.now()) / 86400000);
+        if (days >= -7 && days <= 14) rows.push({
+          name: (typeof _ccCapName === 'function' ? _ccCapName(m.athlete_name || m.parent_name || 'Member') : (m.athlete_name || 'Member')),
+          line: mo + ' months with the academy',
+          when: days === 0 ? 'today' : days > 0 ? 'in ' + days + 'd' : Math.abs(days) + 'd ago',
+          kind: 'trophy',
+        });
+      }
+    }
+    if (!rows.length) { card.style.display = 'none'; return; }
+    body.innerHTML = rows.slice(0, 4).map(row).join('');
+    card.style.display = '';
+  } catch (_) { card.style.display = 'none'; }
+}
+// ── Activity stack: weekly-challenge banner + event rows (demo-seeded for
+// the pilot; the Hawkeye feed below it is live either way) + the MRR /
+// trial toasts (shared _fcToast anatomy, body-docked). ──
+function _fcActivityLoad() {
+  const chal = document.getElementById('fcui-challenge');
+  const act = document.getElementById('fcui-activity');
+  const demoC = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.challenge;
+  if (chal) {
+    if (demoC && !window._fcChalDismissed) {
+      chal.innerHTML = `<div class="fcui-chal">
+        <span class="fcui-chal-orb">S</span>
+        <div class="fcui-chal-tx"><span class="fcui-chal-lab">Weekly challenge</span><b>${escapeHTML(demoC.title)}</b><i>${escapeHTML(demoC.sub)}</i></div>
+        <button type="button" class="fcui-chal-btn" onclick="_fcAiGo(${JSON.stringify(demoC.task || 'Draft a follow-up to my unconverted trials').replace(/"/g, '&quot;')})">Let's do it</button>
+        <button type="button" class="fcui-chal-dis" onclick="window._fcChalDismissed=1;document.getElementById('fcui-challenge').innerHTML=''">Dismiss</button>
+      </div>`;
+    } else chal.innerHTML = '';
+  }
+  if (act) {
+    const evts = (window.__MOCK_FCUI__ && window.__MOCK_FCUI__.activity) || [];
+    act.innerHTML = evts.map(e => `<div class="fcui-evt${e.dim ? ' dim' : ''}">
+      <span class="dot" style="background:${e.color || 'var(--gold)'}"></span>
+      <div class="fcui-evt-tx"><b>${escapeHTML(e.b)}</b> <span>${escapeHTML(e.t)}</span><i>${escapeHTML(e.when || '')}</i></div>
+    </div>`).join('');
+  }
+  _fcToastsMaybe();
+}
+function _fcToastsMaybe() {
+  if (window._fcToasted) return;
+  const seed = window.__MOCK_FCUI__ || {};
+  const I = _fcIcons();
+  if (seed.mrrToast) {
+    window._fcToasted = 1;
+    setTimeout(() => _fcToast(I.trophy, seed.mrrToast), 1400);
+    if (seed.trialToast) setTimeout(() => _fcToast(I.check, seed.trialToast, 'green'), 9000);
+  }
+}
 
 function openCommandCenter() {
   // FCUI pilot: the flag replaces the command center with the FC Home shell
