@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-31 · HARMFUL 0, and a Stripe skills design for you",
+ "updated": "2026-07-31 · Stripe design handed to member management",
  "recentUpdates": [
+  "Handed the whole Stripe design to the member management chat with everything: the finding, all five places it lives, and the production numbers",
+  "Best fact for that conversation: GTA's members are ALREADY owned by the portal, 46 of 47. So it is not a new build, it is making GTA's shape repeatable",
+  "And GTA itself has 5 members with no contact link, which is exactly the gap contact matching closes",
+  "Nobody else has members at all, so there is no backfill problem, only a first-run problem",
   "All four harmful bugs are now fixed. The inventory reads HARMFUL 0 for the first time",
-  "Checked all five onboarding skills: NONE of them mentions Stripe, price match or contact match. It is in no skill at all",
-  "Designed the split for you as a visual: client connects any time, one skill runs immediately, one waits for prices, and the webhook thing stops being anyone's job",
-  "New standing rule from you: bugs get handled by a background agent from the chat that found them, never a chip that opens a new chat",
-  "Written into the playbook and memory so it outlives this conversation, and the rooms have been told",
-  "The catch it creates: a chip quietly deferred the 'is anyone else in this file' question to you. An agent does not, so that check now happens before spawning"
+  "Checked all five onboarding skills: NONE of them mentions Stripe, price match or contact match. It is in no skill at all"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",

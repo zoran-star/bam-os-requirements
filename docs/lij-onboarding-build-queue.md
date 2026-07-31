@@ -874,6 +874,37 @@ NEW: sb(`             ${encodeURIComponent(offerId)}         `)
 
 **⛔ ORCHESTRATOR CALL: STOP REFINING, HOLD UNTIL MERGE.** It asked, correctly, rather than deciding for itself. **The gate is complete; the last round found zero bugs and one non-improvement, which is the signal to stop rather than to go deeper.** Three PRs are blocked on a human, not on quality, and **polish landing after the bottleneck is free while polish landing before it is not.** The remaining risk is better carried by the next person, who now inherits a self-test, seven controls and written measurements instead of folklore.
 
+## 🎯 THE STRIPE WORK IS IN **NO SKILL AT ALL.** Design handed to MEMBER MANAGEMENT to finish with Zoran (2026-07-31)
+
+**Checked all five onboarding skills in `bam-client-sites/.claude/commands/`. `/branding-deck`, `/site-build`, `/sales-system`, `/ghl-migration` and `/agreement` mention Stripe, price match and contact match ZERO times between them.**
+
+**So this is not work sitting in the wrong skill. It is work in no skill**, surviving on a staff member knowing which buttons to press - which is exactly why it keeps being missed and exactly why Zoran raised it.
+
+**Where the five Stripe steps actually live:** the wizard step (`client-portal.html:18310`, the only CLIENT action) · the checklist tick and self-heal (`action-items.js:340`, `:435`) · the chunk gate requiring `prices > 0` (`setup-status.js:72-74`) · **price match** (`offers/match-prices.js`, staff click) · **contact match plus the webhook button** (`contacts/stripe-link.js`, the "Stripe Link-Up" staff view).
+
+**Zoran's direction, and the split follows real dependencies rather than tidiness:** client connects **at any time, no ordering constraint** · one skill fires on **connected alone** (contact match, everything needing no pricing) · one fires on **connected AND prices confirmed** (price match, which genuinely cannot run earlier) · **the webhook subscription belongs to neither**, being platform-wide and one-run-covers-all-47. Visual at `docs/plans/stripe-skills-split.html`. **Not formally approved; he saw it and moved the conversation.**
+
+### ⭐ "SUBSCRIPTION OWNED BY THE PORTAL" IS NOT A NEW BUILD. GTA ALREADY PROVES IT.
+
+`members` already carries `contact_id`, `ghl_contact_id`, `stripe_customer_id`, `stripe_subscription_id`, `stripe_price_id`, `stripe_joined_at`. Queried:
+
+| BAM GTA | |
+|---|---|
+| members | **47** |
+| with `stripe_subscription_id` | **46** |
+| with `stripe_price_id` | **46** |
+| with `contact_id` | **42** |
+
+**Two things fall out.** GTA's members are portal-owned already, which is why its billing actions work, **so the job is making GTA's shape reproducible rather than inventing it.** And **even GTA has 5 of 47 members with no contact link**, live today at the reference academy, which is precisely what contact match closes.
+
+**And the scope is far smaller than it sounds: BAM GTA is the ONLY academy with any members at all.** Every other academy including San Jose starts from zero, **so there is no backfill problem, only a first-run problem.**
+
+### Constraints carried into the handover
+
+**The contact sweep is PAGED** (5 x 100 per call, cursor until `has_more=false`, `maxDuration=60`), **so it cannot be fire-and-forget on connect** - it needs a job that runs to completion and is idempotent, because contacts usually arrive AFTER Stripe connects. **Price match needs a "not ready yet" state distinct from "nothing to do"**, or an unconfigured offer produces a silent no-op indistinguishable from success. **Ambiguous matches always need a human** and must not be designed away. **And two new chunks are two new chances to break the trigger-must-imply-prerequisites rule** that was the bug fixed in three places.
+
+**Open and HIS call, deliberately not decided:** whether these become two new skills or two new phases inside `/member-management`.
+
 ## 🚨 [PR #1676](https://github.com/zoran-star/bam-os-requirements/pull/1676) CARRIES A **MANDATORY DEPLOY-DAY STEP.** MERGING IT WITHOUT THAT STEP SHIPS THE EXACT PATTERN IT FIXES.
 
 **`POST /api/stripe/ensure-webhook-events` must run AFTER the merge**, or the handler is **tested and never called** - perfect code, passing suite, negative controls, and Stripe never sends the event.
