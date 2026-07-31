@@ -47,6 +47,7 @@ import { configureStaffSentryContext } from './lib/sentry';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useStaffMe } from './hooks/useStaffMe';
 import { IconDashboard, IconClients, IconTasks, IconCalendar, IconKnowledge, IconFinancials, IconMessage, IconSettings, IconAlert, IconSearch, IconTraining } from './components/primitives/Icons';
+import { SkelPage } from "./components/Skeleton.jsx";
 
 export default function BAMPortal() {
   const [session, setSession] = useState(undefined); // undefined = loading, null = not authed
@@ -898,7 +899,7 @@ export default function BAMPortal() {
 
             {/* Lazy-loaded views below. Suspense fallback is a tiny spinner so
                 the page doesn't blank out while the chunk downloads. */}
-            <Suspense key={viewEpoch} fallback={<div style={{ padding: 24, color: tk.textMute, fontSize: 13 }}>Loading…</div>}>
+            <Suspense key={viewEpoch} fallback={<SkelPage t={tk} />}>
               {/* CLIENTS — combined view (list + per-client detail with tabs). */}
               {nav === "clients" && (
                 <ClientsCombinedView

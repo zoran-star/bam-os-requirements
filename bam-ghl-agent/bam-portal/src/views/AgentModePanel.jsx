@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { authFetch } from "../lib/authFetch";
+import { SkelRows } from "../components/Skeleton.jsx";
 
 // BAM-staff control: per-academy agent autonomy mode. One switch governs BOTH
 // the Responded reply bot and the follow-up nudge engine.
@@ -75,7 +76,7 @@ export default function AgentModePanel({ tokens }) {
   }
 
   if (err) return <div style={{ padding: 24, color: red, fontFamily: F }}>⚠ {err}</div>;
-  if (!rows) return <div style={{ padding: 24, color: sub, fontFamily: F }}>Loading…</div>;
+  if (!rows) return <div style={{ padding: 24 }}><SkelRows n={4} avatar={false} /></div>;
 
   const seg = (on, danger) => ({
     background: on ? (danger ? red : accent) : "transparent",

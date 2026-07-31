@@ -4,6 +4,7 @@ import MessageThread from "../components/MessageThread";
 import ClientAvatar from "../components/ClientAvatar.jsx";
 import { supabase } from "../lib/supabase";
 import { useUrlState } from "../hooks/useUrlState";
+import { SkelRows } from "../components/Skeleton.jsx";
 
 // Staff inbox: list of every client conversation, sorted unread-first then by
 // most recent activity. Click → opens the thread in the right pane. Realtime
@@ -359,7 +360,7 @@ function NewMessagePicker({ tokens: t, onClose, onPick }) {
           {err && <div style={{ color: t.red, fontSize: 12, marginTop: 8 }}>{err}</div>}
         </div>
         <div style={{ flex: 1, overflowY: "auto", borderTop: `1px solid ${t.border}` }}>
-          {!clients && <div style={{ padding: 16, color: t.textMute, fontSize: 13 }}>Loading…</div>}
+          {!clients && <SkelRows n={5} t={t} pad="10px 16px" />}
           {clients && list.length === 0 && <div style={{ padding: 16, color: t.textMute, fontSize: 13, fontStyle: "italic" }}>No clients match.</div>}
           {list.map(c => (
             <button key={c.id} onClick={() => pick(c)} disabled={busyId === c.id}

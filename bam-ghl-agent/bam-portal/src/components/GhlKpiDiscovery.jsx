@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, Fragment } from "react";
+import { SkelRows } from "./Skeleton.jsx";
 
 // GHL KPI Discovery (beta) — read-only spike. Pulls an academy's GoHighLevel
 // pipeline (stages + opportunity counts) and asks Claude to map it onto a
@@ -897,7 +898,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
                 <button onClick={() => setDetail(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
               </div>
             </div>
-            {detail.loading ? <div style={{ color: t.textSub, fontSize: 13 }}>Loading…</div>
+            {detail.loading ? <SkelRows n={4} avatar={false} t={t} pad="9px 4px" />
               : detail.error ? <div style={{ color: t.red, fontSize: 13 }}>{detail.error}</div>
               : detail.items.length === 0 ? <div style={{ color: t.textSub, fontSize: 13 }}>No records in this window.</div>
               : (
@@ -981,7 +982,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
                 ? <>One row per person, time runs left → right. The line is their journey — <span style={{ color: t.accent, fontWeight: 700 }}>━</span> continued · <span style={{ color: t.textMute }}>┄</span> skipped a stage. Most-complete journeys on top, so lines never cross. ✕ deletes the record.</>
                 : <>Arrows connect the same person across stages. <span style={{ color: t.accent, fontWeight: 700 }}>→</span> continued · <span style={{ color: t.textMute }}>⇢</span> skipped a stage. Each column is sorted with the furthest-along on top, so the gaps fall to the bottom. <span style={{ color: t.amber, fontWeight: 700 }}>×N</span> = merged duplicates. ✕ deletes the record.</>}
             </div>
-            {board.loading ? <div style={{ color: t.textSub, fontSize: 13 }}>Loading…</div>
+            {board.loading ? <SkelRows n={4} avatar={false} t={t} pad="9px 4px" />
               : board.error ? <div style={{ color: t.red, fontSize: 13 }}>{board.error}</div>
               : (() => {
                   const rows = buildBoardRows(board);

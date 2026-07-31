@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { SkelStats, SkelRows } from "../components/Skeleton.jsx";
 
 // Commission & BAM Payment Calculator (Mike / BAM spec, 2026-07-25).
 // Staff-only: admin sees every client; a scaling manager sees only their own
@@ -49,7 +50,7 @@ export default function CommissionsView({ tokens, session, me }) {
   }, [data]);
 
   if (err) return <div style={{ color: "#e08b7e", padding: 24 }}>{err}</div>;
-  if (!data) return <div style={{ color: t.textMute, padding: 24 }}>Loading commissions…</div>;
+  if (!data) return <div><SkelStats n={3} t={t} /><div style={{ borderRadius: 12, border: `1px solid ${t.border}`, overflow: "hidden" }}><SkelRows n={6} t={t} /></div></div>;
 
   const configured = (data.clients || []).filter(c => c.payment_model);
   const unconfigured = (data.clients || []).filter(c => !c.payment_model);

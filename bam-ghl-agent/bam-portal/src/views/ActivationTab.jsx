@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SkelRows } from "../components/Skeleton.jsx";
 
 // Activation tab - the STAFF half of onboarding an academy to the GTA V2 state
 // (accepted design 2026-07-14). The owner's half lives in the client portal's
@@ -73,7 +74,7 @@ export default function ActivationTab({ client, tokens: t, session }) {
   );
 
   if (err) return <div style={{ color: "#e0654f", fontSize: 13 }}>Couldn't load activation status - {err} <button onClick={load} style={{ marginLeft: 8, background: "transparent", border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, padding: "5px 10px", cursor: "pointer", font: "inherit", fontSize: 12 }}>Retry</button></div>;
-  if (!data) return <div style={{ color: t.textMute, fontSize: 13 }}>Loading activation status…</div>;
+  if (!data) return <div style={{ maxWidth: 680 }}><SkelRows n={7} avatar={false} t={t} pad="10px 4px" /></div>;
 
   const it = data.items || {};
   const mg = data.ghl_migration || {};

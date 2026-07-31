@@ -24,6 +24,7 @@ import { supabase } from "../lib/supabase";
 import { useUrlState } from "../hooks/useUrlState";
 import ClientAvatar from "../components/ClientAvatar.jsx";
 import { showToast, uiConfirm, ToastHost, ConfirmHost } from "../components/dialogs.jsx";
+import { SkelRows } from "../components/Skeleton.jsx";
 
 // Lobby = unassigned working tickets (triage queue); Ongoing = the same working
 // statuses once someone is assigned. Assignment is the dividing line.
@@ -549,7 +550,7 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
           </h2>
           <span style={{ fontSize: 12, color: t.textMute }}>grouped by client · newest at top</span>
         </div>
-        {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading…</div>}
+        {loading && <SkelRows n={4} t={t} />}
         {!loading && clientActionTickets.length === 0 && (
           <div style={{ color: t.textMute, fontSize: 13, padding: "20px 0", fontStyle: "italic" }}>
             No tickets awaiting client action.

@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
+import { SkelRows } from "../components/Skeleton.jsx";
 
 const fmt = (iso) => {
   if (!iso) return "—";
@@ -132,7 +133,7 @@ export default function AgentSessionsPanel({ tokens: t, dark }) {
         </div>
       )}
       {loading && (
-        <div style={{ color: t.textMute, padding: 16 }}>Loading…</div>
+        <SkelRows n={5} avatar={false} t={t} />
       )}
       {!loading && sessions.length === 0 && !error && (
         <div style={{ padding: 32, textAlign: "center", color: t.textMute, fontSize: 14, border: `1px dashed ${t.border}`, borderRadius: 8 }}>
@@ -246,7 +247,7 @@ export default function AgentSessionsPanel({ tokens: t, dark }) {
 
             {/* Body — split panels */}
             <div style={{ flex: 1, overflow: "auto", padding: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-              {selectedDetail?.loading && <div style={{ gridColumn: "1 / -1", color: t.textMute }}>Loading…</div>}
+              {selectedDetail?.loading && <div style={{ gridColumn: "1 / -1" }}><SkelRows n={3} avatar={false} t={t} pad="8px 0" /></div>}
               {selectedDetail?.error && <div style={{ gridColumn: "1 / -1", color: "#f8b4b4" }}>{selectedDetail.error}</div>}
               {selectedDetail && !selectedDetail.loading && !selectedDetail.error && (
                 <>

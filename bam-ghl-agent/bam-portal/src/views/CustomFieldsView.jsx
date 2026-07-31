@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
+import { SkelRows } from "../components/Skeleton.jsx";
 
 // Custom Fields — staff-side manager for portal-native contact fields per
 // academy. Backed by /api/custom-fields (custom_field_defs). Pick an academy,
@@ -125,7 +126,7 @@ export default function CustomFieldsView({ tokens, session }) {
       {!clientId ? (
         <div style={{ ...card, textAlign: "center", color: t.textSub }}>Pick an academy to manage its custom fields.</div>
       ) : loading ? (
-        <div style={{ ...card, textAlign: "center", color: t.textSub }}>Loading…</div>
+        <div style={{ ...card, padding: 0, overflow: "hidden" }}><SkelRows n={4} avatar={false} t={t} /></div>
       ) : fields.length === 0 ? (
         <div style={{ ...card, textAlign: "center", color: t.textSub }}>
           No custom fields yet. Click <b style={{ color: t.text }}>+ Add field</b> to create the first one.
