@@ -79,6 +79,9 @@ type PriceRow = {
   amount_cents: number;
   currency: string;
   billing_interval: string | null;
+  // Optional on purpose: the column ships ahead of its migration, and a row read
+  // before it lands simply has no such key. See loadSyncArgs' fallback select.
+  billing_cadence?: string | null;
   stripe_price_id: string | null;
   stripe_product_id: string | null;
   source_offer_id: string | null;
@@ -123,6 +126,10 @@ type PlannedPrice = {
   action: "create" | "update" | "unchanged" | "skip";
   changes: Partial<PriceRow>;
   skipReason?: string;
+  // The billing cadence this key already bills on, INHERITED from whatever typed
+  // row currently carries it. null means "no cadence anywhere for this key",
+  // which is every key today and which writes nothing at all.
+  cadence: string | null;
 };
 
 type PlannedTemplate = {
@@ -163,6 +170,67 @@ export function billingIntervalOf(row: Pick<CatalogRow, "offer_price_key" | "int
   if (term === "one_time") return "one_time";
   if (term === "signup_fee") return "one_time";   // Build S: sign-up fee row
   return row.interval;
+}
+
+// ---- billing cadence, carried across a deactivate-and-recreate
+//
+// Cadence lives on the typed price row and NOWHERE upstream: pricing_catalog has
+// no such column, so a recreated row cannot re-derive it. This sync DEACTIVATES a
+// superseded row rather than deleting it and inserts a fresh one, so without this
+// a re-mint silently DROPS the cadence: the dead row still says 12_weeks, the new
+// live row says NULL, and api/website/checkout.js bills the live one on calendar
+// months while the Stripe price it points at charges every 12 weeks. Nobody gets
+// an error. The parent just gets charged on the wrong clock.
+//
+// The rules, in order:
+//   1. A cadence already on the row WINS. Nothing upstream can authorize clearing
+//      it, because "the catalog says none" is silence, not an instruction.
+//   2. Otherwise inherit from a sibling row for the SAME key in the SAME offer -
+//      offer_price_key is only unique within an offer, so an unscoped match could
+//      hand one offer's clock to another's price.
+//   3. An ACTIVE sibling's STATE IS THE ANSWER - INCLUDING when that state is no
+//      cadence at all. Rule 3 used to read "an active row with a cadence wins",
+//      which is a different rule and does not do what this comment promised: a row
+//      whose cadence was deliberately CLEARED fell through the empty-check and a
+//      stale DEAD sibling resurrected the very value someone had just removed. The
+//      live row is what checkout BILLS, so its silence is an instruction too.
+//   4. Only when there is no active sibling at all does a dead one supply the
+//      cadence - which is the deactivate-and-recreate case rule 2 exists for.
+//   5. Deterministic, always. Two dead siblings that disagree used to be resolved
+//      by whatever order Postgres returned, so the clock a re-minted price is
+//      billed on could differ between two identical syncs. Siblings are sorted by
+//      sort_order then id before any of the above is applied.
+// It only ever carries a cadence FORWARD. It can add one to a row that has none;
+// it can never overwrite or clear one that does.
+//
+// The body below is deliberately free of TypeScript-only syntax so
+// api/_billing-cadence.test.mjs (plain node, no node_modules - this module's
+// imports reach Sentry and the Supabase client) can cut it out of this file and
+// run the SHIPPED code rather than a restatement of it. Only the signature line
+// is rewritten by that suite, and it fails loudly if the line has moved.
+export function cadenceForKey(existingPrices: PriceRow[], offerId: string, key: string, existingCadence: string | null | undefined): string | null {
+  if (existingCadence) return existingCadence;
+  // Siblings for this exact key in this exact offer, in a FIXED order, so that two
+  // identical syncs cannot mint on two different clocks.
+  const siblings = existingPrices
+    .filter((p) => p.source_offer_id === offerId && p.source_offer_price_key === key)
+    .sort((a, b) =>
+      ((Number(a.sort_order) || 0) - (Number(b.sort_order) || 0)) ||
+      String(a.id || "").localeCompare(String(b.id || "")));
+  // Rule 3. The first ACTIVE sibling answers, and "" answers null: a cleared live
+  // row means cleared, not "ask the dead rows".
+  for (const p of siblings) {
+    if (!p.is_active) continue;
+    const live = typeof p.billing_cadence === "string" ? p.billing_cadence.trim() : "";
+    return live || null;
+  }
+  // Rule 4. No live row for this key - this is the recreate case, so carry the
+  // superseded row's cadence forward.
+  for (const p of siblings) {
+    const dead = typeof p.billing_cadence === "string" ? p.billing_cadence.trim() : "";
+    if (dead) return dead;
+  }
+  return null;
 }
 
 function ruleDisplayLabel(rule: EntitlementRule): string {
@@ -292,6 +360,7 @@ export function buildSyncPlan(args: {
     const isRoutable = row.is_routable === true && !archived.has(optionKey) && hasRule;
     const planIdx = planKeys.indexOf(optionKey);
     const sortOrder = (planIdx + 1) * 10 + termOrder(row.offer_price_key);
+    const inheritedCadence = cadenceForKey(existingPrices, offer.id, row.offer_price_key, null);
 
     let existing = priceByCatalogId.get(row.id) || null;
     let skipReason: string | undefined;
@@ -313,6 +382,7 @@ export function buildSyncPlan(args: {
       prices.push({
         catalog: row, optionKey, title: row.display_name || row.offer_price_key,
         isActive, isRoutable, sortOrder, existing: null, action: "skip", changes: {}, skipReason,
+        cadence: inheritedCadence,
       });
       continue;
     }
@@ -321,6 +391,8 @@ export function buildSyncPlan(args: {
       prices.push({
         catalog: row, optionKey, title: row.display_name || row.offer_price_key,
         isActive, isRoutable, sortOrder, existing: null, action: "create", changes: {},
+        // The recreated row inherits the clock its predecessor was billing on.
+        cadence: inheritedCadence,
       });
       continue;
     }
@@ -338,11 +410,17 @@ export function buildSyncPlan(args: {
     if (existing.source_offer_price_key !== row.offer_price_key) changes.source_offer_price_key = row.offer_price_key;
     if (existing.is_active !== isActive) changes.is_active = isActive;
     if (existing.is_routable !== isRoutable) changes.is_routable = isRoutable;
+    // Cadence converges ONE WAY: a sibling's cadence can be ADOPTED by a row that
+    // has none (the reuse-by-stripe_price_id half of the same orphaning bug the
+    // insert path fixes), never overwritten and never cleared.
+    const desiredCadence = cadenceForKey(existingPrices, offer.id, row.offer_price_key, existing.billing_cadence);
+    if (desiredCadence && !existing.billing_cadence) changes.billing_cadence = desiredCadence;
 
     prices.push({
       catalog: row, optionKey, title: existing.title,
       isActive, isRoutable, sortOrder, existing,
       action: Object.keys(changes).length ? "update" : "unchanged", changes,
+      cadence: desiredCadence,
     });
   }
 
@@ -464,6 +542,12 @@ async function applyPlan(
       amount_cents: price.catalog.amount_cents ?? 0,
       currency: price.catalog.currency || "cad",
       billing_interval: billingIntervalOf(price.catalog),
+      // The clock, carried over from the row this one replaces. The key is OMITTED
+      // entirely when there is no cadence, which is every key today - so this
+      // insert is byte-identical to the pre-cadence one, and it cannot fail on a
+      // database where the column does not exist yet (a cadence can only be
+      // non-null if some row was already read carrying one).
+      ...(price.cadence ? { billing_cadence: price.cadence } : {}),
       stripe_price_id: price.catalog.stripe_price_id,
       stripe_product_id: price.catalog.stripe_product_id,
       source_offer_id: price.catalog.offer_id,
@@ -619,12 +703,25 @@ export async function runOffersSync(supabase: RuntimeSupabaseClient, body: SyncB
     .eq("source_offer_id", offerId);
   const existingOptions = assertRows<OptionRow>(optionData, optionError);
 
-  const { data: priceData, error: priceError } = await supabase
-    .from("offer_prices")
-    .select(
-      "id, offer_option_id, title, amount_cents, currency, billing_interval, stripe_price_id, stripe_product_id, source_offer_id, source_offer_price_key, source_pricing_catalog_id, is_active, is_routable, sort_order",
-    )
-    .eq("tenant_id", clientId);
+  // billing_cadence ships AHEAD of its migration, and PostgREST fails the WHOLE
+  // select over one unknown column. This read feeds the entire sync, so ask for
+  // the column and, when the database does not have it yet, ask again without it.
+  // What comes back is rows with no billing_cadence key, which is exactly the
+  // state buildSyncPlan treats as "no cadence anywhere".
+  const PRICE_COLS =
+    "id, offer_option_id, title, amount_cents, currency, billing_interval, stripe_price_id, stripe_product_id, source_offer_id, source_offer_price_key, source_pricing_catalog_id, is_active, is_routable, sort_order";
+  // Ordered on purpose. cadenceForKey sorts its own candidates, but an unordered
+  // read is whatever Postgres felt like returning, and this list also decides which
+  // rows are deactivated and in what order they are reported. A sync whose output
+  // can differ between two identical runs is a sync nobody can review.
+  const readPrices = (cols: string) =>
+    supabase.from("offer_prices").select(cols).eq("tenant_id", clientId)
+      .order("sort_order", { ascending: true }).order("id", { ascending: true });
+  let { data: priceData, error: priceError } = await readPrices(`${PRICE_COLS}, billing_cadence`);
+  if (priceError && /42703|does not exist/i.test(`${priceError.code || ""} ${priceError.message || ""}`)) {
+    console.warn("[offers-sync] offer_prices.billing_cadence is not in the schema yet (migration pending) - re-reading without it");
+    ({ data: priceData, error: priceError } = await readPrices(PRICE_COLS));
+  }
   const existingPrices = assertRows<PriceRow>(priceData, priceError);
 
   const priceIds = existingPrices.map((p) => p.id);

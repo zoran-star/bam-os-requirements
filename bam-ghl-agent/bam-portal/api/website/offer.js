@@ -241,6 +241,34 @@ function termFromLength(length) {
 
 const TERM_LABELS = { monthly: "Monthly (billed every 4 weeks)", "3_months": "3 months", "6_months": "6 months" };
 
+// ── Billing cadence labels ───────────────────────────────────────────────────
+// offer_prices.billing_cadence says how a price actually re-bills, separately
+// from the term key that names the commitment. The vocabulary is owned by
+// CADENCES in api/website/checkout.js, which is what actually charges; this map
+// only puts a human phrase on each one. api/_billing-cadence.test.mjs fails if
+// the two key sets ever drift apart.
+const CADENCE_LABELS = {
+  "4_weeks": "every 4 weeks",
+  monthly: "monthly",
+  "12_weeks": "every 12 weeks",
+  "24_weeks": "every 24 weeks",
+  "3_calendar_months": "every 3 months",
+  "6_calendar_months": "every 6 months",
+};
+// What a row with NO cadence bills as today. Mirrors intervalFor(term) in
+// api/website/checkout.js, so the card describes the charge that is really made
+// rather than the one the term key implies.
+const LEGACY_TERM_CADENCE_LABELS = {
+  monthly: "every 4 weeks",
+  "4_weeks": "every 4 weeks",
+  "3_months": "every 3 months",
+  "6_months": "every 6 months",
+};
+function cadenceOf(row) {
+  const raw = row && row.billing_cadence != null ? String(row.billing_cadence).trim().toLowerCase() : "";
+  return raw && Object.prototype.hasOwnProperty.call(CADENCE_LABELS, raw) ? raw : null;
+}
+
 // Pick the catalog row to charge for one offer_price_key: must be routable;
 // prefer the canonical tier; otherwise the first routable row.
 function pickRoutable(rows) {
@@ -249,7 +277,12 @@ function pickRoutable(rows) {
   return routable.find((r) => r.tier === "canonical") || routable[0];
 }
 
-function buildPricing(offer, catalogRows) {
+// `typedRows` are the offer_prices rows (the same rows checkout bills from).
+// They are the ONLY place billing_cadence lives - pricing_catalog has no such
+// column - so the cadence is looked up by offer_price_key rather than read off
+// the catalog row. Optional and additive: no typed rows, or a schema without the
+// column yet, and every entry simply reports the legacy cadence for its term.
+function buildPricing(offer, catalogRows, typedRows) {
   const offerings = ((offer.data && offer.data.pricing && offer.data.pricing.pricing_offerings) || [])
     .filter((o) => o && !o.archived && String(o.type || "").toLowerCase() === "membership" && String(o.title || "").trim());
 
@@ -259,6 +292,14 @@ function buildPricing(offer, catalogRows) {
     if (!r.offer_price_key) continue;
     if (!byKey.has(r.offer_price_key)) byKey.set(r.offer_price_key, []);
     byKey.get(r.offer_price_key).push(r);
+  }
+  // Cadence by the same key, from the typed rows. First one wins; a key with no
+  // typed row is simply absent from the map.
+  const cadenceByKey = new Map();
+  for (const r of typedRows || []) {
+    const k = r && r.source_offer_price_key;
+    if (!k || cadenceByKey.has(k)) continue;
+    cadenceByKey.set(k, cadenceOf(r));
   }
 
   const out = [];
@@ -278,6 +319,7 @@ function buildPricing(offer, catalogRows) {
     }
     for (const opt of options) {
       const row = pickRoutable(byKey.get(opt.key));
+      const cadence = cadenceByKey.get(opt.key) || null;
       out.push({
         offer_price_key: opt.key,
         title,
@@ -291,6 +333,11 @@ function buildPricing(offer, catalogRows) {
         interval: row ? row.interval : null,
         // Build S: null when this plan has no fee OR this option waives it.
         signup_fee_cents: (planFee && opt.feeCharged) ? planFee.amount_cents : null,
+        // ADDITIVE. billing_cadence is null for every row that has none, which is
+        // every row today; cadence_label always says how the charge really
+        // repeats, so a card can print it without knowing any of this.
+        billing_cadence: cadence,
+        cadence_label: CADENCE_LABELS[cadence] || LEGACY_TERM_CADENCE_LABELS[opt.term] || null,
       });
     }
   }
@@ -373,11 +420,24 @@ async function handler(req, res) {
     // to /api/website/checkout instead of the legacy offer_price_key.
     let purchasable = [], signupFees = [];
     try {
-      purchasable = (await sbReq(
+      // billing_cadence ships AHEAD of its migration, and PostgREST 400s the
+      // WHOLE select over one unknown column - which on this path would empty the
+      // purchasable list and take the enroll page's typed selectors with it. So
+      // ask for the column, and on ANY failure fall back to the exact select that
+      // shipped before it existed. Blind rather than narrow on purpose: sbReq
+      // throws `Supabase <status>` and discards the body, so a 42703 is not
+      // distinguishable here, and the fallback IS today's query - strictly better
+      // than the empty list this catch would otherwise produce.
+      const typedSelect = (withCadence) =>
         `offer_prices?tenant_id=eq.${encodeURIComponent(client_id)}&source_offer_id=eq.${offer.id}` +
         `&is_routable=eq.true&is_active=eq.true&order=sort_order.asc` +
-        `&select=id,title,amount_cents,currency,billing_interval,source_offer_price_key`
-      )) || [];
+        `&select=id,title,amount_cents,currency,billing_interval,source_offer_price_key${withCadence ? ",billing_cadence" : ""}`;
+      try {
+        purchasable = (await sbReq(typedSelect(true))) || [];
+      } catch (_) {
+        console.warn("[website/offer] offer_prices.billing_cadence is not readable yet (migration pending) - re-reading without it");
+        purchasable = (await sbReq(typedSelect(false))) || [];
+      }
       // Build S: a `<plan>|signup_fee` row is a one-time RIDER on an enrollment,
       // never something a parent can buy on its own. Keep it out of the
       // purchasable list (checkout attaches it as an invoice line instead) and
@@ -479,7 +539,9 @@ async function handler(req, res) {
       },
       intake_fields: buildIntakeFields(offer, [...coreDefs, ...onbDefs]),
       lead_fields: buildFields(offer, [...coreDefs, ...salesDefs], "sales"),
-      pricing: buildPricing(offer, catalogRows),
+      // `purchasable` is passed for its billing_cadence only; every existing
+      // pricing[] field still comes from the catalog rows exactly as before.
+      pricing: buildPricing(offer, catalogRows, purchasable),
       purchasable,
       signup_fees: signupFees,
       trial,

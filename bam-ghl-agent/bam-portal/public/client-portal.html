@@ -46323,7 +46323,12 @@ async function _sorterProposeMissing(key) {
     const r = await fetch('/api/offers/create-price', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ client_id: _aiClientId(), mode: 'propose', targets: [{ key: t.key, offering: t.offering, term: t.term, base_cents: t.base_cents, allin_cents: t.allin_cents, fee_label: t.fee_label, label: t.label }] }),
+      // offer_id is forwarded so the server can look up the price row's billing
+      // cadence: offer_price_key is only unique WITHIN an offer, so without it the
+      // lookup correctly refuses to answer and the proposal falls back to the
+      // term's shape - showing "every 3 months" for a row that bills every 12
+      // weeks. The apply payload below already carries the same t.offer_id.
+      body: JSON.stringify({ client_id: _aiClientId(), mode: 'propose', targets: [{ key: t.key, offer_id: t.offer_id, offering: t.offering, term: t.term, base_cents: t.base_cents, allin_cents: t.allin_cents, fee_label: t.fee_label, label: t.label }] }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
