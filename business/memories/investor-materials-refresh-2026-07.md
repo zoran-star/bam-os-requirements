@@ -4,11 +4,15 @@ The one-pager (`business/business/summary.html`, live at `/summary`) and the mai
 (`business/business/fullcontrol-investor-playbook.html`, live at `/playbook`) were rewritten
 from "here's the plan" to "the product is real". Zoran to confirm before anything goes external.
 
-Two framing decisions from Cole (2026-07-31), keep them in any future edit:
+Framing decisions from Cole (2026-07-31), keep them in any future edit:
 - **"Beta testing", not "live/production"** - the product claims say beta with real operators.
 - **Not raising now.** These docs put FullControl on investors' radar for when the round opens,
   which happens on the strength of real MRR ("the round opens on the back of that curve").
   Investment section is future-tense; CTA invites following the build, not booking a pitch.
+- **Hawkeye is the investor-facing agent name**, framed as one of a family of per-area agents
+  (marketing, member management next). "Sage" is retired from the playbook.
+- **Pricing v2 + re-curved model** (see `../pricing-gtm-strategy.md` top block): Core $429,
+  Founding $399, Growth $799, Scale $1,499+, ~$500 blended; $31K MRR @ m9 -> $168K/$2.0M @ m24.
 
 ## The narrative shift
 
