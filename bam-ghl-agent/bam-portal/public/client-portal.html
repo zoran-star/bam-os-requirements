@@ -71,6 +71,7 @@ if (window.__MOCK__) (() => {
       organic_content: true, ads_content_approval_required: false,
       onboarding_feedback_requested_at: null, onboarding_feedback_submitted_at: null,
       contact_provider: 'ghl', ghl_location_id: 'mock-loc-1', archived_at: null, created_at: iso(60),
+      time_zone: 'America/New_York',   // sales-card trials window reads this (matches the mock calendars tz)
     }],
     client_users: [
       { id: 'cu-1', client_id: CID, user_id: 'mock-user-1', name: 'Alex Carter', email: 'demo@northsidehoops.com', role: 'owner', status: 'active', hide_from_team: false, last_seen_at: iso(0), created_at: iso(60) },
@@ -543,19 +544,22 @@ if (window.__MOCK__) (() => {
     // Sales preset card KPIs (mobile Sales section): 6 of 15 qualified closed,
     // 4 sales this week, plus the per-row payload the qualified-trials focus
     // overlay renders. Contact ids reuse OPPS leads so row taps open contacts.
+    // Rows mirror the real endpoint's shape: date_kind 'trial' normally,
+    // 'review' when no booking bridged (Chidi exercises the honest label);
+    // closed rows carry converted_at = members.joined_date (date-only).
     if (p === '/api/sales-kpis') {
       const closed_rows = [
         ['Zaire Thompson', 'Rochelle Thompson', 'lead-4', 19, 16], ['Luca Bianchi', 'Sofia Bianchi', 'lead-5', 17, 11],
         ['Amari Grant', 'Denise Grant', 'lead-6', 13, 12], ['Ravi Patel', 'Meera Patel', 'lead-1', 10, 5],
         ['Kaya Osei', 'Femi Osei', 'lead-3', 9, 3], ['Jordan Wu', 'Mei Wu', 'lead-2', 6, 1],
-      ].map(r => ({ athlete: r[0], parent: r[1], contact_id: r[2], trial_at: iso(r[3]), converted_at: iso(r[4]) }));
+      ].map(r => ({ athlete: r[0], parent: r[1], contact_id: r[2], trial_at: iso(r[3]), date_kind: 'trial', converted_at: iso(r[4]).slice(0, 10) }));
       const open_rows = [
         ['Eli Sanders', 'Leo Sanders', 'lead-7', 0], ['Nico Reyes', 'Carmen Reyes', 'lead-9', 4],
         ['Tyler Moss', 'Renee Moss', 'lead-10', 7], ['Sana Malik', 'Iram Malik', 'lead-11', 11],
         ['Deja Adams', 'Sasha Adams', 'lead-13', 14], ['Arjun Patel', 'Kira Patel', 'lead-14', 18],
         ['Jade Roberts', 'Tia Roberts', 'lead-8', 21], ['Mia Lin', 'Grace Lin', 'lead-15', 24],
         ['Chidi Okafor', 'Tom Okafor', 'lead-16', 28],
-      ].map(r => ({ athlete: r[0], parent: r[1], contact_id: r[2], trial_at: iso(r[3]) }));
+      ].map(r => ({ athlete: r[0], parent: r[1], contact_id: r[2], trial_at: iso(r[3]), date_kind: r[2] === 'lead-16' ? 'review' : 'trial' }));
       return { qualified: 15, closed: 6, sales_week: 4, closed_rows, open_rows };
     }
     if (p === '/api/agent-config') return act === 'get-mode' ? { mode: 'approve' } : { ok: true };
@@ -12695,6 +12699,11 @@ Then the call to action."]</div>
         #mag-list { overflow-anchor: none; padding-bottom: 40px; }
 
         .mag-day { padding: 0 16px; }
+        /* TODAY: a light gold tint edge to edge behind the day header and its
+           session rows (.mag-day spans the full width; its 16px side padding
+           sits inside the box, so the background bleeds to both edges). The
+           gold TODAY pill stays - this is additive. */
+        #mag-today-anchor { background: var(--gold-sheen); padding-bottom: 6px; }
         .mag-dayhd { display: flex; align-items: baseline; gap: 8px; padding: 14px 0 7px; }
         .mag-dayhd .dw { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--text-mute); }
         .mag-dayhd .dn { font-size: 16px; font-weight: 800; color: var(--text); }
@@ -61680,13 +61689,16 @@ function _spcOn() { return window.matchMedia('(max-width: 768px)').matches; }
 
 // Does any live offer carry the free-trial preset stamp? Same offers read the
 // Team notification pills do (_bbNotifLoad: offers.data.sales.preset_key),
-// memoized so Sales can re-mount without re-querying.
+// memoized so Sales can re-mount without re-querying. Only a DEFINITIVE answer
+// is memoized: a failed query clears the memo so the next mount retries,
+// instead of caching a transient failure as "no preset" until full reload.
 function _spcHasPreset() {
   if (!_SPC_PRESET_P) _SPC_PRESET_P = (async () => {
     try {
-      const { data } = await _sb.from('offers').select('data').eq('client_id', CLIENT_ID).neq('status', 'archived');
+      const { data, error } = await _sb.from('offers').select('data').eq('client_id', CLIENT_ID).neq('status', 'archived');
+      if (error) throw error;
       return (data || []).some(o => o && o.data && o.data.sales && o.data.sales.preset_key === 'free_trial');
-    } catch (_) { return false; }
+    } catch (_) { _SPC_PRESET_P = null; return false; }
   })();
   return _SPC_PRESET_P;
 }
@@ -61695,6 +61707,11 @@ function _spcStyle() {
   if (document.getElementById('spc-style')) return;
   const st = document.createElement('style'); st.id = 'spc-style';
   st.textContent = '@media(max-width:768px){'
+    /* When the preset card is live it IS the mobile KPI row: hide the old
+       separate tiles (trials today / close rate / sales week) underneath it.
+       Academies without the preset never get .spc-live, so they keep their
+       tiles - and desktop keeps them everywhere (mobile media query only). */
+    + '#cc-sales-mount.spc-live .cc-sal-kpis,#cc-sales-mount.spc-live .cc-sal-weekbox{display:none}'
     + '.spc-card{font-family:var(--font-ui);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-card);margin-bottom:14px}'
     /* Stats row. The LEFT stat is the list's headline: left-aligned over the
        times below, with a gold notch riding ON the separator (the row's
@@ -61760,6 +61777,7 @@ async function _spcMount() {
   card.innerHTML = _spcKpisHTML()
     + '<div class="spc-tlist" id="spc-tlist"><div class="req-empty" style="padding:12px 16px"><span class="req-spin"></span> Loading trials…</div></div>';
   mount.prepend(card);
+  mount.classList.add('spc-live');   // the card replaces the old KPI tiles on mobile
   _spcLoadTrials();
   _spcLoadKpis();
 }
@@ -61790,18 +61808,59 @@ function _spcTime(startIso) {
   catch (_) { try { return new Date(startIso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); } catch (_) { return ''; } }
 }
 
-// Today's trials: /api/website/calendars for [today 00:00, tomorrow), flattened
-// to one row per attendee (trial booking). FORM chips come from the confirm
-// agent's pending post_trial cards, matched contact-id + slot-start exactly like
-// the mobile calendar's _magLoadForms. Forms are additive: if that call fails
-// there are just no FORM chips, never a broken card.
+// The ACADEMY's timezone (clients.time_zone), memoized. The trials-today
+// window must be the academy's calendar day, not the viewing device's: a
+// viewer in any timezone should see the academy's day. Falls back to the
+// _SPC.tz default (later corrected by the calendars response timezone).
+let _SPC_TZ_P = null;
+function _spcAcademyTz() {
+  if (!_SPC_TZ_P) _SPC_TZ_P = (async () => {
+    try {
+      const { data, error } = await _sb.from('clients').select('time_zone').eq('id', CLIENT_ID).maybeSingle();
+      if (error) throw error;
+      if (data && data.time_zone) return data.time_zone;
+    } catch (_) { _SPC_TZ_P = null; }   // transient failure: retry next load
+    return _SPC.tz;
+  })();
+  return _SPC_TZ_P;
+}
+
+// [midnight, next midnight) of "today" IN tz, as UTC instants (Intl-based,
+// DST-safe: the offset is re-derived from the first approximation).
+function _spcDayWindow(tz) {
+  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(new Date()).split('-').map(Number);
+  const off = (ms) => {
+    const p = {};
+    for (const x of new Intl.DateTimeFormat('en-US', { timeZone: tz, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(ms))) p[x.type] = x.value;
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - ms;
+  };
+  const mid = (dayShift) => {
+    const guess = Date.UTC(ymd[0], ymd[1] - 1, ymd[2] + dayShift);
+    return Date.UTC(ymd[0], ymd[1] - 1, ymd[2] + dayShift) - off(guess - off(guess));
+  };
+  return { from: new Date(mid(0)), to: new Date(mid(1)) };
+}
+
+// Today's trials: /api/website/calendars for the ACADEMY's [today 00:00,
+// tomorrow) window, flattened to one row per attendee (trial booking). FORM
+// chips come from the confirm agent's pending post_trial cards, matched
+// contact-id + slot-start exactly like the mobile calendar's _magLoadForms.
+// Forms are additive: if that call fails there are just no FORM chips, never
+// a broken card.
 async function _spcLoadTrials() {
   try {
-    const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    const tz = await _spcAcademyTz();
+    let win;
+    try { win = _spcDayWindow(tz); _SPC.tz = tz; }
+    catch (_) {                                  // bad tz string: device-local day
+      const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+      win = { from: d0, to: new Date(d0.getTime() + 86400000) };
+    }
     const token = await _mreqAuthToken();
     const url = '/api/website/calendars?client_id=' + encodeURIComponent(CLIENT_ID)
-      + '&from=' + encodeURIComponent(d0.toISOString())
-      + '&to=' + encodeURIComponent(new Date(d0.getTime() + 86400000).toISOString());
+      + '&from=' + encodeURIComponent(win.from.toISOString())
+      + '&to=' + encodeURIComponent(win.to.toISOString());
     const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
     const j = await _safeJson(r);
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
@@ -61864,6 +61923,7 @@ function _spcRowTap(i) {
 }
 
 async function _spcLoadKpis() {
+  let err = null;
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/sales-kpis?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
@@ -61873,8 +61933,20 @@ async function _spcLoadKpis() {
       closed: Number(j.closed) || 0, qualified: Number(j.qualified) || 0, sales_week: Number(j.sales_week) || 0,
       closed_rows: Array.isArray(j.closed_rows) ? j.closed_rows : [], open_rows: Array.isArray(j.open_rows) ? j.open_rows : [],
     };
-  } catch (_) { _SPC.kpi = null; }   // cells stay '-' and untappable, card still renders
+  } catch (e) {
+    // Cells stay '-' and untappable, card still renders - but SAY SO with the
+    // same quiet error line _spcLoadTrials uses, never a silent dash.
+    _SPC.kpi = null;
+    err = e && e.message ? e.message : String(e);
+  }
   _spcPaintKpis();
+  const old = document.getElementById('spc-kpi-err');
+  if (old) old.remove();
+  if (err) {
+    const kpis = document.getElementById('spc-kpis');
+    if (kpis) kpis.insertAdjacentHTML('afterend',
+      '<div class="spc-note" id="spc-kpi-err">Couldn\'t load sales stats: ' + escapeHTML(err) + '</div>');
+  }
 }
 
 function _spcOpenFocus() {
@@ -61883,13 +61955,18 @@ function _spcOpenFocus() {
   if (!ov) { ov = document.createElement('div'); ov.id = 'spc-focus'; document.body.appendChild(ov); }
   const pct = k.qualified ? Math.round(k.closed / k.qualified * 100) : 0;
   const openN = Math.max(0, k.qualified - k.closed);
-  const d = (v) => { try { return new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (_) { return ''; } };
+  // Date-only values (members.joined_date) are pinned to noon so the shown
+  // calendar day never shifts with the viewer's timezone.
+  const d = (v) => { try { return new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? v + 'T12:00:00' : v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (_) { return ''; } };
   const initials = (n) => String(n || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const row = (r, i, closed) => {
     const nm = r.athlete || r.parent || 'Athlete';
+    // date_kind 'review' = no booking could be resolved for this qualified
+    // trial, so trial_at is the review-filed time - label it honestly.
+    const when = (r.date_kind === 'review' ? 'Reviewed ' : 'Trial ') + d(r.trial_at);
     const sub = closed
-      ? ['Trial ' + d(r.trial_at), r.converted_at ? 'joined ' + d(r.converted_at) : ''].filter(Boolean).join(' · ')
-      : 'Trial ' + d(r.trial_at);
+      ? [when, r.converted_at ? 'joined ' + d(r.converted_at) : ''].filter(Boolean).join(' · ')
+      : when;
     return '<button type="button" class="spc-qrow' + (closed ? ' closed' : '') + '" onclick="_spcFocusTap(' + (closed ? 1 : 0) + ',' + i + ')">'
       + '<span class="av">' + escapeHTML(initials(nm)) + '</span>'
       + '<span class="b"><span class="n">' + escapeHTML(nm) + '</span><span class="s">' + escapeHTML(sub) + '</span></span>'
@@ -61936,7 +62013,7 @@ function _ccMountSales(host) {
           <div class="cc-sal-closehint" id="cc-sal-close-hint"></div>
         </div>
       </div>
-      <div class="cc-stat" style="margin-bottom:14px">
+      <div class="cc-stat cc-sal-weekbox" style="margin-bottom:14px">
         <div class="cc-sal-kpirow"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales in the past week</div></div>
         <div class="cc-sal-list" id="cc-sal-7d-names"></div>
       </div>
