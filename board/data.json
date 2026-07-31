@@ -1,17 +1,17 @@
 {
- "updated": "2026-07-31 · all merged. one click owed after the deploy",
+ "updated": "2026-07-31 · DEPLOY LANDED. one click is owed now",
  "recentUpdates": [
+  "DEPLOY LANDED and I checked the new button is actually there, not just that the deploy said success. Safe to click now",
+  "Go to the portal's Stripe view and run ensure-webhook-events. Without it the revocation fix is code Stripe never calls",
+  "That is the last thing standing between tonight's work and it actually being wired up",
   "All merged, including billing cadence and the Stripe revocation fix. Every price still bills exactly as before, verified in the database",
   "One click owed once the deploy lands: turning on the Stripe event in the portal. Without it that fix is code Stripe never calls",
-  "I am watching the deploy and will tell you the moment it is safe to click",
-  "Member management's build wave is COMPLETE. Two pull requests left: billing cadence, and the Stripe revocation fix",
-  "One of them has a mandatory step AFTER merging, or the code is perfect and Stripe never calls it. I own running it and confirming it took",
-  "Next phase is your ruling: onboard San Jose in pieces, learn, THEN write the skill. Not the other way round"
+  "I am watching the deploy and will tell you the moment it is safe to click"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
-   "AFTER I say the deploy landed: open the portal's Stripe view and run the ensure-webhook-events action. One click, not optional",
+   "DO THIS NOW: portal Stripe view, run ensure-webhook-events. Deploy is live and I verified the endpoint responds. One click",
    "CLOSE PR #1546 rather than merge it. The rename already shipped, production has zero old rows, and closing it unblocks the last harmful bug",
    "ROTATE THE STRIPE KEY that was pasted in the old /cancel skill. It was readable by every agent session. Deleting the file is not the same as rotating",
    "Want the 18 GTA emergency contacts pulled into a readable list for coaches as a stopgap? It is minors' family data, so your call, not mine",
