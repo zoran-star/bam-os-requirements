@@ -190,6 +190,36 @@ async function stripeFetch(path, { method = "GET", body, stripeAccount, idempote
 // Audit helper
 // ─────────────────────────────────────────────────────────
 
+// ─── Parent receipts (api/_member-receipts.js) ────────────────────────────────
+// Same shape, and the same reasoning, as the loader in api/stripe/webhook.js:
+// DYNAMIC import behind a cache, every failure swallowed. A module-load error here
+// must not be able to break `refund` - a staff member issuing a refund and getting
+// a 500 after Stripe already moved the money is a far worse outcome than a refund
+// confirmation that did not go out. A guard that can throw is not a guard.
+let _receipts = null;
+let _receiptsLoadFailed = false;
+async function receiptsModule() {
+  if (_receipts || _receiptsLoadFailed) return _receipts;
+  try {
+    _receipts = await import("./_member-receipts.js");
+  } catch (e) {
+    _receiptsLoadFailed = true;
+    console.error("[members] receipts module failed to load - receipts are OFF, billing actions are unaffected:", (e && e.message) || e);
+  }
+  return _receipts;
+}
+async function receiptsCall(fn, args) {
+  try {
+    const mod = await receiptsModule();
+    if (!mod || typeof mod[fn] !== "function") return { skipped: "receipts module unavailable" };
+    const { sendOn } = await import("./_send.js");
+    return await mod[fn]({ sb, sendOn, ...args });
+  } catch (e) {
+    console.error(`[members] receipts.${fn} failed (non-fatal):`, (e && e.message) || e);
+    return { error: String((e && e.message) || e).slice(0, 200) };
+  }
+}
+
 async function writeAudit({ client_id, member_id, action_type, args, performed_by, performed_by_name, stripe_response, db_changes }) {
   try {
     await sb("member_audit_log", {
@@ -282,6 +312,23 @@ async function handler(req, res) {
         }
         const rows = await sb(`member_audit_log?client_id=eq.${cid}&select=id,member_id,action_type,performed_by_name,created_at,args&order=created_at.desc&limit=500`);
         return res.status(200).json({ ok: true, log: Array.isArray(rows) ? rows : [] });
+      }
+
+      // ─── Receipts for one member: powers the drawer's Receipts list ───
+      // Degrades to an empty list before the migration (listReceipts swallows the
+      // missing-table error), so the drawer section simply does not render rather
+      // than showing an error to an academy that has no receipts feature yet.
+      if (req.query.action === "receipts") {
+        const mid = (req.query.member_id || "").toString();
+        if (!mid) return res.status(400).json({ error: "member_id required" });
+        const mrows = await sb(`members?id=eq.${encodeURIComponent(mid)}&select=id,client_id&limit=1`);
+        const m = Array.isArray(mrows) && mrows[0];
+        if (!m) return res.status(404).json({ error: "member not found" });
+        if (!isStaff && !clients.some((c) => c.id === m.client_id)) {
+          return res.status(403).json({ error: "not your member" });
+        }
+        const receipts = await receiptsCall("listReceipts", { clientId: m.client_id, memberId: m.id });
+        return res.status(200).json({ ok: true, receipts: Array.isArray(receipts) ? receipts : [] });
       }
 
       // ─── Cancellations feed: powers the members-focus KPI + Actions pages.
@@ -768,6 +815,20 @@ async function handler(req, res) {
     if (action === "update-profile") {
       try {
         return await actionUpdateProfile(res, member, ctx, body);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // Resend a receipt the academy already issued. Pure DB read + email - it
+    // re-renders from the stored row and never talks to Stripe - so it sits with
+    // update-profile and call, BEFORE the Stripe-connection gate below. That is
+    // deliberate rather than incidental: an academy that has disconnected Stripe
+    // must still be able to hand a parent a copy of a receipt for money that was
+    // taken while it was connected.
+    if (action === "resend-receipt") {
+      try {
+        return await actionResendReceipt(res, member, ctx, body);
       } catch (e) {
         return res.status(500).json({ error: e.message });
       }
@@ -1361,10 +1422,74 @@ async function actionRefund(res, member, stripeAccount, ctx, body) {
     db_changes: { refunds: "inserted" },
   });
 
+  // ── The parent's refund confirmation ──────────────────────────────────────
+  // AFTER Stripe accepted the refund and after the audit row, so the record of
+  // what staff did exists before we start talking to the parent about it.
+  //
+  // Gated exactly like a payment receipt (V2 academy + receipt_mode set), and a
+  // refund sends under BOTH modes: 'first_only' is a preference about routine
+  // billing mail, and money coming back is not routine.
+  //
+  // Non-fatal, deliberately and loudly: the money has ALREADY moved by this line.
+  // If the email fails, the receipt row records that (email_status 'failed') and
+  // staff can resend - but the API must still return ok, because telling a staff
+  // member their refund failed when it succeeded would have them issue a second one.
+  const receipt = await receiptsCall("sendRefundReceipt", {
+    member, refund, chargeId,
+  });
+
   return res.status(200).json({
     ok: true,
     refund: { id: refund.id, amount_cents: refund.amount, status: refund.status },
+    receipt,
   });
+}
+
+// ─────────────────────────────────────────────────────────
+// Action: RESEND-RECEIPT
+// ─────────────────────────────────────────────────────────
+// body: { receipt_id }
+//
+// Re-sends a receipt the academy already issued. It RE-RENDERS FROM THE STORED
+// ROW - it does not go back to Stripe and it does not recompute the tax. A receipt
+// is a document that was issued; reproducing it must not depend on nobody having
+// edited a price since, or the "copy" a parent gets on request would disagree with
+// the one they got at the time.
+//
+// The row is looked up scoped to this member AND this academy inside the module, so
+// a receipt id belonging to somebody else is simply not found.
+async function actionResendReceipt(res, member, ctx, body) {
+  const receiptId = body.receipt_id || body.id;
+  if (!receiptId) return res.status(400).json({ error: "receipt_id required" });
+
+  const out = await receiptsCall("resendReceipt", { member, receiptId });
+
+  // One audit row per resend. A receipt landing in a parent's inbox a second time
+  // is a thing a human chose to do, and the history has to say who and when.
+  await writeAudit({
+    client_id: member.client_id,
+    member_id: member.id,
+    action_type: "resend-receipt",
+    args: { receipt_id: receiptId, result: out },
+    performed_by: ctx.user.id,
+    performed_by_name: ctx.staff?.name || null,
+  });
+
+  if (out && out.error) return res.status(500).json({ error: out.error });
+  // THE CONTRACT, and the spread order is the contract.
+  //
+  // `...out` FIRST, `ok` LAST, so `ok` is always a real boolean that means "this
+  // reached the parent" - and specifically means it for the SKIPPED results too
+  // (receipt not found, no email on file), which carry no `ok` of their own and
+  // would otherwise leave it undefined. Undefined is falsy, so nothing would have
+  // looked broken; a caller reading `if (!j.ok)` would even be right. But a caller
+  // asserting `j.ok === false` would not be, and a 200 whose success flag is absent
+  // rather than false is exactly the ambiguity that let the command bar say "Done."
+  // over a send that never happened.
+  //
+  // ok === true if and only if email_status === 'sent'. Held and failed are 200s
+  // (the row was found and updated) and they are NOT successes.
+  return res.status(200).json({ ...out, ok: (out && out.email_status) === "sent" });
 }
 
 // Resolve a customer-facing promo code string to its live promotion code on the

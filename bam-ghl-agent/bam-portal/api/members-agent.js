@@ -121,6 +121,15 @@ const READ_TOOLS = [
     },
   },
   {
+    name: "list_receipts",
+    description: "List the receipts this academy has already issued to a member (payment receipts and refund confirmations), newest first: receipt_id, number, kind, amount, and whether the email was sent, held or failed. Call this BEFORE proposing resend-receipt - you need the receipt_id, and a receipt that was never issued cannot be resent.",
+    input_schema: {
+      type: "object",
+      properties: { member_id: { type: "string", description: "The member's uuid from find_members." } },
+      required: ["member_id"],
+    },
+  },
+  {
     name: "show_payments",
     description: "Display a member's recent payments as nicely formatted cards to the user, each with a Refund button. ALWAYS use this (never a text/markdown table) when the user asks to see, list, review, or pull up a member's payments, charges, or billing history. Give a one-line intro; the cards render below it. This is ONLY for payments - to open the member's contact/profile card use open_contact instead.",
     input_schema: {
@@ -307,6 +316,19 @@ const WRITE_TOOLS = [
       required: ["member_id"],
     },
   },
+  {
+    name: "resend-receipt",
+    description: "Email a parent another copy of a receipt the academy already issued (a payment receipt or a refund confirmation). Call list_receipts first to get the receipt_id - never guess one. It re-sends the ORIGINAL document from what was stored; it does not recalculate anything and it cannot create a receipt for a payment that was never receipted.",
+    input_schema: {
+      type: "object",
+      properties: {
+        member_id: { type: "string" },
+        receipt_id: { type: "string", description: "The receipt's uuid from list_receipts." },
+        receipt_number: { type: "string", description: "That receipt's number from list_receipts (e.g. BAMGTA-2026-0007). Pass it so the confirm card names the receipt a human can recognise instead of a uuid." },
+      },
+      required: ["member_id", "receipt_id"],
+    },
+  },
 ];
 
 const WRITE_TOOL_NAMES = new Set(WRITE_TOOLS.map(t => t.name));
@@ -365,8 +387,12 @@ function systemPrompt(academyName) {
     `decisions one at a time across turns: confirm the member, then the pause window, then the next payment date, then propose. ` +
     `State facts plainly with real dates and amounts ("Her next charge is $315.27 on Jul 20"). ` +
     `A history line like "(Executed: ...)" means that action already ran; "(Proposal cancelled ...)" means it did not.\n\n` +
+    `RECEIPTS: when a parent asks for a copy of a receipt, or staff say to "send them their receipt again", call list_receipts ` +
+    `(after find_members) to see what has actually been issued, then propose resend-receipt with that receipt_id and its receipt_number. ` +
+    `If list_receipts comes back empty, say plainly that no receipt was issued for that payment and stop - you cannot create one, ` +
+    `and there is no action that will.\n\n` +
     `Actions you can propose: pause (with an optional next-payment date), unpause, cancel, change plan (1/wk 2/wk 3/wk unlmtd), refund, apply/remove coupon, ` +
-    `payment link, card-setup link, referral credit, profile edits, and click-to-call. ` +
+    `payment link, card-setup link, referral credit, profile edits, click-to-call, and resending a receipt. ` +
     `To manually sign up a returning/new client, use start_returning_signup (opens the wizard).`
   );
 }
@@ -509,6 +535,39 @@ async function execGetMember(clientId, memberId, stripeAccountByClient) {
   return out;
 }
 
+// READ tool: the receipts this academy has already issued to this member.
+//
+// It exists so resend-receipt is USABLE rather than merely defined: the write tool
+// needs a receipt_id, and there is no other way for the agent to learn one. A tool
+// that can only be called with a value nobody can supply is a tool that never runs.
+//
+// Reads through listReceipts in api/_member-receipts.js - the same query the member
+// drawer uses - imported dynamically so a load failure degrades this ONE tool to an
+// empty list instead of 500ing the whole agent endpoint.
+async function execListReceipts(clientId, memberId) {
+  const rows = await sb(`members?id=eq.${encodeURIComponent(memberId)}&client_id=eq.${clientId}&select=id&limit=1`).catch(() => []);
+  if (!(Array.isArray(rows) && rows[0])) return { error: "member not found for this academy" };
+  let list = [];
+  try {
+    const mod = await import("./_member-receipts.js");
+    list = await mod.listReceipts({ sb, clientId, memberId });
+  } catch (e) {
+    console.error("[members-agent] receipts module unavailable:", (e && e.message) || e);
+    return { receipts: [], note: "receipts are not available right now" };
+  }
+  return {
+    receipts: (Array.isArray(list) ? list : []).map(r => ({
+      receipt_id: r.id,
+      receipt_number: r.receipt_number,
+      kind: r.kind,
+      amount_dollars: r.amount_cents != null ? +(r.amount_cents / 100).toFixed(2) : null,
+      currency: (r.currency || "cad").toUpperCase(),
+      date: r.created_at ? String(r.created_at).slice(0, 10) : null,
+      email_status: r.email_status,
+    })),
+  };
+}
+
 // DISPLAY tool: the member's recent charges shaped for the UI cards (amount,
 // date, status, refund state). Returned to the frontend as member_context so it
 // renders payment cards + a Refund button per charge, instead of a text table.
@@ -587,6 +646,10 @@ function summarize(action, name, input, body) {
     case "referred": return `Credit ${who}: ${input.count} referral${input.count > 1 ? "s" : ""} (+${input.count * 4} weeks)`;
     case "update-profile": return `Update ${who}: ${Object.keys(body.fields || {}).join(", ") || "profile"}`;
     case "call": return `Call ${who}`;
+    // Names the receipt by its NUMBER, not its uuid: the confirm card is read by a
+    // human deciding whether to put an email in front of a parent, and "resend
+    // BAMGTA-2026-0007" is a decision they can make. A uuid is not.
+    case "resend-receipt": return `Email ${who} another copy of receipt ${input.receipt_number || input.receipt_id}`;
     default: return `${action} for ${who}`;
   }
 }
@@ -728,6 +791,8 @@ async function handler(req, res) {
         } else if (t.name === "get_member") {
           result = await execGetMember(clientId, t.input?.member_id, stripeAccount);
           if (result && result.member_id) nameById[result.member_id] = result.athlete_name || result.parent_name;
+        } else if (t.name === "list_receipts") {
+          result = await execListReceipts(clientId, t.input?.member_id);
         } else {
           result = { error: `unknown tool ${t.name}` };
         }

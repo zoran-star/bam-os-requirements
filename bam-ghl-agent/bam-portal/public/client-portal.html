@@ -49941,6 +49941,14 @@ function _renderMemberModalBody(m, stripe, history, calls) {
       </div>
     ` : ''}
 
+    <!-- Receipts (member_receipts: what the PARENT was actually sent) -->
+    <!-- Distinct from Payment history above, which is what STRIPE recorded. A
+         payment can exist with no receipt (the academy has receipts off, or the
+         payment predates the feature), and a receipt can exist that never reached
+         an inbox (email_status 'held' / 'failed'). Loaded async so the section
+         renders empty and silent for every academy that has no receipts. -->
+    <div id="member-receipts-section" style="margin-top:16px"></div>
+
     ${divider}
 
     <!-- Custom Fields (portal-native contact_field_values) -->
@@ -49989,6 +49997,7 @@ function _renderMemberModalBody(m, stripe, history, calls) {
       ${stripeBtn}
     </div>
   `;
+  _loadMemberReceipts(m);
   _loadMemberDocs(m.id, m.client_id || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null));
   if (m.ghl_contact_id) _loadMemberInbox(m);
   if (m.ghl_contact_id) _loadMemberCustomFields(m);
@@ -50604,6 +50613,90 @@ function _mcCareFind(cardId) {
 // because marketing has to honor it.
 let _memberAgreementCache = null;
 
+// ── Receipts (member_receipts) ───────────────────────────────
+// What the PARENT was actually sent, which is a different question from the
+// Payment history above (what Stripe recorded). Renders NOTHING when there are no
+// receipts - which is every academy until clients.receipt_mode is set, and every
+// member whose payments predate the feature. A silent empty section is correct
+// here: an academy that does not send receipts should not be shown a receipts
+// heading with nothing under it.
+async function _loadMemberReceipts(m) {
+  const sec = document.getElementById('member-receipts-section');
+  if (!sec || !m || !m.id) return;
+  let rows = [];
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/members?action=receipts&member_id=' + encodeURIComponent(m.id), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    rows = Array.isArray(j.receipts) ? j.receipts : [];
+  } catch (_) { return; }   // never break the drawer over a receipts list
+  if (!rows.length) { sec.innerHTML = ''; return; }
+
+  const label = 'font-size:11px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--text-mute)';
+  const money = (c, cur) => (c == null) ? '-' : `$${(c / 100).toFixed(2)} ${(cur || 'CAD').toUpperCase()}`;
+  // 'sent' is the quiet state and gets no colour. 'held' and 'failed' are the ones
+  // staff need to SEE: a held receipt means the academy's email setup is not
+  // finished, and a failed one means the parent never got it. Both are fixed by
+  // Resend, which is why the button is on every row.
+  const tone = { sent: 'var(--text-mute)', held: '#c79a4a', failed: '#e0654f' };
+  sec.innerHTML = `
+    <div style="${label};margin-bottom:8px">Receipts</div>
+    <div style="display:grid;gap:5px">
+      ${rows.map(r => `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12.5px;padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+          <span style="display:flex;align-items:center;gap:9px;min-width:0">
+            <span style="color:var(--text-mute);white-space:nowrap">${escapeHTML(String(r.created_at || '').slice(0, 10))}</span>
+            <span style="color:var(--text);font-weight:700;white-space:nowrap">${escapeHTML(r.receipt_number || '-')}</span>
+            ${r.kind === 'refund' ? `<span style="color:#c79a4a;font-size:10.5px;font-weight:800">Refund</span>` : ''}
+          </span>
+          <span style="display:flex;align-items:center;gap:9px">
+            <b style="color:var(--text)">${money(r.amount_cents, r.currency)}</b>
+            <span style="color:${tone[r.email_status] || 'var(--text-mute)'};font-size:10.5px;font-weight:800;text-transform:capitalize">${escapeHTML(r.email_status || '')}</span>
+            <button onclick="_mResendReceipt('${escapeHTML(m.id)}','${escapeHTML(r.id)}','${escapeHTML(r.receipt_number || '')}')"
+              style="background:transparent;border:1px solid var(--border);color:var(--text-sub);padding:3px 9px;border-radius:4px;cursor:pointer;font:inherit;font-size:11px;font-weight:700">Resend</button>
+          </span>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ── The three outcomes of a resend, decided in ONE place ─────────────────────
+//
+// A resend can (1) reach the parent, (2) be HELD because the academy's email
+// sending is not set up yet, or (3) fail. /api/members returns 200 for all three,
+// because in all three the row was found and updated - the HTTP status is answering
+// "did the request work", not "did the parent get it". A caller that reads only the
+// status therefore reports success over a send that never left the building.
+//
+// That is not hypothetical: it is what the two agent confirm lanes did, pushing
+// "Done." on any 200. So the answer lives here, once, and all three surfaces read
+// it - the drawer's Resend button, the command bar, and the Members-tab agent. No
+// surface can invent a fourth, more optimistic outcome, and there is one sentence
+// to change if the wording is ever wrong.
+function _resendOutcome(result) {
+  const status = result && result.email_status;
+  if (status === 'sent') return { ok: true, text: 'Sent. The parent has another copy.' };
+  if (status === 'held') return { ok: false, text: "Not sent. This academy's email sending is not set up yet, so nothing left the building. The receipt is still on file - resend once setup is finished." };
+  return { ok: false, text: 'Not sent. The receipt is still on file - try again once email sending is working.' };
+}
+
+// Re-sends a receipt the academy already issued. It re-renders from the STORED
+// row server-side, so this cannot invent a receipt or change one - it puts the
+// same document in front of the parent again. Confirmed first, because it is an
+// email to a paying customer.
+async function _mResendReceipt(memberId, receiptId, number) {
+  if (!confirm(number ? `Email this parent another copy of receipt ${number}?` : 'Email this parent another copy of this receipt?')) return;
+  try {
+    const j = await _memberAction(memberId, 'resend-receipt', { receipt_id: receiptId });
+    _plToast(_resendOutcome(j).text);
+    await _loadMemberReceipts({ id: memberId });
+  } catch (e) {
+    _plToast('Resend failed: ' + e.message);
+  }
+}
+
 async function _loadMemberDocs(memberId, clientId) {
   const sec = document.getElementById('member-docs-section');
   if (!sec || !_sb || !memberId) return;
@@ -50989,6 +51082,10 @@ async function magentConfirm() {
       done = 'Link ready - write the message or copy the link.';
       _openPaymentLinkModal(p.member_id, result);
     }
+    // A resend returns 200 whether or not the email actually went. "Done." over a
+    // held send is the bot telling staff a parent has their receipt when nobody
+    // does - see _resendOutcome, which is the one place that distinction lives.
+    if (p.action === 'resend-receipt') done = _resendOutcome(result).text;
     _MAGENT.history.push({ role: 'assistant', text: done });
     magentRender();
     if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
@@ -62115,6 +62212,11 @@ async function _mmaAgentConfirm() {
     if ((p.action === 'payment-link' || p.action === 'card-setup-link') && result && result.url) {
       _mmaSay('Link ready - pick how to send it.', '');
       _openPaymentLinkModal(p.member_id, result);
+    } else if (p.action === 'resend-receipt') {
+      // Same reason as the command bar above, same single source of truth: the
+      // action ran (the history line says so), but whether a parent got anything
+      // is a different question and this is the only place that answers it.
+      _mmaSay(_resendOutcome(result).text, '');
     } else {
       _mmaSay('Done. ' + (p.summary || p.action), '');
     }
