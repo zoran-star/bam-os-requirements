@@ -1,16 +1,17 @@
 {
- "updated": "2026-07-31 · both chips blocked, and by real things",
+ "updated": "2026-07-31 · all 4 merged. 1546 should be closed, not merged",
  "recentUpdates": [
+  "All four merged: 1671, 1670, 1669 and the earlier three. The new safety check is live across the whole API",
+  "1546 I did NOT merge. It is already done. Somebody else shipped that rename days ago, plus a cleanup this branch does not have",
+  "Merging it would re-apply finished work and could undo the more careful version. Close it instead, and say the word",
+  "Good news: closing it unblocks the last of the four harmful bugs, which it was the only thing standing in front of",
   "Straight answer: no, neither of those two chips is running. I checked why, and both are genuinely blocked",
-  "The Stripe one would have collided with your receipts build, which is already in that file. Handed to that room instead of spawning a rival",
-  "The other is blocked by PR 1546, open since 21 July, untouched, and now in the way of its THIRD build. That one needs your call",
-  "Merged 1671 and 1670. The Miami email risk is closed and Stripe now tells owners what it actually wants",
-  "1669 is rebasing behind them, then it merges and the new safety check goes live across the whole API",
-  "Still yours: rotate the Stripe key, and send Lij his list"
+  "The Stripe one would have collided with your receipts build, which is already in that file. Handed to that room instead of spawning a rival"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
   "needs": [
+   "CLOSE PR #1546 rather than merge it. The rename already shipped, production has zero old rows, and closing it unblocks the last harmful bug",
    "ROTATE THE STRIPE KEY that was pasted in the old /cancel skill. It was readable by every agent session. Deleting the file is not the same as rotating",
    "Want the 18 GTA emergency contacts pulled into a readable list for coaches as a stopgap? It is minors' family data, so your call, not mine",
    "Tell Lij: do NOT reconnect Stripe. Finish the remaining items in his Stripe dashboard and the portal ticks itself",
@@ -22,7 +23,6 @@
    "SET UP TWILIO BITCH: 6 items, submit target Thursday, only 3 free attempts",
    "Meta CAPI token: 60% of GTA ad traffic is invisible until it exists",
    "Tell me what the 'Vercel deployment guide for Ant' chat is, it is unmapped",
-   "Decide on PR #1546 (stage rename, open since 21 July). It collides with 2 live builds. Rebase and merge, or accept a bigger rebase later",
    "Cole's inbox migration is still pending and deliberately unapplied. Tell me when you want it run",
    "Confirm real parent quotes are exempt from the no-em-dash rule. Two of GTA's five contain them",
    "Decide: build a heartbeat so we can tell a dead scheduled job from a quiet day? 33 jobs, none watched"

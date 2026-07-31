@@ -874,6 +874,25 @@ NEW: sb(`             ${encodeURIComponent(offerId)}         `)
 
 **⛔ ORCHESTRATOR CALL: STOP REFINING, HOLD UNTIL MERGE.** It asked, correctly, rather than deciding for itself. **The gate is complete; the last round found zero bugs and one non-improvement, which is the signal to stop rather than to go deeper.** Three PRs are blocked on a human, not on quality, and **polish landing after the bottleneck is free while polish landing before it is not.** The remaining risk is better carried by the next person, who now inherits a self-test, seven controls and written measurements instead of folklore.
 
+## ⛔ [PR #1546](https://github.com/zoran-star/bam-os-requirements/pull/1546) IS **SUPERSEDED, NOT STALE.** DO NOT MERGE IT. **AND CLOSING IT UNBLOCKS THE LAST HARMFUL PAIR.**
+
+Zoran asked for it to be rebased and merged. **It should be closed instead**, and the evidence is not an argument, it is four facts:
+
+| check | result |
+|---|---|
+| `pipeline_stages` with `role='interested'` in production | **0** (3 on `ghosted`) |
+| `opportunities` with `stage_role='interested'` | **0** (28 on `ghosted`) |
+| `stage_transitions` carrying `interested` | **0** |
+| Its two migration files on `origin/main` | **both already there** |
+
+**The rebase produced `add/add` CONFLICTS on BOTH migration files**, which is git saying main already contains them. **Main also carries a THIRD migration the branch does not have: `20260723143000_finish_ghosted_role_cleanup.sql`.** So the rename shipped by another route, **plus a follow-up cleanup this branch predates.**
+
+**⚠️ AND MAIN'S VERSION IS MORE CAREFUL THAN THE BRANCH'S.** Main keeps `interested` as a READ alias on purpose - `pipeline-cutover.js:70` says *"READING it still works everywhere (ROLE_MATCHERS, preset-master's ROLE_ALIASES..."*, and a committed test states it outright: **"ROLE_MATCHERS keeps that alias on purpose: this build stops WRITING the key, it does not stop anything from asking for it."** Hand-resolving #1546's conflicts to re-apply a completed rename risks reverting that, **in `client-portal.html` among other places, which is the estate's worst collision surface.**
+
+**📏 THE LESSON, AND IT IS ONE THIS FILE HAD NOT RECORDED: a PR can be superseded WITHOUT ANYONE CLOSING IT, and it goes on looking exactly like a stale PR that needs merging.** #1546 blocked three separate builds over ten days **on the strength of a collision that had already been resolved elsewhere.** Every collision check that flagged it was correct about the files and wrong about the consequence. **The cheap test nobody ran: does the branch's own migration already exist on main?** One command, and it settles supersession versus staleness.
+
+**✅ CONSEQUENCE, AND IT IS THE VALUABLE PART: the remaining HARMFUL pair (`contactInRespondedStage` / `contactInRole`) IS NO LONGER BLOCKED.** #1546 was the only open PR touching those files, and it is not going to land. **Once Zoran closes it, that build can start.**
+
 ## 🏆🏆 THE SENTENCE THIS WHOLE THREAD PRODUCED, from #1671's author closing out:
 
 > **A result consistent with success is not evidence of success unless you know what failure would have looked like.**
