@@ -1,12 +1,12 @@
 {
- "updated": "2026-07-31 · webhook DONE, and a Stripe finding that changes onboarding",
+ "updated": "2026-07-31 · calendar coverage routed to the calendar room",
  "recentUpdates": [
+  "Routed the calendar-running-dry problem to the mobile calendar room. It checks first, and only builds if it is genuinely unfixed",
+  "GTA has 32 days of bookable times left and nothing in the system extends them. The job that would is paused and has never run",
+  "Told them the durable fix covers every academy, not just GTA, because a GTA-only routine is the per-academy forking you keep ruling against",
   "The Stripe webhook click is DONE, verified against Stripe directly: 13 events, the revocation one subscribed. It then PROVED itself on a real event",
   "Lij's real Stripe is controlled by CoachIQ, and Stripe blocks us from connecting to accounts another app controls. Not our bug, not fixable our end",
-  "That generalises: 'did you set Stripe up yourself, or through another app?' belongs on the ask-list BEFORE anyone clicks connect",
-  "San Jose is back to not-connected on a different account, so anything saying its price scan is unblocked is stale",
-  "Handed the whole Stripe design to the member management chat with everything: the finding, all five places it lives, and the production numbers",
-  "Best fact for that conversation: GTA's members are ALREADY owned by the portal, 46 of 47. So it is not a new build, it is making GTA's shape repeatable"
+  "That generalises: 'did you set Stripe up yourself, or through another app?' belongs on the ask-list BEFORE anyone clicks connect"
  ],
  "orchestrator": {
   "focus": "Chats own their own builders and testers. I hold the two goals, the queue, routing and collisions. One track: automation templating.",
