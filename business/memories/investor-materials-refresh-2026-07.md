@@ -12,7 +12,7 @@ Framing decisions from Cole (2026-07-31), keep them in any future edit:
 - **Hawkeye is the investor-facing agent name**, framed as one of a family of per-area agents
   (marketing, member management next). "Sage" is retired from the playbook.
 - **Pricing v2 + re-curved model** (see `../pricing-gtm-strategy.md` top block): Core $429,
-  Founding $399, Growth $799, Scale $1,499+, ~$500 blended; $31K MRR @ m9 -> $168K/$2.0M @ m24.
+  Founding $379, Growth $799, Scale $1,499+, ~$500 blended; $31K MRR @ m9 -> $168K/$2.0M @ m24.
 
 ## The narrative shift
 

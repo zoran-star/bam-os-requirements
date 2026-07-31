@@ -8,24 +8,24 @@ Source of truth: the Notion page [Pricing & GTM Strategy](https://app.notion.com
 
 **Price changes (Cole's call):**
 - FC Core: **$429** (down from $499)
-- Founding: **$399** ("a bit lower" than Core - kept at the old founding price; Cole to confirm exact number)
+- Founding: **$379** (confirmed by Cole 2026-07-31)
 - FC Growth: **$799** (down from $899-999)
 - FC Scale: **$1,499+** unchanged
 - Blended ARPU: **~$500** (list mix ~$556 at 75/20/5, $500 after discounts + annual deals)
 
 **Re-curved OFFICIAL model (Cole: "more like 30K at month 9, curve the growth up to still be ~169K at 24"):**
-- Founding 25 @ $399 fill months 1-3
+- Founding 25 @ $379 fill months 1-3
 - Adds from month 4: start **6/mo, +1 each month through month 14** (peaks 16/mo)
 - From month 15: **+3 each month** as onboarding capacity scales, **capped at 36/mo**
 - Churn 4%/mo, post-founding accounts at $500
 
 | Month | Accounts | MRR | ARR run rate | Marker |
 |---|---|---|---|---|
-| 3 | 25 | $10K | $115K | Founding window closes |
-| 6 | 42 | $19K | $223K | |
-| 9 | 66 | $31K | $371K | $30K MRR proof point |
-| 12 | 96 | $46K | $553K | Seed-ready band ($40-50K) |
-| 18 | 190 | $94K | $1.1M | Capacity compounding |
+| 3 | 25 | $9K | $114K | Founding window closes |
+| 6 | 42 | $18K | $218K | |
+| 9 | 66 | $31K | $366K | $30K MRR proof point |
+| 12 | 96 | $46K | $550K | Seed-ready band ($40-50K) |
+| 18 | 190 | $93K | $1.1M | Capacity compounding |
 | 24 | 338 | $168K | $2.0M | Same ~$169K exit as v1 |
 
 Slower start (fewer closes early, honest), steeper year-2 curve (capacity compounds as revenue
