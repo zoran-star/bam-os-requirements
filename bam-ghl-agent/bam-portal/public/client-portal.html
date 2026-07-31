@@ -21927,12 +21927,6 @@ function _hv2Style() {
     '#home-v2 .hm-ai-overdue{border-left:3px solid #F07060 !important}' +
     '#home-v2 .hm-ai-today{border-left:3px solid #F0B84A !important}' +
 
-    // ── Toggle tabs (Action Items / Inbox) ──
-    '#home-v2 .hm-toggle-tabs{display:flex;gap:0;background:var(--surface-alt,rgba(255,255,255,.04));border-radius:8px;padding:2px;border:1px solid var(--border)}' +
-    '#home-v2 .hm-toggle-tab{font-family:inherit;font-size:11.5px;font-weight:600;color:var(--text-mute);background:none;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}' +
-    '#home-v2 .hm-toggle-tab svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
-    '#home-v2 .hm-toggle-tab.active{color:var(--text);background:rgba(212,182,92,.12)}' +
-    '#home-v2 .hm-toggle-tab:hover:not(.active){color:var(--text-sub)}' +
     // Inbox preview rows
     '#home-v2 .hm-ib-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;position:relative}' +
     '#home-v2 .hm-ib-row:hover{background:rgba(212,182,92,.04)}' +
@@ -22138,18 +22132,25 @@ function renderHomeV2() {
             <div id="hv2-sched-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
             <button class="hv2-pf" onclick="switchView('v15cal')">Open the calendar ›</button>
           </div>
-          <div class="hv2-panel" style="animation-delay:.06s" id="hv2-toggle-panel">
+          <!-- Actions and Inbox are two panels, not one panel with a tab
+               toggle (Zoran 2026-07-31). Under the toggle, whichever tab you
+               were not on was invisible, so waiting action items could sit on
+               Home with nothing on screen saying they existed. -->
+          <div class="hv2-panel" style="animation-delay:.06s" id="hv2-acts-panel">
             <div class="hv2-ph">
-              <div class="hm-toggle-tabs" id="hm-toggle-tabs">
-                <button class="hm-toggle-tab" data-tab="acts" onclick="_hmToggleTab('acts')">${_HV2_ICONS.check} Actions</button>
-                <button class="hm-toggle-tab active" data-tab="inbox" onclick="_hmToggleTab('inbox')">${_HV2_ICONS.inbox || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>'} Inbox</button>
-              </div>
+              <span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.check} Actions</span>
               <span class="hv2-pill" id="hv2-acts-n" style="display:none"></span>
+            </div>
+            <div id="hv2-acts-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
+            <button class="hv2-pf" onclick="switchView('action-items')">Open action items ›</button>
+          </div>
+          <div class="hv2-panel" style="animation-delay:.09s" id="hv2-inbox-panel">
+            <div class="hv2-ph">
+              <span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.inbox || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>'} Inbox</span>
               <span class="hv2-pill" id="hv2-inbox-n" style="display:none"></span>
             </div>
-            <div id="hv2-acts-body" style="display:none"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
             <div id="hv2-inbox-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
-            <button class="hv2-pf" id="hv2-toggle-footer" onclick="switchView('v15inbox')">Open inbox ›</button>
+            <button class="hv2-pf" onclick="switchView('v15inbox')">Open inbox ›</button>
           </div>
         </div>
       </div>
@@ -22540,7 +22541,7 @@ async function _hv2ActsLoad() {
     const j = await _safeJson(r);
     if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
     const open = (Array.isArray(j.items) ? j.items : []).filter(i => !i.completed_at);
-    if (pill) { pill._count = open.length; pill.textContent = open.length; pill.style.display = (open.length > 0 && window._hmActiveTab === 'acts') ? '' : 'none'; }
+    if (pill) { pill._count = open.length; pill.textContent = open.length; pill.style.display = open.length > 0 ? '' : 'none'; }
     if (!body) return;
     if (!open.length) {
       // UX #9: Empty state CTA for action items
@@ -22580,33 +22581,11 @@ async function _hv2ActsLoad() {
   }
 }
 // ── Toggle: Action Items / Inbox ──
-const _HM_TOGGLE_KEY = 'hm_panel_tab';
-window._hmActiveTab = 'inbox'; // default tab
-function _hmToggleTab(tab) {
-  const actsBody = document.getElementById('hv2-acts-body');
-  const ibBody = document.getElementById('hv2-inbox-body');
-  const footer = document.getElementById('hv2-toggle-footer');
-  const actsPill = document.getElementById('hv2-acts-n');
-  const ibPill = document.getElementById('hv2-inbox-n');
-  if (!actsBody || !ibBody) return;
-  const tabs = document.querySelectorAll('#hm-toggle-tabs .hm-toggle-tab');
-  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  // Store active tab so loaders know which pill to show
-  window._hmActiveTab = tab;
-  if (tab === 'inbox') {
-    actsBody.style.display = 'none'; ibBody.style.display = '';
-    if (actsPill) actsPill.style.display = 'none';
-    if (ibPill && ibPill._count > 0) ibPill.style.display = '';
-    if (footer) { footer.textContent = 'Open inbox \u203A'; footer.onclick = () => switchView('v15inbox'); }
-    if (!ibBody._loaded) _hmLoadInboxPreview();
-  } else {
-    actsBody.style.display = ''; ibBody.style.display = 'none';
-    if (ibPill) ibPill.style.display = 'none';
-    if (actsPill && actsPill._count > 0) actsPill.style.display = '';
-    if (footer) { footer.textContent = 'Open action items \u203A'; footer.onclick = () => switchView('action-items'); }
-  }
-  try { localStorage.setItem(_HM_TOGGLE_KEY, tab); } catch (_) {}
-}
+// The Actions/Inbox toggle is retired: they are two panels now, both always
+// rendered. window._hmActiveTab is kept as a harmless constant because other
+// surfaces still read it; nothing writes it any more.
+window._hmActiveTab = 'inbox';
+
 // #4: System notification patterns — group these senders into an accordion
 const _HM_SYSTEM_SENDERS = /^(facebook|meta|google|stripe|square|twilio|mailchimp|quickbooks|zapier|intuit|paypal)/i;
 
@@ -23115,7 +23094,7 @@ async function _hmLoadInboxPreview() {
       convos.push(f);
     }
     const unreadCount = convos.filter(c => c.unreadCount > 0).length;
-    if (pill) { pill._count = unreadCount; pill.textContent = unreadCount; pill.style.display = (unreadCount > 0 && window._hmActiveTab === 'inbox') ? '' : 'none'; }
+    if (pill) { pill._count = unreadCount; pill.textContent = unreadCount; pill.style.display = unreadCount > 0 ? '' : 'none'; }
     if (!convos.length) {
       body.innerHTML = '<div class="hm-empty-cta"><span class="hm-empty-msg">No recent conversations.</span></div>';
       return;
@@ -23146,13 +23125,10 @@ async function _hmLoadInboxPreview() {
     body.innerHTML = '<div style="padding:14px 16px;font-size:12.5px;color:var(--text-mute)">Couldn\'t load inbox.</div>';
   }
 }
-// Restore saved tab preference on load
+// Both panels are on screen, so both load. Kept under the old name so the
+// existing boot call site does not need to change.
 function _hmRestoreToggle() {
-  try {
-    const saved = localStorage.getItem(_HM_TOGGLE_KEY);
-    if (saved === 'acts') _hmToggleTab('acts');
-    else _hmLoadInboxPreview(); // default: inbox, load it
-  } catch (_) { _hmLoadInboxPreview(); }
+  try { _hmLoadInboxPreview(); } catch (_) {}
 }
 // ── Right rail: live scoreboard ──
 // ── KPI ring configuration ──
@@ -23680,7 +23656,7 @@ function _hmRefreshLive() {
   const now = Date.now();
   if (window._hmLiveLast && now - window._hmLiveLast < 3000) return;
   window._hmLiveLast = now;
-  if (window._hmActiveTab === 'inbox') { try { _hmLoadInboxPreview(); } catch (_) {} }
+  try { _hmLoadInboxPreview(); } catch (_) {}
   try { _hmLoadRailBottom(); } catch (_) {}
 }
 function _hmBindLiveRefresh() {
