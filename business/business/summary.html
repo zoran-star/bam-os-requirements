@@ -9,14 +9,14 @@
 <meta property="og:url" content="https://info.fullcntrl.io">
 <meta property="og:title" content="FullControl - The AI Command Center for Sports Programs">
 <meta property="og:description" content="Built by operators. The AI command center for sports program operators.">
-<meta property="og:image" content="images/og-image.png">
+<meta property="og:image" content="https://info.fullcntrl.io/business/business/images/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="FullControl - The AI Command Center for Sports Programs">
 <meta name="twitter:description" content="Built by operators. The AI command center for sports program operators.">
-<meta name="twitter:image" content="images/og-image.png">
-<link rel="icon" type="image/svg+xml" href="images/logo.svg">
+<meta name="twitter:image" content="https://info.fullcntrl.io/business/business/images/og-image.png">
+<link rel="icon" type="image/svg+xml" href="/business/business/images/logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -174,7 +174,7 @@ td:last-child { font-weight: 600; color: var(--gold); text-align: right; }
 /* Team */
 .team-entry {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 1fr;
   gap: 32px;
   padding: 20px 0;
   border-bottom: 1px solid var(--line-dark);
@@ -501,6 +501,29 @@ footer {
 .aio-flow { margin-top:14px; border:1px solid rgba(232,197,71,0.25); background:rgba(232,197,71,0.04); border-radius:6px; padding:14px 16px; font-size:13px; color:rgba(245,241,232,0.7); line-height:1.65; }
 .aio-flow-lbl { display:block; font-family:var(--mono); font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:6px; }
 
+
+/* Agent web constellation */
+.aio-web { margin-top:18px; border:1px solid var(--line-dark); background:var(--ink-2); border-radius:6px; padding:18px 16px 16px; }
+.aio-web svg { width:100%; height:auto; display:block; }
+.w-spoke { stroke:rgba(245,241,232,0.10); stroke-width:1; transition:stroke .4s; }
+.w-spoke.on { stroke:var(--gold); stroke-width:1.4; stroke-dasharray:4 5; animation:webdash 1.2s linear infinite; }
+@keyframes webdash { to { stroke-dashoffset:-9; } }
+.w-node circle { fill:var(--ink); stroke:rgba(245,241,232,0.35); stroke-width:1.2; transition:all .35s; }
+.w-node text { font-family:var(--mono); font-size:11px; fill:rgba(245,241,232,0.5); letter-spacing:0.06em; transition:fill .35s; }
+.w-node.on circle { fill:var(--gold); stroke:var(--gold); }
+.w-node.on text { fill:var(--gold-hi); }
+.w-hub circle { fill:rgba(232,197,71,0.10); stroke:var(--gold); stroke-width:1.4; }
+.w-hub-t1 { font-family:var(--display); font-size:14px; font-weight:600; fill:var(--gold); }
+.w-hub-t2 { font-family:var(--mono); font-size:7.5px; letter-spacing:0.12em; fill:rgba(232,197,71,0.7); text-transform:uppercase; }
+.w-ex-pills { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 10px; }
+.w-pill { font-family:var(--mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(245,241,232,0.55); background:none; border:1px solid var(--line-dark-2); border-radius:999px; padding:5px 12px; cursor:pointer; transition:all .25s; }
+.w-pill.on, .w-pill:hover { color:var(--gold-hi); border-color:var(--gold-3); }
+.w-cap { font-size:13px; color:rgba(245,241,232,0.7); line-height:1.65; min-height:44px; }
+.w-cap b { color:var(--gold); font-weight:600; }
+/* Team without photos */
+.team-headplain { margin-bottom:6px; }
+.team-tag-plain { font-family:var(--mono); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-2); margin-top:3px; }
+
 /* Mobile prototype nudge */
 .proto-mobile-nudge { display: none; background: var(--ink-2); border: 1px solid var(--line-dark); border-radius: 4px; padding: 20px 24px; margin-top: 16px; text-align: center; }
 .proto-mobile-nudge p { font-size: 13px; color: rgba(245,241,232,0.6); line-height: 1.6; margin: 0; }
@@ -764,14 +787,7 @@ footer {
   <div style="margin-top:12px">
 
     <div class="team-entry team-entry-featured">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/coleman.jpg" alt="Coleman Ayers">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Coleman Ayers</div>
-          <div class="team-tag">Co-Founder<br>Brand &amp; Strategy</div>
-        </div>
-      </div>
+      <div class="team-headplain"><div class="team-name">Coleman Ayers</div><div class="team-tag-plain">Co-Founder<br>Brand &amp; Strategy</div></div>
       <div>
         <div class="team-bio">
           <ul>
@@ -786,14 +802,7 @@ footer {
     </div>
 
     <div class="team-entry team-entry-featured">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/zoran.jpg" alt="Zoran Savic">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Zoran Savic</div>
-          <div class="team-tag">Co-Founder<br>Product</div>
-        </div>
-      </div>
+      <div class="team-headplain"><div class="team-name">Zoran Savic</div><div class="team-tag-plain">Co-Founder<br>Product</div></div>
       <div>
         <div class="team-bio">
           <ul>
@@ -807,14 +816,7 @@ footer {
     </div>
 
     <div class="team-entry">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/luka.jpg" alt="Luka" style="object-fit:cover;object-position:center 30%;">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Luka Mircetic</div>
-          <div class="team-tag">Senior Engineer</div>
-        </div>
-      </div>
+      <div class="team-headplain"><div class="team-name">Luka Mircetic</div><div class="team-tag-plain">Senior Engineer</div></div>
       <div>
         <div class="team-bio">
           <ul>
@@ -828,14 +830,7 @@ footer {
     </div>
 
     <div class="team-entry">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/cam.jpg" alt="Cam">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Cameron Wells</div>
-          <div class="team-tag">Content &amp; Branding</div>
-        </div>
-      </div>
+      <div class="team-headplain"><div class="team-name">Cameron Wells</div><div class="team-tag-plain">Content &amp; Branding</div></div>
       <div>
         <div class="team-bio">
           <ul>
@@ -849,14 +844,7 @@ footer {
     </div>
 
     <div class="team-entry">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/mike.jpg" alt="Mike" style="object-fit:cover;object-position:center 15%;">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Mike Eluki</div>
-          <div class="team-tag">Sales &amp; Client Success</div>
-        </div>
-      </div>
+      <div class="team-headplain"><div class="team-name">Mike Eluki</div><div class="team-tag-plain">Sales &amp; Client Success</div></div>
       <div>
         <div class="team-bio">
           <ul>
@@ -919,7 +907,36 @@ footer {
     <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Member App</span><span class="aio-n">3</span></div><div class="aio-chips"><span class="aio-chip">Self-serve booking</span><span class="aio-chip">Payments & history</span><span class="aio-chip">Account management</span></div></div>
     <div class="aio-card" onclick="this.classList.toggle('open')"><div class="aio-head"><span class="aio-lbl">Strategy & AI</span><span class="aio-n">4</span></div><div class="aio-chips"><span class="aio-chip">KPI dashboard</span><span class="aio-chip">Member lifetime value</span><span class="aio-chip">AI insights & forecasts</span><span class="aio-chip">Strategic recommendations</span></div></div>
   </div>
-  <div class="aio-flow"><span class="aio-flow-lbl">And they work together</span>Every area shares one brain. The agents hand work to each other: Hawkeye closes a trial &rarr; billing takes the payment &rarr; the schedule fills the spot &rarr; the member app checks the athlete in &rarr; the owner approves instead of operating. That handoff is the product.</div>
+
+  <div class="aio-web">
+    <svg viewBox="0 0 860 380" role="img" aria-label="FullControl agent web: nine areas connected through one AI brain">
+      <line class="w-spoke" id="sp-sched" x1="430" y1="190" x2="430" y2="50"/>
+      <line class="w-spoke" id="sp-mem" x1="430" y1="190" x2="649" y2="83"/>
+      <line class="w-spoke" id="sp-sales" x1="430" y1="190" x2="765" y2="166"/>
+      <line class="w-spoke" id="sp-bill" x1="430" y1="190" x2="724" y2="260"/>
+      <line class="w-spoke" id="sp-mkt" x1="430" y1="190" x2="546" y2="322"/>
+      <line class="w-spoke" id="sp-cont" x1="430" y1="190" x2="314" y2="322"/>
+      <line class="w-spoke" id="sp-comms" x1="430" y1="190" x2="136" y2="260"/>
+      <line class="w-spoke" id="sp-app" x1="430" y1="190" x2="95" y2="166"/>
+      <line class="w-spoke" id="sp-strat" x1="430" y1="190" x2="211" y2="83"/>
+      <g class="w-hub"><circle cx="430" cy="190" r="26"/><text x="430" y="188" text-anchor="middle" class="w-hub-t1">FC</text><text x="430" y="203" text-anchor="middle" class="w-hub-t2">one brain</text></g>
+      <g class="w-node" id="nd-sched"><circle cx="430" cy="50" r="5"/><text x="430" y="34" text-anchor="middle">Scheduling</text></g>
+      <g class="w-node" id="nd-mem"><circle cx="649" cy="83" r="5"/><text x="649" y="67" text-anchor="middle">Members</text></g>
+      <g class="w-node" id="nd-sales"><circle cx="765" cy="166" r="5"/><text x="765" y="150" text-anchor="middle">Sales & Leads</text></g>
+      <g class="w-node" id="nd-bill"><circle cx="724" cy="260" r="5"/><text x="724" y="284" text-anchor="middle">Billing</text></g>
+      <g class="w-node" id="nd-mkt"><circle cx="546" cy="322" r="5"/><text x="546" y="346" text-anchor="middle">Marketing</text></g>
+      <g class="w-node" id="nd-cont"><circle cx="314" cy="322" r="5"/><text x="314" y="346" text-anchor="middle">Content</text></g>
+      <g class="w-node" id="nd-comms"><circle cx="136" cy="260" r="5"/><text x="136" y="284" text-anchor="middle">Comms</text></g>
+      <g class="w-node" id="nd-app"><circle cx="95" cy="166" r="5"/><text x="95" y="150" text-anchor="middle">Member App</text></g>
+      <g class="w-node" id="nd-strat"><circle cx="211" cy="83" r="5"/><text x="211" y="67" text-anchor="middle">Strategy & AI</text></g>
+      </svg>
+    <div class="w-ex-pills">
+      <button type="button" class="w-pill on" onclick="_webPick(0,this)">The quiet lead</button>
+      <button type="button" class="w-pill" onclick="_webPick(1,this)">Trial to member</button>
+      <button type="button" class="w-pill" onclick="_webPick(2,this)">Ad dollar to revenue</button>
+    </div>
+    <div class="w-cap" id="w-cap"></div>
+  </div>
 
   <div class="section-kicker" style="margin-top:32px">See it in motion</div>
   <p style="margin-bottom:14px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">The interactive prototype below shows the destination. The real product is in beta testing: our own academies run their sales, onboarding, and client operations on it every day. Live demo on request.</p>
@@ -1108,6 +1125,33 @@ footer {
       run();
     }
   })();
+</script>
+
+<script>
+(function(){
+  var EX=[
+    {cap:'<b>The quiet lead.</b> A lead goes silent &rarr; Hawkeye drafts the re-engage &rarr; the owner taps approve &rarr; the trial books itself &rarr; the Confirm agent runs the reminders &rarr; the athlete shows up.', nodes:['sales','comms','sched','mem']},
+    {cap:'<b>Trial to member.</b> The trial ends &rarr; post-trial form &rarr; enroll link sends &rarr; payment lands &rarr; auto-billing switches on &rarr; the member app unlocks booking.', nodes:['sched','sales','bill','app']},
+    {cap:'<b>Ad dollar to revenue.</b> The campaign runs &rarr; leads land in the pipeline &rarr; Hawkeye works every one &rarr; the dashboard shows cost per signed member, not per click.', nodes:['mkt','sales','strat','bill']}
+  ];
+  var timers=[], cycle=null, cur=0;
+  function activate(i){
+    cur=i;
+    timers.forEach(clearTimeout); timers=[];
+    document.querySelectorAll('.w-node.on,.w-spoke.on').forEach(function(el){el.classList.remove('on');});
+    document.querySelectorAll('.w-pill').forEach(function(p,j){p.classList.toggle('on', j===i);});
+    var cap=document.getElementById('w-cap'); if(cap) cap.innerHTML=EX[i].cap;
+    EX[i].nodes.forEach(function(id,j){
+      timers.push(setTimeout(function(){
+        var n=document.getElementById('nd-'+id), s=document.getElementById('sp-'+id);
+        if(n) n.classList.add('on'); if(s) s.classList.add('on');
+      }, 260*j));
+    });
+  }
+  window._webPick=function(i,btn){ activate(i); if(cycle){clearInterval(cycle);} cycle=setInterval(function(){activate((cur+1)%EX.length);},8000); };
+  var boot=function(){ activate(0); cycle=setInterval(function(){activate((cur+1)%EX.length);},8000); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
 </script>
 </body>
 </html>
