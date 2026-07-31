@@ -52,14 +52,26 @@ const stampDeclares = (presetKey) =>
 // Does this academy run a preset that declares the event? The stamp lives on the
 // offer (offer.data.sales.preset_key), written by apply-preset. No stamp means no
 // pill in the portal, so sending would be a text nobody can turn off.
+//
+// THREE OUTCOMES, NOT TWO (scripts/check-network-booleans.mjs). This first
+// shipped returning a bare boolean with `catch { return false }`, which made
+// "this academy does not run the preset" and "Supabase did not answer"
+// the same value - a silently dropped booking text that looks exactly like a
+// correctly-skipped one. That is the SAME shape as the bug this whole file
+// exists to fix: silence indistinguishable from working. CI caught it; the
+// inventory line it offered would only have written the collapse down.
+//
+//   -> { declares: true }   the academy runs a preset that declares the event
+//   -> { declares: false }  it definitely does not - do not send
+//   -> { unknown: true, why } we could not ask - do not send, and SAY SO
 async function academyRunsEvent(clientId) {
   try {
     const rows = await sb(
       `offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=preset_key:data->sales->>preset_key`,
     );
-    return (rows || []).some((row) => stampDeclares(row && row.preset_key));
-  } catch (_) {
-    return false;
+    return { declares: (rows || []).some((row) => stampDeclares(row && row.preset_key)) };
+  } catch (e) {
+    return { unknown: true, why: `could not read the preset stamp: ${String((e && e.message) || e)}` };
   }
 }
 
@@ -147,7 +159,18 @@ export async function notifyTrialBooked({ clientId, trialBookingId, kind = "book
   const result = { ok: false, sent: 0 };
   try {
     if (!clientId || !trialBookingId) return result;
-    if (!(await academyRunsEvent(clientId))) return { ok: true, sent: 0, skipped: "preset does not declare the event" };
+
+    const stamp = await academyRunsEvent(clientId);
+    // "We could not check" is NOT "they do not run it". Both skip the send - we
+    // will not text a recipient list we cannot prove has a switch to turn it off -
+    // but they are different events and only one of them is a problem. Nothing
+    // downstream records this return value, so the unreachable case gets the one
+    // thing that makes it findable later: a log line naming itself.
+    if (stamp.unknown) {
+      console.warn(`[notify-trial-booked] skipped ${kind} for client ${clientId}: ${stamp.why}`);
+      return { ok: false, sent: 0, skipped: stamp.why, unknown: true };
+    }
+    if (!stamp.declares) return { ok: true, sent: 0, skipped: "preset does not declare the event" };
 
     const rows = await sb(
       `trial_bookings?id=eq.${encodeURIComponent(trialBookingId)}&tenant_id=eq.${encodeURIComponent(clientId)}`

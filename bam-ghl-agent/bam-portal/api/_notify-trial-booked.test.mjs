@@ -227,5 +227,62 @@ console.log("\n5. the portal reads the pill from the preset, not from itself");
   else fail("the portal no longer loads preset notifications from the manifest");
 }
 
+// ── 6. "we could not ask" is not "no" ────────────────────────────────────────
+
+console.log("\n6. a lookup that fails is distinguishable from a real no");
+{
+  const { notifyTrialBooked } = await import("./_notify-trial-booked.js");
+  const realFetch = globalThis.fetch;
+  const realWarn = console.warn;
+  const warnings = [];
+  console.warn = (m) => warnings.push(String(m));
+
+  // The academy definitely does not run a preset that declares the event: the
+  // offers read SUCCEEDS and comes back empty. Skipping is correct and boring.
+  globalThis.fetch = async () => new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+  const no = await notifyTrialBooked({ clientId: "c1", trialBookingId: "t1", kind: "booked" });
+
+  // We could not ask: the same read fails at the transport. Skipping is also
+  // what happens, but it is NOT the same event and must not report as one.
+  globalThis.fetch = async () => { throw new Error("ECONNRESET"); };
+  const dunno = await notifyTrialBooked({ clientId: "c1", trialBookingId: "t1", kind: "booked" });
+
+  globalThis.fetch = realFetch;
+  console.warn = realWarn;
+
+  if (no.ok === true && !no.unknown) pass(`a real "no" reports ok: ${JSON.stringify(no.skipped)}`);
+  else fail(`a real "no" should be an ok skip, got ${JSON.stringify(no)}`);
+
+  if (dunno.unknown === true && dunno.ok === false) pass(`"could not ask" reports unknown: ${JSON.stringify(dunno.skipped)}`);
+  else fail(`"could not ask" collapsed into a plain skip, got ${JSON.stringify(dunno)} - this is the exact shape the original bug had`);
+
+  if (no.skipped !== dunno.skipped) pass("the two carry different reasons");
+  else fail("both outcomes carry the same reason string - a caller cannot tell them apart");
+
+  // Nothing downstream records the return value, so the log line IS the only
+  // trace an unreachable lookup ever leaves.
+  if (warnings.some((w) => w.includes("could not read the preset stamp"))) pass("the unreachable case logs itself");
+  else fail(`the unreachable case left no trace; warnings were ${JSON.stringify(warnings)}`);
+
+  // Neither path may send. Proven by the fetch stubs: notifyOwners would have had
+  // to fetch, and every fetch in this block is accounted for above.
+  if (no.sent === 0 && dunno.sent === 0) pass("neither outcome sends");
+  else fail(`a skipped notification still sent: no=${no.sent} unknown=${dunno.sent}`);
+}
+
+// ── negative control ─────────────────────────────────────────────────────────
+// Under MUTATE, "the suite failed" is the SUCCESS condition: the mutation broke
+// something on purpose and the suite had to notice. CI requires the literal
+// NEGATIVE CONTROL PASSED banner rather than accepting a non-zero exit, because
+// a control that no longer exists in the code also exits non-zero - and that
+// would report a decorative control as a working one.
+if (MUTATE) {
+  const caught = failures > 0;
+  console.log(caught
+    ? `\n✅ NEGATIVE CONTROL PASSED: MUTATE=${MUTATE} was caught (${failures} check(s) failed, as intended).`
+    : `\n❌ NEGATIVE CONTROL FAILED: MUTATE=${MUTATE} changed nothing this suite noticed. It is decorative here.`);
+  process.exit(caught ? 0 : 1);
+}
+
 console.log(failures ? `\n${failures} FAILED\n` : "\nall checks passed\n");
 process.exit(failures ? 1 : 0);
