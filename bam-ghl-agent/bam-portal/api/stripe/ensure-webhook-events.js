@@ -32,6 +32,25 @@ const REQUIRED_EVENTS = [
   "price.created",
   "price.updated",
   "customer.created",
+  // ⚠️ PRE-EXISTING GAP, found 2026-07-31 by the derived check in
+  // api/_stripe-deauthorization.test.mjs section 9, not by this build looking for it.
+  // api/stripe/webhook.js has handled checkout.session.completed (the merch store's
+  // order handler, handleStoreOrder) for some time and this list never named it, so
+  // the store depends on the endpoint having been subscribed by hand - or on it
+  // listening to '*'. Adding it is a no-op in both of those cases (the endpoint
+  // update unions) and a fix otherwise. This is the THIRD time an event has shipped
+  // ahead of its subscription here; the derived check is why there should not be a
+  // fourth.
+  "checkout.session.completed",
+  // An academy revoking BAM's access in their own Stripe dashboard. WITHOUT THIS
+  // LINE the handler in api/stripe/webhook.js is unreachable: Stripe only delivers
+  // events an endpoint is subscribed to, so the code would be correct, tested, and
+  // never once called - which is the failure this file was built to end (price.created
+  // and customer.created each shipped ahead of their subscription and sat dead).
+  // api/_stripe-deauthorization.test.mjs now derives the required set from the switch
+  // in webhook.js and fails if this list does not cover it, so the next handler cannot
+  // repeat it either.
+  "account.application.deauthorized",
 ];
 
 const WEBHOOK_PATH = "/api/stripe/webhook";

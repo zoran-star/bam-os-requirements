@@ -521,6 +521,11 @@ async function handler(req, res) {
       case "price.created":                 return await handlePriceUpserted(event, connectedAccount, res);
       case "price.updated":                 return await handlePriceUpserted(event, connectedAccount, res);
       case "checkout.session.completed":    return await handleStoreOrder(event, connectedAccount, res);
+      // The academy revoked our access in their own Stripe dashboard. THE ONLY route
+      // to handleAccountDeauthorized, which is THE ONLY writer of
+      // stripe_connect_status='disabled'. account.updated is deliberately not here -
+      // see the block above that handler for why the two are not the same change.
+      case DEAUTHORIZED_EVENT:              return await handleAccountDeauthorized(event, connectedAccount, res);
       default:                              return res.status(200).json({ skipped: event.type });
     }
   } catch (e) {
@@ -1353,6 +1358,116 @@ async function handleChargeRefunded(event, connectedAccount, res) {
   });
 
   return res.status(200).json({ ok: true, action: "refunds-mirrored", inserted, skipped, member_id: member.id });
+}
+
+// ─────────────────────────────────────────────────────────
+// account.application.deauthorized
+// ─────────────────────────────────────────────────────────
+// An academy revoked BAM's access to its Stripe account (Settings > Connected
+// applications > Disconnect, in their own dashboard). Every billing action the
+// portal offers - pause, cancel, refund, change plan, payment link - stops working
+// at that instant, because every one of them calls Stripe with a Stripe-Account
+// header that is no longer authorised.
+//
+// WHAT THIS FIXES. The portal has always rendered a complete UI branch for
+// clients.stripe_connect_status = 'disabled' ("Stripe access was revoked. Reconnect
+// to resume billing actions.", public/client-portal.html), and NOTHING in the system
+// could produce that state: no code wrote it and this webhook handled no account.*
+// events, so a revoked academy stayed 'connected' forever and the first person to
+// find out was a staff member watching a refund fail on a parent phone call.
+//
+// ⛔ THE FAIL DIRECTION IS THE WHOLE DESIGN, so read this before changing anything.
+//
+// Marking a WORKING academy disconnected is worse than the bug this fixes: it hides
+// every billing action behind a "reconnect" wall and sends staff to re-do an OAuth
+// flow that was never broken. A transient failure - a Supabase blip, a Stripe
+// timeout, a webhook delivery Stripe gave up on - must therefore be incapable of
+// producing this state.
+//
+// It is incapable BY CONSTRUCTION, in four ways that are all mechanically checkable
+// and are checked by api/_stripe-deauthorization.test.mjs:
+//
+//   1. REVOKED_STATUS is the only occurrence of the string in this file, and it is
+//      read in exactly one place - the PATCH below.
+//   2. That PATCH lives in this function and nowhere else. This function is called
+//      from exactly one place: the single switch case for this one event type.
+//   3. No catch block in this file writes stripe_connect_status. The top-level catch
+//      in handler() logs and returns 200; it does not touch the database. So an
+//      error on ANY path, including inside this function, leaves the status alone.
+//   4. The function re-checks event.type itself, so even a mis-wired switch case
+//      cannot route a different event into the write.
+//
+// A webhook Stripe never delivered runs no code at all, which is the fourth case and
+// the one that needs no defending.
+//
+// ⛔ account.updated IS DELIBERATELY ABSENT, and this is not an oversight to tidy up.
+// It fails in the OPPOSITE direction: it is the event you would use to auto-tick
+// "your Stripe is ready", and getting that wrong marks an unfinished account as live
+// rather than a live account as broken. The two need different evidence and
+// different caution, and bundling them makes both harder to reason about. Whoever
+// picks up account.updated should do it as its own change, with its own test.
+//
+// ROUTING. This arrives at the PLATFORM endpoint (one Connect endpoint receives
+// events for every connected academy - see api/stripe/ensure-webhook-events.js), and
+// the academy is identified by the top-level `event.account`, NOT by
+// event.data.object: for this event data.object is the platform's APPLICATION object
+// (ca_...), which is the same value for every academy. Using it would resolve every
+// revocation to the same wrong row, or to none.
+const DEAUTHORIZED_EVENT = "account.application.deauthorized";
+// The ONLY place this status value is written in the portal. See point 1 above.
+const REVOKED_STATUS = "disabled";
+
+async function handleAccountDeauthorized(event, connectedAccount, res) {
+  // Point 4: the write is gated on the event type here, not only at the switch.
+  if (!event || event.type !== DEAUTHORIZED_EVENT) {
+    return res.status(200).json({ skipped: `not ${DEAUTHORIZED_EVENT}` });
+  }
+  // `event.account`, threaded in by the dispatcher. Never data.object - see ROUTING.
+  const acct = connectedAccount || null;
+  if (!acct) return res.status(200).json({ skipped: "no connected account on the event" });
+
+  const rows = await sb(
+    `clients?stripe_connect_account_id=eq.${encodeURIComponent(acct)}` +
+    `&select=id,business_name,stripe_connect_status&limit=1`
+  );
+  const client = Array.isArray(rows) && rows[0];
+  // An account we do not know: another integration on the same platform, an academy
+  // that was already re-pointed at a different Stripe account, or a replay of an old
+  // event. Nothing to do, and nothing to raise about it.
+  if (!client) return res.status(200).json({ skipped: "no academy with that connected account" });
+
+  const prev = client.stripe_connect_status || null;
+  if (prev === REVOKED_STATUS) {
+    return res.status(200).json({ skipped: "already disabled", client_id: client.id });
+  }
+
+  await sb(`clients?id=eq.${client.id}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ stripe_connect_status: REVOKED_STATUS, updated_at: nowIso() }),
+  });
+
+  // TRACEABILITY. A status flip that hides every billing action must be explicable
+  // afterwards - which event, which account, what it was before. The audit row is
+  // academy-level (member_id null) because a revocation is not about one member, and
+  // the console line is there because this is rare enough that nobody will be
+  // watching an audit table when it happens.
+  await writeAudit({
+    client_id:   client.id,
+    member_id:   null,
+    action_type: "stripe-access-revoked",
+    args:        {
+      event_id: event.id, event_type: event.type, connected_account: acct,
+      // The platform application the academy disconnected FROM (ca_...). Recorded
+      // because a future second Connect app would make this the only way to tell
+      // which integration was revoked.
+      application_id: (event.data && event.data.object && event.data.object.id) || null,
+    },
+    db_changes:  { clients: { stripe_connect_status: { from: prev, to: REVOKED_STATUS } } },
+  });
+  console.warn(`[webhook] Stripe access REVOKED by ${client.business_name || client.id} (${acct}) - status ${prev} -> ${REVOKED_STATUS}. Billing actions are now blocked until they reconnect.`);
+
+  return res.status(200).json({ ok: true, action: "stripe-access-revoked", client_id: client.id, from: prev, to: REVOKED_STATUS });
 }
 
 // ─────────────────────────────────────────────────────────
