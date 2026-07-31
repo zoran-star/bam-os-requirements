@@ -80,7 +80,9 @@ missing. `MUTATE=unwire` proves it bites.
   a reachable number, so only Zoran receives it until phones are filled in.
 - Backfill `20260731T210000_carry_calendar_booking_to_free_trial_booked.sql`
   copies GTA's existing `calendar_booking` recipient onto the new key. **In
-  PENDING_SQL, not yet applied.** Inert until the code merges.
+  APPLIED 2026-07-31**, verified by read-back: GTA carries the same recipient on
+  both keys, ShigHoops correctly untouched (it has `calendar_booking` set but no
+  preset stamp, so no pill). Inert until the code merges.
 - `discovery_trial` deliberately does NOT declare the event (Zoran's call). The
   test notes it so preset #2 gaining it is a deliberate edit.
 - `reschedule` only exists on the website path. An agent-driven rebook is a
