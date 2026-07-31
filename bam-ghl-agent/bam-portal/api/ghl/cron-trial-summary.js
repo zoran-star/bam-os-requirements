@@ -10,15 +10,25 @@ import { maybeSendEmailViaResend } from "../messaging/email-provider.js";
 //
 //   GET /api/ghl/cron-trial-summary   (Bearer CRON_SECRET) - runs 15:00 UTC = 8am PT (PDT)
 //
+// A client can have MORE THAN ONE summary (added 2026-07-31 for Major Hoops:
+// Coach Brandon runs his own calendar and wants his own trials texted straight
+// to him, separate from Jeremy's summary of the academy's other calendars).
 // Config resolution per client (DB wins, code fallback for the initial rollout):
-//   1. clients.ghl_kpi_config.trial_summary = {
-//        enabled, to_phone, to_email, timezone,
-//        calendars:[{id,label}] | calendar_ids:[...]
-//      }
-//      (to_phone and/or to_email - sends to whichever are set)
-//   2. FALLBACK_CONFIG keyed by ghl_location_id (below) - lets this ship before
-//      the portal DB env is reachable; move it to ghl_kpi_config anytime and the
-//      DB value takes over automatically.
+//   1. clients.ghl_kpi_config.trial_summaries = [ {...}, {...} ]   <- an ARRAY,
+//      one entry per person who should get a summary. Each entry:
+//        { enabled, to_phone, to_email, timezone, label,
+//          calendars:[{id,label}] | calendar_ids:[...], skip_when_empty, send_hour }
+//      `label` is optional and only changes the message header, e.g. "Major
+//      Hoops - Coach Brandon - Free Trials Today (...)" instead of just the
+//      business name. Leave it off for the main/owner summary.
+//   2. clients.ghl_kpi_config.trial_summary = {...}   <- legacy SINGLE-object
+//      shape, still supported: treated as a one-entry array.
+//   3. FALLBACK_CONFIG keyed by ghl_location_id (below), also array-shaped -
+//      lets this ship before the portal DB env is reachable; move it to
+//      ghl_kpi_config anytime and the DB value takes over automatically.
+// If the DB provides EITHER key for a location, it replaces the fallback array
+// for that location entirely (no per-entry merge across DB/fallback - each
+// entry is self-contained, so "replace the whole list" is unambiguous).
 //
 // Reuses the proven post-trial-escalate mechanics: pickGhlToken -> GHL
 // /calendars/events -> sendSms (which also honors a client's own Twilio).
@@ -26,20 +36,37 @@ import { maybeSendEmailViaResend } from "../messaging/email-provider.js";
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
 
-// Initial rollout config (DB-overridable). Keyed by ghl_location_id.
-const FALLBACK_CONFIG = {
-  // Major Hoops (Jeremy). Send the daily trial list to the academy's own
-  // business number until he has a personal line to receive it.
-  gXHbLTQzaEYlyLSKJUTU: {
-    enabled: true,
-    to_phone: "+16267673748",
-    to_email: "jeremy@majorhoops.com",
-    timezone: "America/Los_Angeles",
-    calendars: [
-      { id: "0Z7H70gSweantyTQBkIt", label: "St. Francis HS" },
-      { id: "W1bcgWyDkAyLDCj3zOLo", label: "2540 E. Orange" },
-    ],
-  },
+// Initial rollout config (DB-overridable), array-shaped per location so it
+// mirrors clients.ghl_kpi_config.trial_summaries exactly. Exported so a verify
+// script tests the ACTUAL fallback, not a hand-copied stand-in that can drift.
+export const FALLBACK_CONFIG = {
+  // Major Hoops (Jeremy + Coach Brandon). Jeremy's summary covers the
+  // academy's 4 general calendars; Brandon's is just his own calendar, sent
+  // straight to his own number (+16263913259, confirmed against the GHL user
+  // record for Brandon Pomroy on this location).
+  gXHbLTQzaEYlyLSKJUTU: [
+    {
+      enabled: true,
+      to_phone: "+16264290220",
+      to_email: "jeremy@majorhoops.com",
+      timezone: "America/Los_Angeles",
+      skip_when_empty: true,
+      calendars: [
+        { id: "0Z7H70gSweantyTQBkIt", label: "St. Francis RG" },
+        { id: "MVwAxbbNdHNGcjSLPxer", label: "St. Francis PPG" },
+        { id: "W1bcgWyDkAyLDCj3zOLo", label: "Orange Grove RG" },
+        { id: "Yin0WBrGXraVTn35yymb", label: "Orange Grove PPG" },
+      ],
+    },
+    {
+      enabled: true,
+      to_phone: "+16263913259",
+      timezone: "America/Los_Angeles",
+      skip_when_empty: true,
+      label: "Coach Brandon",
+      calendars: [{ id: "QTY8Zr8FZ2ZNPNU01ZvO", label: "Coach Brandon RG" }],
+    },
+  ],
 };
 
 async function sb(path, init = {}) {
@@ -116,20 +143,42 @@ function fmtDay(tz) {
   } catch (_) { return ""; }
 }
 
-// Merge DB config with the code fallback; normalize the calendars shape.
-function resolveConfig(client) {
-  const db = (client.ghl_kpi_config || {}).trial_summary || null;
-  const fb = FALLBACK_CONFIG[client.ghl_location_id] || null;
-  if (!db && !fb) return null;
-  const cfg = { ...(fb || {}), ...(db || {}) };
-  if (cfg.enabled === false) return null;
+// Normalize one summary-entry shape (defaults + calendar_ids expansion).
+// Returns null if the entry cannot actually send anything (disabled, no
+// calendars, or no destination) - so a bad entry drops out silently instead of
+// crashing the whole cron for every other entry/client.
+export function normalizeEntry(cfg) {
+  if (!cfg || cfg.enabled === false) return null;
   let calendars = cfg.calendars;
   if (!calendars && Array.isArray(cfg.calendar_ids)) calendars = cfg.calendar_ids.map((id) => ({ id, label: "" }));
   if (!Array.isArray(calendars) || !calendars.length) return null;
   if (!cfg.to_phone && !cfg.to_email) return null; // need at least one destination
-  // skip_when_empty: only send on days that actually have a trial booked, so an
-  // academy is never pinged on days it does not run (its schedule drives it).
-  return { send_hour: Number.isFinite(Number(cfg.send_hour)) ? Number(cfg.send_hour) : DEFAULT_SEND_HOUR, to_phone: cfg.to_phone || null, to_email: cfg.to_email || null, timezone: cfg.timezone || "America/Los_Angeles", calendars, skip_when_empty: cfg.skip_when_empty === true };
+  return {
+    send_hour: Number.isFinite(Number(cfg.send_hour)) ? Number(cfg.send_hour) : DEFAULT_SEND_HOUR,
+    to_phone: cfg.to_phone || null,
+    to_email: cfg.to_email || null,
+    timezone: cfg.timezone || "America/Los_Angeles",
+    calendars,
+    // skip_when_empty: only send on days that actually have a trial booked, so
+    // an academy/coach is never pinged on days they don't run.
+    skip_when_empty: cfg.skip_when_empty === true,
+    label: cfg.label || null,
+  };
+}
+
+// Resolve ALL summary entries for a client -> an array (possibly empty) of
+// normalized entries. DB (trial_summaries array, or legacy trial_summary
+// single object) replaces the fallback array wholesale when present.
+// Exported (alongside normalizeEntry/FALLBACK_CONFIG) so a verify script can
+// exercise the real resolution logic against fixture clients, same pattern as
+// the other verify-*.mjs scripts in bam-portal/scripts/.
+export function resolveConfigs(client) {
+  const kpi = client.ghl_kpi_config || {};
+  const dbList = Array.isArray(kpi.trial_summaries)
+    ? kpi.trial_summaries
+    : (kpi.trial_summary ? [kpi.trial_summary] : null);
+  const list = dbList || FALLBACK_CONFIG[client.ghl_location_id] || [];
+  return list.map(normalizeEntry).filter(Boolean);
 }
 
 // Email the summary. Honors a client's own Resend domain, else sends via GHL
@@ -161,6 +210,72 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// Build + send ONE summary entry for a client (its own destinations, its own
+// calendars, its own send_hour check). Returns the result object for the
+// cron's response payload.
+async function runOneSummary({ client, cfg, creds, force }) {
+  const hourNow = localHour(cfg.timezone);
+  if (!force && hourNow !== cfg.send_hour) {
+    return { skipped: `not ${cfg.send_hour}:00 in ${cfg.timezone} (local hour ${hourNow})` };
+  }
+
+  const { start, end } = dayWindow(cfg.timezone);
+  const appts = [];
+  for (const cal of cfg.calendars) {
+    try {
+      const r = await ghl("GET", `/calendars/events?locationId=${encodeURIComponent(client.ghl_location_id)}&calendarId=${encodeURIComponent(cal.id)}&startTime=${start}&endTime=${end}`, { token: creds.token });
+      for (const ev of (r.events || [])) {
+        if (ev.appointmentStatus === "cancelled") continue;
+        const s = ev.startTime ? new Date(ev.startTime).getTime() : 0;
+        if (!s || s < start || s >= end) continue; // GHL leaks events past the window
+        appts.push({
+          startMs: s,
+          time: fmtTime(ev.startTime, cfg.timezone),
+          who: (ev.contact && ev.contact.name) || ev.title || "Trial",
+          where: cal.label || "",
+        });
+      }
+    } catch (_) { /* one calendar failing shouldn't kill the summary */ }
+  }
+  appts.sort((a, b) => a.startMs - b.startMs);
+
+  const name = client.business_name || "Your academy";
+  const title = cfg.label ? `${name} - ${cfg.label}` : name;
+  const day = fmtDay(cfg.timezone);
+  const header = `${title} - Free Trials Today (${day})`;
+  const subject = `Free Trials Today - ${title} (${day})`;
+  const noun = appts.length === 1 ? "trial" : "trials";
+
+  let smsText, htmlBody;
+  if (!appts.length) {
+    smsText = `${header}\n\nNo free trials scheduled for today.`;
+    htmlBody = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111"><h2 style="margin:0 0 12px">${escapeHtml(header)}</h2><p>No free trials scheduled for today.</p></div>`;
+  } else {
+    const lines = appts.map((a) => `- ${a.time}  ${a.who}${a.where ? `  (${a.where})` : ""}`);
+    smsText = `${header}\n\n${appts.length} ${noun} scheduled:\n${lines.join("\n")}`;
+    const rows = appts
+      .map((a) => `<li style="margin:0 0 6px"><strong>${escapeHtml(a.time)}</strong> &nbsp;${escapeHtml(a.who)}${a.where ? ` <span style="color:#666">(${escapeHtml(a.where)})</span>` : ""}</li>`)
+      .join("");
+    htmlBody = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111"><h2 style="margin:0 0 12px">${escapeHtml(header)}</h2><p style="margin:0 0 8px">${appts.length} ${noun} scheduled:</p><ul style="margin:0;padding-left:20px">${rows}</ul></div>`;
+  }
+
+  const result = { label: cfg.label || null, to_phone: cfg.to_phone || null, to_email: cfg.to_email || null, count: appts.length };
+  // Opt-in: on a zero-trial day, stay silent instead of texting "none".
+  if (cfg.skip_when_empty && !appts.length) {
+    result.skipped = "no trials today (skip_when_empty)";
+    return result;
+  }
+  if (cfg.to_phone) {
+    const r = await sendSms({ client, toPhone: cfg.to_phone, message: smsText, contactName: title });
+    result.sms = r.ok ? "sent" : `failed: ${r.error}`;
+  }
+  if (cfg.to_email) {
+    const e = await sendEmailSummary({ client, toEmail: cfg.to_email, subject, html: htmlBody, text: smsText, contactName: title });
+    result.email = e.ok ? `sent (${e.via})` : `failed: ${e.error}`;
+  }
+  return result;
+}
+
 async function handler(req, res) {
   const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!process.env.CRON_SECRET || got !== process.env.CRON_SECRET) return res.status(401).json({ error: "unauthorized" });
@@ -170,78 +285,27 @@ async function handler(req, res) {
     clients = await sb(`clients?select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config`);
   } catch (e) { return res.status(200).json({ error: e.message }); }
 
+  const force = req.query.force === "1";
+  // ?only=label filters to a single summary entry by its `label`, for testing
+  // one person's summary without also firing everyone else's on that client.
+  const onlyLabel = typeof req.query.only === "string" ? req.query.only : null;
+
   const out = [];
   for (const client of (Array.isArray(clients) ? clients : [])) {
-    const cfg = resolveConfig(client);
-    if (!cfg) continue;
-    try {
-      // Wrong hour for this academy? Another scheduled run will be its 8am.
-      // ?force=1 bypasses it for a manual test.
-      const hourNow = localHour(cfg.timezone);
-      if (req.query.force !== "1" && hourNow !== cfg.send_hour) {
-        out.push({ client_id: client.id, skipped: `not ${cfg.send_hour}:00 in ${cfg.timezone} (local hour ${hourNow})` });
-        continue;
-      }
-      if (!client.ghl_location_id) { out.push({ client_id: client.id, skipped: "no location" }); continue; }
-      const creds = await pickGhlToken(client);
-      if (!creds) { out.push({ client_id: client.id, skipped: "no ghl token" }); continue; }
+    const cfgs = resolveConfigs(client).filter((c) => !onlyLabel || c.label === onlyLabel);
+    if (!cfgs.length) continue;
+    if (!client.ghl_location_id) { out.push({ client_id: client.id, skipped: "no location" }); continue; }
+    const creds = await pickGhlToken(client);
+    if (!creds) { out.push({ client_id: client.id, skipped: "no ghl token" }); continue; }
 
-      const { start, end } = dayWindow(cfg.timezone);
-      const appts = [];
-      for (const cal of cfg.calendars) {
-        try {
-          const r = await ghl("GET", `/calendars/events?locationId=${encodeURIComponent(client.ghl_location_id)}&calendarId=${encodeURIComponent(cal.id)}&startTime=${start}&endTime=${end}`, { token: creds.token });
-          for (const ev of (r.events || [])) {
-            if (ev.appointmentStatus === "cancelled") continue;
-            const s = ev.startTime ? new Date(ev.startTime).getTime() : 0;
-            if (!s || s < start || s >= end) continue; // GHL leaks events past the window
-            appts.push({
-              startMs: s,
-              time: fmtTime(ev.startTime, cfg.timezone),
-              who: (ev.contact && ev.contact.name) || ev.title || "Trial",
-              where: cal.label || "",
-            });
-          }
-        } catch (_) { /* one calendar failing shouldn't kill the summary */ }
+    for (const cfg of cfgs) {
+      try {
+        const result = await runOneSummary({ client, cfg, creds, force });
+        out.push({ client_id: client.id, business: client.business_name, ...result });
+      } catch (e) {
+        out.push({ client_id: client.id, business: client.business_name, label: cfg.label || null, error: e.message });
       }
-      appts.sort((a, b) => a.startMs - b.startMs);
-
-      const name = client.business_name || "Your academy";
-      const day = fmtDay(cfg.timezone);
-      const header = `${name} - Free Trials Today (${day})`;
-      const subject = `Free Trials Today - ${name} (${day})`;
-      const noun = appts.length === 1 ? "trial" : "trials";
-
-      let smsText, htmlBody;
-      if (!appts.length) {
-        smsText = `${header}\n\nNo free trials scheduled for today.`;
-        htmlBody = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111"><h2 style="margin:0 0 12px">${escapeHtml(header)}</h2><p>No free trials scheduled for today.</p></div>`;
-      } else {
-        const lines = appts.map((a) => `- ${a.time}  ${a.who}${a.where ? `  (${a.where})` : ""}`);
-        smsText = `${header}\n\n${appts.length} ${noun} scheduled:\n${lines.join("\n")}`;
-        const rows = appts
-          .map((a) => `<li style="margin:0 0 6px"><strong>${escapeHtml(a.time)}</strong> &nbsp;${escapeHtml(a.who)}${a.where ? ` <span style="color:#666">(${escapeHtml(a.where)})</span>` : ""}</li>`)
-          .join("");
-        htmlBody = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111"><h2 style="margin:0 0 12px">${escapeHtml(header)}</h2><p style="margin:0 0 8px">${appts.length} ${noun} scheduled:</p><ul style="margin:0;padding-left:20px">${rows}</ul></div>`;
-      }
-
-      const result = { client_id: client.id, business: name, count: appts.length };
-      // Opt-in: on a zero-trial day, stay silent instead of texting "none".
-      if (cfg.skip_when_empty && !appts.length) {
-        result.skipped = "no trials today (skip_when_empty)";
-        out.push(result);
-        continue;
-      }
-      if (cfg.to_phone) {
-        const r = await sendSms({ client, toPhone: cfg.to_phone, message: smsText, contactName: name });
-        result.sms = r.ok ? "sent" : `failed: ${r.error}`;
-      }
-      if (cfg.to_email) {
-        const e = await sendEmailSummary({ client, toEmail: cfg.to_email, subject, html: htmlBody, text: smsText, contactName: name });
-        result.email = e.ok ? `sent (${e.via})` : `failed: ${e.error}`;
-      }
-      out.push(result);
-    } catch (e) { out.push({ client_id: client.id, error: e.message }); }
+    }
   }
   return res.status(200).json({ ok: true, processed: out.length, items: out });
 }
