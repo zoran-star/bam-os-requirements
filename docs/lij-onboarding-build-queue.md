@@ -874,6 +874,20 @@ NEW: sb(`             ${encodeURIComponent(offerId)}         `)
 
 **⛔ ORCHESTRATOR CALL: STOP REFINING, HOLD UNTIL MERGE.** It asked, correctly, rather than deciding for itself. **The gate is complete; the last round found zero bugs and one non-improvement, which is the signal to stop rather than to go deeper.** Three PRs are blocked on a human, not on quality, and **polish landing after the bottleneck is free while polish landing before it is not.** The remaining risk is better carried by the next person, who now inherits a self-test, seven controls and written measurements instead of folklore.
 
+## 📏 THE PATTERN GOES ONE LAYER FURTHER OUT THAN ANYONE HAD TAKEN IT: **A WEBHOOK SUBSCRIPTION IS ALSO AN ASSURANCE WITHOUT A CONNECTION.**
+
+MEMBER MANAGEMENT took the Stripe deauthorization build with both routed constraints, and **added one nobody had:**
+
+> **Establish whether the event actually REACHES the platform endpoint as configured**, and if a Stripe-dashboard event-list change is needed, **report it as a deploy-day step rather than pretending code suffices.**
+
+**That is the right extension and it is the exact shape of every instance in this file.** Perfect code handling `account.application.deauthorized`, a committed test proving it flips the status, negative controls proving it cannot flip on an error path - **and if the platform's dashboard is not subscribed to that event, none of it ever runs, and every artifact says it works.** The tests would pass forever.
+
+**Generalise it: for any event-driven fix, the subscription is part of the mechanism and it lives OUTSIDE the repo, so no test in the repo can see it.** The estate has at least one other instance already waiting - there is no `account.updated` subscription either, which is why the Stripe tick still depends on a human loading the Members tab.
+
+**Triage: FRICTION**, not San Jose-blocking. Built now on the orchestrator's routing purely to avoid a future collision in `api/stripe/webhook.js`, on a fresh branch off main since [#1673](https://github.com/zoran-star/bam-os-requirements/pull/1673) merged.
+
+**📌 New Zoran item, small: the receipts ON-switch seed is HELD until GTA's HST number is entered.** Correct behaviour, held rather than guessed, and it needs one number from him to release.
+
 ## ⛔ [PR #1546](https://github.com/zoran-star/bam-os-requirements/pull/1546) IS **SUPERSEDED, NOT STALE.** DO NOT MERGE IT. **AND CLOSING IT UNBLOCKS THE LAST HARMFUL PAIR.**
 
 Zoran asked for it to be rebased and merged. **It should be closed instead**, and the evidence is not an argument, it is four facts:
