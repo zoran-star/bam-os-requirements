@@ -61197,6 +61197,38 @@ function _fcStyle() {
     '.fcui-evt-tx i{display:block;font-style:normal;font-size:11px;color:var(--text-mute);margin-top:4px}' +
     /* Hawkeye feed inherits the card look inside the activity stack */
     '.fcui-dash #hm-rail-bottom .hm-feed{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-card);overflow:hidden}' +
+    /* messages panel: right-side drawer (the V2 detail idiom) */
+    '#fcui-msgp{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .22s}' +
+    '#fcui-msgp.on{opacity:1;pointer-events:auto}' +
+    '.fcui-msgp-card{position:absolute;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--bg);border-left:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(30px);transition:transform .22s var(--es,ease)}' +
+    '#fcui-msgp.on .fcui-msgp-card{transform:none}' +
+    '@media(prefers-reduced-motion:reduce){#fcui-msgp,.fcui-msgp-card{transition:none}}' +
+    '.fcui-msgp-head{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 18px 12px}' +
+    '.fcui-msgp-title{font-family:var(--font-num);font-size:18px;font-weight:800;color:var(--text)}' +
+    '.fcui-msgp-sub{font-size:11.5px;color:var(--text-mute);margin-top:2px}' +
+    '.fcui-msgp-x{background:none;border:none;color:var(--text-mute);cursor:pointer;padding:6px;border-radius:var(--r-sm)}' +
+    '.fcui-msgp-x:hover{color:var(--text)}' +
+    '.fcui-msgp-chips{display:flex;gap:6px;padding:0 18px 12px;overflow-x:auto;scrollbar-width:none;flex:none}' +
+    '.fcui-msgp-chips::-webkit-scrollbar{display:none}' +
+    '.fcui-msgp-chip{flex:none;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--r-full);padding:6px 12px;font:inherit;font-size:11.5px;font-weight:700;color:var(--text-sub);cursor:pointer;white-space:nowrap;transition:border-color var(--t-fast)}' +
+    '.fcui-msgp-chip:hover{border-color:var(--gold)}' +
+    '.fcui-msgp-chip.on{background:var(--gold);border-color:var(--gold);color:var(--on-gold)}' +
+    '.fcui-msgp-list{flex:1;overflow-y:auto;padding:0 10px}' +
+    '.fcui-msgp-row{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);padding:12px 8px;font:inherit;cursor:pointer}' +
+    '.fcui-msgp-row:hover{background:var(--gold-sheen)}' +
+    '.fcui-msgp-av{flex:none;width:32px;height:32px;border-radius:var(--r-full);background:var(--surface-el);border:1px solid var(--border);color:var(--text-mute);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}' +
+    '.fcui-msgp-mid{flex:1;min-width:0}' +
+    '.fcui-msgp-nm{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--text);flex-wrap:wrap}' +
+    '.fcui-msgp-row.unread .fcui-msgp-nm{font-weight:800}' +
+    '.fcui-tag{font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:var(--r-xs);padding:2px 6px}' +
+    '.fcui-tag.lead{background:var(--gold-glow);color:var(--gold)}' +
+    '.fcui-tag.member{background:var(--green-soft);color:var(--green)}' +
+    '.fcui-tag.chan{background:var(--surface-el);color:var(--text-mute);border:1px solid var(--border)}' +
+    '.fcui-msgp-prev{display:block;font-size:12px;color:var(--text-mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.fcui-msgp-meta{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:10.5px;color:var(--text-mute)}' +
+    '.fcui-msgp-dot{width:8px;height:8px;border-radius:var(--r-full);background:var(--gold)}' +
+    '.fcui-msgp-foot{flex:none;background:none;border:none;border-top:1px solid var(--border);padding:13px 18px calc(13px + env(safe-area-inset-bottom));font:inherit;font-size:12.5px;font-weight:700;color:var(--gold);text-align:left;cursor:pointer}' +
+    '.fcui-msgp-foot:hover{background:var(--gold-sheen)}' +
     /* keep the sub-brand cream flat: no ticker canvas, no textures */
     'body.fcui-mode .hm-ticker-bg{display:none !important}';
   document.head.appendChild(st);
@@ -61397,10 +61429,105 @@ async function _fcMsgPreviewLoad() {
     prev.textContent = 'Inbox unavailable right now.';
   }
 }
-// Messages panel comes in the Messages phase; until then the preview opens the inbox.
-function _fcMsgOpen() {
-  if (typeof _fcMsgPanelOpen === 'function') { _fcMsgPanelOpen(); return; }
-  switchView('v15inbox');
+function _fcMsgOpen() { _fcMsgPanelOpen(); }
+// ── Messages panel: right-side drawer (the one V2 detail idiom) over the
+// v15 inbox data + the in-app BAM thread. Channel chips filter; every row
+// carries a LEAD/MEMBER tag (when known) + its channel tag. Rows open the
+// existing message peek (inbox) or the Messages view (in-app). ──
+function _fcMsgChannel(c) {
+  if (c._inApp) return 'In-App';
+  const t = String(c.lastMessageType || '').toUpperCase();
+  if (t.includes('EMAIL')) return 'Email';
+  if (t.includes('INSTAGRAM') || /(^|_)IG\b/.test(t)) return 'Instagram DM';
+  if (t.includes('CALL')) return 'Call';
+  return 'SMS';
+}
+function _fcMsgPanelClose() { document.getElementById('fcui-msgp')?.classList.remove('on'); }
+async function _fcMsgPanelOpen() {
+  let ov = document.getElementById('fcui-msgp');
+  if (!ov) {
+    document.body.insertAdjacentHTML('beforeend', `
+      <div id="fcui-msgp" onclick="if(event.target===this)_fcMsgPanelClose()">
+        <div class="fcui-msgp-card">
+          <div class="fcui-msgp-head">
+            <div><div class="fcui-msgp-title">Messages</div><div class="fcui-msgp-sub" id="fcui-msgp-sub">Loading...</div></div>
+            <button type="button" class="fcui-msgp-x" onclick="_fcMsgPanelClose()" aria-label="Close"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="fcui-msgp-chips" id="fcui-msgp-chips"></div>
+          <div class="fcui-msgp-list" id="fcui-msgp-list"><div class="req-empty" style="padding:18px"><span class="req-spin"></span> Loading...</div></div>
+          <button type="button" class="fcui-msgp-foot" onclick="_fcMsgPanelClose();switchView('v15inbox')">Open full inbox &rsaquo;</button>
+        </div>
+      </div>`);
+    ov = document.getElementById('fcui-msgp');
+  }
+  requestAnimationFrame(() => ov.classList.add('on'));
+  window._fcMsgFilterV = window._fcMsgFilterV || 'All';
+  // Load both sources fresh each open (cheap, and unread states move fast)
+  let convs = [], inapp = [];
+  try {
+    const token = await _mreqAuthToken();
+    const [ib, bm] = await Promise.all([
+      fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(r => _safeJson(r)).catch(() => ({})),
+      fetch('/api/messages?action=list-conversations&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(r => _safeJson(r)).catch(() => ({})),
+    ]);
+    convs = (ib && ib.conversations) || [];
+    inapp = ((bm && bm.conversations) || []).map(c => ({
+      _inApp: true, id: 'inapp-' + c.id, contactName: c.business_name || 'BAM Business',
+      lastMessageBody: c.last_message_preview || '', lastMessageDate: c.last_message_at,
+      unreadCount: c.has_unread ? 1 : 0, classification: null,
+    }));
+  } catch (_) {}
+  window._fcMsgRows = convs.concat(inapp);
+  _fcMsgPanelRender();
+}
+function _fcMsgPanelRender() {
+  const rows = window._fcMsgRows || [];
+  const chipsHost = document.getElementById('fcui-msgp-chips');
+  const list = document.getElementById('fcui-msgp-list');
+  const sub = document.getElementById('fcui-msgp-sub');
+  if (!chipsHost || !list) return;
+  const f = window._fcMsgFilterV || 'All';
+  const FILTERS = ['All', 'Leads', 'Members', 'SMS', 'Email', 'Instagram DM', 'In-App'];
+  chipsHost.innerHTML = FILTERS.map(x =>
+    `<button type="button" class="fcui-msgp-chip${x === f ? ' on' : ''}" onclick="window._fcMsgFilterV=${JSON.stringify(x).replace(/"/g, '&quot;')};_fcMsgPanelRender()">${escapeHTML(x)}</button>`).join('');
+  const isMember = c => c.classification === 'member' || !!c.matched_member_name;
+  const isLead = c => c.classification === 'lead';
+  const match = c => {
+    if (f === 'All') return true;
+    if (f === 'Leads') return isLead(c);
+    if (f === 'Members') return isMember(c);
+    if (f === 'In-App') return !!c._inApp;
+    return _fcMsgChannel(c) === f;
+  };
+  const shown = rows.filter(match).sort((a, b) =>
+    ((b.unreadCount > 0) - (a.unreadCount > 0)) || (new Date(b.lastMessageDate || 0) - new Date(a.lastMessageDate || 0)));
+  const unread = rows.filter(c => (c.unreadCount || 0) > 0).length;
+  if (sub) sub.textContent = rows.length + (rows.length === 1 ? ' conversation' : ' conversations') + (unread ? ', ' + unread + ' unread' : '');
+  const n = document.getElementById('fcui-msgs-n');
+  if (n) n.textContent = unread ? unread + ' unread' : '';
+  if (!shown.length) {
+    list.innerHTML = '<div class="req-empty" style="padding:22px;text-align:center">Nothing here yet. New messages land in this list.</div>';
+    return;
+  }
+  list.innerHTML = shown.slice(0, 40).map(c => {
+    const un = (c.unreadCount || 0) > 0;
+    const name = (typeof _ccCapName === 'function' ? _ccCapName((c.contactName || c.fullName || 'Someone').split(' ').slice(0, 2).join(' ')) : (c.contactName || 'Someone'));
+    const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2);
+    const who = c._inApp ? '' : isMember(c) ? '<span class="fcui-tag member">Member</span>' : isLead(c) ? '<span class="fcui-tag lead">Lead</span>' : '';
+    const chan = `<span class="fcui-tag chan">${escapeHTML(_fcMsgChannel(c))}</span>`;
+    const when = c.lastMessageDate && typeof _hmInboxTimeStr === 'function' ? _hmInboxTimeStr(new Date(c.lastMessageDate)) : '';
+    let go;
+    if (c._inApp) go = `_fcMsgPanelClose();switchView('messages')`;
+    else { (window._hmIbById = window._hmIbById || {})[c.id] = c; go = `_fcMsgPanelClose();_hmMsgPeek('${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}')`; }
+    return `<button type="button" class="fcui-msgp-row${un ? ' unread' : ''}" onclick="${go}">
+      <span class="fcui-msgp-av">${escapeHTML(initials)}</span>
+      <span class="fcui-msgp-mid">
+        <span class="fcui-msgp-nm">${escapeHTML(name)}${who}${chan}</span>
+        <span class="fcui-msgp-prev">${escapeHTML(_hmStripEm(String(c.lastMessageBody || '').slice(0, 90)))}</span>
+      </span>
+      <span class="fcui-msgp-meta">${un ? '<span class="fcui-msgp-dot"></span>' : ''}<span>${escapeHTML(when)}</span></span>
+    </button>`;
+  }).join('');
 }
 // Toast anatomy shared by every FC toast (MRR milestone, trial booked, notices).
 // Docked on document.body: fixed elements inside transformed cards drift.
