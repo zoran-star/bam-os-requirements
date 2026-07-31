@@ -22252,7 +22252,7 @@ function renderHomeV2() {
               <span class="hm-trial-pill" id="hm-trial-pill" style="display:none"></span>
             </div>
             <div id="hv2-sched-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
-            <button class="hv2-pf" onclick="switchView('v15cal')">Open the calendar ›</button>
+            <button class="hv2-pf" onclick="_calOpenRight()">Open the calendar ›</button>
           </div>
           <!-- Actions and Inbox are two panels, not one panel with a tab
                toggle (Zoran 2026-07-31). Under the toggle, whichever tab you
@@ -22525,7 +22525,7 @@ function _hv2UnifiedSchedule(trials, slots, tz) {
 
   // Empty state
   if (!slots.length && !trials.length) {
-    el.innerHTML = `<div class="hm-empty-cta"><span class="hm-empty-msg">Nothing on today's schedule.</span><button class="hm-empty-btn" onclick="switchView('v15cal')">View full calendar</button></div>`;
+    el.innerHTML = `<div class="hm-empty-cta"><span class="hm-empty-msg">Nothing on today's schedule.</span><button class="hm-empty-btn" onclick="_calOpenRight()">View full calendar</button></div>`;
     return;
   }
 
@@ -22605,7 +22605,7 @@ function _hv2UnifiedSchedule(trials, slots, tz) {
       const lowFill = s.capacity && fill < 60;
       const trialId = 'st-' + i;
 
-      html += `<div onclick="switchView('v15cal')" style="${_HV_ROW}${isPast ? ';opacity:.5' : ''}${isNext ? ';border-left:3px solid var(--gold)' : ''}">
+      html += `<div onclick="_calOpenRight()" style="${_HV_ROW}${isPast ? ';opacity:.5' : ''}${isNext ? ';border-left:3px solid var(--gold)' : ''}">
         <span class="hv2-dot" style="background:#7fb0d8"></span>
         <div style="flex:1;min-width:0">
           <div style="${_HV_TITLE}">${escapeHTML(s.name || 'Session')}${hasTrials ? `<span class="hm-sched-trial-tag" onclick="event.stopPropagation();_hvToggleTrial('${trialId}')">${sessionTrials.length} trial${sessionTrials.length > 1 ? 's' : ''} &#9662;</span>` : ''}</div>
@@ -22707,6 +22707,24 @@ async function _hv2ActsLoad() {
 // rendered. window._hmActiveTab is kept as a harmless constant because other
 // surfaces still read it; nothing writes it any more.
 window._hmActiveTab = 'inbox';
+
+// Which calendar is "the calendar" for this academy. V2 = the V2 spine
+// calendar (agenda on mobile); everyone else keeps the V1.5 GHL calendars.
+// Every user-facing door to a calendar routes through here so retiring a
+// view never strands an entry point again.
+function _calOpenRight() {
+  const v2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const view = v2 ? 'calendar' : 'v15cal';
+  // In command-center mode a plain switchView('calendar') is swallowed (the
+  // CC dispatcher only passes views it knows about, and only v15cal was
+  // wired). _ccOpenClassic is the CC-sanctioned opener the Quick-links rail
+  // uses; go through it whenever CC is running.
+  if (document.body.classList.contains('cc-mode') && typeof _ccOpenClassic === 'function') {
+    _ccOpenClassic(view);
+    return;
+  }
+  switchView(view);
+}
 
 // #4: System notification patterns — group these senders into an accordion
 const _HM_SYSTEM_SENDERS = /^(facebook|meta|google|stripe|square|twilio|mailchimp|quickbooks|zapier|intuit|paypal)/i;
