@@ -80,19 +80,59 @@ async function runImportToDone(path, clientId, deadline) {
 // So: SMS history always imports (texts live only in GHL), but the GHL EMAIL
 // import is skipped when a Gmail mailbox is connected. Academies without Gmail
 // still import their GHL email history (they'd otherwise lose it at cutover).
-async function hasGmailMailbox(clientId) {
+//
+// THREE OUTCOMES, NOT TWO (repo house rule 10). This question crosses a network
+// boundary, so "there is no mailbox" and "we could not ask" are different facts
+// and must not share a value. They used to: the catch returned false, which the
+// caller read as "no Gmail connected" and so ran the GHL email import on top of
+// a live Gmail 2-way sync. One Supabase blip would therefore duplicate an
+// academy's entire email history, with nothing downstream able to tell that it
+// happened or which threads were the copies.
+//
+//   "yes"      an active Gmail mailbox row came back
+//   "no"       we asked, and there is none
+//   "unknown"  we could not ask, or could not read the answer we got
+//
+// The caller treats "unknown" like "yes" for SKIPPING the email import, and
+// unlike "yes" for STAMPING the marker. Skipping is recoverable by re-running;
+// duplicating is not recoverable at all.
+export const GMAIL_YES = "yes";
+export const GMAIL_NO = "no";
+export const GMAIL_UNKNOWN = "unknown";
+
+export async function gmailMailboxState(clientId) {
+  let rows;
   try {
-    const rows = await sb(`client_mailboxes?client_id=eq.${encodeURIComponent(clientId)}&provider=eq.gmail&status=eq.active&select=client_id&limit=1`);
-    return Array.isArray(rows) && rows.length > 0;
-  } catch (_) { return false; }
+    rows = await sb(`client_mailboxes?client_id=eq.${encodeURIComponent(clientId)}&provider=eq.gmail&status=eq.active&select=client_id&limit=1`);
+  } catch (e) {
+    console.warn(`[cron-import-history] client_mailboxes lookup failed for ${clientId}: ${(e && e.message) || e}`);
+    return GMAIL_UNKNOWN;
+  }
+  // sb() returns null for an empty body, and anything that is not an array is
+  // an answer we cannot read. Neither is evidence that no mailbox exists.
+  if (!Array.isArray(rows)) {
+    console.warn(`[cron-import-history] client_mailboxes returned an unreadable answer for ${clientId}`);
+    return GMAIL_UNKNOWN;
+  }
+  return rows.length > 0 ? GMAIL_YES : GMAIL_NO;
 }
 
-async function importForAcademy(client, deadline) {
+export async function importForAcademy(client, deadline) {
   const sms = await runImportToDone("/api/messaging/import-ghl-history", client.id, deadline);
-  const gmail = await hasGmailMailbox(client.id);
-  const email = gmail
-    ? { done: true, skipped: "gmail-connected" }
-    : await runImportToDone("/api/messaging/email-import-ghl-history", client.id, deadline);
+  const gmail = await gmailMailboxState(client.id);
+  let email;
+  if (gmail === GMAIL_YES) {
+    email = { done: true, skipped: "gmail-connected" };
+  } else if (gmail === GMAIL_UNKNOWN) {
+    // Deferred, and deliberately NOT done. done:true here would stamp the
+    // marker, and the batch query only ever considers academies whose marker is
+    // NULL - so stamping on an unknown would turn one blip into a permanent
+    // skip of that academy's email history. Leaving it unstamped costs a re-run.
+    email = { done: false, skipped: "gmail-unknown" };
+    console.warn(`[cron-import-history] ${client.business_name}: Gmail mailbox state UNKNOWN - GHL email import deferred, marker not stamped, will re-ask next run`);
+  } else {
+    email = await runImportToDone("/api/messaging/email-import-ghl-history", client.id, deadline);
+  }
   const stamped = !!(sms.done && email.done);
   if (stamped) {
     await sb(`clients?id=eq.${encodeURIComponent(client.id)}`, {
@@ -100,7 +140,7 @@ async function importForAcademy(client, deadline) {
       body: JSON.stringify({ ghl_history_imported_at: nowIso() }),
     }).catch(() => {});
   }
-  return { academy: client.business_name, sms, email, stamped };
+  return { academy: client.business_name, gmail, sms, email, stamped };
 }
 
 async function handler(req, res) {
@@ -149,8 +189,13 @@ async function handler(req, res) {
     catch (e) { results.push({ academy: c.business_name, error: e.message }); }
   }
   const stamped = results.filter(r => r.stamped).length;
-  console.log(`[cron-import-history] processed=${results.length} stamped=${stamped}`);
-  return res.status(200).json({ ok: true, processed: results.length, stamped, results });
+  // An academy skipped because we could not READ its mailbox state is a
+  // different fact from one skipped because Gmail is genuinely connected, and an
+  // operator has to be able to tell them apart: the first means an import is
+  // still owed and will be re-asked, the second means there is nothing to import.
+  const deferred = results.filter(r => r.email && r.email.skipped === "gmail-unknown").length;
+  console.log(`[cron-import-history] processed=${results.length} stamped=${stamped} gmail_unknown_deferred=${deferred}`);
+  return res.status(200).json({ ok: true, processed: results.length, stamped, gmail_unknown_deferred: deferred, results });
 }
 
 export default withSentryApiRoute(handler);
