@@ -12932,6 +12932,25 @@ Then the call to action."]</div>
         #view-v15inbox .v15ib-list .v15ib-conv { border-bottom: 1px solid var(--border); }
         /* last row clears the compose FAB + the Zoran orb */
         #view-v15inbox #v15ib-body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+        /* ── The scroller (live phone fix) ─────────────────────────────
+           The 900px rule flattens the split (display:block) and turns the
+           list's own scroller OFF (overflow:visible), expecting an ancestor
+           to scroll. But the focus card and its .content are overflow:hidden
+           at every width, so on phones NO element could scroll the list or
+           an open thread. Re-stack the split as a flex column and give the
+           list pane its scroller back; the toolbar sits above the scroller,
+           so it stays pinned, and the infinite-scroll listener (bound to
+           .v15ib-list-scroll) fires again. Desktop widths never enter here. */
+        #view-v15inbox .v15ib-split { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+        #view-v15inbox .v15ib-split-list { flex: 1 1 auto; min-height: 0; }
+        #view-v15inbox .v15ib-split-list .v15ib-list-scroll {
+          flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
+        /* phones never render into the split thread pane (threads go to
+           #v15ib-body via _v15ibOpen); in the flex column the empty pane
+           would steal half the height, so it goes. The offsetParent checks
+           in the thread renderers already route around a hidden pane. */
+        #view-v15inbox .v15ib-split-thread { display: none; }
         /* time tiers on tokens (shared hexes stay - desktop untouched) */
         #view-v15inbox .v15ib-time-urgent { color: var(--red) !important; }
         #view-v15inbox .v15ib-time-warm { color: var(--amber) !important; }
