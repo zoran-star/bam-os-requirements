@@ -95,6 +95,81 @@ function intervalFor(term) {
   if (term === "6_months") return { interval: "month", interval_count: 6 };
   return { interval: "week", interval_count: 4 };
 }
+
+// ── Billing CADENCE: how a price actually re-bills ──────────────────────────
+//
+// The term key (4_weeks / 3_months / 6_months) is the COMMITMENT'S IDENTITY and
+// nothing here changes what it means: it is what offer_price_key joins on, what
+// the agreement PDF's term noun reads, and what the revert logic gates on.
+// Cadence is a second, explicit, NULLABLE field on the offer_prices row that
+// says how the money actually recurs, because one 3-month commitment can
+// legitimately bill per calendar quarter (BAM GTA, live today) and another can
+// bill per 12 weeks (San Jose, ruled 2026-07-30) while both are "3 months" to
+// the parent.
+//
+// WHY IT CANNOT COME FROM THE COMMITMENT TEXT. Prod carries both notations for
+// the same thing: GTA's archived tiers say "12 Weeks (3 Months)" and San Jose
+// says "3 Months (12 Weeks)". Both match /(\d+)\s*month/ AND /12\s*week/, so
+// free text cannot express the distinction at all. termFromLength and
+// lengthMatchesTerm are deliberately left alone; the cadence is DATA, not prose.
+//
+// NULL, absent, or unrecognized cadence resolves to intervalFor(term) - byte for
+// byte the behavior every live academy has today.
+const CADENCES = {
+  "4_weeks": { interval: "week", interval_count: 4 },
+  monthly: { interval: "month", interval_count: 1 },
+  "12_weeks": { interval: "week", interval_count: 12 },
+  "24_weeks": { interval: "week", interval_count: 24 },
+  "3_calendar_months": { interval: "month", interval_count: 3 },
+  "6_calendar_months": { interval: "month", interval_count: 6 },
+};
+
+// The ONE place a billing interval is decided. Every caller goes through here so
+// a cadence cannot be honored on one code path and ignored on another.
+// Returns the Stripe recurring shape plus:
+//   cadence          - the recognized cadence that shaped it, else null (legacy)
+//   unknown_cadence  - a value the row carried that this build does not know.
+//                      We bill the LEGACY shape and report it, the same non-fatal
+//                      posture as the sign-up fee lookup: an enrollment is never
+//                      blocked over it, and it never silently invents a cadence.
+function resolveInterval(row, term) {
+  const raw = row && typeof row === "object" && row.billing_cadence != null
+    ? String(row.billing_cadence).trim().toLowerCase()
+    : "";
+  if (raw && Object.prototype.hasOwnProperty.call(CADENCES, raw)) {
+    return { ...CADENCES[raw], cadence: raw, unknown_cadence: null };
+  }
+  return { ...intervalFor(term), cadence: null, unknown_cadence: raw || null };
+}
+
+// The admin-facing note for a cadence this build does not know. Non-fatal by
+// construction: it rides the 200 alongside coupon_error rather than turning a
+// paid enrollment into an error the parent has to read.
+function cadenceWarning(iv) {
+  if (!iv || !iv.unknown_cadence) return null;
+  return `This price is set to bill "${iv.unknown_cadence}", which this build does not recognize. It was billed on the standard schedule for its term instead. Check the price row in the portal.`;
+}
+
+// offer_prices.billing_cadence ships AHEAD of its migration (see
+// supabase/migrations/20260730T230000_offer_prices_billing_cadence.sql and the
+// PENDING_SQL ledger). PostgREST 400s the WHOLE select over one unknown column,
+// and these selects ARE the enrollment path, so ask for the column and, on the
+// one error that means "not migrated yet", ask again without it. What comes back
+// is a row with no billing_cadence key, which is exactly the legacy state
+// resolveInterval already handles. Narrow on purpose: a 5xx or any other 400
+// still throws, because degrading past a real outage would bill the wrong shape
+// quietly.
+const CADENCE_COL = "billing_cadence";
+async function sbWithCadence(pathFor) {
+  try {
+    return await sb(pathFor(true));
+  } catch (e) {
+    const msg = String((e && e.message) || e || "");
+    if (!/42703|does not exist/i.test(msg) || !msg.includes(CADENCE_COL)) throw e;
+    console.warn(`[website/checkout] offer_prices.${CADENCE_COL} is not in the schema yet (migration pending) - re-reading without it`);
+    return await sb(pathFor(false));
+  }
+}
 // Add one billing interval to a date (UTC). Used to place the recurring anchor one
 // full period AFTER a chosen future start date (they pay the first period today).
 function addInterval(date, iv) {
@@ -203,17 +278,26 @@ async function resolveCommitmentRevert({ clientId, offerId, planText, term }) {
   //    no routable typed monthly -> null -> plain sub (today's behavior).
   let monthlyRows = null;
   try {
-    monthlyRows = await sb(
+    monthlyRows = await sbWithCadence((withCadence) =>
       `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_id=eq.${encodeURIComponent(offerId)}` +
       `&source_offer_price_key=eq.${encodeURIComponent(planText + "|monthly")}&is_routable=eq.true&is_active=eq.true` +
-      `&select=stripe_price_id,billing_interval`
+      `&select=stripe_price_id,billing_interval${withCadence ? `,${CADENCE_COL}` : ""}`
     );
   } catch { return null; }
   const monthly = (Array.isArray(monthlyRows) ? monthlyRows : [])
     .filter((r) => r.stripe_price_id)
     .sort((a, b) => (b.billing_interval === "4_weeks" ? 1 : 0) - (a.billing_interval === "4_weeks" ? 1 : 0))[0];
   if (!monthly || !monthly.stripe_price_id) return null;
-  return { revertToPriceId: monthly.stripe_price_id };
+  // The revert price's OWN cadence, resolved through the same door as the
+  // commitment's. It is reported rather than acted on here: the revert price is
+  // charged by Stripe on its own schedule (plain sub) or as the base item of an
+  // anchored sub, so what this endpoint owes it is visibility, not arithmetic.
+  const revertIv = resolveInterval(monthly, "4_weeks");
+  return {
+    revertToPriceId: monthly.stripe_price_id,
+    revertCadence: revertIv.cadence,
+    revertUnknownCadence: revertIv.unknown_cadence,
+  };
 }
 
 async function handler(req, res) {
@@ -322,16 +406,22 @@ async function handler(req, res) {
     // requires a confirmed entitlement rule (offers-sync invariant) - so
     // nothing can be sold that the access/credit engines can't fulfill.
     const typedSelect = "id,title,amount_cents,currency,billing_interval,stripe_price_id,source_offer_id,source_offer_price_key,is_active,is_routable,sort_order";
+    // The plan select asks for billing_cadence too, through the pending-column
+    // retry above. The SIGN-UP FEE select below deliberately does not: a fee is a
+    // one-time price, cadence means nothing to it, and its lookup lives inside a
+    // catch that silently drops the fee - so a column that is not migrated yet
+    // must not be able to reach it.
+    const typedSelectFor = (withCadence) => (withCadence ? `${typedSelect},${CADENCE_COL}` : typedSelect);
     let typedRows;
     if (offerPriceId) {
-      typedRows = await sb(
+      typedRows = await sbWithCadence((withCadence) =>
         `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&id=eq.${encodeURIComponent(offerPriceId)}` +
-        `&source_offer_id=eq.${encodeURIComponent(offerId)}&select=${typedSelect}`
+        `&source_offer_id=eq.${encodeURIComponent(offerId)}&select=${typedSelectFor(withCadence)}`
       );
     } else {
-      typedRows = await sb(
+      typedRows = await sbWithCadence((withCadence) =>
         `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}&source_offer_id=eq.${encodeURIComponent(offerId)}` +
-        `&source_offer_price_key=eq.${encodeURIComponent(priceKey)}&order=sort_order.asc&select=${typedSelect}`
+        `&source_offer_price_key=eq.${encodeURIComponent(priceKey)}&order=sort_order.asc&select=${typedSelectFor(withCadence)}`
       );
     }
     const price = (Array.isArray(typedRows) ? typedRows : []).find((row) => row.is_active && row.is_routable) || null;
@@ -344,6 +434,13 @@ async function handler(req, res) {
     const resolvedPriceKey = priceKey || price.source_offer_price_key || "";
     const term = price.billing_interval || "4_weeks";
     const planText = resolvedPriceKey.split("|")[0] || price.title;
+    // How this row actually re-bills. Resolved ONCE, here, and reused by every
+    // interval decision below (test price, anchor math, metadata) so the Stripe
+    // price and the anchor can never disagree with each other.
+    const cadenceIv = resolveInterval(price, term);
+    if (cadenceIv.unknown_cadence) {
+      console.warn(`[website/checkout] offer_prices.${CADENCE_COL} "${cadenceIv.unknown_cadence}" is not a cadence this build knows (price ${price.id}) - billing the ${term} shape instead`);
+    }
 
     // ── One-time SIGN-UP FEE (Build S) ───────────────────────────────────
     // Resolved SERVER-SIDE from the catalog, exactly like the plan price: a
@@ -468,6 +565,7 @@ async function handler(req, res) {
               client_secret: secret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
               amount_cents: price.amount_cents, currency: price.currency || "cad", agreement_saved: !!member.agreement_pdf_path,
               discount: discountInfo, coupon_error: couponError, start_date: startDate || member.start_date || null,
+              billing_cadence: cadenceIv.cadence, cadence_warning: cadenceWarning(cadenceIv),
             });
           }
         } else if (sub.status === "active" || sub.status === "trialing") {
@@ -494,10 +592,15 @@ async function handler(req, res) {
     // ── Resolve the price to charge (LIVE: matched price; TEST: inline) ──
     let priceIdToUse = price.stripe_price_id;
     if (testMode) {
-      const iv = intervalFor(term);
+      // The row's cadence when it has one, else exactly the legacy term shape.
+      const iv = cadenceIv;
       const testPrice = await stripeFetch(`/prices`, {
         method: "POST", stripeAccount,
-        idempotencyKey: `web-price-${resolvedPriceKey}-${price.amount_cents}`.slice(0, 200),
+        // The cadence joins the idempotency key ONLY when the row carries one.
+        // Without it, a row whose cadence changed would get Stripe's cached price
+        // back at the OLD interval and bill on the wrong clock with no error at
+        // all. A row with no cadence keeps byte-identical keys to today.
+        idempotencyKey: `web-price-${resolvedPriceKey}-${price.amount_cents}${cadenceIv.cadence ? `-${cadenceIv.cadence}` : ""}`.slice(0, 200),
         body: { currency: price.currency || "cad", unit_amount: price.amount_cents,
           "recurring[interval]": iv.interval, "recurring[interval_count]": iv.interval_count,
           "product_data[name]": `${resolvedPriceKey} (FC website enrollment test)` },
@@ -526,9 +629,18 @@ async function handler(req, res) {
     //     recurring invoices (verified with Test Clocks - percent + amount off), so a
     //     coupon + future start anchors normally; the discount just carries through. It
     //     can only reduce the charge, never mischarge.
+    //
+    // The date computed below (renewsIso) is the first recurring charge, and a
+    // cadence can move it: a 12-week commitment anchors 84 days out where a
+    // 3-calendar-month one lands on the calendar date. The natural next build is
+    // an email telling the parent the new date. Deliberately absent - Zoran ruled
+    // 2026-07-30: staff handles this personally. Do not add.
     let recurringStart = null, renewsIso = null, firstPeriod = null, baseItemPrice = priceIdToUse;
     if (startDate) {
-      const iv = intervalFor(term); // commitment term → {month, 3|6}; else 4 weeks
+      // The row's cadence when it has one (a 12_weeks commitment anchors +84 days,
+      // not +3 calendar months), else exactly intervalFor(term): commitment term ->
+      // {month, 3|6}; else 4 weeks.
+      const iv = cadenceIv;
       const anchorSec = Math.floor(addInterval(new Date(`${startDate}T12:00:00Z`), iv).getTime() / 1000);
       const floor = Math.floor(Date.now() / 1000) + 60;
       recurringStart = Math.min(Math.max(anchorSec, floor), Math.floor(Date.now() / 1000) + STRIPE_TRIAL_MAX_SECS);
@@ -558,6 +670,11 @@ async function handler(req, res) {
         "metadata[origin]": "fullcontrol-website-enrollment",
         "metadata[offer_id]": offerId, "metadata[offer_price_key]": resolvedPriceKey, "metadata[offer_price_id]": price.id,
         "metadata[plan]": planText, "metadata[term]": term,
+        // The cadence that shaped the billing, stamped only when the row named
+        // one. Term stays the commitment's identity; this is the clock it runs on,
+        // and it belongs in Stripe so a refund or a dispute can be read without
+        // the database.
+        ...(cadenceIv.cadence ? { "metadata[billing_cadence]": cadenceIv.cadence } : {}),
         "metadata[client_id]": clientId, "metadata[parent_email]": parentEmail, "metadata[athlete_name]": athleteName,
         ...(oppId ? { "metadata[ghl_opportunity_id]": oppId } : {}),
         // Non-anchored commitment → let the webhook attach the from_subscription
@@ -686,6 +803,11 @@ async function handler(req, res) {
       // funnel can itemize it before they confirm instead of after.
       signup_fee_cents: signupFee ? signupFee.amount_cents : null,
       due_today_cents: (price.amount_cents || 0) + (signupFee ? signupFee.amount_cents : 0),
+      // The cadence this enrollment was billed on (null = the legacy term shape),
+      // plus a non-fatal admin note when the row named a cadence this build does
+      // not know. The enrollment still went through on the legacy shape; the note
+      // is how that becomes visible instead of invisible.
+      billing_cadence: cadenceIv.cadence, cadence_warning: cadenceWarning(cadenceIv),
     });
   } catch (e) {
     return res.status(e.stripeStatus || e.status || 500).json({ error: e.message || String(e) });

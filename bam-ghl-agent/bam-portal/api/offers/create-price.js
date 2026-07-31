@@ -73,19 +73,25 @@ async function resolveUser(req) {
 function stripeKey() {
   return process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
 }
+// The form encoding, pulled OUT of stripeFetch so it can be run without a Stripe
+// account. A key whose value is null or undefined is DROPPED, and that dropping is
+// what makes a one-time price a price with no `recurring` block at all rather than
+// one with an empty one - i.e. it is on the money path, not a formatting detail.
+// api/_billing-cadence.test.mjs renders a real sign-up fee body through this.
+function stripeForm(body) {
+  return new URLSearchParams(
+    Object.entries(body).reduce((acc, [k, v]) => {
+      if (v !== undefined && v !== null) acc[k] = String(v);
+      return acc;
+    }, {})
+  ).toString();
+}
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
   const headers = { Authorization: `Bearer ${stripeKey()}` };
   if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
   if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
   if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-  const encoded = body
-    ? new URLSearchParams(
-        Object.entries(body).reduce((acc, [k, v]) => {
-          if (v !== undefined && v !== null) acc[k] = String(v);
-          return acc;
-        }, {})
-      ).toString()
-    : undefined;
+  const encoded = body ? stripeForm(body) : undefined;
   const res = await fetch(`${STRIPE_API}${path}`, { method, headers, body: encoded });
   const text = await res.text();
   const json = text ? JSON.parse(text) : {};
@@ -122,6 +128,119 @@ function termToInterval(term) {
   return { interval: "4_weeks", recurring: { interval: "week", interval_count: 4 } }; // monthly / 4_weeks
 }
 
+// ── Billing CADENCE ─────────────────────────────────────────────────────────
+// How a price actually re-bills, held as an explicit nullable field on the
+// offer_prices row (billing_cadence) rather than inferred from the term key or
+// from commitment free text, which cannot express it: prod carries both
+// "12 Weeks (3 Months)" and "3 Months (12 Weeks)" for different academies.
+//
+// This map MUST stay identical to CADENCES in api/website/checkout.js, which is
+// the code that actually charges. A price minted on one shape and billed on
+// another is the worst outcome available here, so api/_billing-cadence.test.mjs
+// reads both files and fails if they ever drift.
+const CADENCES = {
+  "4_weeks": { interval: "week", interval_count: 4 },
+  monthly: { interval: "month", interval_count: 1 },
+  "12_weeks": { interval: "week", interval_count: 12 },
+  "24_weeks": { interval: "week", interval_count: 24 },
+  "3_calendar_months": { interval: "month", interval_count: 3 },
+  "6_calendar_months": { interval: "month", interval_count: 6 },
+};
+function normCadence(v) {
+  const raw = v == null ? "" : String(v).trim().toLowerCase();
+  if (!raw) return null;
+  if (Object.prototype.hasOwnProperty.call(CADENCES, raw)) return raw;
+  console.warn(`[create-price] billing_cadence "${raw}" is not a cadence this build knows - minting the term's standard shape instead`);
+  return null;
+}
+
+// ⚠️ THE ONE DECISION: what Stripe recurring shape (if any) does this price mint
+// on? Propose and apply BOTH call this, so the sentence an owner approves on the
+// review screen and the price that is actually minted cannot disagree.
+//
+// The order is deliberate and the first rule is load-bearing:
+//   1. THE TERM DECIDES ONE-TIME, AND NOTHING MAY OVERRIDE IT. A sign-up fee
+//      rides an enrollment's first invoice as a single line; it must never become
+//      a subscription. `proposed` comes from the AI response - whose schema
+//      REQUIRES a `recurring` object on every item, so the model returns one for a
+//      one_time target too - and then round-trips through the browser, which
+//      stashes the recommendation and posts it straight back to apply. Without
+//      this line a $75 sign-up fee is minted as a $75 MONTHLY SUBSCRIPTION against
+//      a real parent's card. It was fail-closed only by accident once
+//      (cadenceLabel(null) threw and 500'd the propose call), and accidental
+//      safety is not safety.
+//   2. A cadence on the ROW is the academy's explicit instruction and outranks
+//      anything proposed. An unknown cadence is not a cadence (normCadence has
+//      already warned about it), so it falls through to the term's legacy shape
+//      rather than minting on a guess.
+//   3. Otherwise the proposed shape, and failing that the term's standard shape -
+//      byte-identically what this endpoint minted before cadence existed.
+function recurringFor(term, cadence, proposed) {
+  const termIv = termToInterval(term);
+  if (termIv.recurring === null) return null;
+  if (cadence && Object.prototype.hasOwnProperty.call(CADENCES, cadence)) return CADENCES[cadence];
+  return (proposed && proposed.interval) ? proposed : termIv.recurring;
+}
+
+// The body of the Stripe /prices POST, as a pure value. Extracted for the same
+// reason as stripeForm: this is the last point at which a one-time price could be
+// handed a recurring block, and a test that cannot render it can only ever assert
+// that a line of source still looks the way somebody remembers it looking.
+function priceBody(key, amount, currency, recurring, priceName) {
+  return {
+    currency,
+    unit_amount: amount,
+    // One-time prices carry NO recurring block (stripeForm drops nulls).
+    "recurring[interval]": recurring ? recurring.interval : null,
+    "recurring[interval_count]": recurring ? recurring.interval_count : null,
+    "product_data[name]": priceName,
+    "metadata[source]": "fullcontrol-sorter",
+    "metadata[offer_price_key]": key || undefined,
+  };
+}
+
+// Does the price about to be minted have a cadence? Two sources, in order:
+//   1. an explicit billing_cadence on the creation request, and
+//   2. the typed runtime row for this key, which is where cadence LIVES.
+// (2) is the one that matters in practice: a row whose cadence was set after its
+// Stripe price was minted needs a NEW price on the new clock, and re-minting
+// through the sorter is how that happens. No answer, an unreadable row, or a
+// column that has not been migrated yet all mean null, which mints exactly the
+// shape this endpoint minted before cadence existed.
+//
+// ⚠️ THE ROW THIS READS DECIDES WHAT A REAL STRIPE PRICE CHARGES, so it is scoped
+// exactly the way api/website/checkout.js scopes the row it BILLS - anything
+// looser and the two can disagree:
+//   • source_offer_id, because offer_price_key is only unique WITHIN an offer.
+//     A tenant running two offers that both sell "Steady|3_months" would
+//     otherwise mint one offer's price on the other offer's clock. No offer_id
+//     on the request means no cadence, rather than a guess across offers.
+//   • is_active AND is_routable, because offers-sync DEACTIVATES superseded rows
+//     instead of deleting them. Without this, a re-mint reads the DEAD row's
+//     cadence and mints week x12 while checkout bills the live row on months.
+//   • order=sort_order.asc, so limit=1 returns the same row every time. An
+//     unordered limit=1 is whatever Postgres felt like, which on the money path
+//     means the clock can change between two identical requests.
+async function cadenceForCreation(clientId, c) {
+  const explicit = normCadence(c && c.billing_cadence);
+  if (explicit) return explicit;
+  const key = c && c.key;
+  const offerId = c && c.offer_id;
+  if (!key || !offerId) return null;
+  try {
+    const rows = await sb(
+      `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}` +
+      `&source_offer_id=eq.${encodeURIComponent(offerId)}` +
+      `&source_offer_price_key=eq.${encodeURIComponent(key)}` +
+      `&is_active=eq.true&is_routable=eq.true&billing_cadence=not.is.null` +
+      `&order=sort_order.asc&select=billing_cadence&limit=1`
+    );
+    return normCadence(Array.isArray(rows) && rows[0] && rows[0].billing_cadence);
+  } catch (_) {
+    return null;   // column not migrated yet, or the row is unreadable
+  }
+}
+
 function money(cents, currency) {
   const c = String(currency || FALLBACK_CURRENCY).toUpperCase();
   return `$${(cents / 100).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${c}`;
@@ -145,8 +264,17 @@ async function aiRecommend(targets, currency) {
     "fees (it equals base when no fee was set); `fee_label` describes that fee (e.g. '13% HST') or is " +
     "null. CHARGE THE ALL-IN: pick unit_amount_cents = allin_cents. Never invent tax - the fee is only " +
     "whatever the academy configured, which may be nothing. " +
-    "The recurring shape is fixed by the term: monthly/4_weeks → {interval:'week',interval_count:4}; " +
+    // This used to say the shape "is fixed by the term", which stopped being true
+    // when billing_cadence landed: a row with a cadence overrides whatever comes
+    // back from here. The prompt now says so, because a model told a falsehood
+    // about the money path will confidently explain the wrong number to an owner.
+    "Unless the price row carries an explicit billing cadence (in which case the server overrides you), " +
+    "the recurring shape follows the term: monthly/4_weeks → {interval:'week',interval_count:4}; " +
     "3_months → {interval:'month',interval_count:3}; 6_months → {interval:'month',interval_count:6}. " +
+    // The schema below requires a `recurring` key on every item, so the model
+    // returns one for a sign-up fee too. The server refuses it either way, but a
+    // prompt that never asks for the wrong answer is better than one that does.
+    "A one_time or signup_fee term is a SINGLE charge, never a subscription: set recurring to null for it. " +
     "plain_explanation: if allin_cents > base_cents, write e.g. '$563.87 every 3 months = your $499.00 " +
     "+ 13% HST' using fee_label; otherwise just '$499.00 every 3 months'. " +
     "Set matches_offer=true when unit_amount_cents equals the target's base or all-in; offer_impact_note = " +
@@ -168,18 +296,24 @@ async function aiRecommend(targets, currency) {
 // Deterministic fallback recommendation (also used to harden/normalize the AI output).
 // Charges the ALL-IN = base + the academy's configured added fee (equals base
 // when no fee was set - no automatic HST/markup).
-function fallbackRecommend(t, currency) {
-  const iv = termToInterval(t.term);
+// `rowCadence` is the cadence the price row already carries, when it carries one.
+// It is passed in rather than looked up here so this stays a pure function, and it
+// is honored so the sentence the OWNER READS on the review screen describes the
+// price that will actually be minted. Without it the proposal says "every 3
+// months" and apply mints a 12-week clock, which is the wrong way round to be
+// wrong: the money is right and the screen lies about it.
+function fallbackRecommend(t, currency, rowCadence) {
+  const recurring = recurringFor(t.term, rowCadence, null);
   const base = t.base_cents || 0;
   const amount = t.allin_cents || base || 0;
-  const cadence = cadenceLabel(iv.recurring);
+  const cadence = recurring ? cadenceLabel(recurring) : "one time";
   const planLabel = (t.offering || String(t.key || "").split("|")[0] || "this plan").trim();
   const plain = (t.fee_label && amount > base && base > 0)
     ? `${money(amount, currency)} ${cadence} = your ${money(base, currency)} + ${t.fee_label}`
     : `${money(amount, currency)} ${cadence}`;
   return {
     key: t.key,
-    recurring: iv.recurring,
+    recurring,
     unit_amount_cents: amount,
     currency,
     plain_explanation: plain,
@@ -198,11 +332,29 @@ async function runPropose(req, res, ctx, body, clientId) {
   try { aiOut = await aiRecommend(targets, currency); } catch (_) { aiOut = []; }
   const byKey = Object.fromEntries((Array.isArray(aiOut) ? aiOut : []).map(r => [String(r.key), r]));
 
+  // The cadence each target's row already carries, resolved through the SAME
+  // function apply uses, so the review screen and the mint cannot disagree.
+  // Nothing here writes; an unreadable row or an unmigrated column is simply no
+  // cadence, and the proposal reads exactly as it did before cadence existed.
+  const cadenceByKey = new Map();
+  for (const t of targets) {
+    const c = { key: t.key, offer_id: t.offer_id || body.offer_id, billing_cadence: t.billing_cadence };
+    cadenceByKey.set(t.key, await cadenceForCreation(clientId, c));
+  }
+
   const recommendations = targets.map(t => {
-    const fb = fallbackRecommend(t, currency);
+    const rowCadence = cadenceByKey.get(t.key) || null;
+    const fb = fallbackRecommend(t, currency, rowCadence);
     const a = byKey[t.key];
     if (!a) return fb;
-    const recurring = (a.recurring && a.recurring.interval) ? a.recurring : fb.recurring;
+    // The model's answer enters the system HERE, and it goes through the same one
+    // decision apply uses. The response schema REQUIRES a recurring object, so the
+    // model returns one for a sign-up fee too; passing that on would make the
+    // review screen offer a subscription and hand the UI a payload that asks apply
+    // to mint one. Apply refuses it, but a proposal nobody can act on should never
+    // be shown in the first place.
+    const oneTime = termToInterval(t.term).recurring === null;
+    const recurring = recurringFor(t.term, rowCadence, a.recurring);
     const amount = Number.isFinite(Number(a.unit_amount_cents)) && Number(a.unit_amount_cents) > 0
       ? Math.round(Number(a.unit_amount_cents)) : fb.unit_amount_cents;
     return {
@@ -213,7 +365,10 @@ async function runPropose(req, res, ctx, body, clientId) {
       recurring,
       unit_amount_cents: amount,
       currency, // forced to the account currency - can't create a price in one the account doesn't support
-      plain_explanation: a.plain_explanation || fb.plain_explanation,
+      // Same reason: the model's sentence describes the shape it proposed, which
+      // a cadence has just overridden. Use the deterministic one, which describes
+      // what will actually be minted.
+      plain_explanation: (rowCadence || oneTime) ? fb.plain_explanation : (a.plain_explanation || fb.plain_explanation),
       matches_offer: a.matches_offer != null ? !!a.matches_offer : fb.matches_offer,
       offer_impact_note: a.offer_impact_note || fb.offer_impact_note,
     };
@@ -241,13 +396,34 @@ async function runApply(req, res, ctx, body, clientId) {
     const amount = Math.round(Number(c.unit_amount_cents));
     if (!Number.isFinite(amount) || amount <= 0) { created.push({ key, error: "invalid unit_amount_cents" }); continue; }
     const currency = String(c.currency || acctCurrency).toLowerCase();
-    const termIv = termToInterval(c.term);
-    const recurring = (c.recurring && c.recurring.interval)
-      ? c.recurring
-      : termIv.recurring;   // null for a one-time price (sign-up fee)
+    // ⚠️ THE TERM HAS TO BE RECOVERED FROM THE KEY, because the sorter's apply
+    // payload does not always carry it: public/client-portal.html stashes
+    // { key, offer_id, unit_amount_cents, currency, recurring, product_name } and
+    // posts that back. With no term, termToInterval() returns the 4_weeks default
+    // and the one-time gate below never fires - so a `<plan>|signup_fee` creation
+    // would sail through as a recurring price on the strength of the client's own
+    // `recurring`. The key's term is the same truth match-prices.js and
+    // offers-sync.ts both derive from, so derive it the same way here.
+    const term = c.term || String(c.key || "").split("|")[1] || "";
+    const termIv = termToInterval(term);
+    // ⚠️ THE ONE-TIME GATE, and the cadence, in one call. See recurringFor: the
+    // term decides one-time and NOTHING the client sends may promote it, which is
+    // what stops the sorter UI posting back the model's `recurring` and minting a
+    // $75 sign-up fee as a $75 MONTHLY SUBSCRIPTION.
+    //
+    // A cadence cannot apply to a one-time price either, so it is not even looked
+    // up: that is what stops a cadence on the wrong row doing the same thing, and
+    // it saves a query per sign-up fee.
+    const oneTime = termIv.recurring === null;
+    const cadence = oneTime ? null : await cadenceForCreation(clientId, c);
+    const recurring = recurringFor(term, cadence, c.recurring);
     // Best-effort catalog interval label from the recurring shape.
     let interval = "4_weeks";
     if (!recurring) interval = "one_time";
+    // With a cadence, the shape no longer identifies the term (12_weeks and
+    // 4_weeks are both "week"), so the label comes from the term the sorter was
+    // asked for. Cadence changes HOW it bills, never WHICH commitment it is.
+    else if (cadence) interval = termIv.interval;
     else if (recurring.interval === "month" && recurring.interval_count === 3) interval = "3_months";
     else if (recurring.interval === "month" && recurring.interval_count === 6) interval = "6_months";
     const priceName = (c.product_name || (key ? String(key).replace("|", " · ") : "FullControl price")).toString();
@@ -256,17 +432,13 @@ async function runApply(req, res, ctx, body, clientId) {
     // Idempotent per (client, key, amount) so a double-click can't mint duplicates.
     const price = await stripeFetch(`/prices`, {
       method: "POST", stripeAccount,
-      idempotencyKey: `sorter-price-${clientId}-${key || "nokey"}-${amount}`.slice(0, 200),
-      body: {
-        currency,
-        unit_amount: amount,
-        // One-time prices carry NO recurring block (stripeFetch drops nulls).
-        "recurring[interval]": recurring ? recurring.interval : null,
-        "recurring[interval_count]": recurring ? recurring.interval_count : null,
-        "product_data[name]": priceName,
-        "metadata[source]": "fullcontrol-sorter",
-        "metadata[offer_price_key]": key || undefined,
-      },
+      // The cadence joins the idempotency key ONLY when there is one. Without
+      // that, re-minting a key whose cadence changed would hand back Stripe's
+      // CACHED price on the old clock, with no error anywhere - the catalog would
+      // say 12 weeks and Stripe would keep charging every 3 months. A price with
+      // no cadence keeps a byte-identical key to today.
+      idempotencyKey: `sorter-price-${clientId}-${key || "nokey"}-${amount}${cadence ? `-${cadence}` : ""}`.slice(0, 200),
+      body: priceBody(key, amount, currency, recurring, priceName),
     });
 
     // Upsert the pricing_catalog row — tier canonical, routable.
@@ -307,7 +479,20 @@ async function runApply(req, res, ctx, body, clientId) {
       ).catch(() => {});
     }
 
-    created.push({ key, stripe_price_id: price.id, stripe_product_id: price.product || null, livemode: price.livemode === true, account: stripeAccount || null });
+    created.push({
+      key, stripe_price_id: price.id, stripe_product_id: price.product || null,
+      livemode: price.livemode === true, account: stripeAccount || null,
+      // ⚠️ NOTHING READS THESE TWO FIELDS YET. They are here so the clock a price
+      // was minted on is at least RECOVERABLE from the response, but no consumer
+      // exists: the sorter UI in public/client-portal.html renders the cadence
+      // from the TERM, so a price minted on a 12-week clock is presented to the
+      // owner as "every 3 months". The mint is correct and the screen is wrong,
+      // which is the more dangerous way round. Wiring the UI to these fields is
+      // a separate, tracked build - until it lands, the sorter mis-states the
+      // cadence of any price whose row carries one.
+      billing_cadence: cadence,
+      recurring: recurring ? { interval: recurring.interval, interval_count: recurring.interval_count } : null,
+    });
   }
 
   return res.status(200).json({ ok: true, mode: "apply", created });
