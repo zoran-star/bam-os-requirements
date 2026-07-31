@@ -12802,7 +12802,10 @@ Then the call to action."]</div>
         #view-v15inbox .v15ib-overflow,
         #view-v15inbox .v15ib-filter-toggle,
         #view-v15inbox .v15ib-check { display: none !important; }
-        #view-v15inbox .v15ib-search { max-width: none !important; }
+        /* the toolbar's flex spacer goes too, so search + Filters is ONE
+           full-width unit with no dead space on its right */
+        #view-v15inbox .v15ib-tb-spacer { display: none !important; }
+        #view-v15inbox .v15ib-search { max-width: none !important; min-width: 0 !important; }
 
         /* the kicker returns as the page title ("Inbox", 19/800); the § mark
            stays desktop-only markup and is hidden here */
@@ -17324,7 +17327,7 @@ function _v15ibRenderAll() {
           <button type="button" class="v15ib-mfilters" onclick="_ibSheetOpen()" aria-label="Filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="17" x2="14" y2="17"/></svg>Filters${mActiveCount ? `<b>${mActiveCount}</b>` : ''}</button>
         </div>
         ${clsRow}
-        <span style="flex:1"></span>
+        <span class="v15ib-tb-spacer" style="flex:1"></span>
         ${needsReplyCount > 0 ? `<span class="v15ib-progress" role="button" style="cursor:pointer" title="Show unread" onclick="_v15ibTab('unread')">${_ibProgressRing(needsReplyCount, totalPeople)}</span>` : ''}
         <button class="v15ib-filter-toggle${hasActiveFilters ? ' has-filters' : ''}" onclick="_V15IB.filtersOpen=!_V15IB.filtersOpen;document.getElementById('v15ib-filter-drawer').classList.toggle('open')">Filters${hasActiveFilters ? ' *' : ''}</button>
         <button id="v15ib-approve-btn" onclick="_hk2Open()" class="v15ib-act-btn" data-tip="Review agent drafts before they send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Hawkeye<span id="v15-apx-count" class="v15ib-act-count"></span></button>
@@ -61260,20 +61263,28 @@ function _ccFocusHud(modalId) {
     // the desktop HUD stays pixel-identical.
     : (modalId === 'view-v15inbox' && window.innerWidth <= 768) ? 'INBOX'
     : 'MARKETING';
-  _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE');
+  const goldWord = (modalId === 'view-v15inbox' && window.innerWidth <= 768) ? 'INBOX' : null;
+  _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE', goldWord);
   _ccFocusWallpaper(modalId);
 }
-function _ccHudType(hud, text) {
+function _ccHudType(hud, text, goldWord) {
   const span = hud.querySelector('.cc-hud-txt');
   if (!span) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { span.textContent = text; return; }
+  // Optional: once the line is fully typed, gold one word (mobile inbox crumb
+  // only - every other caller omits goldWord and behaves exactly as before).
+  const finish = () => {
+    if (goldWord && text.includes(goldWord)) {
+      span.innerHTML = escapeHTML(text).replace(goldWord, '<span style="color:var(--gold)">' + goldWord + '</span>');
+    }
+  };
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { span.textContent = text; finish(); return; }
   span.textContent = '';
   let i = 0;
   clearInterval(hud._typeT);
   hud._typeT = setInterval(() => {
     i++;
     span.textContent = text.slice(0, i);
-    if (i >= text.length) clearInterval(hud._typeT);
+    if (i >= text.length) { clearInterval(hud._typeT); finish(); }
   }, 16);
 }
 
