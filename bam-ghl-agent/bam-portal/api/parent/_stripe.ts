@@ -1,4 +1,7 @@
-import { stripeFetch as transportStripeFetchUntyped } from "../_stripe-transport.js";
+import {
+  publishableFor as publishableForUntyped,
+  stripeFetch as transportStripeFetchUntyped,
+} from "../_stripe-transport.js";
 
 type StripeBodyValue = boolean | number | string | null | undefined;
 
@@ -13,6 +16,16 @@ type TransportOptions = {
 };
 const transportStripeFetch =
   transportStripeFetchUntyped as (path: string, opts?: TransportOptions) => Promise<unknown>;
+
+// What the browser mounts Stripe.js with, per transport: Connect academies get
+// the platform publishable key + connected account id (byte-identical to the
+// old env read); a direct academy gets its OWN publishable key and NO account.
+export type PublishableInfo = {
+  publishable_key: string | null;
+  stripe_account: string | null;
+};
+export const publishableFor =
+  publishableForUntyped as (stripeAccount?: string | null) => Promise<PublishableInfo>;
 
 export type StripeFetchOptions = {
   body?: Record<string, StripeBodyValue>;

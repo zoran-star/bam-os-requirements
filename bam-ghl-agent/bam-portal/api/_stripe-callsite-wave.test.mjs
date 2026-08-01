@@ -139,18 +139,29 @@ function checkGateThreeOutcome(src, label, notReadyLine) {
 // not fail. A resolver hiccup (the Supabase read behind publishableFor) must
 // degrade to the Connect answer the site always returned - never 500 a
 // checkout the parent already paid for (tester defect D1; MUTATE=pubcatch).
-const PUB_WITH_CATCH = "publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }))";
+const pubCatch = (acct) => `publishableFor(${acct}).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: ${acct} || null }))`;
+const PUB_WITH_CATCH = pubCatch("stripeAccount"); // the exact string the pubcatch control strips
 function checkOverridesAndPublishable(web = WEB, onb = ONB, camp = CAMP) {
   const out = [];
   for (const [label, src] of [["website/checkout.js", web], ["onboarding/checkout.js", onb], ["website/camp-checkout.js", camp]]) {
     out.push({ ok: src.includes("keyOverride: process.env.ONBOARDING_STRIPE_SECRET_KEY || undefined,"),
       msg: `${label}: ONBOARDING_STRIPE_SECRET_KEY keeps first precedence, as keyOverride` });
   }
-  for (const [label, src, n] of [["website/checkout.js", web, 2], ["onboarding/checkout.js", onb, 2], ["website/camp-checkout.js", camp, 1]]) {
-    const found = (src.match(/publishableFor\(stripeAccount\)/g) || []).length;
+  // The parent-app sites ride the same rule: a direct academy's parents must
+  // mount Stripe.js with the key that matches their client secret, so those
+  // return sites ask the resolver too, with the same Connect fallback.
+  const SITES = [
+    ["website/checkout.js", web, 2, "stripeAccount"],
+    ["onboarding/checkout.js", onb, 2, "stripeAccount"],
+    ["website/camp-checkout.js", camp, 1, "stripeAccount"],
+    ["parent/checkout.ts", read("parent/checkout.ts"), 2, "stripeAccount"],
+    ["parent/billing.ts", read("parent/billing.ts"), 1, "academy.stripeAccount"],
+  ];
+  for (const [label, src, n, acct] of SITES) {
+    const found = src.split(`publishableFor(${acct})`).length - 1;
     out.push({ ok: found === n,
       msg: `${label}: ${n} return site(s) ask the resolver's publishableFor (saw ${found})` });
-    const guarded = src.split(PUB_WITH_CATCH).length - 1;
+    const guarded = src.split(pubCatch(acct)).length - 1;
     out.push({ ok: guarded === n,
       msg: `${label}: all ${n} publishableFor site(s) carry the Connect-fallback .catch - they cannot 500 after the money moved (saw ${guarded})` });
     const envReads = (src.match(/publishable_key: process\.env\.STRIPE_PUBLISHABLE_KEY/g) || []).length;
