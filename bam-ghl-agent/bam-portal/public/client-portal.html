@@ -54728,8 +54728,11 @@ function _paintReport(el, period, goals, bm, compare, insight, demo) {
   const deltaSuffix = _reportView === 'range' ? 'vs previous period' : _reportView === 'last7' ? 'vs prev 7d' : _reportView === 'this_month' ? 'vs last month' : 'vs prior month';
   const ctx = { goals, bm, compare, deltaSuffix, showSpark: _reportView !== 'last7' && _reportView !== 'range', insightNote: '', budgets: _reportBudgets, cardRanges: _reportCardRanges };
   const notes = insight.campaigns || {};
-  const cards = period.campaigns.length
-    ? period.campaigns.map(c => _reportCardHTML(c, { ...ctx, insightNote: notes[c.id] || '' })).join('')
+  // Null-safe on every tier: a report payload without a campaigns array (seen in
+  // mock mode's ad-report gap) blanked the whole card with a TypeError.
+  const camps = (period && Array.isArray(period.campaigns)) ? period.campaigns : [];
+  const cards = camps.length
+    ? camps.map(c => _reportCardHTML(c, { ...ctx, insightNote: notes[c.id] || '' })).join('')
     : '<div class="req-empty" style="padding:18px 0">No campaigns ran in this period.</div>';
   // V1.5: action-oriented - drop the verdict + win/fix analysis (numbers); keep
   // the ad-spend cards.
