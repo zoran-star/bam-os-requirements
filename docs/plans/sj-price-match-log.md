@@ -48,3 +48,7 @@ Asked what Pre Season options are; analysis showed Pre Season amounts mirror the
 
 ### Coverage check status (the skill's gate)
 13 of 14 in-use prices tiered, 19 of 20 members covered. Only Christopher's $199 awaits Lij's answer on which plan it discounts.
+
+## Scope change (Zoran via MEMBER MANAGEMENT II, confirmed in-chat 2026-08-01)
+Room now also: (1) BUILDS + SHIPS the price workbook to Lij, from the LIJ MEMBER WORKBOOK design chat's near-done page (transfer incoming; do not reinvent); all Lij sends clear through MEMBER MANAGEMENT II, one voice; Christopher question rides the workbook send. (2) WRITES SKILL 1 - all 5 steps: contacts sync (link-up chat run log incoming, 142/147 linked, DONE), price pull (GHL screenshot / Stripe history), first draft, match to Stripe, price workbook - from real SJ logs, mockup-confirmed with Zoran before final. (3) After Lij returns the workbook: finalize prices, hand off to members workbook. Live match-prices apply still waits on transport; workbook + skill draft do not.
+Needs list sent to orchestrator: workbook home + auth, response-capture data path, link-up log handle, send channel + from-address, transport ETA.
