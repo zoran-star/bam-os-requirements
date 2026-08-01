@@ -17202,12 +17202,16 @@ function _v15ibToggleSelect(convId, e) {
 }
 function _v15ibBulkAction(action) {
   const ids = [..._V15IB.selected];
+  // This inbox is SHARED with V2, and _v15ibBulkAction has no tier gate, so the
+  // persistence calls are gated instead. V2 keeps the original local-only bulk
+  // marking; only V1.5 gets the state written to ghl_conversation_reads.
+  const persist = _v15ibChanTabsOn();
   if (action === 'read') {
     ids.forEach(id => { const c = _V15IB.convos.find(x => x.id === id); if (c) c.unreadCount = 0; });
-    ids.forEach(id => _v15ibPersistRead(id, 'read'));
+    if (persist) ids.forEach(id => _v15ibPersistRead(id, 'read'));
   } else if (action === 'unread') {
     ids.forEach(id => { const c = _V15IB.convos.find(x => x.id === id); if (c) c.unreadCount = 1; });
-    ids.forEach(id => _v15ibPersistRead(id, 'unread'));
+    if (persist) ids.forEach(id => _v15ibPersistRead(id, 'unread'));
   }
   _V15IB.selected.clear();
   _V15IB.multiSelect = false;
