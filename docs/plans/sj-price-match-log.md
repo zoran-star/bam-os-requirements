@@ -52,3 +52,18 @@ Asked what Pre Season options are; analysis showed Pre Season amounts mirror the
 ## Scope change (Zoran via MEMBER MANAGEMENT II, confirmed in-chat 2026-08-01)
 Room now also: (1) BUILDS + SHIPS the price workbook to Lij, from the LIJ MEMBER WORKBOOK design chat's near-done page (transfer incoming; do not reinvent); all Lij sends clear through MEMBER MANAGEMENT II, one voice; Christopher question rides the workbook send. (2) WRITES SKILL 1 - all 5 steps: contacts sync (link-up chat run log incoming, 142/147 linked, DONE), price pull (GHL screenshot / Stripe history), first draft, match to Stripe, price workbook - from real SJ logs, mockup-confirmed with Zoran before final. (3) After Lij returns the workbook: finalize prices, hand off to members workbook. Live match-prices apply still waits on transport; workbook + skill draft do not.
 Needs list sent to orchestrator: workbook home + auth, response-capture data path, link-up log handle, send channel + from-address, transport ETA.
+
+## Inputs landed 2026-08-01 (post-scope-change)
+
+### Zoran rulings for skill 1
+- THREE SEPARATE SKILLS, not one resuming skill. Mine is its own command and must REFUSE to run until its trigger is true (stripe connected), checked against real DB state, never a checklist. (Assurance-without-connection rule made executable.)
+- Skill lives in bam-client-sites/.claude/commands next to /branding-deck, /site-build, /sales-system, /ghl-migration, /agreement; name in that family's style.
+
+### Orchestrator answers to the needs list
+- Workbook auth RULED (no re-litigating): private tokenized link, NO login; staff confirms before anything applies. Portal-hosted page + api route (bam-client-sites is static); inherit the design chat's anatomy, propose in mockup review if silent.
+- Response capture: no existing pattern; coordinate with design chat; if new table -> align-core-data-model + PENDING_SQL, never solo schema. Requirement: STRUCTURED DECISIONS per row (proposed, changed-to, timestamp), no free-text blob.
+- SJ pilot send: ZORAN FORWARDS THE LINK PERSONALLY in his Lij thread. No automated channel for the pilot; skill can formalize later; from-address estate stays untangled. Christopher question rides the same message.
+- Transport ETA: gated on Zoran running /pending-sql + merging #1703 (+#1704). ~11 min deploy after merge; orchestrator sends GO when SJ key saved + stripe_connect_status=connected.
+
+### Link-up chat delivery (skill step 1 source, COMPLETE)
+147/147 resolved (142 linked, 5 conscious dup-customer skips). Raw material on branch claude/keen-banach-69618e: docs/plans/sj-contact-linkup-learnings.md (recipe: refresh contact store FIRST because v2 academies have no contact cron and last_synced_at lies; classify read-only; execute in sweep order; 7 real edge cases; offline-prelink pattern; DB-verify every phase; claim-then-review sequencing; refused link = dup signal) + sj-contact-linkup-result.md (counts, skip ids, transport-day checklist: expect already_linked=142, review_existing=5). Tooling caveat: refresh script + PGRST102 mixed-batch fix ride in PR #1704, unmerged.
