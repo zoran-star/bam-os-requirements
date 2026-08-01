@@ -65,5 +65,8 @@ Needs list sent to orchestrator: workbook home + auth, response-capture data pat
 - SJ pilot send: ZORAN FORWARDS THE LINK PERSONALLY in his Lij thread. No automated channel for the pilot; skill can formalize later; from-address estate stays untangled. Christopher question rides the same message.
 - Transport ETA: gated on Zoran running /pending-sql + merging #1703 (+#1704). ~11 min deploy after merge; orchestrator sends GO when SJ key saved + stripe_connect_status=connected.
 
+### Scope amendment (Zoran via MM II, 2026-08-01): skill authorship centralized
+This room NO LONGER writes skill 1 - MM II writes all three skills from the run logs. This log is now the PRIMARY SOURCE for skill 1, so it must stay complete and honest: every step, every Zoran ruling in his wording, every surprise. At run close, send MM II: final log path, mapping result file, rulings verbatim, surprises. Skill-1 mockup gate moves to MM II's chat; the WORKBOOK mockup gate stays here. Rest of scope unchanged (workbook build + ship, live apply after GO, finalize after Lij returns).
+
 ### Link-up chat delivery (skill step 1 source, COMPLETE)
 147/147 resolved (142 linked, 5 conscious dup-customer skips). Raw material on branch claude/keen-banach-69618e: docs/plans/sj-contact-linkup-learnings.md (recipe: refresh contact store FIRST because v2 academies have no contact cron and last_synced_at lies; classify read-only; execute in sweep order; 7 real edge cases; offline-prelink pattern; DB-verify every phase; claim-then-review sequencing; refused link = dup signal) + sj-contact-linkup-result.md (counts, skip ids, transport-day checklist: expect already_linked=142, review_existing=5). Tooling caveat: refresh script + PGRST102 mixed-batch fix ride in PR #1704, unmerged.
