@@ -56,8 +56,11 @@ async function sb(path, init = {}) {
 // ── the direct-row cache ─────────────────────────────────────────────────────
 // One reverse lookup per account id per minute, not per Stripe call. Negative
 // results (no direct row = Connect academy) are cached too - that is the hot
-// path for every existing academy. api/stripe/direct-key.js busts this the
-// moment a key is saved or disabled so routing flips without waiting a minute.
+// path for every existing academy. api/stripe/direct-key.js busts this on key
+// save/disable, but the bust only reaches THIS lambda instance - other warm
+// instances keep their entry until the TTL runs out, so a routing flip is
+// guaranteed everywhere only after 60s. Anything needing a faster, global flip
+// must not rely on bustTransportCache().
 const CACHE_TTL_MS = 60_000;
 const directRowCache = new Map(); // stripe_account_id -> { row: object|null, at: ms }
 
@@ -193,21 +196,31 @@ export async function readAccountHealth(clientRowOrId) {
 
   const status = await readStripeAccountViaKey(decryptSecret(direct.secret_key_enc));
   const nowIso = new Date().toISOString();
+  // BOTH patches re-filter on status=in.(active,invalid). Without that, a health
+  // read racing a staff disable would match on client_id alone and flip the row
+  // back - silently re-arming a key staff just turned off. With the filter, a
+  // row that became 'disabled' between our SELECT and this PATCH matches nothing.
   if (status.outcome === "unreachable" && status.credential_problem) {
-    await sb(`client_stripe_direct?client_id=eq.${encodeURIComponent(client.id)}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ status: "invalid", updated_at: nowIso }),
-    });
+    await sb(
+      `client_stripe_direct?client_id=eq.${encodeURIComponent(client.id)}&status=in.(active,invalid)`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "invalid", updated_at: nowIso }),
+      }
+    );
     bustTransportCache();
   } else if (status.outcome === "ready" || status.outcome === "not_ready") {
     const patch = { key_last_verified_at: nowIso, updated_at: nowIso };
     if (direct.status === "invalid") patch.status = "active"; // self-heal: the key answered
-    await sb(`client_stripe_direct?client_id=eq.${encodeURIComponent(client.id)}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify(patch),
-    });
+    await sb(
+      `client_stripe_direct?client_id=eq.${encodeURIComponent(client.id)}&status=in.(active,invalid)`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify(patch),
+      }
+    );
     if (patch.status) bustTransportCache();
   }
   return status;

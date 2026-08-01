@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { syncMemberAccessNonFatal } from "../_runtime/access-sync-portal.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 export const maxDuration = 60; // Stripe cross-checks + DB promote — avoid the short default timeout
 // Vercel Serverless Function — The Pricing Sorter, STEP 3: cleanup checks + promote.
 //
@@ -80,26 +81,14 @@ function stripeKey() {
   return process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
 }
 async function stripeGet(path, stripeAccount) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const res = await fetch(`${STRIPE_API}${path}`, { headers });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) throw new Error(json?.error?.message || `Stripe ${res.status}`);
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js): platform key + Stripe-Account
+  // header for Connect academies, the academy's own key when a direct row exists.
+  return transportStripeFetch(path, { stripeAccount });
 }
 async function stripePost(path, body, stripeAccount) {
-  const headers = { Authorization: `Bearer ${stripeKey()}`, "Content-Type": "application/x-www-form-urlencoded" };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const encoded = new URLSearchParams(Object.entries(body || {}).reduce((a, [k, v]) => {
-    if (v !== undefined && v !== null) a[k] = String(v);
-    return a;
-  }, {})).toString();
-  const res = await fetch(`${STRIPE_API}${path}`, { method: "POST", headers, body: encoded });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) throw new Error(json?.error?.message || `Stripe ${res.status}`);
-  return json;
+  // Same seam; POST with a flat body ({} when the caller passed nothing, so an
+  // empty POST still sends an encoded body exactly as before).
+  return transportStripeFetch(path, { method: "POST", body: body || {}, stripeAccount });
 }
 
 const ACTIVEISH = new Set(["active", "trialing", "past_due", "paused", "unpaid"]);

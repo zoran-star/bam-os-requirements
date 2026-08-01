@@ -15,6 +15,7 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -52,13 +53,8 @@ function stripeKey() {
   return process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
 }
 async function stripeFetch(path, stripeAccount) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const r = await fetch(`${STRIPE_API}${path}`, { headers });
-  const txt = await r.text();
-  const json = txt ? JSON.parse(txt) : {};
-  if (!r.ok) throw new Error(json?.error?.message || `Stripe ${r.status}`);
-  return json;
+  // Positional signature preserved; delegates to THE seam (api/_stripe-transport.js).
+  return transportStripeFetch(path, { stripeAccount });
 }
 
 // Routable catalog row for one offer_price_key (prefer canonical tier).

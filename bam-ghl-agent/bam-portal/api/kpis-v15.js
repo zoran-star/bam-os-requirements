@@ -2,6 +2,7 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { getClientGhlToken } from "./website/availability.js";
 import { contactsReadTable } from "./_contacts.js";
 import { recordKpiEvent } from "./_kpi.js";
+import { stripeFetch as transportStripeFetch, getCapabilities } from "./_stripe-transport.js";
 // Scans Stripe (charges/subs/payouts) + GHL opportunities per month — well past
 // the default ~10s budget.
 export const maxDuration = 60;
@@ -58,14 +59,9 @@ async function resolveUser(req) {
 // ── Stripe ──
 function stripeKey() { return process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY; }
 async function stripeReq(method, path, stripeAccount, form) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  if (form) headers["Content-Type"] = "application/x-www-form-urlencoded";
-  const res = await fetch(`${STRIPE_API}${path}`, { method, headers, body: form ? new URLSearchParams(form).toString() : undefined });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) throw new Error(json?.error?.message || `Stripe ${res.status}`);
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js): platform key + Stripe-Account
+  // header for Connect academies, the academy's own key when a direct row exists.
+  return transportStripeFetch(path, { method, body: form || undefined, stripeAccount });
 }
 const stripeGet = (path, acct) => stripeReq("GET", path, acct);
 async function stripeGetAll(path, acct, cap = 12) {
@@ -502,13 +498,23 @@ async function handler(req, res) {
           failed.push({ id: ch.id, amount: money(ch.amount), created: ch.created, customer: custId(ch.customer), name: custName(ch.customer), email: custEmail(ch.customer) || ch.billing_details?.email || null, reason: ch.failure_message || ch.outcome?.seller_message || null });
         }
       }
-      const payoutsArr = await stripeGetAll(`/payouts?created[gte]=${start}&created[lt]=${end}`, acct).catch(() => []);
-      const payouts = payoutsArr.reduce((s, p) => s + (p.amount || 0), 0);
+      // Payouts are a per-transport fact: a direct academy's restricted key may
+      // lack the payouts permission (the entry-time probe records that). When
+      // getCapabilities says so, report null - "we cannot see payouts" - instead
+      // of throwing or showing $0.00 as if none happened. Connect academies have
+      // no capability row (null caps) and keep today's behavior byte-identical.
+      const caps = await getCapabilities(acct).catch(() => null);
+      const payoutsVisible = !caps || caps.payouts !== false;
+      const payoutsArr = payoutsVisible
+        ? await stripeGetAll(`/payouts?created[gte]=${start}&created[lt]=${end}`, acct).catch(() => [])
+        : null;
+      const payouts = payoutsArr ? payoutsArr.reduce((s, p) => s + (p.amount || 0), 0) : null;
       return res.status(200).json({
         ok: true, stripe_ok: true,
         gross: money(gross), refunds: money(refunds), fees: money(fees),
         net: money(gross - refunds - fees),
-        payouts: money(payouts), payouts_count: payoutsArr.length,
+        payouts: payoutsArr ? money(payouts) : null,
+        payouts_count: payoutsArr ? payoutsArr.length : null,
         failed,
       });
     }

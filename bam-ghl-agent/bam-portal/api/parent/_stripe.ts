@@ -1,6 +1,18 @@
-const STRIPE_API = "https://api.stripe.com/v1";
+import { stripeFetch as transportStripeFetchUntyped } from "../_stripe-transport.js";
 
 type StripeBodyValue = boolean | number | string | null | undefined;
+
+// The transport is plain JS; tsc cannot infer its destructured options object,
+// so type the seam here exactly as the transport reads it.
+type TransportOptions = {
+  body?: Record<string, StripeBodyValue> | string;
+  idempotencyKey?: string;
+  keyOverride?: string;
+  method?: string;
+  stripeAccount?: string;
+};
+const transportStripeFetch =
+  transportStripeFetchUntyped as (path: string, opts?: TransportOptions) => Promise<unknown>;
 
 export type StripeFetchOptions = {
   body?: Record<string, StripeBodyValue>;
@@ -51,26 +63,24 @@ export async function stripeFetch<T = unknown>(
   const key = stripeKey();
   if (!key) throw new StripeFetchError("Stripe secret key not configured");
 
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${key}`,
-  };
-  if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-
-  const res = await fetch(`${STRIPE_API}${path}`, {
-    body: body ? encodeStripeBody(body) : undefined,
-    headers,
-    method,
-  });
-  const text = await res.text();
-  const json = text ? safeJsonParse(text) : {};
-
-  if (!res.ok) {
-    throw new StripeFetchError(stripeErrorMessage(json) || `Stripe ${res.status}`, res.status, json);
+  // Delegates to THE seam (api/_stripe-transport.js). ONBOARDING_STRIPE_SECRET_KEY
+  // keeps today's precedence exactly - when set it overrides transport resolution,
+  // which is what stripeKey() always did. Transport errors are rethrown as this
+  // module's StripeFetchError so the importers keep their catch contract
+  // (message / stripeStatus / responseBody).
+  try {
+    return (await transportStripeFetch(path, {
+      body: body ?? undefined,
+      idempotencyKey,
+      method,
+      stripeAccount: stripeAccount ?? undefined,
+      keyOverride: process.env.ONBOARDING_STRIPE_SECRET_KEY || undefined,
+    })) as T;
+  } catch (e) {
+    if (e instanceof StripeFetchError) throw e;
+    const err = e as { message?: string; stripeStatus?: number | null; responseBody?: unknown };
+    throw new StripeFetchError(err.message || "Stripe request failed", err.stripeStatus ?? null, err.responseBody ?? null);
   }
-
-  return json as T;
 }
 
 export function piSecretFromSub(sub: unknown): string | null {
@@ -93,26 +103,5 @@ export function piSecretFromSub(sub: unknown): string | null {
   return null;
 }
 
-function encodeStripeBody(body: Record<string, StripeBodyValue>): string {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(body)) {
-    if (value != null) params.set(key, String(value));
-  }
-  return params.toString();
-}
-
-function safeJsonParse(text: string): unknown {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return text;
-  }
-}
-
-function stripeErrorMessage(body: unknown): string | null {
-  if (!body || typeof body !== "object") return null;
-  const error = (body as { error?: unknown }).error;
-  if (!error || typeof error !== "object") return null;
-  const message = (error as { message?: unknown }).message;
-  return typeof message === "string" ? message : null;
-}
+// Body encoding, JSON parsing and error-message extraction now live in the
+// transport (api/_stripe-transport.js), byte-compatible with what used to be here.

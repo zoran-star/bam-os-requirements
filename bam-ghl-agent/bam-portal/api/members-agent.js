@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { stripeFetch as transportStripeFetch } from "./_stripe-transport.js";
 // Vercel Serverless Function — Member-Management AGENT (natural language)
 //
 //   POST /api/members-agent   (staff OR client bearer)
@@ -74,14 +75,9 @@ async function resolveUser(req) {
 
 // ── Stripe helper (read-only here — connected-account GETs for context) ──
 async function stripeFetch(path, { stripeAccount } = {}) {
-  const stripeSecret = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
-  const headers = { Authorization: `Bearer ${stripeSecret}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const res = await fetch(`https://api.stripe.com/v1${path}`, { headers });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) throw new Error(json?.error?.message || `Stripe ${res.status}`);
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js): platform key + Stripe-Account
+  // header for Connect academies, the academy's own key when a direct row exists.
+  return transportStripeFetch(path, { stripeAccount });
 }
 
 // ─────────────────────────────────────────────────────────

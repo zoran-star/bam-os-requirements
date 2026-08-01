@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { applyDiscountToCents, normCode, couponFromPromo } from "../_coupon-guardrails.js";
 import { resolveOrMintPortalContact, phone10 } from "../_contacts.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 export const maxDuration = 60; // Stripe search + customer + sub writes
 
 // Vercel Serverless Function - Returning Client Enroll (Members V2)
@@ -90,25 +91,9 @@ async function resolveUser(req) {
 
 function stripeKey() { return process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY; }
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-  const encoded = body
-    ? new URLSearchParams(Object.entries(body).reduce((a, [k, v]) => {
-        if (v !== undefined && v !== null) a[k] = String(v);
-        return a;
-      }, {})).toString()
-    : undefined;
-  const res = await fetch(`${STRIPE_API}${path}`, { method, headers, body: encoded });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) {
-    const err = new Error(json?.error?.message || `Stripe ${res.status}`);
-    err.stripeStatus = res.status;
-    throw err;
-  }
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js): platform key + Stripe-Account
+  // header for Connect academies, the academy's own key when a direct row exists.
+  return transportStripeFetch(path, { method, body, stripeAccount, idempotencyKey });
 }
 
 async function writeAudit(row) {
@@ -713,9 +698,17 @@ async function handler(req, res) {
     const allowed = Boolean(ctx.staff) || Boolean(hasMembersTab);
     if (!allowed) return res.status(403).json({ error: "you don't have access to sign up returning clients - ask the account owner" });
 
-    const clientRows = await sb(
-      `clients?id=eq.${encodeURIComponent(clientId)}&select=id,stripe_connect_account_id,stripe_connect_status&limit=1`
-    );
+    // Three-outcome money gate (house rule 10): a clients read that THREW is
+    // "could not ask", never "not connected" - it gets a retryable 503, and the
+    // 409 below stays reserved for a row that actually answered not-connected.
+    let clientRows;
+    try {
+      clientRows = await sb(
+        `clients?id=eq.${encodeURIComponent(clientId)}&select=id,stripe_connect_account_id,stripe_connect_status&limit=1`
+      );
+    } catch {
+      return res.status(503).json({ error: "could not verify billing setup, try again" });
+    }
     const client = Array.isArray(clientRows) && clientRows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
     if (!client.stripe_connect_account_id || client.stripe_connect_status !== "connected") {

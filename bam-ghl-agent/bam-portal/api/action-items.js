@@ -1,6 +1,6 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { notifyOwners } from "./_notify-owners.js";
-import { readStripeAccount } from "./stripe/_requirements.js";
+import { readAccountHealth } from "./_stripe-transport.js";
 // Vercel Serverless Function — Action Items (v1)
 //
 // A shared per-client to-do list. Visible to the academy team (client portal)
@@ -443,10 +443,11 @@ async function loadClientSignals(clientId) {
 async function backfillStripeWhenChargeable(clientId, signals) {
   const acct = signals.stripe_connect_account_id;
   if (!acct || signals.stripe_connect_connected_at) return signals;
-  const key = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
-  if (!key) return signals;
   try {
-    const status = await readStripeAccount(acct, key);
+    // Transport-aware health read (api/_stripe-transport.js): a Connect academy
+    // is read via the platform key exactly as before; a direct-key academy is
+    // read via its own key. Same three outcomes, same gating - only "ready" ticks.
+    const status = await readAccountHealth({ id: clientId, stripe_connect_account_id: acct });
     if (status.outcome !== "ready") return signals; // not ready, or we could not ask - leave the step open
     const nowIso = new Date().toISOString();
     await sb(`clients?id=eq.${clientId}`, {

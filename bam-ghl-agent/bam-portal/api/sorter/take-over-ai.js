@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 export const maxDuration = 60; // Stripe reads + one Anthropic call
 
 // Vercel Serverless Function — AI assist for the "take over billing" import step.
@@ -60,13 +61,9 @@ async function resolveUser(req) {
 
 function stripeKey() { return process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY; }
 async function stripeGet(path, acct) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (acct) headers["Stripe-Account"] = acct;
-  const res = await fetch(`${STRIPE_API}${path}`, { headers });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) { const e = new Error(json?.error?.message || `Stripe ${res.status}`); e.stripeStatus = res.status; throw e; }
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js): platform key + Stripe-Account
+  // header for Connect academies, the academy's own key when a direct row exists.
+  return transportStripeFetch(path, { stripeAccount: acct });
 }
 const iso = (u) => (u ? new Date(u * 1000).toISOString().slice(0, 10) : null);
 const money = (c) => (c == null ? "—" : `$${(c / 100).toFixed(2)}`);

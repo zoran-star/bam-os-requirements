@@ -21,6 +21,7 @@
 // be >= 50 cents; the actual number comes from hardcoded pricing on the client site.
 
 import { withSentryApiRoute } from "../_sentry.js";
+import { stripeFetch as transportStripeFetch, publishableFor } from "../_stripe-transport.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -64,24 +65,12 @@ function stripeKey() {
 function isTestMode() { return String(process.env.ONBOARDING_STRIPE_SECRET_KEY || "").startsWith("sk_test"); }
 
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-  const encoded = body
-    ? new URLSearchParams(
-        Object.entries(body).reduce((a, [k, v]) => { if (v != null) a[k] = String(v); return a; }, {})
-      ).toString()
-    : undefined;
-  const res = await fetch(`${STRIPE_API}${path}`, { method, headers, body: encoded });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) {
-    const err = new Error(json?.error?.message || `Stripe ${res.status}`);
-    err.stripeStatus = res.status;
-    throw err;
-  }
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js). ONBOARDING_STRIPE_SECRET_KEY
+  // keeps today's precedence exactly (test sandbox override), as stripeKey() did.
+  return transportStripeFetch(path, {
+    method, body, stripeAccount, idempotencyKey,
+    keyOverride: process.env.ONBOARDING_STRIPE_SECRET_KEY || undefined,
+  });
 }
 
 async function handler(req, res) {
@@ -203,11 +192,14 @@ async function handler(req, res) {
       });
     } catch { /* non-fatal */ }
 
+    // What Stripe.js mounts with is a per-transport fact - ask the resolver.
+    // Connect academies keep the platform publishable key + account id.
+    const pub = await publishableFor(stripeAccount);
     return res.status(200).json({
       ok: true,
       client_secret:    pi.client_secret,
-      publishable_key:  process.env.STRIPE_PUBLISHABLE_KEY || null,
-      stripe_account:   stripeAccount,
+      publishable_key:  pub.publishable_key,
+      stripe_account:   pub.stripe_account,
       amount_cents:     amountCents,
       currency,
     });

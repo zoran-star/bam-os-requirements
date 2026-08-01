@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 // Vercel Serverless Function — One-shot backfill of members.stripe_joined_at
 //
 // POST /api/admin/backfill-stripe-joined-at?client_id=<uuid>
@@ -31,12 +32,13 @@ async function sb(path, init = {}) {
 }
 
 async function stripeFetch(path, stripeAccount) {
-  const key = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
-  const headers = { Authorization: `Bearer ${key}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const res = await fetch(`${STRIPE_API}${path}`, { headers });
-  if (!res.ok) throw new Error(`Stripe ${res.status}: ${await res.text()}`);
-  return res.json();
+  // Delegates to THE seam (api/_stripe-transport.js); rethrows in this file's
+  // original "Stripe <status>: <body>" format so per-member error rows read the same.
+  try { return await transportStripeFetch(path, { stripeAccount }); }
+  catch (e) {
+    if (!e.stripeStatus) throw e;
+    throw new Error(`Stripe ${e.stripeStatus}: ${JSON.stringify(e.stripeResponse)}`);
+  }
 }
 
 async function resolveStaff(req) {

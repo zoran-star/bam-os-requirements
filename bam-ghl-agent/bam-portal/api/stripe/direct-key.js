@@ -101,6 +101,21 @@ async function probeKey(secretKey, publishableKey) {
   }
 
   const capabilities = {};
+  // THREE outcomes per probe, never two. `false` may ONLY mean "Stripe said no"
+  // (401/403). Could-not-ask - a network failure (no stripeStatus on the error)
+  // or a Stripe 5xx - ABORTS the whole probe instead: this map is persisted on
+  // save and served forever via getCapabilities, so a timeout recorded as
+  // "cannot do payouts" would gate features off a fact nobody ever established.
+  // A partial or guessed map is worse than a retry.
+  const classify = (e, name) => {
+    if (e.stripeStatus === 401 || e.stripeStatus === 403) return false;
+    if (!e.stripeStatus || e.stripeStatus >= 500) {
+      throw bad(`could not reach Stripe to test permissions (${name}) - try again`, 502);
+    }
+    // Any other 4xx got PAST the permission gate before failing on the request
+    // itself, so the permission is present.
+    return true;
+  };
   const reads = [
     ["customers", "/customers?limit=1"],
     ["subscriptions", "/subscriptions?limit=1"],
@@ -113,20 +128,21 @@ async function probeKey(secretKey, publishableKey) {
     try {
       await stripeFetch(path, { keyOverride: k });
       capabilities[name] = true;
-    } catch (_) {
-      capabilities[name] = false;
+    } catch (e) {
+      capabilities[name] = classify(e, name);
     }
   }
   // THE 400-MEANS-YES TRICK: a key WITHOUT billing-portal permission is stopped
   // at the door with a 403 before Stripe ever looks at the body. A key WITH the
   // permission gets far enough for Stripe to complain that cus_probe_nonexistent
-  // does not exist - HTTP 400. So 400 = permission PRESENT, 403 = absent, and
-  // no billing portal session is ever actually created.
+  // does not exist - HTTP 400. So 400 = permission PRESENT, 403 = absent, and no
+  // billing portal session is ever actually created. Anything else is
+  // could-not-ask and aborts, same as the reads.
   try {
     await stripeFetch("/billing_portal/sessions", { method: "POST", body: { customer: "cus_probe_nonexistent" }, keyOverride: k });
     capabilities.billing_portal = true; // cannot happen with a nonexistent customer, but a success is a yes
   } catch (e) {
-    capabilities.billing_portal = e.stripeStatus === 400;
+    capabilities.billing_portal = e.stripeStatus === 400 ? true : classify(e, "billing_portal");
   }
 
   return {
@@ -168,9 +184,14 @@ async function handler(req, res) {
       const clientRows = await sb(`clients?id=eq.${encodeURIComponent(client_id)}&select=id,stripe_connect_account_id&limit=1`);
       const client = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;
       if (!client) throw bad("academy not found", 404);
-      if (client.stripe_connect_account_id && client.stripe_connect_account_id !== report.account_id) {
+      // Trimmed on both sides: a stored id with whitespace drift (the classic
+      // trailing-\n from a bad env pipe) is still the SAME account and must not
+      // false-409, while a genuinely different account must never slip past on
+      // a formatting difference.
+      const storedAcct = String(client.stripe_connect_account_id || "").trim();
+      if (storedAcct && storedAcct !== String(report.account_id || "").trim()) {
         throw bad(
-          `this key belongs to ${report.account_id}, but the academy is already tied to ${client.stripe_connect_account_id}. ` +
+          `this key belongs to ${report.account_id}, but the academy is already tied to ${storedAcct}. ` +
           "Refusing to switch Stripe accounts through a key save.",
           409
         );
@@ -202,7 +223,7 @@ async function handler(req, res) {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
         body: JSON.stringify({
-          ...(client.stripe_connect_account_id ? {} : { stripe_connect_account_id: report.account_id }),
+          ...(storedAcct ? {} : { stripe_connect_account_id: report.account_id }),
           stripe_connect_status: chargeable ? "connected" : "onboarding",
           stripe_connect_connected_at: chargeable ? nowIso() : null,
           updated_at: nowIso(),

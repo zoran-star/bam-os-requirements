@@ -31,6 +31,7 @@ import { renderAgreementPdf, uploadAgreementPdf, uploadSignaturePng, buildClause
 import { requiredConsentKeys } from "../_lib/agreement-version.js";
 import { applyDiscountToCents, normCode, couponFromPromo, couponCoversKey } from "../_coupon-guardrails.js";
 import { resolveOrMintPortalContact, writePortalFieldValues, ensureStorageOnlyDefs } from "../_contacts.js";
+import { stripeFetch as transportStripeFetch, publishableFor } from "../_stripe-transport.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -184,18 +185,13 @@ function addInterval(date, iv) {
 // Stripe rejects trial_end more than 730 days out — clamp so a far-future anchor can't 400.
 const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-  const encoded = body
-    ? new URLSearchParams(Object.entries(body).reduce((a, [k, v]) => { if (v != null) a[k] = String(v); return a; }, {})).toString()
-    : undefined;
-  const res = await fetch(`${STRIPE_API}${path}`, { method, headers, body: encoded });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) { const err = new Error(json?.error?.message || `Stripe ${res.status}`); err.stripeStatus = res.status; throw err; }
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js). ONBOARDING_STRIPE_SECRET_KEY
+  // keeps today's precedence exactly - when set (the test sandbox) it overrides
+  // transport resolution, which is what stripeKey() always did here.
+  return transportStripeFetch(path, {
+    method, body, stripeAccount, idempotencyKey,
+    keyOverride: process.env.ONBOARDING_STRIPE_SECRET_KEY || undefined,
+  });
 }
 function piSecretFromSub(sub) {
   const inv = sub && sub.latest_invoice;
@@ -394,7 +390,15 @@ async function handler(req, res) {
     }
 
     // ── Academy must exist + be Stripe-connected ──
-    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,email,stripe_connect_account_id&limit=1`);
+    // Three-outcome money gate (house rule 10): a clients read that THREW is
+    // "could not ask", never "not connected" - it gets a retryable 503, and the
+    // 409 below stays reserved for a row that actually answered without an account.
+    let clientRows;
+    try {
+      clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,email,stripe_connect_account_id&limit=1`);
+    } catch {
+      return res.status(503).json({ error: "could not verify billing setup, try again" });
+    }
     const client = Array.isArray(clientRows) && clientRows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
     const stripeAccount = testMode ? null : client.stripe_connect_account_id;
@@ -560,9 +564,13 @@ async function handler(req, res) {
           const secret = piSecretFromSub(sub);
           if (secret) {
             await maybeAttachAgreement({ member, client, parentName, athleteName, planText, price, term, agreement, clientId, offerId, signedDoc });
+            // What Stripe.js mounts with is a per-transport fact - ask the resolver.
+            // Connect academies get the platform publishable key + account id,
+            // byte-identical to before; a direct academy gets its own key, no account.
+            const pub = await publishableFor(stripeAccount);
             return res.status(200).json({
               ok: true, reused: true, member_id: member.id, subscription_id: sub.id, customer_id: sub.customer,
-              client_secret: secret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
+              client_secret: secret, stripe_account: pub.stripe_account, publishable_key: pub.publishable_key,
               amount_cents: price.amount_cents, currency: price.currency || "cad", agreement_saved: !!member.agreement_pdf_path,
               discount: discountInfo, coupon_error: couponError, start_date: startDate || member.start_date || null,
               billing_cadence: cadenceIv.cadence, cadence_warning: cadenceWarning(cadenceIv),
@@ -794,9 +802,11 @@ async function handler(req, res) {
       }
     } catch { /* non-fatal - the member + payment are already saved */ }
 
+    // Per-transport fact, from the resolver (see the reuse-branch note above).
+    const pub = await publishableFor(stripeAccount);
     return res.status(200).json({
       ok: true, member_id: member && member.id, subscription_id: sub.id, customer_id: customerId,
-      client_secret: clientSecret, stripe_account: stripeAccount, publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
+      client_secret: clientSecret, stripe_account: pub.stripe_account, publishable_key: pub.publishable_key,
       amount_cents: price.amount_cents, currency: price.currency || "cad", agreement_saved: agreementSaved,
       discount: discountInfo, coupon_error: couponError, start_date: startDate, first_recurring_date: renewsIso,
       // Build S: what the parent is charged TODAY vs every cycle after, so the

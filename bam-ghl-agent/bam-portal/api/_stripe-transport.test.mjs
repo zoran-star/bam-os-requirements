@@ -355,6 +355,32 @@ console.log("\n── 6. readAccountHealth: three outcomes, right transport, rig
   ok(DB.client_stripe_direct[0].status === "active" && patches().length === patchCount,
     "and writes nothing - a blip must never invalidate a working key");
 
+  // THE DISABLE RACE. Staff turn the key off between the health read's SELECT
+  // and its PATCH. Both patches re-filter on status=in.(active,invalid), so the
+  // late write must match NOTHING - a health read must never re-arm a key.
+  DB.client_stripe_direct[0].status = "invalid";  // selected as probe-able...
+  stripeResponder = (m, u) => {
+    if (u !== "https://api.stripe.com/v1/account") return null;
+    DB.client_stripe_direct[0].status = "disabled";  // ...staff disable lands mid-read
+    return { status: 200, body: { id: "acct_direct", charges_enabled: true, details_submitted: true, requirements: {} } };
+  };
+  h = await T.readAccountHealth("client-direct");
+  ok(h.outcome === "ready" && DB.client_stripe_direct[0].status === "disabled",
+    "a staff disable landing mid-health-read is never overwritten by the self-heal");
+  // Same race, the other write: the credential-problem 'invalid' stamp.
+  DB.client_stripe_direct[0].status = "active";
+  stripeResponder = (m, u) => {
+    if (u !== "https://api.stripe.com/v1/account") return null;
+    DB.client_stripe_direct[0].status = "disabled";
+    return { status: 401, body: { error: { message: "Invalid API Key provided" } } };
+  };
+  h = await T.readAccountHealth("client-direct");
+  ok(h.outcome === "unreachable" && DB.client_stripe_direct[0].status === "disabled",
+    "nor by the credential-problem 'invalid' stamp");
+  ok(patches().every(p => p.qs.includes("status=in.(active,invalid)")),
+    "every health-read patch carries the status filter, so 'disabled' is out of reach by construction");
+  DB.client_stripe_direct[0].status = "active";
+
   // connect academy: read via /v1/accounts/{id} with the platform key
   stripeResponder = (m, u) => u.startsWith("https://api.stripe.com/v1/accounts/acct_connect")
     ? { status: 200, body: { id: "acct_connect", charges_enabled: true, requirements: {} } } : null;
