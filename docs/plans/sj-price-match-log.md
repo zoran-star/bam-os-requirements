@@ -86,5 +86,20 @@ BUILT: academy-level tax card at the TOP of the workbook (tax is one setting for
 NOTE FOR MM II (cross-surface): this makes the workbook write an academy-level Blueprint General setting, not just pricing rows. Flagged as out-of-scope-adjacent per the comms rule; Zoran ruled it directly.
 Verified in browser: hidden-before-answer, No path, Yes path, default-taxed, confirm gating, preview math. All pass.
 
+### Ruling: shared response-capture schema (MM II, 2026-08-01)
+Triggered by the tax escalation. Academy-level answers are a DISTINCT KIND, never flattened into price rows. Envelope every captured decision carries:
+- `target_kind`: "academy_setting" | "price_row" | "member_row"
+- the concrete target (clients.tax_config / offer_price id / member id)
+- the was/now pair (what we proposed, what the owner changed it to) + timestamp
+Reasons given: blast radius differs by an order of magnitude (a wrong price row costs one plan, a wrong tax_config re-prices every athlete, so staff review must sort on it); the member workbook needs member_row anyway and inventing the third kind later means migrating the first two; skills 1 and 2 both consume this table and must not each invent a convention.
+STAFF REVIEW CONSEQUENCE (build it in): academy-level changes surface FIRST, visually separated, never mixed into a long list of price rows where a tax change reads like a typo fix.
+MY ADDITION, sent to the member workbook chat for the shared spec: a state field (untouched / confirmed / changed). The "confirmed is a deliberate act" rule fails if it lives only in the page - in the data, a card the owner never opened would otherwise be indistinguishable from one he read and approved.
+STATUS: envelope sent to the member workbook chat (local_f9f034e9) to confirm their member rows fit. If incompatible, MM II's instruction is to STOP and report rather than fork. Table itself still to be spec'd through align-core-data-model + PENDING_SQL once they reply.
+
+### Recorded for skill 1 (MM II, from this room's work)
+- "A workbook question that cannot change anything is the assurance-without-connection failure in owner-facing form." The tax card is the skill's worked example.
+- Technique that caught it: RENDER THE CONTROL AND ASK WHAT IT ACTUALLY DOES.
+- MM II's correction to my framing, carried: I wrote that SJ's tax answers were inert "by construction" because tax_config is NULL. True today, but that is precisely why the dead chip was invisible. The skill's check must be "render it AND confirm the value reaches an output", never "confirm the field exists".
+
 ### Link-up chat delivery (skill step 1 source, COMPLETE)
 147/147 resolved (142 linked, 5 conscious dup-customer skips). Raw material on branch claude/keen-banach-69618e: docs/plans/sj-contact-linkup-learnings.md (recipe: refresh contact store FIRST because v2 academies have no contact cron and last_synced_at lies; classify read-only; execute in sweep order; 7 real edge cases; offline-prelink pattern; DB-verify every phase; claim-then-review sequencing; refused link = dup signal) + sj-contact-linkup-result.md (counts, skip ids, transport-day checklist: expect already_linked=142, review_existing=5). Tooling caveat: refresh script + PGRST102 mixed-batch fix ride in PR #1704, unmerged.
