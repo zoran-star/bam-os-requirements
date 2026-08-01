@@ -68,5 +68,13 @@ Needs list sent to orchestrator: workbook home + auth, response-capture data pat
 ### Scope amendment (Zoran via MM II, 2026-08-01): skill authorship centralized
 This room NO LONGER writes skill 1 - MM II writes all three skills from the run logs. This log is now the PRIMARY SOURCE for skill 1, so it must stay complete and honest: every step, every Zoran ruling in his wording, every surprise. At run close, send MM II: final log path, mapping result file, rulings verbatim, surprises. Skill-1 mockup gate moves to MM II's chat; the WORKBOOK mockup gate stays here. Rest of scope unchanged (workbook build + ship, live apply after GO, finalize after Lij returns).
 
+### Steering plan (MM II, 2026-08-01): hold lifted, workbook build sequenced
+- Design transfer incoming from workbook chat: mockup v2 + decisions file + _bbStdPricing source pointer (verified: client-portal.html:32985, the Blueprint pricing block anatomy incl signup fee + commitments).
+- RULING: workbook builds LIGHT-themed - both workbooks are one light product family to Lij; portal-dark ignored for this surface. Build from their page, deep-link the real pricing embed where they did, no forking.
+- RULING (program-wide, from workbook chat design): "confirmed" is a DELIBERATE act distinct from "untouched" - an unread row must never look approved. Goes into the response schema.
+- Q1-Q6 staged SECOND (workbook chat asks Zoran one sequencing question first). When signaled: ask in this chat, one at a time, max 2-3 per sitting, keep the simple-words register.
+- Flow: mockup -> Zoran approves here -> MM II clears the Lij send. Live apply still waits deploy GO. billing_cadence hand SQL moved OFF this room (MM II owns it transport day).
+- Comms rules: report completions/decisions to MM II not narration; out-of-scope decisions stop and go to MM II; nothing reaches Lij except through Zoran, cleared by MM II.
+
 ### Link-up chat delivery (skill step 1 source, COMPLETE)
 147/147 resolved (142 linked, 5 conscious dup-customer skips). Raw material on branch claude/keen-banach-69618e: docs/plans/sj-contact-linkup-learnings.md (recipe: refresh contact store FIRST because v2 academies have no contact cron and last_synced_at lies; classify read-only; execute in sweep order; 7 real edge cases; offline-prelink pattern; DB-verify every phase; claim-then-review sequencing; refused link = dup signal) + sj-contact-linkup-result.md (counts, skip ids, transport-day checklist: expect already_linked=142, review_existing=5). Tooling caveat: refresh script + PGRST102 mixed-batch fix ride in PR #1704, unmerged.
