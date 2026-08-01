@@ -1,0 +1,1325 @@
+[
+ {
+  "customer_id": "cus_TXEmy3alF6Mttc",
+  "name": "Aaron Rufin",
+  "email": "arufin712@gmail.com",
+  "phone": "+14089661833",
+  "created": "2025-12-03",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TCV5AgubU47YnE",
+  "name": "Adam Ly",
+  "email": "adamly42025580@gmail.com",
+  "phone": null,
+  "created": "2025-10-08",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UQG0iwsQNATykD",
+  "name": "Bernard Lintag",
+  "email": "bernielintag1987@gmail.com",
+  "phone": "+14088327717",
+  "created": "2026-04-29",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_URQD58sYGObVzZ",
+  "name": "Brian De Guzman",
+  "email": "brian.deguzman23@gmail.com",
+  "phone": "+14088385753",
+  "created": "2026-05-02",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TFmAmOqFhFRbV0",
+  "name": "Christy Hang",
+  "email": "christyhang11@yahoo.com",
+  "phone": "+14086300131",
+  "created": "2025-10-17",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Tx2FCcFPC2FUVY",
+  "name": "Crystal Gomez",
+  "email": "fyitf@hotmail.com",
+  "phone": "+14087714413",
+  "created": "2026-02-10",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Uj053QqfcFq50W",
+  "name": "Dana Lee",
+  "email": "dananlee@yahoo.com",
+  "phone": "+16506805393",
+  "created": "2026-06-18",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TXEaUPNTJaHmFd",
+  "name": "James Hwang",
+  "email": "james.hwang@gmail.com",
+  "phone": "+14159386839",
+  "created": "2025-12-03",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TuHTKd0tdpyBO4",
+  "name": "Janeth Beltran",
+  "email": "jvaldovinos.beltran@gmail.com",
+  "phone": "+14085858100",
+  "created": "2026-02-02",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SmGLGVMOh2gEr1",
+  "name": "Jenny Chung",
+  "email": "jaijai1012@yahoo.com",
+  "phone": null,
+  "created": "2025-07-30",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UgOGfXF7jOrBSE",
+  "name": "Jimmy Nguyen",
+  "email": "toasty1634@yahoo.com",
+  "phone": "+14084757155",
+  "created": "2026-06-11",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SyvYSDjPuRM79q",
+  "name": "MEREDITH TORIO",
+  "email": "meredith.torio@gmail.com",
+  "phone": "+14084791780",
+  "created": "2025-09-02",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Ui54B9AfWntX2T",
+  "name": "Manish Patel",
+  "email": "manishpatel78@gmail.com",
+  "phone": "+14085074921",
+  "created": "2026-06-15",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UFilnoKMh2bPbQ",
+  "name": "Mohan Sriperambaduru",
+  "email": "mohan2hp@gmail.com",
+  "phone": null,
+  "created": "2026-04-01",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UIcrnRLiHLlqlg",
+  "name": "Neha Vashistha",
+  "email": "vashistha.neha@gmail.com",
+  "phone": "+15109363823",
+  "created": "2026-04-08",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UpbsXGE6ZpjQX4",
+  "name": "Prakash Kumaar Sambandam",
+  "email": "sprakashkumaar@gmail.com",
+  "phone": "+14089314563",
+  "created": "2026-07-05",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SuXlNaHUyq5A8r",
+  "name": "Salvador Esparza",
+  "email": "salesp222@gmail.com",
+  "phone": null,
+  "created": "2025-08-22",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UejXog6DwuLTRC",
+  "name": "Tamba GbondoTugbawa",
+  "email": "tambatugbawa@gmail.com",
+  "phone": "+14083073465",
+  "created": "2026-06-06",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Sz5op7xUCCcm9W",
+  "name": "Ted Miranda",
+  "email": "rowandted2015@gmail.com",
+  "phone": "+14088286314",
+  "created": "2025-09-03",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UmZxgrt3OSqf7z",
+  "name": "Thuy Chau",
+  "email": "ttweettiiee@gmail.com",
+  "phone": "+16693332932",
+  "created": "2026-06-27",
+  "live_member": true,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TMaSTiXIH5YQWC",
+  "name": "Aileen Dav",
+  "email": "mrs.aileen.dav@gmail.com",
+  "phone": "+14088572442",
+  "created": "2025-11-04",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TwUJvzMQ0gH4Ar",
+  "name": "Alex Balagot Juvy Mae Cudal-Balagot",
+  "email": "juvymae@gmail.com",
+  "phone": "+14085298642",
+  "created": "2026-02-08",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SrdCT6AzHkpMnf",
+  "name": "Algier Redoloza",
+  "email": "aredoloza@gmail.com",
+  "phone": "+14085686168",
+  "created": "2025-08-14",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U4Zpo3KwAekDpi",
+  "name": "Allen An Tran",
+  "email": "alexnguyen251009@gmail.com",
+  "phone": "+14088267646",
+  "created": "2026-03-02",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U3FkPhZE3zlPVi",
+  "name": "Alma Mausisa Traylor",
+  "email": "av.mausisa@gmail.com",
+  "phone": "+14089107738",
+  "created": "2026-02-26",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TtVHtS8IXKoSaq",
+  "name": "Andrea Hurtado",
+  "email": "andreahurtado82@yahoo.com",
+  "phone": "+14084801061",
+  "created": "2026-01-31",
+  "live_member": false,
+  "delinquent": true
+ },
+ {
+  "customer_id": "cus_UePfJoADKdjqbN",
+  "name": "Angel Delao",
+  "email": "aangeldelao@gmail.com",
+  "phone": "+14086466092",
+  "created": "2026-06-05",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_T4WaKYjaIurpqG",
+  "name": "Anju Rani",
+  "email": "siyarani@gmail.com",
+  "phone": "+14086600821",
+  "created": "2025-09-17",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U9CFfW6MInQlD3",
+  "name": "Annie Williams-Conrad",
+  "email": "anniewilliamsconrad@gmail.com",
+  "phone": null,
+  "created": "2026-03-14",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U1idn8tXZiH2Vt",
+  "name": "Arai \"Ari\" Balanga Aileen Cabico",
+  "email": "acabico@tjkm.com",
+  "phone": "+14087125440",
+  "created": "2026-02-22",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TWnoOn86BUvBQS",
+  "name": "Ardielyn Feliciano",
+  "email": "ardielyn@gmail.com",
+  "phone": "+14084209957",
+  "created": "2025-12-02",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Sc7oTQhtEUcwDj",
+  "name": "Ben Romsaitong",
+  "email": "mzhongvilay@yahoo.com",
+  "phone": "+12096031482",
+  "created": "2025-07-03",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UFgrxWgAWLNv5t",
+  "name": "Brahmdeep kuar",
+  "email": "noor32kuar@gamil.com",
+  "phone": "+14089019462",
+  "created": "2026-03-31",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TgyZu1SKFJHw4x",
+  "name": "Brian ly",
+  "email": "brianly81@hotmail.com",
+  "phone": "+14087058682",
+  "created": "2025-12-29",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U9mshHsDm3zWzq",
+  "name": "Bryson Patrick Magto",
+  "email": "pmagto@hotmail.com",
+  "phone": "+14088926068",
+  "created": "2026-03-16",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UrxwIDi6ZBaufP",
+  "name": "Carolyn Nolasco",
+  "email": "carolynn.glennf@gmail.com",
+  "phone": "+14088138894",
+  "created": "2026-07-12",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U9FC3Y0Zf9j6oT",
+  "name": "Charles Wong",
+  "email": "charleskwwong@gmail.com",
+  "phone": null,
+  "created": "2026-03-14",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SrDiRd10sS515i",
+  "name": "Charles Wong",
+  "email": "charleskwwong@yahoo.com",
+  "phone": "+14085649026",
+  "created": "2025-08-13",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SmMsdUJFXq0T5H",
+  "name": "Chi Nan Yen",
+  "email": "nazki19@gmail.com",
+  "phone": null,
+  "created": "2025-07-31",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TRoRgrYQvN44TU",
+  "name": "Chia-Yi Cheng",
+  "email": "cycheng0628@gmail.com",
+  "phone": null,
+  "created": "2025-11-18",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Skf5HpMIbXmuee",
+  "name": "ChiaYi  Cheng",
+  "email": "pitfall-coppers-2q@icloud.com",
+  "phone": null,
+  "created": "2025-07-26",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SzUTunvZTdvb6O",
+  "name": "Christel Yasutake",
+  "email": "christelyasutake@gmail.com",
+  "phone": null,
+  "created": "2025-09-04",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U4QHIjjgs8N7kW",
+  "name": "Claudia Sorenson",
+  "email": "claudiaprado114@gmail.com",
+  "phone": "+15109150256",
+  "created": "2026-03-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Sn4FR2RSx7gh2T",
+  "name": "DOMINGO GONZALEZ",
+  "email": "dogocba@gmail.com",
+  "phone": "+14088397646",
+  "created": "2025-08-02",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Uw3D9789Cn5LRl",
+  "name": "Dania Izhar",
+  "email": "daniaizhar1@icloud.com",
+  "phone": "+14083680434",
+  "created": "2026-07-23",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SbLGGO57td0frP",
+  "name": "Daniel Ju",
+  "email": "danielhju@gmail.com",
+  "phone": "+19496322359",
+  "created": "2025-07-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UeV9rdCHgymt1p",
+  "name": "Darren Yasutake",
+  "email": null,
+  "phone": "+14084975331",
+  "created": "2026-06-06",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UGA3camSvFP79e",
+  "name": "David Garcia",
+  "email": "worldstubebending@gmail.com",
+  "phone": null,
+  "created": "2026-04-02",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Sc9vmswtwpM6Zx",
+  "name": "David Nguyen",
+  "email": "nguyend00@outlook.com",
+  "phone": "+14084716755",
+  "created": "2025-07-03",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SZgcZBUtuwQnG1",
+  "name": "Elijah De Guzman",
+  "email": "elijah@3dsportsprep.com",
+  "phone": null,
+  "created": "2025-06-27",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Sls39mKcdC00pU",
+  "name": "Emily Jacinto",
+  "email": "emcjacinto@gmail.com",
+  "phone": null,
+  "created": "2025-07-29",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TTNRhdi2ebr8YF",
+  "name": "Emma Nakamoto",
+  "email": "emmanakamoto@gmail.com",
+  "phone": null,
+  "created": "2025-11-22",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SnNUi7mLyyvqfR",
+  "name": "Eric  Ramones",
+  "email": "ejramones@gmail.com",
+  "phone": null,
+  "created": "2025-08-02",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U2zWE8X0VOjVPC",
+  "name": "Eric Rebugio",
+  "email": "e.rebugio@gmail.com",
+  "phone": "+14087813073",
+  "created": "2026-02-26",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SmhYIERjqIt1pp",
+  "name": "Eric Rebugio",
+  "email": "e.rebugio@yahoo.com",
+  "phone": null,
+  "created": "2025-08-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U0mLnWYpg8973F",
+  "name": "Eshaan Basu Subhadeep Basu",
+  "email": "sbasu1@gmail.com",
+  "phone": "+15105180044",
+  "created": "2026-02-20",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TaCHrZorTMzfgU",
+  "name": "Estelle Cooper",
+  "email": "estellesbox@gmail.com",
+  "phone": "+14085958161",
+  "created": "2025-12-11",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U02XdYKvGv36JP",
+  "name": "Farzaneh Babaei",
+  "email": "farzanehziabari@yahoo.com",
+  "phone": "+19252165334",
+  "created": "2026-02-18",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SlRveptfTlRzAi",
+  "name": "Gyan Prakash",
+  "email": "prakashgyan@gmail.com",
+  "phone": null,
+  "created": "2025-07-28",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SkjI7l5fGRrnCo",
+  "name": "Hong Lam",
+  "email": "hongvlam90@gmail.com",
+  "phone": null,
+  "created": "2025-07-26",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_ULyEMLbxxLthk1",
+  "name": "Jacob Garcia Jaime Garcia",
+  "email": "jaimegascon2012@gmail.com",
+  "phone": "+14085289135",
+  "created": "2026-04-17",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UN8gdd1jlTtLqU",
+  "name": "Jacob Orozco Orozco",
+  "email": "andrew@squaretoround.com",
+  "phone": "+14085099789",
+  "created": "2026-04-20",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U6hiiXmUHsV2b4",
+  "name": "Jay Tseng",
+  "email": "jaytseng@gmail.com",
+  "phone": null,
+  "created": "2026-03-07",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Sfc3yl67dOgZlc",
+  "name": "Jaycob Amistoso",
+  "email": "amistoso@comcast.net",
+  "phone": null,
+  "created": "2025-07-13",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U8cWjBUXGgaTe9",
+  "name": "Jean-Claude Brizard",
+  "email": "jccaty@gmail.com",
+  "phone": null,
+  "created": "2026-03-13",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U1PEUd7ua0ZW98",
+  "name": "Jeff Monks",
+  "email": "jeffmonks@gmail.com",
+  "phone": "+14082066625",
+  "created": "2026-02-21",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TZ2r8QQX8X7Qvo",
+  "name": "Jeffrey Peng",
+  "email": "peng.jeff@gmail.com",
+  "phone": null,
+  "created": "2025-12-08",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_T4djOZGbNkBdbr",
+  "name": "Jesus Mota",
+  "email": "jmota@sjusd.org",
+  "phone": null,
+  "created": "2025-09-17",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SbHfZfNzmhS6CG",
+  "name": "Jeyven Sumabat JonVincent Sumabat",
+  "email": "jesumabat@gmail.com",
+  "phone": "+14088632208",
+  "created": "2025-07-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TzykUjutQwS9YM",
+  "name": "Jiaxiang Liu",
+  "email": "adolf.panda.lau@gmail.com",
+  "phone": null,
+  "created": "2026-02-18",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U8rik0W2vwjcM2",
+  "name": "Jon Baltazar",
+  "email": "jon_baltazar@comcast.net",
+  "phone": null,
+  "created": "2026-03-13",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U40Vez7qmLHsNX",
+  "name": "Jonah Coven",
+  "email": "jz@cov.in",
+  "phone": null,
+  "created": "2026-02-28",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SmAkARwdcgwfg4",
+  "name": "Jonathan  Sy-Quimsiam",
+  "email": "jon.syquimsiam@gmail.com",
+  "phone": "+14088864550",
+  "created": "2025-07-30",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Szr9msVCk2rI6O",
+  "name": "Jonathan E Thai",
+  "email": "jthai21@gmail.com",
+  "phone": "+19494392202",
+  "created": "2025-09-05",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TZ0ItlZzTtHLfs",
+  "name": "Joshua Y Cheng",
+  "email": "joshycheng@gmail.com",
+  "phone": null,
+  "created": "2025-12-08",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UvNAoE5D2UdzYP",
+  "name": "Joyce Wong",
+  "email": "randallandjoyce@gmail.com",
+  "phone": "+16266748162",
+  "created": "2026-07-21",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UQC7s1QydX30qX",
+  "name": "Juan Rodriguez",
+  "email": "jayrod408@yahoo.com",
+  "phone": "+14157471725",
+  "created": "2026-04-29",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SlQUEQDKIT9JM4",
+  "name": "Karilee Stansbury",
+  "email": "karileestansbury@gmail.com",
+  "phone": null,
+  "created": "2025-07-28",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TxlUkBafLajI5F",
+  "name": "Katherine Y",
+  "email": "kathydo.dc@gmail.com",
+  "phone": "+19162033236",
+  "created": "2026-02-12",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_ScQ95WWwPe5Pns",
+  "name": "Kathy Nomura",
+  "email": "kvillacorta@sbcglobal.net",
+  "phone": "+14085977888",
+  "created": "2025-07-04",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TMAJ0dgpdV8an8",
+  "name": "Kevin Brooks",
+  "email": "kevindbrooks@gmail.com",
+  "phone": null,
+  "created": "2025-11-03",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U8VENR5jm0ggoA",
+  "name": "Kristee Catacutan",
+  "email": "kristee.catacutan@gmail.com",
+  "phone": "+14089148784",
+  "created": "2026-03-12",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TK6RoVyJ9kM6Ka",
+  "name": "Kristopher Quilindrino",
+  "email": "quilindrinok@yahoo.com",
+  "phone": "+14088382865",
+  "created": "2025-10-29",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Ts5yBJRL6uKjLl",
+  "name": "Kyle Chu",
+  "email": "ktchu78@yahoo.com",
+  "phone": "+14082059558",
+  "created": "2026-01-27",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UqPlA7xISXOjBL",
+  "name": "Kyle Leung",
+  "email": "janicejinghu@gmail.com",
+  "phone": "+14087864398",
+  "created": "2026-07-08",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TbcplD2UqsK5ho",
+  "name": "Leah Lucas",
+  "email": "leahslucas@gmail.com",
+  "phone": null,
+  "created": "2025-12-15",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TbwKdXzF1Zg1IT",
+  "name": "Leslie Les Margate",
+  "email": "margateleslie@yahoo.com",
+  "phone": "+15108627077",
+  "created": "2025-12-15",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SlU5hdboypjYpe",
+  "name": "Lily Huang",
+  "email": "lilyclhuang@gmail.com",
+  "phone": null,
+  "created": "2025-07-28",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U0pbDNpopsuTDR",
+  "name": "Linton Huong le",
+  "email": "huong2le@hotmail.com",
+  "phone": "+14083156302",
+  "created": "2026-02-20",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Sb8cjHUqkHWD0u",
+  "name": "Makoa Malaluan",
+  "email": "smallmak09@gmail.com",
+  "phone": null,
+  "created": "2025-07-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SrAxgjYcom975i",
+  "name": "Marco Rosa",
+  "email": "marcorosa20@gmail.com",
+  "phone": "+14083984332",
+  "created": "2025-08-13",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TQQcpHvwDGmRH6",
+  "name": "Marco Zuniga",
+  "email": "marco.zuniga91@yahoo.com",
+  "phone": null,
+  "created": "2025-11-15",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SbAO9tggvfCKsR",
+  "name": "Marianna Sierra",
+  "email": "mariannass2017@gmail.com",
+  "phone": "+16692786022",
+  "created": "2025-07-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TwJdZUv0HAkxJX",
+  "name": "Marielle Velasco",
+  "email": "mvelasco126@gmail.com",
+  "phone": "+14083960456",
+  "created": "2026-02-08",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Sz33WL8kkvvgJq",
+  "name": "Marissa Sandoval",
+  "email": "marissaslaughter@gmail.com",
+  "phone": "+14057263967",
+  "created": "2025-09-03",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TER4bZAWDFbvoU",
+  "name": "Mary Myers",
+  "email": "mmyerssj@gmail.com",
+  "phone": null,
+  "created": "2025-10-14",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SlwJ8SPJ3YbybP",
+  "name": "Mary Myers",
+  "email": "marymyers22@yahoo.com",
+  "phone": "+14084836279",
+  "created": "2025-07-30",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U1ZCccqcDsy47D",
+  "name": "Matthew McBride",
+  "email": "4154599999mm@gmail.com",
+  "phone": "+14154599999",
+  "created": "2026-02-22",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SlZyaaGMnWEG0v",
+  "name": "Mattias Adlawan Maria Adlawan",
+  "email": "mvinoya@yahoo.com",
+  "phone": "+14082399917",
+  "created": "2025-07-29",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UePzhBtCcsPjxB",
+  "name": "Mayank Agrawal",
+  "email": null,
+  "phone": "+14084622167",
+  "created": "2026-06-05",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SbKvnJv6sbFBvN",
+  "name": "Merlynn Tan",
+  "email": "skeezah620@aol.com",
+  "phone": "+14089816248",
+  "created": "2025-07-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U4TuEeKg0Bftky",
+  "name": "Mike Jr Mike",
+  "email": "mike@byanymeansbball.com",
+  "phone": null,
+  "created": "2026-03-02",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TjlJ49u30AKCmA",
+  "name": "Miles Ruiz Justin Ruiz",
+  "email": "contactbjr@icloud.com",
+  "phone": "+15104620687",
+  "created": "2026-01-05",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TStLAs4OZroLh6",
+  "name": "Miyami Miranda",
+  "email": "angie33miyami@aol.com",
+  "phone": "+14086855095",
+  "created": "2025-11-21",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UjeLJhAmSGKpWE",
+  "name": "Nallely Martinez",
+  "email": "nallely.business@gmail.com",
+  "phone": "+14088332580",
+  "created": "2026-06-19",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Se3Ke0aVbYhZjP",
+  "name": "Nancy Nguyen",
+  "email": "nancyn08@yahoo.com",
+  "phone": "+14087506352",
+  "created": "2025-07-08",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Sb8QIQy6K2jSEy",
+  "name": "Nancy Nguyen",
+  "email": "nancyn08@yahooo.com",
+  "phone": "+14087506352",
+  "created": "2025-07-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U2fB1VQUgfSiW5",
+  "name": "Nellie Figueroa",
+  "email": "nellie_figueroa@yahoo.com",
+  "phone": "+14084765130",
+  "created": "2026-02-25",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SmAyPxtgxsfi61",
+  "name": "Neranjana Ranganathan",
+  "email": "neranjana112@gmail.com",
+  "phone": "+14086464819",
+  "created": "2025-07-30",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_So4zfIMSHmPecC",
+  "name": "Nicholas Fernandez Glenn Fernandez",
+  "email": "carolynn.glennf@gmail.com",
+  "phone": "+14088138894",
+  "created": "2025-08-04",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TunI4Opud87epQ",
+  "name": "Nickolas Galdorj",
+  "email": "dugersuren.g@gmail.com",
+  "phone": "+12133729558",
+  "created": "2026-02-04",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Tztj62AFnv6gKt",
+  "name": "Nilay Sriperambaduru Sriperambaduru",
+  "email": "nilnik1216@gmail.com",
+  "phone": "+16503003060",
+  "created": "2026-02-17",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U419C7hZ0tAIIQ",
+  "name": "Patrick Slone",
+  "email": "patrickslone@icloud.com",
+  "phone": null,
+  "created": "2026-02-28",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SbHTpscLZbdNCI",
+  "name": "Paul Chiu",
+  "email": "paul.chiu@sbcglobal.net",
+  "phone": "+14082055502",
+  "created": "2025-07-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TUL1W5WXkbT5ZI",
+  "name": "Po Tu",
+  "email": "powentu@gmail.com",
+  "phone": null,
+  "created": "2025-11-25",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U46MsFIkamkTHl",
+  "name": "Q Zhao",
+  "email": "qzhao0325@gmail.com",
+  "phone": null,
+  "created": "2026-03-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SrXO89C5nWkdRD",
+  "name": "Rochelle Seto",
+  "email": "rochelleseto@gmail.com",
+  "phone": "+15102925707",
+  "created": "2025-08-13",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TSiNorV6V2PBND",
+  "name": "Roderick Fernandez",
+  "email": "rf0034@yahoo.com",
+  "phone": null,
+  "created": "2025-11-21",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SleT5Ibm1PhP7P",
+  "name": "Ryo Lin",
+  "email": "pavirry@gmail.com",
+  "phone": null,
+  "created": "2025-07-29",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_ScHcFXTrOjGRWS",
+  "name": "Sam Ameri",
+  "email": "ironhulkbusterfood@gmail.com",
+  "phone": "+16692655115",
+  "created": "2025-07-04",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UduK29txhgWCDW",
+  "name": "Simantini Bhattacharya",
+  "email": "sim.777@gmail.com",
+  "phone": "+14083167194",
+  "created": "2026-06-04",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U41lBC19GYnmAU",
+  "name": "Stephanie Le",
+  "email": "stephanie.le@gmail.com",
+  "phone": null,
+  "created": "2026-02-28",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TsBW0Y7pnjTadP",
+  "name": "Stephanie McKinny",
+  "email": "smckinny213@gmail.com",
+  "phone": "+14088876324",
+  "created": "2026-01-28",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SyyQBlAj4GSlVc",
+  "name": "TJ Capili Sam Capili",
+  "email": "samanthcapili21@gmail.com",
+  "phone": "+14087221466",
+  "created": "2025-09-02",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SL1q4jR8hWPCHu",
+  "name": "Test Customer",
+  "email": "elijahdeguzman23@gmail.com",
+  "phone": null,
+  "created": "2025-05-19",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SnHgu0RHRqOcbw",
+  "name": "Tony Lam",
+  "email": "tonster799@gmail.com",
+  "phone": null,
+  "created": "2025-08-02",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SmAwChzTMGYG19",
+  "name": "Trinh Vuong",
+  "email": "tvuongfamily@yahoo.com",
+  "phone": null,
+  "created": "2025-07-30",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TwJPVNeYLlQQQW",
+  "name": "Van Williams",
+  "email": "van.williams@gmail.com",
+  "phone": "+19176873775",
+  "created": "2026-02-08",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UfPX6by8x44EJY",
+  "name": "Vi Nguyen",
+  "email": "vinguyen240810@yahoo.com",
+  "phone": "+14082039495",
+  "created": "2026-06-08",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SlZB3PyUHjSbvX",
+  "name": "Vu Hang",
+  "email": "vu.huy.hang@gmail.com",
+  "phone": null,
+  "created": "2025-07-29",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SbKGs0UtJqsMww",
+  "name": "Yuting Zeng",
+  "email": "yutingzeng73@gmail.com",
+  "phone": "+14086282752",
+  "created": "2025-07-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Sb6aMaOiIieExf",
+  "name": "bptique@yahoo.com",
+  "email": "bptique@yahoo.com",
+  "phone": "+14088068778",
+  "created": "2025-07-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UkgFYWNaGnzyMF",
+  "name": "carlos brun",
+  "email": "carlosbrunwork@gmail.com",
+  "phone": "+16505216861",
+  "created": "2026-06-22",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_UePhCOgOqsqHgA",
+  "name": "chi chau",
+  "email": "cvchau@gmail.com",
+  "phone": "+14084206777",
+  "created": "2026-06-05",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_Se1Rzkd4TNimOV",
+  "name": "glegaspi103@gmail.com",
+  "email": "glegaspi103@gmail.com",
+  "phone": null,
+  "created": "2025-07-08",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_T6onyjsNMcgFdl",
+  "name": "hailin xu",
+  "email": "milkhailin2008@gmail.com",
+  "phone": null,
+  "created": "2025-09-23",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_TFrkH5eBJc4IP1",
+  "name": "jason Seto",
+  "email": "jsxenon@icloud.com",
+  "phone": null,
+  "created": "2025-10-17",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_ShT0YHsLNVqvhL",
+  "name": "jordan rivera",
+  "email": "jordansport2009@gmail.com",
+  "phone": null,
+  "created": "2025-07-18",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_ScSI8hutBIafpq",
+  "name": "linton le",
+  "email": "linton2le@gmail.com",
+  "phone": "+14089925946",
+  "created": "2025-07-04",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SbPDpc3k8zvydG",
+  "name": "miya09160916@gmail.com",
+  "email": "miya09160916@gmail.com",
+  "phone": "+16693088154",
+  "created": "2025-07-01",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U57FlGXuvaxfTk",
+  "name": "rodel Rodel baldoz",
+  "email": null,
+  "phone": "+14085159936",
+  "created": "2026-03-03",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U5diub1RBjC6EN",
+  "name": null,
+  "email": null,
+  "phone": "+14082059555",
+  "created": "2026-03-05",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U5XEnrx8JwrvP8",
+  "name": null,
+  "email": null,
+  "phone": "+825105180044",
+  "created": "2026-03-04",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U5DF8aNbAAQFkr",
+  "name": null,
+  "email": null,
+  "phone": "+14083045605",
+  "created": "2026-03-03",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_U4YFG0WUujIfW6",
+  "name": null,
+  "email": null,
+  "phone": "+14084211074",
+  "created": "2026-03-02",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SZqcgs3dd2oOta",
+  "name": null,
+  "email": "mike@byanymeansbball.com",
+  "phone": null,
+  "created": "2025-06-27",
+  "live_member": false,
+  "delinquent": false
+ },
+ {
+  "customer_id": "cus_SXKhV8zvXOSolC",
+  "name": null,
+  "email": "e.rebugio@yahoo.com",
+  "phone": null,
+  "created": "2025-06-21",
+  "live_member": false,
+  "delinquent": false
+ }
+]
