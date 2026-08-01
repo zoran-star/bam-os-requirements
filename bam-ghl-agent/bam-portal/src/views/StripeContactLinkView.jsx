@@ -94,6 +94,56 @@ export default function StripeContactLinkView({ tokens, session }) {
     } catch (e) { setWhStatus(""); setErr(e.message); }
   }
 
+  // ── Direct API key (platform-locked Stripe, e.g. CoachIQ: no Connect OAuth) ──
+  // Staff paste the academy's own rk_live_ restricted key + pk_live_ publishable
+  // key. Probe is a dry run (writes nothing); Save persists + registers the
+  // academy webhook. Backed by /api/stripe/direct-key.
+  const [dk, setDk] = useState(null);          // action=status payload
+  const [dkErr, setDkErr] = useState("");
+  const [dkBusy, setDkBusy] = useState("");    // "probe" | "save" | "disable" | "status"
+  const [rk, setRk] = useState("");
+  const [pk, setPk] = useState("");
+  const [dkProbe, setDkProbe] = useState(null);
+
+  const dkApi = useCallback(async (action, payload) => {
+    const res = await fetch("/api/stripe/direct-key", {
+      method: "POST", headers: authHeaders(),
+      body: JSON.stringify({ action, client_id: clientId, ...(payload || {}) }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+    return json;
+  }, [authHeaders, clientId]);
+
+  const loadDk = useCallback(async () => {
+    if (!clientId) { setDk(null); return; }
+    setDkBusy("status"); setDkErr("");
+    try { setDk(await dkApi("status")); }
+    catch (e) { setDkErr(e.message); setDk(null); }
+    finally { setDkBusy(""); }
+  }, [clientId, dkApi]);
+
+  useEffect(() => { setDkProbe(null); setRk(""); setPk(""); setDkErr(""); loadDk(); }, [clientId, loadDk]);
+
+  async function dkRun(action) {
+    setDkBusy(action); setDkErr("");
+    try {
+      if (action === "probe") {
+        setDkProbe(await dkApi("probe", { secret_key: rk, publishable_key: pk || undefined }));
+      } else if (action === "save") {
+        const json = await dkApi("save", { secret_key: rk, publishable_key: pk });
+        setDkProbe(json);
+        setRk(""); setPk("");
+        await loadDk();
+      } else if (action === "disable") {
+        await dkApi("disable");
+        setDkProbe(null);
+        await loadDk();
+      }
+    } catch (e) { setDkErr(e.message); }
+    finally { setDkBusy(""); }
+  }
+
   // ── styles ──────────────────────────────────────────────
   const card = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: 20 };
   const input = {
@@ -138,6 +188,69 @@ export default function StripeContactLinkView({ tokens, session }) {
           {whStatus || "One click, all academies: keeps the Stripe webhook subscribed to every event the portal handles."}
         </span>
       </div>
+
+      {clientId && (
+        <div style={{ ...card, marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: t.textSub, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+            Direct API key (platform-locked Stripe, no Connect)
+          </div>
+          {dkBusy === "status" ? (
+            <div style={{ fontSize: 12.5, color: t.textSub }}>Checking key status…</div>
+          ) : dk?.direct ? (
+            <div style={{ fontSize: 12.5, marginBottom: 10 }}>
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontWeight: 700, color: dk.direct.status === "active" ? t.accent : t.red }}>
+                  {dk.transport?.startsWith("direct") ? "Transport: direct key" : "Transport: Connect"}
+                </span>
+                <span>key ••••{dk.direct.secret_key_last4}</span>
+                <span>{dk.direct.stripe_account_id}</span>
+                <span>status: {dk.direct.status}</span>
+                {dk.health && <span>health: {dk.health.outcome}{dk.health.error ? ` (${dk.health.error})` : ""}</span>}
+                <span>webhook: {dk.webhook?.endpoint_id ? "registered" : "not registered"}</span>
+              </div>
+              {dk.direct.capabilities && (
+                <div style={{ marginTop: 6, color: t.textSub }}>
+                  can do: {Object.entries(dk.direct.capabilities).map(([k, v]) => `${k} ${v ? "✓" : "✕"}`).join(" · ")}
+                </div>
+              )}
+              <button style={{ ...btn(false), marginTop: 10 }} onClick={() => dkRun("disable")} disabled={!!dkBusy}>
+                {dkBusy === "disable" ? "Disabling…" : "Disable key (back to Connect)"}
+              </button>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12.5, color: t.textSub, marginBottom: 10 }}>
+              No direct key on file. For academies whose Stripe cannot use Connect OAuth: paste their restricted key (rk_live_) and publishable key (pk_live_), Probe first, then Save.
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input style={{ ...input, width: 320, flex: "1 1 240px" }} type="password" placeholder="rk_live_… (restricted key)" value={rk} onChange={e => setRk(e.target.value)} />
+            <input style={{ ...input, width: 260, flex: "1 1 200px" }} placeholder="pk_live_… (publishable key)" value={pk} onChange={e => setPk(e.target.value)} />
+            <button style={{ ...btn(false), opacity: rk && !dkBusy ? 1 : 0.4 }} onClick={() => dkRun("probe")} disabled={!rk || !!dkBusy}>
+              {dkBusy === "probe" ? "Probing…" : "Probe"}
+            </button>
+            <button style={{ ...btn(true), opacity: dkProbe && rk && pk && !dkBusy ? 1 : 0.4 }} onClick={() => dkRun("save")} disabled={!dkProbe || !rk || !pk || !!dkBusy}>
+              {dkBusy === "save" ? "Saving…" : "Save"}
+            </button>
+          </div>
+          {dkProbe && (
+            <div style={{ fontSize: 12, marginTop: 8 }}>
+              <span style={{ fontWeight: 700 }}>{dkProbe.account_id}</span>
+              {" · "}charges {dkProbe.charges_enabled ? "enabled" : "OFF"}
+              {" · "}details {dkProbe.details_submitted ? "submitted" : "incomplete"}
+              {" · "}key ••••{dkProbe.key_last4}
+              <div style={{ color: t.textSub, marginTop: 4 }}>
+                {Object.entries(dkProbe.capabilities || {}).map(([k, v]) => `${k} ${v ? "✓" : "✕"}`).join(" · ")}
+              </div>
+              {dkProbe.webhook && (
+                <div style={{ marginTop: 4, color: dkProbe.webhook.ok ? t.textSub : t.red }}>
+                  webhook: {dkProbe.webhook.ok ? (dkProbe.webhook.skipped || dkProbe.webhook.action || "ok") : `FAILED: ${dkProbe.webhook.error}`}
+                </div>
+              )}
+            </div>
+          )}
+          {dkErr && <div style={{ fontSize: 12, color: t.red, marginTop: 8 }}>{dkErr}</div>}
+        </div>
+      )}
 
       {err && <div style={{ ...card, borderColor: t.red, color: t.red, marginBottom: 16, padding: 12 }}>{err}</div>}
 

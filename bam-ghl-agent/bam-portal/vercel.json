@@ -13,12 +13,20 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/stripe/cron-key-health",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/offers/cron-make-sellable",
       "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/schedule/cron-activate-booking",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/schedule/cron-extend-slots",
+      "schedule": "0 8 * * 1"
     },
     {
       "path": "/api/clients?action=cron-resend-invites",

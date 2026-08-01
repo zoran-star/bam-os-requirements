@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Inbox mobile mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F8F7F5; --surface:#FFFFFF; --surface-el:#FAFAF8; --surface-hov:#F0EFEC;
+  --border:rgba(0,0,0,0.07); --border-med:rgba(0,0,0,0.12); --border-str:rgba(0,0,0,0.18);
+  --text:#1C1B18; --text-sub:#6E6B63; --text-mute:#807C74;
+  --gold:#C8A84E; --gold-sheen:rgba(200,168,78,0.06); --accent-border:rgba(200,168,78,0.28);
+  --ink:#1C1B18; --danger:#B4462F;
+}
+[data-theme="dark"]{
+  --bg:#131416; --surface:#1B1D1F; --surface-el:#232629; --surface-hov:#2B2E32;
+  --border:rgba(255,255,255,0.08); --border-med:rgba(255,255,255,0.12); --border-str:rgba(255,255,255,0.2);
+  --text:#F0EDE8; --text-sub:#A5A19A; --text-mute:#7C786F;
+  --gold:#D4B65C; --gold-sheen:rgba(212,182,92,0.08); --accent-border:rgba(212,182,92,0.28);
+  --ink:#131416; --danger:#E0785E;
+}
+*{box-sizing:border-box}
+/* no overflow-x:hidden here - it makes body a scroll container and silently
+   breaks position:sticky for everything inside. .swipe clips its own row. */
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;border:none;background:none;padding:0;text-align:left;cursor:pointer}
+
+.sw{position:sticky;top:0;z-index:90;display:flex;gap:6px;align-items:center;
+  padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
+.sw button{flex:none;padding:6px 12px;border-radius:999px;border:1px solid var(--border-med);font-size:12px;font-weight:600}
+.sw button[aria-selected="true"]{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+.sw .sp{margin-left:auto}
+.note{margin:14px 14px 0;padding:11px 13px;border-radius:11px;background:var(--surface);
+  border:1px solid var(--border);font-size:12px;line-height:1.55;color:var(--text-sub)}
+.note strong{color:var(--text)}
+
+/* the top block stays put while the list scrolls under it */
+#top{position:sticky;top:49px;z-index:40;background:var(--bg);
+  border-bottom:1px solid var(--border);box-shadow:0 6px 14px -12px rgba(0,0,0,.5)}
+.crumb{padding:10px 14px 0;font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--text-mute)}
+.crumb span{color:var(--gold)}
+
+/* header: back, title, mass message */
+.hd{display:flex;align-items:center;gap:10px;padding:9px 14px 8px}
+.hd .back{flex:none;padding:7px 12px 7px 9px;border-radius:10px;border:1px solid var(--border-med);
+  background:var(--surface);font-size:13px;font-weight:700}
+.hd h1{flex:1;margin:0;font-size:19px;font-weight:800;letter-spacing:-.01em}
+.mass{flex:none;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;
+  border:1px solid var(--border-med);background:var(--surface);font-size:12.5px;font-weight:700;
+  color:var(--text-mute);opacity:.5}
+.mass svg{width:15px;height:15px}
+
+/* search with filters folded in */
+.srch{display:flex;align-items:center;gap:9px;margin:0 14px 10px;padding:9px 12px;
+  border-radius:11px;border:1px solid var(--border-med);background:var(--surface)}
+.srch>svg{width:15px;height:15px;color:var(--text-mute);flex:none}
+.srch input{flex:1;min-width:0;border:none;background:none;outline:none;font:inherit;font-size:13.5px;color:var(--text)}
+.srch input::placeholder{color:var(--text-mute)}
+.fbtn{flex:none;display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;
+  background:var(--surface-hov);font-size:11.5px;font-weight:700;color:var(--text-sub)}
+.fbtn b{background:var(--gold);color:var(--ink);border-radius:999px;padding:0 5px;font-size:10px;font-family:Nunito,inherit}
+
+/* ── list ── */
+.list{border-top:1px solid var(--border)}
+.swipe{position:relative;overflow:hidden;background:var(--gold)}
+.swipe .behind{position:absolute;inset:0;display:flex;align-items:center;gap:8px;
+  padding-left:18px;color:var(--ink);font-size:12.5px;font-weight:800}
+.swipe .behind svg{width:16px;height:16px}
+.msg{cursor:pointer;position:relative;display:grid;grid-template-columns:8px 42px 1fr auto auto;gap:0 11px;
+  align-items:center;width:100%;padding:12px 14px;border-bottom:1px solid var(--border);
+  background:var(--surface);transition:transform .18s cubic-bezier(.32,.72,0,1)}
+.msg.dragging{transition:none}
+.msg .u{grid-column:1;width:7px;height:7px;border-radius:50%;background:var(--gold)}
+.msg.read .u{background:transparent}
+
+/* member = gold ring on the avatar. costs no width, sits away from the
+   unread dot, and reads instantly down a column of avatars. */
+.msg .av{grid-column:2;width:42px;height:42px;border-radius:50%;background:var(--surface-hov);
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;
+  color:var(--text-sub);position:relative}
+.msg .av.member{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--gold)}
+.msg .av .vm{position:absolute;right:-2px;bottom:-2px;width:17px;height:17px;border-radius:50%;
+  background:var(--text-sub);color:var(--bg);display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--surface)}
+.msg .av .vm svg{width:9px;height:9px}
+
+.msg .mid{grid-column:3;min-width:0}
+.msg .nm{display:block;font-size:14px;font-weight:700;line-height:1.3;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg.read .nm{font-weight:600;color:var(--text-sub)}
+.msg .sn{display:block;font-size:12.5px;color:var(--text-mute);margin-top:2px;line-height:1.4;
+  overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.msg .sn .dir{opacity:.65;font-weight:700}
+/* the agent or automation they are sitting in, if any */
+.msg .agent{display:inline-flex;align-items:center;gap:5px;margin-top:5px;
+  font-size:10.5px;font-weight:700;color:var(--text-sub)}
+.msg .agent svg{width:11px;height:11px;flex:none;color:var(--gold)}
+.msg .t{grid-column:4;font-size:11px;font-weight:700;color:var(--text-mute);white-space:nowrap;align-self:start;padding-top:2px}
+.msg .t.old{color:var(--danger)}
+/* Hawkeye lives on the right and goes straight to that card */
+.msg .hawk{grid-column:5;width:34px;height:34px;border-radius:10px;background:var(--gold);
+  color:var(--ink);display:flex;align-items:center;justify-content:center;margin-left:8px}
+.msg .hawk svg{width:16px;height:16px}
+.msg .hawk.spacer{background:none;pointer-events:none}
+
+/* bottom corners */
+.dock{position:fixed;left:0;right:0;bottom:0;height:0;z-index:60}
+.fab{position:fixed;bottom:20px;width:54px;height:54px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;z-index:60}
+.fab.compose{left:16px;background:var(--gold);color:var(--ink);box-shadow:0 4px 14px rgba(200,168,78,.42)}
+.fab.compose svg{width:22px;height:22px}
+.fab.zoran{right:16px;background:var(--surface);border:2px solid var(--gold);
+  box-shadow:0 4px 14px rgba(0,0,0,.14)}
+.fab.zoran .face{font-size:24px;line-height:1}
+.fab.zoran .n{position:absolute;top:-2px;right:-2px;min-width:19px;height:19px;border-radius:999px;
+  background:var(--gold);color:var(--ink);font-size:10.5px;font-weight:800;font-family:Nunito,inherit;
+  display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--bg)}
+.spacer{height:96px}
+
+/* ── compose ── */
+#pane-new{display:none}
+.cmp-sec{padding:16px 14px 7px;font-size:10px;font-weight:800;letter-spacing:.11em;color:var(--text-mute)}
+.cmp-input{display:block;width:calc(100% - 28px);margin:0 14px;padding:11px 12px;border-radius:11px;
+  border:1px solid var(--border-med);background:var(--surface);color:var(--text);font:inherit;font-size:13.5px;outline:none}
+.cmp-area{min-height:120px;resize:vertical;line-height:1.5}
+.cmp-seg{display:flex;gap:7px;padding:0 14px}
+.cmp-seg button{flex:1;padding:10px;border-radius:11px;border:1px solid var(--border-med);
+  background:var(--surface);text-align:center;font-size:13px;font-weight:700;color:var(--text-sub)}
+.cmp-seg button.on{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+.cmp-meta{display:flex;align-items:center;gap:10px;padding:9px 14px 0}
+.cmp-attach{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:9px;
+  border:1px solid var(--border-med);background:var(--surface);font-size:12px;font-weight:700;color:var(--text-sub)}
+.cmp-attach svg{width:13px;height:13px}
+#cmp-count{margin-left:auto;font-size:11px;font-weight:700;color:var(--text-mute)}
+.cmp-send{display:flex;align-items:center;justify-content:center;gap:8px;
+  margin:18px 14px 0;width:calc(100% - 28px);padding:14px;border-radius:12px;
+  background:var(--gold);color:var(--ink);font-size:14.5px;font-weight:800}
+.cmp-send svg{width:17px;height:17px}
+.cmp-send[disabled]{opacity:.4;cursor:default}
+.cmp-res{display:flex;align-items:center;gap:11px;width:100%;padding:10px 14px;
+  border-bottom:1px solid var(--border);background:var(--surface);text-align:left}
+.cmp-res .av{width:36px;height:36px;border-radius:50%;background:var(--surface-hov);flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--text-sub)}
+.cmp-res .av.member{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--gold)}
+.cmp-res .nm{display:block;font-size:13.5px;font-weight:700}
+.cmp-res .sb{display:block;font-size:11.5px;color:var(--text-mute);margin-top:1px}
+.cmp-chip{display:inline-flex;align-items:center;gap:8px;margin:10px 14px 0;padding:7px 8px 7px 7px;
+  border-radius:999px;background:var(--gold-sheen);border:1px solid var(--accent-border);font-size:13px;font-weight:700}
+.cmp-chip .x{width:20px;height:20px;border-radius:50%;background:var(--surface);
+  display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-mute)}
+.cmp-block{margin:12px 14px 0;padding:12px 13px;border-radius:12px;background:var(--gold);
+  color:var(--ink);font-size:12.5px;font-weight:700;line-height:1.5}
+.cmp-block button{display:block;margin-top:8px;padding:8px 12px;border-radius:9px;
+  background:rgba(0,0,0,.12);font-size:12.5px;font-weight:800}
+
+/* filters sheet */
+#fsheet{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.45);display:none}
+#fsheet.on{display:block}
+.fcard{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:18px 18px 0 0;
+  padding:16px 16px 26px;max-height:82vh;overflow:auto}
+.fcard h3{margin:0 0 4px;font-size:16px;font-weight:800}
+.fsec{margin-top:16px;font-size:10px;font-weight:800;letter-spacing:.11em;color:var(--text-mute)}
+.fchips{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.fchip{padding:7px 12px;border-radius:999px;border:1px solid var(--border-med);background:var(--surface);
+  font-size:12.5px;font-weight:700;color:var(--text-sub)}
+.fchip.on{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+.fchip b{font-family:Nunito,inherit;opacity:.7;font-size:11px}
+.fclear{display:block;width:100%;margin-top:18px;padding:12px;border-radius:11px;
+  background:var(--surface);border:1px solid var(--border-med);text-align:center;font-size:13px;font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="sw">
+  <button aria-selected="true">Inbox</button>
+  <button class="sp" onclick="theme()">◐</button>
+</div>
+
+<div id="pane-inbox">
+<div id="top">
+<div class="crumb">FOCUS &middot; <span>INBOX</span> &middot; LIVE</div>
+
+<div class="hd">
+  <button class="back">&lsaquo; Back</button>
+  <h1>Inbox</h1>
+  <button class="mass" title="Mass message (coming soon)" disabled>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg>
+    Mass
+  </button>
+</div>
+
+<div class="srch">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+  <input placeholder="Search messages">
+  <button class="fbtn" onclick="document.getElementById('fsheet').classList.add('on')">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="17" x2="14" y2="17"/></svg>
+    Filters <b>1</b>
+  </button>
+</div>
+</div>
+
+<div class="list" id="list">
+
+  <!-- member + in an agent -->
+  <div class="swipe">
+    <span class="behind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 4h16v16H4z"/><path d="M4 8l8 5 8-5"/></svg>Unread</span>
+    <div class="msg" role="button" tabindex="0">
+      <span class="u"></span>
+      <span class="av member">DW</span>
+      <span class="mid">
+        <span class="nm">Dalia Wahba</span>
+        <span class="sn"><span class="dir">←</span> Thanks!</span>
+        <span class="agent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Nurture drip &middot; day 3</span>
+      </span>
+      <span class="t">20m</span>
+      <span class="hawk spacer"></span>
+    </div>
+  </div>
+
+  <!-- flagged by hawkeye -->
+  <div class="swipe">
+    <span class="behind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 4h16v16H4z"/><path d="M4 8l8 5 8-5"/></svg>Unread</span>
+    <div class="msg" role="button" tabindex="0">
+      <span class="u"></span>
+      <span class="av">DS</span>
+      <span class="mid">
+        <span class="nm">Drruti Shah</span>
+        <span class="sn"><span class="dir">←</span> Hi, sorry not able to come. I broke my hand, not able to drive</span>
+        <span class="agent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/></svg>Booking agent</span>
+      </span>
+      <span class="t old">1d</span>
+      <button class="hawk" title="Open in Hawkeye">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- voicemail, inline, transcript as the message -->
+  <div class="swipe">
+    <span class="behind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 4h16v16H4z"/><path d="M4 8l8 5 8-5"/></svg>Unread</span>
+    <div class="msg" role="button" tabindex="0">
+      <span class="u"></span>
+      <span class="av">JP
+        <span class="vm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>
+      </span>
+      <span class="mid">
+        <span class="nm">Jordan Price</span>
+        <span class="sn"><span class="dir">←</span> "Hi, calling about the Saturday U12 session, wanted to check if there's still space for my son"</span>
+        <span class="agent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/></svg>Booking agent</span>
+      </span>
+      <span class="t">2h</span>
+      <span class="hawk spacer"></span>
+    </div>
+  </div>
+
+  <!-- member, no agent -->
+  <div class="swipe">
+    <span class="behind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 4h16v16H4z"/><path d="M4 8l8 5 8-5"/></svg>Unread</span>
+    <div class="msg read" role="button" tabindex="0">
+      <span class="u"></span>
+      <span class="av member">RT</span>
+      <span class="mid">
+        <span class="nm">Rochelle Thompson</span>
+        <span class="sn"><span class="dir">→</span> Sounds good, see you Saturday</span>
+      </span>
+      <span class="t">6h</span>
+      <span class="hawk spacer"></span>
+    </div>
+  </div>
+
+  <!-- plain lead -->
+  <div class="swipe">
+    <span class="behind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 4h16v16H4z"/><path d="M4 8l8 5 8-5"/></svg>Unread</span>
+    <div class="msg read" role="button" tabindex="0">
+      <span class="u"></span>
+      <span class="av">L</span>
+      <span class="mid">
+        <span class="nm">Lead</span>
+        <span class="sn"><span class="dir">←</span> Avertissement concernant votre compte. Votre page professionnelle Facebook a été…</span>
+      </span>
+      <span class="t old">1d</span>
+      <span class="hawk spacer"></span>
+    </div>
+  </div>
+
+  <div class="swipe">
+    <span class="behind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 4h16v16H4z"/><path d="M4 8l8 5 8-5"/></svg>Unread</span>
+    <div class="msg read" role="button" tabindex="0">
+      <span class="u"></span>
+      <span class="av">M</span>
+      <span class="mid">
+        <span class="nm">Matt</span>
+        <span class="sn"><span class="dir">←</span> matt@mindswebsolutiion.com</span>
+      </span>
+      <span class="t old">Jul 20</span>
+      <span class="hawk spacer"></span>
+    </div>
+  </div>
+
+</div>
+
+<div class="spacer"></div>
+
+</div><!-- /pane-inbox -->
+
+<!-- ═══ NEW MESSAGE ═══ -->
+<div id="pane-new">
+  <div id="top">
+    <div class="crumb">FOCUS &middot; <span>INBOX</span> &middot; LIVE</div>
+    <div class="hd">
+      <button class="back" onclick="showInbox()">&lsaquo; Back</button>
+      <h1>New message</h1>
+    </div>
+  </div>
+
+  <!-- 1. who -->
+  <div class="cmp-sec">TO</div>
+  <div class="srch" style="margin-bottom:0">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="cmp-to" placeholder="Search name, phone or email" oninput="cmpSearch(this.value)">
+  </div>
+  <div id="cmp-picked"></div>
+  <div id="cmp-results"></div>
+
+  <!-- 2. how -->
+  <div class="cmp-sec">SEND AS</div>
+  <div class="cmp-seg">
+    <button class="on" onclick="cmpChan('sms',this)">SMS</button>
+    <button onclick="cmpChan('email',this)">Email</button>
+  </div>
+  <div id="cmp-subject-wrap" style="display:none">
+    <div class="cmp-sec">SUBJECT</div>
+    <input class="cmp-input" placeholder="Subject">
+  </div>
+
+  <!-- 3. what -->
+  <div class="cmp-sec">MESSAGE</div>
+  <textarea class="cmp-input cmp-area" id="cmp-body" placeholder="Type your message…" oninput="cmpCount()"></textarea>
+  <div class="cmp-meta">
+    <button class="cmp-attach">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.05l-8.5 8.5a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 1 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>
+      Attach
+    </button>
+    <span id="cmp-count">0 / 160 · 1 SMS</span>
+  </div>
+
+  <button class="cmp-send" id="cmp-send" disabled onclick="return false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg>
+    Send
+  </button>
+  <div class="note" style="margin-bottom:30px"><strong>Send stays off</strong> until a contact is picked and there is something to send. Pick "Drruti Shah" to see what happens when Hawkeye is holding someone.</div>
+</div>
+
+<button class="fab compose" title="New message" onclick="showNew()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+</button>
+<button class="fab zoran" title="Ask BAM">
+  <span class="face">🧑‍💻</span>
+  <span class="n">2</span>
+</button>
+
+<div id="fsheet" onclick="if(event.target===this)this.classList.remove('on')">
+  <div class="fcard">
+    <h3>Filters</h3>
+    <div class="fsec">WHO</div>
+    <div class="fchips">
+      <button class="fchip on">All <b>406</b></button>
+      <button class="fchip">Members <b>44</b></button>
+      <button class="fchip">Leads <b>362</b></button>
+      <button class="fchip">Spam <b>10</b></button>
+    </div>
+    <div class="fsec">STATE</div>
+    <div class="fchips">
+      <button class="fchip">Unread</button>
+      <button class="fchip">Needs reply <b>44</b></button>
+      <button class="fchip">Failed to send</button>
+    </div>
+    <div class="fsec">CHANNEL</div>
+    <div class="fchips">
+      <button class="fchip">SMS</button>
+      <button class="fchip">Email</button>
+      <button class="fchip">Voicemail <b>4</b></button>
+      <button class="fchip">Instagram</button>
+      <button class="fchip">Facebook</button>
+    </div>
+    <div class="fsec">AGENT OR AUTOMATION</div>
+    <div class="fchips">
+      <button class="fchip">Booking agent</button>
+      <button class="fchip">Confirm agent</button>
+      <button class="fchip">Nurture drip</button>
+      <button class="fchip">Not in one</button>
+    </div>
+    <button class="fclear" onclick="document.getElementById('fsheet').classList.remove('on')">Clear all filters</button>
+  </div>
+</div>
+
+<div class="note" style="margin-bottom:26px"><strong>Swipe a row right</strong> to mark unread. Try it. The gesture only takes over once it is clearly horizontal, and it ignores drags that start near the left edge so it does not fight Safari's back gesture.</div>
+
+<script>
+const CONTACTS = [
+  { n:'Dalia Wahba',        s:'+1 416 555 0142 · Member', m:true },
+  { n:'Drruti Shah',        s:'+1 647 555 0198',          m:false, hawk:true },
+  { n:'Jordan Price',       s:'+1 905 555 0177',          m:false },
+  { n:'Rochelle Thompson',  s:'+1 416 555 0110 · Member', m:true },
+  { n:'Matt',               s:'matt@mindswebsolutiion.com', m:false },
+];
+let cmpPicked = null, cmpChannel = 'sms';
+
+function showNew(){
+  document.getElementById('pane-inbox').style.display='none';
+  document.getElementById('pane-new').style.display='block';
+  document.querySelectorAll('.fab').forEach(f=>f.style.display='none');
+  window.scrollTo(0,0);
+}
+function showInbox(){
+  document.getElementById('pane-new').style.display='none';
+  document.getElementById('pane-inbox').style.display='block';
+  document.querySelectorAll('.fab').forEach(f=>f.style.display='flex');
+  window.scrollTo(0,0);
+}
+function cmpSearch(q){
+  const box = document.getElementById('cmp-results');
+  q = (q||'').trim().toLowerCase();
+  if (cmpPicked || q.length < 1) { box.innerHTML=''; return; }
+  box.innerHTML = CONTACTS.filter(c=>c.n.toLowerCase().includes(q)||c.s.toLowerCase().includes(q))
+    .map((c,i)=>`<button class="cmp-res" onclick="cmpPick(${CONTACTS.indexOf(c)})">
+      <span class="av${c.m?' member':''}">${c.n.split(' ').map(w=>w[0]).slice(0,2).join('')}</span>
+      <span style="flex:1;min-width:0"><span class="nm">${c.n}</span><span class="sb">${c.s}</span></span>
+    </button>`).join('') || '<div style="padding:12px 14px;font-size:12.5px;color:var(--text-mute)">No matches.</div>';
+}
+function cmpPick(i){
+  const c = CONTACTS[i]; cmpPicked = c;
+  document.getElementById('cmp-results').innerHTML='';
+  document.getElementById('cmp-to').value='';
+  document.getElementById('cmp-to').style.display='none';
+  document.getElementById('cmp-picked').innerHTML =
+    `<span class="cmp-chip">${c.n}<span class="x" onclick="cmpClear()">×</span></span>`
+    // Story 18 all over again: if Hawkeye is holding this lead, sending from
+    // here has to be refused the same way the thread refuses it.
+    + (c.hawk ? `<div class="cmp-block">Hawkeye is holding Drruti Shah. Answer the card first so the agent and you are not both replying.
+        <button>Open in Hawkeye ›</button></div>` : '');
+  cmpCount();
+}
+function cmpClear(){
+  cmpPicked = null;
+  document.getElementById('cmp-picked').innerHTML='';
+  const to = document.getElementById('cmp-to'); to.style.display=''; to.value='';
+  cmpCount();
+}
+function cmpChan(k, el){
+  cmpChannel = k;
+  document.querySelectorAll('.cmp-seg button').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('cmp-subject-wrap').style.display = k==='email' ? '' : 'none';
+  cmpCount();
+}
+function cmpCount(){
+  const v = document.getElementById('cmp-body').value;
+  const el = document.getElementById('cmp-count');
+  el.textContent = cmpChannel==='sms'
+    ? `${v.length} / 160 · ${Math.max(1, Math.ceil(v.length/160))} SMS`
+    : `${v.length} characters`;
+  const blocked = !!(cmpPicked && cmpPicked.hawk);
+  document.getElementById('cmp-send').disabled = !cmpPicked || !v.trim() || blocked;
+}
+
+function theme(){
+  const r = document.documentElement;
+  r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark';
+}
+
+/* Swipe right to mark unread.
+   Three things this has to get right on a phone:
+   1. never steal a vertical scroll: decide the axis after ~10px and bail if
+      the drag is more vertical than horizontal
+   2. never start within 30px of the left edge, that is Safari's back gesture
+   3. the "click" is haptic, and haptics are native-only (Capacitor). In a
+      browser tab there is no vibration on iOS, so the snap animation carries
+      the feedback instead. */
+const EDGE_GUARD = 30, THRESHOLD = 72;
+document.querySelectorAll('#list .msg').forEach(row => {
+  let x0 = 0, y0 = 0, dx = 0, axis = null, active = false;
+
+  row.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    if (t.clientX < EDGE_GUARD) return;      // leave the back gesture alone
+    x0 = t.clientX; y0 = t.clientY; dx = 0; axis = null; active = true;
+    row.classList.add('dragging');
+  }, { passive: true });
+
+  row.addEventListener('touchmove', e => {
+    if (!active) return;
+    const t = e.touches[0];
+    const ddx = t.clientX - x0, ddy = t.clientY - y0;
+    if (!axis) {
+      if (Math.abs(ddx) < 10 && Math.abs(ddy) < 10) return;
+      axis = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y';
+      if (axis === 'y') { active = false; row.classList.remove('dragging'); row.style.transform = ''; return; }
+    }
+    dx = Math.max(0, ddx);                    // right only
+    row.style.transform = 'translateX(' + Math.min(dx, 110) + 'px)';
+  }, { passive: true });
+
+  const end = () => {
+    if (!active) return;
+    active = false;
+    row.classList.remove('dragging');
+    if (dx > THRESHOLD) {
+      row.classList.remove('read');
+      try { navigator.vibrate && navigator.vibrate(12); } catch (_) {}
+    }
+    row.style.transform = '';
+  };
+  row.addEventListener('touchend', end, { passive: true });
+  row.addEventListener('touchcancel', end, { passive: true });
+});
+</script>
+</body>
+</html>

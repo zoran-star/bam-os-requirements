@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
 import { applyFee, feeLabel, resolveFee } from "../_fees.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 // Reads ALL live Stripe subs/products/charges (paginated) + an AI call — the
 // default ~10s function timeout is not enough, which surfaces as "Failed to
 // fetch" on the client. Give it headroom.
@@ -69,13 +70,9 @@ function stripeKey() {
   return process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
 }
 async function stripeGet(path, stripeAccount) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const res = await fetch(`${STRIPE_API}${path}`, { headers });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) throw new Error(json?.error?.message || `Stripe ${res.status}`);
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js): platform key + Stripe-Account
+  // header for Connect academies, the academy's own key when a direct row exists.
+  return transportStripeFetch(path, { stripeAccount });
 }
 
 // Pull all subscriptions on the connected account (any status), expanded.
@@ -461,7 +458,15 @@ async function handler(req, res) {
     }
 
     // ── PROPOSE mode (default, review-first) ──
-    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id&limit=1`);
+    // Three-outcome money gate (house rule 10): a clients read that THREW is
+    // "could not ask", never "not connected" - retryable 503; the 409 below
+    // stays reserved for a row that actually answered without an account.
+    let clientRows;
+    try {
+      clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id&limit=1`);
+    } catch {
+      return res.status(503).json({ error: "could not verify billing setup, try again" });
+    }
     const client = Array.isArray(clientRows) && clientRows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
     if (!client.stripe_connect_account_id) return res.status(409).json({ error: "academy not connected to Stripe" });

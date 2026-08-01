@@ -20,7 +20,10 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
 // KEEP IN SYNC with the switch in api/stripe/webhook.js.
-const REQUIRED_EVENTS = [
+// Exported: api/stripe/ensure-academy-webhook.js derives a direct-key academy's
+// endpoint events from this same list (minus CONNECT_ONLY_EVENTS), so the two
+// endpoint kinds can never drift apart.
+export const REQUIRED_EVENTS = [
   "customer.subscription.created",
   "customer.subscription.deleted",
   "customer.subscription.updated",

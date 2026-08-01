@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { pickGhlToken } from "../ghl/_core.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 // Reads ALL Stripe subscriptions + products (paginated) and the GHL pipeline
 // list — more than the default ~10s function budget, so give it headroom.
 export const maxDuration = 60;
@@ -133,13 +134,9 @@ async function resolveUser(req) {
 // ── Stripe ──
 function stripeKey() { return process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY; }
 async function stripeGet(path, stripeAccount) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const res = await fetch(`${STRIPE_API}${path}`, { headers });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) throw new Error(json?.error?.message || `Stripe ${res.status}`);
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js): platform key + Stripe-Account
+  // header for Connect academies, the academy's own key when a direct row exists.
+  return transportStripeFetch(path, { stripeAccount });
 }
 
 // Every subscription (any status, incl. canceled) → product id → paid-sub count.

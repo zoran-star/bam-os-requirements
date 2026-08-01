@@ -1,0 +1,4470 @@
+{
+ "one_time_invoice_lines": [
+  {
+   "customer": "cus_Tx2FCcFPC2FUVY",
+   "invoice": "in_1Ty2F9K6ZS1cqefuHFeluP6z",
+   "date": "2026-07-28",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UejXog6DwuLTRC",
+   "invoice": "in_1Tw5EwK6ZS1cqefu3jE8wNj9",
+   "date": "2026-07-22",
+   "desc": "1 \u00d7 Academy (2x/week) (at $1,150.00 / every 24 weeks)",
+   "amount": 1150.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UQG0iwsQNATykD",
+   "invoice": "in_1TviDEK6ZS1cqefud8oMwsfb",
+   "date": "2026-07-21",
+   "desc": "1 \u00d7 Academy (2x/week) - 1 Month (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "invoice": "in_1TvMyiK6ZS1cqefu8UnnHF7I",
+   "date": "2026-07-20",
+   "desc": "1 \u00d7 Academy (1x/week) (at $175.00 / every 4 weeks)",
+   "amount": 175.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "invoice": "in_1Tv29VK6ZS1cqefu9nNvABZp",
+   "date": "2026-07-19",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "invoice": "in_1TroXcK6ZS1cqefuV6oqyJXw",
+   "date": "2026-07-11",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "invoice": "in_1TrjafK6ZS1cqefuPcfwl55K",
+   "date": "2026-07-10",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UgOGfXF7jOrBSE",
+   "invoice": "in_1TrAqXK6ZS1cqefuX5YV8URg",
+   "date": "2026-07-09",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UpbsXGE6ZpjQX4",
+   "invoice": "in_1TpwfBK6ZS1cqefuYP2DzIk5",
+   "date": "2026-07-05",
+   "desc": "1 \u00d7 Academy Unlimited (at $749.00 / every 12 weeks)",
+   "amount": 749.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UGA3camSvFP79e",
+   "invoice": "in_1Tod7OK6ZS1cqefu6Tsa9vT1",
+   "date": "2026-07-02",
+   "desc": "1 \u00d7 Adapt Season - Gabriel Garcia (at $225.00 / month)",
+   "amount": 225.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "invoice": "in_1ToWVBK6ZS1cqefujfIAWxOo",
+   "date": "2026-07-01",
+   "desc": "1 \u00d7 Adapt Season - Teo Seto (at $250.00 / month)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_UIcrnRLiHLlqlg",
+   "invoice": "in_1ToTebK6ZS1cqefuTlUuGzF4",
+   "date": "2026-07-01",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UmZxgrt3OSqf7z",
+   "invoice": "in_1Tn0nrK6ZS1cqefuhEq4ELlz",
+   "date": "2026-06-27",
+   "desc": "1 \u00d7 Academy Unlimited (at $1,399.00 / every 24 weeks)",
+   "amount": 1399.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_URQD58sYGObVzZ",
+   "invoice": "in_1Tmq4wK6ZS1cqefun3M8Nu9K",
+   "date": "2026-06-27",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "invoice": "in_1TmILiK6ZS1cqefuVlJVx2OJ",
+   "date": "2026-06-25",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "invoice": "in_1Tlyo7K6ZS1cqefufBw8Gfch",
+   "date": "2026-06-24",
+   "desc": "1 \u00d7 Academy (Christopher) (at $199.00 / every 4 weeks)",
+   "amount": 199.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UFilnoKMh2bPbQ",
+   "invoice": "in_1TlfMSK6ZS1cqefuMrw2r2up",
+   "date": "2026-06-24",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "invoice": "in_1TlDeAK6ZS1cqefuFqW9ocLG",
+   "date": "2026-06-22",
+   "desc": "1 \u00d7 Academy (1x/week) (at $175.00 / every 4 weeks)",
+   "amount": 175.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "invoice": "in_1TkspRK6ZS1cqefuRScREvK4",
+   "date": "2026-06-21",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Uj053QqfcFq50W",
+   "invoice": "in_1TjY5JK6ZS1cqefuHiXHxj3v",
+   "date": "2026-06-18",
+   "desc": "1 \u00d7 Academy Unlimited (at $1,399.00 / every 24 weeks)",
+   "amount": 1399.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_Ui54B9AfWntX2T",
+   "invoice": "in_1TieuUK6ZS1cqefuP1HjhmOq",
+   "date": "2026-06-15",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "invoice": "in_1Thf5fK6ZS1cqefuCAwRqEYe",
+   "date": "2026-06-13",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "invoice": "in_1ThaFBK6ZS1cqefuCmfbB4LP",
+   "date": "2026-06-12",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UgOGfXF7jOrBSE",
+   "invoice": "in_1Th1UKK6ZS1cqefuDJjIx99Y",
+   "date": "2026-06-11",
+   "desc": "Setup Fee - Academy (2x/week) ",
+   "amount": 40.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UgOGfXF7jOrBSE",
+   "invoice": "in_1Th1UKK6ZS1cqefuDJjIx99Y",
+   "date": "2026-06-11",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TunI4Opud87epQ",
+   "invoice": "in_1Tguf2K6ZS1cqefuA7cc1VhC",
+   "date": "2026-06-10",
+   "desc": "Time on Adapt Academy Tuition (4 Payments) after 10 Jun 2026",
+   "amount": 361.55,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "invoice": "in_1TgcBVK6ZS1cqefuqGXb7Hip",
+   "date": "2026-06-10",
+   "desc": "1 \u00d7 Adapt Season - Teo Seto (at $250.00 / month)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U8VENR5jm0ggoA",
+   "invoice": "in_1TegIPK6ZS1cqefuwoCD0oMH",
+   "date": "2026-06-04",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "invoice": "in_1TeGy7K6ZS1cqefuQtNd8EGr",
+   "date": "2026-06-03",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_UGA3camSvFP79e",
+   "invoice": "in_1TdkpSK6ZS1cqefuxq9rercd",
+   "date": "2026-06-02",
+   "desc": "1 \u00d7 Adapt Season - Gabriel Garcia (at $225.00 / month)",
+   "amount": 225.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "invoice": "in_1TdjzGK6ZS1cqefuhPJ8bgCR",
+   "date": "2026-06-02",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "invoice": "in_1TdeD3K6ZS1cqefu7Zi7ZNAC",
+   "date": "2026-06-01",
+   "desc": "1 \u00d7 Adapt Season - Teo Seto (at $250.00 / month)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_URQD58sYGObVzZ",
+   "invoice": "in_1TcgjQK6ZS1cqefuzRNTRRWb",
+   "date": "2026-05-30",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "invoice": "in_1TcRMkK6ZS1cqefur2DEsw6u",
+   "date": "2026-05-29",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "invoice": "in_1TbpU3K6ZS1cqefuHmItnuxh",
+   "date": "2026-05-27",
+   "desc": "1 \u00d7 Academy (Christopher) (at $199.00 / every 4 weeks)",
+   "amount": 199.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UFgrxWgAWLNv5t",
+   "invoice": "in_1TbUHqK6ZS1cqefuFgQ8cYwa",
+   "date": "2026-05-26",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "invoice": "in_1Tb3ZTK6ZS1cqefupPjVaudz",
+   "date": "2026-05-25",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "invoice": "in_1TajUCK6ZS1cqefuqpa9FEmV",
+   "date": "2026-05-24",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TunI4Opud87epQ",
+   "invoice": "in_1TVfrZK6ZS1cqefuDxA29Tf7",
+   "date": "2026-05-10",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TXEaUPNTJaHmFd",
+   "invoice": "in_1TUvqqK6ZS1cqefuQnWcn0rI",
+   "date": "2026-05-08",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "invoice": "in_1TU92TK6ZS1cqefuoWpLaKZI",
+   "date": "2026-05-06",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "invoice": "in_1TU7v3K6ZS1cqefufCJr1jQd",
+   "date": "2026-05-06",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_Tx2FCcFPC2FUVY",
+   "invoice": "in_1TTaDzK6ZS1cqefuHaT1AO4M",
+   "date": "2026-05-05",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "invoice": "in_1TT2DyK6ZS1cqefu02Prnbkc",
+   "date": "2026-05-03",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_URQD58sYGObVzZ",
+   "invoice": "in_1TSXNKK6ZS1cqefuk5x4PLvR",
+   "date": "2026-05-02",
+   "desc": "Setup Fee - Academy (2x/week) ",
+   "amount": 40.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_URQD58sYGObVzZ",
+   "invoice": "in_1TSXNKK6ZS1cqefuk5x4PLvR",
+   "date": "2026-05-02",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UGA3camSvFP79e",
+   "invoice": "in_1TSW3gK6ZS1cqefudWI3Ixr6",
+   "date": "2026-05-02",
+   "desc": "1 \u00d7 Adapt Season - Gabriel Garcia (at $225.00 / month)",
+   "amount": 225.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "invoice": "in_1TSVDJK6ZS1cqefupfReUAuN",
+   "date": "2026-05-02",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "invoice": "in_1TSPRtK6ZS1cqefuvxVJYlbN",
+   "date": "2026-05-01",
+   "desc": "1 \u00d7 Adapt Season - Teo Seto (at $250.00 / month)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "invoice": "in_1TRnroK6ZS1cqefuSxmrgF6X",
+   "date": "2026-04-30",
+   "desc": "1 \u00d7 Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "invoice": "in_1TRZ1yK6ZS1cqefu3T9yr6sl",
+   "date": "2026-04-29",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_UQG0iwsQNATykD",
+   "invoice": "in_1TRPUOK6ZS1cqefudsYaQPsr",
+   "date": "2026-04-29",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UFgrxWgAWLNv5t",
+   "invoice": "in_1TRKtHK6ZS1cqefuAoKNFC1h",
+   "date": "2026-04-28",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "invoice": "in_1TQux8K6ZS1cqefuIVsM7mBO",
+   "date": "2026-04-27",
+   "desc": "1 \u00d7 Academy (1x/week) (at $175.00 / every 4 weeks)",
+   "amount": 175.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "invoice": "in_1TQctfK6ZS1cqefue9jPMQHA",
+   "date": "2026-04-27",
+   "desc": "1 \u00d7 Elementary Academy (Keanu) (at $100.00 / month)",
+   "amount": 100.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "invoice": "in_1TQa8tK6ZS1cqefunQyRJpMb",
+   "date": "2026-04-26",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "invoice": "in_1TNnJfK6ZS1cqefu6zWKyEWU",
+   "date": "2026-04-19",
+   "desc": "1 \u00d7 Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U8rik0W2vwjcM2",
+   "invoice": "in_1TMWFlK6ZS1cqefuuNN2JpWb",
+   "date": "2026-04-15",
+   "desc": "1 \u00d7 Academy (Siblings) - Unlimited (at $450.00 / every 4 weeks)",
+   "amount": 450.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TunI4Opud87epQ",
+   "invoice": "in_1TKnYvK6ZS1cqefuIxlMlI5W",
+   "date": "2026-04-10",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_UIcrnRLiHLlqlg",
+   "invoice": "in_1TK1c7K6ZS1cqefuAhk2lmID",
+   "date": "2026-04-08",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "invoice": "in_1TJzfjK6ZS1cqefu2f68Giu6",
+   "date": "2026-04-08",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "invoice": "in_1TJyYaK6ZS1cqefuSqTvT0C9",
+   "date": "2026-04-08",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_U0mLnWYpg8973F",
+   "invoice": "in_1TJevHK6ZS1cqefu3X75Nvub",
+   "date": "2026-04-07",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "invoice": "in_1TJdtgK6ZS1cqefu9rRGFCy9",
+   "date": "2026-04-07",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "invoice": "in_1TI9uiK6ZS1cqefuSYmd7NgW",
+   "date": "2026-04-03",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "invoice": "in_1TI0AkK6ZS1cqefubIpMuPTn",
+   "date": "2026-04-03",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "invoice": "in_1THeWgK6ZS1cqefuPSU2eDoH",
+   "date": "2026-04-02",
+   "desc": "1 \u00d7 Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_UGA3camSvFP79e",
+   "invoice": "in_1THdjiK6ZS1cqefuQshAl9xm",
+   "date": "2026-04-02",
+   "desc": "1 \u00d7 Adapt Season - Gabriel Garcia (at $225.00 / month)",
+   "amount": 225.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "invoice": "in_1THcuNK6ZS1cqefuQqqgcyND",
+   "date": "2026-04-02",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "invoice": "in_1THX7WK6ZS1cqefucIm9sAI8",
+   "date": "2026-04-01",
+   "desc": "1 \u00d7 Adapt Season - Teo Seto (at $250.00 / month)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "invoice": "in_1THWllK6ZS1cqefuxwgxTVtS",
+   "date": "2026-04-01",
+   "desc": "1 \u00d7 Academy (Christopher) (at $199.00 / every 4 weeks)",
+   "amount": 199.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UFilnoKMh2bPbQ",
+   "invoice": "in_1THDJuK6ZS1cqefuOdEgLYgE",
+   "date": "2026-04-01",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_UFgrxWgAWLNv5t",
+   "invoice": "in_1THBU1K6ZS1cqefuy0XvH62H",
+   "date": "2026-03-31",
+   "desc": "Setup Fee - Academy (2x/week) ",
+   "amount": 40.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_UFgrxWgAWLNv5t",
+   "invoice": "in_1THBU1K6ZS1cqefuy0XvH62H",
+   "date": "2026-03-31",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "invoice": "in_1TGlbrK6ZS1cqefuO99zcfin",
+   "date": "2026-03-30",
+   "desc": "1 \u00d7 Academy (1x/week) (at $175.00 / every 4 weeks)",
+   "amount": 175.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TXEmy3alF6Mttc",
+   "invoice": "in_1TGXwxK6ZS1cqefuNx7y9QHb",
+   "date": "2026-03-30",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SkjI7l5fGRrnCo",
+   "invoice": "in_1TGXH4K6ZS1cqefu9voYawMI",
+   "date": "2026-03-30",
+   "desc": "1 \u00d7 Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "invoice": "in_1TGQmCK6ZS1cqefu8y40qGyr",
+   "date": "2026-03-29",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "invoice": "in_1TFO1mK6ZS1cqefuAuwoMvsK",
+   "date": "2026-03-27",
+   "desc": "1 \u00d7 Elementary Academy (Keanu) (at $100.00 / month)",
+   "amount": 100.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_U2fB1VQUgfSiW5",
+   "invoice": "in_1TEjCpK6ZS1cqefuoeM9pzYQ",
+   "date": "2026-03-25",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "invoice": "in_1TDdxDK6ZS1cqefu73i8pfZ0",
+   "date": "2026-03-22",
+   "desc": "1 \u00d7 Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U8rik0W2vwjcM2",
+   "invoice": "in_1TAZz8K6ZS1cqefuIDyKIx2T",
+   "date": "2026-03-13",
+   "desc": "1 \u00d7 Academy (Siblings) - Unlimited (at $450.00 / every 4 weeks)",
+   "amount": 450.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U8VENR5jm0ggoA",
+   "invoice": "in_1TAEEUK6ZS1cqefuYPsYcQxY",
+   "date": "2026-03-12",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "invoice": "in_1T9qKhK6ZS1cqefuJNfUrrcd",
+   "date": "2026-03-11",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "invoice": "in_1T9UWfK6ZS1cqefuAIDpoi4W",
+   "date": "2026-03-10",
+   "desc": "Setup Fee - Academy Unlimited",
+   "amount": 40.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "invoice": "in_1T9UWfK6ZS1cqefuAIDpoi4W",
+   "date": "2026-03-10",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "invoice": "in_1T8w14K6ZS1cqefukzxhTI9m",
+   "date": "2026-03-09",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U0mLnWYpg8973F",
+   "invoice": "in_1T8Q7VK6ZS1cqefuUWZOoFxT",
+   "date": "2026-03-07",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "invoice": "in_1T7VA3K6ZS1cqefudR63VWTC",
+   "date": "2026-03-05",
+   "desc": "1 \u00d7 Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "invoice": "in_1T7UcVK6ZS1cqefuwk1TeBPa",
+   "date": "2026-03-05",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "invoice": "in_1T6v77K6ZS1cqefuT1NumVPZ",
+   "date": "2026-03-03",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "invoice": "in_1T6lOTK6ZS1cqefuoTAkRMjI",
+   "date": "2026-03-03",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "invoice": "in_1T6cGOK6ZS1cqefuz7d9qAq7",
+   "date": "2026-03-02",
+   "desc": "1 \u00d7 Academy (1x/week) (at $175.00 / every 4 weeks)",
+   "amount": 175.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TunI4Opud87epQ",
+   "invoice": "in_1T6Y4JK6ZS1cqefuJPvP3E4p",
+   "date": "2026-03-02",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "invoice": "in_1T6O7ZK6ZS1cqefu0xQiQ7by",
+   "date": "2026-03-02",
+   "desc": "1 \u00d7 Adapt Academy Tuition (4 Payments) (at $500.00 / month)",
+   "amount": 500.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "invoice": "in_1T6HQjK6ZS1cqefu1scwKIua",
+   "date": "2026-03-01",
+   "desc": "Setup Fee - Academy (2x/week) ",
+   "amount": 40.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "invoice": "in_1T6HQjK6ZS1cqefu1scwKIua",
+   "date": "2026-03-01",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "invoice": "in_1T5WxgK6ZS1cqefuRWYX1YfU",
+   "date": "2026-02-27",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "invoice": "in_1T5EfwK6ZS1cqefukYMEpyTv",
+   "date": "2026-02-27",
+   "desc": "1 \u00d7 Elementary Academy (Keanu) (at $100.00 / month)",
+   "amount": 100.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_U3FkPhZE3zlPVi",
+   "invoice": "in_1T59EeK6ZS1cqefuaA5Vee1M",
+   "date": "2026-02-26",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U2fB1VQUgfSiW5",
+   "invoice": "in_1T4ZrHK6ZS1cqefueLKpE7QG",
+   "date": "2026-02-25",
+   "desc": "Setup Fee - Academy (2x/week) ",
+   "amount": 40.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_U2fB1VQUgfSiW5",
+   "invoice": "in_1T4ZrHK6ZS1cqefueLKpE7QG",
+   "date": "2026-02-25",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "invoice": "in_1T3MMkK6ZS1cqefuOZywjCmS",
+   "date": "2026-02-21",
+   "desc": "1 \u00d7 Academy (Christopher) (at $199.00 / every 4 weeks)",
+   "amount": 199.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TaCHrZorTMzfgU",
+   "invoice": "in_1T2F80K6ZS1cqefu1PIzRINu",
+   "date": "2026-02-18",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "invoice": "in_1T2F6eK6ZS1cqefuw01P9e7F",
+   "date": "2026-02-18",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "invoice": "in_1Szgz9K6ZS1cqefuHnVlRwZv",
+   "date": "2026-02-11",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_Tx2FCcFPC2FUVY",
+   "invoice": "in_1Sz8AcK6ZS1cqefumKSlTowy",
+   "date": "2026-02-10",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "invoice": "in_1SymhXK6ZS1cqefupPrxyVEp",
+   "date": "2026-02-09",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "invoice": "in_1SymgYK6ZS1cqefuj1NzKglF",
+   "date": "2026-02-09",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "invoice": "in_1SymflK6ZS1cqefuagFFrDOP",
+   "date": "2026-02-09",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "invoice": "in_1SxLGuK6ZS1cqefudGNwO5cG",
+   "date": "2026-02-05",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "invoice": "in_1SwSuUK6ZS1cqefuBnSnKmJ1",
+   "date": "2026-02-02",
+   "desc": "Setup Fee - Academy (1x/week) ",
+   "amount": 40.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "invoice": "in_1SwSuUK6ZS1cqefuBnSnKmJ1",
+   "date": "2026-02-02",
+   "desc": "1 \u00d7 Academy (1x/week) (at $175.00 / every 4 weeks)",
+   "amount": 175.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TjlJ49u30AKCmA",
+   "invoice": "in_1SwR9OK6ZS1cqefuUpjqHuUQ",
+   "date": "2026-02-02",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "invoice": "in_1SvNbaK6ZS1cqefuXva8FpTy",
+   "date": "2026-01-30",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "invoice": "in_1SvNL0K6ZS1cqefuUn2BWBBS",
+   "date": "2026-01-30",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TsBW0Y7pnjTadP",
+   "invoice": "in_1SuR9dK6ZS1cqefuAUB5pLCQ",
+   "date": "2026-01-28",
+   "desc": "Setup Fee - Academy (2x/week) ",
+   "amount": 40.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TsBW0Y7pnjTadP",
+   "invoice": "in_1SuR9dK6ZS1cqefuAUB5pLCQ",
+   "date": "2026-01-28",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "invoice": "in_1StztJK6ZS1cqefudWZDY17I",
+   "date": "2026-01-27",
+   "desc": "1 \u00d7 Elementary Academy (Keanu) (at $100.00 / month)",
+   "amount": 100.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "invoice": "in_1StCzyK6ZS1cqefuiCPxClBU",
+   "date": "2026-01-24",
+   "desc": "1 \u00d7 Academy (Christopher) (at $199.00 / every 4 weeks)",
+   "amount": 199.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TaCHrZorTMzfgU",
+   "invoice": "in_1Ss5kdK6ZS1cqefuCRZAwnFW",
+   "date": "2026-01-21",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "invoice": "in_1Ss5k6K6ZS1cqefui4t7rye5",
+   "date": "2026-01-21",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "invoice": "in_1SpXdVK6ZS1cqefuRuMVFMoG",
+   "date": "2026-01-14",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "invoice": "in_1SodLMK6ZS1cqefupM8YJqbR",
+   "date": "2026-01-12",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "invoice": "in_1SodLAK6ZS1cqefuYUjMI6Ae",
+   "date": "2026-01-12",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "invoice": "in_1SodKSK6ZS1cqefu2GPlJviV",
+   "date": "2026-01-12",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "invoice": "in_1SodK3K6ZS1cqefuwBQkSU8e",
+   "date": "2026-01-12",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "invoice": "in_1SodJiK6ZS1cqefugfn6QJ77",
+   "date": "2026-01-12",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TjlJ49u30AKCmA",
+   "invoice": "in_1SmHmxK6ZS1cqefuDCqduUog",
+   "date": "2026-01-05",
+   "desc": "Setup Fee - Academy (2x/week) ",
+   "amount": 40.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TjlJ49u30AKCmA",
+   "invoice": "in_1SmHmxK6ZS1cqefuDCqduUog",
+   "date": "2026-01-05",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "invoice": "in_1SlDwuK6ZS1cqefud60hhmDJ",
+   "date": "2026-01-02",
+   "desc": "Setup Fee - Academy Unlimited",
+   "amount": 40.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "invoice": "in_1SlDwuK6ZS1cqefud60hhmDJ",
+   "date": "2026-01-02",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TbwKdXzF1Zg1IT",
+   "invoice": "in_1SeiS1K6ZS1cqefu3JWYAJLA",
+   "date": "2025-12-15",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "invoice": "in_1SdmWtK6ZS1cqefuGATZRBLL",
+   "date": "2025-12-13",
+   "desc": "1 \u00d7 Elementary Academy (Keanu) (at $100.00 / month)",
+   "amount": 100.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TQQcpHvwDGmRH6",
+   "invoice": "in_1Sdj6ZK6ZS1cqefuoyareSkw",
+   "date": "2025-12-13",
+   "desc": "1 \u00d7 Elementary Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TaCHrZorTMzfgU",
+   "invoice": "in_1Sd1swK6ZS1cqefuWwqhY00Z",
+   "date": "2025-12-11",
+   "desc": "Setup Fee - Academy Unlimited",
+   "amount": 40.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TaCHrZorTMzfgU",
+   "invoice": "in_1Sd1swK6ZS1cqefuWwqhY00Z",
+   "date": "2025-12-11",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "invoice": "in_1ScxhFK6ZS1cqefu2TSztccs",
+   "date": "2025-12-11",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SuXlNaHUyq5A8r",
+   "invoice": "in_1ScwPFK6ZS1cqefuF239XTF3",
+   "date": "2025-12-10",
+   "desc": "1 \u00d7 Academy (1x/week) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "invoice": "in_1Sc9QFK6ZS1cqefu3Pc9NM1Z",
+   "date": "2025-12-08",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "invoice": "in_1SaOmHK6ZS1cqefuV8uOEhrc",
+   "date": "2025-12-03",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TXEmy3alF6Mttc",
+   "invoice": "in_1SaAJRK6ZS1cqefug29KxWRY",
+   "date": "2025-12-03",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TXEaUPNTJaHmFd",
+   "invoice": "in_1SaA7oK6ZS1cqefunBTM2HIG",
+   "date": "2025-12-03",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmAyPxtgxsfi61",
+   "invoice": "in_1Sa8ULK6ZS1cqefuI3EeRN7P",
+   "date": "2025-12-03",
+   "desc": "1 \u00d7 Elementary Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "invoice": "in_1SXzD2K6ZS1cqefufTmIaYbV",
+   "date": "2025-11-27",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "invoice": "in_1SXx74K6ZS1cqeful44qGY2y",
+   "date": "2025-11-27",
+   "desc": "1 \u00d7 Academy (2x/week) (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "invoice": "in_1SXqzOK6ZS1cqefuyzlknkOY",
+   "date": "2025-11-26",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "invoice": "in_1SXZPeK6ZS1cqefuza7nUrHA",
+   "date": "2025-11-26",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TQQcpHvwDGmRH6",
+   "invoice": "in_1STZkrK6ZS1cqefuPP6zLy4W",
+   "date": "2025-11-15",
+   "desc": "1 \u00d7 Elementary Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SuXlNaHUyq5A8r",
+   "invoice": "in_1SSn3ZK6ZS1cqefuQFAXVPly",
+   "date": "2025-11-12",
+   "desc": "1 \u00d7 Academy (1x/week) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "invoice": "in_1SS051K6ZS1cqefud4AVz7NT",
+   "date": "2025-11-10",
+   "desc": "1 \u00d7 Elementary Academy (Keanu) (at $100.00 / month)",
+   "amount": 100.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "invoice": "in_1SS049K6ZS1cqefuDG1kp7C4",
+   "date": "2025-11-10",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "invoice": "in_1SQFRaK6ZS1cqefu5jUxaoxB",
+   "date": "2025-11-05",
+   "desc": "1 \u00d7 Academy Unlimited (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "invoice": "in_1SQAFZK6ZS1cqefuRdnxB3gG",
+   "date": "2025-11-05",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmAyPxtgxsfi61",
+   "invoice": "in_1SPz88K6ZS1cqefuAKf62c7E",
+   "date": "2025-11-05",
+   "desc": "1 \u00d7 Elementary Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "invoice": "in_1SNprHK6ZS1cqefuxbVIsEA5",
+   "date": "2025-10-30",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "invoice": "in_1SNoFrK6ZS1cqefuiTjlcKXS",
+   "date": "2025-10-30",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "invoice": "in_1SNhcwK6ZS1cqefu1d0zHCzY",
+   "date": "2025-10-29",
+   "desc": "1 \u00d7 Academy Unlimited (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TK6RoVyJ9kM6Ka",
+   "invoice": "in_1SNSEpK6ZS1cqefuEXovVksK",
+   "date": "2025-10-29",
+   "desc": "1 \u00d7 Academy (2x/week) (at $599.00 / every 12 weeks)",
+   "amount": 599.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sz5op7xUCCcm9W",
+   "invoice": "in_1SNQQoK6ZS1cqefuhrFRiWu4",
+   "date": "2025-10-29",
+   "desc": "1 \u00d7 Elementary Academy (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "invoice": "in_1SNQ4HK6ZS1cqefuFLRzvBAw",
+   "date": "2025-10-29",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "invoice": "in_1SNHZHK6ZS1cqefuNBWyGzJ5",
+   "date": "2025-10-28",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "invoice": "in_1SJe1wK6ZS1cqefuy5BSsW39",
+   "date": "2025-10-18",
+   "desc": "1 \u00d7 Pre Season Academy (3 Months) (at $749.00 / every 12 weeks)",
+   "amount": 749.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_TER4bZAWDFbvoU",
+   "invoice": "in_1SHyBzK6ZS1cqefuyaFIS9Ic",
+   "date": "2025-10-14",
+   "desc": "1 \u00d7 Pre Season Academy (1x/week) - 1 Month (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "invoice": "in_1SG65PK6ZS1cqefu4utvxYZ9",
+   "date": "2025-10-08",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "invoice": "in_1SG0tVK6ZS1cqefuIXSXfpLP",
+   "date": "2025-10-08",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "invoice": "in_1SDgWLK6ZS1cqefuoeJtbFZN",
+   "date": "2025-10-02",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "invoice": "in_1SDeusK6ZS1cqefuInTJy5aq",
+   "date": "2025-10-02",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "invoice": "in_1SDeQEK6ZS1cqefufyK1uBNr",
+   "date": "2025-10-02",
+   "desc": "1 \u00d7 Pre Season Academy (1x/week) - 1 Month (at $250.00 / every 4 weeks)",
+   "amount": 250.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "invoice": "in_1SDbECK6ZS1cqefuGBoNX2H9",
+   "date": "2025-10-02",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "invoice": "in_1SDYICK6ZS1cqefuge874HZ5",
+   "date": "2025-10-01",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sz5op7xUCCcm9W",
+   "invoice": "in_1SDGynK6ZS1cqefuj6toJrcB",
+   "date": "2025-10-01",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "invoice": "in_1SDGiKK6ZS1cqefuQ5ZxqmFm",
+   "date": "2025-10-01",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "invoice": "in_1SDEwKK6ZS1cqefueoFKODED",
+   "date": "2025-10-01",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "invoice": "in_1SD9pYK6ZS1cqefuL1CZAm3L",
+   "date": "2025-09-30",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "invoice": "in_1SD8c2K6ZS1cqefuirkStOeB",
+   "date": "2025-09-30",
+   "desc": "1 \u00d7 Elementary Academy (Keanu) (at $100.00 / month)",
+   "amount": 100.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "invoice": "in_1SD8DoK6ZS1cqefu1YxfS7Um",
+   "date": "2025-09-30",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SuXlNaHUyq5A8r",
+   "invoice": "in_1S8UM8K6ZS1cqefuMX81b3km",
+   "date": "2025-09-17",
+   "desc": "1 \u00d7 Pre Season Academy (1x/week) - 1 Month (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmhYIERjqIt1pp",
+   "invoice": "in_1S5vVfK6ZS1cqefujpxxaAlp",
+   "date": "2025-09-10",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "invoice": "in_1S3XALK6ZS1cqefuN4bDDFTR",
+   "date": "2025-09-04",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "invoice": "in_1S3VYbK6ZS1cqefuSzu7NBSG",
+   "date": "2025-09-04",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "invoice": "in_1S3OwBK6ZS1cqefu1O5PxYMz",
+   "date": "2025-09-03",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmAyPxtgxsfi61",
+   "invoice": "in_1S3LBEK6ZS1cqefue6TZxNUa",
+   "date": "2025-09-03",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sz5op7xUCCcm9W",
+   "invoice": "in_1S37d6K6ZS1cqefuZsgJnhNK",
+   "date": "2025-09-03",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "invoice": "in_1S37MeK6ZS1cqefuI43m3QbR",
+   "date": "2025-09-03",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sz33WL8kkvvgJq",
+   "invoice": "in_1S34xKK6ZS1cqefutu3jspmB",
+   "date": "2025-09-03",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "invoice": "in_1S34iTK6ZS1cqefuZgaq5AKo",
+   "date": "2025-09-03",
+   "desc": "1 \u00d7 Pre Season Academy (1 Month) (at $300.00 / every 4 weeks)",
+   "amount": 300.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "invoice": "in_1S30TxK6ZS1cqefuIyct5J98",
+   "date": "2025-09-02",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "invoice": "in_1S2ys3K6ZS1cqefufKgpDAzk",
+   "date": "2025-09-02",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "invoice": "in_1S2xh6K6ZS1cqefuqPYHsJWy",
+   "date": "2025-09-02",
+   "desc": "1 \u00d7 Elementary Academy (1 month) (at $200.00 / every 4 weeks)",
+   "amount": 200.0,
+   "live_member": true
+  }
+ ],
+ "standalone_charges": [
+  {
+   "customer": "cus_UrxwIDi6ZBaufP",
+   "date": "2026-07-31",
+   "amount": 250.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UrxwIDi6ZBaufP",
+   "date": "2026-07-31",
+   "amount": 250.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2026-07-30",
+   "amount": 250.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sz5op7xUCCcm9W",
+   "date": "2026-07-30",
+   "amount": 250.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_Uw3D9789Cn5LRl",
+   "date": "2026-07-23",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UejXog6DwuLTRC",
+   "date": "2026-07-22",
+   "amount": 1150.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TxlUkBafLajI5F",
+   "date": "2026-07-21",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TXEaUPNTJaHmFd",
+   "date": "2026-07-21",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UQG0iwsQNATykD",
+   "date": "2026-07-21",
+   "amount": 250.0,
+   "desc": "Academy (2x/week) - 1 Month",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UvNAoE5D2UdzYP",
+   "date": "2026-07-21",
+   "amount": 350.0,
+   "desc": "Summer Bundle Camp ($350)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "date": "2026-07-20",
+   "amount": 175.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UrxwIDi6ZBaufP",
+   "date": "2026-07-12",
+   "amount": 250.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "date": "2026-07-11",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2026-07-10",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UgOGfXF7jOrBSE",
+   "date": "2026-07-09",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UqPlA7xISXOjBL",
+   "date": "2026-07-08",
+   "amount": 350.0,
+   "desc": "Summer Bundle Camp ($350)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UpbsXGE6ZpjQX4",
+   "date": "2026-07-05",
+   "amount": 749.0,
+   "desc": "Academy Unlimited",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UGA3camSvFP79e",
+   "date": "2026-07-02",
+   "amount": 225.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2026-07-02",
+   "amount": 200.0,
+   "desc": "Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "date": "2026-07-01",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UIcrnRLiHLlqlg",
+   "date": "2026-07-01",
+   "amount": 599.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UmZxgrt3OSqf7z",
+   "date": "2026-06-27",
+   "amount": 1399.0,
+   "desc": "Academy Unlimited",
+   "live_member": true
+  },
+  {
+   "customer": "cus_URQD58sYGObVzZ",
+   "date": "2026-06-27",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "date": "2026-06-25",
+   "amount": 500.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2026-06-24",
+   "amount": 199.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UFilnoKMh2bPbQ",
+   "date": "2026-06-24",
+   "amount": 599.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2026-06-23",
+   "amount": 500.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250) + Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "date": "2026-06-22",
+   "amount": 175.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UkgFYWNaGnzyMF",
+   "date": "2026-06-22",
+   "amount": 350.0,
+   "desc": "Summer Bundle Camp ($350)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "date": "2026-06-21",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UjeLJhAmSGKpWE",
+   "date": "2026-06-19",
+   "amount": 350.0,
+   "desc": "Summer Bundle Camp ($350)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Uj053QqfcFq50W",
+   "date": "2026-06-18",
+   "amount": 1399.0,
+   "desc": "Academy Unlimited",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TsBW0Y7pnjTadP",
+   "date": "2026-06-16",
+   "amount": 250.0,
+   "desc": "Academy (4 sessions) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TxlUkBafLajI5F",
+   "date": "2026-06-16",
+   "amount": 350.0,
+   "desc": "Summer Bundle Camp ($350)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Ui54B9AfWntX2T",
+   "date": "2026-06-15",
+   "amount": 599.0,
+   "desc": "Subscription creation",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "date": "2026-06-13",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2026-06-12",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UgOGfXF7jOrBSE",
+   "date": "2026-06-11",
+   "amount": 290.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TunI4Opud87epQ",
+   "date": "2026-06-10",
+   "amount": 361.55,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2026-06-10",
+   "amount": 200.0,
+   "desc": "Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "date": "2026-06-10",
+   "amount": 250.0,
+   "desc": "Adapt Season - Teo Seto",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2026-06-08",
+   "amount": 500.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UfPX6by8x44EJY",
+   "date": "2026-06-08",
+   "amount": 899.0,
+   "desc": "Summer Bundle Camp ($899)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UejXog6DwuLTRC",
+   "date": "2026-06-06",
+   "amount": 899.0,
+   "desc": "Summer Bundle Camp ($899)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UeV9rdCHgymt1p",
+   "date": "2026-06-06",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UePzhBtCcsPjxB",
+   "date": "2026-06-05",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UePhCOgOqsqHgA",
+   "date": "2026-06-05",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UePfJoADKdjqbN",
+   "date": "2026-06-05",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_URQD58sYGObVzZ",
+   "date": "2026-06-04",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UduK29txhgWCDW",
+   "date": "2026-06-04",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U8VENR5jm0ggoA",
+   "date": "2026-06-03",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UGA3camSvFP79e",
+   "date": "2026-06-02",
+   "amount": 225.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2026-06-02",
+   "amount": 500.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "date": "2026-06-01",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2026-05-30",
+   "amount": 250.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2026-05-30",
+   "amount": 250.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2026-05-28",
+   "amount": 200.0,
+   "desc": "Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2026-05-27",
+   "amount": 199.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UFgrxWgAWLNv5t",
+   "date": "2026-05-27",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "date": "2026-05-25",
+   "amount": 500.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "date": "2026-05-24",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2026-05-16",
+   "amount": 500.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250) + Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_URQD58sYGObVzZ",
+   "date": "2026-05-15",
+   "amount": 549.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($549)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TunI4Opud87epQ",
+   "date": "2026-05-10",
+   "amount": 500.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Tx2FCcFPC2FUVY",
+   "date": "2026-05-09",
+   "amount": 599.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TXEaUPNTJaHmFd",
+   "date": "2026-05-08",
+   "amount": 599.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2026-05-08",
+   "amount": 250.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2026-05-08",
+   "amount": 250.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TZ0ItlZzTtHLfs",
+   "date": "2026-05-08",
+   "amount": 500.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250) + Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TZ0ItlZzTtHLfs",
+   "date": "2026-05-08",
+   "amount": 500.0,
+   "desc": "Summer Bundle Camp (BAM/ADAPT Members) ($250) + Summer Bundle Camp (BAM/ADAPT Members) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2026-05-07",
+   "amount": 575.0,
+   "desc": "Blakely/Nathan Private Package ($575)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "date": "2026-05-06",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2026-05-06",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2026-05-03",
+   "amount": 500.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_URQD58sYGObVzZ",
+   "date": "2026-05-02",
+   "amount": 290.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UGA3camSvFP79e",
+   "date": "2026-05-02",
+   "amount": 225.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2026-05-02",
+   "amount": 500.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrAxgjYcom975i",
+   "date": "2026-05-01",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "date": "2026-05-01",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U8cWjBUXGgaTe9",
+   "date": "2026-04-30",
+   "amount": 600.0,
+   "desc": "8 Private Sessions - Silas Brizard ($600)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "date": "2026-04-29",
+   "amount": 500.0,
+   "desc": "Adapt Academy Tuition (4 Payments)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UQG0iwsQNATykD",
+   "date": "2026-04-29",
+   "amount": 599.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UFgrxWgAWLNv5t",
+   "date": "2026-04-29",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UQC7s1QydX30qX",
+   "date": "2026-04-29",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "date": "2026-04-27",
+   "amount": 175.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "date": "2026-04-27",
+   "amount": 100.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "date": "2026-04-26",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Ts5yBJRL6uKjLl",
+   "date": "2026-04-21",
+   "amount": 1150.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UN8gdd1jlTtLqU",
+   "date": "2026-04-20",
+   "amount": 1150.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2026-04-19",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_ULyEMLbxxLthk1",
+   "date": "2026-04-17",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_ULyEMLbxxLthk1",
+   "date": "2026-04-17",
+   "amount": 1150.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U8rik0W2vwjcM2",
+   "date": "2026-04-15",
+   "amount": 450.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TunI4Opud87epQ",
+   "date": "2026-04-10",
+   "amount": 500.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UIcrnRLiHLlqlg",
+   "date": "2026-04-08",
+   "amount": 599.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "date": "2026-04-08",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2026-04-08",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TZ0ItlZzTtHLfs",
+   "date": "2026-04-07",
+   "amount": 90.0,
+   "desc": "Drop In (1.5 Hours) ($90)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2026-04-07",
+   "amount": 500.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "date": "2026-04-07",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2026-04-04",
+   "amount": 90.0,
+   "desc": "Drop In (1.5 Hours) ($90)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TTNRhdi2ebr8YF",
+   "date": "2026-04-04",
+   "amount": 90.0,
+   "desc": "Drop In (1.5 Hours) ($90)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2026-04-04",
+   "amount": 575.0,
+   "desc": "Blakely/Nathan Private Package ($575)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "date": "2026-04-03",
+   "amount": 500.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2026-04-02",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2026-04-02",
+   "amount": 500.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_UGA3camSvFP79e",
+   "date": "2026-04-02",
+   "amount": 225.0,
+   "desc": "Adapt Season - Gabriel Garcia",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "date": "2026-04-01",
+   "amount": 250.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2026-04-01",
+   "amount": 199.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UFilnoKMh2bPbQ",
+   "date": "2026-04-01",
+   "amount": 599.0,
+   "desc": "Subscription creation",
+   "live_member": true
+  },
+  {
+   "customer": "cus_UFgrxWgAWLNv5t",
+   "date": "2026-03-31",
+   "amount": 290.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "date": "2026-03-30",
+   "amount": 175.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TXEmy3alF6Mttc",
+   "date": "2026-03-30",
+   "amount": 599.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SkjI7l5fGRrnCo",
+   "date": "2026-03-30",
+   "amount": 200.0,
+   "desc": "Academy",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "date": "2026-03-29",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "date": "2026-03-27",
+   "amount": 100.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TsBW0Y7pnjTadP",
+   "date": "2026-03-26",
+   "amount": 250.0,
+   "desc": "Academy (4 sessions) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U2fB1VQUgfSiW5",
+   "date": "2026-03-25",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sc9vmswtwpM6Zx",
+   "date": "2026-03-23",
+   "amount": 200.0,
+   "desc": "Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2026-03-22",
+   "amount": 200.0,
+   "desc": "Academy",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U6hiiXmUHsV2b4",
+   "date": "2026-03-21",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U9mshHsDm3zWzq",
+   "date": "2026-03-16",
+   "amount": 1800.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800) - Bryson Magto 12u",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U9FC3Y0Zf9j6oT",
+   "date": "2026-03-14",
+   "amount": 200.0,
+   "desc": "Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U9CFfW6MInQlD3",
+   "date": "2026-03-14",
+   "amount": 300.0,
+   "desc": "6 Group Sessions ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U8rik0W2vwjcM2",
+   "date": "2026-03-13",
+   "amount": 450.0,
+   "desc": "Academy (Siblings) - Unlimited",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U8cWjBUXGgaTe9",
+   "date": "2026-03-13",
+   "amount": 600.0,
+   "desc": "8 Private Sessions - Silas Brizard ($600)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U8VENR5jm0ggoA",
+   "date": "2026-03-12",
+   "amount": 599.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U6hiiXmUHsV2b4",
+   "date": "2026-03-12",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "date": "2026-03-11",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "date": "2026-03-10",
+   "amount": 340.0,
+   "desc": "Academy Unlimited",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U6hiiXmUHsV2b4",
+   "date": "2026-03-07",
+   "amount": 60.0,
+   "desc": "Drop-in Group Session ($60)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U0mLnWYpg8973F",
+   "date": "2026-03-07",
+   "amount": 500.0,
+   "desc": "Adapt Academy Tuition (4 Payments)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2026-03-05",
+   "amount": 575.0,
+   "desc": "Blakely/Nathan Private Package ($575)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmAkARwdcgwfg4",
+   "date": "2026-03-05",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2026-03-05",
+   "amount": 200.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlwJ8SPJ3YbybP",
+   "date": "2026-03-05",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHTpscLZbdNCI",
+   "date": "2026-03-05",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U5diub1RBjC6EN",
+   "date": "2026-03-05",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U5XEnrx8JwrvP8",
+   "date": "2026-03-04",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U02XdYKvGv36JP",
+   "date": "2026-03-04",
+   "amount": 200.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2026-03-04",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U1PEUd7ua0ZW98",
+   "date": "2026-03-04",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U0pbDNpopsuTDR",
+   "date": "2026-03-04",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U0pbDNpopsuTDR",
+   "date": "2026-03-04",
+   "amount": 1800.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U57FlGXuvaxfTk",
+   "date": "2026-03-03",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "date": "2026-03-03",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2026-03-03",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2026-03-03",
+   "amount": 500.0,
+   "desc": "Adapt Academy Tuition (4 Payments)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwUJvzMQ0gH4Ar",
+   "date": "2026-03-03",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwUJvzMQ0gH4Ar",
+   "date": "2026-03-03",
+   "amount": 1800.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Tztj62AFnv6gKt",
+   "date": "2026-03-03",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Tztj62AFnv6gKt",
+   "date": "2026-03-03",
+   "amount": 1800.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "date": "2026-03-03",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "date": "2026-03-03",
+   "amount": 500.0,
+   "desc": "Adapt Academy Tuition (4 Payments)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2026-03-03",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2026-03-03",
+   "amount": 1800.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2026-03-03",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2026-03-03",
+   "amount": 1800.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "date": "2026-03-02",
+   "amount": 175.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TunI4Opud87epQ",
+   "date": "2026-03-02",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TunI4Opud87epQ",
+   "date": "2026-03-02",
+   "amount": 500.0,
+   "desc": "Adapt Academy Tuition (4 Payments)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4Zpo3KwAekDpi",
+   "date": "2026-03-02",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4Zpo3KwAekDpi",
+   "date": "2026-03-02",
+   "amount": 1000.0,
+   "desc": "AAU Season ($1000)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4YFG0WUujIfW6",
+   "date": "2026-03-02",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2026-03-02",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2026-03-02",
+   "amount": 500.0,
+   "desc": "Adapt Academy Tuition (4 Payments)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U1idn8tXZiH2Vt",
+   "date": "2026-03-02",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U1idn8tXZiH2Vt",
+   "date": "2026-03-02",
+   "amount": 1800.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TjlJ49u30AKCmA",
+   "date": "2026-03-02",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TjlJ49u30AKCmA",
+   "date": "2026-03-02",
+   "amount": 1800.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2026-03-02",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TbwKdXzF1Zg1IT",
+   "date": "2026-03-02",
+   "amount": 250.0,
+   "desc": "Adapt Academy Jersey/Merchandise ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TbwKdXzF1Zg1IT",
+   "date": "2026-03-02",
+   "amount": 1000.0,
+   "desc": "Liam - AAU Season ($1000)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2026-03-02",
+   "amount": 1800.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U1PEUd7ua0ZW98",
+   "date": "2026-03-02",
+   "amount": 1800.0,
+   "desc": "Adapt Academy Tuition (1 Payment) ($1800)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U4QHIjjgs8N7kW",
+   "date": "2026-03-01",
+   "amount": 290.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U46MsFIkamkTHl",
+   "date": "2026-03-01",
+   "amount": 30.0,
+   "desc": "Trial Training ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U41lBC19GYnmAU",
+   "date": "2026-02-28",
+   "amount": 30.0,
+   "desc": "Trial Training ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U419C7hZ0tAIIQ",
+   "date": "2026-02-28",
+   "amount": 30.0,
+   "desc": "Trial Training ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U40Vez7qmLHsNX",
+   "date": "2026-02-28",
+   "amount": 30.0,
+   "desc": "Trial Training ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "date": "2026-02-27",
+   "amount": 100.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_U3FkPhZE3zlPVi",
+   "date": "2026-02-26",
+   "amount": 599.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmhYIERjqIt1pp",
+   "date": "2026-02-26",
+   "amount": 200.0,
+   "desc": "Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U2zWE8X0VOjVPC",
+   "date": "2026-02-26",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U2fB1VQUgfSiW5",
+   "date": "2026-02-25",
+   "amount": 290.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2026-02-22",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U1idn8tXZiH2Vt",
+   "date": "2026-02-22",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U1ZCccqcDsy47D",
+   "date": "2026-02-22",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2026-02-21",
+   "amount": 199.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2026-02-21",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U1PEUd7ua0ZW98",
+   "date": "2026-02-21",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U0pbDNpopsuTDR",
+   "date": "2026-02-20",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U0mLnWYpg8973F",
+   "date": "2026-02-20",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TsBW0Y7pnjTadP",
+   "date": "2026-02-19",
+   "amount": 250.0,
+   "desc": "Academy (4 sessions) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2026-02-18",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TaCHrZorTMzfgU",
+   "date": "2026-02-18",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_U02XdYKvGv36JP",
+   "date": "2026-02-18",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TzykUjutQwS9YM",
+   "date": "2026-02-18",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "date": "2026-02-17",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Tztj62AFnv6gKt",
+   "date": "2026-02-17",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TxlUkBafLajI5F",
+   "date": "2026-02-12",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "date": "2026-02-11",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_Tx2FCcFPC2FUVY",
+   "date": "2026-02-10",
+   "amount": 599.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2026-02-09",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2026-02-09",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2026-02-09",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sc9vmswtwpM6Zx",
+   "date": "2026-02-08",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2026-02-08",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwUJvzMQ0gH4Ar",
+   "date": "2026-02-08",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJdZUv0HAkxJX",
+   "date": "2026-02-08",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TwJPVNeYLlQQQW",
+   "date": "2026-02-08",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TgyZu1SKFJHw4x",
+   "date": "2026-02-08",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2026-02-08",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2026-02-05",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "date": "2026-02-05",
+   "amount": 150.0,
+   "desc": "Academy - Teo Seto ($150)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TunI4Opud87epQ",
+   "date": "2026-02-04",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2026-02-03",
+   "amount": 300.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sz33WL8kkvvgJq",
+   "date": "2026-02-03",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TuHTKd0tdpyBO4",
+   "date": "2026-02-02",
+   "amount": 215.0,
+   "desc": "Academy (1x/week) ",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TjlJ49u30AKCmA",
+   "date": "2026-02-02",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2026-02-02",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2026-02-01",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2026-01-30",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2026-01-30",
+   "amount": 575.0,
+   "desc": "Blakely/Nathan Private Package ($575)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TsBW0Y7pnjTadP",
+   "date": "2026-01-28",
+   "amount": 290.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Ts5yBJRL6uKjLl",
+   "date": "2026-01-27",
+   "amount": 30.0,
+   "desc": "Adapt Academy Tryouts ($30)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "date": "2026-01-27",
+   "amount": 100.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2026-01-24",
+   "amount": 199.0,
+   "desc": "Academy (Christopher)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TaCHrZorTMzfgU",
+   "date": "2026-01-21",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2026-01-21",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2026-01-17",
+   "amount": 200.0,
+   "desc": "Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sc9vmswtwpM6Zx",
+   "date": "2026-01-17",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "date": "2026-01-14",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2026-01-12",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2026-01-12",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "date": "2026-01-12",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2026-01-12",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2026-01-06",
+   "amount": 200.0,
+   "desc": "Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TjlJ49u30AKCmA",
+   "date": "2026-01-05",
+   "amount": 290.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2026-01-03",
+   "amount": 160.0,
+   "desc": "Private Training ($160)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TZ0ItlZzTtHLfs",
+   "date": "2026-01-03",
+   "amount": 160.0,
+   "desc": "Private Training ($160)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2026-01-02",
+   "amount": 300.0,
+   "desc": "Academy Unlimited",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sz5op7xUCCcm9W",
+   "date": "2025-12-31",
+   "amount": 90.0,
+   "desc": "New Years Camp ($275)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TgyZu1SKFJHw4x",
+   "date": "2025-12-29",
+   "amount": 225.0,
+   "desc": "New Years Camp ($275)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "date": "2025-12-27",
+   "amount": 225.0,
+   "desc": "New Years Camp ($275)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2025-12-22",
+   "amount": 275.0,
+   "desc": "New Years Camp ($275)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2025-12-20",
+   "amount": 275.0,
+   "desc": "New Years Camp ($275)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2025-12-18",
+   "amount": 200.0,
+   "desc": "Pre Season Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2025-12-17",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2025-12-16",
+   "amount": 225.0,
+   "desc": "New Years Camp ($275)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TbwKdXzF1Zg1IT",
+   "date": "2025-12-15",
+   "amount": 599.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TbcplD2UqsK5ho",
+   "date": "2025-12-15",
+   "amount": 275.0,
+   "desc": "New Years Camp ($275)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TTNRhdi2ebr8YF",
+   "date": "2025-12-14",
+   "amount": 60.0,
+   "desc": "Drop-in Group Session ($60)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2025-12-14",
+   "amount": 90.0,
+   "desc": "New Years Camp ($275)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2025-12-14",
+   "amount": 575.0,
+   "desc": "Blakely/Nathan Private Package ($575)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "date": "2025-12-13",
+   "amount": 100.0,
+   "desc": "Elementary Academy (Keanu)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TQQcpHvwDGmRH6",
+   "date": "2025-12-13",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TaCHrZorTMzfgU",
+   "date": "2025-12-11",
+   "amount": 340.0,
+   "desc": "Academy Unlimited",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2025-12-11",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SuXlNaHUyq5A8r",
+   "date": "2025-12-11",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2025-12-08",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TZ2r8QQX8X7Qvo",
+   "date": "2025-12-08",
+   "amount": 400.0,
+   "desc": "Small Group Training (8 Sessions) ($400)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TZ0ItlZzTtHLfs",
+   "date": "2025-12-08",
+   "amount": 400.0,
+   "desc": "Small Group Training (8 Sessions) ($400)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2025-12-07",
+   "amount": 360.0,
+   "desc": "Small Group Training (8 Sessions) ($400)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlwJ8SPJ3YbybP",
+   "date": "2025-12-04",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "date": "2025-12-03",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TXEmy3alF6Mttc",
+   "date": "2025-12-03",
+   "amount": 599.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TXEaUPNTJaHmFd",
+   "date": "2025-12-03",
+   "amount": 599.0,
+   "desc": "Subscription creation",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2025-12-03",
+   "amount": 150.0,
+   "desc": "Academy (4 Sessions) ($150)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TWnoOn86BUvBQS",
+   "date": "2025-12-02",
+   "amount": 250.0,
+   "desc": "Academy (4 sessions) ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2025-11-27",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2025-11-27",
+   "amount": 250.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "date": "2025-11-26",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2025-11-26",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TUL1W5WXkbT5ZI",
+   "date": "2025-11-25",
+   "amount": 250.0,
+   "desc": "Thanksgiving Camp ($250)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "date": "2025-11-24",
+   "amount": 225.0,
+   "desc": "Thanksgiving Camp (Academy Member) ($225)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2025-11-23",
+   "amount": 225.0,
+   "desc": "Thanksgiving Camp (Academy Member) ($225)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TTNRhdi2ebr8YF",
+   "date": "2025-11-22",
+   "amount": 60.0,
+   "desc": "Drop-in Group Session ($60)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2025-11-22",
+   "amount": 300.0,
+   "desc": "Thanksgiving Camp ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TStLAs4OZroLh6",
+   "date": "2025-11-21",
+   "amount": 200.0,
+   "desc": "Thanksgiving Camp ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sc9vmswtwpM6Zx",
+   "date": "2025-11-19",
+   "amount": 225.0,
+   "desc": "Thanksgiving Camp (Academy Member) ($225)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TRoRgrYQvN44TU",
+   "date": "2025-11-18",
+   "amount": 175.0,
+   "desc": "Thanksgiving Camp (1 Day) ($175)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "date": "2025-11-15",
+   "amount": 150.0,
+   "desc": "Academy - Teo Seto ($150)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlwJ8SPJ3YbybP",
+   "date": "2025-11-15",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TQQcpHvwDGmRH6",
+   "date": "2025-11-15",
+   "amount": 200.0,
+   "desc": "Elementary Academy",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2025-11-13",
+   "amount": 225.0,
+   "desc": "Thanksgiving Camp (Academy Member) ($225)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SuXlNaHUyq5A8r",
+   "date": "2025-11-13",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2025-11-12",
+   "amount": 225.0,
+   "desc": "Thanksgiving Camp (Academy Member) ($225)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "date": "2025-11-10",
+   "amount": 100.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2025-11-10",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2025-11-06",
+   "amount": 550.0,
+   "desc": "Thanksgiving Camp (Sibling Discount) ($550)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2025-11-06",
+   "amount": 200.0,
+   "desc": "Pre Season Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "date": "2025-11-05",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2025-11-05",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmAyPxtgxsfi61",
+   "date": "2025-11-05",
+   "amount": 200.0,
+   "desc": "Elementary Academy",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TMaSTiXIH5YQWC",
+   "date": "2025-11-04",
+   "amount": 700.0,
+   "desc": "10 Sessions (Sibling Discount) ($700)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TMAJ0dgpdV8an8",
+   "date": "2025-11-03",
+   "amount": 300.0,
+   "desc": "Thanksgiving Camp ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2025-10-30",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2025-10-30",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "date": "2025-10-29",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TK6RoVyJ9kM6Ka",
+   "date": "2025-10-29",
+   "amount": 599.0,
+   "desc": "Academy (2x/week) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2025-10-29",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sz5op7xUCCcm9W",
+   "date": "2025-10-29",
+   "amount": 200.0,
+   "desc": "Elementary Academy",
+   "live_member": true
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2025-10-28",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2025-10-25",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2025-10-24",
+   "amount": 600.0,
+   "desc": "Blakely/Nathan Private Package ($600)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2025-10-18",
+   "amount": 749.0,
+   "desc": "Pre Season Academy (3 Months)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2025-10-18",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFrkH5eBJc4IP1",
+   "date": "2025-10-17",
+   "amount": 150.0,
+   "desc": "Academy - Teo Seto ($150)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TFmAmOqFhFRbV0",
+   "date": "2025-10-17",
+   "amount": 60.0,
+   "desc": "Drop-in Group Session ($60)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmAyPxtgxsfi61",
+   "date": "2025-10-15",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TER4bZAWDFbvoU",
+   "date": "2025-10-14",
+   "amount": 250.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_ScHcFXTrOjGRWS",
+   "date": "2025-10-09",
+   "amount": 50.0,
+   "desc": "Pre-Season Camp ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "date": "2025-10-08",
+   "amount": 50.0,
+   "desc": "Pre-Season Camp ($100)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_TCV5AgubU47YnE",
+   "date": "2025-10-08",
+   "amount": 300.0,
+   "desc": "Pre Season Academy (1 Month) ",
+   "live_member": true
+  },
+  {
+   "customer": "cus_ScSI8hutBIafpq",
+   "date": "2025-10-08",
+   "amount": 50.0,
+   "desc": "Pre-Season Camp ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2025-10-08",
+   "amount": 50.0,
+   "desc": "Pre-Season Camp ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2025-10-08",
+   "amount": 200.0,
+   "desc": "Elementary Academy (1 month)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "date": "2025-10-08",
+   "amount": 50.0,
+   "desc": "Pre-Season Camp ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2025-10-06",
+   "amount": 100.0,
+   "desc": "Pre-Season Camp ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2025-10-04",
+   "amount": 50.0,
+   "desc": "Pre-Season Camp ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2025-10-03",
+   "amount": 50.0,
+   "desc": "Pre-Season Camp ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2025-10-02",
+   "amount": 100.0,
+   "desc": "Pre-Season Camp ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2025-10-02",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2025-10-02",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2025-10-02",
+   "amount": 250.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "date": "2025-10-01",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sz5op7xUCCcm9W",
+   "date": "2025-10-01",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2025-10-01",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "date": "2025-10-01",
+   "amount": 300.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2025-09-30",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2025-09-30",
+   "amount": 200.0,
+   "desc": "Subscription update",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "date": "2025-09-30",
+   "amount": 100.0,
+   "desc": "Elementary Academy (Keanu)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_T4djOZGbNkBdbr",
+   "date": "2025-09-20",
+   "amount": 60.0,
+   "desc": "Drop-in Group Session ($60)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmAkARwdcgwfg4",
+   "date": "2025-09-20",
+   "amount": 60.0,
+   "desc": "Drop-in Group Session ($60)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SkjI7l5fGRrnCo",
+   "date": "2025-09-18",
+   "amount": 200.0,
+   "desc": "Pre Season Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_T4djOZGbNkBdbr",
+   "date": "2025-09-17",
+   "amount": 50.0,
+   "desc": "Drop-in Group Session ($50)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SuXlNaHUyq5A8r",
+   "date": "2025-09-17",
+   "amount": 200.0,
+   "desc": "Subscription creation",
+   "live_member": true
+  },
+  {
+   "customer": "cus_T4WaKYjaIurpqG",
+   "date": "2025-09-17",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmAkARwdcgwfg4",
+   "date": "2025-09-16",
+   "amount": 50.0,
+   "desc": "Drop-in Group Session ($50)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmhYIERjqIt1pp",
+   "date": "2025-09-10",
+   "amount": 200.0,
+   "desc": "Pre Season Academy (1 Month) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sc9vmswtwpM6Zx",
+   "date": "2025-09-09",
+   "amount": 200.0,
+   "desc": "Pre Season Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2025-09-08",
+   "amount": 600.0,
+   "desc": "Blakely/Nathan Private Package ($600)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrAxgjYcom975i",
+   "date": "2025-09-06",
+   "amount": 200.0,
+   "desc": "Pre Season Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Szr9msVCk2rI6O",
+   "date": "2025-09-05",
+   "amount": 60.0,
+   "desc": "Drop-in Group Session ($60)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "date": "2025-09-04",
+   "amount": 200.0,
+   "desc": "Pre Season Academy ($200)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2025-09-04",
+   "amount": 300.0,
+   "desc": "Pre Season Academy (1 Month) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2025-09-04",
+   "amount": 200.0,
+   "desc": "Pre Season Academy (1 Month) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SzUTunvZTdvb6O",
+   "date": "2025-09-04",
+   "amount": 50.0,
+   "desc": "Drop-in Group Session ($50)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "date": "2025-09-03",
+   "amount": 300.0,
+   "desc": "Pre Season Academy (1 Month) ",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmAyPxtgxsfi61",
+   "date": "2025-09-03",
+   "amount": 200.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2025-09-03",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_Sz5op7xUCCcm9W",
+   "date": "2025-09-03",
+   "amount": 200.0,
+   "desc": "Subscription creation",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2025-09-03",
+   "amount": 200.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sz33WL8kkvvgJq",
+   "date": "2025-09-03",
+   "amount": 200.0,
+   "desc": "Elementary Academy (1 month)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "date": "2025-09-03",
+   "amount": 300.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyyQBlAj4GSlVc",
+   "date": "2025-09-02",
+   "amount": 200.0,
+   "desc": "Subscription creation",
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2025-09-02",
+   "amount": 200.0,
+   "desc": "Elementary Academy (1 month)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SyvYSDjPuRM79q",
+   "date": "2025-09-02",
+   "amount": 100.0,
+   "desc": "Subscription creation",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2025-08-27",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_Sc9vmswtwpM6Zx",
+   "date": "2025-08-23",
+   "amount": 60.0,
+   "desc": "Drop-in Group Session ($60)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SuXlNaHUyq5A8r",
+   "date": "2025-08-22",
+   "amount": 200.0,
+   "desc": "Academy ($300)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SmAkARwdcgwfg4",
+   "date": "2025-08-16",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrdCT6AzHkpMnf",
+   "date": "2025-08-14",
+   "amount": 200.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmhYIERjqIt1pp",
+   "date": "2025-08-14",
+   "amount": 200.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2025-08-14",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrXO89C5nWkdRD",
+   "date": "2025-08-13",
+   "amount": 200.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrDiRd10sS515i",
+   "date": "2025-08-13",
+   "amount": 60.0,
+   "desc": "Drop-in Group Session ($60)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2025-08-13",
+   "amount": 300.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SrAxgjYcom975i",
+   "date": "2025-08-13",
+   "amount": 200.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2025-08-12",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbPDpc3k8zvydG",
+   "date": "2025-08-12",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlwJ8SPJ3YbybP",
+   "date": "2025-08-12",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmMsdUJFXq0T5H",
+   "date": "2025-08-06",
+   "amount": 200.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmAyPxtgxsfi61",
+   "date": "2025-08-06",
+   "amount": 200.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_So4zfIMSHmPecC",
+   "date": "2025-08-04",
+   "amount": 100.0,
+   "desc": "Drop-in Group Session (2 hours) ($100)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2025-08-04",
+   "amount": 200.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SnNUi7mLyyvqfR",
+   "date": "2025-08-02",
+   "amount": 200.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SnHgu0RHRqOcbw",
+   "date": "2025-08-02",
+   "amount": 60.0,
+   "desc": "Drop-in Group Session ($60)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sn4FR2RSx7gh2T",
+   "date": "2025-08-02",
+   "amount": 300.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmhYIERjqIt1pp",
+   "date": "2025-08-01",
+   "amount": 100.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmMsdUJFXq0T5H",
+   "date": "2025-07-31",
+   "amount": 50.0,
+   "desc": "Drop-in Group Session ($50)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbPDpc3k8zvydG",
+   "date": "2025-07-30",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmGLGVMOh2gEr1",
+   "date": "2025-07-30",
+   "amount": 50.0,
+   "desc": "Drop-in Group Session ($50)",
+   "live_member": true
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2025-07-30",
+   "amount": 50.0,
+   "desc": "Drop-in Group Session ($50)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmAyPxtgxsfi61",
+   "date": "2025-07-30",
+   "amount": 199.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmAwChzTMGYG19",
+   "date": "2025-07-30",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmAwChzTMGYG19",
+   "date": "2025-07-30",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SmAkARwdcgwfg4",
+   "date": "2025-07-30",
+   "amount": 199.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlwJ8SPJ3YbybP",
+   "date": "2025-07-30",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sc9vmswtwpM6Zx",
+   "date": "2025-07-29",
+   "amount": 100.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sls39mKcdC00pU",
+   "date": "2025-07-29",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SleT5Ibm1PhP7P",
+   "date": "2025-07-29",
+   "amount": 199.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZyaaGMnWEG0v",
+   "date": "2025-07-29",
+   "amount": 199.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbKvnJv6sbFBvN",
+   "date": "2025-07-29",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlZB3PyUHjSbvX",
+   "date": "2025-07-29",
+   "amount": 199.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlU5hdboypjYpe",
+   "date": "2025-07-28",
+   "amount": 75.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2025-07-28",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlRveptfTlRzAi",
+   "date": "2025-07-28",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SlQUEQDKIT9JM4",
+   "date": "2025-07-28",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SkjI7l5fGRrnCo",
+   "date": "2025-07-26",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Skf5HpMIbXmuee",
+   "date": "2025-07-26",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "date": "2025-07-22",
+   "amount": 150.0,
+   "desc": "Summer Camp ($199)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se3Ke0aVbYhZjP",
+   "date": "2025-07-08",
+   "amount": 300.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Se1Rzkd4TNimOV",
+   "date": "2025-07-08",
+   "amount": 200.0,
+   "desc": "Academy ($300)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_ScSI8hutBIafpq",
+   "date": "2025-07-04",
+   "amount": 75.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_ScQ95WWwPe5Pns",
+   "date": "2025-07-04",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_ScHcFXTrOjGRWS",
+   "date": "2025-07-04",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sc9vmswtwpM6Zx",
+   "date": "2025-07-03",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sc7oTQhtEUcwDj",
+   "date": "2025-07-03",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbPDpc3k8zvydG",
+   "date": "2025-07-01",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbKGs0UtJqsMww",
+   "date": "2025-07-01",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbLGGO57td0frP",
+   "date": "2025-07-01",
+   "amount": 75.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbKvnJv6sbFBvN",
+   "date": "2025-07-01",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHfZfNzmhS6CG",
+   "date": "2025-07-01",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbHTpscLZbdNCI",
+   "date": "2025-07-01",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_SbAO9tggvfCKsR",
+   "date": "2025-07-01",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sb8QIQy6K2jSEy",
+   "date": "2025-07-01",
+   "amount": 75.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  },
+  {
+   "customer": "cus_Sb6aMaOiIieExf",
+   "date": "2025-07-01",
+   "amount": 50.0,
+   "desc": "4th of July Summer Camp ($75)",
+   "live_member": false
+  }
+ ],
+ "VERDICT": {
+  "setup_fee_exists": true,
+  "amount": 40.0,
+  "name_pattern": "Setup Fee - <plan name>",
+  "occurrences_paid": 11,
+  "waived_via_NOSETUP_coupon_or_credit": 3,
+  "last_seen": "2026-06-11",
+  "applies_to": "first invoice of a new Academy subscription (invoice line item, never a standalone charge)",
+  "caveat_first_pass_list_is_noisy": "one_time_invoice_lines includes first-cycle plan lines GHL bills as invoiceitems - use the explicit fee scan, not that list",
+  "also_found_standalone_products": "Summer Bundle Camp $250-350, Adapt Academy Tryouts $30 - one-time CHARGES outside billing, relevant to price match as non-subscription products"
+ }
+}

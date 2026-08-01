@@ -11,6 +11,7 @@ import {
   intervalFor,
   isTestMode,
   piSecretFromSub,
+  publishableFor,
   stripeFetch,
   type StripeFetchOptions,
 } from "./_stripe.js";
@@ -244,6 +245,11 @@ async function handler(req: ParentApiRequest, res: ParentApiResponse) {
       term,
     });
 
+    // Per-transport fact from the resolver: a direct academy's parents must
+    // mount Stripe.js with the key that matches this client secret. A resolver
+    // hiccup must not 500 a checkout whose subscription already exists - fall
+    // back to the Connect answer this site always returned.
+    const pub = await publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }));
     return res.status(200).json({
       ok: true,
       amount_cents: price.amount_cents,
@@ -251,8 +257,8 @@ async function handler(req: ParentApiRequest, res: ParentApiResponse) {
       currency: price.currency || "cad",
       customer_id: customerId,
       member_id: member.id,
-      publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
-      stripe_account: stripeAccount,
+      publishable_key: pub.publishable_key,
+      stripe_account: pub.stripe_account,
       subscription_id: subscriptionId,
     });
   } catch (error) {
@@ -382,6 +388,8 @@ async function maybeReuseExistingSubscription({
     const clientSecret = piSecretFromSub(sub);
     if (!clientSecret) return null;
 
+    // Same per-transport fact + Connect fallback as the fresh-checkout return.
+    const pub = await publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }));
     return {
       ok: true,
       amount_cents: price.amount_cents,
@@ -389,9 +397,9 @@ async function maybeReuseExistingSubscription({
       currency: price.currency || "cad",
       customer_id: stripeCustomerId(sub.customer) || member.stripe_customer_id,
       member_id: member.id,
-      publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
+      publishable_key: pub.publishable_key,
       reused: true,
-      stripe_account: stripeAccount,
+      stripe_account: pub.stripe_account,
       subscription_id: sub.id || member.stripe_subscription_id,
     };
   }

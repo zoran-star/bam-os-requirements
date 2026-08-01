@@ -26,10 +26,10 @@ import { withSentryApiRoute } from "../_sentry.js";
 // the same active+paid+portal-owned checks).
 
 import { activatePortalOnboardingMember, isPortalOwnedOrigin } from "./webhook.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const STRIPE_API = "https://api.stripe.com/v1";
 
 // How far back to look for stuck signups. Comfortably covers any realistic
 // webhook-delivery gap without scanning ancient abandoned rows.
@@ -50,13 +50,13 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// Routed through api/_stripe-transport.js: a Connect academy's account id
+// resolves to the platform key + Stripe-Account header (identical to the old
+// inline fetch); a direct-key academy's account id reverse-resolves to its own
+// key. Same signature as before, so activatePortalOnboardingMember and the
+// webhook keep sharing one activation path.
 async function stripeFetch(path, stripeAccount) {
-  const stripeSecret = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
-  const headers = { Authorization: `Bearer ${stripeSecret}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const res = await fetch(`${STRIPE_API}${path}`, { headers });
-  if (!res.ok) throw new Error(`Stripe ${res.status}: ${await res.text()}`);
-  return res.json();
+  return transportStripeFetch(path, { stripeAccount });
 }
 
 // A subscription counts as genuinely paid + activatable when it is active/trialing
@@ -67,14 +67,19 @@ async function reconcileOne(member, accountCache) {
   const subId = member.stripe_subscription_id;
   if (!subId) return { member_id: member.id, skipped: "no stripe_subscription_id" };
 
-  // Resolve the academy's connected Stripe account (cached per client).
+  // Resolve the academy's Stripe account (cached per client). EITHER transport
+  // carries one: Connect academies from OAuth, direct-key academies from the
+  // key save (direct-key.js stamps stripe_connect_account_id too). The account
+  // id is all the resolver needs to route - Connect gets the platform key +
+  // header, direct gets the academy's own key. Only an academy with no Stripe
+  // at all is skipped.
   let account = accountCache.get(member.client_id);
   if (account === undefined) {
     const rows = await sb(`clients?id=eq.${member.client_id}&select=stripe_connect_account_id&limit=1`).catch(() => null);
     account = (Array.isArray(rows) && rows[0] && rows[0].stripe_connect_account_id) || null;
     accountCache.set(member.client_id, account);
   }
-  if (!account) return { member_id: member.id, skipped: "academy has no stripe_connect_account_id" };
+  if (!account) return { member_id: member.id, skipped: "no stripe transport" };
 
   let sub;
   try {

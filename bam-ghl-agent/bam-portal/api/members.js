@@ -29,6 +29,7 @@ import { buildCancellationSnapshot, stripeLifetimeSpend } from "./_runtime/cance
 import { smsProvider } from "./messaging/provider.js";
 import { emailProvider } from "./messaging/email-provider.js";
 import { readStripeAccount } from "./stripe/_requirements.js";
+import { stripeFetch as transportStripeFetch } from "./_stripe-transport.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -151,39 +152,11 @@ async function resolveUser(req) {
 // ─────────────────────────────────────────────────────────
 
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
-  // Platform key — required for connected-account writes (Stripe-Account header).
-  // Falls back to STRIPE_SECRET_KEY if STRIPE_CONNECT_SECRET_KEY isn't set.
-  const stripeSecret = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
-  const headers = {
-    Authorization: `Bearer ${stripeSecret}`,
-  };
-  if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-
-  let encoded;
-  if (body) {
-    encoded = typeof body === "string"
-      ? body
-      : new URLSearchParams(
-          // Allow nested params Stripe expects like items[0][price]
-          Object.entries(body).reduce((acc, [k, v]) => {
-            if (v !== undefined && v !== null) acc[k] = String(v);
-            return acc;
-          }, {})
-        ).toString();
-  }
-
-  const res = await fetch(`${STRIPE_API}${path}`, { method, headers, body: encoded });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) {
-    const err = new Error(json?.error?.message || `Stripe ${res.status}`);
-    err.stripeResponse = json;
-    err.stripeStatus = res.status;
-    throw err;
-  }
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js): platform key + Stripe-Account
+  // header for Connect academies, the academy's own key when a direct row exists.
+  // Pre-encoded STRING bodies pass through as-is (this file builds some by hand),
+  // and the thrown error keeps message/stripeStatus/stripeResponse.
+  return transportStripeFetch(path, { method, body, stripeAccount, idempotencyKey });
 }
 
 // ─────────────────────────────────────────────────────────
@@ -844,8 +817,16 @@ async function handler(req, res) {
       }
     }
 
-    // Load the academy's client row → connect account
-    const client = await loadClientRow(member.client_id);
+    // Load the academy's client row → connect account.
+    // Three-outcome money gate (house rule 10): a clients read that THREW is
+    // "could not ask", never "not connected" - it gets a retryable 503, and the
+    // not-connected 400 below stays reserved for a row that actually answered.
+    let client;
+    try {
+      client = await loadClientRow(member.client_id);
+    } catch {
+      return res.status(503).json({ error: "could not verify billing setup, try again" });
+    }
     if (!client) return res.status(404).json({ error: "academy not found" });
     if (!client.stripe_connect_account_id || client.stripe_connect_status !== "connected") {
       return res.status(400).json({

@@ -1,6 +1,6 @@
 # FullControl V2 Design System
 
-**Version 1.7 - 2026-07-22 | Living document: update it every time the UI evolves.**
+**Version 1.8 - 2026-07-31 | Living document: update it every time the UI evolves.**
 
 > ⛔ **RULE FOR EVERY AGENT + HUMAN: read this file BEFORE any front-end work in the V2 portal.**
 > Use the tokens in [`tokens.css`](tokens.css). Never hardcode a color, radius, font, or shadow that a token covers. If the design needs something the system doesn't have, ADD IT HERE FIRST (see "How to change this system" at the bottom), then use it.
@@ -88,6 +88,7 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 **Pills (filters, statuses):** `border-radius:var(--r-full)`; active = gold fill + `var(--on-gold)` text.
 **Toolbar:** `sticky top:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md)`.
 **Detail views:** ONE idiom - the **right-side drawer** (`#cal-drawer` pattern: overlay `rgba(0,0,0,.55)` + blur, 460px max, full-width on mobile). No bottom sheets.
+**Mobile filter sheet (sanctioned exception, under 768px only):** filter/refine controls on a phone may use a bottom sheet: `rgba(0,0,0,.5)` scrim, `--r-lg` top corners, `--border-str` top hairline, safe-area bottom padding, micro-label section headers, pill chips (active = gold fill + `--on-gold`), one full-width "Clear all" secondary button. Dock it on `document.body` - fixed elements drift inside transformed focus overlays. Detail views still use the right-side drawer; this pattern is for filters only (first use: the v15 inbox).
 **Modals (confirm/pick):** centered, `--r-xl`, `--shadow-pop`, overlay `rgba(0,0,0,.5)`.
 **Empty states:** centered, dashed `--border-med` box (or icon at `opacity:.3`) + 1-line muted message + one CTA button.
 **Icons:** feather-style stroke SVGs (`stroke-width:2, round caps`). **No emojis, period.** Not in nav, buttons, headers, badges, labels, empty states, tooltips, or any copy we write. The only place an emoji may appear is inside text a client/lead typed themselves (their messages render as-is - we never add our own).
@@ -136,6 +137,7 @@ transition:transform var(--t-med) var(--es), box-shadow var(--t-med);
 
 | Date | v | Change |
 |---|---|---|
+| 2026-07-31 | 1.8 | Mobile filter sheet added as a sanctioned under-768px pattern (scrim `rgba(0,0,0,.5)`, `--r-lg` top corners, gold-fill active chips, body-docked). First use: v15 inbox mobile pass (filters fold into the search field, unread gutter dot, gold swipe reveal, full-screen compose page). Desktop untouched. |
 | 2026-07-22 | 1.7 | Onboarding wizard (`_obf*`) consistency pass: wizard + satellite modals moved onto shared `.obf2-*`/`.obfm-*` classes (step cards = card DNA on `--surface-el`, buttons per section 5 recipes, locked radii replace stray 5/7px, off-token `#c96856`/`#7BC47F`/`#1a1a1a` killed, fade-rise entrances, full-screen wizard on phones). client-portal.html `:root` mirror COMPLETED: `--r-*`, `--shadow-card/hover/pop`, `--t-*` now defined there (values match tokens.css; previously fallback-only). |
 | 2026-07-06 | 1.6 | Emoji purge COMPLETE portal-wide (~520 removed; sole icon slots became 1em stroke SVGs, label prefixes dropped). Monochrome text glyphs (arrows, check/cross, star, theme sun/moon) stay. Member avatars: random 8-color hash replaced by one neutral chip (surface-el + border + muted initials); status pills own the color. |
 | 2026-07-05 | 1.5 | Dark theme moves to true charcoal (bg #131416, surface #1B1D1F, elevated #232629, hover #2B2E32; --on-gold follows to #131416). Neutral graphite replaces the warm brown-black. Sound design added to the command center (SFX set + Settings toggle, off on mobile). |

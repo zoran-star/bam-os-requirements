@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { stripeFetch as transportStripeFetch, publishableFor } from "../_stripe-transport.js";
 // Vercel Serverless Function — Parent payment funnel, step 3 (PUBLIC)
 //
 // Creates a PORTAL-OWNED Stripe subscription (so the academy's billing buttons —
@@ -74,27 +75,13 @@ function intervalFor(term) {
 }
 
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-  const encoded = body
-    ? new URLSearchParams(
-        Object.entries(body).reduce((acc, [k, v]) => {
-          if (v !== undefined && v !== null) acc[k] = String(v);
-          return acc;
-        }, {})
-      ).toString()
-    : undefined;
-  const res = await fetch(`${STRIPE_API}${path}`, { method, headers, body: encoded });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) {
-    const err = new Error(json?.error?.message || `Stripe ${res.status}`);
-    err.stripeStatus = res.status;
-    throw err;
-  }
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js). ONBOARDING_STRIPE_SECRET_KEY
+  // keeps today's precedence exactly - when set (the test sandbox) it overrides
+  // transport resolution, which is what stripeKey() always did here.
+  return transportStripeFetch(path, {
+    method, body, stripeAccount, idempotencyKey,
+    keyOverride: process.env.ONBOARDING_STRIPE_SECRET_KEY || undefined,
+  });
 }
 
 function piSecretFromSub(sub) {
@@ -177,7 +164,15 @@ async function handler(req, res) {
     const testMode = isTestMode();
 
     // ── Academy must exist + be Stripe-connected (connected account skipped in test) ──
-    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,stripe_connect_status&limit=1`);
+    // Three-outcome money gate (house rule 10): a clients read that THREW is
+    // "could not ask", never "not connected" - it gets a retryable 503, and the
+    // 409 below stays reserved for a row that actually answered without an account.
+    let clientRows;
+    try {
+      clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,stripe_connect_status&limit=1`);
+    } catch {
+      return res.status(503).json({ error: "could not verify billing setup, try again" });
+    }
     const client = Array.isArray(clientRows) && clientRows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
     const stripeAccount = testMode ? null : client.stripe_connect_account_id;
@@ -222,11 +217,17 @@ async function handler(req, res) {
         if (sub.status === "incomplete") {
           const secret = piSecretFromSub(sub);
           if (secret) {
+            // What Stripe.js mounts with is a per-transport fact - ask the
+            // resolver. Connect academies keep the platform publishable key +
+            // account id, byte-identical to before. A resolver hiccup must not
+            // 500 a checkout whose subscription already exists - fall back to
+            // the Connect answer this site always returned.
+            const pub = await publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }));
             return res.status(200).json({
               ok: true, reused: true, member_id: member.id,
               subscription_id: sub.id, customer_id: sub.customer,
-              client_secret: secret, mode: "payment", stripe_account: stripeAccount,
-              publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
+              client_secret: secret, mode: "payment", stripe_account: pub.stripe_account,
+              publishable_key: pub.publishable_key,
               amount_cents: price.amount_cents, currency: price.currency || "cad",
             });
           }
@@ -381,6 +382,9 @@ async function handler(req, res) {
       });
     } catch (_) { /* non-fatal */ }
 
+    // Per-transport fact, from the resolver (see the reuse-branch note above),
+    // with the same no-500-after-the-sub-exists fallback.
+    const pub = await publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }));
     return res.status(200).json({
       ok: true,
       member_id: member && member.id,
@@ -391,8 +395,8 @@ async function handler(req, res) {
       charged_today_iso: chargedTodayIso,
       start_date: startDate,
       renews_iso: renewsIso,
-      stripe_account: stripeAccount,
-      publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
+      stripe_account: pub.stripe_account,
+      publishable_key: pub.publishable_key,
       amount_cents: price.amount_cents,
       currency: price.currency || "cad",
     });

@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 
 // Import CANCELLED members (onboarding mini-flow, 2026-07-14; rebuilt 2026-07-18
 // to close the cancellations-contract gap - see
@@ -41,7 +42,8 @@ import { withSentryApiRoute } from "../_sentry.js";
 
 const SUPABASE_URL         = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const STRIPE_KEY           = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+// The Stripe key is no longer read at module import - the transport
+// (api/_stripe-transport.js) resolves it lazily per call, per academy.
 const enc = encodeURIComponent;
 
 // A gap of up to 14 days between one sub ending and the next starting is a
@@ -62,12 +64,13 @@ async function sb(path, init = {}) {
 }
 
 async function stripeGet(path, stripeAccount) {
-  const headers = { Authorization: `Bearer ${STRIPE_KEY}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const res = await fetch(`https://api.stripe.com/v1${path}`, { headers });
-  const j = await res.json();
-  if (!res.ok) throw new Error(`Stripe ${res.status}: ${(j.error && j.error.message) || "error"}`);
-  return j;
+  // Delegates to THE seam (api/_stripe-transport.js); rethrows in this file's
+  // original "Stripe <status>: <message>" format so callers read the same text.
+  try { return await transportStripeFetch(path, { stripeAccount }); }
+  catch (e) {
+    if (!e.stripeStatus) throw e;
+    throw new Error(`Stripe ${e.stripeStatus}: ${(e.stripeResponse && e.stripeResponse.error && e.stripeResponse.error.message) || "error"}`);
+  }
 }
 
 // params is an ARRAY of [key, value] entries so repeated keys (expand[]) survive.

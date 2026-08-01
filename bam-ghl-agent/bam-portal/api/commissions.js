@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { stripeFetch as transportStripeFetch } from "./_stripe-transport.js";
 // Vercel Serverless Function - Commission & BAM Payment Calculator
 // (Mike / BAM spec, 2026-07-25 - built off the Scaling System Partner
 // Agreement's growth-share clause).
@@ -173,17 +174,22 @@ async function stripeForm(path, params, extraHeaders = {}) {
   return json;
 }
 async function stripeGetAll(path, acct) {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error("STRIPE_SECRET_KEY not configured");
-  const headers = { Authorization: `Bearer ${key}`, ...(acct ? { "Stripe-Account": acct } : {}) };
+  // ACADEMY-SCOPED revenue read, now through THE seam (api/_stripe-transport.js)
+  // so a direct-key academy's gross revenue is readable too. The platform-key
+  // stripeForm invoicing half above is deliberately NOT delegated - BAM invoices
+  // its clients on BAM's own account, which is not an academy-scoped call.
+  if (!process.env.STRIPE_SECRET_KEY) throw new Error("STRIPE_SECRET_KEY not configured");
   const out = [];
   let startingAfter = null;
   for (let i = 0; i < 20; i++) {
     const sep = path.includes("?") ? "&" : "?";
-    const url = `${STRIPE_API}${path}${sep}limit=100${startingAfter ? `&starting_after=${startingAfter}` : ""}`;
-    const res = await fetch(url, { headers });
-    const json = await res.json();
-    if (!res.ok) throw new Error(`Stripe ${res.status}: ${json?.error?.message || "error"}`);
+    let json;
+    try {
+      json = await transportStripeFetch(`${path}${sep}limit=100${startingAfter ? `&starting_after=${startingAfter}` : ""}`, { stripeAccount: acct });
+    } catch (e) {
+      if (!e.stripeStatus) throw e;
+      throw new Error(`Stripe ${e.stripeStatus}: ${(e.stripeResponse && e.stripeResponse.error && e.stripeResponse.error.message) || "error"}`);
+    }
     out.push(...(json.data || []));
     if (!json.has_more || !json.data?.length) break;
     startingAfter = json.data[json.data.length - 1].id;

@@ -2,7 +2,7 @@ import { withSentryApiRoute } from "../_sentry.js";
 import { HttpError, sendError } from "./_errors.js";
 import { getParentReadContext, type ParentReadContext, type ParentReadStudent } from "./_parent-context.js";
 import { eq, sb } from "./_supabase.js";
-import { isTestMode, stripeFetch } from "./_stripe.js";
+import { isTestMode, publishableFor, stripeFetch } from "./_stripe.js";
 import type { ParentApiRequest, ParentApiResponse } from "./_types.js";
 
 const BILLING_DETAILS_FAILED_MESSAGE = "We couldn't load billing details right now.";
@@ -226,12 +226,17 @@ async function createPaymentMethodSetupIntent(req: ParentApiRequest, res: Parent
     throw new HttpError(502, "Payment setup failed. Please try again.");
   }
 
+  // Per-transport fact from the resolver: the saved-card SetupIntent must be
+  // mounted with the key of the account that minted it. A resolver hiccup must
+  // not 500 a card update whose SetupIntent already exists - fall back to the
+  // Connect answer this site always returned.
+  const pub = await publishableFor(academy.stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: academy.stripeAccount || null }));
   return res.status(200).json({
     client_secret: setupIntent.client_secret,
     customer_id: customerId,
-    publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null,
+    publishable_key: pub.publishable_key,
     setup_intent_id: setupIntent.id,
-    stripe_account: academy.stripeAccount,
+    stripe_account: pub.stripe_account,
     test_mode: academy.testMode,
   });
 }

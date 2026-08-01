@@ -4,8 +4,8 @@
 -- transports; the ONLY files allowed to read these tables are
 -- api/_stripe-transport.js (resolver), api/stripe/direct-key.js (staff key
 -- entry) and api/stripe/ensure-academy-webhook.js (endpoint registration).
--- Anything else referencing them is a fork and fails the one-doorway scan in
--- api/_stripe-transport-parity.test.mjs.
+-- Anything else referencing them is a fork - enforced by the one-doorway
+-- parity suite once the call-site wave lands.
 --
 -- INERT WHEN APPLIED: zero rows exist until staff saves a key, and no shipped
 -- code path reads the tables until the transport build merges.

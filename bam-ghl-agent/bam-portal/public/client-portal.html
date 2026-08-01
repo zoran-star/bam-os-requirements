@@ -71,6 +71,7 @@ if (window.__MOCK__) (() => {
       organic_content: true, ads_content_approval_required: false,
       onboarding_feedback_requested_at: null, onboarding_feedback_submitted_at: null,
       contact_provider: 'ghl', ghl_location_id: 'mock-loc-1', archived_at: null, created_at: iso(60),
+      time_zone: 'America/New_York',   // sales-card trials window reads this (matches the mock calendars tz)
     }],
     client_users: [
       { id: 'cu-1', client_id: CID, user_id: 'mock-user-1', name: 'Alex Carter', email: 'demo@northsidehoops.com', role: 'owner', status: 'active', hide_from_team: false, last_seen_at: iso(0), created_at: iso(60) },
@@ -183,25 +184,66 @@ if (window.__MOCK__) (() => {
     parent_email: m[1].toLowerCase().replace(/\s+/g, '.') + '@example.com', parent_phone: '+1416555' + String(1000 + i),
     created_at: iso(40 - i * 3), start_date: iso(40 - i * 3),
   }));
-  // Canonical V2 training-pipeline stage names: _plStageBot() maps them to the
-  // agent lanes (Responded=Booking, Scheduled Trial=Confirm, Done Trial=Closing,
-  // Interested=Ghosted, Won=Member) so the sales board renders like BAM GTA.
+  // Canonical V2 training-pipeline stages, mirroring the REAL board API shape:
+  // `role` is the registry stamp and `displayName` the master-preset name every
+  // preset academy sees (Nurture / Booking / Confirm / Closing / Ghosted), while
+  // `name` stays the academy's own GHL wording. _plStageBot() still matches the
+  // names, so the sales board renders like BAM GTA either way.
   const STAGES = [
-    { id: 'st-1', name: 'New Lead' }, { id: 'st-2', name: 'Responded' }, { id: 'st-3', name: 'Scheduled Trial' },
-    { id: 'st-4', name: 'Done Trial' }, { id: 'st-5', name: 'Ghosted' }, { id: 'st-6', name: 'Won' },
+    { id: 'st-1', name: 'New Lead' },
+    { id: 'st-0', name: 'Nurture', role: 'nurture', displayName: 'Nurture' },
+    { id: 'st-2', name: 'Responded', role: 'responded', displayName: 'Booking' },
+    { id: 'st-3', name: 'Scheduled Trial', role: 'scheduled_trial', displayName: 'Confirm' },
+    { id: 'st-4', name: 'Done Trial', role: 'done_trial', displayName: 'Closing' },
+    { id: 'st-5', name: 'Ghosted', role: 'ghosted', displayName: 'Ghosted' },
+    { id: 'st-6', name: 'Won' },
   ];
+  // Rows with a 4th element carry an EXPLICIT contact id (new leads seeded for
+  // the mobile pipeline card's cascades); the first 12 keep their positional
+  // lead-N ids, which the Hawkeye seeds + conversations below reference.
+  // Cascade states exercised offline: Booking = 12 rows with exactly TWO lit by
+  // Hawkeye (lead-3 reply, lead-4 book); Closing = one lit (lead-9); Nurture (7)
+  // + Ghosted (4) run on automation steps. Devon/Nina/Owen (lead-5/10/11) moved
+  // to New Lead so their pending cards don't add extra lit rows to those stages.
   const OPPS = [
     ['Jordan Price', 'st-1', 'Micah Price'], ['Riley Chen', 'st-1', 'Lucas Chen'],
-    ['Sasha Adams', 'st-2', 'Deja Adams'], ['Malik Turner', 'st-2', 'Malik Turner Jr'], ['Devon Ellis', 'st-2', 'Trey Ellis'],
+    ['Sasha Adams', 'st-2', 'Deja Adams'], ['Malik Turner', 'st-2', 'Malik Turner Jr'], ['Devon Ellis', 'st-1', 'Trey Ellis'],
     ['Kira Patel', 'st-3', 'Arjun Patel'], ['Leo Sanders', 'st-3', 'Eli Sanders'], ['Tia Roberts', 'st-3', 'Jade Roberts'],
-    ['Andre Boyd', 'st-4', 'AJ Boyd'], ['Nina Flores', 'st-4', 'Mateo Flores'],
-    ['Owen Marsh', 'st-5', 'Cole Marsh'], ['Zara Quinn', 'st-6', 'Noor Quinn'],
+    ['Andre Boyd', 'st-4', 'AJ Boyd'], ['Nina Flores', 'st-1', 'Mateo Flores'],
+    ['Owen Marsh', 'st-1', 'Cole Marsh'], ['Zara Quinn', 'st-6', 'Noor Quinn'],
+    // Booking fillers (plain rows - last message + arrow, no Hawkeye hold)
+    ['Chris Okoye', 'st-2', 'Femi Okoye', 'lead-b1'], ['Tessa Ng', 'st-2', 'Marcus Ng', 'lead-b2'],
+    ['Gabe Fontaine', 'st-2', 'Remy Fontaine', 'lead-b3'], ['Ines Marino', 'st-2', 'Luca Marino', 'lead-b4'],
+    ['Yusuf Ali', 'st-2', 'Idris Ali', 'lead-b5'], ['Hana Brik', 'st-2', 'Samir Brik', 'lead-b6'],
+    ['Sam Cole', 'st-2', 'Jesse Cole', 'lead-b7'], ['Lior Peretz', 'st-2', 'Ari Peretz', 'lead-b8'],
+    ['Farah Rahim', 'st-2', 'Zaid Rahim', 'lead-b9'], ['Dan Kim', 'st-2', 'Min Kim', 'lead-b10'],
+    // Closing fillers
+    ['Nico Reyes', 'st-4', 'Mateo Reyes', 'lead-c1'], ['Tyler Moss', 'st-4', 'Jalen Moss', 'lead-c2'],
+    ['Maya Brooks', 'st-4', 'Amara Brooks', 'lead-c3'],
+    // Nurture drip (automation steps come from the active-enrollments seed)
+    ['Dalia Wahba', 'st-0', 'Nour Wahba', 'lead-n1'], ['Omar Haddad', 'st-0', 'Rami Haddad', 'lead-n2'],
+    ['Lena Kovac', 'st-0', 'Ivan Kovac', 'lead-n3'], ['Priya Batra', 'st-0', 'Arya Batra', 'lead-n4'],
+    ['Rui Duarte', 'st-0', 'Tiago Duarte', 'lead-n5'], ['Aisha Jalloh', 'st-0', 'Musa Jalloh', 'lead-n6'],
+    ['Ken Tanaka', 'st-0', 'Yuki Tanaka', 'lead-n7'],
+    // Ghosted automation
+    ['Marta Silva', 'st-5', 'Beatriz Silva', 'lead-g1'], ['Dev Anand', 'st-5', 'Kiran Anand', 'lead-g2'],
+    ['Bo Williams', 'st-5', 'Trey Williams', 'lead-g3'], ['Carla Vega', 'st-5', 'Sofia Vega', 'lead-g4'],
   ].map((o, i) => ({
-    id: 'op-' + (i + 1), name: o[0], contactName: o[0], contactId: 'lead-' + (i + 1), stageId: o[1],
-    contact: { id: 'lead-' + (i + 1), name: o[0], phone: '+1416555' + String(2000 + i), email: o[0].toLowerCase().replace(/\s+/g, '.') + '@example.com' },
+    id: o[3] ? 'op-' + o[3] : 'op-' + (i + 1), name: o[0], contactName: o[0], contactId: o[3] || 'lead-' + (i + 1), stageId: o[1],
+    contact: { id: o[3] || 'lead-' + (i + 1), name: o[0], phone: '+1416555' + String(2000 + i), email: o[0].toLowerCase().replace(/\s+/g, '.') + '@example.com' },
     athlete: o[2], trialDate: (o[1] === 'st-3' || o[1] === 'st-4') ? iso(-(i % 4)) : null,
     status: 'open', monetaryValue: 249, dateAdded: iso(i), source: i % 2 ? 'Instagram' : 'Website',
   }));
+  // Automation step positions for the Nurture/Ghosted cascades ("3 of 14"),
+  // mirroring api/automations.js `active-enrollments` exactly.
+  const AUTO_ENROLLMENTS = [
+    ['lead-n1', 'nurture', 3, 14, 5, -2], ['lead-n2', 'nurture', 9, 14, 21, -1],
+    ['lead-n3', 'nurture', 1, 14, 1, 0], ['lead-n4', 'nurture', 6, 14, 12, -3],
+    ['lead-n5', 'nurture', 12, 14, 30, -5], ['lead-n6', 'nurture', 4, 14, 8, -1],
+    ['lead-n7', 'nurture', 8, 14, 18, -2],
+    ['lead-g1', 'ghosted', 1, 3, 2, -1], ['lead-g2', 'ghosted', 3, 3, 9, 0],
+    ['lead-g3', 'ghosted', 2, 3, 5, -2], ['lead-g4', 'ghosted', 2, 3, 6, -4],
+  ].map(e => ({ contact_id: e[0], automation_key: e[1], step: e[2], steps_total: e[3], entered_at: iso(e[4]), next_run_after: iso(e[5]) }));
   const BAM_THREAD = [
     { id: 'bm-1', body: 'Hey Alex! The new camp landing page is live. Can you give it a quick look?', author_staff_id: 'staff-1', author_auth_user_id: null, files: [], created_at: iso(1, 4), edited_at: null, deleted_at: null },
     { id: 'bm-2', body: 'Looks great. Can we make the header photo the team huddle shot?', author_staff_id: null, author_auth_user_id: 'mock-user-1', files: [], created_at: iso(1, 2), edited_at: null, deleted_at: null },
@@ -217,14 +259,35 @@ if (window.__MOCK__) (() => {
     ['Sam Reed', 'Can we switch Elijah to the 6pm group next month?', 'inbound', 1, null, 'Elijah Reed'],
     ['Riley Chen', 'Thanks! Just booked the free trial for this weekend.', 'inbound', 0, 'lead', null],
     ['Marcus Cole', 'Payment went through, thanks for the quick help.', 'inbound', 0, 'member', 'Jayden Cole'],
-    ['Kira Patel', 'Is there parking at the Northside gym?', 'inbound', 0, 'lead', null],
+    ['Kira Patel', 'Is there parking at the Northside gym?', 'inbound', 0, 'lead', null, 'lead-6'],
     ['Nicole Hayes', 'We will finish out the month then pause for summer.', 'inbound', 0, null, 'Carter Hayes'],
     ['Tanya Brooks', 'Aaliyah loved the shooting clinic last week!', 'inbound', 0, 'member', 'Aaliyah Brooks'],
     ['Sasha Adams', 'Do you have anything on Saturday mornings for Deja?', 'inbound', 1, 'lead', null, 'lead-3'],
     ['Andre Boyd', 'AJ had a blast at the trial yesterday!', 'inbound', 0, 'lead', null, 'lead-9'],
+    // Last messages for the pipeline card's cascades (Booking/Confirm/Closing
+    // rows show the thread's last line + direction arrow). Appended AFTER the
+    // rows above so they sort below them in the inbox (older lastMessageDate).
+    ['Malik Turner', 'Tuesday is good. What does he need to bring?', 'inbound', 0, 'lead', null, 'lead-4'],
+    ['Leo Sanders', 'How did Eli like Sunday’s session?', 'outbound', 0, 'lead', null, 'lead-7'],
+    ['Tia Roberts', 'So sorry, something came up Thursday. Can Jade come a different day?', 'inbound', 0, 'lead', null, 'lead-8'],
+    ['Chris Okoye', 'Here is what a first session looks like', 'outbound', 0, 'lead', null, 'lead-b1'],
+    ['Tessa Ng', 'Here is the booking link whenever you are ready', 'outbound', 0, 'lead', null, 'lead-b2'],
+    ['Gabe Fontaine', 'Welcome! Grabbing you the trial details now', 'outbound', 0, 'lead', null, 'lead-b3'],
+    ['Ines Marino', 'Which days do the younger kids train?', 'inbound', 0, 'lead', null, 'lead-b4'],
+    ['Yusuf Ali', 'Any chance of a Sunday session?', 'inbound', 0, 'lead', null, 'lead-b5'],
+    ['Hana Brik', 'Just checking you saw the booking link', 'outbound', 0, 'lead', null, 'lead-b6'],
+    ['Sam Cole', 'Booked! We will text the details', 'outbound', 0, 'lead', null, 'lead-b7'],
+    ['Lior Peretz', 'Is there a weekend option for beginners?', 'inbound', 0, 'lead', null, 'lead-b8'],
+    ['Farah Rahim', 'Thanks, thinking about it', 'inbound', 0, 'lead', null, 'lead-b9'],
+    ['Dan Kim', 'Here are the trial details, which day suits?', 'outbound', 0, 'lead', null, 'lead-b10'],
+    ['Nico Reyes', 'Following up on how the trial went', 'outbound', 0, 'lead', null, 'lead-c1'],
+    ['Tyler Moss', 'Here is the pricing breakdown you asked for', 'outbound', 0, 'lead', null, 'lead-c2'],
+    ['Maya Brooks', 'Does the monthly include both weekdays?', 'inbound', 0, 'lead', null, 'lead-c3'],
   ].map((c, i) => ({
     id: 'cv-' + (i + 1), contactId: c[6] || 'ct-cv-' + (i + 1), contactName: c[0], fullName: c[0],
-    lastMessageBody: c[1], lastMessageDate: iso(0, i * 5 + 1), lastMessageDirection: c[2],
+    // Age capped at 2.5 days: the appended pipeline-card rows would otherwise
+    // drift past the stuck-list's 3-day idle line and spam "NOT FLOWING".
+    lastMessageBody: c[1], lastMessageDate: iso(0, Math.min(i * 5 + 1, 60)), lastMessageDirection: c[2],
     lastMessageType: 'TYPE_SMS', unreadCount: c[3], classification: c[4], matched_member_name: c[5],
   }));
   const THREAD = (name) => ([
@@ -301,6 +364,9 @@ if (window.__MOCK__) (() => {
       draft_message: 'No problem at all! Let me find Jade another time - does Saturday morning or Tuesday evening work better?',
       reasoning: 'The booked slot fell through, so this goes back to the booking flow to pick a new time. The old booking gets released.' },
     { id: 'cfx-3', kind: 'post_trial', status: 'pending', contact_name: 'Leo Sanders', ghl_contact_id: 'lead-7', ghl_conversation_id: 'cv-cfx-3', athlete_name: 'Eli Sanders',
+      // trial_at matches today's 7pm mock slot (Eli is seeded into its roster
+      // below) so the mobile sales card + calendar show a live FORM chip offline.
+      trial_at: (() => { const d = new Date(); d.setHours(19, 0, 0, 0); return d.toISOString(); })(),
       summary: 'Trial was Sunday. How did it go?',
       reasoning: 'Eli\'s trial session finished. Fill in whether he showed and if he\'s a fit - that decides which follow-up sequence runs.' },
     { id: 'cfx-4', kind: 'confirm_lost', status: 'pending', contact_name: 'Dana Whitfield', ghl_contact_id: 'lead-17',
@@ -483,6 +549,81 @@ if (window.__MOCK__) (() => {
         { key: 'free_trial_booked', label: 'Free trial booked', hint: 'A family books, cancels or moves a free trial' },
       ] } }] };
     }
+    // Portal-spine calendar, honouring ?from=&to= so the mobile agenda's
+    // windowed infinite scroll is exercisable offline. Mirrors GTA's real
+    // shape: two named classes, capacity 12, Mon-Thu evenings + Sat.
+    if (p === '/api/website/calendars') {
+      const CLASSES = [
+        { name: 'Group 1 (Elementary)', days: [1,2,3,4], h: 19, m: 0, sat: [11, 30] },
+        { name: 'Group 2 (High School)', days: [1,2,3,4], h: 20, m: 0, sat: [12, 30] },
+      ];
+      const t0 = new Date(); t0.setHours(0,0,0,0);
+      const from = q.get('from') ? new Date(q.get('from')) : new Date(t0.getTime() - 14 * 864e5);
+      const to = q.get('to') ? new Date(q.get('to')) : new Date(t0.getTime() + 42 * 864e5);
+      const slots = [];
+      for (let d = new Date(from); d < to; d.setDate(d.getDate() + 1)) {
+        const isToday = d.getFullYear() === t0.getFullYear() && d.getMonth() === t0.getMonth() && d.getDate() === t0.getDate();
+        for (const c of CLASSES) {
+          let hh = null, mm = 0;
+          // The sales preset card renders TODAY's roster, so today is always the
+          // two evening sessions whatever the weekday (Fri/Sat/Sun included) -
+          // deterministic times keep the FORM-chip seed below matchable.
+          if (isToday) { hh = c.h; mm = c.m; }
+          else if (c.days.includes(d.getDay())) { hh = c.h; mm = c.m; }
+          else if (d.getDay() === 6) { hh = c.sat[0]; mm = c.sat[1]; }
+          if (hh == null) continue;
+          const st = new Date(d); st.setHours(hh, mm, 0, 0);
+          // deterministic so a reload does not reshuffle the roster
+          let s = (st.getTime() / 6e4 | 0) * 31 + hh;
+          s = (s * 1103515245 + 12345) & 0x7fffffff;
+          const n = st < t0 ? (s % 6) + 1 : (s % 5);
+          const names = ['Nia Charles','Jordan Wu','Kaya Osei','Zaire Thompson','Luca Bianchi','Ravi Patel','Amari Grant'];
+          const att = [];
+          for (let k = 0; k < n; k++) att.push({
+            ghl_contact_id: 'lead-' + ((s + k) % 7 + 1), name: names[(s + k) % names.length],
+            athlete_name: names[(s + k) % names.length], parent_name: 'Parent ' + (((s + k) % 7) + 1), status: 'BOOKED',
+          });
+          // Seed today's rosters so every sales-card chip is exercisable offline:
+          // Eli (lead-7) SHOWED with a pending post_trial card above -> FORM chip;
+          // Jade SHOWED with her form already done -> SHOWED chip. Unshifted so
+          // they win the card's per-contact dedupe over the hashed BOOKED rows.
+          if (isToday && hh === 19) {
+            att.unshift({ ghl_contact_id: 'lead-7', name: 'Eli Sanders', athlete_name: 'Eli Sanders', parent_name: 'Leo Sanders', status: 'SHOWED' });
+          }
+          if (isToday && hh === 20) {
+            att.unshift({ ghl_contact_id: 'lead-8', name: 'Jade Roberts', athlete_name: 'Jade Roberts', parent_name: 'Tia Roberts', status: 'SHOWED' });
+          }
+          slots.push({
+            id: 'slot-' + st.getTime() + '-' + c.name.slice(6, 7), name: c.name,
+            start: st.toISOString(), end: new Date(st.getTime() + 36e5).toISOString(),
+            capacity: 12, spots_taken: att.length, spots_left: 12 - att.length,
+            program: c.name, venue: 'Linbrook', attendees: att,
+          });
+        }
+      }
+      return { provider: 'portal', timezone: 'America/New_York', slots };
+    }
+    // Sales preset card KPIs (mobile Sales section): 6 of 15 qualified closed,
+    // 4 sales this week, plus the per-row payload the qualified-trials focus
+    // overlay renders. Contact ids reuse OPPS leads so row taps open contacts.
+    // Rows mirror the real endpoint's shape: date_kind 'trial' normally,
+    // 'review' when no booking bridged (Chidi exercises the honest label);
+    // closed rows carry converted_at = members.joined_date (date-only).
+    if (p === '/api/sales-kpis') {
+      const closed_rows = [
+        ['Zaire Thompson', 'Rochelle Thompson', 'lead-4', 19, 16], ['Luca Bianchi', 'Sofia Bianchi', 'lead-5', 17, 11],
+        ['Amari Grant', 'Denise Grant', 'lead-6', 13, 12], ['Ravi Patel', 'Meera Patel', 'lead-1', 10, 5],
+        ['Kaya Osei', 'Femi Osei', 'lead-3', 9, 3], ['Jordan Wu', 'Mei Wu', 'lead-2', 6, 1],
+      ].map(r => ({ athlete: r[0], parent: r[1], contact_id: r[2], trial_at: iso(r[3]), date_kind: 'trial', converted_at: iso(r[4]).slice(0, 10) }));
+      const open_rows = [
+        ['Eli Sanders', 'Leo Sanders', 'lead-7', 0], ['Nico Reyes', 'Carmen Reyes', 'lead-9', 4],
+        ['Tyler Moss', 'Renee Moss', 'lead-10', 7], ['Sana Malik', 'Iram Malik', 'lead-11', 11],
+        ['Deja Adams', 'Sasha Adams', 'lead-13', 14], ['Arjun Patel', 'Kira Patel', 'lead-14', 18],
+        ['Jade Roberts', 'Tia Roberts', 'lead-8', 21], ['Mia Lin', 'Grace Lin', 'lead-15', 24],
+        ['Chidi Okafor', 'Tom Okafor', 'lead-16', 28],
+      ].map(r => ({ athlete: r[0], parent: r[1], contact_id: r[2], trial_at: iso(r[3]), date_kind: r[2] === 'lead-16' ? 'review' : 'trial' }));
+      return { qualified: 15, closed: 6, sales_week: 4, closed_rows, open_rows };
+    }
     if (p === '/api/agent-config') return act === 'get-mode' ? { mode: 'approve' } : { ok: true };
     if (p === '/api/agent-followups') return act === 'list' ? { followups: HAWK_FU } : { ok: true };
     if (p === '/api/agent-approvals') {
@@ -494,6 +635,11 @@ if (window.__MOCK__) (() => {
     }
     if (p === '/api/agent-confirm') return act === 'list-ready' ? { ready: HAWK_CONFIRM } : { ok: true };
     if (p === '/api/agent-closing') return act === 'list-ready' ? { ready: HAWK_CLOSING } : { ok: true };
+    // Automations engine: step positions for the Nurture/Ghosted cascades
+    // ("3 of 14") + the board's "somebody is messaging this lead" check.
+    // Every other automations action falls through to DEFAULT_API below.
+    if (p === '/api/automations' && act === 'active-enrollments') return { enrollments: AUTO_ENROLLMENTS };
+    if (p === '/api/automations' && act === 'active-contacts') return { contact_ids: AUTO_ENROLLMENTS.map(e => e.contact_id) };
     // The Hawkeye send gate, mirrored from api/agent/_hawk-gate.js so the whole
     // redirect loop is testable offline: SMS to a contact with a pending card 409s
     // (booking -> confirm -> closing priority), email is never blocked, and
@@ -7843,6 +7989,24 @@ if (window.__MOCK__) (() => {
         <span class="nav-badge" id="parent-messages-unread-badge" style="display:none;background:var(--accent);color:#0B0B0D;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:auto"></span>
       </div>
 
+      <!-- Direct door to organic content submission. V1.5 buries Marketing inside the
+           "Support" accordion, so submitting raw assets was Support > Marketing >
+           Organic > Request - four clicks behind a label that reads "help desk"
+           (Pro Bound couldn't find it at all, 2026-07-31). Shown by
+           applyOrganicShortcutNav() only for V1.5 academies that have BOTH organic and
+           ads on; content-only clients already land straight on organic and V1/V2 keep
+           their existing nav untouched. -->
+      <div class="nav-item" id="nav-content-flat" style="display:none" onclick="_goOrganic(this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/>
+            <path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/>
+            <path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>
+          </svg>
+        </span>
+        Content
+      </div>
+
       <!-- V1.5 "Support" accordion: groups Systems + Marketing under one expandable
            header. Hidden for V1/V2 (they keep the flat Systems + Marketing items below).
            Shown + flat items hidden by applyV15NavState when V1.5. -->
@@ -10952,6 +11116,12 @@ Then the call to action."]</div>
           .plo2-cfg{position:absolute;top:6px;right:7px;width:15px;height:15px;cursor:pointer;opacity:.8}
           .plo2-cfg:hover{opacity:1}
           .plo2-cfg svg{width:100%;height:100%;display:block}
+          /* No pipeline configuration on mobile, EVER (Zoran 2026-07-31):
+             the stage-config affordances hide under 768px unconditionally -
+             any preset, any view, any mount order. Static rule on purpose:
+             it must hold even before (or without) the mobile Sales cards.
+             Desktop untouched. */
+          @media(max-width:768px){.plo2-cfg,.plo-gear{display:none !important}}
           .plo2-casc{margin-top:14px;width:100%}
           .plo2-panel{border-radius:16px;background:var(--surface);border:1px solid var(--border);padding:15px}
           .plo2-phead{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-bottom:11px;display:flex;align-items:center;gap:8px;font-weight:700}
@@ -12562,6 +12732,481 @@ Then the call to action."]</div>
       }
     </style>
 
+    <!-- ══ Mobile calendar agenda (under 768px) ══════════════════════════
+         The 7-column week grid does not survive a phone: each day column is
+         ~49px, names truncate to "8:00 PM …" and the board needs sideways
+         scrolling. Under 768px we render the same spine slots as a vertical
+         day list instead. Desktop is untouched. Tokens only. -->
+    <style>
+      #mag-wrap, #mag-sheet, #mag-jump { display: none; }
+
+      @media (max-width: 768px) {
+        /* hide the desktop grid + its chrome, show the agenda */
+        #view-calendar .cal-toolbar,
+        #view-calendar .cal-grid-wrap,
+        #view-calendar .bk-section { display: none !important; }
+        /* .content clips (overflow hidden) because the desktop grid does its own
+           scrolling inside .cal-scroll. The agenda scrolls the page instead. */
+        #view-calendar .content {
+          padding: 0 !important;
+          overflow-y: auto !important; -webkit-overflow-scrolling: touch;
+        }
+        #mag-wrap { display: block; }
+
+        /* pinned top block: stays put wherever you scroll */
+        #mag-top {
+          position: sticky; top: 0; z-index: 20;
+          background: var(--bg); border-bottom: 1px solid var(--border);
+          box-shadow: 0 6px 14px -12px rgba(0,0,0,.5);
+          padding: 8px 16px 10px;
+        }
+        #mag-bar { display: flex; align-items: center; gap: 9px; }
+        .mag-mo {
+          display: inline-flex; align-items: center; gap: 5px;
+          background: none; border: none; padding: 0; cursor: pointer;
+          font-family: var(--font-num, inherit); font-size: 15px; font-weight: 800;
+          color: var(--text); letter-spacing: -.01em;
+        }
+        .mag-mo svg { width: 12px; height: 12px; color: var(--text-mute); }
+        .mag-tz { font-size: 11px; font-weight: 600; color: var(--text-mute); }
+        .mag-today {
+          margin-left: auto; display: none; align-items: center; gap: 5px;
+          padding: 6px 12px; border-radius: 999px; border: none;
+          background: var(--gold); color: #131416;
+          font-size: 11.5px; font-weight: 800; cursor: pointer; white-space: nowrap;
+        }
+        .mag-today.on { display: inline-flex; }
+        .mag-alert {
+          display: flex; align-items: center; gap: 9px; width: 100%;
+          margin-top: 9px; padding: 10px 13px; border: none; border-radius: 11px;
+          background: var(--gold); color: #131416;
+          font-size: 13px; font-weight: 800; cursor: pointer; text-align: left;
+        }
+        .mag-alert svg { width: 15px; height: 15px; flex: none; }
+        .mag-alert .mag-go { margin-left: auto; font-size: 16px; }
+
+        /* Chrome/Firefox auto-anchor on prepend, Safari does not. We compensate
+           by hand in _magFetchOlder(), so turn the browser's off or they fight. */
+        #mag-list { overflow-anchor: none; padding-bottom: 40px; }
+
+        .mag-day { padding: 0 16px; }
+        /* TODAY: a light gold tint edge to edge behind the day header and its
+           session rows (.mag-day spans the full width; its 16px side padding
+           sits inside the box, so the background bleeds to both edges). The
+           gold TODAY pill stays - this is additive. */
+        #mag-today-anchor { background: var(--gold-sheen); padding-bottom: 6px; }
+        .mag-dayhd { display: flex; align-items: baseline; gap: 8px; padding: 14px 0 7px; }
+        .mag-dayhd .dw { font-size: 11px; font-weight: 800; letter-spacing: .11em; color: var(--text-mute); }
+        .mag-dayhd .dn { font-size: 16px; font-weight: 800; color: var(--text); }
+        .mag-dayhd.is-today .dw, .mag-dayhd.is-today .dn { color: var(--gold); }
+        .mag-dayhd .mag-pill {
+          margin-left: auto; font-size: 10px; font-weight: 800; letter-spacing: .05em;
+          text-transform: none; color: #131416; background: var(--gold);
+          border: none; border-radius: 999px; padding: 3px 9px;
+        }
+        .mag-none { font-size: 12px; font-weight: 600; color: var(--text-mute); padding: 2px 2px 6px; }
+
+        .mag-sesh {
+          display: flex; gap: 12px; align-items: center; width: 100%;
+          background: var(--surface); border: 1px solid var(--border); border-radius: 13px;
+          padding: 12px 14px; margin-bottom: 7px; cursor: pointer;
+          position: relative; overflow: hidden; text-align: left;
+        }
+        .mag-sesh .bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+        .mag-sesh .t {
+          flex: none; width: 78px; padding-left: 4px; white-space: nowrap;
+          font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: -.01em;
+        }
+        .mag-sesh .g {
+          flex: 1; min-width: 0; font-size: 13.5px; font-weight: 700; color: var(--text);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .mag-sesh .c { flex: none; font-size: 14px; font-weight: 800; color: var(--text-sub); }
+        .mag-sesh .c small { font-weight: 600; color: var(--text-mute); }
+        .mag-sesh .dot {
+          flex: none; width: 7px; height: 7px; border-radius: 50%;
+          background: var(--gold); box-shadow: 0 0 0 3px var(--gold-sheen);
+        }
+        .mag-sesh.empty { background: transparent; border: 1.5px dashed var(--border-str); }
+        .mag-sesh.empty .bar { opacity: .35; }
+        .mag-sesh.empty .t, .mag-sesh.empty .g { color: var(--text-mute); font-weight: 700; }
+        .mag-sesh.empty .c { color: var(--text-mute); }
+        .mag-sesh.full .c { color: #B4462F; }
+        .mag-sesh.flagged { border-color: var(--accent-border); box-shadow: 0 0 0 2px var(--gold-sheen); }
+        .mag-sesh.past { opacity: .55; }
+        .mag-sesh.past.flagged { opacity: 1; }
+
+        /* roster sheet */
+        /* must clear the focus-page modal (#view-calendar sits at 10050) */
+        #mag-sheet {
+          display: block; position: fixed; inset: 0; z-index: 10060;
+          background: var(--bg); overflow-y: auto;
+          transform: translateX(100%); transition: transform .22s ease;
+          -webkit-overflow-scrolling: touch;
+        }
+        #mag-sheet.on { transform: translateX(0); }
+        .mag-rhd { padding: 14px 16px 0; }
+        .mag-rhd .back {
+          display: inline-flex; align-items: center; padding: 7px 13px 7px 10px;
+          border-radius: 10px; border: 1px solid var(--border-med); background: var(--surface);
+          font-size: 13px; font-weight: 700; color: var(--text); cursor: pointer; margin-bottom: 14px;
+        }
+        .mag-rhd .grp { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--text-sub); }
+        .mag-rhd .grp i { width: 9px; height: 9px; border-radius: 50%; }
+        .mag-rhd .when { font-size: 22px; font-weight: 800; color: var(--text); margin: 5px 0 3px; letter-spacing: -.01em; }
+        .mag-rhd .sub { font-size: 12px; color: var(--text-mute); font-weight: 600; }
+        .mag-textall {
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          margin: 16px 16px 0; width: calc(100% - 32px);
+          background: var(--gold); color: #131416; border: none; border-radius: 12px;
+          padding: 13px; font-size: 14px; font-weight: 800; cursor: pointer;
+        }
+        .mag-textall svg { width: 16px; height: 16px; }
+        .mag-textall[disabled] { opacity: .45; cursor: default; }
+        .mag-sec { padding: 20px 16px 7px; font-size: 10px; font-weight: 800; letter-spacing: .11em; color: var(--text-mute); }
+        .mag-prow {
+          display: flex; align-items: center; gap: 11px; background: var(--surface);
+          border: 1px solid var(--border); border-radius: 13px; padding: 10px 12px;
+          margin: 0 16px 7px; width: calc(100% - 32px); cursor: pointer; text-align: left;
+        }
+        .mag-prow .av {
+          flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--surface-hov);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 12.5px; font-weight: 800; color: var(--text-sub);
+        }
+        .mag-prow .pb { flex: 1; min-width: 0; }
+        .mag-prow .pn { display: block; font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.25; }
+        .mag-prow .pp { display: block; font-size: 11.5px; color: var(--text-mute); margin-top: 2px; font-weight: 600; }
+        .mag-prow .acts { flex: none; display: flex; gap: 6px; }
+        .mag-prow .acts a, .mag-prow .acts span {
+          width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--border-med);
+          display: flex; align-items: center; justify-content: center; color: var(--text-sub);
+        }
+        .mag-prow .acts svg { width: 15px; height: 15px; }
+        .mag-prow.flagged { border-color: var(--gold); background: var(--gold-sheen); box-shadow: 0 0 0 2px var(--gold-sheen); }
+        .mag-prow.flagged .av { background: var(--gold); color: #131416; }
+
+        /* month jump */
+        #mag-jump { display: none; position: fixed; inset: 0; z-index: 10070; background: rgba(0,0,0,.45); }
+        #mag-jump.on { display: block; }
+        .mag-jump-card {
+          position: absolute; left: 0; right: 0; bottom: 0; background: var(--bg);
+          border-radius: 18px 18px 0 0; padding: 16px 16px 26px; max-height: 70vh; overflow: auto;
+        }
+        .mag-jump-card h3 { margin: 0 0 12px; font-size: 15px; font-weight: 800; color: var(--text); }
+        .mag-jump-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .mag-jump-grid button {
+          padding: 12px 6px; border-radius: 11px; border: 1px solid var(--border-med);
+          background: var(--surface); color: var(--text);
+          font-size: 12.5px; font-weight: 700; text-align: center; cursor: pointer;
+        }
+        .mag-jump-grid button.now { background: var(--gold); border-color: var(--gold); color: #131416; }
+      }
+    </style>
+
+    <!-- ══ Mobile inbox (under 768px) ══════════════════════════════════════
+         The desktop inbox toolbar carries five rows of chrome a phone cannot
+         afford. Under 768px: search + Filters is the whole toolbar, the class
+         segments and state pills move INTO the filter drawer (which becomes a
+         bottom sheet), the pipeline chip yields to the agent line, members get
+         a gold avatar ring, compose docks bottom-left and the Zoran orb
+         bottom-right. Desktop is untouched. -->
+    <style>
+      .v15ib-mass-btn { display: none; }
+      .v15ib-fab-m { display: none; }
+      .v15ib-msheet-only { display: none; }
+      .v15ib-agent-line { display: none; }
+      .v15ib-mfilters { display: none; }
+      .v15ib-mdir { display: none; }
+      .v15ib-vm-pip { display: none; }
+      .v15ib-prev-vm { display: none; }
+
+      @media (max-width: 768px) {
+        /* header: Mass appears; heavy desktop actions go */
+        .v15ib-mass-btn {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-med);
+          background: var(--surface); color: var(--text-mute);
+          font: inherit; font-size: 12.5px; font-weight: 700; opacity: .5;
+        }
+        #view-v15inbox .v15ib-cls-row,
+        #view-v15inbox .v15ib-progress,
+        #view-v15inbox #v15ib-approve-btn,
+        #view-v15inbox #v15ib-vmx-btn,
+        #view-v15inbox #v15ib-bc-btn,
+        #view-v15inbox #ib-mute-btn2,
+        #view-v15inbox .v15ib-overflow,
+        #view-v15inbox .v15ib-filter-toggle,
+        #view-v15inbox .v15ib-check { display: none !important; }
+        /* the toolbar's flex spacer goes too, so search + Filters is ONE
+           full-width unit with no dead space on its right */
+        #view-v15inbox .v15ib-tb-spacer { display: none !important; }
+        #view-v15inbox .v15ib-search { max-width: none !important; min-width: 0 !important; }
+
+        /* the kicker returns as the page title ("Inbox", 19/800); the § mark
+           stays desktop-only markup and is hidden here */
+        #view-v15inbox .v15ib-focus-head .topbar-kicker {
+          display: inline-block !important;
+          font-size: 19px; font-weight: 800; letter-spacing: -.01em;
+          text-transform: none; color: var(--text);
+        }
+        #view-v15inbox .v15ib-focus-head .v15ib-kick-mark { display: none; }
+
+        /* search owns the row; Filters folds INTO the field as a chip */
+        #view-v15inbox .v15ib-search {
+          border: 1px solid var(--border-med); background: var(--surface);
+          border-radius: var(--r-md); gap: 6px; padding: 2px 6px 2px 0;
+        }
+        #view-v15inbox .v15ib-search input,
+        #view-v15inbox .v15ib-search input:focus { border: none; background: none; font-size: 13.5px; }
+        #view-v15inbox .v15ib-search-clear { position: static; transform: none; }
+        .v15ib-mfilters {
+          display: inline-flex; align-items: center; gap: 5px; flex: none;
+          padding: 6px 10px; border: none; border-radius: var(--r-sm);
+          background: var(--surface-hov); color: var(--text-sub);
+          font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+        }
+        .v15ib-mfilters svg { width: 12px; height: 12px; }
+        .v15ib-mfilters b {
+          background: var(--gold); color: var(--on-gold);
+          border-radius: var(--r-full); padding: 0 5px;
+          font-size: 10px; font-family: var(--font-num, inherit);
+        }
+
+        /* the desktop compose modal must clear the focus overlay (z 10050) */
+        .v15ib-compose-overlay { z-index: 10080; }
+
+        /* filter sheet: the drawer node is PORTALED to document.body while
+           open (the focus overlay's transform makes fixed resolve against the
+           card), so these rules ride on .msheet-open, unscoped */
+        .v15ib-filter-drawer.msheet-open {
+          position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 10070;
+          background: var(--bg); border-radius: var(--r-lg) var(--r-lg) 0 0;
+          border-top: 1px solid var(--border-str);
+          box-shadow: 0 -12px 40px rgba(0,0,0,.35);
+          padding: 18px 16px calc(24px + env(safe-area-inset-bottom));
+          max-height: 75vh; overflow-y: auto;
+          display: flex; flex-wrap: wrap; gap: 7px; align-content: flex-start;
+        }
+        #v15ib-msheet-scrim { position: fixed; inset: 0; z-index: 10069; background: rgba(0,0,0,.5); }
+        .v15ib-msheet-only.v15ib-msec {
+          display: block; width: 100%; margin-top: 6px;
+          font-size: 10px; font-weight: 800; letter-spacing: .11em; color: var(--text-mute);
+        }
+        .v15ib-msheet-only.v15ib-mrow { display: flex; flex-wrap: wrap; gap: 7px; width: 100%; }
+        .v15ib-msheet-only.v15ib-mtitle { display: block; width: 100%; font-size: 16px; font-weight: 800; color: var(--text); }
+        .v15ib-msheet-only.v15ib-chan { display: inline-flex; }
+        .v15ib-msheet-only.v15ib-mclear {
+          display: block; width: 100%; margin-top: 16px; padding: 12px;
+          border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--border-med);
+          color: var(--text); text-align: center; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+        }
+        .v15ib-filter-drawer.msheet-open .v15ib-chan {
+          padding: 8px 13px; font-size: 12.5px; border-radius: var(--r-full);
+        }
+        /* active sheet chips read solid gold (pills recipe, section 5) */
+        .v15ib-filter-drawer.msheet-open .v15ib-chan.on {
+          background: var(--gold); border-color: var(--gold); color: var(--on-gold); font-weight: 700;
+        }
+        /* pipeline stage filtering stays a desktop tool */
+        .v15ib-filter-drawer.msheet-open .v15ib-sel { display: none; }
+        /* the split pane's empty state is desktop furniture (keyboard hints) */
+        #view-v15inbox .v15ib-empty-state { display: none; }
+
+        /* rows: dot only (no gold left edge), no pipeline chip, agent line on */
+        #view-v15inbox .v15ib-conv.unread { border-left-color: transparent; background: none; }
+        #view-v15inbox .v15ib-conv .v15ib-chip { display: none; }
+        /* unread = one gold dot in its own left gutter (corner dot goes) */
+        #view-v15inbox .v15ib-conv .v15ib-unread-dot { display: none; }
+        #view-v15inbox .v15ib-conv { padding-left: 26px; }
+        #view-v15inbox .v15ib-conv.unread::before {
+          content: ''; position: absolute; left: 10px; top: 50%; margin-top: -3.5px;
+          width: 7px; height: 7px; border-radius: var(--r-full); background: var(--gold);
+        }
+        /* direction arrow moves from the name line to the snippet */
+        #view-v15inbox .v15ib-name .v15ib-dir { display: none; }
+        .v15ib-mdir { display: inline; margin-right: 3px; opacity: .65; font-weight: 700; }
+        /* read rows: quieter name, still legible */
+        #view-v15inbox .v15ib-conv:not(.unread) .v15ib-name { font-weight: 600; color: var(--text-sub); }
+        /* hairline row separators */
+        #view-v15inbox .v15ib-list .v15ib-conv { border-bottom: 1px solid var(--border); }
+        /* last row clears the compose FAB + the Zoran orb */
+        #view-v15inbox #v15ib-body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+        /* ── The scroller (live phone fix) ─────────────────────────────
+           The 900px rule flattens the split (display:block) and turns the
+           list's own scroller OFF (overflow:visible), expecting an ancestor
+           to scroll. But the focus card and its .content are overflow:hidden
+           at every width, so on phones NO element could scroll the list or
+           an open thread. Re-stack the split as a flex column and give the
+           list pane its scroller back; the toolbar sits above the scroller,
+           so it stays pinned, and the infinite-scroll listener (bound to
+           .v15ib-list-scroll) fires again. Desktop widths never enter here. */
+        #view-v15inbox .v15ib-split { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+        #view-v15inbox .v15ib-split-list { flex: 1 1 auto; min-height: 0; }
+        #view-v15inbox .v15ib-split-list .v15ib-list-scroll {
+          flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
+        /* phones never render into the split thread pane (threads go to
+           #v15ib-body via _v15ibOpen); in the flex column the empty pane
+           would steal half the height, so it goes. The offsetParent checks
+           in the thread renderers already route around a hidden pane. */
+        #view-v15inbox .v15ib-split-thread { display: none; }
+        /* time tiers on tokens (shared hexes stay - desktop untouched) */
+        #view-v15inbox .v15ib-time-urgent { color: var(--red) !important; }
+        #view-v15inbox .v15ib-time-warm { color: var(--amber) !important; }
+        /* swipe reveal reads gold here (shared green hex stays for desktop) */
+        #view-v15inbox .v15ib-swipe-bg.left { background: var(--gold); color: var(--on-gold); }
+        /* voicemail rows: phone pip on the avatar corner + transcript snippet */
+        .v15ib-vm-pip {
+          display: flex; position: absolute; right: -2px; bottom: -2px;
+          width: 17px; height: 17px; border-radius: var(--r-full);
+          background: var(--text-sub); color: var(--bg);
+          align-items: center; justify-content: center;
+          border: 2px solid var(--surface);
+        }
+        .v15ib-vm-pip svg { width: 9px; height: 9px; }
+        #view-v15inbox .v15ib-prev-vm { display: inline; }
+        #view-v15inbox .v15ib-prev-std.has-vm { display: none; }
+        .v15ib-agent-line {
+          display: inline-flex; align-items: center; gap: 5px; margin-top: 4px;
+          font-size: 10.5px; font-weight: 700; color: var(--text-sub);
+        }
+        .v15ib-agent-line svg { width: 11px; height: 11px; color: var(--gold); }
+        /* member = gold ring on the avatar (reads down the column, costs no width) */
+        #view-v15inbox .v15ib-avatar.is-member {
+          box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--gold);
+        }
+        #view-v15inbox .v15ib-conv .v15ib-member-pill { display: none; }
+        /* Hawkeye: a real gold button on the right edge of the row */
+        #view-v15inbox .v15ib-hawk {
+          width: 34px; height: 34px; border-radius: 10px;
+          background: var(--gold); color: #131416; border: none;
+          display: flex; align-items: center; justify-content: center;
+          flex: none; align-self: center;
+        }
+        #view-v15inbox .v15ib-hawk svg { width: 16px; height: 16px; }
+
+        /* compose docks bottom-left; the Zoran orb owns bottom-right */
+        #view-v15inbox .v15ib-fab { display: none !important; }
+        #view-v15inbox .v15ib-fab-m {
+          display: flex; position: fixed;
+          left: 16px; bottom: calc(20px + env(safe-area-inset-bottom));
+          width: 54px; height: 54px; border-radius: 999px; z-index: 10060;
+          background: var(--gold); color: #131416; border: none;
+          align-items: center; justify-content: center; cursor: pointer;
+          box-shadow: 0 6px 18px rgba(200,168,78,.4);
+        }
+        #view-v15inbox .v15ib-fab-m svg { width: 22px; height: 22px; }
+        /* An older rule hides the orb (display:none !important) whenever the
+           v15 inbox is open so it can't cover the desktop composer. On mobile
+           Zoran wants the orb ON the inbox list (it IS the support door now),
+           so out-important that rule here; this block loads later in the
+           cascade. Thread-view overlap gets handled when that page is designed. */
+        body:has(#view-v15inbox.mm-open) #admin-fb-wrap {
+          display: block !important; z-index: 10060;
+          bottom: calc(20px + env(safe-area-inset-bottom));
+        }
+
+        /* ── Mobile compose: a full page docked on document.body (fixed
+           elements drift inside the transformed focus overlay) ── */
+        #v15ib-compose-m {
+          position: fixed; inset: 0; z-index: 10080; background: var(--bg);
+          overflow-y: auto; -webkit-overflow-scrolling: touch;
+          padding-bottom: calc(30px + env(safe-area-inset-bottom));
+        }
+        .ibm-top { padding: calc(10px + env(safe-area-inset-top)) 14px 0; }
+        .ibm-crumb { font-size: 10px; font-weight: 700; letter-spacing: .14em; color: var(--text-mute); font-family: var(--font-mono, inherit); }
+        .ibm-crumb span { color: var(--gold); }
+        .ibm-hd { display: flex; align-items: center; gap: 10px; padding: 9px 0 4px; }
+        .ibm-back {
+          flex: none; padding: 7px 12px 7px 9px; border-radius: var(--r-sm);
+          border: 1px solid var(--border-med); background: var(--surface);
+          color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+        }
+        .ibm-hd h1 { flex: 1; margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.01em; color: var(--text); }
+        .ibm-sec { padding: 16px 14px 7px; font-size: 10px; font-weight: 800; letter-spacing: .11em; color: var(--text-mute); }
+        .ibm-srch {
+          display: flex; align-items: center; gap: 9px; margin: 0 14px; padding: 9px 12px;
+          border-radius: var(--r-sm); border: 1px solid var(--border-med); background: var(--surface);
+        }
+        .ibm-srch svg { width: 15px; height: 15px; color: var(--text-mute); flex: none; }
+        .ibm-srch input { flex: 1; min-width: 0; border: none; background: none; outline: none; font: inherit; font-size: 13.5px; color: var(--text); }
+        .ibm-srch input::placeholder { color: var(--text-mute); }
+        .ibm-res {
+          display: flex; align-items: center; gap: 11px; width: 100%; padding: 10px 14px;
+          border: none; border-bottom: 1px solid var(--border); background: var(--surface);
+          text-align: left; font: inherit; cursor: pointer;
+        }
+        .ibm-av {
+          width: 36px; height: 36px; border-radius: var(--r-full); background: var(--surface-hov);
+          flex: none; display: flex; align-items: center; justify-content: center;
+          font-size: 12px; font-weight: 800; color: var(--text-sub);
+        }
+        .ibm-av.is-member { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--gold); }
+        .ibm-res .nm { display: block; font-size: 13.5px; font-weight: 700; color: var(--text); }
+        .ibm-res .sb { display: block; font-size: 11.5px; color: var(--text-mute); margin-top: 1px; }
+        .ibm-none { padding: 12px 14px; font-size: 12.5px; color: var(--text-mute); }
+        .ibm-chip {
+          display: inline-flex; align-items: center; gap: 8px; margin: 10px 14px 0;
+          padding: 7px 8px 7px 12px; border-radius: var(--r-full);
+          background: var(--gold-sheen); border: 1px solid var(--accent-border);
+          font-size: 13px; font-weight: 700; color: var(--text);
+        }
+        .ibm-chip button {
+          width: 20px; height: 20px; border-radius: var(--r-full); border: none; padding: 0;
+          background: var(--surface); display: flex; align-items: center; justify-content: center;
+          font-size: 13px; color: var(--text-mute); cursor: pointer;
+        }
+        .ibm-block {
+          margin: 12px 14px 0; padding: 12px 13px; border-radius: var(--r-md);
+          background: var(--gold); color: var(--on-gold);
+          font-size: 12.5px; font-weight: 700; line-height: 1.5;
+        }
+        .ibm-block button {
+          display: block; margin-top: 8px; padding: 8px 12px; border-radius: var(--r-sm);
+          border: none; background: rgba(0,0,0,.12); color: var(--on-gold);
+          font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;
+        }
+        .ibm-seg { display: flex; gap: 7px; padding: 0 14px; }
+        .ibm-seg button {
+          flex: 1; padding: 10px; border-radius: var(--r-sm); border: 1px solid var(--border-med);
+          background: var(--surface); text-align: center; font: inherit; font-size: 13px;
+          font-weight: 700; color: var(--text-sub); cursor: pointer;
+        }
+        .ibm-seg button.on { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
+        .ibm-input {
+          display: block; width: calc(100% - 28px); margin: 0 14px; padding: 11px 12px;
+          border-radius: var(--r-sm); border: 1px solid var(--border-med); background: var(--surface);
+          color: var(--text); font: inherit; font-size: 13.5px; outline: none; box-sizing: border-box;
+        }
+        .ibm-input:focus { border-color: var(--gold); }
+        .ibm-area { min-height: 120px; resize: vertical; line-height: 1.5; }
+        .ibm-files { padding: 6px 14px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+        .ibm-files:empty { display: none; }
+        .ibm-file {
+          font-size: 11px; font-weight: 600; color: var(--text-sub); background: var(--surface);
+          border: 1px solid var(--border); border-radius: var(--r-full); padding: 3px 10px;
+          max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ibm-meta { display: flex; align-items: center; gap: 10px; padding: 9px 14px 0; }
+        .ibm-attach {
+          display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px;
+          border-radius: var(--r-sm); border: 1px solid var(--border-med); background: var(--surface);
+          font-size: 12px; font-weight: 700; color: var(--text-sub); cursor: pointer;
+        }
+        .ibm-attach svg { width: 13px; height: 13px; }
+        .ibm-count { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--text-mute); font-family: var(--font-mono, inherit); }
+        .ibm-send {
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          margin: 18px 14px 0; width: calc(100% - 28px); padding: 14px;
+          border-radius: var(--r-md); border: none; background: var(--gold); color: var(--on-gold);
+          font: inherit; font-size: 14.5px; font-weight: 800; cursor: pointer;
+        }
+        .ibm-send svg { width: 17px; height: 17px; }
+        .ibm-send[disabled] { opacity: .4; cursor: default; }
+      }
+    </style>
+
     <div class="view" id="view-assets">
       <div class="topbar">
         <div>
@@ -12703,20 +13348,23 @@ Then the call to action."]</div>
       <div class="modal-card mm-modal-card v15ib-focus-card" onclick="event.stopPropagation()">
         <div class="v15ib-focus-head">
           <button type="button" class="mm-back-btn" onclick="closeV15InboxFocus()">‹ Back</button>
-          <span class="topbar-kicker">§ Inbox</span>
+          <span class="topbar-kicker"><span class="v15ib-kick-mark">§ </span>Inbox</span>
           <div class="v15ib-focus-head-actions">
             <button id="inbox-contacts-btn" onclick="switchView('contacts')" style="display:none;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;align-items:center;gap:7px">Contacts</button>
-            <button class="v15ib-mute-btn" id="ib-mute-btn" onclick="_ibToggleMute()" title="Toggle sounds">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path id="ib-mute-waves" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-              <span id="ib-mute-label">Sound on</span>
+            <!-- Sound toggle + "Talk to BAM Business" removed (Zoran 2026-07-31):
+                 the Zoran orb is the support door now, and sounds live in the
+                 desktop overflow. V1's own inbox (view-inbox) is untouched. -->
+            <button class="v15ib-mass-btn" id="v15ib-mass-btn" disabled title="Mass message - coming soon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg>
+              Mass
             </button>
-            <button class="inbox-talk-btn" onclick="switchView('messages')" style="background:var(--surface);border:1px solid var(--border-med);border-radius:8px;color:var(--text);padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px">Talk to BAM Business</button>
           </div>
         </div>
         <div class="content">
           <div id="v15inbox-content"></div>
         </div>
       </div>
+      <button type="button" class="v15ib-fab-m" onclick="_ibShowCompose()" aria-label="New message"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
     </div>
 
   <!-- ── Calendars (V1.5): focus-mode overlay ──
@@ -12786,6 +13434,26 @@ Then the call to action."]</div>
             <div class="cal-body" id="cal-body"></div>
           </div>
         </div>
+        <!-- Mobile agenda: replaces the 7-column grid under 768px. Same spine
+             data (/api/website/calendars), rendered as a scrolling day list. -->
+        <div id="mag-wrap">
+          <div id="mag-top">
+            <div id="mag-bar">
+              <button class="mag-mo" id="mag-mo" onclick="_magOpenJump()">
+                <span id="mag-mo-label">-</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <span class="mag-tz" id="mag-tz"></span>
+              <button class="mag-today" id="mag-today" onclick="_magJumpToday()"><span id="mag-today-arrow">↑</span> Today</button>
+            </div>
+            <button class="mag-alert" id="mag-alert" onclick="_magOpenForms()" style="display:none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg>
+              <span id="mag-alert-label"></span>
+              <span class="mag-go">›</span>
+            </button>
+          </div>
+          <div id="mag-list"></div>
+        </div>
       </div>
       </div>
     </div>
@@ -12793,6 +13461,15 @@ Then the call to action."]</div>
     <!-- Calendar session detail drawer (read-only) -->
     <div id="cal-drawer-overlay" onclick="if(event.target===this)closeCalDrawer()">
       <div id="cal-drawer"></div>
+    </div>
+
+    <!-- Mobile session roster + month jump. These MUST live outside
+         #view-calendar: .content carries a transform for the focus-mode camera
+         pan, which makes position:fixed resolve against it instead of the
+         viewport (the sheet rendered 5000px off-screen when nested). -->
+    <div id="mag-sheet"><div id="mag-sheet-body"></div></div>
+    <div id="mag-jump" onclick="if(event.target===this)_magCloseJump()">
+      <div class="mag-jump-card"><h3>Jump to</h3><div class="mag-jump-grid" id="mag-jump-grid"></div></div>
     </div>
 
   <!-- ── Business Blueprint: focus-mode overlay ──
@@ -12933,6 +13610,16 @@ Then the call to action."]</div>
       </svg>
       <span class="mobile-nav-label">KPIs</span>
     </button>
+    <!-- Mobile twin of #nav-content-flat. Same gate (applyOrganicShortcutNav), so it
+         only appears for V1.5 academies running organic alongside ads. -->
+    <button type="button" class="mobile-nav-item mnav-v15" data-view="organic" style="display:none" onclick="_mobileOrganic()" aria-label="Content">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/>
+        <path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/>
+        <path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>
+      </svg>
+      <span class="mobile-nav-label">Content</span>
+    </button>
     <button type="button" class="mobile-nav-item mnav-v15" data-view="support" onclick="_mobileSupport()" aria-label="Support">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24M14.83 14.83l4.24 4.24M14.83 9.17l4.24-4.24M14.83 9.17l3.53-3.53M4.93 19.07l4.24-4.24"/>
@@ -12940,8 +13627,12 @@ Then the call to action."]</div>
       <span class="mobile-nav-label">Support</span>
     </button>
     <!-- "More" opens a sheet with the academy switcher + every other enabled tab
-         (Contacts, Calendars, Blueprint, …) so nothing is sidebar-only on phones. -->
-    <button type="button" class="mobile-nav-item mnav-v2" data-view="more" onclick="_mobileMore()" aria-label="More">
+         (Contacts, Calendars, Blueprint, …) so nothing is sidebar-only on phones.
+         V1.5 needs it MORE than V2 does, not less: applyV15NavTrim() removes Inbox
+         and Sales from the V1.5 bar, so without this the bar was literally KPIs +
+         Support and Home / Assets / Contacts / Blueprint / Resources / Action Items
+         / Settings had no way in on a phone at all. -->
+    <button type="button" class="mobile-nav-item mnav-v2 mnav-v15" data-view="more" onclick="_mobileMore()" aria-label="More">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
         <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
@@ -16472,6 +17163,11 @@ _V15IB.selected = new Set();
 _V15IB.filtersOpen = false;
 _V15IB.noteMode = false;
 _V15IB.renderLimit = 30;        // #4: virtual scroll - render N at a time
+// Mobile filter sheet lanes (only settable from the sheet under 768px)
+_V15IB.needsReplyOnly = false;  // "Needs reply" chip
+_V15IB.fAgent = '';             // '' | booking | confirm | closing | none
+_V15IB.vmOnly = false;          // "Voicemail" chip
+_V15IB.msheetOpen = false;      // sheet is portaled onto document.body
 
 // #12: Search filter
 function _v15ibSetSearch(q) {
@@ -16635,11 +17331,77 @@ function _v15ibFiltered() {
       if (!cp || cp.pipelineId !== _V15IB.fPipeline) return false;
       if (_V15IB.fStage && cp.stageId !== _V15IB.fStage) return false;
     }
+    // Mobile sheet lanes. Same definition as the toolbar's needs-reply count.
+    if (_V15IB.needsReplyOnly && !(_ibPriorityLane(c) === 'needs-reply' && !_ibIsSystemSender(c))) return false;
+    if (_V15IB.vmOnly && !_ibIsVoicemailConv(c)) return false;
+    // Agent lane reads the Hawkeye index; before it loads, filter nothing
+    // (fail open, same contract as _hawkPendingFor).
+    if (_V15IB.fAgent && window._hawkIdx) {
+      let hk = null; try { hk = _hawkPendingFor(c.contactId, c.id); } catch (_) {}
+      if (_V15IB.fAgent === 'none' ? !!hk : hk !== _V15IB.fAgent) return false;
+    }
     return true;
   });
 }
 
 function _v15ibClearPipe() { _V15IB.fPipeline = ''; _V15IB.fStage = ''; _v15ibRenderAll(); }
+
+// ── Mobile filter sheet (under 768px) ───────────────────────────────────────
+// The focus overlay's .content is transformed, so position:fixed inside it
+// resolves against the card, not the viewport. While the sheet is open the
+// drawer node is PORTALED onto document.body (styles ride on .msheet-open,
+// which survives the move); every _v15ibRenderAll re-portals the fresh node.
+function _ibSheetPortal() {
+  document.querySelectorAll('body > .v15ib-filter-drawer.msheet-open').forEach(n => n.remove());
+  const d = document.getElementById('v15ib-filter-drawer');
+  if (!d) return;
+  d.classList.add('msheet-open');
+  document.body.appendChild(d);
+}
+function _ibSheetOpen() {
+  if (_V15IB.msheetOpen) return;
+  _V15IB.msheetOpen = true;
+  _v15ibRenderAll();   // fresh chip states; ends by portaling the drawer out
+  if (!document.getElementById('v15ib-msheet-scrim')) {
+    const s = document.createElement('div');
+    s.id = 'v15ib-msheet-scrim';
+    s.onclick = _ibSheetClose;
+    document.body.appendChild(s);
+  }
+}
+function _ibSheetClose() {
+  if (!_V15IB.msheetOpen) return;
+  _V15IB.msheetOpen = false;
+  document.getElementById('v15ib-msheet-scrim')?.remove();
+  document.querySelectorAll('body > .v15ib-filter-drawer.msheet-open').forEach(n => n.remove());
+  _v15ibRenderAll();   // rebuilds the drawer back in its toolbar slot
+}
+function _ibMNeedsReply() { _V15IB.needsReplyOnly = !_V15IB.needsReplyOnly; _v15ibRenderAll(); }
+function _ibMAgent(v) { _V15IB.fAgent = _V15IB.fAgent === v ? '' : v; _v15ibRenderAll(); }
+function _ibMVm() { _V15IB.vmOnly = !_V15IB.vmOnly; _v15ibRenderAll(); }
+function _ibMFiltersClear() {
+  _V15IB.fClass = ''; _V15IB.unreadOnly = false; _V15IB.readOnly = false; _V15IB.sentOnly = false;
+  _V15IB.failedOnly = false; _V15IB.fChannels = []; _V15IB.fPipeline = ''; _V15IB.fStage = '';
+  _V15IB.needsReplyOnly = false; _V15IB.fAgent = ''; _V15IB.vmOnly = false;
+  _v15ibRenderAll();
+}
+
+// ── Voicemail ↔ conversation matching ───────────────────────────────────────
+// Repo rule: phones match on the LAST 10 DIGITS, never raw equality.
+function _ibPhone10(v) { return String(v || '').replace(/\D+/g, '').slice(-10); }
+function _ibVmRowFor(c) {
+  const rows = (typeof _VMX !== 'undefined' && _VMX && _VMX.rows) || [];
+  if (!rows.length || !c) return null;
+  const p10 = _ibPhone10(c.phone);
+  if (p10.length < 10) return null;
+  return rows.find(v => _ibPhone10(v.contact_phone) === p10) || null;
+}
+function _ibIsVoicemailConv(c) {
+  if (!c) return false;
+  const t = String(c.lastMessageType || c.channel || '').toLowerCase();
+  if (/call|voicemail/.test(t)) return true;
+  return !!_ibVmRowFor(c);
+}
 
 function _v15ibRenderAll() {
   const host = document.getElementById('v15inbox-content');
@@ -16702,6 +17464,13 @@ function _v15ibRenderAll() {
   const stageOpts = curPipe ? `<option value="">All stages</option>` + (curPipe.stages || []).map(s => `<option value="${escapeHTML(s.id)}" ${_V15IB.fStage === s.id ? 'selected' : ''}>${escapeHTML(_plStageLabel(s))}</option>`).join('') : '';
   const hasActiveFilters = _V15IB.fChannels.length > 0 || _V15IB.fPipeline;
 
+  // Mobile Filters chip: badge counts EVERY active filter, incl. sheet lanes
+  const isMobileIB = window.innerWidth <= 768;
+  const mActiveCount = (_V15IB.fClass ? 1 : 0) + (_V15IB.unreadOnly ? 1 : 0) + (_V15IB.failedOnly ? 1 : 0)
+    + _V15IB.fChannels.length + (_V15IB.fPipeline ? 1 : 0) + (_V15IB.needsReplyOnly ? 1 : 0)
+    + (_V15IB.fAgent ? 1 : 0) + (_V15IB.vmOnly ? 1 : 0);
+  const vmRowCount = ((typeof _VMX !== 'undefined' && _VMX && _VMX.rows) || []).length;
+
   // Needs-reply count for progress indicator
   const needsReplyCount = _V15IB.convos.filter(c => _ibPriorityLane(c) === 'needs-reply' && !_ibIsSystemSender(c)).length;
 
@@ -16722,16 +17491,17 @@ function _v15ibRenderAll() {
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <div class="v15ib-search" style="flex:1;min-width:180px;max-width:320px">
           <svg class="v15ib-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-          <input type="text" placeholder="Search..." oninput="_v15ibSetSearch(this.value)" id="v15ib-search-input" value="${escapeHTML(_V15IB.searchQuery)}">
+          <input type="text" placeholder="${isMobileIB ? 'Search messages' : 'Search...'}" oninput="_v15ibSetSearch(this.value)" id="v15ib-search-input" value="${escapeHTML(_V15IB.searchQuery)}">
           <button class="v15ib-search-clear ${_V15IB.searchQuery ? 'show' : ''}" onclick="document.getElementById('v15ib-search-input').value='';_v15ibSetSearch('')">x</button>
+          <button type="button" class="v15ib-mfilters" onclick="_ibSheetOpen()" aria-label="Filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="17" x2="14" y2="17"/></svg>Filters${mActiveCount ? `<b>${mActiveCount}</b>` : ''}</button>
         </div>
         ${clsRow}
-        <span style="flex:1"></span>
+        <span class="v15ib-tb-spacer" style="flex:1"></span>
         ${needsReplyCount > 0 ? `<span class="v15ib-progress" role="button" style="cursor:pointer" title="Show unread" onclick="_v15ibTab('unread')">${_ibProgressRing(needsReplyCount, totalPeople)}</span>` : ''}
         <button class="v15ib-filter-toggle${hasActiveFilters ? ' has-filters' : ''}" onclick="_V15IB.filtersOpen=!_V15IB.filtersOpen;document.getElementById('v15ib-filter-drawer').classList.toggle('open')">Filters${hasActiveFilters ? ' *' : ''}</button>
         <button id="v15ib-approve-btn" onclick="_hk2Open()" class="v15ib-act-btn" data-tip="Review agent drafts before they send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Hawkeye<span id="v15-apx-count" class="v15ib-act-count"></span></button>
         <button id="v15ib-vmx-btn" onclick="_vmxOpen()" class="v15ib-act-btn" style="display:none" data-tip="Listen to voicemails from leads"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Voicemail<span id="v15-vmx-count" class="v15ib-act-count"></span></button>
-        <button onclick="_v15ibMassSend()" class="v15ib-act-btn" data-tip="Text multiple contacts at once"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Broadcast</button>
+        <button onclick="_v15ibMassSend()" id="v15ib-bc-btn" class="v15ib-act-btn" data-tip="Text multiple contacts at once"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Broadcast</button>
         <button class="v15ib-mute-btn" id="ib-mute-btn2" onclick="_ibToggleMute()" title="Toggle sounds" style="background:none;border:1px solid var(--border-med);border-radius:6px;padding:5px 8px;cursor:pointer;color:var(--text-mute);display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:12px;font-weight:600">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path id="ib-mute-waves2" d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
         </button>
@@ -16747,17 +17517,39 @@ function _v15ibRenderAll() {
             <button class="v15ib-overflow-item" onclick="_ibShowCompose();this.closest('.v15ib-overflow-menu').classList.remove('open')">New message</button>
             <button class="v15ib-overflow-item" onclick="_v15ibMassSend();this.closest('.v15ib-overflow-menu').classList.remove('open')">Broadcast</button>
             <button class="v15ib-overflow-item" onclick="_ibToggleMute();this.closest('.v15ib-overflow-menu').classList.remove('open')">Toggle sounds</button>
-            <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-            <button class="v15ib-overflow-item" onclick="switchView('messages');this.closest('.v15ib-overflow-menu').classList.remove('open')">Talk to BAM Business</button>
           </div>
         </div>
       </div>
       ${chanTabRow}
       <div class="v15ib-filter-drawer ${_V15IB.filtersOpen ? 'open' : ''}" id="v15ib-filter-drawer">
+        <div class="v15ib-msheet-only v15ib-mtitle">Filters</div>
+        <div class="v15ib-msheet-only v15ib-msec">WHO</div>
+        <div class="v15ib-msheet-only v15ib-mrow">
+          <button onclick="_v15ibTab('');_v15ibRenderAll()" class="v15ib-chan${_V15IB.fClass === '' && !_V15IB.unreadOnly ? ' on' : ''}">All <span style="opacity:.6">${totalPeople}</span></button>
+          <button onclick="_v15ibTab('member');_v15ibRenderAll()" class="v15ib-chan${_V15IB.fClass === 'member' ? ' on' : ''}">Members <span style="opacity:.6">${clsCounts.member + clsCounts.member_family}</span></button>
+          <button onclick="_v15ibTab('lead');_v15ibRenderAll()" class="v15ib-chan${_V15IB.fClass === 'lead' ? ' on' : ''}">Leads <span style="opacity:.6">${clsCounts.lead}</span></button>
+          ${(clsCounts.spam + autoSpamCount) > 0 ? `<button onclick="_v15ibTab('spam');_v15ibRenderAll()" class="v15ib-chan${_V15IB.fClass === 'spam' ? ' on' : ''}">Spam <span style="opacity:.6">${clsCounts.spam + autoSpamCount}</span></button>` : ''}
+        </div>
+        <div class="v15ib-msheet-only v15ib-msec">STATE</div>
+        <div class="v15ib-msheet-only v15ib-mrow">
+          <button onclick="_v15ibTab('unread');_v15ibRenderAll()" class="v15ib-chan${_V15IB.unreadOnly ? ' on' : ''}">Unread${unreadCount ? ` <span style="opacity:.6">${unreadCount}</span>` : ''}</button>
+          <button onclick="_ibMNeedsReply()" class="v15ib-chan${_V15IB.needsReplyOnly ? ' on' : ''}">Needs reply${needsReplyCount ? ` <span style="opacity:.6">${needsReplyCount}</span>` : ''}</button>
+          <button onclick="_v15ibSetFailed(!_V15IB.failedOnly);_v15ibRenderAll()" class="v15ib-chan${_V15IB.failedOnly ? ' on' : ''}">Failed to send</button>
+        </div>
+        <div class="v15ib-msheet-only v15ib-msec">CHANNEL</div>
         ${chanBtns}
+        ${vmRowCount ? `<button onclick="_ibMVm()" class="v15ib-msheet-only v15ib-chan${_V15IB.vmOnly ? ' on' : ''}">Voicemail <span style="opacity:.6">${vmRowCount}</span></button>` : ''}
+        <div class="v15ib-msheet-only v15ib-msec">AGENT</div>
+        <div class="v15ib-msheet-only v15ib-mrow">
+          <button onclick="_ibMAgent('booking')" class="v15ib-chan${_V15IB.fAgent === 'booking' ? ' on' : ''}">Booking agent</button>
+          <button onclick="_ibMAgent('confirm')" class="v15ib-chan${_V15IB.fAgent === 'confirm' ? ' on' : ''}">Confirm agent</button>
+          <button onclick="_ibMAgent('closing')" class="v15ib-chan${_V15IB.fAgent === 'closing' ? ' on' : ''}">Closing agent</button>
+          <button onclick="_ibMAgent('none')" class="v15ib-chan${_V15IB.fAgent === 'none' ? ' on' : ''}">Not in one</button>
+        </div>
         <select onchange="_v15ibSetPipeline(this.value)" class="v15ib-sel" style="max-width:160px;padding:5px 8px;font-size:11px;border-radius:6px">${pipeOpts}</select>
         ${curPipe ? `<select onchange="_v15ibSetStage(this.value)" class="v15ib-sel" style="max-width:140px;padding:5px 8px;font-size:11px;border-radius:6px">${stageOpts}</select>` : ''}
         ${hasActiveFilters ? `<button onclick="_v15ibClearPipe();_V15IB.fChannels=[];_v15ibRenderAll()" style="background:none;border:none;color:var(--text-mute);font-size:11px;cursor:pointer;text-decoration:underline">Clear</button>` : ''}
+        <button type="button" onclick="_ibMFiltersClear()" class="v15ib-msheet-only v15ib-mclear">Clear all filters</button>
       </div>
       <button type="button" class="v15ib-fab" onclick="_ibShowCompose()" aria-label="New message"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
     </div>
@@ -16770,6 +17562,8 @@ function _v15ibRenderAll() {
       <div class="v15ib-split-thread" id="v15ib-thread-pane">${emptyState}</div>
     </div>`;
   _v15ibRenderList();
+  // Mobile sheet open across a re-render: portal the fresh drawer back out
+  if (_V15IB.msheetOpen) { try { _ibSheetPortal(); } catch (_) {} }
   _apxRefreshCount();
   _acxRefreshCount();
   _aclxRefreshCount();
@@ -16985,10 +17779,20 @@ function _v15ibConvRow(c, idx) {
     : /call|voice|phone/i.test(chLbl) ? '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>'
     : '<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 8.5-8.5 8.38 8.38 0 0 1 3.8.9 8.5 8.5 0 0 1 4.7 7.6z"/>';
   const chTag = chIcon ? `<span class="v15ib-chtag" title="${escapeHTML(chLbl)}"><svg viewBox="0 0 24 24">${chSvg}</svg></span>` : '';
-  const memTag = _ibMemberOf(c) ? `<span style="margin-left:4px">${_ibMemberPill(true)}</span>` : '';
+  const memTag = _ibMemberOf(c) ? `<span class="v15ib-member-pill" style="margin-left:4px">${_ibMemberPill(true)}</span>` : '';
   const classBadges = _ibClassBadges(c);
   const dirArrow = _ibDirArrow(c);
   const timeClass = _ibTimeUrgency(c);
+  // Mobile-only: the arrow leads the snippet instead of trailing the name
+  // (both spans render always; CSS swaps them at 768px, desktop unchanged).
+  const mdir = String(c.lastMessageDirection || '').toLowerCase();
+  const mDirArrow = mdir === 'inbound' ? '<span class="v15ib-mdir">←</span>'
+    : mdir === 'outbound' ? '<span class="v15ib-mdir">→</span>' : '';
+  // Voicemail rows (call-type last message OR a phone10 match into _VMX):
+  // mobile shows a phone pip on the avatar + the transcript in quotes.
+  const vmRow = _ibVmRowFor(c);
+  const isVm = !!vmRow || /call|voicemail/.test(String(c.lastMessageType || c.channel || '').toLowerCase());
+  const vmTxt = vmRow ? String(vmRow.voicemail_transcript || '').trim() : '';
   // Replied fade
   const dir = String(c.lastMessageDirection || '').toLowerCase();
   const repliedClass = (!unread && dir === 'outbound') ? ' replied' : '';
@@ -17002,27 +17806,32 @@ function _v15ibConvRow(c, idx) {
   const checked = _V15IB.selected.has(c.id) ? ' checked' : '';
   // Hawkeye: this lead's reply belongs to the deck. Clicking the row redirects
   // anyway - the chip makes that visible BEFORE the click, and jumps to the card.
-  let hawkChip = '';
+  let hawkChip = '', agentLine = '';
   try {
     const hkAgent = _hawkPendingFor(c.contactId, c.id);
     if (hkAgent) {
       const hkCid = c.contactId ? String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '') : '';
       hawkChip = `<button type="button" class="v15ib-hawk" title="Hawkeye has an action waiting" onclick="event.stopPropagation();_hk2Open('${hkAgent}'${hkCid ? `,'${hkCid}'` : ''})">${_HV2_ICONS.eye}</button>`;
+      // Mobile-only label: which agent is working this lead. Replaces the
+      // pipeline chip there (Zoran 2026-07-31). Desktop keeps the chip.
+      const agentLabel = ({ booking: 'Booking agent', confirm: 'Confirm agent', closing: 'Closing agent' })[hkAgent] || 'Agent';
+      agentLine = `<div class="v15ib-agent-line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/></svg>${agentLabel}</div>`;
     }
   } catch (_) {}
 
   return `<div class="v15ib-conv ${unread ? 'unread' : ''}${repliedClass}${hotClass}${isActive ? ' v15ib-active' : ''}${needsReply ? ' unread' : ''}" style="${stagger}" data-conv-id="${escapeHTML(c.id)}" onclick='${_V15IB.multiSelect ? `_v15ibToggleSelect("${c.id}",event)` : `_v15ibOpenSplit(${JSON.stringify(c.id)},${JSON.stringify(c.contactId || "")},${JSON.stringify(c.phone || "")},${JSON.stringify(c.email || "")},${JSON.stringify(c.contactName || "")},${JSON.stringify(c.lastMessageType || c.channel || "")})`}'>
-    <span class="v15ib-swipe-bg left">Read</span>
+    <span class="v15ib-swipe-bg left">${unread ? 'Read' : 'Unread'}</span>
     <div class="v15ib-check${checked}" onclick="_v15ibToggleSelect('${c.id}',event)"></div>
     <div style="position:relative;flex:none">
-      <div style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;${_ibAvatarStyle(smart.display)}">${escapeHTML(_ibInitials(smart.display))}</div>
+      <div class="v15ib-avatar${(_ibMemberOf(c) || c.classification === 'member' || c.classification === 'member_family') ? ' is-member' : ''}" style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;${_ibAvatarStyle(smart.display)}">${escapeHTML(_ibInitials(smart.display))}</div>
       ${unread ? '<span class="v15ib-unread-dot" style="position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:var(--gold);border:2px solid var(--surface)"></span>' : ''}
+      ${isVm ? '<span class="v15ib-vm-pip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>' : ''}
     </div>
     <div style="flex:1;min-width:0">
       <div class="v15ib-name">${escapeHTML(smart.display)}${memTag}${chTag}${classBadges}${dirArrow}</div>
       ${smart.sub ? `<div class="v15ib-name-sub">${escapeHTML(smart.sub)}</div>` : ''}
-      <div class="v15ib-prev">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</div>
-      ${chip}
+      <div class="v15ib-prev">${mDirArrow}<span class="v15ib-prev-std${vmTxt ? ' has-vm' : ''}">${escapeHTML(_ibCleanPreview(c.lastMessageBody))}</span>${vmTxt ? `<span class="v15ib-prev-vm">"${escapeHTML(vmTxt)}"</span>` : ''}</div>
+      ${chip}${agentLine}
     </div>
     ${hawkChip}
     <div style="flex:none;align-self:flex-start;font-size:10px;white-space:nowrap;padding-top:2px;color:var(--text-mute)" class="${timeClass}">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
@@ -17401,6 +18210,9 @@ function _ibInitScrollShadows(el) {
 
 // #25: Quick compose modal
 function _ibShowCompose() {
+  // Phones get the full-screen compose page (per the mobile inbox mockup);
+  // the desktop modal below stays byte-identical.
+  if (window.innerWidth <= 768) { _ibShowComposeM(); return; }
   if (document.getElementById('v15ib-compose-overlay')) return;
   const overlay = document.createElement('div');
   overlay.id = 'v15ib-compose-overlay';
@@ -17453,6 +18265,193 @@ async function _ibSendCompose() {
   }
 }
 
+// ── Mobile compose: full-screen page (under 768px) ──────────────────────────
+// Own fixed element docked on document.body (fixed elements drift inside the
+// transformed focus overlay). Recipient comes from a contact search over the
+// loaded conversations - never a free-typed number - so the Hawkeye hold can
+// be shown BEFORE the send; the server 409 stays as the backstop.
+let _IBM = null;
+function _ibShowComposeM() {
+  if (document.getElementById('v15ib-compose-m')) return;
+  _IBM = { picked: null, hawk: null, channel: 'sms', attachments: [] };
+  const page = document.createElement('div');
+  page.id = 'v15ib-compose-m';
+  page.innerHTML = `
+    <div class="ibm-top">
+      <div class="ibm-crumb">FOCUS &middot; <span>INBOX</span> &middot; LIVE</div>
+      <div class="ibm-hd">
+        <button type="button" class="ibm-back" onclick="_ibmClose()">&lsaquo; Back</button>
+        <h1>New message</h1>
+      </div>
+    </div>
+    <div class="ibm-sec">TO</div>
+    <div class="ibm-srch" id="ibm-to-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="ibm-to" placeholder="Search name, phone or email" oninput="_ibmSearch(this.value)" autocomplete="off">
+    </div>
+    <div id="ibm-picked"></div>
+    <div id="ibm-results"></div>
+    <div class="ibm-sec">SEND AS</div>
+    <div class="ibm-seg">
+      <button type="button" class="on" id="ibm-seg-sms" onclick="_ibmChan('sms')">SMS</button>
+      <button type="button" id="ibm-seg-email" onclick="_ibmChan('email')">Email</button>
+    </div>
+    <div id="ibm-subject-wrap" style="display:none">
+      <div class="ibm-sec">SUBJECT</div>
+      <input class="ibm-input" id="ibm-subject" placeholder="Subject" oninput="_ibmCount()">
+    </div>
+    <div class="ibm-sec">MESSAGE</div>
+    <textarea class="ibm-input ibm-area" id="ibm-body" placeholder="Type your message..." oninput="_ibmCount()"></textarea>
+    <div class="ibm-files" id="ibm-files"></div>
+    <div class="ibm-meta">
+      <label class="ibm-attach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.05l-8.5 8.5a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 1 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>Attach<input type="file" multiple style="display:none" onchange="_ibmPickFiles(this)"></label>
+      <span class="ibm-count" id="ibm-count">0 / 160 &middot; 1 SMS</span>
+    </div>
+    <button type="button" class="ibm-send" id="ibm-send" disabled onclick="_ibmSend()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg>
+      <span id="ibm-send-label">Send</span>
+    </button>`;
+  document.body.appendChild(page);
+  // Warm the Hawkeye index so the pick-time hold check has data; if a pick
+  // already happened by the time it lands, re-run it so the block card shows.
+  try { _hawkIdxEnsure().then(() => { if (_IBM && _IBM.picked) _ibmPick(_IBM.picked.id); }).catch(() => {}); } catch (_) {}
+  setTimeout(() => document.getElementById('ibm-to')?.focus(), 60);
+}
+function _ibmClose() {
+  document.getElementById('v15ib-compose-m')?.remove();
+  _IBM = null;
+}
+function _ibmSearch(q) {
+  const box = document.getElementById('ibm-results');
+  if (!box || !_IBM) return;
+  q = String(q || '').trim().toLowerCase();
+  if (_IBM.picked || q.length < 1) { box.innerHTML = ''; return; }
+  // One row per person - the list can hold the same contact on two channels.
+  const seen = new Set(); const out = [];
+  for (const c of (_V15IB.convos || [])) {
+    const hay = ((c.contactName || '') + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase();
+    if (!hay.includes(q)) continue;
+    const key = c.contactId || _ibPhone10(c.phone) || String(c.email || '').toLowerCase() || c.id;
+    if (seen.has(key)) continue;
+    seen.add(key); out.push(c);
+    if (out.length >= 8) break;
+  }
+  box.innerHTML = out.map(c => {
+    const smart = _ibSmartName(c);
+    const isMem = !!(_ibMemberOf(c) || c.classification === 'member' || c.classification === 'member_family');
+    const sub = [c.phone, c.email, isMem ? 'Member' : ''].filter(Boolean).join(' · ');
+    return `<button type="button" class="ibm-res" onclick='_ibmPick(${JSON.stringify(String(c.id))})'>
+      <span class="ibm-av${isMem ? ' is-member' : ''}">${escapeHTML(_ibInitials(smart.display))}</span>
+      <span style="flex:1;min-width:0"><span class="nm">${escapeHTML(smart.display)}</span><span class="sb">${escapeHTML(sub)}</span></span>
+    </button>`;
+  }).join('') || '<div class="ibm-none">No matches.</div>';
+}
+function _ibmPick(convId) {
+  if (!_IBM) return;
+  const c = (_V15IB.convos || []).find(x => String(x.id) === String(convId));
+  if (!c) return;
+  _IBM.picked = c;
+  const box = document.getElementById('ibm-results'); if (box) box.innerHTML = '';
+  const to = document.getElementById('ibm-to'); if (to) to.value = '';
+  const wrap = document.getElementById('ibm-to-wrap'); if (wrap) wrap.style.display = 'none';
+  const smart = _ibSmartName(c);
+  // Hawkeye hold: same rule as the thread - staff answers the card, not here.
+  let hk = null;
+  try { hk = _hawkPendingFor(c.contactId, c.id); } catch (_) {}
+  _IBM.hawk = hk || null;
+  let hawkCard = '';
+  if (hk) {
+    const cid = c.contactId ? String(c.contactId).replace(/[^A-Za-z0-9_-]/g, '') : '';
+    hawkCard = `<div class="ibm-block">Hawkeye is holding ${escapeHTML(smart.display)}. Answer the card first so the agent and you are not both replying.
+      <button type="button" onclick="_ibmClose();_hk2Open('${hk}'${cid ? `,'${cid}'` : ''})">Open in Hawkeye &rsaquo;</button></div>`;
+  }
+  const picked = document.getElementById('ibm-picked');
+  if (picked) picked.innerHTML = `<span class="ibm-chip">${escapeHTML(smart.display)}<button type="button" onclick="_ibmClear()" aria-label="Remove recipient">×</button></span>` + hawkCard;
+  _ibmCount();
+}
+function _ibmClear() {
+  if (!_IBM) return;
+  _IBM.picked = null; _IBM.hawk = null;
+  const picked = document.getElementById('ibm-picked'); if (picked) picked.innerHTML = '';
+  const wrap = document.getElementById('ibm-to-wrap'); if (wrap) wrap.style.display = '';
+  const to = document.getElementById('ibm-to'); if (to) { to.value = ''; to.focus(); }
+  _ibmCount();
+}
+function _ibmChan(k) {
+  if (!_IBM) return;
+  _IBM.channel = k;
+  document.getElementById('ibm-seg-sms')?.classList.toggle('on', k === 'sms');
+  document.getElementById('ibm-seg-email')?.classList.toggle('on', k === 'email');
+  const sw = document.getElementById('ibm-subject-wrap');
+  if (sw) sw.style.display = k === 'email' ? '' : 'none';
+  _ibmCount();
+}
+function _ibmCount() {
+  if (!_IBM) return;
+  const v = document.getElementById('ibm-body')?.value || '';
+  const el = document.getElementById('ibm-count');
+  if (el) el.textContent = _IBM.channel === 'sms'
+    ? `${v.length} / 160 · ${Math.max(1, Math.ceil(v.length / 160))} SMS`
+    : `${v.length} characters`;
+  const btn = document.getElementById('ibm-send');
+  if (btn) btn.disabled = !_IBM.picked || !v.trim() || !!_IBM.hawk;
+}
+// Attach reuses the thread pipeline: upload to the message-attachments bucket,
+// send the public URLs (api/ghl/send-message accepts `attachments`).
+async function _ibmPickFiles(input) {
+  if (!_IBM) return;
+  const files = Array.from(input.files || []); input.value = '';
+  for (const file of files) {
+    try {
+      const clean = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+      const path = `${CLIENT_ID}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${clean}`;
+      const { error } = await _sb.storage.from('message-attachments').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+      if (error) throw error;
+      const { data } = _sb.storage.from('message-attachments').getPublicUrl(path);
+      if (data?.publicUrl) _IBM.attachments.push({ url: data.publicUrl, name: file.name });
+    } catch (e) { alert("Couldn't attach " + file.name + ' - ' + (e.message || e)); }
+  }
+  const host = document.getElementById('ibm-files');
+  if (host && _IBM) host.innerHTML = _IBM.attachments.map(a => `<span class="ibm-file">${escapeHTML(a.name)}</span>`).join('');
+}
+async function _ibmSend() {
+  if (!_IBM || !_IBM.picked || _IBM.hawk) return;
+  const c = _IBM.picked;
+  const text = (document.getElementById('ibm-body')?.value || '').trim();
+  const subject = (document.getElementById('ibm-subject')?.value || '').trim();
+  if (!text) return;
+  const type = _IBM.channel === 'email' ? 'Email' : 'SMS';
+  if (type === 'Email' && !subject) { alert('Email needs a subject.'); return; }
+  const btn = document.getElementById('ibm-send');
+  const lbl = document.getElementById('ibm-send-label');
+  if (btn) btn.disabled = true;
+  if (lbl) lbl.textContent = 'Sending...';
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        client_id: CLIENT_ID, type,
+        contactId: c.contactId || undefined, phone: c.phone || undefined, email: c.email || undefined,
+        message: text, subject: subject || undefined,
+        attachments: _IBM.attachments.length ? _IBM.attachments.map(a => a.url) : undefined,
+      }),
+    });
+    const j = await _safeJson(r);
+    // Server 409 backstop: Hawkeye owns this lead - route into the deck.
+    if (_hawkGate409(r.status, j, c.contactId || null)) { _ibmClose(); return; }
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _SFX.whoosh();
+    _ibmClose();
+    openV15Inbox();   // refresh the list so the new thread shows
+  } catch (e) {
+    _SFX.buzz();
+    alert('Send failed: ' + (e.message || e));
+    if (lbl) lbl.textContent = 'Send';
+    _ibmCount();      // re-enables per the normal rules
+  }
+}
+
 // #7: Mobile swipe gesture handler
 function _ibInitSwipe() {
   if (!('ontouchstart' in window)) return;
@@ -17460,6 +18459,8 @@ function _ibInitSwipe() {
     let startX = 0, startY = 0, dx = 0, horiz = null, lastX = 0, lastT = 0, vx = 0;
     el.addEventListener('touchstart', e => {
       const t = e.touches[0];
+      // Safari's back gesture owns the left 30px - never contest it.
+      if (t.clientX < 30) { dx = 0; horiz = false; return; }
       startX = t.clientX; startY = t.clientY; dx = 0; horiz = null; vx = 0; lastX = t.clientX; lastT = e.timeStamp;
       el.style.transition = 'none';
     }, { passive: true });
@@ -17486,7 +18487,12 @@ function _ibInitSwipe() {
         try { hapticTap('LIGHT'); } catch (_) {}
         const convId = el.dataset.convId;
         const conv = (_V15IB.convos || []).find(c => c.id === convId);
-        if (conv) { conv.unreadCount = conv.unreadCount > 0 ? 0 : 1; _v15ibRenderList(); }
+        if (conv) {
+          conv.unreadCount = conv.unreadCount > 0 ? 0 : 1;
+          // Persist, or the flip silently reverts on the next load.
+          try { _v15ibPersistRead(conv.id, conv.unreadCount > 0 ? 'unread' : 'read'); } catch (_) {}
+          _v15ibRenderList();
+        }
       }
       dx = 0; horiz = null;
     });
@@ -21184,14 +22190,20 @@ function _mobileBarViews() {
 function syncMobileNav(name) {
   let matched = false;
   document.querySelectorAll('.mobile-nav-item').forEach(b => {
-    if (b.dataset.view === 'more' || b.dataset.view === 'support') return;
+    if (b.dataset.view === 'more' || b.dataset.view === 'support' || b.dataset.view === 'organic') return;
     const on = b.dataset.view === name;
     b.classList.toggle('active', on);
     if (on && b.offsetParent !== null) matched = true;   // a visible bar item owns this view
   });
+  // Marketing has two doors on the V1.5 bar: Content owns the organic channel, Support
+  // owns everything else under Marketing/Systems. Split them on _MKT_CHANNEL so exactly
+  // one lights up.
+  const onOrganic = name === 'marketing' && _MKT_CHANNEL === 'organic';
+  const content = document.querySelector('.mobile-nav-item[data-view="organic"]');
+  if (content) { content.classList.toggle('active', onOrganic); if (onOrganic && content.offsetParent !== null) matched = true; }
   // Support owns Marketing/Systems in V1.5; light it then.
   const support = document.querySelector('.mobile-nav-item[data-view="support"]');
-  if (support) { const owns = V15_ACCESS && (name === 'marketing' || name === 'systems'); support.classList.toggle('active', owns); if (owns) matched = true; }
+  if (support) { const owns = V15_ACCESS && !onOrganic && (name === 'marketing' || name === 'systems'); support.classList.toggle('active', owns); if (owns) matched = true; }
   const more = document.querySelector('.mobile-nav-item[data-view="more"]');
   if (more) more.classList.toggle('active', !matched);
 }
@@ -21692,12 +22704,6 @@ function _hv2Style() {
     '#home-v2 .hm-ai-overdue{border-left:3px solid #F07060 !important}' +
     '#home-v2 .hm-ai-today{border-left:3px solid #F0B84A !important}' +
 
-    // ── Toggle tabs (Action Items / Inbox) ──
-    '#home-v2 .hm-toggle-tabs{display:flex;gap:0;background:var(--surface-alt,rgba(255,255,255,.04));border-radius:8px;padding:2px;border:1px solid var(--border)}' +
-    '#home-v2 .hm-toggle-tab{font-family:inherit;font-size:11.5px;font-weight:600;color:var(--text-mute);background:none;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}' +
-    '#home-v2 .hm-toggle-tab svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
-    '#home-v2 .hm-toggle-tab.active{color:var(--text);background:rgba(212,182,92,.12)}' +
-    '#home-v2 .hm-toggle-tab:hover:not(.active){color:var(--text-sub)}' +
     // Inbox preview rows
     '#home-v2 .hm-ib-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;position:relative}' +
     '#home-v2 .hm-ib-row:hover{background:rgba(212,182,92,.04)}' +
@@ -21895,30 +22901,37 @@ function renderHomeV2() {
       </div>
       <div class="hm-bubble">
         <div class="hv2-mid">
-          <div class="hv2-panel">
+          <div class="hv2-panel" id="hv2-sched-panel">
             <div class="hv2-ph">
               <span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.calendar} Today's schedule</span>
               <span class="hm-trial-pill" id="hm-trial-pill" style="display:none"></span>
             </div>
             <div id="hv2-sched-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
-            <button class="hv2-pf" onclick="switchView('v15cal')">Open the calendar ›</button>
+            <button class="hv2-pf" onclick="_calOpenRight()">Open the calendar ›</button>
           </div>
-          <div class="hv2-panel" style="animation-delay:.06s" id="hv2-toggle-panel">
+          <!-- Actions and Inbox are two panels, not one panel with a tab
+               toggle (Zoran 2026-07-31). Under the toggle, whichever tab you
+               were not on was invisible, so waiting action items could sit on
+               Home with nothing on screen saying they existed. -->
+          <div class="hv2-panel" style="animation-delay:.06s" id="hv2-acts-panel">
             <div class="hv2-ph">
-              <div class="hm-toggle-tabs" id="hm-toggle-tabs">
-                <button class="hm-toggle-tab" data-tab="acts" onclick="_hmToggleTab('acts')">${_HV2_ICONS.check} Actions</button>
-                <button class="hm-toggle-tab active" data-tab="inbox" onclick="_hmToggleTab('inbox')">${_HV2_ICONS.inbox || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>'} Inbox</button>
-              </div>
+              <span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.check} Actions</span>
               <span class="hv2-pill" id="hv2-acts-n" style="display:none"></span>
+            </div>
+            <div id="hv2-acts-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
+            <button class="hv2-pf" onclick="switchView('action-items')">Open action items ›</button>
+          </div>
+          <div class="hv2-panel" style="animation-delay:.09s" id="hv2-inbox-panel">
+            <div class="hv2-ph">
+              <span class="hv2-lab" style="color:var(--text-sub)">${_HV2_ICONS.inbox || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>'} Inbox</span>
               <span class="hv2-pill" id="hv2-inbox-n" style="display:none"></span>
             </div>
-            <div id="hv2-acts-body" style="display:none"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
             <div id="hv2-inbox-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading…</div></div>
-            <button class="hv2-pf" id="hv2-toggle-footer" onclick="switchView('v15inbox')">Open inbox ›</button>
+            <button class="hv2-pf" onclick="switchView('v15inbox')">Open inbox ›</button>
           </div>
         </div>
       </div>
-      <div class="hm-bubble">
+      <div class="hm-bubble" id="hv2-nav-bubble">
         <div class="hv2-nav">
           ${_hv2NavCard('mega', 'Marketing', 'Campaigns, leads and content', 'marketing', 0.12)}
           ${_hv2NavCard('trend', 'Sales', 'Pipeline, agents and trials', 'pipelines', 0.18)}
@@ -22167,7 +23180,7 @@ function _hv2UnifiedSchedule(trials, slots, tz) {
 
   // Empty state
   if (!slots.length && !trials.length) {
-    el.innerHTML = `<div class="hm-empty-cta"><span class="hm-empty-msg">Nothing on today's schedule.</span><button class="hm-empty-btn" onclick="switchView('v15cal')">View full calendar</button></div>`;
+    el.innerHTML = `<div class="hm-empty-cta"><span class="hm-empty-msg">Nothing on today's schedule.</span><button class="hm-empty-btn" onclick="_calOpenRight()">View full calendar</button></div>`;
     return;
   }
 
@@ -22247,7 +23260,7 @@ function _hv2UnifiedSchedule(trials, slots, tz) {
       const lowFill = s.capacity && fill < 60;
       const trialId = 'st-' + i;
 
-      html += `<div onclick="switchView('v15cal')" style="${_HV_ROW}${isPast ? ';opacity:.5' : ''}${isNext ? ';border-left:3px solid var(--gold)' : ''}">
+      html += `<div onclick="_calOpenRight()" style="${_HV_ROW}${isPast ? ';opacity:.5' : ''}${isNext ? ';border-left:3px solid var(--gold)' : ''}">
         <span class="hv2-dot" style="background:#7fb0d8"></span>
         <div style="flex:1;min-width:0">
           <div style="${_HV_TITLE}">${escapeHTML(s.name || 'Session')}${hasTrials ? `<span class="hm-sched-trial-tag" onclick="event.stopPropagation();_hvToggleTrial('${trialId}')">${sessionTrials.length} trial${sessionTrials.length > 1 ? 's' : ''} &#9662;</span>` : ''}</div>
@@ -22305,7 +23318,7 @@ async function _hv2ActsLoad() {
     const j = await _safeJson(r);
     if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
     const open = (Array.isArray(j.items) ? j.items : []).filter(i => !i.completed_at);
-    if (pill) { pill._count = open.length; pill.textContent = open.length; pill.style.display = (open.length > 0 && window._hmActiveTab === 'acts') ? '' : 'none'; }
+    if (pill) { pill._count = open.length; pill.textContent = open.length; pill.style.display = open.length > 0 ? '' : 'none'; }
     if (!body) return;
     if (!open.length) {
       // UX #9: Empty state CTA for action items
@@ -22345,33 +23358,29 @@ async function _hv2ActsLoad() {
   }
 }
 // ── Toggle: Action Items / Inbox ──
-const _HM_TOGGLE_KEY = 'hm_panel_tab';
-window._hmActiveTab = 'inbox'; // default tab
-function _hmToggleTab(tab) {
-  const actsBody = document.getElementById('hv2-acts-body');
-  const ibBody = document.getElementById('hv2-inbox-body');
-  const footer = document.getElementById('hv2-toggle-footer');
-  const actsPill = document.getElementById('hv2-acts-n');
-  const ibPill = document.getElementById('hv2-inbox-n');
-  if (!actsBody || !ibBody) return;
-  const tabs = document.querySelectorAll('#hm-toggle-tabs .hm-toggle-tab');
-  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  // Store active tab so loaders know which pill to show
-  window._hmActiveTab = tab;
-  if (tab === 'inbox') {
-    actsBody.style.display = 'none'; ibBody.style.display = '';
-    if (actsPill) actsPill.style.display = 'none';
-    if (ibPill && ibPill._count > 0) ibPill.style.display = '';
-    if (footer) { footer.textContent = 'Open inbox \u203A'; footer.onclick = () => switchView('v15inbox'); }
-    if (!ibBody._loaded) _hmLoadInboxPreview();
-  } else {
-    actsBody.style.display = ''; ibBody.style.display = 'none';
-    if (ibPill) ibPill.style.display = 'none';
-    if (actsPill && actsPill._count > 0) actsPill.style.display = '';
-    if (footer) { footer.textContent = 'Open action items \u203A'; footer.onclick = () => switchView('action-items'); }
+// The Actions/Inbox toggle is retired: they are two panels now, both always
+// rendered. window._hmActiveTab is kept as a harmless constant because other
+// surfaces still read it; nothing writes it any more.
+window._hmActiveTab = 'inbox';
+
+// Which calendar is "the calendar" for this academy. V2 = the V2 spine
+// calendar (agenda on mobile); everyone else keeps the V1.5 GHL calendars.
+// Every user-facing door to a calendar routes through here so retiring a
+// view never strands an entry point again.
+function _calOpenRight() {
+  const v2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const view = v2 ? 'calendar' : 'v15cal';
+  // In command-center mode a plain switchView('calendar') is swallowed (the
+  // CC dispatcher only passes views it knows about, and only v15cal was
+  // wired). _ccOpenClassic is the CC-sanctioned opener the Quick-links rail
+  // uses; go through it whenever CC is running.
+  if (document.body.classList.contains('cc-mode') && typeof _ccOpenClassic === 'function') {
+    _ccOpenClassic(view);
+    return;
   }
-  try { localStorage.setItem(_HM_TOGGLE_KEY, tab); } catch (_) {}
+  switchView(view);
 }
+
 // #4: System notification patterns — group these senders into an accordion
 const _HM_SYSTEM_SENDERS = /^(facebook|meta|google|stripe|square|twilio|mailchimp|quickbooks|zapier|intuit|paypal)/i;
 
@@ -22880,7 +23889,7 @@ async function _hmLoadInboxPreview() {
       convos.push(f);
     }
     const unreadCount = convos.filter(c => c.unreadCount > 0).length;
-    if (pill) { pill._count = unreadCount; pill.textContent = unreadCount; pill.style.display = (unreadCount > 0 && window._hmActiveTab === 'inbox') ? '' : 'none'; }
+    if (pill) { pill._count = unreadCount; pill.textContent = unreadCount; pill.style.display = unreadCount > 0 ? '' : 'none'; }
     if (!convos.length) {
       body.innerHTML = '<div class="hm-empty-cta"><span class="hm-empty-msg">No recent conversations.</span></div>';
       return;
@@ -22911,13 +23920,10 @@ async function _hmLoadInboxPreview() {
     body.innerHTML = '<div style="padding:14px 16px;font-size:12.5px;color:var(--text-mute)">Couldn\'t load inbox.</div>';
   }
 }
-// Restore saved tab preference on load
+// Both panels are on screen, so both load. Kept under the old name so the
+// existing boot call site does not need to change.
 function _hmRestoreToggle() {
-  try {
-    const saved = localStorage.getItem(_HM_TOGGLE_KEY);
-    if (saved === 'acts') _hmToggleTab('acts');
-    else _hmLoadInboxPreview(); // default: inbox, load it
-  } catch (_) { _hmLoadInboxPreview(); }
+  try { _hmLoadInboxPreview(); } catch (_) {}
 }
 // ── Right rail: live scoreboard ──
 // ── KPI ring configuration ──
@@ -23445,7 +24451,7 @@ function _hmRefreshLive() {
   const now = Date.now();
   if (window._hmLiveLast && now - window._hmLiveLast < 3000) return;
   window._hmLiveLast = now;
-  if (window._hmActiveTab === 'inbox') { try { _hmLoadInboxPreview(); } catch (_) {} }
+  try { _hmLoadInboxPreview(); } catch (_) {}
   try { _hmLoadRailBottom(); } catch (_) {}
 }
 function _hmBindLiveRefresh() {
@@ -24979,6 +25985,16 @@ function applyCrmSupersetNav() {
   // V2 uses the upgraded v15 inbox → retire the older V2 inbox nav item
   const oldInbox = document.getElementById('nav-v2inbox');
   if (oldInbox && isV2) oldInbox.style.display = 'none';
+  // Retire the GHL calendar for academies fully on V2 (Zoran 2026-07-31, GTA is
+  // the only one today). The header comment above has claimed v15cal is "NOT
+  // surfaced for V2" since this function was written, but only applyV4NavState
+  // ever hid it - so V2 academies saw BOTH calendars and could land on the GHL
+  // one, which has no capacity, no roster and no post-trial link.
+  const v15Cal = document.getElementById('nav-v15cal');
+  if (v15Cal && isV2) v15Cal.style.display = 'none';
+  document.querySelectorAll('.mobile-nav-item[data-view="v15cal"]').forEach(el => {
+    if (isV2) el.style.setProperty('display', 'none', 'important');
+  });
   // Marketing: V1.5/V2 get the cleaner view (no Ad Performance report / month progress)
   const adPerf = document.getElementById('ad-performance-section');
   if (adPerf) adPerf.style.display = crm ? 'none' : '';
@@ -25077,6 +26093,27 @@ function applySupportAccordionNav() {
   if (caret)   caret.style.transform = '';
   if (flatSys) flatSys.style.display = v15only ? 'none' : '';
   if (flatMkt) flatMkt.style.display = v15only ? 'none' : '';
+  applyOrganicShortcutNav();
+}
+
+// Show the top-level "Content" shortcut (sidebar + mobile bar) that lands straight on
+// Marketing > Organic. V1.5 ONLY, and only when the academy runs organic ALONGSIDE ads:
+//   - V1/V2 keep their existing nav (V2's doors live in the command-center orb, not here)
+//   - content-only academies (organic on, ads off) already boot into organic and their
+//     Marketing nav is relabelled "Content" by applyContentOnlyNav - a second one would
+//     just be a duplicate.
+// Called from applySupportAccordionNav so it runs after V15_ACCESS is set; both content
+// flags are already populated by then (the clients row loads before either nav gate).
+function applyOrganicShortcutNav() {
+  const v15only = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) &&
+                  !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const show = v15only && _hasOrganic() && _hasAds();
+  const side = document.getElementById('nav-content-flat');
+  if (side) side.style.display = show ? '' : 'none';
+  document.querySelectorAll('.mobile-nav-item[data-view="organic"]').forEach(el => {
+    if (show) el.style.removeProperty('display');
+    else el.style.setProperty('display', 'none', 'important');
+  });
 }
 
 // Click handler for the "Support" accordion header (V1.5).
@@ -25630,6 +26667,354 @@ async function bkCreate(name, capacity, slotDurationMinutes) {
   } catch (e) {
     if (host) host.insertAdjacentHTML('afterbegin', `<div class="bk-err">Couldn't create calendar - ${escapeHTML(e.message)}</div>`);
   }
+}
+
+/* ══ Mobile calendar agenda ═══════════════════════════════════════════════
+   Under 768px the 7-column week grid is unusable (49px columns, truncated
+   names, sideways scroll), so the same portal-spine slots render as a
+   vertical day list that scrolls continuously through time.
+
+   Data:  /api/website/calendars?from=&to=   (already range-aware, no backend
+          change needed)  ->  slots[] with capacity, spots_taken, attendees[]
+   Flags: /api/agent-confirm action=list-ready -> kind:'post_trial' pending
+          cards. Each carries ghl_contact_id + trial_at, so a card maps to an
+          exact attendee in an exact slot.
+   Desktop is untouched: every entry point checks _magOn() first. */
+const _MAG = {
+  lo: -14, hi: 42,        // loaded window, in days from today
+  page: 28,               // days pulled per fetch
+  near: 900,              // px from an edge that triggers the next fetch
+  slots: new Map(),       // dayKey -> slot[]
+  forms: new Set(),       // `${ghl_contact_id}|${slotStartMs}` with a form pending
+  fetching: false,
+  booted: false,
+  tz: null,
+  colors: {},
+};
+const _MAG_DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const _MAG_MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function _magOn() { return window.matchMedia('(max-width: 768px)').matches; }
+function _magMidnight(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+function _magDayOffset(i) { const d = _magMidnight(new Date()); d.setDate(d.getDate() + i); return d; }
+function _magKey(d) { return calDateKey(d); }
+function _magIso(i) { return _magDayOffset(i).toISOString(); }
+
+function _magColor(slot) {
+  const k = String(slot.program || slot.name || 'x');
+  if (!_MAG.colors[k]) {
+    let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
+    const c = BK_COLORS[h % BK_COLORS.length];
+    _MAG.colors[k] = (c && (c.text || c.bar || c)) || 'var(--gold)';
+  }
+  return _MAG.colors[k];
+}
+function _magTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+// Show the offset abbreviation (EDT), never the city. GTA's stored zone is
+// America/New_York, so "New York time" would read as flatly wrong to a Toronto
+// academy even though the offset is right.
+function _magTzLabel() {
+  if (!_MAG.tz) return '';
+  try {
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: _MAG.tz, timeZoneName: 'short' })
+      .formatToParts(new Date()).find(x => x.type === 'timeZoneName');
+    return p ? p.value : '';
+  } catch (_) { return ''; }
+}
+// A booked seat is one that still counts against capacity. spots_taken already
+// excludes NO_SHOW/CANCELLED, so trust it and fall back to counting attendees.
+function _magTaken(s) {
+  if (typeof s.spots_taken === 'number') return s.spots_taken;
+  return (s.attendees || []).filter(a => a.status === 'BOOKED' || a.status === 'SHOWED' || a.status === 'CONVERTED').length;
+}
+function _magFlagged(s) {
+  const ms = new Date(s.start).getTime();
+  return (s.attendees || []).some(a => a.ghl_contact_id && _MAG.forms.has(a.ghl_contact_id + '|' + ms));
+}
+
+async function _magLoadRange(fromI, toI) {
+  const token = await _mreqAuthToken();
+  const url = '/api/website/calendars?client_id=' + encodeURIComponent(CLIENT_ID)
+    + '&from=' + encodeURIComponent(_magIso(fromI)) + '&to=' + encodeURIComponent(_magIso(toI));
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  const j = await _safeJson(r);
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  if (j.timezone) _MAG.tz = j.timezone;
+  for (const s of (j.slots || [])) {
+    const k = _magKey(new Date(s.start));
+    const arr = _MAG.slots.get(k) || [];
+    if (!arr.some(x => x.id === s.id)) arr.push(s);
+    arr.sort((a, b) => new Date(a.start) - new Date(b.start));
+    _MAG.slots.set(k, arr);
+  }
+}
+
+// Pending post-trial forms. Additive: a failure here must never stop the
+// calendar rendering, it just means no gold dots this load.
+async function _magLoadForms() {
+  try {
+    const j = await _apxPost('/api/agent-confirm', 'list-ready', {});
+    _MAG.forms.clear();
+    let n = 0;
+    for (const row of (j.ready || [])) {
+      if (row.kind !== 'post_trial' || row.status !== 'pending') continue;
+      if (!row.ghl_contact_id || !row.trial_at) continue;
+      _MAG.forms.add(String(row.ghl_contact_id) + '|' + new Date(row.trial_at).getTime());
+      n++;
+    }
+    const bar = document.getElementById('mag-alert');
+    const lbl = document.getElementById('mag-alert-label');
+    if (bar && lbl) {
+      lbl.textContent = n + ' post-trial form' + (n === 1 ? '' : 's') + ' due';
+      bar.style.display = n ? 'flex' : 'none';
+    }
+  } catch (_) { /* no dots, still a working calendar */ }
+}
+
+function _magDayHTML(i) {
+  const d = _magDayOffset(i);
+  const isToday = i === 0, past = i < 0;
+  const list = _MAG.slots.get(_magKey(d)) || [];
+  let rows = '';
+  for (const s of list) {
+    const cap = s.capacity, taken = _magTaken(s);
+    const flag = _magFlagged(s);
+    const col = _magColor(s);
+    const cls = ['mag-sesh',
+      taken === 0 ? 'empty' : '',
+      (cap != null && taken >= cap) ? 'full' : '',
+      flag ? 'flagged' : '',
+      past ? 'past' : ''].filter(Boolean).join(' ');
+    rows += '<button class="' + cls + '" onclick="_magOpenSlot(\'' + s.id + '\')">'
+      + '<span class="bar" style="background:' + col + (taken === 0 ? ';opacity:.35' : '') + '"></span>'
+      + '<span class="t">' + escapeHTML(_magTime(s.start)) + '</span>'
+      + '<span class="g">' + escapeHTML(s.name || 'Session') + '</span>'
+      + (flag ? '<span class="dot"></span>' : '')
+      + '<span class="c">' + taken + (cap != null ? '<small>/' + cap + '</small>' : '') + '</span>'
+      + '</button>';
+  }
+  if (!rows) rows = '<div class="mag-none">No sessions</div>';
+  return '<div class="mag-day" data-i="' + i + '" data-mo="' + d.getMonth() + '" data-yr="' + d.getFullYear() + '"'
+    + (isToday ? ' id="mag-today-anchor"' : '') + '>'
+    + '<div class="mag-dayhd' + (isToday ? ' is-today' : '') + '">'
+    + '<span class="dw">' + _MAG_DOW[d.getDay()] + '</span><span class="dn">' + d.getDate() + '</span>'
+    + (isToday ? '<span class="mag-pill">Today</span>' : '')
+    + '</div>' + rows + '</div>';
+}
+
+function _magBuild() {
+  const host = document.getElementById('mag-list'); if (!host) return;
+  const out = [];
+  for (let i = _MAG.lo; i <= _MAG.hi; i++) out.push(_magDayHTML(i));
+  host.innerHTML = out.join('');
+}
+
+function _magStick() {
+  const t = document.getElementById('mag-top');
+  return t ? t.offsetHeight : 0;
+}
+function _magScroller() { return document.querySelector('#view-calendar .content') || window; }
+
+async function _magFetchOlder() {
+  if (_MAG.fetching) return;
+  _MAG.fetching = true;
+  try {
+    const from = _MAG.lo - _MAG.page, to = _MAG.lo;
+    await _magLoadRange(from, to);
+    const host = document.getElementById('mag-list');
+    const sc = _magScroller();
+    const before = sc === window ? document.documentElement.scrollHeight : sc.scrollHeight;
+    const out = [];
+    for (let i = from; i < _MAG.lo; i++) out.push(_magDayHTML(i));
+    _MAG.lo = from;
+    host.insertAdjacentHTML('afterbegin', out.join(''));
+    // prepending pushes everything down; hand back exactly what we added or the
+    // view jumps out from under the thumb (Safari has no scroll anchoring)
+    const after = sc === window ? document.documentElement.scrollHeight : sc.scrollHeight;
+    if (sc === window) window.scrollBy(0, after - before); else sc.scrollTop += (after - before);
+  } catch (_) {} finally { _MAG.fetching = false; }
+}
+
+async function _magFetchNewer() {
+  if (_MAG.fetching) return;
+  _MAG.fetching = true;
+  try {
+    const from = _MAG.hi + 1, to = _MAG.hi + 1 + _MAG.page;
+    await _magLoadRange(from, to);
+    const out = [];
+    for (let i = from; i <= _MAG.hi + _MAG.page; i++) out.push(_magDayHTML(i));
+    _MAG.hi += _MAG.page;
+    document.getElementById('mag-list').insertAdjacentHTML('beforeend', out.join(''));
+  } catch (_) {} finally { _MAG.fetching = false; }
+}
+
+function _magOnScroll() {
+  const sc = _magScroller();
+  const top = sc === window ? window.scrollY : sc.scrollTop;
+  const vh = sc === window ? window.innerHeight : sc.clientHeight;
+  const h = sc === window ? document.documentElement.scrollHeight : sc.scrollHeight;
+  const stick = _magStick();
+
+  // month label tracks whatever day sits just under the pinned block
+  const days = document.querySelectorAll('#mag-list .mag-day');
+  const base = sc === window ? 0 : sc.getBoundingClientRect().top;
+  for (const el of days) {
+    const r = el.getBoundingClientRect();
+    if (r.bottom > base + stick + 4) {
+      const lbl = _MAG_MON[+el.dataset.mo] + ' ' + el.dataset.yr;
+      const node = document.getElementById('mag-mo-label');
+      if (node && node.textContent !== lbl) node.textContent = lbl;
+      break;
+    }
+  }
+  const anchor = document.getElementById('mag-today-anchor');
+  const btn = document.getElementById('mag-today');
+  if (anchor && btn) {
+    const a = anchor.getBoundingClientRect();
+    const visible = a.bottom > base + stick && a.top < base + vh;
+    btn.classList.toggle('on', !visible);
+    const arrow = document.getElementById('mag-today-arrow');
+    if (arrow) arrow.textContent = a.top > base ? '↓' : '↑';
+  }
+  if (top < _MAG.near) _magFetchOlder();
+  else if (h - top - vh < _MAG.near) _magFetchNewer();
+}
+
+// Measure against the scroller's own box rather than offsetTop: the agenda's
+// offsetParent is not .content, so offsetTop would be measured from the wrong
+// origin and land nowhere near the day we asked for.
+function _magScrollToEl(el) {
+  if (!el) return;
+  const sc = _magScroller();
+  const stick = _magStick();
+  if (sc === window) { window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - stick, behavior: 'smooth' }); return; }
+  sc.scrollTop += el.getBoundingClientRect().top - sc.getBoundingClientRect().top - stick;
+}
+function _magJumpToday() { _magScrollToEl(document.getElementById('mag-today-anchor')); }
+
+function _magOpenJump() {
+  const grid = document.getElementById('mag-jump-grid'); if (!grid) return;
+  const now = new Date();
+  const out = [];
+  for (let k = -2; k <= 5; k++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + k, 1);
+    out.push('<button class="' + (k === 0 ? 'now' : '') + '" onclick="_magJumpTo(' + d.getFullYear() + ',' + d.getMonth() + ')">'
+      + _MAG_MON[d.getMonth()].slice(0, 3) + '<br><span style="font-weight:600;font-size:10.5px;opacity:.7">' + d.getFullYear() + '</span></button>');
+  }
+  grid.innerHTML = out.join('');
+  document.getElementById('mag-jump').classList.add('on');
+}
+function _magCloseJump() { document.getElementById('mag-jump')?.classList.remove('on'); }
+async function _magJumpTo(yr, mo) {
+  _magCloseJump();
+  const target = new Date(yr, mo, 1);
+  const i = Math.round((_magMidnight(target) - _magMidnight(new Date())) / 864e5);
+  let guard = 0;
+  while (i < _MAG.lo && guard++ < 24) await _magFetchOlder();
+  while (i > _MAG.hi && guard++ < 24) await _magFetchNewer();
+  const el = [...document.querySelectorAll('#mag-list .mag-day')]
+    .find(e => +e.dataset.mo === mo && +e.dataset.yr === yr);
+  _magScrollToEl(el);
+}
+
+/* ── Session roster (mobile) ─────────────────────────────────────────────
+   A flagged attendee opens Hawkeye focused on them with the post-trial form
+   ready. Everyone else opens their contact page. */
+function _magFindSlot(id) {
+  for (const arr of _MAG.slots.values()) { const s = arr.find(x => String(x.id) === String(id)); if (s) return s; }
+  return null;
+}
+function _magInitials(n) {
+  return String(n || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+}
+const _MAG_ICO_CALL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>';
+const _MAG_ICO_MSG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg>';
+
+function _magRowHTML(a, slotMs, flagged) {
+  const nm = a.athlete_name || a.name || 'Guest';
+  const sub = (a.parent_name && a.parent_name !== nm) ? a.parent_name : '';
+  const cid = a.ghl_contact_id ? String(a.ghl_contact_id) : '';
+  const onclk = cid
+    ? (flagged
+        ? ' onclick="_magGoHawkeye(\'' + escapeHTML(cid) + '\')"'
+        : ' onclick="_magGoContact(\'' + escapeHTML(cid) + '\',\'' + escapeHTML(nm.replace(/'/g, '')) + '\')"')
+    : '';
+  return '<button class="mag-prow' + (flagged ? ' flagged' : '') + '"' + onclk + '>'
+    + '<span class="av">' + escapeHTML(_magInitials(nm)) + '</span>'
+    + '<span class="pb"><span class="pn">' + escapeHTML(nm) + '</span>'
+    + (sub ? '<span class="pp">' + escapeHTML(sub) + '</span>' : '') + '</span>'
+    + '<span class="acts">' + _MAG_ICO_CALL_WRAP + _MAG_ICO_MSG_WRAP + '</span>'
+    + '</button>';
+}
+const _MAG_ICO_CALL_WRAP = '<span>' + _MAG_ICO_CALL + '</span>';
+const _MAG_ICO_MSG_WRAP = '<span>' + _MAG_ICO_MSG + '</span>';
+
+function _magOpenSlot(id) {
+  const s = _magFindSlot(id); if (!s) return;
+  const sheet = document.getElementById('mag-sheet');
+  const body = document.getElementById('mag-sheet-body');
+  if (!sheet || !body) return;
+  const ms = new Date(s.start).getTime();
+  const cap = s.capacity, taken = _magTaken(s);
+  const att = s.attendees || [];
+  const flagged = att.filter(a => a.ghl_contact_id && _MAG.forms.has(a.ghl_contact_id + '|' + ms));
+  const rest = att.filter(a => !flagged.includes(a));
+  const when = new Date(s.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    + ', ' + _magTime(s.start);
+  const tzName = _magTzLabel();
+
+  body.innerHTML =
+    '<div class="mag-rhd">'
+    + '<button class="back" onclick="_magCloseSlot()">‹ Back</button>'
+    + '<div class="grp"><i style="background:' + _magColor(s) + '"></i>' + escapeHTML(s.name || 'Session') + '</div>'
+    + '<div class="when">' + escapeHTML(when) + '</div>'
+    + '<div class="sub">' + taken + (cap != null ? ' of ' + cap : '') + (tzName ? ' · ' + escapeHTML(tzName) : '') + '</div>'
+    + '</div>'
+    // Bulk send is deliberately inert until api/mass-send.js can take explicit
+    // contact ids. Looping the single-send would drop the DND skip + throttling.
+    + '<button class="mag-textall" disabled title="Needs mass-send to accept contact ids">'
+    + _MAG_ICO_MSG + 'Text everyone</button>'
+    + (flagged.length ? '<div class="mag-sec">FORM DUE</div>' + flagged.map(a => _magRowHTML(a, ms, true)).join('') : '')
+    + (rest.length ? '<div class="mag-sec">BOOKED IN</div>' + rest.map(a => _magRowHTML(a, ms, false)).join('') : '')
+    + (att.length ? '' : '<div class="mag-sec">BOOKED IN</div><div style="padding:0 16px;font-size:12.5px;color:var(--text-mute)">Nobody booked yet.</div>');
+  sheet.classList.add('on');
+}
+function _magCloseSlot() { document.getElementById('mag-sheet')?.classList.remove('on'); }
+function _magGoContact(cid, nm) {
+  _magCloseSlot();
+  try { _calOpenContact(cid, nm); } catch (_) {}
+}
+function _magGoHawkeye(cid) {
+  _magCloseSlot();
+  try { _hk2Open('confirm', cid); } catch (_) { try { _hv2OpenHawkeye(); } catch (_) {} }
+}
+function _magOpenForms() { try { _hk2Open('confirm'); } catch (_) { try { _hv2OpenHawkeye(); } catch (_) {} } }
+
+// Entry point. openCalendar() calls this; it no-ops on desktop.
+async function _magBoot() {
+  if (!_magOn()) return;
+  const host = document.getElementById('mag-list'); if (!host) return;
+  const tzEl = document.getElementById('mag-tz');
+  host.innerHTML = '<div class="req-empty" style="padding:22px 16px"><span class="req-spin"></span> Loading sessions…</div>';
+  try {
+    await _magLoadRange(_MAG.lo, _MAG.hi);
+  } catch (e) {
+    host.innerHTML = '<div class="req-empty" style="padding:18px 16px;color:#9a3b2f">Couldn\'t load the calendar - '
+      + escapeHTML(e.message || String(e)) + '</div>';
+    return;
+  }
+  if (tzEl) tzEl.textContent = _magTzLabel();
+  await _magLoadForms();
+  _magBuild();
+  if (!_MAG.booted) {
+    _MAG.booted = true;
+    const sc = _magScroller();
+    (sc === window ? window : sc).addEventListener('scroll', _magOnScroll, { passive: true });
+  }
+  requestAnimationFrame(() => { _magJumpToday(); _magOnScroll(); });
 }
 
 function renderCalendar() {
@@ -26623,6 +28008,8 @@ function openCalendar() {
   window._calScrolled = false;
   try { renderCalendar(); } catch (_) {}
   try { bkFetchAndRender(); } catch (_) {}
+  // Phones get the agenda instead of the 7-column grid (no-op on desktop).
+  try { _magBoot(); } catch (_) {}
   if (typeof _ccOpenFocusPage === 'function') {
     _ccOpenFocusPage('view-calendar', '.nav-item[data-feature="calendar"]');
   } else {
@@ -26672,6 +28059,10 @@ function openV15InboxFocus() {
   }
 }
 function closeV15InboxFocus() {
+  // Mobile-only leftovers: the filter sheet + compose page live on
+  // document.body, so the overlay close doesn't take them along.
+  try { _ibSheetClose(); } catch (_) {}
+  try { _ibmClose(); } catch (_) {}
   if (typeof _mmCloseFocus === 'function') _mmCloseFocus('view-v15inbox');
   else {
     const m = document.getElementById('view-v15inbox');
@@ -35442,11 +36833,33 @@ function _hasAds() { return typeof MARKETING_INCLUDED === 'undefined' || MARKETI
 // Funnel content rides the scaling service: every client with a BAM-run
 // website (marketing_included) has it. Content-only clients don't.
 function _hasFunnel() { return _hasAds(); }
+// Which channel the Marketing view is currently showing ('ads' | 'funnel' | 'organic'),
+// or null on the channel-split screen. syncMobileNav reads it so the Content bar item
+// and the Support bar item don't both light up on the same view.
+let _MKT_CHANNEL = null;
 function _showOrganicOnly() {
   _hideAllMarketingSub();
   const back = document.getElementById('organic-back-btn'); if (back) back.style.display = 'none';
   const e = document.getElementById('marketing-organic'); if (e) e.style.display = 'block';
+  _MKT_CHANNEL = 'organic';
   _fetchAndRenderOrganic();
+}
+// Jump straight from the sidebar to Marketing > Organic, skipping the channel split.
+// _chooseChannel runs AFTER switchView so _marketingEnter()'s split render can't
+// overwrite it. Back still returns to the split, so Ads/Funnel stay reachable.
+function _goOrganic(el) {
+  switchView('marketing', el);
+  try { _chooseChannel('organic'); } catch (_) {}
+  if (el) {
+    document.querySelectorAll('.sidebar .nav-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+  }
+  syncMobileNav('marketing');
+}
+function _mobileOrganic() {
+  mobileSwitchView('marketing');
+  try { _chooseChannel('organic'); } catch (_) {}
+  syncMobileNav('marketing');
 }
 function _marketingEnter() {
   _renderFirstCampaignGuide();   // data-drive the "Your First Campaign" card from the default guide card
@@ -35468,9 +36881,11 @@ function _showChannelSplit() {
   const org = document.getElementById('channel-card-organic');
   if (org) org.style.display = _hasOrganic() ? '' : 'none';
   const e = document.getElementById('marketing-channel-split'); if (e) e.style.display = 'block';
+  _MKT_CHANNEL = null;
 }
 function _chooseChannel(ch) {
   _hideAllMarketingSub();
+  _MKT_CHANNEL = ch;
   if (ch === 'organic') {
     const e = document.getElementById('marketing-organic'); if (e) e.style.display = 'block';
     _fetchAndRenderOrganic();
@@ -43958,6 +45373,10 @@ async function _vmxRefreshCount() {
     _VMX.rows = j.voicemails || [];
     btn.style.display = '';
     _vmxBadge();
+    // The mobile inbox reads _VMX.rows (voicemail chip in the filter sheet +
+    // row pips/transcripts) - repaint the list now that they exist. No-op
+    // when the inbox isn't rendered.
+    if (document.getElementById('v15ib-body')) { try { _v15ibRenderList(); } catch (_) {} }
   } catch (_) { /* keep hidden on error - refreshed on next inbox render */ }
 }
 
@@ -59435,6 +60854,25 @@ function _ccStyle() {
     'html.mm-focus-open #member-drawer-backdrop{z-index:9590 !important}' +
     /* quick links widget (home rail) */
     '.cc-res-widget{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:14px 16px}' +
+    // Two-up Contacts/Calendar mini cards - the mobile stand-in for Quick links.
+    '.cc-mini-row{display:none;gap:10px}' +
+    '.cc-mini-card{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:15px 10px;font:inherit;font-size:13px;font-weight:700;color:var(--text);cursor:pointer}' +
+    '.cc-mini-card svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
+    '@media (max-width:768px){' +
+      // Mobile home diet (Zoran 2026-07-31): KPI scorecard, the three big nav
+      // cards, the Hawkeye activity feed and Quick links all go. Contacts +
+      // Calendar mini cards take the rail spot. Card order: Actions, Inbox,
+      // then Today's schedule.
+      '#home-v2 .hm-score{display:none !important}' +
+      '#home-v2 #hv2-nav-bubble{display:none !important}' +
+      '#home-v2 #hm-rail-bottom{display:none !important}' +
+      '#home-v2 .cc-res-widget{display:none !important}' +
+      '#home-v2 .cc-mini-row{display:flex}' +
+      '#home-v2 .hv2-mid{display:flex;flex-direction:column}' +
+      '#home-v2 #hv2-acts-panel{order:1}' +
+      '#home-v2 #hv2-inbox-panel{order:2}' +
+      '#home-v2 #hv2-sched-panel{order:3}' +
+    '}' +
     '.cc-res-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:10px}' +
     '.cc-res-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}' +
     '.cc-res-btn{display:flex;align-items:center;gap:8px;background:transparent;border:1px solid var(--border-med);border-radius:8px;padding:9px 11px;font:inherit;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:border-color .12s,color .12s;text-align:left}' +
@@ -60060,21 +61498,32 @@ function _ccFocusHud(modalId) {
     : modalId === 'view-blueprint' ? 'BLUEPRINT'
     : modalId === 'view-calendar' ? 'CALENDAR'
     : modalId === 'view-support' ? 'SUPPORT'
+    // Phones only (Zoran 2026-07-31): desktop keeps its historical label so
+    // the desktop HUD stays pixel-identical.
+    : (modalId === 'view-v15inbox' && window.innerWidth <= 768) ? 'INBOX'
     : 'MARKETING';
-  _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE');
+  const goldWord = (modalId === 'view-v15inbox' && window.innerWidth <= 768) ? 'INBOX' : null;
+  _ccHudType(hud, 'FOCUS · ' + label + ' · LIVE', goldWord);
   _ccFocusWallpaper(modalId);
 }
-function _ccHudType(hud, text) {
+function _ccHudType(hud, text, goldWord) {
   const span = hud.querySelector('.cc-hud-txt');
   if (!span) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { span.textContent = text; return; }
+  // Optional: once the line is fully typed, gold one word (mobile inbox crumb
+  // only - every other caller omits goldWord and behaves exactly as before).
+  const finish = () => {
+    if (goldWord && text.includes(goldWord)) {
+      span.innerHTML = escapeHTML(text).replace(goldWord, '<span style="color:var(--gold)">' + goldWord + '</span>');
+    }
+  };
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { span.textContent = text; finish(); return; }
   span.textContent = '';
   let i = 0;
   clearInterval(hud._typeT);
   hud._typeT = setInterval(() => {
     i++;
     span.textContent = text.slice(0, i);
-    if (i >= text.length) clearInterval(hud._typeT);
+    if (i >= text.length) { clearInterval(hud._typeT); finish(); }
   }, 16);
 }
 
@@ -60376,6 +61825,16 @@ function _ccMountHome(host) {
     try { _hv2Style(); hv.style.display = 'block'; renderHomeV2(); } catch (e) { console.error('[cc] home', e); }
     // Quick links widget - fills the empty right-rail spot under Hawkeye.
     const rail = hv.querySelector('.hm-right');
+    // Mobile home (Zoran 2026-07-31): the Quick links card gives way to two
+    // mini cards on one row - Contacts + Calendar. Desktop keeps Quick links;
+    // the media query below decides which of the two renders.
+    if (rail && !document.getElementById('cc-mini-row')) {
+      rail.insertAdjacentHTML('beforeend', `
+        <div class="cc-mini-row" id="cc-mini-row">
+          <button type="button" class="cc-mini-card" onclick="_ccOpenClassic('contacts')">${_ccIcons().contacts}<span>Contacts</span></button>
+          <button type="button" class="cc-mini-card" onclick="_calOpenRight()">${_ccIcons().cal}<span>Calendar</span></button>
+        </div>`);
+    }
     if (rail && !document.getElementById('cc-res-widget')) {
       rail.insertAdjacentHTML('beforeend', `
         <div class="cc-res-widget" id="cc-res-widget">
@@ -60390,6 +61849,626 @@ function _ccMountHome(host) {
         </div>`);
     }
   }
+}
+
+// ═══ Mobile Sales: the free-trial preset card (Zoran's 2026-07-31 mockup) ═══
+// Rides on top of #cc-sales-mount as the FIRST card of the MOBILE Sales view,
+// only when the academy runs the free-trial sales preset (an offer stamped
+// with data.sales.preset_key === 'free_trial'). Three stats over today's trial
+// roster; the middle stat opens the qualified-trials focus overlay. Every
+// entry point is gated behind _spcOn(), so desktop Sales renders untouched.
+let _SPC = { rows: [], trialsN: null, tz: 'America/Toronto', forms: new Set(), kpi: null };
+let _SPC_PRESET_P = null;
+
+function _spcOn() { return window.matchMedia('(max-width: 768px)').matches; }
+
+// Does any live offer carry the free-trial preset stamp? Same offers read the
+// Team notification pills do (_bbNotifLoad: offers.data.sales.preset_key),
+// memoized so Sales can re-mount without re-querying. Only a DEFINITIVE answer
+// is memoized: a failed query clears the memo so the next mount retries,
+// instead of caching a transient failure as "no preset" until full reload.
+function _spcHasPreset() {
+  if (!_SPC_PRESET_P) _SPC_PRESET_P = (async () => {
+    try {
+      const { data, error } = await _sb.from('offers').select('data').eq('client_id', CLIENT_ID).neq('status', 'archived');
+      if (error) throw error;
+      return (data || []).some(o => o && o.data && o.data.sales && o.data.sales.preset_key === 'free_trial');
+    } catch (_) { _SPC_PRESET_P = null; return false; }
+  })();
+  return _SPC_PRESET_P;
+}
+
+function _spcStyle() {
+  if (document.getElementById('spc-style')) return;
+  const st = document.createElement('style'); st.id = 'spc-style';
+  st.textContent = '@media(max-width:768px){'
+    /* When the preset card is live it IS the mobile KPI row: hide the old
+       separate tiles (trials today / close rate / sales week) underneath it.
+       Academies without the preset never get .spc-live, so they keep their
+       tiles - and desktop keeps them everywhere (mobile media query only). */
+    + '#cc-sales-mount.spc-live .cc-sal-kpis,#cc-sales-mount.spc-live .cc-sal-weekbox{display:none}'
+    + '.spc-card{font-family:var(--font-ui);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-card);margin-bottom:14px}'
+    /* Stats row. The LEFT stat is the list's headline: left-aligned over the
+       times below, with a gold notch riding ON the separator (the row's
+       border-bottom is the card's only separator). */
+    + '.spc-kpis{display:grid;grid-template-columns:1.1fr 1.2fr 1fr;position:relative;border-bottom:1px solid var(--border)}'
+    + '.spc-kpi{padding:14px 10px 12px;text-align:center;position:relative;background:none;border:none;font:inherit;color:inherit}'
+    + '.spc-kpi.lead{text-align:left;padding-left:16px}'
+    + '.spc-kpi.lead::after{content:"";position:absolute;left:16px;bottom:-1px;width:38px;height:3px;border-radius:2px 2px 0 0;background:var(--gold)}'
+    + '.spc-kpi+.spc-kpi{border-left:1px solid var(--border)}'
+    + '.spc-kpi .v{display:block;font-family:var(--font-num);font-size:23px;font-weight:800;line-height:1.1;color:var(--text)}'
+    + '.spc-kpi .v small{font-size:13px;font-weight:700;color:var(--text-mute)}'
+    + '.spc-kpi .l{display:block;margin-top:3px;font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute)}'
+    + '.spc-kpi.tap{cursor:pointer}'
+    + '.spc-kpi.tap .v{color:var(--gold)}'
+    + '.spc-kpi .meter{display:block;width:44px;height:3px;border-radius:2px;background:var(--border-med);margin:6px auto 0;overflow:hidden}'
+    + '.spc-kpi .meter i{display:block;height:100%;background:var(--gold)}'
+    + '.spc-kpi .chev{position:absolute;top:8px;right:8px;font-size:11px;color:var(--text-mute)}'
+    /* Trials: single-line rows, NO separators between them - the stat above is
+       the header, whitespace does the dividing. Times align under the count. */
+    + '.spc-tlist{padding:6px 0 10px}'
+    + '.spc-trow{display:flex;align-items:center;gap:11px;width:100%;padding:9px 16px;background:none;border:none;font:inherit;color:inherit;text-align:left;cursor:pointer}'
+    + '.spc-trow .tm{flex:none;width:62px;font-family:var(--font-num);font-size:13px;font-weight:800;white-space:nowrap;color:var(--text-sub)}'
+    + '.spc-trow .n{flex:1;min-width:0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.spc-trow .st{flex:none;font-size:10px;font-weight:800;letter-spacing:.05em;border-radius:var(--r-full);padding:4px 10px}'
+    + '.spc-trow .st.booked{background:var(--gold-sheen);border:1px solid var(--accent-border);color:var(--gold)}'
+    + '.spc-trow .st.showed{background:transparent;border:1px solid var(--green);color:var(--green)}'
+    + '.spc-trow .st.form{background:var(--gold);border:1px solid var(--gold);color:var(--on-gold)}'
+    + '.spc-note{padding:14px 16px;font-size:12.5px;color:var(--text-mute)}'
+    /* Focus overlay: qualified trials. Docked on <body>, NOT inside .content -
+       focus modes transform .content, which would hijack position:fixed. The
+       contacts modal is raised to 10060 by _calOpenContact, so stay under it. */
+    + '#spc-focus{position:fixed;inset:0;z-index:10055;background:var(--bg);font-family:var(--font-ui);display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}'
+    + '#spc-focus.on{display:block}'
+    + '.spc-fhd{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--border);padding:12px 16px 10px;z-index:5}'
+    + '.spc-fhd .back{display:inline-flex;align-items:center;padding:7px 13px 7px 10px;border-radius:var(--r-sm);border:1px solid var(--border-med);background:var(--surface);font:inherit;color:inherit;font-size:13px;font-weight:700;margin-bottom:10px;cursor:pointer}'
+    + '.spc-fhd .t{font-size:19px;font-weight:800;letter-spacing:-.01em;color:var(--text)}'
+    + '.spc-fhd .sub{font-size:12px;color:var(--text-mute);font-weight:600;margin-top:2px}'
+    + '.spc-fbar{height:6px;border-radius:3px;background:var(--border-med);margin:10px 0 2px;overflow:hidden}'
+    + '.spc-fbar i{display:block;height:100%;background:var(--gold);border-radius:3px}'
+    + '.spc-fsec{padding:16px 16px 7px;font-size:10px;font-weight:800;letter-spacing:.11em;color:var(--text-mute)}'
+    + '.spc-qrow{display:flex;align-items:center;gap:11px;width:100%;padding:11px 16px;border:none;border-bottom:1px solid var(--border);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}'
+    + '.spc-qrow .av{flex:none;width:36px;height:36px;border-radius:var(--r-full);background:var(--surface-hov);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--text-sub)}'
+    + '.spc-qrow.closed .av{background:var(--gold);color:var(--on-gold)}'
+    + '.spc-qrow .b{flex:1;min-width:0}'
+    + '.spc-qrow .n{display:block;font-size:14px;font-weight:700;color:var(--text)}'
+    + '.spc-qrow .s{display:block;font-size:11.5px;color:var(--text-mute);margin-top:1px;font-weight:600}'
+    + '.spc-qrow .tag{flex:none;font-size:10px;font-weight:800;letter-spacing:.05em;border-radius:var(--r-full);padding:3px 9px}'
+    + '.spc-qrow .tag.won{background:var(--gold);color:var(--on-gold)}'
+    + '.spc-qrow .tag.open{border:1px solid var(--border-med);color:var(--text-mute)}'
+    + '.spc-qrow .chev{flex:none;color:var(--text-mute);font-size:14px}'
+    + '}';
+  document.head.appendChild(st);
+}
+
+async function _spcMount() {
+  if (!_spcOn()) return;                       // MOBILE ONLY - desktop untouched
+  if (!(await _spcHasPreset())) return;        // no free-trial preset, no card
+  const mount = document.getElementById('cc-sales-mount');
+  if (!mount || document.getElementById('spc-card')) return;
+  _spcStyle();
+  const card = document.createElement('div');
+  card.className = 'spc-card'; card.id = 'spc-card';
+  card.innerHTML = _spcKpisHTML()
+    + '<div class="spc-tlist" id="spc-tlist"><div class="req-empty" style="padding:12px 16px"><span class="req-spin"></span> Loading trials…</div></div>';
+  mount.prepend(card);
+  mount.classList.add('spc-live');   // the card replaces the old KPI tiles on mobile
+  _spcLoadTrials();
+  _spcLoadKpis();
+}
+
+function _spcKpisHTML() {
+  const k = _SPC.kpi;
+  const trials = _SPC.trialsN == null ? '-' : String(_SPC.trialsN);
+  const mid = k
+    ? '<button type="button" class="spc-kpi tap" onclick="_spcOpenFocus()">'
+      + '<span class="chev">&rsaquo;</span>'
+      + '<span class="v">' + k.closed + '<small> of ' + k.qualified + '</small></span>'
+      + '<span class="l">Qualified closed</span>'
+      + '<span class="meter"><i style="width:' + (k.qualified ? Math.round(k.closed / k.qualified * 100) : 0) + '%"></i></span></button>'
+    : '<div class="spc-kpi"><span class="v">-</span><span class="l">Qualified closed</span></div>';
+  return '<div class="spc-kpis" id="spc-kpis">'
+    + '<div class="spc-kpi lead"><span class="v">' + trials + '</span><span class="l">Trials today</span></div>'
+    + mid
+    + '<div class="spc-kpi"><span class="v">' + (k ? k.sales_week : '-') + '</span><span class="l">Sales this week</span></div>'
+    + '</div>';
+}
+function _spcPaintKpis() {
+  const el = document.getElementById('spc-kpis');
+  if (el) el.outerHTML = _spcKpisHTML();
+}
+
+function _spcTime(startIso) {
+  try { return new Date(startIso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: _SPC.tz }); }
+  catch (_) { try { return new Date(startIso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); } catch (_) { return ''; } }
+}
+
+// The ACADEMY's timezone (clients.time_zone), memoized. The trials-today
+// window must be the academy's calendar day, not the viewing device's: a
+// viewer in any timezone should see the academy's day. Falls back to the
+// _SPC.tz default (later corrected by the calendars response timezone).
+let _SPC_TZ_P = null;
+function _spcAcademyTz() {
+  if (!_SPC_TZ_P) _SPC_TZ_P = (async () => {
+    try {
+      const { data, error } = await _sb.from('clients').select('time_zone').eq('id', CLIENT_ID).maybeSingle();
+      if (error) throw error;
+      if (data && data.time_zone) return data.time_zone;
+    } catch (_) { _SPC_TZ_P = null; }   // transient failure: retry next load
+    return _SPC.tz;
+  })();
+  return _SPC_TZ_P;
+}
+
+// [midnight, next midnight) of "today" IN tz, as UTC instants (Intl-based,
+// DST-safe: the offset is re-derived from the first approximation).
+function _spcDayWindow(tz) {
+  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(new Date()).split('-').map(Number);
+  const off = (ms) => {
+    const p = {};
+    for (const x of new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(ms))) p[x.type] = x.value;
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - ms;
+  };
+  const mid = (dayShift) => {
+    const guess = Date.UTC(ymd[0], ymd[1] - 1, ymd[2] + dayShift);
+    return Date.UTC(ymd[0], ymd[1] - 1, ymd[2] + dayShift) - off(guess - off(guess));
+  };
+  return { from: new Date(mid(0)), to: new Date(mid(1)) };
+}
+
+// Today's trials: /api/website/calendars for the ACADEMY's [today 00:00,
+// tomorrow) window, flattened to one row per attendee (trial booking). FORM
+// chips come from the confirm agent's pending post_trial cards, matched
+// contact-id + slot-start exactly like the mobile calendar's _magLoadForms.
+// Forms are additive: if that call fails there are just no FORM chips, never
+// a broken card.
+async function _spcLoadTrials() {
+  try {
+    const tz = await _spcAcademyTz();
+    let win;
+    try { win = _spcDayWindow(tz); _SPC.tz = tz; }
+    catch (_) {                                  // bad tz string: device-local day
+      const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+      win = { from: d0, to: new Date(d0.getTime() + 86400000) };
+    }
+    const token = await _mreqAuthToken();
+    const url = '/api/website/calendars?client_id=' + encodeURIComponent(CLIENT_ID)
+      + '&from=' + encodeURIComponent(win.from.toISOString())
+      + '&to=' + encodeURIComponent(win.to.toISOString());
+    const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (j.timezone) _SPC.tz = j.timezone;
+    _SPC.forms = new Set();
+    try {
+      const f = await _apxPost('/api/agent-confirm', 'list-ready', {});
+      for (const row of (f.ready || [])) {
+        if (row.kind !== 'post_trial' || row.status !== 'pending') continue;
+        if (!row.ghl_contact_id || !row.trial_at) continue;
+        _SPC.forms.add(String(row.ghl_contact_id) + '|' + new Date(row.trial_at).getTime());
+      }
+    } catch (_) { /* no FORM chips, still a working card */ }
+    const rows = [];
+    const seen = new Set();
+    for (const s of (j.slots || [])) {
+      const ms = new Date(s.start).getTime();
+      for (const a of (s.attendees || [])) {
+        const cid = a.ghl_contact_id ? String(a.ghl_contact_id) : '';
+        const form = !!(cid && _SPC.forms.has(cid + '|' + ms));
+        const status = String(a.status || 'BOOKED').toUpperCase();
+        if (!form && (status === 'CANCELLED' || status === 'NO_SHOW')) continue;
+        const key = (cid || String(a.name || '')) + '|' + ms;   // one row per booking
+        if (seen.has(key)) continue;
+        seen.add(key);
+        rows.push({ ms, start: s.start, cid, name: a.athlete_name || a.name || 'Trial', status, form });
+      }
+    }
+    rows.sort((a, b) => a.ms - b.ms);
+    _SPC.rows = rows;
+    _SPC.trialsN = rows.length;
+    _spcPaintKpis();
+    const host = document.getElementById('spc-tlist');
+    if (!host) return;
+    if (!rows.length) { host.innerHTML = '<div class="spc-note">No trials today</div>'; return; }
+    host.innerHTML = rows.map((t, i) => {
+      const chip = t.form ? '<span class="st form">FORM &rsaquo;</span>'
+        : (t.status === 'SHOWED' || t.status === 'CONVERTED') ? '<span class="st showed">SHOWED</span>'
+        : '<span class="st booked">BOOKED</span>';
+      return '<button type="button" class="spc-trow" onclick="_spcRowTap(' + i + ')">'
+        + '<span class="tm">' + escapeHTML(_spcTime(t.start)) + '</span>'
+        + '<span class="n">' + escapeHTML(t.name) + '</span>' + chip + '</button>';
+    }).join('');
+  } catch (e) {
+    _SPC.trialsN = null; _SPC.rows = [];
+    _spcPaintKpis();
+    const host = document.getElementById('spc-tlist');
+    if (host) host.innerHTML = '<div class="spc-note">Couldn\'t load today\'s trials: ' + escapeHTML(e.message || String(e)) + '</div>';
+  }
+}
+
+// FORM rows go to the real post-trial form: it lives inline on the Hawkeye
+// confirm card for that contact (submits via /api/ghl/post-trial), the same
+// route the mobile calendar's FORM DUE rows take (_magGoHawkeye). Everything
+// else opens the real contact card, same path as the calendar roster.
+function _spcRowTap(i) {
+  const t = _SPC.rows[i]; if (!t) return;
+  if (t.form) { try { _hk2Open('confirm', t.cid || undefined); } catch (_) {} return; }
+  if (t.cid) { try { _calOpenContact(t.cid, t.name); } catch (_) {} }
+}
+
+async function _spcLoadKpis() {
+  let err = null;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sales-kpis?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _SPC.kpi = {
+      closed: Number(j.closed) || 0, qualified: Number(j.qualified) || 0, sales_week: Number(j.sales_week) || 0,
+      closed_rows: Array.isArray(j.closed_rows) ? j.closed_rows : [], open_rows: Array.isArray(j.open_rows) ? j.open_rows : [],
+    };
+  } catch (e) {
+    // Cells stay '-' and untappable, card still renders - but SAY SO with the
+    // same quiet error line _spcLoadTrials uses, never a silent dash.
+    _SPC.kpi = null;
+    err = e && e.message ? e.message : String(e);
+  }
+  _spcPaintKpis();
+  const old = document.getElementById('spc-kpi-err');
+  if (old) old.remove();
+  if (err) {
+    const kpis = document.getElementById('spc-kpis');
+    if (kpis) kpis.insertAdjacentHTML('afterend',
+      '<div class="spc-note" id="spc-kpi-err">Couldn\'t load sales stats: ' + escapeHTML(err) + '</div>');
+  }
+}
+
+function _spcOpenFocus() {
+  const k = _SPC.kpi; if (!k) return;
+  let ov = document.getElementById('spc-focus');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'spc-focus'; document.body.appendChild(ov); }
+  const pct = k.qualified ? Math.round(k.closed / k.qualified * 100) : 0;
+  const openN = Math.max(0, k.qualified - k.closed);
+  // Date-only values (members.joined_date) are pinned to noon so the shown
+  // calendar day never shifts with the viewer's timezone.
+  const d = (v) => { try { return new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? v + 'T12:00:00' : v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (_) { return ''; } };
+  const initials = (n) => String(n || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const row = (r, i, closed) => {
+    const nm = r.athlete || r.parent || 'Athlete';
+    // date_kind 'review' = no booking could be resolved for this qualified
+    // trial, so trial_at is the review-filed time - label it honestly.
+    const when = (r.date_kind === 'review' ? 'Reviewed ' : 'Trial ') + d(r.trial_at);
+    const sub = closed
+      ? [when, r.converted_at ? 'joined ' + d(r.converted_at) : ''].filter(Boolean).join(' · ')
+      : when;
+    return '<button type="button" class="spc-qrow' + (closed ? ' closed' : '') + '" onclick="_spcFocusTap(' + (closed ? 1 : 0) + ',' + i + ')">'
+      + '<span class="av">' + escapeHTML(initials(nm)) + '</span>'
+      + '<span class="b"><span class="n">' + escapeHTML(nm) + '</span><span class="s">' + escapeHTML(sub) + '</span></span>'
+      + '<span class="tag ' + (closed ? 'won">MEMBER' : 'open">OPEN') + '</span><span class="chev">&rsaquo;</span></button>';
+  };
+  ov.innerHTML =
+    '<div class="spc-fhd">'
+    + '<button type="button" class="back" onclick="_spcCloseFocus()">&lsaquo; Sales</button>'
+    + '<div class="t">Qualified trials</div>'
+    + '<div class="sub">Last 30 days &middot; showed up and marked a good fit</div>'
+    + '<div class="spc-fbar"><i style="width:' + pct + '%"></i></div>'
+    + '<div class="sub"><b style="color:var(--gold);font-family:var(--font-num)">' + k.closed + ' closed</b> &middot; ' + openN + ' still open</div>'
+    + '</div>'
+    + (k.closed_rows.length ? '<div class="spc-fsec">CLOSED &middot; ' + k.closed_rows.length + '</div>' + k.closed_rows.map((r, i) => row(r, i, true)).join('') : '')
+    + (k.open_rows.length ? '<div class="spc-fsec">STILL OPEN &middot; ' + k.open_rows.length + '</div>' + k.open_rows.map((r, i) => row(r, i, false)).join('') : '')
+    + (!k.closed_rows.length && !k.open_rows.length ? '<div class="spc-note">No qualified trials in the last 30 days</div>' : '');
+  ov.classList.add('on');
+}
+function _spcCloseFocus() { const ov = document.getElementById('spc-focus'); if (ov) ov.classList.remove('on'); }
+function _spcFocusTap(closed, i) {
+  const k = _SPC.kpi; if (!k) return;
+  const r = (closed ? k.closed_rows : k.open_rows)[i]; if (!r || !r.contact_id) return;
+  try { _calOpenContact(String(r.contact_id), r.athlete || r.parent || 'Contact'); } catch (_) {}
+}
+
+// ═══ Mobile Sales: the pipeline + Hawkeye card (Zoran's 2026-07-31 mockup) ═══
+// SECOND card of the MOBILE Sales view, directly below the free-trial preset
+// KPI card (_spc*). Gold Hawkeye bar on top (opens the deck; count = the same
+// pending total the home orb/deck computes from _hmHawkFetch), then the five
+// free_trial stages as full-width rows in Zoran's locked display order
+// (Nurture, Ghosted, Booking, Confirm, Closing). Tapping a stage cascades its
+// full contact list open below it - rendered LAZILY on first open, one open at
+// a time. Every entry point is gated behind _spcOn() + _spcHasPreset(), so
+// desktop Sales renders untouched and off-preset academies never see it.
+let _PIP = { stages: null, open: null, lastOpen: null, hawkTotal: null, msgs: null, err: null };
+let _PIP_MSG_P = null;
+const _PIP_ENGINE = {
+  booking: { label: 'Booking agent', kind: 'agent' },
+  confirm: { label: 'Confirm agent', kind: 'agent' },
+  closing: { label: 'Closing agent', kind: 'agent' },
+  nurture: { label: 'Nurture drip', kind: 'automation' },
+  ghosted: { label: 'Ghosted automation', kind: 'automation' },
+};
+const _PIP_ICONS = {
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5z"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+};
+
+function _pipStyle() {
+  if (document.getElementById('pip-style')) return;
+  const st = document.createElement('style'); st.id = 'pip-style';
+  st.textContent = '@media(max-width:768px){'
+    + '.pip-card{font-family:var(--font-ui);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-card);margin-bottom:14px}'
+    + '.pip-hawkbar{display:flex;align-items:center;gap:9px;width:100%;padding:12px 16px;background:var(--gold);color:var(--on-gold);border:none;font:inherit;font-size:13.5px;font-weight:800;text-align:left;cursor:pointer}'
+    + '.pip-hawkbar>svg{width:18px;height:18px;flex:none}'
+    + '.pip-hawkbar .n{margin-left:auto;font-family:var(--font-num);font-size:12px;font-weight:800;opacity:.85;white-space:nowrap}'
+    + '.pip-hawkbar .ch{font-size:16px;line-height:1}'
+    + '.pip-stg{display:flex;align-items:center;gap:10px;width:100%;padding:14px 16px;border:none;border-top:1px solid var(--border);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;position:relative}'
+    /* a stage with pending Hawkeye actions lights up like the real board */
+    + '.pip-stg.alert{background:var(--gold-sheen);box-shadow:inset 3px 0 0 var(--gold)}'
+    + '.pip-stg .sb{flex:1;min-width:0}'
+    + '.pip-stg .sn{display:block;font-size:14.5px;font-weight:800;color:var(--text)}'
+    + '.pip-stg.open .sn{color:var(--gold)}'
+    + '.pip-stg .sa{display:inline-flex;align-items:center;gap:5px;margin-top:3px;font-size:10.5px;font-weight:700;color:var(--text-sub)}'
+    + '.pip-stg .sa.quiet{color:var(--text-mute)}'
+    + '.pip-stg .sa svg{width:11px;height:11px;color:var(--gold);flex:none}'
+    + '.pip-stg .hk{flex:none;display:inline-flex;align-items:center;gap:4px;background:var(--gold);color:var(--on-gold);border-radius:var(--r-full);padding:3px 9px;font-family:var(--font-num);font-size:11px;font-weight:800}'
+    + '.pip-stg .hk svg{width:11px;height:11px}'
+    + '.pip-stg .sc{flex:none;font-family:var(--font-num);font-size:18px;font-weight:800;color:var(--text-sub);min-width:26px;text-align:right}'
+    + '.pip-stg .ch{flex:none;font-size:12px;color:var(--text-mute);transition:transform var(--t-med)}'
+    + '.pip-stg.open .ch{transform:rotate(180deg)}'
+    /* the cascade opens right below its stage and pushes later stages down */
+    + '.pip-casc{max-height:0;overflow:hidden;background:var(--surface-el);transition:max-height .28s var(--es)}'
+    + '.pip-crow{display:flex;align-items:center;gap:11px;width:100%;padding:10px 16px 10px 24px;border:none;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}'
+    /* a cascaded lead held by Hawkeye lights up too */
+    + '.pip-crow.alert{background:var(--gold-sheen);box-shadow:inset 3px 0 0 var(--gold)}'
+    + '.pip-crow .av{flex:none;width:34px;height:34px;border-radius:var(--r-full);background:var(--surface-hov);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--text-sub)}'
+    + '.pip-crow .b{flex:1;min-width:0}'
+    + '.pip-crow .n{display:block;font-size:13.5px;font-weight:700;color:var(--text)}'
+    + '.pip-crow .s{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-mute);margin-top:1px;font-weight:600;white-space:nowrap;overflow:hidden}'
+    + '.pip-crow .s .tx{overflow:hidden;text-overflow:ellipsis}'
+    + '.pip-crow .s svg{width:11px;height:11px;color:var(--gold);flex:none}'
+    + '.pip-crow .dir{font-style:normal;font-weight:800;color:var(--gold);flex:none}'
+    + '.pip-crow .eye{flex:none;width:30px;height:30px;border-radius:var(--r-sm);background:var(--gold);color:var(--on-gold);display:flex;align-items:center;justify-content:center;cursor:pointer}'
+    + '.pip-crow .eye svg{width:14px;height:14px}'
+    + '.pip-note{padding:12px 16px 14px 24px;font-size:12px;color:var(--text-mute);font-weight:600}'
+    + '.pip-load{padding:14px 16px;font-size:12.5px;color:var(--text-mute)}'
+    /* This card IS the mobile pipeline: once it mounts (.pip-live, same
+       pattern as .spc-live) the legacy strip below - its own Hawkeye bar,
+       the stage pill grid, the stuck list, the movement feed - folds away.
+       Academies without the preset never get .pip-live, so they keep the
+       strip; desktop keeps it everywhere. (Pipeline config affordances are
+       hidden on mobile unconditionally by the static .plo2-cfg/.plo-gear
+       rule in the head styles, independent of this card.) */
+    + '#cc-sales-mount.pip-live .cc-sal-pipe{display:none}'
+    + '}'
+    + '@media(max-width:768px) and (prefers-reduced-motion:reduce){.pip-casc{transition:none}}';
+  document.head.appendChild(st);
+}
+
+async function _pipMount() {
+  if (!_spcOn()) return;                       // MOBILE ONLY - desktop untouched
+  if (!(await _spcHasPreset())) return;        // no free-trial preset, no card
+  const mount = document.getElementById('cc-sales-mount');
+  if (!mount || document.getElementById('pip-card')) return;
+  _pipStyle();
+  const card = document.createElement('div');
+  card.className = 'pip-card'; card.id = 'pip-card';
+  card.innerHTML = _pipHTML();
+  // Directly below the preset KPI card. If that card hasn't mounted yet, prepend -
+  // _spcMount prepends its own card afterwards, which lands it above this one.
+  const spc = document.getElementById('spc-card');
+  if (spc && spc.parentElement === mount) spc.insertAdjacentElement('afterend', card);
+  else mount.prepend(card);
+  mount.classList.add('pip-live');   // the card replaces the legacy strip on mobile
+  _pipLoad();
+}
+
+// The five preset stages from the SAME pipeline data the Sales strip loader
+// (_ccSalesLoad) and the board (fetchAndRenderPipelines) share via _PL_DATA -
+// _ccSalesLoad kicks off the fetch when the Sales view mounts, so wait briefly
+// for its response before falling back to our own call to the same endpoint.
+async function _pipPipelineData() {
+  for (let i = 0; i < 15; i++) {
+    if (_PL_DATA && Array.isArray(_PL_DATA.pipelines) && _PL_DATA.pipelines.length) return _PL_DATA;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+  const j = await _safeJson(r);
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  if (!_PL_DATA) _PL_DATA = j;
+  return j;
+}
+
+async function _pipLoad() {
+  try {
+    // The SAME coalesced three-queue fetch Home + the deck use. _hawkIdxEnsure
+    // rides the same promise and fills window._hawkIdx for _hawkPendingFor.
+    const hawkP = _hmHawkFetch();
+    const idxP = _hawkIdxEnsure();
+    const data = await _pipPipelineData();
+    const pl = (data.pipelines || []).find(p => (p.stages || []).length);
+    if (!pl) throw new Error('No sales pipeline set up yet');
+    const open = (pl.opportunities || []).filter(o => String(o.status || 'open').toLowerCase() === 'open');
+    const byStage = {};
+    open.forEach(o => { (byStage[o.stageId] = byStage[o.stageId] || []).push(o); });
+    // Zoran's locked display order: Nurture, Ghosted, Booking, Confirm, Closing.
+    // Roles come from the academy's own pipeline data (_plRoleOf: role stamp
+    // first, stage-name fallback); terminal/custom stages don't get a row.
+    const ORD = { nurture: 0, ghosted: 1, responded: 2, scheduled_trial: 3, done_trial: 4 };
+    _PIP.stages = (pl.stages || [])
+      .filter(s => (typeof _isStageAllowed !== 'function') || _isStageAllowed(s.id))
+      .map(s => {
+        const role = (typeof _plRoleOf === 'function') ? _plRoleOf(s) : null;
+        const bot = (typeof _plBotFor === 'function') ? _plBotFor(s) : null;
+        const key = bot && _PIP_ENGINE[bot.key] ? bot.key : null;
+        return { s, role, key };
+      })
+      .filter(x => x.key && x.role && ORD[x.role] != null)
+      .sort((a, b) => ORD[a.role] - ORD[b.role])
+      .map(x => ({
+        id: x.s.id,
+        label: (typeof _plStageLabel === 'function') ? _plStageLabel(x.s) : (x.s.displayName || x.s.name || ''),
+        key: x.key, kind: _PIP_ENGINE[x.key].kind, engine: _PIP_ENGINE[x.key].label,
+        rows: (byStage[x.s.id] || []).map(o => ({
+          cid: o.contactId ? String(o.contactId) : '',
+          name: (o.contact && o.contact.name) || o.name || 'Lead',
+        })),
+      }));
+    _PIP.err = null;
+    // Bar count = the deck's card total (closing followup_N rows collapse to one
+    // plan card per contact), mirrored from _hmLoadRailBottom / _hk2Load.
+    const [rd, cf, cl] = await hawkP;
+    const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
+    let closingN = 0; const clSeen = new Set();
+    for (const r of pend(cl)) {
+      if ((r.step_key || '').startsWith('followup_')) {
+        const k = String(r.ghl_contact_id);
+        if (clSeen.has(k)) continue;
+        clSeen.add(k);
+      }
+      closingN++;
+    }
+    const ok = r => r && (r.ready || r.error === undefined);
+    _PIP.hawkTotal = (ok(rd) || ok(cf) || ok(cl)) ? (pend(rd).length + pend(cf).length + closingN) : null;
+    await idxP;   // stage pills + lit rows read _hawkPendingFor
+  } catch (e) {
+    if (!_PIP.stages) _PIP.err = e.message || String(e);
+  }
+  _pipPaint();
+}
+
+// Pending Hawkeye actions inside one stage = its contacts the deck is holding
+// (same per-contact answer the inbox rows use: _hawkPendingFor).
+function _pipStagePend(st) {
+  let n = 0;
+  for (const r of (st.rows || [])) { if (r.cid && _hawkPendingFor(r.cid)) n++; }
+  return n;
+}
+
+function _pipHTML() {
+  const t = _PIP.hawkTotal;
+  const nTxt = t == null ? '' : (t === 0 ? 'All clear' : t + ' action' + (t === 1 ? '' : 's') + ' waiting');
+  let h = '<button type="button" class="pip-hawkbar" onclick="_hv2OpenHawkeye()">' + _PIP_ICONS.eye + 'Hawkeye'
+    + '<span class="n">' + escapeHTML(nTxt) + '</span><span class="ch">&rsaquo;</span></button>';
+  if (_PIP.err) return h + '<div class="pip-note">Couldn\'t load the pipeline: ' + escapeHTML(_PIP.err) + '</div>';
+  if (!_PIP.stages) return h + '<div class="pip-load"><span class="req-spin"></span> Loading pipeline…</div>';
+  _PIP.stages.forEach((st, si) => {
+    const pendN = _pipStagePend(st);
+    const isOpen = _PIP.open === st.id;
+    const ic = st.kind === 'agent' ? _PIP_ICONS.spark : _PIP_ICONS.clock;
+    h += '<button type="button" class="pip-stg' + (pendN ? ' alert' : '') + (isOpen ? ' open' : '') + '" onclick="_pipToggle(' + si + ')">'
+      + '<span class="sb"><span class="sn">' + escapeHTML(st.label) + '</span>'
+      + '<span class="sa' + (st.kind === 'automation' ? ' quiet' : '') + '">' + ic + escapeHTML(st.engine) + '</span></span>'
+      + (pendN ? '<span class="hk">' + _PIP_ICONS.eye + pendN + '</span>' : '')
+      + '<span class="sc">' + st.rows.length + '</span>'
+      + '<span class="ch">&#9662;</span></button>';
+    if (isOpen) h += '<div class="pip-casc" id="pip-casc">' + _pipCascHTML(st, si) + '</div>';
+  });
+  return h;
+}
+
+// Cascade rows - ALL contacts in the stage, no truncation. Sub-line rule:
+// held by Hawkeye -> lit row, last message + direction arrow, gold eye that
+// jumps to that card in the deck; agent stage -> last message + arrow;
+// automation stage -> clock + step position ("3 of 14") from the automations
+// engine's active-enrollments (falls back to the automation name).
+function _pipCascHTML(st, si) {
+  if (!st.rows.length) return '<div class="pip-note">Nobody in this stage</div>';
+  const initials = (n) => String(n || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  return st.rows.map((r, i) => {
+    const hk = r.cid ? _hawkPendingFor(r.cid) : null;
+    let sub = '';
+    if (hk || st.kind === 'agent') {
+      const m = (_PIP.msgs && r.cid) ? _PIP.msgs.get(r.cid) : null;
+      if (m && m.body) {
+        const arrow = m.dir === 'inbound' ? '&#8592;' : '&#8594;';
+        sub = '<i class="dir">' + arrow + '</i><span class="tx">' + escapeHTML(m.body) + '</span>';
+      } else {
+        sub = '<span class="tx">' + (_PIP.msgs ? 'No messages yet' : '&#8230;') + '</span>';
+      }
+    } else {
+      const e = (typeof _PL_ENR !== 'undefined' && _PL_ENR && r.cid) ? _PL_ENR.get(r.cid) : null;
+      const txt = (e && e.step && e.steps_total) ? (e.step + ' of ' + e.steps_total) : st.engine;
+      sub = _PIP_ICONS.clock + '<span class="tx">' + escapeHTML(txt) + '</span>';
+    }
+    const eye = hk
+      ? '<span class="eye" role="button" aria-label="Open in Hawkeye" onclick="event.stopPropagation();_pipEye(' + si + ',' + i + ')">' + _PIP_ICONS.eye + '</span>'
+      : '';
+    return '<button type="button" class="pip-crow' + (hk ? ' alert' : '') + '" onclick="_pipRowTap(' + si + ',' + i + ')">'
+      + '<span class="av">' + escapeHTML(initials(r.name)) + '</span>'
+      + '<span class="b"><span class="n">' + escapeHTML(r.name) + '</span><span class="s">' + sub + '</span></span>'
+      + eye + '</button>';
+  }).join('');
+}
+
+function _pipPaint(animate) {
+  const card = document.getElementById('pip-card'); if (!card) return;
+  card.innerHTML = _pipHTML();
+  const casc = document.getElementById('pip-casc');
+  if (casc) {
+    if (animate && _PIP.lastOpen !== _PIP.open) {
+      void casc.offsetHeight;   // commit the max-height:0 start frame, then transition
+      casc.style.maxHeight = casc.scrollHeight + 'px';
+      setTimeout(() => { const c = document.getElementById('pip-casc'); if (c) c.style.maxHeight = 'none'; }, 320);
+    } else {
+      casc.style.maxHeight = 'none';   // repaint of an already-open cascade: no re-animation
+    }
+  }
+  _PIP.lastOpen = _PIP.open;
+}
+
+// One cascade open at a time; tapping the open stage closes it. The cascade's
+// data loads lazily on FIRST open: one inbox fetch total for last messages
+// (never per-row) and the shared _PL_ENR enrollment map for step positions.
+function _pipToggle(si) {
+  const st = (_PIP.stages || [])[si]; if (!st) return;
+  _PIP.open = _PIP.open === st.id ? null : st.id;
+  _pipPaint(true);
+  if (_PIP.open !== st.id) return;
+  if (!_PIP.msgs && (st.kind === 'agent' || _pipStagePend(st) > 0)) _pipMsgsEnsure();
+  if (st.kind === 'automation' && (typeof _PL_ENR === 'undefined' || !_PL_ENR)) {
+    try { _plLoadActiveAutomations().then(() => _pipPaint()); } catch (_) {}
+  }
+}
+
+// Last message per contact: ONE fetch of the same GHL inbox list the board's
+// _plLoadLastMessages and the inbox views read (conversations already carry
+// lastMessageBody + lastMessageDirection client-side) - newest thread wins.
+function _pipMsgsEnsure() {
+  if (_PIP_MSG_P) return _PIP_MSG_P;
+  _PIP_MSG_P = (async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+      const j = await _safeJson(r);
+      if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      const map = new Map();
+      for (const c of (j.conversations || [])) {
+        if (!c.contactId) continue;
+        const k = String(c.contactId);
+        const t = c.lastMessageDate ? new Date(c.lastMessageDate).getTime() : 0;
+        const prev = map.get(k);
+        if (!prev || t > prev.t) map.set(k, { t, body: c.lastMessageBody || '', dir: (c.lastMessageDirection || '').toLowerCase() });
+      }
+      _PIP.msgs = map;
+    } catch (_) { _PIP.msgs = new Map(); }   // quiet fallback: rows read "No messages yet"
+    _pipPaint();
+  })();
+  return _PIP_MSG_P;
+}
+
+// The eye jumps to that lead's card in the Hawkeye deck (agent tab + contact
+// surfaced on top). The row itself opens the real contact card - _calOpenContact
+// raises the contacts modal to z 10060, above every overlay.
+function _pipEye(si, i) {
+  const st = (_PIP.stages || [])[si]; if (!st) return;
+  const r = st.rows[i]; if (!r || !r.cid) return;
+  const agent = _hawkPendingFor(r.cid);
+  try { _hk2Open(agent || null, r.cid); } catch (_) {}
+}
+function _pipRowTap(si, i) {
+  const st = (_PIP.stages || [])[si]; if (!st) return;
+  const r = st.rows[i]; if (!r || !r.cid) return;
+  try { _calOpenContact(r.cid, r.name); } catch (_) {}
 }
 
 // SALES (skeleton): quick stats + jump-offs, per the Figma (pipeline cards,
@@ -60413,7 +62492,7 @@ function _ccMountSales(host) {
           <div class="cc-sal-closehint" id="cc-sal-close-hint"></div>
         </div>
       </div>
-      <div class="cc-stat" style="margin-bottom:14px">
+      <div class="cc-stat cc-sal-weekbox" style="margin-bottom:14px">
         <div class="cc-sal-kpirow"><div class="cc-stat-v" id="cc-sal-7d">-</div><div class="cc-stat-l">Sales in the past week</div></div>
         <div class="cc-sal-list" id="cc-sal-7d-names"></div>
       </div>
@@ -60429,6 +62508,11 @@ function _ccMountSales(host) {
         <div class="cc-sal-feed" id="cc-sal-feed"></div>
       </div>
     </div>`;
+  // Mobile-only free-trial preset card rides on top of the mount (Zoran's
+  // 2026-07-31 mockup). No-ops on desktop and for academies without the preset.
+  try { _spcMount(); } catch (_) {}
+  // Mobile-only pipeline + Hawkeye card, directly below it. Same gates.
+  try { _pipMount(); } catch (_) {}
   _ccLoadTrialsCount();
   _ccSalesLoad();
   if (!window._ccSalHawkT) window._ccSalHawkT = setInterval(_ccSalesHawk, 8000);

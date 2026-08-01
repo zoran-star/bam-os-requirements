@@ -9,14 +9,14 @@
 <meta property="og:url" content="https://info.fullcntrl.io">
 <meta property="og:title" content="FullControl - The AI Command Center for Sports Programs">
 <meta property="og:description" content="Built by operators. The AI command center for sports program operators.">
-<meta property="og:image" content="images/og-image.png">
+<meta property="og:image" content="https://info.fullcntrl.io/business/business/images/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="FullControl - The AI Command Center for Sports Programs">
 <meta name="twitter:description" content="Built by operators. The AI command center for sports program operators.">
-<meta name="twitter:image" content="images/og-image.png">
-<link rel="icon" type="image/svg+xml" href="images/logo.svg">
+<meta name="twitter:image" content="https://info.fullcntrl.io/business/business/images/og-image.png">
+<link rel="icon" type="image/svg+xml" href="/business/business/images/logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -174,7 +174,7 @@ td:last-child { font-weight: 600; color: var(--gold); text-align: right; }
 /* Team */
 .team-entry {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 1fr;
   gap: 32px;
   padding: 20px 0;
   border-bottom: 1px solid var(--line-dark);
@@ -484,6 +484,50 @@ footer {
 .tl-note p { font-size:12px; color:rgba(245,241,232,0.5); line-height:1.55; margin:0; }
 .tl-note strong { color:var(--paper); }
 
+
+
+
+/* Team without photos */
+.team-headplain { margin-bottom:6px; }
+.team-tag-plain { font-family:var(--mono); font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-2); margin-top:3px; }
+
+
+/* Agent web - one interactive constellation */
+.aio-web { margin-top:8px; border:1px solid var(--line-dark); background:var(--ink-2); border-radius:6px; padding:14px 16px 16px; }
+.aio-web svg { width:100%; height:auto; display:block; }
+.w-mesh { stroke:rgba(245,241,232,0.07); stroke-width:1; transition:stroke .35s; }
+.w-mesh.on { stroke:rgba(232,197,71,0.45); }
+.w-spoke { stroke:rgba(245,241,232,0.12); stroke-width:1; transition:stroke .35s; }
+.w-spoke.on { stroke:var(--gold); stroke-width:1.3; }
+.w-pathseg { stroke:var(--gold); stroke-width:1.6; stroke-dasharray:5 5; animation:webdash 1s linear infinite; }
+@keyframes webdash { to { stroke-dashoffset:-10; } }
+.w-node { cursor:pointer; }
+.w-node .w-dotc { fill:var(--ink); stroke:rgba(245,241,232,0.4); stroke-width:1.3; transition:all .3s; }
+.w-node:hover .w-dotc { stroke:var(--gold); }
+.w-node.on .w-dotc, .w-node.sel .w-dotc { fill:var(--gold); stroke:var(--gold); }
+.w-nlbl { font-family:var(--mono); font-size:12.5px; fill:rgba(245,241,232,0.55); letter-spacing:0.05em; transition:fill .3s; }
+.w-node:hover .w-nlbl, .w-node.on .w-nlbl, .w-node.sel .w-nlbl { fill:var(--gold-hi); }
+.w-step { font-family:var(--mono); font-size:11px; font-weight:700; fill:var(--gold); }
+.w-beta-ring { fill:none; stroke:var(--gold); stroke-width:1; opacity:.55; animation:betapulse 2.4s ease-out infinite; transform-origin:center; transform-box:fill-box; }
+@keyframes betapulse { 0% { transform:scale(.7); opacity:.7; } 70% { transform:scale(1.35); opacity:0; } 100% { opacity:0; } }
+.w-beta-t { font-family:var(--mono); font-size:8.5px; letter-spacing:0.1em; fill:var(--gold-2); }
+.w-hub circle { fill:rgba(232,197,71,0.10); stroke:var(--gold); stroke-width:1.4; }
+.w-hub-t1 { font-family:var(--display); font-size:15px; font-weight:600; fill:var(--gold); }
+.w-hub-t2 { font-family:var(--mono); font-size:7px; letter-spacing:0.14em; fill:rgba(232,197,71,0.75); }
+#w-dot { fill:var(--gold-hi); filter:drop-shadow(0 0 4px rgba(232,197,71,0.9)); }
+.w-ex-pills { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 10px; }
+.w-pill { font-family:var(--mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(245,241,232,0.55); background:none; border:1px solid var(--line-dark-2); border-radius:999px; padding:6px 13px; cursor:pointer; transition:all .25s; }
+.w-pill:hover { color:var(--gold-hi); border-color:var(--gold-3); }
+.w-pill.on { color:var(--ink); background:var(--gold); border-color:var(--gold); font-weight:700; }
+.w-cap { font-size:13px; color:rgba(245,241,232,0.7); line-height:1.6; min-height:46px; }
+.w-cap b { color:var(--gold); font-weight:600; }
+.w-proof { margin-top:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--gold-2); }
+.w-chippanel { margin-top:14px; border-top:1px solid var(--line-dark); padding-top:12px; min-height:74px; }
+.w-cp-lbl { font-family:var(--mono); font-size:9.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; }
+.w-cp-chips { display:flex; flex-wrap:wrap; gap:5px; }
+.aio-chip { font-size:11px; color:rgba(245,241,232,0.75); border:1px solid var(--line-dark-2); border-radius:999px; padding:3px 9px; white-space:nowrap; }
+@media (max-width:640px){ .w-nlbl { font-size:15px; } .w-beta-t { font-size:10.5px; } }
+
 /* Mobile prototype nudge */
 .proto-mobile-nudge { display: none; background: var(--ink-2); border: 1px solid var(--line-dark); border-radius: 4px; padding: 20px 24px; margin-top: 16px; text-align: center; }
 .proto-mobile-nudge p { font-size: 13px; color: rgba(245,241,232,0.6); line-height: 1.6; margin: 0; }
@@ -747,14 +791,7 @@ footer {
   <div style="margin-top:12px">
 
     <div class="team-entry team-entry-featured">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/coleman.jpg" alt="Coleman Ayers">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Coleman Ayers</div>
-          <div class="team-tag">Co-Founder<br>Brand &amp; Strategy</div>
-        </div>
-      </div>
+      <div class="team-headplain"><div class="team-name">Coleman Ayers</div><div class="team-tag-plain">Co-Founder<br>Brand &amp; Strategy</div></div>
       <div>
         <div class="team-bio">
           <ul>
@@ -769,14 +806,7 @@ footer {
     </div>
 
     <div class="team-entry team-entry-featured">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/zoran.jpg" alt="Zoran Savic">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Zoran Savic</div>
-          <div class="team-tag">Co-Founder<br>Product</div>
-        </div>
-      </div>
+      <div class="team-headplain"><div class="team-name">Zoran Savic</div><div class="team-tag-plain">Co-Founder<br>Product</div></div>
       <div>
         <div class="team-bio">
           <ul>
@@ -790,14 +820,7 @@ footer {
     </div>
 
     <div class="team-entry">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/luka.jpg" alt="Luka" style="object-fit:cover;object-position:center 30%;">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Luka Mircetic</div>
-          <div class="team-tag">Senior Engineer</div>
-        </div>
-      </div>
+      <div class="team-headplain"><div class="team-name">Luka Mircetic</div><div class="team-tag-plain">Senior Engineer</div></div>
       <div>
         <div class="team-bio">
           <ul>
@@ -811,56 +834,7 @@ footer {
     </div>
 
     <div class="team-entry">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/20250816_1336271.jpeg" alt="Danny Liu" style="object-fit:cover;object-position:center 75%;">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Danny Liu</div>
-          <div class="team-tag">Developer · AI Architecture</div>
-        </div>
-      </div>
-      <div>
-        <div class="team-bio">
-          <ul>
-            <li>Computer Science graduate, University of&nbsp;Waterloo</li>
-            <li>Data Engineering Manager at&nbsp;Uplift</li>
-            <li>Software Engineer, AI/ML Platform at&nbsp;Upgrade</li>
-            <li>Lead expansion of RiverPay WeChat/Alipay product in European&nbsp;Market</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="team-entry" style="padding:14px 0;align-items:center">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/headshot.png" alt="Jacky Li" style="object-fit:cover;object-position:center top;">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Jacky Li</div>
-          <div class="team-tag">Junior Engineer</div>
-        </div>
-      </div>
-      <div>
-        <div class="team-bio">
-          <ul>
-            <li>Software Engineering student &amp; varsity volleyball athlete, Trent&nbsp;University</li>
-            <li>Former Software Engineer at Warner Bros. Discovery (CNN, HBO Max) and SickKids&nbsp;Foundation</li>
-            <li>Owned core CNN iOS features serving hundreds of thousands of&nbsp;users</li>
-            <li>Bet on athletic dreams over a conventional career path, and brings that same relentlessness to&nbsp;FullControl</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="team-entry">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/cam.jpg" alt="Cam">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Cameron Wells</div>
-          <div class="team-tag">Content &amp; Branding</div>
-        </div>
-      </div>
+      <div class="team-headplain"><div class="team-name">Cameron Wells</div><div class="team-tag-plain">Content &amp; Branding</div></div>
       <div>
         <div class="team-bio">
           <ul>
@@ -874,14 +848,7 @@ footer {
     </div>
 
     <div class="team-entry">
-      <div class="team-card">
-        <img class="team-card-bg" src="images/mike.jpg" alt="Mike" style="object-fit:cover;object-position:center 15%;">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Mike Eluki</div>
-          <div class="team-tag">Sales &amp; Client Success</div>
-        </div>
-      </div>
+      <div class="team-headplain"><div class="team-name">Mike Eluki</div><div class="team-tag-plain">Sales &amp; Client Success</div></div>
       <div>
         <div class="team-bio">
           <ul>
@@ -916,7 +883,7 @@ footer {
       <div class="moat-body">
         <h3>It runs while you sleep</h3>
         <p>Overnight agents do the operational work most operators do reactively. Conversational AI follows up with warm leads. Ad spend rebalances based on performance. Parent comms queue for approval. At-risk players are flagged with notes. You wake up to drafts, not a blank inbox.</p>
-        <p style="margin-top:8px"><strong style="color:var(--gold)">In beta today:</strong> three sales agents (Booking, Confirm, Closing) run real parent conversations for our academies right now. The agent drafts every message overnight; the owner approves, edits, or redirects from a card deck each morning. Nothing sends without a human tap.</p>
+        <p style="margin-top:8px"><strong style="color:var(--gold)">In beta today:</strong> Hawkeye, our sales agent, runs real parent conversations for our academies right now - drafting every message overnight while the owner approves, edits, or redirects from a card deck each morning. Nothing sends without a human tap. Named agents for marketing and member management follow the same playbook next.</p>
       </div>
     </div>
     <div class="moat-item">
@@ -928,7 +895,63 @@ footer {
     </div>
   </div>
 
-  <div class="section-kicker" style="margin-top:32px">See it in motion</div>
+
+
+
+
+  <div class="section-kicker" style="margin-top:40px">Everything the all-in-one covers</div>
+  <p style="margin-bottom:14px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">Nine areas, one brain. Tap an area for what it handles, or watch a real handoff play across the web.</p>
+  <div class="aio-web">
+    <svg id="w-svg" viewBox="0 0 860 445" role="img" aria-label="FullControl agent web: nine connected areas around one AI brain">
+      <line class="w-mesh" id="e-sched-mem" x1="430" y1="60" x2="642" y2="96"/>
+      <line class="w-mesh" id="e-sched-app" x1="430" y1="60" x2="105" y2="188"/>
+      <line class="w-mesh" id="e-sched-sales" x1="430" y1="60" x2="755" y2="188"/>
+      <line class="w-mesh" id="e-mem-bill" x1="642" y1="96" x2="716" y2="292"/>
+      <line class="w-mesh" id="e-mem-comms" x1="642" y1="96" x2="144" y2="293"/>
+      <line class="w-mesh" id="e-mem-strat" x1="642" y1="96" x2="218" y2="96"/>
+      <line class="w-mesh" id="e-sales-mkt" x1="755" y1="188" x2="543" y2="361"/>
+      <line class="w-mesh" id="e-sales-comms" x1="755" y1="188" x2="144" y2="293"/>
+      <line class="w-mesh" id="e-bill-app" x1="716" y1="292" x2="105" y2="188"/>
+      <line class="w-mesh" id="e-bill-strat" x1="716" y1="292" x2="218" y2="96"/>
+      <line class="w-mesh" id="e-mkt-cont" x1="543" y1="361" x2="317" y2="361"/>
+      <line class="w-mesh" id="e-mkt-strat" x1="543" y1="361" x2="218" y2="96"/>
+      <line class="w-mesh" id="e-cont-comms" x1="317" y1="361" x2="144" y2="293"/>
+      <line class="w-mesh" id="e-app-comms" x1="105" y1="188" x2="144" y2="293"/>
+      <line class="w-spoke" id="sp-sched" x1="430" y1="215" x2="430" y2="60"/>
+      <line class="w-spoke" id="sp-mem" x1="430" y1="215" x2="642" y2="96"/>
+      <line class="w-spoke" id="sp-sales" x1="430" y1="215" x2="755" y2="188"/>
+      <line class="w-spoke" id="sp-bill" x1="430" y1="215" x2="716" y2="292"/>
+      <line class="w-spoke" id="sp-mkt" x1="430" y1="215" x2="543" y2="361"/>
+      <line class="w-spoke" id="sp-cont" x1="430" y1="215" x2="317" y2="361"/>
+      <line class="w-spoke" id="sp-comms" x1="430" y1="215" x2="144" y2="293"/>
+      <line class="w-spoke" id="sp-app" x1="430" y1="215" x2="105" y2="188"/>
+      <line class="w-spoke" id="sp-strat" x1="430" y1="215" x2="218" y2="96"/>
+      <g class="w-hub"><circle cx="430" cy="215" r="30"/><text x="430" y="212" text-anchor="middle" class="w-hub-t1">FC</text><text x="430" y="229" text-anchor="middle" class="w-hub-t2">ONE BRAIN</text></g>
+      <g class="w-node" id="nd-sched" data-id="sched"><circle class="w-dotc" cx="430" cy="60" r="7"/><text class="w-nlbl" x="430" y="40" text-anchor="middle">Scheduling</text></g>
+      <g class="w-node" id="nd-mem" data-id="mem"><circle class="w-dotc" cx="642" cy="96" r="7"/><text class="w-nlbl" x="642" y="76" text-anchor="middle">Members</text></g>
+      <g class="w-node" id="nd-sales" data-id="sales"><circle class="w-beta-ring" cx="755" cy="188" r="13"/><circle class="w-dotc" cx="755" cy="188" r="7"/><text class="w-nlbl" x="755" y="168" text-anchor="middle">Sales & Leads</text><text class="w-beta-t" x="755" y="234" text-anchor="middle">HAWKEYE &middot; IN BETA</text></g>
+      <g class="w-node" id="nd-bill" data-id="bill"><circle class="w-dotc" cx="716" cy="292" r="7"/><text class="w-nlbl" x="716" y="322" text-anchor="middle">Billing</text></g>
+      <g class="w-node" id="nd-mkt" data-id="mkt"><circle class="w-dotc" cx="543" cy="361" r="7"/><text class="w-nlbl" x="543" y="391" text-anchor="middle">Marketing</text></g>
+      <g class="w-node" id="nd-cont" data-id="cont"><circle class="w-dotc" cx="317" cy="361" r="7"/><text class="w-nlbl" x="317" y="391" text-anchor="middle">Content</text></g>
+      <g class="w-node" id="nd-comms" data-id="comms"><circle class="w-dotc" cx="144" cy="293" r="7"/><text class="w-nlbl" x="144" y="323" text-anchor="middle">Comms</text></g>
+      <g class="w-node" id="nd-app" data-id="app"><circle class="w-dotc" cx="105" cy="188" r="7"/><text class="w-nlbl" x="105" y="168" text-anchor="middle">Member App</text></g>
+      <g class="w-node" id="nd-strat" data-id="strat"><circle class="w-dotc" cx="218" cy="96" r="7"/><text class="w-nlbl" x="218" y="76" text-anchor="middle">Strategy & AI</text></g>
+      <circle id="w-dot" r="4.5" style="display:none"/>
+    </svg>
+    <div class="w-ex-pills">
+      <button type="button" class="w-pill on" onclick="_webPick(0,event)">The quiet lead</button>
+      <button type="button" class="w-pill" onclick="_webPick(1,event)">Trial to member</button>
+      <button type="button" class="w-pill" onclick="_webPick(2,event)">Ad dollar to revenue</button>
+    </div>
+    <div class="w-cap" id="w-cap"></div>
+    <div class="w-proof">This exact loop runs in beta today - every handoff owner-approved.</div>
+    <div class="w-chippanel">
+      <div class="w-cp-lbl" id="w-cp-lbl"></div>
+      <div class="w-cp-chips" id="w-cp-chips"></div>
+    </div>
+  </div>
+
+<div class="section-kicker" style="margin-top:32px">See it in motion</div>
   <p style="margin-bottom:14px;font-size:13px;color:rgba(245,241,232,0.6);line-height:1.6">The interactive prototype below shows the destination. The real product is in beta testing: our own academies run their sales, onboarding, and client operations on it every day. Live demo on request.</p>
   <div class="proto-frame">
     <div class="proto-topbar">
@@ -1013,15 +1036,15 @@ footer {
       <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;color:var(--gold);text-transform:uppercase;margin-bottom:10px;opacity:0.85">Year 1.5 &middot; Strong seed position</div>
       <div style="display:flex;gap:24px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px">
         <div style="flex-shrink:0">
-          <span style="font-family:var(--display);font-size:32px;font-weight:600;color:var(--paper);letter-spacing:-0.02em">$113K</span>
+          <span style="font-family:var(--display);font-size:32px;font-weight:600;color:var(--paper);letter-spacing:-0.02em">$94K</span>
           <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.12em;color:var(--gold);text-transform:uppercase;margin-left:6px">MRR</span>
         </div>
-        <div style="font-size:13px;color:rgba(245,241,232,0.6);line-height:1.55;flex:1;min-width:220px">~190 paying programs at $600 blended ARPU. $1.4M ARR run rate at month 18, seed-ready ($40-50K MRR) by month 9. Growth is tied to onboarding capacity, not a guessed percentage.</div>
+        <div style="font-size:13px;color:rgba(245,241,232,0.6);line-height:1.55;flex:1;min-width:220px">~190 paying programs at $500 blended ARPU by month 18, on a curve that compounds to $168K MRR / $2.0M ARR at month 24. $30K MRR proof point by month 9, seed-ready band by month 12. Growth is tied to onboarding capacity, not a guessed percentage.</div>
       </div>
       <div style="font-size:13px;color:rgba(245,241,232,0.6);line-height:1.55;margin-bottom:8px">
-        Blended CAC <strong style="color:var(--paper)">$293</strong> against $600 ARPU: payback inside the <strong style="color:var(--paper)">first month</strong>. Unit economics defensible because 55% of acquisition comes through warm network and organic content we already own.
+        Blended CAC <strong style="color:var(--paper)">$293</strong> against $500 ARPU: payback inside the <strong style="color:var(--paper)">first month</strong>. Unit economics defensible because 55% of acquisition comes through warm network and organic content we already own.
       </div>
-      <div style="font-size:11px;color:rgba(245,241,232,0.4);line-height:1.5;font-family:var(--mono);letter-spacing:0.04em">Pricing: Founding $399 &middot; Core $499 &middot; Growth $899+ &middot; Scale $1,499+ &middot; ~$600 blended &middot; <a href="/projections" style="color:var(--gold);text-decoration:none">full model &rarr;</a></div>
+      <div style="font-size:11px;color:rgba(245,241,232,0.4);line-height:1.5;font-family:var(--mono);letter-spacing:0.04em">Pricing: Founding $379 &middot; Core $429 &middot; Growth $799+ &middot; Scale $1,499+ &middot; ~$500 blended &middot; <a href="/projections" style="color:var(--gold);text-decoration:none">full model &rarr;</a></div>
     </div>
 
     <div style="padding:22px 22px">
@@ -1047,14 +1070,14 @@ footer {
       <div style="font-family:var(--display);font-size:32px;font-weight:700;color:var(--gold);line-height:1;flex-shrink:0;min-width:32px">1</div>
       <div>
         <h3 style="font-size:16px;font-weight:600;color:var(--paper);margin:0 0 8px">Developer Capacity</h3>
-        <p style="font-size:14px;color:rgba(245,241,232,0.6);line-height:1.65;margin:0">Jacky and Luka move to full-time. Right now, they're building around their schedules. That's the first constraint the round&nbsp;removes.</p>
+        <p style="font-size:14px;color:rgba(245,241,232,0.6);line-height:1.65;margin:0">Luka moves to full-time - and that's the whole engineering line item. AI-accelerated development keeps our dev costs a fraction of a typical SaaS build, so the round buys focus, not headcount.</p>
       </div>
     </div>
     <div style="display:flex;gap:20px;align-items:flex-start;background:var(--ink-2);border:1px solid var(--line-dark);border-radius:6px;padding:24px">
       <div style="font-family:var(--display);font-size:32px;font-weight:700;color:var(--gold);line-height:1;flex-shrink:0;min-width:32px">2</div>
       <div>
         <h3 style="font-size:16px;font-weight:600;color:var(--paper);margin:0 0 8px">Hyper-Launch Marketing</h3>
-        <p style="font-size:14px;color:rgba(245,241,232,0.6);line-height:1.65;margin:0">The network is already primed. The round fuels the pre-launch build-up and the post-launch push so when we open the doors, we fill the room. One shot to make a first impression on one million people. We're not leaving that to chance.</p>
+        <p style="font-size:14px;color:rgba(245,241,232,0.6);line-height:1.65;margin:0">Where most of the round goes. The network is already primed - this fuels the pre-launch build-up and the post-launch push so when we open the doors, we fill the room. One shot to make a first impression on one million people. We're not leaving that to chance.</p>
       </div>
     </div>
   </div>
@@ -1115,6 +1138,98 @@ footer {
       run();
     }
   })();
+</script>
+
+
+<script>
+(function(){
+  var POS={sched:[430,60],mem:[642,96],sales:[755,188],bill:[716,292],mkt:[543,361],cont:[317,361],comms:[144,293],app:[105,188],strat:[218,96]};
+  var CHIPS={
+    sched:['Sessions & classes','Coach staffing','Attendance','Capacity & waitlists','Makeup credits','Session notes'],
+    mem:['360\u00b0 member profiles','Health scores','At-risk flags','Pauses & resumes','Streaks & milestones'],
+    sales:['Lead capture & pipeline','AI sales agents','Trial booking','Post-trial follow-up','Cold-lead reignition'],
+    bill:['Auto-billing','Failed-payment recovery','Credits & extensions','Refunds & discounts'],
+    mkt:['Meta ads management','Cost-per-lead tracking','Budget pacing','Underperformance alerts'],
+    cont:['Content planning','Production pipeline','Performance tracking'],
+    comms:['Two-way inbox','Mass messaging','Announcements','Automated reminders'],
+    app:['Self-serve booking','Payments & history','Account management'],
+    strat:['KPI dashboard','Member lifetime value','AI insights & forecasts','Strategic recommendations']
+  };
+  var NAMES={sched:'Scheduling',mem:'Members',sales:'Sales & Leads',bill:'Billing & Payments',mkt:'Marketing & Ads',cont:'Content',comms:'Comms',app:'Member App',strat:'Strategy & AI'};
+  var EX=[
+    {cap:'<b>The quiet lead.</b> A lead goes silent \u2192 Hawkeye drafts the re-engage \u2192 the owner taps approve \u2192 the trial books itself \u2192 the Confirm agent runs the reminders \u2192 the athlete shows up.', nodes:['sales','comms','sched','mem']},
+    {cap:'<b>Trial to member.</b> The trial ends \u2192 post-trial form \u2192 enroll link sends \u2192 payment lands \u2192 auto-billing switches on \u2192 the member app unlocks booking.', nodes:['sched','sales','bill','app']},
+    {cap:'<b>Ad dollar to revenue.</b> The campaign runs \u2192 leads land in the pipeline \u2192 Hawkeye works every one \u2192 the dashboard shows cost per signed member, not per click.', nodes:['mkt','sales','strat','bill']}
+  ];
+  var NS='http://www.w3.org/2000/svg';
+  var svg=document.getElementById('w-svg'), dot=document.getElementById('w-dot');
+  var timers=[], cycle=null, cur=0, raf=null, segEls=[], stepEls=[];
+  function clearPlay(){
+    timers.forEach(clearTimeout); timers=[];
+    if(raf) cancelAnimationFrame(raf); raf=null;
+    segEls.forEach(function(e){e.remove();}); segEls=[];
+    stepEls.forEach(function(e){e.remove();}); stepEls=[];
+    dot.style.display='none';
+    document.querySelectorAll('.w-node.on,.w-spoke.on,.w-mesh.on').forEach(function(el){el.classList.remove('on');});
+  }
+  function showChips(id){
+    document.querySelectorAll('.w-node.sel').forEach(function(el){el.classList.remove('sel');});
+    var nd=document.getElementById('nd-'+id); if(nd) nd.classList.add('sel');
+    document.getElementById('w-cp-lbl').textContent=NAMES[id]+' handles';
+    document.getElementById('w-cp-chips').innerHTML=CHIPS[id].map(function(c){return '<span class="aio-chip">'+c+'</span>';}).join('');
+  }
+  function travel(pts,idx){
+    if(idx>=pts.length-1){ dot.style.display='none'; return; }
+    var p1=pts[idx], p2=pts[idx+1], t0=null, DUR=700;
+    var seg=document.createElementNS(NS,'line');
+    seg.setAttribute('class','w-pathseg');
+    seg.setAttribute('x1',p1[0]); seg.setAttribute('y1',p1[1]); seg.setAttribute('x2',p2[0]); seg.setAttribute('y2',p2[1]);
+    svg.insertBefore(seg, svg.querySelector('.w-hub')); segEls.push(seg);
+    dot.style.display='';
+    function step(ts){
+      if(!t0) t0=ts;
+      var k=Math.min(1,(ts-t0)/DUR);
+      dot.setAttribute('cx', p1[0]+(p2[0]-p1[0])*k);
+      dot.setAttribute('cy', p1[1]+(p2[1]-p1[1])*k);
+      if(k<1){ raf=requestAnimationFrame(step); } else { travel(pts,idx+1); }
+    }
+    raf=requestAnimationFrame(step);
+  }
+  function activate(i){
+    cur=i; clearPlay();
+    document.querySelectorAll('.w-pill').forEach(function(p,j){p.classList.toggle('on', j===i);});
+    document.getElementById('w-cap').innerHTML=EX[i].cap;
+    var ids=EX[i].nodes, pts=ids.map(function(id){return POS[id];});
+    ids.forEach(function(id,j){
+      timers.push(setTimeout(function(){
+        var n=document.getElementById('nd-'+id); if(n) n.classList.add('on');
+        var s=document.getElementById('sp-'+id); if(s) s.classList.add('on');
+        var st=document.createElementNS(NS,'text');
+        st.setAttribute('class','w-step');
+        st.setAttribute('x',POS[id][0]+12); st.setAttribute('y',POS[id][1]-10);
+        st.textContent=(j+1);
+        svg.appendChild(st); stepEls.push(st);
+      }, 700*j));
+    });
+    dot.setAttribute('cx',pts[0][0]); dot.setAttribute('cy',pts[0][1]);
+    travel(pts,0);
+    showChips(ids[0]);
+  }
+  function rearm(){ if(cycle) clearInterval(cycle); cycle=setInterval(function(){activate((cur+1)%EX.length);},9000); }
+  window._webPick=function(i,ev){ if(ev) ev.preventDefault(); activate(i); rearm(); };
+  function boot(){
+    document.querySelectorAll('.w-node').forEach(function(n){
+      n.addEventListener('click',function(){ showChips(n.dataset.id); if(cycle){clearInterval(cycle); cycle=null;} clearPlay();
+        var id=n.dataset.id;
+        document.querySelectorAll('.w-mesh').forEach(function(m){ m.classList.toggle('on', m.id.indexOf('-'+id)>=0 && (m.id.split('-')[1]===id||m.id.split('-')[2]===id)); });
+        var s=document.getElementById('sp-'+id); if(s) s.classList.add('on');
+        document.querySelectorAll('.w-pill').forEach(function(p){p.classList.remove('on');});
+      });
+    });
+    activate(0); rearm();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
 </script>
 </body>
 </html>
