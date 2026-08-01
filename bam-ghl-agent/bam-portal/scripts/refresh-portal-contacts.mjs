@@ -191,10 +191,16 @@ console.log(`\n  upserted into ghl_contacts:              ${mappedRows.length}`)
 // synced_at is a ghl_contacts-only column; drop it and tag provenance to match
 // the academy's existing rows (source:'ghl-import').
 if (client.contact_provider !== "portal") {
-  await bulkUpsertPortalContacts(
+  // bulkUpsertPortalContacts swallows its own errors by design (the cron must
+  // never crash on it); it returns how many rows it actually posted, so report
+  // that number and fail loudly when it comes back short.
+  const posted = await bulkUpsertPortalContacts(
     mappedRows.map(({ synced_at, ...r }) => ({ ...r, source: "ghl-import" })),
   );
-  console.log(`  upserted into portal contacts store:     ${mappedRows.length} (source: ghl-import)`);
+  console.log(`  upserted into portal contacts store:     ${posted} of ${mappedRows.length} (source: ghl-import)`);
+  if (posted < mappedRows.length) {
+    die(`FAILED: portal contacts store took ${posted} of ${mappedRows.length} rows; see the [bulkUpsertPortalContacts] line above`);
+  }
 }
 
 console.log(`\nDone: ${newRows.length} new, ${wouldChange} changed, ${alreadyExist} pre-existing.`);
