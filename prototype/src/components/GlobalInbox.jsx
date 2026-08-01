@@ -7,7 +7,7 @@ const CONVERSATIONS = [
   { id: 'c2', type: 'lead', initials: 'EW', name: 'Emily Watson', time: '6h ago', preview: 'Can we reschedule the trial to Saturday morning instead?', channel: 'SMS', unread: true },
   { id: 'c3', type: 'lead', initials: 'AM', name: 'Ava Martinez', time: '1d ago', preview: 'My son loved the trial class! What are the membership options?', channel: 'Email', unread: true },
   { id: 'c4', type: 'lead', initials: 'NK', name: 'Noah Kim', time: '2d ago', preview: 'Just signed up! When is the next beginner class?', channel: 'Instagram DM', unread: false },
-  { id: 'c5', type: 'lead', initials: 'JR', name: 'Jake Rivera', time: '2d ago', preview: 'AI: Hi Jake! Following up — would you like to book a trial this week?', channel: 'SMS', unread: false },
+  { id: 'c5', type: 'lead', initials: 'JR', name: 'Jake Rivera', time: '2d ago', preview: 'AI: Hi Jake! Following up - would you like to book a trial this week?', channel: 'SMS', unread: false },
   // Members
   { id: 'c6', type: 'member', initials: 'MT', name: 'Mia Thompson', time: '1d ago', preview: 'Sounds great, see you Saturday!', channel: 'In-App', unread: true },
   { id: 'c7', type: 'member', initials: 'CM', name: 'Carlos Martinez', time: '2d ago', preview: 'Can I switch to the Thursday 5pm session?', channel: 'In-App', unread: false },

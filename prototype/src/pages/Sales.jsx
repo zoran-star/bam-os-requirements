@@ -13,7 +13,7 @@ const INITIAL_LEADS = [
     salesNotes: { childAge: '9', goal: 'Build confidence and discipline', source: 'Instagram', budget: '$150/mo', availability: 'Weekends', notes: 'Dad coaches little league, very motivated' },
     messages: [
       { from: 'parent', text: 'Hi! I saw your ad on Instagram.', time: '2d ago' },
-      { from: 'ai', text: "Hi Marcus! We'd love to have your son try a class. We have spots this Saturday at 10am — would that work?", time: '2d ago' },
+      { from: 'ai', text: "Hi Marcus! We'd love to have your son try a class. We have spots this Saturday at 10am - would that work?", time: '2d ago' },
       { from: 'parent', text: 'That works! What age groups do you have?', time: '1d ago' },
       { from: 'ai', text: 'We have groups for ages 6-8, 9-12, and 13+. Your son would be in our 9-12 group with Coach Rivera.', time: '4h ago' },
     ] },
@@ -46,7 +46,7 @@ const INITIAL_LEADS = [
     parentName: 'Mike Rivera', athleteName: 'Jake Rivera',
     salesNotes: { childAge: '13', goal: 'Make the school team', source: 'SMS outbound', budget: '$180/mo', availability: 'Flexible', notes: 'Tryouts in 6 weeks, needs intensive prep' },
     messages: [
-      { from: 'ai', text: 'Hi Jake! Following up — would you like to book a trial this week?', time: '4d ago' },
+      { from: 'ai', text: 'Hi Jake! Following up - would you like to book a trial this week?', time: '4d ago' },
       { from: 'parent', text: "Yeah maybe. When do you have openings?", time: '3d ago' },
       { from: 'ai', text: 'We have Tuesday at 4pm or Thursday at 5pm. Both are with our teen competitive group.', time: '2d ago' },
     ] },
@@ -115,10 +115,10 @@ const TYPEWRITER_PROMPTS = [
 
 const COMPILED_INBOX = [
   { id: 'i1', domain: 'Sales', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>, title: 'Marcus Johnson replied', preview: 'That works! What age groups do you have?', channel: 'Instagram DM', time: '4h ago', unread: true },
-  { id: 'i2', domain: 'Sales', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>, title: 'Ava Martinez — follow up recommended', preview: 'Trial 1d ago, highest close probability. Momentum fading.', channel: 'AI Insight', time: '1h ago', unread: true },
-  { id: 'i3', domain: 'Marketing', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>, title: 'Free Trial Story — 0 conversions', preview: '62 days active, $158 spent. Consider pausing.', channel: 'Ad Alert', time: '3h ago', unread: true },
+  { id: 'i2', domain: 'Sales', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>, title: 'Ava Martinez - follow up recommended', preview: 'Trial 1d ago, highest close probability. Momentum fading.', channel: 'AI Insight', time: '1h ago', unread: true },
+  { id: 'i3', domain: 'Marketing', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>, title: 'Free Trial Story - 0 conversions', preview: '62 days active, $158 spent. Consider pausing.', channel: 'Ad Alert', time: '3h ago', unread: true },
   { id: 'i4', domain: 'Sales', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>, title: 'Jake Rivera went cold', preview: 'No response in 3 days. AI re-engagement queued.', channel: 'AI Insight', time: '5h ago', unread: false },
-  { id: 'i5', domain: 'Members', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>, title: 'Sarah Chen — renewal in 3 days', preview: 'Monthly membership auto-renews Friday. No issues flagged.', channel: 'System', time: '6h ago', unread: false },
+  { id: 'i5', domain: 'Members', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>, title: 'Sarah Chen - renewal in 3 days', preview: 'Monthly membership auto-renews Friday. No issues flagged.', channel: 'System', time: '6h ago', unread: false },
   { id: 'i6', domain: 'Sales', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>, title: 'Weekly sales report ready', preview: '8 trials, 5 closes, 62.5% rate. +8% vs last month.', channel: 'Report', time: '1d ago', unread: false },
 ];
 
@@ -452,7 +452,7 @@ function genSampleData(periodDays) {
       { source: 'Walk-in', leads: Math.round(2 * scale), trials: 0, sales: 0 },
       { source: 'Other', leads: Math.round(1 * scale), trials: 0, sales: 0 },
     ],
-    notes: 'AI conversion rate outperforming direct bookings by 14pts. Post-trial close time trending down — 2 closings pending from this week\u2019s trials.',
+    notes: 'AI conversion rate outperforming direct bookings by 14pts. Post-trial close time trending down - 2 closings pending from this week\u2019s trials.',
     // Time series
     leadsOverTime: rand(3, 2), trialsOverTime: rand(1.5, 1), salesOverTime: rand(0.8, 0.6),
     closeRateOverTime: rand(55, 12), aiRateOverTime: rand(40, 8),
@@ -575,7 +575,7 @@ function FullDashboard({ onClose }) {
 
 /* ─── MAIN COMPONENT ─── */
 export default function Sales() {
-  // Leads state — stage property is mutable via drag-and-drop
+  // Leads state - stage property is mutable via drag-and-drop
   const [leads, setLeads] = useState(INITIAL_LEADS);
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
@@ -691,7 +691,7 @@ export default function Sales() {
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToastVisible(false), 1600);
 
-    // Sound — muted for now, will revisit later
+    // Sound - muted for now, will revisit later
     // try {
     //   const a = new (window.AudioContext || window.webkitAudioContext)();
     //   const o = a.createOscillator(), g = a.createGain();
@@ -844,7 +844,7 @@ export default function Sales() {
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
             </div>
             <div className={s.insightStripText}>
-              <strong>Ava Martinez</strong> completed a trial 1 day ago — highest close probability. Follow up now before momentum fades.
+              <strong>Ava Martinez</strong> completed a trial 1 day ago - highest close probability. Follow up now before momentum fades.
             </div>
             <button className={s.insightStripAction}>Follow up</button>
           </div>

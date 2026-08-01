@@ -88,7 +88,7 @@ export default function SageBar() {
 
   return (
     <>
-      {/* Bottom trigger removed — Sage accessible via Control key and page-level Sage bars */}
+      {/* Bottom trigger removed - Sage accessible via Control key and page-level Sage bars */}
 
       {/* Voice mode fullscreen overlay (Control key) */}
       {voiceMode && (

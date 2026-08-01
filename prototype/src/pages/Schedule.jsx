@@ -72,7 +72,7 @@ const SESSIONS = [
   { id: 4, day: 2, hour: 17, minutes: 0, duration: 60, type: 'Individual', coach: 'Coach Zoran', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 1, capacity: 1, location: 'Downtown', notes: 'One-on-one with Carlos.' },
   { id: 5, day: 2, hour: 18, minutes: 30, duration: 60, type: 'Elite Training', coach: 'Coach Marcus', coachInitials: 'CM', coachName: 'Coach Marcus', booked: 10, capacity: 15, location: 'Downtown', notes: '' },
   { id: 6, day: 3, hour: 16, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Zoran', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 6, capacity: 12, location: 'Westside', notes: '' },
-  /* STF-004a: Coach Zoran conflict — overlapping session at same time on Thursday */
+  /* STF-004a: Coach Zoran conflict - overlapping session at same time on Thursday */
   { id: 12, day: 3, hour: 16, minutes: 0, duration: 60, type: 'Individual', coach: 'Coach Zoran', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 1, capacity: 1, location: 'Downtown', notes: 'CONFLICT: overlaps with Beginner session.' },
   { id: 7, day: 3, hour: 18, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Marcus', coachInitials: 'CM', coachName: 'Coach Marcus', booked: 15, capacity: 15, location: 'Downtown', notes: 'Session is full. Waitlist enabled.' },
   { id: 8, day: 4, hour: 17, minutes: 0, duration: 60, type: 'Evaluation', coach: 'Coach Ava', coachInitials: 'CA', coachName: 'Coach Ava', booked: 2, capacity: 4, location: 'Downtown', notes: 'New athlete evaluations.' },
@@ -481,7 +481,7 @@ function CoachViewGrid({ sessions, onSelectSession }) {
                     key={se.id}
                     className={`${s.coachGridSession} ${typeClass(se.type)} ${conflicts.has(se.id) ? s.coachGridSessionConflict : ''}`}
                     onClick={() => onSelectSession(se)}
-                    title={`${se.type} — ${formatTime(se.hour, se.minutes)} (${se.duration}min)`}
+                    title={`${se.type} - ${formatTime(se.hour, se.minutes)} (${se.duration}min)`}
                   >
                     <span className={s.coachGridSessionName}>{se.type}</span>
                     <span className={s.coachGridSessionTime}>{formatTime(se.hour, se.minutes)}</span>
@@ -697,7 +697,7 @@ export default function Schedule() {
           <div className={s.monthPlaceholder}>Navigate to current week to see coach assignments</div>
         )}
 
-        {/* Calendar — Session View */}
+        {/* Calendar - Session View */}
         {scheduleMode === 'session' && calView === 'week' ? (
           <div className={s.calendarWrap}>
             {/* Day headers */}
