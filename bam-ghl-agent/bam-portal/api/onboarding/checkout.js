@@ -219,8 +219,10 @@ async function handler(req, res) {
           if (secret) {
             // What Stripe.js mounts with is a per-transport fact - ask the
             // resolver. Connect academies keep the platform publishable key +
-            // account id, byte-identical to before.
-            const pub = await publishableFor(stripeAccount);
+            // account id, byte-identical to before. A resolver hiccup must not
+            // 500 a checkout whose subscription already exists - fall back to
+            // the Connect answer this site always returned.
+            const pub = await publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }));
             return res.status(200).json({
               ok: true, reused: true, member_id: member.id,
               subscription_id: sub.id, customer_id: sub.customer,
@@ -380,8 +382,9 @@ async function handler(req, res) {
       });
     } catch (_) { /* non-fatal */ }
 
-    // Per-transport fact, from the resolver (see the reuse-branch note above).
-    const pub = await publishableFor(stripeAccount);
+    // Per-transport fact, from the resolver (see the reuse-branch note above),
+    // with the same no-500-after-the-sub-exists fallback.
+    const pub = await publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }));
     return res.status(200).json({
       ok: true,
       member_id: member && member.id,

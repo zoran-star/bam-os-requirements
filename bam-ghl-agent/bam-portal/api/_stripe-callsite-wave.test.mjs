@@ -56,6 +56,10 @@
 //   MUTATE=gate409  node api/_stripe-callsite-wave.test.mjs
 //     makes website/checkout.js's gate answer 409 "not connected" when the
 //     clients read THREW - caught by the three-outcome assertions (4).
+//   MUTATE=pubcatch node api/_stripe-callsite-wave.test.mjs
+//     strips the Connect-fallback .catch off one publishableFor return site,
+//     restoring the resolver as a hard-failure point AFTER the subscription
+//     exists - caught by the publishable-key assertions (5).
 //
 // EXIT CODES read like the other control suites: a control run exits 0 when the
 // mutation IS caught (the banner prints), 1 when it slipped through or the pin
@@ -130,18 +134,28 @@ function checkGateThreeOutcome(src, label, notReadyLine) {
 }
 
 // ─── 2 + 5. precedence and publishable keys ─────────────────────────────────
-function checkOverridesAndPublishable() {
+// Every publishableFor site carries the SAME .catch fallback: these returns fire
+// AFTER the subscription/PaymentIntent exists, and before this wave they could
+// not fail. A resolver hiccup (the Supabase read behind publishableFor) must
+// degrade to the Connect answer the site always returned - never 500 a
+// checkout the parent already paid for (tester defect D1; MUTATE=pubcatch).
+const PUB_WITH_CATCH = "publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }))";
+function checkOverridesAndPublishable(web = WEB, onb = ONB, camp = CAMP) {
   const out = [];
-  for (const [label, src] of [["website/checkout.js", WEB], ["onboarding/checkout.js", ONB], ["website/camp-checkout.js", CAMP]]) {
+  for (const [label, src] of [["website/checkout.js", web], ["onboarding/checkout.js", onb], ["website/camp-checkout.js", camp]]) {
     out.push({ ok: src.includes("keyOverride: process.env.ONBOARDING_STRIPE_SECRET_KEY || undefined,"),
       msg: `${label}: ONBOARDING_STRIPE_SECRET_KEY keeps first precedence, as keyOverride` });
   }
-  for (const [label, src, n] of [["website/checkout.js", WEB, 2], ["onboarding/checkout.js", ONB, 2], ["website/camp-checkout.js", CAMP, 1]]) {
+  for (const [label, src, n] of [["website/checkout.js", web, 2], ["onboarding/checkout.js", onb, 2], ["website/camp-checkout.js", camp, 1]]) {
     const found = (src.match(/publishableFor\(stripeAccount\)/g) || []).length;
     out.push({ ok: found === n,
       msg: `${label}: ${n} return site(s) ask the resolver's publishableFor (saw ${found})` });
-    out.push({ ok: !src.includes("publishable_key: process.env.STRIPE_PUBLISHABLE_KEY"),
-      msg: `${label}: no return site reads STRIPE_PUBLISHABLE_KEY from env any more` });
+    const guarded = src.split(PUB_WITH_CATCH).length - 1;
+    out.push({ ok: guarded === n,
+      msg: `${label}: all ${n} publishableFor site(s) carry the Connect-fallback .catch - they cannot 500 after the money moved (saw ${guarded})` });
+    const envReads = (src.match(/publishable_key: process\.env\.STRIPE_PUBLISHABLE_KEY/g) || []).length;
+    out.push({ ok: envReads === n,
+      msg: `${label}: the direct env read survives ONLY inside the ${n} catch fallback(s), nowhere else (saw ${envReads})` });
   }
   return out;
 }
@@ -284,8 +298,21 @@ if (MUTATE === "gate409") {
   process.exit(caught ? 0 : 1);
 }
 
+if (MUTATE === "pubcatch") {
+  // Strip the fallback off ONE return site - publishableFor becomes a hard
+  // failure point again, on a response that fires after the sub was created.
+  if (!WEB.includes(PUB_WITH_CATCH)) { console.error("PIN MOVED: website/checkout.js publishableFor+catch not found; the control cannot run."); process.exit(1); }
+  const mutated = WEB.replace(PUB_WITH_CATCH, "publishableFor(stripeAccount)");
+  const results = checkOverridesAndPublishable(mutated, ONB, CAMP);
+  const caught = results.some((r) => !r.ok);
+  console.log(caught
+    ? "NEGATIVE CONTROL PASSED (pubcatch) - an unguarded publishableFor return site was flagged by the fallback assertions."
+    : "❌ NEGATIVE CONTROL FAILED (pubcatch) - a post-payment return site can 500 on a resolver hiccup and nothing here noticed.");
+  process.exit(caught ? 0 : 1);
+}
+
 if (MUTATE) {
-  console.error(`Unknown MUTATE="${MUTATE}". Known controls: localenv, gate409`);
+  console.error(`Unknown MUTATE="${MUTATE}". Known controls: localenv, gate409, pubcatch`);
   process.exit(1);
 }
 

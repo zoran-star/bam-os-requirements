@@ -76,10 +76,12 @@ async function writeAudit({ client_id, action_type, args, performed_by, performe
 }
 
 // ── the probe: what can this key actually do? ───────────────────────────────
-// Writes NOTHING. Validates the key shape, reads the account, then best-effort
-// tests each permission the member-management system leans on. Every probe is
-// an independent true/false; a key missing one still saves (the capability map
-// is stored so the UI can say exactly what will not work).
+// Writes NOTHING. Validates the key shape, reads the account, then tests each
+// permission the member-management system leans on. A permission Stripe DENIES
+// (401/403) records as false and the key still saves - the capability map is
+// stored so the UI can say exactly what will not work. But a probe that could
+// not get an answer (network, 429, 5xx) ABORTS the whole run with a 502: only
+// established facts may enter the map.
 async function probeKey(secretKey, publishableKey) {
   const k = String(secretKey || "").trim();
   if (!k) throw bad("secret_key required");
@@ -109,7 +111,8 @@ async function probeKey(secretKey, publishableKey) {
   // A partial or guessed map is worse than a retry.
   const classify = (e, name) => {
     if (e.stripeStatus === 401 || e.stripeStatus === 403) return false;
-    if (!e.stripeStatus || e.stripeStatus >= 500) {
+    // 429 is could-not-ask too: rate limiting says nothing about permissions.
+    if (!e.stripeStatus || e.stripeStatus === 429 || e.stripeStatus >= 500) {
       throw bad(`could not reach Stripe to test permissions (${name}) - try again`, 502);
     }
     // Any other 4xx got PAST the permission gate before failing on the request

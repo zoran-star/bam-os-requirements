@@ -567,7 +567,9 @@ async function handler(req, res) {
             // What Stripe.js mounts with is a per-transport fact - ask the resolver.
             // Connect academies get the platform publishable key + account id,
             // byte-identical to before; a direct academy gets its own key, no account.
-            const pub = await publishableFor(stripeAccount);
+            // A resolver hiccup must not 500 a checkout whose subscription already
+            // exists - fall back to the Connect answer this site always returned.
+            const pub = await publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }));
             return res.status(200).json({
               ok: true, reused: true, member_id: member.id, subscription_id: sub.id, customer_id: sub.customer,
               client_secret: secret, stripe_account: pub.stripe_account, publishable_key: pub.publishable_key,
@@ -802,8 +804,9 @@ async function handler(req, res) {
       }
     } catch { /* non-fatal - the member + payment are already saved */ }
 
-    // Per-transport fact, from the resolver (see the reuse-branch note above).
-    const pub = await publishableFor(stripeAccount);
+    // Per-transport fact, from the resolver (see the reuse-branch note above),
+    // with the same no-500-after-the-sub-exists fallback.
+    const pub = await publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }));
     return res.status(200).json({
       ok: true, member_id: member && member.id, subscription_id: sub.id, customer_id: customerId,
       client_secret: clientSecret, stripe_account: pub.stripe_account, publishable_key: pub.publishable_key,

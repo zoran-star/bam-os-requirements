@@ -193,8 +193,10 @@ async function handler(req, res) {
     } catch { /* non-fatal */ }
 
     // What Stripe.js mounts with is a per-transport fact - ask the resolver.
-    // Connect academies keep the platform publishable key + account id.
-    const pub = await publishableFor(stripeAccount);
+    // Connect academies keep the platform publishable key + account id. A
+    // resolver hiccup must not 500 a checkout whose PaymentIntent already
+    // exists - fall back to the Connect answer this site always returned.
+    const pub = await publishableFor(stripeAccount).catch(() => ({ publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || null, stripe_account: stripeAccount || null }));
     return res.status(200).json({
       ok: true,
       client_secret:    pi.client_secret,

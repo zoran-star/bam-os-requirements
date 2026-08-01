@@ -631,15 +631,30 @@ async function handler(req, res) {
 
   let tenant = null;
   try {
-    tenant = await buildTenant(routing, event);
-
     // An academy endpoint is never subscribed to Connect plumbing (see
     // CONNECT_ONLY_EVENTS in api/stripe/ensure-academy-webhook.js), so one
-    // arriving WITH a token is forged or misrouted. Refuse it here: an academy's
-    // own signing secret must never be able to drive a Connect-status write.
-    if (tenant.kind === "direct" && CONNECT_ONLY_EVENTS.includes(event.type)) {
+    // arriving WITH a token is forged or misrouted. Refused on the ROUTING,
+    // before any tenant lookup: an academy's own signing secret must never be
+    // able to reach the Connect-status writer.
+    if (routing.kind === "direct" && CONNECT_ONLY_EVENTS.includes(event.type)) {
       return res.status(200).json({ skipped: "connect-only event on an academy endpoint" });
     }
+
+    // The academy revoked our access in their own Stripe dashboard. THE ONLY
+    // route to handleAccountDeauthorized, which is THE ONLY writer of
+    // stripe_connect_status='disabled' - and it dispatches BEFORE buildTenant,
+    // deliberately: the handler never uses the tenant, and buildTenant's clients
+    // read would otherwise be a third database read on this path whose failure
+    // rides into the catch below, which acks 200 and makes Stripe drop a REAL
+    // revocation forever. On the revocation path every database read either
+    // answers or becomes a 500 retry (deauthGuardedRead) - deferred, never
+    // dropped. account.updated is deliberately not routed here - see the block
+    // above the handler for why the two are not the same change.
+    if (event.type === DEAUTHORIZED_EVENT) {
+      return await handleAccountDeauthorized(event, connectedAccount, res);
+    }
+
+    tenant = await buildTenant(routing, event);
 
     switch (event.type) {
       case "customer.subscription.created": return await handleSubCreated(event, tenant, res);
@@ -654,11 +669,6 @@ async function handler(req, res) {
       case "price.created":                 return await handlePriceUpserted(event, tenant, res);
       case "price.updated":                 return await handlePriceUpserted(event, tenant, res);
       case "checkout.session.completed":    return await handleStoreOrder(event, tenant, res);
-      // The academy revoked our access in their own Stripe dashboard. THE ONLY route
-      // to handleAccountDeauthorized, which is THE ONLY writer of
-      // stripe_connect_status='disabled'. account.updated is deliberately not here -
-      // see the block above that handler for why the two are not the same change.
-      case DEAUTHORIZED_EVENT:              return await handleAccountDeauthorized(event, connectedAccount, res);
       default:                              return res.status(200).json({ skipped: event.type });
     }
   } catch (e) {
@@ -1551,17 +1561,15 @@ async function handleChargeRefunded(event, tenant, res) {
   return res.status(200).json({ ok: true, action: "refunds-mirrored", inserted, skipped, member_id: member.id });
 }
 
-// The deauthorized handler's direct-key guard lookup, isolated so its failure
-// mode is explicit. Returns { rows } on an answer (empty rows = a Connect
-// academy) or { failed: true } when the database could not be asked.
-async function directKeyGuardRows(clientId) {
+// Every database read on the DEAUTHORIZED path goes through this. Returns
+// { rows } on an answer or { failed: true } when the database could not be
+// asked - and the caller then answers 500 so Stripe RETRIES. The query string
+// is built at the call site, so this helper knows nothing about columns.
+async function deauthGuardedRead(path) {
   try {
-    const rows = await sb(
-      `client_stripe_direct?client_id=eq.${clientId}&status=eq.active&select=client_id,status&limit=1`
-    );
-    return { rows };
+    return { rows: await sb(path) };
   } catch (e) {
-    console.error("[webhook] deauthorized: direct-key guard lookup failed, asking Stripe to retry:", (e && e.message) || e);
+    console.error("[webhook] deauthorized: lookup failed, asking Stripe to retry:", (e && e.message) || e);
     return { failed: true };
   }
 }
@@ -1596,7 +1604,9 @@ async function directKeyGuardRows(clientId) {
 //   1. REVOKED_STATUS is the only occurrence of the string in this file, and it is
 //      read in exactly one place - the PATCH below.
 //   2. That PATCH lives in this function and nowhere else. This function is called
-//      from exactly one place: the single switch case for this one event type.
+//      from exactly one place: the single guarded dispatch in handler() for this
+//      one event type, which runs BEFORE any tenant lookup so no other read's
+//      failure can sit between verification and this handler.
 //   3. No catch block in this file writes stripe_connect_status. The top-level catch
 //      in handler() logs and returns 200; it does not touch the database. So an
 //      error on ANY path, including inside this function, leaves the status alone.
@@ -1632,10 +1642,22 @@ async function handleAccountDeauthorized(event, connectedAccount, res) {
   const acct = connectedAccount || null;
   if (!acct) return res.status(200).json({ skipped: "no connected account on the event" });
 
-  const rows = await sb(
+  // ⛔ THE ONE DELIBERATE EXCEPTION to this file's swallow-to-200 pattern, applied
+  // to BOTH reads on this path (this lookup and the direct-key guard below). A
+  // failed read here cannot tell "unknown academy" from "database down", and a
+  // 200 ack makes Stripe mark the revocation delivered and never retry. 500 =
+  // retry: the handler is idempotent (a replay that finds the flip already done
+  // skips without a second write), and the fail direction is preserved - a blip
+  // still never flips anybody, it only defers the decision until the database
+  // answers.
+  const looked = await deauthGuardedRead(
     `clients?stripe_connect_account_id=eq.${encodeURIComponent(acct)}` +
     `&select=id,business_name,stripe_connect_status&limit=1`
   );
+  if (looked.failed) {
+    return res.status(500).json({ error: "academy lookup failed - retry" });
+  }
+  const rows = looked.rows;
   const client = Array.isArray(rows) && rows[0];
   // An account we do not know: another integration on the same platform, an academy
   // that was already re-pointed at a different Stripe account, or a replay of an old
@@ -1648,15 +1670,12 @@ async function handleAccountDeauthorized(event, connectedAccount, res) {
   // revoking THAT tears down nothing the portal now uses - the key routes every
   // call. Flipping the status here would hide every billing action from an academy
   // whose transport is working perfectly. Skip, and leave a trace.
-  // ⛔ THE ONE DELIBERATE EXCEPTION to this file's swallow-to-200 pattern. If the
-  // guard lookup fails we cannot tell a direct-key academy (must NOT be flipped)
-  // from a Connect academy (MUST be flipped) - and letting the error ride to the
-  // dispatcher catch acks 200, which makes Stripe drop a REAL revocation forever.
-  // Answer 500 instead so Stripe RETRIES: the handler is idempotent (a replay
-  // that finds the status already flipped skips without a second write), and the
-  // fail direction is preserved - a blip still never flips anybody, it only
-  // defers the decision until the database answers.
-  const guard = await directKeyGuardRows(client.id);
+  // Same exception as the lookup above: a guard failure cannot tell a direct-key
+  // academy (must NOT be flipped) from a Connect academy (MUST be flipped), so
+  // it defers via 500 rather than guessing - or dropping.
+  const guard = await deauthGuardedRead(
+    `client_stripe_direct?client_id=eq.${client.id}&status=eq.active&select=client_id,status&limit=1`
+  );
   if (guard.failed) {
     return res.status(500).json({ error: "direct-key guard lookup failed - retry" });
   }

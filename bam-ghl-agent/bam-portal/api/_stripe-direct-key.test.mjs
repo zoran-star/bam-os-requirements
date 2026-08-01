@@ -264,6 +264,13 @@ console.log("\n── 3. could-not-ask ABORTS - it is never stored as `false` �
   r = await post({ action: "probe", client_id: "c1", secret_key: RK });
   ok(r.code === 502, `a Stripe 500 aborts the same way (saw ${r.code})`);
 
+  // And so does a 429: rate limiting says nothing about permissions, so it
+  // must never persist a guess into the forever-served capability map.
+  stripeOverride = (m, u) => u.includes("/v1/payouts") ? { status: 429, body: { error: { message: "Too many requests" } } } : null;
+  r = await post({ action: "probe", client_id: "c1", secret_key: RK });
+  ok(r.code === 502 && !("capabilities" in (r.payload || {})),
+    `a 429 aborts too - rate limited is not a permission answer (saw ${r.code})`);
+
   // 401/403 is Stripe SAYING no - the only thing that may become `false`.
   stripeOverride = (m, u) => u.includes("/v1/payouts") ? { status: 403, body: { error: { message: "not permitted" } } } : null;
   r = await post({ action: "probe", client_id: "c1", secret_key: RK });
