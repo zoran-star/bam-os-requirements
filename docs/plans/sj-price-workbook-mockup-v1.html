@@ -138,10 +138,11 @@
 </header>
 
 <div class="prog">
-  <div class="pline"><span><b id="ncf">0</b> of <b>5</b> confirmed</span><span class="left" id="lefttxt">5 still to review</span></div>
+  <div class="pline"><span><b id="ncf">0</b> of <b id="ntot">6</b> confirmed</span><span class="left" id="lefttxt">6 still to review</span></div>
   <div class="pbar"><i id="pfill" style="width:0%"></i></div>
 </div>
 
+<div id="taxcard"></div>
 <div id="cards"></div>
 
 <button class="addbtn" style="margin-bottom:4px">+ Add a plan you sell that isn't here</button>
@@ -156,7 +157,7 @@
 
 <footer>
   <div class="footin">
-    <div class="cnt"><b id="ncf2">0</b>/5 confirmed · <b id="nflag">0</b> changes flagged</div>
+    <div class="cnt"><b id="ncf2">0</b>/<span id="ntot2">6</span> confirmed · <b id="nflag">0</b> changes flagged</div>
     <button class="send" id="sendbtn" disabled>Send back to BAM</button>
   </div>
 </footer>
@@ -183,8 +184,11 @@ const DEALS=[
  {who:"Christy Hang, for Christopher",sent:'Pays <b>$199</b> every 4 weeks on his own special price',pick:null,opts:["Academy 2x/week","Academy 1x/week","Academy Unlimited","Elementary Academy"]},
  {who:"Meredith Torio, for Keanu",sent:'Pays <b>$100</b> a month on a family deal',pick:"Elementary Academy",opts:["Academy 2x/week","Academy 1x/week","Academy Unlimited","Elementary Academy"]},
 ];
-const ST={two:{c:0,e:0},unl:{c:0,e:0},one:{c:0,e:0},ele:{c:0,e:0},cus:{c:0,e:0}};
+const ST={tax:{c:0,e:0},two:{c:0,e:0},unl:{c:0,e:0},one:{c:0,e:0},ele:{c:0,e:0},cus:{c:0,e:0}};
 let flags=0;
+// Academy-wide tax setting. One answer for the whole academy, not per plan.
+// null = not answered yet. Drives whether per-price tax questions exist at all.
+const TAX={on:null,pct:"",label:"Sales tax"};
 
 function money(n){return '$'+Math.round(n).toLocaleString()}
 function monthsOf(s){const m=(s||'').match(/\d+/);let n=m?+m[0]:0;if(/year/i.test(s))n*=12;if(/week/i.test(s))n=Math.round(n/4.345);return n||1}
@@ -219,8 +223,9 @@ function cardHTML(k){
         ${CADS.map((c,j)=>`<button class="bchip ${p.cad===j?'sel':''}" onclick="P['${k}'].cad=${j};edited('${k}');draw('${k}')">${c}</button>`).join('')}
       </div>
 
-      <div class="q">Do you add sales tax on top?</div>
-      <div class="chiprow">${["Yes, add tax","No, price includes it"].map((c,j)=>`<button class="bchip ${p.tax===j?'sel':''}" onclick="P['${k}'].tax=${j};edited('${k}');draw('${k}')">${c}</button>`).join('')}</div>
+      ${TAX.on===1?`<div class="q">Is this plan taxed?</div>
+      <div class="qhint">You told us you charge ${TAX.pct||'?'}% ${esc(TAX.label)}. Say No only if this particular plan is exempt.</div>
+      <div class="chiprow">${["Yes, taxed like everything else","No, this one is exempt"].map((c,j)=>`<button class="bchip ${p.tax===j?'sel':''}" onclick="P['${k}'].tax=${j};edited('${k}');draw('${k}')">${c}</button>`).join('')}</div>`:''}
 
       <div class="q">Is there a one-time joining fee?</div>
       <div class="qhint">Your Stripe history shows you charged a $40 setup fee on new signups, and waived it sometimes. This keeps that.</div>
@@ -289,6 +294,59 @@ function dealCard(){
   </div>`;
 }
 
+function taxCardHTML(){
+  const answered=TAX.on!==null;
+  return `<div class="bcard" data-fam="cus" id="card_tax">
+   <div class="bhead" onclick="tog('tax')">
+    <button class="btog">▸</button>
+    <div class="binfo">
+      <div class="btitle"><span class="famdot"></span>Sales tax <span id="pill_tax">${pillOf('tax')}</span></div>
+      <div class="rowsent" id="sent_tax">${answered?(TAX.on?`You charge <b>${TAX.pct||'?'}% ${TAX.label}</b> on top of your prices`:'You do not charge sales tax, prices are what parents pay'):'One question that affects every price below'}</div>
+    </div>
+   </div>
+   <div class="bfields">
+    <div class="q">Do you charge sales tax on training? <span class="req">*</span></div>
+    <div class="qhint">This is one answer for your whole academy. If yes, we add it on top of every price unless you mark a specific one as exempt. If you are not sure, answer No and we will check it with you before anything goes live.</div>
+    <div class="chiprow">
+      <button class="bchip ${TAX.on===0?'sel':''}" onclick="setTax(0)">No, my prices are the full amount</button>
+      <button class="bchip ${TAX.on===1?'sel':''}" onclick="setTax(1)">Yes, tax gets added</button>
+    </div>
+    <div id="taxdetail" style="display:${TAX.on===1?'block':'none'}">
+      <div class="q">How much, and what is it called?</div>
+      <div class="chiprow">
+        <input class="bb-input" type="number" step="0.01" placeholder="8.25" value="${esc(TAX.pct)}" style="max-width:100px;font-weight:800" oninput="TAX.pct=this.value;edited('tax');taxEcho()">
+        <span style="font-size:17px;font-weight:800;color:var(--mut)">%</span>
+        <input class="bb-input" placeholder="Sales tax" value="${esc(TAX.label)}" style="max-width:180px" oninput="TAX.label=this.value;edited('tax');taxEcho()">
+      </div>
+      <div class="qhint" id="taxecho" style="margin-top:8px"></div>
+    </div>
+    <div class="confirmbar">
+      <button class="cbtn" onclick="confirmTax()" id="cbtn_tax">✓ That's right</button>
+      <span class="chint">Nothing is taxed until you answer this. Answering No is a real answer, not a skip.</span>
+    </div>
+   </div>
+  </div>`;
+}
+function setTax(v){TAX.on=v;edited('tax');
+  // Real Blueprint rule: with a tax set, a row nobody answered counts as taxed.
+  // Exempt is the deliberate exception, so default every row to taxed.
+  if(v===1){['two','unl','one','ele'].forEach(k=>{P[k].tax=0;P[k].rungs.forEach(r=>r.taxable=0)})}
+  drawTax();['two','unl','one','ele'].forEach(k=>{const o=document.getElementById('card_'+k).classList.contains('open');document.getElementById('card_'+k).outerHTML=cardHTML(k);if(o)document.getElementById('card_'+k).classList.add('open');draw(k)})}
+function taxEcho(){const e=document.getElementById('taxecho');if(!e)return;
+  const p=parseFloat(TAX.pct);
+  e.innerHTML=p>0?`A $250 plan would show as <b>${money(250*(1+p/100))}</b> with ${esc(TAX.label)||'tax'} included.`:'';
+  const s=document.getElementById('sent_tax');
+  if(s&&TAX.on===1)s.innerHTML=`You charge <b>${TAX.pct||'?'}% ${esc(TAX.label)}</b> on top of your prices`;
+  ['two','unl','one','ele'].forEach(prevOpts);
+}
+function drawTax(){const o=document.getElementById('card_tax').classList.contains('open');
+  document.getElementById('card_tax').outerHTML=taxCardHTML();
+  if(o)document.getElementById('card_tax').classList.add('open');taxEcho()}
+function confirmTax(){
+  if(TAX.on===null){alert('Pick Yes or No first.');return}
+  if(TAX.on===1&&!(parseFloat(TAX.pct)>0)){alert('Type the tax rate first.');return}
+  ST.tax.c=1;ST.tax.e=0;drawTax();updProg();
+}
 function tog(k){document.getElementById('card_'+k).classList.toggle('open')}
 function edited(k){if(ST[k].c){ST[k].c=0}ST[k].e=1;flags++;paintPills(k);updProg()}
 function confirmCard(k){
@@ -297,12 +355,14 @@ function confirmCard(k){
 }
 function paintPills(k){document.getElementById('pill_'+k).innerHTML=pillOf(k)}
 function updProg(){
+  const tot=Object.keys(ST).length;
   const n=Object.values(ST).filter(s=>s.c).length;
   document.getElementById('ncf').textContent=n;document.getElementById('ncf2').textContent=n;
+  document.getElementById('ntot').textContent=tot;document.getElementById('ntot2').textContent=tot;
   document.getElementById('nflag').textContent=flags;
-  document.getElementById('pfill').style.width=(n/5*100)+'%';
-  document.getElementById('lefttxt').textContent=n===5?'all done, press Send':(5-n)+' still to review';
-  document.getElementById('sendbtn').disabled=n<5;
+  document.getElementById('pfill').style.width=(n/tot*100)+'%';
+  document.getElementById('lefttxt').textContent=n===tot?'all done, press Send':(tot-n)+' still to review';
+  document.getElementById('sendbtn').disabled=n<tot;
 }
 
 function draw(k){
@@ -335,8 +395,8 @@ function draw(k){
       <div class="rmore">
         <div class="mf"><span class="ml">What do they get on this one?</span>
           <input class="rin" value="${esc(r.gets)}" placeholder="same as monthly" oninput="P['${k}'].rungs[${i}].gets=this.value;edited('${k}')"></div>
-        <div class="mf"><span class="ml">Do you add tax on it?</span>
-          <span class="chiprow">${["Yes","No"].map((a,j)=>`<button class="bchip sm ${r.taxable===j?'sel':''}" onclick="P['${k}'].rungs[${i}].taxable=${j};edited('${k}');draw('${k}')">${a}</button>`).join('')}</span></div>
+        ${TAX.on===1?`<div class="mf"><span class="ml">Taxed?</span>
+          <span class="chiprow">${["Yes","No, exempt"].map((a,j)=>`<button class="bchip sm ${r.taxable===j?'sel':''}" onclick="P['${k}'].rungs[${i}].taxable=${j};edited('${k}');draw('${k}')">${a}</button>`).join('')}</span></div>`:''}
         <div class="mf"><span class="ml">Joining fee on this one?</span>
           <span class="chiprow">${["Charge it","Waive it"].map((a,j)=>`<button class="bchip sm ${r.fee===j?'sel':''}" onclick="P['${k}'].rungs[${i}].fee=${j};edited('${k}');draw('${k}')">${a}</button>`).join('')}</span></div>
         <div class="mf"><span class="ml">Notes on this discount</span>
@@ -369,7 +429,12 @@ function prevOpts(k){
     const save=base*monthsOf(r.len)-r.price;
     return `<div class="opt"><span>${r.len}</span><span>${money(r.price)} ${save>0&&base?`<span class="os">save ${money(save)}</span>`:''}</span></div>`;
   }).join('')||'<div class="opt" style="color:var(--mut)">none yet</div>';
-  document.getElementById('pv_fee_'+k).textContent=p.fee===1?`Plus a one-time ${money(p.feeAmt)} joining fee (waived if you pay up front).`:'';
+  const pct=parseFloat(TAX.pct);
+  const taxed=TAX.on===1&&p.tax===0&&pct>0;
+  const bits=[];
+  if(taxed)bits.push(`With ${TAX.pct}% ${esc(TAX.label)}, a parent pays ${money(base*(1+pct/100))} ${CADS[p.cad]}.`);
+  if(p.fee===1)bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee (waived if you pay up front).`);
+  document.getElementById('pv_fee_'+k).textContent=bits.join(' ');
   const back=p.rungs.filter(r=>r.after===0).length, ren=p.rungs.filter(r=>r.after===1).length;
   let line='';
   if(back)line=`When a commitment ends you go back to ${money(base)} ${CADS[p.cad]}.`;
@@ -385,6 +450,7 @@ function drawDeals(){
   paintPills('cus');
 }
 
+document.getElementById('taxcard').innerHTML=taxCardHTML();
 const host=document.getElementById('cards');
 host.innerHTML=['two','unl','one','ele'].map(cardHTML).join('')+dealCard();
 ['two','unl','one','ele'].forEach(k=>{draw(k)});
