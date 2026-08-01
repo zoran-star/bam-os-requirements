@@ -732,8 +732,46 @@ if (window.__MOCK__) (() => {
       }
       return { ok: true, card: c || null };
     }
-    if (p === '/api/action-items') return { items: [], team: [], sm: null, mktg: null, ads: null, review_ready: false };
-    if (p === '/api/kpis-v15') return { ...DEFAULT_API };
+    if (p === '/api/action-items') return {
+      items: [
+        { id: 'ai-1', title: '2 content pieces pending review', due_date: new Date(NOW).toISOString().slice(0, 10), completed_at: null, created_at: iso(0, 6) },
+        { id: 'ai-2', title: '1 failed payment (Jake Rivera)', due_date: new Date(NOW - 86400e3).toISOString().slice(0, 10), completed_at: null, created_at: iso(1) },
+        { id: 'ai-3', title: '3 leads need follow-up', due_date: null, completed_at: null, created_at: iso(0, 9) },
+        { id: 'ai-4', title: '4pm Intermediate class: 3/12 spots filled', due_date: new Date(NOW).toISOString().slice(0, 10), completed_at: null, created_at: iso(0, 3) },
+      ],
+      team: [], sm: null, mktg: null, ads: null, review_ready: false,
+    };
+    // Home KPI endpoint: enough signal for the win card + scoreboard to demo
+    // rich (marketing today carries 2 trials booked -> "+2 trials booked today").
+    if (p === '/api/kpis-v15') {
+      const sec = q.get('section');
+      if (sec === 'marketing') return { ...DEFAULT_API, leads: 12, trials_booked: 2, joined: 6, cancelled: 1 };
+      if (sec === 'revenue') return { ...DEFAULT_API, net: 1240, mrr: 8200, stripe_ok: true };
+      if (sec === 'members') return { ...DEFAULT_API, roster: { live: 42 }, cancelled: { count: 1 }, payments: [] };
+      return { ...DEFAULT_API };
+    }
+    // V2 spine schedule for the FC Home "Today's Schedule" panel: 4 named
+    // classes with fills (13/15, 11/15, 8/12, 1/1). Rolls to tomorrow when
+    // the demo runs late in the evening so the list is not all dimmed-past.
+    if (p === '/api/ghl/calendars-v15') {
+      const act2 = q.get('action');
+      if (act2 === 'trials-today') return { trials: [], timezone: undefined };
+      if (act2 === 'slots-today') {
+        const base = new Date(NOW);
+        if (base.getHours() >= 17) base.setDate(base.getDate() + 1);
+        const at = (h, m2) => { const d = new Date(base); d.setHours(h, m2 || 0, 0, 0); return d.toISOString(); };
+        return {
+          timezone: undefined,
+          slots: [
+            { id: 'sl-1', name: 'Elite Training', start: at(9), capacity: 15, booked: 13 },
+            { id: 'sl-2', name: 'Group Training', start: at(11), capacity: 15, booked: 11 },
+            { id: 'sl-3', name: 'Beginner', start: at(16), capacity: 12, booked: 8 },
+            { id: 'sl-4', name: 'Individual Session', start: at(17), capacity: 1, booked: 1 },
+          ],
+        };
+      }
+      return { ...DEFAULT_API };
+    }
     // ── V2 ticket rail (support focus mode + the product-feedback intake) ──
     // create pushes into T so the new row shows up when the rail re-reads _sb.
     if (p === '/api/v2-tickets') {
@@ -758,6 +796,54 @@ if (window.__MOCK__) (() => {
     }
     return null;
   }
+  // ── FCUI Home pilot demo seed (?mock=1 + the fcui flag) ──────────────────
+  // Everything the FC Home reads when it wants the pilot to demo rich:
+  // header chips, hero copy, radials, milestones/streaks, activity events,
+  // weekly challenge, toasts. Fictional names only; no em dashes anywhere.
+  window.__MOCK_FCUI__ = {
+    chips: [
+      { v: '7', l: 'actions vs 5.2 avg', dot: 'var(--green)' },
+      { v: '47', l: 'AI actions' },
+      { v: '12d', l: 'streak', dot: 'var(--amber)' },
+      { v: '$8.2k', l: 'MRR', dot: 'var(--gold)' },
+      { v: '42', l: 'members', dot: 'var(--blue)' },
+    ],
+    bestThing: {
+      v: '+2 trials booked today',
+      c: 'Mia Thompson and Sofia Reyes both confirmed. Your Saturday pipeline is the strongest it has been in 3 weeks.',
+    },
+    priority: {
+      title: 'Follow up with Ava Martinez',
+      sub: 'She finished her trial yesterday and asked about membership options. Highest close probability in your pipeline.',
+      cta: 'Open conversation',
+      go: "_hk2Open('closing')",
+    },
+    radials: [
+      { key: 'fcnewmem', label: 'New Members', color: '#4CC76A', pct: 60, val: '6', target: '10' },
+      { key: 'fcmrrg', label: 'MRR Growth', color: '#D4B65C', pct: 82, val: '8.2%', target: '10%' },
+      { key: 'fcclasses', label: 'Classes Filled', color: '#5A8FB8', pct: 75, val: '18', target: '24' },
+      { key: 'fctrials', label: 'Trials Booked', color: '#F0B84A', pct: 67, val: '4', target: '6' },
+    ],
+    milestones: [
+      { name: 'Jaylen Brooks', line: 'Hit 50 sessions', when: '2 days ago', kind: 'trophy' },
+      { name: 'Carlos Martinez', line: '4-week streak', when: '3 days ago', kind: 'streak' },
+      { name: 'Mia Thompson', line: '12-day streak', when: '5 days ago', kind: 'streak' },
+      { name: 'Ava Chen', line: 'Hit 10 sessions', when: '1 week ago', kind: 'trophy' },
+    ],
+    challenge: {
+      title: 'You are 2 members away from your best month ever.',
+      sub: 'Draft a follow-up to your 3 unconverted trials?',
+      task: 'Draft a follow-up to my 3 unconverted trials',
+    },
+    activity: [
+      { b: 'New lead:', t: 'James Park inquired via Instagram DM about the teen competitive program.', when: '2h ago', color: 'var(--gold)' },
+      { b: 'Payment received:', t: 'Carlos Martinez, $175/mo membership started.', when: '5h ago', color: 'var(--green)' },
+      { b: 'Session reminder:', t: '3 athletes expected for the 4pm Intermediate group.', when: 'Today, 3:30pm', dim: true, color: 'var(--text-mute)' },
+    ],
+    mrrToast: 'MRR crossed $8k',
+    trialToast: '+1 trial booked: Sofia Reyes, Saturday 9:00 AM',
+  };
+
   const _realFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     try {
@@ -22046,6 +22132,9 @@ function switchView(name, el) {
     try { syncMobileNav('v15cal'); } catch (_) {}
     return;
   }
+  // FCUI pilot: while the FC shell is active, Home means the FC dashboard
+  // view (bypasses the V2 home-hidden bounce below - the shell IS home).
+  if (typeof _fcActive === 'function' && _fcActive() && name === 'home') { _fcShowHome(); return; }
   // Command center (beta): while the one-page flow is active, section-mapped
   // views scroll to their section instead of swapping views; anything else
   // opens classically with a "back to command center" pill. _CC_BYPASS lets
@@ -22174,6 +22263,8 @@ function switchView(name, el) {
 
   // Keep the mobile bottom nav in sync with the active view
   syncMobileNav(name);
+  // FCUI pilot: keep the FC sidebar's active state in sync too (no-op off-flag)
+  try { if (typeof _fcSyncNav === 'function') _fcSyncNav(name); } catch (_) {}
 }
 
 // ── Mobile bottom-nav helpers ──
@@ -22884,6 +22975,8 @@ function _hv2NavCard(icon, title, sub, view, delay) {
 }
 function renderHomeV2() {
   const host = document.getElementById('home-v2'); if (!host) return;
+  // FCUI pilot: the FC shell renders its own one-column dashboard layout.
+  if (typeof _fcActive === 'function' && _fcActive()) { _hv2Style(); _fcRenderHome(host); return; }
   _hv2Style();
   host.innerHTML = `<div class="hm-layout">
     <div class="hm-left">
@@ -23003,6 +23096,16 @@ function _hv2BootType() {
   })();
 }
 async function _hv2WinLoad() {
+  // FCUI pilot demo seed: exact hero copy for the pilot walkthrough. Gated on
+  // the FC shell being active - plain ?mock=1 with the flag off keeps the
+  // shipped win-card behavior untouched.
+  if (typeof _fcActive === 'function' && _fcActive() && window.__MOCK_FCUI__ && window.__MOCK_FCUI__.bestThing) {
+    const seed = window.__MOCK_FCUI__.bestThing;
+    const v0 = document.getElementById('hv2-win-v'), c0 = document.getElementById('hv2-win-c');
+    if (v0) v0.textContent = seed.v;
+    if (c0) c0.textContent = seed.c;
+    return;
+  }
   _hv2BootType();
   const now = new Date(), today = _hv2Ymd(now);
   const yd = new Date(now); yd.setDate(yd.getDate() - 1); const yday = _hv2Ymd(yd);
@@ -23260,8 +23363,13 @@ function _hv2UnifiedSchedule(trials, slots, tz) {
       const lowFill = s.capacity && fill < 60;
       const trialId = 'st-' + i;
 
+      // FCUI pilot: class rows get a per-class dot color (mockup purple maps
+      // to gold - no purple in this system). Shipped layout keeps the blue.
+      const dotColor = (typeof _fcActive === 'function' && _fcActive())
+        ? ['var(--green)', 'var(--green)', 'var(--blue)', 'var(--gold)'][i % 4]
+        : '#7fb0d8';
       html += `<div onclick="_calOpenRight()" style="${_HV_ROW}${isPast ? ';opacity:.5' : ''}${isNext ? ';border-left:3px solid var(--gold)' : ''}">
-        <span class="hv2-dot" style="background:#7fb0d8"></span>
+        <span class="hv2-dot" style="background:${dotColor}"></span>
         <div style="flex:1;min-width:0">
           <div style="${_HV_TITLE}">${escapeHTML(s.name || 'Session')}${hasTrials ? `<span class="hm-sched-trial-tag" onclick="event.stopPropagation();_hvToggleTrial('${trialId}')">${sessionTrials.length} trial${sessionTrials.length > 1 ? 's' : ''} &#9662;</span>` : ''}</div>
           <div style="${_HV_SUB}">${escapeHTML(_hvTime(s.start, tz))}${cd && cd !== 'done' ? ` <span class="hm-sched-countdown${cd === 'now' ? ' now' : ''}" id="hm-cd-${i}">in ${cd}</span>` : ''}</div>
@@ -23974,6 +24082,11 @@ function _hmSetRing(key, pct) {
   const clamped = Math.min(Math.max(pct, 0), 100);
   const offset = arcLen - (arcLen * clamped / 100);
   requestAnimationFrame(() => { el.style.strokeDashoffset = offset.toFixed(1); });
+  // FCUI pilot radial cards carry a % readout in the ring's center (the
+  // overlay only exists in the fcui score-grid markup, so this is gated by
+  // element presence and never touches the shipped layout).
+  const pctEl = document.getElementById('hm-ringpct-' + key);
+  if (pctEl) pctEl.textContent = Math.round(clamped) + '%';
 }
 
 // Calculate ring fill % based on mode
@@ -24001,8 +24114,19 @@ function _hmRenderScoreGrid() {
   const grid = document.getElementById('hm-score-grid');
   if (!grid) return;
   const selected = _hmGetSelectedKpis();
+  // FCUI pilot: radial-card variant (big ring, % in the middle, label + value
+  // stacked under). Same ids, so _hmLoadScoreboard/_hmSetRing fill both.
+  const fc = (typeof _fcActive === 'function' && _fcActive());
   grid.innerHTML = selected.map(key => {
     const kpi = _HM_KPI_CATALOG.find(k => k.key === key) || { key, label: key, color: '#D4B65C' };
+    if (fc) return `<div class="hm-stat" data-stat="${kpi.key}" onclick="_hmStatTap(this)">
+      <div class="fcui-ringbox">${_hmRingHtml(kpi.key, kpi.color)}<span class="fcui-ringpct" id="hm-ringpct-${kpi.key}"></span></div>
+      <div class="hm-stat-info">
+        <div class="hm-stat-lab">${escapeHTML(kpi.label)}</div>
+        <div class="hm-stat-val hm-stat-skel" id="hm-s-${kpi.key}">&nbsp;</div>
+        <div class="hm-stat-trend" id="hm-s-${kpi.key}-t"></div>
+      </div>
+    </div>`;
     return `<div class="hm-stat" data-stat="${kpi.key}" onclick="_hmStatTap(this)">
       ${_hmRingHtml(kpi.key, kpi.color)}
       <div class="hm-stat-info">
@@ -61056,7 +61180,902 @@ function _ccStyle() {
   document.head.appendChild(st);
 }
 
+// ═════════════════════════════════════════════════════════════════════════
+// FCUI HOME PILOT (?fcui=1) - FullControl prototype Home rebuild (2026-07-31)
+// Preview flag for the new owner Home: fixed light sidebar + compact header
+// + one ~1500px dashboard column, replacing the command-center scroll flow.
+// ON when: URL has ?fcui=1 (persists via localStorage 'fcui'), OR localStorage
+// fcui === '1', OR mock mode (?mock=1). ?fcui=0 is an explicit OFF override,
+// even in mock. Desktop (>768px) only - phones keep the shipped command
+// center + bottom tab bar untouched. Gated inside the V2 branch only
+// (openCommandCenter is V2-only); V1/V1.5 never reach any of this.
+// All function declarations, no top-level statements (same rule as the cc
+// module above - hoisted, can't be knocked out by earlier failures).
+// ═════════════════════════════════════════════════════════════════════════
+function _fcOn() {
+  try {
+    const v = new URLSearchParams(location.search).get('fcui');
+    if (v === '0') { try { localStorage.removeItem('fcui'); } catch (_) {} return false; }
+    if (v === '1') { try { localStorage.setItem('fcui', '1'); } catch (_) {} return true; }
+    if (localStorage.getItem('fcui') === '1') return true;
+  } catch (_) {}
+  return !!window.__MOCK__;
+}
+function _fcDesk() { return window.matchMedia('(min-width: 769px)').matches; }
+function _fcActive() { return document.body.classList.contains('fcui-mode'); }
+
+function _fcIcons() {
+  const cc = _ccIcons();
+  return {
+    home: '<svg viewBox="0 0 24 24"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>',
+    cal: cc.cal, gear: cc.gear, search: cc.search, users: cc.contacts,
+    pulse: '<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+    file: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+    layers: '<svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+    phone: '<svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>',
+    msg: '<svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    pin: '<svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+    chev: '<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>',
+    check: '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    bolt: '<svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+    wave: '<svg viewBox="0 0 24 24"><line x1="4" y1="10" x2="4" y2="14"/><line x1="8" y1="7" x2="8" y2="17"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="16" y1="7" x2="16" y2="17"/><line x1="20" y1="10" x2="20" y2="14"/></svg>',
+    trophy: '<svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>',
+    flame: '<svg viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
+    droplet: '<svg viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>',
+  };
+}
+
+function _fcStyle() {
+  if (document.getElementById('fcui-style')) return;
+  const st = document.createElement('style'); st.id = 'fcui-style';
+  st.textContent =
+    /* mode: swap the classic chrome for the FC shell (desktop only) */
+    '@media(min-width:769px){' +
+    'body.fcui-mode .sidebar{display:none !important}' +
+    'body.fcui-mode .main{margin-left:240px}' +
+    /* banners live in .main above the views: compact alert restyle */
+    'body.fcui-mode #ghl-banner,body.fcui-mode #action-banner,body.fcui-mode #completed-banner{margin:10px 24px 0;border-radius:var(--r-md);border:1px solid var(--accent-border) !important;background:var(--gold-sheen) !important;padding:9px 14px !important;font-size:12.5px !important}' +
+    /* the support orb must stay reachable on the FC shell (some modes force-
+       hide it); the support focus page still owns the screen when open */
+    'body.fcui-mode:not(:has(#view-support.mm-open)) #admin-fb-wrap{display:block !important}' +
+    /* never show the command-center speed-dial "+" dock under the flag */
+    'body.fcui-mode .cc-dock{display:none !important}' +
+    '}' +
+    /* the FC sidebar */
+    '#fcui-side{position:fixed;left:0;top:0;bottom:0;width:240px;z-index:80;display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--border);font-family:var(--font-ui);padding:18px 14px calc(14px + env(safe-area-inset-bottom))}' +
+    '@media(max-width:768px){#fcui-side{display:none}body.fcui-mode .main{margin-left:0}}' +
+    '.fcui-brand{display:flex;align-items:center;gap:10px;padding:2px 6px 16px}' +
+    '.fcui-brand-tile{flex:none;width:38px;height:38px;border-radius:var(--r-md);background:var(--gold);color:var(--on-gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-num);font-size:15px;font-weight:900}' +
+    '.fcui-brand-tx b{display:block;font-family:var(--font-num);font-size:15px;font-weight:900;letter-spacing:.02em;color:var(--text);line-height:1.15}' +
+    '.fcui-brand-tx i{display:block;font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--text-mute);margin-top:2px}' +
+    '.fcui-nav-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);padding:10px 8px 6px}' +
+    '.fcui-nav-item{display:flex;align-items:center;gap:11px;width:100%;padding:10px 12px;margin:1px 0;border:1px solid transparent;border-radius:var(--r-md);background:none;font:inherit;font-size:13.5px;font-weight:600;color:var(--text-sub);cursor:pointer;text-align:left;transition:background var(--t-fast),color var(--t-fast),border-color var(--t-fast)}' +
+    '.fcui-nav-item span{white-space:nowrap}' +
+    '.fcui-nav-item svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}' +
+    '.fcui-nav-item:hover{background:var(--gold-sheen);color:var(--text)}' +
+    '.fcui-nav-item.on{background:var(--gold-glow);border-color:var(--accent-border);color:var(--gold);font-weight:700}' +
+    '.fcui-nav-item.fcui-preview{border:1px dashed var(--border-med)}' +
+    '.fcui-nav-item.fcui-preview:hover{border-color:var(--accent-border)}' +
+    '.fcui-badge{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;background:var(--gold-glow);color:var(--gold);border-radius:var(--r-full);padding:3px 8px}' +
+    /* messages preview card */
+    '.fcui-msgs{display:block;width:100%;margin-top:10px;padding:11px 12px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--gold-sheen);font:inherit;text-align:left;cursor:pointer;transition:border-color var(--t-fast)}' +
+    '.fcui-msgs:hover{border-color:var(--accent-border)}' +
+    '.fcui-msgs-top{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--text)}' +
+    '.fcui-msgs-top svg{width:14px;height:14px;stroke:var(--red);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '.fcui-msgs-top em{font-style:normal;font-size:11px;font-weight:700;color:var(--gold)}' +
+    '.fcui-msgs-prev{display:block;margin-top:5px;font-size:11.5px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.fcui-msgs-top{display:flex}' +
+    '.fcui-side-spacer{flex:1}' +
+    '.fcui-user{display:flex;align-items:center;gap:10px;border-top:1px solid var(--border);padding:12px 6px 0}' +
+    '.fcui-user-av{flex:none;width:34px;height:34px;border-radius:var(--r-full);background:var(--gold);color:var(--on-gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-num);font-size:12.5px;font-weight:800}' +
+    '.fcui-user-tx{flex:1;min-width:0}' +
+    '.fcui-user-tx b{display:block;font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.fcui-user-tx i{display:block;font-style:normal;font-size:10.5px;color:var(--text-mute)}' +
+    '.fcui-user-gear{flex:none;background:none;border:none;color:var(--text-mute);cursor:pointer;padding:6px;border-radius:var(--r-sm);transition:color var(--t-fast)}' +
+    '.fcui-user-gear:hover{color:var(--text)}' +
+    '.fcui-user-gear svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;display:block}' +
+    /* header bar */
+    '#fcui-head{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:12px;padding:12px 24px;background:var(--bg);border-bottom:1px solid var(--border)}' +
+    '.fcui-greet{flex:none}' +
+    '.fcui-greet b{display:block;font-family:var(--font-num);font-size:16.5px;font-weight:800;color:var(--text);line-height:1.15}' +
+    '.fcui-greet span{display:block;font-size:11px;color:var(--text-mute)}' +
+    '.fcui-search{flex:0 1 210px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:8px 12px;min-width:130px}' +
+    '.fcui-search svg{width:14px;height:14px;stroke:var(--text-mute);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}' +
+    '.fcui-search input{flex:1;min-width:0;background:none;border:none;outline:none;font:inherit;font-size:12.5px;color:var(--text)}' +
+    '.fcui-search input::placeholder{color:var(--text-mute)}' +
+    '.fcui-search:focus-within{border-color:var(--accent-border)}' +
+    '.fcui-kbd{flex:none;font-family:var(--font-mono,monospace);font-size:10px;color:var(--text-mute);border:1px solid var(--border-med);border-radius:var(--r-xs);padding:1px 5px}' +
+    '.fcui-loc{flex:none;display:flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:8px 13px;font:inherit;font-size:12.5px;font-weight:700;color:var(--text);cursor:pointer;position:relative;transition:border-color var(--t-fast)}' +
+    '.fcui-loc:hover{border-color:var(--accent-border)}' +
+    '.fcui-loc svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '.fcui-loc-pop{position:absolute;top:calc(100% + 6px);left:0;min-width:190px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-pop,0 12px 40px rgba(0,0,0,.18));padding:6px;display:none;z-index:70}' +
+    '.fcui-loc-pop.open{display:block}' +
+    '.fcui-loc-opt{display:block;width:100%;text-align:left;background:none;border:none;font:inherit;font-size:12.5px;font-weight:600;color:var(--text-sub);padding:8px 10px;border-radius:var(--r-sm);cursor:pointer}' +
+    '.fcui-loc-opt:hover{background:var(--gold-sheen);color:var(--text)}' +
+    /* Chips never clip: the row is allowed to wrap (a chip drops fully
+       visible to a second line on tight widths) instead of overflowing. */
+    '.fcui-chips{flex:1 1 auto;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px 8px;overflow:visible;min-width:0}' +
+    '.fcui-chip{flex:none;display:inline-flex;align-items:baseline;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:5px 9px;font-size:10.5px;color:var(--text-mute);white-space:nowrap}' +
+    '.fcui-chip b{font-family:var(--font-num);font-size:12px;font-weight:800;color:var(--text)}' +
+    '.fcui-chip .dot{align-self:center;width:6px;height:6px;border-radius:var(--r-full);flex:none}' +
+    /* dashboard column */
+    '#fcui-col{max-width:1500px;margin:0 auto;padding:22px 24px 90px;width:100%}' +
+    'body.fcui-mode #view-fcui{background:var(--bg)}' +
+    /* one-column dashboard: home-v2 renders _fcRenderHome inside */
+    '.fcui-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-card)}' +
+    '.fcui-dash{display:flex;flex-direction:column;gap:18px}' +
+    '@media(prefers-reduced-motion:no-preference){.fcui-dash>*{animation:fcRise .42s var(--es,ease) both}.fcui-dash>*:nth-child(2){animation-delay:.04s}.fcui-dash>*:nth-child(3){animation-delay:.08s}.fcui-dash>*:nth-child(4){animation-delay:.12s}.fcui-dash>*:nth-child(n+5){animation-delay:.16s}}' +
+    '@keyframes fcRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}' +
+    /* two-up panels */
+    '.fcui-two{display:grid;grid-template-columns:1fr 1.2fr;gap:18px;align-items:start}' +
+    '.fcui-panel{overflow:hidden}' +
+    '.fcui-ph{display:flex;align-items:center;gap:8px;padding:15px 18px;border-bottom:1px solid var(--border)}' +
+    '.fcui-ph svg{width:15px;height:15px;stroke:var(--text-sub);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}' +
+    '.fcui-ph b{font-family:var(--font-num);font-size:15px;font-weight:800;color:var(--text)}' +
+    '.fcui-ph .hv2-pill{margin-left:auto}' +
+    '.fcui-panel .hv2-pf{display:block;width:100%;background:none;border:none;border-top:1px solid var(--border);padding:11px 18px;font:inherit;font-size:12.5px;font-weight:700;color:var(--gold);text-align:left;cursor:pointer}' +
+    '.fcui-panel .hv2-pf:hover{background:var(--gold-sheen)}' +
+    /* support attention card slots in as its own card */
+    '.fcui-dash #hm-support-card{margin:0}' +
+    /* hero row: best-thing + #1 priority */
+    '.fcui-hero{display:grid;grid-template-columns:1fr 1.05fr;gap:18px;align-items:stretch}' +
+    '.fcui-eyebrow{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}' +
+    '.fcui-eyebrow svg{width:12px;height:12px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '.fcui-best{display:flex;gap:14px;align-items:flex-start;padding:20px 22px;background:var(--gold-sheen);border:1px dashed var(--accent-border)}' +
+    '.fcui-best-ic{flex:none;width:38px;height:38px;border-radius:var(--r-md);background:var(--green-soft);color:var(--green);display:flex;align-items:center;justify-content:center}' +
+    '.fcui-best-ic svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '.fcui-best-v{font-family:var(--font-num);font-size:23px;font-weight:900;color:var(--text);margin-top:4px;line-height:1.15}' +
+    '.fcui-best-c{font-size:12.5px;color:var(--text-sub);margin-top:5px;line-height:1.5}' +
+    '.fcui-pri{padding:20px 22px}' +
+    '.fcui-pri-t{font-family:var(--font-num);font-size:17px;font-weight:800;color:var(--text);margin-top:7px}' +
+    '.fcui-pri-c{font-size:12.5px;color:var(--text-sub);margin-top:5px;line-height:1.5}' +
+    '.fcui-pri-btn{display:inline-flex;align-items:center;gap:6px;margin-top:13px;background:var(--gold);color:var(--on-gold);border:none;border-radius:var(--r-sm);padding:9px 16px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:filter var(--t-fast)}' +
+    '.fcui-pri-btn:hover{filter:brightness(1.05)}' +
+    /* AI task bar */
+    '.fcui-aibar{display:flex;align-items:center;gap:13px;padding:13px 18px;border-radius:var(--r-full)}' +
+    '.fcui-ai-orb{flex:none;width:36px;height:36px;border-radius:var(--r-md);background:var(--gold);color:var(--on-gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-num);font-size:15px;font-weight:900}' +
+    '.fcui-ai-line{flex:1;display:flex;align-items:center;gap:8px;min-width:0;cursor:text}' +
+    '.fcui-ai-line b{flex:none;font-family:var(--font-num);font-size:14.5px;font-weight:800;color:var(--text)}' +
+    '.fcui-ai-ph{flex:none;font-size:13px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50%}' +
+    '.fcui-ai-line input{flex:1;min-width:60px;background:none;border:none;outline:none;font:inherit;font-size:13px;color:var(--text)}' +
+    '.fcui-aibar.typing .fcui-ai-ph{display:none}' +
+    '.fcui-ai-wave{flex:none;background:none;border:none;color:var(--gold);cursor:pointer;padding:6px;border-radius:var(--r-sm)}' +
+    '.fcui-ai-wave svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;display:block}' +
+    '.fcui-ai-wave:hover{background:var(--gold-sheen)}' +
+    /* monthly progress + radials */
+    '.fcui-mp-head{display:flex;align-items:baseline;gap:9px;margin-bottom:12px}' +
+    '.fcui-mp-head b{font-family:var(--font-num);font-size:15px;font-weight:800;color:var(--text)}' +
+    '.fcui-mp-head span{font-size:11.5px;color:var(--text-mute)}' +
+    '.fcui-customize{margin-left:auto;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-mute);font-size:12px;font-weight:700;white-space:nowrap;padding:4px 8px;border-radius:var(--r-sm);transition:color var(--t-fast)}' +
+    '.fcui-customize:hover{color:var(--text)}' +
+    '.fcui-customize svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    'body.fcui-mode #home-v2 .hm-score-grid{display:grid;grid-template-columns:repeat(4,minmax(160px,230px));gap:16px}' +
+    'body.fcui-mode #home-v2 .hm-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:18px 14px 16px;margin:0;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;position:relative;transition:transform var(--t-med) var(--es,ease),box-shadow var(--t-med)}' +
+    'body.fcui-mode #home-v2 .hm-stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover,0 10px 30px rgba(0,0,0,.1))}' +
+    '.fcui-ringbox{position:relative;flex:none}' +
+    'body.fcui-mode #home-v2 .hm-stat-ring{width:86px;height:86px}' +
+    'body.fcui-mode #home-v2 .hm-stat-ring svg{width:86px;height:86px;transform:rotate(135deg)}' +
+    '.fcui-ringpct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-num);font-size:17px;font-weight:800;color:var(--text)}' +
+    'body.fcui-mode #home-v2 .hm-stat-info{text-align:center}' +
+    'body.fcui-mode #home-v2 .hm-stat-lab{font-size:12px;font-weight:700;color:var(--text);text-transform:none;letter-spacing:0}' +
+    'body.fcui-mode #home-v2 .hm-stat-val{font-family:var(--font-num);font-size:13.5px;font-weight:800;color:var(--text-sub);margin-top:2px}' +
+    'body.fcui-mode #home-v2 .hm-stat-val .of{color:var(--text-mute);font-weight:700}' +
+    'body.fcui-mode #home-v2 .hm-stat-trend{font-size:10.5px;color:var(--text-mute)}' +
+    '@media(max-width:1100px){body.fcui-mode #home-v2 .hm-score-grid{grid-template-columns:repeat(2,1fr)}}' +
+    /* milestones + activity */
+    '.fcui-miles-row{display:flex;align-items:center;gap:12px;margin:8px 14px;padding:10px 14px;border-radius:var(--r-md);background:var(--gold-sheen)}' +
+    '.fcui-miles-ic{flex:none;width:30px;height:30px;border-radius:var(--r-full);background:var(--gold-glow);color:var(--gold);display:flex;align-items:center;justify-content:center}' +
+    '.fcui-miles-ic.hot{color:var(--red);background:color-mix(in srgb, var(--red) 12%, transparent)}' +
+    '.fcui-miles-ic svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}' +
+    '.fcui-miles-row b{display:block;font-size:13px;font-weight:700;color:var(--text)}' +
+    '.fcui-miles-row i{display:block;font-style:normal;font-size:11.5px;color:var(--text-mute)}' +
+    '.fcui-miles-when{margin-left:auto;font-size:11px;color:var(--text-mute);white-space:nowrap}' +
+    '.fcui-act-label{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);margin-bottom:10px}' +
+    '.fcui-chal{display:flex;align-items:center;gap:14px;background:var(--gold-sheen);border:1px solid var(--accent-border);border-radius:var(--r-lg);padding:15px 18px;margin-bottom:12px}' +
+    '.fcui-chal-orb{flex:none;width:34px;height:34px;border-radius:var(--r-md);background:var(--gold);color:var(--on-gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-num);font-size:14px;font-weight:900}' +
+    '.fcui-chal-tx{flex:1;min-width:0}' +
+    '.fcui-chal-lab{display:block;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mute);margin-bottom:2px}' +
+    '.fcui-chal-tx b{display:block;font-size:13.5px;font-weight:800;color:var(--text)}' +
+    '.fcui-chal-tx i{display:block;font-style:normal;font-size:12px;color:var(--text-sub);margin-top:2px}' +
+    '.fcui-chal-btn{flex:none;background:var(--gold);color:var(--on-gold);border:none;border-radius:var(--r-sm);padding:9px 16px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}' +
+    '.fcui-chal-dis{flex:none;background:none;border:none;color:var(--text-mute);font:inherit;font-size:11.5px;font-weight:600;cursor:pointer}' +
+    '.fcui-evt{display:flex;align-items:flex-start;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:13px 16px;margin-bottom:10px}' +
+    '.fcui-evt .dot{flex:none;width:7px;height:7px;border-radius:var(--r-full);background:var(--gold);margin-top:5px}' +
+    '.fcui-evt.dim{opacity:.6}' +
+    '.fcui-evt-tx b{font-weight:700;color:var(--text);font-size:13px}' +
+    '.fcui-evt-tx span{color:var(--text-sub);font-size:13px}' +
+    '.fcui-evt-tx i{display:block;font-style:normal;font-size:11px;color:var(--text-mute);margin-top:4px}' +
+    /* Hawkeye feed inherits the card look inside the activity stack */
+    '.fcui-dash #hm-rail-bottom .hm-feed{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-card);overflow:hidden}' +
+    /* messages panel: right-side drawer (the V2 detail idiom) */
+    '#fcui-msgp{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .22s}' +
+    '#fcui-msgp.on{opacity:1;pointer-events:auto}' +
+    '.fcui-msgp-card{position:absolute;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--bg);border-left:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(30px);transition:transform .22s var(--es,ease)}' +
+    '#fcui-msgp.on .fcui-msgp-card{transform:none}' +
+    '@media(prefers-reduced-motion:reduce){#fcui-msgp,.fcui-msgp-card{transition:none}}' +
+    '.fcui-msgp-head{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 18px 12px}' +
+    '.fcui-msgp-title{font-family:var(--font-num);font-size:18px;font-weight:800;color:var(--text)}' +
+    '.fcui-msgp-sub{font-size:11.5px;color:var(--text-mute);margin-top:2px}' +
+    '.fcui-msgp-x{background:none;border:none;color:var(--text-mute);cursor:pointer;padding:6px;border-radius:var(--r-sm)}' +
+    '.fcui-msgp-x:hover{color:var(--text)}' +
+    '.fcui-msgp-chips{display:flex;gap:6px;padding:0 18px 12px;overflow-x:auto;scrollbar-width:none;flex:none}' +
+    '.fcui-msgp-chips::-webkit-scrollbar{display:none}' +
+    '.fcui-msgp-chip{flex:none;background:var(--surface);border:1px solid var(--border-med);border-radius:var(--r-full);padding:6px 12px;font:inherit;font-size:11.5px;font-weight:700;color:var(--text-sub);cursor:pointer;white-space:nowrap;transition:border-color var(--t-fast)}' +
+    '.fcui-msgp-chip:hover{border-color:var(--gold)}' +
+    '.fcui-msgp-chip.on{background:var(--gold);border-color:var(--gold);color:var(--on-gold)}' +
+    '.fcui-msgp-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 18px 10px;flex:none}' +
+    '.fcui-msgp-sortw{display:inline-flex;align-items:center;gap:7px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)}' +
+    '#fcui-msgp-sort{font:inherit;font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text);background:var(--surface);border:1px solid var(--border-med);border-radius:var(--r-sm);padding:6px 8px;outline:none;cursor:pointer}' +
+    '#fcui-msgp-sort:focus{border-color:var(--gold)}' +
+    '.fcui-msgp-markall{background:none;border:none;font:inherit;font-size:12px;font-weight:700;color:var(--gold);cursor:pointer;padding:6px 8px;border-radius:var(--r-sm)}' +
+    '.fcui-msgp-markall:hover{background:var(--gold-sheen)}' +
+    '.fcui-msgp-list{flex:1;overflow-y:auto;padding:0 10px}' +
+    '.fcui-msgp-row{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);padding:12px 8px;font:inherit;cursor:pointer}' +
+    '.fcui-msgp-row:hover{background:var(--gold-sheen)}' +
+    '.fcui-msgp-av{flex:none;width:32px;height:32px;border-radius:var(--r-full);background:var(--surface-el);border:1px solid var(--border);color:var(--text-mute);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}' +
+    '.fcui-msgp-mid{flex:1;min-width:0}' +
+    '.fcui-msgp-nm{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--text);flex-wrap:wrap}' +
+    '.fcui-msgp-row.unread .fcui-msgp-nm{font-weight:800}' +
+    '.fcui-tag{font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:var(--r-xs);padding:2px 6px}' +
+    '.fcui-tag.lead{background:var(--gold-glow);color:var(--gold)}' +
+    '.fcui-tag.member{background:var(--green-soft);color:var(--green)}' +
+    '.fcui-tag.chan{background:var(--surface-el);color:var(--text-mute);border:1px solid var(--border)}' +
+    '.fcui-msgp-prev{display:block;font-size:12px;color:var(--text-mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.fcui-msgp-meta{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:10.5px;color:var(--text-mute)}' +
+    '.fcui-msgp-dot{width:8px;height:8px;border-radius:var(--r-full);background:var(--gold)}' +
+    '.fcui-msgp-foot{flex:none;background:none;border:none;border-top:1px solid var(--border);padding:13px 18px calc(13px + env(safe-area-inset-bottom));font:inherit;font-size:12.5px;font-weight:700;color:var(--gold);text-align:left;cursor:pointer}' +
+    '.fcui-msgp-foot:hover{background:var(--gold-sheen)}' +
+    /* keep the sub-brand cream flat: no ticker canvas, no textures */
+    'body.fcui-mode .hm-ticker-bg{display:none !important}';
+  document.head.appendChild(st);
+}
+
+// Open the FC shell. Called instead of openCommandCenter when the flag is on.
+function _fcOpen() {
+  _fcStyle();
+  // The cc stylesheet carries the focus-page + member-agent (.mma-*) styles
+  // the AI bar hands off to. Injecting it does NOT enter cc-mode (all cc
+  // layout rules are scoped to body.cc-mode / #view-cc).
+  try { _ccStyle(); } catch (_) {}
+  document.body.classList.add('fcui-mode');
+  // Build shell chrome once
+  if (!document.getElementById('fcui-side')) _fcBuildSide();
+  if (!document.getElementById('view-fcui')) {
+    const main = document.querySelector('.main');
+    // Header lives directly in .main (above the banners + every view), so the
+    // GHL / action / completed banners read as compact alerts UNDER it.
+    main.insertAdjacentHTML('afterbegin', _fcHeadHtml());
+    const v = document.createElement('div');
+    v.className = 'view'; v.id = 'view-fcui';
+    v.innerHTML = '<div id="fcui-col"></div>';
+    main.appendChild(v);
+    _fcBindKeys();
+  }
+  _fcShowHome();
+  _fcInitNavSync();
+  _fcChipsLoad();
+  _fcMsgPreviewLoad();
+  _fcUserFill();
+}
+
+function _fcHeadHtml() {
+  const I = _fcIcons();
+  const h = new Date().getHours();
+  const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  return `<div id="fcui-head">
+    <div class="fcui-greet"><b id="fcui-greet-t">${part}</b><span id="fcui-greet-d">${escapeHTML(dateStr)}</span></div>
+    <label class="fcui-search">${I.search}<input id="fcui-search-in" type="text" placeholder="Search members, classes, or ask anything..." onkeydown="if(event.key==='Enter')_fcAiGo(this.value)"><span class="fcui-kbd">&#8984;K</span></label>
+    <div class="fcui-loc" id="fcui-loc" role="button" tabindex="0" onclick="_fcLocToggle(event)" onkeydown="if(event.key==='Enter')_fcLocToggle(event)">${I.pin}<b id="fcui-loc-t">All Locations</b>${I.chev}<div class="fcui-loc-pop" id="fcui-loc-pop"></div></div>
+    <div class="fcui-chips" id="fcui-chips"></div>
+  </div>`;
+}
+
+function _fcBuildSide() {
+  const I = _fcIcons();
+  const side = document.createElement('aside');
+  side.id = 'fcui-side'; side.setAttribute('aria-label', 'Navigation');
+  const item = (view, icon, label, extra) =>
+    `<button type="button" class="fcui-nav-item${extra || ''}" id="fcui-nav-${view}" data-view="${view}" onclick="_fcNavGo('${view}', this)">${icon}<span>${label}</span></button>`;
+  side.innerHTML = `
+    <div class="fcui-brand"><span class="fcui-brand-tile">FC</span><span class="fcui-brand-tx"><b>FULLCONTROL</b><i>Command Center</i></span></div>
+    <div class="fcui-nav-label">Main</div>
+    <nav>
+      ${item('home', I.home, 'Home')}
+      ${item('calendar', I.cal, 'Schedule')}
+      ${item('marketing', I.pulse, 'Marketing')}
+      ${item('assets', I.file, 'Content')}
+      ${item('pipelines', I.layers, 'Sales')}
+      ${item('members', I.users, 'Members')}
+    </nav>
+    <div class="fcui-nav-label">Preview</div>
+    <button type="button" class="fcui-nav-item fcui-preview" onclick="_fcMemberAppPreview()">${I.phone}<span>Member App</span><span class="fcui-badge">Preview</span></button>
+    <button type="button" class="fcui-msgs" id="fcui-msgs" onclick="_fcMsgOpen()">
+      <span class="fcui-msgs-top">${I.msg}<span>Messages</span><em id="fcui-msgs-n"></em></span>
+      <span class="fcui-msgs-prev" id="fcui-msgs-prev">Checking your inbox...</span>
+    </button>
+    <div class="fcui-side-spacer"></div>
+    <div class="fcui-user">
+      <span class="fcui-user-av" id="fcui-user-av">-</span>
+      <span class="fcui-user-tx"><b id="fcui-user-nm">-</b><i id="fcui-user-role">Owner</i></span>
+      <button type="button" class="fcui-user-gear" onclick="switchView('settings')" aria-label="Settings" title="Settings">${I.gear}</button>
+    </div>`;
+  document.body.appendChild(side);
+}
+
+// Sidebar nav: everything goes through the REAL switchView. Home shows the
+// FC dashboard view; overlays (calendar/settings) pop over whatever is open.
+function _fcNavGo(view, el) {
+  if (view === 'home') { _fcShowHome(); return; }
+  switchView(view);
+  _fcSyncNav(view);
+}
+function _fcShowHome() {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const v = document.getElementById('view-fcui');
+  if (v) v.classList.add('active');
+  // greeting refresh (name lands async on boot)
+  const first = (typeof _hv2FirstName === 'function' ? _hv2FirstName() : '');
+  const gt = document.getElementById('fcui-greet-t');
+  if (gt) {
+    const h = new Date().getHours();
+    const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+    gt.textContent = first ? part + ', ' + first : part;
+  }
+  // (re)parent the home dashboard into the column and render the FC layout
+  const col = document.getElementById('fcui-col');
+  const hv = document.getElementById('home-v2');
+  if (col && hv) {
+    if (hv.parentElement !== col) col.appendChild(hv);
+    hv.style.display = 'block';
+    try { renderHomeV2(); } catch (e) { console.error('[fcui] home render', e); }
+  }
+  _fcSyncNav('home');
+  try { syncMobileNav('home'); } catch (_) {}
+}
+function _fcSyncNav(name) {
+  if (!_fcActive()) return;
+  const map = { home: 'home', fcui: 'home', calendar: 'calendar', v15cal: 'calendar', marketing: 'marketing', assets: 'assets', pipelines: 'pipelines', members: 'members' };
+  const key = map[name] || '';
+  document.querySelectorAll('#fcui-side .fcui-nav-item').forEach(b => {
+    b.classList.toggle('on', !!key && b.dataset.view === key);
+  });
+}
+// The sidebar highlight must track the VISIBLE view whatever changed it -
+// sidebar clicks, deep links, or an overlay's own Back button (the calendar
+// focus closes via _mmCloseFocus, which never goes through switchView). A
+// MutationObserver on the views' class attributes derives the truth from
+// the DOM: an open calendar overlay wins, else the .view.active id.
+function _fcSyncFromDom() {
+  if (typeof _fcActive !== 'function' || !_fcActive()) return;
+  const cal = document.getElementById('view-calendar');
+  if (cal && cal.classList.contains('mm-open')) { _fcSyncNav('calendar'); return; }
+  const act = document.querySelector('.view.active');
+  _fcSyncNav(act ? act.id.replace('view-', '') : '');
+}
+function _fcInitNavSync() {
+  if (window._fcNavObs) return;
+  const obs = new MutationObserver(() => { try { _fcSyncFromDom(); } catch (_) {} });
+  window._fcNavObs = obs;
+  document.querySelectorAll('.view').forEach(v => obs.observe(v, { attributes: true, attributeFilter: ['class'] }));
+  // #view-calendar is NOT a .view - it is a focus overlay (modal-backdrop
+  // mm-focus-page) whose Back button toggles mm-open without touching any
+  // .view. Watch it explicitly or the Schedule highlight sticks after Back.
+  const cal = document.getElementById('view-calendar');
+  if (cal) obs.observe(cal, { attributes: true, attributeFilter: ['class'] });
+}
+function _fcUserFill() {
+  const nm = ((document.getElementById('userName') || {}).textContent || '').trim();
+  const good = nm && nm !== '-' && !nm.includes('@');
+  const el = document.getElementById('fcui-user-nm');
+  if (el) el.textContent = good ? nm : 'Owner';
+  const av = document.getElementById('fcui-user-av');
+  if (av) av.textContent = good ? nm.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() : '-';
+  if (!good) setTimeout(_fcUserFill, 1500);   // name arrives async on boot
+}
+function _fcBindKeys() {
+  if (window._fcKeysBound) return;
+  window._fcKeysBound = true;
+  document.addEventListener('keydown', e => {
+    if (!_fcActive()) return;
+    if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') {
+      e.preventDefault();
+      document.getElementById('fcui-search-in')?.focus();
+    }
+  });
+}
+function _fcMemberAppPreview() {
+  _fcToast(_fcIcons().phone, 'Member App preview is coming to the pilot soon.');
+}
+// Location filter pill: lists this academy's locations (visual filter for the
+// pilot - picking one relabels the pill; data stays academy-wide).
+async function _fcLocToggle(e) {
+  if (e && e.target && e.target.closest('.fcui-loc-pop')) return;
+  const pop = document.getElementById('fcui-loc-pop');
+  if (!pop) return;
+  if (pop.classList.contains('open')) { pop.classList.remove('open'); return; }
+  let rows = [];
+  try {
+    const { data } = await _sb.from('locations').select('id,title').eq('client_id', CLIENT_ID).order('sort_order');
+    rows = data || [];
+  } catch (_) {}
+  pop.innerHTML = ['All Locations'].concat(rows.map(r => r.title).filter(Boolean))
+    .map(t => `<button type="button" class="fcui-loc-opt" onclick="event.stopPropagation();_fcLocPick(this)">${escapeHTML(t)}</button>`).join('');
+  pop.classList.add('open');
+  const close = ev => { if (!ev.target.closest('#fcui-loc')) { pop.classList.remove('open'); document.removeEventListener('click', close); } };
+  setTimeout(() => document.addEventListener('click', close), 0);
+}
+function _fcLocPick(btn) {
+  const t = document.getElementById('fcui-loc-t');
+  if (t) t.textContent = btn.textContent;
+  document.getElementById('fcui-loc-pop')?.classList.remove('open');
+}
+// Header stat chips. Demo values come from the mock seed; real academies get
+// the chips we can actually compute (actions waiting, members, MRR).
+async function _fcChipsLoad() {
+  const host = document.getElementById('fcui-chips');
+  if (!host) return;
+  const chip = (v, l, dot) => `<span class="fcui-chip">${dot ? `<span class="dot" style="background:${dot}"></span>` : ''}<b>${escapeHTML(String(v))}</b><span>${escapeHTML(l)}</span></span>`;
+  const demo = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.chips;
+  if (demo) { host.innerHTML = demo.map(c => chip(c.v, c.l, c.dot)).join(''); return; }
+  const parts = [];
+  const acts = window._hmHawkTotal;
+  if (typeof acts === 'number') parts.push(chip(acts, acts === 1 ? 'action waiting' : 'actions waiting', 'var(--green)'));
+  try {
+    const roster = (typeof _ccEnsureMembers === 'function') ? await _ccEnsureMembers() : [];
+    if (roster && roster.length && typeof _ccMemberKpis === 'function') {
+      const k = _ccMemberKpis(roster);
+      if (k.mrr > 0) parts.push(chip('$' + (k.mrr >= 1000 ? (k.mrr / 1000).toFixed(1) + 'k' : Math.round(k.mrr)), 'MRR', 'var(--gold)'));
+      parts.push(chip(k.live, 'members', 'var(--blue)'));
+    }
+  } catch (_) {}
+  host.innerHTML = parts.join('');
+  if (typeof acts !== 'number') setTimeout(_fcChipsLoad, 4000);   // hawkeye count lands async
+}
+// Sidebar messages preview: unread count + newest unread snippet (v15 inbox).
+async function _fcMsgPreviewLoad() {
+  const n = document.getElementById('fcui-msgs-n');
+  const prev = document.getElementById('fcui-msgs-prev');
+  if (!n || !prev) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    const convs = (r.ok && j && j.conversations) || [];
+    window._fcConvs = convs;
+    const unread = convs.filter(c => (c.unreadCount || 0) > 0);
+    n.textContent = unread.length ? unread.length + ' unread' : '';
+    const top = unread[0] || convs[0];
+    prev.textContent = top ? ((top.contactName || top.fullName || 'Someone') + ': ' + (top.lastMessageBody || '')) : 'No conversations yet.';
+  } catch (_) {
+    n.textContent = '';
+    prev.textContent = 'Inbox unavailable right now.';
+  }
+}
+function _fcMsgOpen() { _fcMsgPanelOpen(); }
+// Mark every conversation read: optimistic in-memory clear (badges + rows),
+// then the SAME read-marking call the inbox uses on thread open, one per
+// unread GHL conversation. The in-app BAM thread has no read endpoint, so
+// its dot clears in-memory only (matches how the panel loaded it).
+async function _fcMsgMarkAllRead(btn) {
+  const rows = window._fcMsgRows || [];
+  const unread = rows.filter(c => (c.unreadCount || 0) > 0);
+  if (!unread.length) return;
+  unread.forEach(c => { c.unreadCount = 0; });
+  if (window._fcConvs) window._fcConvs.forEach(c => { c.unreadCount = 0; });
+  _fcMsgPanelRender();
+  if (btn) { btn.textContent = 'All read'; setTimeout(() => { btn.textContent = 'Mark all read'; }, 1800); }
+  try {
+    const token = await _mreqAuthToken();
+    for (const c of unread.filter(x => !x._inApp).slice(0, 30)) {
+      fetch(`/api/ghl/inbox?action=mark-read&client_id=${encodeURIComponent(CLIENT_ID)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ conversation_id: c.id }),
+      }).catch(() => {});
+    }
+  } catch (_) {}
+}
+// ── Messages panel: right-side drawer (the one V2 detail idiom) over the
+// v15 inbox data + the in-app BAM thread. Channel chips filter; every row
+// carries a LEAD/MEMBER tag (when known) + its channel tag. Rows open the
+// existing message peek (inbox) or the Messages view (in-app). ──
+function _fcMsgChannel(c) {
+  if (c._inApp) return 'In-App';
+  const t = String(c.lastMessageType || '').toUpperCase();
+  if (t.includes('EMAIL')) return 'Email';
+  if (t.includes('INSTAGRAM') || /(^|_)IG\b/.test(t)) return 'Instagram DM';
+  if (t.includes('CALL')) return 'Call';
+  return 'SMS';
+}
+function _fcMsgPanelClose() { document.getElementById('fcui-msgp')?.classList.remove('on'); }
+async function _fcMsgPanelOpen() {
+  let ov = document.getElementById('fcui-msgp');
+  if (!ov) {
+    document.body.insertAdjacentHTML('beforeend', `
+      <div id="fcui-msgp" onclick="if(event.target===this)_fcMsgPanelClose()">
+        <div class="fcui-msgp-card">
+          <div class="fcui-msgp-head">
+            <div><div class="fcui-msgp-title">Messages</div><div class="fcui-msgp-sub" id="fcui-msgp-sub">Loading...</div></div>
+            <button type="button" class="fcui-msgp-x" onclick="_fcMsgPanelClose()" aria-label="Close"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="fcui-msgp-chips" id="fcui-msgp-chips"></div>
+          <div class="fcui-msgp-tools">
+            <label class="fcui-msgp-sortw">Sort
+              <select id="fcui-msgp-sort" onchange="window._fcMsgSortV=this.value;_fcMsgPanelRender()">
+                <option value="recent">Most recent</option>
+                <option value="unread">Unread first</option>
+                <option value="name">Name A-Z</option>
+              </select>
+            </label>
+            <button type="button" class="fcui-msgp-markall" onclick="_fcMsgMarkAllRead(this)">Mark all read</button>
+          </div>
+          <div class="fcui-msgp-list" id="fcui-msgp-list"><div class="req-empty" style="padding:18px"><span class="req-spin"></span> Loading...</div></div>
+          <button type="button" class="fcui-msgp-foot" onclick="_fcMsgPanelClose();switchView('v15inbox')">Open full inbox &rsaquo;</button>
+        </div>
+      </div>`);
+    ov = document.getElementById('fcui-msgp');
+  }
+  requestAnimationFrame(() => ov.classList.add('on'));
+  window._fcMsgFilterV = window._fcMsgFilterV || 'All';
+  // Load both sources fresh each open (cheap, and unread states move fast)
+  let convs = [], inapp = [];
+  try {
+    const token = await _mreqAuthToken();
+    const [ib, bm] = await Promise.all([
+      fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(r => _safeJson(r)).catch(() => ({})),
+      fetch('/api/messages?action=list-conversations&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } }).then(r => _safeJson(r)).catch(() => ({})),
+    ]);
+    convs = (ib && ib.conversations) || [];
+    inapp = ((bm && bm.conversations) || []).map(c => ({
+      _inApp: true, id: 'inapp-' + c.id, contactName: c.business_name || 'BAM Business',
+      lastMessageBody: c.last_message_preview || '', lastMessageDate: c.last_message_at,
+      unreadCount: c.has_unread ? 1 : 0, classification: null,
+    }));
+  } catch (_) {}
+  window._fcMsgRows = convs.concat(inapp);
+  _fcMsgPanelRender();
+}
+function _fcMsgPanelRender() {
+  const rows = window._fcMsgRows || [];
+  const chipsHost = document.getElementById('fcui-msgp-chips');
+  const list = document.getElementById('fcui-msgp-list');
+  const sub = document.getElementById('fcui-msgp-sub');
+  if (!chipsHost || !list) return;
+  const f = window._fcMsgFilterV || 'All';
+  const FILTERS = ['All', 'Leads', 'Members', 'SMS', 'Email', 'Instagram DM', 'In-App'];
+  chipsHost.innerHTML = FILTERS.map(x =>
+    `<button type="button" class="fcui-msgp-chip${x === f ? ' on' : ''}" onclick="window._fcMsgFilterV=${JSON.stringify(x).replace(/"/g, '&quot;')};_fcMsgPanelRender()">${escapeHTML(x)}</button>`).join('');
+  const isMember = c => c.classification === 'member' || !!c.matched_member_name;
+  const isLead = c => c.classification === 'lead';
+  const match = c => {
+    if (f === 'All') return true;
+    if (f === 'Leads') return isLead(c);
+    if (f === 'Members') return isMember(c);
+    if (f === 'In-App') return !!c._inApp;
+    return _fcMsgChannel(c) === f;
+  };
+  const sortV = window._fcMsgSortV || 'recent';
+  const sel = document.getElementById('fcui-msgp-sort');
+  if (sel && sel.value !== sortV) sel.value = sortV;
+  const nameOf = c => String(c.contactName || c.fullName || '').trim().toLowerCase();
+  const byDate = (a, b) => new Date(b.lastMessageDate || 0) - new Date(a.lastMessageDate || 0);
+  const shown = rows.filter(match).sort((a, b) => {
+    if (sortV === 'name') return nameOf(a).localeCompare(nameOf(b)) || byDate(a, b);
+    if (sortV === 'unread') return ((b.unreadCount > 0) - (a.unreadCount > 0)) || byDate(a, b);
+    return byDate(a, b);
+  });
+  const unread = rows.filter(c => (c.unreadCount || 0) > 0).length;
+  if (sub) sub.textContent = rows.length + (rows.length === 1 ? ' conversation' : ' conversations') + (unread ? ', ' + unread + ' unread' : '');
+  const n = document.getElementById('fcui-msgs-n');
+  if (n) n.textContent = unread ? unread + ' unread' : '';
+  if (!shown.length) {
+    list.innerHTML = '<div class="req-empty" style="padding:22px;text-align:center">Nothing here yet. New messages land in this list.</div>';
+    return;
+  }
+  list.innerHTML = shown.slice(0, 40).map(c => {
+    const un = (c.unreadCount || 0) > 0;
+    const name = (typeof _ccCapName === 'function' ? _ccCapName((c.contactName || c.fullName || 'Someone').split(' ').slice(0, 2).join(' ')) : (c.contactName || 'Someone'));
+    const initials = name.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2);
+    const who = c._inApp ? '' : isMember(c) ? '<span class="fcui-tag member">Member</span>' : isLead(c) ? '<span class="fcui-tag lead">Lead</span>' : '';
+    const chan = `<span class="fcui-tag chan">${escapeHTML(_fcMsgChannel(c))}</span>`;
+    const when = c.lastMessageDate && typeof _hmInboxTimeStr === 'function' ? _hmInboxTimeStr(new Date(c.lastMessageDate)) : '';
+    let go;
+    if (c._inApp) go = `_fcMsgPanelClose();switchView('messages')`;
+    else { (window._hmIbById = window._hmIbById || {})[c.id] = c; go = `_fcMsgPanelClose();_hmMsgPeek('${String(c.id).replace(/[^A-Za-z0-9_-]/g, '')}')`; }
+    return `<button type="button" class="fcui-msgp-row${un ? ' unread' : ''}" onclick="${go}">
+      <span class="fcui-msgp-av">${escapeHTML(initials)}</span>
+      <span class="fcui-msgp-mid">
+        <span class="fcui-msgp-nm">${escapeHTML(name)}${who}${chan}</span>
+        <span class="fcui-msgp-prev">${escapeHTML(_hmStripEm(String(c.lastMessageBody || '').slice(0, 90)))}</span>
+      </span>
+      <span class="fcui-msgp-meta">${un ? '<span class="fcui-msgp-dot"></span>' : ''}<span>${escapeHTML(when)}</span></span>
+    </button>`;
+  }).join('');
+}
+// Toast anatomy shared by every FC toast (MRR milestone, trial booked, notices).
+// Docked on document.body: fixed elements inside transformed cards drift.
+function _fcToast(iconSvg, text, tone) {
+  document.getElementById('fcui-toast')?.remove();
+  const color = tone === 'green' ? 'var(--green)' : 'var(--gold)';
+  document.body.insertAdjacentHTML('beforeend',
+    `<div id="fcui-toast" style="position:fixed;right:22px;bottom:calc(104px + env(safe-area-inset-bottom));z-index:9600;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:10px 16px;font-family:var(--font-ui);font-size:12.5px;font-weight:700;color:var(--text);box-shadow:var(--shadow-hover,0 10px 30px rgba(0,0,0,.14))">` +
+    `<span style="display:inline-flex;color:${color}">${iconSvg || ''}</span><span>${escapeHTML(text)}</span></div>`);
+  const el = document.getElementById('fcui-toast');
+  if (el) {
+    const svg = el.querySelector('svg');
+    if (svg) { svg.style.width = '15px'; svg.style.height = '15px'; svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('fill', 'none'); svg.style.strokeWidth = '2'; }
+    setTimeout(() => { try { el.style.transition = 'opacity .4s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 450); } catch (_) {} }, 6000);
+  }
+}
+
+// ── The FC Home dashboard (one column). Loader IDs are preserved so the
+// existing right-rail loaders keep working: #hv2-win-* (win card),
+// #hv2-acts-body/#hv2-acts-n (action items), #hv2-sched-body/#hm-trial-pill
+// (schedule), #hm-score-grid (scoreboard), #hm-support-card (support card),
+// #hm-rail-bottom (Hawkeye feed). No .hm-bubble classes: those start at
+// opacity 0 waiting for a .main-rooted observer this layout never runs. ──
+function _fcRenderHome(host) {
+  const I = _fcIcons();
+  host.innerHTML = `<div class="fcui-dash">
+    <div class="fcui-hero" id="fcui-hero">
+      <div class="fcui-card fcui-best" id="hv2-win">
+        <div class="fcui-best-ic">${_HV2_ICONS.check}</div>
+        <div style="min-width:0">
+          <div class="fcui-eyebrow">Best thing since your last open</div>
+          <div class="fcui-best-v" id="hv2-win-v"><span class="cc-skel2" style="min-width:220px">--</span></div>
+          <div class="fcui-best-c" id="hv2-win-c"><span class="cc-skel2" style="min-width:150px;font-size:11px">--</span></div>
+        </div>
+      </div>
+      <div class="fcui-card fcui-pri" id="fcui-pri">
+        <div class="fcui-eyebrow">${I.bolt} Your #1 priority</div>
+        <div class="fcui-pri-t" id="fcui-pri-t"><span class="cc-skel2" style="min-width:180px">--</span></div>
+        <div class="fcui-pri-c" id="fcui-pri-c"></div>
+        <div id="fcui-pri-cta"></div>
+      </div>
+    </div>
+    <div class="fcui-card fcui-aibar" id="fcui-aibar">
+      <span class="fcui-ai-orb">S</span>
+      <label class="fcui-ai-line" for="fcui-ai-in">
+        <b id="fcui-ai-hey">Hey</b>
+        <span class="fcui-ai-ph" id="fcui-ai-ph" aria-hidden="true"></span>
+        <input id="fcui-ai-in" type="text" autocomplete="off" aria-label="Give the assistant a task" oninput="_fcAiTyping(this)" onkeydown="if(event.key==='Enter')_fcAiGo(this.value)">
+      </label>
+      <button type="button" class="fcui-ai-wave" onclick="_fcAiGo(document.getElementById('fcui-ai-in').value)" aria-label="Send">${I.wave}</button>
+    </div>
+    <div class="fcui-two">
+      <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+        <div class="fcui-card fcui-panel" id="fcui-acts-panel">
+          <div class="fcui-ph">${_HV2_ICONS.check}<b>Action Items</b><span class="hv2-pill" id="hv2-acts-n" style="display:none"></span></div>
+          <div id="hv2-acts-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading...</div></div>
+          <button class="hv2-pf" onclick="switchView('action-items')">Open action items &rsaquo;</button>
+        </div>
+        <div id="hm-support-card" style="display:none"></div>
+      </div>
+      <div class="fcui-card fcui-panel" id="fcui-sched-panel">
+        <div class="fcui-ph">${_HV2_ICONS.calendar}<b>Today's Schedule</b><span class="hm-trial-pill" id="hm-trial-pill" style="display:none;margin-left:auto"></span></div>
+        <div id="hv2-sched-body"><div class="req-empty" style="padding:14px 16px"><span class="req-spin"></span> Loading...</div></div>
+        <button class="hv2-pf" onclick="_calOpenRight()">Open the calendar &rsaquo;</button>
+      </div>
+    </div>
+    <div>
+      <div class="fcui-mp-head">
+        <b>Monthly Progress</b><span>vs. last month as baseline</span>
+        <div class="fcui-customize" id="hm-kpi-btn" title="Customize KPIs" role="button" tabindex="0">${I.gear}<span>Customize</span></div>
+      </div>
+      <div class="hm-score-grid fcui-radials" id="hm-score-grid"></div>
+    </div>
+    <div class="fcui-card fcui-miles" id="fcui-miles" style="display:none">
+      <div class="fcui-ph">${I.droplet}<b>Member Milestones &amp; Streaks</b></div>
+      <div id="fcui-miles-body"></div>
+    </div>
+    <div>
+      <div class="fcui-act-label">Activity</div>
+      <div id="fcui-challenge"></div>
+      <div id="fcui-activity"></div>
+      <div id="hm-rail-bottom"></div>
+    </div>
+  </div>`;
+  _fcHomeLoad();
+}
+function _fcHomeLoad() {
+  _hv2WinLoad();
+  _fcPriorityLoad();
+  _fcAiInit();
+  _hv2SchedLoad();
+  _hv2ActsLoad();
+  _fcScoreLoad();
+  _fcMilesLoad();
+  _fcActivityLoad();
+  _hmLoadRailBottom();
+  _hmLoadReplyTime();
+  try { _zdLoadHomeCard(); } catch (_) {}
+  const kpiBtn = document.getElementById('hm-kpi-btn');
+  if (kpiBtn) kpiBtn.addEventListener('click', function (e) { e.stopPropagation(); _hmOpenKpiPicker(); });
+}
+// ── "Your #1 priority" hero card: the single highest-value next move.
+// Demo seed wins when present; otherwise the top pending Hawkeye card
+// (booking > closing > confirm order of the deck), else all-clear. ──
+async function _fcPriorityLoad() {
+  const t = document.getElementById('fcui-pri-t');
+  const c = document.getElementById('fcui-pri-c');
+  const cta = document.getElementById('fcui-pri-cta');
+  if (!t) return;
+  const demo = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.priority;
+  const paint = (title, sub, btnLabel, go) => {
+    t.textContent = title;
+    if (c) c.textContent = sub || '';
+    if (cta) cta.innerHTML = btnLabel ? `<button type="button" class="fcui-pri-btn" onclick="${go}">${escapeHTML(btnLabel)} &rarr;</button>` : '';
+  };
+  if (demo && (typeof _fcActive !== 'function' || _fcActive())) {
+    paint(demo.title, demo.sub, demo.cta || 'Open conversation', demo.go || '_hv2OpenHawkeye()');
+    return;
+  }
+  try {
+    const [rd, cf, cl] = await _hmHawkFetch();
+    const pend = r => ((r && r.ready) || []).filter(x => x.status === 'pending');
+    const pick = pend(rd)[0] || pend(cl)[0] || pend(cf)[0];
+    if (pick) {
+      const name = (typeof _ccHawkCleanName === 'function' ? _ccHawkCleanName(pick.contact_name) : (pick.contact_name || 'a lead'));
+      const agent = pend(rd).includes(pick) ? 'booking' : pend(cl).includes(pick) ? 'closing' : 'confirm';
+      const cid = String(pick.ghl_contact_id || '').replace(/[^A-Za-z0-9_-]/g, '');
+      paint('Follow up with ' + name,
+        _hmStripEm(pick.summary || pick.reasoning || 'The agent drafted the next move, it just needs your eyes.'),
+        'Open conversation', `_hk2Open('${agent}'${cid ? `,'${cid}'` : ''})`);
+      return;
+    }
+    paint('Nothing is waiting on you', 'Every agent queue is clear. Good moment to check the pipeline.', 'Open Sales', "switchView('pipelines')");
+  } catch (_) {
+    paint('Nothing is waiting on you', 'Every agent queue is clear right now.', 'Open Sales', "switchView('pipelines')");
+  }
+}
+// ── AI task bar: "Hey {name}" + typed prompt rotation. Submits into the
+// EXISTING member-agent machinery (openMembersFocus + _mmaSend), so a typed
+// task gets a real answer. ──
+function _fcAiInit() {
+  const hey = document.getElementById('fcui-ai-hey');
+  const first = (typeof _hv2FirstName === 'function' ? _hv2FirstName() : '');
+  if (hey) hey.textContent = first ? 'Hey ' + first + ',' : 'Hey,';
+  if (!first) setTimeout(() => {
+    const f2 = (typeof _hv2FirstName === 'function' ? _hv2FirstName() : '');
+    const h2 = document.getElementById('fcui-ai-hey');
+    if (h2 && f2) h2.textContent = 'Hey ' + f2 + ',';
+  }, 1800);
+  const el = document.getElementById('fcui-ai-ph');
+  if (!el || el._typing) return;
+  el._typing = true;
+  const prompts = [
+    'give me a task...',
+    'who needs a follow-up today?',
+    'pull up a member for me...',
+    'how is my MRR looking?',
+    'who is at risk of churning?',
+  ];
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = prompts[0]; return; }
+  let p = 0, i = 0, dir = 1;
+  (function tick() {
+    if (!el.isConnected) { el._typing = false; return; }
+    const text = prompts[p];
+    i += dir;
+    el.textContent = text.slice(0, Math.max(0, i)) || ' ';
+    let wait = dir > 0 ? 40 : 12;
+    if (dir > 0 && i >= text.length) { dir = -1; wait = 2600; }
+    else if (dir < 0 && i <= 0) { dir = 1; p = (p + 1) % prompts.length; wait = 420; }
+    el._typeT = setTimeout(tick, wait);
+  })();
+}
+function _fcAiTyping(inp) {
+  document.getElementById('fcui-aibar')?.classList.toggle('typing', !!(inp && inp.value));
+}
+function _fcAiGo(q) {
+  q = String(q || '').trim();
+  const inp = document.getElementById('fcui-ai-in');
+  if (!q) { if (inp) inp.focus(); return; }
+  if (inp) { inp.value = ''; _fcAiTyping(inp); }
+  try {
+    openMembersFocus();
+    setTimeout(() => {
+      const i = document.getElementById('mma-input');
+      if (i) { i.value = q; _mmaSend(); }
+    }, 350);
+  } catch (e) { console.error('[fcui] ai submit', e); }
+}
+// ── Monthly Progress radials. Demo seed paints the four mockup radials
+// directly; real academies keep the existing scoreboard loader (same ring
+// component, fcui card variant of the grid markup). ──
+function _fcScoreLoad() {
+  const demo = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.radials;
+  const grid = document.getElementById('hm-score-grid');
+  if (demo && grid) {
+    grid.innerHTML = demo.map(r => `<div class="hm-stat" data-stat="fc-${r.key}">
+      <div class="fcui-ringbox">${_hmRingHtml(r.key, r.color)}<span class="fcui-ringpct" id="hm-ringpct-${r.key}"></span></div>
+      <div class="hm-stat-info">
+        <div class="hm-stat-lab">${escapeHTML(r.label)}</div>
+        <div class="hm-stat-val">${escapeHTML(r.val)} <span class="of">/ ${escapeHTML(r.target)}</span></div>
+      </div>
+    </div>`).join('');
+    setTimeout(() => demo.forEach(r => _hmSetRing(r.key, r.pct)), 80);
+    return;
+  }
+  _hmLoadScoreboard();
+}
+// ── Member Milestones & Streaks. Demo rows from the seed; real academies
+// surface month-anniversaries from the roster (the only milestone signal the
+// portal tracks today). Card hides itself when there is nothing to show. ──
+async function _fcMilesLoad() {
+  const card = document.getElementById('fcui-miles'), body = document.getElementById('fcui-miles-body');
+  if (!card || !body) return;
+  const I = _fcIcons();
+  const row = m => `<div class="fcui-miles-row">
+    <span class="fcui-miles-ic${m.kind === 'streak' ? ' hot' : ''}">${m.kind === 'streak' ? I.flame : I.trophy}</span>
+    <div style="min-width:0"><b>${escapeHTML(m.name)}</b><i>${escapeHTML(m.line)}</i></div>
+    <span class="fcui-miles-when">${escapeHTML(m.when || '')}</span>
+  </div>`;
+  const demo = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.milestones;
+  if (demo && demo.length) { body.innerHTML = demo.map(row).join(''); card.style.display = ''; return; }
+  try {
+    const roster = (typeof _ccEnsureMembers === 'function') ? await _ccEnsureMembers() : [];
+    const rows = [];
+    for (const m of roster) {
+      if (m.status !== 'live') continue;
+      const t = new Date(m.joined_date || m.start_date || m.stripe_joined_at || 0).getTime();
+      if (!(t > 0)) continue;
+      for (const mo of [3, 6, 12, 18, 24]) {
+        const anniv = new Date(t); anniv.setMonth(anniv.getMonth() + mo);
+        const days = Math.ceil((anniv.getTime() - Date.now()) / 86400000);
+        if (days >= -7 && days <= 14) rows.push({
+          name: (typeof _ccCapName === 'function' ? _ccCapName(m.athlete_name || m.parent_name || 'Member') : (m.athlete_name || 'Member')),
+          line: mo + ' months with the academy',
+          when: days === 0 ? 'today' : days > 0 ? 'in ' + days + 'd' : Math.abs(days) + 'd ago',
+          kind: 'trophy',
+        });
+      }
+    }
+    if (!rows.length) { card.style.display = 'none'; return; }
+    body.innerHTML = rows.slice(0, 4).map(row).join('');
+    card.style.display = '';
+  } catch (_) { card.style.display = 'none'; }
+}
+// ── Activity stack: weekly-challenge banner + event rows (demo-seeded for
+// the pilot; the Hawkeye feed below it is live either way) + the MRR /
+// trial toasts (shared _fcToast anatomy, body-docked). ──
+function _fcActivityLoad() {
+  const chal = document.getElementById('fcui-challenge');
+  const act = document.getElementById('fcui-activity');
+  const demoC = window.__MOCK_FCUI__ && window.__MOCK_FCUI__.challenge;
+  if (chal) {
+    if (demoC && !window._fcChalDismissed) {
+      chal.innerHTML = `<div class="fcui-chal">
+        <span class="fcui-chal-orb">S</span>
+        <div class="fcui-chal-tx"><span class="fcui-chal-lab">Weekly challenge</span><b>${escapeHTML(demoC.title)}</b><i>${escapeHTML(demoC.sub)}</i></div>
+        <button type="button" class="fcui-chal-btn" onclick="_fcAiGo(${JSON.stringify(demoC.task || 'Draft a follow-up to my unconverted trials').replace(/"/g, '&quot;')})">Let's do it</button>
+        <button type="button" class="fcui-chal-dis" onclick="window._fcChalDismissed=1;document.getElementById('fcui-challenge').innerHTML=''">Dismiss</button>
+      </div>`;
+    } else chal.innerHTML = '';
+  }
+  if (act) {
+    const evts = (window.__MOCK_FCUI__ && window.__MOCK_FCUI__.activity) || [];
+    act.innerHTML = evts.map(e => `<div class="fcui-evt${e.dim ? ' dim' : ''}">
+      <span class="dot" style="background:${e.color || 'var(--gold)'}"></span>
+      <div class="fcui-evt-tx"><b>${escapeHTML(e.b)}</b> <span>${escapeHTML(e.t)}</span><i>${escapeHTML(e.when || '')}</i></div>
+    </div>`).join('');
+  }
+  _fcToastsMaybe();
+}
+function _fcToastsMaybe() {
+  if (window._fcToasted) return;
+  const seed = window.__MOCK_FCUI__ || {};
+  const I = _fcIcons();
+  if (seed.mrrToast) {
+    window._fcToasted = 1;
+    setTimeout(() => _fcToast(I.trophy, seed.mrrToast), 1400);
+    if (seed.trialToast) setTimeout(() => _fcToast(I.check, seed.trialToast, 'green'), 9000);
+  }
+}
+
 function openCommandCenter() {
+  // FCUI pilot: the flag replaces the command center with the FC Home shell
+  // (desktop only - phones keep the shipped flow).
+  if (typeof _fcOn === 'function' && _fcOn() && _fcDesk()) { _fcOpen(); return; }
   _ccStyle();
   document.body.classList.add('cc-mode');
   document.body.classList.remove('cc-classic');
