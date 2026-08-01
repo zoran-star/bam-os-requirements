@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact match on connect</title>
+<style>
+  :root{--bg:#0B0B0D;--surface:#141417;--line:#26262b;--gold:#D4B65C;--text:#EDEDF0;
+    --mute:#8A8A94;--green:#4FB477;--blue:#5B9BD5;--red:#D96C6C}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    padding:30px 20px 60px;line-height:1.5}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:25px;margin:0 0 6px;letter-spacing:-.3px}
+  .sub{color:var(--mute);font-size:15px;margin:0 0 26px}
+  h2{font-size:11.5px;letter-spacing:2.4px;text-transform:uppercase;color:var(--mute);
+    margin:34px 0 12px;font-weight:700}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;color:var(--mute);font-weight:600;font-size:10.5px;letter-spacing:1.4px;
+    text-transform:uppercase;padding:0 10px 8px 0;border-bottom:1px solid var(--line)}
+  td{padding:9px 10px 9px 0;border-bottom:1px solid var(--line)}
+  td.bad{color:var(--red);font-weight:700}
+  td.ok{color:var(--green);font-weight:700}
+  .finding{border-left:3px solid var(--red);padding:15px 18px;background:#1a1416;
+    border-radius:8px;margin-bottom:14px;font-size:14.5px}
+  .finding b{color:var(--red)}
+  .good{border-left:3px solid var(--green);padding:15px 18px;background:#101a14;
+    border-radius:8px;font-size:14.5px}
+  .good b{color:var(--green)}
+  .flow{display:flex;gap:0;margin-top:6px;flex-wrap:wrap}
+  .step{flex:1;min-width:158px;background:var(--surface);border:1px solid var(--line);padding:13px 15px}
+  .step:first-child{border-radius:12px 0 0 12px}
+  .step:last-child{border-radius:0 12px 12px 0}
+  .step + .step{border-left:none}
+  .step .n{font-size:9.5px;letter-spacing:1.5px;color:var(--mute);text-transform:uppercase}
+  .step .t{font-size:14.5px;font-weight:700;margin-top:5px}
+  .step .d{font-size:12.5px;color:var(--mute);margin-top:4px}
+  .step.you{background:#1a1710;border-color:#3d3320}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+  .opt{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .opt header{padding:11px 16px;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;
+    font-weight:700;background:rgba(212,182,94,.13);color:var(--gold);border-bottom:1px solid var(--line)}
+  .opt .body{padding:15px 16px;font-size:13.5px}
+  .opt ul{margin:8px 0 0;padding-left:18px;color:var(--mute)}
+  .opt li{margin-bottom:5px}
+  .note{font-size:13.5px;color:var(--mute);margin-top:12px}
+  .note b{color:var(--text)}
+  @media(max-width:720px){.opts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Contact match, running by itself</h1>
+  <p class="sub">The client clicks Connect Stripe once. This is what should happen next, and the one thing that must not.</p>
+
+  <h2>The hazard I found before building it</h2>
+
+  <div class="finding">
+    <b>Matching cannot be allowed to CREATE people automatically.</b>
+    Today the staff tool does three things: link the obvious ones, ask a human about
+    the unclear ones, and <b>invent a new person when it has never seen them</b>.
+    That third one is safe when a human runs it after the academy's contacts are loaded.
+    It is not safe on connect, because <b>Stripe is usually connected before the contacts arrive</b>,
+    and every invented person becomes a duplicate of the real one that lands later.
+  </div>
+
+  <div class="card">
+    <p class="note" style="margin-top:0">Live right now, not hypothetical. These academies
+    are Stripe-connected today:</p>
+    <table>
+      <tr><th>Academy</th><th>People we hold</th><th>Live Stripe plans</th><th>If it ran on connect</th></tr>
+      <tr><td>Pro Precision</td><td>0</td><td>a few</td><td class="bad">every one invented</td></tr>
+      <tr><td>CH3 Training</td><td>7</td><td>51</td><td class="bad">about 46 invented</td></tr>
+      <tr><td>Basketball+</td><td>149</td><td>100+</td><td class="bad">most invented</td></tr>
+      <tr><td>BAM GTA</td><td>1,574</td><td>24</td><td class="ok">fine, contacts are loaded</td></tr>
+      <tr><td>BAM San Jose</td><td>0</td><td>0</td><td class="ok">nothing to do either way</td></tr>
+    </table>
+  </div>
+
+  <div class="good" style="margin-top:14px">
+    <b>The fix is a one-word change to what runs automatically: it LINKS, it never CREATES.</b>
+    Anyone it cannot confidently match goes on a short staff list in the portal, where
+    "this is a new person, add them" is one click. Nothing is lost, nothing is invented
+    behind our backs, and the client still never touches it.
+  </div>
+
+  <h2>So this is the shape</h2>
+  <div class="flow">
+    <div class="step"><div class="n">Client</div><div class="t">Connect Stripe</div>
+      <div class="d">Once, any time. Last thing they touch.</div></div>
+    <div class="step"><div class="n">Automatic</div><div class="t">Tell Stripe what to send us</div>
+      <div class="d">Platform-wide. Nobody's job any more.</div></div>
+    <div class="step"><div class="n">Automatic</div><div class="t">Link paying customers</div>
+      <div class="d">Runs to the end. Re-runs as contacts arrive.</div></div>
+    <div class="step you"><div class="n">Staff, in the portal</div><div class="t">Clear the short list</div>
+      <div class="d">Only the ones that need a human.</div></div>
+  </div>
+  <p class="note"><b>Price match is not on this line</b> and cannot be: there is nothing
+  to compare against until the academy's prices are confirmed.</p>
+
+  <h2>Your call: where does this live</h2>
+  <div class="opts">
+    <div class="opt">
+      <header>Two new skills</header>
+      <div class="body">
+        A "Stripe setup" skill and a "price match" skill, sitting next to the branding deck,
+        the site build and the sales system.
+        <ul>
+          <li>Shows up on the onboarding checklist like everything else</li>
+          <li>Obvious to a new staff member that it exists</li>
+          <li>Two more things on a list that is already long</li>
+        </ul>
+      </div>
+    </div>
+    <div class="opt">
+      <header>Two phases inside member management</header>
+      <div class="body">
+        Both live inside the member management one, because they only ever exist to make
+        members work.
+        <ul>
+          <li>Keeps everything about paying members in one place</li>
+          <li>Fewer moving parts on the checklist</li>
+          <li>Easier to miss, because it is buried one level down</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">Either way the automatic half is identical. This only changes where the
+  human-facing half is written down.</p>
+
+</div>
+</body>
+</html>
