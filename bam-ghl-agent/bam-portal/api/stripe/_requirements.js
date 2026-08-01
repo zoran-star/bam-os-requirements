@@ -259,6 +259,80 @@ export async function readStripeAccount(acctId, platformSecret, opts = {}) {
   };
 }
 
+// ── the same question, asked with the ACADEMY'S OWN key ─────────────────────
+//
+// Direct-key academies (platform-locked Stripe, no Connect OAuth) are read via
+// GET /v1/account with their restricted key as the bearer and NO Stripe-Account
+// header - the key IS the account. Same describers, same three-outcome shape as
+// readStripeAccount(), so nothing downstream can tell the transports apart.
+//
+// ONE addition to the shape: a 401/403 means THE KEY cannot answer - revoked,
+// rolled, or stripped of its Account read permission. That is a fact about the
+// stored credential, not about the network, so it comes back as outcome
+// "unreachable" PLUS `credential_problem: true` and a reason that says so.
+// A network failure stays plain unreachable with credential_problem absent -
+// the resolver flips a key to 'invalid' only on the former, never the latter.
+export async function readStripeAccountViaKey(key, opts = {}) {
+  const doFetch = opts.fetchImpl || globalThis.fetch;
+  const unreachable = (error, extra = {}) => ({
+    outcome: "unreachable",
+    ready: false,
+    reachable: false,
+    error,
+    charges_enabled: null,
+    details_submitted: null,
+    disabled_reason: null,
+    needs: [],
+    reviewing: [],
+    problems: [],
+    ...extra,
+  });
+
+  if (!key) return unreachable("no direct API key on file");
+
+  let r, a;
+  try {
+    r = await doFetch("https://api.stripe.com/v1/account", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    a = await r.json();
+  } catch (e) {
+    return unreachable(`could not reach Stripe: ${e && e.message ? e.message : String(e)}`);
+  }
+  if (r.status === 401 || r.status === 403) {
+    const msg = (a && a.error && (a.error.message || a.error.code)) || `HTTP ${r.status}`;
+    return unreachable(
+      `the stored key cannot answer for this account (Stripe ${r.status}: ${msg}) - it was revoked, rolled, or lost its Account read permission`,
+      { credential_problem: true }
+    );
+  }
+  if (!r.ok) {
+    const msg = (a && a.error && (a.error.message || a.error.code)) || `HTTP ${r.status}`;
+    return unreachable(`Stripe answered ${r.status}: ${msg}`);
+  }
+
+  const req = (a && a.requirements) || {};
+  const problems = (Array.isArray(req.errors) ? req.errors : []).map(e => ({
+    requirement: (e && e.requirement) || null,
+    label: (e && (e.reason || e.code)) || "Stripe rejected something and did not say what",
+    what: e && e.requirement ? describeRequirement(e.requirement).label : null,
+    code: (e && e.code) || null,
+  }));
+  const due = [...(req.currently_due || []), ...(req.past_due || [])];
+  return {
+    outcome: a.charges_enabled === true ? "ready" : "not_ready",
+    ready: a.charges_enabled === true,
+    reachable: true,
+    error: null,
+    charges_enabled: a.charges_enabled === true,
+    details_submitted: a.details_submitted === true,
+    disabled_reason: describeDisabledReason(req.disabled_reason),
+    needs: describeRequirements(due),
+    reviewing: describeRequirements(req.pending_verification || []),
+    problems,
+  };
+}
+
 // ── what the owner reads after the OAuth round trip ─────────────────────────
 //
 // The old message said "Stripe connected, but it cannot accept payments yet.

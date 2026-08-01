@@ -1436,6 +1436,28 @@ async function handleAccountDeauthorized(event, connectedAccount, res) {
   // event. Nothing to do, and nothing to raise about it.
   if (!client) return res.status(200).json({ skipped: "no academy with that connected account" });
 
+  // DIRECT-KEY ACADEMIES ARE NOT DISCONNECTED BY A CONNECT REVOCATION. An academy
+  // running on its own restricted key (client_stripe_direct, status active) may
+  // still have a stale Connect OAuth link from before the key entry; the owner
+  // revoking THAT tears down nothing the portal now uses - the key routes every
+  // call. Flipping the status here would hide every billing action from an academy
+  // whose transport is working perfectly. Skip, and leave a trace.
+  const directRows = await sb(
+    `client_stripe_direct?client_id=eq.${client.id}&status=eq.active&select=client_id,status&limit=1`
+  );
+  if (Array.isArray(directRows) && directRows[0]) {
+    await writeAudit({
+      client_id:   client.id,
+      member_id:   null,
+      action_type: "stripe-access-revoked-skipped",
+      args:        {
+        event_id: event.id, event_type: event.type, connected_account: acct,
+        note: "direct-key academy, stale OAuth revocation ignored",
+      },
+    });
+    return res.status(200).json({ skipped: "direct-key academy, stale OAuth revocation ignored", client_id: client.id });
+  }
+
   const prev = client.stripe_connect_status || null;
   if (prev === REVOKED_STATUS) {
     return res.status(200).json({ skipped: "already disabled", client_id: client.id });
