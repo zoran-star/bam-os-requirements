@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Basketball Prep · Confirm Your Pricing</title>
+<style>
+  :root{
+    --bg:#faf9f6; --paper:#ffffff; --line:#e6e2d8; --line2:#f0ede5;
+    --ink:#22211e; --mut:#8a867c; --gold:#D4B65C; --gold-bg:#faf3df; --gold-ink:#8a6d1f;
+    --good:#3e8e5a; --good-bg:#eaf5ee; --bad:#b3543f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding-bottom:90px}
+  .wrap{max-width:820px;margin:0 auto;padding:0 16px}
+
+  header{padding:22px 0 6px}
+  .brand{font-size:11px;letter-spacing:.15em;color:var(--gold-ink);text-transform:uppercase;font-weight:700}
+  h1{font-size:21px;font-weight:800;margin-top:2px}
+  .sub{color:var(--mut);font-size:13px;margin-top:5px;line-height:1.5}
+  .sub b{color:var(--ink)}
+
+  .prog{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin:14px 0 16px}
+  .prog .pline{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:7px}
+  .prog .pline b{font-weight:800}
+  .prog .left{color:var(--gold-ink);font-size:12px;font-weight:700}
+  .pbar{height:6px;background:var(--line2);border-radius:3px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:var(--gold);border-radius:3px;transition:width .25s}
+
+  .bcard{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;border-left:4px solid var(--fam,var(--line))}
+  .bcard[data-fam="unl"]{--fam:#7b5ea7}
+  .bcard[data-fam="two"]{--fam:#2f7fa8}
+  .bcard[data-fam="one"]{--fam:#3e8e5a}
+  .bcard[data-fam="ele"]{--fam:#b3546f}
+  .bcard[data-fam="cus"]{--fam:var(--gold)}
+  .famdot{width:9px;height:9px;border-radius:50%;background:var(--fam);display:inline-block;flex-shrink:0}
+  .bhead{display:flex;align-items:center;gap:10px;cursor:pointer}
+  .btog{width:26px;height:26px;border:1px solid var(--gold);color:var(--gold-ink);background:none;border-radius:6px;cursor:pointer;flex-shrink:0}
+  .binfo{flex:1;min-width:0}
+  .btitle{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .rowsent{font-size:12.5px;color:var(--mut);margin-top:2px}
+  .rowsent b{color:var(--ink);font-weight:600}
+  .pill{font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;border:1px solid var(--line);color:var(--mut);background:none}
+  .pill.confirmed{border-color:var(--good);color:var(--good);background:var(--good-bg)}
+  .pill.changed{border-color:var(--gold);color:var(--gold-ink);background:var(--gold-bg)}
+  .pill.live{border-color:var(--good);color:var(--good)}
+  .bfields{margin-top:14px;border-top:1px solid var(--line2);padding-top:4px;display:none}
+  .bcard.open .bfields{display:block}
+
+  .q{font-size:14px;font-weight:700;color:var(--ink);margin:16px 0 7px}
+  .q .req{color:var(--gold-ink)}
+  .qhint{font-size:11.5px;color:var(--mut);margin:-4px 0 7px;line-height:1.5}
+  .bb-input{width:100%;max-width:340px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:inherit;color:var(--ink)}
+  .bb-input:focus{border-color:var(--gold);outline:none}
+  .chiprow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .bchip{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 13px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+  .bchip.sel{background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700}
+  .bchip.sm{padding:4px 10px;font-size:11.5px;border-radius:20px}
+  .members{font-size:11.5px;color:var(--mut)}
+  .members b{color:var(--ink)}
+
+  .twocol{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+  .twocol .left{flex:1 1 340px;min-width:280px}
+  .twocol .right{flex:0 0 240px;position:sticky;top:14px}
+  .prevlabel{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+  .prevcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 3px 14px rgba(40,35,20,.07)}
+  .prevcard .pt{font-weight:800;font-size:15px}
+  .prevcard .pp{font-size:26px;font-weight:800;margin:6px 0 0;letter-spacing:-.02em}
+  .prevcard .pp small{font-size:13px;font-weight:500;color:var(--mut)}
+  .prevcard .pd{font-size:12.5px;color:var(--mut);margin:8px 0 12px;line-height:1.5}
+  .prevcard .popt{border-top:1px solid var(--line2);padding-top:9px}
+  .prevcard .oh{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+  .prevcard .opt{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0}
+  .prevcard .opt .os{color:var(--good);font-weight:700;font-size:11.5px}
+  .prevcard .pfee{font-size:11.5px;color:var(--mut);margin-top:8px}
+  .prevcard .pafter{font-size:11.5px;color:var(--mut);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line2);line-height:1.45}
+  .prevcard .cta{margin-top:12px;background:var(--gold);color:#fff;border:none;border-radius:8px;padding:9px;width:100%;font-weight:800;font-size:13px}
+
+  .ladder{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:4px}
+  .rung{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--paper);flex-wrap:wrap}
+  .rung.base{background:var(--bg)}
+  .rung .rprice{font-weight:800;font-size:14px;min-width:64px}
+  .rung .rper{color:var(--mut);font-size:12px;min-width:82px}
+  .rung .rsave{color:var(--good);font-weight:700;font-size:12px;background:var(--good-bg);border-radius:20px;padding:2px 9px}
+  .rung .rsave.none{color:var(--gold-ink);background:var(--gold-bg)}
+  .rung .rnew{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-ink);background:var(--gold-bg);border:1px solid var(--gold);border-radius:20px;padding:2px 8px}
+  .rung .redit{margin-left:auto;display:flex;gap:6px;align-items:center}
+  .rung .redit input{border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:inherit;width:74px;background:var(--paper);color:var(--ink)}
+  .rung .redit input:focus{border-color:var(--gold);outline:none}
+  .rlenin{font-weight:700;font-size:13px;width:88px;border:1px solid transparent;border-radius:6px;padding:3px 5px;background:none;color:var(--ink);font-family:inherit}
+  .rlenin:hover{border-color:var(--line)}
+  .rlenin:focus{border-color:var(--gold);background:var(--paper);outline:none}
+  .rm2{border:none;background:none;color:var(--mut);cursor:pointer;font-size:11px;text-decoration:underline dotted}
+  .laddernote{font-size:11.5px;color:var(--mut);margin-top:6px}
+  .rungwrap{border-bottom:1px solid var(--line2)}
+  .rungwrap:last-child{border-bottom:none}
+  .rungwrap .rung{border-bottom:none;padding-bottom:4px}
+  .afterrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 12px 10px;background:var(--paper)}
+  .afterrow .al{font-size:11.5px;color:var(--mut);margin-right:2px}
+  .rmore{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:2px 12px 12px;background:var(--paper)}
+  .mf{display:flex;align-items:center;gap:8px;min-width:0}
+  .ml{font-size:11.5px;color:var(--mut);flex:0 0 auto}
+  .rin{flex:1;min-width:0;border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:inherit;font-size:12.5px;background:var(--bg);color:var(--ink)}
+  .rin:focus{border-color:var(--gold);background:var(--paper);outline:none}
+  @media(max-width:640px){.rmore{grid-template-columns:1fr}}
+  .addbtn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:4px}
+
+  .confirmbar{display:flex;align-items:center;gap:12px;margin-top:16px;border-top:1px solid var(--line2);padding-top:12px}
+  .cbtn{border:2px solid var(--good);background:none;color:var(--good);border-radius:9px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer}
+  .bcard.confirmed .cbtn{background:var(--good);color:#fff}
+  .chint{font-size:11.5px;color:var(--mut);line-height:1.45}
+
+  .dealrow{border:1px solid var(--line2);border-radius:9px;padding:10px 12px;margin-top:10px;background:var(--bg)}
+  .dealrow .dwho{font-weight:700;font-size:13px}
+  .dealrow .dsent{font-size:12px;color:var(--mut);margin:3px 0 8px}
+  .dealrow .dsent b{color:var(--ink)}
+
+  .legacy{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:16px;background:var(--paper)}
+  .legacy .mt{font-size:12.5px;font-weight:700}
+  .legacy .ms{font-size:11.5px;color:var(--mut);margin-top:3px;line-height:1.6}
+
+  footer{position:fixed;left:0;right:0;bottom:0;background:rgba(250,249,246,.95);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:11px 16px}
+  .footin{max-width:820px;margin:0 auto;display:flex;align-items:center;gap:14px}
+  .footin .cnt{color:var(--mut);font-size:13px;flex:1}
+  .footin .cnt b{color:var(--gold-ink)}
+  .send{background:var(--gold);color:#fff;border:none;border-radius:9px;padding:11px 24px;font-size:14px;font-weight:800;cursor:pointer}
+  .send:disabled{opacity:.45;cursor:not-allowed}
+  .note{color:var(--mut);font-size:11px;margin:14px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand">3D Basketball Prep</div>
+  <h1>Confirm your pricing</h1>
+  <div class="sub">These are the plans your new system will sell, built from what your members actually pay today. Open each one, fix anything that's wrong, then press <b>This plan is right</b>. Old members keep their current rate no matter what, this only sets prices for new signups.</div>
+</header>
+
+<div class="prog">
+  <div class="pline"><span><b id="ncf">0</b> of <b>5</b> confirmed</span><span class="left" id="lefttxt">5 still to review</span></div>
+  <div class="pbar"><i id="pfill" style="width:0%"></i></div>
+</div>
+
+<div id="cards"></div>
+
+<button class="addbtn" style="margin-bottom:4px">+ Add a plan you sell that isn't here</button>
+
+<div class="legacy">
+  <div class="mt">Your existing Stripe prices are already matched</div>
+  <div class="ms">Your Stripe has 119 prices; 14 are in use by your 20 members. We matched every one of them to the plans above. Members on older or special amounts keep paying exactly what they pay now (we call those Legacy). Nothing about this page changes anyone's current bill.</div>
+</div>
+
+<div class="note">Changes save automatically. Nothing goes live until BAM confirms everything with you.</div>
+</div>
+
+<footer>
+  <div class="footin">
+    <div class="cnt"><b id="ncf2">0</b>/5 confirmed · <b id="nflag">0</b> changes flagged</div>
+    <button class="send" id="sendbtn" disabled>Send back to BAM</button>
+  </div>
+</footer>
+
+<script>
+const AFTER=["Goes back to monthly","Renews for the same length","Just ends","Something else"];
+const CADS=["every week","every 4 weeks","every month","every 3 months"];
+const P={
+ two:{fam:"two",title:"Academy 2x/week",desc:"2 training sessions per week",price:250,cad:1,tax:1,fee:1,feeAmt:40,feeOn:0,
+   sent:'<b>$250</b> every 4 weeks, or pay up front for <b>3 or 6 months</b> and save',members:"9 members pay on this plan today",
+   rungs:[{len:"3 months",price:599,after:1,gets:"",taxable:1,fee:1,notes:"",other:"",m:"5 members"},{len:"6 months",price:1150,after:1,gets:"",taxable:1,fee:1,notes:"",other:"",m:"1 member"}]},
+ unl:{fam:"unl",title:"Academy Unlimited",desc:"Unlimited training sessions every week",price:300,cad:1,tax:1,fee:1,feeAmt:40,feeOn:0,
+   sent:'<b>$300</b> every 4 weeks, or <b>3 months $749</b> and <b>6 months $1,399</b> up front',members:"5 members pay on this plan today",
+   hint:"One member already pays $300 every 4 weeks for unlimited (it was named Pre Season in your Stripe). Confirm $300 is the month to month price a commitment returns to, or change it.",
+   rungs:[{len:"3 months",price:749,after:1,gets:"",taxable:1,fee:1,notes:"",other:"",m:"2 members"},{len:"6 months",price:1399,after:1,gets:"",taxable:1,fee:1,notes:"",other:"",m:"2 members"}]},
+ one:{fam:"one",title:"Academy 1x/week",desc:"1 training session per week",price:175,cad:1,tax:1,fee:1,feeAmt:40,feeOn:0,
+   sent:'<b>$175</b> every 4 weeks; two new pay-up-front options proposed',members:"2 members pay on this plan today",
+   rungs:[{len:"3 months",price:425,after:1,gets:"",taxable:1,fee:1,notes:"",other:"",m:"",fresh:1},{len:"6 months",price:875,after:1,gets:"",taxable:1,fee:1,notes:"",other:"",m:"",fresh:1}]},
+ ele:{fam:"ele",title:"Elementary Academy",desc:"1 Elementary session per week, ages 9 to 12",price:200,cad:1,tax:1,fee:1,feeAmt:40,feeOn:0,
+   sent:'<b>$200</b> every 4 weeks, no pay-up-front options',members:"3 members pay on this plan today",
+   rungs:[]},
+};
+const DEALS=[
+ {who:"Christy Hang, for Christopher",sent:'Pays <b>$199</b> every 4 weeks on his own special price',pick:null,opts:["Academy 2x/week","Academy 1x/week","Academy Unlimited","Elementary Academy"]},
+ {who:"Meredith Torio, for Keanu",sent:'Pays <b>$100</b> a month on a family deal',pick:"Elementary Academy",opts:["Academy 2x/week","Academy 1x/week","Academy Unlimited","Elementary Academy"]},
+];
+const ST={two:{c:0,e:0},unl:{c:0,e:0},one:{c:0,e:0},ele:{c:0,e:0},cus:{c:0,e:0}};
+let flags=0;
+
+function money(n){return '$'+Math.round(n).toLocaleString()}
+function monthsOf(s){const m=(s||'').match(/\d+/);let n=m?+m[0]:0;if(/year/i.test(s))n*=12;if(/week/i.test(s))n=Math.round(n/4.345);return n||1}
+function esc(s){return (s||'').replace(/"/g,'&quot;')}
+
+function pillOf(k){const s=ST[k];if(s.c)return '<span class="pill confirmed">Confirmed by you</span>';if(s.e)return '<span class="pill changed">Changed, press confirm</span>';return '<span class="pill">Not reviewed yet</span>'}
+
+function cardHTML(k){
+  const p=P[k];
+  return `<div class="bcard" data-fam="${p.fam}" id="card_${k}">
+   <div class="bhead" onclick="tog('${k}')">
+    <button class="btog">▸</button>
+    <div class="binfo">
+      <div class="btitle"><span class="famdot"></span><span id="t_${k}">${p.title}</span> <span class="pill live">Live in Stripe</span> <span id="pill_${k}">${pillOf(k)}</span></div>
+      <div class="rowsent" id="sent_${k}">${p.sent} · <span class="members">${p.members}</span></div>
+    </div>
+   </div>
+   <div class="bfields">
+    <div class="twocol">
+     <div class="left">
+      <div class="q">What do you call this plan? <span class="req">*</span></div>
+      <input class="bb-input" value="${esc(p.title)}" oninput="P['${k}'].title=this.value;edited('${k}');recalc('${k}')">
+
+      <div class="q">What does a parent get for it?</div>
+      <input class="bb-input" style="max-width:100%" value="${esc(p.desc)}" oninput="P['${k}'].desc=this.value;edited('${k}');recalc('${k}')">
+
+      <div class="q">How much do they pay, and how often? <span class="req">*</span></div>
+      ${p.hint?`<div class="qhint">${p.hint}</div>`:''}
+      <div class="chiprow">
+        <span style="font-size:19px;font-weight:800;color:var(--mut)">$</span>
+        <input class="bb-input" type="number" id="price_${k}" value="${p.price}" style="max-width:110px;font-size:17px;font-weight:800" oninput="P['${k}'].price=+this.value||0;edited('${k}');recalc('${k}')">
+        ${CADS.map((c,j)=>`<button class="bchip ${p.cad===j?'sel':''}" onclick="P['${k}'].cad=${j};edited('${k}');draw('${k}')">${c}</button>`).join('')}
+      </div>
+
+      <div class="q">Do you add sales tax on top?</div>
+      <div class="chiprow">${["Yes, add tax","No, price includes it"].map((c,j)=>`<button class="bchip ${p.tax===j?'sel':''}" onclick="P['${k}'].tax=${j};edited('${k}');draw('${k}')">${c}</button>`).join('')}</div>
+
+      <div class="q">Is there a one-time joining fee?</div>
+      <div class="qhint">Your Stripe history shows you charged a $40 setup fee on new signups, and waived it sometimes. This keeps that.</div>
+      <div class="chiprow">
+        ${["No fee","Yes"].map((c,j)=>`<button class="bchip ${p.fee===j?'sel':''}" onclick="P['${k}'].fee=${j};edited('${k}');draw('${k}')">${c}</button>`).join('')}
+        <span id="feeamt_${k}" style="display:${p.fee===1?'inline-flex':'none'};align-items:center;gap:6px">
+          <span style="font-weight:800;color:var(--mut)">$</span>
+          <input class="bb-input" type="number" value="${p.feeAmt}" style="max-width:80px;font-weight:800" oninput="P['${k}'].feeAmt=+this.value||0;edited('${k}');recalc('${k}')">
+          <span class="ml">charged once when a new athlete joins, waived on pay-up-front commitments</span>
+        </span>
+      </div>
+
+      ${p.rungs.length||1?`<div class="q">Can parents pay up front for a discount?</div>
+      <div class="qhint" id="lhint_${k}"></div>
+      <div class="ladder" id="ladder_${k}"></div>
+      <div class="laddernote">Savings are compared against paying <b id="basecmp_${k}">${money(p.price)}</b> ${CADS[p.cad]}.</div>
+      <button class="addbtn" onclick="addRung('${k}')">+ Add another length</button>`:''}
+     </div>
+
+     <div class="right">
+      <div class="prevlabel">What a parent sees</div>
+      <div class="prevcard">
+        <div class="pt" id="pv_t_${k}">${p.title}</div>
+        <div class="pp">$<span id="pv_p_${k}">${p.price}</span><small> / 4 weeks</small></div>
+        <div class="pd" id="pv_d_${k}">${p.desc}</div>
+        <div class="popt" id="pv_optwrap_${k}">
+          <div class="oh">Or save with a commitment</div>
+          <div id="pv_opts_${k}"></div>
+          <div class="pfee" id="pv_fee_${k}"></div>
+          <div class="pafter" id="pv_after_${k}"></div>
+        </div>
+        <button class="cta">Join now</button>
+      </div>
+     </div>
+    </div>
+    <div class="confirmbar">
+      <button class="cbtn" onclick="confirmCard('${k}')" id="cbtn_${k}">✓ This plan is right</button>
+      <span class="chint">Pressing this tells us you actually looked at it. A plan you never open is never treated as approved.</span>
+    </div>
+   </div>
+  </div>`;
+}
+
+function dealCard(){
+  return `<div class="bcard" data-fam="cus" id="card_cus">
+   <div class="bhead" onclick="tog('cus')">
+    <button class="btog">▸</button>
+    <div class="binfo">
+      <div class="btitle"><span class="famdot"></span>Special deals <span id="pill_cus">${pillOf('cus')}</span></div>
+      <div class="rowsent">2 members pay their own special price. They keep it. Just tell us which plan each one belongs to.</div>
+    </div>
+   </div>
+   <div class="bfields">
+    ${DEALS.map((d,i)=>`<div class="dealrow">
+      <div class="dwho">${d.who}</div>
+      <div class="dsent">${d.sent} · keeps this price</div>
+      <div class="chiprow"><span class="al" style="font-size:11.5px;color:var(--mut)">Which plan do they attend?</span>
+        ${d.opts.map(o=>`<button class="bchip sm ${d.pick===o?'sel':''}" onclick="DEALS[${i}].pick='${o}';edited('cus');drawDeals()">${o}</button>`).join('')}
+      </div>
+    </div>`).join('')}
+    <div class="confirmbar">
+      <button class="cbtn" onclick="confirmCard('cus')" id="cbtn_cus">✓ These are right</button>
+      <span class="chint">Both need a plan picked before this card can be confirmed.</span>
+    </div>
+   </div>
+  </div>`;
+}
+
+function tog(k){document.getElementById('card_'+k).classList.toggle('open')}
+function edited(k){if(ST[k].c){ST[k].c=0}ST[k].e=1;flags++;paintPills(k);updProg()}
+function confirmCard(k){
+  if(k==='cus'&&DEALS.some(d=>!d.pick)){alert('Pick a plan for both members first.');return}
+  ST[k].c=1;ST[k].e=0;document.getElementById('card_'+k).classList.add('confirmed');paintPills(k);updProg();
+}
+function paintPills(k){document.getElementById('pill_'+k).innerHTML=pillOf(k)}
+function updProg(){
+  const n=Object.values(ST).filter(s=>s.c).length;
+  document.getElementById('ncf').textContent=n;document.getElementById('ncf2').textContent=n;
+  document.getElementById('nflag').textContent=flags;
+  document.getElementById('pfill').style.width=(n/5*100)+'%';
+  document.getElementById('lefttxt').textContent=n===5?'all done, press Send':(5-n)+' still to review';
+  document.getElementById('sendbtn').disabled=n<5;
+}
+
+function draw(k){
+  const p=P[k];const el=document.getElementById('ladder_'+k);if(!el)return;
+  const base=p.price;
+  document.getElementById('lhint_'+k).innerHTML=p.rungs.some(r=>r.fresh)
+    ? 'Options marked <b>new</b> are proposed by BAM and are not in your Stripe yet. Confirm them to start selling them, or remove them.'
+    : (p.rungs.length?'Your Stripe already sells these. The savings are worked out for you.':'No pay-up-front options today. Add one if you want to offer it.');
+  el.innerHTML=
+   `<div class="rung base"><span class="rlenin" style="border:none">Month to month</span><span class="rprice">${money(base)}</span><span class="rper">${money(base)}/mo</span><span class="rsave none">the baseline</span></div>`
+   + p.rungs.map((r,i)=>{
+     const mo=monthsOf(r.len), save=base*mo-r.price, per=r.price/mo;
+     const badge=base?(save>0?`<span class="rsave">saves ${money(save)}</span>`:`<span class="rsave none">no saving</span>`):`<span class="rsave none">set a monthly price</span>`;
+     return `<div class="rungwrap">
+      <div class="rung">
+       <input class="rlenin" value="${esc(r.len)}" oninput="P['${k}'].rungs[${i}].len=this.value;edited('${k}');recalc('${k}')">
+       <span class="rprice" id="rp_${k}${i}">${money(r.price)}</span>
+       <span class="rper" id="rm_${k}${i}">${money(per)}/mo</span>
+       <span id="rs_${k}${i}">${badge}</span>
+       ${r.fresh?'<span class="rnew">new</span>':''}
+       ${r.m?`<span class="members">${r.m}</span>`:''}
+       <span class="redit">$<input type="number" value="${r.price}" oninput="P['${k}'].rungs[${i}].price=+this.value||0;edited('${k}');recalc('${k}')">
+       <button class="rm2" onclick="P['${k}'].rungs.splice(${i},1);edited('${k}');draw('${k}')">remove</button></span>
+      </div>
+      <div class="afterrow"><span class="al">When the <span id="rl_${k}${i}">${esc(r.len)}</span> is up</span>
+       ${AFTER.map((a,j)=>`<button class="bchip sm ${r.after===j?'sel':''}" onclick="P['${k}'].rungs[${i}].after=${j};edited('${k}');draw('${k}')">${a}</button>`).join('')}
+      </div>
+      ${r.after===3?`<div class="afterrow"><span class="al">What happens instead? <b style="color:var(--gold-ink)">*</b></span>
+        <input class="rin" style="flex:1;min-width:200px" value="${esc(r.other)}" placeholder="explain in your own words" oninput="P['${k}'].rungs[${i}].other=this.value;edited('${k}')"></div>`:''}
+      <div class="rmore">
+        <div class="mf"><span class="ml">What do they get on this one?</span>
+          <input class="rin" value="${esc(r.gets)}" placeholder="same as monthly" oninput="P['${k}'].rungs[${i}].gets=this.value;edited('${k}')"></div>
+        <div class="mf"><span class="ml">Do you add tax on it?</span>
+          <span class="chiprow">${["Yes","No"].map((a,j)=>`<button class="bchip sm ${r.taxable===j?'sel':''}" onclick="P['${k}'].rungs[${i}].taxable=${j};edited('${k}');draw('${k}')">${a}</button>`).join('')}</span></div>
+        <div class="mf"><span class="ml">Joining fee on this one?</span>
+          <span class="chiprow">${["Charge it","Waive it"].map((a,j)=>`<button class="bchip sm ${r.fee===j?'sel':''}" onclick="P['${k}'].rungs[${i}].fee=${j};edited('${k}');draw('${k}')">${a}</button>`).join('')}</span></div>
+        <div class="mf"><span class="ml">Notes on this discount</span>
+          <input class="rin" value="${esc(r.notes)}" placeholder="optional, just for you and BAM" oninput="P['${k}'].rungs[${i}].notes=this.value;edited('${k}')"></div>
+      </div>
+     </div>`;
+   }).join('');
+  prevOpts(k);
+}
+function recalc(k){
+  const p=P[k];const base=p.price;
+  const bc=document.getElementById('basecmp_'+k);if(bc)bc.textContent=money(base);
+  p.rungs.forEach((r,i)=>{
+    const el=document.getElementById('rp_'+k+i);if(!el)return;
+    const mo=monthsOf(r.len),save=base*mo-r.price;
+    el.textContent=money(r.price);
+    document.getElementById('rm_'+k+i).textContent=money(r.price/mo)+'/mo';
+    document.getElementById('rl_'+k+i).textContent=r.len;
+    document.getElementById('rs_'+k+i).innerHTML=base?(save>0?`<span class="rsave">saves ${money(save)}</span>`:`<span class="rsave none">no saving</span>`):`<span class="rsave none">set a monthly price</span>`;
+  });
+  document.getElementById('pv_t_'+k).textContent=p.title;
+  document.getElementById('pv_d_'+k).textContent=p.desc;
+  document.getElementById('pv_p_'+k).textContent=(p.price||0).toLocaleString();
+  prevOpts(k);
+}
+function prevOpts(k){
+  const p=P[k];const base=p.price;
+  const w=document.getElementById('pv_opts_'+k);if(!w)return;
+  w.innerHTML=p.rungs.map(r=>{
+    const save=base*monthsOf(r.len)-r.price;
+    return `<div class="opt"><span>${r.len}</span><span>${money(r.price)} ${save>0&&base?`<span class="os">save ${money(save)}</span>`:''}</span></div>`;
+  }).join('')||'<div class="opt" style="color:var(--mut)">none yet</div>';
+  document.getElementById('pv_fee_'+k).textContent=p.fee===1?`Plus a one-time ${money(p.feeAmt)} joining fee (waived if you pay up front).`:'';
+  const back=p.rungs.filter(r=>r.after===0).length, ren=p.rungs.filter(r=>r.after===1).length;
+  let line='';
+  if(back)line=`When a commitment ends you go back to ${money(base)} ${CADS[p.cad]}.`;
+  else if(ren)line='Commitments renew automatically for the same length.';
+  else if(p.rungs.length)line='Commitments simply end, nothing renews.';
+  document.getElementById('pv_after_'+k).textContent=line;
+}
+function addRung(k){P[k].rungs.push({len:"12 months",price:0,after:1,gets:"",taxable:1,fee:1,notes:"",other:"",fresh:1});edited(k);draw(k)}
+function drawDeals(){
+  const host=document.getElementById('card_cus');const open=host.classList.contains('open');
+  host.outerHTML=dealCard();
+  if(open)document.getElementById('card_cus').classList.add('open');
+  paintPills('cus');
+}
+
+const host=document.getElementById('cards');
+host.innerHTML=['two','unl','one','ele'].map(cardHTML).join('')+dealCard();
+['two','unl','one','ele'].forEach(k=>{draw(k)});
+document.getElementById('card_two').classList.add('open');
+updProg();
+</script>
+</body>
+</html>
