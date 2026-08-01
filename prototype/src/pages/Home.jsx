@@ -63,13 +63,13 @@ const SAGE_CHALLENGE = {
 /* ─── Milestone ─── */
 const MILESTONE = {
   label: 'MRR crossed $8k',
-  detail: 'First time hitting this level — up 18% from 3 months ago',
+  detail: 'First time hitting this level - up 18% from 3 months ago',
 };
 
 /* ─── Sage KPI advice (simulated responses) ─── */
 const SAGE_KPI_ADVICE = [
-  { q: 'Which KPIs matter most for my stage?', a: "You're in growth mode with 42 members. Focus on **New Members** and **Trial Conversion** — those are your growth levers. Churn rate matters but yours is healthy at 2.4%, so don't over-index on retention yet." },
-  { q: 'What should I track to reduce churn?', a: "Add **Avg Attendance** and **Churn Rate** to your dashboard. Members who attend less than 2x/week are 4x more likely to cancel. Your attendance is solid at 8.2/class — keep watching it." },
+  { q: 'Which KPIs matter most for my stage?', a: "You're in growth mode with 42 members. Focus on **New Members** and **Trial Conversion** - those are your growth levers. Churn rate matters but yours is healthy at 2.4%, so don't over-index on retention yet." },
+  { q: 'What should I track to reduce churn?', a: "Add **Avg Attendance** and **Churn Rate** to your dashboard. Members who attend less than 2x/week are 4x more likely to cancel. Your attendance is solid at 8.2/class - keep watching it." },
   { q: 'How do I grow revenue without more members?', a: "Track **Revenue/Member** and **Fill Rate**. You can increase revenue by filling existing classes (75% → 90%) and upselling plans. Your ARPM of $126 has room to grow toward $150." },
 ];
 
@@ -128,7 +128,7 @@ function KpiPicker({ selected, onSave, onClose }) {
 
   const askSage = (question) => {
     const advice = SAGE_KPI_ADVICE.find(a => a.q === question);
-    setSageChat(prev => [...prev, { q: question, a: advice?.a || "I'd recommend focusing on the metrics most tied to your current goal — growth, retention, or revenue. What matters most to you right now?" }]);
+    setSageChat(prev => [...prev, { q: question, a: advice?.a || "I'd recommend focusing on the metrics most tied to your current goal - growth, retention, or revenue. What matters most to you right now?" }]);
     setSageInput('');
   };
 
@@ -143,7 +143,7 @@ function KpiPicker({ selected, onSave, onClose }) {
           <button className={s.pickerClose} onClick={onClose}>✕</button>
         </div>
 
-        {/* Selected KPIs — draggable */}
+        {/* Selected KPIs - draggable */}
         {picks.length > 0 && (
           <div className={s.pickerSelected}>
             <div className={s.pickerSectionLabel}>Your dashboard ({picks.length}/6)</div>
@@ -289,7 +289,7 @@ export default function Home() {
     "what do you need? I'll figure it out",
     "what should I work on next?",
     "got a question? just ask",
-    "give me a task — I'm on it",
+    "give me a task - I'm on it",
   ];
   const [pillText, setPillText] = useState('');
   const pillRef = useRef({ idx: 0, charIdx: 0, deleting: false, timeout: null });
@@ -356,7 +356,7 @@ export default function Home() {
     if (!sageInput.trim()) return;
     setSageResponse({
       q: sageInput,
-      a: `Great question. Let me look into "${sageInput.toLowerCase()}" for you — I'll pull the latest data and have a recommendation ready in a moment.`,
+      a: `Great question. Let me look into "${sageInput.toLowerCase()}" for you - I'll pull the latest data and have a recommendation ready in a moment.`,
     });
     setSageInput('');
   };
@@ -392,7 +392,7 @@ export default function Home() {
 
   return (
     <main className={sh.main}>
-      {/* ═══ COMMAND BAR — replaces old PageBanner ═══ */}
+      {/* ═══ COMMAND BAR - replaces old PageBanner ═══ */}
       <div className={s.cmdBar}>
         <div className={s.cmdBarCanvas}>
           <canvas ref={canvasRef} />
@@ -485,11 +485,11 @@ export default function Home() {
             <div className={s.highlightBody}>
               <div className={s.highlightLabel}>Best thing since your last open</div>
               <div className={s.highlightValue}>+2 trials booked today</div>
-              <div className={s.highlightContext}>Mia Thompson and Sofia Reyes both confirmed — your Saturday pipeline is strongest it's been in 3 weeks.</div>
+              <div className={s.highlightContext}>Mia Thompson and Sofia Reyes both confirmed - your Saturday pipeline is strongest it's been in 3 weeks.</div>
             </div>
           </div>
 
-          {/* Priority task — dominant CTA */}
+          {/* Priority task - dominant CTA */}
           <div className={s.taskCard}>
             <div className={s.taskHeader}>
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -501,7 +501,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ═══ SAGE — expanding greeting pill ═══ */}
+        {/* ═══ SAGE - expanding greeting pill ═══ */}
         <div className={`${s.sageWrap} ${sageExpanded ? s.sageWrapExpanded : ''}`}>
           <div className={s.sageBorderGlow} />
 
@@ -513,7 +513,7 @@ export default function Home() {
               </div>
               <div className={s.sagePillText}>
                 <span className={s.sagePillGreeting}>Hey User</span>
-                <span className={s.sagePillPrompt}> — {pillText}<span className={s.sagePillCursor} /></span>
+                <span className={s.sagePillPrompt}> - {pillText}<span className={s.sagePillCursor} /></span>
               </div>
               <div className={s.sagePillWaveform}>
                 {[1, 2, 3, 4, 5].map(i => (
@@ -583,7 +583,7 @@ export default function Home() {
               { label: '2 content pieces pending review', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>, color: '#6366f1', link: '/content' },
               { label: '1 failed payment (Jake Rivera)', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>, color: '#E05A42', link: '/members' },
               { label: '3 leads need follow-up', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>, color: '#C8A84E', link: '/sales' },
-              { label: '4pm Intermediate — 3/12 spots filled', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, color: '#3EAF5C', link: '/schedule' },
+              { label: '4pm Intermediate - 3/12 spots filled', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, color: '#3EAF5C', link: '/schedule' },
             ].map((item, i) => (
               <div key={i} onClick={() => navigate(item.link)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none', cursor: 'pointer', fontSize: 13, color: 'var(--tp)' }}>
                 <span style={{ fontSize: 14 }}>{item.icon}</span>
@@ -659,7 +659,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ═══ MEMBER MILESTONES — GAM-E02 ═══ */}
+        {/* ═══ MEMBER MILESTONES - GAM-E02 ═══ */}
         <div style={{ background: 'var(--surf)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, marginBottom: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--tp)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
             <svg width="16" height="16" fill="none" stroke="#C8A84E" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22c-4.97 0-9-2.69-9-6 0-4 5-11 9-14 4 3 9 10 9 14 0 3.31-4.03 6-9 6z"/></svg>
@@ -718,7 +718,7 @@ export default function Home() {
           <div className={s.notifCard}>
             <div className={s.notifDot} />
             <div className={s.notifBody}>
-              <div className={s.notifText}><strong>Payment received:</strong> Carlos Martinez — $175/mo membership started.</div>
+              <div className={s.notifText}><strong>Payment received:</strong> Carlos Martinez - $175/mo membership started.</div>
               <div className={s.notifTime}>5h ago</div>
             </div>
           </div>

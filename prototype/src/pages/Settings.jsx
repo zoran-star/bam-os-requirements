@@ -20,7 +20,7 @@ const DEFAULT_PLANS = [
   { id: 'p1', name: 'Elite', price: 175, interval: 'month', sessions: '3x/week', stripeId: 'price_elite_175', active: true },
   { id: 'p2', name: 'Intermediate', price: 125, interval: 'month', sessions: '2x/week', stripeId: 'price_inter_125', active: true },
   { id: 'p3', name: 'Beginner', price: 95, interval: 'month', sessions: '1x/week', stripeId: 'price_begin_95', active: true },
-  { id: 'p4', name: 'Free Trial', price: 0, interval: '—', sessions: '1 session', stripeId: '—', active: true },
+  { id: 'p4', name: 'Free Trial', price: 0, interval: ' -', sessions: '1 session', stripeId: ' -', active: true },
 ];
 
 const DEFAULT_LOCATIONS = [
@@ -29,8 +29,8 @@ const DEFAULT_LOCATIONS = [
 ];
 
 const DEFAULT_LINKS = [
-  { id: 'lk1', plan: 'Free Trial', location: 'Downtown', url: 'bamacademy.bamos.app/join/dt-trial', visits: 142, completions: 38, created: 'Jan 15', expires: '—' },
-  { id: 'lk2', plan: 'Free Trial', location: 'Westside', url: 'bamacademy.bamos.app/join/ws-trial', visits: 67, completions: 12, created: 'Feb 1', expires: '—' },
+  { id: 'lk1', plan: 'Free Trial', location: 'Downtown', url: 'bamacademy.bamos.app/join/dt-trial', visits: 142, completions: 38, created: 'Jan 15', expires: ' -' },
+  { id: 'lk2', plan: 'Free Trial', location: 'Westside', url: 'bamacademy.bamos.app/join/ws-trial', visits: 67, completions: 12, created: 'Feb 1', expires: ' -' },
   { id: 'lk3', plan: 'Elite', location: 'Downtown', url: 'bamacademy.bamos.app/join/elite-dt', visits: 23, completions: 5, created: 'Mar 1', expires: 'Apr 1' },
 ];
 
@@ -104,13 +104,13 @@ const STRATEGY_TOPICS = [
 ];
 
 const STRATEGY_MESSAGES = [
-  { from: 'ai', text: "Let's define your academy's mission. Why does BAM Academy exist — beyond just basketball training?" },
+  { from: 'ai', text: "Let's define your academy's mission. Why does BAM Academy exist - beyond just basketball training?" },
   { from: 'user', text: "We want to develop the whole athlete. Not just skills, but discipline, confidence, and leadership." },
-  { from: 'ai', text: "That's strong. Here's a refined version: \"BAM Academy develops complete athletes — building discipline, confidence, and leadership through elite basketball training.\" Does that capture it, or should we adjust?" },
+  { from: 'ai', text: "That's strong. Here's a refined version: \"BAM Academy develops complete athletes - building discipline, confidence, and leadership through elite basketball training.\" Does that capture it, or should we adjust?" },
   { from: 'user', text: "Yeah that's good. Maybe add something about the community aspect." },
-  { from: 'ai', text: "How about: \"BAM Academy builds complete athletes and a tight-knit community — developing discipline, confidence, and leadership through elite basketball training.\" ✓ Saved. Let's move to Core Values — what 3-5 values define how you operate?" },
+  { from: 'ai', text: "How about: \"BAM Academy builds complete athletes and a tight-knit community - developing discipline, confidence, and leadership through elite basketball training.\" ✓ Saved. Let's move to Core Values - what 3-5 values define how you operate?" },
   { from: 'user', text: "Player development over winning, positive coaching, accountability, and family atmosphere." },
-  { from: 'ai', text: "Those are clear and authentic. I'll format them:\n\n1. Player development over winning\n2. Positive, encouraging coaching\n3. Personal accountability\n4. Family atmosphere\n\n✓ Saved. Now let's work on your Origin Story — how and why did you start BAM?" },
+  { from: 'ai', text: "Those are clear and authentic. I'll format them:\n\n1. Player development over winning\n2. Positive, encouraging coaching\n3. Personal accountability\n4. Family atmosphere\n\n✓ Saved. Now let's work on your Origin Story - how and why did you start BAM?" },
 ];
 
 /* ─── DEFAULT OBJECTIONS ─── */
@@ -121,13 +121,13 @@ const DEFAULT_OBJECTIONS = [
   { id: 'obj4', category: 'Schedule', objection: "Schedule doesn't work", response: 'Ask what times DO work. Check alternative sessions. Mention makeup sessions and open gym flexibility.', active: true },
   { id: 'obj5', category: 'Schedule', objection: 'Too much time commitment', response: 'Suggest starting with lower frequency plan. Sessions are only 60-90 min. Consistency matters more than volume.', active: true },
   { id: 'obj6', category: 'Schedule', objection: 'Too far to drive', response: 'Acknowledge the commute. Mention what parents do during sessions. If multi-location, suggest the closer one.', active: true },
-  { id: 'obj7', category: 'Child', objection: 'My kid is shy / not confident', response: 'Normalize it — many kids feel this way. Small groups, supportive coaches. Building confidence IS the outcome. Trial is low-pressure.', active: true },
+  { id: 'obj7', category: 'Child', objection: 'My kid is shy / not confident', response: 'Normalize it - many kids feel this way. Small groups, supportive coaches. Building confidence IS the outcome. Trial is low-pressure.', active: true },
   { id: 'obj8', category: 'Child', objection: 'Too young / not ready', response: 'Explain age-appropriate programming. Fundamentals programs for younger kids. Starting early builds habits.', active: true },
   { id: 'obj9', category: 'Child', objection: 'Not sure my kid will like it', response: "That's exactly what the free trial is for. No commitment, just come try. Many unsure kids end up loving it.", active: true },
   { id: 'obj10', category: 'Child', objection: 'Bad experience at another program', response: 'Take it seriously. Ask what happened. Explain how this program is different. Offer coach to personally welcome them.', active: true },
   { id: 'obj11', category: 'Trust', objection: 'Never heard of you', response: 'Share proof points: years in business, athletes trained, locations. Offer the trial to experience it firsthand.', active: true },
   { id: 'obj12', category: 'Trust', objection: 'What are the coaches\' qualifications?', response: 'Share credentials, playing experience, certifications. Personalize to the specific coach they would train with.', active: true },
-  { id: 'obj13', category: 'Commitment', objection: "Don't want to sign a contract", response: 'Clarify actual terms — month-to-month if applicable. Mention cancellation policy. No long-term lock-in.', active: true },
+  { id: 'obj13', category: 'Commitment', objection: "Don't want to sign a contract", response: 'Clarify actual terms - month-to-month if applicable. Mention cancellation policy. No long-term lock-in.', active: true },
   { id: 'obj14', category: 'Commitment', objection: 'What if we need to pause?', response: 'Explain pause policy: up to 30 days, 2 per year. Flexibility is a feature. We want you here because you love it.', active: true },
   { id: 'obj15', category: 'Timing', objection: 'Need to talk to my spouse', response: 'Completely respect this. Offer to send an info summary to share. Ask when to follow up.', active: true },
   { id: 'obj16', category: 'Timing', objection: 'Let me think about it', response: 'Respect it. Ask if there\'s a specific concern. Offer to answer questions. Follow up in 2-3 days.', active: true },
@@ -212,7 +212,7 @@ function CoachForm({ coach, onSave, onClose }) {
         <label className={s.formLabel}>Bio / Background</label>
         <textarea className={s.formTextarea} rows={3} value={bio} onChange={e => setBio(e.target.value)} placeholder="Playing experience, certifications, coaching philosophy..." />
       </div>
-      <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>This bio is used in parent-facing communications — when the AI mentions a coach, it references their background. Keep it authentic.</span></div>
+      <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>This bio is used in parent-facing communications - when the AI mentions a coach, it references their background. Keep it authentic.</span></div>
       <div className={s.modalFooter}>
         <button className={s.btnSecondary} onClick={onClose}>Cancel</button>
         <button className={s.btnPrimary} disabled={!canSave} onClick={() => onSave({ name, role, email, phone, locations, bio, permission, availability })}>{coach ? 'Save Changes' : 'Add Coach'}</button>
@@ -247,7 +247,7 @@ function AddObjectionForm({ onSave, onClose }) {
         <label className={s.formLabel}>AI Response Strategy</label>
         <textarea className={s.formTextarea} rows={4} value={response} onChange={e => setResponse(e.target.value)} placeholder="How should the AI handle this objection? Be specific about tone, what to say, and what NOT to say." />
       </div>
-      <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>The AI will use this strategy when it detects this objection in a conversation. Be specific — "acknowledge, then redirect to trial" works better than "handle it."</span></div>
+      <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>The AI will use this strategy when it detects this objection in a conversation. Be specific - "acknowledge, then redirect to trial" works better than "handle it."</span></div>
       <div className={s.modalFooter}>
         <button className={s.btnSecondary} onClick={onClose}>Cancel</button>
         <button className={s.btnPrimary} disabled={!canSave} onClick={() => onSave({ category, objection, response })}>Add Objection</button>
@@ -293,7 +293,7 @@ export default function Settings() {
   const [cancelNotice, setCancelNotice] = useState('7');
   const [dunningRetries, setDunningRetries] = useState('3');
 
-  // Appearance — persisted + applied to document
+  // Appearance - persisted + applied to document
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('fc_theme') || 'light'; } catch { return 'light'; }
   });
@@ -432,7 +432,7 @@ export default function Settings() {
                 <h3 className={s.sectionTitle}>Membership Plans</h3>
                 <div className={s.sectionActions}><button className={s.addBtn} onClick={() => { setShowOfferWizard(true); setWizardStep(0); }}>+ Create Plan</button><span className={s.sectionRef}>SET-003</span></div>
               </div>
-              <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>Plans are synced with Stripe Products & Prices. Price is immutable after creation — archive the plan and create a new one to change pricing.</span></div>
+              <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>Plans are synced with Stripe Products & Prices. Price is immutable after creation - archive the plan and create a new one to change pricing.</span></div>
               <div className={s.planGrid}>
                 {DEFAULT_PLANS.map(p => (
                   <div key={p.id} className={s.planCard}>
@@ -451,7 +451,7 @@ export default function Settings() {
                 ))}
               </div>
 
-              {/* Product Builder — merged from Offer Builder */}
+              {/* Product Builder - merged from Offer Builder */}
               <div className={s.sectionHead} style={{ marginTop: 32 }}>
                 <h3 className={s.sectionTitle}>Products</h3>
                 <span className={s.sectionRef}>SAL-014</span>
@@ -580,7 +580,7 @@ export default function Settings() {
                     <span className={s.linkUrl}>{lk.url}</span>
                     <span className={s.linkStat}>{lk.visits}</span>
                     <span className={s.linkStat}>{lk.completions}</span>
-                    <span className={s.linkStat}>{lk.visits ? `${Math.round((lk.completions / lk.visits) * 100)}%` : '—'}</span>
+                    <span className={s.linkStat}>{lk.visits ? `${Math.round((lk.completions / lk.visits) * 100)}%` : ' -'}</span>
                     <span>{lk.expires}</span>
                   </div>
                 ))}
@@ -766,7 +766,7 @@ export default function Settings() {
                     <div className={s.staffDetails}>
                       <div className={s.staffDetailRow}>
                         <span className={s.staffDetailLabel}>Availability</span>
-                        <span className={s.staffDetailValue}>{c.availability || '—'}</span>
+                        <span className={s.staffDetailValue}>{c.availability || ' -'}</span>
                       </div>
                       <div className={s.staffDetailRow}>
                         <span className={s.staffDetailLabel}>Sessions this week</span>
@@ -893,7 +893,7 @@ export default function Settings() {
                   <label className={s.formLabel}>Sessions Per Week</label>
                   <select className={s.formSelect}><option>1x/week</option><option>2x/week</option><option>3x/week</option><option>4x/week</option><option>5x/week</option></select>
                   <label className={s.formLabel}>Location</label>
-                  <input className={s.formInput} defaultValue="BAM Academy — Main Court" />
+                  <input className={s.formInput} defaultValue="BAM Academy - Main Court" />
                 </div>
               )}
               {wizardStep === 2 && (

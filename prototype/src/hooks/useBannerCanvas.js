@@ -81,7 +81,7 @@ export default function useBannerCanvas(canvasRef) {
       const shadowPts = genCurvePts(1.5, 5, -2);
       drawCurve(shadowPts, 'rgba(200,168,78,0.12)', 1);
       drawCurve(mainPts, 'rgba(200,168,78,0.42)', 2);
-      // Glowing dots — spread evenly across bars
+      // Glowing dots - spread evenly across bars
       const dotIndices = Array.from({ length: 5 }, (_, i) => Math.round((i + 1) * barCount / 6));
       ctx.save();
       for (const di of dotIndices) {

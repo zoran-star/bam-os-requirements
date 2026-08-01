@@ -35,7 +35,7 @@
 .greetingText{font-size:14px;font-weight:600;color:var(--ts)}
 .greetingName{font-size:22px;font-weight:800;color:var(--tp);letter-spacing:-0.02em}
 
-/* Trial banner — APP-034a/b */
+/* Trial banner - APP-034a/b */
 .trialBanner{margin:0 20px;background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(99,102,241,0.04));border:1px solid rgba(99,102,241,0.2);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;position:relative}
 .trialBannerLeft{flex:1}
 .trialBannerTitle{font-size:14px;font-weight:700;color:#6366f1}
@@ -162,7 +162,7 @@
 .detailCancelBookingBtn{font-family:var(--ff);font-size:14px;font-weight:700;color:#fff;background:#E05A42;border:none;border-radius:14px;padding:13px;cursor:pointer;transition:all 180ms;text-align:center;margin-top:8px}
 .detailCancelBookingBtn:hover{background:#c9483a;transform:translateY(-1px)}
 
-/* Waitlist position — APP-027 */
+/* Waitlist position - APP-027 */
 .waitlistInfo{display:flex;align-items:center;gap:12px;background:var(--warnl);border:1px solid rgba(224,157,36,0.2);border-radius:14px;padding:14px 16px}
 .waitlistIcon{flex-shrink:0}
 .waitlistLabel{font-size:13px;font-weight:700;color:var(--warn)}
@@ -189,7 +189,7 @@
 .attendedBadge{font-size:10px;font-weight:700;color:var(--green);background:var(--greenl);padding:3px 10px;border-radius:6px}
 .missedBadge{font-size:10px;font-weight:700;color:var(--red);background:var(--redl);padding:3px 10px;border-radius:6px}
 
-/* QR Check-In button — APP-030a */
+/* QR Check-In button - APP-030a */
 .qrCheckinBtn{font-family:var(--ff);width:100%;font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--gold),var(--goldl));border:none;border-radius:16px;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all 180ms;box-shadow:var(--shadow-sm)}
 .qrCheckinBtn:hover{transform:translateY(-1px);box-shadow:var(--shadow-gold)}
 
@@ -235,7 +235,7 @@
 .notifToggleDot{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform 200ms;box-shadow:0 1px 3px rgba(0,0,0,0.15)}
 .notifToggleOn .notifToggleDot{transform:translateX(20px)}
 
-/* ─── BILLING — APP-001, APP-002, APP-033 ─── */
+/* ─── BILLING - APP-001, APP-002, APP-033 ─── */
 .billingSummary{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px}
 .billingPlanRow{display:flex;align-items:center;justify-content:space-between}
 .billingPlanName{font-size:16px;font-weight:800;color:var(--tp)}
@@ -262,7 +262,7 @@
 .paymentBadge{font-size:10px;font-weight:700;color:var(--green);background:var(--greenl);padding:2px 8px;border-radius:5px}
 .paymentBadgePending{font-size:10px;font-weight:700;color:var(--warn);background:var(--warnl);padding:2px 8px;border-radius:5px}
 
-/* ─── CHANGE PLAN — APP-012a/b ─── */
+/* ─── CHANGE PLAN - APP-012a/b ─── */
 .planGrid{display:flex;flex-direction:column;gap:10px}
 .planCard{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:18px;display:flex;align-items:center;gap:14px;transition:all 140ms}
 .planCard:hover{border-color:var(--borderm)}
@@ -274,7 +274,7 @@
 .planCardBtn{font-family:var(--ff);font-size:11px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:8px;padding:6px 14px;cursor:pointer;flex-shrink:0;transition:all 140ms}
 .planCardBtn:hover{background:var(--goldl)}
 
-/* ─── CANCEL CLASS DIALOG — APP-019a/b ─── */
+/* ─── CANCEL CLASS DIALOG - APP-019a/b ─── */
 .dialogOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:600;display:flex;align-items:center;justify-content:center;padding:24px;animation:cmdFadeIn 0.2s ease}
 .dialogBox{background:var(--bg);border-radius:24px;padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:14px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
 .dialogIcon{width:52px;height:52px;border-radius:50%;background:var(--warnl);display:flex;align-items:center;justify-content:center}
@@ -301,11 +301,11 @@
 .altSuggestionBtn{font-family:var(--ff);font-size:13px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.1);border:1px solid rgba(200,168,78,0.2);border-radius:10px;padding:10px;cursor:pointer;transition:all 140ms;text-align:center}
 .altSuggestionBtn:hover{background:rgba(200,168,78,0.15)}
 
-/* ─── PROFILE EDIT — PRF-002b, PRF-003b ─── */
+/* ─── PROFILE EDIT - PRF-002b, PRF-003b ─── */
 .profileAvatarEdit{display:flex;flex-direction:column;align-items:center;gap:10px}
 .profileAvatarBtn{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--gold);background:none;border:none;cursor:pointer}
 
-/* ─── CREDIT DETAIL — APP-021 ─── */
+/* ─── CREDIT DETAIL - APP-021 ─── */
 .creditSummaryCard{background:linear-gradient(135deg,var(--gold),var(--goldl));border-radius:20px;padding:24px;color:#fff;display:flex;flex-direction:column;gap:16px}
 .creditSummaryMain{display:flex;align-items:baseline;gap:8px}
 .creditSummaryNum{font-size:42px;font-weight:900;line-height:1}
@@ -316,7 +316,7 @@
 .creditHistoryLabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--tm)}
 .creditBalBadge{font-size:10px;font-weight:600;color:var(--tm);background:var(--surf2);padding:2px 8px;border-radius:5px}
 
-/* ─── INBOX — APP-026 ─── */
+/* ─── INBOX - APP-026 ─── */
 .inboxList{flex:1;overflow-y:auto;display:flex;flex-direction:column}
 .inboxRow{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 140ms}
 .inboxRow:hover{background:var(--surf2)}
@@ -343,7 +343,7 @@
 .inboxSendBtn{width:40px;height:40px;border-radius:50%;background:var(--gold);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 140ms;flex-shrink:0}
 .inboxSendBtn:hover{background:var(--goldl)}
 
-/* ─── NOTIFICATION CENTER — APP-031 ─── */
+/* ─── NOTIFICATION CENTER - APP-031 ─── */
 .notifCenterList{flex:1;overflow-y:auto;display:flex;flex-direction:column}
 .notifCenterRow{display:flex;align-items:flex-start;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border);transition:background 140ms}
 .notifCenterUnread{background:rgba(200,168,78,0.04)}
@@ -353,7 +353,7 @@
 .notifCenterSub{font-size:11px;font-weight:500;color:var(--ts);margin-top:2px}
 .notifCenterTime{font-size:10px;font-weight:500;color:var(--tm);flex-shrink:0;padding-top:2px}
 
-/* ─── QR CHECK-IN — APP-030a ─── */
+/* ─── QR CHECK-IN - APP-030a ─── */
 .qrScreen{display:flex;flex-direction:column;align-items:center;gap:20px;padding:20px;text-align:center;flex:1}
 .qrTitle{font-size:20px;font-weight:800;color:var(--tp)}
 .qrSub{font-size:13px;font-weight:500;color:var(--ts);line-height:1.5;max-width:280px}

@@ -8,7 +8,7 @@
 .topGreeting{font-size:15px;font-weight:800;color:var(--tp);letter-spacing:-0.01em}
 .topSub{font-size:11px;font-weight:500;color:var(--tm)}
 
-/* Sage search — animated, alive */
+/* Sage search - animated, alive */
 .topSage{flex:1;display:flex;align-items:center;gap:10px;position:relative;background:var(--surf);border:2px solid var(--border);border-radius:16px;padding:6px 10px 6px 6px;transition:all 300ms var(--es);max-width:480px;margin:0 auto}
 .topSage:hover{border-color:rgba(200,168,78,0.3);box-shadow:0 0 16px rgba(200,168,78,0.06)}
 .topSageFocused{border-color:var(--gold);box-shadow:0 0 24px rgba(200,168,78,0.12),0 0 0 3px rgba(200,168,78,0.06)}
@@ -648,7 +648,7 @@
 .modalTitle{font-size:20px;font-weight:800;color:var(--tp)}
 .modalRef{font-size:10px;font-weight:600;color:var(--tm);font-family:var(--fm);background:var(--surf2);padding:2px 8px;border-radius:6px;width:fit-content;margin-top:-12px}
 
-/* ─── CHANNEL DETAIL MODAL — with education ─── */
+/* ─── CHANNEL DETAIL MODAL - with education ─── */
 .campaignDetailCard{background:var(--surf2);border:1px solid var(--border);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px}
 .campaignDetailName{font-size:15px;font-weight:800;color:var(--tp)}
 .campaignDetailGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
@@ -661,7 +661,7 @@
 .campaignDemoBanner{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:var(--greenl);font-size:11px;font-weight:500;color:var(--ts)}
 .campaignDemoWarn{background:rgba(212,160,23,0.08)}
 
-/* Education tooltip — MKT-003 */
+/* Education tooltip - MKT-003 */
 .eduTooltip{background:linear-gradient(135deg,rgba(200,168,78,0.08),rgba(200,168,78,0.04));border:1px solid rgba(200,168,78,0.25);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:4px;animation:fadeIn 0.2s ease}
 .eduTooltipLabel{font-size:12px;font-weight:800;color:var(--gold)}
 .eduTooltipText{font-size:13px;font-weight:500;color:var(--tp);line-height:1.55}

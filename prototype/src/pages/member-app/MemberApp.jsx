@@ -7,7 +7,7 @@ import s from '../../styles/member-app/MemberApp.module.css';
 
 const ANNOUNCEMENTS = [
   { id: 1, title: 'Spring Break Schedule Changes', body: 'All Saturday sessions moved to 11am during March 22–29. Normal schedule resumes March 31.', full: 'All Saturday sessions have been moved to 11:00 AM during the week of March 22–29 to accommodate spring break scheduling. This affects Elite Skills Training, Youth Development, and Open Gym sessions. Normal schedule resumes on Monday, March 31. Please update your bookings accordingly. Contact the front desk if you have questions.' },
-  { id: 2, title: 'Summer Camp Registration Open', body: 'Early bird pricing through April 15. Limited spots — register now!', full: 'Summer Camp 2026 registration is now open! We\'re offering three age-group camps this year: Mini Ballers (6–8), Rising Stars (9–12), and Elite Prep (13–16). Each camp runs Monday–Friday, 9 AM – 3 PM. Early bird pricing is available through April 15: $299/week (regular $375). Space is limited to 20 campers per group. Register through the app or contact Coach Zoran.' },
+  { id: 2, title: 'Summer Camp Registration Open', body: 'Early bird pricing through April 15. Limited spots - register now!', full: 'Summer Camp 2026 registration is now open! We\'re offering three age-group camps this year: Mini Ballers (6–8), Rising Stars (9–12), and Elite Prep (13–16). Each camp runs Monday–Friday, 9 AM – 3 PM. Early bird pricing is available through April 15: $299/week (regular $375). Space is limited to 20 campers per group. Register through the app or contact Coach Zoran.' },
 ];
 
 const ICON = {
@@ -68,7 +68,7 @@ const NOTIF_TYPES = [
 
 const CAL_DAYS_WITH_CLASSES = [16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 28, 29, 30, 31];
 
-/* ─── P0: Inbox messages — APP-026, APP-031 ─── */
+/* ─── P0: Inbox messages - APP-026, APP-031 ─── */
 const INBOX_MESSAGES = [
   { id: 1, from: 'Coach Zoran', avatar: 'CZ', time: '2h ago', preview: 'Great work on the pull-up jumper today. Let\'s add some off-screen reps next session.', unread: true, messages: [
     { sender: 'Coach Zoran', text: 'Great work on the pull-up jumper today. Let\'s add some off-screen reps next session.', time: '2:15 PM' },
@@ -84,17 +84,17 @@ const INBOX_MESSAGES = [
   ]},
 ];
 
-/* ─── P0: Notification center — APP-031 ─── */
+/* ─── P0: Notification center - APP-031 ─── */
 const NOTIF_CENTER = [
   { id: 1, type: 'reminder', title: 'Youth Development starts in 1 hour', sub: 'Today at 10:30 AM · Court B', time: '30m ago', unread: true },
   { id: 2, type: 'message', title: 'New message from Coach Zoran', sub: 'Great work on the pull-up jumper…', time: '2h ago', unread: true },
-  { id: 3, type: 'billing', title: 'Payment processed — $175.00', sub: 'Elite Plan · Mar 15, 2026', time: '2d ago', unread: false },
+  { id: 3, type: 'billing', title: 'Payment processed - $175.00', sub: 'Elite Plan · Mar 15, 2026', time: '2d ago', unread: false },
   { id: 4, type: 'announcement', title: 'Spring Break Schedule Changes', sub: 'Saturday sessions moved to 11am', time: '3d ago', unread: false },
   { id: 5, type: 'report', title: 'Progress report available', sub: 'March 2026 performance summary', time: '4d ago', unread: false },
-  { id: 6, type: 'waitlist', title: 'Spot opened! Beginner Fundamentals', sub: 'Tomorrow at 11:00 AM — book now', time: '5d ago', unread: false },
+  { id: 6, type: 'waitlist', title: 'Spot opened! Beginner Fundamentals', sub: 'Tomorrow at 11:00 AM - book now', time: '5d ago', unread: false },
 ];
 
-/* ─── P0: Billing data — APP-001, APP-002, APP-033 ─── */
+/* ─── P0: Billing data - APP-001, APP-002, APP-033 ─── */
 const BILLING_INFO = {
   plan: 'Elite Plan',
   price: '$175/mo',
@@ -105,11 +105,11 @@ const BILLING_INFO = {
 };
 
 const PAYMENT_HISTORY = [
-  { date: 'Mar 15, 2026', amount: '$175.00', desc: 'Elite Plan — Monthly', status: 'Paid' },
-  { date: 'Feb 15, 2026', amount: '$175.00', desc: 'Elite Plan — Monthly', status: 'Paid' },
-  { date: 'Jan 15, 2026', amount: '$175.00', desc: 'Elite Plan — Monthly', status: 'Paid' },
-  { date: 'Dec 15, 2025', amount: '$50.00', desc: 'Credit Pack — 5 sessions', status: 'Paid' },
-  { date: 'Dec 15, 2025', amount: '$175.00', desc: 'Elite Plan — Monthly', status: 'Paid' },
+  { date: 'Mar 15, 2026', amount: '$175.00', desc: 'Elite Plan - Monthly', status: 'Paid' },
+  { date: 'Feb 15, 2026', amount: '$175.00', desc: 'Elite Plan - Monthly', status: 'Paid' },
+  { date: 'Jan 15, 2026', amount: '$175.00', desc: 'Elite Plan - Monthly', status: 'Paid' },
+  { date: 'Dec 15, 2025', amount: '$50.00', desc: 'Credit Pack - 5 sessions', status: 'Paid' },
+  { date: 'Dec 15, 2025', amount: '$175.00', desc: 'Elite Plan - Monthly', status: 'Paid' },
 ];
 
 const PLANS = [
@@ -119,12 +119,12 @@ const PLANS = [
   { id: 'unlimited', name: 'Unlimited', price: '$249/mo', credits: 'Unlimited', current: false },
 ];
 
-/* ─── P1: Credit history — APP-021 ─── */
+/* ─── P1: Credit history - APP-021 ─── */
 const CREDIT_HISTORY = [
   { date: 'Mar 16', action: 'Used', amount: -2, desc: 'Elite Skills Training', balance: 6 },
   { date: 'Mar 14', action: 'Used', amount: -1, desc: 'Shooting Lab', balance: 8 },
   { date: 'Mar 11', action: 'No-show', amount: -1, desc: 'Open Gym', balance: 9 },
-  { date: 'Mar 1', action: 'Renewed', amount: 12, desc: 'Monthly reset — Elite Plan', balance: 10 },
+  { date: 'Mar 1', action: 'Renewed', amount: 12, desc: 'Monthly reset - Elite Plan', balance: 10 },
   { date: 'Feb 28', action: 'Used', amount: -2, desc: 'Elite Skills Training', balance: -2 },
 ];
 
@@ -223,11 +223,11 @@ export default function MemberApp({ onClose }) {
         <div className={s.greetingName}>Carlos</div>
       </div>
 
-      {/* P1: Trial banner — APP-034a/b */}
+      {/* P1: Trial banner - APP-034a/b */}
       {IS_TRIAL && !trialDismissed && (
         <div className={s.trialBanner}>
           <div className={s.trialBannerLeft}>
-            <div className={s.trialBannerTitle}>Free Trial — 3 days left</div>
+            <div className={s.trialBannerTitle}>Free Trial - 3 days left</div>
             <div className={s.trialBannerSub}>You have 2 trial sessions remaining. Book now!</div>
           </div>
           <button className={s.trialBannerBtn} onClick={() => { setTab('account'); setAccountView('billing'); }}>Upgrade</button>
@@ -235,7 +235,7 @@ export default function MemberApp({ onClose }) {
         </div>
       )}
 
-      {/* Announcement Carousel — APP-006 / MEM-016 / APP-029 (tap for detail) */}
+      {/* Announcement Carousel - APP-006 / MEM-016 / APP-029 (tap for detail) */}
       <div className={s.announceCarousel}>
         <div className={s.announceSlide} onClick={() => setAnnounceDetail(ANNOUNCEMENTS[announceIdx])}>
           <div className={s.announceSlideTitle}>{ANNOUNCEMENTS[announceIdx].title}</div>
@@ -249,7 +249,7 @@ export default function MemberApp({ onClose }) {
         </div>
       </div>
 
-      {/* Quick Actions — APP-006 */}
+      {/* Quick Actions - APP-006 */}
       <div className={s.shortcuts}>
         {SHORTCUTS.map(sc => (
           <div key={sc.label} className={s.shortcutBtn} onClick={() => {
@@ -266,7 +266,7 @@ export default function MemberApp({ onClose }) {
         ))}
       </div>
 
-      {/* Upcoming Sessions — APP-006 */}
+      {/* Upcoming Sessions - APP-006 */}
       <div className={s.sectionHead}>
         <div className={s.sectionTitle}>Up Next</div>
         <div className={s.sectionLink} onClick={() => navTo('schedule')}>See all</div>
@@ -282,7 +282,7 @@ export default function MemberApp({ onClose }) {
         </div>
       ))}
 
-      {/* Streak Widget — GAM-001 / GAM-003: Progress ring + milestone tracker */}
+      {/* Streak Widget - GAM-001 / GAM-003: Progress ring + milestone tracker */}
       <div className={s.streakWidget} onClick={() => setMilestoneModal(true)} style={{ cursor: 'pointer' }}>
         <div className={s.progressRingWrap}>
           <svg className={s.progressRingSvg} viewBox="0 0 100 100">
@@ -299,7 +299,7 @@ export default function MemberApp({ onClose }) {
         </div>
       </div>
 
-      {/* Credit Balance — APP-021 */}
+      {/* Credit Balance - APP-021 */}
       <div className={s.creditWidget} onClick={() => { setTab('account'); setAccountView('credits'); }} style={{ cursor: 'pointer' }}>
         <div className={s.creditLeft}>
           <div className={s.creditLabel}>Session Credits</div>
@@ -348,7 +348,7 @@ export default function MemberApp({ onClose }) {
             </div>
           ))
         ) : (
-          /* Calendar View — APP-015b */
+          /* Calendar View - APP-015b */
           <div className={s.calGrid}>
             <div className={s.calHeader}>
               <div className={s.calMonth}>March 2026</div>
@@ -411,7 +411,7 @@ export default function MemberApp({ onClose }) {
   /* ─── MY SCHEDULE ─── */
   const SchedulePage = () => (
     <div className={s.pageScroll}>
-      {/* P1: QR Check-In button — APP-030a */}
+      {/* P1: QR Check-In button - APP-030a */}
       <div style={{ padding: '0 20px' }}>
         <button className={s.qrCheckinBtn} onClick={() => setQrOpen(true)}>
           <svg width="18" height="18" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
@@ -420,7 +420,7 @@ export default function MemberApp({ onClose }) {
         </button>
       </div>
 
-      {/* Credit balance widget — APP-021 */}
+      {/* Credit balance widget - APP-021 */}
       <div className={s.creditWidget} onClick={() => { setTab('account'); setAccountView('credits'); }} style={{ cursor: 'pointer' }}>
         <div className={s.creditLeft}>
           <div className={s.creditLabel}>Session Credits</div>
@@ -429,7 +429,7 @@ export default function MemberApp({ onClose }) {
         <div className={s.creditReset}>Resets Apr 1 · 1 make-up credit</div>
       </div>
 
-      {/* Upcoming — APP-018 */}
+      {/* Upcoming - APP-018 */}
       <div className={s.scheduleSection}>
         <div className={s.scheduleLabel}>Upcoming</div>
         {MY_UPCOMING.map(u => (
@@ -444,7 +444,7 @@ export default function MemberApp({ onClose }) {
         ))}
       </div>
 
-      {/* Past 30 days — APP-018 */}
+      {/* Past 30 days - APP-018 */}
       <div className={s.scheduleSection}>
         <div className={s.scheduleLabel}>Past 30 Days</div>
         {MY_PAST.map((p, i) => (
@@ -483,7 +483,7 @@ export default function MemberApp({ onClose }) {
           <div className={s.accountAvatar}>CM</div>
           <div className={s.accountName}>Carlos Martinez</div>
           <div className={s.accountEmail}>carlos.m@email.com</div>
-          <div className={s.accountPlan}>Elite Plan — $175/mo</div>
+          <div className={s.accountPlan}>Elite Plan - $175/mo</div>
         </div>
 
         <div className={s.accountSection}>
@@ -545,7 +545,7 @@ export default function MemberApp({ onClose }) {
     );
   };
 
-  /* ─── PAUSE FLOW — APP-009 / APP-009a / APP-009b ─── */
+  /* ─── PAUSE FLOW - APP-009 / APP-009a / APP-009b ─── */
   const PauseFlow = () => (
     <div className={s.pageScroll}>
       <div style={{ padding: '0 20px' }}>
@@ -584,7 +584,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── NOTIFICATIONS — APP-010 / APP-022a ─── */
+  /* ─── NOTIFICATIONS - APP-010 / APP-022a ─── */
   const NotificationsView = () => (
     <div className={s.pageScroll}>
       <div style={{ padding: '0 20px' }}>
@@ -613,7 +613,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── PASSWORD CHANGE — APP-023a ─── */
+  /* ─── PASSWORD CHANGE - APP-023a ─── */
   const PasswordChange = () => (
     <div className={s.pageScroll}>
       <div style={{ padding: '0 20px' }}>
@@ -638,7 +638,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P0: BILLING — APP-001, APP-002, APP-033, APP-012a/b ─── */
+  /* ─── P0: BILLING - APP-001, APP-002, APP-033, APP-012a/b ─── */
   const BillingView = () => (
     <div className={s.pageScroll}>
       <div style={{ padding: '0 20px' }}>
@@ -659,7 +659,7 @@ export default function MemberApp({ onClose }) {
           <div className={s.billingNext}>Next billing: {BILLING_INFO.nextBilling}</div>
         </div>
 
-        {/* Payment method — APP-033 */}
+        {/* Payment method - APP-033 */}
         <div className={s.billingMethodCard}>
           <div className={s.billingMethodLeft}>
             <div className={s.billingMethodIcon}>
@@ -698,7 +698,7 @@ export default function MemberApp({ onClose }) {
           <div className={s.paymentList}>
             <div className={s.paymentRow}>
               <div className={s.paymentRowLeft}>
-                <div className={s.paymentDesc}>{BILLING_INFO.plan} — Monthly</div>
+                <div className={s.paymentDesc}>{BILLING_INFO.plan} - Monthly</div>
                 <div className={s.paymentDate}>{BILLING_INFO.nextBilling}</div>
               </div>
               <div className={s.paymentRowRight}>
@@ -712,7 +712,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P0: CHANGE PLAN — APP-012a/b ─── */
+  /* ─── P0: CHANGE PLAN - APP-012a/b ─── */
   const ChangePlanView = () => (
     <div className={s.pageScroll}>
       <div style={{ padding: '0 20px' }}>
@@ -739,7 +739,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P0: CANCEL CLASS CONFIRMATION — APP-019a/b ─── */
+  /* ─── P0: CANCEL CLASS CONFIRMATION - APP-019a/b ─── */
   const CancelClassDialog = () => (
     <div className={s.dialogOverlay} onClick={() => setCancelConfirm(null)}>
       <div className={s.dialogBox} onClick={e => e.stopPropagation()}>
@@ -752,7 +752,7 @@ export default function MemberApp({ onClose }) {
           {cancelConfirm.day} at {cancelConfirm.time}
         </div>
         <div className={s.dialogPolicy}>
-          Cancellations within 2 hours of start time will not receive a credit refund. This session is more than 2 hours away — your credit will be returned.
+          Cancellations within 2 hours of start time will not receive a credit refund. This session is more than 2 hours away - your credit will be returned.
         </div>
         <div className={s.dialogActions}>
           <button className={s.dialogDanger} onClick={() => setCancelConfirm(null)}>Yes, Cancel Class</button>
@@ -762,7 +762,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P0: ANNOUNCEMENT DETAIL — APP-029 ─── */
+  /* ─── P0: ANNOUNCEMENT DETAIL - APP-029 ─── */
   const AnnouncementDetail = () => (
     <div className={s.detailOverlay}>
       <button className={s.detailBack} onClick={() => setAnnounceDetail(null)}>← Back</button>
@@ -778,7 +778,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P0: DELETE ACCOUNT — APP-023c ─── */
+  /* ─── P0: DELETE ACCOUNT - APP-023c ─── */
   const DeleteAccountFlow = () => (
     <div className={s.pageScroll}>
       <div style={{ padding: '0 20px' }}>
@@ -816,7 +816,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P0: CANCEL MEMBERSHIP — MEM-006a ─── */
+  /* ─── P0: CANCEL MEMBERSHIP - MEM-006a ─── */
   const CancelMembershipFlow = () => (
     <div className={s.pageScroll}>
       <div style={{ padding: '0 20px' }}>
@@ -866,7 +866,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P1: PROFILE EDIT — PRF-002b, PRF-003b ─── */
+  /* ─── P1: PROFILE EDIT - PRF-002b, PRF-003b ─── */
   const ProfileEdit = () => (
     <div className={s.pageScroll}>
       <div style={{ padding: '0 20px' }}>
@@ -903,7 +903,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P1: CREDIT DETAIL / HISTORY — APP-021 ─── */
+  /* ─── P1: CREDIT DETAIL / HISTORY - APP-021 ─── */
   const CreditDetailView = () => (
     <div className={s.pageScroll}>
       <div style={{ padding: '0 20px' }}>
@@ -947,7 +947,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P0: INBOX — APP-026 ─── */
+  /* ─── P0: INBOX - APP-026 ─── */
   const InboxOverlay = () => (
     <div className={s.detailOverlay}>
       {inboxThread ? (
@@ -998,7 +998,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P0: NOTIFICATION CENTER — APP-031 ─── */
+  /* ─── P0: NOTIFICATION CENTER - APP-031 ─── */
   const NotifCenterOverlay = () => (
     <div className={s.detailOverlay}>
       <button className={s.detailBack} onClick={() => setNotifCenterOpen(false)}>← Back</button>
@@ -1027,7 +1027,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── P1: QR CHECK-IN — APP-030a ─── */
+  /* ─── P1: QR CHECK-IN - APP-030a ─── */
   const QrCheckinOverlay = () => (
     <div className={s.detailOverlay}>
       <button className={s.detailBack} onClick={() => setQrOpen(false)}>← Back</button>
@@ -1076,7 +1076,7 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
-  /* ─── CLASS DETAIL — APP-017 ─── */
+  /* ─── CLASS DETAIL - APP-017 ─── */
   const ClassDetail = () => (
     <div className={s.detailOverlay}>
       <button className={s.detailBack} onClick={() => setSelectedClass(null)}>← Back</button>
@@ -1093,7 +1093,7 @@ export default function MemberApp({ onClose }) {
           <div className={s.detailRow}><span>Credits</span><span>{selectedClass.credits} credit{selectedClass.credits > 1 ? 's' : ''}</span></div>
         </div>
 
-        {/* P1: Waitlist position — APP-027 */}
+        {/* P1: Waitlist position - APP-027 */}
         {selectedClass.full && (
           <div className={s.waitlistInfo}>
             <div className={s.waitlistIcon}>
@@ -1131,14 +1131,14 @@ export default function MemberApp({ onClose }) {
           <button className={s.detailBookBtn} style={{ background: 'var(--warn)' }}>Join Waitlist</button>
         ) : (
           <button className={s.detailBookBtn} onClick={() => handleBook(selectedClass)}>
-            Book — {selectedClass.credits} credit{selectedClass.credits > 1 ? 's' : ''}
+            Book - {selectedClass.credits} credit{selectedClass.credits > 1 ? 's' : ''}
           </button>
         )}
       </div>
     </div>
   );
 
-  /* ─── BOOKING CONFIRMATION — APP-016a ─── */
+  /* ─── BOOKING CONFIRMATION - APP-016a ─── */
   const BookingConfirm = () => (
     <div className={s.confirmOverlay}>
       <div className={s.confirmCheck}>✓</div>
@@ -1187,7 +1187,7 @@ export default function MemberApp({ onClose }) {
         {qrOpen && <QrCheckinOverlay />}
       </div>
 
-      {/* P0: Cancel class dialog — APP-019a/b */}
+      {/* P0: Cancel class dialog - APP-019a/b */}
       {cancelConfirm && <CancelClassDialog />}
 
       {/* GAM-002 / GAM-002a: Milestone celebration modal */}

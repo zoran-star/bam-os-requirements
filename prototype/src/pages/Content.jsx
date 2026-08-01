@@ -40,7 +40,7 @@ const STATUS_CFG = {
 };
 
 /* ══════════════════════════════════════════════════════════════
-   MOCK DATA — Content Plans (renamed from Campaigns)
+   MOCK DATA - Content Plans (renamed from Campaigns)
    ══════════════════════════════════════════════════════════════ */
 const CONTENT_PLANS = [
   { id: 'cp1', name: 'Spring Growth Push', description: 'Focus on trial conversions and member success stories', isDefault: true, reelsPerRun: 3, carouselsPerRun: 2, tone: 'organic' },
@@ -49,7 +49,7 @@ const CONTENT_PLANS = [
 ];
 
 /* ══════════════════════════════════════════════════════════════
-   MOCK DATA — Content Pieces
+   MOCK DATA - Content Pieces
    ══════════════════════════════════════════════════════════════ */
 const CONTENT_PIECES = [
   { id: 'c1', type: 'reel_script', hook: '3 things I wish I knew before starting my fitness journey', status: 'pending_review', contentPlanId: 'cp1', avatar: 'Busy Professional', created: '2026-03-20', body: 'Hook: "I wasted 6 months doing the wrong things..."\n\n1. Consistency beats intensity\n2. Nutrition is 80% of the game\n3. Find a community that holds you accountable\n\nCTA: Book a free trial and skip the mistakes I made.' },
@@ -69,7 +69,7 @@ const CONTENT_PIECES = [
 ];
 
 /* ══════════════════════════════════════════════════════════════
-   MOCK DATA — Research Insights
+   MOCK DATA - Research Insights
    ══════════════════════════════════════════════════════════════ */
 const SOURCE_LABELS = {
   'r/personaltraining': 'Personal Training Communities',
@@ -82,11 +82,11 @@ const RESEARCH_INSIGHTS = [
   { id: 'r1', title: 'Members want more behind-the-scenes content', category: 'trend', source: 'r/personaltraining', relevance: 92 },
   { id: 'r2', title: '"Accountability partner" is the #1 reason cited for staying', category: 'pain_point', source: 'r/fitness', relevance: 88 },
   { id: 'r3', title: 'Short-form video outperforms long-form by 4x for gym content', category: 'trend', source: 'r/socialmediamarketing', relevance: 85 },
-  { id: 'r4', title: 'Price is rarely the real objection — it\'s fear of not fitting in', category: 'villain', source: 'r/gym', relevance: 91 },
+  { id: 'r4', title: 'Price is rarely the real objection - it\'s fear of not fitting in', category: 'villain', source: 'r/gym', relevance: 91 },
 ];
 
 /* ══════════════════════════════════════════════════════════════
-   MOCK DATA — Brief Angles (pre-extracted)
+   MOCK DATA - Brief Angles (pre-extracted)
    ══════════════════════════════════════════════════════════════ */
 const SAMPLE_ANGLES = [
   { id: 'a1', title: 'The Consistency Compound Effect', hook: '"Small daily wins add up to massive transformations"', tags: ['motivation', 'transformation'] },
@@ -230,7 +230,7 @@ export default function Content() {
   };
 
   /* ══════════════════════════════════════════════════════════════
-     RENDER — DASHBOARD VIEW
+     RENDER - DASHBOARD VIEW
      ══════════════════════════════════════════════════════════════ */
   const renderDashboard = () => (
     <>
@@ -365,7 +365,7 @@ export default function Content() {
   );
 
   /* ══════════════════════════════════════════════════════════════
-     RENDER — PIPELINE VIEW
+     RENDER - PIPELINE VIEW
      ══════════════════════════════════════════════════════════════ */
   const renderPipeline = () => (
     <div className={s.pipelineWrap}>
@@ -457,7 +457,7 @@ export default function Content() {
   );
 
   /* ══════════════════════════════════════════════════════════════
-     RENDER — CALENDAR VIEW
+     RENDER - CALENDAR VIEW
      ══════════════════════════════════════════════════════════════ */
   const renderCalendar = () => {
     const scheduledPieces = filteredPieces.filter(p => p.scheduledFor || p.postedAt);
@@ -505,7 +505,7 @@ export default function Content() {
   };
 
   /* ══════════════════════════════════════════════════════════════
-     RENDER — BRIEF VIEW
+     RENDER - BRIEF VIEW
      ══════════════════════════════════════════════════════════════ */
   const renderBrief = () => (
     <div className={s.briefWrap}>
@@ -583,7 +583,7 @@ export default function Content() {
   );
 
   /* ══════════════════════════════════════════════════════════════
-     RENDER — CONTENT PLANS VIEW
+     RENDER - CONTENT PLANS VIEW
      ══════════════════════════════════════════════════════════════ */
   const renderPlans = () => (
     <div className={s.plansGrid}>
@@ -626,7 +626,7 @@ export default function Content() {
   );
 
   /* ══════════════════════════════════════════════════════════════
-     RENDER — ANALYTICS VIEW
+     RENDER - ANALYTICS VIEW
      ══════════════════════════════════════════════════════════════ */
   const renderAnalytics = () => {
     const funnelData = [
@@ -686,7 +686,7 @@ export default function Content() {
             <div className={s.statValue}>8.2h</div>
             <div className={`${s.statDelta} ${s.statDeltaDown}`}>
               <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-              -12%
+ -12%
             </div>
           </div>
         </div>
@@ -735,7 +735,7 @@ export default function Content() {
   };
 
   /* ══════════════════════════════════════════════════════════════
-     RENDER — CONTENT DETAIL DRAWER
+     RENDER - CONTENT DETAIL DRAWER
      ══════════════════════════════════════════════════════════════ */
   const renderDrawer = () => {
     if (!drawerPiece) return null;
@@ -756,8 +756,8 @@ export default function Content() {
           </div>
           <div className={s.drawerSection}>
             <div className={s.drawerSectionTitle}>Details</div>
-            <div className={s.drawerRow}><span>Content Plan</span><span>{CONTENT_PLANS.find(p => p.id === drawerPiece.contentPlanId)?.name || '—'}</span></div>
-            <div className={s.drawerRow}><span>Avatar</span><span>{drawerPiece.avatar || '—'}</span></div>
+            <div className={s.drawerRow}><span>Content Plan</span><span>{CONTENT_PLANS.find(p => p.id === drawerPiece.contentPlanId)?.name || ' -'}</span></div>
+            <div className={s.drawerRow}><span>Avatar</span><span>{drawerPiece.avatar || ' -'}</span></div>
             <div className={s.drawerRow}><span>Created</span><span>{drawerPiece.created}</span></div>
             {drawerPiece.scheduledFor && <div className={s.drawerRow}><span>Scheduled</span><span>{drawerPiece.scheduledFor}</span></div>}
             {drawerPiece.postedAt && <div className={s.drawerRow}><span>Posted</span><span>{drawerPiece.postedAt}</span></div>}
@@ -786,7 +786,7 @@ export default function Content() {
   };
 
   /* ══════════════════════════════════════════════════════════════
-     RENDER — SWIPE REVIEW
+     RENDER - SWIPE REVIEW
      ══════════════════════════════════════════════════════════════ */
   const renderSwipeReview = () => {
     if (!swipeMode) return null;
@@ -842,7 +842,7 @@ export default function Content() {
   };
 
   /* ══════════════════════════════════════════════════════════════
-     RENDER — GENERATE MODAL
+     RENDER - GENERATE MODAL
      ══════════════════════════════════════════════════════════════ */
   const renderGenerateModal = () => {
     if (!generateOpen) return null;

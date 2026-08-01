@@ -44,11 +44,11 @@ const MEMBERS = [
   { id: 1, name: 'Carlos Martinez', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 14', joined: 'Sep 2025', health: 'green', photo: 'CM', payStatus: 'Current', email: 'carlos.m@email.com', sessions: 38, streak: 4, revenue: 1050, location: 'Downtown', milestones: [10, 25] },
   { id: 2, name: 'Mia Thompson', status: 'Active', plan: 'Intermediate', price: 125, lastSession: 'Mar 15', joined: 'Nov 2025', health: 'green', photo: 'MT', payStatus: 'Current', email: 'mia.t@email.com', sessions: 24, streak: 3, revenue: 625, location: 'Downtown', milestones: [10] },
   { id: 3, name: 'Jaylen Brooks', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 12', joined: 'Jun 2025', health: 'yellow', photo: 'JB', payStatus: 'Current', email: 'jaylen.b@email.com', sessions: 52, streak: 1, revenue: 1575, location: 'Downtown', milestones: [10, 25, 50] },
-  { id: 4, name: 'Sofia Reyes', status: 'Trial', plan: 'Free Trial', price: 0, lastSession: 'Mar 16', joined: 'Mar 2026', health: 'green', photo: 'SR', payStatus: '—', email: 'sofia.r@email.com', sessions: 2, streak: 2, revenue: 0, location: 'Downtown', milestones: [] },
+  { id: 4, name: 'Sofia Reyes', status: 'Trial', plan: 'Free Trial', price: 0, lastSession: 'Mar 16', joined: 'Mar 2026', health: 'green', photo: 'SR', payStatus: ' -', email: 'sofia.r@email.com', sessions: 2, streak: 2, revenue: 0, location: 'Downtown', milestones: [] },
   { id: 5, name: 'Ethan Nguyen', status: 'Paused', plan: 'Beginner', price: 95, lastSession: 'Feb 22', joined: 'Aug 2025', health: 'yellow', photo: 'EN', payStatus: 'Paused', email: 'ethan.n@email.com', sessions: 18, streak: 0, revenue: 665, location: 'Westside', milestones: [10] },
   { id: 6, name: 'Ava Chen', status: 'Active', plan: 'Beginner', price: 95, lastSession: 'Mar 13', joined: 'Jan 2026', health: 'green', photo: 'AC', payStatus: 'Current', email: 'ava.c@email.com', sessions: 12, streak: 3, revenue: 285, location: 'Westside', milestones: [10] },
   { id: 7, name: 'Marcus Davis', status: 'Active', plan: 'Intermediate', price: 125, lastSession: 'Mar 11', joined: 'Apr 2025', health: 'red', photo: 'MD', payStatus: 'Failed', email: 'marcus.d@email.com', sessions: 44, streak: 0, revenue: 1375, location: 'Westside', milestones: [10, 25] },
-  { id: 8, name: 'Lily Park', status: 'Cancelled', plan: '—', price: 0, lastSession: 'Feb 10', joined: 'Oct 2025', health: 'red', photo: 'LP', payStatus: '—', email: 'lily.p@email.com', sessions: 16, streak: 0, revenue: 475, location: 'Westside', milestones: [10] },
+  { id: 8, name: 'Lily Park', status: 'Cancelled', plan: ' -', price: 0, lastSession: 'Feb 10', joined: 'Oct 2025', health: 'red', photo: 'LP', payStatus: ' -', email: 'lily.p@email.com', sessions: 16, streak: 0, revenue: 475, location: 'Westside', milestones: [10] },
 ];
 
 const PAUSES = [
@@ -69,23 +69,23 @@ const ACTIVITY_ICONS = {
 };
 
 const ACTIVITY = [
-  { type: 'payment', text: 'Payment received — Carlos Martinez ($175)', time: '2h ago', member: 'Carlos Martinez', location: 'Downtown' },
-  { type: 'signup', text: 'New trial booked — Sofia Reyes (Saturday 10am)', time: '4h ago', member: 'Sofia Reyes', location: 'Downtown' },
-  { type: 'alert', text: 'Payment failed — Marcus Davis ($125)', time: '6h ago', member: 'Marcus Davis', location: 'Westside' },
-  { type: 'pause', text: 'Membership paused — Ethan Nguyen (vacation)', time: '1d ago', member: 'Ethan Nguyen', location: 'Westside' },
-  { type: 'message', text: 'New reply — Mia Thompson: "Sounds great, see you Saturday!"', time: '1d ago', member: 'Mia Thompson', location: 'Downtown' },
-  { type: 'cancel', text: 'Cancellation confirmed — Lily Park', time: '3d ago', member: 'Lily Park', location: 'Westside' },
-  { type: 'refund', text: 'Refund issued — Lily Park ($125, final month)', time: '3d ago', member: 'Lily Park', location: 'Westside' },
-  { type: 'credit', text: 'Make-up credit issued — Jaylen Brooks (Saturday makeup)', time: '4d ago', member: 'Jaylen Brooks', location: 'Downtown' },
-  { type: 'announcement', text: 'Announcement published — "Spring Break Schedule Changes"', time: '5d ago', member: null, location: null },
+  { type: 'payment', text: 'Payment received - Carlos Martinez ($175)', time: '2h ago', member: 'Carlos Martinez', location: 'Downtown' },
+  { type: 'signup', text: 'New trial booked - Sofia Reyes (Saturday 10am)', time: '4h ago', member: 'Sofia Reyes', location: 'Downtown' },
+  { type: 'alert', text: 'Payment failed - Marcus Davis ($125)', time: '6h ago', member: 'Marcus Davis', location: 'Westside' },
+  { type: 'pause', text: 'Membership paused - Ethan Nguyen (vacation)', time: '1d ago', member: 'Ethan Nguyen', location: 'Westside' },
+  { type: 'message', text: 'New reply - Mia Thompson: "Sounds great, see you Saturday!"', time: '1d ago', member: 'Mia Thompson', location: 'Downtown' },
+  { type: 'cancel', text: 'Cancellation confirmed - Lily Park', time: '3d ago', member: 'Lily Park', location: 'Westside' },
+  { type: 'refund', text: 'Refund issued - Lily Park ($125, final month)', time: '3d ago', member: 'Lily Park', location: 'Westside' },
+  { type: 'credit', text: 'Make-up credit issued - Jaylen Brooks (Saturday makeup)', time: '4d ago', member: 'Jaylen Brooks', location: 'Downtown' },
+  { type: 'announcement', text: 'Announcement published - "Spring Break Schedule Changes"', time: '5d ago', member: null, location: null },
 ];
 
 const KPIS = [
   { label: 'Active Members', value: '42', trend: '+3', trendUp: true, ref: 'MEM-003a', explain: 'Members with an active, non-paused subscription right now. This is your core headcount.', pb: true },
   { label: 'New This Month', value: '6', trend: '+2 vs last', trendUp: true, ref: 'MEM-003b', explain: 'Members who started their first subscription this month. Shows how fast you\'re growing.', pb: false },
-  { label: 'Churned (30d)', value: '1', trend: '-1 vs last', trendUp: true, ref: 'MEM-003c', explain: 'Members who cancelled in the last 30 days. This is not month to date — it is calculated over a rolling 30-day window.', pb: true },
-  { label: 'Pause Rate (30d)', value: '4.8%', trend: 'Stable', trendUp: true, ref: 'MEM-003d', explain: 'Percentage of active members who paused in the last 30 days. This is not month to date — it is calculated over a rolling 30-day window.', pb: false },
-  { label: 'Churn Rate (30d)', value: '2.4%', trend: 'Healthy', trendUp: true, ref: 'MEM-003g', explain: 'Percentage of members who cancelled in the last 30 days. This is not month to date — it is calculated over a rolling 30-day window. Under 5% is strong.', pb: true },
+  { label: 'Churned (30d)', value: '1', trend: '-1 vs last', trendUp: true, ref: 'MEM-003c', explain: 'Members who cancelled in the last 30 days. This is not month to date - it is calculated over a rolling 30-day window.', pb: true },
+  { label: 'Pause Rate (30d)', value: '4.8%', trend: 'Stable', trendUp: true, ref: 'MEM-003d', explain: 'Percentage of active members who paused in the last 30 days. This is not month to date - it is calculated over a rolling 30-day window.', pb: false },
+  { label: 'Churn Rate (30d)', value: '2.4%', trend: 'Healthy', trendUp: true, ref: 'MEM-003g', explain: 'Percentage of members who cancelled in the last 30 days. This is not month to date - it is calculated over a rolling 30-day window. Under 5% is strong.', pb: true },
   { label: 'Avg Attendance', value: '8.2', trend: 'per class', trendUp: true, ref: 'MEM-003f', explain: 'Average number of athletes per session. Higher attendance means better class utilization and energy.', pb: false },
   { label: 'Avg Duration', value: '7.4mo', trend: '+0.6 vs last', trendUp: true, ref: 'MEM-003h', explain: 'How long members stay on average before cancelling. Longer duration = more lifetime revenue per member.', pb: true },
 ];
@@ -93,7 +93,7 @@ const KPIS = [
 const ANNOUNCEMENTS = [
   { id: 1, title: 'Spring Break Schedule Changes', body: 'All Saturday sessions moved to 11am during March 22–29. Normal schedule resumes March 31.', date: 'Mar 12', status: 'Published', location: 'All Locations' },
   { id: 2, title: 'New Elite Program Starting April', body: 'We\'re launching advanced sessions for competitive players. Contact us for details.', date: 'Mar 8', status: 'Published', location: 'Downtown' },
-  { id: 3, title: 'Summer Camp Registration Open', body: 'Early bird pricing available through April 15. Limited spots — register now!', date: 'Mar 5', status: 'Scheduled', location: 'All Locations' },
+  { id: 3, title: 'Summer Camp Registration Open', body: 'Early bird pricing available through April 15. Limited spots - register now!', date: 'Mar 5', status: 'Scheduled', location: 'All Locations' },
 ];
 
 const REFUND_REASONS = ['Billing error', 'Service not delivered', 'Cancellation refund', 'Duplicate charge', 'Customer request', 'Other'];
@@ -104,11 +104,11 @@ const MORE_TOOLS = [
 
 /* ─── NOTIFICATIONS (MEM-007) ─── */
 const NOTIFICATIONS = [
-  { id: 'n1', domain: 'Members', title: 'Payment failed — Marcus Davis', preview: '$125 charge declined. Retry or contact member.', time: '6h ago', unread: true, action: 'Retry payment' },
-  { id: 'n2', domain: 'Members', title: 'Pause ending soon — Ethan Nguyen', preview: 'Membership resumes in 7 days. Send a welcome-back message?', time: '1d ago', unread: true, action: 'Send message' },
-  { id: 'n3', domain: 'Members', title: 'New trial completed — Sofia Reyes', preview: 'Trial session finished. Follow up to convert.', time: '4h ago', unread: true, action: 'Follow up' },
+  { id: 'n1', domain: 'Members', title: 'Payment failed - Marcus Davis', preview: '$125 charge declined. Retry or contact member.', time: '6h ago', unread: true, action: 'Retry payment' },
+  { id: 'n2', domain: 'Members', title: 'Pause ending soon - Ethan Nguyen', preview: 'Membership resumes in 7 days. Send a welcome-back message?', time: '1d ago', unread: true, action: 'Send message' },
+  { id: 'n3', domain: 'Members', title: 'New trial completed - Sofia Reyes', preview: 'Trial session finished. Follow up to convert.', time: '4h ago', unread: true, action: 'Follow up' },
   { id: 'n4', domain: 'System', title: 'Monthly report ready', preview: 'March member metrics are available for review.', time: '1d ago', unread: false, action: 'View report' },
-  { id: 'n5', domain: 'Members', title: 'Attendance streak — Mia Thompson', preview: '3-week streak! Consider sending encouragement.', time: '2d ago', unread: false, action: 'Send kudos' },
+  { id: 'n5', domain: 'Members', title: 'Attendance streak - Mia Thompson', preview: '3-week streak! Consider sending encouragement.', time: '2d ago', unread: false, action: 'Send kudos' },
 ];
 
 /* ─── ATTENDANCE CHECK-IN (MEM-036) ─── */
@@ -132,7 +132,7 @@ const FAILED_PAYMENTS = [
 
 /* ─── SUB-COMPONENTS ─── */
 
-/* Compose Message Modal — MEM-002a / MEM-002b */
+/* Compose Message Modal - MEM-002a / MEM-002b */
 function ComposeMessage({ onClose }) {
   const [mode, setMode] = useState('direct');
   const [recipient, setRecipient] = useState('');
@@ -165,7 +165,7 @@ function ComposeMessage({ onClose }) {
             <select className={s.formSelect} value={recipient} onChange={e => setRecipient(e.target.value)}>
               <option value="">Select a member...</option>
               {MEMBERS.filter(m => m.status !== 'Cancelled').map(m => (
-                <option key={m.id} value={m.name}>{m.name} — {m.plan}</option>
+                <option key={m.id} value={m.name}>{m.name} - {m.plan}</option>
               ))}
             </select>
           </div>
@@ -202,7 +202,7 @@ function ComposeMessage({ onClose }) {
 
         <div className={s.sageTipModal}>
           <span className={s.sageTipLabel}>Sage</span>
-          <span>{mode === 'direct' ? 'Members receive messages in the BAM app. Replies show up in your inbox.' : 'Each member gets their own copy — they won\'t see other recipients.'}</span>
+          <span>{mode === 'direct' ? 'Members receive messages in the BAM app. Replies show up in your inbox.' : 'Each member gets their own copy - they won\'t see other recipients.'}</span>
         </div>
 
         {sent ? (
@@ -220,7 +220,7 @@ function ComposeMessage({ onClose }) {
   );
 }
 
-/* Announcement Editor Modal — MEM-016 */
+/* Announcement Editor Modal - MEM-016 */
 function AnnouncementEditor({ onClose, existing }) {
   const [title, setTitle] = useState(existing?.title || '');
   const [body, setBody] = useState(existing?.body || '');
@@ -284,7 +284,7 @@ function AnnouncementEditor({ onClose, existing }) {
   );
 }
 
-/* Refund Modal — MEM-047 / MEM-047a */
+/* Refund Modal - MEM-047 / MEM-047a */
 function RefundModal({ onClose, member }) {
   const [step, setStep] = useState('form');
   const [refundType, setRefundType] = useState('full');
@@ -309,7 +309,7 @@ function RefundModal({ onClose, member }) {
                 <div className={s.refundAvatar}>{member.photo}</div>
                 <div>
                   <div className={s.refundMemberName}>{member.name}</div>
-                  <div className={s.refundMemberPlan}>{member.plan} — ${member.price}/mo</div>
+                  <div className={s.refundMemberPlan}>{member.plan} - ${member.price}/mo</div>
                 </div>
               </div>
             )}
@@ -378,7 +378,7 @@ function RefundModal({ onClose, member }) {
             </div>
             <div className={s.modalFooter}>
               <button className={s.btnSecondary} onClick={() => setStep('form')}>Back</button>
-              <button className={s.btnDanger} onClick={handleConfirm}>Confirm refund — ${amount}</button>
+              <button className={s.btnDanger} onClick={handleConfirm}>Confirm refund - ${amount}</button>
             </div>
           </>
         )}
@@ -391,7 +391,7 @@ function RefundModal({ onClose, member }) {
   );
 }
 
-/* Discount Modal — MEM-023 */
+/* Discount Modal - MEM-023 */
 function DiscountModal({ onClose }) {
   const [code, setCode] = useState('');
   const [discountType, setDiscountType] = useState('percentage');
@@ -465,7 +465,7 @@ function DiscountModal({ onClose }) {
   );
 }
 
-/* Make-up Credit Modal — MEM-026 */
+/* Make-up Credit Modal - MEM-026 */
 function CreditModal({ onClose, member }) {
   const [creditType, setCreditType] = useState('class_cancel');
   const [note, setNote] = useState('');
@@ -487,7 +487,7 @@ function CreditModal({ onClose, member }) {
             <div className={s.refundAvatar}>{member.photo}</div>
             <div>
               <div className={s.refundMemberName}>{member.name}</div>
-              <div className={s.refundMemberPlan}>{member.plan} — ${member.price}/mo</div>
+              <div className={s.refundMemberPlan}>{member.plan} - ${member.price}/mo</div>
             </div>
           </div>
         )}
@@ -540,7 +540,7 @@ function CreditModal({ onClose, member }) {
   );
 }
 
-/* Full Dashboard Overlay — MEM-003 deep view */
+/* Full Dashboard Overlay - MEM-003 deep view */
 function FullDashboard({ onClose }) {
   const [period, setPeriod] = useState('This Month');
   return (
@@ -601,7 +601,7 @@ function FullDashboard({ onClose }) {
               { plan: 'Elite ($175)', count: 2, pct: '33%', revenue: '$350/mo' },
               { plan: 'Intermediate ($125)', count: 2, pct: '33%', revenue: '$250/mo' },
               { plan: 'Beginner ($95)', count: 2, pct: '33%', revenue: '$190/mo' },
-              { plan: 'Trial (Free)', count: 1, pct: '—', revenue: '$0' },
+              { plan: 'Trial (Free)', count: 1, pct: ' -', revenue: '$0' },
             ].map(p => (
               <div key={p.plan} className={s.dashBreakdownRow}>
                 <span className={s.dashBreakdownPlan}>{p.plan}</span>
@@ -626,7 +626,7 @@ function FullDashboard({ onClose }) {
 }
 
 
-/* Extension Modal — Issue Credit */
+/* Extension Modal - Issue Credit */
 function ExtendModal({ onClose }) {
   const [extType, setExtType] = useState('date');
   const [member, setMember] = useState('');
@@ -650,7 +650,7 @@ function ExtendModal({ onClose }) {
           <select className={s.formSelect} value={member} onChange={e => setMember(e.target.value)}>
             <option value="">Select a member...</option>
             {MEMBERS.filter(m => m.status !== 'Cancelled').map(m => (
-              <option key={m.id} value={m.name}>{m.name} — {m.plan}</option>
+              <option key={m.id} value={m.name}>{m.name} - {m.plan}</option>
             ))}
           </select>
         </div>
@@ -766,7 +766,7 @@ export default function Members() {
     if (!cmd.trim()) return;
     setCmdResponse({
       input: cmd,
-      reply: `Got it — I'll ${cmd.toLowerCase().startsWith('show') || cmd.toLowerCase().startsWith('find') ? 'pull that up' : 'take care of that'} for you. Processing "${cmd}"...`,
+      reply: `Got it - I'll ${cmd.toLowerCase().startsWith('show') || cmd.toLowerCase().startsWith('find') ? 'pull that up' : 'take care of that'} for you. Processing "${cmd}"...`,
       actions: cmd.toLowerCase().includes('pause') ? ['Confirm pause', 'Edit dates', 'Cancel']
         : cmd.toLowerCase().includes('cancel') ? ['Confirm cancellation', 'Process final invoice', 'Cancel']
         : cmd.toLowerCase().includes('refund') ? ['Issue full refund', 'Partial refund', 'Cancel']
@@ -780,7 +780,7 @@ export default function Members() {
     if (!isListening) {
       setTimeout(() => {
         setIsListening(false);
-        setCmdInput('Pause Ethan Nguyen for 2 weeks — family vacation');
+        setCmdInput('Pause Ethan Nguyen for 2 weeks - family vacation');
       }, 2500);
     }
   };
@@ -905,7 +905,7 @@ export default function Members() {
           </div>
         )}
 
-        {/* Quick action chips — consolidated with dropdowns */}
+        {/* Quick action chips - consolidated with dropdowns */}
         <div className={s.cmdChips}>
           {QUICK_ACTIONS.filter(a => !a.group).map(a => (
             <button key={a.label} className={s.cmdChip} onClick={() => handleQuickAction(a.action, a.label)}>
@@ -1054,7 +1054,7 @@ export default function Members() {
                 {filtered.length === 0 && <div className={s.emptyState}>No members match your search.</div>}
               </div>
             ) : (
-              /* Card view — MEM-011a */
+              /* Card view - MEM-011a */
               <div className={s.cardGrid}>
                 {filtered.map(m => (
                   <div key={m.id} className={s.memberCard} onClick={() => setDrawerMember(m)}>
@@ -1106,7 +1106,7 @@ export default function Members() {
 
             <div className={s.sageTip}>
               <span className={s.sageTipLabel}>Sage</span>
-              <span>Your churn rate dropped below 3% this month — the Saturday trial pipeline is converting into long-term members. Keep the Saturday energy going.</span>
+              <span>Your churn rate dropped below 3% this month - the Saturday trial pipeline is converting into long-term members. Keep the Saturday energy going.</span>
             </div>
           </>
         )}
@@ -1400,7 +1400,7 @@ export default function Members() {
               )}
             </div>
 
-            {/* Streak Management — GAM-001b */}
+            {/* Streak Management - GAM-001b */}
             <div className={s.drawerSection}>
               <div className={s.drawerSectionTitle}>Streak Management</div>
               {drawerMember.streak > 0 ? (
@@ -1423,12 +1423,12 @@ export default function Members() {
             <div className={s.drawerSection}>
               <div className={s.drawerSectionTitle}>Credits & Discounts</div>
               <div className={s.drawerRow}><span>Make-up credits</span><span>1 available</span></div>
-              <div className={s.drawerRow}><span>Active discounts</span><span>—</span></div>
+              <div className={s.drawerRow}><span>Active discounts</span><span> -</span></div>
             </div>
 
             <div className={s.drawerSection}>
               <div className={s.drawerSectionTitle}>Internal Notes</div>
-              <div className={s.drawerNote}>Interested in upgrading to Elite next month. Dad asked about sibling discount. — Coach Z, Mar 10</div>
+              <div className={s.drawerNote}>Interested in upgrading to Elite next month. Dad asked about sibling discount. - Coach Z, Mar 10</div>
               <input className={s.drawerNoteInput} placeholder="Add a note..." />
             </div>
           </div>
