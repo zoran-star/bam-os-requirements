@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Member management onboarding: current clients</title>
+<style>
+  :root{--bg:#0B0B0D;--line:#26262b;--gold:#D4B65C;--text:#EDEDF0;--mute:#8A8A94;
+    --red:#D9482B;--redbg:#2a1410;--orange:#E08A3C;--orangebg:#221810;
+    --yellow:#E6C34A;--yellowbg:#221e0e;--green:#4FB477;--greenbg:#102a1a;
+    --gray:#55555e;--graybg:#1b1b1f;--newg:#5f7a68;--newgbg:#15201a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    padding:30px 18px 70px;line-height:1.45}
+  .wrap{max-width:1120px;margin:0 auto}
+  h1{font-size:27px;margin:0 0 4px;letter-spacing:-.5px}
+  .sub{color:var(--mute);font-size:14.5px;margin:0 0 20px}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:26px;font-size:12px}
+  .lg{display:flex;align-items:center;gap:7px;color:var(--mute)}
+  .sw{width:26px;height:15px;border-radius:4px;border:1.5px solid}
+  .sw.r{background:var(--redbg);border-color:var(--red)}
+  .sw.o{background:var(--orangebg);border-color:var(--orange)}
+  .sw.y{background:var(--yellowbg);border-color:var(--yellow)}
+  .sw.g{background:var(--greenbg);border-color:var(--green)}
+  .sw.sk{background:none;border:1.5px dashed var(--gold)}
+  .sw.ch{background:var(--graybg);border-color:var(--gray)}
+  .sw.nw{background:var(--newgbg);border-color:var(--newg)}
+
+  /* two-column: flow left, chat rail right */
+  .flowrow{display:grid;grid-template-columns:1fr 280px;gap:18px;align-items:start}
+  .rail{display:flex;flex-direction:column;gap:10px;position:sticky;top:10px}
+
+  .box{border-radius:11px;padding:11px 14px;border:1.5px solid;position:relative}
+  .box .t{font-weight:800;font-size:14.5px;letter-spacing:-.1px}
+  .box .d{font-size:12px;color:var(--mute);margin-top:5px;line-height:1.45}
+  .box .d b{color:var(--text);font-weight:600}
+  .box.r{background:var(--redbg);border-color:var(--red)} .box.r .t{color:#ff8d70}
+  .box.o{background:var(--orangebg);border-color:var(--orange)} .box.o .t{color:#f0a865}
+  .box.y{background:var(--yellowbg);border-color:var(--yellow)} .box.y .t{color:#f0d67a}
+  .box.g{background:var(--greenbg);border-color:var(--green)} .box.g .t{color:#7fd3a1}
+
+  .step{display:flex;gap:12px;align-items:flex-start}
+  .step .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--orange);
+    color:#1a1208;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:13px;margin-top:10px}
+  .step .box{flex:1}
+  .confirm{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;
+    letter-spacing:1.1px;text-transform:uppercase;color:var(--gold);
+    border:1px solid rgba(212,182,94,.4);border-radius:20px;padding:2.5px 9px;margin-top:8px}
+  .chips{display:inline-flex;gap:5px;flex-wrap:wrap;margin-top:8px;margin-right:6px}
+  .chip{font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+    padding:2.5px 8px;border-radius:20px}
+  .c-live{background:rgba(79,180,119,.18);color:#7fd3a1}
+  .c-pr{background:rgba(91,155,213,.18);color:#8fbce8}
+  .c-todo{background:rgba(138,138,148,.16);color:var(--mute)}
+  .c-open{background:rgba(217,72,43,.18);color:#ff8d70}
+
+  /* chat cards on the rail */
+  .chat{border-radius:11px;padding:10px 13px;border:1.5px solid var(--gray);background:var(--graybg)}
+  .chat .cn{font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#c9c9d2}
+  .chat .cg{font-size:11.5px;color:var(--mute);margin-top:5px;line-height:1.5}
+  .chat .cg b{color:var(--text);font-weight:600}
+  .chat .cs{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+    margin-top:7px;color:#8fbce8}
+  .chat.new{border-color:var(--newg);background:var(--newgbg)}
+  .chat.new .cn{color:#9dc4ab}
+  .chat.new .cs{color:#9dc4ab}
+  .railhead{font-size:9.5px;letter-spacing:2px;text-transform:uppercase;color:var(--mute);
+    font-weight:800;margin:2px 0 0}
+
+  .skill{border:2px dashed var(--gold);border-radius:16px;padding:16px 16px 14px;position:relative;margin-top:12px}
+  .skill > .sklabel{position:absolute;top:-12px;left:16px;background:var(--bg);
+    color:var(--gold);font-size:11px;font-weight:800;letter-spacing:1.8px;
+    text-transform:uppercase;padding:0 10px}
+  .skill .step + .step{margin-top:10px}
+  .steparrow{margin-left:12px;color:var(--orange);font-size:16px;line-height:.6;padding:3px 0}
+  .down{display:flex;justify-content:center;padding:5px 0;color:var(--orange);font-size:20px;line-height:1;max-width:calc(100% - 298px)}
+  .down.red{color:var(--red)} .down.yel{color:var(--yellow)} .down.grn{color:var(--green)}
+  .row{display:grid;gap:14px}
+  .cols2{grid-template-columns:1fr 1fr}
+  .note{font-size:12.5px;color:var(--mute);margin-top:10px}
+  .note b{color:var(--text)}
+  h2.phase{font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:var(--mute);
+    margin:30px 0 8px;font-weight:800}
+  @media(max-width:860px){.flowrow{grid-template-columns:1fr}.rail{position:static}.down{max-width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Member management onboarding: current clients</h1>
+  <p class="sub">v3. Flow left, chats right. <b style="color:var(--text)">Building a skill = doing it for San Jose</b> - each chat's goal is its San Jose run, and the skill is written afterward from that run's log.</p>
+
+  <div class="legend">
+    <div class="lg"><span class="sw r"></span> trigger</div>
+    <div class="lg"><span class="sw o"></span> Claude + staff cowork step</div>
+    <div class="lg"><span class="sw y"></span> client action (breaks the chain)</div>
+    <div class="lg"><span class="sw g"></span> done</div>
+    <div class="lg"><span class="sw sk"></span> one SKILL = one unbroken orange chain</div>
+    <div class="lg"><span class="sw ch"></span> existing chat + its goal</div>
+    <div class="lg"><span class="sw nw"></span> chat we still need to create</div>
+  </div>
+
+  <!-- ═══ TRIGGER ═══ -->
+  <div class="flowrow">
+    <div class="box r">
+      <div class="t">TRIGGER: stripe connected</div>
+      <div class="d">Connect click, OR staff saves the academy's restricted key (locked academies like SJ). Same trigger, two doors. <b>One trigger now, not two:</b> pulling their old prices needs their history, and their history arrives with Stripe.</div>
+      <div class="chips"><span class="chip c-pr">PR #1703 open</span><span class="chip c-todo">SJ key save = deploy day</span></div>
+    </div>
+    <div class="rail">
+      <div class="chat">
+        <div class="cn">This chat &#183; Member Management II</div>
+        <div class="cg"><b>Goal:</b> the two-door trigger works. Deploy #1703, verify GTA untouched, save Lij's key, SJ flips to connected. Then orchestrate everything below.</div>
+        <div class="cs">PR open &#183; deploy needs Zoran</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="down red">&#8595;</div>
+
+  <!-- ═══ SKILL 1 ═══ -->
+  <div class="flowrow">
+    <div class="skill">
+      <div class="sklabel">Skill 1 · match &nbsp;(5 steps, staff confirms each)</div>
+
+      <div class="step"><div class="n">1</div>
+        <div class="box o">
+          <div class="t">Stripe to contacts sync</div>
+          <div class="d">Match 1, locked rules: exact-email auto-links &#183; no match mints a contact &#183; duplicates + phone matches queue for review. Staff clears the review list, confirms the counts.</div>
+          <div class="chips"><span class="chip c-live">tool live</span></div>
+          <div class="confirm">&#10003; staff confirm: review list cleared, counts sane</div>
+        </div>
+      </div>
+      <div class="steparrow">&#8595;</div>
+
+      <div class="step"><div class="n">2</div>
+        <div class="box o">
+          <div class="t">Pull prices from GHL / Stripe history</div>
+          <div class="d"><b>GHL side: staff just screenshots what is in GHL and sends it in.</b> Stripe side: we read the real history where we hold access. SJ done: 119 prices, 13-14 live, <b>$40 setup fee, waivable</b>, camps + tryouts as one-time charges. No confirm here - the first draft is the confirm.</div>
+          <div class="chips"><span class="chip c-live">done for SJ</span></div>
+        </div>
+      </div>
+      <div class="steparrow">&#8595;</div>
+
+      <div class="step"><div class="n">3</div>
+        <div class="box o">
+          <div class="t">First draft of prices</div>
+          <div class="d"><b>SJ DONE + ruled:</b> 4 plans (1x, 2x, Unlimited, Elementary $200/4wk), <b>$40 signup fee on the 4-week option only, waived on prepay</b>, applied and verified.</div>
+          <div class="chips"><span class="chip c-live">SJ finalized in portal</span></div>
+          <div class="confirm">&#10003; staff confirm: draft matches what he really sells</div>
+        </div>
+      </div>
+      <div class="steparrow">&#8595;</div>
+
+      <div class="step"><div class="n">4</div>
+        <div class="box o">
+          <div class="t">Match prices to Stripe</div>
+          <div class="d"><b>SJ: 13 of 14 in-use prices ruled</b> (live or legacy), 19/20 members covered; Pre Season = Unlimited by ruling; camps + tryouts out of scope. Coverage gate logged as the skill's mandatory check. <b>Open: 1 Lij question</b> ("Christopher $199" plan attachment), queued through this chat.</div>
+          <div class="chips"><span class="chip c-open">live run blocked on deploy</span></div>
+          <div class="confirm">&#10003; staff confirm: every live price mapped or consciously parked</div>
+        </div>
+      </div>
+      <div class="steparrow">&#8595;</div>
+
+      <div class="step"><div class="n">5</div>
+        <div class="box o">
+          <div class="t">Create price workbook for client</div>
+          <div class="d">Private link, no login. Confident matches collapsed; only judgement calls readable; owner answers in plain words. <b>What it says to Lij clears through Member Management II first - one voice.</b></div>
+          <div class="chips"><span class="chip c-todo">to build</span></div>
+          <div class="confirm">&#10003; staff confirm: workbook reviewed before the link is sent</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="railhead">covering skill 1</div>
+      <div class="chat">
+        <div class="cn">Walk through: SJ Stripe contact link-up</div>
+        <div class="cg"><b>Goal:</b> all 147 customers linked or minted, review list cleared with Zoran, result file + log handed up. <b>Already done:</b> SJ contact store refreshed from GHL (556 contacts), all 20 live members pre-linked, offline pre-link of the rest underway from my export. <b>PR #1704:</b> the refresh CLI + a LIVE cron bug fix (contacts silently dropped on mixed batches) - tested, merge-soon.</div>
+        <div class="cs">Ahead of schedule &#183; final sweep awaits deploy</div>
+      </div>
+      <div class="chat">
+        <div class="cn">Walk through: SJ price match + skill</div>
+        <div class="cg"><b>Goal:</b> steps 2-4 done live for SJ (mapping applied post-deploy), every ruling logged, then the MATCH SKILL written from the log.</div>
+        <div class="cs">Steps 2-3 done &#183; step 4 ruled, awaits deploy</div>
+      </div>
+      <div class="chat new">
+        <div class="cn">NEW CHAT NEEDED: workbook build</div>
+        <div class="cg"><b>Goal:</b> build the ONE workbook surface (price + members share it): private link, proposals, plain-word answers, staff apply. Design comes from the workbook design chat; build for SJ first.</div>
+        <div class="cs">Step 5 + skill 2 step 2 &#183; spins up after design confirm</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="down yel">&#8595;</div>
+  <div class="flowrow">
+    <div class="box y">
+      <div class="t">CLIENT: adjusts and confirms the prices</div>
+      <div class="d">Lij edits the workbook, sends it back. Staff approval is what applies it.</div>
+    </div>
+    <div class="rail"></div>
+  </div>
+  <div class="down">&#8595;</div>
+
+  <!-- ═══ SKILL 2 ═══ -->
+  <div class="flowrow">
+    <div class="skill">
+      <div class="sklabel">Skill 2 · members workbook &nbsp;(2 steps)</div>
+
+      <div class="step"><div class="n">1</div>
+        <div class="box o">
+          <div class="t">Finalize prices</div>
+          <div class="d">Confirmed mapping written: every live Stripe price_id &#8594; a portal plan. The file the next step joins against.</div>
+          <div class="confirm">&#10003; staff confirm: mapping applied, portal plans live</div>
+        </div>
+      </div>
+      <div class="steparrow">&#8595;</div>
+
+      <div class="step"><div class="n">2</div>
+        <div class="box o">
+          <div class="t">Create members workbook</div>
+          <div class="d">Match 3 = the join: person (skill 1 step 1) + plan (finalized prices) = proposed member row. SJ: 20 rows prefilled from real subscriptions; only ambiguous rows ask anything. One pass: send &#8594; edit &#8594; back.</div>
+          <div class="confirm">&#10003; staff confirm: workbook reviewed before the link is sent</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="railhead">covering skill 2</div>
+      <div class="chat">
+        <div class="cn">Walk through: SJ price match + skill</div>
+        <div class="cg"><b>Goal:</b> step 1 - the applied mapping is its finish line.</div>
+        <div class="cs">Awaits deploy</div>
+      </div>
+      <div class="chat">
+        <div class="cn">Design: Lij member workbook</div>
+        <div class="cg"><b>Goal:</b> the DESIGN of both workbooks decided with Zoran, every decision logged. Plan-only; build goes to the new workbook-build chat. <b>Smart seam already designed:</b> the Adjust-prices button deep-links the REAL Blueprint pricing embed, never a clone.</div>
+        <div class="cs">Mockup v2 ready &#183; waiting on Zoran to lock the presentation (paused mid-review)</div>
+      </div>
+      <div class="chat new">
+        <div class="cn">NEW CHAT NEEDED: workbook build</div>
+        <div class="cg">Same chat as skill 1 step 5 - one surface, both workbooks.</div>
+        <div class="cs">After design confirm</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="down yel">&#8595;</div>
+  <div class="flowrow">
+    <div class="box y"><div class="t">CLIENT: adjusts and confirms the members</div></div>
+    <div class="rail"></div>
+  </div>
+  <div class="down">&#8595;</div>
+
+  <!-- ═══ SKILL 3 ═══ -->
+  <div class="flowrow">
+    <div class="skill">
+      <div class="sklabel">Skill 3 · seed + handoff &nbsp;(one pass, member by member)</div>
+
+      <div class="step"><div class="n">&#8635;</div>
+        <div class="box o">
+          <div class="t">Per member: seed + action items + workbook task, confirmed TOGETHER</div>
+          <div class="d">Staff + Claude walk the members one at a time. ONE screen per member shows all three:<br>
+          <b>&#183; the seeded row</b> - contact + customer + subscription + price, the GTA shape (link-only, zero Stripe writes)<br>
+          <b>&#183; the action items</b> - what needs cleaning up for this member<br>
+          <b>&#183; the workbook task</b> - what gets this member's sub portal-created<br>
+          One confirm covers all three, then the next member. SJ deadline: <b>Aug 4</b>, before the Aug 5-7 renewals.</div>
+          <div class="chips"><span class="chip c-live">member spine live</span><span class="chip c-live">action-items live</span><span class="chip c-todo">contents TBD - talk when the time is right</span></div>
+          <div class="confirm">&#10003; staff confirm PER MEMBER: all three right</div>
+        </div>
+      </div>
+      <div class="steparrow">&#8595;</div>
+
+      <div class="step"><div class="n">!</div>
+        <div class="box o">
+          <div class="t">The subs-adoption question underneath</div>
+          <div class="d">&#9888; <b>Open ruling, yours:</b> what does portal-CREATED buy over portal-LINKED? Portal already cancels/pauses/refunds linked subs. If ruled in: create-first, cancel-at-period-end, never a gap. Staff runs it where we hold the key (SJ).</div>
+          <div class="chips"><span class="chip c-open">Zoran ruling needed</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="railhead">covering skill 3</div>
+      <div class="chat">
+        <div class="cn">Design: Lij member workbook</div>
+        <div class="cg"><b>Goal:</b> design the per-member confirm screen + host the subs-adoption ruling workshop with Zoran.</div>
+        <div class="cs">Design scope &#183; build waits</div>
+      </div>
+      <div class="chat new">
+        <div class="cn">NEW CHAT NEEDED: seed cockpit build</div>
+        <div class="cg"><b>Goal:</b> build the member-by-member confirm pass + run it for SJ's 20 members by Aug 4. Scoped by the Fable planning subagent when Zoran says the time is right.</div>
+        <div class="cs">Not spun up yet</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="down yel">&#8595;</div>
+  <div class="flowrow">
+    <div class="row cols2">
+      <div class="box y"><div class="t">CLIENT: completes the action items</div></div>
+      <div class="box y"><div class="t">CLIENT: executes the workbook</div><div class="d">Or staff, where we hold their Stripe.</div></div>
+    </div>
+    <div class="rail"></div>
+  </div>
+  <div class="down grn">&#8595;</div>
+  <div class="flowrow">
+    <div class="box g">
+      <div class="t">Member management system fully set up</div>
+      <div class="d">Members visible, billing owned, receipts firing, cancel/pause/refund in the portal, welcome emails from the master preset.</div>
+    </div>
+    <div class="rail"></div>
+  </div>
+
+  <h2 class="phase">The rules this page encodes</h2>
+  <p class="note"><b>Three skills.</b> Chain rule: consecutive orange = one skill; only a client action or a trigger cuts a chain. Every step pauses at its &#10003; for staff confirm. Each skill checks its trigger before it will run. <b>Anything client-facing clears through Member Management II before it reaches Lij - one voice.</b> Skills are written LAST from the San Jose run logs. When all chats report done, a Fable planning subagent plans the full build - parked until Zoran calls it.</p>
+
+</div>
+</body>
+</html>
