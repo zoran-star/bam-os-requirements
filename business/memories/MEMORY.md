@@ -1,5 +1,7 @@
 # Memories — business
 
+- [fc-demo.md](fc-demo.md) — zero-backend public investor demo generated from the canonical portal on every deploy (fc-demo/ at repo root); Vercel import + demo.fullcntrl.io domain still pending; one-pager button to add once live
+
 - [investor-materials-refresh-2026-07.md](investor-materials-refresh-2026-07.md) — 2026-07-31 refresh of /summary + /playbook: live-product narrative, locked pricing ($499 Core / $600 blended), official ramp projections, em-dash sweep, /playbook rewrite fix; list of numbers still needing human verification
 
 - [vercel-deployments.md](vercel-deployments.md) — How `/summary`, `/playbook`, `/investor` deploy via repo-root vercel.json rewrites; branch preview URL pattern; 100/day free-tier deploy cap

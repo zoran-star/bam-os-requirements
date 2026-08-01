@@ -23,6 +23,7 @@ Each folder has its own CLAUDE.md + memories/ that load when you `cd` in. **If Z
 | AI sales agent prompt (the "brain") | `bam-ghl-agent/bam-portal/api/agent/prompt-structure.js` (behavior) + `fact-render.js` (per-academy facts). `sales-conversation-agents/` is design notes only |
 | Brand guide, shared front-end resources | `front-end/` |
 | Market research survey | `market-research/` |
+| Investor demo of the portal (zero-backend build) | `fc-demo/` |
 | Notion business requirements | repo root |
 | New top-level folder | repo root, run `/setup-project-memory <folder>` |
 
