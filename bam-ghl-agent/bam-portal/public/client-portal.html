@@ -7989,6 +7989,24 @@ if (window.__MOCK__) (() => {
         <span class="nav-badge" id="parent-messages-unread-badge" style="display:none;background:var(--accent);color:#0B0B0D;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:auto"></span>
       </div>
 
+      <!-- Direct door to organic content submission. V1.5 buries Marketing inside the
+           "Support" accordion, so submitting raw assets was Support > Marketing >
+           Organic > Request - four clicks behind a label that reads "help desk"
+           (Pro Bound couldn't find it at all, 2026-07-31). Shown by
+           applyOrganicShortcutNav() only for V1.5 academies that have BOTH organic and
+           ads on; content-only clients already land straight on organic and V1/V2 keep
+           their existing nav untouched. -->
+      <div class="nav-item" id="nav-content-flat" style="display:none" onclick="_goOrganic(this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/>
+            <path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/>
+            <path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>
+          </svg>
+        </span>
+        Content
+      </div>
+
       <!-- V1.5 "Support" accordion: groups Systems + Marketing under one expandable
            header. Hidden for V1/V2 (they keep the flat Systems + Marketing items below).
            Shown + flat items hidden by applyV15NavState when V1.5. -->
@@ -13592,6 +13610,16 @@ Then the call to action."]</div>
       </svg>
       <span class="mobile-nav-label">KPIs</span>
     </button>
+    <!-- Mobile twin of #nav-content-flat. Same gate (applyOrganicShortcutNav), so it
+         only appears for V1.5 academies running organic alongside ads. -->
+    <button type="button" class="mobile-nav-item mnav-v15" data-view="organic" style="display:none" onclick="_mobileOrganic()" aria-label="Content">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/>
+        <path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/>
+        <path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>
+      </svg>
+      <span class="mobile-nav-label">Content</span>
+    </button>
     <button type="button" class="mobile-nav-item mnav-v15" data-view="support" onclick="_mobileSupport()" aria-label="Support">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24M14.83 14.83l4.24 4.24M14.83 9.17l4.24-4.24M14.83 9.17l3.53-3.53M4.93 19.07l4.24-4.24"/>
@@ -13599,8 +13627,12 @@ Then the call to action."]</div>
       <span class="mobile-nav-label">Support</span>
     </button>
     <!-- "More" opens a sheet with the academy switcher + every other enabled tab
-         (Contacts, Calendars, Blueprint, …) so nothing is sidebar-only on phones. -->
-    <button type="button" class="mobile-nav-item mnav-v2" data-view="more" onclick="_mobileMore()" aria-label="More">
+         (Contacts, Calendars, Blueprint, …) so nothing is sidebar-only on phones.
+         V1.5 needs it MORE than V2 does, not less: applyV15NavTrim() removes Inbox
+         and Sales from the V1.5 bar, so without this the bar was literally KPIs +
+         Support and Home / Assets / Contacts / Blueprint / Resources / Action Items
+         / Settings had no way in on a phone at all. -->
+    <button type="button" class="mobile-nav-item mnav-v2 mnav-v15" data-view="more" onclick="_mobileMore()" aria-label="More">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
         <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
@@ -22158,14 +22190,20 @@ function _mobileBarViews() {
 function syncMobileNav(name) {
   let matched = false;
   document.querySelectorAll('.mobile-nav-item').forEach(b => {
-    if (b.dataset.view === 'more' || b.dataset.view === 'support') return;
+    if (b.dataset.view === 'more' || b.dataset.view === 'support' || b.dataset.view === 'organic') return;
     const on = b.dataset.view === name;
     b.classList.toggle('active', on);
     if (on && b.offsetParent !== null) matched = true;   // a visible bar item owns this view
   });
+  // Marketing has two doors on the V1.5 bar: Content owns the organic channel, Support
+  // owns everything else under Marketing/Systems. Split them on _MKT_CHANNEL so exactly
+  // one lights up.
+  const onOrganic = name === 'marketing' && _MKT_CHANNEL === 'organic';
+  const content = document.querySelector('.mobile-nav-item[data-view="organic"]');
+  if (content) { content.classList.toggle('active', onOrganic); if (onOrganic && content.offsetParent !== null) matched = true; }
   // Support owns Marketing/Systems in V1.5; light it then.
   const support = document.querySelector('.mobile-nav-item[data-view="support"]');
-  if (support) { const owns = V15_ACCESS && (name === 'marketing' || name === 'systems'); support.classList.toggle('active', owns); if (owns) matched = true; }
+  if (support) { const owns = V15_ACCESS && !onOrganic && (name === 'marketing' || name === 'systems'); support.classList.toggle('active', owns); if (owns) matched = true; }
   const more = document.querySelector('.mobile-nav-item[data-view="more"]');
   if (more) more.classList.toggle('active', !matched);
 }
@@ -26055,6 +26093,27 @@ function applySupportAccordionNav() {
   if (caret)   caret.style.transform = '';
   if (flatSys) flatSys.style.display = v15only ? 'none' : '';
   if (flatMkt) flatMkt.style.display = v15only ? 'none' : '';
+  applyOrganicShortcutNav();
+}
+
+// Show the top-level "Content" shortcut (sidebar + mobile bar) that lands straight on
+// Marketing > Organic. V1.5 ONLY, and only when the academy runs organic ALONGSIDE ads:
+//   - V1/V2 keep their existing nav (V2's doors live in the command-center orb, not here)
+//   - content-only academies (organic on, ads off) already boot into organic and their
+//     Marketing nav is relabelled "Content" by applyContentOnlyNav - a second one would
+//     just be a duplicate.
+// Called from applySupportAccordionNav so it runs after V15_ACCESS is set; both content
+// flags are already populated by then (the clients row loads before either nav gate).
+function applyOrganicShortcutNav() {
+  const v15only = (typeof V15_ACCESS !== 'undefined' && V15_ACCESS) &&
+                  !(typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+  const show = v15only && _hasOrganic() && _hasAds();
+  const side = document.getElementById('nav-content-flat');
+  if (side) side.style.display = show ? '' : 'none';
+  document.querySelectorAll('.mobile-nav-item[data-view="organic"]').forEach(el => {
+    if (show) el.style.removeProperty('display');
+    else el.style.setProperty('display', 'none', 'important');
+  });
 }
 
 // Click handler for the "Support" accordion header (V1.5).
@@ -36774,11 +36833,33 @@ function _hasAds() { return typeof MARKETING_INCLUDED === 'undefined' || MARKETI
 // Funnel content rides the scaling service: every client with a BAM-run
 // website (marketing_included) has it. Content-only clients don't.
 function _hasFunnel() { return _hasAds(); }
+// Which channel the Marketing view is currently showing ('ads' | 'funnel' | 'organic'),
+// or null on the channel-split screen. syncMobileNav reads it so the Content bar item
+// and the Support bar item don't both light up on the same view.
+let _MKT_CHANNEL = null;
 function _showOrganicOnly() {
   _hideAllMarketingSub();
   const back = document.getElementById('organic-back-btn'); if (back) back.style.display = 'none';
   const e = document.getElementById('marketing-organic'); if (e) e.style.display = 'block';
+  _MKT_CHANNEL = 'organic';
   _fetchAndRenderOrganic();
+}
+// Jump straight from the sidebar to Marketing > Organic, skipping the channel split.
+// _chooseChannel runs AFTER switchView so _marketingEnter()'s split render can't
+// overwrite it. Back still returns to the split, so Ads/Funnel stay reachable.
+function _goOrganic(el) {
+  switchView('marketing', el);
+  try { _chooseChannel('organic'); } catch (_) {}
+  if (el) {
+    document.querySelectorAll('.sidebar .nav-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+  }
+  syncMobileNav('marketing');
+}
+function _mobileOrganic() {
+  mobileSwitchView('marketing');
+  try { _chooseChannel('organic'); } catch (_) {}
+  syncMobileNav('marketing');
 }
 function _marketingEnter() {
   _renderFirstCampaignGuide();   // data-drive the "Your First Campaign" card from the default guide card
@@ -36800,9 +36881,11 @@ function _showChannelSplit() {
   const org = document.getElementById('channel-card-organic');
   if (org) org.style.display = _hasOrganic() ? '' : 'none';
   const e = document.getElementById('marketing-channel-split'); if (e) e.style.display = 'block';
+  _MKT_CHANNEL = null;
 }
 function _chooseChannel(ch) {
   _hideAllMarketingSub();
+  _MKT_CHANNEL = ch;
   if (ch === 'organic') {
     const e = document.getElementById('marketing-organic'); if (e) e.style.display = 'block';
     _fetchAndRenderOrganic();
