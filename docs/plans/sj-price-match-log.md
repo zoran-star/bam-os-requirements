@@ -28,11 +28,23 @@ Rule of the room: skill gets written AFTER the live run, from this log, never fr
 "Yes, set it" - fee goes on the portal pricing rows, charged on the every-4-weeks option only, waived on 3/6-month prepay (mirrors Lij's real Stripe behaviour).
 APPLIED via SQL to offers.data.pricing.pricing_offerings (all 3 offerings: signup_fee="40", signup_fee_on_base="charge"; all commitments: signup_fee_charge="waive"). Verified in the returning row. This makes buildOfferTargets mint a `<plan>|signup_fee` one-time target per plan at match time.
 
+### Ruling: one-time products (Zoran, 2026-08-01)
+Summer Bundle Camp ($250-350) and Adapt Academy Tryouts ($30) are OUT of the price match. Membership subscriptions only. They stay untouched in Stripe, recorded in the result doc as deliberately out of scope; can become portal camp offers later.
+
+### Zoran's framing of the room (2026-08-01, goes in the skill)
+This room does NOT seed members (separate chat). The exercise = every Stripe price with a live subscriber ends up classified live OR legacy in our pricing. That coverage check is a mandatory gate in the skill: in-use prices with no tier = match not done.
+
+### Ruling: Elementary Academy (Zoran, 2026-08-01)
+"Add it" - Elementary Academy added as 4th plan, $200 every 4 weeks, no commitments. APPLIED via SQL (plan_count now 4). Default taken and flagged: same $40 signup fee as the other plans (Zoran can veto). Ted's price -> live, Jenny's dup -> legacy, Keanu deal -> legacy.
+
+### Ruling: Pre Season (Zoran, 2026-08-01)
+Asked what Pre Season options are; analysis showed Pre Season amounts mirror the Unlimited ladder ($300/749-750/1399ish) and 1x ladder, and the in-use ones sit ON the core products. Zoran: "actually just treat it as the unlimited" -> Pre Season Academy prices = Unlimited plan. Adam Ly $300/4wk = LIVE Unlimited monthly. Pre Season 1x prices remain 1x variants: Salvador $200 = legacy 1x monthly. No Pre Season plan in portal pricing; season stays a schedule/class concept.
+
 ### Open items
-- [ ] Adopt draft mapping sheet (popup pending)
-- [ ] Ruling: Elementary Academy as 4th portal plan ($200/4wk)
-- [ ] Ruling: Adam Ly $300 = live Unlimited monthly
-- [ ] Ask Lij: which plan is Christopher's $199 deal on
-- [ ] Scoping: Summer Bundle Camp + Tryouts in/out of match
+- [ ] Ask Lij: which plan is Christopher's $199 deal on (last untiered judgement; tier=legacy either way, only the plan attachment is open)
+- [ ] Optional veto: Elementary got the $40 signup fee by default
 - [ ] billing_cadence: nothing writes offer_prices.billing_cadence yet - SJ rows may need hand SQL after offers-sync (queue item from PR #1675)
 - [ ] BLOCKED: live run waits on direct-key transport deploy + Lij write key saved
+
+### Coverage check status (the skill's gate)
+13 of 14 in-use prices tiered, 19 of 20 members covered. Only Christopher's $199 awaits Lij's answer on which plan it discounts.
