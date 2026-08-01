@@ -105,7 +105,10 @@
       "merch_url": "https://byanymeansgsc.com"
     },
     "tagline": "Youth and high-school basketball training in Oakville and across the GTA.",
-    "instagram_url": "https://instagram.com/byanymeanstoronto"
+    "instagram_url": "https://instagram.com/byanymeanstoronto",
+    "stripe_connect_account_id": "acct_1P7kUCRxInSEtAh8",
+    "stripe_connect_status": "connected",
+    "_stripe_note": "The two columns above were added 2026-07-31 for the direct-key transport parity suite (api/_stripe-transport-parity.test.mjs), which uses GTA as its CONNECT-transport fixture and fails 'snapshot stale' if a column the shipped resolver selects is missing here. The account id is GTA's real connected account (same value every pricing_catalog GTA row carries in supabase/pricing-catalog-gta-seed.sql); it is an identifier, not a credential. GTA has NO client_stripe_direct block on purpose: no direct row IS what makes an academy a Connect academy."
   },
   "_facts_note": "The member-facing facts that are NOT on the clients row, captured the same day and from the same production database. api/_academy-facts.js derives these at send time from the locations table, from schedule_slots collapsed into one typical week, and from client_users; they live here so an offline render and the step lock resolve exactly what a real send resolves. Re-capture them whenever GTA's venue, sessions or coach handles change. location_entry_note joins them from the same table (locations.entry_note), and it is the one fact here a parent reads VERBATIM rather than as rendered prose: it is sent word for word in the morning-of trial confirmation, per venue. Re-capture it with the rest whenever GTA's venue changes.",
   "facts": {

@@ -1,0 +1,57 @@
+# STRIPE TRANSPORT INVENTORY - every file that touches Stripe account routing.
+#
+# Enforced by api/_stripe-transport-parity.test.mjs section C (Tier 2). A file
+# lands here when it references stripe_connect_account_id or builds a Stripe
+# Authorization header from an env key. Every hit must carry a verdict and a
+# REAL reason (40+ characters); an unlisted hit fails the run as new unaudited
+# Stripe access, and a line whose file no longer matches fails as stale - when
+# a file is cleaned up, deleting its line here is part of the same change.
+#
+# Verdicts:
+#   RESOLVER       the doorway itself: allowed to know two transports exist
+#   HOLLOWED       local Stripe helper is a delegation to api/_stripe-transport.js;
+#                  call sites unchanged, the resolver owns key selection
+#   PLATFORM_ONLY  BAM's own Stripe account; must NEVER route through the resolver
+#   GATE           reads the stored account/status fields only to gate or display,
+#                  never to build its own Stripe request
+#   OTHER          none of the above; the reason must say exactly what it is
+#
+# Format: VERDICT | path relative to bam-portal | reason
+
+RESOLVER | api/_stripe-transport.js | The one seam: the only module allowed to pick a bearer, read client_stripe_direct, and know a second transport exists at all.
+RESOLVER | api/stripe/direct-key.js | Staff key entry: probes and stores the academy key encrypted, stamps stripe_connect_account_id at save time; an approved doorway file per the 2026-07-31 plan.
+RESOLVER | api/stripe/webhook.js | Tenant routing (?t= token selects the per-academy signing secret BEFORE verification) plus the deauthorized guard that must not flip a key academy; approved doorway file.
+HOLLOWED | api/members.js | Local stripeFetch is a two-line delegation; the remaining env read only feeds readStripeAccount for a MID-SETUP Connect academy's health card, a branch a direct academy (status connected) never enters.
+HOLLOWED | api/members/enroll.js | stripeKey() survives only as the configured-at-all guard; every request rides the transport and the money gate is three-outcome (409 answered / 503 could-not-ask).
+HOLLOWED | api/members/import-cancelled.js | Reads the stored account id to scope the import, then every subscription read goes through the delegating helper to the resolver.
+HOLLOWED | api/members-agent.js | The member bot resolves the academy's stored account + status, then rides the hollowed fetcher; it never builds its own envelope.
+HOLLOWED | api/ghl.js | The KPI sFetch closure delegates to the transport (keeping its historical "stripe <status>" error text); the env read remains only as the configured-at-all gate.
+HOLLOWED | api/marketing.js | Same shape as ghl.js: revenue reads resolve the stored account and delegate; no local Authorization header is built for academy calls.
+HOLLOWED | api/kpis-v15.js | stripeReq/stripeGet/stripeGetAll delegate to the transport; payouts additionally degrade to null via getCapabilities when a direct key lacks the permission.
+HOLLOWED | api/contacts/stripe-link.js | Sweep actions gate on the stored account + connected status, then every customer/subscription read delegates to the resolver.
+HOLLOWED | api/stripe/contact.js | Contact billing card resolves the stored account id and rides the delegating helper; envelope choice belongs to the resolver.
+HOLLOWED | api/offers/create-price.js | Price minting delegates to the transport; both of its money gates carry the 409-answered / 503-could-not-ask split pinned in the parity suite.
+HOLLOWED | api/offers/create-discount.js | Coupon and promotion-code writes delegate to the transport on the academy's stored account; the env read is the configured-at-all guard.
+HOLLOWED | api/offers/kpi-setup.js | Offer KPI wiring reads the stored account and delegates every product/price call; no local bearer construction remains.
+HOLLOWED | api/offers/match-prices.js | Price matching delegates to the transport and keeps the three-outcome gate; the stored account id is its scope, not its envelope.
+HOLLOWED | api/sorter/cleanup.js | Sorter Stripe reads/writes delegate through stripeGet/stripePost to the resolver; stripeKey() remains only as the configured guard.
+HOLLOWED | api/sorter/fix-payment.js | Same sorter shape: stored account in, delegation out; the resolver owns which key signs the request.
+HOLLOWED | api/sorter/setup-monthly.js | Monthly setup builds subscriptions through the delegating helper on the academy's stored account; no env bearer of its own.
+HOLLOWED | api/sorter/take-over.js | Take-over rides the delegating helper for every subscription mutation; envelope selection stays in the resolver.
+HOLLOWED | api/sorter/take-over-ai.js | AI take-over variant, same seam: stored account scoping plus transport delegation, zero local Authorization headers.
+HOLLOWED | api/website/checkout.js | The enroll money path: helper delegates with the ONBOARDING keyOverride precedence, both return sites ask publishableFor, and the gate is three-outcome. Parity section B runs this file's shipped bytes.
+HOLLOWED | api/website/camp-checkout.js | Camp checkout mirrors website/checkout: delegation with keyOverride precedence and a publishableFor return site.
+HOLLOWED | api/website/validate-coupon.js | Coupon validation reads promotion codes through the transport on the stored account; env read is the configured-at-all guard.
+HOLLOWED | api/onboarding/checkout.js | Onboarding checkout delegates with ONBOARDING_STRIPE_SECRET_KEY as keyOverride (test-sandbox precedence preserved); both return sites use publishableFor.
+HOLLOWED | api/admin/backfill-stripe-joined-at.js | Admin backfill resolves the stored account per client and delegates its subscription reads; skips academies with no account at all.
+HOLLOWED | api/stripe/reconcile-activations.js | The rescue cron routes through the resolver so DIRECT academies get the same stuck-signup rescue; its only skip is an academy with no Stripe transport at all.
+GATE | api/action-items.js | Reads the stored account id purely to gate the onboarding signal and hands health reads to the resolver's readAccountHealth; it never builds a Stripe request itself.
+PLATFORM_ONLY | api/clients.js | getStripeRevenue reads BAM's own platform revenue with STRIPE_SECRET_KEY on purpose; routing it through the resolver would point it at academy accounts.
+PLATFORM_ONLY | api/stripe/overview.js | Staff platform overview of BAM's own Stripe; env-key Authorization is correct here and must never resolve to an academy key.
+PLATFORM_ONLY | api/stripe/ensure-webhook-events.js | Updates the PLATFORM webhook endpoint's event list with the platform key; per-academy endpoints are ensure-academy-webhook.js's job, not this file's.
+PLATFORM_ONLY | api/stripe/connect.js | The Connect OAuth exchange itself: platform credentials by definition, and the one onboarding path a direct-key academy never takes.
+PLATFORM_ONLY | api/website/ch3-checkout.js | Pre-existing separate direct-key precedent with its own CH3_* env keys; per the approved plan it stays entirely outside the resolver.
+OTHER | api/commissions.js | Two halves on purpose: academy-scoped reads delegate to the transport, while the platform invoicing half keeps its own STRIPE_SECRET_KEY bearer because it bills on BAM's account.
+OTHER | api/parent/checkout.ts | Fetches ride parent/_stripe.ts (hollowed) and the account is a stored-field gate, BUT its return sites still hand the browser process.env.STRIPE_PUBLISHABLE_KEY - right for Connect, wrong for a direct academy. Needs publishableFor before any direct academy's parents use the app.
+OTHER | api/parent/billing.ts | Same as parent/checkout.ts: transport-correct fetches via parent/_stripe.ts, but the card-update return site still serves the platform publishable key from env; a direct academy needs publishableFor here too.
+OTHER | api/parent/member-management.ts | Parent-app plan changes: gates on the stored account + connected status and fetches through parent/_stripe.ts; returns no publishable key, so only the gate lives here.
