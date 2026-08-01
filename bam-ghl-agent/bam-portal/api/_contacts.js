@@ -427,10 +427,12 @@ export async function writePortalFieldValues(clientId, portalContactId, fieldMap
 }
 
 // Bulk mirror (sync cron). rows must already be contacts-shaped (snake_case
-// columns). Best-effort, returns nothing.
+// columns). Best-effort; returns the count of rows actually posted (0 on
+// failure) so a caller that cares can tell "wrote nothing" from "wrote all".
 export async function bulkUpsertPortalContacts(rows) {
+  let posted = 0;
   try {
-    if (!SB_URL || !SB_KEY || !Array.isArray(rows) || rows.length === 0) return;
+    if (!SB_URL || !SB_KEY || !Array.isArray(rows) || rows.length === 0) return posted;
     const now = new Date().toISOString();
     // Cron rows arrive with athlete_name already resolved, so withAthleteName
     // no-ops there; the per-client field-id cache keeps this one lookup per client.
@@ -439,13 +441,30 @@ export async function bulkUpsertPortalContacts(rows) {
     const clean_rows = named
       .map((r) => ({ ...clean(r), updated_at: now }))
       .filter((r) => r.client_id && r.ghl_contact_id);
-    if (!clean_rows.length) return;
-    await post(
-      "contacts?on_conflict=client_id,ghl_contact_id",
-      clean_rows,
-      "resolution=merge-duplicates,return=minimal",
-    );
+    if (!clean_rows.length) return posted;
+    // PostgREST bulk inserts demand every object share the same keys (PGRST102
+    // "All object keys must match") and reject the WHOLE batch otherwise. clean()
+    // strips empty fields per row, so a mixed batch (one row has email, the next
+    // does not) is the norm, not the exception - and for a long time such batches
+    // silently vanished into the catch below. Bucket rows by their exact key set
+    // and post each homogeneous bucket on its own.
+    const buckets = new Map();
+    for (const r of clean_rows) {
+      const sig = Object.keys(r).sort().join(",");
+      if (!buckets.has(sig)) buckets.set(sig, []);
+      buckets.get(sig).push(r);
+    }
+    for (const bucket of buckets.values()) {
+      await post(
+        "contacts?on_conflict=client_id,ghl_contact_id",
+        bucket,
+        "resolution=merge-duplicates,return=minimal",
+      );
+      posted += bucket.length;
+    }
+    return posted;
   } catch (e) {
     console.error("[bulkUpsertPortalContacts] non-fatal:", e?.message || e);
+    return posted;
   }
 }

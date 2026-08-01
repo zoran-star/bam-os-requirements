@@ -49,7 +49,9 @@ async function sb(path, opts = {}) {
 
 // ── GHL token plumbing (same shape as inbox.js / send-message.js) ──
 // ── GHL fetch w/ 429 backoff ──
-async function ghlFetchWithBackoff(path, token) {
+// Exported for scripts/refresh-portal-contacts.mjs (manual one-academy refresh)
+// so the CLI shares this exact backoff instead of forking it.
+export async function ghlFetchWithBackoff(path, token) {
   let attempt = 0;
   while (true) {
     const r = await fetch(`${GHL_V2}${path}`, {
@@ -72,6 +74,39 @@ async function ghlFetchWithBackoff(path, token) {
     }
     return r.json();
   }
+}
+
+// ── Per-contact mapping: one GHL contact -> one ghl_contacts mirror row ──
+// Extracted verbatim from the v15 mirror block below so that
+// scripts/refresh-portal-contacts.mjs reuses the EXACT mapping the cron writes
+// (no fork, no drift). Pure: no I/O, no env reads. Returns null when the
+// contact carries no id. nowIsoStr becomes the row's synced_at.
+export function ghlContactToMirrorRow(client, c, nowIsoStr) {
+  const cid = c.id || c.contactId;
+  if (!cid) return null;
+  const athleteFieldIds = Array.isArray(client.v15_config?.athlete_name_field_ids)
+    ? client.v15_config.athlete_name_field_ids.map(String) : [];
+  const cfArr = c.customFields || c.customField || [];
+  const cfMap = {};
+  for (const f of (Array.isArray(cfArr) ? cfArr : [])) {
+    if (f && f.id != null) cfMap[String(f.id)] = (f.value ?? f.field_value ?? f.fieldValue ?? "");
+  }
+  let athleteName = null;
+  for (const fid of athleteFieldIds) {
+    const v = cfMap[fid];
+    if (v != null && String(v).trim()) { athleteName = String(v).trim(); break; }
+  }
+  const tags = Array.isArray(c.tags)
+    ? c.tags.map(t => (typeof t === "string" ? t : (t.name || t.tag || ""))).filter(Boolean) : [];
+  const name = [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || c.contactName || c.name || null;
+  return {
+    client_id: client.id, ghl_contact_id: cid,
+    first_name: c.firstName || null, last_name: c.lastName || null, name,
+    email: (c.email || "").toLowerCase().trim() || null, phone: c.phone || null,
+    tags, athlete_name: athleteName, custom_fields: cfMap,
+    dnd: c.dnd === true || !!(c.dndSettings && Object.values(c.dndSettings).some(s => s && s.status === "active")),
+    date_added: c.dateAdded || c.createdAt || null, synced_at: nowIsoStr,
+  };
 }
 
 // ── Sync one academy ──
@@ -106,33 +141,7 @@ async function syncContactsForAcademy(client, deadline) {
     // Contacts tab). Only for V1.5 academies — the Contacts tab is their CRM.
     // athlete_name is resolved from the mapped custom field(s).
     if (client.v15_access === true) {
-      const athleteFieldIds = Array.isArray(client.v15_config?.athlete_name_field_ids)
-        ? client.v15_config.athlete_name_field_ids.map(String) : [];
-      const mirrorRows = contacts.map(c => {
-        const cid = c.id || c.contactId;
-        if (!cid) return null;
-        const cfArr = c.customFields || c.customField || [];
-        const cfMap = {};
-        for (const f of (Array.isArray(cfArr) ? cfArr : [])) {
-          if (f && f.id != null) cfMap[String(f.id)] = (f.value ?? f.field_value ?? f.fieldValue ?? "");
-        }
-        let athleteName = null;
-        for (const fid of athleteFieldIds) {
-          const v = cfMap[fid];
-          if (v != null && String(v).trim()) { athleteName = String(v).trim(); break; }
-        }
-        const tags = Array.isArray(c.tags)
-          ? c.tags.map(t => (typeof t === "string" ? t : (t.name || t.tag || ""))).filter(Boolean) : [];
-        const name = [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || c.contactName || c.name || null;
-        return {
-          client_id: client.id, ghl_contact_id: cid,
-          first_name: c.firstName || null, last_name: c.lastName || null, name,
-          email: (c.email || "").toLowerCase().trim() || null, phone: c.phone || null,
-          tags, athlete_name: athleteName, custom_fields: cfMap,
-          dnd: c.dnd === true || !!(c.dndSettings && Object.values(c.dndSettings).some(s => s && s.status === "active")),
-          date_added: c.dateAdded || c.createdAt || null, synced_at: nowIso(),
-        };
-      }).filter(Boolean);
+      const mirrorRows = contacts.map(c => ghlContactToMirrorRow(client, c, nowIso())).filter(Boolean);
       if (mirrorRows.length) {
         await sb(`ghl_contacts?on_conflict=client_id,ghl_contact_id`, {
           method: "POST",
