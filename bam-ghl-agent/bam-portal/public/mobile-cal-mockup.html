@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Calendar mobile mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Archivo:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F8F7F5; --surface:#FFFFFF; --surface-el:#FAFAF8; --surface-hov:#F0EFEC;
+  --border:rgba(0,0,0,0.07); --border-med:rgba(0,0,0,0.12); --border-str:rgba(0,0,0,0.18);
+  --text:#1C1B18; --text-sub:#6E6B63; --text-mute:#807C74;
+  --gold:#C8A84E; --accent:#C8A84E; --gold-sheen:rgba(200,168,78,0.05);
+  --accent-border:rgba(200,168,78,0.25);
+  --g1:#C8A84E; --g2:#3E6FB0; --danger:#B4462F; --ink:#1C1B18;
+}
+[data-theme="dark"]{
+  --bg:#131416; --surface:#1B1D1F; --surface-el:#232629; --surface-hov:#2B2E32;
+  --border:rgba(255,255,255,0.08); --border-med:rgba(255,255,255,0.12); --border-str:rgba(255,255,255,0.2);
+  --text:#F0EDE8; --text-sub:#A5A19A; --text-mute:#7C786F;
+  --gold:#D4B65C; --accent:#D4B65C; --gold-sheen:rgba(212,182,92,0.06);
+  --accent-border:rgba(212,182,92,0.25);
+  --g1:#D4B65C; --g2:#6E9AD8; --danger:#E0785E; --ink:#131416;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;border:none;background:none;padding:0;text-align:left}
+
+/* screen switcher */
+.sw{position:sticky;top:0;z-index:80;display:flex;gap:6px;align-items:center;
+  padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border)}
+.sw button{flex:none;padding:6px 13px;border-radius:999px;border:1px solid var(--border-med);
+  font-size:12px;font-weight:600;cursor:pointer}
+.sw button[aria-selected="true"]{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+.sw .sp{margin-left:auto}
+.pane{display:none;padding:0 0 44px}
+.pane.on{display:block}
+
+/* header */
+.crumb{padding:14px 16px 0;font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--text-mute)}
+.crumb span{color:var(--gold)}
+.hdr{display:flex;align-items:center;gap:10px;padding:10px 16px 10px}
+.hdr .back{flex:none;display:inline-flex;align-items:center;gap:4px;padding:7px 13px 7px 10px;
+  border-radius:10px;border:1px solid var(--border-med);background:var(--surface);
+  font-size:13px;font-weight:700;color:var(--text);cursor:pointer}
+.hdr h1{flex:none;margin:0;font-family:Archivo,Inter,sans-serif;font-size:19px;font-weight:800;letter-spacing:-.01em}
+.hdr .tzs{flex:1;font-size:11px;font-weight:600;color:var(--text-mute)}
+.hdr .add{flex:none;width:38px;height:38px;border-radius:50%;background:var(--gold);
+  color:var(--ink);font-size:22px;font-weight:600;line-height:1;cursor:pointer;text-align:center;
+  box-shadow:0 2px 8px rgba(200,168,78,.35)}
+
+/* the whole top block stays put, whatever you scroll to */
+.topbar{position:sticky;top:49px;z-index:60;background:var(--bg);
+  border-bottom:1px solid var(--border);box-shadow:0 6px 14px -12px rgba(0,0,0,.5)}
+.topbar .crumb{padding:10px 16px 0}
+.topbar .hdr{padding:6px 16px 4px}
+.monthbar{display:flex;align-items:center;gap:9px;padding:6px 16px 9px}
+.monthbar .mo{display:inline-flex;align-items:center;gap:5px;font-family:Archivo,Inter,sans-serif;
+  font-size:14px;font-weight:800;letter-spacing:-.01em;cursor:pointer}
+.monthbar .mo svg{width:12px;height:12px;color:var(--text-mute)}
+.monthbar .back{flex:none;display:inline-flex;align-items:center;padding:6px 11px 6px 9px;
+  border-radius:9px;border:1px solid var(--border-med);background:var(--surface);
+  font-size:12px;font-weight:700;color:var(--text);cursor:pointer}
+.monthbar .today{margin-left:auto;display:none;align-items:center;gap:5px;padding:6px 12px;
+  border-radius:999px;background:var(--gold);color:var(--ink);
+  font-size:11.5px;font-weight:800;cursor:pointer;white-space:nowrap}
+.monthbar .today.on{display:inline-flex}
+
+/* month jump sheet */
+.jump{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);display:none}
+.jump.on{display:block}
+.jump .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--bg);
+  border-radius:18px 18px 0 0;padding:16px 16px 26px;max-height:70vh;overflow:auto}
+.jump h3{margin:0 0 12px;font-family:Archivo,Inter,sans-serif;font-size:15px;font-weight:800}
+.jump .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.jump .grid button{padding:12px 6px;border-radius:11px;border:1px solid var(--border-med);
+  background:var(--surface);font-size:12.5px;font-weight:700;text-align:center;cursor:pointer}
+.jump .grid button.now{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+
+.earlier{display:block;margin:20px auto 0;padding:8px 16px;border-radius:999px;
+  border:1px solid var(--border-med);background:var(--surface);
+  font-size:12px;font-weight:700;color:var(--text-sub);cursor:pointer;text-align:center}
+.sesh.past{opacity:.55}
+.sesh.past.flagged{opacity:1}
+
+.alertbar{display:flex;align-items:center;gap:9px;margin:0 16px 10px;padding:10px 13px;
+  border-radius:11px;background:var(--gold);color:var(--ink);cursor:pointer;
+  font-size:13px;font-weight:800;width:calc(100% - 32px);box-shadow:0 2px 8px rgba(200,168,78,.28)}
+.alertbar svg{width:15px;height:15px;flex:none}
+.alertbar .go{margin-left:auto;font-size:16px}
+
+/* week */
+/* Chrome/Firefox auto-anchor on prepend, Safari does not. We compensate by hand
+   in fetchOlder(), so turn the browser's version off or they double-correct. */
+#agenda{overflow-anchor:none}
+.day{padding:0 16px}
+.dayhd{display:flex;align-items:baseline;gap:8px;padding:14px 0 7px}
+.dayhd .dw{font-size:11px;font-weight:800;letter-spacing:.11em;color:var(--text-mute)}
+.dayhd .dn{font-family:Archivo,Inter,sans-serif;font-size:16px;font-weight:800}
+.dayhd.is-today .dw,.dayhd.is-today .dn{color:var(--gold)}
+.dayhd .pill{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.05em;
+  color:var(--ink);background:var(--gold);border-radius:999px;padding:3px 9px}
+
+.sesh{display:flex;gap:12px;align-items:center;width:100%;
+  background:var(--surface);border:1px solid var(--border);border-radius:13px;
+  padding:12px 14px;margin-bottom:7px;cursor:pointer;position:relative;overflow:hidden}
+.sesh .bar{position:absolute;left:0;top:0;bottom:0;width:4px}
+.sesh .time{flex:none;width:78px;padding-left:4px;font-family:Archivo,Inter,sans-serif;
+  font-size:15px;font-weight:800;line-height:1.15;letter-spacing:-.01em;white-space:nowrap}
+.sesh .grp{flex:1;min-width:0;font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sesh .cap{flex:none;font-family:Archivo,Inter,sans-serif;font-size:14px;font-weight:800;color:var(--text-sub)}
+.sesh .cap small{font-weight:600;color:var(--text-mute)}
+.sesh .dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--gold);
+  box-shadow:0 0 0 3px var(--gold-sheen)}
+.sesh.open{background:transparent;border:1.5px dashed var(--border-str)}
+.sesh.open .bar{opacity:.35}
+.sesh.open .time,.sesh.open .grp{color:var(--text-mute);font-weight:700}
+.sesh.open .cap{color:var(--text-mute)}
+.sesh.full .cap{color:var(--danger)}
+.sesh.flagged{border-color:var(--accent-border);box-shadow:0 0 0 2px var(--gold-sheen)}
+.emptyday{font-size:12px;font-weight:600;color:var(--text-mute);padding:2px 2px 6px}
+
+/* session */
+.rhead{padding:2px 16px 0}
+.rhead .rgrp{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--text-sub)}
+.rhead .rgrp i{width:9px;height:9px;border-radius:50%;background:var(--g1)}
+.rhead .rwhen{font-family:Archivo,Inter,sans-serif;font-size:22px;font-weight:800;margin:5px 0 3px;letter-spacing:-.01em}
+.rhead .rsub{font-size:12px;color:var(--text-mute);font-weight:600}
+
+.textall{display:flex;align-items:center;justify-content:center;gap:8px;
+  margin:16px 16px 0;width:calc(100% - 32px);
+  background:var(--gold);color:var(--ink);border-radius:12px;padding:13px;
+  font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 2px 10px rgba(200,168,78,.3)}
+.textall svg{width:16px;height:16px}
+
+.rsec{padding:20px 16px 7px;font-size:10px;font-weight:800;letter-spacing:.11em;color:var(--text-mute)}
+.prow{display:flex;align-items:center;gap:11px;background:var(--surface);
+  border:1px solid var(--border);border-radius:13px;padding:10px 12px;margin:0 16px 7px;
+  width:calc(100% - 32px);cursor:pointer;position:relative;overflow:hidden}
+.prow .av{flex:none;width:36px;height:36px;border-radius:50%;background:var(--surface-hov);
+  display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--text-sub)}
+.prow .pb{flex:1;min-width:0}
+.prow .pn{display:block;font-size:14px;font-weight:700;line-height:1.25}
+.prow .pp{display:block;font-size:11.5px;color:var(--text-mute);margin-top:2px;font-weight:600}
+.prow .acts{flex:none;display:flex;gap:6px}
+.prow .acts span{width:32px;height:32px;border-radius:9px;border:1px solid var(--border-med);
+  display:flex;align-items:center;justify-content:center;color:var(--text-sub)}
+.prow .acts svg{width:15px;height:15px}
+.prow.flagged{border-color:var(--gold);background:var(--gold-sheen);box-shadow:0 0 0 2px var(--gold-sheen)}
+.prow.flagged .av{background:var(--gold);color:var(--ink)}
+</style>
+</head>
+<body>
+
+<div class="sw">
+  <button aria-selected="true" onclick="pick('week',this)">Week</button>
+  <button aria-selected="false" onclick="pick('roster',this)">Session</button>
+  <button class="sp" onclick="theme()">◐</button>
+</div>
+
+<!-- ═══ WEEK ═══ -->
+<div class="pane on" id="pane-week">
+  <div class="topbar" id="topbar">
+    <div class="crumb">FOCUS &middot; <span>CALENDAR</span> &middot; LIVE</div>
+
+    <div class="hdr">
+      <h1>Calendar</h1>
+      <span class="tzs">Toronto time</span>
+      <button class="add" title="New booking">+</button>
+    </div>
+
+    <div class="monthbar">
+      <button class="back">&lsaquo; Back</button>
+      <button class="mo" id="mo-label" onclick="openJump()">July 2026
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <button class="today" id="today-btn" onclick="jumpToday()"><span id="today-arrow">&uarr;</span> Today</button>
+    </div>
+
+    <button class="alertbar" onclick="pick('roster',document.querySelectorAll('.sw button')[1])">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg>
+      2 post-trial forms due
+      <span class="go">&rsaquo;</span>
+    </button>
+  </div>
+
+  <div id="agenda"></div>
+
+</div>
+
+<div class="jump" id="jump" onclick="if(event.target.id==='jump')closeJump()">
+  <div class="sheet">
+    <h3>Jump to</h3>
+    <div class="grid" id="jump-grid"></div>
+  </div>
+</div>
+
+<!-- ═══ SESSION ═══ -->
+<div class="pane" id="pane-roster">
+  <div class="crumb">FOCUS &middot; <span>CALENDAR</span> &middot; LIVE</div>
+
+  <div class="hdr">
+    <button class="back" onclick="pick('week',document.querySelectorAll('.sw button')[0])">&lsaquo; Back</button>
+    <h1>Session</h1>
+    <button class="add" title="Add to this session">+</button>
+  </div>
+
+  <div class="rhead">
+    <span class="rgrp"><i></i>Elementary</span>
+    <div class="rwhen">Thu Jul 30, 7:00 PM</div>
+    <div class="rsub">4 of 8 &middot; Toronto time</div>
+  </div>
+
+  <button class="textall">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg>
+    Text everyone
+  </button>
+
+  <div class="rsec">FORM DUE</div>
+
+  <button class="prow flagged">
+    <span class="av">NC</span>
+    <span class="pb"><span class="pn">Nia Charles</span><span class="pp">Dionne Charles</span></span>
+    <span class="acts">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg></span>
+    </span>
+  </button>
+
+  <div class="rsec">BOOKED IN</div>
+
+  <button class="prow">
+    <span class="av">JW</span>
+    <span class="pb"><span class="pn">Jordan Wu</span><span class="pp">Mei Wu</span></span>
+    <span class="acts">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg></span>
+    </span>
+  </button>
+
+  <button class="prow">
+    <span class="av">KO</span>
+    <span class="pb"><span class="pn">Kaya Osei</span><span class="pp">Femi Osei &middot; do not contact</span></span>
+    <span class="acts">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>
+      <span style="opacity:.35"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/><line x1="3" y1="21" x2="21" y2="3"/></svg></span>
+    </span>
+  </button>
+
+  <button class="prow">
+    <span class="av">ZT</span>
+    <span class="pb"><span class="pn">Zaire Thompson</span><span class="pp">Rochelle Thompson</span></span>
+    <span class="acts">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg></span>
+    </span>
+  </button>
+
+  <button class="prow">
+    <span class="av">LB</span>
+    <span class="pb"><span class="pn">Luca Bianchi</span><span class="pp">Sofia Bianchi</span></span>
+    <span class="acts">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg></span>
+    </span>
+  </button>
+</div>
+
+<script>
+function pick(k, el){
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + k));
+  document.querySelectorAll('.sw button').forEach(t => t.setAttribute('aria-selected','false'));
+  if (el) el.setAttribute('aria-selected','true');
+  window.scrollTo({top:0});
+}
+function go(){ pick('roster', document.querySelectorAll('.sw button')[1]); }
+
+/* ── agenda data ─────────────────────────────────────────────── */
+const TODAY = new Date(2026, 6, 30);                 // Thu Jul 30 2026
+const DAY = 86400000;
+const DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const CAP = 8;
+
+// weekly open-hours blocks: one session per block
+const SCHED = {
+  1: [{h:20, m:0,  g:'High School', c:2}],
+  2: [{h:19, m:0,  g:'Elementary',  c:1}],
+  3: [{h:19, m:0,  g:'Elementary',  c:1}, {h:20, m:0, g:'High School', c:2}],
+  4: [{h:19, m:0,  g:'Elementary',  c:1}, {h:20, m:0, g:'High School', c:2}],
+  6: [{h:10, m:0,  g:'Elementary',  c:1}, {h:11, m:30, g:'High School', c:2}],
+};
+
+const key = d => d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+// deterministic so the mockup looks the same every reload
+function seeded(d, h){
+  let s = (d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate()) * 31 + h;
+  s = (s * 1103515245 + 12345) & 0x7fffffff;
+  return (s % 1000) / 1000;
+}
+function booked(d, s){
+  const days = Math.round((d - TODAY) / DAY);
+  const r = seeded(d, s.h);
+  if (days < 0)  return Math.min(CAP, 2 + Math.floor(r * 7));   // past runs fuller
+  if (days <= 7) return Math.floor(r * 6);
+  if (days <= 21) return Math.floor(r * 4);
+  return Math.floor(r * 2);
+}
+// the two sessions carrying a pending post-trial form
+const FLAGGED = new Set([ key(new Date(2026,6,29)) + '-19', key(TODAY) + '-19' ]);
+
+function fmtTime(h, m){
+  const ap = h >= 12 ? 'PM' : 'AM';
+  const hh = h % 12 === 0 ? 12 : h % 12;
+  return hh + ':' + String(m).padStart(2,'0') + ' ' + ap;
+}
+
+function dayHTML(i){
+  const d = new Date(TODAY.getTime() + i * DAY);
+  const isToday = i === 0;
+  const past = i < 0;
+  const list = SCHED[d.getDay()] || [];
+
+  let rows = '';
+  for (const s of list){
+    const flag = FLAGGED.has(key(d) + '-' + s.h);
+    // a form can only be due for somebody who actually attended, so a flagged
+    // session is never empty
+    const b = flag ? Math.max(2, booked(d, s)) : booked(d, s);
+    const cls = ['sesh',
+      b === 0 ? 'open' : '',
+      b >= CAP ? 'full' : '',
+      flag ? 'flagged' : '',
+      past ? 'past' : ''].filter(Boolean).join(' ');
+    const col = s.c === 1 ? 'var(--g1)' : 'var(--g2)';
+    rows += `<button class="${cls}" ${b===0?`style="color:${col}"`:''} onclick="go()">
+      <span class="bar" style="background:${b===0?'currentColor':col}"></span>
+      <span class="time">${fmtTime(s.h, s.m)}</span>
+      <span class="grp">${s.g}</span>
+      ${flag ? '<span class="dot"></span>' : ''}
+      <span class="cap">${b}<small>/${CAP}</small></span>
+    </button>`;
+  }
+  if (!rows) rows = '<div class="emptyday">No sessions</div>';
+
+  return `<div class="day" data-i="${i}" data-mo="${d.getMonth()}" data-yr="${d.getFullYear()}" ${isToday?'id="today-anchor"':''}>
+    <div class="dayhd${isToday?' is-today':''}">
+      <span class="dw">${DOW[d.getDay()]}</span><span class="dn">${d.getDate()}</span>
+      ${isToday?'<span class="pill">Today</span>':''}
+    </div>${rows}</div>`;
+}
+
+/* ── windowed fetch: grow the list as either end comes into range ── */
+const PAGE = 28;          // days pulled per fetch
+const NEAR = 900;         // px from an edge that triggers the next fetch
+let loLoaded = -14, hiLoaded = 21;
+let fetching = false;
+
+function buildAgenda(){
+  const out = [];
+  for (let i = loLoaded; i <= hiLoaded; i++) out.push(dayHTML(i));
+  document.getElementById('agenda').innerHTML = out.join('');
+}
+
+function fetchOlder(){
+  if (fetching) return;
+  fetching = true;
+  const host = document.getElementById('agenda');
+  const before = document.documentElement.scrollHeight;
+  const out = [];
+  for (let i = loLoaded - PAGE; i < loLoaded; i++) out.push(dayHTML(i));
+  loLoaded -= PAGE;
+  host.insertAdjacentHTML('afterbegin', out.join(''));
+  // prepending pushes everything down, so give back exactly what we added or
+  // the view jumps out from under the thumb
+  window.scrollBy(0, document.documentElement.scrollHeight - before);
+  fetching = false;
+}
+
+function fetchNewer(){
+  if (fetching) return;
+  fetching = true;
+  const out = [];
+  for (let i = hiLoaded + 1; i <= hiLoaded + PAGE; i++) out.push(dayHTML(i));
+  hiLoaded += PAGE;
+  document.getElementById('agenda').insertAdjacentHTML('beforeend', out.join(''));
+  fetching = false;
+}
+
+function checkEdges(){
+  const doc = document.documentElement;
+  if (window.scrollY < NEAR) fetchOlder();
+  else if (doc.scrollHeight - window.scrollY - window.innerHeight < NEAR) fetchNewer();
+}
+
+// make sure a target day exists before we try to scroll to it
+function ensureLoaded(i){
+  let guard = 0;
+  while (i < loLoaded && guard++ < 60) fetchOlder();
+  while (i > hiLoaded && guard++ < 60) fetchNewer();
+}
+
+/* ── sticky month label + conditional Today button ───────────── */
+// everything pinned above the list: the mockup's screen switcher + the top block
+function stick(){
+  const sw = document.querySelector('.sw');
+  const tb = document.getElementById('topbar');
+  return (sw ? sw.offsetHeight : 0) + (tb ? tb.offsetHeight : 0);
+}
+function onScroll(){
+  const STICK = stick();
+  const days = document.querySelectorAll('#agenda .day');
+  for (const el of days){
+    const r = el.getBoundingClientRect();
+    if (r.bottom > STICK + 4){
+      const lbl = MON[+el.dataset.mo] + ' ' + el.dataset.yr;
+      const node = document.getElementById('mo-label');
+      if (!node.textContent.trim().startsWith(lbl)) node.childNodes[0].nodeValue = lbl + ' ';
+      break;
+    }
+  }
+  const anchor = document.getElementById('today-anchor');
+  const btn = document.getElementById('today-btn');
+  if (!anchor || !btn) return;
+  const a = anchor.getBoundingClientRect();
+  const visible = a.bottom > STICK && a.top < window.innerHeight;
+  btn.classList.toggle('on', !visible);
+  document.getElementById('today-arrow').innerHTML = a.top > 0 ? '&darr;' : '&uarr;';
+}
+function jumpToday(smooth){
+  const el = document.getElementById('today-anchor');
+  window.scrollTo({ top: el.offsetTop - stick(), behavior: smooth === false ? 'auto' : 'smooth' });
+}
+// land on today before the user sees anything, and re-settle once webfonts
+// finish swapping (they change row heights and would leave us off by ~40px)
+function settleOnToday(){
+  jumpToday(false);
+  onScroll();
+}
+
+/* ── month jump sheet ────────────────────────────────────────── */
+function openJump(){
+  const grid = document.getElementById('jump-grid');
+  const out = [];
+  for (let i = -2; i <= 5; i++){
+    const d = new Date(2026, 6 + i, 1);
+    const now = i === 0;
+    out.push(`<button class="${now?'now':''}" onclick="jumpTo(${d.getFullYear()},${d.getMonth()})">${MON[d.getMonth()].slice(0,3)}<br><span style="font-weight:600;font-size:10.5px;opacity:.7">${d.getFullYear()}</span></button>`);
+  }
+  grid.innerHTML = out.join('');
+  document.getElementById('jump').classList.add('on');
+}
+function closeJump(){ document.getElementById('jump').classList.remove('on'); }
+function jumpTo(yr, mo){
+  closeJump();
+  // the target month may be outside what is loaded, so pull it in first
+  const target = new Date(yr, mo, 1);
+  ensureLoaded(Math.round((target - TODAY) / DAY));
+  const el = [...document.querySelectorAll('#agenda .day')]
+    .find(e => +e.dataset.mo === mo && +e.dataset.yr === yr);
+  if (el) window.scrollTo({ top: el.offsetTop - stick(), behavior: 'smooth' });
+}
+
+buildAgenda();
+window.addEventListener('scroll', () => { onScroll(); checkEdges(); }, { passive: true });
+settleOnToday();
+window.addEventListener('load', settleOnToday);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(settleOnToday);
+function theme(){
+  const r = document.documentElement;
+  r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark';
+}
+</script>
+</body>
+</html>
