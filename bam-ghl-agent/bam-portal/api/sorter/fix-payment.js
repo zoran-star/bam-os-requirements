@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 export const maxDuration = 60; // Stripe reads/writes + one Anthropic call
 
 // Vercel Serverless Function — "Fix the next payment" for a staged member.
@@ -64,25 +65,9 @@ async function resolveUser(req) {
 
 function stripeKey() { return process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY; }
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-  const encoded = body
-    ? new URLSearchParams(Object.entries(body).reduce((a, [k, v]) => {
-        if (v !== undefined && v !== null) a[k] = String(v);
-        return a;
-      }, {})).toString()
-    : undefined;
-  const res = await fetch(`${STRIPE_API}${path}`, { method, headers, body: encoded });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) {
-    const err = new Error(json?.error?.message || `Stripe ${res.status}`);
-    err.stripeStatus = res.status;
-    throw err;
-  }
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js): platform key + Stripe-Account
+  // header for Connect academies, the academy's own key when a direct row exists.
+  return transportStripeFetch(path, { method, body, stripeAccount, idempotencyKey });
 }
 
 const iso = (unix) => (unix ? new Date(unix * 1000).toISOString().slice(0, 10) : null);

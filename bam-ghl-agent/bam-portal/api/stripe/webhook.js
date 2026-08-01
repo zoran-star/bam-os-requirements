@@ -1,10 +1,21 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { notifyClientPush } from "../push/_send.js";
-// Vercel Serverless Function — Stripe webhook (Connect events)
+// Vercel Serverless Function — Stripe webhook (Connect + direct-key events)
 //
-// Single platform-level Stripe webhook receiving events from every
-// connected academy account. Keeps the portal's `members` table in
-// sync with Stripe even when things change OUTSIDE the portal.
+// ONE dispatcher, TWO arrival paths:
+//   no ?t= query param   the single platform-level Connect endpoint, exactly as
+//                        it has always been: events for every OAuth-connected
+//                        academy, verified against STRIPE_WEBHOOK_SECRET.
+//   ?t=<token>           a DIRECT-KEY academy's own endpoint (registered on ITS
+//                        Stripe account by api/stripe/ensure-academy-webhook.js).
+//                        The token resolves a stripe_academy_webhooks row and the
+//                        event is verified against THAT academy's whsec_ secret.
+// There is NO fallback between the two paths: a token request never verifies
+// against the platform secret, and a tokenless request never touches the token
+// table.
+//
+// Keeps the portal's `members` table in sync with Stripe even when things
+// change OUTSIDE the portal.
 //
 // Events handled:
 //   customer.subscription.created   →  link pending member ↔ first sub
@@ -36,6 +47,9 @@ import { notifyClientPush } from "../push/_send.js";
 // request body with the webhook signing secret.
 
 import crypto from "node:crypto";
+import { decryptSecret } from "../_stripe-direct-crypto.js";
+import { CONNECT_ONLY_EVENTS } from "./ensure-academy-webhook.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 import { fireOnboardingActivations } from "../onboarding/activations.js";
 import { ghl } from "../ghl/_core.js";
 import { findOpenOpp, setStatus } from "../agent/_store.js";
@@ -52,7 +66,6 @@ import { resolveOrMintPortalContact } from "../_contacts.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-const STRIPE_API = "https://api.stripe.com/v1";
 const GHL_V2 = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
 
@@ -127,16 +140,81 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// Historical signature (every call site and the receipts module pass
+// (path[, body], stripeAccount)) - but the body now routes through THE ONE SEAM,
+// api/_stripe-transport.js. A Connect academy's account id resolves to the
+// platform key + Stripe-Account header (what the inline fetch here always did);
+// a direct-key academy's account id reverse-resolves to its own decrypted key
+// with no header. Nothing in this file may ask which transport it got.
 async function stripeFetch(path, stripeAccount) {
-  const stripeSecret = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
-  const headers = { Authorization: `Bearer ${stripeSecret}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const res = await fetch(`${STRIPE_API}${path}`, { headers });
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Stripe ${res.status}: ${txt}`);
+  return transportStripeFetch(path, { stripeAccount });
+}
+
+// ─── Tenant routing (Connect endpoint vs direct-key academy endpoints) ────────
+// Runs BEFORE signature verification: the request itself decides which signing
+// secret is even eligible. No ?t= token -> the platform Connect path, verified
+// against STRIPE_WEBHOOK_SECRET exactly as before (no DB read, no async work on
+// the way in). A ?t= token -> the academy whose stripe_academy_webhooks row
+// carries that token, verified against ITS endpoint's whsec_ secret. An unknown
+// token answers 401 and touches nothing - public endpoints get scanned, so no
+// audit rows for strangers (log-only). NEVER a fallback between the two paths,
+// in either direction.
+function routingToken(req) {
+  if (req.query && req.query.t != null && req.query.t !== "") return String(req.query.t);
+  const url = String(req.url || "");
+  const q = url.indexOf("?");
+  if (q < 0) return null;
+  return new URLSearchParams(url.slice(q + 1)).get("t") || null;
+}
+
+async function resolveTenantContext(req) {
+  const token = routingToken(req);
+  if (!token) {
+    return { kind: "connect", secret: process.env.STRIPE_WEBHOOK_SECRET, clientId: null };
   }
-  return res.json();
+  const rows = await sb(
+    `stripe_academy_webhooks?token=eq.${encodeURIComponent(token)}&select=client_id,secret_enc&limit=1`
+  );
+  const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  if (!row || !row.secret_enc) return null; // caller answers 401 - no cross-path fallback, ever
+  return { kind: "direct", secret: decryptSecret(row.secret_enc), clientId: row.client_id };
+}
+
+// The per-event tenant every handler receives instead of a bare account string.
+//   kind      'connect' | 'direct'
+//   clientId  the academy this event belongs to. Null is tolerated on connect
+//             events whose account matches no client row - handlers SKIP those,
+//             they never fall back to a global lookup.
+//   account   event.account for connect; the client's stripe_connect_account_id
+//             for direct (the resolver reverse-looks-up direct rows by account
+//             id, so passing it through the existing helpers routes every call
+//             to the academy's own key).
+//   label     'connect:acct_x' | 'direct:<clientId>', for audit trails only.
+async function buildTenant(routing, event) {
+  let clientId = routing.clientId || null;
+  let account = null;
+  if (routing.kind === "connect") {
+    account = event.account || null;
+    if (account) {
+      const rows = await sb(
+        `clients?stripe_connect_account_id=eq.${encodeURIComponent(account)}&select=id&limit=1`
+      );
+      clientId = (Array.isArray(rows) && rows[0] && rows[0].id) || null;
+    }
+  } else {
+    const rows = await sb(
+      `clients?id=eq.${encodeURIComponent(clientId)}&select=stripe_connect_account_id&limit=1`
+    );
+    account = (Array.isArray(rows) && rows[0] && rows[0].stripe_connect_account_id) || null;
+  }
+  return {
+    kind: routing.kind,
+    clientId,
+    account,
+    label: routing.kind === "direct" ? `direct:${clientId}` : `connect:${account || "platform"}`,
+    stripeFetch: (path) => stripeFetch(path, account),
+    stripePost: (path, body) => stripePost(path, body, account),
+  };
 }
 
 // ─── Parent receipts (api/_member-receipts.js) ────────────────────────────────
@@ -181,17 +259,10 @@ async function sendPaymentReceipt(member, inv, connectedAccount) {
   }
 }
 
+// Same routing as stripeFetch above; the transport encodes the flat body the
+// same way this helper always did.
 async function stripePost(path, body, stripeAccount) {
-  const stripeSecret = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
-  const headers = { Authorization: `Bearer ${stripeSecret}`, "Content-Type": "application/x-www-form-urlencoded" };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const encoded = new URLSearchParams(
-    Object.entries(body || {}).reduce((a, [k, v]) => { if (v != null) a[k] = String(v); return a; }, {})
-  ).toString();
-  const res = await fetch(`${STRIPE_API}${path}`, { method: "POST", headers, body: encoded });
-  const txt = await res.text();
-  if (!res.ok) throw new Error(`Stripe ${res.status}: ${txt}`);
-  return txt ? JSON.parse(txt) : {};
+  return transportStripeFetch(path, { method: "POST", body, stripeAccount });
 }
 
 // ─── Pipeline exit on payment: mark the member's GHL opportunity WON ───────────
@@ -349,6 +420,51 @@ async function writeAudit({ client_id, member_id, action_type, args, stripe_resp
   } catch { /* non-fatal */ }
 }
 
+// ─── Tenant-scoped row resolution ────────────────────────────────────────────
+// Stripe ids (customer, subscription) are only unique PER Stripe account, and
+// the object-keyed handlers below used to resolve members across every academy
+// at once - a global lookup that stayed safe only while no two academies could
+// ever share an id. With academy-owned accounts (direct keys) that assumption is
+// dead, so every members/cancellations resolution is scoped to the event's
+// tenant. MISS-PATH DISCIPLINE: when the scoped lookup finds nothing, the OLD
+// unscoped query runs once as a PROBE (id + client_id only). A probe hit on
+// another tenant means the old code would have written to that tenant's member -
+// that is recorded loudly and processing SKIPS. Never a silent write to another
+// tenant's member.
+async function findTenantRow(tenant, event, table, filter, select = "*", extra = "") {
+  const rows = await sb(
+    `${table}?${filter}&client_id=eq.${encodeURIComponent(tenant.clientId)}&select=${select}${extra}&limit=1`
+  );
+  if (Array.isArray(rows) && rows[0]) return rows[0];
+  const probe = await sb(`${table}?${filter}&select=id,client_id${extra}&limit=1`);
+  const hit = Array.isArray(probe) && probe[0] ? probe[0] : null;
+  if (hit && hit.client_id !== tenant.clientId) {
+    await writeAudit({
+      client_id:   tenant.clientId,
+      action_type: "stripe-cross-tenant-member-mismatch",
+      args: {
+        member_id: hit.id, member_client_id: hit.client_id,
+        tenant_client_id: tenant.clientId, event_id: event && event.id, table,
+      },
+    });
+    return { crossTenant: true };
+  }
+  return null;
+}
+
+// A connect event whose account matches no client row: we cannot say whose data
+// this is, so nothing may be resolved globally "to be helpful". Skip, on the
+// record.
+async function auditUnknownTenantSkip(tenant, event) {
+  await writeAudit({
+    action_type: "stripe-unknown-tenant-skip",
+    args: {
+      event_id: event && event.id, event_type: event && event.type,
+      account: (tenant && tenant.account) || null,
+    },
+  });
+}
+
 // ─────────────────────────────────────────────────────────
 // Phase 5 access sync (typed entitlements) — see
 // api/_runtime/access-sync.ts + docs/parent-runtime-cutover-guardrails.md.
@@ -495,9 +611,15 @@ async function handler(req, res) {
 
   const rawBody = await readRawBody(req);
   const sig     = req.headers["stripe-signature"];
-  const secret  = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!verifyStripeSignature(rawBody, sig, secret)) {
+  // Which tenant - and therefore which signing secret - BEFORE verification.
+  const routing = await resolveTenantContext(req);
+  if (!routing) {
+    console.error("stripe webhook: unknown routing token");
+    return res.status(401).json({ error: "unknown token" });
+  }
+
+  if (!verifyStripeSignature(rawBody, sig, routing.secret)) {
     return res.status(400).json({ error: "invalid signature" });
   }
 
@@ -507,30 +629,63 @@ async function handler(req, res) {
 
   const connectedAccount = event.account || null;
 
+  let tenant = null;
   try {
+    // An academy endpoint is never subscribed to Connect plumbing (see
+    // CONNECT_ONLY_EVENTS in api/stripe/ensure-academy-webhook.js), so one
+    // arriving WITH a token is forged or misrouted. Refused on the ROUTING,
+    // before any tenant lookup: an academy's own signing secret must never be
+    // able to reach the Connect-status writer.
+    if (routing.kind === "direct" && CONNECT_ONLY_EVENTS.includes(event.type)) {
+      return res.status(200).json({ skipped: "connect-only event on an academy endpoint" });
+    }
+
+    // The academy revoked our access in their own Stripe dashboard. THE ONLY
+    // route to handleAccountDeauthorized, which is THE ONLY writer of
+    // stripe_connect_status='disabled' - and it dispatches BEFORE buildTenant,
+    // deliberately: the handler never uses the tenant, and buildTenant's clients
+    // read would otherwise be a third database read on this path whose failure
+    // rides into the catch below, which acks 200 and makes Stripe drop a REAL
+    // revocation forever. On the revocation path every database read either
+    // answers or becomes a 500 retry (deauthGuardedRead) - deferred, never
+    // dropped. account.updated is deliberately not routed here - see the block
+    // above the handler for why the two are not the same change.
+    if (event.type === DEAUTHORIZED_EVENT) {
+      return await handleAccountDeauthorized(event, connectedAccount, res);
+    }
+
+    tenant = await buildTenant(routing, event);
+
     switch (event.type) {
-      case "customer.subscription.created": return await handleSubCreated(event, connectedAccount, res);
-      case "customer.subscription.deleted": return await handleSubDeleted(event, connectedAccount, res);
-      case "customer.subscription.updated": return await handleSubUpdated(event, connectedAccount, res);
-      case "invoice.payment_failed":        return await handleInvoiceFailed(event, connectedAccount, res);
-      case "invoice.payment_succeeded":     return await handleInvoiceSucceeded(event, connectedAccount, res);
-      case "invoice.paid":                  return await handleInvoiceSucceeded(event, connectedAccount, res);
-      case "payment_method.attached":       return await handlePaymentMethodAttached(event, connectedAccount, res);
-      case "charge.refunded":               return await handleChargeRefunded(event, connectedAccount, res);
-      case "customer.created":              return await handleCustomerCreated(event, connectedAccount, res);
-      case "price.created":                 return await handlePriceUpserted(event, connectedAccount, res);
-      case "price.updated":                 return await handlePriceUpserted(event, connectedAccount, res);
-      case "checkout.session.completed":    return await handleStoreOrder(event, connectedAccount, res);
-      // The academy revoked our access in their own Stripe dashboard. THE ONLY route
-      // to handleAccountDeauthorized, which is THE ONLY writer of
-      // stripe_connect_status='disabled'. account.updated is deliberately not here -
-      // see the block above that handler for why the two are not the same change.
-      case DEAUTHORIZED_EVENT:              return await handleAccountDeauthorized(event, connectedAccount, res);
+      case "customer.subscription.created": return await handleSubCreated(event, tenant, res);
+      case "customer.subscription.deleted": return await handleSubDeleted(event, tenant, res);
+      case "customer.subscription.updated": return await handleSubUpdated(event, tenant, res);
+      case "invoice.payment_failed":        return await handleInvoiceFailed(event, tenant, res);
+      case "invoice.payment_succeeded":     return await handleInvoiceSucceeded(event, tenant, res);
+      case "invoice.paid":                  return await handleInvoiceSucceeded(event, tenant, res);
+      case "payment_method.attached":       return await handlePaymentMethodAttached(event, tenant, res);
+      case "charge.refunded":               return await handleChargeRefunded(event, tenant, res);
+      case "customer.created":              return await handleCustomerCreated(event, tenant, res);
+      case "price.created":                 return await handlePriceUpserted(event, tenant, res);
+      case "price.updated":                 return await handlePriceUpserted(event, tenant, res);
+      case "checkout.session.completed":    return await handleStoreOrder(event, tenant, res);
       default:                              return res.status(200).json({ skipped: event.type });
     }
   } catch (e) {
-    // Return 200 so Stripe doesn't retry endlessly. Log for inspection.
+    // Return 200 so Stripe doesn't retry endlessly. Log for inspection, and leave
+    // a best-effort audit trace naming the transport - a direct academy's failed
+    // event would otherwise be invisible (nothing 4xxs, and nobody watches one
+    // academy's endpoint logs).
     console.error("stripe webhook error:", event.type, e.message);
+    await writeAudit({
+      client_id:   (tenant && tenant.clientId) || null,
+      action_type: "stripe-webhook-error",
+      args: {
+        event_id: event.id, event_type: event.type,
+        transport: (tenant && tenant.label) || null,
+        error: String((e && e.message) || e).slice(0, 300),
+      },
+    }).catch(() => {});
     return res.status(200).json({ error: e.message, event_type: event.type });
   }
 }
@@ -541,7 +696,7 @@ async function handler(req, res) {
 // First payment / first sub. Match a pending member by parent email and
 // link the Stripe IDs + flip to 'live'. Siblings (one parent → many
 // athletes) handled FIFO: oldest pending member matches first sub.
-async function handleSubCreated(event, connectedAccount, res) {
+async function handleSubCreated(event, tenant, res) {
   const sub = event.data && event.data.object;
   if (!sub) return res.status(200).json({ skipped: "no sub object" });
   // PORTAL-OWNED onboarding subs are created by api/onboarding/checkout.js as
@@ -551,6 +706,11 @@ async function handleSubCreated(event, connectedAccount, res) {
   if (sub.metadata && isPortalOwnedOrigin(sub.metadata.origin)) {
     return res.status(200).json({ skipped: "portal-owned sub — activated on first paid invoice" });
   }
+  if (!tenant.clientId) {
+    await auditUnknownTenantSkip(tenant, event);
+    return res.status(200).json({ skipped: "no client for event account" });
+  }
+  const connectedAccount = tenant.account;
   const customerId = sub.customer;
   const customer = await stripeFetch(`/customers/${customerId}`, connectedAccount);
   const email = ((customer && customer.email) || "").toLowerCase().trim();
@@ -558,6 +718,7 @@ async function handleSubCreated(event, connectedAccount, res) {
 
   const candidates = await sb(
     `members?status=eq.payment_method_required` +
+    `&client_id=eq.${encodeURIComponent(tenant.clientId)}` +
     `&parent_email=eq.${encodeURIComponent(email)}` +
     `&stripe_subscription_id=is.null` +
     `&select=id,client_id,athlete_name,parent_email,ghl_contact_id,ghl_opportunity_id` +
@@ -566,6 +727,24 @@ async function handleSubCreated(event, connectedAccount, res) {
   const target = Array.isArray(candidates) && candidates[0];
 
   if (!target) {
+    // Miss-path discipline: probe the OLD unscoped query once. A hit on another
+    // academy is exactly the cross-tenant link the unscoped code would have
+    // made - record it loudly and skip instead of linking.
+    const probe = await sb(
+      `members?status=eq.payment_method_required` +
+      `&parent_email=eq.${encodeURIComponent(email)}` +
+      `&stripe_subscription_id=is.null` +
+      `&select=id,client_id&order=created_at.asc&limit=1`
+    );
+    const hit = Array.isArray(probe) && probe[0] ? probe[0] : null;
+    if (hit && hit.client_id !== tenant.clientId) {
+      await writeAudit({
+        client_id:   tenant.clientId,
+        action_type: "stripe-cross-tenant-member-mismatch",
+        args: { member_id: hit.id, member_client_id: hit.client_id, tenant_client_id: tenant.clientId, event_id: event.id, table: "members" },
+      });
+      return res.status(200).json({ skipped: "cross-tenant member mismatch" });
+    }
     await writeAudit({
       action_type: "stripe-intake-orphan",
       args:        { event_id: event.id, customer_email: email, sub_id: sub.id, connected_account: connectedAccount },
@@ -696,14 +875,17 @@ async function handleSubCreated(event, connectedAccount, res) {
 // "sorry to see you go" would go, and it is the last message an academy would ever
 // want a machine to write. The cancellation is recorded, the owner is notified, and
 // a person picks it up from there.
-async function handleSubDeleted(event, connectedAccount, res) {
+async function handleSubDeleted(event, tenant, res) {
   const sub = event.data && event.data.object;
   if (!sub) return res.status(200).json({ skipped: "no sub object" });
+  if (!tenant.clientId) {
+    await auditUnknownTenantSkip(tenant, event);
+    return res.status(200).json({ skipped: "no client for event account" });
+  }
+  const connectedAccount = tenant.account;
 
-  const rows = await sb(
-    `members?stripe_subscription_id=eq.${encodeURIComponent(sub.id)}&select=*&limit=1`
-  );
-  const member = Array.isArray(rows) && rows[0];
+  const member = await findTenantRow(tenant, event, "members", `stripe_subscription_id=eq.${encodeURIComponent(sub.id)}`);
+  if (member && member.crossTenant) return res.status(200).json({ skipped: "cross-tenant member mismatch" });
   if (!member) return res.status(200).json({ skipped: "no member with that sub_id" });
 
   // If a cancellations row was already created by the portal (e.g. period-end
@@ -711,7 +893,7 @@ async function handleSubDeleted(event, connectedAccount, res) {
   // a duplicate. Otherwise insert one now (covers cancellations done directly
   // in the Stripe Dashboard, outside the portal).
   const existingCancel = await sb(
-    `cancellations?member_id=eq.${member.id}&type=eq.cancel&select=id&limit=1`
+    `cancellations?member_id=eq.${member.id}&client_id=eq.${encodeURIComponent(tenant.clientId)}&type=eq.cancel&select=id&limit=1`
   );
   const cancellationAlreadyLogged = Array.isArray(existingCancel) && existingCancel.length > 0;
   if (!cancellationAlreadyLogged) {
@@ -790,7 +972,7 @@ async function handleSubDeleted(event, connectedAccount, res) {
 // If the sub's price changed AND the new price is in the canonical map,
 // sync members.plan. Non-canonical / grandfathered prices are left
 // alone (we don't want to silently overwrite a special-case label).
-async function handleSubUpdated(event, connectedAccount, res) {
+async function handleSubUpdated(event, tenant, res) {
   const sub = event.data && event.data.object;
   if (!sub) return res.status(200).json({ skipped: "no sub object" });
   const newPriceId = sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].price && sub.items.data[0].price.id;
@@ -798,10 +980,12 @@ async function handleSubUpdated(event, connectedAccount, res) {
   const newPlan = PRICE_TO_PLAN[newPriceId];
   if (!newPlan) return res.status(200).json({ skipped: "price not in canonical map", price: newPriceId });
 
-  const rows = await sb(
-    `members?stripe_subscription_id=eq.${encodeURIComponent(sub.id)}&select=id,plan,client_id,athlete_name&limit=1`
-  );
-  const member = Array.isArray(rows) && rows[0];
+  if (!tenant.clientId) {
+    await auditUnknownTenantSkip(tenant, event);
+    return res.status(200).json({ skipped: "no client for event account" });
+  }
+  const member = await findTenantRow(tenant, event, "members", `stripe_subscription_id=eq.${encodeURIComponent(sub.id)}`, "id,plan,client_id,athlete_name");
+  if (member && member.crossTenant) return res.status(200).json({ skipped: "cross-tenant member mismatch" });
   if (!member) return res.status(200).json({ skipped: "no member with that sub_id" });
   if (member.plan === newPlan) return res.status(200).json({ skipped: "plan already in sync" });
 
@@ -850,20 +1034,24 @@ async function handleSubUpdated(event, connectedAccount, res) {
 // human then decides how to have that conversation. An automated dunning email
 // would arrive before the human does and set the wrong tone for the exact moment
 // the relationship is most fragile.
-async function handleInvoiceFailed(event, connectedAccount, res) {
+async function handleInvoiceFailed(event, tenant, res) {
   const inv = event.data && event.data.object;
   if (!inv) return res.status(200).json({ skipped: "no invoice" });
   const subId  = invoiceSubId(inv);
   const custId = inv.customer;
 
-  let member = null;
-  if (subId) {
-    const r = await sb(`members?stripe_subscription_id=eq.${encodeURIComponent(subId)}&select=*&limit=1`);
-    if (Array.isArray(r) && r[0]) member = r[0];
-  }
-  if (!member && custId) {
-    const r = await sb(`members?stripe_customer_id=eq.${encodeURIComponent(custId)}&select=*&limit=1`);
-    if (Array.isArray(r) && r[0]) member = r[0];
+  let member = null, mismatch = false;
+  if (!tenant.clientId) {
+    await auditUnknownTenantSkip(tenant, event);
+  } else {
+    if (subId) {
+      const f = await findTenantRow(tenant, event, "members", `stripe_subscription_id=eq.${encodeURIComponent(subId)}`);
+      if (f && f.crossTenant) mismatch = true; else member = f;
+    }
+    if (!member && !mismatch && custId) {
+      const f = await findTenantRow(tenant, event, "members", `stripe_customer_id=eq.${encodeURIComponent(custId)}`);
+      if (f && f.crossTenant) mismatch = true; else member = f;
+    }
   }
   if (!member) return res.status(200).json({ skipped: "no member match for invoice" });
   if (member.status === "payment_failed") {
@@ -1081,20 +1269,25 @@ export async function activatePortalOnboardingMember({ member, onbSub, inv, conn
   return { ok: true, action: silent ? "import-activated-silent" : "onboarding-activated", member_id: member.id, activations, onboarding_enroll: onboardingEnroll, sales_exit: salesExit, sales_sweep: salesSweep, staff_notify: staffNotify, commitment_schedule: commitmentSchedule, pipeline_won: pipelineWon };
 }
 
-async function handleInvoiceSucceeded(event, connectedAccount, res) {
+async function handleInvoiceSucceeded(event, tenant, res) {
   const inv = event.data && event.data.object;
   if (!inv) return res.status(200).json({ skipped: "no invoice" });
+  const connectedAccount = tenant.account;
   const subId  = invoiceSubId(inv);
   const custId = inv.customer;
 
-  let member = null;
-  if (subId) {
-    const r = await sb(`members?stripe_subscription_id=eq.${encodeURIComponent(subId)}&select=*&limit=1`);
-    if (Array.isArray(r) && r[0]) member = r[0];
-  }
-  if (!member && custId) {
-    const r = await sb(`members?stripe_customer_id=eq.${encodeURIComponent(custId)}&select=*&limit=1`);
-    if (Array.isArray(r) && r[0]) member = r[0];
+  let member = null, mismatch = false;
+  if (!tenant.clientId) {
+    await auditUnknownTenantSkip(tenant, event);
+  } else {
+    if (subId) {
+      const f = await findTenantRow(tenant, event, "members", `stripe_subscription_id=eq.${encodeURIComponent(subId)}`);
+      if (f && f.crossTenant) mismatch = true; else member = f;
+    }
+    if (!member && !mismatch && custId) {
+      const f = await findTenantRow(tenant, event, "members", `stripe_customer_id=eq.${encodeURIComponent(custId)}`);
+      if (f && f.crossTenant) mismatch = true; else member = f;
+    }
   }
   if (!member) return res.status(200).json({ skipped: "no member match for invoice" });
 
@@ -1244,16 +1437,18 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
 // successful invoice (handleInvoiceSucceeded). Lets staff see "card
 // updated at 10:23am" when scrolling a member's history without
 // digging into Stripe.
-async function handlePaymentMethodAttached(event, connectedAccount, res) {
+async function handlePaymentMethodAttached(event, tenant, res) {
   const pm = event.data && event.data.object;
   if (!pm) return res.status(200).json({ skipped: "no payment_method" });
   const custId = pm.customer;
   if (!custId) return res.status(200).json({ skipped: "no customer on payment_method" });
+  if (!tenant.clientId) {
+    await auditUnknownTenantSkip(tenant, event);
+    return res.status(200).json({ skipped: "no client for event account" });
+  }
 
-  const rows = await sb(
-    `members?stripe_customer_id=eq.${encodeURIComponent(custId)}&select=id,client_id&limit=1`
-  );
-  const member = Array.isArray(rows) && rows[0];
+  const member = await findTenantRow(tenant, event, "members", `stripe_customer_id=eq.${encodeURIComponent(custId)}`, "id,client_id");
+  if (member && member.crossTenant) return res.status(200).json({ skipped: "cross-tenant member mismatch" });
   if (!member) return res.status(200).json({ skipped: "no member with that customer_id" });
 
   await writeAudit({
@@ -1282,24 +1477,30 @@ async function handlePaymentMethodAttached(event, connectedAccount, res) {
 // when the refund was created in the Stripe Dashboard (outside our portal).
 // Mirror any refund rows that aren't already in `refunds` (idempotent on
 // stripe_refund_id) so the portal's refund history stays complete.
-async function handleChargeRefunded(event, connectedAccount, res) {
+async function handleChargeRefunded(event, tenant, res) {
   const charge = event.data && event.data.object;
   if (!charge) return res.status(200).json({ skipped: "no charge object" });
   const custId = charge.customer;
   if (!custId) return res.status(200).json({ skipped: "no customer on charge" });
+  if (!tenant.clientId) {
+    await auditUnknownTenantSkip(tenant, event);
+    return res.status(200).json({ skipped: "no client for event account" });
+  }
 
-  const memberRows = await sb(
-    `members?stripe_customer_id=eq.${encodeURIComponent(custId)}&select=*&limit=1`
-  );
-  let member = Array.isArray(memberRows) && memberRows[0];
+  let member = await findTenantRow(tenant, event, "members", `stripe_customer_id=eq.${encodeURIComponent(custId)}`);
+  if (member && member.crossTenant) return res.status(200).json({ skipped: "cross-tenant member mismatch" });
 
   // Member may have been cancelled/deleted already. Try cancellations as
   // fallback so we still log a refund row for the historical relationship.
   if (!member) {
-    const cancelRows = await sb(
-      `cancellations?stripe_customer_id=eq.${encodeURIComponent(custId)}&select=client_id,member_id,athlete_name,parent_name,stripe_subscription_id&order=created_at.desc&limit=1`
+    const cRow = await findTenantRow(
+      tenant, event, "cancellations",
+      `stripe_customer_id=eq.${encodeURIComponent(custId)}`,
+      "client_id,member_id,athlete_name,parent_name,stripe_subscription_id",
+      "&order=created_at.desc"
     );
-    const c = Array.isArray(cancelRows) && cancelRows[0];
+    if (cRow && cRow.crossTenant) return res.status(200).json({ skipped: "cross-tenant member mismatch" });
+    const c = cRow;
     if (c) {
       member = {
         id:                     c.member_id,
@@ -1360,6 +1561,19 @@ async function handleChargeRefunded(event, connectedAccount, res) {
   return res.status(200).json({ ok: true, action: "refunds-mirrored", inserted, skipped, member_id: member.id });
 }
 
+// Every database read on the DEAUTHORIZED path goes through this. Returns
+// { rows } on an answer or { failed: true } when the database could not be
+// asked - and the caller then answers 500 so Stripe RETRIES. The query string
+// is built at the call site, so this helper knows nothing about columns.
+async function deauthGuardedRead(path) {
+  try {
+    return { rows: await sb(path) };
+  } catch (e) {
+    console.error("[webhook] deauthorized: lookup failed, asking Stripe to retry:", (e && e.message) || e);
+    return { failed: true };
+  }
+}
+
 // ─────────────────────────────────────────────────────────
 // account.application.deauthorized
 // ─────────────────────────────────────────────────────────
@@ -1390,7 +1604,9 @@ async function handleChargeRefunded(event, connectedAccount, res) {
 //   1. REVOKED_STATUS is the only occurrence of the string in this file, and it is
 //      read in exactly one place - the PATCH below.
 //   2. That PATCH lives in this function and nowhere else. This function is called
-//      from exactly one place: the single switch case for this one event type.
+//      from exactly one place: the single guarded dispatch in handler() for this
+//      one event type, which runs BEFORE any tenant lookup so no other read's
+//      failure can sit between verification and this handler.
 //   3. No catch block in this file writes stripe_connect_status. The top-level catch
 //      in handler() logs and returns 200; it does not touch the database. So an
 //      error on ANY path, including inside this function, leaves the status alone.
@@ -1426,15 +1642,56 @@ async function handleAccountDeauthorized(event, connectedAccount, res) {
   const acct = connectedAccount || null;
   if (!acct) return res.status(200).json({ skipped: "no connected account on the event" });
 
-  const rows = await sb(
+  // ⛔ THE ONE DELIBERATE EXCEPTION to this file's swallow-to-200 pattern, applied
+  // to BOTH reads on this path (this lookup and the direct-key guard below). A
+  // failed read here cannot tell "unknown academy" from "database down", and a
+  // 200 ack makes Stripe mark the revocation delivered and never retry. 500 =
+  // retry: the handler is idempotent (a replay that finds the flip already done
+  // skips without a second write), and the fail direction is preserved - a blip
+  // still never flips anybody, it only defers the decision until the database
+  // answers.
+  const looked = await deauthGuardedRead(
     `clients?stripe_connect_account_id=eq.${encodeURIComponent(acct)}` +
     `&select=id,business_name,stripe_connect_status&limit=1`
   );
+  if (looked.failed) {
+    return res.status(500).json({ error: "academy lookup failed - retry" });
+  }
+  const rows = looked.rows;
   const client = Array.isArray(rows) && rows[0];
   // An account we do not know: another integration on the same platform, an academy
   // that was already re-pointed at a different Stripe account, or a replay of an old
   // event. Nothing to do, and nothing to raise about it.
   if (!client) return res.status(200).json({ skipped: "no academy with that connected account" });
+
+  // DIRECT-KEY ACADEMIES ARE NOT DISCONNECTED BY A CONNECT REVOCATION. An academy
+  // running on its own restricted key (client_stripe_direct, status active) may
+  // still have a stale Connect OAuth link from before the key entry; the owner
+  // revoking THAT tears down nothing the portal now uses - the key routes every
+  // call. Flipping the status here would hide every billing action from an academy
+  // whose transport is working perfectly. Skip, and leave a trace.
+  // Same exception as the lookup above: a guard failure cannot tell a direct-key
+  // academy (must NOT be flipped) from a Connect academy (MUST be flipped), so
+  // it defers via 500 rather than guessing - or dropping.
+  const guard = await deauthGuardedRead(
+    `client_stripe_direct?client_id=eq.${client.id}&status=eq.active&select=client_id,status&limit=1`
+  );
+  if (guard.failed) {
+    return res.status(500).json({ error: "direct-key guard lookup failed - retry" });
+  }
+  const directRows = guard.rows;
+  if (Array.isArray(directRows) && directRows[0]) {
+    await writeAudit({
+      client_id:   client.id,
+      member_id:   null,
+      action_type: "stripe-access-revoked-skipped",
+      args:        {
+        event_id: event.id, event_type: event.type, connected_account: acct,
+        note: "direct-key academy, stale OAuth revocation ignored",
+      },
+    });
+    return res.status(200).json({ skipped: "direct-key academy, stale OAuth revocation ignored", client_id: client.id });
+  }
 
   const prev = client.stripe_connect_status || null;
   if (prev === REVOKED_STATUS) {
@@ -1489,14 +1746,14 @@ async function handleAccountDeauthorized(event, connectedAccount, res) {
 // contacts.stripe_customer_id stamped, no match mints a contact
 // (source='stripe-import'). Ambiguous cases are left for the next sweep -
 // no review row is written from webhook context. Best-effort, always 200.
-async function handleCustomerCreated(event, connectedAccount, res) {
+async function handleCustomerCreated(event, tenant, res) {
   const cust = event.data && event.data.object;
   if (!cust || !cust.id) return res.status(200).json({ skipped: "no customer" });
   try {
-    if (!connectedAccount) return res.status(200).json({ skipped: "platform-level customer" });
-    const cRows = await sb(`clients?stripe_connect_account_id=eq.${encodeURIComponent(connectedAccount)}&select=id&limit=1`);
+    if (!tenant.clientId) return res.status(200).json({ skipped: "no client for event - platform-level or unknown-account customer" });
+    const cRows = await sb(`clients?id=eq.${encodeURIComponent(tenant.clientId)}&select=id&limit=1`);
     const client = Array.isArray(cRows) && cRows[0];
-    if (!client) return res.status(200).json({ skipped: "no client for connected account" });
+    if (!client) return res.status(200).json({ skipped: "no client row" });
 
     const email = String(cust.email || "").trim().toLowerCase();
     if (email) {
@@ -1535,23 +1792,27 @@ async function handleCustomerCreated(event, connectedAccount, res) {
   }
 }
 
-async function handlePriceUpserted(event, connectedAccount, res) {
+async function handlePriceUpserted(event, tenant, res) {
   const price = event.data && event.data.object;
   if (!price) return res.status(200).json({ skipped: "no price object" });
-  if (!connectedAccount) return res.status(200).json({ skipped: "no connected account on event" });
+  if (!tenant.clientId) {
+    // An account-keyed event we cannot place. Keep the orphan trace when there
+    // WAS an account (mirrors the old "no client for connected account" audit);
+    // a platform-level price event stays a silent skip, as before.
+    if (tenant.account) {
+      await writeAudit({
+        action_type: "stripe-price-upsert-orphan",
+        args:        { event_id: event.id, connected_account: tenant.account, price_id: price.id },
+      });
+    }
+    return res.status(200).json({ skipped: "no client for event account" });
+  }
 
-  // Resolve client_id from the connected account
   const clientRows = await sb(
-    `clients?stripe_connect_account_id=eq.${encodeURIComponent(connectedAccount)}&select=id&limit=1`
+    `clients?id=eq.${encodeURIComponent(tenant.clientId)}&select=id&limit=1`
   );
   const client = Array.isArray(clientRows) && clientRows[0];
-  if (!client) {
-    await writeAudit({
-      action_type: "stripe-price-upsert-orphan",
-      args:        { event_id: event.id, connected_account: connectedAccount, price_id: price.id },
-    });
-    return res.status(200).json({ skipped: "no client for connected account" });
-  }
+  if (!client) return res.status(200).json({ skipped: "no client row" });
 
   // Existing row? Preserve owner-set classification.
   const existingRows = await sb(
@@ -1600,7 +1861,7 @@ async function handlePriceUpserted(event, connectedAccount, res) {
     client_id:         client.id,
     stripe_price_id:   price.id,
     stripe_product_id: price.product,
-    stripe_account_id: connectedAccount,
+    stripe_account_id: tenant.account,
     display_name:      price.nickname || null,
     canonical_plan,
     tier,
@@ -1638,13 +1899,14 @@ async function handlePriceUpserted(event, connectedAccount, res) {
 // session carries `metadata.client` AND the matched client has
 // `ghl_kpi_config.store_order_workflow_id`. Everything else returns skip. Always
 // 200 + best-effort (a GHL hiccup never makes Stripe retry-storm).
-async function handleStoreOrder(event, connectedAccount, res) {
+async function handleStoreOrder(event, tenant, res) {
   const session = event.data && event.data.object;
   if (!session || !session.metadata || !session.metadata.client) return res.status(200).json({ skipped: "not a store order" });
   if (session.status && session.status !== "complete") return res.status(200).json({ skipped: `session ${session.status}` });
-  if (!connectedAccount) return res.status(200).json({ skipped: "no connected account" });
+  if (!tenant.clientId) return res.status(200).json({ skipped: "no client for event" });
+  const connectedAccount = tenant.account;
 
-  const cRows = await sb(`clients?stripe_connect_account_id=eq.${encodeURIComponent(connectedAccount)}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
+  const cRows = await sb(`clients?id=eq.${encodeURIComponent(tenant.clientId)}&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_kpi_config&limit=1`);
   const client = Array.isArray(cRows) && cRows[0];
   if (!client) return res.status(200).json({ skipped: "no client for account" });
   // Per-checkout workflow override (metadata.workflow_id) lets one client route

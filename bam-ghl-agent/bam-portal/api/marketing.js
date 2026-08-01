@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { MARKETING_OPS_ROLES, CONTENT_MANAGER_ROLES, CONTENT_ROLES, hasRole } from "./_roles.js";
 import { CANONICAL_FUNNEL, mapStageName, buildKpis } from "./_ghl_funnel.js";
 import { notifyClientPush } from "./push/_send.js";
+import { stripeFetch as transportStripeFetch } from "./_stripe-transport.js";
 
 // Vercel Serverless Function — Marketing (combined: tickets + guide cards)
 //
@@ -3342,10 +3343,11 @@ async function handleGhlKpiStripe(req, res) {
   const stripeKey = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   if (!stripeAcct || !stripeKey) return res.status(200).json({ found: false, reason: "no_stripe" });
 
+  // Delegates to THE seam (api/_stripe-transport.js); errors keep this block's
+  // original "stripe <status>" text so downstream reads are unchanged.
   const sFetch = async (path) => {
-    const r = await fetch(`https://api.stripe.com/v1${path}`, { headers: { Authorization: `Bearer ${stripeKey}`, "Stripe-Account": stripeAcct } });
-    if (!r.ok) throw new Error(`stripe ${r.status}`);
-    return r.json();
+    try { return await transportStripeFetch(path, { stripeAccount: stripeAcct }); }
+    catch (e) { throw e.stripeStatus ? new Error(`stripe ${e.stripeStatus}`) : e; }
   };
 
   try {

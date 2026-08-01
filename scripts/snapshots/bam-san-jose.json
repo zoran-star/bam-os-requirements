@@ -1,5 +1,6 @@
 {
   "_note": "BEFORE snapshot of BAM San Jose, captured from production. Pinned deliberately so a preset re-seed has something honest to be diffed against. THE THING TO WATCH: the nurture step at position 2 (template:nurture-3) is enabled:false. That is Zoran's deliberate hold on the testimonials email, not drift. A re-seed that flips it back to true has failed, which is why re-seeding is diff-and-patch and never delete-and-recreate. Every automation is approved:false, so nothing sends until Lij approves it. The facts block is EMPTY of sessions on purpose: San Jose has zero schedule_slots rows, so its schedule block does not render and its schedule SMS resolves to the venue line alone. `business_email` is ahead of production until migration 20260729T210000 is applied (it seeds this exact value). It happens to equal `email` here, which is a coincidence of Lij using one address for both, not a fallback: one is the OWNER's inbox and the other is the academy's public address, and nothing copies either into the other.",
+  "_stripe_note": "STRIPE TRANSPORT FIXTURE (2026-07-31, direct-key build). San Jose is the direct-transport pilot: CoachIQ platform-locks acct_1RDtSMK6ZS1cqefu, so the portal reaches it with the academy's OWN restricted key instead of Connect OAuth. The `stripe_connect_account_id` / `stripe_connect_status` client columns and the `client_stripe_direct` block below are what api/_stripe-transport-parity.test.mjs routes its direct-transport runs through. The account id is Lij's REAL account (it is an identifier, not a credential). Every secret-shaped value is a PLACEHOLDER on purpose - secret_key_enc is not ciphertext, publishable_key is not a real pk, last4 is F1XT - and the parity suite's tripwire FAILS THE RUN if any value in this file ever matches a real live-key shape ((sk|rk)_live_... or whsec_...). Do not paste real values here, ever; the real key lives encrypted in the client_stripe_direct table and nowhere else.",
   "_captured": "2026-07-28, re-captured from production. The 2026-07-27 version had drifted in exactly the two rows this workstream then changed: ghosted steps 0 and 1 carried bodies production did not have. A stale BEFORE-state is worse than no before-state, because it makes a seeding diff lie in the reassuring direction - a fabricated baseline that already resembles the after-state shows a small clean diff and reads as success. Verified body by body by md5 against production after re-capture. business_name stays 'BAM San Jose', which is the internal label and is what staff see. public_name was set to 'By Any Means Basketball' on 2026-07-28 (the parent-facing name is the BRAND, the city lives in the domain and the footer, the same string GTA used) and that was REVERSED on 2026-07-29 by migration 20260729T235000, so the value here is AHEAD of production, which still holds the old string. Reason: deleting the per-academy LOCATIONS map from api/email-shells.js means public_name now drives the gold WORDMARK as well as the full name - the wordmark is public_name with the 'By Any Means' prefix stripped - so the bare brand rendered a wordmark reading BY ANY MEANS BASKETBALL for every academy that used it. San Jose had no pinned entry and never did, so this was never a GTA-specific bug: it is what any academy leaving public_name as the bare brand gets. San Jose is not live yet, so it is fixed before a parent sees it. Its address already parses to 'San Jose', so nothing else here changes.",
   "client": {
     "id": "5576acf0-acd3-4c05-9f9f-ebfde8618154",
@@ -65,7 +66,28 @@
     "community_group_platform": null,
     "google_review_url": null,
     "online_programs_url": null,
-    "referral_offer": null
+    "referral_offer": null,
+    "stripe_connect_account_id": "acct_1RDtSMK6ZS1cqefu",
+    "stripe_connect_status": "connected"
+  },
+  "client_stripe_direct": {
+    "client_id": "5576acf0-acd3-4c05-9f9f-ebfde8618154",
+    "status": "active",
+    "secret_key_enc": "ENCRYPTED_FIXTURE_NOT_REAL",
+    "secret_key_last4": "F1XT",
+    "publishable_key": "pk_live_FIXTURE",
+    "livemode": true,
+    "stripe_account_id": "acct_1RDtSMK6ZS1cqefu",
+    "capabilities": {
+      "customers": true,
+      "subscriptions": true,
+      "prices": true,
+      "invoices": true,
+      "search": true,
+      "billing_portal": true,
+      "payouts": false
+    },
+    "key_last_verified_at": null
   },
   "automations": [
     {

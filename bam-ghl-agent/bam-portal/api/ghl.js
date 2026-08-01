@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { stripeFetch as transportStripeFetch } from "./_stripe-transport.js";
 // Unified GHL Serverless Function — locations, contacts, conversations, pipelines
 // Supports both V1 (rest.gohighlevel.com) and V2 (services.leadconnectorhq.com) APIs
 // Routes via ?action=locations|contacts|conversations|pipelines|forms|webhook
@@ -500,10 +501,11 @@ async function refreshFunnel(req, res) {
   const stripeKey = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   if (stripeAcct && stripeKey) {
     const sinceSec = Math.floor(sinceMs / 1000);
+    // Delegates to THE seam (api/_stripe-transport.js); errors keep this
+    // block's original "stripe <status>" text so downstream reads are unchanged.
     const sFetch = async (path) => {
-      const r = await fetch(`https://api.stripe.com/v1${path}`, { headers: { Authorization: `Bearer ${stripeKey}`, "Stripe-Account": stripeAcct } });
-      if (!r.ok) throw new Error(`stripe ${r.status}`);
-      return r.json();
+      try { return await transportStripeFetch(path, { stripeAccount: stripeAcct }); }
+      catch (e) { throw e.stripeStatus ? new Error(`stripe ${e.stripeStatus}`) : e; }
     };
     // Page through a Stripe list endpoint via starting_after until has_more=false.
     const sFetchAll = async (path) => {

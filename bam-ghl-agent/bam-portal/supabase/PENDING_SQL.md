@@ -11,6 +11,10 @@ session that APPLIES them (Zoran, locally, via the Supabase CLI).
 row here in the same commit as the migration.** Remote sessions can never
 apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
+## ✅ APPLIED 2026-08-01 by MEMBER MANAGEMENT II (Zoran's go: "merge and run it")
+
+`20260801T120000_client_stripe_direct.sql` - applied via Supabase MCP, read back: both tables exist (13 + 10 cols), RLS enabled on both, zero rows. Env `STRIPE_DIRECT_ENC_KEY` + `PORTAL_BASE_URL` set in Vercel PRODUCTION (preview adds blocked by a CLI wrapper loop - add per-branch if ever needed; preview deploys refuse webhook registration anyway via the PORTAL_BASE_URL guard).
+
 ## ⏳ PENDING
 
 | Migration file | What it does | Blocked features until applied | Added |

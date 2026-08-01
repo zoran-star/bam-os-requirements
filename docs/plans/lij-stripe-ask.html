@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two quick things in your old Stripe</title>
+<style>
+  :root{--bg:#FAFAF8;--card:#fff;--line:#E6E4DF;--ink:#1A1A1C;--mute:#6E6E76;
+        --gold:#B8993F;--goldbg:#FDF8E9;--green:#2F855A;--greenbg:#EAF7EF;--blue:#3B6FB6}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    line-height:1.55;padding:26px 16px 64px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:640px;margin:0 auto}
+  h1{font-size:24px;line-height:1.25;margin:0 0 8px;letter-spacing:-.4px}
+  .lede{color:var(--mute);font-size:16px;margin:0 0 8px}
+  .why{background:var(--greenbg);border:1px solid #CFE8DA;border-radius:12px;
+    padding:14px 16px;font-size:15px;margin:20px 0 30px}
+  .why b{color:var(--green)}
+
+  .ask{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:0 0 20px;margin-bottom:22px;overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .ask > header{display:flex;align-items:center;gap:12px;padding:16px 18px;
+    background:var(--goldbg);border-bottom:1px solid var(--line)}
+  .num{width:28px;height:28px;border-radius:50%;background:var(--gold);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none}
+  .ask h2{font-size:17px;margin:0;letter-spacing:-.2px}
+  .ask .body{padding:16px 18px 0}
+  .ask p{margin:0 0 14px;font-size:15px}
+  .mute{color:var(--mute);font-size:14px}
+
+  /* fake stripe chrome */
+  .shot{border:1px solid var(--line);border-radius:11px;overflow:hidden;
+    background:#fff;margin:6px 0 16px;font-size:13.5px}
+  .shot .bar{background:#F5F5F7;border-bottom:1px solid var(--line);
+    padding:9px 12px;display:flex;align-items:center;gap:9px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#DDD}
+  .search{flex:1;background:#fff;border:1.5px solid var(--blue);border-radius:7px;
+    padding:6px 10px;color:var(--ink);font-size:13px;display:flex;align-items:center;gap:7px}
+  .search .cursor{width:1.5px;height:14px;background:var(--ink);display:inline-block}
+  .shot .panel{padding:0}
+  .row{padding:11px 13px;border-bottom:1px solid #F0EFEC;display:flex;
+    align-items:center;gap:10px}
+  .row:last-child{border-bottom:none}
+  .row .ic{width:22px;height:22px;border-radius:5px;background:#EDEBFF;color:#5B4BD6;
+    display:flex;align-items:center;justify-content:center;font-size:12px;flex:none}
+  .row .t{font-weight:600}
+  .row .s{color:var(--mute);font-size:12.5px}
+  .empty{padding:24px 13px;text-align:center;color:var(--mute)}
+
+  .outcomes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px}
+  .out{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+  .out header{padding:9px 12px;font-size:12px;font-weight:800;letter-spacing:.4px;
+    text-transform:uppercase}
+  .out.a header{background:var(--greenbg);color:var(--green)}
+  .out.b header{background:#FDF0EE;color:#B3462F}
+  .out .c{padding:12px;font-size:14px}
+  .out .say{margin-top:8px;font-weight:700}
+
+  /* customers table shot */
+  .thead{display:flex;justify-content:space-between;align-items:center;
+    padding:11px 13px;border-bottom:1px solid #F0EFEC}
+  .thead .ttl{font-weight:700;font-size:14.5px}
+  .btn{border:1px solid var(--line);border-radius:7px;padding:5px 11px;
+    font-size:12.5px;font-weight:600;background:#fff}
+  .btn.hot{border-color:var(--gold);background:var(--goldbg);color:var(--gold);
+    box-shadow:0 0 0 3px rgba(184,153,63,.15)}
+  .tr{display:flex;gap:10px;padding:9px 13px;border-bottom:1px solid #F5F4F1;
+    font-size:13px;color:var(--mute)}
+  .tr span:first-child{flex:1.6;color:var(--ink)}
+  .tr span{flex:1}
+  .tr.h{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#9A9AA2;font-weight:700}
+
+  .safe{background:#fff;border:1px solid var(--line);border-left:4px solid var(--green);
+    border-radius:12px;padding:16px 18px;font-size:15px;margin-top:6px}
+  .safe h3{margin:0 0 10px;font-size:15px}
+  .safe li{margin-bottom:7px}
+  .safe ul{margin:0;padding-left:19px}
+  .foot{margin-top:26px;color:var(--mute);font-size:14px;text-align:center}
+  @media(max-width:560px){.outcomes{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Two quick things inside your old Stripe</h1>
+  <p class="lede">Both take about a minute. Nothing changes and nobody gets charged.</p>
+
+  <div class="why">
+    <b>Why we are asking.</b> Your new Stripe is connected and working. We want to bring your
+    current members across <b>without a single parent having to re-enter their card</b>.
+    These two answers tell us whether we can.
+  </div>
+
+  <!-- ASK 1 -->
+  <div class="ask">
+    <header><div class="num">1</div><h2>Search for "data migration"</h2></header>
+    <div class="body">
+      <p>Open your <b>old</b> Stripe (the one your current members are in) and type
+      <b>data migration</b> into the search bar at the top.</p>
+
+      <div class="shot">
+        <div class="bar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <div class="search">🔍 data migration<span class="cursor"></span></div>
+        </div>
+        <div class="panel">
+          <div class="row"><div class="ic">↗</div>
+            <div><div class="t">Data migrations</div><div class="s">Copy customers and cards to another account</div></div></div>
+          <div class="row"><div class="ic">≡</div>
+            <div><div class="t">Migrations overview</div><div class="s">Settings</div></div></div>
+        </div>
+      </div>
+
+      <p class="mute" style="margin-bottom:10px">Then just tell us which of these you got:</p>
+      <div class="outcomes">
+        <div class="out a">
+          <header>If you see something</header>
+          <div class="c">Anything at all comes up with the word migration in it.
+            <div class="say">Send a screenshot.</div></div>
+        </div>
+        <div class="out b">
+          <header>If you see nothing</header>
+          <div class="c">No results, or it is greyed out and unclickable.
+            <div class="say">Just say "nothing".</div></div>
+        </div>
+      </div>
+      <p class="mute" style="margin-top:14px">Either answer is useful. There is no wrong one.</p>
+    </div>
+  </div>
+
+  <!-- ASK 2 -->
+  <div class="ask">
+    <header><div class="num">2</div><h2>Export your customer list</h2></header>
+    <div class="body">
+      <p>In the same old Stripe, go to <b>Customers</b> and hit <b>Export</b>. Send us the file
+      it downloads.</p>
+
+      <div class="shot">
+        <div class="thead"><div class="ttl">Customers</div>
+          <div style="display:flex;gap:8px"><span class="btn">Filter</span><span class="btn hot">Export</span></div></div>
+        <div class="tr h"><span>Name</span><span>Email</span><span>Spend</span></div>
+        <div class="tr"><span>Parent name</span><span>parent@email.com</span><span>$180/mo</span></div>
+        <div class="tr"><span>Parent name</span><span>parent@email.com</span><span>$180/mo</span></div>
+        <div class="tr"><span>Parent name</span><span>parent@email.com</span><span>$240/mo</span></div>
+      </div>
+
+      <p>That file is just your member list: who they are and what they pay.
+      <b>It contains no card numbers</b>, so it is safe to send.</p>
+      <p class="mute">This is what we use to set your programs up properly, so your members land
+      in the portal already correct instead of you retyping them.</p>
+    </div>
+  </div>
+
+  <div class="safe">
+    <h3>To be completely clear about what this does not do</h3>
+    <ul>
+      <li><b>Nobody is charged.</b> Not today, not by this.</li>
+      <li><b>Your current billing keeps running exactly as it is.</b></li>
+      <li><b>Nothing is switched off</b> until you say you are ready.</li>
+      <li><b>Your members are not contacted</b> and will not notice anything.</li>
+    </ul>
+  </div>
+
+  <p class="foot">Two answers and we can tell you exactly how your switchover will go.</p>
+
+</div>
+</body>
+</html>

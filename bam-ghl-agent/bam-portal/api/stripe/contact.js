@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { contactsReadTable } from "../_contacts.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 // Vercel Serverless Function — Stripe info for a SINGLE contact, scoped to one
 // academy's CONNECTED Stripe account. Powers the Stripe section of the V1.5
 // Contacts-tab right drawer.
@@ -45,13 +46,10 @@ async function resolveUser(req) {
 }
 
 async function stripeFetch(path, { stripeAccount } = {}) {
-  const stripeSecret = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
-  const headers = { Authorization: `Bearer ${stripeSecret}` };
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  const res = await fetch(`${STRIPE_API}${path}`, { headers });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) { const e = new Error(json?.error?.message || `Stripe ${res.status}`); e.status = res.status; throw e; }
-  return json;
+  // Delegates to THE seam (api/_stripe-transport.js); this file's callers read
+  // e.status (not e.stripeStatus), so mirror the transport's status onto it.
+  try { return await transportStripeFetch(path, { stripeAccount }); }
+  catch (e) { if (e.status == null && e.stripeStatus != null) e.status = e.stripeStatus; throw e; }
 }
 
 // Stripe 2025-03-31 moved current_period_end onto the subscription item.

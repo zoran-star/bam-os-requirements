@@ -37,7 +37,10 @@
 //   3. An unknown connected account is a silent no-op, and a replay of an
 //      already-disabled academy writes nothing twice.
 //   4. FAIL DIRECTION: a transient database failure on this event leaves the status
-//      alone. The top-level catch logs and returns 200; it does not write.
+//      alone AND answers 500, so Stripe RETRIES the revocation instead of dropping
+//      it. Every read on the deauthorized path defers-or-answers; the shared
+//      swallow-to-200 catch never sees this event (it dispatches before the tenant
+//      lookup and guards its own reads).
 //   5. FAIL DIRECTION: a transient failure on ANY OTHER event leaves it alone too.
 //   6. A bad signature never reaches any handler.
 //   7. BY CONSTRUCTION: 'disabled' is written in exactly one place in webhook.js,
@@ -102,6 +105,23 @@
 //   MUTATE=noacctguard    the "no connected account" guard is deleted, so the handler
 //                         builds a database lookup out of a value it has already
 //                         established it does not have.
+//   MUTATE=directevents   the CONNECT_ONLY_EVENTS filter is dropped from the academy
+//                         endpoint's derived event set, so every direct-key academy
+//                         subscribes to account.application.deauthorized - a Connect
+//                         event delivered under the academy's own signature to the
+//                         handler that disables Connect academies.
+//   MUTATE=tenantfirst    the deauthorized dispatch slides back BELOW buildTenant (the
+//                         pre-fix ordering). buildTenant's clients read then sits
+//                         between verification and the handler, and ITS failure rides
+//                         into the swallow-to-200 catch: Stripe marks the revocation
+//                         delivered and never retries. Live-repro'd by the adversarial
+//                         tester; caught by sections 4, 7 and 11c.
+//   MUTATE=guardblip200   the deauthorized handler's direct-key guard lookup goes back
+//                         to riding its error into the dispatcher catch, which acks
+//                         200 - and Stripe then drops a REAL revocation forever the
+//                         moment the guard lookup blips. The fixed shape answers 500
+//                         so Stripe retries (the ONE deliberate exception to the
+//                         swallow-to-200 pattern; the handler is idempotent).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -175,23 +195,24 @@ tmpFiles.push(path.join(HERE, "stripe", SHIM_NAME));
 
 // ── the mutations, expressed against the real source text ────────────────────
 const DEAUTH_ON_ERROR = [[
-  `    console.error("stripe webhook error:", event.type, e.message);
-    return res.status(200).json({ error: e.message, event_type: event.type });`,
+  `    console.error("stripe webhook error:", event.type, e.message);`,
   `    console.error("stripe webhook error:", event.type, e.message);
     if (connectedAccount) {
       await sb(\`clients?stripe_connect_account_id=eq.\${encodeURIComponent(connectedAccount)}\`, {
         method: "PATCH", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ stripe_connect_status: "disabled" }),
       }).catch(() => {});
-    }
-    return res.status(200).json({ error: e.message, event_type: event.type });`]];
+    }`]];
 const DATA_OBJECT = [[
   `  const acct = connectedAccount || null;`,
   `  const acct = (event.data && event.data.object && event.data.object.id) || null;`]];
 const ACCOUNT_UPDATED = [[
-  `      case DEAUTHORIZED_EVENT:              return await handleAccountDeauthorized(event, connectedAccount, res);`,
-  `      case DEAUTHORIZED_EVENT:              return await handleAccountDeauthorized(event, connectedAccount, res);
-      case "account.updated":               return await handleAccountDeauthorized({ ...event, type: DEAUTHORIZED_EVENT }, connectedAccount, res);`]];
+  `    if (event.type === DEAUTHORIZED_EVENT) {
+      return await handleAccountDeauthorized(event, connectedAccount, res);
+    }`,
+  `    if (event.type === DEAUTHORIZED_EVENT || event.type === "account.updated") {
+      return await handleAccountDeauthorized({ ...event, type: DEAUTHORIZED_EVENT }, connectedAccount, res);
+    }`]];
 
 // A NEW HANDLER IN THE HOUSE STYLE: a declared constant, a case routed through it,
 // and nobody remembering the REQUIRED_EVENTS line. This is the shape the next
@@ -200,8 +221,8 @@ const ACCOUNT_UPDATED = [[
 const CONST_CASE = [
   [`const DEAUTHORIZED_EVENT = "account.application.deauthorized";`,
    `const DEAUTHORIZED_EVENT = "account.application.deauthorized";\nconst PAYOUT_FAILED_EVENT = "payout.failed";`],
-  [`      case DEAUTHORIZED_EVENT:              return await handleAccountDeauthorized(event, connectedAccount, res);`,
-   `      case DEAUTHORIZED_EVENT:              return await handleAccountDeauthorized(event, connectedAccount, res);
+  [`      case "checkout.session.completed":    return await handleStoreOrder(event, tenant, res);`,
+   `      case "checkout.session.completed":    return await handleStoreOrder(event, tenant, res);
       case PAYOUT_FAILED_EVENT:             return res.status(200).json({ ok: true, action: "payout-failed-noted" });`],
 ];
 // The "no connected account" guard removed. With it gone the handler still asks the
@@ -213,9 +234,39 @@ const NO_ACCT_GUARD = [[
   `  if (!acct) return res.status(200).json({ skipped: "no connected account on the event" });`,
   `  // guard removed by the control`]];
 
+// The direct-key guard failure ceases to be the one deliberate 500 and goes back
+// to riding into the dispatcher catch - which acks 200, so Stripe never retries
+// and a real revocation that hit a database blip is gone for good.
+const GUARD_BLIP_200 = [[
+  `  const guard = await deauthGuardedRead(
+    \`client_stripe_direct?client_id=eq.\${client.id}&status=eq.active&select=client_id,status&limit=1\`
+  );
+  if (guard.failed) {
+    return res.status(500).json({ error: "direct-key guard lookup failed - retry" });
+  }
+  const directRows = guard.rows;`,
+  `  const directRows = await sb(
+    \`client_stripe_direct?client_id=eq.\${client.id}&status=eq.active&select=client_id,status&limit=1\`
+  );`]];
+
+// The pre-fix ordering, restored: buildTenant back above the deauthorized
+// dispatch. Its clients read then fails into the shared catch, which acks 200.
+const TENANT_FIRST = [[
+  `    if (event.type === DEAUTHORIZED_EVENT) {
+      return await handleAccountDeauthorized(event, connectedAccount, res);
+    }
+
+    tenant = await buildTenant(routing, event);`,
+  `    tenant = await buildTenant(routing, event);
+
+    if (event.type === DEAUTHORIZED_EVENT) {
+      return await handleAccountDeauthorized(event, connectedAccount, res);
+    }`]];
+
 const WEBHOOK_EDITS = {
   deauthonerror: DEAUTH_ON_ERROR, dataobject: DATA_OBJECT, accountupdated: ACCOUNT_UPDATED,
-  constcase: CONST_CASE, noacctguard: NO_ACCT_GUARD,
+  constcase: CONST_CASE, noacctguard: NO_ACCT_GUARD, guardblip200: GUARD_BLIP_200,
+  tenantfirst: TENANT_FIRST,
 };
 
 // Build the runnable copy: the shim rewrite always, plus the mutation if any.
@@ -233,7 +284,7 @@ const strip = (s) => s
   .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + " ".repeat(m.length - p.length));
 
 // ─── the in-memory database ──────────────────────────────────────────────────
-const DB = { clients: [], members: [], member_audit_log: [] };
+const DB = { clients: [], members: [], member_audit_log: [], client_stripe_direct: [] };
 // The transient blip, aimed per section at ONE table's READS.
 //
 // Reads only, deliberately. A stub that failed writes too would hide the very damage
@@ -441,14 +492,16 @@ console.log("\n── 4. FAIL DIRECTION: a transient failure must not disconnect
 // The scenario: the deauthorized event arrives, and Supabase is having a moment.
 // Marking OTHER disabled here would hide every billing action from an academy whose
 // Stripe is working perfectly, and send staff to redo an OAuth flow that was never
-// broken. The status must be untouched.
+// broken. The status must be untouched - and, since the transport build, the answer
+// must be 500: a 200 ack makes Stripe mark the revocation delivered and never
+// retry, so a blip would DROP a real revocation forever. Defer, never drop.
 {
   const before = statusOf(OTHER.id);
   BLIP = { table: "clients", method: "GET" };   // the academy lookup times out
   const r = await post(deauthEvent("acct_detail"));
   BLIP = null;
 
-  ok(r.code === 200, `the endpoint still answers 200 so Stripe stops retrying (saw ${r.code})`);
+  ok(r.code === 500, `the endpoint answers 500 so Stripe RETRIES the revocation instead of dropping it (saw ${r.code})`);
   ok(!!r.payload && !!r.payload.error, `and reports the error rather than claiming success (saw ${JSON.stringify(r.payload)})`);
   ok(statusOf(OTHER.id) === before && before === "connected",
     `THE STATUS IS UNTOUCHED - a database blip is not a revocation (saw ${statusOf(OTHER.id)})`);
@@ -518,11 +571,17 @@ console.log("\n── 7. BY CONSTRUCTION: one writer, one route, no catch block 
   ok(handlerStart > 0 && /stripe_connect_status: REVOKED_STATUS/.test(handlerBody),
     "and that write is inside handleAccountDeauthorized, through the constant");
 
-  // 3. Exactly one route in, and it is the one event.
+  // 3. Exactly one route in, and it is the one event - dispatched BEFORE
+  //    buildTenant, so no tenant read can fail between verification and this
+  //    handler (a failure there rides into the shared catch, which acks 200 and
+  //    makes Stripe drop the revocation; the adversarial tester live-repro'd
+  //    exactly that against the first cut of this build).
   const calls = (code.match(/handleAccountDeauthorized\(/g) || []).length;
   ok(calls === 2, `the handler is defined once and called once (saw ${calls} occurrences)`);
-  ok(/case DEAUTHORIZED_EVENT:\s+return await handleAccountDeauthorized\(/.test(code),
-    "from the switch case for account.application.deauthorized and nowhere else");
+  ok(/if \(event\.type === DEAUTHORIZED_EVENT\) \{\s*\n\s*return await handleAccountDeauthorized\(event, connectedAccount, res\);/.test(code),
+    "from the guarded pre-switch dispatch for account.application.deauthorized and nowhere else");
+  ok(code.indexOf("return await handleAccountDeauthorized(") < code.indexOf("tenant = await buildTenant("),
+    "and that dispatch sits BEFORE buildTenant - no tenant lookup can fail in between");
   ok(/const DEAUTHORIZED_EVENT = "account\.application\.deauthorized";/.test(code),
     "which is that event type and not a near neighbour");
   ok(/event\.type !== DEAUTHORIZED_EVENT/.test(handlerBody),
@@ -536,14 +595,14 @@ console.log("\n── 7. BY CONSTRUCTION: one writer, one route, no catch block 
   const guilty = catchBlocks.filter((b) => /stripe_connect_status/.test(b));
   ok(guilty.length === 0,
     `no catch block in the file writes stripe_connect_status (saw ${guilty.length})`);
-  ok(/console\.error\("stripe webhook error:", event\.type, e\.message\);\s*\n\s*return res\.status\(200\)/.test(code),
-    "the top-level catch logs and returns - it does not touch the database");
+  ok(/console\.error\("stripe webhook error:", event\.type, e\.message\);\s*\n\s*await writeAudit\(\{[\s\S]{0,500}?\}\)\.catch\(\(\) => \{\}\);\s*\n\s*return res\.status\(200\)/.test(code),
+    "the top-level catch logs, leaves a best-effort audit trace, and returns 200 - it never writes a clients row");
 }
 
 console.log("\n── 8. account.updated is deliberately absent ──");
 {
-  ok(!/case\s+["']account\.updated["']/.test(strip(WEBHOOK_SRC)),
-    "there is no account.updated case - it fails in the OPPOSITE direction and is its own change");
+  ok(!/["']account\.updated["']/.test(strip(WEBHOOK_SRC)),
+    "account.updated is routed nowhere - no case, no dispatch guard; it fails in the OPPOSITE direction and is its own change");
   ok(/account\.updated IS DELIBERATELY ABSENT/.test(WEBHOOK_SRC),
     "and the file says so at the handler, where somebody would reach for it");
   // Live proof of the same thing: the event goes in, nothing comes out.
@@ -596,18 +655,26 @@ console.log("\n── 9. THE SUBSCRIPTION: a handler Stripe never calls is dead 
 
   const literalCases = [...sw.matchAll(/case\s+"([^"]+)"\s*:/g)].map((m) => m[1]);
   const identCases = [...sw.matchAll(/case\s+([A-Za-z_$][\w$]*)\s*:/g)].map((m) => m[1]);
+  // The deauthorized event no longer rides the switch: it dispatches from a
+  // guarded if BEFORE buildTenant (fail-closed ordering - see section 7). The
+  // sweep resolves that dispatch exactly like a constant-routed case, so the
+  // event stays in the handled set and in the subscription check below.
+  const preSwitch = code.slice(code.indexOf("async function handler("), swStart);
+  const ifDispatches = [...preSwitch.matchAll(/if \(event\.type === ([A-Za-z_$][\w$]*)\) \{\s*\n\s*return await handleAccountDeauthorized\(/g)].map((m) => m[1]);
+  ok(ifDispatches.length === 1,
+    `the pre-switch deauthorized dispatch is where this sweep expects it (saw ${ifDispatches.length})`);
   const resolvedCases = [];
   const unresolved = [];
-  for (const id of identCases) {
+  for (const id of [...identCases, ...ifDispatches]) {
     const decl = new RegExp(`const\\s+${id}\\s*=\\s*["']([^"']+)["']`).exec(code);
     if (decl) resolvedCases.push(decl[1]); else unresolved.push(id);
   }
   ok(unresolved.length === 0,
     `every constant-routed case resolves to its declared value${unresolved.length ? ` (UNRESOLVED: ${unresolved.join(", ")} - declare it in this file or this sweep is blind to it)` : ""}`);
-  // The resolver is doing work, not passing vacuously: this build's own case is
-  // constant-routed, so a resolver that silently found nothing would show up here.
+  // The resolver is doing work, not passing vacuously: this build's own dispatch
+  // is constant-routed, so a resolver that silently found nothing would show up here.
   ok(resolvedCases.includes("account.application.deauthorized"),
-    `the resolver read this build's own constant-routed case off its declaration (saw ${resolvedCases.join(", ") || "none"})`);
+    `the resolver read this build's own constant-routed dispatch off its declaration (saw ${resolvedCases.join(", ") || "none"})`);
 
   const handled = [...literalCases, ...resolvedCases].sort();
 
@@ -643,6 +710,95 @@ console.log("\n── 9. THE SUBSCRIPTION: a handler Stripe never calls is dead 
   const missing = handled.filter((h) => !listed.includes(h));
   ok(missing.length === 0,
     `every handled event is in REQUIRED_EVENTS, so the portal asks Stripe for it${missing.length ? ` (MISSING: ${missing.join(", ")})` : ""}`);
+}
+
+console.log("\n── 10. the academy endpoint's derived event set ──");
+// Direct-key academies get their OWN webhook endpoints, subscribed to a set
+// DERIVED from REQUIRED_EVENTS minus the Connect-only plumbing
+// (api/stripe/ensure-academy-webhook.js). Drop that filter and every academy
+// endpoint subscribes to account.application.deauthorized - a Connect event
+// that means nothing on an account with no Connect application, delivered
+// under the ACADEMY'S signature to the handler that disables Connect
+// academies. MUTATE=directevents is that exact regression.
+{
+  let ensureModPath = path.join(HERE, "stripe/ensure-academy-webhook.js");
+  if (MUTATE === "directevents") {
+    const mutated = mutatedSource("stripe/ensure-academy-webhook.js", [[
+      `export const ACADEMY_EVENTS = REQUIRED_EVENTS.filter((ev) => !CONNECT_ONLY_EVENTS.includes(ev));`,
+      `export const ACADEMY_EVENTS = [...REQUIRED_EVENTS];`,
+    ]]);
+    ensureModPath = path.join(HERE, "stripe", ".mutant-deauth-ensure.js");
+    fs.writeFileSync(ensureModPath, mutated);
+    tmpFiles.push(ensureModPath);
+  }
+  const ensureMod = await import(pathToFileURL(ensureModPath).href);
+  const eventsMod = await import(pathToFileURL(path.join(HERE, "stripe/ensure-webhook-events.js")).href);
+
+  ok(Array.isArray(ensureMod.CONNECT_ONLY_EVENTS) && ensureMod.CONNECT_ONLY_EVENTS.includes("account.application.deauthorized"),
+    "account.application.deauthorized is declared Connect-only");
+  const leaked = (ensureMod.ACADEMY_EVENTS || []).filter((ev) => ensureMod.CONNECT_ONLY_EVENTS.includes(ev));
+  ok(leaked.length === 0,
+    `no Connect-only event reaches an academy endpoint's subscription (leaked: ${leaked.join(", ") || "none"})`);
+  const union = [...new Set([...(ensureMod.ACADEMY_EVENTS || []), ...ensureMod.CONNECT_ONLY_EVENTS])].sort();
+  ok(JSON.stringify(union) === JSON.stringify([...eventsMod.REQUIRED_EVENTS].sort()),
+    "and the derivation is complete: academy events + Connect-only events = REQUIRED_EVENTS exactly");
+  // The dispatcher's own backstop: a Connect-only event that somehow arrives
+  // WITH a routing token is refused before the switch - an academy's signing
+  // secret must never be able to reach the Connect-status writer.
+  ok(/routing\.kind === "direct" && CONNECT_ONLY_EVENTS\.includes\(event\.type\)/.test(strip(WEBHOOK_SRC)),
+    "and the dispatcher refuses Connect-only events on a token - on the ROUTING, before any tenant read");
+}
+
+console.log("\n── 11. a direct-key academy cannot be disconnected by a stale OAuth revocation ──");
+// The direct-key guard, and its ONE deliberate exception to swallow-to-200: if
+// the guard lookup itself fails, the handler cannot tell a direct-key academy
+// (must NOT be flipped) from a Connect academy (MUST be flipped). Riding that
+// error into the dispatcher catch acks 200 and Stripe drops a REAL revocation
+// forever - so the handler answers 500 and lets Stripe retry. Idempotent: a
+// replay that finds the flip already done skips without a second write.
+{
+  const DIRECT = academy("DirectKey", "acct_directkey");
+  DB.client_stripe_direct.push({ id: "csd1", client_id: DIRECT.id, status: "active", stripe_account_id: "acct_directkey" });
+
+  // (a) active direct row: skip, on the record, and the status never flips.
+  const r1 = await post(deauthEvent("acct_directkey"));
+  ok(r1.code === 200 && /direct-key academy/.test(String(r1.payload.skipped)),
+    `the revocation is skipped and says why (saw ${r1.code} ${JSON.stringify(r1.payload)})`);
+  ok(statusOf(DIRECT.id) === "connected",
+    `and the academy stays connected - its transport does not use Connect (saw ${statusOf(DIRECT.id)})`);
+  const skippedAudit = auditRows("stripe-access-revoked-skipped");
+  ok(skippedAudit.length === 1 && skippedAudit[0].client_id === DIRECT.id,
+    `with one stale-OAuth audit row on the academy (saw ${skippedAudit.length})`);
+
+  // (b) guard lookup blip: 500 so Stripe RETRIES; nothing written either way.
+  const VICTIM = academy("GuardBlip", "acct_guardblip");
+  BLIP = { table: "client_stripe_direct", method: "GET" };
+  const r2 = await post(deauthEvent("acct_guardblip"));
+  BLIP = null;
+  ok(r2.code === 500,
+    `a guard-lookup failure answers 500 - Stripe must retry, not drop the revocation (saw ${r2.code})`);
+  ok(statusOf(VICTIM.id) === "connected",
+    `and the status is untouched - the blip deferred the decision, it did not make one (saw ${statusOf(VICTIM.id)})`);
+  ok(auditRows("stripe-access-revoked").length === 2, "and no revocation was recorded during the blip");
+
+  // The retry converges once the database answers.
+  const r3 = await post(deauthEvent("acct_guardblip"));
+  ok(r3.code === 200 && r3.payload.action === "stripe-access-revoked" && statusOf(VICTIM.id) === "disabled",
+    `the retry lands and the Connect academy is then disabled for real (saw ${r3.code} ${JSON.stringify(r3.payload)})`);
+
+  // (c) the OTHER read on this path - the academy lookup itself - same contract.
+  // Section 4 proves the 500; this proves it with a fresh academy AND that the
+  // retry converges for this read too, rather than inheriting section 4's state.
+  const VICTIM2 = academy("ClientsBlip", "acct_clientsblip");
+  BLIP = { table: "clients", method: "GET" };
+  const r4 = await post(deauthEvent("acct_clientsblip"));
+  BLIP = null;
+  ok(r4.code === 500,
+    `an academy-lookup failure answers 500 too - every read on this path defers, none drops (saw ${r4.code})`);
+  ok(statusOf(VICTIM2.id) === "connected", "with the status untouched");
+  const r5 = await post(deauthEvent("acct_clientsblip"));
+  ok(r5.code === 200 && r5.payload.action === "stripe-access-revoked" && statusOf(VICTIM2.id) === "disabled",
+    "and its retry lands as well");
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────

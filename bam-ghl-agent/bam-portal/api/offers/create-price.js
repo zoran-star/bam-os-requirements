@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
+import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 export const maxDuration = 60; // AI call + Stripe write — avoid the short default timeout
 // Vercel Serverless Function — The Pricing Sorter, STEP 1 "create a missing price".
 //
@@ -87,20 +88,13 @@ function stripeForm(body) {
   ).toString();
 }
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
-  if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
-  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  // Delegates to THE seam (api/_stripe-transport.js). The body is STILL encoded
+  // by stripeForm here - api/_billing-cadence.test.mjs pins the next line, because
+  // the null-dropping IS money behavior (it is what makes a one-time price carry
+  // no `recurring` block at all) - and the pre-encoded string passes through the
+  // transport AS-IS.
   const encoded = body ? stripeForm(body) : undefined;
-  const res = await fetch(`${STRIPE_API}${path}`, { method, headers, body: encoded });
-  const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
-  if (!res.ok) {
-    const err = new Error(json?.error?.message || `Stripe ${res.status}`);
-    err.stripeStatus = res.status;
-    throw err;
-  }
-  return json;
+  return transportStripeFetch(path, { method, body: encoded, stripeAccount, idempotencyKey });
 }
 
 // The academy's Stripe account default_currency is the source of truth for what
@@ -383,7 +377,15 @@ async function runApply(req, res, ctx, body, clientId) {
   if (!creations.length) return res.status(400).json({ error: "creations[] required" });
   if (!stripeKey()) throw new Error("Stripe secret key not configured");
 
-  const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id&limit=1`);
+  // Three-outcome money gate (house rule 10): a clients read that THREW is
+  // "could not ask", never "not connected" - retryable 503; the 409 below stays
+  // reserved for a row that actually answered without an account.
+  let clientRows;
+  try {
+    clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id&limit=1`);
+  } catch {
+    return res.status(503).json({ error: "could not verify billing setup, try again" });
+  }
   const client = Array.isArray(clientRows) && clientRows[0];
   if (!client) return res.status(404).json({ error: "academy not found" });
   if (!client.stripe_connect_account_id) return res.status(409).json({ error: "academy not connected to Stripe" });
@@ -501,7 +503,13 @@ async function runApply(req, res, ctx, body, clientId) {
 // ── SEARCH: list the academy's existing Stripe prices to match against ──
 async function runSearch(req, res, ctx, body, clientId) {
   if (!stripeKey()) throw new Error("Stripe secret key not configured");
-  const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,stripe_connect_account_id&limit=1`);
+  // Three-outcome money gate (house rule 10): clients read THREW = 503, never the 409.
+  let clientRows;
+  try {
+    clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,stripe_connect_account_id&limit=1`);
+  } catch {
+    return res.status(503).json({ error: "could not verify billing setup, try again" });
+  }
   const client = Array.isArray(clientRows) && clientRows[0];
   if (!client) return res.status(404).json({ error: "academy not found" });
   if (!client.stripe_connect_account_id) return res.status(409).json({ error: "academy not connected to Stripe" });
