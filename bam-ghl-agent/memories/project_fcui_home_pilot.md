@@ -47,9 +47,17 @@ Right-rail loaders write by ID (#hm-score-grid etc.) - mounts kept/guarded. Reve
 observers root on .main (.hm-bubble starts opacity:0). Messages panel DOM has three
 hidden selects - automated checks must target `.fcui-msgp-sortw`.
 
-## Rollout state
+## Rollout state - DIRECTION DECIDED 2026-08-01
 
-Pilot commits live on the working branch (phases 53ffc7cb..b7f70809-era). NOT the
-default for any real academy - Zoran + Cole sign-off flips it (either default-on
-for V2 or per-academy). Next pages if approved: Schedule, Members, Sales via the
-same mockup-build loop. Screenshots: scratchpad/home-pilot/ (round1/2/3, build).
+**Cole + Zoran both prefer the V2 command center (full-bleed scroll) as the
+product's face.** The prototype's sidebar look is retired as a direction; this
+pilot stays PARKED behind its flag (merged, harmless, flag off everywhere).
+Do NOT extend it to more pages. Its best pieces (progress radials, messages
+drawer with sort/mark-all-read, milestones card) may be folded into the V2
+command center later as individual features.
+
+Gotcha: mock mode (`?mock=1`) AUTO-ONS the fcui flag, so demos/screenshots of
+the real product need `&fcui=0`. If the pilot stays parked long-term, flip the
+mock default to off (one-line change in `_fcuiOn()`).
+
+Screenshots: scratchpad/home-pilot/ (round1/2/3, build).
