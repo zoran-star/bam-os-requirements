@@ -15,12 +15,51 @@ function money(n) {
   if (n == null || n === "") return "-";
   return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+// Whole dollars - the revenue column is a scan-at-a-glance number, cents are noise.
+function money0(n) {
+  if (n == null || n === "") return "-";
+  return "$" + Math.round(Number(n)).toLocaleString("en-US");
+}
+
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// "2026-07-01" -> "Jul 2026". Parsed by hand: new Date("2026-07-01") is UTC
+// midnight, which renders as June 30 for anyone west of Greenwich.
+function monthLabel(monthStart) {
+  if (!monthStart) return "";
+  const [y, m] = String(monthStart).split("-").map(Number);
+  return `${MONTH_ABBR[(m || 1) - 1]} ${y}`;
+}
+
+// Why a revenue number is missing, in Zoran-readable words. "not_connected"
+// is the common one and it is NOT an error: nobody has linked that academy's
+// Stripe yet, so there is nothing to read.
+const REV_MISSING = {
+  not_connected: { text: "not connected", hint: "This academy's Stripe is not linked to the portal yet, so there is no revenue to read." },
+  failed: { text: "pull failed", hint: "Stripe is linked but the read failed." },
+};
+
+function RevenueCell({ row, t, compact }) {
+  if (!row) return <span style={{ color: t.textMute }}>…</span>;
+  if (row.status === "ok") {
+    return <span style={{ fontWeight: compact ? 400 : 600 }}>{money0(row.gross)}</span>;
+  }
+  const m = REV_MISSING[row.status] || REV_MISSING.failed;
+  return (
+    <span title={row.error ? `${m.hint} ${row.error}` : m.hint}
+      style={{ fontSize: 12, color: row.status === "failed" ? t.amber : t.textMute, fontStyle: "italic" }}>
+      {m.text}
+    </span>
+  );
+}
 
 export default function CommissionsView({ tokens, session, me }) {
   const t = tokens;
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [openId, setOpenId] = useState(null);
+  // Last month's gross revenue, loaded AFTER the table so the Stripe fan-out
+  // never holds up the page. null = still pulling.
+  const [rev, setRev] = useState(null);
 
   const tok = session?.access_token;
   async function api(method, qs, body) {
@@ -39,9 +78,19 @@ export default function CommissionsView({ tokens, session, me }) {
     try { setData(await api("GET", "?action=overview")); }
     catch (e) { setErr(e.message); }
   }
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  async function loadRevenue() {
+    try { setRev(await api("GET", "?action=monthly-revenue")); }
+    // A revenue outage must not take the Commissions page down with it - the
+    // column just stays empty and the rest of the page keeps working.
+    catch (e) { setRev({ month: null, rows: [], error: e.message }); }
+  }
+  useEffect(() => { load(); loadRevenue(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const isAdmin = !!data?.me?.is_admin;
+  const revByClient = useMemo(
+    () => Object.fromEntries((rev?.rows || []).map(r => [r.client_id, r])),
+    [rev]
+  );
   const smNames = useMemo(() => Object.fromEntries((data?.sms || []).map(s => [s.id, s.name])), [data]);
   const cyclesByClient = useMemo(() => {
     const m = {};
@@ -56,6 +105,10 @@ export default function CommissionsView({ tokens, session, me }) {
   const unconfigured = (data.clients || []).filter(c => !c.payment_model);
   const growthCount = configured.filter(c => c.payment_model === "growth_percentage").length;
 
+  const revOk = (rev?.rows || []).filter(r => r.status === "ok");
+  const revTotal = revOk.reduce((s, r) => s + Number(r.gross || 0), 0);
+  const revMissing = (rev?.rows || []).length - revOk.length;
+
   const card = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: "14px 18px" };
   const th = { textAlign: "left", fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: t.textMute, padding: "8px 10px" };
   const td = { fontSize: 13, color: t.text, padding: "9px 10px", borderTop: `1px solid ${t.border}` };
@@ -63,6 +116,15 @@ export default function CommissionsView({ tokens, session, me }) {
   return (
     <div style={{ maxWidth: 1080 }}>
       <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <div style={{ ...card, borderColor: t.accent }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
+            {rev ? money0(revTotal) : "…"}
+          </div>
+          <div style={{ fontSize: 12, color: t.textMute }}>
+            gross revenue{rev?.month ? ` · ${monthLabel(rev.month)}` : " · last month"}
+            {revMissing > 0 && <span style={{ color: t.textMute }}> ({revMissing} not connected)</span>}
+          </div>
+        </div>
         <div style={card}><div style={{ fontSize: 22, fontWeight: 700, color: t.text }}>{configured.length}</div><div style={{ fontSize: 12, color: t.textMute }}>clients on a payment model</div></div>
         <div style={card}><div style={{ fontSize: 22, fontWeight: 700, color: t.text }}>{growthCount}</div><div style={{ fontSize: 12, color: t.textMute }}>growth-percentage clients</div></div>
         <div style={card}><div style={{ fontSize: 22, fontWeight: 700, color: t.text }}>{(data.cycles || []).filter(c => !c.report_sent_at && c.payment_model === "growth_percentage").length}</div><div style={{ fontSize: 12, color: t.textMute }}>cycles awaiting the next report batch</div></div>
@@ -77,7 +139,9 @@ export default function CommissionsView({ tokens, session, me }) {
       <div style={{ ...card, padding: 0, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr>
-            <th style={th}>Client</th><th style={th}>Model</th><th style={th}>Terms</th>
+            <th style={th}>Client</th>
+            <th style={{ ...th, color: t.accent }}>{rev?.month ? `${monthLabel(rev.month)} gross` : "Last month gross"}</th>
+            <th style={th}>Model</th><th style={th}>Terms</th>
             <th style={th}>Renewal</th><th style={th}>SM</th><th style={th}>Last cycle</th><th style={th}></th>
           </tr></thead>
           <tbody>
@@ -87,12 +151,13 @@ export default function CommissionsView({ tokens, session, me }) {
               return (
                 <ClientRows key={c.id} c={c} latest={latest} isOpen={isOpen} isAdmin={isAdmin}
                   cycles={cyclesByClient[c.id] || []} smName={smNames[c.scaling_manager_id]}
+                  rev={rev ? (revByClient[c.id] || { status: "not_connected" }) : null}
                   t={t} td={td} api={api} reload={load}
                   onToggle={() => setOpenId(isOpen ? null : c.id)} />
               );
             })}
             {!data.clients?.length && (
-              <tr><td style={{ ...td, color: t.textMute, fontStyle: "italic" }} colSpan={7}>No clients visible to you.</td></tr>
+              <tr><td style={{ ...td, color: t.textMute, fontStyle: "italic" }} colSpan={8}>No clients visible to you.</td></tr>
             )}
           </tbody>
         </table>
@@ -101,7 +166,7 @@ export default function CommissionsView({ tokens, session, me }) {
   );
 }
 
-function ClientRows({ c, latest, isOpen, isAdmin, cycles, smName, t, td, api, reload, onToggle }) {
+function ClientRows({ c, latest, isOpen, isAdmin, cycles, smName, rev, t, td, api, reload, onToggle }) {
   const isGrowth = c.payment_model === "growth_percentage";
   const terms = !c.payment_model ? <span style={{ color: t.textMute }}>not configured</span>
     : isGrowth
@@ -116,6 +181,9 @@ function ClientRows({ c, latest, isOpen, isAdmin, cycles, smName, t, td, api, re
     <>
       <tr onClick={onToggle} style={{ cursor: "pointer", background: isOpen ? `${t.accent}0d` : "transparent" }}>
         <td style={{ ...td, fontWeight: 600 }}>{c.business_name}</td>
+        <td style={{ ...td, whiteSpace: "nowrap" }} title="Click the row for month-by-month gross revenue">
+          <RevenueCell row={rev} t={t} />
+        </td>
         <td style={td}>{pill || <span style={{ color: t.textMute }}>-</span>}</td>
         <td style={td}>{terms}</td>
         <td style={td}>{c.subscription_renewal_date || "-"}</td>
@@ -124,14 +192,88 @@ function ClientRows({ c, latest, isOpen, isAdmin, cycles, smName, t, td, api, re
         <td style={{ ...td, color: t.textMute }}>{isOpen ? "▴" : "▾"}</td>
       </tr>
       {isOpen && (
-        <tr><td colSpan={7} style={{ ...td, background: t.surfaceEl }}>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", padding: "6px 0 10px" }}>
-            {isAdmin && <SettingsForm c={c} t={t} api={api} reload={reload} />}
-            <CycleHistory c={c} cycles={cycles} t={t} api={api} reload={reload} isAdmin={isAdmin} />
+        <tr><td colSpan={8} style={{ ...td, background: t.surfaceEl }}>
+          <div style={{ padding: "6px 0 10px" }}>
+            <MonthlyRevenue c={c} t={t} api={api} />
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 18 }}>
+              {isAdmin && <SettingsForm c={c} t={t} api={api} reload={reload} />}
+              <CycleHistory c={c} cycles={cycles} t={t} api={api} reload={reload} isAdmin={isAdmin} />
+            </div>
           </div>
         </td></tr>
       )}
     </>
+  );
+}
+
+// Month-by-month GROSS revenue for one academy, newest first. Mounted only
+// when its row is expanded, so the 12 Stripe reads happen on the click and not
+// on every Commissions page load.
+function MonthlyRevenue({ c, t, api }) {
+  const [state, setState] = useState({ loading: true });
+  const MONTHS = 12;
+
+  useEffect(() => {
+    let live = true;
+    api("GET", `?action=monthly-revenue&client_id=${c.id}&months=${MONTHS}`)
+      .then(j => { if (live) setState({ loading: false, ...j }); })
+      .catch(e => { if (live) setState({ loading: false, error: e.message }); });
+    return () => { live = false; };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [c.id]);
+
+  const months = state.months || [];
+  const peak = Math.max(0, ...months.filter(m => m.status === "ok").map(m => Number(m.gross || 0)));
+  const head = { fontSize: 13, fontWeight: 700, color: t.text, marginBottom: 8 };
+
+  if (state.loading) {
+    return <div><div style={head}>Gross revenue by month</div>
+      <div style={{ fontSize: 12, color: t.textMute }}>Reading {c.business_name}'s Stripe…</div></div>;
+  }
+  if (state.error) {
+    return <div><div style={head}>Gross revenue by month</div>
+      <div style={{ fontSize: 12, color: t.amber }}>{state.error}</div></div>;
+  }
+
+  const allMissing = months.length > 0 && months.every(m => m.status !== "ok");
+  return (
+    <div>
+      <div style={head}>Gross revenue by month</div>
+      {allMissing ? (
+        <div style={{ fontSize: 12, color: t.textMute, lineHeight: 1.6, maxWidth: 560 }}>
+          {months[0]?.status === "not_connected"
+            ? <>No Stripe account is linked to {c.business_name} in the portal, so there is no revenue to read. Link it under Member Management, then this fills in automatically.</>
+            : <>Stripe is linked but every month failed to read. Latest error: {months[0]?.error || "unknown"}</>}
+        </div>
+      ) : (
+        <div style={{ maxWidth: 560 }}>
+          {months.map((m, i) => {
+            const prev = months[i + 1];
+            const delta = (m.status === "ok" && prev?.status === "ok" && Number(prev.gross) > 0)
+              ? Math.round(((Number(m.gross) - Number(prev.gross)) / Number(prev.gross)) * 100)
+              : null;
+            const pctOfPeak = peak > 0 && m.status === "ok" ? Math.max(2, (Number(m.gross) / peak) * 100) : 0;
+            return (
+              <div key={m.month} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0", borderTop: i ? `1px solid ${t.border}` : "none" }}>
+                <div style={{ width: 74, fontSize: 12, color: t.textMute, flexShrink: 0 }}>{monthLabel(m.month)}</div>
+                <div style={{ flex: 1, height: 8, background: `${t.border}`, borderRadius: 999, overflow: "hidden" }}>
+                  <div style={{ width: `${pctOfPeak}%`, height: "100%", background: i === 0 ? t.accent : `${t.accent}66`, borderRadius: 999 }} />
+                </div>
+                <div style={{ width: 92, textAlign: "right", fontSize: 13, color: t.text, flexShrink: 0 }}>
+                  <RevenueCell row={m} t={t} compact={i > 0} />
+                </div>
+                <div style={{ width: 52, textAlign: "right", fontSize: 11, flexShrink: 0, color: delta == null ? t.textMute : delta >= 0 ? t.green || t.accent : t.amber }}>
+                  {delta == null ? "" : `${delta >= 0 ? "+" : ""}${delta}%`}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ fontSize: 11, color: t.textMute, marginTop: 8, lineHeight: 1.5, maxWidth: 560 }}>
+        Whole calendar months, raw gross charges on the academy's own Stripe - refunds and chargebacks are not netted out, per the agreement. This is not the same window as a billing cycle, which runs renewal date to renewal date.
+      </div>
+    </div>
   );
 }
 

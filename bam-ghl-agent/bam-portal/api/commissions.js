@@ -153,6 +153,18 @@ function epochSeconds(dateStr) {
   const { y, m, d } = parseYMD(dateStr);
   return Math.floor(Date.UTC(y, m - 1, d) / 1000);
 }
+// ── CALENDAR months (the Commissions page's revenue column) ────────────────
+// Deliberately separate from the cycle windows above: a cycle runs renewal-date
+// to renewal-date (e.g. Jul 25 -> Aug 25), which is NOT what "last month's
+// revenue" means. The column reports whole calendar months so the number lines
+// up with what an academy owner sees in their own Stripe dashboard.
+function monthStartOf(dateStr) { const { y, m } = parseYMD(dateStr); return ymd(y, m, 1); }
+// First day of the most recent FULLY COMPLETED calendar month.
+function lastCompletedMonthStart(todayStr) { return addMonthsClamped(monthStartOf(todayStr), -1); }
+// The n completed calendar months ending with `lastStart`, newest first.
+function completedMonthsBack(lastStart, n) {
+  return Array.from({ length: n }, (_, i) => addMonthsClamped(lastStart, -i));
+}
 const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;
 const money = (n) => "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -178,7 +190,15 @@ async function stripeGetAll(path, acct) {
   // so a direct-key academy's gross revenue is readable too. The platform-key
   // stripeForm invoicing half above is deliberately NOT delegated - BAM invoices
   // its clients on BAM's own account, which is not an academy-scoped call.
-  if (!process.env.STRIPE_SECRET_KEY) throw new Error("STRIPE_SECRET_KEY not configured");
+  // Guard the key the SEAM actually uses, not the one this file's invoicing
+  // half uses. This checked STRIPE_SECRET_KEY only, so a prod that had switched
+  // to the Connect key alone would have thrown "STRIPE_SECRET_KEY not
+  // configured" on every revenue read while every other Stripe feature - all of
+  // which go through the transport - kept working. A direct-key academy needs
+  // neither: its own key comes out of client_stripe_direct.
+  if (!process.env.STRIPE_CONNECT_SECRET_KEY && !process.env.STRIPE_SECRET_KEY) {
+    throw new Error("no Stripe platform key configured (STRIPE_CONNECT_SECRET_KEY or STRIPE_SECRET_KEY)");
+  }
   const out = [];
   let startingAfter = null;
   for (let i = 0; i < 20; i++) {
@@ -219,6 +239,50 @@ async function pullGrossRevenue(client, startStr, endStr) {
     throw new Error("GHL revenue integration is not wired up yet");
   }
   throw new Error("no revenue integration configured on the client record");
+}
+
+// ── Calendar-month gross revenue (Commissions page column + drilldown) ─────
+// Same RAW gross figure the cycle engine uses (no refund/chargeback netting,
+// per Agreement §4) but windowed to a whole calendar month.
+//
+// Never throws: one academy with a broken/absent Stripe connection must not
+// blank the column for the other twelve. Every month comes back with an
+// explicit status so the UI can say WHY a number is missing instead of showing
+// a dash that reads as "$0".
+//   ok             -> gross is a number
+//   not_connected  -> no revenue source on the client record (human must connect Stripe)
+//   failed         -> the source is configured but Stripe refused (error carries why)
+//
+// A completed calendar month's raw charge total is immutable once the month is
+// over, so results are cached per lambda instance. Cold instances re-pull; that
+// is fine, this is a read-only report.
+const REVENUE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const monthRevenueCache = new Map(); // `${clientId}:${monthStart}` -> { at, value }
+
+function revenueSourceOf(client) {
+  return client.revenue_integration_connection || (client.stripe_connect_account_id ? "stripe_connect" : null);
+}
+
+async function grossForMonth(client, monthStart) {
+  const key = `${client.id}:${monthStart}`;
+  const hit = monthRevenueCache.get(key);
+  if (hit && Date.now() - hit.at < REVENUE_CACHE_TTL_MS) return hit.value;
+
+  let value;
+  if (!revenueSourceOf(client)) {
+    value = { month: monthStart, gross: null, status: "not_connected", error: null };
+  } else {
+    try {
+      const gross = await pullGrossRevenue(client, monthStart, addMonthsClamped(monthStart, 1));
+      value = { month: monthStart, gross, status: "ok", error: null };
+    } catch (e) {
+      value = { month: monthStart, gross: null, status: "failed", error: e?.message || String(e) };
+    }
+  }
+  // Only cache a real answer - a transient Stripe failure should retry on the
+  // next page load, not stick around for six hours.
+  if (value.status !== "failed") monthRevenueCache.set(key, { at: Date.now(), value });
+  return value;
 }
 
 // Failure alert (Mike + Cole): a pull failure must never silently skip or
@@ -513,6 +577,50 @@ async function handler(req, res) {
       }
       const cycles = await sb(`commission_cycles?client_id=eq.${clientId}&select=*&order=cycle_date.desc`);
       return res.status(200).json({ cycles: cycles || [] });
+    }
+
+    // ── GET monthly-revenue: calendar-month GROSS revenue ──────────────────
+    // Two shapes, one action:
+    //   no client_id  -> last completed month for every client you can see
+    //                    (the Commissions table's "Last month" column)
+    //   client_id     -> that client's last `months` completed months, newest
+    //                    first (the month-by-month drilldown)
+    // Loaded separately from ?action=overview on purpose: the table paints
+    // instantly off Supabase while the slower Stripe fan-out fills in behind it.
+    if (req.method === "GET" && action === "monthly-revenue") {
+      if (!ctx.isAdmin && !ctx.isSM) return res.status(403).json({ error: "admin or scaling manager only" });
+      const lastStart = lastCompletedMonthStart(todayET());
+      const clientId = req.query.client_id;
+
+      if (clientId) {
+        if (!ctx.isAdmin) {
+          const ids = await smClientIds();
+          if (!ids.includes(clientId)) return res.status(403).json({ error: "not your client" });
+        }
+        const crows = await sb(`clients?id=eq.${clientId}&select=${CLIENT_COLS}`);
+        const client = crows?.[0];
+        if (!client) return res.status(404).json({ error: "client not found" });
+        const months = Math.min(Math.max(Number(req.query.months) || 12, 1), 24);
+        // Sequential: 24 windows against ONE connected account in parallel is a
+        // fast way to get rate-limited off that academy's Stripe.
+        const rows = [];
+        for (const m of completedMonthsBack(lastStart, months)) rows.push(await grossForMonth(client, m));
+        return res.status(200).json({ client_id: clientId, months: rows, source: revenueSourceOf(client) });
+      }
+
+      let clientFilter = "";
+      if (!ctx.isAdmin) {
+        const ids = await smClientIds();
+        if (!ids.length) return res.status(200).json({ month: lastStart, rows: [] });
+        clientFilter = `&id=in.(${ids.join(",")})`;
+      }
+      const clients = await sb(`clients?archived_at=is.null${clientFilter}&select=${CLIENT_COLS}`);
+      // One month per client, fanned out across DIFFERENT accounts - safe in
+      // parallel, and it keeps the whole column inside the 60s function budget.
+      const rows = await Promise.all(
+        (clients || []).map(c => grossForMonth(c, lastStart).then(r => ({ client_id: c.id, ...r })))
+      );
+      return res.status(200).json({ month: lastStart, rows });
     }
 
     // ── POST save-settings (admin): the onboarding payment fields ──────────
