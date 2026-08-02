@@ -35,3 +35,55 @@ sm_comm = $250 + 25% x fee                (ONLY when growth > 0)
 - Client needs `stripe_customer_id` (platform) or invoicing errors -> stored as `invoice_status='error'` + alert.
 - `STRIPE_SECRET_KEY` needs WRITE scope for invoiceitems/invoices (env README said read-only restricted key).
 - Env vars (optional overrides only, defaults are correct per spec): `COMMISSION_ALERT_EMAILS`, `COMMISSION_REPORT_EMAILS`.
+
+## Gross revenue by month (2026-08-02) - the Commissions page's headline number
+
+The page opens on **last calendar month's gross revenue per academy**, plus a
+total tile. Click any row for **month-by-month gross, 12 months back**, with a
+bar per month and a MoM % delta.
+
+**Calendar months, NOT cycle windows.** A cycle runs renewal-date to
+renewal-date (Jul 25 -> Aug 25); "last month" means Jul 1 -> Aug 1, which is
+what the academy owner sees in their own Stripe. Never collapse the two - the
+column would print a number that disagrees with the client's own screen.
+`api/_commission-monthly-revenue.test.mjs` pins this (mutation-checked).
+
+- `api/commissions.js` `?action=monthly-revenue` - no `client_id` = last
+  completed month for every visible client (parallel fan-out); with `client_id`
+  = that client's last N months (max 24, sequential to avoid rate-limiting one
+  academy's account). Loaded SEPARATELY from `?action=overview` so the table
+  paints off Supabase while Stripe fills in behind it.
+- Reads live from the academy's Stripe through the transport seam, so
+  direct-key academies work too. Same RAW gross as the cycle engine (no refund
+  or chargeback netting, Agreement §4). Independent of `payment_model`, so
+  flat-retainer academies get a revenue number too (the cycle engine never
+  pulls for them).
+- `grossForMonth()` **never throws** - every month returns `ok` /
+  `not_connected` / `failed`. One academy with a broken Stripe must not blank
+  the column for the others. `not_connected` renders as the words "not
+  connected", never as a dash: **a dash reads as $0**, and a real $0 month must
+  not look like an unlinked Stripe.
+- Cache: 6h per lambda instance, keyed client+month. Safe ONLY because completed
+  months are immutable. **Failures are deliberately not cached** so a transient
+  Stripe outage retries on the next load instead of sticking for six hours.
+
+**Fixed in the same change:** `stripeGetAll` guarded on `STRIPE_SECRET_KEY`
+alone, but the transport seam it calls uses `STRIPE_CONNECT_SECRET_KEY ||
+STRIPE_SECRET_KEY`. A prod holding only the Connect key would have failed every
+revenue read while every other Stripe feature kept working. Now accepts either.
+
+### Why an academy shows "not connected" (this is data, not a bug)
+
+Stripe Connect OAuth is a **client-portal** action - the academy owner clicks
+Connect Stripe in their own portal (`public/client-portal.html` `connectStripe()`
+-> `api/stripe/connect.js`). Staff cannot do it for them. Platform-locked
+academies (CoachIQ-style) instead need a staff-pasted restricted `rk_live_` key
+via `StripeContactLinkView` -> `client_stripe_direct` (table applied 2026-08-01,
+**zero rows**). Until one of those two happens there is genuinely no revenue to
+read. To see who is connected:
+
+```sql
+select business_name, payment_model, subscription_renewal_date,
+       revenue_integration_connection, stripe_connect_account_id
+from clients where archived_at is null order by business_name;
+```
