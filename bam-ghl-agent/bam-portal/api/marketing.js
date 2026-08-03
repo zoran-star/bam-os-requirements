@@ -1606,6 +1606,9 @@ async function handleContentTickets(req, res) {
         messageBody = summaryParts.length
           ? `${messageBody}. Note: "${noteText}"`
           : `Added a note: "${noteText}"`;
+        // Share links pasted into notes become real link tiles - the note
+        // flow has no attachment field, so this is how folders arrive.
+        rawFilesWithTextLinks(ticket, patch, noteText, "Client response");
       }
       patch.messages = appendMessage(ticket.messages, {
         author_type: "client", author_name: authorName,
@@ -1856,6 +1859,7 @@ async function handleContentTickets(req, res) {
           .map(f => ({ name: f.name, url: f.url, mime: "", size: 0, folder: "Client response" }));
         if (fresh.length) patch.raw_files = [...(ticket.raw_files || []), ...fresh];
       }
+      rawFilesWithTextLinks(ticket, patch, message, "Client response");
       mirrorFilesToAssets(ticket.client_id, ticket.id, respFiles);
 
     } else if (action === "send-for-review") {
@@ -4818,6 +4822,42 @@ function mirrorFilesToAssets(clientId, ticketId, files) {
 }
 
 // Pull "• name - url" attachment bullets out of a client response message.
+// Pull shareable asset links (Drive, Dropbox, iCloud, WeTransfer, OneDrive,
+// Box) out of free client text. Clients paste folder links into notes because
+// the note flow has no attachment field - without this, those links die as
+// prose in the activity feed (Twin Hoops "Training Clips", 2026-08-03).
+const ASSET_LINK_HOSTS = /(?:drive|docs)\.google\.com|dropbox\.com|icloud\.com|wetransfer\.com|we\.tl\b|1drv\.ms|onedrive\.live\.com|box\.com/i;
+function assetLinksFromText(text) {
+  const urls = String(text || "").match(/https?:\/\/[^\s"'<>)\]]+/g) || [];
+  return urls.filter(u => ASSET_LINK_HOSTS.test(u));
+}
+function linkNameFor(url, text) {
+  // Label heuristic: 'Training Clips: https://...' -> 'Training Clips'
+  const idx = String(text || "").indexOf(url);
+  if (idx > 0) {
+    const before = String(text).slice(0, idx).split("\n").pop().replace(/["'\s:-]+$/, "").replace(/^["']+/, "").trim();
+    if (before && before.length <= 60 && !/^https?:/i.test(before)) return before;
+  }
+  if (/(?:drive|docs)\.google/i.test(url)) return "Google Drive link";
+  if (/dropbox/i.test(url)) return "Dropbox link";
+  if (/icloud/i.test(url)) return "iCloud link";
+  if (/wetransfer|we\.tl/i.test(url)) return "WeTransfer link";
+  if (/1drv|onedrive/i.test(url)) return "OneDrive link";
+  if (/box\.com/i.test(url)) return "Box link";
+  return "Shared link";
+}
+// Append link entries for any share-URLs in client text to raw_files (deduped).
+function rawFilesWithTextLinks(ticket, patch, text, folder) {
+  const links = assetLinksFromText(text);
+  if (!links.length) return;
+  const base = patch.raw_files || ticket.raw_files || [];
+  const have = new Set(base.map(f => f && f.url));
+  const fresh = links.filter(u => !have.has(u)).map(u => ({
+    name: linkNameFor(u, text), url: u, mime: "text/uri-list", size: 0, folder,
+  }));
+  if (fresh.length) patch.raw_files = [...base, ...fresh];
+}
+
 function attachmentBulletsFrom(messageBody) {
   const out = [];
   for (const line of String(messageBody || "").split("\n")) {
