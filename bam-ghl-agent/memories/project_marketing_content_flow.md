@@ -325,3 +325,11 @@ keep the plain supabase-js upload. Button shows real byte-level percent
 aggregated across the 3-worker pool. `supabaseUrl` is now exported from
 lib/supabase.js. NOTE: TUS does not bypass the PROJECT-wide upload cap
 (dashboard-only) - Zoran must raise that for >cap files regardless.
+
+## Client response attachments land in raw_files (2026-08-02)
+Respond-action attachments were only "• name - url" bullets in the message
+body (plus client_assets mirror) - invisible as tiles on the ticket (Twin
+Hoops voiceover). The content respond handler now ALSO appends them to
+raw_files (deduped by url, folder "Client response", mime "") so they render
+in the raw grid, Client media, and are promotable to Finals. Marketing-ticket
+respond still bullets-only - open gap if it ever bites.
