@@ -331,5 +331,9 @@ Respond-action attachments were only "• name - url" bullets in the message
 body (plus client_assets mirror) - invisible as tiles on the ticket (Twin
 Hoops voiceover). The content respond handler now ALSO appends them to
 raw_files (deduped by url, folder "Client response", mime "") so they render
-in the raw grid, Client media, and are promotable to Finals. Marketing-ticket
-respond still bullets-only - open gap if it ever bites.
+in the raw grid, Client media, and are promotable to Finals. Share links (Drive/Dropbox/iCloud/WeTransfer/OneDrive/Box) pasted
+into client NOTES or respond text also become raw_files link entries
+(`assetLinksFromText` + `linkNameFor` label heuristic, folder "Client
+response", mime text/uri-list) - the note flow has no attachment field, so
+pasted folders used to die as prose. Marketing-ticket respond/note still
+bullets-only - open gap if it ever bites.
