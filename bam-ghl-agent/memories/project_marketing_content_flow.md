@@ -337,3 +337,17 @@ into client NOTES or respond text also become raw_files link entries
 response", mime text/uri-list) - the note flow has no attachment field, so
 pasted folders used to die as prose. Marketing-ticket respond/note still
 bullets-only - open gap if it ever bites.
+
+## Send-to-systems repointed to V2 (2026-08-04, Zoran-approved)
+Funnel handoffs now INSERT into `v2_tickets` (type website_change, assignee_role
+systems, status new, source 'content-handoff', finals on intake.files + an
+opening `v2_ticket_messages` row with attachments) instead of the legacy
+tickets table - systems moved to the Website V2 queue and legacy handoffs were
+being bulk-closed unexecuted (GWA/Pro Precision/Major Hoops, Jul 27-30, empty
+message trails). Content ticket context now stores `systems_v2_ticket_id`.
+Client Slack confirm is explicit now (the legacy insert trigger no longer
+fires). return-to-systems still PATCHes its legacy origin ticket - correct for
+round-trips that START from a legacy systems ticket; revisit if systems stops
+using the legacy tab entirely. Prime By Design lesson: a reopened origin
+assigned to a non-systems person is invisible to the team - the edited clips
+had to be copied onto Jenny's own ticket manually.
