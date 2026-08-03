@@ -1845,7 +1845,18 @@ async function handleContentTickets(req, res) {
         body: message, is_action_request: false,
       });
       // Response attachments arrive as "• name - url" bullets in the message.
-      mirrorFilesToAssets(ticket.client_id, ticket.id, attachmentBulletsFrom(message));
+      // Append them to raw_files too (deduped by url) so they render as real
+      // tiles in the ticket's file grid - a bullet in the activity feed is
+      // where attachments went to die (Twin Hoops voiceover, 2026-08-02).
+      const respFiles = attachmentBulletsFrom(message);
+      if (respFiles.length) {
+        const have = new Set((ticket.raw_files || []).map(f => f && f.url));
+        const fresh = respFiles
+          .filter(f => f.url && !have.has(f.url))
+          .map(f => ({ name: f.name, url: f.url, mime: "", size: 0, folder: "Client response" }));
+        if (fresh.length) patch.raw_files = [...(ticket.raw_files || []), ...fresh];
+      }
+      mirrorFilesToAssets(ticket.client_id, ticket.id, respFiles);
 
     } else if (action === "send-for-review") {
       // Content team sends the finished creative to the client to review.
