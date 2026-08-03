@@ -1774,52 +1774,61 @@ async function handleContentTickets(req, res) {
       }
       const staffNote = (body.note || "").trim();
       const label = (ticket.title || "").trim() || `${ticket.type} content`;
-      const inserted = await sb("tickets", {
+      // V2 REPOINT (Zoran-approved 2026-08-04): the systems team works the
+      // Website V2 queue (v2_tickets, assignee_role systems) - handoffs into
+      // the legacy tickets table were invisible to them and got bulk-closed
+      // unexecuted. Lands as a website_change with the finals on the intake
+      // AND as thread-message attachments.
+      const howText = [
+        staffNote,
+        (ticket.notes || "").trim() ? `Client brief: ${ticket.notes.trim()}` : "",
+        `Final files attached. Produced by the content team (content ticket ${String(ticket.id).slice(0, 3).toUpperCase()}).`,
+      ].filter(Boolean).join("\n\n");
+      const inserted = await sb("v2_tickets", {
         method: "POST",
         headers: { Prefer: "return=representation" },
         body: JSON.stringify([{
           client_id: ticket.client_id,
-          type: "change",
-          status: "open",
-          // ⚠️ tickets has CHECK constraints: priority in (urgent|standard|low),
-          // source in (portal|asana_import), category in (systems|website|ads|
-          // other|null). The first live send-to-systems 400'd on 'normal' +
-          // 'funnel-content' (2026-07-12) - keep these in the allowed sets.
-          priority: "standard",
-          source: "portal",
-          category: "website",
-          fields: {
-            // `title` doubles as the headline in the tickets-insert Slack
-            // trigger (fields->>'title'), so the client channel confirm reads
-            // "Change request submitted: Add funnel content..." not "(no title)".
-            title: `Add funnel content to the website: ${label}`,
-            what: `Add new funnel content to the website: ${label}`,
-            how: [
-              staffNote,
-              (ticket.notes || "").trim() ? `Client brief: ${ticket.notes.trim()}` : "",
-              `Final files are attached. Produced by the content team (content ticket ${String(ticket.id).slice(0, 3).toUpperCase()}).`,
-            ].filter(Boolean).join("\n\n"),
-            funnel_content_ticket_id: ticket.id,
-          },
-          menu_item: null,
-          files: finals,
-          messages: [],
-          submitted_by_staff: ctx.staff.id,
+          type: "website_change",
+          status: "new",
+          assignee_role: "systems",
+          assigned_to: null,
+          title: `Add funnel content: ${label}`.slice(0, 200),
+          source: "content-handoff",
+          intake: { notes: howText, files: finals },
+          context: { funnel_content_ticket_id: ticket.id },
+          created_by: null,
+          created_by_staff: ctx.staff.id,
         }]),
       });
       const sysTicket = inserted?.[0];
       if (!sysTicket) return res.status(500).json({ error: "failed to create the systems ticket" });
+      // Opening thread message carries the assets so they are visible in the
+      // drawer regardless of how intake renders.
+      try {
+        await sb("v2_ticket_messages", {
+          method: "POST",
+          body: JSON.stringify({
+            ticket_id: sysTicket.id, client_id: ticket.client_id,
+            author_kind: "staff", author_client_user_id: null,
+            author_staff_id: ctx.staff.id, author_name: authorName,
+            body: `${howText}\n\n${finals.map(f => `• ${f.name} - ${f.url}`).join("\n")}`,
+            attachments: finals,
+          }),
+        });
+      } catch (e) { console.error("send-to-systems v2 message failed:", e?.message || e); }
       patch.status = "completed";
       patch.resolved_at = nowIso();
-      patch.context = { ...(ticket.context || {}), systems_ticket_id: sysTicket.id };
+      patch.context = { ...(ticket.context || {}), systems_v2_ticket_id: sysTicket.id };
       patch.messages = appendMessage(ticket.messages, {
         author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
         body: "Content finished - sent to the systems team to be added to your website.",
         is_action_request: false,
       });
-      // No explicit client Slack here: the tickets-insert trigger
-      // (notify_slack_on_new_ticket) already confirms the new Change ticket
-      // in the client's channel - a second message would double-notify.
+      // The legacy tickets-insert Slack trigger no longer fires (V2 insert),
+      // so confirm in the client channel explicitly.
+      postClientSlackNotification(ticket.client_id,
+        `🌐 Funnel content finished - handed to the systems team to go on your website [${String(ticket.id).slice(0, 3).toUpperCase()}]`, req);
 
     } else if (action === "cancel") {
       if (!["active", "client-dependent"].includes(ticket.status)) {
