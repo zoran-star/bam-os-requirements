@@ -137,6 +137,11 @@
   .footin .cnt b{color:var(--gold-ink)}
   .send{background:var(--gold);color:#fff;border:none;border-radius:9px;padding:11px 24px;font-size:14px;font-weight:800;cursor:pointer}
   .send:disabled{opacity:.45;cursor:not-allowed}
+  .sendwrap{display:flex;align-items:center;gap:12px}
+  .sendwhy{font-size:12.5px;color:#8a6d1f;background:#fdf6e3;border:1px solid #f0e0b0;
+           border-radius:8px;padding:6px 10px;line-height:1.3;display:none}
+  .sendwhy.pulse{animation:whypulse .5s ease}
+  @keyframes whypulse{0%{transform:scale(1)}35%{transform:scale(1.06);background:#fbeec4}100%{transform:scale(1)}}
   .note{color:var(--mut);font-size:11px;margin:14px 0}
 </style>
 </head>
@@ -176,7 +181,13 @@
 <footer>
   <div class="footin">
     <div class="cnt"><b id="ncf2">0</b>/<span id="ntot2">0</span> confirmed · <b id="nflag">0</b> changes flagged</div>
-    <button class="send" id="sendbtn" disabled>Send back to BAM</button>
+    <!-- A disabled button with no stated reason is the dead-control failure in quieter form:
+         the owner sees a button that does nothing and cannot tell why. The reason is always
+         on screen, on hover, and pulses if he presses the dead button. -->
+    <div class="sendwrap" id="sendwrap" onclick="nudgeSend()">
+      <div class="sendwhy" id="sendwhy"></div>
+      <button class="send" id="sendbtn" disabled>Send back to BAM</button>
+    </div>
   </div>
 </footer>
 
@@ -265,7 +276,19 @@ function updProg(){
   ncf.textContent=n;ncf2.textContent=n;ntot.textContent=tot;ntot2.textContent=tot;nflag.textContent=flags;
   pfill.style.width=(tot?n/tot*100:0)+'%';
   lefttxt.textContent=n===tot?'all done, press Send':(tot-n)+' still to review';
-  sendbtn.disabled=n<tot;
+  const left=tot-n;
+  sendbtn.disabled=left>0;
+  // Same sentence in all three places, so the reason never depends on hovering the right pixel.
+  const why=left>0?('Confirm the remaining '+left+' '+(left===1?'card':'cards')+' to send'):'';
+  sendwhy.textContent=why;
+  sendwhy.style.display=left>0?'block':'none';
+  sendbtn.title=left>0?why:'Send your answers back to BAM';
+  sendwrap.title=sendbtn.title;
+}
+// A disabled button swallows its own click, so the wrapper catches the press.
+function nudgeSend(){
+  if(!sendbtn.disabled) return;
+  sendwhy.classList.remove('pulse');void sendwhy.offsetWidth;sendwhy.classList.add('pulse');
 }
 function tog(k){const c=document.getElementById('card_'+k);if(c)c.classList.toggle('open')}
 function reopen(id,fn){const c=document.getElementById('card_'+id);const open=c&&c.classList.contains('open');
@@ -511,7 +534,9 @@ function prevOpts(id){
   else if(R.length)line='Commitments simply end, nothing renews.';
   document.getElementById('pv_after_'+id).textContent=line;
 }
-function addRung(id){plan(id).rungs.push({len:"12 months",price:0,after:1,other:"",gets:"",taxable:0,fee:1,notes:"",archived:0,fresh:1});edited(id);drawPlan(id)}
+// Defaults to 3 months on purpose. "12 months" is the one length the offer schema cannot
+// represent - _bbTermFromLength collapses it to 6_months - so it must never be the default.
+function addRung(id){plan(id).rungs.push({len:"3 months",price:0,after:1,other:"",gets:"",taxable:0,fee:1,notes:"",archived:0,fresh:1});edited(id);drawPlan(id)}
 function addPlan(){
   const id='new'+(++newPlanN);
   PLANS.push({id,fam:"new",title:"",type:null,desc:"",price:0,cad:3,cadOther:"",tax:0,fee:0,feeAmt:40,feeTax:0,feeOnBase:0,
