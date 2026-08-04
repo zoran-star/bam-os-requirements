@@ -106,16 +106,22 @@
   <!-- ══ IN FLIGHT ══ -->
   <h2 class="sec">In flight right now</h2>
 
-  <div class="item now">
-    <div class="ih"><h3>Proving production can read his key back</h3><span class="pill p-now">waiting on a deploy</span></div>
-    <p>His key is saved and his webhook is live, both checked against Stripe directly. The last unproven link is production decrypting that key and using it. It failed once, on <b>our own bug, not his key</b>: the check refused any key with a line break, and our own Supabase key has a stray one on the end.</p>
-    <p class="where"><b>The fix is written and passing, but it is not on main, so it is not deployed.</b> Re-running the check today would fail the same way and prove nothing. Merge plus about 11 minutes, then it means something.</p>
+  <div class="item done">
+    <div class="ih"><h3>Production can read his key back</h3><span class="pill p-done">PROVEN, live</span></div>
+    <p>The last unproven link is now proven. Production decrypted Lij's key and used it against his real Stripe: <b>checked 1, ok 1, outcome ready</b>. <b>San Jose is connected end to end</b>, not connected on paper.</p>
+    <p class="where">It had failed once on <b>our bug, not his key</b>: our check refused any key with a line break, and our own Supabase key has a stray one on the end. That fix is live.</p>
   </div>
 
   <div class="item now">
-    <div class="ih"><h3>Attacking that fix before it ships</h3><span class="pill p-now">5 found, being fixed</span></div>
-    <p>A second agent tried to break the fix rather than confirm it. It found <b>5 real defects</b>, the worst being that part of the fix had <b>no test holding it in place at all</b> - you could delete that line and everything still passed. It also found the same leak we closed is <b>still open in another file</b>.</p>
-    <p class="where"><b>Next:</b> two builders are fixing those now. Nothing merges until they are clean.</p>
+    <div class="ih"><h3>The fix is live but exists nowhere on main</h3><span class="pill p-now">merge to protect it</span></div>
+    <p>That fix was pushed straight to production from someone's laptop instead of going through main. So production is running code that is <b>not in the main branch</b>.</p>
+    <p class="where"><b>Why it matters:</b> the next thing that merges to main and deploys would wipe it out, and San Jose would break the same way again. Merging now is about <b>protecting</b> the fix, not switching it on.</p>
+  </div>
+
+  <div class="item now">
+    <div class="ih"><h3>Attacking that fix before it ships</h3><span class="pill p-now">fixed, being re-attacked</span></div>
+    <p>A second agent tried to break the fix rather than confirm it, and found <b>5 real defects</b>. The worst: part of the fix had <b>no test holding it in place at all</b>, so you could delete that line and everything still passed. It also found <b>the same leak we closed was still open in four other files</b>, one of them a public page a parent can reach.</p>
+    <p class="where">Both fixed. Test coverage went <b>91 to 102</b> on one suite, plus <b>86 brand new checks</b> on the leak. <b>Next:</b> two fresh agents are attacking the fixes. Nothing merges until they clear.</p>
   </div>
 
   <div class="item done">
