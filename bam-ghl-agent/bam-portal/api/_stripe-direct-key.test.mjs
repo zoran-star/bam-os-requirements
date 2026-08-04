@@ -54,6 +54,15 @@
 //  10. A TYPO'D ACADEMY ID is a 404 that writes nothing - the guard between an
 //      argv typo and a live Stripe key stored under an academy that does not
 //      exist.
+//  11. ONE STRIPE ACCOUNT, ONE ACADEMY. client_stripe_direct keys its upsert on
+//      client_id but holds a UNIQUE index on stripe_account_id, so an account
+//      already saved under another academy used to walk into that index and
+//      come back as a raw PostgREST 409 with no .status: a 500 full of Postgres
+//      for staff, a crash for a CLI, both AFTER the probe hit live Stripe. The
+//      save now asks first and refuses with a sentence naming the other academy
+//      - and because that name lookup is best effort, the case that matters is
+//      the one where it FAILS: the refusal must survive it. An academy
+//      re-saving its OWN account (every key rotation) stays idempotent.
 //
 // WHAT IT DOES NOT PROVE
 //   - Real Stripe's status codes for the capability probes (stubbed; the
@@ -76,6 +85,12 @@
 //       route - every other assertion passes - which is exactly the point: the
 //       fork is invisible to behavior and only the wiring pin can see it. If
 //       the pin ever goes decorative, this control stops printing.
+//
+//   MUTATE=nocollision  node api/_stripe-direct-key.test.mjs
+//       deletes the one-account-one-academy guard, restoring the shape where a
+//       Stripe account already claimed by another academy walks into the UNIQUE
+//       index and comes back as a Postgres string nobody can act on. Section
+//       13 must catch it.
 //
 // A control run exits ZERO when the mutation IS caught. CI greps for the
 // banner, not the exit code.
@@ -160,6 +175,26 @@ const INLINESAVE = [[
     '          409',
     '        );',
     '      }',
+    // the collision guard, inlined too - this mutant must stay behaviorally
+    // CORRECT so that only the wiring pin can catch it
+    '      const acctId = String(report.account_id || "").trim();',
+    '      const claimRows = await sb(`client_stripe_direct?stripe_account_id=eq.${encodeURIComponent(acctId)}&select=client_id&limit=1`);',
+    '      const claimedBy = Array.isArray(claimRows) && claimRows[0] ? String(claimRows[0].client_id || "").trim() : "";',
+    '      if (claimedBy && claimedBy !== String(client_id).trim()) {',
+    '        let claimedName = "";',
+    '        try {',
+    '          const owner = await sb(`clients?id=eq.${encodeURIComponent(claimedBy)}&select=business_name&limit=1`);',
+    '          claimedName = Array.isArray(owner) && owner[0] ? String(owner[0].business_name || "").trim() : "";',
+    '        } catch (e) {',
+    '          claimedName = "";',
+    '        }',
+    '        throw bad(',
+    '          claimedName',
+    '            ? `that Stripe account (${acctId}) is already saved under "${claimedName}" - remove it there first`',
+    '            : `that Stripe account (${acctId}) is already saved under another academy (client_id ${claimedBy}) - remove it there first`,',
+    '          409',
+    '        );',
+    '      }',
     '      await sb(`client_stripe_direct?on_conflict=client_id`, {',
     '        method: "POST",',
     '        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },',
@@ -207,9 +242,26 @@ const INLINESAVE = [[
     '    }',
   ].join("\n")]];
 
+// Deletes the collision guard outright, restoring the shape where the upsert
+// walks into the UNIQUE index on stripe_account_id: PostgREST 409, sb() rethrow
+// with no .status, a Postgres string in front of staff, and a CLI crash - all
+// AFTER the probe already hit live Stripe.
+const NOCOLLISION = [[
+  [
+    '  const acctId = String(report.account_id || "").trim();',
+    '  const claimRows = await sb(`client_stripe_direct?stripe_account_id=eq.${encodeURIComponent(acctId)}&select=client_id&limit=1`);',
+    '  const claimedBy = Array.isArray(claimRows) && claimRows[0] ? String(claimRows[0].client_id || "").trim() : "";',
+    '  if (claimedBy && claimedBy !== String(clientId).trim()) {',
+  ].join("\n"),
+  [
+    '  const acctId = String(report.account_id || "").trim();',
+    '  if (false) {',
+    '    const claimedBy = "";',
+  ].join("\n")]];
+
 let modulePath = path.join(HERE, "stripe/direct-key.js");
 if (MUTATE) {
-  const edits = { capfalse: CAPFALSE, inlinesave: INLINESAVE }[MUTATE];
+  const edits = { capfalse: CAPFALSE, inlinesave: INLINESAVE, nocollision: NOCOLLISION }[MUTATE];
   if (!edits) { console.log(`❌ NEGATIVE CONTROL FAILED: unknown control MUTATE=${MUTATE}`); process.exit(1); }
   let src = fs.readFileSync(modulePath, "utf8");
   for (const [find, repl] of edits) {
@@ -243,6 +295,9 @@ const DB = {
     // c3 is the never-saved academy section 9 runs BOTH ways (route, then the
     // exported function) to compare their database writes.
     { id: "c3", business_name: "BAM Fresh", stripe_connect_account_id: null, stripe_connect_status: "not_connected", stripe_connect_connected_at: null },
+    // c4 is the second never-saved academy: section 13 points it at the Stripe
+    // account c3 already owns.
+    { id: "c4", business_name: "BAM Second", stripe_connect_account_id: null, stripe_connect_status: "not_connected", stripe_connect_connected_at: null },
   ],
   client_stripe_direct: [],
   member_audit_log: [],
@@ -268,6 +323,10 @@ const SB_GETS = [];
 const STRIPE_CALLS = [];
 // (method, url) => {status, body} | "network" | null(use defaults)
 let stripeOverride = null;
+// (table, qs) => true makes that ONE Supabase read fail, the way a real one can.
+// Section 13 uses it to prove the collision guard's best-effort name lookup
+// cannot swallow the refusal it decorates.
+let sbFail = null;
 
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
@@ -298,6 +357,7 @@ globalThis.fetch = async (url, init = {}) => {
     const body = init.body ? JSON.parse(init.body) : null;
     if (method === "GET") {
       SB_GETS.push(`${table}?${qs}`);
+      if (sbFail && sbFail(table, qs)) return new Response("stub: this read failed", { status: 500 });
       // Honor PostgREST column projection: the status action's "row minus
       // secret" guarantee IS its select list, so the stub must enforce it or
       // this suite cannot see a ciphertext leak.
@@ -498,6 +558,13 @@ console.log("\n── 8. no response ever carried a secret ──");
 
 console.log("\n── 9. ONE save, TWO callers: the route and a CLI run the same code ──");
 {
+  // c3 is a DIFFERENT academy, so it must probe a DIFFERENT Stripe account:
+  // acct_A belongs to c1 from section 5, and one Stripe account belongs to
+  // exactly one academy (section 13). Every save from here on is acct_C.
+  stripeOverride = (m, u) => (u === "https://api.stripe.com/v1/account"
+    ? { status: 200, body: { id: "acct_C", charges_enabled: true, details_submitted: true, requirements: {} } }
+    : null);
+
   const resetC3 = () => {
     DB.client_stripe_direct = DB.client_stripe_direct.filter(r => r.client_id !== "c3");
     DB.member_audit_log = DB.member_audit_log.filter(r => r.client_id !== "c3");
@@ -670,6 +737,56 @@ console.log("\n── 12. a typo'd academy id is a 404, not a credential written
     `an unknown client_id is refused 404 "academy not found" (saw ${e ? `${e.status} ${e.message}` : "NO THROW - it went through"})`);
   ok(snapshot() === before && SB_POSTS.length === p && SB_PATCHES.length === q,
     "and NOTHING is written - no key row, no clients patch, no audit row under an academy that does not exist");
+}
+
+console.log("\n── 13. one Stripe account, one academy ──");
+{
+  // THE PREMISE, pinned to the schema instead of to my belief about it: this
+  // guard exists because stripe_account_id carries a UNIQUE index. If that
+  // index is ever dropped, the guard is enforcing a rule the database no longer
+  // has, and this assertion says so out loud rather than passing quietly.
+  const MIG = fs.readFileSync(path.join(HERE, "../supabase/migrations/20260801T120000_client_stripe_direct.sql"), "utf8");
+  ok(/CREATE UNIQUE INDEX[\s\S]{0,200}?client_stripe_direct\s*\(\s*stripe_account_id\s*\)/i.test(MIG),
+    "the schema really does hold stripe_account_id UNIQUE - the guard enforces a real constraint, not a hunch");
+
+  // c3 owns acct_C (section 9). c4 pastes a key for the SAME Stripe account.
+  // Without the guard this walks into that index: PostgREST 409, sb() rethrows
+  // with no .status, staff get a 500 full of Postgres and a CLI just crashes -
+  // all after the probe already hit live Stripe.
+  const before = snapshot();
+  const posts = SB_POSTS.length, patches = SB_PATCHES.length;
+  let r = await post({ action: "save", client_id: "c4", secret_key: RK, publishable_key: "pk_live_academy" });
+  ok(r.code === 409, `a Stripe account already saved under another academy is a 409 (saw ${r.code})`);
+  ok(/already saved under "BAM Fresh"/.test(String(r.payload.error)) && /acct_C/.test(String(r.payload.error))
+    && !/Supabase|duplicate key|constraint|violates/i.test(String(r.payload.error)),
+    `naming the OTHER ACADEMY and the account, in a sentence an operator can act on (saw ${JSON.stringify(r.payload.error)})`);
+  ok(snapshot() === before && SB_POSTS.length === posts && SB_PATCHES.length === patches,
+    "with NOTHING written - no upsert, no clients patch, no audit");
+
+  // THE ONE THAT MATTERS: the name lookup is a decoration on the refusal, and a
+  // decoration that fails must never take the refusal down with it. The throw
+  // lives OUTSIDE that try for exactly this reason - move it inside and this
+  // save goes through against a claimed Stripe account.
+  sbFail = (table, qs) => table === "clients" && /select=business_name/.test(qs);
+  const before2 = snapshot();
+  const posts2 = SB_POSTS.length, patches2 = SB_PATCHES.length;
+  r = await post({ action: "save", client_id: "c4", secret_key: RK, publishable_key: "pk_live_academy" });
+  sbFail = null;
+  ok(r.code === 409, `when the name lookup THROWS, the collision is still refused 409 (saw ${r.code})`);
+  ok(/already saved under another academy \(client_id c3\)/.test(String(r.payload.error)) && /acct_C/.test(String(r.payload.error)),
+    `falling back to the unnamed shape, still naming the account and the owner's id (saw ${JSON.stringify(r.payload.error)})`);
+  ok(snapshot() === before2 && SB_POSTS.length === posts2 && SB_PATCHES.length === patches2,
+    "and still nothing written - a failure to look up a name is not a failure to refuse");
+
+  // THE REGRESSION RISK: an academy re-saving its OWN account (a key rotation
+  // is a re-save) must stay idempotent. A guard that blocks this would break
+  // every future key rotation, quietly, at the worst moment.
+  const rowsBefore = DB.client_stripe_direct.filter(x => x.client_id === "c3").length;
+  const again = await post({ action: "save", client_id: "c3", secret_key: RK, publishable_key: "pk_live_academy" });
+  ok(again.code === 200 && again.payload.ok === true,
+    `the SAME academy re-saving its own account id still succeeds (saw ${again.code} ${JSON.stringify(again.payload && again.payload.error || "")})`);
+  ok(rowsBefore === 1 && DB.client_stripe_direct.filter(x => x.client_id === "c3").length === 1,
+    "and it stays ONE row - a re-save is an upsert, not a second claim on the account");
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────
