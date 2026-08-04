@@ -227,7 +227,7 @@ let PLANS=[
 /* DEALS removed with the Special deals card - Christy/Christopher $199 and
    Meredith/Keanu $100 are now member-workbook rows. Their data lives in
    docs/plans/sj-price-match-log.md so nothing is lost by deleting it here. */
-let ADDONS=[];
+/* ADDONS removed with the Add-ons card - he sells none. */
 let CODES=[];
 let NOTES="";
 
@@ -563,29 +563,20 @@ function addPlan(){
    both prices are tiered LEGACY, so the coverage gate still closes at 14 of 14.
    Only the plan attachment is open, and that is a member-level fact. */
 
-/* ─────────── add-ons ─────────── */
-function addonCardHTML(){
-  return `<div class="bcard" data-fam="new" id="card_addons">
-   <div class="bhead" onclick="tog('addons')"><button class="btog">▸</button>
-    <div class="binfo"><div class="btitle"><span class="famdot"></span>Add-ons <span id="pill_addons">${pillOf('addons')}</span></div>
-     <div class="rowsent">${ADDONS.length?ADDONS.filter(a=>a.name).map(a=>`<b>${esc(a.name)}</b> ${money(a.price||0)}`).join(', ')||'Add-ons started':'Extras you sell on top of a membership, like a shooting program or 1-on-1s'}</div></div></div>
-   <div class="bfields">
-    <div class="qhint">Anything a parent can buy on top of their plan. Leave empty if you do not sell any.</div>
-    ${ADDONS.map((a,i)=>`<div class="subrow">
-      <div class="sl"><span>Add-on ${i+1}</span><button class="rarch" onclick="ADDONS.splice(${i},1);edited('addons');drawAddons()">Remove</button></div>
-      <div class="subgrid">
-        <input class="bb-input" style="max-width:200px" placeholder="what it is called" value="${esc(a.name)}" oninput="ADDONS[${i}].name=this.value;edited('addons')">
-        <span style="font-weight:800;color:var(--mut)">$</span>
-        <input class="bb-input" type="number" style="max-width:100px;font-weight:800" value="${a.price}" oninput="ADDONS[${i}].price=+this.value||0;edited('addons')">
-      </div>
-      <input class="bb-input" style="max-width:100%;margin-top:8px" placeholder="what a parent gets for it" value="${esc(a.desc)}" oninput="ADDONS[${i}].desc=this.value;edited('addons')">
-    </div>`).join('')}
-    <button class="addbtn" onclick="ADDONS.push({name:'',price:0,desc:''});edited('addons');drawAddons()">+ Add an add-on</button>
-    <div class="confirmbar"><button class="cbtn" onclick="confirmCard('addons')">✓ This is right</button>
-     <span class="chint">If you sell no add-ons, confirm it empty. That is an answer too.</span></div>
-   </div></div>`;
-}
-function drawAddons(){reopen('addons',addonCardHTML)}
+/* ─────────── add-ons: CUT ───────────
+   Zoran, 2026-08-04, after asking "do we need add ons?" and being shown the data.
+   Lij sells ZERO add-ons: all 20 members sit on Academy / Elementary / Pre Season
+   subscriptions with nothing on top. The only one-time things he sells, Summer
+   Bundle Camp and Adapt Academy Tryouts, were already ruled OUT of scope on
+   2026-08-01.
+
+   So the card could only ever come back empty. Under the no-partial-submit
+   ruling every card is a REQUIRED confirm, which made this a mandatory click
+   that produced no information. Adding an add-on later is the portal wizard's
+   job, not a migration workbook's.
+
+   Contrast, and why discount codes survived the same test: he has a REAL code,
+   NOSETUP, used 3 times to waive the $40 fee. That card earns its click. */
 
 /* ─────────── discount codes ─────────── */
 function codeCardHTML(){
@@ -645,11 +636,12 @@ function notesCardHTML(){
 function drawNotes(){reopen('notes',notesCardHTML)}
 
 /* ─────────── boot ─────────── */
-/* 8 cards, not 9: 'cus' (Special deals) moved to the member workbook. */
-['tax',...PLANS.map(p=>p.id),'addons','codes','notes'].forEach(k=>ST[k]={c:0,e:0});
+/* 7 cards. 'cus' (Special deals) moved to the member workbook; 'addons' cut
+   outright because Lij sells none. Both on Zoran's ruling, 2026-08-04. */
+['tax',...PLANS.map(p=>p.id),'codes','notes'].forEach(k=>ST[k]={c:0,e:0});
 document.getElementById('taxcard').innerHTML=taxCardHTML();
 document.getElementById('cards').innerHTML=PLANS.map(p=>planCardHTML(p.id)).join('');
-document.getElementById('extras').innerHTML=addonCardHTML()+codeCardHTML()+notesCardHTML();
+document.getElementById('extras').innerHTML=codeCardHTML()+notesCardHTML();
 PLANS.forEach(p=>drawLadder(p.id));
 document.getElementById('card_'+PLANS[0].id).classList.add('open');
 updProg();

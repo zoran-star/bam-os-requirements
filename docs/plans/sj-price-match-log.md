@@ -165,3 +165,14 @@ This room owns the adjust-prices page outright; the member workbook chat stopped
 
 ### Link-up chat delivery (skill step 1 source, COMPLETE)
 147/147 resolved (142 linked, 5 conscious dup-customer skips). Raw material on branch claude/keen-banach-69618e: docs/plans/sj-contact-linkup-learnings.md (recipe: refresh contact store FIRST because v2 academies have no contact cron and last_synced_at lies; classify read-only; execute in sweep order; 7 real edge cases; offline-prelink pattern; DB-verify every phase; claim-then-review sequencing; refused link = dup signal) + sj-contact-linkup-result.md (counts, skip ids, transport-day checklist: expect already_linked=142, review_existing=5). Tooling caveat: refresh script + PGRST102 mixed-batch fix ride in PR #1704, unmerged.
+
+### Ruling: the Add-ons card is CUT (Zoran, 2026-08-04)
+Zoran asked *"do we need add ons?"* rather than accepting the card. Checked against his real Stripe before answering: **he sells zero add-ons.** All 20 members sit on Academy / Elementary / Pre Season subscriptions with nothing on top, and the only one-time products he does sell, Summer Bundle Camp and Adapt Academy Tryouts, were already ruled OUT of scope on 2026-08-01.
+
+So the card could only ever come back empty. Under the no-partial-submit ruling every card is a REQUIRED confirm, which made this a mandatory click that yields no information. Adding an add-on later is the portal wizard's job, not a migration workbook's.
+
+**Discount codes survived the identical test** and that contrast is the reusable rule: he has a real code, NOSETUP, used 3 times to waive the $40 fee, so that card earns its click. **A workbook card must be justified by data in the academy's own account, not by the shape of the wizard it was copied from.** This belongs in skill 1: build the card list from what the academy actually has, then drop every card whose only possible answer is "none".
+
+**Card count now 7:** sales tax, 4 plans, discount codes, anything else. Down from 9 (special deals to the member workbook, add-ons cut).
+Verified in the rendered page: 7 cards, no console errors, ADDONS and addonCardHTML gone, tax and codes cards intact, send gating correct at 7 and at 0 remaining.
+
