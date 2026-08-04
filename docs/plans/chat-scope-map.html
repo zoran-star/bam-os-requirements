@@ -112,10 +112,10 @@
     <p class="where">It had failed once on <b>our bug, not his key</b>: our check refused any key with a line break, and our own Supabase key has a stray one on the end. That fix is live.</p>
   </div>
 
-  <div class="item now">
-    <div class="ih"><h3>The fix is live but exists nowhere on main</h3><span class="pill p-now">merge to protect it</span></div>
-    <p>That fix was pushed straight to production from someone's laptop instead of going through main. So production is running code that is <b>not in the main branch</b>.</p>
-    <p class="where"><b>Why it matters:</b> the next thing that merges to main and deploys would wipe it out, and San Jose would break the same way again. Merging now is about <b>protecting</b> the fix, not switching it on.</p>
+  <div class="item done">
+    <div class="ih"><h3>Main and production are back in step</h3><span class="pill p-done">resolved</span></div>
+    <p>For part of today the fix was live in production but <b>existed nowhere on main</b>, because it had been pushed straight from a laptop. The next merge would have wiped it out.</p>
+    <p class="where"><b>PR #1719 merged and closed that gap.</b> The fix is on main, production redeployed from it, and <b>San Jose was re-checked afterwards and still reads ready</b> - so the redeploy did not break it.</p>
   </div>
 
   <div class="item now">
