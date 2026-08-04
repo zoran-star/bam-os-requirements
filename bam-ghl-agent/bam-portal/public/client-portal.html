@@ -37175,21 +37175,32 @@ function _renderOrganic() {
   }
 }
 function _organicStatusCard(t) {
-  const inReview = t.status === 'client-dependent';
+  // client-dependent covers TWO states: an open REVIEW (approve/request
+  // changes) vs an open QUESTION (staff needs a reply). Rendering approve
+  // buttons for a question made Approve 409 ("Approve failed", Hoops Made
+  // Simple 2026-08-04) - split them.
+  const inReview = t.status === 'client-dependent' && t.client_action_status === 'review-requested';
+  const needsReply = t.status === 'client-dependent' && !inReview;
   const code = String(t.id || '').slice(0, 3).toUpperCase();
   const finals = Array.isArray(t.final_files) ? t.final_files : [];
   const statusPill = inReview
     ? '<span style="font-size:10px;font-weight:700;color:var(--gold);background:rgba(212,182,92,.15);padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em">Review</span>'
+    : needsReply
+    ? '<span style="font-size:10px;font-weight:700;color:var(--gold);background:rgba(212,182,92,.15);padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em">Needs your reply</span>'
     : '<span style="font-size:10px;font-weight:700;color:var(--text-mute);background:rgba(255,255,255,.05);padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em">In progress</span>';
   const title = ((t.notes || '').split('\n')[0] || 'Organic creative').slice(0, 80);
   const finalsHtml = (inReview && finals.length) ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${finals.map(_organicFileTile).join('')}</div>` : '';
   // Edit/cancel are open until the content team produces finals; after that
   // the brief is locked and direction changes go through review/messages.
-  const editable = !inReview && !finals.length;
+  const editable = !inReview && !needsReply && !finals.length;
   const actions = inReview ? `
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button onclick="_organicRequestChanges('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:8px 14px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:600;cursor:pointer">Request changes</button>
       <button onclick="_organicApprove('${t.id}')" style="background:var(--gold);border:none;color:var(--on-gold,#131416);padding:8px 16px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
+    </div>` : needsReply ? `
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+      <button onclick="openContentTicketDetail('${t.id}')" style="background:var(--gold);border:none;color:var(--on-gold,#131416);padding:8px 16px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:700;cursor:pointer">Reply</button>
+      <span style="font-size:11px;color:var(--text-mute)">We asked you a question - answer to keep this moving.</span>
     </div>` : editable ? `
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button onclick="_organicEdit('${t.id}')" style="background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:8px 14px;border-radius:var(--r-sm,8px);font-size:12px;font-weight:600;cursor:pointer">Edit request</button>

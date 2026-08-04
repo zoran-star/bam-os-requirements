@@ -118,3 +118,12 @@ the .mov survived and was restored + ticket put back in review. Guards now:
 while client_action_status=review-requested auto-withdraws the review
 (status active, cas none, internal note). Also (same night): send-for-review had no already-in-review guard - Eli triple-clicked and Pro Bound got 3 identical Slack pings; now 409s "already with the client for review". Lesson: any state pair like
 "review open" + "no files" must be unrepresentable, and every state TRANSITION needs an idempotency check.
+
+## Organic card: review vs reply split (2026-08-04)
+`_organicStatusCard` treated ANY client-dependent ticket as a review -
+question tickets (cas=requested) got Approve/Request-changes buttons, and
+Approve 409'd ("Approve failed", Hoops Made Simple). Cards now split:
+review-requested -> Review pill + approve actions; requested -> "Needs your
+reply" pill + Reply button that opens `openContentTicketDetail` (the respond
+form with file/link attach). Rule: cas decides the UI, status alone is
+ambiguous.
