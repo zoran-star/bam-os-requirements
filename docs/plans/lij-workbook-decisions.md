@@ -28,6 +28,71 @@ Locked context: private link no login, staff confirms before anything applies, o
 
 **MEMBER GRID LOCKED (Zoran, 2026-08-01): "Locked, build it."** The spreadsheet surface is final and the build proceeds from mockup v2: light theme, all rows visible at once, live prices grouped by plan family across the top, focus mode with the per-row check-off button on the far left.
 
+## 2026-08-02 - Part 4 CLOSED: what Lij can edit
+
+All six open design questions answered in one sitting. This is the build spec for the member workbook.
+
+| # | Question | Zoran's ruling |
+|---|---|---|
+| 1 | Seed now and correct later, or wait for Lij? | Not this room's job. Seeding goes to the orchestrator chat. "we dont do seeding in this chat because we have to wait for lij" |
+| 2 | "Not a member": junk row, or stop charging this parent? | **"stop charging this parent"** |
+| 3 | Can Lij edit the dollar amount a parent pays? | **No. "only plan and date."** Prices are changed through the top-right button, not per member |
+| 4 | Two athletes on one subscription? | **Yes** |
+| 5 | Partial return, take the confirmed rows? | **No. "every row has to be confirmed, so put guardrails in the UI"** |
+| 6 | The link has no login, so whoever holds it sees the full customer list | **"fine for now, we will change it in the future"** |
+
+**What each ruling means for the build:**
+
+- **Q2.** The not-a-member action carries a MONEY consequence, not just an import decision. It means the parent should stop being billed. It still never writes directly (staff-confirms is locked), so it lands on the proposed change list as an URGENT item with the dollar amount and the subscription id attached, because every day it waits is another day a parent may be charged. A row with no live subscription (Test Customer, duplicates) resolves to simply not importing, since there is nothing to stop.
+- **Q3.** The money columns are READ ONLY in the grid. Editable per member: which plan they are on, and the next payment date. Price changes route to the prices page behind the top-right button. Zoran also flagged that the price-adjust tab has had significant work done in another chat and that chat will ping this room when it is finished.
+- **Q4.** A subscription can hold more than one athlete. Each athlete carries its own name and AGE. The response format must therefore treat athletes as a list per row, never a single field.
+- **Q5.** There is no partial submit. The send button stays blocked until every row is confirmed, with a visible count of what is left and a jump to the first unconfirmed row. This is the enforcement arm of the standing ruling that "confirmed" is a deliberate act distinct from "untouched": if partial returns were allowed, untouched rows would silently pass as approved.
+- **Q6.** Accepted risk, revisit later. Recorded here so it is a decision with a date rather than an oversight.
+
+**Orchestrator rulings on the three escalations (MM II, 2026-08-02):**
+- **Q2, the stop-billing queue, is OWNED BY MM II**, since seeding is their job. Committed requirements this room builds to match: rows carry the dollar amount, subscription id, parent name and the date Lij marked them; they surface FIRST in staff review, above everything else, on blast-radius precedence; and working the queue is a REQUIRED step in skill 3, not optional cleanup. Reason given: "a queue nobody is obliged to clear is how a parent gets charged for four months after their kid quit."
+- **Q5 is now PROGRAM-WIDE** and binds the PRICE workbook too, not just this one. No partial submit anywhere. One product, one rule.
+- **Q6 goes into skill 2 as a NAMED LIMITATION with Zoran's words attached**, so the next academy meets a decision rather than a default. MM II asked this room to PROPOSE link-expiry-on-submit if it is cheap, but explicitly not to build it unasked, since Zoran ruled "fine for now".
+- **Q3 confirms the single-surface rule**: the price-adjust tab is the ONLY way money changes. The price chat pings this room when theirs is done.
+## Capture schema: how Lij's edits come back as DECISIONS
+
+Designed in this room, never built and NEVER agreed with the price chat (they were sent the price page only). Written down here at wind-down so it is not lost. Treat as a proposal, not a contract.
+
+The workbook returns one envelope. The point of the shape is that a Claude reads DECISIONS, not values:
+
+```json
+{
+  "workbook": "member-setup", "academy": "san-jose",
+  "returned_at": "<ISO>", "complete": true,
+  "rows": [{
+    "subscription_id": "sub_...", "customer_id": "cus_...", "contact_id": "...",
+    "outcome": "confirmed" | "stop_billing",
+    "confirmed_at": "<ISO>",
+    "parent": { "name": {"was": "Christy Hang", "now": "Christy Hang"} },
+    "athletes": [{"name": "Christopher", "age": 12, "source": "plan_name" | "ghl" | "typed"}],
+    "plan":         {"was": "price_...", "now": "price_..."},
+    "next_payment": {"was": "2026-08-20", "now": "2026-08-27"},
+    "money": {"amount": 199, "cadence": "4 week", "editable": false},
+    "changed_fields": ["athletes.0.age", "next_payment"]
+  }],
+  "additions": [{ "source": "stripe_search" | "manual_non_stripe", "...": "same row shape" }],
+  "academy_values": {"confirmed": true, "corrections": {}}
+}
+```
+
+Rules the shape enforces, each tied to a ruling:
+
+| Rule | Why |
+|---|---|
+| `outcome` and `confirmed_at` are never absent | A row nobody read must not serialize identically to a row the owner approved. This is the program-wide confirmed-is-a-deliberate-act ruling made structural rather than trusted |
+| Every editable field is `{was, now}`, never a bare value | A consuming Claude sees what CHANGED and can ask why. A bare value cannot be told apart from an unchanged default |
+| `athletes` is always a list | Q4: two kids can sit on one subscription |
+| `money.editable` is `false` | Q3: amounts are context for Lij's judgement, never a proposal. If a build ever makes them writable, this flag is the thing that should stop it |
+| `stop_billing` rows carry amount, subscription id, parent name and marked date | MM II's committed requirement for the queue they own. These sort FIRST in staff review |
+| `complete: true` is only reachable because partial submit is blocked | Q5. If partial returns were ever allowed, this field would become a lie rather than a fact |
+
+- **Link-expiry-on-submit was PROPOSED to Zoran (2026-08-02) and NOT taken up.** His Q6 ruling stands unchanged: the link keeps working, "fine for now, we will change it in the future". Do not re-raise it; it has been put to him once and declined.
+
 **PRICES PAGE BUILD DEFERRED (Zoran, 2026-08-01):** "hold off on building the adjust prices page until we finish the build in this chat [Walk through: SJ price match + skill] - let the orchestrator know." This is sequencing, not a design reversal: the price room builds the page once, and the workbook's Adjust-prices button later points at whatever they ship rather than at a second implementation of the same page.
 
 ---

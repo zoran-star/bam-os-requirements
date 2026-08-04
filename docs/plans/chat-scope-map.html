@@ -3,116 +3,182 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The chats, simply</title>
+<title>Mission control: everything for Lij</title>
 <style>
   *{box-sizing:border-box}
-  body{margin:0;color:#1c1c1e;background:#F4F4F1;
-    background-image:radial-gradient(#c9c8c2 1.1px, transparent 1.1px);
-    background-size:22px 22px;
+  body{margin:0;color:#E9E9EC;background:#0C0C0E;
+    background-image:radial-gradient(#1e1e22 1.2px, transparent 1.2px);background-size:24px 24px;
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
-    padding:38px 20px 80px;line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:620px;margin:0 auto}
-  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.8px;font-weight:800}
-  .key{font-size:13px;color:#6e6e76;margin:0 0 8px}
-  .key .r{color:#C92F1D;font-weight:800}
-  .stamp{font-size:12px;color:#6e6e76;margin:0 0 24px;font-style:italic}
+    line-height:1.5;-webkit-font-smoothing:antialiased;padding:26px 20px 70px}
+  .wrap{max-width:1020px;margin:0 auto}
+  .top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  h1{font-size:26px;margin:0;letter-spacing:-.7px;font-weight:800}
+  .clock{font-size:12px;color:#7C7C86;font-variant-numeric:tabular-nums}
+  .sub{font-size:13.5px;color:#7C7C86;margin:4px 0 22px}
 
-  .card{background:#fff;border:1.5px solid #D8D6D0;border-radius:14px;
-    padding:16px 20px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,.07)}
-  .card h2{margin:0 0 4px;font-size:16px;letter-spacing:-.2px}
-  .card .now{font-size:11px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;
-    color:#2f6fb5;margin-bottom:9px}
-  .card p{margin:0 0 10px;font-size:14px;color:#3c3c40}
-  .card p:last-child{margin-bottom:0}
-  .feeds{background:#FFF6E8;border-radius:9px;padding:9px 13px;font-size:13.5px;color:#7a5a1e;margin-bottom:10px}
-  .feeds b{color:#5c3c14}
-  .approve{background:#FDEEEB;border:1.5px solid #E8442A;border-radius:9px;
-    padding:9px 13px;font-size:13.5px;color:#8f2314}
-  .approve b{color:#C92F1D;text-transform:uppercase;font-size:11px;letter-spacing:1.2px}
-  .done{color:#2c9552;font-weight:700}
-  .arrow{text-align:center;font-size:22px;color:#b0aea7;margin:2px 0 14px;font-weight:700}
+  .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:26px}
+  .kpi{background:#141417;border:1px solid #26262b;border-radius:12px;padding:12px 14px}
+  .kpi .v{font-size:23px;font-weight:800;letter-spacing:-.6px}
+  .kpi .l{font-size:10.5px;color:#7C7C86;text-transform:uppercase;letter-spacing:1.3px;margin-top:2px}
+  .kpi.g .v{color:#5CC98A} .kpi.r .v{color:#FF6A4D} .kpi.b .v{color:#6FA8DC} .kpi.y .v{color:#E0A64A}
 
-  .shipped{background:#E9F7EE;border:1.5px solid #37B45F;border-radius:14px;
-    padding:14px 20px;margin-bottom:20px}
-  .shipped h2{margin:0 0 6px;font-size:15px;color:#1e7a41}
-  .shipped p{margin:0;font-size:13.5px;color:#2f5c3e}
+  h2.sec{font-size:11px;letter-spacing:2.2px;text-transform:uppercase;color:#7C7C86;
+    margin:30px 0 12px;font-weight:800;border-top:1px solid #22222a;padding-top:16px}
 
-  .hub{background:#1c1c1e;color:#fff;border-color:#1c1c1e}
-  .hub h2{color:#fff}
-  .hub p{color:#d6d6dc}
-  .hub .now{color:#8fbce8}
-  .hub .feeds{background:#33322f;color:#f0d67a}
-  .hub .feeds b{color:#fff}
-  .hub .approve{background:#3a1712;border-color:#E8442A;color:#f4b0a3}
-  .hub .approve b{color:#ff7a61}
+  .item{background:#141417;border:1px solid #26262b;border-radius:13px;padding:14px 17px;
+    margin-bottom:11px;position:relative;overflow:hidden}
+  .item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+  .item.done::before{background:#5CC98A}
+  .item.now::before{background:#6FA8DC}
+  .item.you::before{background:#FF6A4D}
+  .item.next::before{background:#E0A64A}
+  .item.later::before{background:#4A4A52}
+  .ih{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:5px}
+  .ih h3{margin:0;font-size:15px;letter-spacing:-.2px}
+  .pill{font-size:9px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;padding:2.5px 8px;border-radius:20px}
+  .p-done{background:rgba(92,201,138,.16);color:#5CC98A}
+  .p-now{background:rgba(111,168,220,.16);color:#6FA8DC}
+  .p-you{background:rgba(255,106,77,.18);color:#FF6A4D}
+  .p-next{background:rgba(224,166,74,.16);color:#E0A64A}
+  .p-later{background:rgba(140,140,150,.14);color:#8A8A94}
+  .item p{margin:0;font-size:13px;color:#B8B8C0}
+  .item p + p{margin-top:6px}
+  .item b{color:#fff;font-weight:650}
+  .where{font-size:11.5px;color:#7C7C86;margin-top:7px}
+  .where b{color:#A8A8B2;font-weight:700}
 
-  .lij{background:#E9F7EE;border:1.5px solid #37B45F}
-  .lij h2{color:#1e7a41}
-  .lij p{color:#2f5c3e}
+  .chain{background:#101318;border:1px solid #2b3440;border-radius:13px;padding:15px 18px;margin-bottom:11px}
+  .chain .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:#B8B8C0}
+  .chain .n{background:#1e2733;border:1px solid #33404f;border-radius:7px;padding:4px 10px;font-weight:700;color:#CBD6E2;font-size:12.5px}
+  .chain .ar{color:#4a5866;font-weight:800}
+
+  .nowbox{background:#1a0f0c;border:2px solid #FF6A4D;border-radius:14px;padding:15px 18px;margin-top:22px}
+  .nowbox h3{margin:0 0 8px;font-size:15px;color:#FF6A4D}
+  .nowbox ol{margin:0;padding-left:20px;font-size:13.5px;color:#F0A997}
+  .nowbox li{margin-bottom:6px} .nowbox li b{color:#fff}
+  @media(max-width:760px){.strip{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <h1>The chats, simply</h1>
-  <p class="key"><span class="r">Red = what you approve.</span> Orange = what it feeds this chat. Blue = doing right now.</p>
-  <p class="stamp">Refreshed after the deploy. Status checks are out to all three chats.</p>
+  <div class="top">
+    <h1>Everything for Lij, in one place</h1>
+    <div class="clock" id="clock"></div>
+  </div>
+  <p class="sub">All rooms closing. Everything runs from the member management chat from here.</p>
 
-  <div class="shipped">
-    <h2>&#10003; Shipped since you last looked</h2>
-    <p>The transport, the contact fix and a CI fix are <b>merged and live in production</b>. The database change is applied. Lij's Stripe can now be reached by key. <b>GTA verified untouched.</b></p>
+  <div class="strip">
+    <div class="kpi g"><div class="v">5</div><div class="l">done</div></div>
+    <div class="kpi b"><div class="v">2</div><div class="l">in flight</div></div>
+    <div class="kpi y"><div class="v">4</div><div class="l">still to build</div></div>
+    <div class="kpi r"><div class="v">1</div><div class="l">waiting on you</div></div>
   </div>
 
-  <div class="card">
-    <h2>1 &#183; SJ contact link-up</h2>
-    <div class="now">standing by for the key</div>
-    <p><span class="done">Done.</span> All 147 of Lij's Stripe customers connected to portal contacts, with you approving every judgement call. Its fix also went live today and quietly repaired a bug that was losing contacts for every academy.</p>
-    <div class="feeds"><b>Feeds this chat:</b> its write-up and every weird case. <span class="done">Delivered.</span></div>
-    <div class="approve"><b>You approve:</b> nothing more.</div>
-  </div>
-  <div class="arrow">&#8595;</div>
+  <!-- ══ DONE ══ -->
+  <h2 class="sec">Done and live</h2>
 
-  <div class="card">
-    <h2>2 &#183; SJ price match</h2>
-    <div class="now">price workbook mockup built, waiting on you</div>
-    <p>Prices are settled (4 plans, $40 fee). The workbook is built and in front of you. <b>You already caught a dead tax button in it</b> and ruled we ask Lij his real tax rate instead - that is now built as its own card.</p>
-    <div class="feeds"><b>Feeds this chat:</b> its run log and every ruling you made.</div>
-    <div class="approve"><b>You approve:</b> the price workbook mockup &#183; then its 6 design questions, 2-3 at a time.</div>
-  </div>
-  <div class="arrow">&#8595;</div>
-
-  <div class="card">
-    <h2>3 &#183; Lij member workbook</h2>
-    <div class="now">staging your review, two questions</div>
-    <p>Designing and building the member workbook. It handed its price-page design to the price chat so Lij gets one consistent product, not two inventions.</p>
-    <div class="feeds"><b>Feeds this chat:</b> its decisions file.</div>
-    <div class="approve"><b>You approve:</b> the prices page &#183; the member grid &#183; what Lij can edit vs only view &#183; portal-created vs linked &#183; the finished workbook.</div>
-  </div>
-  <div class="arrow">&#8595;</div>
-
-  <div class="card">
-    <h2>4 &#183; Seeding <span style="font-weight:600;color:#2c9552">(now handled here)</span></h2>
-    <div class="now">waiting on Lij</div>
-    <p>You ruled seeding waits for Lij and belongs to this chat, so the separate chat is cancelled. After he confirms his members, we seed all 20 together, one screen per member.</p>
-    <div class="approve"><b>You approve:</b> each member as we walk the pass.</div>
-  </div>
-  <div class="arrow">&#8595;</div>
-
-  <div class="card hub">
-    <h2>This chat picks up the rest</h2>
-    <div class="now">deploy done &#183; waiting on the key</div>
-    <p><b>It unblocked everyone</b> - merged, deployed, database applied, GTA checked.</p>
-    <p><b>It is the only voice to Lij</b> - he gets exactly two links, nothing else.</p>
-    <p><b>And it writes the three skills</b> from the logs above, each shown to you first.</p>
-    <div class="feeds"><b>Skill 1</b> &#8592; chats 1 + 2 &nbsp;&#183;&nbsp; <b>Skill 2</b> &#8592; chat 3 &nbsp;&#183;&nbsp; <b>Skill 3</b> &#8592; the seeding pass</div>
-    <div class="approve"><b>You approve:</b> sending Lij each link &#183; each skill mockup.</div>
+  <div class="item done">
+    <div class="ih"><h3>Reaching Lij's Stripe at all</h3><span class="pill p-done">live</span></div>
+    <p>His Stripe is locked by CoachIQ, so the normal connect button can never work. We built a second way in that uses his own key. <b>Deployed, every existing academy verified untouched.</b></p>
   </div>
 
-  <div class="card lij" style="border-width:2px">
-    <h2>&#9888; The one thing everything is waiting on</h2>
-    <p><b>Mint the write-scope key in Lij's Stripe and paste it here with the pk_live_.</b> That single paste connects San Jose, starts the verification sweep, and lets the real price matching run.</p>
+  <div class="item done">
+    <div class="ih"><h3>His 147 customers matched to contacts</h3><span class="pill p-done">done</span></div>
+    <p>Every Stripe customer now points at a person in the portal. 142 linked, 5 were duplicates. <b>You approved every judgement call.</b></p>
+  </div>
+
+  <div class="item done">
+    <div class="ih"><h3>His real prices worked out</h3><span class="pill p-done">done</span></div>
+    <p>4 plans, $40 signup fee waived on prepay. 13 of his 14 live prices mapped, 19 of 20 members covered.</p>
+  </div>
+
+  <div class="item done">
+    <div class="ih"><h3>A key leak, found and fixed</h3><span class="pill p-done">fixed</span></div>
+    <p>A key pasted with a line break in it could be shown back on screen in full. Found by a deliberate hunt, fixed before anyone used the page.</p>
+  </div>
+
+  <div class="item done">
+    <div class="ih"><h3>A contact bug across every academy</h3><span class="pill p-done">fixed + live</span></div>
+    <p>Contact syncing was silently dropping batches for all V1.5 academies. Repaired on the way past.</p>
+  </div>
+
+  <!-- ══ IN FLIGHT ══ -->
+  <h2 class="sec">In flight right now</h2>
+
+  <div class="item now">
+    <div class="ih"><h3>The command that saves his key</h3><span class="pill p-now">finishing</span></div>
+    <p>You wanted this done from chat, not a browser page. Nearly built. It proves production can actually read the key back rather than assuming it.</p>
+    <p class="where"><b>Next:</b> its room hands it over, I merge it, we run it. <b>That connects San Jose.</b></p>
+  </div>
+
+  <div class="item now">
+    <div class="ih"><h3>Handovers from all three rooms</h3><span class="pill p-now">incoming</span></div>
+    <p>Each room is committing whatever it has and sending me everything. Then they stop.</p>
+  </div>
+
+  <!-- ══ TO BUILD ══ -->
+  <h2 class="sec">Still to build, in order</h2>
+
+  <div class="item next">
+    <div class="ih"><h3>1 &#183; Price workbook</h3><span class="pill p-you">needs your yes</span></div>
+    <p>The page Lij uses to confirm his prices. <b>Built as a mockup and waiting on you.</b> Once approved: build it for real, then it goes to him.</p>
+    <p class="where"><b>Blocked by:</b> your approval, nothing else.</p>
+  </div>
+
+  <div class="item next">
+    <div class="ih"><h3>2 &#183; Member workbook</h3><span class="pill p-next">design locked</span></div>
+    <p>The page where he confirms his 20 members. Design finished, all six questions answered by you. <b>Needs building.</b></p>
+    <p class="where"><b>Blocked by:</b> his prices coming back first.</p>
+  </div>
+
+  <div class="item next">
+    <div class="ih"><h3>3 &#183; Seeding his 20 members</h3><span class="pill p-next">not started</span></div>
+    <p>One screen per member, you confirm each. Includes the <b>stop-charging list</b>: anyone Lij marks as gone gets their billing cancelled, and that list has to be cleared, not admired.</p>
+    <p class="where"><b>Blocked by:</b> his member workbook coming back.</p>
+  </div>
+
+  <div class="item later">
+    <div class="ih"><h3>4 &#183; The three skills</h3><span class="pill p-later">written last</span></div>
+    <p>Written from what actually happened with San Jose, not from a plan. One for matching, one for the member workbook, one for seeding. <b>This is what makes academy #4 a repeat instead of a rebuild.</b></p>
+  </div>
+
+  <!-- ══ CHAIN ══ -->
+  <h2 class="sec">How it ties together</h2>
+  <div class="chain">
+    <div class="row">
+      <span class="n">key saved</span><span class="ar">&#8594;</span>
+      <span class="n">SJ connected</span><span class="ar">&#8594;</span>
+      <span class="n">prices apply for real</span><span class="ar">&#8594;</span>
+      <span class="n">price workbook to Lij</span>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <span class="ar">&#8627;</span>
+      <span class="n">he confirms prices</span><span class="ar">&#8594;</span>
+      <span class="n">member workbook to Lij</span><span class="ar">&#8594;</span>
+      <span class="n">he confirms members</span><span class="ar">&#8594;</span>
+      <span class="n">we seed all 20</span>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <span class="ar">&#8627;</span>
+      <span class="n">SJ fully live</span><span class="ar">&#8594;</span>
+      <span class="n">3 skills written from the run</span><span class="ar">&#8594;</span>
+      <span class="n">academy #4 is a repeat</span>
+    </div>
+  </div>
+
+  <div class="nowbox">
+    <h3>The only thing waiting on you</h3>
+    <ol>
+      <li><b>Approve the price workbook</b> so it can be built for real. I can bring it into this chat and give you a recommendation if you would rather not go back into that room.</li>
+    </ol>
   </div>
 
 </div>
+<script>
+  const el=document.getElementById('clock');
+  const t=()=>{el.textContent=new Date().toLocaleString('en-GB',{hour12:false});};
+  t();setInterval(t,1000);
+</script>
 </body>
 </html>

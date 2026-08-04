@@ -23,9 +23,19 @@
 //   4. The error is the SUPERSET of both existing shapes - message, stripeStatus,
 //      stripeResponse, responseBody (alias), transportLabel - so every current
 //      consumer reads what it already reads.
-//   5. THE KEY NEVER LEAKS. The decrypted academy key appears in no thrown error
-//      property and no console output. This is the property that makes storing
-//      other people's payment credentials tolerable at all.
+//   5. THE KEY NEVER LEAKS, in EITHER kind of error. Not in one this module
+//      constructs, and not in one the RUNTIME throws - the second half is where
+//      the leak actually lived. A key pasted with a line break in the middle of
+//      it survives .trim(), passes every rk_live_ check, and makes undici throw
+//      a TypeError quoting the whole key with no .status, which a route echoes
+//      to the browser. The probe drives \n, \r and \x00 through the real code
+//      path and asserts on a TWO-PART canary, so a "fix" that scrubs the
+//      message for rk_live_[A-Za-z0-9]* - which stops at the break and leaves
+//      the tail on screen - fails here instead of shipping. It also covers the
+//      RETURN path: readAccountHealth must not hand an unusable key to
+//      _requirements.js, whose reason string ends up in a JSON response body.
+//      This is the property that makes storing other people's payment
+//      credentials tolerable at all.
 //   6. publishableFor / getCapabilities answer per-transport facts so no caller
 //      ever needs to know the transport.
 //   7. readAccountHealth: three outcomes over the right transport, with the two
@@ -49,6 +59,18 @@
 //   MUTATE=keyleak    node api/_stripe-transport.test.mjs
 //       the decrypted key is appended to the thrown error message - the leak
 //       assertions must notice.
+//   MUTATE=noshapecheck  node api/_stripe-transport.test.mjs
+//       the printable-ASCII refusal is deleted, so a key with a line break in
+//       it reaches the runtime again. The belt (the sanitiser around fetch)
+//       still holds the canary out of the error, so what catches this is the
+//       REFUSAL half of section 7 - the 400 and the re-copy sentence - not the
+//       canary half. Said plainly because a control whose report is vague is
+//       how a decorative check survives.
+//   MUTATE=rawruntime    node api/_stripe-transport.test.mjs
+//       BOTH layers deleted - the refusal and the fetch sanitiser - so the
+//       runtime's own TypeError, quoting the entire Authorization header,
+//       propagates exactly as it does in production today. This is the control
+//       that proves the two-part canary assertions are alive.
 //
 // A control run exits ZERO when the mutation IS caught (the suite is reporting
 // "the control worked"). CI greps for the banner, not the exit code.
@@ -117,7 +139,42 @@ const NULLROUTE = [[
 const KEYLEAK = [[
   "    const err = new Error((json && json.error && json.error.message) || `Stripe ${res.status}`);",
   "    const err = new Error(((json && json.error && json.error.message) || `Stripe ${res.status}`) + ` via key ${t.bearer}`);"]];
-const EDITS = { nullroute: NULLROUTE, keyleak: KEYLEAK };
+
+// Removes the printable-ASCII refusal, so a pasted key with a line break in it
+// reaches the runtime again.
+//
+// BE PRECISE ABOUT WHAT THIS PROVES. The fetch sanitiser (the belt) is still in
+// place in this mutant, so it still keeps the canary out of the error - the
+// leak assertions stay green and it is the REFUSAL assertions (status 400, the
+// re-copy sentence, nothing hitting the wire) that catch it. That is the honest
+// result: this control shows the refusal is load-bearing, not decorative.
+// MUTATE=rawruntime is the control that proves the canary assertions themselves
+// are alive.
+const NOSHAPECHECK = [[
+  "  assertHeaderSafeKey(t.bearer);",
+  "  // (control noshapecheck) the printable-ASCII refusal was removed"]];
+
+// Removes BOTH layers - the refusal AND the sanitiser wrapped around fetch - so
+// the runtime's own TypeError propagates to the caller exactly as it does in
+// production today: a message quoting the entire Authorization header, no
+// .status, and a route that echoes it. This is the control that makes the
+// two-part canary assertions earn their keep. If they were decorative, or if
+// someone "fixed" the leak by regex-scrubbing rk_live_[A-Za-z0-9]* (which stops
+// at the line break and leaves the tail on screen), this control would pass.
+const RAWRUNTIME = [
+  ["  assertHeaderSafeKey(t.bearer);", "  // (control rawruntime) the refusal was removed"],
+  [`async function safeFetch(url, init, what) {
+  try {
+    return await fetch(url, init);
+  } catch (e) {
+    throw sanitizeFetchError(e, what);
+  }
+}`,
+   `async function safeFetch(url, init, what) {
+  return await fetch(url, init); // (control rawruntime) sanitiser removed
+}`],
+];
+const EDITS = { nullroute: NULLROUTE, keyleak: KEYLEAK, noshapecheck: NOSHAPECHECK, rawruntime: RAWRUNTIME };
 
 const modulePath = MUTATE
   ? mutatedCopy(EDITS[MUTATE] || (() => { controlBroken = `unknown control MUTATE=${MUTATE}`; throw new Error(controlBroken); })())
@@ -125,6 +182,15 @@ const modulePath = MUTATE
 
 // ── the in-memory world ──────────────────────────────────────────────────────
 const DIRECT_KEY = "rk_live_supersecret_academy_key_9Xq7";
+
+// TWO-PART CANARY, split the way a real paste is. The break lands in the MIDDLE
+// of the key, so a "fix" that scrubs an error message for rk_live_[A-Za-z0-9]*
+// stops dead at the break and leaves CANARY_TAIL - a recoverable piece of a
+// LIVE credential - on screen. Every leak assertion below checks BOTH halves,
+// which is what makes truncation fail here rather than pass here and leak in
+// production. Neither half may appear in any label printed by this suite.
+const CANARY_HEAD = "rk_live_FAKE_CANARY";
+const CANARY_TAIL = "SECOND_LINE_TAIL";
 const { encryptSecret, decryptSecret } = await import(pathToFileURL(path.join(HERE, "_stripe-direct-crypto.js")).href);
 
 const DB = {
@@ -162,6 +228,15 @@ let stripeResponder = null;
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
   const method = String(init.method || "GET").toUpperCase();
+  // THE STUB VALIDATES HEADERS LIKE THE RUNTIME DOES, or the leak this suite
+  // exists to catch cannot happen inside it. Real fetch builds a Headers object
+  // out of init.headers, and undici's validator throws a TypeError QUOTING the
+  // whole offending header value - live key and all. This is that same
+  // validator, called at the same point in the sequence, so section 7 drives
+  // the actual production failure instead of a story about it. Without this
+  // line a stub simply accepts a key with a line break in it and every leak
+  // assertion below passes for the wrong reason.
+  new Headers(init.headers || {});
   const json = (v, status = 200) => new Response(JSON.stringify(v), { status, headers: { "content-type": "application/json" } });
 
   if (u.startsWith("https://api.stripe.com/")) {
@@ -344,6 +419,9 @@ console.log("\n── 6. readAccountHealth: three outcomes, right transport, rig
     "a 401 is unreachable PLUS credential_problem - the key is dead, not the network");
   ok(/cannot answer/.test(String(h.error)), "and the reason says the KEY cannot answer");
   ok(DB.client_stripe_direct[0].status === "invalid", "side effect: the row is flipped to 'invalid'");
+  // Captured for the drift pin further down: this is the REAL shape
+  // api/stripe/_requirements.js hands back for a credential problem.
+  const CRED_PROBLEM_SHAPE = Object.keys(h).sort().join(",");
 
   // network failure: unreachable, NO credential_problem, row untouched
   DB.client_stripe_direct[0].status = "active";
@@ -380,6 +458,55 @@ console.log("\n── 6. readAccountHealth: three outcomes, right transport, rig
   ok(patches().every(p => p.qs.includes("status=in.(active,invalid)")),
     "every health-read patch carries the status filter, so 'disabled' is out of reach by construction");
   DB.client_stripe_direct[0].status = "active";
+  stripeResponder = null;
+
+  // ── THE OTHER MOUTH OF THE LEAK: the RETURN path, not the throw path ───────
+  // readAccountHealth hands its key to api/stripe/_requirements.js, whose catch
+  // folds a fetch failure into `could not reach Stripe: ${e.message}` and
+  // RETURNS it - and api/stripe/direct-key.js's status action puts that string
+  // straight into the JSON it sends the browser. So a key that cannot be a
+  // header value would arrive in a response body without ever being thrown, and
+  // no amount of care in a catch block would catch it. Both keys are checked
+  // before they are handed over.
+  {
+    const realEnc = DB.client_stripe_direct[0].secret_key_enc;
+    DB.client_stripe_direct[0].secret_key_enc = encryptSecret(`${CANARY_HEAD}\n${CANARY_TAIL}`);
+    DB.client_stripe_direct[0].status = "active";
+    T.bustTransportCache();
+    const wireBefore = STRIPE_CALLS.length;
+    const broken = await T.readAccountHealth("client-direct");
+    const dump = JSON.stringify(broken);
+    ok(broken.outcome === "unreachable" && broken.credential_problem === true,
+      "a STORED key with an embedded break reads unreachable + credential_problem");
+    ok(!dump.includes(CANARY_HEAD) && !dump.includes(CANARY_TAIL),
+      "and NEITHER canary half is anywhere in the health object the status action returns");
+    ok(STRIPE_CALLS.length === wireBefore, "it never reached the wire");
+    ok(DB.client_stripe_direct[0].status === "invalid",
+      "and the row flips to 'invalid' - a key that cannot be sent must stop routing");
+    // DRIFT PIN. That unreachable object is BUILT in _stripe-transport.js
+    // rather than imported, because _requirements.js keeps its builder private.
+    // If the two shapes ever diverge, callers reading .needs / .problems break
+    // on a path nobody exercises by hand - so the shapes are compared, here,
+    // against a real credential-problem result from the real function.
+    ok(Object.keys(broken).sort().join(",") === CRED_PROBLEM_SHAPE,
+      `the built unreachable object matches the shape _requirements.js returns (saw ${Object.keys(broken).sort().join(",")})`);
+
+    // Our OWN key, same failure: a platform secret with a trailing newline (the
+    // `echo` instead of `printf` classic when setting a secret) would be quoted
+    // by the runtime and returned in the health object of every CONNECT academy.
+    DB.client_stripe_direct[0].secret_key_enc = realEnc;
+    DB.client_stripe_direct[0].status = "active";
+    T.bustTransportCache();
+    const realPlatform = process.env.STRIPE_CONNECT_SECRET_KEY;
+    process.env.STRIPE_CONNECT_SECRET_KEY = `sk_live_${CANARY_HEAD}\n${CANARY_TAIL}`;
+    const bp = await T.readAccountHealth("client-connect");
+    process.env.STRIPE_CONNECT_SECRET_KEY = realPlatform;
+    const bpDump = JSON.stringify(bp);
+    ok(bp.outcome === "unreachable" && !bpDump.includes(CANARY_HEAD) && !bpDump.includes(CANARY_TAIL),
+      "a PLATFORM key with an embedded break is unreachable with neither canary half in the result");
+    ok(!("credential_problem" in bp),
+      "and carries NO credential_problem - our misconfiguration must never flip an academy's key to invalid");
+  }
 
   // connect academy: read via /v1/accounts/{id} with the platform key
   stripeResponder = (m, u) => u.startsWith("https://api.stripe.com/v1/accounts/acct_connect")
@@ -391,13 +518,52 @@ console.log("\n── 6. readAccountHealth: three outcomes, right transport, rig
   stripeResponder = null;
 }
 
-console.log("\n── 7. THE KEY NEVER LEAKS ──");
+console.log("\n── 7. THE KEY NEVER LEAKS - constructed errors AND runtime throws ──");
 {
   const propDump = JSON.stringify(caughtDirectError, Object.getOwnPropertyNames(caughtDirectError || {}));
   ok(!!caughtDirectError && !propDump.includes(DIRECT_KEY),
     "the decrypted key appears in NO property of a thrown transport error");
   ok(!consoleBuffer.includes(DIRECT_KEY),
     "and in NO console output produced by the whole suite");
+
+  // ── the half this probe used to miss ──────────────────────────────────────
+  // Everything above inspects errors this module CONSTRUCTS, and the module
+  // header used to claim that was the whole guarantee. It was not. The errors
+  // that actually leaked are the ones the RUNTIME throws: a restricted key
+  // copied out of a wrapped email, a Slack code block or a PDF arrives with a
+  // line break IN THE MIDDLE, .trim() cannot see it (trim only touches the
+  // ends), every rk_live_ shape check passes, and undici refuses the header
+  // with a TypeError quoting the entire key - no .status, so a route's
+  // `e.status || 500` + `e.message` hands a live credential to the browser.
+  //
+  // A leak probe that only reads errors we wrote is assurance with nothing
+  // behind it: it cannot fail on the case it was written for.
+  for (const [label, sep] of [["a line break", "\\n"], ["a carriage return", "\\r"], ["a NUL", "\\x00"]]) {
+    const raw = { "\\n": "\n", "\\r": "\r", "\\x00": "\x00" }[sep];
+    const pasted = `${CANARY_HEAD}${raw}${CANARY_TAIL}`;
+    const wireBefore = STRIPE_CALLS.length;
+    let e = null;
+    try { await T.stripeFetch("/account", { keyOverride: pasted }); } catch (err) { e = err; }
+
+    ok(!!e, `a key containing ${label} is refused rather than sent`);
+    // message + EVERY enumerable property + the STACK. The stack matters on its
+    // own: Node builds err.stack out of the message, so an error whose message
+    // was cleaned after construction still carries the original in its stack.
+    const dump = e
+      ? [String(e.message), String(e.stack || ""), JSON.stringify(e, Object.getOwnPropertyNames(e)), JSON.stringify(e)].join("\n")
+      : "";
+    ok(!!e && !dump.includes(CANARY_HEAD) && !dump.includes(CANARY_TAIL),
+      `and NEITHER half of the canary is in its message, its properties or its stack (${label})`);
+    ok(!!e && e.status === 400,
+      `refused as bad INPUT rather than a server fault (${label}) - saw status ${JSON.stringify(e && e.status)}`);
+    ok(!!e && /re-copy it without the break/.test(String(e.message)),
+      `with the sentence that tells the operator what to actually do (${label})`);
+    ok(STRIPE_CALLS.length === wireBefore,
+      `and the malformed key never reached the wire (${label})`);
+  }
+
+  ok(!consoleBuffer.includes(CANARY_HEAD) && !consoleBuffer.includes(CANARY_TAIL),
+    "and neither canary half was printed to the console by anything in this suite");
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────

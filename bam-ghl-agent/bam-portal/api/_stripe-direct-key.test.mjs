@@ -63,6 +63,19 @@
 //      - and because that name lookup is best effort, the case that matters is
 //      the one where it FAILS: the refusal must survive it. An academy
 //      re-saving its OWN account (every key rotation) stays idempotent.
+//  12. A KEY WITH A LINE BREAK IN IT NEVER COMES BACK. The realistic paste -
+//      copied out of a wrapped email, a Slack code block, a PDF - carries a
+//      break in the MIDDLE, which .trim() cannot see and the rk_live_ check
+//      does not mind. The runtime then refuses the header with a TypeError
+//      quoting the whole live key and no .status, which this route used to
+//      echo as a 500. Asserted on a TWO-PART canary (the break splits the key,
+//      so scrubbing for rk_live_[A-Za-z0-9]* leaves the tail on screen) across
+//      \n, \r and \x00, through both probe and save.
+//  13. A .status MEANS "REFUSED, NOTHING HAPPENED". Every .status-carrying
+//      throw in saveDirectKey is driven and shown to fire before the first
+//      sb() write, because a CLI reports that promise to an operator verbatim.
+//      It is also why the transport's sanitised runtime errors carry no status
+//      at all: a fetch can throw after a write.
 //
 // WHAT IT DOES NOT PROVE
 //   - Real Stripe's status codes for the capability probes (stubbed; the
@@ -91,6 +104,15 @@
 //       Stripe account already claimed by another academy walks into the UNIQUE
 //       index and comes back as a Postgres string nobody can act on. Section
 //       13 must catch it.
+//
+//   MUTATE=rawmessage  node api/_stripe-direct-key.test.mjs
+//       restores `error: e.message` for statusless errors in handler()'s catch,
+//       AND removes the transport's two guards, because the belt only matters
+//       for an error we did not construct and with the transport refusing the
+//       key there is no such error to echo. Together the two edits ARE the
+//       shipped bug: a live restricted key with a line break in it comes back
+//       to the browser as a 500 with the credential in the body. Section 14
+//       must catch it.
 //
 // A control run exits ZERO when the mutation IS caught. CI greps for the
 // banner, not the exit code.
@@ -259,21 +281,77 @@ const NOCOLLISION = [[
     '    const claimedBy = "";',
   ].join("\n")]];
 
+// A TWO-FILE CONTROL, and it has to be, which is the interesting part.
+//
+// The boundary belt in handler()'s catch only matters for an error we did NOT
+// construct. With api/_stripe-transport.js refusing a malformed key up front,
+// no such error ever arrives - so a control that mutated only direct-key.js
+// would break nothing, catch nothing, and print nothing. Removing the
+// transport's two guards alongside it reproduces the shipped bug EXACTLY as it
+// exists in production right now: a live key inside a statusless TypeError,
+// echoed straight into the response body.
+const RAWMESSAGE = {
+  directKey: [[
+    `    if (e && e.status) return res.status(e.status).json({ error: e.message || String(e) });
+    console.error("stripe/direct-key unexpected error:", (e && e.stack) || e);
+    return res.status(500).json({ error: "unexpected error saving the key" });`,
+    `    return res.status(e.status || 500).json({ error: e.message || String(e) });`]],
+  transport: [
+    ["  assertHeaderSafeKey(t.bearer);", "  // (control rawmessage) refusal removed"],
+    [`async function safeFetch(url, init, what) {
+  try {
+    return await fetch(url, init);
+  } catch (e) {
+    throw sanitizeFetchError(e, what);
+  }
+}`,
+     `async function safeFetch(url, init, what) {
+  return await fetch(url, init); // (control rawmessage) sanitiser removed
+}`],
+  ],
+};
+
 let modulePath = path.join(HERE, "stripe/direct-key.js");
-if (MUTATE) {
-  const edits = { capfalse: CAPFALSE, inlinesave: INLINESAVE, nocollision: NOCOLLISION }[MUTATE];
-  if (!edits) { console.log(`❌ NEGATIVE CONTROL FAILED: unknown control MUTATE=${MUTATE}`); process.exit(1); }
-  let src = fs.readFileSync(modulePath, "utf8");
+let transportPath = path.join(HERE, "_stripe-transport.js");
+
+const controlDied = (msg) => { console.log(`❌ NEGATIVE CONTROL FAILED: ${msg}`); process.exit(1); };
+const applyEdits = (srcPath, edits, outPath, human) => {
+  let src = fs.readFileSync(srcPath, "utf8");
   for (const [find, repl] of edits) {
     if (!src.includes(find)) {
-      console.log(`❌ NEGATIVE CONTROL FAILED: MUTATE=${MUTATE} is pinned to text that is no longer in api/stripe/direct-key.js:\n\n${find}\n\nRe-point it or delete it.`);
-      process.exit(1);
+      controlDied(`MUTATE=${MUTATE} is pinned to text that is no longer in ${human}:\n\n${find}\n\nRe-point it or delete it - a pin that fails to apply looks exactly like a check that passed.`);
     }
     src = src.split(find).join(repl);
   }
-  modulePath = path.join(HERE, "stripe", ".mutant-direct-key.js");
-  fs.writeFileSync(modulePath, src);
-  tmpFiles.push(modulePath);
+  fs.writeFileSync(outPath, src);
+  tmpFiles.push(outPath);
+  return outPath;
+};
+
+if (MUTATE) {
+  const PLANS = {
+    capfalse: { directKey: CAPFALSE },
+    inlinesave: { directKey: INLINESAVE },
+    nocollision: { directKey: NOCOLLISION },
+    rawmessage: RAWMESSAGE,
+  };
+  const plan = PLANS[MUTATE];
+  if (!plan) controlDied(`unknown control MUTATE=${MUTATE}`);
+
+  const dkEdits = [...(plan.directKey || [])];
+  if (plan.transport) {
+    transportPath = applyEdits(transportPath, plan.transport,
+      path.join(HERE, ".mutant-stripe-transport-dk.js"), "api/_stripe-transport.js");
+    // The mutant direct-key must import the MUTANT transport, and section 7's
+    // cache assertions must talk to that same instance - one specifier, one
+    // module, one cache. Two instances would fail section 7 for a reason that
+    // has nothing to do with the control.
+    dkEdits.push(['from "../_stripe-transport.js";', 'from "../.mutant-stripe-transport-dk.js";']);
+  }
+  if (dkEdits.length) {
+    modulePath = applyEdits(modulePath, dkEdits,
+      path.join(HERE, "stripe", ".mutant-direct-key.js"), "api/stripe/direct-key.js");
+  }
 }
 
 // The source of the module ACTUALLY under test (the shipped file, or the mutant
@@ -331,6 +409,13 @@ let sbFail = null;
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
   const method = String(init.method || "GET").toUpperCase();
+  // THE STUB VALIDATES HEADERS LIKE THE RUNTIME DOES. Real fetch builds a
+  // Headers object out of init.headers and undici's validator throws a
+  // TypeError QUOTING the entire offending header value - the live key
+  // included. Section 14 exists to prove that string never reaches a response
+  // body; without this line the stub happily accepts a key with a line break in
+  // it, the failure never happens, and section 14 passes for the wrong reason.
+  new Headers(init.headers || {});
   const json = (v, status = 200) => new Response(JSON.stringify(v), { status, headers: { "content-type": "application/json" } });
 
   if (u === "https://stub.supabase.test/auth/v1/user") return json({ id: "user-1", email: "zo@test" });
@@ -392,7 +477,7 @@ globalThis.fetch = async (url, init = {}) => {
 
 const MOD = await import(pathToFileURL(modulePath).href);
 const handler = MOD.default;
-const T = await import(pathToFileURL(path.join(HERE, "_stripe-transport.js")).href);
+const T = await import(pathToFileURL(transportPath).href);
 
 const RESPONSES = [];   // every payload the handler ever returned, for the leak scan
 async function post(body) {
@@ -787,6 +872,87 @@ console.log("\n── 13. one Stripe account, one academy ──");
     `the SAME academy re-saving its own account id still succeeds (saw ${again.code} ${JSON.stringify(again.payload && again.payload.error || "")})`);
   ok(rowsBefore === 1 && DB.client_stripe_direct.filter(x => x.client_id === "c3").length === 1,
     "and it stays ONE row - a re-save is an upsert, not a second claim on the account");
+}
+
+console.log("\n── 14. a key pasted with a line break in it never comes back in the response ──");
+{
+  // THE BUG THIS SECTION EXISTS FOR, reproduced end to end. A restricted key
+  // copied out of a wrapped email, a Slack code block or a PDF arrives with a
+  // break IN THE MIDDLE. .trim() only touches the ends, so it survives; the
+  // rk_live_ prefix check passes; and the runtime refuses the header with
+  //   TypeError: Headers.append: "Bearer rk_live_...\n..." is an invalid header value
+  // - a message containing the WHOLE LIVE KEY and carrying no .status, which
+  // this route used to echo as a 500. The key is malformed but trivially
+  // repaired by deleting the break, and the operator's next move on a
+  // confusing error is to paste it into Slack or a ticket.
+  //
+  // TWO-PART CANARY on purpose: the break SPLITS the key, so a fix that scrubs
+  // the body for rk_live_[A-Za-z0-9]* stops at the break and leaves
+  // CANARY_TAIL in the response. Both halves are asserted, so that fix fails
+  // here rather than shipping.
+  const CANARY_HEAD = "rk_live_FAKE_CANARY";
+  const CANARY_TAIL = "SECOND_LINE_TAIL";
+  for (const [label, raw] of [["a line break", "\n"], ["a carriage return", "\r"], ["a NUL", "\x00"]]) {
+    const pasted = `${CANARY_HEAD}${raw}${CANARY_TAIL}`;
+    for (const action of ["probe", "save"]) {
+      const before = snapshot();
+      const r = await post({ action, client_id: "c1", secret_key: pasted, publishable_key: "pk_live_academy" });
+      const body = JSON.stringify(r.payload);
+      ok(!body.includes(CANARY_HEAD) && !body.includes(CANARY_TAIL),
+        `NEITHER half of the canary is in the ${action} response body (${label})`);
+      ok(r.code === 400,
+        `and it answers 400 - bad input, not a server fault (${action}, ${label}) - saw ${r.code}`);
+      ok(/re-copy it without the break/.test(String(r.payload && r.payload.error)),
+        `with the sentence that tells the operator what to do (${action}, ${label})`);
+      ok(snapshot() === before, `and nothing was written (${action}, ${label})`);
+    }
+  }
+  const all = RESPONSES.join("\n");
+  ok(!all.includes(CANARY_HEAD) && !all.includes(CANARY_TAIL),
+    "and neither half appears in ANY response this handler sent across the whole suite");
+}
+
+console.log("\n── 15. every .status refusal fires BEFORE the first write ──");
+{
+  // THE INVARIANT A CLI DEPENDS ON. saveDirectKey's callers read .status as
+  // "refused deliberately, and nothing happened" - a CLI prints exactly that to
+  // an operator. So a .status may only ever ride on an error thrown BEFORE the
+  // first sb() write. Get that wrong and an operator is told nothing happened
+  // while a live payment credential is already in the database, which is worse
+  // than an unmapped 500.
+  //
+  // It is also why the transport's sanitised runtime errors are deliberately
+  // STATUSLESS: a fetch can throw AFTER a write, so a status there would be a
+  // reassurance we cannot back. The one new .status - the printable-ASCII key
+  // refusal - fires before fetch is called at all, so it is inside the rule,
+  // and this table proves it by driving it alongside every older refusal.
+  const cases = [
+    ["no client id", { clientId: "", secretKey: RK, publishableKey: "pk_live_academy", performedByName: "CLI" }],
+    ["no actor", { clientId: "c3", secretKey: RK, publishableKey: "pk_live_academy", performedByName: "" }],
+    ["no publishable key", { clientId: "c3", secretKey: RK, publishableKey: "", performedByName: "CLI" }],
+    ["a test-mode publishable key", { clientId: "c3", secretKey: RK, publishableKey: "pk_test_x", performedByName: "CLI" }],
+    ["a full sk_ key", { clientId: "c3", secretKey: "sk_live_whatever", publishableKey: "pk_live_academy", performedByName: "CLI" }],
+    ["a test-mode restricted key", { clientId: "c3", secretKey: "rk_test_whatever", publishableKey: "pk_live_academy", performedByName: "CLI" }],
+    ["a key with a line break in it", { clientId: "c3", secretKey: "rk_live_FAKE_CANARY\nSECOND_LINE_TAIL", publishableKey: "pk_live_academy", performedByName: "CLI" }],
+    ["an unknown academy", { clientId: "c3-typo", secretKey: RK, publishableKey: "pk_live_academy", performedByName: "CLI" }],
+    ["an account already claimed", { clientId: "c4", secretKey: RK, publishableKey: "pk_live_academy", performedByName: "CLI" }],
+  ];
+  const offenders = [];
+  for (const [label, args] of cases) {
+    const before = snapshot();
+    const p = SB_POSTS.length, q = SB_PATCHES.length;
+    let e = null;
+    try { await MOD.saveDirectKey(args); } catch (err) { e = err; }
+    if (!e) { offenders.push(`${label}: did not throw at all`); continue; }
+    if (!e.status) { offenders.push(`${label}: threw without a .status`); continue; }
+    if (SB_POSTS.length !== p || SB_PATCHES.length !== q || snapshot() !== before) {
+      offenders.push(`${label}: .status ${e.status} was thrown AFTER a write landed`);
+    }
+  }
+  ok(offenders.length === 0,
+    offenders.length
+      ? `a .status refusal escaped the rule - ${offenders.join("; ")}`
+      : `all ${cases.length} .status refusals fire before the first sb() write, so "refused, nothing happened" is true every time`);
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────
