@@ -297,7 +297,7 @@ const RAWMESSAGE = {
     return res.status(500).json({ error: "unexpected error saving the key" });`,
     `    return res.status(e.status || 500).json({ error: e.message || String(e) });`]],
   transport: [
-    ["  assertHeaderSafeKey(t.bearer);", "  // (control rawmessage) refusal removed"],
+    ["  const bearer = assertHeaderSafeKey(t.bearer);", "  const bearer = t.bearer; // (control rawmessage) refusal removed"],
     [`async function safeFetch(url, init, what) {
   try {
     return await fetch(url, init);
