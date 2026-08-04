@@ -107,9 +107,15 @@
   <h2 class="sec">In flight right now</h2>
 
   <div class="item now">
-    <div class="ih"><h3>The command that saves his key</h3><span class="pill p-now">finishing</span></div>
-    <p>You wanted this done from chat, not a browser page. Nearly built. It proves production can actually read the key back rather than assuming it.</p>
-    <p class="where"><b>Next:</b> its room hands it over, I merge it, we run it. <b>That connects San Jose.</b></p>
+    <div class="ih"><h3>Proving production can read his key back</h3><span class="pill p-now">waiting on a deploy</span></div>
+    <p>His key is saved and his webhook is live, both checked against Stripe directly. The last unproven link is production decrypting that key and using it. It failed once, on <b>our own bug, not his key</b>: the check refused any key with a line break, and our own Supabase key has a stray one on the end.</p>
+    <p class="where"><b>The fix is written and passing, but it is not on main, so it is not deployed.</b> Re-running the check today would fail the same way and prove nothing. Merge plus about 11 minutes, then it means something.</p>
+  </div>
+
+  <div class="item now">
+    <div class="ih"><h3>Attacking that fix before it ships</h3><span class="pill p-now">5 found, being fixed</span></div>
+    <p>A second agent tried to break the fix rather than confirm it. It found <b>5 real defects</b>, the worst being that part of the fix had <b>no test holding it in place at all</b> - you could delete that line and everything still passed. It also found the same leak we closed is <b>still open in another file</b>.</p>
+    <p class="where"><b>Next:</b> two builders are fixing those now. Nothing merges until they are clean.</p>
   </div>
 
   <div class="item done">
@@ -121,8 +127,9 @@
   <h2 class="sec">Still to build, in order</h2>
 
   <div class="item next">
-    <div class="ih"><h3>1 &#183; Price workbook</h3><span class="pill p-you">needs your yes</span></div>
-    <p>The page Lij uses to confirm his prices. <b>Built as a mockup and waiting on you.</b> Once approved: build it for real, then it goes to him.</p>
+    <div class="ih"><h3>1 &#183; Price workbook</h3><span class="pill p-you">you are looking at it</span></div>
+    <p>The page Lij uses to confirm his prices. <b><a href="sj-price-workbook-mockup-v1.html">Open the mockup</a></b>. Two known defects were fixed before handing it to you, so this is a yes-or-change decision, not an inspection:</p>
+    <p class="where">The <b>Send button used to be dead with no reason given</b> - it now says "Confirm the remaining 9 cards to send" beside it, on hover, and it flashes if he presses it anyway. And <b>"add another length" defaulted to 12 months</b>, the one length our system cannot actually store. Now 3 months.</p>
     <p class="where"><b>Blocked by:</b> your approval, nothing else.</p>
   </div>
 
@@ -170,8 +177,9 @@
   <div class="nowbox">
     <h3>The only thing waiting on you</h3>
     <ol>
-      <li><b>Approve the price workbook</b> so it can be built for real. I can bring it into this chat and give you a recommendation if you would rather not go back into that room.</li>
+      <li><b><a href="sj-price-workbook-mockup-v1.html">Approve the price workbook</a></b> so it can be built for real. Two defects already fixed, so this is yes or name a change.</li>
     </ol>
+    <p class="where" style="margin-top:10px"><b>Answered today:</b> Elementary keeps its $40 sign-up fee, same as the other three plans. That was a silent default until you ruled on it, so the workbook now ships it prefilled instead of asking Lij.</p>
   </div>
 
 </div>

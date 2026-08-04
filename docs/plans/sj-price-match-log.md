@@ -40,9 +40,11 @@ This room does NOT seed members (separate chat). The exercise = every Stripe pri
 ### Ruling: Pre Season (Zoran, 2026-08-01)
 Asked what Pre Season options are; analysis showed Pre Season amounts mirror the Unlimited ladder ($300/749-750/1399ish) and 1x ladder, and the in-use ones sit ON the core products. Zoran: "actually just treat it as the unlimited" -> Pre Season Academy prices = Unlimited plan. Adam Ly $300/4wk = LIVE Unlimited monthly. Pre Season 1x prices remain 1x variants: Salvador $200 = legacy 1x monthly. No Pre Season plan in portal pricing; season stays a schedule/class concept.
 
+### Ruling: Elementary keeps the $40 sign-up fee (Zoran, 2026-08-04, MEMBER MANAGEMENT III)
+Asked directly rather than left as a default nobody ever confirmed. "Keep the $40" - Elementary matches the other three plans: charged on the every-4-weeks option only, waived on prepay. **No DB change needed**, this ratifies what was already applied on 2026-08-01; the point was to convert a silent default into a ruling. The Elementary card in the price workbook therefore ships with the fee prefilled and does NOT ask Lij about it.
+
 ### Open items
 - [ ] Ask Lij: which plan is Christopher's $199 deal on (last untiered judgement; tier=legacy either way, only the plan attachment is open)
-- [ ] Optional veto: Elementary got the $40 signup fee by default
 - [ ] billing_cadence: nothing writes offer_prices.billing_cadence yet - SJ rows may need hand SQL after offers-sync (queue item from PR #1675)
 - [ ] BLOCKED: live run waits on direct-key transport deploy + Lij write key saved
 
