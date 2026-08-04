@@ -43,6 +43,15 @@ Asked what Pre Season options are; analysis showed Pre Season amounts mirror the
 ### Ruling: Elementary keeps the $40 sign-up fee (Zoran, 2026-08-04, MEMBER MANAGEMENT III)
 Asked directly rather than left as a default nobody ever confirmed. "Keep the $40" - Elementary matches the other three plans: charged on the every-4-weeks option only, waived on prepay. **No DB change needed**, this ratifies what was already applied on 2026-08-01; the point was to convert a silent default into a ruling. The Elementary card in the price workbook therefore ships with the fee prefilled and does NOT ask Lij about it.
 
+### Build requirement found 2026-08-04 (MEMBER MANAGEMENT III): the prefilled plan TITLES do not match the stored ones
+Verified live, both sides, rather than assumed. The portal draft offer (4d15a274) stores **"1 Training/Week" / "2 Trainings/Week" / "Unlimited" / "Elementary Academy"**. The workbook mockup prefills **"Academy 1x/week" / "Academy 2x/week" / "Academy Unlimited" / "Elementary Academy"**, which are Lij's own Stripe product names (his roster reads "Academy (2x/week) - 3 Months" etc). **Three of four differ.**
+
+The mockup is RIGHT to use his names - he has to recognise the plan to confirm it - and the portal offer is still `status=draft`, never published, so nothing live is at stake. But it creates a concrete requirement for the confirm-wiring, and it is the no-partial-submit ruling's problem in a second costume:
+
+- **An untouched card that Lij simply confirms would rewrite the portal's plan title.** Under the capture schema that must serialise as `state=confirmed` with a real `was`/`now` pair (was "2 Trainings/Week", now "Academy 2x/week"), NOT as an unchanged row. A card he never edited must never produce a silent data change that staff review renders as "no change".
+- Staff review must therefore show these three renames explicitly on the first pass, or they land unseen.
+- Exact-match nit: his Stripe uses parentheses, "Academy (2x/week)"; the mockup drops them. Either match his spelling exactly or record the normalisation deliberately. Do not let it happen by accident.
+
 ### Open items
 - [ ] Ask Lij: which plan is Christopher's $199 deal on (last untiered judgement; tier=legacy either way, only the plan attachment is open)
 - [ ] billing_cadence: nothing writes offer_prices.billing_cadence yet - SJ rows may need hand SQL after offers-sync (queue item from PR #1675)
