@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The chats, simply</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;color:#1c1c1e;background:#F4F4F1;
+    background-image:radial-gradient(#c9c8c2 1.1px, transparent 1.1px);
+    background-size:22px 22px;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    padding:38px 20px 80px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:620px;margin:0 auto}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.8px;font-weight:800}
+  .key{font-size:13px;color:#6e6e76;margin:0 0 8px}
+  .key .r{color:#C92F1D;font-weight:800}
+  .stamp{font-size:12px;color:#6e6e76;margin:0 0 24px;font-style:italic}
+
+  .card{background:#fff;border:1.5px solid #D8D6D0;border-radius:14px;
+    padding:16px 20px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,.07)}
+  .card h2{margin:0 0 4px;font-size:16px;letter-spacing:-.2px}
+  .card .now{font-size:11px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;
+    color:#2f6fb5;margin-bottom:9px}
+  .card p{margin:0 0 10px;font-size:14px;color:#3c3c40}
+  .card p:last-child{margin-bottom:0}
+  .feeds{background:#FFF6E8;border-radius:9px;padding:9px 13px;font-size:13.5px;color:#7a5a1e;margin-bottom:10px}
+  .feeds b{color:#5c3c14}
+  .approve{background:#FDEEEB;border:1.5px solid #E8442A;border-radius:9px;
+    padding:9px 13px;font-size:13.5px;color:#8f2314}
+  .approve b{color:#C92F1D;text-transform:uppercase;font-size:11px;letter-spacing:1.2px}
+  .done{color:#2c9552;font-weight:700}
+  .arrow{text-align:center;font-size:22px;color:#b0aea7;margin:2px 0 14px;font-weight:700}
+
+  .shipped{background:#E9F7EE;border:1.5px solid #37B45F;border-radius:14px;
+    padding:14px 20px;margin-bottom:20px}
+  .shipped h2{margin:0 0 6px;font-size:15px;color:#1e7a41}
+  .shipped p{margin:0;font-size:13.5px;color:#2f5c3e}
+
+  .hub{background:#1c1c1e;color:#fff;border-color:#1c1c1e}
+  .hub h2{color:#fff}
+  .hub p{color:#d6d6dc}
+  .hub .now{color:#8fbce8}
+  .hub .feeds{background:#33322f;color:#f0d67a}
+  .hub .feeds b{color:#fff}
+  .hub .approve{background:#3a1712;border-color:#E8442A;color:#f4b0a3}
+  .hub .approve b{color:#ff7a61}
+
+  .lij{background:#E9F7EE;border:1.5px solid #37B45F}
+  .lij h2{color:#1e7a41}
+  .lij p{color:#2f5c3e}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>The chats, simply</h1>
+  <p class="key"><span class="r">Red = what you approve.</span> Orange = what it feeds this chat. Blue = doing right now.</p>
+  <p class="stamp">Refreshed after the deploy. Status checks are out to all three chats.</p>
+
+  <div class="shipped">
+    <h2>&#10003; Shipped since you last looked</h2>
+    <p>The transport, the contact fix and a CI fix are <b>merged and live in production</b>. The database change is applied. Lij's Stripe can now be reached by key. <b>GTA verified untouched.</b></p>
+  </div>
+
+  <div class="card">
+    <h2>1 &#183; SJ contact link-up</h2>
+    <div class="now">standing by for the key</div>
+    <p><span class="done">Done.</span> All 147 of Lij's Stripe customers connected to portal contacts, with you approving every judgement call. Its fix also went live today and quietly repaired a bug that was losing contacts for every academy.</p>
+    <div class="feeds"><b>Feeds this chat:</b> its write-up and every weird case. <span class="done">Delivered.</span></div>
+    <div class="approve"><b>You approve:</b> nothing more.</div>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="card">
+    <h2>2 &#183; SJ price match</h2>
+    <div class="now">price workbook mockup built, waiting on you</div>
+    <p>Prices are settled (4 plans, $40 fee). The workbook is built and in front of you. <b>You already caught a dead tax button in it</b> and ruled we ask Lij his real tax rate instead - that is now built as its own card.</p>
+    <div class="feeds"><b>Feeds this chat:</b> its run log and every ruling you made.</div>
+    <div class="approve"><b>You approve:</b> the price workbook mockup &#183; then its 6 design questions, 2-3 at a time.</div>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="card">
+    <h2>3 &#183; Lij member workbook</h2>
+    <div class="now">staging your review, two questions</div>
+    <p>Designing and building the member workbook. It handed its price-page design to the price chat so Lij gets one consistent product, not two inventions.</p>
+    <div class="feeds"><b>Feeds this chat:</b> its decisions file.</div>
+    <div class="approve"><b>You approve:</b> the prices page &#183; the member grid &#183; what Lij can edit vs only view &#183; portal-created vs linked &#183; the finished workbook.</div>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="card">
+    <h2>4 &#183; Seeding <span style="font-weight:600;color:#2c9552">(now handled here)</span></h2>
+    <div class="now">waiting on Lij</div>
+    <p>You ruled seeding waits for Lij and belongs to this chat, so the separate chat is cancelled. After he confirms his members, we seed all 20 together, one screen per member.</p>
+    <div class="approve"><b>You approve:</b> each member as we walk the pass.</div>
+  </div>
+  <div class="arrow">&#8595;</div>
+
+  <div class="card hub">
+    <h2>This chat picks up the rest</h2>
+    <div class="now">deploy done &#183; waiting on the key</div>
+    <p><b>It unblocked everyone</b> - merged, deployed, database applied, GTA checked.</p>
+    <p><b>It is the only voice to Lij</b> - he gets exactly two links, nothing else.</p>
+    <p><b>And it writes the three skills</b> from the logs above, each shown to you first.</p>
+    <div class="feeds"><b>Skill 1</b> &#8592; chats 1 + 2 &nbsp;&#183;&nbsp; <b>Skill 2</b> &#8592; chat 3 &nbsp;&#183;&nbsp; <b>Skill 3</b> &#8592; the seeding pass</div>
+    <div class="approve"><b>You approve:</b> sending Lij each link &#183; each skill mockup.</div>
+  </div>
+
+  <div class="card lij" style="border-width:2px">
+    <h2>&#9888; The one thing everything is waiting on</h2>
+    <p><b>Mint the write-scope key in Lij's Stripe and paste it here with the pk_live_.</b> That single paste connects San Jose, starts the verification sweep, and lets the real price matching run.</p>
+  </div>
+
+</div>
+</body>
+</html>

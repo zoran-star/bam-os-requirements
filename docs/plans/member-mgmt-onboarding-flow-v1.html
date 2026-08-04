@@ -129,9 +129,9 @@
       <div class="step"><div class="n">1</div>
         <div class="box o">
           <div class="t">Stripe to contacts sync</div>
-          <div class="d">Match 1, locked rules: exact-email auto-links &#183; no match mints a contact &#183; duplicates + phone matches queue for review. Staff clears the review list, confirms the counts.</div>
-          <div class="chips"><span class="chip c-live">tool live</span></div>
-          <div class="confirm">&#10003; staff confirm: review list cleared, counts sane</div>
+          <div class="d"><b>SJ DONE (offline, Zoran supervised every review):</b> 147/147 accounted - 142 linked, 5 skipped (all duplicate Stripe customers), 0 pending. 559 contacts in store. Transport day is now just a verification sweep (expect already_linked=142).</div>
+          <div class="chips"><span class="chip c-live">SJ COMPLETE</span><span class="chip c-todo">1 Lij item queued: "Test Customer" link keep-or-unlink</span></div>
+          <div class="confirm">&#10003; confirmed: review list cleared, counts DB-verified</div>
         </div>
       </div>
       <div class="steparrow">&#8595;</div>
@@ -180,7 +180,7 @@
       <div class="chat">
         <div class="cn">Walk through: SJ Stripe contact link-up</div>
         <div class="cg"><b>Goal:</b> all 147 customers linked or minted, review list cleared with Zoran, result file + log handed up. <b>Already done:</b> SJ contact store refreshed from GHL (556 contacts), all 20 live members pre-linked, offline pre-link of the rest underway from my export. <b>PR #1704:</b> the refresh CLI + a LIVE cron bug fix (contacts silently dropped on mixed batches) - tested, merge-soon.</div>
-        <div class="cs">Ahead of schedule &#183; final sweep awaits deploy</div>
+        <div class="cs">&#10003; DONE for SJ &#183; transport day = verification sweep only</div>
       </div>
       <div class="chat">
         <div class="cn">Walk through: SJ price match + skill</div>
@@ -316,7 +316,7 @@
   </div>
 
   <h2 class="phase">The rules this page encodes</h2>
-  <p class="note"><b>Three skills.</b> Chain rule: consecutive orange = one skill; only a client action or a trigger cuts a chain. Every step pauses at its &#10003; for staff confirm. Each skill checks its trigger before it will run. <b>Anything client-facing clears through Member Management II before it reaches Lij - one voice.</b> Skills are written LAST from the San Jose run logs. When all chats report done, a Fable planning subagent plans the full build - parked until Zoran calls it.</p>
+  <p class="note"><b>Three SEPARATE skills (Zoran ruled 2026-08-01), living in bam-client-sites/.claude/commands next to the five onboarding skills.</b> Each refuses to run until its trigger is true. Chain rule: consecutive orange = one skill; only a client action or a trigger cuts a chain. Every step pauses at its &#10003; for staff confirm. <b>Skill authorship:</b> skill 1 = SJ price match chat (fed by the link-up chat's logs, mockup-confirmed with Zoran) &#183; skill 2 = Lij member workbook chat (after Lij returns the price workbook) &#183; skill 3 = a NEW chat, from scratch, while doing it for SJ after members are confirmed. <b>Anything client-facing clears through Member Management II - one voice.</b> Skills are written LAST from the San Jose run logs.</p>
 
 </div>
 </body>

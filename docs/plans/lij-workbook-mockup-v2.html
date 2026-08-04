@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Basketball Prep · Member Setup Workbook</title>
+<style>
+  :root{
+    --bg:#faf9f6; --paper:#ffffff; --line:#e6e2d8; --line2:#f0ede5;
+    --ink:#22211e; --mut:#8a867c; --gold:#D4B65C; --gold-bg:#faf3df; --gold-ink:#8a6d1f;
+    --good:#3e8e5a; --good-bg:#eaf5ee; --bad:#b3543f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding-bottom:80px}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 18px}
+
+  header{padding:20px 0 14px;display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap}
+  .brand{font-size:11px;letter-spacing:.15em;color:var(--gold-ink);text-transform:uppercase;font-weight:700}
+  h1{font-size:21px;font-weight:800;margin-top:2px}
+  .sub{color:var(--mut);font-size:13px;margin-top:4px}
+  .sub b{color:var(--ink)}
+  .hbtns{display:flex;gap:10px}
+  .btn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:9px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer}
+  .btn.gold{border-color:var(--gold);color:var(--gold-ink);background:var(--gold-bg)}
+  .btn.focus.on{background:var(--gold);border-color:var(--gold);color:#fff}
+
+  .pricegrid{display:flex;gap:10px;overflow-x:auto;padding:2px 0 14px;align-items:flex-start;scrollbar-width:thin}
+  .pcard{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px;flex:0 0 auto;min-width:180px}
+  .pcard h4{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);border-bottom:2px solid var(--gold);padding-bottom:6px;margin-bottom:6px}
+  .pcard .term{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--line2)}
+  .pcard .term:last-child{border-bottom:none}
+  .pcard .term .tn{color:var(--mut)}
+  .pcard .term .tp{font-weight:800}
+  .pcard .term .tp small{color:var(--mut);font-weight:400}
+  .pcard .term .tc{color:var(--gold-ink);font-size:12px;font-weight:700}
+  .pcard.custom{border-color:var(--gold);background:var(--gold-bg)}
+  .pcard.custom h4{color:var(--gold-ink)}
+
+  .sheet{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow-x:auto;box-shadow:0 1px 3px rgba(40,35,20,.05)}
+  table{border-collapse:collapse;width:100%;min-width:1080px}
+  thead .grp th{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);padding:10px 10px 2px;text-align:left;border-bottom:none}
+  thead .grp th.gline{border-left:2px solid var(--line2)}
+  thead .cols th{font-size:11px;color:var(--mut);font-weight:600;text-align:left;padding:2px 10px 9px;border-bottom:2px solid var(--line)}
+  thead .cols th.gline{border-left:2px solid var(--line2)}
+  tbody td{padding:7px 10px;border-bottom:1px solid var(--line2);vertical-align:top;white-space:nowrap}
+  tbody td.gline{border-left:2px solid var(--line2)}
+  tbody tr:hover{background:#fcfbf7}
+
+  .done-btn{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);background:none;cursor:pointer;color:transparent;font-size:14px;line-height:1}
+  .done-btn:hover{border-color:var(--good)}
+  tr.done .done-btn{background:var(--good);border-color:var(--good);color:#fff}
+  tr.done td{background:var(--good-bg)}
+
+  input,select{font:inherit;color:var(--ink);background:none;border:1px solid transparent;border-radius:6px;padding:3px 6px;outline:none;max-width:170px}
+  input:hover,select:hover{border-color:var(--line)}
+  input:focus,select:focus{border-color:var(--gold);background:#fff}
+  input.age{width:44px;text-align:center}
+  .need input,.need select{background:var(--gold-bg);border-color:var(--gold)}
+  td.edited input,td.edited select{background:var(--gold-bg)}
+  .flagdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-left:4px;vertical-align:middle;visibility:hidden}
+  td.edited .flagdot,.need .flagdot{visibility:visible}
+
+  .plus{border:none;background:none;color:var(--gold-ink);cursor:pointer;font-size:12px;padding:2px 0;display:block}
+  .amt{font-weight:700}
+  .per{color:var(--mut);font-size:12px}
+  .paylink{color:var(--gold-ink);cursor:pointer;text-decoration:underline dotted}
+  .ok{color:var(--good);font-weight:600;font-size:12px}
+  .stlink{color:var(--mut);text-decoration:none;font-size:13px}
+  .stlink:hover{color:var(--gold-ink)}
+  .skipbtn{border:none;background:none;color:var(--mut);cursor:pointer;font-size:12px;text-decoration:underline dotted}
+  tr.skipped td{opacity:.45}
+  tr.skipped .who{text-decoration:line-through}
+  tr.skipped .skipbtn{color:var(--bad);opacity:1}
+
+  .who{font-weight:700}
+  .email{color:var(--mut);font-size:12px}
+
+  /* focus mode */
+  body.focusing tr.blur td{filter:blur(3px);pointer-events:none;user-select:none}
+  body.focusing tr.active td{background:var(--gold-bg)}
+  body.focusing tr.active .done-btn{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,182,92,.3)}
+
+  /* ── Adjust prices overlay (mirrors Blueprint Pricing step) ── */
+  .pov{position:fixed;inset:0;background:rgba(30,28,22,.4);display:none;z-index:60;overflow-y:auto;padding:26px 14px}
+  .pov.open{display:block}
+  .povcard{max-width:760px;margin:0 auto;background:var(--bg);border-radius:16px;padding:20px 22px 26px;box-shadow:0 14px 60px rgba(0,0,0,.3)}
+  .povtop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .povback{border:none;background:none;color:var(--mut);cursor:pointer;font-size:13px;padding:0}
+  .povback:hover{color:var(--gold-ink)}
+  .povtop h2{font-size:16px;font-weight:800}
+  .tag{background:var(--gold-bg);border:1px solid var(--gold);color:var(--gold-ink);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:6px;padding:2px 8px}
+  .povsub{color:var(--mut);font-size:12px;margin-bottom:16px}
+  .bb-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:14px 0 6px}
+  .bb-label .req{color:var(--gold-ink)}
+  .bb-hint{font-size:11px;color:var(--mut);margin:4px 0 8px}
+  .dep{font:10px 'SF Mono',ui-monospace,monospace;background:var(--gold-bg);color:var(--gold-ink);border-radius:4px;padding:1px 5px;margin-right:6px}
+  .bcard{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+  .bhead{display:flex;align-items:center;gap:10px;cursor:pointer}
+  .btog{width:26px;height:26px;border:1px solid var(--gold);color:var(--gold-ink);background:none;border-radius:6px;cursor:pointer;flex-shrink:0}
+  .binfo{flex:1;min-width:0}
+  .btitle{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .pill{font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;border:1px solid var(--good);color:var(--good)}
+  .pill.miss{border-color:var(--gold);color:var(--gold-ink);background:var(--gold-bg)}
+  .bmeta{font:11px 'SF Mono',ui-monospace,monospace;color:var(--mut);margin-top:2px}
+  .bmeta .empty{color:var(--gold-ink)}
+  .arch{border:1px solid var(--line);background:none;color:var(--mut);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer}
+  .bfields{margin-top:14px;border-top:1px solid var(--line2);padding-top:4px;display:none}
+  .bcard.open .bfields{display:block}
+  .bb-input{width:100%;max-width:340px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:inherit;color:var(--ink)}
+  .bb-input:focus{border-color:var(--gold);outline:none}
+  .chiprow{display:flex;gap:6px;flex-wrap:wrap}
+  .bchip{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 13px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+  .bchip.sel{background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700}
+  .slot{background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:10px 12px;margin-bottom:6px}
+  .slot .sl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);display:flex;justify-content:space-between}
+  .slot .rm{border:none;background:none;color:var(--mut);font-size:11px;cursor:pointer;text-decoration:underline dotted}
+  .slotgrid{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .slotgrid .bb-input{max-width:130px}
+  .addbtn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:4px}
+  .matchpanel{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:18px;background:var(--paper)}
+  .matchpanel .mt{font-size:12.5px;font-weight:700}
+  .matchpanel .ms{font-size:11.5px;color:var(--mut);margin-top:3px;line-height:1.5}
+  .matchbtn{margin-top:10px;border:1px solid var(--gold);background:var(--gold-bg);color:var(--gold-ink);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer}
+  .savenote{font:11px 'SF Mono',ui-monospace,monospace;color:var(--good);margin-top:16px}
+
+  /* v3 additions: progress, plain questions, live preview, price ladder */
+  .povprog{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin-bottom:16px}
+  .povprog .pline{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:7px}
+  .povprog .pline b{font-weight:800}
+  .povprog .left{color:var(--gold-ink);font-size:12px;font-weight:700}
+  .pbar{height:6px;background:var(--line2);border-radius:3px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:var(--gold);border-radius:3px}
+  .q{font-size:14px;font-weight:700;color:var(--ink);margin:16px 0 7px}
+  .q .req{color:var(--gold-ink)}
+  .qhint{font-size:11.5px;color:var(--mut);margin:-4px 0 7px}
+  .twocol{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+  .twocol .left{flex:1 1 340px;min-width:280px}
+  .twocol .right{flex:0 0 250px;position:sticky;top:20px}
+  .prevlabel{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+  .prevcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 3px 14px rgba(40,35,20,.07)}
+  .prevcard .pt{font-weight:800;font-size:15px}
+  .prevcard .pp{font-size:26px;font-weight:800;margin:6px 0 0;letter-spacing:-.02em}
+  .prevcard .pp small{font-size:13px;font-weight:500;color:var(--mut)}
+  .prevcard .pd{font-size:12.5px;color:var(--mut);margin:8px 0 12px;line-height:1.5}
+  .prevcard .popt{border-top:1px solid var(--line2);padding-top:9px}
+  .prevcard .popt .oh{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+  .prevcard .opt{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0}
+  .prevcard .opt .os{color:var(--good);font-weight:700;font-size:11.5px}
+  .prevcard .cta{margin-top:12px;background:var(--gold);color:#fff;border:none;border-radius:8px;padding:9px;width:100%;font-weight:800;font-size:13px}
+
+  .ladder{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:4px}
+  .rung{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line2);background:var(--paper);flex-wrap:wrap}
+  .rung:last-child{border-bottom:none}
+  .rung.base{background:var(--bg)}
+  .rung .rlen{font-weight:700;font-size:13px;min-width:78px}
+  .rung .rprice{font-weight:800;font-size:14px;min-width:64px}
+  .rung .rper{color:var(--mut);font-size:12px;min-width:82px}
+  .rung .rsave{color:var(--good);font-weight:700;font-size:12px;background:var(--good-bg);border-radius:20px;padding:2px 9px}
+  .rung .rsave.none{color:var(--gold-ink);background:var(--gold-bg)}
+  .rung .redit{margin-left:auto;display:flex;gap:6px;align-items:center}
+  .rung .redit input{border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:inherit;width:74px;background:var(--paper);color:var(--ink)}
+  .rung .redit input:focus{border-color:var(--gold);outline:none}
+  .rung .rm2{border:none;background:none;color:var(--mut);cursor:pointer;font-size:11px;text-decoration:underline dotted}
+  .laddernote{font-size:11.5px;color:var(--mut);margin-top:6px}
+  .rungwrap{border-bottom:1px solid var(--line2)}
+  .rungwrap:last-child{border-bottom:none}
+  .rungwrap .rung{border-bottom:none;padding-bottom:4px}
+  .afterrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 12px 10px;background:var(--paper)}
+  .afterrow .al{font-size:11.5px;color:var(--mut);margin-right:2px}
+  .bchip.sm{padding:4px 10px;font-size:11.5px;border-radius:20px}
+  .afterwarn{font-size:11px;font-weight:700;color:#a15f28;background:#fdf3e8;border-radius:20px;padding:2px 9px}
+  .pafter{font-size:11.5px;color:var(--mut);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line2);line-height:1.45}
+  .rlenin{font-weight:700;font-size:13px;width:88px;border:1px solid transparent;border-radius:6px;padding:3px 5px;background:none;color:var(--ink);font-family:inherit}
+  .rlenin:hover{border-color:var(--line)}
+  .rlenin:focus{border-color:var(--gold);background:var(--paper);outline:none}
+  .rmore{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:2px 12px 12px;background:var(--paper)}
+  .mf{display:flex;align-items:center;gap:8px;min-width:0}
+  .ml{font-size:11.5px;color:var(--mut);flex:0 0 auto}
+  .rin{flex:1;min-width:0;border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:inherit;font-size:12.5px;background:var(--bg);color:var(--ink)}
+  .rin:focus{border-color:var(--gold);background:var(--paper);outline:none}
+  @media(max-width:640px){.rmore{grid-template-columns:1fr}}
+
+  /* plan family colour coding */
+  .bcard{border-left:4px solid var(--fam,var(--line))}
+  .bcard[data-fam="unl"]{--fam:#7b5ea7}
+  .bcard[data-fam="two"]{--fam:#2f7fa8}
+  .bcard[data-fam="one"]{--fam:#3e8e5a}
+  .bcard[data-fam="pre"]{--fam:#c1783c}
+  .bcard[data-fam="ele"]{--fam:#b3546f}
+  .famdot{width:9px;height:9px;border-radius:50%;background:var(--fam);display:inline-block;flex-shrink:0}
+  .pcard[data-fam="unl"]{border-top:3px solid #7b5ea7}
+  .pcard[data-fam="two"]{border-top:3px solid #2f7fa8}
+  .pcard[data-fam="one"]{border-top:3px solid #3e8e5a}
+  .pcard[data-fam="pre"]{border-top:3px solid #c1783c}
+  .pcard[data-fam="ele"]{border-top:3px solid #b3546f}
+  .pill.attn{border-color:#c1783c;color:#a15f28;background:#fdf3e8}
+  .rowsent{font-size:12.5px;color:var(--mut);margin-top:2px}
+  .rowsent b{color:var(--ink);font-weight:600}
+
+  .histpop{position:fixed;inset:0;background:rgba(30,28,22,.35);display:none;align-items:center;justify-content:center;z-index:50}
+  .histpop.open{display:flex}
+  .histcard{background:#fff;border-radius:14px;padding:20px 24px;min-width:320px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+  .histcard h3{font-size:15px;margin-bottom:10px}
+  .histcard table{min-width:0;width:100%}
+  .histcard td{padding:6px 8px;border-bottom:1px solid var(--line2)}
+  .histcard .close{margin-top:12px;float:right}
+
+  .below{display:flex;gap:14px;margin-top:16px;flex-wrap:wrap}
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;flex:1;min-width:300px}
+  .panel h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin-bottom:10px}
+  .addrow{display:flex;gap:8px}
+  .addrow input{flex:1;border:1px solid var(--line);padding:8px 12px;max-width:none}
+  .ghost{border:1px dashed var(--line);background:none;color:var(--mut);border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;margin-top:8px;width:100%}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:13px}
+  .kv div span{display:block;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+
+  footer{position:fixed;left:0;right:0;bottom:0;background:rgba(250,249,246,.95);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:11px 18px}
+  .footin{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:14px}
+  .footin .cnt{color:var(--mut);font-size:13px;flex:1}
+  .footin .cnt b{color:var(--gold-ink)}
+  .send{background:var(--gold);color:#fff;border:none;border-radius:9px;padding:11px 24px;font-size:14px;font-weight:800;cursor:pointer}
+  .note{color:var(--mut);font-size:11px;margin:14px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <div class="brand">3D Basketball Prep</div>
+    <h1>Member Setup Workbook</h1>
+    <div class="sub"><b>30 active memberships</b> from your Stripe. Gold cells need a look. Check off each row on the left when it's right.</div>
+  </div>
+  <div class="hbtns">
+    <button class="btn gold" onclick="document.getElementById('pov').classList.add('open')">Adjust prices →</button>
+    <button class="btn focus" id="focusbtn" onclick="toggleFocus()">◉ Focus mode</button>
+  </div>
+</header>
+
+<div class="pricegrid" id="pricegrid"></div>
+
+<div class="sheet">
+<table id="grid">
+<thead>
+  <tr class="grp">
+    <th></th>
+    <th colspan="2">Member</th>
+    <th colspan="2" class="gline">Athlete</th>
+    <th colspan="3" class="gline">Membership</th>
+    <th colspan="3" class="gline">Payments</th>
+    <th colspan="2" class="gline"></th>
+  </tr>
+  <tr class="cols">
+    <th>✓</th>
+    <th>Parent</th><th>Email</th>
+    <th class="gline">Name</th><th>Age</th>
+    <th class="gline">Plan</th><th>Price</th><th>Status</th>
+    <th class="gline">Last</th><th>Next</th><th>Health</th>
+    <th class="gline">Stripe</th><th></th>
+  </tr>
+</thead>
+<tbody id="tb"></tbody>
+</table>
+</div>
+
+<div class="below">
+  <div class="panel">
+    <h3>Add a member we missed</h3>
+    <div class="addrow"><input placeholder="Search your 147 Stripe customers…"></div>
+    <button class="ghost">+ Add someone who doesn't pay through Stripe (cash, Zelle, free)</button>
+  </div>
+  <div class="panel">
+    <h3>Your academy details · double-check</h3>
+    <div class="kv">
+      <div><span>Academy</span>3D Basketball Prep</div>
+      <div><span>Owner</span>Elijah</div>
+      <div><span>Location</span>San Jose, CA</div>
+      <div><span>Time zone</span>America/Los_Angeles</div>
+      <div><span>Reply email</span>set at onboarding</div>
+      <div><span>More values</span>core + extras render here</div>
+    </div>
+  </div>
+</div>
+
+<div class="note">Dates shown are illustrative until the live Stripe pull. Rows 21-30 are sample data for density testing, Lij's real roster is the first 20. Nothing changes until BAM confirms.</div>
+</div>
+
+<!-- ══════════ ADJUST PRICES OVERLAY (mirrors the Blueprint Pricing step) ══════════ -->
+<div class="pov" id="pov">
+  <div class="povcard">
+    <div class="povtop">
+      <button class="povback" onclick="document.getElementById('pov').classList.remove('open')">← Back to workbook</button>
+      <h2>Confirm your pricing</h2>
+      <span class="tag">Launch must-have</span>
+    </div>
+    <div class="povsub">Old members keep their legacy rate, new signups get these prices.</div>
+
+    <div class="povprog">
+      <div class="pline"><span><b>4</b> of <b>5</b> plans confirmed</span><span class="left">1 needs a monthly price</span></div>
+      <div class="pbar"><i style="width:80%"></i></div>
+    </div>
+
+    <!-- ── PLAN 1: open, the guided version ── -->
+    <div class="bcard open" data-fam="two">
+      <div class="bhead" onclick="this.parentNode.classList.toggle('open')">
+        <button class="btog">▾</button>
+        <div class="binfo">
+          <div class="btitle"><span class="famdot"></span>Academy 2x/week <span class="pill">Live in Stripe</span></div>
+          <div class="rowsent"><b>$250</b> every 4 weeks, or pay up front for <b>3 or 6 months</b> and save</div>
+        </div>
+        <button class="arch" onclick="event.stopPropagation()">Archive</button>
+      </div>
+      <div class="bfields">
+        <div class="twocol">
+          <div class="left">
+            <div class="q">What do you call this plan? <span class="req">*</span></div>
+            <input class="bb-input" id="q_title" value="Academy 2x/week" oninput="prev()">
+
+            <div class="q">What does a parent get for it?</div>
+            <input class="bb-input" id="q_desc" value="2 training sessions per week" style="max-width:100%" oninput="prev()">
+
+            <div class="q">How much do they pay, and how often? <span class="req">*</span></div>
+            <div class="chiprow" style="align-items:center">
+              <span style="font-size:19px;font-weight:800;color:var(--mut)">$</span>
+              <input class="bb-input" id="q_price" type="number" value="250" style="max-width:110px;font-size:17px;font-weight:800" oninput="prev()">
+              <button class="bchip">every week</button><button class="bchip sel">every 4 weeks</button><button class="bchip">every month</button><button class="bchip">every 3 months</button>
+            </div>
+
+            <div class="q">Do you add sales tax on top?</div>
+            <div class="chiprow"><button class="bchip">Yes, add tax</button><button class="bchip sel">No, price includes it</button></div>
+
+            <div class="q">Is there a one-time joining fee?</div>
+            <div class="chiprow"><button class="bchip">Yes</button><button class="bchip sel">No fee</button></div>
+
+            <div class="q">Can parents pay up front for a discount?</div>
+            <div class="qhint">Your Stripe already sells two of these. The savings are worked out for you.</div>
+            <div class="ladder" id="ladder"></div>
+            <div class="laddernote">Savings are compared against paying <b id="basecmp">$250</b> every 4 weeks.</div>
+            <button class="addbtn" onclick="addRung()">+ Add another length</button>
+          </div>
+
+          <div class="right">
+            <div class="prevlabel">What a parent sees</div>
+            <div class="prevcard" data-fam="two">
+              <div class="pt" id="pv_title">Academy 2x/week</div>
+              <div class="pp">$<span id="pv_price">250</span><small> / 4 weeks</small></div>
+              <div class="pd" id="pv_desc">2 training sessions per week</div>
+              <div class="popt">
+                <div class="oh">Or save with a commitment</div>
+                <div id="pv_opts"></div>
+                <div class="pafter" id="pv_after"></div>
+              </div>
+              <button class="cta">Join now</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PLAN 2: the one that needs attention ── -->
+    <div class="bcard" data-fam="unl">
+      <div class="bhead" onclick="this.parentNode.classList.toggle('open')">
+        <button class="btog">▸</button>
+        <div class="binfo">
+          <div class="btitle"><span class="famdot"></span>Academy Unlimited <span class="pill attn">Needs a monthly price</span></div>
+          <div class="rowsent">Sold as <b>3 months $749</b> or <b>6 months $1,399</b>, but nothing set for month to month</div>
+        </div>
+        <button class="arch" onclick="event.stopPropagation()">Archive</button>
+      </div>
+      <div class="bfields">
+        <div class="q">What would a parent pay month to month? <span class="req">*</span></div>
+        <div class="qhint">You only sell Unlimited as 3 and 6 month commitments today. This is the price they return to when a commitment ends.</div>
+        <div class="chiprow" style="align-items:center">
+          <span style="font-size:19px;font-weight:800;color:var(--mut)">$</span>
+          <input class="bb-input" type="number" placeholder="?" style="max-width:110px;font-size:17px;font-weight:800;border-color:#c1783c;background:#fdf3e8">
+          <button class="bchip">every 4 weeks</button><button class="bchip">every month</button>
+        </div>
+        <div class="qhint" style="margin-top:10px">Or <a href="#" style="color:var(--gold-ink)">keep commitments only</a> and never sell it monthly.</div>
+      </div>
+    </div>
+
+    <div class="bcard" data-fam="one">
+      <div class="bhead" onclick="this.parentNode.classList.toggle('open')">
+        <button class="btog">▸</button>
+        <div class="binfo">
+          <div class="btitle"><span class="famdot"></span>Academy 1x/week <span class="pill">Live in Stripe</span></div>
+          <div class="rowsent"><b>$175</b> every 4 weeks, no pay-up-front options</div>
+        </div>
+        <button class="arch" onclick="event.stopPropagation()">Archive</button>
+      </div>
+      <div class="bfields"><div class="qhint">Same questions as Academy 2x/week.</div></div>
+    </div>
+
+    <div class="bcard" data-fam="pre">
+      <div class="bhead" onclick="this.parentNode.classList.toggle('open')">
+        <button class="btog">▸</button>
+        <div class="binfo">
+          <div class="btitle"><span class="famdot"></span>Pre Season Academy <span class="pill">Live in Stripe</span></div>
+          <div class="rowsent"><b>$300</b> every 4 weeks, or <b>$200</b> for the once a week version</div>
+        </div>
+        <button class="arch" onclick="event.stopPropagation()">Archive</button>
+      </div>
+      <div class="bfields"><div class="qhint">Same questions as Academy 2x/week.</div></div>
+    </div>
+
+    <div class="bcard" data-fam="ele">
+      <div class="bhead" onclick="this.parentNode.classList.toggle('open')">
+        <button class="btog">▸</button>
+        <div class="binfo">
+          <div class="btitle"><span class="famdot"></span>Elementary Academy <span class="pill">Live in Stripe</span></div>
+          <div class="rowsent"><b>$200</b> every 4 weeks, no pay-up-front options</div>
+        </div>
+        <button class="arch" onclick="event.stopPropagation()">Archive</button>
+      </div>
+      <div class="bfields"><div class="qhint">Same questions as Academy 2x/week.</div></div>
+    </div>
+
+    <button class="addbtn">+ Add a plan you sell that isn't here</button>
+
+    <div class="matchpanel">
+      <div class="mt">Bringing an existing Stripe account?</div>
+      <div class="ms">Match the prices already in your Stripe to these tiers - members on old prices stay on them (Legacy), new signups get the prices above (Live). Your Stripe has 119 prices; 14 are in use.</div>
+      <button class="matchbtn">Match existing Stripe prices</button>
+    </div>
+
+    <div class="savenote">✓ Changes save automatically</div>
+  </div>
+</div>
+
+<div class="histpop" id="hist" onclick="this.classList.remove('open')">
+  <div class="histcard" onclick="event.stopPropagation()">
+    <h3 id="histname">Payment history</h3>
+    <table><tbody id="histrows"></tbody></table>
+    <button class="btn close" onclick="document.getElementById('hist').classList.remove('open')">Close</button>
+  </div>
+</div>
+
+<footer>
+  <div class="footin">
+    <div class="cnt"><b id="ndone">0</b>/<span id="ntotal">30</span> rows checked · <b id="nflag">0</b> changes flagged</div>
+    <button class="send">Send back to BAM</button>
+  </div>
+</footer>
+
+<script>
+// [parent, email, athlete, plan, planNeed, price, per, last, next, athNeed]
+const PLANS=["Academy Unlimited · 6 mo","Academy Unlimited · 3 mo","Academy 2x/wk · 6 mo","Academy 2x/wk · 3 mo","Academy 2x/wk · 1 mo","Academy 1x/wk · 1 mo","Pre Season Academy · 1 mo","Pre Season 1x/wk · 1 mo","Elementary Academy · 1 mo","Custom deal"];
+const ROWS=[
+["Dana Lee","dananlee@yahoo.com","","Academy Unlimited · 6 mo",0,"$1,399","24 wk","Jul 2","Oct 15",1],
+["Thuy Chau","ttweettiiee@gmail.com","","Academy Unlimited · 6 mo",0,"$1,399","24 wk","Jun 18","Nov 2",1],
+["Tamba GbondoTugbawa","tambatugbawa@gmail.com","","Academy 2x/wk · 6 mo",0,"$1,150","24 wk","Jun 24","Dec 9",1],
+["Aaron Rufin","arufin712@gmail.com","","",1,"$749","12 wk","Jul 10","Aug 21",1],
+["Prakash Kumaar Sambandam","sprakashkumaar@gmail.com","","Academy Unlimited · 3 mo",0,"$749","12 wk","Jul 8","Sep 30",1],
+["Crystal Gomez","fyitf@hotmail.com","","Academy 2x/wk · 3 mo",0,"$599","12 wk","May 16","Aug 8",1],
+["James Hwang","james.hwang@gmail.com","","Academy 2x/wk · 3 mo",0,"$599","12 wk","May 14","Aug 6",1],
+["Manish Patel","manishpatel78@gmail.com","","Academy 2x/wk · 3 mo",0,"$599","12 wk","Jun 20","Sep 12",1],
+["Mohan Sriperambaduru","mohan2hp@gmail.com","","Academy 2x/wk · 3 mo",0,"$599","12 wk","Jun 2","Aug 25",1],
+["Neha Vashistha","vashistha.neha@gmail.com","","Academy 2x/wk · 3 mo",0,"$599","12 wk","May 26","Aug 18",1],
+["Adam Ly","adamly42025580@gmail.com","","Pre Season Academy · 1 mo",0,"$300","4 wk","Jul 9","Aug 6",1],
+["Bernard Lintag","bernielintag1987@gmail.com","","Academy 2x/wk · 1 mo",0,"$250","4 wk","Jul 15","Aug 12",1],
+["Brian De Guzman","brian.deguzman23@gmail.com","","Academy 2x/wk · 1 mo",0,"$250","4 wk","Jul 8","Aug 5",1],
+["Jimmy Nguyen","toasty1634@yahoo.com","","Academy 2x/wk · 1 mo",0,"$250","4 wk","Jul 10","Aug 7",1],
+["Jenny Chung","jaijai1012@yahoo.com","","Elementary Academy · 1 mo",1,"$200","4 wk","Jul 12","Aug 9",1],
+["Salvador Esparza","salesp222@gmail.com","","Pre Season 1x/wk · 1 mo",0,"$200","4 wk","Jul 18","Aug 15",1],
+["Ted Miranda","rowandted2015@gmail.com","","Elementary Academy · 1 mo",1,"$200","4 wk","Jul 8","Aug 5",1],
+["Christy Hang","christyhang11@yahoo.com","Christopher","Academy 2x/wk · 1 mo",1,"$199","4 wk","Jul 23","Aug 20",0],
+["Janeth Beltran","jvaldovinos.beltran@gmail.com","","Academy 1x/wk · 1 mo",0,"$175","4 wk","Jul 14","Aug 11",1],
+["MEREDITH TORIO","meredith.torio@gmail.com","Keanu","Elementary Academy · 1 mo",1,"$100","mo","Jul 1","Aug 1",0],
+// rows below are SAMPLE data for density testing only, not in Lij's real roster
+["Marcus Delgado","mdelgado.fam@gmail.com","","Academy Unlimited · 3 mo",0,"$749","12 wk","Jul 3","Sep 25",1],
+["Priya Natarajan","priya.nat@gmail.com","","Academy 2x/wk · 3 mo",0,"$599","12 wk","Jun 29","Sep 21",1],
+["Kevin Osei","kosei.hoops@yahoo.com","","Academy 2x/wk · 1 mo",0,"$250","4 wk","Jul 20","Aug 17",1],
+["Lena Vu","lena.vu88@gmail.com","","Academy 1x/wk · 1 mo",0,"$175","4 wk","Jul 16","Aug 13",1],
+["Robert Kim","rkim.family@gmail.com","","Academy 2x/wk · 6 mo",0,"$1,150","24 wk","May 30","Nov 14",1],
+["Sofia Ramirez","sof.ramirez@hotmail.com","","Elementary Academy · 1 mo",0,"$200","4 wk","Jul 21","Aug 18",1],
+["Daniel Achebe","dachebe@gmail.com","","Pre Season Academy · 1 mo",0,"$300","4 wk","Jul 11","Aug 8",1],
+["Hannah Park","hpark.sj@gmail.com","","Academy 2x/wk · 3 mo",0,"$599","12 wk","Jun 12","Sep 4",1],
+["Victor Nunez","vnunez22@yahoo.com","","Academy 2x/wk · 1 mo",0,"$250","4 wk","Jul 24","Aug 21",1],
+["Grace Liu","graceliu.fam@gmail.com","","Academy Unlimited · 6 mo",0,"$1,399","24 wk","Jun 5","Nov 20",1],
+];
+// Lij's live prices grouped by plan family, commitments under each
+const FAMILIES=[
+ ["Academy Unlimited",[["6 months","$1,399","24 wk","Academy Unlimited · 6 mo"],["3 months","$749","12 wk","Academy Unlimited · 3 mo"]]],
+ ["Academy 2x/week",[["6 months","$1,150","24 wk","Academy 2x/wk · 6 mo"],["3 months","$599","12 wk","Academy 2x/wk · 3 mo"],["1 month","$250","4 wk","Academy 2x/wk · 1 mo"]]],
+ ["Academy 1x/week",[["1 month","$175","4 wk","Academy 1x/wk · 1 mo"]]],
+ ["Pre Season",[["1 month","$300","4 wk","Pre Season Academy · 1 mo"],["1x/wk · 1 month","$200","4 wk","Pre Season 1x/wk · 1 mo"]]],
+ ["Elementary",[["1 month","$200","4 wk","Elementary Academy · 1 mo"]]],
+];
+const tb=document.getElementById('tb');
+ROWS.forEach((r,i)=>{
+  const tr=document.createElement('tr');tr.dataset.i=i;
+  const planSel=`<select onchange="mark(this)" ${r[4]?'':''}>${r[4]?'<option value="">pick a plan…</option>':''}${PLANS.map(p=>`<option ${p===r[3]?'selected':''}>${p}</option>`).join('')}</select><span class="flagdot"></span>`;
+  tr.innerHTML=`
+   <td><button class="done-btn" onclick="doneRow(this)">✓</button></td>
+   <td class="who"><input value="${r[0]}" oninput="mark(this)"></td>
+   <td class="email"><input value="${r[1]}" oninput="mark(this)" style="max-width:200px"></td>
+   <td class="gline ${r[2]?'':'need'}"><input value="${r[2]}" placeholder="athlete name" oninput="mark(this)"><span class="flagdot"></span><button class="plus" onclick="addAth(this)">+ athlete</button></td>
+   <td class="need"><input class="age" placeholder="age" maxlength="2" oninput="mark(this)"><span class="flagdot"></span></td>
+   <td class="gline ${r[4]?'need':''}">${planSel}</td>
+   <td><span class="amt">${r[5]}</span> <span class="per">/ ${r[6]}</span></td>
+   <td><span class="ok">active</span></td>
+   <td class="gline"><span class="paylink" onclick="openHist('${r[0].replace(/'/g,"")}','${r[5]}')">${r[7]}</span></td>
+   <td><input value="${r[8]}" style="width:70px" oninput="mark(this)"><span class="flagdot"></span></td>
+   <td><span class="ok">paid ✓</span></td>
+   <td class="gline"><a class="stlink" href="#">↗</a></td>
+   <td><button class="skipbtn" onclick="skipRow(this)">not a member</button></td>`;
+  tb.appendChild(tr);
+});
+const strip=document.getElementById('pricegrid');
+FAMILIES.forEach(f=>{
+  const d=document.createElement('div');d.className='pcard';
+  d.innerHTML=`<h4>${f[0]}</h4>`+f[1].map(t=>{
+    const n=ROWS.filter(r=>r[3]===t[3]&&!r[4]).length;
+    return `<div class="term"><span class="tn">${t[0]}</span><span class="tp">${t[1]} <small>/ ${t[2]}</small></span><span class="tc">×${n}</span></div>`;
+  }).join('');
+  strip.appendChild(d);
+});
+const nCustom=ROWS.filter(r=>r[4]||!r[3]).length;
+const c=document.createElement('div');c.className='pcard custom';
+c.innerHTML=`<h4>Custom deals</h4><div class="term"><span class="tn">one-off pricing</span><span class="tp">varies</span><span class="tc">×${nCustom}</span></div>`;
+strip.appendChild(c);
+let flags=0,done=0,focusing=false,cur=0;
+function upd(){document.getElementById('nflag').textContent=flags;document.getElementById('ndone').textContent=done}
+function mark(el){const td=el.closest('td');if(!td.classList.contains('edited')){td.classList.add('edited');flags++;upd()}}
+function doneRow(b){const tr=b.closest('tr');tr.classList.toggle('done');done+=tr.classList.contains('done')?1:-1;upd();
+  if(focusing){cur=Math.min(ROWS.length-1,+tr.dataset.i+1);paint()}}
+function skipRow(b){const tr=b.closest('tr');tr.classList.toggle('skipped');if(tr.classList.contains('skipped')){flags++;upd()}}
+function addAth(b){const td=b.closest('td');const inp=document.createElement('input');inp.placeholder='second athlete';inp.oninput=()=>mark(inp);td.insertBefore(inp,b);const ag=document.createElement('input');ag.className='age';ag.placeholder='age';ag.maxLength=2;ag.oninput=()=>mark(ag);td.insertBefore(ag,b);mark(b)}
+function toggleFocus(){focusing=!focusing;document.body.classList.toggle('focusing',focusing);
+  document.getElementById('focusbtn').classList.toggle('on',focusing);
+  if(focusing){cur=[...tb.children].findIndex(t=>!t.classList.contains('done'));if(cur<0)cur=0;paint()}
+  else [...tb.children].forEach(t=>t.classList.remove('blur','active'))}
+function paint(){[...tb.children].forEach((t,i)=>{t.classList.toggle('active',i===cur);t.classList.toggle('blur',i!==cur)});
+  tb.children[cur].scrollIntoView({block:'center',behavior:'smooth'})}
+/* ── prices v3: live preview + price ladder with the savings math ── */
+const AFTER=["Goes back to monthly","Renews for the same length","Just ends","Something else"];
+let RUNGS=[
+ {len:"3 months",price:599,after:0,gets:"",taxable:1,fee:1,notes:"",other:""},
+ {len:"6 months",price:1150,after:0,gets:"",taxable:1,fee:1,notes:"",other:""}
+];
+function money(n){return '$'+Math.round(n).toLocaleString()}
+function monthsOf(s){const m=(s||'').match(/\d+/);let n=m?+m[0]:0;if(/year/i.test(s))n*=12;if(/week/i.test(s))n=Math.round(n/4.345);return n||1}
+function set(i,k,v){RUNGS[i][k]=v;drawLadder();prevOpts()}
+function drawLadder(){
+  const base=+document.getElementById('q_price').value||0;
+  document.getElementById('basecmp').textContent=money(base);
+  document.getElementById('ladder').innerHTML=
+   `<div class="rung base"><span class="rlen">Month to month</span><span class="rprice">${money(base)}</span><span class="rper">${money(base)}/mo</span><span class="rsave none">the baseline</span></div>`
+   + RUNGS.map((r,i)=>{
+     const mo=monthsOf(r.len), full=base*mo, save=full-r.price, per=r.price/mo;
+     const badge = base ? (save>0?`<span class="rsave">saves ${money(save)}</span>`:`<span class="rsave none">no saving</span>`) : `<span class="rsave none">set a monthly price</span>`;
+     const warn = (r.after===0 && !base) ? `<span class="afterwarn">no monthly price to go back to</span>` : '';
+     return `<div class="rungwrap">
+      <div class="rung">
+       <input class="rlenin" value="${r.len}" oninput="RUNGS[${i}].len=this.value;recalc()">
+       <span class="rprice" id="rp${i}">${money(r.price)}</span>
+       <span class="rper" id="rm${i}">${money(per)}/mo</span>
+       <span id="rs${i}">${badge}</span>
+       <span class="redit">$<input type="number" value="${r.price}" oninput="RUNGS[${i}].price=+this.value||0;recalc()">
+       <button class="rm2" onclick="RUNGS.splice(${i},1);drawLadder();prevOpts()">remove</button></span>
+      </div>
+      <div class="afterrow"><span class="al">When the <span id="rl${i}">${r.len}</span> is up</span>
+       ${AFTER.map((a,j)=>`<button class="bchip sm ${r.after===j?'sel':''}" onclick="set(${i},'after',${j})">${a}</button>`).join('')}
+       ${warn}
+      </div>
+      ${r.after===3?`<div class="afterrow"><span class="al">What happens instead? <b style="color:var(--gold-ink)">*</b></span>
+        <input class="rin" style="flex:1;min-width:200px" value="${r.other}" placeholder="explain in your own words" oninput="RUNGS[${i}].other=this.value"></div>`:''}
+      <div class="rmore">
+        <div class="mf"><span class="ml">What do they get on this one?</span>
+          <input class="rin" value="${r.gets}" placeholder="same as monthly" oninput="RUNGS[${i}].gets=this.value"></div>
+        <div class="mf"><span class="ml">Do you add tax on it?</span>
+          <span class="chiprow">${["Yes","No"].map((a,j)=>`<button class="bchip sm ${r.taxable===j?'sel':''}" onclick="set(${i},'taxable',${j})">${a}</button>`).join('')}</span></div>
+        <div class="mf"><span class="ml">Joining fee on this one?</span>
+          <span class="chiprow">${["Charge it","Waive it"].map((a,j)=>`<button class="bchip sm ${r.fee===j?'sel':''}" onclick="set(${i},'fee',${j})">${a}</button>`).join('')}</span></div>
+        <div class="mf"><span class="ml">Notes on this discount</span>
+          <input class="rin" value="${r.notes}" placeholder="optional, just for you and BAM" oninput="RUNGS[${i}].notes=this.value"></div>
+      </div>
+     </div>`;
+   }).join('');
+}
+/* updates only the computed bits, so typing never loses focus */
+function recalc(){
+  const base=+document.getElementById('q_price').value||0;
+  document.getElementById('basecmp').textContent=money(base);
+  RUNGS.forEach((r,i)=>{
+    const mo=monthsOf(r.len), save=base*mo-r.price;
+    const p=document.getElementById('rp'+i); if(!p) return;
+    p.textContent=money(r.price);
+    document.getElementById('rm'+i).textContent=money(r.price/mo)+'/mo';
+    document.getElementById('rl'+i).textContent=r.len;
+    document.getElementById('rs'+i).innerHTML= base
+      ? (save>0?`<span class="rsave">saves ${money(save)}</span>`:`<span class="rsave none">no saving</span>`)
+      : `<span class="rsave none">set a monthly price</span>`;
+  });
+  prevOpts();
+}
+function addRung(){RUNGS.push({len:"12 months",price:0,after:0,gets:"",taxable:1,fee:1,notes:"",other:""});drawLadder();prevOpts()}
+function prevOpts(){
+  const base=+document.getElementById('q_price').value||0;
+  document.getElementById('pv_opts').innerHTML=RUNGS.map(r=>{
+    const save=base*monthsOf(r.len)-r.price;
+    return `<div class="opt"><span>${r.len}</span><span>${money(r.price)} ${save>0&&base?`<span class="os">save ${money(save)}</span>`:''}</span></div>`;
+  }).join('');
+  const back=RUNGS.filter(r=>r.after===0).length, ren=RUNGS.filter(r=>r.after===1).length;
+  let line='';
+  if(back) line=`When a commitment ends you go back to ${money(base)} every 4 weeks.`;
+  else if(ren) line=`Commitments renew automatically for the same length.`;
+  else if(RUNGS.length) line=`Commitments simply end, nothing renews.`;
+  document.getElementById('pv_after').textContent=line;
+}
+function prev(){
+  document.getElementById('pv_title').textContent=document.getElementById('q_title').value;
+  document.getElementById('pv_desc').textContent=document.getElementById('q_desc').value;
+  document.getElementById('pv_price').textContent=(+document.getElementById('q_price').value||0).toLocaleString();
+  drawLadder();prevOpts();
+}
+prev();
+
+function openHist(name,amt){document.getElementById('histname').textContent=name+' · payment history';
+  document.getElementById('histrows').innerHTML=['Jul','Jun','May','Apr'].map((m,i)=>`<tr><td>${m} ${8+i}</td><td>${amt}</td><td class="ok">paid</td></tr>`).join('');
+  document.getElementById('hist').classList.add('open')}
+upd();
+</script>
+</body>
+</html>
