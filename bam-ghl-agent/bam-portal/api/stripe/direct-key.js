@@ -395,7 +395,24 @@ async function handler(req, res) {
 
     throw bad(`unknown action: ${action}`);
   } catch (e) {
-    return res.status(e.status || 500).json({ error: e.message || String(e) });
+    // ONLY A MESSAGE WE WROTE IS EVER ECHOED.
+    //
+    // This used to be `res.status(e.status || 500).json({ error: e.message })`
+    // for every error, which quietly made this route a repeater for whatever
+    // string an exception happened to be carrying. A key pasted with a line
+    // break in it (out of a wrapped email, a Slack code block, a PDF) survives
+    // .trim(), reaches fetch, and the runtime throws
+    //   Headers.append: "Bearer rk_live_...\n..." is an invalid header value
+    // - a message containing THE WHOLE LIVE KEY, with no .status, so it came
+    // back here as a 500 with the credential in the body.
+    //
+    // .status is the tell: bad() sets it, and bad() is us. Anything without one
+    // is a throw we did not write, and its message is not ours to forward. The
+    // detail still exists - it goes to the server log, where staff can read it
+    // and the browser cannot.
+    if (e && e.status) return res.status(e.status).json({ error: e.message || String(e) });
+    console.error("stripe/direct-key unexpected error:", (e && e.stack) || e);
+    return res.status(500).json({ error: "unexpected error saving the key" });
   }
 }
 
