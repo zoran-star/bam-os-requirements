@@ -37208,7 +37208,27 @@ function _organicBankCard(t) {
   const finals = Array.isArray(t.final_files) ? t.final_files : [];
   const f = finals[0];
   const inner = f ? _organicFileTile(f) : '<div style="height:80px;display:flex;align-items:center;justify-content:center;color:var(--text-mute)">✓</div>';
-  return `<div style="border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface)">${inner}<div style="font-size:11px;color:var(--text-mute);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML((t.notes || '').split('\n')[0] || 'Creative')}</div></div>`;
+  // Multi-file creatives (carousels!) expand to show every file - the old
+  // card linked only finals[0], stranding the other slides.
+  const more = finals.length > 1
+    ? `<button onclick="_organicBankExpand(this, '${t.id}')" style="margin-top:6px;width:100%;background:transparent;border:1px solid var(--line);color:var(--text-sub);padding:5px 0;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">View all ${finals.length} files</button>`
+    : '';
+  return `<div data-bank-ticket="${t.id}" style="border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface)">${inner}<div style="font-size:11px;color:var(--text-mute);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML((t.notes || '').split('\n')[0] || 'Creative')}</div>${more}</div>`;
+}
+// Expand a bank card in place: the card spans the grid row and shows every
+// final file as its own tile (each opens/downloads individually).
+function _organicBankExpand(btn, ticketId) {
+  const t = _ORGANIC_TICKETS.find(x => String(x.id) === String(ticketId));
+  const card = btn && btn.closest('[data-bank-ticket]');
+  if (!t || !card) return;
+  const finals = Array.isArray(t.final_files) ? t.final_files : [];
+  card.style.gridColumn = '1 / -1';
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="flex:1;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML((t.notes || '').split('\n')[0] || 'Creative')}</div>
+      <span style="font-size:11px;color:var(--text-mute)">${finals.length} files</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">${finals.map(_organicFileTile).join('')}</div>`;
 }
 function _organicFileTile(f) {
   const isImage = (f.mime || '').startsWith('image/');
