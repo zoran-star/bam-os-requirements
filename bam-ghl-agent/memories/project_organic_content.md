@@ -116,5 +116,5 @@ Creative Bank card was a fileless checkmark. Storage delete half-failed so
 the .mov survived and was restored + ticket put back in review. Guards now:
 (1) approve 409s when final_files is empty; (2) set-final that EMPTIES finals
 while client_action_status=review-requested auto-withdraws the review
-(status active, cas none, internal note). Lesson: any state pair like
-"review open" + "no files" must be unrepresentable.
+(status active, cas none, internal note). Also (same night): send-for-review had no already-in-review guard - Eli triple-clicked and Pro Bound got 3 identical Slack pings; now 409s "already with the client for review". Lesson: any state pair like
+"review open" + "no files" must be unrepresentable, and every state TRANSITION needs an idempotency check.
