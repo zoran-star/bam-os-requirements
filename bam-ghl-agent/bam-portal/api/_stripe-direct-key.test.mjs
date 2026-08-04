@@ -29,6 +29,31 @@
 //   7. DISABLE flips the row, writes an audit row, and busts the transport
 //      cache so routing falls back to Connect on the very next call in this
 //      instance.
+//   8. ONE SAVE, TWO CALLERS. The save logic is EXPORTED as saveDirectKey and
+//      the HTTP route is a thin caller of it, so a CLI can save a
+//      platform-locked academy's key without a browser and cannot drift from
+//      what staff get. Proven three ways: the exported function is callable
+//      with no req/res and produces the SAME database writes and audit row as
+//      the route path (both drives compared byte-for-byte, volatile fields
+//      aside); a source-text wiring pin fails if the handler ever re-inlines
+//      the save; and an ACTOR is mandatory at the function boundary - an empty
+//      performedByName is refused before Stripe is asked or anything is
+//      written, so a CLI cannot land a save with a null actor in the audit row.
+//      The goal is IDENTIFIABILITY, not a name check: a staff row whose
+//      cosmetic `name` column is null, blank OR whitespace-only still saves
+//      through the route, because actorName() trims each link of
+//      name -> email -> staff id before it counts. Blocking a real staff
+//      member's payment-credential save over a display name would be failing
+//      closed on the wrong thing. Disable resolves its actor from the SAME
+//      helper, so the two branches cannot drift.
+//   9. THE TWO IDS, PINNED BY VALUE. member_audit_log.performed_by gets the
+//      STAFF row's id and client_stripe_direct.created_by gets the AUTH user's
+//      id - different id spaces, asserted absolutely rather than by comparing
+//      the two drives, because a swap inside the save hits both drives
+//      identically and any relative comparison cancels it out.
+//  10. A TYPO'D ACADEMY ID is a 404 that writes nothing - the guard between an
+//      argv typo and a live Stripe key stored under an academy that does not
+//      exist.
 //
 // WHAT IT DOES NOT PROVE
 //   - Real Stripe's status codes for the capability probes (stubbed; the
@@ -37,13 +62,20 @@
 //   - Real PostgREST upsert semantics (the stub honors on_conflict merging).
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// NEGATIVE CONTROL. Breaks one thing; the suite must print
-// NEGATIVE CONTROL PASSED:
+// NEGATIVE CONTROLS. Each breaks one thing; the suite must print
+// "NEGATIVE CONTROL PASSED (<name>)":
 //
 //   MUTATE=capfalse  node api/_stripe-direct-key.test.mjs
 //       restores the could-not-ask collapse: every capability probe error is
 //       recorded as `false` again, network failures included. The abort
 //       assertions must catch it.
+//
+//   MUTATE=inlinesave  node api/_stripe-direct-key.test.mjs
+//       re-inlines the whole save inside the handler, leaving the exported
+//       saveDirectKey orphaned. The mutant still BEHAVES correctly through the
+//       route - every other assertion passes - which is exactly the point: the
+//       fork is invisible to behavior and only the wiring pin can see it. If
+//       the pin ever goes decorative, this control stops printing.
 //
 // A control run exits ZERO when the mutation IS caught. CI greps for the
 // banner, not the exit code.
@@ -87,9 +119,97 @@ const CAPFALSE = [[
       capabilities[name] = false;
     }`]];
 
+// The thin save branch as shipped, and the inlined save that must NOT come
+// back. The replacement is deliberately CORRECT code: it does exactly what
+// saveDirectKey does, so the mutant passes every behavioral assertion and only
+// the wiring pin in section 9 can catch it.
+const INLINESAVE = [[
+  `    if (action === "save") {
+      // Thin caller. The save lives in saveDirectKey above so a CLI can run the
+      // exact same code path - re-inlining it here forks the money path.
+      //
+      // The actor is resolved by actorName() - the same one the disable branch
+      // uses, so the two can never drift into different rules about who counts
+      // as identifiable.
+      const payload = await saveDirectKey({
+        clientId: client_id,
+        secretKey: req.body.secret_key,
+        publishableKey: req.body.publishable_key,
+        performedBy: staff.id,
+        performedByName: actorName(staff, user),
+        createdBy: user.id,
+      });
+      return res.status(200).json(payload);
+    }`,
+  [
+    '    if (action === "save") {',
+    '      const pk = String(req.body.publishable_key || "").trim();',
+    '      if (!pk || !pk.startsWith("pk_live_")) {',
+    '        throw bad("publishable_key (pk_live_...) is required to save - the checkout cannot mount Stripe.js without it");',
+    '      }',
+    '      const actor = actorName(staff, user);',
+    '      const report = await probeKey(req.body.secret_key, pk);',
+    '      const clientRows = await sb(`clients?id=eq.${encodeURIComponent(client_id)}&select=id,stripe_connect_account_id&limit=1`);',
+    '      const client = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;',
+    '      if (!client) throw bad("academy not found", 404);',
+    '      const storedAcct = String(client.stripe_connect_account_id || "").trim();',
+    '      if (storedAcct && storedAcct !== String(report.account_id || "").trim()) {',
+    '        throw bad(',
+    '          `this key belongs to ${report.account_id}, but the academy is already tied to ${storedAcct}. ` +',
+    '          "Refusing to switch Stripe accounts through a key save.",',
+    '          409',
+    '        );',
+    '      }',
+    '      await sb(`client_stripe_direct?on_conflict=client_id`, {',
+    '        method: "POST",',
+    '        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },',
+    '        body: JSON.stringify([{',
+    '          client_id,',
+    '          status: "active",',
+    '          secret_key_enc: encryptSecret(String(req.body.secret_key).trim()),',
+    '          secret_key_last4: report.key_last4,',
+    '          publishable_key: pk,',
+    '          livemode: true,',
+    '          stripe_account_id: report.account_id,',
+    '          capabilities: report.capabilities,',
+    '          key_last_verified_at: nowIso(),',
+    '          created_by: user.id,',
+    '          created_by_name: actor,',
+    '          updated_at: nowIso(),',
+    '        }]),',
+    '      });',
+    '      const chargeable = report.charges_enabled === true;',
+    '      await sb(`clients?id=eq.${encodeURIComponent(client_id)}`, {',
+    '        method: "PATCH",',
+    '        headers: { Prefer: "return=minimal" },',
+    '        body: JSON.stringify({',
+    '          ...(storedAcct ? {} : { stripe_connect_account_id: report.account_id }),',
+    '          stripe_connect_status: chargeable ? "connected" : "onboarding",',
+    '          stripe_connect_connected_at: chargeable ? nowIso() : null,',
+    '          updated_at: nowIso(),',
+    '        }),',
+    '      });',
+    '      await writeAudit({',
+    '        client_id,',
+    '        action_type: "stripe-direct-key-save",',
+    '        args: { account: report.account_id, key_last4: report.key_last4, capabilities: report.capabilities },',
+    '        performed_by: staff.id,',
+    '        performed_by_name: actor,',
+    '      });',
+    '      bustTransportCache();',
+    '      let webhook;',
+    '      try {',
+    '        webhook = await ensureAcademyWebhook({ clientId: client_id });',
+    '      } catch (e) {',
+    '        webhook = { ok: false, error: e.message || String(e) };',
+    '      }',
+    '      return res.status(200).json({ ok: true, ...report, webhook });',
+    '    }',
+  ].join("\n")]];
+
 let modulePath = path.join(HERE, "stripe/direct-key.js");
 if (MUTATE) {
-  const edits = { capfalse: CAPFALSE }[MUTATE];
+  const edits = { capfalse: CAPFALSE, inlinesave: INLINESAVE }[MUTATE];
   if (!edits) { console.log(`❌ NEGATIVE CONTROL FAILED: unknown control MUTATE=${MUTATE}`); process.exit(1); }
   let src = fs.readFileSync(modulePath, "utf8");
   for (const [find, repl] of edits) {
@@ -104,6 +224,11 @@ if (MUTATE) {
   tmpFiles.push(modulePath);
 }
 
+// The source of the module ACTUALLY under test (the shipped file, or the mutant
+// copy). Section 9's wiring pin reads this, so a control that re-inlines the
+// save is judged on the code that just ran, not on the pristine file.
+const MODULE_SRC = fs.readFileSync(modulePath, "utf8");
+
 // ── the in-memory world ──────────────────────────────────────────────────────
 const RK = "rk_live_the_pasted_academy_key_7Zp4";
 const { decryptSecret } = await import(pathToFileURL(path.join(HERE, "_stripe-direct-crypto.js")).href);
@@ -115,6 +240,9 @@ const DB = {
     { id: "c1", business_name: "BAM Locked", stripe_connect_account_id: "acct_A\n", stripe_connect_status: "not_connected", stripe_connect_connected_at: null },
     // c2 is tied to a DIFFERENT account - the 409 case.
     { id: "c2", business_name: "BAM Other", stripe_connect_account_id: "acct_B", stripe_connect_status: "connected", stripe_connect_connected_at: "2026-01-01T00:00:00.000Z" },
+    // c3 is the never-saved academy section 9 runs BOTH ways (route, then the
+    // exported function) to compare their database writes.
+    { id: "c3", business_name: "BAM Fresh", stripe_connect_account_id: null, stripe_connect_status: "not_connected", stripe_connect_connected_at: null },
   ],
   client_stripe_direct: [],
   member_audit_log: [],
@@ -202,7 +330,8 @@ globalThis.fetch = async (url, init = {}) => {
   throw new Error(`UNSTUBBED CALL: ${method} ${u}`);
 };
 
-const handler = (await import(pathToFileURL(modulePath).href)).default;
+const MOD = await import(pathToFileURL(modulePath).href);
+const handler = MOD.default;
 const T = await import(pathToFileURL(path.join(HERE, "_stripe-transport.js")).href);
 
 const RESPONSES = [];   // every payload the handler ever returned, for the leak scan
@@ -367,6 +496,182 @@ console.log("\n── 8. no response ever carried a secret ──");
   ok(!!enc && !all.includes(enc), "and neither does the stored ciphertext");
 }
 
+console.log("\n── 9. ONE save, TWO callers: the route and a CLI run the same code ──");
+{
+  const resetC3 = () => {
+    DB.client_stripe_direct = DB.client_stripe_direct.filter(r => r.client_id !== "c3");
+    DB.member_audit_log = DB.member_audit_log.filter(r => r.client_id !== "c3");
+    Object.assign(DB.clients.find(c => c.id === "c3"),
+      { stripe_connect_account_id: null, stripe_connect_status: "not_connected", stripe_connect_connected_at: null });
+  };
+  // Timestamps and the ciphertext (a fresh random IV per encrypt) differ between
+  // ANY two runs by design. Everything else must not, so everything else is
+  // compared literally.
+  const VOLATILE = new Set(["updated_at", "created_at", "key_last_verified_at", "stripe_connect_connected_at", "secret_key_enc"]);
+  const writesSince = (p, q) => JSON.stringify([SB_POSTS.slice(p), SB_PATCHES.slice(q)],
+    (k, v) => (VOLATILE.has(k) ? (v == null ? null : "<volatile>") : v), 1);
+
+  resetC3();
+  const p0 = SB_POSTS.length, q0 = SB_PATCHES.length;
+  const viaRoute = await post({ action: "save", client_id: "c3", secret_key: RK, publishable_key: "pk_live_academy" });
+  const routeWrites = writesSince(p0, q0);
+  const routeAudit = auditRows("stripe-direct-key-save").find(r => r.client_id === "c3");
+  const routeRow = DB.client_stripe_direct.find(r => r.client_id === "c3");
+
+  // The CLI drive: no req, no res, no HTTP - the same actor the route resolved,
+  // stamped by hand the way a CLI must stamp it.
+  resetC3();
+  const p1 = SB_POSTS.length, q1 = SB_PATCHES.length;
+  let viaFn = null, fnErr = null;
+  try {
+    viaFn = await MOD.saveDirectKey({
+      clientId: "c3", secretKey: RK, publishableKey: "pk_live_academy",
+      performedBy: "staff-1", performedByName: "Zoran", createdBy: "user-1",
+    });
+  } catch (e) { fnErr = e; }
+  const fnWrites = writesSince(p1, q1);
+  const fnRow = DB.client_stripe_direct.find(r => r.client_id === "c3");
+  const fnAudit = auditRows("stripe-direct-key-save").find(r => r.client_id === "c3");
+
+  ok(typeof MOD.saveDirectKey === "function" && typeof MOD.probeKey === "function",
+    "saveDirectKey and probeKey are EXPORTED - a CLI has something to call");
+  ok(!fnErr && !!viaFn && viaFn.ok === true,
+    `saveDirectKey runs with no req and no res${fnErr ? ` (threw: ${fnErr.message})` : ""}`);
+  ok(fnWrites === routeWrites, "and writes the SAME rows the browser route writes, byte for byte");
+  if (fnWrites !== routeWrites) {
+    console.log("\n     THE DIFFERING WRITES:\n     route: " + routeWrites.replace(/\n/g, "\n     route: "));
+    console.log("     fn:    " + fnWrites.replace(/\n/g, "\n     fn:    ") + "\n");
+  }
+  ok(JSON.stringify(viaFn) === JSON.stringify(viaRoute.payload),
+    "and returns the identical payload, webhook report and all");
+  ok(!!fnAudit && !!routeAudit && fnAudit.performed_by === routeAudit.performed_by
+    && fnAudit.performed_by_name === "Zoran" && JSON.stringify(fnAudit.args) === JSON.stringify(routeAudit.args),
+    "one audit row either way, same actor, same args - and still no key in it");
+
+  // ABSOLUTE, by value, not fn-vs-route. The two ids live in different id
+  // spaces (staff row vs auth user) and a swap inside saveDirectKey hits BOTH
+  // drives identically, so every relative comparison above cancels it out and
+  // reports green. Only naming the expected value per column can see it. This
+  // is the highest-consequence invariant in the file: a staff id sitting in a
+  // column everything else joins as an auth id is a silent data-integrity bug
+  // on live payment rows, invisible until someone tries to join on it.
+  ok(!!routeAudit && routeAudit.performed_by === "staff-1",
+    `the STAFF row's id is what lands in member_audit_log.performed_by (saw ${JSON.stringify(routeAudit && routeAudit.performed_by)}, want "staff-1")`);
+  ok(!!routeRow && routeRow.created_by === "user-1",
+    `the AUTH user's id is what lands in client_stripe_direct.created_by (saw ${JSON.stringify(routeRow && routeRow.created_by)}, want "user-1")`);
+  ok(!!fnAudit && fnAudit.performed_by === "staff-1" && !!fnRow && fnRow.created_by === "user-1",
+    "and the CLI's performedBy / createdBy arguments route to those same two columns, not to each other");
+  ok(!!fnRow && fnRow.secret_key_enc !== RK && decryptSecret(fnRow.secret_key_enc) === RK,
+    "the CLI drive encrypts through the same module (no plaintext shortcut off the HTTP path)");
+  ok(!JSON.stringify(viaFn).includes(RK) && !JSON.stringify(fnAudit).includes(RK),
+    "and neither the returned payload nor the audit row carries the pasted key");
+}
+
+console.log("\n── 10. the wiring pin: the route CALLS the save, it does not re-inline it ──");
+{
+  // Source-text, deliberately: a re-inlined save behaves perfectly through the
+  // route (see MUTATE=inlinesave) and no behavioral assertion can see it. Only
+  // the shape of the code can.
+  const branchOf = (src) => {
+    const pin = 'if (action === "save") {';
+    const at = src.indexOf(pin, src.indexOf("async function handler("));
+    if (at === -1) return null;
+    let depth = 0;
+    for (let i = at + pin.length - 1; i < src.length; i++) {
+      if (src[i] === "{") depth++;
+      else if (src[i] === "}") { depth--; if (depth === 0) return src.slice(at, i + 1); }
+    }
+    return null;
+  };
+  const branch = branchOf(MODULE_SRC);
+  if (branch == null) {
+    controlBroken = 'This suite is pinned to `if (action === "save") {` inside handler() in api/stripe/direct-key.js and can no longer find it. Re-point section 10 - a pin that cannot run looks exactly like a check that passed.';
+  }
+  ok(/export async function saveDirectKey\(\{/.test(MODULE_SRC),
+    "saveDirectKey is declared as an exported function, not a closure inside the handler");
+  ok(!!branch && /saveDirectKey\(\{/.test(branch),
+    "the handler's save branch CALLS saveDirectKey");
+  // The save's own machinery, listed by name: if any of it reappears inside the
+  // branch, the money path has been forked back into two implementations.
+  const INLINED = ["encryptSecret(", "client_stripe_direct?on_conflict=client_id", "ensureAcademyWebhook(",
+    "stripe-direct-key-save", "bustTransportCache()", "stripe_connect_status:"];
+  const found = branch == null ? ["(branch not found)"] : INLINED.filter(t => branch.includes(t));
+  ok(found.length === 0,
+    `and re-implements none of it inline${found.length ? ` - found: ${found.join(", ")}` : ""}`);
+}
+
+console.log("\n── 11. an actor is mandatory - no save lands nameless ──");
+{
+  const before = snapshot();
+  const stripeBefore = STRIPE_CALLS.length;
+  const refused = [];
+  for (const [label, name] of [["missing", undefined], ["null", null], ["empty", ""], ["whitespace", "   "]]) {
+    let e = null;
+    try {
+      await MOD.saveDirectKey({ clientId: "c3", secretKey: RK, publishableKey: "pk_live_academy", performedByName: name });
+    } catch (err) { e = err; }
+    refused.push(!!e && /performedByName required/.test(e.message) && (e.status || 400) === 400 ? null : `${label} was not refused`);
+  }
+  const bad4 = refused.filter(Boolean);
+  ok(bad4.length === 0, `on the CLI path, a missing, null, empty or whitespace performedByName is refused${bad4.length ? ` (${bad4.join("; ")})` : ""}`);
+  ok(snapshot() === before, "with NOTHING written - the refusal comes before the upsert, the patch and the audit");
+  ok(STRIPE_CALLS.length === stripeBefore, "and before Stripe is asked anything at all");
+
+  // But the ROUTE must never fail closed on a cosmetic column. `name` is blank
+  // on plenty of real staff rows - null in some, "   " in others. A whitespace
+  // name is TRUTHY, which is exactly how an untrimmed fallback chain hands back
+  // an empty actor and then 400s a live key save; the shipped chain trims each
+  // link BEFORE it counts, which is what makes the invariant true instead of
+  // merely asserted in a comment. Blocking a payment-credential save over a
+  // display name would be failing closed on the wrong thing: every shape goes
+  // through, and every one still names a human in the audit.
+  const staffRow = DB.staff[0];
+  const realName = staffRow.name;
+  for (const [label, cosmetic] of [["null", null], ["whitespace-only", "   "], ["an empty string", ""]]) {
+    DB.client_stripe_direct = DB.client_stripe_direct.filter(r => r.client_id !== "c3");
+    DB.member_audit_log = DB.member_audit_log.filter(r => r.client_id !== "c3");
+    staffRow.name = cosmetic;
+    const r = await post({ action: "save", client_id: "c3", secret_key: RK, publishable_key: "pk_live_academy" });
+    const row = auditRows("stripe-direct-key-save").find(a => a.client_id === "c3");
+    staffRow.name = realName;
+    ok(r.code === 200 && r.payload.ok === true,
+      `a staff row whose name is ${label} still saves through the route (saw ${r.code}${r.code === 200 ? "" : ` ${JSON.stringify(r.payload && r.payload.error)}`})`);
+    ok(!!row && row.performed_by_name === "zo@test" && String(row.performed_by_name).trim() !== ""
+      && row.performed_by_name !== "null",
+      `and its audit row carries the email fallback - never null, never the STRING "null", never blank (saw ${JSON.stringify(row && row.performed_by_name)})`);
+  }
+
+  // The disable branch answers to the same rule, from the same helper: turning
+  // a live academy's payment transport OFF is exactly as answerable as turning
+  // it on, so it may not land nameless either.
+  staffRow.name = "   ";
+  const d = await post({ action: "disable", client_id: "c3" });
+  staffRow.name = realName;
+  const dis = auditRows("stripe-direct-key-disable").find(a => a.client_id === "c3");
+  ok(d.code === 200 && !!dis && dis.performed_by_name === "zo@test",
+    `disable resolves the SAME actor as save - one helper, both branches (saw ${JSON.stringify(dis && dis.performed_by_name)})`);
+}
+
+console.log("\n── 12. a typo'd academy id is a 404, not a credential written into nowhere ──");
+{
+  // A CLI takes clientId as an argv string, so a typo is now the likeliest
+  // operator error there is - and this guard is the only thing standing between
+  // it and a live Stripe key stored under an academy that does not exist.
+  const before = snapshot();
+  const p = SB_POSTS.length, q = SB_PATCHES.length;
+  let e = null;
+  try {
+    await MOD.saveDirectKey({
+      clientId: "c3-typo", secretKey: RK, publishableKey: "pk_live_academy",
+      performedBy: "staff-1", performedByName: "CLI: zoran",
+    });
+  } catch (err) { e = err; }
+  ok(!!e && /academy not found/.test(String(e.message)) && e.status === 404,
+    `an unknown client_id is refused 404 "academy not found" (saw ${e ? `${e.status} ${e.message}` : "NO THROW - it went through"})`);
+  ok(snapshot() === before && SB_POSTS.length === p && SB_PATCHES.length === q,
+    "and NOTHING is written - no key row, no clients patch, no audit row under an academy that does not exist");
+}
+
 // ─── report ──────────────────────────────────────────────────────────────────
 cleanup();
 console.log("");
@@ -374,8 +679,8 @@ if (MUTATE) {
   if (controlBroken) { console.log(`❌ NEGATIVE CONTROL FAILED: ${controlBroken}`); process.exit(1); }
   const caught = fail > 0;
   console.log(caught
-    ? `✅ NEGATIVE CONTROL PASSED: MUTATE=${MUTATE} was caught by ${fail} assertion(s):\n   - ${failures.slice(0, 4).join("\n   - ")}`
-    : `❌ NEGATIVE CONTROL FAILED: MUTATE=${MUTATE} broke a real guarantee and every assertion still passed. That check is decorative.`);
+    ? `✅ NEGATIVE CONTROL PASSED (${MUTATE}) - MUTATE=${MUTATE} was caught by ${fail} assertion(s):\n   - ${failures.slice(0, 4).join("\n   - ")}`
+    : `❌ NEGATIVE CONTROL FAILED (${MUTATE}): MUTATE=${MUTATE} broke a real guarantee and every assertion still passed. That check is decorative.`);
   process.exit(caught ? 0 : 1);
 }
 console.log(fail ? `❌ ${pass} passed, ${fail} failed.` : `✅ ${pass} passed, 0 failed.`);

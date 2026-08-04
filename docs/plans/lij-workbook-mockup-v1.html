@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Basketball Prep · Member Setup Workbook</title>
+<style>
+  :root{
+    --bg:#0e0f12; --card:#17181c; --card2:#1d1f24; --line:#2a2c33;
+    --gold:#D4B65C; --gold-dim:rgba(212,182,92,.14);
+    --txt:#e8e6e1; --mut:#9a9890; --good:#7dc98f; --warn:#e0a44c; --bad:#d97b6c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding-bottom:90px}
+  .wrap{max-width:680px;margin:0 auto;padding:0 14px}
+
+  header{padding:22px 0 14px;border-bottom:1px solid var(--line);margin-bottom:18px}
+  .topline{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .brand{font-size:12px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;font-weight:700}
+  h1{font-size:22px;margin-top:2px;font-weight:800}
+  .prices-btn{border:1px solid var(--gold);color:var(--gold);background:none;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .sub{color:var(--mut);font-size:13px;margin-top:6px}
+  .sub b{color:var(--txt)}
+  .progress{height:6px;background:var(--card2);border-radius:3px;margin-top:12px;overflow:hidden}
+  .progress i{display:block;height:100%;width:12%;background:var(--gold);border-radius:3px;transition:width .3s}
+
+  .secttl{display:flex;align-items:center;gap:8px;margin:22px 0 10px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:700}
+  .secttl .n{background:var(--gold);color:#141414;border-radius:20px;padding:1px 9px;font-size:12px}
+  .secttl.quiet .n{background:var(--card2);color:var(--mut)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+  .card.ask{border-left:3px solid var(--gold)}
+  .who{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .who .nm{font-weight:800;font-size:16px}
+  .who .amt{color:var(--gold);font-weight:700;font-size:14px;white-space:nowrap}
+  .q{margin:8px 0 10px;color:var(--txt);font-size:14px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--line);background:var(--card2);color:var(--txt);border-radius:20px;padding:7px 13px;font-size:13px;cursor:pointer}
+  .chip.on{border-color:var(--gold);background:var(--gold-dim);color:var(--gold);font-weight:700}
+  .mini{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .fld{display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:6px 10px}
+  .fld label{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+  .fld input{background:none;border:none;color:var(--txt);font-size:14px;width:110px;outline:none}
+  .fld input.age{width:34px;text-align:center}
+  .fld input:focus{color:var(--gold)}
+
+  .row{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:6px;overflow:hidden}
+  .rowhead{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer}
+  .rowhead .nm{font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rowhead .pl{color:var(--mut);font-size:12px;white-space:nowrap}
+  .rowhead .amt{color:var(--gold);font-size:13px;font-weight:700;white-space:nowrap}
+  .agechip{border:1px dashed var(--mut);border-radius:16px;padding:3px 8px;font-size:12px;color:var(--mut);display:flex;gap:4px;align-items:center}
+  .agechip input{width:26px;background:none;border:none;color:var(--gold);font-weight:700;text-align:center;outline:none;font-size:13px}
+  .agechip.filled{border-style:solid;border-color:var(--gold)}
+  .chev{color:var(--mut);font-size:12px;transition:transform .2s}
+  .row.open .chev{transform:rotate(90deg)}
+  .detail{display:none;border-top:1px solid var(--line);padding:12px 14px;background:var(--card2)}
+  .row.open .detail{display:block}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:13px}
+  .kv div span{display:block;color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .kv a{color:var(--gold);text-decoration:none}
+  .payhist{margin-top:10px;font-size:13px}
+  .payhist button{background:none;border:none;color:var(--gold);cursor:pointer;font-size:13px;padding:0}
+  .payhist table{width:100%;margin-top:8px;border-collapse:collapse;display:none}
+  .payhist.open table{display:table}
+  .payhist td{padding:4px 0;border-top:1px solid var(--line);color:var(--mut)}
+  .payhist td.ok{color:var(--good)}
+  .actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .act{border:1px solid var(--line);background:none;color:var(--mut);border-radius:9px;padding:7px 12px;font-size:12px;cursor:pointer}
+  .act:hover{color:var(--txt)}
+  .act.skip.on{border-color:var(--bad);color:var(--bad)}
+  .flag{display:none;background:var(--gold-dim);color:var(--gold);border-radius:6px;font-size:11px;padding:2px 8px;font-weight:700}
+  .row.flagged .flag,.card.flagged .flag{display:inline-block}
+  .row.skipped{opacity:.55}
+  .row.skipped .nm{text-decoration:line-through}
+
+  .addbox{display:flex;gap:8px;margin-bottom:8px}
+  .addbox input{flex:1;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 14px;color:var(--txt);font-size:14px;outline:none}
+  .addbox input:focus{border-color:var(--gold)}
+  .ghost{border:1px dashed var(--line);background:none;color:var(--mut);border-radius:10px;padding:11px 14px;font-size:13px;cursor:pointer;width:100%;text-align:center}
+
+  .acad .kv{grid-template-columns:1fr 1fr}
+  .acad .ok{color:var(--good);font-size:12px}
+
+  footer{position:fixed;left:0;right:0;bottom:0;background:rgba(14,15,18,.92);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:12px 14px}
+  .footin{max-width:680px;margin:0 auto;display:flex;align-items:center;gap:12px}
+  .footin .cnt{color:var(--mut);font-size:13px;flex:1}
+  .footin .cnt b{color:var(--gold)}
+  .send{background:var(--gold);color:#141414;border:none;border-radius:10px;padding:12px 22px;font-size:15px;font-weight:800;cursor:pointer}
+  .note{color:var(--mut);font-size:11px;text-align:center;margin:26px 0 10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="topline">
+    <div>
+      <div class="brand">3D Basketball Prep</div>
+      <h1>Member Setup Workbook</h1>
+    </div>
+    <button class="prices-btn">Adjust prices →</button>
+  </div>
+  <div class="sub">We found <b>20 active memberships</b> in your Stripe, about <b>$4,640 per month</b>. <b>5 need your answer.</b> The rest look right, just add each athlete's age.</div>
+  <div class="progress"><i id="bar"></i></div>
+</header>
+
+<!-- ══════════ SECTION A: NEEDS YOU ══════════ -->
+<div class="secttl"><span class="n">5</span> Need your answer</div>
+
+<div class="card ask" data-need="1">
+  <div class="who"><span class="nm">Aaron Rufin</span><span class="amt">$749 / 12 wk</span></div>
+  <div class="q">Aaron pays $749 every 12 weeks but the plan has no name in Stripe. Is this <b>Academy Unlimited, 3 Months</b> (also $749)?</div>
+  <div class="chips">
+    <button class="chip" onclick="pick(this)">Yes, Unlimited 3 Months</button>
+    <button class="chip" onclick="pick(this)">No, it's something else</button>
+  </div>
+  <div class="mini">
+    <div class="fld"><label>Athlete</label><input placeholder="name"></div>
+    <div class="fld"><label>Age</label><input class="age" placeholder="–" maxlength="2"></div>
+    <span class="flag">flagged for BAM</span>
+  </div>
+</div>
+
+<div class="card ask" data-need="1">
+  <div class="who"><span class="nm">Christy Hang</span><span class="amt">$199 / 4 wk</span></div>
+  <div class="q">This looks like a custom deal named <b>"Academy (Christopher)"</b> at $199. Is <b>Christopher</b> the athlete, and is this the 2x/week Academy?</div>
+  <div class="chips">
+    <button class="chip" onclick="pick(this)">Yes to both</button>
+    <button class="chip" onclick="pick(this)">Let me correct it</button>
+  </div>
+  <div class="mini">
+    <div class="fld"><label>Athlete</label><input value="Christopher"></div>
+    <div class="fld"><label>Age</label><input class="age" placeholder="–" maxlength="2"></div>
+    <span class="flag">flagged for BAM</span>
+  </div>
+</div>
+
+<div class="card ask" data-need="1">
+  <div class="who"><span class="nm">Meredith Torio</span><span class="amt">$100 / mo</span></div>
+  <div class="q">Custom deal <b>"Elementary Academy (Keanu)"</b> at $100, your only true-monthly membership. Is <b>Keanu</b> the athlete on the Elementary Academy?</div>
+  <div class="chips">
+    <button class="chip" onclick="pick(this)">Yes, that's right</button>
+    <button class="chip" onclick="pick(this)">Let me correct it</button>
+  </div>
+  <div class="mini">
+    <div class="fld"><label>Athlete</label><input value="Keanu"></div>
+    <div class="fld"><label>Age</label><input class="age" placeholder="–" maxlength="2"></div>
+    <span class="flag">flagged for BAM</span>
+  </div>
+</div>
+
+<div class="card ask" data-need="1">
+  <div class="who"><span class="nm">Ted Miranda</span><span class="amt">$200 / 4 wk</span></div>
+  <div class="q">Custom price <b>"Elementary Academy @ 200"</b>. Who is the athlete, and is this the standard Elementary Academy?</div>
+  <div class="chips">
+    <button class="chip" onclick="pick(this)">Standard Elementary</button>
+    <button class="chip" onclick="pick(this)">It's a special deal</button>
+  </div>
+  <div class="mini">
+    <div class="fld"><label>Athlete</label><input placeholder="name"></div>
+    <div class="fld"><label>Age</label><input class="age" placeholder="–" maxlength="2"></div>
+    <span class="flag">flagged for BAM</span>
+  </div>
+</div>
+
+<div class="card ask" data-need="1">
+  <div class="who"><span class="nm">Jenny Chung</span><span class="amt">$200 / 4 wk</span></div>
+  <div class="q">Custom price <b>"Elementary Academy (1 month) @ 200"</b>. Who is the athlete, and is this the standard Elementary Academy?</div>
+  <div class="chips">
+    <button class="chip" onclick="pick(this)">Standard Elementary</button>
+    <button class="chip" onclick="pick(this)">It's a special deal</button>
+  </div>
+  <div class="mini">
+    <div class="fld"><label>Athlete</label><input placeholder="name"></div>
+    <div class="fld"><label>Age</label><input class="age" placeholder="–" maxlength="2"></div>
+    <span class="flag">flagged for BAM</span>
+  </div>
+</div>
+
+<!-- ══════════ SECTION B: LOOKS RIGHT ══════════ -->
+<div class="secttl quiet"><span class="n">15</span> Looks right · tap a row to see details or make a change</div>
+
+<div id="rows"></div>
+
+<!-- ══════════ SECTION C: ADD ══════════ -->
+<div class="secttl quiet">Add a member we missed</div>
+<div class="addbox"><input placeholder="Search your 147 Stripe customers…"></div>
+<button class="ghost">+ Add someone who doesn't pay through Stripe (cash, Zelle, free)</button>
+
+<!-- ══════════ SECTION D: ACADEMY DETAILS ══════════ -->
+<div class="secttl quiet">Your academy details · double-check</div>
+<div class="card acad">
+  <div class="kv">
+    <div><span>Academy</span>3D Basketball Prep <span class="ok">✓</span></div>
+    <div><span>Owner</span>Elijah <span class="ok">✓</span></div>
+    <div><span>Location</span>San Jose, CA <span class="ok">✓</span></div>
+    <div><span>Time zone</span>America/Los_Angeles <span class="ok">✓</span></div>
+    <div><span>Reply email</span>set at onboarding <span class="ok">✓</span></div>
+    <div><span>More values</span>core + extras render here</div>
+  </div>
+</div>
+
+<div class="note">Dates shown are illustrative until the live Stripe pull. Nothing changes until BAM confirms.</div>
+</div>
+
+<footer>
+  <div class="footin">
+    <div class="cnt"><b id="nflag">0</b> changes flagged · <b id="nage">0</b>/20 ages filled</div>
+    <button class="send">Send back to BAM</button>
+  </div>
+</footer>
+
+<script>
+const ROWS = [
+ ["Dana Lee","Academy Unlimited · 6 mo","$1,399 / 24 wk","dananlee@yahoo.com","Oct 15"],
+ ["Thuy Chau","Academy Unlimited · 6 mo","$1,399 / 24 wk","ttweettiiee@gmail.com","Nov 2"],
+ ["Tamba GbondoTugbawa","Academy 2x/wk · 6 mo","$1,150 / 24 wk","tambatugbawa@gmail.com","Dec 9"],
+ ["Prakash Kumaar Sambandam","Academy Unlimited · 3 mo","$749 / 12 wk","sprakashkumaar@gmail.com","Sep 30"],
+ ["Crystal Gomez","Academy 2x/wk · 3 mo","$599 / 12 wk","fyitf@hotmail.com","Aug 8"],
+ ["James Hwang","Academy 2x/wk · 3 mo","$599 / 12 wk","james.hwang@gmail.com","Aug 6"],
+ ["Manish Patel","Academy 2x/wk · 3 mo","$599 / 12 wk","manishpatel78@gmail.com","Sep 12"],
+ ["Mohan Sriperambaduru","Academy 2x/wk · 3 mo","$599 / 12 wk","mohan2hp@gmail.com","Aug 25"],
+ ["Neha Vashistha","Academy 2x/wk · 3 mo","$599 / 12 wk","vashistha.neha@gmail.com","Aug 18"],
+ ["Adam Ly","Pre Season Academy · 1 mo","$300 / 4 wk","adamly42025580@gmail.com","Aug 6"],
+ ["Bernard Lintag","Academy 2x/wk · 1 mo","$250 / 4 wk","bernielintag1987@gmail.com","Aug 12"],
+ ["Brian De Guzman","Academy 2x/wk · 1 mo","$250 / 4 wk","brian.deguzman23@gmail.com","Aug 5"],
+ ["Jimmy Nguyen","Academy 2x/wk · 1 mo","$250 / 4 wk","toasty1634@yahoo.com","Aug 7"],
+ ["Salvador Esparza","Pre Season 1x/wk · 1 mo","$200 / 4 wk","salesp222@gmail.com","Aug 15"],
+ ["Janeth Beltran","Academy 1x/wk · 1 mo","$175 / 4 wk","jvaldovinos.beltran@gmail.com","Aug 11"],
+];
+const holder = document.getElementById('rows');
+ROWS.forEach((r,i)=>{
+  const d=document.createElement('div');d.className='row';
+  d.innerHTML=`
+  <div class="rowhead" onclick="tog(this)">
+    <span class="nm">${r[0]}</span>
+    <span class="pl">${r[1]}</span>
+    <span class="amt">${r[2]}</span>
+    <span class="agechip" onclick="event.stopPropagation()"><input placeholder="age" maxlength="2" oninput="ageIn(this)"></span>
+    <span class="chev">▶</span>
+  </div>
+  <div class="detail">
+    <div class="kv">
+      <div><span>Email</span>${r[3]}</div>
+      <div><span>Next payment</span>${r[4]}</div>
+      <div><span>Payments</span><span style="color:var(--good)">All paid ✓</span></div>
+      <div><span>Stripe</span><a href="#">Open customer ↗</a></div>
+    </div>
+    <div class="payhist"><button onclick="this.parentNode.classList.toggle('open')">Show payment history</button>
+      <table><tr><td>Jul 8</td><td>${r[2].split(' /')[0]}</td><td class="ok">paid</td></tr>
+             <tr><td>Jun 10</td><td>${r[2].split(' /')[0]}</td><td class="ok">paid</td></tr>
+             <tr><td>May 13</td><td>${r[2].split(' /')[0]}</td><td class="ok">paid</td></tr></table>
+    </div>
+    <div class="actions">
+      <button class="act" onclick="flagRow(this)">Change plan</button>
+      <button class="act" onclick="flagRow(this)">Change next payment</button>
+      <button class="act" onclick="flagRow(this)">+ Add athlete</button>
+      <button class="act skip" onclick="skipRow(this)">Not a member</button>
+      <span class="flag">flagged for BAM</span>
+    </div>
+  </div>`;
+  holder.appendChild(d);
+});
+let flags=0;
+function upd(){
+  document.getElementById('nflag').textContent=flags;
+  const ages=[...document.querySelectorAll('.agechip input,.fld input.age')].filter(x=>x.value.trim()).length;
+  document.getElementById('nage').textContent=ages;
+  document.getElementById('bar').style.width=Math.min(100,12+ages/20*60+flags*3)+'%';
+}
+function tog(h){h.parentNode.classList.toggle('open')}
+function pick(c){[...c.parentNode.children].forEach(x=>x.classList.remove('on'));c.classList.add('on');
+  const card=c.closest('.card');if(!card.classList.contains('flagged')){card.classList.add('flagged');flags++}upd()}
+function flagRow(b){const row=b.closest('.row');if(!row.classList.contains('flagged')){row.classList.add('flagged');flags++}upd()}
+function ageIn(inp){inp.closest('.agechip').classList.toggle('filled',!!inp.value.trim());upd()}
+function skipRow(b){const row=b.closest('.row');b.classList.toggle('on');row.classList.toggle('skipped');
+  if(row.classList.contains('skipped')&&!row.classList.contains('flagged')){row.classList.add('flagged');flags++}upd()}
+document.querySelectorAll('.fld input.age').forEach(i=>i.addEventListener('input',upd));
+upd();
+</script>
+</body>
+</html>

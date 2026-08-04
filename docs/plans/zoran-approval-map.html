@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The plan + what Zoran approves</title>
+<style>
+  :root{--ink:#1c1c1e;--mute:#6e6e76;--red:#E8442A;--redbg:#F94F2E;
+    --orange:#F5923E;--orangebg:#F79A47;--yellow:#F7CE46;--green:#37B45F;
+    --purple:#7B5CF0;--purplebg:#EFEAFE;--card:#fff;--line:#D8D6D0}
+  *{box-sizing:border-box}
+  body{margin:0;color:var(--ink);
+    background:#F4F4F1;
+    background-image:radial-gradient(#c9c8c2 1.1px, transparent 1.1px);
+    background-size:22px 22px;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    padding:34px 20px 80px;line-height:1.4;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1150px;margin:0 auto}
+  h1{font-size:34px;margin:0 0 4px;letter-spacing:-1px;font-weight:800}
+  .sub{color:var(--mute);font-size:15px;margin:0 0 24px}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:30px;font-size:12.5px;
+    background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 16px;width:fit-content}
+  .lg{display:flex;align-items:center;gap:7px;color:var(--mute);font-weight:600}
+  .dotb{width:22px;height:14px;border-radius:4px}
+
+  .phase{margin-bottom:8px}
+  .phasehead{display:flex;align-items:center;gap:12px;margin:26px 0 14px}
+  .pnum{width:34px;height:34px;border-radius:50%;background:var(--ink);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex:none}
+  .phasehead h2{font-size:19px;margin:0;letter-spacing:-.4px}
+  .phasehead .when{font-size:12px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:1px}
+
+  .lane{display:flex;gap:14px;flex-wrap:wrap;align-items:stretch}
+  .card{border-radius:10px;padding:12px 14px;min-width:190px;max-width:250px;flex:1;
+    box-shadow:0 2px 5px rgba(0,0,0,.09), 0 1px 0 rgba(0,0,0,.04);position:relative}
+  .card .t{font-weight:800;font-size:14px;line-height:1.25}
+  .card .d{font-size:12px;margin-top:6px;line-height:1.45}
+  .card.red{background:var(--redbg);color:#fff}
+  .card.red .d{color:#ffe3db}
+  .card.orange{background:var(--orangebg);color:#241302}
+  .card.orange .d{color:#5c3c14}
+  .card.yellow{background:var(--yellow);color:#2b2205}
+  .card.yellow .d{color:#6d5c14}
+  .card.green{background:var(--green);color:#fff}
+  .card.green .d{color:#dcf5e4}
+  .card.me{background:#fff;border:1.5px solid var(--line)}
+  .card.me .d{color:var(--mute)}
+
+  .card.you{background:var(--purplebg);border:2px solid var(--purple)}
+  .card.you .t{color:#4a2fd0}
+  .card.you .d{color:#5f51a8}
+  .youtag{position:absolute;top:-11px;right:10px;background:var(--purple);color:#fff;
+    font-size:9.5px;font-weight:800;letter-spacing:1.4px;padding:3px 10px;border-radius:20px;
+    box-shadow:0 2px 4px rgba(123,92,240,.4)}
+  .chattag{display:inline-block;margin-top:8px;font-size:9.5px;font-weight:800;letter-spacing:.8px;
+    text-transform:uppercase;background:rgba(0,0,0,.14);border-radius:20px;padding:2.5px 9px}
+  .card.me .chattag,.card.you .chattag{background:#ECEAE4;color:#6e6e76}
+
+  .arrow{display:flex;align-items:center;color:#a7a6a0;font-size:22px;font-weight:700;padding:0 2px}
+  .varrow{color:#a7a6a0;font-size:24px;text-align:center;margin:6px 0 6px 24px;font-weight:700}
+
+  .bigcheck{background:#fff;border:2px solid var(--purple);border-radius:14px;
+    padding:16px 20px;margin:0 0 26px;box-shadow:0 3px 8px rgba(123,92,240,.15)}
+  .bigcheck h3{margin:0 0 10px;font-size:15px;color:#4a2fd0;letter-spacing:-.2px}
+  .bigcheck ol{margin:0;padding-left:22px;font-size:13.5px}
+  .bigcheck li{margin-bottom:7px}
+  .bigcheck li b{color:#4a2fd0}
+  .bigcheck .st{font-size:11px;font-weight:700;color:var(--mute)}
+  .now{background:var(--purple);color:#fff;font-size:9.5px;font-weight:800;letter-spacing:1px;
+    padding:2px 8px;border-radius:14px;vertical-align:1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>The plan, and your part in it</h1>
+  <p class="sub">Purple = you. Everything else runs itself and reports back.</p>
+
+  <div class="bigcheck">
+    <h3>YOUR APPROVAL LIST, in order</h3>
+    <ol>
+      <li><b>Run /pending-sql + merge #1703 and #1704</b> <span class="now">DO NOW</span> <span class="st">- the domino every chat is waiting on</span></li>
+      <li><b>Lock the member workbook presentation</b> <span class="st">- in the Lij member workbook chat, you paused mid-review</span></li>
+      <li><b>Approve the price workbook mockup</b> <span class="st">- price match chat brings it</span></li>
+      <li><b>Send Lij the price workbook link</b> <span class="st">- your thread, Christopher question + Test Customer ride along</span></li>
+      <li><b>Approve skill 1 via mockup</b> <span class="st">- in THIS chat, written here from the run logs</span></li>
+      <li><b>Clear + send the member workbook</b> <span class="st">- after prices come back final</span></li>
+      <li><b>Rule: portal-created vs portal-linked subs</b> <span class="st">- workbook chat, before skill 3's chat spins up</span></li>
+      <li><b>Approve skills 2 and 3</b> <span class="st">- each via mockup, in THIS chat</span></li>
+    </ol>
+  </div>
+
+  <!-- PHASE 1 -->
+  <div class="phase">
+    <div class="phasehead"><div class="pnum">1</div><h2>Unblock everything</h2><span class="when">today</span></div>
+    <div class="lane">
+      <div class="card you"><span class="youtag">YOU</span>
+        <div class="t">Run /pending-sql, merge #1703 + #1704</div>
+        <div class="d">One migration (inert), the transport build, and a live cron bug fix.</div>
+      </div>
+      <div class="arrow">&#8594;</div>
+      <div class="card me">
+        <div class="t">I set env vars, watch the deploy, verify GTA untouched</div>
+        <div class="d">Then save Lij's key via the new staff screen.</div>
+        <div class="chattag">this chat</div>
+      </div>
+      <div class="arrow">&#8594;</div>
+      <div class="card red">
+        <div class="t">SJ = stripe connected</div>
+        <div class="d">The trigger fires. GO signals go out to every chat below.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="varrow">&#8595;</div>
+
+  <!-- PHASE 2 -->
+  <div class="phase">
+    <div class="phasehead"><div class="pnum">2</div><h2>Workbooks reach Lij</h2><span class="when">this week</span></div>
+    <div class="lane">
+      <div class="card orange">
+        <div class="t">Price workbook built</div>
+        <div class="d">From the design page being transferred over. Live match applies right after the GO.</div>
+        <div class="chattag">SJ price match chat</div>
+      </div>
+      <div class="arrow">&#8594;</div>
+      <div class="card you"><span class="youtag">YOU</span>
+        <div class="t">Approve mockup, then send Lij the link</div>
+        <div class="d">Your thread with him. One voice.</div>
+      </div>
+      <div class="arrow">&#8594;</div>
+      <div class="card yellow">
+        <div class="t">LIJ: adjusts + confirms prices</div>
+        <div class="d">His edits come back as structured decisions.</div>
+      </div>
+    </div>
+    <div class="lane" style="margin-top:12px">
+      <div class="card orange">
+        <div class="t">Contacts: verification sweep</div>
+        <div class="d">Already done offline - 142 of 147 linked, 0 pending. The sweep just proves it.</div>
+        <div class="chattag">SJ contact link-up chat</div>
+      </div>
+      <div class="arrow">&#8594;</div>
+      <div class="card you"><span class="youtag">YOU</span>
+        <div class="t">Lock the member workbook presentation</div>
+        <div class="d">You paused mid-review. Its build starts on your lock + finalized prices.</div>
+      </div>
+      <div class="arrow">&#8594;</div>
+      <div class="card yellow">
+        <div class="t">LIJ: adjusts + confirms members</div>
+        <div class="d">After you clear + send the member workbook.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="varrow">&#8595;</div>
+
+  <!-- PHASE 3 -->
+  <div class="phase">
+    <div class="phasehead"><div class="pnum">3</div><h2>Skills get written + the last build</h2><span class="when">as each run finishes</span></div>
+    <div class="lane">
+      <div class="card orange">
+        <div class="t">ALL THREE SKILLS: written IN THIS CHAT</div>
+        <div class="d">From the run logs the chats hand up: link-up learnings (banked &#10003;), price match log, workbook decisions, seed cockpit run. Skill 1 after the price run closes &#183; skill 2 after Lij returns the price workbook &#183; skill 3 after the SJ seed pass.</div>
+        <div class="chattag">this chat</div>
+      </div>
+      <div class="card orange">
+        <div class="t">Seed cockpit: NEW chat builds + runs it</div>
+        <div class="d">Spins up after members confirm; builds the one-screen-per-member pass while running it for SJ's 20, by Aug 4. Its log comes here for skill 3.</div>
+        <div class="chattag">new chat</div>
+      </div>
+      <div class="card you"><span class="youtag">YOU</span>
+        <div class="t">Approve each skill via mockup HERE + rule on subs adoption</div>
+        <div class="d">All three skill mockups land in this chat. Subs ruling (portal-created vs linked) before skill 3's chat starts.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="varrow">&#8595;</div>
+
+  <!-- PHASE 4 -->
+  <div class="phase">
+    <div class="phasehead"><div class="pnum">4</div><h2>Proof</h2><span class="when">aug 5 - aug 17</span></div>
+    <div class="lane">
+      <div class="card me">
+        <div class="t">Aug 5-7: three renewals observed</div>
+        <div class="d">Ted $200, Jimmy $250, Jenny $200 - receipts off, webhooks watched.</div>
+      </div>
+      <div class="arrow">&#8594;</div>
+      <div class="card me">
+        <div class="t">Aug 8: receipts armed</div>
+      </div>
+      <div class="arrow">&#8594;</div>
+      <div class="card me">
+        <div class="t">Aug 17: the $175 canary</div>
+        <div class="d">Janeth's renewal. Four facts read from production: paid, webhook 200, receipt sent, member advanced.</div>
+      </div>
+      <div class="arrow">&#8594;</div>
+      <div class="card green">
+        <div class="t">SJ fully set up + 3 skills exist</div>
+        <div class="d">Academy #4 onboards by running them.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
