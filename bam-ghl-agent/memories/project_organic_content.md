@@ -108,3 +108,13 @@ Cards with multiple finals now show a "View all N files" button that expands
 the card across the grid row with every file as its own open/download tile
 (`_organicBankExpand`). Rule: any surface rendering final_files must render
 ALL of them, not finals[0].
+
+## Empty-review guards (2026-08-05)
+Pro Bound approved a review with ZERO finals: Eli removed the final 3 min
+after send-for-review (set-final 1->0), Misha approved the empty review, the
+Creative Bank card was a fileless checkmark. Storage delete half-failed so
+the .mov survived and was restored + ticket put back in review. Guards now:
+(1) approve 409s when final_files is empty; (2) set-final that EMPTIES finals
+while client_action_status=review-requested auto-withdraws the review
+(status active, cas none, internal note). Lesson: any state pair like
+"review open" + "no files" must be unrepresentable.

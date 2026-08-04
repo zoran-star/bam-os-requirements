@@ -1636,6 +1636,19 @@ async function handleContentTickets(req, res) {
         is_action_request: false,
         internal: true,
       });
+      // Emptying the finals while a review is OPEN would leave the client
+      // approving nothing - withdraw the review so the flow restarts cleanly
+      // when the corrected file is re-sent.
+      if (!patch.final_files.length && ticket.client_action_status === "review-requested") {
+        patch.status = "active";
+        patch.client_action_status = "none";
+        patch.messages = appendMessage(patch.messages, {
+          author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+          body: "Review withdrawn - the finals were removed. Re-send for review after uploading the corrected file.",
+          is_action_request: false,
+          internal: true,
+        });
+      }
 
     } else if (action === "send-to-marketing") {
       if (!ticket.final_files || !ticket.final_files.length) {
@@ -1894,6 +1907,12 @@ async function handleContentTickets(req, res) {
       // Client approves a content review. Only valid while a review is open.
       if (ticket.client_action_status !== "review-requested") {
         return res.status(409).json({ error: "no review is awaiting approval" });
+      }
+      // Guard: an approval must approve SOMETHING. Pro Bound approved an
+      // empty review (staff removed the final minutes after sending it) and
+      // got a fileless Creative Bank card (2026-08-04).
+      if (!Array.isArray(ticket.final_files) || !ticket.final_files.length) {
+        return res.status(409).json({ error: "this review has no files - ask us to re-send it" });
       }
       if (ticket.channel === "ads") {
         // Ads gate: approval auto-sends the finished creative to marketing.
