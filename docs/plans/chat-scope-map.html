@@ -119,9 +119,19 @@
   </div>
 
   <div class="item now">
-    <div class="ih"><h3>Attacking that fix before it ships</h3><span class="pill p-now">fixed, being re-attacked</span></div>
-    <p>A second agent tried to break the fix rather than confirm it, and found <b>5 real defects</b>. The worst: part of the fix had <b>no test holding it in place at all</b>, so you could delete that line and everything still passed. It also found <b>the same leak we closed was still open in four other files</b>, one of them a public page a parent can reach.</p>
-    <p class="where">Both fixed. Test coverage went <b>91 to 102</b> on one suite, plus <b>86 brand new checks</b> on the leak. <b>Next:</b> two fresh agents are attacking the fixes. Nothing merges until they clear.</p>
+    <div class="ih"><h3>Attacking the fixes before they ship</h3><span class="pill p-done">stream 1 CLEARED</span></div>
+    <p>Nothing was trusted because it was written carefully. Every build was attacked by a different agent, and the attacks kept paying.</p>
+    <p class="where"><b>Stream 1, the key fix: DONE and banked.</b> The attacker deleted a line of the fix and watched everything still pass, which meant part of it had <b>no test holding it at all</b>. Now <b>105 checks and 11 safety controls</b>, every one of which can only pass if the thing it guards actually works.</p>
+  </div>
+
+  <div class="item now">
+    <div class="ih"><h3>Stream 2, the key-leak sweep</h3><span class="pill p-now">told DO NOT SHIP</span></div>
+    <p>The leak we set out to fix turned out to be open in <b>six more files</b>, one of them a <b>public checkout page any parent can reach</b>, leaking the master database key. Those are now <b>closed and proven by running the real files</b>, not test copies: 135 attempts, zero leaks.</p>
+    <p class="where">But the attacker still said <b>do not ship</b>, and it was right about three things worth knowing:</p>
+    <p class="where">1. The fix <b>crashed two pages</b> in the ordinary case where a key is simply not set up yet. They used to fail politely.<br>
+       2. The new guard that is supposed to stop this happening again <b>could be fooled by a code formatter</b>, and would then tell you the hazard was fixed.<br>
+       3. The one safety check protecting a <b>real-money</b> path <b>was never actually running</b> in our automated checks.</p>
+    <p class="where"><b>Round four in progress.</b> None of this touches San Jose, which stays connected and proven throughout.</p>
   </div>
 
   <div class="item done">
