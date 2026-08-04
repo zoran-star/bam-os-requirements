@@ -52,17 +52,50 @@ const HEADER_UNSAFE = /[^\x20-\x7E]/;
 const NON_PRINTABLE_KEY_MESSAGE =
   "the API key contains a line break or non-printable character - re-copy it without the break";
 
+// ── TRIM FIRST, THEN REFUSE ──────────────────────────────────────────────────
+//
+// The two cases look identical to a naive printable-ASCII test and are not the
+// same thing at all:
+//
+//   TRAILING/LEADING whitespace is a PASTE ARTIFACT - how the value happened to
+//   be stored or copied. `echo` instead of `printf` into a secret store leaves a
+//   \n on the end; a copy out of a text field brings a space. The credential
+//   itself is intact. Refusing it turns a cosmetic artifact into a hard failure
+//   and refuses OUR OWN env config (production's SUPABASE_SERVICE_KEY carries
+//   exactly this trailing newline today). It is trimmed away and USED.
+//
+//   An EMBEDDED break - a non-printable character still there AFTER the trim -
+//   is a BROKEN KEY, and it is the leak vector this whole guard exists for: it
+//   reaches fetch, undici refuses the header with a TypeError QUOTING THE WHOLE
+//   KEY and no .status, and a route's `e.status || 500` hands a live credential
+//   to the browser. That is still refused, and the refusal carries no key
+//   material at all.
+//
+// .trim() already strips spaces, \t, \r and \n at BOTH ends - and only at the
+// ends, which is precisely the line between the two cases.
+function normalizeKey(v) {
+  return String(v ?? "").trim();
+}
+
 // A shape refusal is a DELIBERATE refusal, so it carries .status - and it fires
 // before fetch is called, therefore before anything is written. That ordering is
 // load-bearing: .status is this codebase's signal to a caller (the CLI included)
 // that a save was refused and NOTHING happened.
+//
+// RETURNS THE NORMALIZED KEY, and every call site must use what it returns -
+// otherwise the trimmed value is checked and the untrimmed one is sent, which is
+// the same bug in a nicer costume.
 function assertHeaderSafeKey(key) {
   // A MISSING key is not this check's business. An unconfigured env var must
   // keep today's behavior (Stripe answers 401), or an empty STRIPE_SECRET_KEY
-  // would start telling people to re-copy a line break.
-  if (key == null || key === "") return;
-  if (!HEADER_UNSAFE.test(String(key))) return;
-  throw Object.assign(new Error(NON_PRINTABLE_KEY_MESSAGE), { status: 400 });
+  // would start telling people to re-copy a line break. Handed back untouched so
+  // an absent key stays absent rather than becoming "".
+  if (key == null || key === "") return key;
+  const normalized = normalizeKey(key);
+  if (HEADER_UNSAFE.test(normalized)) {
+    throw Object.assign(new Error(NON_PRINTABLE_KEY_MESSAGE), { status: 400 });
+  }
+  return normalized;
 }
 
 // ── belt as well as braces: nothing the runtime wrote is ever passed on ──────
@@ -134,17 +167,21 @@ function supabaseServiceKey() {
 }
 
 async function sb(path, init = {}) {
-  // Same treatment as the Stripe bearer. This secret comes from env rather than
-  // from a paste, but env is exactly where the trailing-newline classic lives
-  // (`echo` instead of `printf` into a secret store), and the runtime would
-  // quote THIS key in its invalid-header TypeError just as happily.
+  // Same treatment as the Stripe bearer, trim first and all: this secret comes
+  // from env rather than from a paste, and env is exactly where the trailing
+  // newline lives (`echo` instead of `printf` into a secret store). That
+  // newline is an artifact of how the value was stored, not a broken key, so it
+  // is trimmed off and the key is used. A break still inside it after the trim
+  // would be quoted by the runtime's invalid-header TypeError just as happily
+  // as a Stripe key, so that is still refused.
   //
   // STATUSLESS on purpose, unlike the Stripe key refusal: sb() is called both
   // before and after writes, so a .status here could one day tell a caller
   // "nothing happened" after a write landed. A broken service key is a server
   // misconfiguration, and 500 is the truthful answer.
-  const serviceKey = supabaseServiceKey();
-  if (serviceKey && HEADER_UNSAFE.test(String(serviceKey))) {
+  const rawServiceKey = supabaseServiceKey();
+  const serviceKey = rawServiceKey ? normalizeKey(rawServiceKey) : rawServiceKey;
+  if (serviceKey && HEADER_UNSAFE.test(serviceKey)) {
     throw new Error("the Supabase service key contains a line break or non-printable character - re-set it without the break");
   }
   const res = await safeFetch(`${supabaseUrl()}/rest/v1/${path}`, {
@@ -247,9 +284,10 @@ export async function stripeFetch(path, { method = "GET", body, stripeAccount, i
   // key. Whichever envelope the resolver picked - a pasted keyOverride, a
   // decrypted academy key, the platform key out of env - it is about to become
   // an Authorization header, so it must be able to be one.
-  assertHeaderSafeKey(t.bearer);
+  // USE what it returns: the trimmed key is the one that becomes the header.
+  const bearer = assertHeaderSafeKey(t.bearer);
 
-  const headers = { Authorization: `Bearer ${t.bearer}` };
+  const headers = { Authorization: `Bearer ${bearer}` };
   const encoded = encodeBody(body);
   if (encoded != null) headers["Content-Type"] = "application/x-www-form-urlencoded";
   if (t.accountHeader) headers["Stripe-Account"] = t.accountHeader;
@@ -315,8 +353,13 @@ export async function readAccountHealth(clientRowOrId) {
   // path, and no amount of care in a catch block upstream would stop it. Neither
   // key is handed over until it can be a header.
   if (!direct) {
-    const pk = platformKey();
-    if (pk && HEADER_UNSAFE.test(String(pk))) {
+    // Trim first here too: readStripeAccount builds its OWN Authorization
+    // header out of what we hand it, so the normalized key has to be the one
+    // that travels. A trailing newline on STRIPE_CONNECT_SECRET_KEY is our
+    // storage artifact, not a broken platform key.
+    const rawPk = platformKey();
+    const pk = rawPk ? normalizeKey(rawPk) : rawPk;
+    if (pk && HEADER_UNSAFE.test(pk)) {
       // OUR configuration is broken, not this academy's credential, so no
       // credential_problem - that flag is what flips a direct row to 'invalid'.
       return unreachableStatus("the configured Stripe platform key contains a line break or non-printable character - re-set it without the break");
@@ -324,14 +367,18 @@ export async function readAccountHealth(clientRowOrId) {
     return readStripeAccount(client.stripe_connect_account_id, pk);
   }
 
-  const storedKey = decryptSecret(direct.secret_key_enc);
-  // A stored key with an embedded break can never answer for its account, which
+  // Trim first, then judge. A row stored with a trailing newline (written before
+  // the save path trimmed, or pasted with one) holds a PERFECTLY GOOD key, so it
+  // must read as whatever Stripe says it is - not as credential_problem, which
+  // would flip a working academy's row to 'invalid' over a stray byte.
+  const storedKey = normalizeKey(decryptSecret(direct.secret_key_enc));
+  // A stored key with an EMBEDDED break can never answer for its account, which
   // is precisely what credential_problem means - so this takes the existing
   // 'invalid' side effect below and routing falls back to Connect until staff
   // re-enter it. In practice the save path can no longer store such a key
   // (stripeFetch refuses it during the probe); this is the belt for a row
   // written before that guard existed.
-  const status = HEADER_UNSAFE.test(String(storedKey || ""))
+  const status = HEADER_UNSAFE.test(storedKey)
     ? unreachableStatus(
         "the stored key contains a line break or non-printable character and cannot be sent to Stripe - re-enter it without the break",
         { credential_problem: true }
