@@ -124,14 +124,12 @@
     <p class="where"><b>Stream 1, the key fix: DONE and banked.</b> The attacker deleted a line of the fix and watched everything still pass, which meant part of it had <b>no test holding it at all</b>. Now <b>105 checks and 11 safety controls</b>, every one of which can only pass if the thing it guards actually works.</p>
   </div>
 
-  <div class="item now">
-    <div class="ih"><h3>Stream 2, the key-leak sweep</h3><span class="pill p-now">told DO NOT SHIP</span></div>
-    <p>The leak we set out to fix turned out to be open in <b>six more files</b>, one of them a <b>public checkout page any parent can reach</b>, leaking the master database key. Those are now <b>closed and proven by running the real files</b>, not test copies: 135 attempts, zero leaks.</p>
-    <p class="where">But the attacker still said <b>do not ship</b>, and it was right about three things worth knowing:</p>
-    <p class="where">1. The fix <b>crashed two pages</b> in the ordinary case where a key is simply not set up yet. They used to fail politely.<br>
-       2. The new guard that is supposed to stop this happening again <b>could be fooled by a code formatter</b>, and would then tell you the hazard was fixed.<br>
-       3. The one safety check protecting a <b>real-money</b> path <b>was never actually running</b> in our automated checks.</p>
-    <p class="where"><b>Round four in progress.</b> None of this touches San Jose, which stays connected and proven throughout.</p>
+  <div class="item next">
+    <div class="ih"><h3>Stream 2, the key-leak sweep</h3><span class="pill p-you">PR #1721, needs your merge</span></div>
+    <p>The leak we set out to fix was open in <b>six more files</b>, one a <b>public checkout page any parent can reach</b>, and there it leaked the <b>master database key</b>. All closed, proven by running the real files: <b>76 attempts across 11 pages, zero leaks</b>.</p>
+    <p class="where"><b>It took four rounds, and every single round found the fix had broken something else</b> - worst of all, a test sandbox quietly spending <b>real money</b>. That one was created by the fix and its own test said it was fine.</p>
+    <p class="where">There is now a <b>counted list of every place we handle a key</b>: 610 of them. 590 are old and unchanged and honestly labelled as such. The point is that <b>a new one cannot appear unnoticed</b>. Getting that honest took three tries: at one point a code formatter could make a hazard vanish from the count and the tool would call it fixed.</p>
+    <p class="where"><b><a href="https://github.com/zoran-star/bam-os-requirements/pull/1721">PR #1721</a> is open and waiting on you.</b> Merging it deploys.</p>
   </div>
 
   <div class="item done">
