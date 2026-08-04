@@ -237,6 +237,41 @@ export async function saveDirectKey({
     );
   }
 
+  // ONE STRIPE ACCOUNT, ONE ACADEMY. The upsert below keys on client_id, but
+  // client_stripe_direct carries a UNIQUE index on stripe_account_id, so an
+  // account already saved under ANOTHER academy makes that upsert violate the
+  // index. PostgREST answers 409 and sb() rethrows it as a raw
+  // "Supabase 409: ..." with NO .status - which surfaces as a 500 full of
+  // Postgres to staff and as a crash to a CLI, AFTER the probe has already hit
+  // live Stripe, and in neither case does anyone get told the actual problem.
+  // So ask first and say it in a sentence someone can act on. Trim-compared on
+  // both sides, same discipline as the stored-account check above: an academy
+  // re-saving its OWN account id must stay idempotent.
+  const acctId = String(report.account_id || "").trim();
+  const claimRows = await sb(`client_stripe_direct?stripe_account_id=eq.${encodeURIComponent(acctId)}&select=client_id&limit=1`);
+  const claimedBy = Array.isArray(claimRows) && claimRows[0] ? String(claimRows[0].client_id || "").trim() : "";
+  if (claimedBy && claimedBy !== String(clientId).trim()) {
+    // NAME THE OTHER ACADEMY. "already saved under BAM Whatever" is something an
+    // operator can act on; a uuid is not. But the lookup is BEST EFFORT and the
+    // throw is computed OUTSIDE the try on purpose: if this select fails or
+    // comes back empty we still refuse, just less helpfully. A failure to look
+    // up a name must never become a failure to refuse - that would turn a
+    // nice-to-have into a hole that lets a colliding save through.
+    let claimedName = "";
+    try {
+      const owner = await sb(`clients?id=eq.${encodeURIComponent(claimedBy)}&select=business_name&limit=1`);
+      claimedName = Array.isArray(owner) && owner[0] ? String(owner[0].business_name || "").trim() : "";
+    } catch (e) {
+      claimedName = "";
+    }
+    throw bad(
+      claimedName
+        ? `that Stripe account (${acctId}) is already saved under "${claimedName}" - remove it there first`
+        : `that Stripe account (${acctId}) is already saved under another academy (client_id ${claimedBy}) - remove it there first`,
+      409
+    );
+  }
+
   await sb(`client_stripe_direct?on_conflict=client_id`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
