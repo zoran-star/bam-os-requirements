@@ -1894,6 +1894,12 @@ async function handleContentTickets(req, res) {
       if (!Array.isArray(ticket.final_files) || !ticket.final_files.length) {
         return res.status(400).json({ error: "upload at least one final creative before sending for review" });
       }
+      // Idempotency: a re-click while the review is already with the client
+      // must not re-ping them (Pro Bound got 3 identical Slack notifications
+      // from 3 clicks over 3 minutes, 2026-08-04).
+      if (ticket.client_action_status === "review-requested") {
+        return res.status(409).json({ error: "already with the client for review" });
+      }
       patch.status = "client-dependent";
       patch.client_action_status = "review-requested";
       const note = (body.message || "").trim();
