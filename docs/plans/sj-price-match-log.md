@@ -52,8 +52,19 @@ The mockup is RIGHT to use his names - he has to recognise the plan to confirm i
 - Staff review must therefore show these three renames explicitly on the first pass, or they land unseen.
 - Exact-match nit: his Stripe uses parentheses, "Academy (2x/week)"; the mockup drops them. Either match his spelling exactly or record the normalisation deliberately. Do not let it happen by accident.
 
+### Ruling: special deals move to the MEMBER workbook (Zoran, 2026-08-04)
+*"i think for special deals we have to set that up with the member import workbook"*
+
+The Special deals card is REMOVED from the price workbook (9 cards -> 8). Christopher's $199 and Keanu's $100 are arrangements with a PERSON, not plans the academy sells, so they belong where Lij confirms his members. The price workbook is now purely about what he sells going forward.
+
+**Why this does not break "editing money: only plan and date", and the guardrail that keeps it that way.** A special deal is a dollar amount, so at first glance this moves money onto the member surface. It does not, PROVIDED the member workbook is built so it cannot: both members already pay those amounts in Stripe. The member workbook shows the amount **read-only** and asks only which plan the discount attaches to. **It must never render a box to type a dollar figure.** The moment it does, money is being edited off the price surface and the ruling is broken. This is a build constraint on the member workbook, recorded here because that is where the ruling was made.
+
+**The coverage gate is unaffected.** Both prices are tiered LEGACY already, so skill 1's mandatory check (every in-use price classified live or legacy) still closes. Only the plan attachment is open, and that is a member-level fact.
+
+**Consequence for the Lij send:** the Christopher question no longer rides the price workbook. It rides the member workbook, which is the second of his two links. Nothing extra reaches him.
+
 ### Open items
-- [ ] Ask Lij: which plan is Christopher's $199 deal on (last untiered judgement; tier=legacy either way, only the plan attachment is open)
+- [ ] Ask Lij via the MEMBER workbook: which plan is Christopher's $199 deal on (tier=legacy either way, only the plan attachment is open)
 - [ ] billing_cadence: nothing writes offer_prices.billing_cadence yet - SJ rows may need hand SQL after offers-sync (queue item from PR #1675)
 - [ ] BLOCKED: live run waits on direct-key transport deploy + Lij write key saved
 

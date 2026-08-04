@@ -224,10 +224,9 @@ let PLANS=[
   tax:0,fee:1,feeAmt:40,feeTax:0,feeOnBase:0,sessions:"",expires:"",otherDesc:"",notes:"",archived:0,live:1,
   members:"3 members pay on this plan today",rungs:[]},
 ];
-const DEALS=[
- {who:"Christy Hang, for Christopher",sent:'Pays <b>$199</b> every 4 weeks on his own special price',pick:null},
- {who:"Meredith Torio, for Keanu",sent:'Pays <b>$100</b> a month on a family deal',pick:"Elementary Academy"},
-];
+/* DEALS removed with the Special deals card - Christy/Christopher $199 and
+   Meredith/Keanu $100 are now member-workbook rows. Their data lives in
+   docs/plans/sj-price-match-log.md so nothing is lost by deleting it here. */
 let ADDONS=[];
 let CODES=[];
 let NOTES="";
@@ -260,7 +259,6 @@ function anyJoiningFee(){return PLANS.some(p=>!p.archived&&p.fee===1)}
 function pillOf(k){const s=ST[k];if(!s)return '';if(s.c)return '<span class="pill confirmed">Confirmed by you</span>';if(s.e)return '<span class="pill changed">Changed, press confirm</span>';return '<span class="pill">Not reviewed yet</span>'}
 function edited(k){if(!ST[k])ST[k]={c:0,e:0};if(ST[k].c)ST[k].c=0;ST[k].e=1;flags++;const el=document.getElementById('pill_'+k);if(el)el.innerHTML=pillOf(k);updProg()}
 function confirmCard(k){
-  if(k==='cus'&&DEALS.some(d=>!d.pick)){alert('Pick a plan for both members first.');return}
   const p=plan(k);
   if(p&&!p.archived){
     if(!String(p.title).trim()){alert('Give this plan a name first.');return}
@@ -548,25 +546,22 @@ function addPlan(){
   document.getElementById('card_'+id).scrollIntoView({block:'center',behavior:'smooth'});
 }
 
-/* ─────────── special deals ─────────── */
-function dealCardHTML(){
-  const opts=PLANS.filter(p=>!p.archived&&p.title).map(p=>p.title);
-  return `<div class="bcard" data-fam="cus" id="card_cus">
-   <div class="bhead" onclick="tog('cus')"><button class="btog">▸</button>
-    <div class="binfo"><div class="btitle"><span class="famdot"></span>Special deals <span id="pill_cus">${pillOf('cus')}</span></div>
-     <div class="rowsent">2 members pay their own special price. They keep it. Just tell us which plan each one belongs to.</div></div></div>
-   <div class="bfields">
-    ${DEALS.map((d,i)=>`<div class="subrow">
-      <div style="font-weight:700;font-size:13px">${d.who}</div>
-      <div style="font-size:12px;color:var(--mut);margin:3px 0 8px">${d.sent} · keeps this price</div>
-      <div class="chiprow"><span class="ml">Which plan do they attend?</span>
-       ${opts.map(o=>`<button class="bchip sm ${d.pick===o?'sel':''}" onclick="DEALS[${i}].pick='${esc(o)}';edited('cus');drawDeals()">${o}</button>`).join('')}</div>
-    </div>`).join('')}
-    <div class="confirmbar"><button class="cbtn" onclick="confirmCard('cus')">✓ These are right</button>
-     <span class="chint">Both need a plan picked before this card can be confirmed.</span></div>
-   </div></div>`;
-}
-function drawDeals(){reopen('cus',dealCardHTML)}
+/* ─────────── special deals: MOVED TO THE MEMBER WORKBOOK ───────────
+   Zoran, 2026-08-04: "for special deals we have to set that up with the member
+   import workbook". Christopher's $199 and Keanu's $100 are arrangements with a
+   PERSON, not plans the academy sells, so they belong where Lij confirms his
+   members. This page is now only about what he sells going forward.
+
+   This does NOT break the "editing money: only plan and date" ruling, and the
+   member workbook must be built so it cannot: those two already pay those
+   amounts in Stripe. The member workbook shows the amount READ-ONLY and asks
+   only which plan the discount attaches to. It never offers a box to type a
+   dollar figure - the moment it does, money is being edited off the price
+   surface and the ruling is broken.
+
+   The price side of both members is already settled and needs no question here:
+   both prices are tiered LEGACY, so the coverage gate still closes at 14 of 14.
+   Only the plan attachment is open, and that is a member-level fact. */
 
 /* ─────────── add-ons ─────────── */
 function addonCardHTML(){
@@ -650,10 +645,11 @@ function notesCardHTML(){
 function drawNotes(){reopen('notes',notesCardHTML)}
 
 /* ─────────── boot ─────────── */
-['tax',...PLANS.map(p=>p.id),'cus','addons','codes','notes'].forEach(k=>ST[k]={c:0,e:0});
+/* 8 cards, not 9: 'cus' (Special deals) moved to the member workbook. */
+['tax',...PLANS.map(p=>p.id),'addons','codes','notes'].forEach(k=>ST[k]={c:0,e:0});
 document.getElementById('taxcard').innerHTML=taxCardHTML();
 document.getElementById('cards').innerHTML=PLANS.map(p=>planCardHTML(p.id)).join('');
-document.getElementById('extras').innerHTML=dealCardHTML()+addonCardHTML()+codeCardHTML()+notesCardHTML();
+document.getElementById('extras').innerHTML=addonCardHTML()+codeCardHTML()+notesCardHTML();
 PLANS.forEach(p=>drawLadder(p.id));
 document.getElementById('card_'+PLANS[0].id).classList.add('open');
 updProg();
