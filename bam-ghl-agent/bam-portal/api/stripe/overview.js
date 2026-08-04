@@ -2,6 +2,8 @@ import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Stripe Financial Overview
 // GET: MRR, revenue, expenses, customer list, recent invoices
 
+import { assertHeaderSafeCredential, safeFetch, HEADER_UNSAFE } from "../_header-safe-credential.js";
+
 const STRIPE_API = "https://api.stripe.com/v1";
 
 // Staff-only gate. This returns company financials (MRR, revenue, customer
@@ -10,16 +12,22 @@ const STRIPE_API = "https://api.stripe.com/v1";
 const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 async function requireStaff(req) {
-  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
   if (!token || !SB_URL || !SB_KEY) return null;
+  if (HEADER_UNSAFE.test(token)) return null; // a token that cannot be a header value is not a valid token
   try {
-    const ur = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${token}` } });
+    // This gate's catch returns null, so it cannot leak into a body - but an
+    // unguarded key here still fails EVERY staff request with an opaque 401
+    // instead of naming the misconfiguration, and it leaves the file with raw
+    // sites the scan has to carry. Guard it where it is built.
+    const key = assertHeaderSafeCredential(SB_KEY, "the Supabase service key (SUPABASE_SERVICE_ROLE_KEY)");
+    const ur = await safeFetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: key, Authorization: `Bearer ${token}` } }, "Supabase");
     if (!ur.ok) return null;
     const user = await ur.json();
     if (!user?.email) return null;
-    const sr = await fetch(`${SB_URL}/rest/v1/staff?email=eq.${encodeURIComponent(user.email)}&select=role`, {
-      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-    });
+    const sr = await safeFetch(`${SB_URL}/rest/v1/staff?email=eq.${encodeURIComponent(user.email)}&select=role`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    }, "Supabase");
     if (!sr.ok) return null;
     const rows = await sr.json();
     return rows?.[0]?.role ? { user, role: rows[0].role } : null;
@@ -36,9 +44,16 @@ function subCurrentPeriodEnd(sub) {
 }
 
 async function stripeFetch(path) {
-  const res = await fetch(`${STRIPE_API}${path}`, {
-    headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
-  });
+  // This handler's catch is `res.status(500).json({ error: err.message })`, so
+  // whatever throws in here is shown to a browser. Trim the platform key, refuse
+  // a break that survives the trim (undici would quote the whole header back at
+  // us), and never pass a runtime fetch error onward - safeFetch replaces it
+  // with a name/code we wrote. USE the returned value: checking the trimmed key
+  // and sending the raw one is the same bug wearing a hat.
+  const key = assertHeaderSafeCredential(process.env.STRIPE_SECRET_KEY, "the platform Stripe key (STRIPE_SECRET_KEY)");
+  const res = await safeFetch(`${STRIPE_API}${path}`, {
+    headers: { Authorization: `Bearer ${key}` },
+  }, "Stripe");
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Stripe ${res.status}: ${err}`);

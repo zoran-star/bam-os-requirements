@@ -17,6 +17,7 @@
 //   5. Return { ok, client_secret, publishable_key, amount_cents, lead_id }
 
 import { withSentryApiRoute } from "../_sentry.js";
+import { assertHeaderSafeCredential, safeFetch } from "../_header-safe-credential.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -62,14 +63,23 @@ function setCors(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
+// The service key is guarded and the fetch is sanitised for the SAME reason the
+// Stripe half of this file is: this handler's catch echoes e.message into the
+// response body. A service-role key with a leading break makes undici throw a
+// TypeError quoting the whole Authorization header, and that key bypasses RLS.
+function sbKey() {
+  return assertHeaderSafeCredential(SB_KEY, "the Supabase service key (SUPABASE_SERVICE_ROLE_KEY)");
+}
+
 async function sb(path, init = {}) {
-  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+  const key = sbKey();
+  const res = await safeFetch(`${SB_URL}/rest/v1/${path}`, {
     ...init,
     headers: {
-      apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+      apikey: key, Authorization: `Bearer ${key}`,
       "Content-Type": "application/json", ...(init.headers || {}),
     },
-  });
+  }, "Supabase");
   if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
@@ -83,12 +93,19 @@ function stripePublishableKey() {
 }
 
 async function stripeFetch(path, { method = "GET", body } = {}) {
-  const headers = { Authorization: `Bearer ${stripeKey()}` };
+  // CH3 is the one direct-key precedent that stays outside the resolver, so it
+  // needs the resolver's credential rules applied here. The handler's catch is
+  // `res.status(500).json({ ok: false, error: err.message })` and this is a
+  // PUBLIC endpoint, so an unguarded key with a break in it would be quoted by
+  // undici straight into a parent's browser. Trim, refuse what survives the
+  // trim, and hand no runtime fetch error onward.
+  const key = assertHeaderSafeCredential(stripeKey(), "the CH3 Stripe key (CH3_STRIPE_SECRET_KEY)");
+  const headers = { Authorization: `Bearer ${key}` };
   if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
   const encoded = body
     ? new URLSearchParams(Object.entries(body).reduce((a, [k, v]) => { if (v != null) a[k] = String(v); return a; }, {})).toString()
     : undefined;
-  const res = await fetch(`${STRIPE_API}${path}`, { method, headers, body: encoded });
+  const res = await safeFetch(`${STRIPE_API}${path}`, { method, headers, body: encoded }, "Stripe");
   const text = await res.text();
   const json = text ? JSON.parse(text) : {};
   if (!res.ok) { const err = new Error(json?.error?.message || `Stripe ${res.status}`); err.code = res.status; throw err; }
@@ -126,11 +143,12 @@ async function ghlUpsertContact({ first, last, email, phone, planName, billingTa
     ]
   };
   try {
-    const res = await fetch(`${GHL_V2}/contacts/upsert`, {
+    const ghlToken = assertHeaderSafeCredential(GHL_TOKEN, "the CH3 GHL token (CH3_GHL_TOKEN)");
+    const res = await safeFetch(`${GHL_V2}/contacts/upsert`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${GHL_TOKEN}`, Version: V2_VERSION, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${ghlToken}`, Version: V2_VERSION, "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    });
+    }, "GHL");
     if (!res.ok) return null;
     const data = await res.json();
     return data?.contact?.id || null;

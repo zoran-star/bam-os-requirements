@@ -161,6 +161,18 @@ async function getStripeRevenue(customerId) {
     revenueCache.set(customerId, { data, at: Date.now() });
     return data;
   } catch {
+    // THE ONLY THING KEEPING STRIPE_KEY OUT OF A RESPONSE BODY, so it is named
+    // rather than left to look like ordinary best-effort tidiness. The fetch two
+    // lines up builds an Authorization header from the raw env value; if that
+    // value ever carried an embedded line break, undici would throw a TypeError
+    // QUOTING THE WHOLE HEADER. This catch takes no binding and returns null, so
+    // that message reaches no caller, no log and no JSON. Every caller of
+    // getStripeRevenue treats null as "no revenue data".
+    //
+    // Widening this to `catch (e)` and putting e.message anywhere - a field, a
+    // console.error, a Sentry breadcrumb - re-opens the leak. api/_credential-
+    // leak.test.mjs drives an embedded-break key through this exact shipped
+    // function and asserts neither canary half escapes.
     return null;
   }
 }

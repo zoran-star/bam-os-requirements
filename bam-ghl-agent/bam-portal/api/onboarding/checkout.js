@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { stripeFetch as transportStripeFetch, publishableFor } from "../_stripe-transport.js";
+import { isOnboardingTestMode, onboardingKeyOverride } from "../_stripe-onboarding-key.js";
 // Vercel Serverless Function — Parent payment funnel, step 3 (PUBLIC)
 //
 // Creates a PORTAL-OWNED Stripe subscription (so the academy's billing buttons —
@@ -64,8 +65,12 @@ async function sb(path, init = {}) {
 function stripeKey() {
   return process.env.ONBOARDING_STRIPE_SECRET_KEY || process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
 }
+// ONE reading of the env var decides the mode AND supplies the credential (see
+// api/_stripe-onboarding-key.js). Judging the raw value here while the transport
+// authenticated with the trimmed one meant a leading space made this return
+// false on an sk_test key: live branches, test money.
 function isTestMode() {
-  return String(process.env.ONBOARDING_STRIPE_SECRET_KEY || "").indexOf("sk_test") === 0;
+  return isOnboardingTestMode();
 }
 // Stripe recurring interval for an inline (test) price, derived from our term.
 function intervalFor(term) {
@@ -77,10 +82,12 @@ function intervalFor(term) {
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
   // Delegates to THE seam (api/_stripe-transport.js). ONBOARDING_STRIPE_SECRET_KEY
   // keeps today's precedence exactly - when set (the test sandbox) it overrides
-  // transport resolution, which is what stripeKey() always did here.
+  // transport resolution, which is what stripeKey() always did here. The override
+  // is the SAME normalized string isTestMode() judged, so the mode the route
+  // believes it is in and the key it authenticates with cannot disagree.
   return transportStripeFetch(path, {
     method, body, stripeAccount, idempotencyKey,
-    keyOverride: process.env.ONBOARDING_STRIPE_SECRET_KEY || undefined,
+    keyOverride: onboardingKeyOverride(),
   });
 }
 

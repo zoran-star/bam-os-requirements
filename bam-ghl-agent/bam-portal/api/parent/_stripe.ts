@@ -2,6 +2,31 @@ import {
   publishableFor as publishableForUntyped,
   stripeFetch as transportStripeFetchUntyped,
 } from "../_stripe-transport.js";
+import { onboardingKeyOverride } from "../_stripe-onboarding-key.js";
+
+// A RE-EXPORT, NOT A WRAPPER, and that is a structural decision rather than a
+// stylistic one. This file is TypeScript and the suites are plain node with no
+// build step, so isTestMode can never be EXECUTED by a test - only pinned. A
+// wrapper whose body is `return isOnboardingTestMode();` looked airtight and was
+// not: the drift just moves into the local alias
+//   const isOnboardingTestMode = () => rawIsTestMode() && noLeadingSpace();
+// and every pin still passes while isTestMode() returns false for a leading-space
+// sk_test key. A re-export has NO BODY and NO ALIAS to host that branch, so the
+// defeat has nowhere to live. When a thing cannot be tested, make it unable to be
+// wrong instead.
+export { isOnboardingTestMode as isTestMode } from "../_stripe-onboarding-key.js";
+
+// THE CREDENTIAL GETS THE SAME TREATMENT, and the comment that used to sit here
+// is deleted rather than softened. It claimed this alias "IS executed, by
+// api/_stripe-callsite-wave.test.mjs driving the real transport", which was
+// FALSE for the reason stated three lines above it: no suite transpiles this
+// .ts file, so nothing here is ever executed. A drifting alias -
+//   const onboardingKeyOverride = () => { const v = raw(); return v?.trim() === v ? v : undefined; }
+// - returns undefined for a whitespace override, the transport falls through to
+// the PLATFORM key, and defect 4 is back in the parent app with every suite
+// green. So there is no alias: the import is used directly at the call site.
+// Fixing the claim and the code together is the rule this whole change exists
+// to enforce, and it applies to the file doing the enforcing.
 
 type StripeBodyValue = boolean | number | string | null | undefined;
 
@@ -59,10 +84,6 @@ export function stripeKey(): string | undefined {
   );
 }
 
-export function isTestMode(): boolean {
-  return String(process.env.ONBOARDING_STRIPE_SECRET_KEY || "").startsWith("sk_test");
-}
-
 export function intervalFor(term: string | null | undefined): StripeInterval {
   if (term === "3_months") return { interval: "month", interval_count: 3 };
   if (term === "6_months") return { interval: "month", interval_count: 6 };
@@ -87,7 +108,9 @@ export async function stripeFetch<T = unknown>(
       idempotencyKey,
       method,
       stripeAccount: stripeAccount ?? undefined,
-      keyOverride: process.env.ONBOARDING_STRIPE_SECRET_KEY || undefined,
+      // The SAME normalized string isTestMode() judged, so the mode this module
+      // reports and the key it authenticates with cannot disagree.
+      keyOverride: onboardingKeyOverride(),
     })) as T;
   } catch (e) {
     if (e instanceof StripeFetchError) throw e;
