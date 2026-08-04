@@ -101,5 +101,45 @@ STATUS: envelope sent to the member workbook chat (local_f9f034e9) to confirm th
 - Technique that caught it: RENDER THE CONTROL AND ASK WHAT IT ACTUALLY DOES.
 - MM II's correction to my framing, carried: I wrote that SJ's tax answers were inert "by construction" because tax_config is NULL. True today, but that is precisely why the dead chip was invisible. The skill's check must be "render it AND confirm the value reaches an output", never "confirm the field exists".
 
+## FIELD MAP: workbook mockup vs the wizard's `_bbStdPricing` (scan run 2026-08-01)
+Zoran ruled "make it the same put everything in", so the page was REBUILT at full parity. Content parity is COMPLETE: no field exists on one side and not the other. What differs is encoding, wording, and additions. This is the map the confirm-wiring must implement.
+
+**1. Renames (same field, different key).** mine -> offer:
+`desc`->`whats_included`, `cad`/`cadOther`->`billing_cycle`/`billing_cycle_other`, `tax`->`taxable`, `fee`+`feeAmt`->`signup_fee` (ONE currency field; empty = no fee), `feeTax`->`signup_fee_taxable`, `feeOnBase`->`signup_fee_on_base`, `sessions`->`sessions_included`, `expires`->`expires_after`, `otherDesc`->`other_description`, `notes`->`description`.
+Rung: `len`->`length`, `gets`->`whats_included`, `fee`->`signup_fee_charge`, `notes`->`discount_notes`, `other`->`after_other`.
+Code: `dur`->`duration`, `durMonths`->`duration_months`, `applies`->`applies_to`, `expires`->`expires_at`, `max`->`max_redemptions`, `once`->`once_per_customer`. Add-on: `desc`->`description`.
+
+**2. Value encoding.** The mockup stores CHIP POSITIONS (0,1,2) and friendly lowercase labels; the offer stores exact strings. Mine -> offer:
+type: "Single session"->"Single Session", "Something else"->"Other".
+billing_cycle: "every week"->"Weekly", "every 2 weeks"->"Biweekly", "every month"->"Monthly", "every 4 weeks"->"Every 4 weeks", "every 3 months"->"Quarterly", "every year"->"Annually", "something else"->"Other".
+taxable: "Yes, taxed like everything else"/"No, this one is exempt" -> "Yes"/"No" (rung: "No, exempt"->"No").
+signup_fee_on_base + rung signup_fee_charge: "Charge it"/"Waive it" -> "Charge"/"Waive".
+after: "Renews for the same length"->"Renews same length", "Just ends"->"Ends", "Something else"->"Other".
+ALREADY EXACT: discount code kind, duration, once_per_customer.
+
+**3. The one real format mismatch.** discount `applies_to`: mockup stores DISPLAY LABELS ("Academy 2x/week · every 4 weeks"); the offer stores KEYS from `_BB_DYNAMIC_OPTIONS.offer_price_keys`: `<title>|monthly`, `<title>|3_months`, `<title>|6_months`, `<title>|signup_fee`. Note the generator only emits keys for Membership-type, non-archived plans with a price, and only for commitments whose length maps to 3/6 months.
+
+**4. In the mockup, no home in the offer yet:** rung-level archive; the academy tax rate (lives on clients.tax_config, not in pricing); the Special deals card; the confirmed/untouched/changed state.
+
+**5. Required marks.** The offer marks required: title, type, price, billing_cycle, billing_cycle_other, commitment length, commitment price, commitment after, after_other, and code/kind/value/duration(+duration_months). The mockup stars only some.
+
+### Two LATENT schema gaps found (MM II verified against production: real, but not biting today)
+- **Commitments are not archivable.** `pricing_offerings` has `archivable:true`; `commitments` does not, so the real wizard offers Remove on a rung. Removing a rung members are paying on is destructive; the mockup added Archive, which has nowhere to land in the offer data. Worth fixing in the wizard.
+- **Closed term vocabulary.** Only monthly / 3_months / 6_months / signup_fee exist. `_bbTermFromLength` collapses 12 months to `6_months`, and "1 year" yields NO key. MM II checked prod: every live price key across every academy is monthly/3_months/6_months, zero 12-month, no populated commitment arrays. So phrase it as "WOULD silently mis-key a 12-month commitment if an academy ever asked for one", not "is mis-keying prices".
+- MY OWN BUG, unfixed at wind-down: the mockup's "+ Add another length" defaults a new rung to `"12 months"`, the exact value the system cannot represent. Default should be a supported length.
+
+### Fix list, agreed but NOT applied at wind-down
+1. Send button is disabled with no stated reason. Agreed wording: "Confirm the remaining N rows to send", on hover and on click. MM II: same family as the dead tax chip, just quieter.
+2. New-rung default "12 months" -> a supported length.
+3. Emit the offer's exact values and key names (sections 1-3 above) so confirm is a straight copy, templatized, with no per-field translation table.
+
+### Ruling: no partial submit (Zoran, program-wide, 2026-08-01)
+"Every row has to be confirmed, so put guardrails in the UI." Binds both workbooks: one product, one rule. Concretes: visible remaining count, button disabled WITH A REASON, per-row untouched/confirmed/changed state. Mockup already satisfies 1 and 3; 2 is fix-list item 1.
+CONFIRMED BY MM II: confirmation is CARD-level, not rung-level. A rung is part of one plan's answer, not a separate decision. 9 cards for SJ (tax, 4 plans, special deals, add-ons, discount codes, anything-else).
+Related rulings carried, no action taken: money changes ONLY through this price surface (the member workbook forbids inline money edits and its Adjust-prices button points here); the private no-login link is an accepted risk WITH A DATE, not permanent, and no expiry was built unasked.
+
+### Ownership (Zoran via MM II, 2026-08-01)
+This room owns the adjust-prices page outright; the member workbook chat stopped its parallel build. Whatever ships here is THE prices surface for both workbooks, so it is built to be linked into (?from= back link, #plan-<id> deep link) as well as visited standalone.
+
 ### Link-up chat delivery (skill step 1 source, COMPLETE)
 147/147 resolved (142 linked, 5 conscious dup-customer skips). Raw material on branch claude/keen-banach-69618e: docs/plans/sj-contact-linkup-learnings.md (recipe: refresh contact store FIRST because v2 academies have no contact cron and last_synced_at lies; classify read-only; execute in sweep order; 7 real edge cases; offline-prelink pattern; DB-verify every phase; claim-then-review sequencing; refused link = dup signal) + sj-contact-linkup-result.md (counts, skip ids, transport-day checklist: expect already_linked=142, review_existing=5). Tooling caveat: refresh script + PGRST102 mixed-batch fix ride in PR #1704, unmerged.
