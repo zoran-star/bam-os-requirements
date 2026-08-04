@@ -100,3 +100,11 @@ guide-card block's declared `c.type`; else a name/link sniff (video|reel|vsl|
 .mov|.mp4...); else graphic. The Add-creative modal path already had the manual
 toggle and is unaffected. Rule: NEVER type a creative purely from file mimes
 when link entries (text/uri-list) are involved.
+
+## Creative Bank multi-file fix (2026-08-05)
+Bank cards only linked `finals[0]` - a completed carousel stranded every slide
+after the first (review cards always showed all files; the bank did not).
+Cards with multiple finals now show a "View all N files" button that expands
+the card across the grid row with every file as its own open/download tile
+(`_organicBankExpand`). Rule: any surface rendering final_files must render
+ALL of them, not finals[0].
