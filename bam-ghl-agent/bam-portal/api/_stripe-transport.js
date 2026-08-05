@@ -332,8 +332,40 @@ export async function readAccountHealth(clientRowOrId) {
     client = Array.isArray(rows) && rows[0] ? rows[0] : null;
   }
   if (!client || !client.id) {
-    // Same shape readStripeAccount() returns for a missing account id.
-    return readStripeAccount(null, platformKey());
+    // Same shape readStripeAccount() returns for a missing account id - but the
+    // key is normalized and REFUSED HERE, by this branch, like the one below.
+    //
+    // NOT BECAUSE THIS PATH LEAKS TODAY. It does not: readStripeAccount checks
+    // `if (!acctId)` before it ever touches the secret, and the acctId here is
+    // the literal null. That is the whole reason it is safe - a guarantee that
+    // lives in another file, in the order of two statements, for a caller that
+    // cannot see it. Swap those two lines over there and this hands an unusable
+    // key to fetch, whose TypeError quotes the header verbatim into
+    // `could not reach Stripe: ${e.message}` - a RETURNED string, which
+    // api/stripe/direct-key.js's status action serializes into the response
+    // body without ever touching a catch block.
+    //
+    // SAY ONLY WHAT IS ENFORCED, because a claim wider than its test is the
+    // exact shape that let the original leak read as safe. What is enforced and
+    // asserted here is the REFUSAL: an embedded break in the platform key stops
+    // at this branch with a message carrying no key material, and a paste
+    // artifact is trimmed and still answers "no connected account id" rather
+    // than a refusal. What is NOT enforceable here is the hand-over half: with
+    // acctId hardcoded null, readStripeAccount returns before it reads the
+    // secret, so passing `pk` or `rawPk` is behaviourally identical and NO test
+    // can tell them apart. Nothing on this branch proves the normalized value is
+    // the one that travels, because on this branch nothing travels. If this
+    // return ever gains a real account id, that half needs an assertion of its
+    // own before it can be trusted - see the Connect branch below, where the
+    // key does travel and the outgoing header is pinned exactly.
+    const rawPk = platformKey();
+    const pk = rawPk ? normalizeKey(rawPk) : rawPk;
+    if (pk && HEADER_UNSAFE.test(pk)) {
+      // OUR configuration, not an academy's credential - so no
+      // credential_problem, same as the Connect branch below.
+      return unreachableStatus("the configured Stripe platform key contains a line break or non-printable character - re-set it without the break");
+    }
+    return readStripeAccount(null, pk);
   }
 
   // active OR invalid: an invalid row must still be probed, or it could never

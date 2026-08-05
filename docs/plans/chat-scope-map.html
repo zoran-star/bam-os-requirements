@@ -106,10 +106,30 @@
   <!-- ══ IN FLIGHT ══ -->
   <h2 class="sec">In flight right now</h2>
 
+  <div class="item done">
+    <div class="ih"><h3>Production can read his key back</h3><span class="pill p-done">PROVEN, live</span></div>
+    <p>The last unproven link is now proven. Production decrypted Lij's key and used it against his real Stripe: <b>checked 1, ok 1, outcome ready</b>. <b>San Jose is connected end to end</b>, not connected on paper.</p>
+    <p class="where">It had failed once on <b>our bug, not his key</b>: our check refused any key with a line break, and our own Supabase key has a stray one on the end. That fix is live.</p>
+  </div>
+
+  <div class="item done">
+    <div class="ih"><h3>Main and production are back in step</h3><span class="pill p-done">resolved</span></div>
+    <p>For part of today the fix was live in production but <b>existed nowhere on main</b>, because it had been pushed straight from a laptop. The next merge would have wiped it out.</p>
+    <p class="where"><b>PR #1719 merged and closed that gap.</b> The fix is on main, production redeployed from it, and <b>San Jose was re-checked afterwards and still reads ready</b> - so the redeploy did not break it.</p>
+  </div>
+
   <div class="item now">
-    <div class="ih"><h3>The command that saves his key</h3><span class="pill p-now">finishing</span></div>
-    <p>You wanted this done from chat, not a browser page. Nearly built. It proves production can actually read the key back rather than assuming it.</p>
-    <p class="where"><b>Next:</b> its room hands it over, I merge it, we run it. <b>That connects San Jose.</b></p>
+    <div class="ih"><h3>Attacking the fixes before they ship</h3><span class="pill p-done">stream 1 CLEARED</span></div>
+    <p>Nothing was trusted because it was written carefully. Every build was attacked by a different agent, and the attacks kept paying.</p>
+    <p class="where"><b>Stream 1, the key fix: DONE and banked.</b> The attacker deleted a line of the fix and watched everything still pass, which meant part of it had <b>no test holding it at all</b>. Now <b>105 checks and 11 safety controls</b>, every one of which can only pass if the thing it guards actually works.</p>
+  </div>
+
+  <div class="item next">
+    <div class="ih"><h3>Stream 2, the key-leak sweep</h3><span class="pill p-you">PR #1721, needs your merge</span></div>
+    <p>The leak we set out to fix was open in <b>six more files</b>, one a <b>public checkout page any parent can reach</b>, and there it leaked the <b>master database key</b>. All closed, proven by running the real files: <b>76 attempts across 11 pages, zero leaks</b>.</p>
+    <p class="where"><b>It took four rounds, and every single round found the fix had broken something else</b> - worst of all, a test sandbox quietly spending <b>real money</b>. That one was created by the fix and its own test said it was fine.</p>
+    <p class="where">There is now a <b>counted list of every place we handle a key</b>: 610 of them. 590 are old and unchanged and honestly labelled as such. The point is that <b>a new one cannot appear unnoticed</b>. Getting that honest took three tries: at one point a code formatter could make a hazard vanish from the count and the tool would call it fixed.</p>
+    <p class="where"><b><a href="https://github.com/zoran-star/bam-os-requirements/pull/1721">PR #1721</a> is open and waiting on you.</b> Merging it deploys.</p>
   </div>
 
   <div class="item done">
@@ -121,8 +141,9 @@
   <h2 class="sec">Still to build, in order</h2>
 
   <div class="item next">
-    <div class="ih"><h3>1 &#183; Price workbook</h3><span class="pill p-you">needs your yes</span></div>
-    <p>The page Lij uses to confirm his prices. <b>Built as a mockup and waiting on you.</b> Once approved: build it for real, then it goes to him.</p>
+    <div class="ih"><h3>1 &#183; Price workbook</h3><span class="pill p-you">you are looking at it</span></div>
+    <p>The page Lij uses to confirm his prices. <b><a href="sj-price-workbook-mockup-v1.html">Open the mockup</a></b>. <b>Down from 9 cards to 7</b>, both cuts on your call: <b>special deals</b> moved to the member workbook, and <b>add-ons cut outright</b> because he sells none, so that card could only ever answer "none".</p>
+    <p class="where">Two defects were also fixed first. The <b>Send button used to be dead with no reason given</b>; it now says "Confirm the remaining 7 cards to send" beside it, on hover, and flashes if he presses it anyway. And <b>"add another length" defaulted to 12 months</b>, the one length our system cannot store. Now 3 months.</p>
     <p class="where"><b>Blocked by:</b> your approval, nothing else.</p>
   </div>
 
@@ -170,8 +191,9 @@
   <div class="nowbox">
     <h3>The only thing waiting on you</h3>
     <ol>
-      <li><b>Approve the price workbook</b> so it can be built for real. I can bring it into this chat and give you a recommendation if you would rather not go back into that room.</li>
+      <li><b><a href="sj-price-workbook-mockup-v1.html">Approve the price workbook</a></b> so it can be built for real. Two defects already fixed, so this is yes or name a change.</li>
     </ol>
+    <p class="where" style="margin-top:10px"><b>Answered today:</b> Elementary keeps its $40 sign-up fee, same as the other three plans. That was a silent default until you ruled on it, so the workbook now ships it prefilled instead of asking Lij.</p>
   </div>
 
 </div>

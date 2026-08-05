@@ -40,9 +40,31 @@ This room does NOT seed members (separate chat). The exercise = every Stripe pri
 ### Ruling: Pre Season (Zoran, 2026-08-01)
 Asked what Pre Season options are; analysis showed Pre Season amounts mirror the Unlimited ladder ($300/749-750/1399ish) and 1x ladder, and the in-use ones sit ON the core products. Zoran: "actually just treat it as the unlimited" -> Pre Season Academy prices = Unlimited plan. Adam Ly $300/4wk = LIVE Unlimited monthly. Pre Season 1x prices remain 1x variants: Salvador $200 = legacy 1x monthly. No Pre Season plan in portal pricing; season stays a schedule/class concept.
 
+### Ruling: Elementary keeps the $40 sign-up fee (Zoran, 2026-08-04, MEMBER MANAGEMENT III)
+Asked directly rather than left as a default nobody ever confirmed. "Keep the $40" - Elementary matches the other three plans: charged on the every-4-weeks option only, waived on prepay. **No DB change needed**, this ratifies what was already applied on 2026-08-01; the point was to convert a silent default into a ruling. The Elementary card in the price workbook therefore ships with the fee prefilled and does NOT ask Lij about it.
+
+### Build requirement found 2026-08-04 (MEMBER MANAGEMENT III): the prefilled plan TITLES do not match the stored ones
+Verified live, both sides, rather than assumed. The portal draft offer (4d15a274) stores **"1 Training/Week" / "2 Trainings/Week" / "Unlimited" / "Elementary Academy"**. The workbook mockup prefills **"Academy 1x/week" / "Academy 2x/week" / "Academy Unlimited" / "Elementary Academy"**, which are Lij's own Stripe product names (his roster reads "Academy (2x/week) - 3 Months" etc). **Three of four differ.**
+
+The mockup is RIGHT to use his names - he has to recognise the plan to confirm it - and the portal offer is still `status=draft`, never published, so nothing live is at stake. But it creates a concrete requirement for the confirm-wiring, and it is the no-partial-submit ruling's problem in a second costume:
+
+- **An untouched card that Lij simply confirms would rewrite the portal's plan title.** Under the capture schema that must serialise as `state=confirmed` with a real `was`/`now` pair (was "2 Trainings/Week", now "Academy 2x/week"), NOT as an unchanged row. A card he never edited must never produce a silent data change that staff review renders as "no change".
+- Staff review must therefore show these three renames explicitly on the first pass, or they land unseen.
+- Exact-match nit: his Stripe uses parentheses, "Academy (2x/week)"; the mockup drops them. Either match his spelling exactly or record the normalisation deliberately. Do not let it happen by accident.
+
+### Ruling: special deals move to the MEMBER workbook (Zoran, 2026-08-04)
+*"i think for special deals we have to set that up with the member import workbook"*
+
+The Special deals card is REMOVED from the price workbook (9 cards -> 8). Christopher's $199 and Keanu's $100 are arrangements with a PERSON, not plans the academy sells, so they belong where Lij confirms his members. The price workbook is now purely about what he sells going forward.
+
+**Why this does not break "editing money: only plan and date", and the guardrail that keeps it that way.** A special deal is a dollar amount, so at first glance this moves money onto the member surface. It does not, PROVIDED the member workbook is built so it cannot: both members already pay those amounts in Stripe. The member workbook shows the amount **read-only** and asks only which plan the discount attaches to. **It must never render a box to type a dollar figure.** The moment it does, money is being edited off the price surface and the ruling is broken. This is a build constraint on the member workbook, recorded here because that is where the ruling was made.
+
+**The coverage gate is unaffected.** Both prices are tiered LEGACY already, so skill 1's mandatory check (every in-use price classified live or legacy) still closes. Only the plan attachment is open, and that is a member-level fact.
+
+**Consequence for the Lij send:** the Christopher question no longer rides the price workbook. It rides the member workbook, which is the second of his two links. Nothing extra reaches him.
+
 ### Open items
-- [ ] Ask Lij: which plan is Christopher's $199 deal on (last untiered judgement; tier=legacy either way, only the plan attachment is open)
-- [ ] Optional veto: Elementary got the $40 signup fee by default
+- [ ] Ask Lij via the MEMBER workbook: which plan is Christopher's $199 deal on (tier=legacy either way, only the plan attachment is open)
 - [ ] billing_cadence: nothing writes offer_prices.billing_cadence yet - SJ rows may need hand SQL after offers-sync (queue item from PR #1675)
 - [ ] BLOCKED: live run waits on direct-key transport deploy + Lij write key saved
 
@@ -143,3 +165,14 @@ This room owns the adjust-prices page outright; the member workbook chat stopped
 
 ### Link-up chat delivery (skill step 1 source, COMPLETE)
 147/147 resolved (142 linked, 5 conscious dup-customer skips). Raw material on branch claude/keen-banach-69618e: docs/plans/sj-contact-linkup-learnings.md (recipe: refresh contact store FIRST because v2 academies have no contact cron and last_synced_at lies; classify read-only; execute in sweep order; 7 real edge cases; offline-prelink pattern; DB-verify every phase; claim-then-review sequencing; refused link = dup signal) + sj-contact-linkup-result.md (counts, skip ids, transport-day checklist: expect already_linked=142, review_existing=5). Tooling caveat: refresh script + PGRST102 mixed-batch fix ride in PR #1704, unmerged.
+
+### Ruling: the Add-ons card is CUT (Zoran, 2026-08-04)
+Zoran asked *"do we need add ons?"* rather than accepting the card. Checked against his real Stripe before answering: **he sells zero add-ons.** All 20 members sit on Academy / Elementary / Pre Season subscriptions with nothing on top, and the only one-time products he does sell, Summer Bundle Camp and Adapt Academy Tryouts, were already ruled OUT of scope on 2026-08-01.
+
+So the card could only ever come back empty. Under the no-partial-submit ruling every card is a REQUIRED confirm, which made this a mandatory click that yields no information. Adding an add-on later is the portal wizard's job, not a migration workbook's.
+
+**Discount codes survived the identical test** and that contrast is the reusable rule: he has a real code, NOSETUP, used 3 times to waive the $40 fee, so that card earns its click. **A workbook card must be justified by data in the academy's own account, not by the shape of the wizard it was copied from.** This belongs in skill 1: build the card list from what the academy actually has, then drop every card whose only possible answer is "none".
+
+**Card count now 7:** sales tax, 4 plans, discount codes, anything else. Down from 9 (special deals to the member workbook, add-ons cut).
+Verified in the rendered page: 7 cards, no console errors, ADDONS and addonCardHTML gone, tax and codes cards intact, send gating correct at 7 and at 0 remaining.
+
