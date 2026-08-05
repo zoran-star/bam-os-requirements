@@ -327,17 +327,59 @@ async function findOpenOppRef(clientId, token, locationId, contactId) {
 // ── the worker: send due jobs, then schedule the next step ──
 // Exported so the confirm agent's scripted automations can resolve a lead's
 // email/name the same way. `cache` is optional (the worker passes a shared Map).
-export async function resolveContactInfo(token, contactId, cache = new Map()) {
+/**
+ * The lead's name / email / phone for merge tokens at send time.
+ *
+ * READS THE PORTAL STORE FIRST (Zoran 2026-08-05). This used to ask GHL and only
+ * GHL, which is wrong for every off-GHL academy: BAM GTA mints its own contact
+ * ids for website leads, so `GET /contacts/:id` answers "Contact with id ... not
+ * found", the catch below swallowed the 400, and `firstName` came back null.
+ * `{{contact.first_name}}` then resolved to its "there" fallback, so the very
+ * first message an academy ever sends a new parent opened "Hi there" while their
+ * name sat in our own contacts table. Measured on GTA the day this was found: 27
+ * of 174 greeting texts in 30 days.
+ *
+ * `clientId` is optional only so existing callers keep working; without it the
+ * portal read is skipped and behaviour is exactly as before. Pass it.
+ */
+export async function resolveContactInfo(token, contactId, cache = new Map(), clientId = null) {
   const key = String(contactId);
   if (cache.has(key)) return cache.get(key);
   let info = { email: null, phone: null, firstName: null, fullName: null };
-  try {
-    const d = await ghl("GET", `/contacts/${encodeURIComponent(key)}`, { token });
-    const c = (d && (d.contact || d)) || {};
-    const first = c.firstName || c.first_name || (c.name ? String(c.name).trim().split(/\s+/)[0] : null) || null;
-    const full = c.name || [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || first || null;
-    info = { email: c.email || null, phone: c.phone || null, firstName: first, fullName: full };
-  } catch (_) {}
+  // 1) The portal's own contacts row - authoritative for portal-native leads,
+  //    and correct for GHL-era ones too (the sync mirrors them here).
+  if (clientId) {
+    try {
+      const tbl = await contactsReadTable(clientId);
+      const rows = await sb(`${tbl}?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(key)}&select=name,first_name,last_name,email,phone&limit=1`);
+      const c = (Array.isArray(rows) && rows[0]) || null;
+      if (c) {
+        // Names arrive with stray whitespace from form fills ("Ramon  Dioquino",
+        // last_name " Dioquino"), so collapse it - an un-trimmed value renders as
+        // "Hi Ramon  Dioquino" in a text message.
+        const tidy = (v) => String(v || "").replace(/\s+/g, " ").trim() || null;
+        const first = tidy(c.first_name) || (tidy(c.name) ? tidy(c.name).split(" ")[0] : null);
+        const full = tidy(c.name) || tidy([tidy(c.first_name), tidy(c.last_name)].filter(Boolean).join(" ")) || first;
+        info = { email: c.email || null, phone: c.phone || null, firstName: first, fullName: full };
+      }
+    } catch (_) { /* fall through to GHL */ }
+  }
+  // 2) GHL, for academies whose contacts genuinely live there - and as a backfill
+  //    for any single field the portal row was missing.
+  if (!info.firstName || !info.email || !info.phone) {
+    try {
+      const d = await ghl("GET", `/contacts/${encodeURIComponent(key)}`, { token });
+      const c = (d && (d.contact || d)) || {};
+      const first = c.firstName || c.first_name || (c.name ? String(c.name).trim().split(/\s+/)[0] : null) || null;
+      const full = c.name || [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || first || null;
+      info = {
+        email: info.email || c.email || null,
+        phone: info.phone || c.phone || null,
+        firstName: info.firstName || first,
+        fullName: info.fullName || full,
+      };
+    } catch (_) {}
+  }
   cache.set(key, info);
   return info;
 }
@@ -585,7 +627,9 @@ async function runWork(res) {
       if (!tokenCache.has(job.client_id)) tokenCache.set(job.client_id, client ? await pickGhlToken(client) : null);
       const creds = tokenCache.get(job.client_id);
       const token = creds && creds.token;
-      const info = token ? await resolveContactInfo(token, job.contact_id, contactCache) : { email: null, phone: null, firstName: null, fullName: null };
+      // clientId is what lets this read the portal's own contacts row - without it
+      // an off-GHL academy's every merge token falls back to "there".
+      const info = await resolveContactInfo(token, job.contact_id, contactCache, job.client_id);
 
       // 🏀 trial_form: if they've since BOOKED (now in the Scheduled Trial
       // stage, via any path) the 20-min nudge is moot - exit + skip the send.
