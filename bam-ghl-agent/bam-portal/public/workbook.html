@@ -324,7 +324,29 @@ function plan(id){return MODEL[id]}
 
 /* ─────────── helpers carried from the mockup ─────────── */
 function money(n){return '$'+Math.round(n||0).toLocaleString()}
-function monthsOf(s){const m=(s||'').match(/\d+/);let n=m?+m[0]:0;if(/year/i.test(s))n*=12;if(/week/i.test(s))n=Math.round(n/4.345);return n||1}
+/* How many MONTHS a commitment length means. Everything the owner reads about a
+   prepay option is divided by this: the per-month figure and the saving.
+
+   It used to take the first number in the string and then convert if the string
+   mentioned weeks ANYWHERE. Real offer data says "3 Months (12 Weeks)" - both
+   units in one label - so it took the 3 and then divided it by 4.345, giving 1.
+   The page then told the owner his 3-month prepay cost $599 a MONTH and saved
+   him nothing, when it is $200 a month and saves $151. A parsing miss became a
+   wrong money claim on the page whose only job is checking the money.
+
+   So the UNIT is matched together with its own number, and months win when a
+   label carries both, because that is the unit the label leads with. */
+function monthsOf(s){
+  const t=String(s==null?'':s);
+  const mo=t.match(/(\d+(?:\.\d+)?)\s*(?:mo|mos|month|months)\b/i);
+  if(mo)return Math.max(1,Math.round(+mo[1]));
+  const yr=t.match(/(\d+(?:\.\d+)?)\s*(?:yr|yrs|year|years)\b/i);
+  if(yr)return Math.max(1,Math.round(+yr[1]*12));
+  const wk=t.match(/(\d+(?:\.\d+)?)\s*(?:wk|wks|week|weeks)\b/i);
+  if(wk)return Math.max(1,Math.round(+wk[1]/4.345));
+  const any=t.match(/\d+(?:\.\d+)?/);
+  return any?Math.max(1,Math.round(+any[0])):1;
+}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 function liveRungs(p){return (p.rungs||[]).filter(r=>!r.archived)}
 function pctNum(){return parseFloat(TAX().pct)||0}
