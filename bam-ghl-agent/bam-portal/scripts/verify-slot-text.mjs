@@ -12,7 +12,7 @@
 //
 //   node scripts/verify-slot-text.mjs
 
-import { slotTextConflict, slotLocalParts } from "../api/agent/_slot-text.js";
+import { slotTextConflict, slotLocalParts, slotWhenLabel } from "../api/agent/_slot-text.js";
 
 const TZ = "America/New_York";
 const TUE_AUG_18 = "2026-08-18T23:00:00Z";   // Tue Aug 18, 7:00 PM in Toronto
@@ -81,6 +81,25 @@ const checks = [
   ["a bad timezone does not throw", slotLocalParts(TUE_AUG_18, "Not/AZone") === null || !!slotLocalParts(TUE_AUG_18, "Not/AZone")],
 ];
 for (const [name, ok] of checks) { if (!ok) failed++; console.log(`  ${ok ? "✅" : "❌"} ${name}`); }
+
+// The PREVENTION half. check_availability hands the agent `when` so it never has
+// to derive a weekday. That wording must be correct on its own terms, and - the
+// point of the whole exercise - copying it verbatim must never trip the guard.
+console.log("\n━━━ slotWhenLabel: the wording handed to the agent ━━━\n");
+const whenChecks = [
+  ["Toronto: Tuesday, August 18th at 7:00 PM", slotWhenLabel(TUE_AUG_18, TZ) === "Tuesday, August 18th at 7:00 PM"],
+  ["Saturday slot reads Saturday", (slotWhenLabel(SAT_AUG_22, TZ) || "").startsWith("Saturday, August 22nd at 11:30")],
+  ["carries AM/PM", /\b(AM|PM)\b/.test(slotWhenLabel(SAT_AUG_22, TZ) || "")],
+  ["null slot -> null, never a broken string", slotWhenLabel(null, TZ) === null],
+];
+for (const [name, ok] of whenChecks) { if (!ok) failed++; console.log(`  ${ok ? "✅" : "❌"} ${name}${ok ? "" : `  (got: ${slotWhenLabel(TUE_AUG_18, TZ)})`}`); }
+
+for (const iso of [TUE_AUG_18, MON_AUG_17, SAT_AUG_22]) {
+  const parroted = `Great - I've got ${slotWhenLabel(iso, TZ)} open, want me to lock it in?`;
+  const ok = !slotTextConflict(parroted, iso, TZ);
+  if (!ok) failed++;
+  console.log(`  ${ok ? "✅" : "❌"} copying \`when\` verbatim never trips the guard (${iso.slice(0, 10)})`);
+}
 
 console.log(failed ? `\n❌ ${failed} failing\n` : "\n✅ All checks passed.\n");
 process.exit(failed ? 1 : 0);

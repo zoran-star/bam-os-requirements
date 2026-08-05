@@ -36,6 +36,19 @@ const MONTHS = ["january", "february", "march", "april", "may", "june", "july", 
 const MONTH_RE = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*";
 const DAY_RE = "(?:sun|mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat)[a-z]*";
 
+// The slot written the way a human would say it, in the academy's timezone, or
+// null. THIS is what the agent should be handed instead of a raw ISO string.
+//
+// The prevention half of the Julie Boulton fix: check_availability used to return
+// bare timestamps, so writing "Monday the 18th" meant the model converting
+// 2026-08-18T23:00Z from UTC to Toronto AND deriving a weekday from the result,
+// in its head, mid-sentence. It got the weekday wrong. Handing it "Tuesday,
+// August 18th at 7:00 PM" removes the arithmetic rather than checking it.
+export function slotWhenLabel(slotIso, timeZone) {
+  const p = slotLocalParts(slotIso, timeZone);
+  return p ? p.label : null;
+}
+
 // The slot, as the parent's academy would say it. Intl does the timezone work;
 // a bad timezone or unparseable date returns null and the caller stands down.
 export function slotLocalParts(slotIso, timeZone) {
@@ -54,7 +67,7 @@ export function slotLocalParts(slotIso, timeZone) {
       weekday, month, day,
       weekdayIndex: DAYS.findIndex(g => g[0] === weekday),
       monthIndex: MONTHS.indexOf(month),
-      label: `${parts.weekday}, ${parts.month} ${parts.day} at ${parts.hour}:${parts.minute}`,
+      label: `${parts.weekday}, ${parts.month} ${ord(parts.day)} at ${parts.hour}:${parts.minute}${parts.dayPeriod ? " " + parts.dayPeriod : ""}`,
       dayLabel: `${parts.weekday} the ${ord(parts.day)}`,
     };
   } catch (_) { return null; }
