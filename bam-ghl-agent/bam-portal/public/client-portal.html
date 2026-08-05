@@ -42319,7 +42319,7 @@ function _hk2Moves(r) {
   }
   // The card's textarea isn't in the DOM yet at render time - label from the
   // prefill on the kinds that show a message box.
-  const hasMsg = !!(['reply', 'enroll', 'lost', 'handoff'].includes(k) && String(r.draft_message || '').trim());
+  const hasMsg = !!(['reply', 'enroll', 'lost'].includes(k) && String(r.draft_message || '').trim());
   if (_HK2.agent === 'booking') {
     // Ghost is the recommended action here - give a manual escape hatch to
     // write a message instead of handing them to the automation (Zoran 2026-07-10).
@@ -42399,7 +42399,15 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       <div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed, your confirmation text sends, and the Confirm agent takes over (reminders send from config).</div>`
       : `<div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed in your calendar and its booked-trial automation sends the confirmation + location. The Confirm agent then takes over.</div>`;
-    body = `${_hk2ThreadHtml(r, isTop)}
+    // Same text-vs-slot warning as the proposal card, and it counts double here:
+    // this card BOOKS. The pickers below show the slot, the box above shows the
+    // words, and nothing used to compare them - so "Monday the 18th" could book
+    // Tuesday the 18th and text the family the confirmation. confirm-book refuses
+    // while this is showing.
+    const slotWarn = r.slot_text_warning
+      ? `<div style="display:flex;gap:8px;align-items:flex-start;background:rgba(240,112,96,.1);border:1px solid var(--red,#F07060);border-radius:8px;padding:9px 11px;margin:2px 0 8px;font-size:12px;line-height:1.5;color:var(--text)"><span style="color:var(--red,#F07060);font-weight:700">!</span><span>${escapeHTML(r.slot_text_warning)}</span></div>`
+      : '';
+    body = `${_hk2ThreadHtml(r, isTop)}${slotWarn}
       <div class="hk2-lbl">Booking details - the agent's pick, change if needed</div>
       <div class="hk2-fields">
         <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
@@ -42427,11 +42435,16 @@ function _hk2CardHtml(r, pos, total, isTop) {
       ${(r.rows || []).map((row, i) => { const when = _fuDate(row.send_after); const last = i === r.rows.length - 1; return `<div class="hk2-planwhen"><span>Sends</span><input type="date" class="hk2-when"${isTop ? ` id="hk2-plan-when-${i}"` : ''} value="${escapeHTML(when)}" min="${_minSend}" onchange="_hk2Edited(true)"><span>· only if still no reply${last ? ' · final, no-pressure' : ''}</span></div><textarea class="hk2-draft sm"${isTop ? ` id="hk2-plan-${i}"` : ''} oninput="_hk2Edited()">${escapeHTML(row.draft_message || '')}</textarea>`; }).join('')}
       <div class="hk2-note">Approve = the schedule locks in and each message sends itself on its day, only while the lead stays quiet. A reply cancels the rest instantly. Edit a date above to move that step, or set the default cadence in the stage config (gear) under Follow-ups.</div>`;
   } else if (r._kind === 'handoff') {
+    // NO message box on purpose (Zoran 2026-08-04). This card used to carry an
+    // "acknowledgement to send", which went out and was then followed minutes
+    // later by the Booking agent's actual rebook text - two messages for one
+    // thought. Nothing sends from here now. Approving hands the lead over and
+    // the Booking agent drafts the ONE message, naming a real open slot, which
+    // comes straight back into this modal for your ✓.
     const note = r.handoff_note ? `<div class="hk2-note"><b style="color:var(--text)">Reason:</b> ${escapeHTML(r.handoff_note)}</div>` : '';
     body = `${_hk2ThreadHtml(r, isTop)}${note}
-      <div class="hk2-lbl">Acknowledgement to send (optional)</div>
-      <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
-      <div class="hk2-note">One approve does BOTH: sends your note + hands the lead to Booking, and the Booking agent drafts the rebook text as its next action.</div>`;
+      <div class="hk2-lbl">Hand this lead back to Booking to rebook?</div>
+      <div class="hk2-note">Nothing is sent by this step. Approving frees their old slot, moves them back to Booking, and the Booking agent writes the rebook offer with a real open time - it appears here for your ✓ in a few seconds.</div>`;
   } else if (r._kind === 'lost') {
     const reason = r.lost_reason ? ` <span style="color:var(--red,#F07060);font-weight:700">${escapeHTML(r.lost_reason)}</span>` : '';
     body = `${_hk2ThreadHtml(r, isTop)}
@@ -42494,7 +42507,17 @@ function _hk2CardHtml(r, pos, total, isTop) {
     // source of truth on a proposal; the slot only becomes visible on the formal
     // Book-it confirmation card (where send actually books). The stored
     // book_slot_at still rides the card silently to pre-fill that later Book-it.
-    const proposal = '';
+    //
+    // 2026-08-04: hiding the box hid the DISPLAY of that disagreement, not the
+    // disagreement. The silent slot still pre-fills the later Book-it, so a
+    // message saying Monday carrying a Tuesday slot books Tuesday - which is
+    // exactly what happened to Julie Boulton ("Monday the 18th", stamped Tue Aug
+    // 18). So: still no box when the two agree, but when the backend detects they
+    // DON'T, say so loudly. The send refuses on the same condition, so this is the
+    // reviewer's chance to fix it rather than a wall they hit after tapping.
+    const proposal = r.slot_text_warning
+      ? `<div style="display:flex;gap:8px;align-items:flex-start;background:rgba(240,112,96,.1);border:1px solid var(--red,#F07060);border-radius:8px;padding:9px 11px;margin:2px 0 8px;font-size:12px;line-height:1.5;color:var(--text)"><span style="color:var(--red,#F07060);font-weight:700">!</span><span>${escapeHTML(r.slot_text_warning)}</span></div>`
+      : '';
     // 🔥 The fired reignition: the message pre-written at park time, back for
     // its final ✓ on the day the lead asked for.
     const reigBanner = (r._kind === 'reignite_due' && r.reignite_at)
@@ -43020,8 +43043,9 @@ function _hk2Confirm() {
         _apxToast('Sent to Ghosted', true);
       }
     } else if (k === 'handoff') {
-      chk(await _apxPost(ep, 'confirm-handoff', { ready_id: r.id, reply, handoff_note: r.handoff_note }));
-      _apxToast('Handed back to Booking - rebook text drafts next', true);
+      // No `reply`: this card sends nothing. The one family-facing message is the
+      // rebook offer the server drafts and returns, shown right here for a ✓.
+      await _hk2DoHandoff(ep, { ready_id: r.id, handoff_note: r.handoff_note }, r);
     } else if (k === 'enroll') {
       chk(await _apxPost(ep, 'confirm-enroll', { ready_id: r.id, contact_id: r.ghl_contact_id, conversation_id: r.ghl_conversation_id, reply, contact_name: r.contact_name, enroll_note: r.enroll_note }));
       _apxToast('Sent - won lands when they pay', true);
@@ -43140,7 +43164,7 @@ function _hk2Move(op, btn) {
   // (the same allow-list _hk2Moves uses for hasMsg). A book/reignite/reignite_due
   // card has a PREFILLED box but silent-labeled moves - capturing it would text the
   // parent a confirmation/re-engagement they never approved (Zoran 2026-07-10).
-  const canSendOnMove = ['reply', 'enroll', 'lost', 'handoff'].includes(r._kind);
+  const canSendOnMove = ['reply', 'enroll', 'lost'].includes(r._kind);
   const reply = ((op === 'lost' || op === 'unq') && canSendOnMove) ? (((document.getElementById('hk2-draft') || {}).value) || '').trim() : '';
   const chk = resp => { if (resp && resp.error) throw new Error(resp.error); return resp; };
   const label = op === 'ghost' ? 'Sent to Ghosted' : op === 'handoff' ? 'Handed to Booking'
@@ -43163,8 +43187,9 @@ function _hk2Move(op, btn) {
       try { _plMoveContactToInterested(r.ghl_contact_id); } catch (_) {}
       _apxToast('Sent to Ghosted', true);
     } else if (op === 'handoff') {
-      chk(await _apxPost(ep, 'confirm-handoff', { ready_id: readyId, reply: '', handoff_note: r.handoff_note || 'Needs a new time - rebook.' }));
-      _apxToast('Handed back to Booking', true);
+      // "Rebook: back to Booking" from the Other menu takes the same chained path
+      // as approving a Reschedule card: hand off, then review the one message.
+      await _hk2DoHandoff(ep, { ready_id: readyId, handoff_note: r.handoff_note || 'Needs a new time - rebook.' }, r);
     } else if (op === 'lost') {
       const resp = chk(await _apxPost(ep, 'confirm-lost', { ready_id: readyId, reply, lost_reason: r.lost_reason || 'Other', reason_detail: r.last_message || null }));
       goodbyeToast(resp, reply ? 'Message sent + moved to Nurture' : (lesson ? 'Marked lost + taught' : 'Marked lost - Nurture takes over'));
@@ -44725,6 +44750,101 @@ async function fetchAndRenderInbox() {
 // ═══════════════════════════════════════════════════════════════
 let _APX_DATA = { followups: [], ready: [], lost: [] };
 
+// ── The rebook offer, chained straight onto an approved handoff (Zoran 2026-08-04).
+//
+// A "can't make it" used to cost the family TWO texts (a content-free "we'll find
+// another time" from Confirm, then the actual offer from Booking ~15 minutes later)
+// and staff TWO trips to the deck. Now the handoff sends nothing, and the server
+// drafts the Booking agent's rebook offer inline and hands it back on the response.
+// This shows it while the modal is still open.
+//
+// It is a real Booking card either way: sending goes through the Booking agent's
+// own send action, and if this overlay is dismissed the card simply waits in the
+// Booking lane. Nothing here is a second, parallel send path.
+let _HK2_RB = null;
+// One entry point for every "hand this lead back to Booking" button, on both the
+// full deck and the simple view. The server call is SLOW on purpose - it drafts
+// the rebook offer inline, which means a Claude turn plus a live availability
+// read - so the waiting state is opened first and then filled in. Errors close
+// the overlay and rethrow, so _hawkDefer still restores the card.
+async function _hk2DoHandoff(ep, payload, card) {
+  _hk2RebookWait(card);
+  let resp;
+  try { resp = await _apxPost(ep, 'confirm-handoff', payload); }
+  catch (e) { _hk2RebookClose(); throw e; }
+  if (resp && resp.error) { _hk2RebookClose(); throw new Error(resp.error); }
+  if (resp && resp.rebook) _hk2RebookStep(resp.rebook, card);
+  else {
+    _hk2RebookClose();
+    // Honest about WHY there's no draft to review: the lead is handed off either
+    // way, but the message is not written yet and the cron is what will write it.
+    _apxToast('Handed back to Booking - the rebook text drafts on the next run', true);
+  }
+  return resp;
+}
+function _hk2RebookWait(card) {
+  const who = (card && card.contact_name) ? escapeHTML(String(card.contact_name).trim().split(/\s+/)[0]) : 'them';
+  document.getElementById('hk2-rb-ov')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div id="hk2-rb-ov" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:520px;padding:26px 22px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">Writing the rebook offer for ${who}</div>
+      <div style="font-size:12px;color:var(--text-sub)">Checking which times are actually open. A few seconds.</div>
+    </div></div>`);
+}
+function _hk2RebookStep(rebook, card) {
+  document.getElementById('hk2-rb-ov')?.remove();
+  if (!rebook || !rebook.ready_id || !String(rebook.draft_message || '').trim()) return;
+  _HK2_RB = { ...rebook, contact_id: (card && card.ghl_contact_id) || null, contact_name: (card && card.contact_name) || null, original: rebook.draft_message };
+  const who = (card && card.contact_name) ? escapeHTML(String(card.contact_name).trim().split(/\s+/)[0]) : 'them';
+  const slot = rebook.book_slot_at
+    ? `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(90,143,184,.14);border:1px solid var(--blue,#5A8FB8);color:var(--blue,#5A8FB8);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;margin-bottom:10px">Offering ${escapeHTML(_hk2SlotLabel(rebook.book_slot_at))}${rebook.book_group ? ' · ' + escapeHTML(rebook.book_group) : ''}</div>`
+    : `<div style="font-size:12px;color:var(--gold,#D4B65C);margin-bottom:10px">No open slot was available to offer, so this asks what days work.</div>`;
+  document.body.insertAdjacentHTML('beforeend', `<div id="hk2-rb-ov" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9100;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_hk2RebookClose()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:4px">
+        <div style="font-size:16px;font-weight:700;color:var(--text)">Rebook offer for ${who}</div>
+        <button onclick="_hk2RebookClose()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:18px;cursor:pointer;line-height:1">×</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px">Handed off. This is the one message they get - the Booking agent wrote it and checked the time is open.</div>
+      ${slot}
+      <textarea id="hk2-rb-msg" style="width:100%;min-height:110px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font:inherit;font-size:14px;line-height:1.5;resize:vertical">${escapeHTML(rebook.draft_message || '')}</textarea>
+      <div id="hk2-rb-err" style="display:none;font-size:12px;color:var(--red,#F07060);margin-top:8px"></div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button id="hk2-rb-go" onclick="_hk2RebookSend()" style="flex:2;background:var(--gold,#D4B65C);border:1px solid var(--gold,#D4B65C);color:#08080A;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer">Send it</button>
+        <button onclick="_hk2RebookClose()" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--text-sub);border-radius:8px;padding:11px;font-size:13px;font-weight:600;cursor:pointer">Not yet</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-mute);margin-top:10px">"Not yet" keeps it as a card in the Booking lane - nothing is lost.</div>
+    </div></div>`);
+}
+function _hk2RebookClose() { _HK2_RB = null; document.getElementById('hk2-rb-ov')?.remove(); }
+async function _hk2RebookSend() {
+  const rb = _HK2_RB; if (!rb) return;
+  const el = document.getElementById('hk2-rb-msg');
+  const reply = (el ? el.value : '').trim();
+  const err = document.getElementById('hk2-rb-err');
+  const btn = document.getElementById('hk2-rb-go');
+  if (!reply) { if (err) { err.textContent = 'Write the message, or use "Not yet" to leave it in Booking.'; err.style.display = 'block'; } return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+  try {
+    await _apxPost(_HK2_META.booking.ep, 'send', {
+      ready_id: rb.ready_id, contact_id: rb.contact_id, reply, conversation_id: null,
+      contact_name: rb.contact_name, reasoning: rb.reasoning || null, confidence: rb.confidence,
+      // The picked time rides along so an edit to the message can't leave the row
+      // claiming a slot the text no longer names.
+      proposed_slot_at: rb.book_slot_at || undefined,
+      adjusted: reply !== String(rb.original || '').trim(), suggested_reply: rb.original || null,
+    });
+    _hk2RebookClose();
+    _apxToast('Rebook offer sent - Booking takes it from here', true);
+    try { _hk2Load(); } catch (_) {}
+  } catch (e) {
+    // An honest failure: the card is already queued, so the work is NOT lost -
+    // say exactly where it went rather than implying the rebook died.
+    if (btn) { btn.disabled = false; btn.textContent = 'Send it'; }
+    if (err) { err.textContent = _apxErr(e) + ' - the draft is safe as a card in the Booking lane.'; err.style.display = 'block'; }
+  }
+}
+
 async function _apxPost(endpoint, action, payload) {
   const token = await _mreqAuthToken();
   const r = await fetch(endpoint, {
@@ -45021,10 +45141,8 @@ function _acxHandoffCard(r) {
   const note = r.handoff_note ? `<div style="font-size:12px;color:var(--text-sub);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin:4px 0 8px"><b style="color:var(--text)">Reason:</b> ${escapeHTML(r.handoff_note)}</div>` : '';
   return `<div id="acx-${r.id}" style="background:var(--surface);border:1px solid #5A8FB8;border-radius:11px;padding:12px 14px;margin-bottom:9px">
     ${_acxHeader(r, 'reschedule', '#5A8FB8')}
-    <div style="font-size:11.5px;color:#5A8FB8;margin-bottom:6px">↩ Hands back to the booking agent to rebook (writes a note + moves them to Responded).</div>
+    <div style="font-size:11.5px;color:#5A8FB8;margin-bottom:6px">↩ Nothing sends here. Hands them back to the booking agent, which writes the one rebook message with a real open time for your ✓.</div>
     ${_acxContext(r)}${note}
-    <div style="text-align:center;font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.09em;margin:2px 0 5px">acknowledgement to send (optional)</div>
-    ${_acxBox(r, 'optional warm message before handing off')}
     <div style="display:flex;align-items:stretch;gap:8px;margin-top:10px">
       <button onclick="_acxSkip('${r.id}')" title="Skip" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--red);border-radius:8px;padding:9px;font-size:17px;cursor:pointer">✕</button>
       <button onclick="_acxUnqualified('${r.id}')" title="Remove from the pipeline as unqualified - no message, no nurture" style="background:transparent;border:1px solid var(--text-mute);color:var(--text-sub);border-radius:8px;padding:9px 11px;font-size:12px;cursor:pointer">Unqualified</button>
@@ -45077,12 +45195,16 @@ function _acxSend(id) {
     _acxRemove(id); _apxToast(resp && resp.deferred ? _apxQuietMsg(resp.send_after) : '✓ Sent', true);
   } });
 }
+// The handoff sends NOTHING (Zoran 2026-08-04) - no `reply` is passed. The server
+// drafts the booking agent's rebook offer inline and returns it, and it is shown
+// here for a ✓, same as the full deck. Falls back to a plain toast when no draft
+// came back (booking agent off, a card already waiting, or the draft failed - the
+// trigger note the server wrote then lands on the next booking run).
 function _acxHandoff(id) {
   const r = _ACX_DATA.find(x => x.id === id); if (!r) return;
-  const ta = document.getElementById('acx-edit-' + id);
-  const reply = (ta ? ta.value : (r.draft_message || '')).trim();
   _hawkDefer({ cardId: 'acx-' + id, label: 'Handed back', restore: _acxRender, run: async () => {
-    await _apxPost('/api/agent-confirm', 'confirm-handoff', { ready_id: id, reply, handoff_note: r.handoff_note }); _acxRemove(id); _apxToast('↩ Handed back to booking', true);
+    await _hk2DoHandoff('/api/agent-confirm', { ready_id: id, handoff_note: r.handoff_note }, r);
+    _acxRemove(id);
   } });
 }
 function _acxLost(id) {

@@ -295,3 +295,59 @@ are still proactive-only - the AI owns a live conversation.
 booking creates NO GHL appointment. It shows in the portal Calendar (attendees on
 the slot) and on the pipeline card - never in the GHL calendar. "I can't see the
 booking" is usually someone looking at GHL.
+
+## 2026-08-04 - the handoff sends NOTHING; the rebook offer names a real time
+
+Zoran: "I don't think we need two messages." He was right. A "can't make it" cost
+the family TWO texts and staff TWO approvals:
+
+1. Confirm's warm ack ("no problem, we'll find another time") - content-free by
+   construction, because the confirm agent has no calendar and is banned from
+   naming times, and
+2. ~15 min later, the booking agent's rebook opener, which said roughly the same
+   thing because it was drafted from the COLD-opener prompt, whose seed literally
+   told it *"they have not messaged yet"* - the wrong frame for someone
+   mid-conversation who just lost a slot.
+
+Worse ordering bug: after hours the ack PARKED to 8am while the `Entry: Rebook`
+trigger note went live immediately, so the follow-up could arrive before the thing
+it followed up on.
+
+**Now: one message, one approval, and it names a real open slot.**
+
+- `confirm-handoff` sends nothing at all. No ack, no quiet-hours park. It is pure
+  bookkeeping: memory note -> stage bounce -> cancel the dropped `trial_bookings`
+  row -> `pipeline_outcomes` 'rebook'. The confirm prompt now says leave `reply`
+  EMPTY and put everything in `handoff_note` (constraints word-for-word - that is
+  what picks the time).
+- New **`REBOOK_TRAILER` + `REBOOK_SEED`** in `api/agent-approvals.js`: a rebook
+  brain that knows the lead already knows us, and is TOLD to call
+  `check_availability` and offer the soonest slot fitting their constraint. Never
+  `book=true` - it is offering, not taking. `normalizeProposal` verifies the named
+  time against a live `freeSlots` read, so a hallucinated slot is dropped, not
+  stamped.
+- New exported **`draftAndQueueRebook()`** - the ONE path both producers use:
+  `confirm-handoff` calls it INLINE (so the drafted text comes back on the
+  response), and the booking cron's rebook pass calls it for no-shows and for any
+  handoff whose inline draft failed. It carries the dedupe (pending/approved card,
+  or a touch actioned within 14 days - the TARA duplicate) and is gated on
+  `modeIsOn(agentMode(client))` so an academy running Confirm with Booking OFF
+  never gets cards in a lane it didn't turn on. Never throws.
+- The `Entry: Rebook` trigger note is now written **only when the inline draft did
+  not land**. That is what stops the same text being drafted twice.
+- Deck: the Reschedule card has NO message box any more (`hasMsg` /
+  `canSendOnMove` dropped `handoff`). `_hk2DoHandoff()` opens a waiting overlay,
+  posts, then `_hk2RebookStep()` shows the drafted offer + its verified slot for a
+  ✓. "Not yet" just leaves it as a card in the Booking lane. Both the full deck,
+  the Other-menu "Rebook: back to Booking", and the simple view (`_acxHandoff`)
+  go through that one function.
+- Sending goes through the BOOKING agent's own `send` action, which hard-requires
+  the lead to be in Responded. The handoff bounces them there in the same request,
+  so this normally passes; if it 409s the overlay says so and points at the card
+  waiting in the Booking lane.
+- The no-show path (`api/ghl/post-trial.js`) still writes `Entry: Rebook` and waits
+  for the cron - but it inherits the better brain, so its rebook text now names a
+  time too.
+- The flush's `handoffAck` exemption in `agent-confirm.js` is KEPT on purpose:
+  nothing new parks as `confirm_handoff`, but rows parked before this change still
+  need to drain.

@@ -26,6 +26,9 @@ import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForClass, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial, passedTrialContactIds, upcomingBookedContactIds, loadClassesFor } from "./agent/booking.js";
 import { classIndex, classByName, classForCalendar, ageRoutingReadiness, buildQuestion } from "./agent/_class-slots.js";
+// Does the drafted SENTENCE agree with the slot stamped on the card? Everything
+// else here verifies the timestamp; this reads the words the parent receives.
+import { slotTextConflict } from "./agent/_slot-text.js";
 import { resolveClassesForAge } from "./agent/_class-routing.js";
 import { respondedStage, contactStageState, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
@@ -112,6 +115,31 @@ const OPENER_TRAILER =
   `Respond ONLY by calling propose_reply: 'reply' = the exact opening text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; 'asked_to_book' = true if your message invites them to book or come in; 'escalate' = true (reply empty) only if you genuinely cannot draft an opener from the context.\n</live_booking>`;
 function buildOpenerSystem({ lessons, overrides, examples }) {
   return buildAgentSystem({ lessons, overrides, examples, trailer: OPENER_TRAILER });
+}
+
+// REBOOK opener: this lead is NOT cold. They already talked to us, already picked
+// a time, and then dropped it - either they told the confirm agent they can't make
+// it, or they no-showed and the coach filed the post-trial form. Both producers
+// hand the lead back to Booking with the reason in <contact_memory>.
+//
+// This trailer exists because the rebook pass used to reuse OPENER_TRAILER, whose
+// seed literally says "they have not messaged yet" - the wrong frame for someone
+// mid-conversation, and it produced a vague "let's find you another time!" that
+// then needed a whole second round-trip to name one.
+//
+// The instruction that matters is PROPOSE A REAL TIME. check_availability is on
+// this turn's tool list, and propose_slot_at/propose_group are verified against a
+// live freeSlots read in normalizeProposal - a hallucinated time is dropped rather
+// than stamped, so asking for a concrete offer here is safe.
+const REBOOK_TRAILER =
+  `<live_booking>\n` +
+  `You are writing the ONE text that rebooks a REAL lead who had a free trial locked in and just dropped it - they told us they can't make it, or they no-showed. Why, and anything they told us about it, is in <contact_memory>. They know us; this is not a first hello. ` +
+  `Write it like a coach who noticed, in this order: acknowledge the drop in ONE short clause (no apology spiral, no guilt, never imply they let anyone down), then offer them the next time. ` +
+  `PROPOSE A SPECIFIC TIME - this is the whole job. Call check_availability FIRST, then name the soonest open slot that fits what they told us (if they gave a constraint - "weekends only", "after 6", "not Tuesdays" - honour it and pick the soonest slot that satisfies it). Offer ONE time, or at most two. Never send a vague "what works for you?" when real open slots exist: that costs the family another round of texting. Set 'propose_slot_at' to the EXACT ISO time you named and 'propose_group' to that slot's class. Only fall back to asking what days work if check_availability genuinely returns nothing. ` +
+  `NEVER set book=true here. You are offering a time, not taking it - they have not agreed to anything yet. When they say yes, the live reply agent books it. ` +
+  `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; 'asked_to_book' = true (you are inviting them back in); 'escalate' = true (reply empty) only if you genuinely cannot draft a rebook from the context.\n</live_booking>`;
+function buildRebookSystem({ lessons, overrides, examples }) {
+  return buildAgentSystem({ lessons, overrides, examples, trailer: REBOOK_TRAILER });
 }
 
 const REPLY_TOOL = {
@@ -277,10 +305,18 @@ async function runAgent(system, messages, bookingCtx = null) {
 // The opener turn: no inbound thread - seed a single instruction so the agent
 // drafts a FIRST outbound from <contact_memory>. Same check_availability loop +
 // forced propose_reply as runAgent.
-async function runOpener(system, bookingCtx = null) {
+//
+// Two seeds, because there are two kinds of "no inbound thread to reply to" and
+// they are opposites. COLD is a stranger who filled a form. REBOOK is someone
+// mid-relationship who just lost a slot - telling that lead "they have not
+// messaged yet" is false and produced openers that ignored the whole reason we
+// were texting.
+const OPENER_SEED = "Write your FIRST outbound text to this lead now, using what you know from the context above. They have not messaged yet, so open the conversation and move toward booking a free trial.";
+const REBOOK_SEED = "Write the rebook text for this lead now. They had a free trial booked and it fell through - the reason is in the context above. Call check_availability first, then send them one concrete new time that fits what they told us. Do not book it; you are offering it.";
+async function runOpener(system, bookingCtx = null, seed = OPENER_SEED) {
   const canBook = !!(bookingCtx && Array.isArray(bookingCtx.calendars) && bookingCtx.calendars.length);
   const tools = canBook ? [REPLY_TOOL, CHECK_AVAILABILITY] : [REPLY_TOOL];
-  const convo = [{ role: "user", content: "Write your FIRST outbound text to this lead now, using what you know from the context above. They have not messaged yet, so open the conversation and move toward booking a free trial." }];
+  const convo = [{ role: "user", content: seed }];
   for (let i = 0; i < 4; i++) {
     const forceReply = !canBook || i === 3;
     const data = await anthropicCall({
@@ -443,6 +479,98 @@ async function draftOpener(token, locationId, clientId, contactId, cfg, calendar
     book, book_group: book ? out.book_group : prop.group, book_slot_at: book ? out.book_slot_at : prop.slotAt,
     book_calendar_id: book ? bookCal.key : prop.calendarId,
   };
+}
+
+// Draft a REBOOK opener for a lead who dropped a booked trial (confirm-agent
+// handoff, or a coach's no-show form). Same shape as draftOpener, different brain
+// and different seed - see REBOOK_TRAILER. `timezone` is the academy's, not a
+// hardcoded Toronto, because this draft names an actual time to a parent.
+async function draftRebookOpener({ token, locationId, clientId, contactId, cfg, calendars, classes, timezone }) {
+  const system = buildRebookSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
+  const out = await runOpener(
+    system,
+    { calendars: calendars || [], classes: classes || [], token, timezone: timezone || "America/Toronto", clientId },
+    REBOOK_SEED,
+  );
+  // book=true is refused rather than honoured: the trailer forbids it, and a
+  // rebook offer the family has not agreed to must never create a booking. Any
+  // slot the model did name still rides along as a PROPOSAL via normalizeProposal,
+  // which verifies it against a live freeSlots read.
+  const prop = await normalizeProposal(out, false, calendars, { token, clientId, classes: classes || [] });
+  return {
+    reply: out.reply || "",
+    reasoning: out.reasoning || "",
+    confidence: typeof out.confidence === "number" ? out.confidence : null,
+    escalate: !!out.escalate,
+    asked_to_book: !!out.asked_to_book || BOOK_ASK.test(out.reply || ""),
+    summary: out.summary ? String(out.summary).slice(0, 600) : null,
+    book: false, book_group: prop.group, book_slot_at: prop.slotAt, book_calendar_id: prop.calendarId,
+  };
+}
+
+/**
+ * Draft the rebook text and queue it as a PENDING Booking card. The single path
+ * used by BOTH producers of a rebook:
+ *
+ *   • the cron rebook pass (post-trial no-show, or a handoff whose inline draft
+ *     failed), which finds the lead via its "Entry: Rebook" trigger note, and
+ *   • api/agent-confirm.js's confirm-handoff, which calls this INLINE so the
+ *     drafted text is waiting in the same modal the moment staff approves the
+ *     handoff, instead of up to 15 minutes later on the next cron.
+ *
+ * Returns { queued, row?, skipped? }. Never throws: a rebook that fails to draft
+ * must not take down the handoff (which has already moved the lead and freed the
+ * slot). Callers fall back to leaving the trigger note active for the cron.
+ */
+export async function draftAndQueueRebook({ token, locationId, client, contactId, contactName = null, cfg, calendars, classes, createdBy = "rebook-opener" }) {
+  try {
+    if (!client || !contactId) return { queued: false, skipped: "missing client or contact" };
+    // The BOOKING agent owns this card, so the BOOKING agent's switch decides
+    // whether it exists. Without this, an academy running Confirm with Booking
+    // off would get cards in a lane it never turned on (the cron pass is gated
+    // by modeIsOn upstream; an inline caller is not).
+    if (!modeIsOn(agentMode(client))) return { queued: false, skipped: "booking agent is off" };
+    const clientId = client.id;
+    // Dedupe: a card already waiting, or a touch already sent/dismissed in the
+    // last 14 days, means the conversation is live and the reply engine owns it.
+    // Same guard the cron pass uses - the TARA duplicate.
+    let recent;
+    try { recent = await sb(`agent_ready_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,created_at&limit=3`); }
+    catch (e) { return { queued: false, skipped: `dedup error - ${e.message}` }; }
+    const rows14 = Array.isArray(recent) ? recent : [];
+    if (rows14.some(x => ["pending", "approved"].includes(x.status))) return { queued: false, skipped: "a card is already waiting" };
+    const RECENT_MS = 14 * 24 * 3600000;
+    if (rows14.some(x => ["sent", "scheduled", "dismissed"].includes(x.status) && x.created_at && (Date.now() - new Date(x.created_at).getTime()) < RECENT_MS)) {
+      return { queued: false, skipped: "recent card already actioned", stale: true };
+    }
+    let nm = contactName;
+    if (!nm) {
+      try { const c = await sb(`${await contactsReadTable(clientId)}?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
+    }
+    const conf = cfg || await loadConfig(clientId);
+    const cals = calendars || await loadCalendars(sb, clientId);
+    const cls  = classes   || await loadClassesFor(sb, clientId);
+    const d = await draftRebookOpener({
+      token, locationId, clientId, contactId, cfg: conf, calendars: cals, classes: cls,
+      timezone: (client.time_zone || "").trim() || "America/Toronto",
+    });
+    if (!d.reply || !String(d.reply).trim()) return { queued: false, skipped: d.escalate ? "agent escalated" : "empty draft", escalated: !!d.escalate };
+    const inserted = await sb(`agent_ready_replies`, {
+      method: "POST", headers: { Prefer: "return=representation" },
+      body: JSON.stringify([{
+        client_id: clientId, ghl_contact_id: String(contactId), ghl_conversation_id: null,
+        contact_name: nm, kind: "reply",
+        book_calendar_id: d.book_calendar_id || null, book_slot_at: d.book_slot_at || null, book_group: d.book_group || null,
+        draft_message: d.reply, reasoning: d.reasoning || "Rebook offer (their booked trial fell through).",
+        confidence: d.confidence, asked_to_book: d.asked_to_book, summary: d.summary || null,
+        status: "pending", created_by: createdBy,
+      }]),
+    });
+    const row = Array.isArray(inserted) ? inserted[0] : inserted;
+    return { queued: true, row: row || null, proposed_slot_at: d.book_slot_at || null };
+  } catch (e) {
+    return { queued: false, skipped: `draft threw - ${e.message}` };
+  }
 }
 
 // Scripted BOOKING initial-automation opener (Phase C). When the academy has its
@@ -932,69 +1060,45 @@ async function detectForClient(client) {
     }
   } catch (e) { reasons.push(`opener pass: ${e.message}`); }
 
-  // ── A5 REBOOK pass: the confirm agent handed a "can't make it" lead back to the
-  // Responded stage with an "Entry: Rebook" trigger note. The booking agent must now
-  // PROACTIVELY text them to rebook rather than waiting for the lead to message first.
-  // A rebook lead has prior booking history + an existing GHL conversation, so the cold
-  // -opener guards above deliberately skip them - this pass re-opens them on purpose:
-  // draft a first rebook text via the booking opener brain (the persistent "Rebook
-  // needed" memory note gives it context), queue it for Hawkeye, then CONSUME the
-  // trigger note (active=false) so a lead is opened exactly once.
+  // ── A5 REBOOK pass: a lead who had a trial booked and dropped it is handed back
+  // to the Responded stage with an "Entry: Rebook" trigger note - by the confirm
+  // agent ("can't make it") or by a coach's no-show form. The booking agent must
+  // PROACTIVELY text them a new time rather than waiting for the lead to message
+  // first. A rebook lead has prior booking history + an existing conversation, so
+  // the cold-opener guards above deliberately skip them; this pass re-opens them
+  // on purpose, then CONSUMES the trigger note so a lead is opened exactly once.
+  //
+  // The drafting + dedupe live in draftAndQueueRebook because confirm-handoff now
+  // calls the SAME function inline (so staff sees the rebook text in the handoff
+  // modal instead of up to 15 minutes later). This pass is what catches the leads
+  // that inline call did not: every no-show, and any handoff whose inline draft
+  // failed. Both leave the trigger note active, and it is the note that lands here.
   try {
     const rebookCandidates = [...rebookIds].filter(id => respondedIds.has(id) && !mutedSet.has(id) && !reignSet.has(id));
     if (rebookCandidates.length) {
       const calendars = await loadCalendars(sb, client.id);
       const classes = await loadClassesFor(sb, client.id);
+      const consumeTrigger = (contactId) => sb(
+        `agent_contact_notes?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&active=eq.true&note=ilike.${encodeURIComponent("Entry: Rebook")}*`,
+        { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ active: false }) },
+      ).catch(() => {});
       for (const contactId of rebookCandidates) {
         if (rebookOpeners >= OPENER_CAP) break;
-        // Dedupe: if a card is already waiting (pending/approved), leave it be.
-        // ALSO block when a recent card was already actioned (sent/scheduled/
-        // dismissed within 14 days) - the TARA duplicate: staff sent the rebook
-        // opener, a fresh "Entry: Rebook" note re-triggered the pass, and the
-        // scripted opener re-emitted the byte-identical text because only
-        // pending/approved blocked. An already-sent recent touch means the
-        // conversation is live; the reply engine owns it from here.
-        let recent;
-        try { recent = await sb(`agent_ready_replies?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&order=created_at.desc&select=id,status,created_at&limit=3`); }
-        catch (e) { reasons.push(`rebook ${contactId}: dedup error - ${e.message}`); continue; }
-        const rows14 = (Array.isArray(recent) ? recent : []);
-        if (rows14.some(x => ["pending", "approved"].includes(x.status))) continue;
-        const RECENT_MS = 14 * 24 * 3600000;
-        if (rows14.some(x => ["sent", "scheduled", "dismissed"].includes(x.status) && x.created_at && (Date.now() - new Date(x.created_at).getTime()) < RECENT_MS)) {
-          // Consume the trigger note anyway - it is stale (the touch already went out).
-          try { await sb(`agent_contact_notes?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&active=eq.true&note=ilike.${encodeURIComponent("Entry: Rebook")}*`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ active: false }) }); } catch (_) {}
-          reasons.push(`rebook ${contactId}: recent card already actioned - trigger note consumed`);
-          continue;
-        }
-        let nm = null;
-        try { const c = await sb(`${await contactsReadTable(client.id)}?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&select=name&limit=1`); nm = (Array.isArray(c) && c[0] && c[0].name) || null; } catch (_) {}
-        const firstName = nm ? String(nm).trim().split(/\s+/)[0] : null;
-        let d;
-        // Phase C: a bounced-back lead = the "rebook" booking entry point. Scripted
-        // opener when live+approved; else the AI rebook opener (uses the memory note).
-        try { d = scriptedBookingOpener(client, "rebook", firstName) || await draftOpener(token, locationId, client.id, contactId, cfg, calendars); }
-        catch (e) { reasons.push(`rebook ${contactId}: draft threw - ${e.message}`); continue; }
-        if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
-        const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
-        let queued = false;
-        try {
-          await sb(`agent_ready_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-            client_id: client.id, ghl_contact_id: String(contactId), ghl_conversation_id: null,
-            contact_name: nm, kind: isBook ? "book" : "reply",
-            book_calendar_id: d.book_calendar_id || null, book_slot_at: d.book_slot_at || null, book_group: d.book_group || null,
-            draft_message: d.reply, reasoning: d.reasoning || "First rebook touch (confirm agent handed this lead back to rebook).",
-            confidence: d.confidence, asked_to_book: d.asked_to_book, summary: d.summary || null,
-            status: "pending", created_by: "rebook-opener",
-          }]) });
-          queued = true;
+        const r = await draftAndQueueRebook({ token, locationId, client, contactId, cfg, calendars, classes });
+        if (r.queued) {
           rebookOpeners++;
-        } catch (e) { reasons.push(`rebook ${contactId}: insert failed - ${e.message}`); }
-        // Consume the trigger note so we open exactly once. The persistent "Rebook needed"
-        // memory note (no "Entry:" prefix) stays active for ongoing conversation context.
-        if (queued) {
-          try { await sb(`agent_contact_notes?client_id=eq.${client.id}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&active=eq.true&note=ilike.${encodeURIComponent("Entry: Rebook")}*`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ active: false }) }); } catch (_) {}
+          // Consume the trigger note so we open exactly once. The persistent
+          // "Rebook needed" memory note (no "Entry:" prefix) stays active as
+          // ongoing conversation context.
+          await consumeTrigger(contactId);
+        } else {
+          if (r.escalated) escalated++;
+          // A stale trigger (the touch already went out) is consumed too, so it
+          // can't re-fire forever. Every other skip leaves it for the next run.
+          if (r.stale) await consumeTrigger(contactId);
+          if (r.skipped) reasons.push(`rebook ${contactId}: ${r.skipped}`);
         }
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r2 => setTimeout(r2, 300));
       }
     }
   } catch (e) { reasons.push(`rebook pass: ${e.message}`); }
@@ -1137,6 +1241,16 @@ async function handler(req, res) {
       // automation send it (#3). Fail to 'ghl' (the no-double-text branch).
       let booking_provider = "ghl";
       try { booking_provider = await bookingProviderOf(clientId); } catch (_) {}
+      // Text-vs-slot check at READ time, not draft time, so it needs no column and
+      // so it catches cards that were drafted BEFORE this check existed - Julie
+      // Boulton's "Monday the 18th" card was already sitting pending when this
+      // shipped, and a draft-time-only check would have let exactly the card that
+      // motivated the guard through. The send refuses on the same condition; this
+      // is what tells the reviewer why before they get there. Fail open per card.
+      for (const r of list) {
+        if (!r.book_slot_at || !r.draft_message) continue;
+        try { r.slot_text_warning = slotTextConflict(r.draft_message, r.book_slot_at, (client && client.time_zone) || null); } catch (_) {}
+      }
       return res.status(200).json({ ready: list, count: list.length, quiet, booking_provider });
     }
     // Deck header names (Zoran 2026-07-09): the Hawkeye card shows the ATHLETE on
@@ -1326,6 +1440,27 @@ async function handler(req, res) {
       // Tuesday at 5 work?" on Wednesday. Reopen + repick is one tap.
       if (propPatch.book_slot_at && new Date(propPatch.book_slot_at).getTime() <= Date.now()) {
         return res.status(409).json({ error: "That proposed time has already passed - reopen the card and pick a new slot." });
+      }
+      // The message must AGREE with the slot it carries. The staleness check above
+      // and the open-slot check in normalizeProposal both interrogate the
+      // timestamp; neither reads the sentence, which is the half the parent
+      // actually receives. Julie Boulton's card (GTA 2026-08-04) offered "Monday
+      // the 18th" while stamped with Tuesday the 18th and passed every check we
+      // had. Refuse rather than repair: we cannot know whether the model meant
+      // Monday the 17th or Tuesday the 18th, and a human is already right here.
+      {
+        // The picked slot the deck sent wins; fall back to whatever the row is
+        // already stamped with, so a caller that omits proposed_slot_at is still
+        // checked rather than silently exempt.
+        let slotForText = propPatch.book_slot_at || null;
+        if (!slotForText && b.ready_id) {
+          try {
+            const [pr] = await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=book_slot_at`);
+            slotForText = (pr && pr.book_slot_at) || null;
+          } catch (_) {}
+        }
+        const conflict = slotForText ? slotTextConflict(b.reply, slotForText, (client && client.time_zone) || null) : null;
+        if (conflict) return res.status(409).json({ error: conflict, slot_text_conflict: true });
       }
       // QUIET HOURS: a human approved this after 9:30pm / before 8am. Don't text the
       // parent now — hold the approved reply and let the detect cron flush it at 8am.
@@ -1650,6 +1785,18 @@ async function handler(req, res) {
       if (!calendarId || !slotAt) return res.status(400).json({ error: "missing calendar or slot for this booking" });
       let startIso;
       try { startIso = new Date(slotAt).toISOString(); } catch (_) { return res.status(400).json({ error: "invalid slot time" }); }
+      // Same text-vs-slot guard as the reply send, and it matters MORE here: this
+      // branch books the slot AND texts the confirmation, so a message naming the
+      // wrong weekday becomes a family's diarised plan for a session on another
+      // day. Checked against the slot actually being booked (the picker's value
+      // when staff changed it), not the draft's original.
+      {
+        const conflict = slotTextConflict(
+          (typeof b.reply === "string" ? b.reply : row.draft_message) || "",
+          startIso, (client && client.time_zone) || null,
+        );
+        if (conflict) return res.status(409).json({ error: conflict, slot_text_conflict: true });
+      }
       // Provider branch: booking_provider='portal' books onto OUR slot via the
       // capacity-safe book_trial_slot RPC (no GHL appointment at all); every
       // other academy keeps the exact GHL appointment POST.

@@ -33,6 +33,11 @@ import { buildAgentSystem } from "./agent/brain.js";
 import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { nextAppointment, passedTrialContactIds, upcomingBookedContactIds, bookingProviderOf } from "./agent/booking.js";
+// The BOOKING agent's rebook drafter. A "can't make it" handoff calls it inline so
+// the one family-facing message (an offer of a real open slot) is drafted while
+// staff is still in the modal - see the confirm-handoff branch below. The booking
+// cron calls the SAME function for no-shows and for handoffs whose draft failed.
+import { draftAndQueueRebook } from "./agent-approvals.js";
 import {
   scheduledTrialStage, contactStageState, computeConfirmQueue,
   scheduledTrialContactIdSetCached, peekScheduledTrialIdSet, respondedStage, nurtureStage, toIso,
@@ -163,7 +168,7 @@ const CONFIRM_TRAILER =
   `You are drafting the next SMS to a REAL lead who has ALREADY booked a free trial and is in the "Scheduled Trial" stage. Your goal is to make sure they SHOW UP — confirm they're still coming and help them get there. You do NOT sell and you do NOT rebook. A human reviews your draft before it sends. ` +
   `Respond ONLY by calling propose_reply: 'reply' = the exact text to send; 'reasoning' = 1-2 sentence why; 'confidence' = 0..1; ` +
   `'escalate' = true (with 'escalate_reason', reply empty) if your guardrails say to hand to a human. ` +
-  `If the lead CAN'T make their booked time / needs to reschedule, set 'recommend_handoff' = true with a clear 'handoff_note' capturing the dropped slot + any reason or constraint they gave (this note is what the booking assistant reads to rebook them) — do NOT propose new times yourself; put a warm acknowledgement in 'reply'. ` +
+  `If the lead CAN'T make their booked time / needs to reschedule, set 'recommend_handoff' = true with a clear 'handoff_note' capturing the dropped slot + any reason or constraint they gave, and leave 'reply' EMPTY - send NOTHING here. You have no calendar, so anything you could write would be a content-free "we'll find another time!" that the booking assistant then has to follow with the actual offer: two texts, minutes apart, saying one thing. The handoff_note IS your output - it is what the booking assistant reads, and it answers with ONE text naming a real open slot. Capture any constraint they gave ("weekends only", "after 6", "we're away till the 20th") word-for-word, because that is what picks the time. ` +
   `If your confirm_lost criteria say the lead no longer wants the trial at all, set 'recommend_lost' = true with a short 'lost_reason' and put your warm closing message in 'reply'. A human confirms handoff/lost before anything changes. ` +
   `OPT-OUT: if the lead asks you to STOP contacting them in any phrasing ("stop talking to me", "leave me alone", "don't contact me", "remove me", "stop texting"), set 'recommend_unqualified' = true with 'unqualified_reason' "Opted out" and leave 'reply' EMPTY - send NOTHING, not even a goodbye. This is NOT recommend_lost (Lost routes to nurture texts) and NOT an escalation. A human confirms; approving removes them from the pipeline entirely. ` +
   `REIGNITION: if the lead still WANTS the trial but only at a clearly LATER date ("after summer", "once the season ends", "text us in September") - not just a different time this week or next (that's a handoff to rebook) - set 'reignite_at' (YYYY-MM-DD - resolve a vague timeframe to a concrete date, e.g. "after summer" = Sep 01; a bare "later" = about 30 days out) and 'reignite_message' = the exact re-engagement text to open with ON that date. Make 'reply' the warm acknowledgement to send NOW. A human confirms the date + both messages before anything is scheduled.\n</live_confirm>`;
@@ -778,6 +783,12 @@ async function detectForClient(client) {
         // A held HANDOFF acknowledgement (approved after 9:30pm) is exempt from
         // both gates below: the handoff already bounced this lead out of
         // Scheduled-Trial on purpose - that's the plan, not staleness.
+        //
+        // KEPT DELIBERATELY (2026-08-04): confirm-handoff no longer sends or parks
+        // an acknowledgement at all (the booking agent's rebook offer is the one
+        // message now), so nothing NEW lands here as a confirm_handoff. Rows parked
+        // before that change still need to flush correctly, so this stays until
+        // they have drained.
         const handoffAck = row.kind === "confirm_handoff";
         // Bot muted on this lead after the send was approved: cancel, don't send.
         if (row.ghl_contact_id && mutedSet.has(String(row.ghl_contact_id))) {
@@ -1412,15 +1423,14 @@ async function handler(req, res) {
         contactId = row.ghl_contact_id;
       }
       if (!contactId) return res.status(400).json({ error: "ready_id or contact_id required" });
-      // Send the warm acknowledgement only if one was provided / drafted.
-      // QUIET HOURS (Zoran 2026-07-10): an after-hours ✓ still hands off NOW
-      // (notes + stage bounce below run immediately), but the parent-facing text
-      // PARKS until morning - the detect cron's flush sends it at 8am
-      // (confirm_handoff rows are exempt from the flush's stage gates, since
-      // this lead just left Scheduled-Trial on purpose).
-      const closing = (typeof b.reply === "string" ? b.reply : (row ? row.draft_message : "")) || "";
-      const holdAck = !!closing.trim() && !withinQuietHours(new Date(), quietTz(client));
-      if (closing.trim() && !holdAck) { try { await sendReplyViaGhl(token, contactId, closing.trim(), clientId); } catch (_) {} }
+      // NOTHING IS SENT FROM HERE (Zoran 2026-08-04). This used to text the family
+      // a warm acknowledgement, and then the booking agent texted them AGAIN
+      // minutes later to actually offer a time. Two messages, one thought, two
+      // approvals - and after hours the ack parked to 8am while the trigger note
+      // was live immediately, so the follow-up could arrive BEFORE the thing it
+      // followed up on. The handoff is now pure bookkeeping; the single family-
+      // facing message is the booking agent's rebook offer, drafted below, which
+      // names a real open slot. See REBOOK_TRAILER in api/agent-approvals.js.
       // Write the context note (this is how the booking agent gets full context —
       // contact-memory.js injects agent_contact_notes into the booking prompt).
       const note = (b.handoff_note || (row && row.handoff_note) || "Couldn't make their booked trial — needs to rebook.").toString().trim();
@@ -1430,18 +1440,6 @@ async function handler(req, res) {
           note: `Rebook needed (from confirm agent): ${note}`, created_by: staffEmail || "confirm-agent",
         }]) });
       } catch (e) { return res.status(500).json({ error: `couldn't save handoff note: ${e.message}` }); }
-      // A5: don't just park them in Responded waiting for the lead to text first - have
-      // the BOOKING agent proactively open a rebook conversation. Write a SECOND note
-      // prefixed "Entry:" so the booking detector's opener pass picks it up (it keys off
-      // an Entry note + the Responded stage) and drafts the first rebook text. The memory
-      // note above stays active so the opener has full rebook context; this trigger note
-      // is consumed (deactivated) by the opener once it drafts, so it fires exactly once.
-      try {
-        await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-          client_id: clientId, ghl_contact_id: String(contactId), active: true,
-          note: `Entry: Rebook needed - ${note}`, created_by: "confirm-agent-rebook",
-        }]) });
-      } catch (_) { /* best-effort - the handoff + bounce already landed */ }
       // Bounce the opportunity back to Responded (best-effort — the note is the part
       // that must land; the booking agent works the Responded stage).
       let oppId = null, moved = false;
@@ -1478,34 +1476,53 @@ async function handler(req, res) {
         }
       } catch (_) { /* best-effort - the bounce + notes are the parts that must land */ }
       try { if (oppId) await sb(`pipeline_outcomes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{ client_id: clientId, opportunity_id: oppId, status: "rebook", reason: note.slice(0, 300) }]) }); } catch (_) {}
-      if (b.ready_id && !holdAck) {
+      if (b.ready_id) {
         try { await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "sent", approved_by: staffEmail, approved_at: new Date().toISOString(), sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }); } catch (_) {}
       }
       await clearConfirmCards(clientId, contactId, "handed off to booking");
       await cancelReignitions(clientId, contactId, "handed off to booking to rebook");
-      // Park the held acknowledgement AFTER the card sweep above, so it's the
-      // contact's one active row (partial unique index: one pending/approved
-      // per contact). PATCH revives the just-cleared ready row; contact-direct
-      // handoffs insert a fresh row. Best-effort: the handoff itself landed.
-      let ackAfter = null;
-      if (holdAck) {
-        ackAfter = nextSendableTime(new Date(), quietTz(client)).toISOString();
-        const parked = {
-          kind: "confirm_handoff", draft_message: closing.trim(), status: "approved", send_after: ackAfter,
-          approved_by: staffEmail, approved_at: new Date().toISOString(), send_error: null, updated_at: new Date().toISOString(),
-        };
+      // Draft the rebook offer NOW rather than leaving it to the booking cron. The
+      // cron runs every 15 minutes, and the card it produces is the ONE message
+      // this family gets - so waiting for it meant staff approved a handoff, left
+      // the deck, and had to come back later to approve the actual text. Drafting
+      // inline hands that text straight back to the modal that is still open.
+      //
+      // It calls check_availability, so it is slow (a few seconds) but bounded by
+      // the same tool loop the cron uses. It NEVER throws: the handoff above has
+      // already moved the lead and freed the slot, and none of that may be undone
+      // because a draft failed.
+      const rebook = await draftAndQueueRebook({
+        token, locationId, client, contactId,
+        contactName: (row && row.contact_name) || b.contact_name || null,
+        createdBy: "confirm-handoff",
+      });
+      // The "Entry: Rebook" trigger note is the CRON's copy of this job. Write it
+      // only when the inline draft did not land, so the next booking run picks the
+      // lead up - and never when it did, which would draft the same text twice.
+      // A skip that means "a card already exists" needs no trigger either; only a
+      // genuine failure does.
+      if (!rebook.queued && !rebook.stale && !/already waiting/.test(rebook.skipped || "")) {
         try {
-          if (b.ready_id) {
-            await sb(`agent_confirm_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(parked) });
-          } else {
-            await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
-              ...parked, client_id: clientId, ghl_contact_id: String(contactId), contact_name: b.contact_name || null,
-              handoff_note: note, reasoning: "After-hours handoff: warm acknowledgement held to morning.", created_by: staffEmail,
-            }]) });
-          }
-        } catch (_) {}
+          await sb(`agent_contact_notes`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([{
+            client_id: clientId, ghl_contact_id: String(contactId), active: true,
+            note: `Entry: Rebook needed - ${note}`, created_by: "confirm-agent-rebook",
+          }]) });
+        } catch (_) { /* best-effort - the handoff + bounce already landed */ }
       }
-      return res.status(200).json({ ok: true, handed_off: true, moved_to_responded: moved, opportunity_id: oppId, ack_deferred: holdAck, ack_send_after: ackAfter });
+      return res.status(200).json({
+        ok: true, handed_off: true, moved_to_responded: moved, opportunity_id: oppId,
+        // The drafted rebook offer, for the deck to show as the next step in the
+        // same modal. `ready_id` is the Booking card staff approves to send it.
+        rebook: rebook.queued && rebook.row ? {
+          ready_id: rebook.row.id,
+          draft_message: rebook.row.draft_message,
+          book_slot_at: rebook.row.book_slot_at || null,
+          book_group: rebook.row.book_group || null,
+          reasoning: rebook.row.reasoning || null,
+          confidence: rebook.row.confidence,
+        } : null,
+        rebook_skipped: rebook.queued ? null : (rebook.skipped || "not drafted"),
+      });
     }
 
     // 🔥 Confirm a Reignition: send the (editable) ack now, park the lead in place
