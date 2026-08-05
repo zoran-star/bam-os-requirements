@@ -57,17 +57,29 @@
   .pill.changed{border-color:var(--gold);color:var(--gold-ink);background:var(--gold-bg)}
   .pill.live{border-color:var(--good);color:var(--good)}
   .pill.attn{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
-  .arch{border:1px solid var(--line);background:none;color:var(--mut);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0}
-  .arch:hover{border-color:var(--warn);color:var(--warn)}
+  /* Scoped to the BUTTON. `arch` is also the state class on an archived plan card
+     and an archived rung, so the unscoped rule was repainting those as if they were
+     little buttons: a 5px/10px pad instead of the card's own, a stray border, and an
+     11px indent that knocked the archived rung out of line with the rungs above it. */
+  button.arch{border:1px solid var(--line);background:none;color:var(--mut);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0}
+  button.arch:hover{border-color:var(--warn);color:var(--warn)}
   .bfields{margin-top:14px;border-top:1px solid var(--line2);padding-top:4px;display:none}
   .bcard.open .bfields{display:block}
 
   .q{font-size:14px;font-weight:700;color:var(--ink);margin:16px 0 7px}
   .q .req{color:var(--gold-ink)}
   .qhint{font-size:11.5px;color:var(--mut);margin:-4px 0 7px;line-height:1.5}
-  .bb-input{width:100%;max-width:340px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:inherit;color:var(--ink)}
+  /* 340px truncated a plan name of ordinary length. There is room in the column, so
+     the field takes it: nothing on this page may show the owner a value with its
+     end cut off. */
+  .bb-input{width:100%;max-width:400px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:inherit;color:var(--ink)}
   .bb-input:focus{border-color:var(--gold);outline:none}
-  textarea.bb-input{max-width:100%;min-height:60px;resize:vertical}
+  /* 60px is two lines and a bit, so a real "what a parent gets" paragraph arrived
+     with a line sliced through the middle of its letters. `field-sizing:content`
+     grows the box to whatever he wrote where the browser supports it; the taller
+     floor is what everywhere else falls back to, and it is a whole number of lines
+     so a half-cut line is not the first thing he sees. */
+  textarea.bb-input{max-width:100%;min-height:102px;resize:vertical;field-sizing:content}
   .chiprow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
   .bchip{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 13px;font-size:12.5px;cursor:pointer;color:var(--ink)}
   .bchip.sel{background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700}
@@ -92,35 +104,86 @@
   .prevcard .cta{margin-top:12px;background:var(--gold);color:#fff;border:none;border-radius:8px;padding:9px;width:100%;font-weight:800;font-size:13px}
 
   .ladder{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:4px}
-  .rung{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--paper);flex-wrap:wrap}
+
+  /* THE LADDER IS A TABLE HE READS DOWN, so its columns have to be declared rather
+     than inferred. It used to be a flex row held together by min-widths: every row
+     sized itself from its own content, so the "Month to month" baseline and the
+     rungs beneath it only lined up while every value happened to be short, and the
+     length field was a flat 88px - which is how "3 Months (12 Weeks)" reached the
+     owner's screen as "3 Months (1".
+     Every row is its own grid element, so the only way separate rows stay in step
+     is for the shared tracks to be fixed lengths and the flexible one to be fr:
+     both resolve to the same numbers on every row because every row is the same
+     width. Nothing here is sized to its own content.
+     The length gets a line of its own. That is also the only honest way to promise
+     it is never cut off, because it is free text and the owner can type anything. */
+  .rung{
+    --rw-price:78px; --rw-per:92px;
+    display:grid;
+    grid-template-columns:minmax(var(--rw-price),max-content) minmax(var(--rw-per),max-content) minmax(0,1fr) auto;
+    grid-template-areas:
+      "len   len len  tags"
+      "price per save edit";
+    align-items:center;gap:7px 12px;padding:10px 12px;background:var(--paper);
+  }
   .rung.base{background:var(--bg)}
-  .rung .rprice{font-weight:800;font-size:14px;min-width:64px}
-  .rung .rper{color:var(--mut);font-size:12px;min-width:82px}
-  .rung .rsave{color:var(--good);font-weight:700;font-size:12px;background:var(--good-bg);border-radius:20px;padding:2px 9px}
+  .rung .rprice{grid-area:price;font-weight:800;font-size:14px;white-space:nowrap}
+  .rung .rper{grid-area:per;color:var(--mut);font-size:12px;white-space:nowrap}
+  /* Two shapes arrive in the saving column: on the baseline row the badge is a
+     direct child, on a rung it sits inside the span recalc() rewrites. Place both. */
+  .rung>.rsave,.rung>.rsavecell{grid-area:save;justify-self:start;min-width:0}
+  .rung .rsave{display:inline-block;color:var(--good);font-weight:700;font-size:12px;background:var(--good-bg);border-radius:20px;padding:3px 10px}
   .rung .rsave.none{color:var(--gold-ink);background:var(--gold-bg)}
-  .rnew{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-ink);background:var(--gold-bg);border:1px solid var(--gold);border-radius:20px;padding:2px 8px}
-  .rung .redit{margin-left:auto;display:flex;gap:6px;align-items:center}
-  .rung .redit input{border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:inherit;width:74px;background:var(--paper);color:var(--ink)}
+  /* "new" and the member count ride together so that a rung carrying both does not
+     push the edit controls onto a line of their own. */
+  .rtags{grid-area:tags;justify-self:end;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+  .rtags:empty{display:none}
+  .rnew{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-ink);background:var(--gold-bg);border:1px solid var(--gold);border-radius:20px;padding:2px 8px;white-space:nowrap}
+  .rung .redit{grid-area:edit;justify-self:end;display:flex;gap:8px;align-items:center}
+  .rung .redit input{border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:inherit;width:88px;background:var(--paper);color:var(--ink)}
   .rung .redit input:focus{border-color:var(--gold);outline:none}
-  .rlenin{font-weight:700;font-size:13px;width:88px;border:1px solid transparent;border-radius:6px;padding:3px 5px;background:none;color:var(--ink);font-family:inherit}
-  .rlenin:hover{border-color:var(--line)}
-  .rlenin:focus{border-color:var(--gold);background:var(--paper);outline:none}
-  .rarch{border:none;background:none;color:var(--mut);cursor:pointer;font-size:11px;text-decoration:underline dotted}
+  /* Full width of its own line. The -6px cancels the field's own padding so the
+     label's text and the money underneath it share one left edge. */
+  .rlenin{grid-area:len;width:100%;min-width:0;margin-left:-6px;font-weight:700;font-size:13px;border:1px solid transparent;border-radius:6px;padding:4px 6px;background:none;color:var(--ink);font-family:inherit}
+  /* Only the editable one reacts. The baseline label and an archived length are
+     spans that read as headings, and a hover border would offer an edit that is
+     not there. They keep the same transparent border so they sit on the same line. */
+  input.rlenin:hover{border-color:var(--line)}
+  input.rlenin:focus{border-color:var(--gold);background:var(--paper);outline:none}
+  .rarch{border:none;background:none;color:var(--mut);cursor:pointer;font-size:11px;text-decoration:underline dotted;white-space:nowrap}
   .rarch:hover{color:var(--warn)}
-  .laddernote{font-size:11.5px;color:var(--mut);margin-top:6px}
+  .laddernote{font-size:11.5px;color:var(--mut);margin-top:8px}
   .rungwrap{border-bottom:1px solid var(--line2)}
   .rungwrap:last-child{border-bottom:none}
   .rungwrap.arch{opacity:.5}
-  .rungwrap .rung{border-bottom:none;padding-bottom:4px}
-  .afterrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 12px 10px;background:var(--paper)}
-  .afterrow .al{font-size:11.5px;color:var(--mut);margin-right:2px}
-  .afterwarn{font-size:11px;font-weight:700;color:var(--warn);background:var(--warn-bg);border-radius:20px;padding:2px 9px}
-  .rmore{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:2px 12px 12px;background:var(--paper)}
-  .mf{display:flex;align-items:center;gap:8px;min-width:0}
-  .ml{font-size:11.5px;color:var(--mut);flex:0 0 auto}
-  .rin{flex:1;min-width:0;border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:inherit;font-size:12.5px;background:var(--bg);color:var(--ink)}
+  .rungwrap .rung{border-bottom:none;padding-bottom:6px}
+  /* An archived rung carries a sentence where the edit controls would be. */
+  .rungwrap.arch .rung{grid-template-areas:"len len len edit" "price note note note"}
+  .rung>.members{grid-area:note;justify-self:start}
+
+  /* THE BLOCK UNDER A RUNG IS A FORM, so it is laid out as one: one question per
+     row, every label in the same column, every control starting at the same x.
+     It used to be a flex pile in which each label pushed its own control to
+     wherever that label happened to end, and the two text inputs were narrow
+     enough to truncate their own placeholders ("same as m...").
+     `display:contents` on .mf lets a label and the control it owns join the shared
+     grid instead of forming a private flex box that only lines up with itself. */
+  .afterrow,.rmore{
+    --rlbl:176px;
+    display:grid;grid-template-columns:var(--rlbl) minmax(0,1fr);
+    gap:8px 12px;align-items:start;background:var(--paper);
+  }
+  .afterrow{padding:0 12px 10px}
+  .rmore{padding:2px 12px 12px}
+  .mf{display:contents}
+  .afterrow .al,.rmore .ml{font-size:11.5px;color:var(--mut);line-height:1.5;padding-top:6px}
+  .afterwarn{font-size:11px;font-weight:700;color:var(--warn);background:var(--warn-bg);border-radius:20px;padding:3px 10px}
+  .rin{width:100%;min-width:0;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font:inherit;font-size:12.5px;background:var(--bg);color:var(--ink)}
   .rin:focus{border-color:var(--gold);background:var(--paper);outline:none}
-  @media(max-width:640px){.rmore{grid-template-columns:1fr}}
+  /* The ladder is the widest thing on the page, so the parent preview drops below
+     the form well before the phone breakpoint. Squeezed between the two, the rung
+     columns had nowhere to go but on top of each other. */
+  @media(max-width:760px){.twocol .right{flex:1 1 100%;position:static}}
   .addbtn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:6px}
 
   .confirmbar{display:flex;align-items:center;gap:12px;margin-top:16px;border-top:1px solid var(--line2);padding-top:12px;flex-wrap:wrap}
@@ -178,9 +241,15 @@
   .donebar{background:var(--good-bg);border:1px solid var(--good);border-radius:10px;padding:12px 14px;margin:14px 0 4px}
   .donebar .dt{font-size:14px;font-weight:800;color:var(--good)}
   .donebar .dd{font-size:12.5px;color:var(--ink);margin-top:4px;line-height:1.55}
-  body.ro .cbtn,body.ro .addbtn,body.ro .arch,body.ro .rarch,body.ro .prevcard .cta,body.ro footer{display:none}
+  /* button.arch, not .arch: unscoped, this hid every ARCHIVED plan card and rung the
+     moment the workbook went read only, so the copy he sent back was missing the
+     plans he had just archived. */
+  body.ro .cbtn,body.ro .addbtn,body.ro button.arch,body.ro .rarch,body.ro .prevcard .cta,body.ro footer{display:none}
   body.ro{padding-bottom:24px}
-  body.ro .bb-input,body.ro .rin,body.ro .rlenin,body.ro .redit input{background:var(--bg);color:var(--mut)}
+  /* input.rlenin for the same reason the hover is: "Month to month" and an archived
+     length are spans, and greying them like a locked field paints a control that was
+     never there. */
+  body.ro .bb-input,body.ro .rin,body.ro input.rlenin,body.ro .redit input{background:var(--bg);color:var(--mut)}
   body.ro .bchip{cursor:default;opacity:.75}
   body.ro .bchip.sel{opacity:1}
 
@@ -218,6 +287,24 @@
     .send{flex:1 1 100%;order:1}
     .twocol .right{flex:1 1 100%;position:static}
     h1{font-size:19px}
+    /* Same four columns of meaning, stacked. The edit controls take a line of their
+       own because $ + field + Archive is wider than a phone has left after the
+       money columns, and squeezing them in is what crushed the saving badge. */
+    .rung{
+      --rw-price:70px; --rw-per:84px;
+      grid-template-columns:minmax(var(--rw-price),max-content) minmax(var(--rw-per),max-content) minmax(0,1fr);
+      grid-template-areas:
+        "len   len  len"
+        "tags  tags tags"
+        "price per  save"
+        "edit  edit edit";
+    }
+    .rungwrap.arch .rung{grid-template-areas:"len len len" "price note note" "edit edit edit"}
+    .rtags,.rung .redit{justify-self:start}
+    /* One column: the label sits directly above the control it belongs to, and the
+       gap above each label is what keeps the pairs apart. */
+    .afterrow,.rmore{grid-template-columns:minmax(0,1fr);gap:4px 0}
+    .afterrow .al,.rmore .ml{padding-top:9px}
   }
 </style>
 </head>
@@ -1051,32 +1138,35 @@ function drawLadder(lid){
   // The baseline row carries ids because recalc has to update it too. Without them
   // it keeps the price it was drawn with, so typing a new monthly price leaves the
   // ladder claiming the old one is the baseline every saving is measured against.
-  el.innerHTML=`<div class="rung base"><span class="rlenin" style="border:none">Month to month</span><span class="rprice" id="rbp_${lid}">${money(base)}</span><span class="rper" id="rbm_${lid}">${money(base)}/mo</span><span class="rsave none">the baseline</span></div>`
+  el.innerHTML=`<div class="rung base"><span class="rlenin">Month to month</span><span class="rprice" id="rbp_${lid}">${money(base)}</span><span class="rper" id="rbm_${lid}">${money(base)}/mo</span><span class="rsave none">the baseline</span></div>`
    + p.rungs.map((r,n)=>{
      const i=r.i;
      const mo=monthsOf(r.len), save=base*mo-r.price, per=r.price/mo;
      const badge=base?(save>0?`<span class="rsave">saves ${money(save)}</span>`:`<span class="rsave none">no saving</span>`):`<span class="rsave none">set a monthly price</span>`;
      const warn=(r.after===0&&!base)?`<span class="afterwarn">no monthly price to go back to</span>`:'';
      if(r.archived)return `<div class="rungwrap arch"><div class="rung">
-       <span class="rlenin" style="border:none">${esc(r.len)}</span><span class="rprice">${money(r.price)}</span>
+       <span class="rlenin">${esc(r.len)}</span><span class="rprice">${money(r.price)}</span>
        <span class="members">archived, members on it keep paying it</span>
        <span class="redit"><button class="rarch" onclick="setA('${lid}',${F(i)}archived',false);drawPlan('${lid}')">Restore</button></span></div></div>`;
+     // The badge span keeps its id (recalc rewrites it) and gains a class, because
+     // grid placement needs a handle on the CELL, not on the badge inside it. The
+     // "new" pill and the member count are wrapped together so a rung carrying both
+     // cannot elbow the edit controls onto a line of their own.
      return `<div class="rungwrap">
       <div class="rung">
        <input class="rlenin" value="${esc(r.len)}" oninput="setA('${lid}',${F(i)}length',this.value);recalc('${lid}')">
        <span class="rprice" id="rp_${lid}_${n}">${money(r.price)}</span>
        <span class="rper" id="rm_${lid}_${n}">${money(per)}/mo</span>
-       <span id="rs_${lid}_${n}">${badge}</span>
-       ${r.fresh?'<span class="rnew">new</span>':''}
-       ${r.m?`<span class="members">${esc(r.m)}</span>`:''}
+       <span class="rsavecell" id="rs_${lid}_${n}">${badge}</span>
+       <span class="rtags">${r.fresh?'<span class="rnew">new</span>':''}${r.m?`<span class="members">${esc(r.m)}</span>`:''}</span>
        <span class="redit">$<input type="number" inputmode="decimal" value="${r.price}" oninput="setA('${lid}',${F(i)}price',+this.value||0);recalc('${lid}')">
        <button class="rarch" onclick="setA('${lid}',${F(i)}archived',true);drawPlan('${lid}')" title="Keeps its Stripe price and history; just stops selling it">Archive</button></span>
       </div>
       <div class="afterrow"><span class="al">When the <span id="rl_${lid}_${n}">${esc(r.len)}</span> is up</span>
-       ${AFTER.map((a,j)=>`<button class="bchip sm ${r.after===j?'sel':''}" onclick="setA('${lid}',${F(i)}after',AFTER_W[${j}]);drawPlan('${lid}')">${a}</button>`).join('')} ${warn}
+       <span class="chiprow">${AFTER.map((a,j)=>`<button class="bchip sm ${r.after===j?'sel':''}" onclick="setA('${lid}',${F(i)}after',AFTER_W[${j}]);drawPlan('${lid}')">${a}</button>`).join('')}${warn}</span>
       </div>
       ${r.after===3?`<div class="afterrow"><span class="al">What happens instead? <b style="color:var(--gold-ink)">*</b></span>
-       <input class="rin" style="flex:1;min-width:200px" value="${esc(r.other)}" placeholder="explain in your own words" oninput="setA('${lid}',${F(i)}after_other',this.value)"></div>`:''}
+       <input class="rin" value="${esc(r.other)}" placeholder="explain in your own words" oninput="setA('${lid}',${F(i)}after_other',this.value)"></div>`:''}
       <div class="rmore">
        <div class="mf"><span class="ml">What do they get on this one?</span>
         <input class="rin" value="${esc(r.gets)}" placeholder="same as monthly" oninput="setA('${lid}',${F(i)}whats_included',this.value)"></div>
@@ -1206,7 +1296,7 @@ function codeCardHTML(lid){
       ${!(c.applies&&c.applies.length)&&String(c.code).trim()?`<div class="warnbox">Nothing ticked means this code comes off <b>everything</b> on the first bill${anyJoiningFee()?', including the joining fee':''}. Tick the prices it should apply to if that is not what you want.</div>`:''}
       <div class="subgrid" style="margin-top:10px">
         <span class="ml">Expires</span><input class="bb-input" type="date" style="max-width:160px" value="${esc(c.expires)}" oninput="setA('${lid}',${F}expires_at',this.value)">
-        <span class="ml">Max total uses</span><input class="bb-input" type="number" inputmode="numeric" style="max-width:100px" placeholder="unlimited" value="${c.max||''}" oninput="setA('${lid}',${F}max_redemptions',+this.value||0)">
+        <span class="ml">Max total uses</span><input class="bb-input" type="number" inputmode="numeric" style="max-width:130px" placeholder="unlimited" value="${c.max||''}" oninput="setA('${lid}',${F}max_redemptions',+this.value||0)">
       </div>
       <div class="subgrid" style="margin-top:8px"><span class="ml">One use per customer?</span>
         ${["Yes","No"].map((a,j)=>`<button class="bchip sm ${c.once===j?'sel':''}" onclick="setA('${lid}',${F}once_per_customer',YESNO_W[${j}]);drawCodes()">${a}</button>`).join('')}</div>
