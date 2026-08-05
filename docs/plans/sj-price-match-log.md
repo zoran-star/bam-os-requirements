@@ -203,3 +203,14 @@ The handoff records his business as "3D Basketball Prep", which is where the moc
 
 This is not cosmetic. It is the first thing Lij reads on a page asking him to confirm his own prices, and a wrong business name there costs confidence before he answers anything. **Needs Zoran's call**; until then the page renders the mockup's approved wording and the API returns it explicitly rather than deriving it from whichever column happens to be populated.
 
+
+### Ruling: the workbook header reads "By Any Means San Jose" (Zoran, 2026-08-04)
+Chosen over the mockup's "3D Basketball Prep" and over the legal "3D Prep LLC", **with the wordmark warning stated in the question and chosen anyway**, so it is a decision and not an oversight.
+
+The reading that makes it coherent: **the workbook is a BAM-sent artifact.** It arrives from us, it asks him to confirm what our system will sell on his behalf, and it is one of exactly two links he ever receives from us. BAM branding on a BAM page is right even though his own business trades as 3D.
+
+Consequences for the build:
+- The page takes the name from the API as `academy_name`, sourced from `clients.public_name`. **It is not hardcoded**, so when the branding deck settles San Jose's wordmark the page follows automatically with no code change.
+- The mockup's hardcoded "3D BASKETBALL PREP" string is therefore removed rather than re-pointed.
+- This does NOT resolve the wider wordmark question for the other 34 academies. It is one page's header, decided once.
+
