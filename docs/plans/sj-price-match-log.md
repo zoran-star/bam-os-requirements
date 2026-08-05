@@ -176,3 +176,30 @@ So the card could only ever come back empty. Under the no-partial-submit ruling 
 **Card count now 7:** sales tax, 4 plans, discount codes, anything else. Down from 9 (special deals to the member workbook, add-ons cut).
 Verified in the rendered page: 7 cards, no console errors, ADDONS and addonCardHTML gone, tax and codes cards intact, send gating correct at 7 and at 0 remaining.
 
+
+## Seeding facts verified live 2026-08-04 (MEMBER MANAGEMENT III), before building the workbook
+
+Queried rather than assumed, because the seed writes what these say.
+
+| Fact | Value | Consequence |
+|---|---|---|
+| `offer_prices` rows for SJ | **0** | Plans do NOT live in `offer_prices`. They are inside `offers.data.pricing.pricing_offerings` jsonb on offer `4d15a274`. So a plan card's target is `target_table='offers'`, `target_id=4d15a274`, `target_field='pricing.pricing_offerings[<i>]'` - NOT an `offer_prices` row. The schema comment guessed `offer_prices`; the seed must not. |
+| `offer_options` rows for SJ | 0 | Same |
+| `clients.tax_config` | **NULL** | The tax card's `current_value` is null, so ANY answer Lij gives is a change. Correct, and it is why the card exists. |
+| `clients.time_zone` | `America/Los_Angeles` | Confirmations render from this |
+
+### ⚠️ OPEN, and Lij sees it first: which name goes at the top of the page
+
+The approved mockup header reads **"3D BASKETBALL PREP"**. The database holds three names and **none of them is that**:
+
+| Column | Value |
+|---|---|
+| `business_name` | BAM San Jose |
+| `public_name` | By Any Means San Jose |
+| `legal_name` | 3D Prep LLC |
+| `owner_name` | Elijah De Guzman |
+
+The handoff records his business as "3D Basketball Prep", which is where the mockup got it. `public_name` = "By Any Means San Jose" is plausibly one of the **35 of 41 academies wrongly showing "BY ANY MEANS"** recorded in the wordmark note - the wordmark is supposed to be decided in the BRANDING DECK, which San Jose has not been through.
+
+This is not cosmetic. It is the first thing Lij reads on a page asking him to confirm his own prices, and a wrong business name there costs confidence before he answers anything. **Needs Zoran's call**; until then the page renders the mockup's approved wording and the API returns it explicitly rather than deriving it from whichever column happens to be populated.
+
