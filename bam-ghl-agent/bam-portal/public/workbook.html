@@ -1132,7 +1132,7 @@ function drawLadder(lid){
   const base=p.price;const T=TAX();
   const hint=document.getElementById('lhint_'+lid);
   if(hint)hint.innerHTML=p.rungs.some(r=>r.fresh&&!r.archived)
-    ? 'Options marked <b>new</b> are proposed by BAM and are not in your Stripe yet. Confirm them to start selling them, or archive them.'
+    ? 'Options marked <b>new</b> are ones we are proposing to sell for you. Confirm them to start, or archive them.'
     : (liveRungs(p).length?'Your Stripe already sells these. The savings are worked out for you.':'No pay-up-front options today. Add one if you want to offer it.');
   const F=i=>`'commitments.${i}.`;
   // The baseline row carries ids because recalc has to update it too. Without them

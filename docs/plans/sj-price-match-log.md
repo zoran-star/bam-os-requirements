@@ -214,3 +214,24 @@ Consequences for the build:
 - The mockup's hardcoded "3D BASKETBALL PREP" string is therefore removed rather than re-pointed.
 - This does NOT resolve the wider wordmark question for the other 34 academies. It is one page's header, decided once.
 
+
+### Correction 2026-08-05: Elementary DOES have prepay options, and our rule was applied inconsistently
+Zoran asked why we said Elementary Academy is $200. **The $200 is right** - Jenny Chung and Ted Miranda each pay exactly that every 4 weeks, against live Stripe prices. But answering the question exposed a gap.
+
+His Stripe holds a complete Elementary ladder that the 2026-08-01 ruling recorded as "no commitments":
+
+| Rung | Price | Interval | Subscribers |
+|---|---|---|---|
+| Month to month | $200 | 4 week | 2 |
+| **3 Months** | **$499** | 12 week | **0** |
+| **6 Months** | **$999** | 24 week | **0** |
+
+It was missed because the match only adopted prices with LIVE SUBSCRIBERS. **But we did not apply that rule consistently:** Academy 1x/week's $425 and $875 also have zero subscribers and we DID include them. Same situation, two different answers, and the difference was invisible because nobody compared the two decisions.
+
+**Ruling (Zoran, 2026-08-05): add both.** Not selling something he deliberately set up is a quiet loss. They enter as `proposed` with `current_value` NULL, so adopting them is a real change he has to confirm.
+
+**Rule for skill 1, and this is the transferable part:** the coverage gate asks whether every IN-USE price is classified. That is necessary and not sufficient - it is blind to a price the academy built and has never sold. A second sweep must ask the opposite question: *which coherent product ladders exist in their account that our plans do not offer?* His account holds 119 prices, most of them old one-offs, so the signal is a ladder whose intervals and discount shape MATCH the academy's other plans, not merely an unused price.
+
+### Correction: the "new" badge made a false claim about his own Stripe
+The badge read *"Options marked new are proposed by BAM and are not in your Stripe yet."* That is untrue of every rung it was applied to: Elementary $499/$999 and 1x/week $425/$875 all EXIST in his Stripe and have simply never sold. The flag is derived from `current_value` being null, which means *the portal has never stored this* - a different and narrower fact than the sentence claimed. Copy corrected to "ones we are proposing to sell for you", which is true whatever his Stripe holds. Same shape as the tax chip and the dead Send button: a claim wider than the thing that produced it.
+
