@@ -11,6 +11,14 @@ session that APPLIES them (Zoran, locally, via the Supabase CLI).
 row here in the same commit as the migration.** Remote sessions can never
 apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
+## ✅ APPLIED 2026-08-04 by MEMBER MANAGEMENT III (Zoran tried to run `/pending-sql` himself; it is a Claude Code command, not a shell one, so it errored in his terminal and the orchestrator applied it via Supabase MCP instead)
+
+`20260804T230000_workbooks.sql` - the owner-workbook capture schema. **Read back and verified, not trusted:** `workbooks` (16 cols, 3 indexes), `workbook_cards` (9 cols, 2 indexes), `workbook_answers` (14 cols, 4 indexes); RLS enabled and **0 policies** on all three, which is the intended service-role-only shape.
+
+**RLS was PROVEN, not assumed.** Checking `relrowsecurity` only proves a flag is set. So: a real row was inserted with the service role and returned, then read back with the browser anon key, which got `[]`. Control run alongside it, because an empty array can also mean the probe is broken: no key at all returns 401 and a bogus key returns 401, so a 200 with `[]` genuinely means authenticated-and-filtered. Probe row deleted afterwards (`RLSPROBE_%`, 1 row removed, id 7f4f4796).
+
+Design + rulings: `docs/plans/sj-price-match-log.md`. Core handoff: `docs/core-handoff/owner-workbooks.md`, **marked `core_parity: not-reviewed`** because `fc-core-srvc` returned `Repository not found` from this machine, so no core model was ever read.
+
 ## ✅ APPLIED 2026-08-01 by MEMBER MANAGEMENT II (Zoran's go: "merge and run it")
 
 `20260801T120000_client_stripe_direct.sql` - applied via Supabase MCP, read back: both tables exist (13 + 10 cols), RLS enabled on both, zero rows. Env `STRIPE_DIRECT_ENC_KEY` + `PORTAL_BASE_URL` set in Vercel PRODUCTION (preview adds blocked by a CLI wrapper loop - add per-branch if ever needed; preview deploys refuse webhook registration anyway via the PORTAL_BASE_URL guard).
@@ -20,7 +28,6 @@ apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 | Migration file | What it does | Blocked features until applied | Added |
 |---|---|---|---|
 | `20260731T090000_clients_stripe_portal_url.sql` | Adds `clients.stripe_portal_url text` (nullable, no backfill). ONLY the column - the `receipts` build owns the wider receipt system and will declare it again; `IF NOT EXISTS` so whichever runs second is a no-op | The welcome email's manage-membership link (PR #1666). **Must be applied BEFORE that PR merges**: the code reads the column from the MAIN select lists (`CLIENT_COLS` in `api/automations.js` + `api/agent-confirm.js`, `SENDER_COLS` in `api/_send.js`), so merging first would 400 the clients read that feeds EVERY channel, SMS included. Additive and unread until the merge, so applying first is inert | 2026-07-31. **The orchestrator is applying this one directly**, per Zoran's 2026-07-31 ruling that the pending-column retry (one wasted 400 plus a warning line on every send, forever) is not an acceptable substitute for shipping the column. Not for `/pending-sql` |
-| `20260804T230000_workbooks.sql` | Three new tables, all additive, nothing existing touched: `workbooks` (one send to one owner, tokenized no-login link, draft→sent→submitted→reviewed→applied→void), `workbook_cards` (**the unit of confirmation**, holding untouched/confirmed/changed), `workbook_answers` (the structured decisions: `target_kind` + target pointer + a `proposed`/`answered` was-now pair). RLS enabled with **no policies** on all three, service-role only, matching `client_stripe_direct` - the owner's browser never talks to Supabase, it calls an API route that resolves the token server-side | The **San Jose price workbook** (Zoran approved the mockup 2026-08-04) and later the member workbook. Both are blocked on this. **Inert when applied**: zero rows until a workbook is created, and no shipped code reads these tables until the workbook build merges, so applying early is safe | 2026-08-04, MEMBER MANAGEMENT III. Ready for `/pending-sql`. Design + rulings in `docs/plans/sj-price-match-log.md`; core handoff in `docs/core-handoff/owner-workbooks.md`, **marked `core_parity: not-reviewed` because the fc-core-srvc repo was inaccessible from this machine (`Repository not found`)** |
 
 
 > **`20260729T230000` step 2 - DONE 2026-07-30.** The follow-up this note demanded is
