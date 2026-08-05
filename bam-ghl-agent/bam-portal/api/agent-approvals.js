@@ -26,6 +26,9 @@ import { loadMergedOverrides } from "./agent/_sections.js";
 import { loadContactMemory } from "./agent/contact-memory.js";
 import { loadCalendars, calendarForClass, freeSlots, summarizeSlots, bookingProviderOf, bookPortalTrial, passedTrialContactIds, upcomingBookedContactIds, loadClassesFor } from "./agent/booking.js";
 import { classIndex, classByName, classForCalendar, ageRoutingReadiness, buildQuestion } from "./agent/_class-slots.js";
+// Does the drafted SENTENCE agree with the slot stamped on the card? Everything
+// else here verifies the timestamp; this reads the words the parent receives.
+import { slotTextConflict } from "./agent/_slot-text.js";
 import { resolveClassesForAge } from "./agent/_class-routing.js";
 import { respondedStage, contactStageState, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
@@ -1238,6 +1241,16 @@ async function handler(req, res) {
       // automation send it (#3). Fail to 'ghl' (the no-double-text branch).
       let booking_provider = "ghl";
       try { booking_provider = await bookingProviderOf(clientId); } catch (_) {}
+      // Text-vs-slot check at READ time, not draft time, so it needs no column and
+      // so it catches cards that were drafted BEFORE this check existed - Julie
+      // Boulton's "Monday the 18th" card was already sitting pending when this
+      // shipped, and a draft-time-only check would have let exactly the card that
+      // motivated the guard through. The send refuses on the same condition; this
+      // is what tells the reviewer why before they get there. Fail open per card.
+      for (const r of list) {
+        if (!r.book_slot_at || !r.draft_message) continue;
+        try { r.slot_text_warning = slotTextConflict(r.draft_message, r.book_slot_at, (client && client.time_zone) || null); } catch (_) {}
+      }
       return res.status(200).json({ ready: list, count: list.length, quiet, booking_provider });
     }
     // Deck header names (Zoran 2026-07-09): the Hawkeye card shows the ATHLETE on
@@ -1427,6 +1440,27 @@ async function handler(req, res) {
       // Tuesday at 5 work?" on Wednesday. Reopen + repick is one tap.
       if (propPatch.book_slot_at && new Date(propPatch.book_slot_at).getTime() <= Date.now()) {
         return res.status(409).json({ error: "That proposed time has already passed - reopen the card and pick a new slot." });
+      }
+      // The message must AGREE with the slot it carries. The staleness check above
+      // and the open-slot check in normalizeProposal both interrogate the
+      // timestamp; neither reads the sentence, which is the half the parent
+      // actually receives. Julie Boulton's card (GTA 2026-08-04) offered "Monday
+      // the 18th" while stamped with Tuesday the 18th and passed every check we
+      // had. Refuse rather than repair: we cannot know whether the model meant
+      // Monday the 17th or Tuesday the 18th, and a human is already right here.
+      {
+        // The picked slot the deck sent wins; fall back to whatever the row is
+        // already stamped with, so a caller that omits proposed_slot_at is still
+        // checked rather than silently exempt.
+        let slotForText = propPatch.book_slot_at || null;
+        if (!slotForText && b.ready_id) {
+          try {
+            const [pr] = await sb(`agent_ready_replies?id=eq.${encodeURIComponent(b.ready_id)}&client_id=eq.${clientId}&select=book_slot_at`);
+            slotForText = (pr && pr.book_slot_at) || null;
+          } catch (_) {}
+        }
+        const conflict = slotForText ? slotTextConflict(b.reply, slotForText, (client && client.time_zone) || null) : null;
+        if (conflict) return res.status(409).json({ error: conflict, slot_text_conflict: true });
       }
       // QUIET HOURS: a human approved this after 9:30pm / before 8am. Don't text the
       // parent now — hold the approved reply and let the detect cron flush it at 8am.
@@ -1751,6 +1785,18 @@ async function handler(req, res) {
       if (!calendarId || !slotAt) return res.status(400).json({ error: "missing calendar or slot for this booking" });
       let startIso;
       try { startIso = new Date(slotAt).toISOString(); } catch (_) { return res.status(400).json({ error: "invalid slot time" }); }
+      // Same text-vs-slot guard as the reply send, and it matters MORE here: this
+      // branch books the slot AND texts the confirmation, so a message naming the
+      // wrong weekday becomes a family's diarised plan for a session on another
+      // day. Checked against the slot actually being booked (the picker's value
+      // when staff changed it), not the draft's original.
+      {
+        const conflict = slotTextConflict(
+          (typeof b.reply === "string" ? b.reply : row.draft_message) || "",
+          startIso, (client && client.time_zone) || null,
+        );
+        if (conflict) return res.status(409).json({ error: conflict, slot_text_conflict: true });
+      }
       // Provider branch: booking_provider='portal' books onto OUR slot via the
       // capacity-safe book_trial_slot RPC (no GHL appointment at all); every
       // other academy keeps the exact GHL appointment POST.

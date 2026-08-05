@@ -42399,7 +42399,15 @@ function _hk2CardHtml(r, pos, total, isTop) {
       <textarea class="hk2-draft"${id.draft} oninput="_hk2Edited()">${escapeHTML(r.draft_message || '')}</textarea>
       <div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed, your confirmation text sends, and the Confirm agent takes over (reminders send from config).</div>`
       : `<div class="hk2-note">Only this academy's trial calendars show here. Book it = the slot is claimed in your calendar and its booked-trial automation sends the confirmation + location. The Confirm agent then takes over.</div>`;
-    body = `${_hk2ThreadHtml(r, isTop)}
+    // Same text-vs-slot warning as the proposal card, and it counts double here:
+    // this card BOOKS. The pickers below show the slot, the box above shows the
+    // words, and nothing used to compare them - so "Monday the 18th" could book
+    // Tuesday the 18th and text the family the confirmation. confirm-book refuses
+    // while this is showing.
+    const slotWarn = r.slot_text_warning
+      ? `<div style="display:flex;gap:8px;align-items:flex-start;background:rgba(240,112,96,.1);border:1px solid var(--red,#F07060);border-radius:8px;padding:9px 11px;margin:2px 0 8px;font-size:12px;line-height:1.5;color:var(--text)"><span style="color:var(--red,#F07060);font-weight:700">!</span><span>${escapeHTML(r.slot_text_warning)}</span></div>`
+      : '';
+    body = `${_hk2ThreadHtml(r, isTop)}${slotWarn}
       <div class="hk2-lbl">Booking details - the agent's pick, change if needed</div>
       <div class="hk2-fields">
         <label><span>Calendar</span><select${id.cal} onchange="_hk2CalChange()"><option value="${escapeHTML(r.book_calendar_id || '')}" selected>${escapeHTML(r.book_group || 'Loading calendars…')}</option></select></label>
@@ -42499,7 +42507,17 @@ function _hk2CardHtml(r, pos, total, isTop) {
     // source of truth on a proposal; the slot only becomes visible on the formal
     // Book-it confirmation card (where send actually books). The stored
     // book_slot_at still rides the card silently to pre-fill that later Book-it.
-    const proposal = '';
+    //
+    // 2026-08-04: hiding the box hid the DISPLAY of that disagreement, not the
+    // disagreement. The silent slot still pre-fills the later Book-it, so a
+    // message saying Monday carrying a Tuesday slot books Tuesday - which is
+    // exactly what happened to Julie Boulton ("Monday the 18th", stamped Tue Aug
+    // 18). So: still no box when the two agree, but when the backend detects they
+    // DON'T, say so loudly. The send refuses on the same condition, so this is the
+    // reviewer's chance to fix it rather than a wall they hit after tapping.
+    const proposal = r.slot_text_warning
+      ? `<div style="display:flex;gap:8px;align-items:flex-start;background:rgba(240,112,96,.1);border:1px solid var(--red,#F07060);border-radius:8px;padding:9px 11px;margin:2px 0 8px;font-size:12px;line-height:1.5;color:var(--text)"><span style="color:var(--red,#F07060);font-weight:700">!</span><span>${escapeHTML(r.slot_text_warning)}</span></div>`
+      : '';
     // 🔥 The fired reignition: the message pre-written at park time, back for
     // its final ✓ on the day the lead asked for.
     const reigBanner = (r._kind === 'reignite_due' && r.reignite_at)
