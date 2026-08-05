@@ -1848,7 +1848,7 @@ async function handler(req, res) {
         // template's Location line still arrives via the same-day 9am check-in.)
         if (confirmationSent) {
           try {
-            const info = await resolveContactInfo(token, contactId);
+            const info = await resolveContactInfo(token, contactId, new Map(), clientId);
             if (info && info.email) await sendOn({ channel: "email", clientId, toEmail: info.email, subject: "Your free trial is booked!", body: confirmMsg, vars: {} });
           } catch (_) {}
         }

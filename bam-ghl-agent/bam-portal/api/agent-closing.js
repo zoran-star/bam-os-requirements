@@ -405,7 +405,7 @@ async function isLiveMember(clientId, contactId, token) {
     const byId = await sb(`members?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.live&select=id&limit=1`);
     if (Array.isArray(byId) && byId.length) return true;
     if (token) {
-      const info = await resolveContactInfo(token, contactId).catch(() => null);
+      const info = await resolveContactInfo(token, contactId, new Map(), clientId).catch(() => null);
       const email = info && info.email;
       if (email) {
         const byEmail = await sb(`members?client_id=eq.${encodeURIComponent(clientId)}&parent_email=eq.${encodeURIComponent(email)}&status=eq.live&select=id&limit=1`);

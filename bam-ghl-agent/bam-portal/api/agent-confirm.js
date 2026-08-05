@@ -382,7 +382,7 @@ async function isLiveMember(clientId, contactId, token) {
     const byId = await sb(`members?client_id=eq.${encodeURIComponent(clientId)}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=eq.live&select=id&limit=1`);
     if (Array.isArray(byId) && byId.length) return true;
     if (token) {
-      const info = await resolveContactInfo(token, contactId).catch(() => null);
+      const info = await resolveContactInfo(token, contactId, new Map(), clientId).catch(() => null);
       const email = info && info.email;
       if (email) {
         const byEmail = await sb(`members?client_id=eq.${encodeURIComponent(clientId)}&parent_email=eq.${encodeURIComponent(email)}&status=eq.live&select=id&limit=1`);
@@ -575,7 +575,7 @@ async function fireScriptedStep({ client, token, locationId, mode, autos, cfg, i
   // Resolve EVERYTHING ourselves now (portal-native): appointment tokens here, then
   // the contact/location tokens via the send engine's resolver — so the stored card
   // is final text (clean in the approval inbox, and quiet-hours flush can send it raw).
-  const info = await resolveContactInfo(token, contactId).catch(() => ({ email: null, phone: null, firstName: null, fullName: null }));
+  const info = await resolveContactInfo(token, contactId, new Map(), client && client.id).catch(() => ({ email: null, phone: null, firstName: null, fullName: null }));
   // Greet the PARENT by first name (they booked the trial and receive this SMS).
   // The parent name lives in the portal booking (trial_bookings.parent_name), off
   // GHL; fall back to the queue item name, then the GHL contact first name.
@@ -1364,7 +1364,7 @@ async function handler(req, res) {
       const fireCardEmail = async (card) => {
         if (!card || !card.email_body) return;
         try {
-          const info = await resolveContactInfo(token, b.contact_id);
+          const info = await resolveContactInfo(token, b.contact_id, new Map(), clientId);
           if (info && info.email) await sendOn({ channel: "email", clientId, toEmail: info.email, subject: card.email_subject || "Your free trial is booked!", body: card.email_body, vars: {} });
         } catch (_) {}
       };
