@@ -9000,7 +9000,12 @@ function _renderAssets() {
 }
 
 function _assetCard(a) {
-  const isLink = !!a.link_url;
+  // storage_path always wins: an asset stored in Supabase (uploaded directly,
+  // or synced from GHL/a website import) should preview as a real thumbnail
+  // even when link_url is also set for provenance (where the file originally
+  // came from). Only treat it as a bare external link when there's no
+  // storage_path at all (e.g. a pasted Drive/Dropbox share link).
+  const isLink = !a.storage_path && !!a.link_url;
   const url = isLink ? a.link_url : _assetUrl(a.storage_path);
   const selStyle = "width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:6px 8px;font:inherit;font-size:11.5px";
   const lbl = (t) => `<div style="font-size:9.5px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em;margin:9px 0 3px">${t}</div>`;
