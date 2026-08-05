@@ -421,7 +421,18 @@ function isChanged(a){
   const shown=has(a.proposed)?a.proposed:a.current_value;
   return JSON.stringify(a.answered)!==JSON.stringify(has(shown)?shown:null);
 }
-function idxOf(list,v,dflt){const i=list.indexOf(v);return i<0?dflt:i}
+/* Vocabulary lookup, CASE-INSENSITIVE on purpose. The offer stores these values
+   lowercase ("waive", "charge") while this page's lists are capitalised, and an
+   exact match silently fell through to the DEFAULT - which on the sign-up fee is
+   "Charge". Every prepay rung then told the owner we take his joining fee, the
+   opposite of what his own Stripe does. A money field must not fail toward
+   charging, and a vocabulary mismatch is not the owner's answer. */
+function idxOf(list,v,dflt){
+  if(v==null)return dflt;
+  const t=String(v).trim().toLowerCase();
+  const i=list.findIndex(x=>String(x).trim().toLowerCase()===t);
+  return i<0?dflt:i;
+}
 
 /* Writes an answer and schedules the save. Every write goes through here, so
    there is exactly one place where "the owner changed something" is defined. */
