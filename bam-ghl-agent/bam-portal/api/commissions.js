@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { stripeFetch as transportStripeFetch } from "./_stripe-transport.js";
+import { assertHeaderSafeCredential, safeFetch, HEADER_UNSAFE } from "./_header-safe-credential.js";
 // Vercel Serverless Function - Commission & BAM Payment Calculator
 // (Mike / BAM spec, 2026-07-25 - built off the Scaling System Partner
 // Agreement's growth-share clause).
@@ -55,16 +56,28 @@ const REPORT_EMAILS = (process.env.COMMISSION_REPORT_EMAILS || "acallon@gmail.co
 const ALERT_EMAILS = (process.env.COMMISSION_ALERT_EMAILS || "mike@byanymeansbusiness.com,cole@byanymeansbball.com")
   .split(",").map(s => s.trim()).filter(Boolean);
 
+// THE OTHER HALF OF THE SAME LEAK, and the worse half. The Stripe helper below
+// was guarded first while this one still built `Bearer ${SUPABASE_SERVICE_KEY}`
+// raw - and the handler's catch is `res.status(e.status || 500).json({ error:
+// e.message })`. A service-role key with a leading break makes undici throw a
+// TypeError quoting the whole header, and that key bypasses RLS. Guarding one
+// credential in a file and not the other is not a partial fix, it is a fix that
+// reads like one.
+function sbKey() {
+  return assertHeaderSafeCredential(SUPABASE_SERVICE_KEY, "the Supabase service key (SUPABASE_SERVICE_ROLE_KEY)");
+}
+
 async function sb(path, init = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  const key = sbKey();
+  const res = await safeFetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...init,
     headers: {
-      apikey: SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      apikey: key,
+      Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
       ...(init.headers || {}),
     },
-  });
+  }, "Supabase");
   if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
@@ -72,11 +85,23 @@ async function sb(path, init = {}) {
 
 // ── Auth (staff only - clients never see commission figures) ───────────────
 async function resolveStaff(req) {
-  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
   if (!token) throw Object.assign(new Error("no token"), { status: 401 });
-  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
-  });
+  // REACHABLE BY ANY CALLER, which is what made this the worst site in the file:
+  // the service-key header is built BEFORE the token can be rejected, so a
+  // stranger sending any bearer at all reached the throw. The caller's own token
+  // gets the same treatment for a different reason - a token that cannot be a
+  // header value is an invalid token, so it earns the 401 it was always going to
+  // get instead of a 500 that quotes it back.
+  // TOKEN FIRST, then our own configuration. Both orders are safe, but this one
+  // keeps an anonymous caller's answer unchanged: a bad token is still a 401
+  // rather than a 500 that says our service key is missing. Server faults are
+  // for callers who got past the door.
+  if (HEADER_UNSAFE.test(token)) throw Object.assign(new Error("invalid token"), { status: 401 });
+  const key = sbKey();
+  const userRes = await safeFetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: key, Authorization: `Bearer ${token}` },
+  }, "Supabase");
   if (!userRes.ok) throw Object.assign(new Error("invalid token"), { status: 401 });
   const user = await userRes.json();
   let rows = await sb(`staff?user_id=eq.${user.id}&select=id,name,role&limit=1`);
@@ -170,9 +195,16 @@ const money = (n) => "$" + Number(n || 0).toLocaleString("en-US", { minimumFract
 
 // ── Stripe (platform key for invoicing; connected account for revenue) ─────
 async function stripeForm(path, params, extraHeaders = {}) {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error("STRIPE_SECRET_KEY not configured");
-  const res = await fetch(`${STRIPE_API}${path}`, {
+  const raw = process.env.STRIPE_SECRET_KEY;
+  if (!raw) throw new Error("STRIPE_SECRET_KEY not configured");
+  // The handler's catch is `res.status(e.status || 500).json({ error: e.message })`
+  // - the exact shape that put a live key on screen once already. Trim the
+  // platform key, refuse a break that survives the trim before it can be quoted
+  // back by undici, and let safeFetch replace any runtime fetch error with one
+  // we wrote. The refusal is statusless on purpose, so that catch answers 500:
+  // a broken env var is our misconfiguration, not the caller's bad request.
+  const key = assertHeaderSafeCredential(raw, "the platform Stripe key (STRIPE_SECRET_KEY)");
+  const res = await safeFetch(`${STRIPE_API}${path}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
@@ -180,7 +212,7 @@ async function stripeForm(path, params, extraHeaders = {}) {
       ...extraHeaders,
     },
     body: new URLSearchParams(params).toString(),
-  });
+  }, "Stripe");
   const json = await res.json();
   if (!res.ok) throw new Error(`Stripe ${res.status}: ${json?.error?.message || JSON.stringify(json).slice(0, 200)}`);
   return json;

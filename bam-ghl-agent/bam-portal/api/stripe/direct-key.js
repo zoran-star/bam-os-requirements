@@ -45,9 +45,12 @@ async function resolveStaff(req) {
   });
   if (!userRes.ok) throw Object.assign(new Error("invalid token"), { status: 401 });
   const user = await userRes.json();
-  let staff = await sb(`staff?user_id=eq.${user.id}&select=id,name&limit=1`);
+  // email is selected so the save's actor chain has something REAL to fall back
+  // to when the cosmetic name field is empty - a fallback to a column nobody
+  // asked for is a fallback that never fires.
+  let staff = await sb(`staff?user_id=eq.${user.id}&select=id,name,email&limit=1`);
   if ((!staff || !staff[0]) && user.email) {
-    staff = await sb(`staff?email=eq.${encodeURIComponent(user.email)}&select=id,name&limit=1`);
+    staff = await sb(`staff?email=eq.${encodeURIComponent(user.email)}&select=id,name,email&limit=1`);
   }
   if (!Array.isArray(staff) || !staff[0]) throw Object.assign(new Error("BAM staff only"), { status: 403 });
   return { user, staff: staff[0] };
@@ -55,6 +58,22 @@ async function resolveStaff(req) {
 
 const nowIso = () => new Date().toISOString();
 const bad = (message, status = 400) => Object.assign(new Error(message), { status });
+
+// ── who is acting: ONE resolution, used by every branch that writes audit ────
+// IDENTIFIABILITY, not a name check. `name` is a cosmetic column; an empty or
+// whitespace-only one must never block a staff member from touching a payment
+// credential, and it must never land a nameless row in the audit either.
+//
+// Every link is TRIMMED BEFORE it counts, which is what makes the invariant
+// true rather than merely claimed: "   " is truthy, so an untrimmed `||` chain
+// would short-circuit on it and hand back a blank actor. The tail is the staff
+// id, a value that exists for every row that got past resolveStaff, so this
+// function cannot return an empty string.
+const actorName = (staff, user) =>
+  String((staff && staff.name) || "").trim()
+  || String((staff && staff.email) || "").trim()
+  || String((user && user.email) || "").trim()
+  || `staff:${staff.id}`;
 
 async function writeAudit({ client_id, action_type, args, performed_by, performed_by_name }) {
   try {
@@ -82,7 +101,7 @@ async function writeAudit({ client_id, action_type, args, performed_by, performe
 // stored so the UI can say exactly what will not work. But a probe that could
 // not get an answer (network, 429, 5xx) ABORTS the whole run with a 502: only
 // established facts may enter the map.
-async function probeKey(secretKey, publishableKey) {
+export async function probeKey(secretKey, publishableKey) {
   const k = String(secretKey || "").trim();
   if (!k) throw bad("secret_key required");
   if (k.startsWith("sk_")) throw bad("paste a RESTRICTED key, never the full secret key");
@@ -157,6 +176,157 @@ async function probeKey(secretKey, publishableKey) {
   };
 }
 
+// ── the save: probe, persist, register the webhook ──────────────────────────
+// ONE implementation, two callers: the HTTP route below and a CLI. It never
+// touches req/res, so a chat/CLI can save a platform-locked academy's key
+// without a browser. Errors are thrown with a .status the caller maps (the HTTP
+// route to a status code, a CLI to an exit code).
+//
+// ACTOR DISCIPLINE. performedByName is REQUIRED - the goal is IDENTIFIABILITY,
+// never a null actor in the audit row, and this function never invents a staff
+// identity to fill the gap. It is NOT a name check standing between a staff
+// member and a payment credential: the HTTP route resolves the first thing that
+// identifies the signed-in human (name, then email, then the staff id - see the
+// save branch), a chain that cannot come out empty for a real staff row. So the
+// throw below only ever fires on the CLI path, where an omitted actor is a
+// genuine caller bug.
+//
+// TWO IDS ON PURPOSE, not an oversight: performedBy is member_audit_log
+// .performed_by and createdBy is client_stripe_direct.created_by. Both columns
+// are uuid, but they hold DIFFERENT id spaces - the route passes the STAFF
+// row's id for the first and the AUTH user's id for the second, exactly as this
+// code did before it was extracted. One shared parameter would put a staff id
+// in a column everything else joins as an auth id. Either may be null (a CLI
+// has neither); the NAME is what makes the row answerable.
+export async function saveDirectKey({
+  clientId,
+  secretKey,
+  publishableKey,
+  performedBy = null,
+  performedByName,
+  createdBy = null,
+}) {
+  if (!clientId) throw bad("client_id required");
+  const actor = String(performedByName || "").trim();
+  if (!actor) throw bad("performedByName required");
+
+  const pk = String(publishableKey || "").trim();
+  if (!pk || !pk.startsWith("pk_live_")) {
+    throw bad("publishable_key (pk_live_...) is required to save - the checkout cannot mount Stripe.js without it");
+  }
+  const report = await probeKey(secretKey, pk);
+
+  // Idempotency keys are ACCOUNT-scoped: re-pointing an academy at a
+  // different Stripe account under the same client_id would replay old
+  // idempotency keys against a stranger's account. No force flag on purpose
+  // - clearing clients.stripe_connect_account_id first is the deliberate,
+  // visible step that says "yes, this academy changed Stripe accounts".
+  const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,stripe_connect_account_id&limit=1`);
+  const client = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;
+  if (!client) throw bad("academy not found", 404);
+  // Trimmed on both sides: a stored id with whitespace drift (the classic
+  // trailing-\n from a bad env pipe) is still the SAME account and must not
+  // false-409, while a genuinely different account must never slip past on
+  // a formatting difference.
+  const storedAcct = String(client.stripe_connect_account_id || "").trim();
+  if (storedAcct && storedAcct !== String(report.account_id || "").trim()) {
+    throw bad(
+      `this key belongs to ${report.account_id}, but the academy is already tied to ${storedAcct}. ` +
+      "Refusing to switch Stripe accounts through a key save.",
+      409
+    );
+  }
+
+  // ONE STRIPE ACCOUNT, ONE ACADEMY. The upsert below keys on client_id, but
+  // client_stripe_direct carries a UNIQUE index on stripe_account_id, so an
+  // account already saved under ANOTHER academy makes that upsert violate the
+  // index. PostgREST answers 409 and sb() rethrows it as a raw
+  // "Supabase 409: ..." with NO .status - which surfaces as a 500 full of
+  // Postgres to staff and as a crash to a CLI, AFTER the probe has already hit
+  // live Stripe, and in neither case does anyone get told the actual problem.
+  // So ask first and say it in a sentence someone can act on. Trim-compared on
+  // both sides, same discipline as the stored-account check above: an academy
+  // re-saving its OWN account id must stay idempotent.
+  const acctId = String(report.account_id || "").trim();
+  const claimRows = await sb(`client_stripe_direct?stripe_account_id=eq.${encodeURIComponent(acctId)}&select=client_id&limit=1`);
+  const claimedBy = Array.isArray(claimRows) && claimRows[0] ? String(claimRows[0].client_id || "").trim() : "";
+  if (claimedBy && claimedBy !== String(clientId).trim()) {
+    // NAME THE OTHER ACADEMY. "already saved under BAM Whatever" is something an
+    // operator can act on; a uuid is not. But the lookup is BEST EFFORT and the
+    // throw is computed OUTSIDE the try on purpose: if this select fails or
+    // comes back empty we still refuse, just less helpfully. A failure to look
+    // up a name must never become a failure to refuse - that would turn a
+    // nice-to-have into a hole that lets a colliding save through.
+    let claimedName = "";
+    try {
+      const owner = await sb(`clients?id=eq.${encodeURIComponent(claimedBy)}&select=business_name&limit=1`);
+      claimedName = Array.isArray(owner) && owner[0] ? String(owner[0].business_name || "").trim() : "";
+    } catch (e) {
+      claimedName = "";
+    }
+    throw bad(
+      claimedName
+        ? `that Stripe account (${acctId}) is already saved under "${claimedName}" - remove it there first`
+        : `that Stripe account (${acctId}) is already saved under another academy (client_id ${claimedBy}) - remove it there first`,
+      409
+    );
+  }
+
+  await sb(`client_stripe_direct?on_conflict=client_id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{
+      client_id: clientId,
+      status: "active",
+      secret_key_enc: encryptSecret(String(secretKey).trim()),
+      secret_key_last4: report.key_last4,
+      publishable_key: pk,
+      livemode: true, // rk_live_ enforced by the probe
+      stripe_account_id: report.account_id,
+      capabilities: report.capabilities,
+      key_last_verified_at: nowIso(),
+      created_by: createdBy,
+      created_by_name: actor,
+      updated_at: nowIso(),
+    }]),
+  });
+
+  // Mirror api/stripe/connect.js exactly: 'connected' + connected_at only
+  // once Stripe says the account can actually charge.
+  const chargeable = report.charges_enabled === true;
+  await sb(`clients?id=eq.${encodeURIComponent(clientId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      ...(storedAcct ? {} : { stripe_connect_account_id: report.account_id }),
+      stripe_connect_status: chargeable ? "connected" : "onboarding",
+      stripe_connect_connected_at: chargeable ? nowIso() : null,
+      updated_at: nowIso(),
+    }),
+  });
+
+  await writeAudit({
+    client_id: clientId,
+    action_type: "stripe-direct-key-save",
+    args: { account: report.account_id, key_last4: report.key_last4, capabilities: report.capabilities },
+    performed_by: performedBy,
+    performed_by_name: actor,
+  });
+
+  bustTransportCache();
+
+  // Webhook registration failure is REPORTED, never thrown away, and never
+  // undoes the save - staff can re-run it from the card.
+  let webhook;
+  try {
+    webhook = await ensureAcademyWebhook({ clientId });
+  } catch (e) {
+    webhook = { ok: false, error: e.message || String(e) };
+  }
+
+  return { ok: true, ...report, webhook };
+}
+
 const ROW_SELECT = "client_id,status,secret_key_last4,publishable_key,livemode,stripe_account_id,capabilities,key_last_verified_at,created_by_name,created_at,updated_at";
 const WEBHOOK_SELECT = "client_id,endpoint_id,enabled_events,registered_at,last_verified_at";
 
@@ -173,86 +343,21 @@ async function handler(req, res) {
     }
 
     if (action === "save") {
-      const pk = String(req.body.publishable_key || "").trim();
-      if (!pk || !pk.startsWith("pk_live_")) {
-        throw bad("publishable_key (pk_live_...) is required to save - the checkout cannot mount Stripe.js without it");
-      }
-      const report = await probeKey(req.body.secret_key, pk);
-
-      // Idempotency keys are ACCOUNT-scoped: re-pointing an academy at a
-      // different Stripe account under the same client_id would replay old
-      // idempotency keys against a stranger's account. No force flag on purpose
-      // - clearing clients.stripe_connect_account_id first is the deliberate,
-      // visible step that says "yes, this academy changed Stripe accounts".
-      const clientRows = await sb(`clients?id=eq.${encodeURIComponent(client_id)}&select=id,stripe_connect_account_id&limit=1`);
-      const client = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;
-      if (!client) throw bad("academy not found", 404);
-      // Trimmed on both sides: a stored id with whitespace drift (the classic
-      // trailing-\n from a bad env pipe) is still the SAME account and must not
-      // false-409, while a genuinely different account must never slip past on
-      // a formatting difference.
-      const storedAcct = String(client.stripe_connect_account_id || "").trim();
-      if (storedAcct && storedAcct !== String(report.account_id || "").trim()) {
-        throw bad(
-          `this key belongs to ${report.account_id}, but the academy is already tied to ${storedAcct}. ` +
-          "Refusing to switch Stripe accounts through a key save.",
-          409
-        );
-      }
-
-      await sb(`client_stripe_direct?on_conflict=client_id`, {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify([{
-          client_id,
-          status: "active",
-          secret_key_enc: encryptSecret(String(req.body.secret_key).trim()),
-          secret_key_last4: report.key_last4,
-          publishable_key: pk,
-          livemode: true, // rk_live_ enforced by the probe
-          stripe_account_id: report.account_id,
-          capabilities: report.capabilities,
-          key_last_verified_at: nowIso(),
-          created_by: user.id,
-          created_by_name: staff.name || null,
-          updated_at: nowIso(),
-        }]),
+      // Thin caller. The save lives in saveDirectKey above so a CLI can run the
+      // exact same code path - re-inlining it here forks the money path.
+      //
+      // The actor is resolved by actorName() - the same one the disable branch
+      // uses, so the two can never drift into different rules about who counts
+      // as identifiable.
+      const payload = await saveDirectKey({
+        clientId: client_id,
+        secretKey: req.body.secret_key,
+        publishableKey: req.body.publishable_key,
+        performedBy: staff.id,
+        performedByName: actorName(staff, user),
+        createdBy: user.id,
       });
-
-      // Mirror api/stripe/connect.js exactly: 'connected' + connected_at only
-      // once Stripe says the account can actually charge.
-      const chargeable = report.charges_enabled === true;
-      await sb(`clients?id=eq.${encodeURIComponent(client_id)}`, {
-        method: "PATCH",
-        headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({
-          ...(storedAcct ? {} : { stripe_connect_account_id: report.account_id }),
-          stripe_connect_status: chargeable ? "connected" : "onboarding",
-          stripe_connect_connected_at: chargeable ? nowIso() : null,
-          updated_at: nowIso(),
-        }),
-      });
-
-      await writeAudit({
-        client_id,
-        action_type: "stripe-direct-key-save",
-        args: { account: report.account_id, key_last4: report.key_last4, capabilities: report.capabilities },
-        performed_by: staff.id,
-        performed_by_name: staff.name || null,
-      });
-
-      bustTransportCache();
-
-      // Webhook registration failure is REPORTED, never thrown away, and never
-      // undoes the save - staff can re-run it from the card.
-      let webhook;
-      try {
-        webhook = await ensureAcademyWebhook({ clientId: client_id });
-      } catch (e) {
-        webhook = { ok: false, error: e.message || String(e) };
-      }
-
-      return res.status(200).json({ ok: true, ...report, webhook });
+      return res.status(200).json(payload);
     }
 
     if (action === "disable") {
@@ -266,7 +371,10 @@ async function handler(req, res) {
         action_type: "stripe-direct-key-disable",
         args: { note: "direct key switched off by staff - academy routes via Connect again" },
         performed_by: staff.id,
-        performed_by_name: staff.name || null,
+        // Same resolution as the save. Switching a live academy's payment
+        // transport off is exactly as answerable as switching it on, so it may
+        // not land nameless either.
+        performed_by_name: actorName(staff, user),
       });
       bustTransportCache();
       return res.status(200).json({ ok: true });
@@ -287,7 +395,24 @@ async function handler(req, res) {
 
     throw bad(`unknown action: ${action}`);
   } catch (e) {
-    return res.status(e.status || 500).json({ error: e.message || String(e) });
+    // ONLY A MESSAGE WE WROTE IS EVER ECHOED.
+    //
+    // This used to be `res.status(e.status || 500).json({ error: e.message })`
+    // for every error, which quietly made this route a repeater for whatever
+    // string an exception happened to be carrying. A key pasted with a line
+    // break in it (out of a wrapped email, a Slack code block, a PDF) survives
+    // .trim(), reaches fetch, and the runtime throws
+    //   Headers.append: "Bearer rk_live_...\n..." is an invalid header value
+    // - a message containing THE WHOLE LIVE KEY, with no .status, so it came
+    // back here as a 500 with the credential in the body.
+    //
+    // .status is the tell: bad() sets it, and bad() is us. Anything without one
+    // is a throw we did not write, and its message is not ours to forward. The
+    // detail still exists - it goes to the server log, where staff can read it
+    // and the browser cannot.
+    if (e && e.status) return res.status(e.status).json({ error: e.message || String(e) });
+    console.error("stripe/direct-key unexpected error:", (e && e.stack) || e);
+    return res.status(500).json({ error: "unexpected error saving the key" });
   }
 }
 

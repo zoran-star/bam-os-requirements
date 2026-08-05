@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { assertHeaderSafeCredential, safeFetch } from "../_header-safe-credential.js";
 // Vercel Serverless Function — Asana Tasks (combined: tasks + import)
 //
 // Default mode (no ?import flag):
@@ -47,22 +48,34 @@ const ASANA_TO_STAFF_EMAIL = {
   "Chris Delos Trinos":  "mcdelostrinos@gmail.com",
 };
 
-const SB_HEADERS = {
-  apikey: SUPABASE_SERVICE_KEY,
-  Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-  "Content-Type": "application/json",
-};
+// A FUNCTION, not a frozen object, because the guard has to run at call time -
+// a module-level object builds the header at import and there is nothing left to
+// refuse. tasksHandler has NO staff gate (verifyStaffForImport only guards
+// ?import=1) and its catch is `res.status(500).json({ error: err.message })`, so
+// an unguarded service-role key here is readable by anyone who can reach the
+// route.
+function sbHeaders() {
+  const key = assertHeaderSafeCredential(SUPABASE_SERVICE_KEY, "the Supabase service key (SUPABASE_SERVICE_ROLE_KEY)");
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+  };
+}
 
 // ── Generic fetch helpers ────────────────────────────────
 async function asanaFetch(path, options = {}) {
-  const res = await fetch(`${ASANA_API}${path}`, {
+  // Same catch, same exposure: an Asana PAT with a leading break would be quoted
+  // back by undici and echoed to an unauthenticated caller.
+  const token = assertHeaderSafeCredential(process.env.ASANA_ACCESS_TOKEN, "the Asana token (ASANA_ACCESS_TOKEN)");
+  const res = await safeFetch(`${ASANA_API}${path}`, {
     ...options,
     headers: {
-      "Authorization": `Bearer ${process.env.ASANA_ACCESS_TOKEN}`,
+      "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
       ...options.headers,
     },
-  });
+  }, "Asana");
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Asana API ${res.status}: ${err}`);
@@ -73,7 +86,7 @@ async function asanaFetch(path, options = {}) {
 async function sb(path, opts = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...opts,
-    headers: { ...SB_HEADERS, ...(opts.headers || {}) },
+    headers: { ...sbHeaders(), ...(opts.headers || {}) },
   });
   if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
   const text = await res.text();
@@ -110,11 +123,11 @@ function mapTask(t) {
 // ── Import-mode helpers ──────────────────────────────────
 async function verifyStaffForImport(req) {
   const auth = req.headers.authorization || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+  const token = (auth.startsWith("Bearer ") ? auth.slice(7) : "").trim();
   if (!token) return null;
-  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
-  });
+  const userRes = await safeFetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { ...sbHeaders(), Authorization: `Bearer ${token}` },
+  }, "Supabase");
   if (!userRes.ok) return null;
   const user = await userRes.json();
   if (!user?.email) return null;
@@ -369,7 +382,23 @@ async function tasksHandler(req, res) {
 // Import mode: list/import Asana → portal tickets
 // ─────────────────────────────────────────────────────────
 async function importHandler(req, res) {
-  const me = await verifyStaffForImport(req);
+  // INSIDE the try, and that placement is the whole fix. verifyStaffForImport
+  // now calls sbHeaders(), which THROWS when the Supabase service key is absent
+  // (the ordinary state on a preview or branch deploy), empty, or broken. Called
+  // above the try, that throw left the handler entirely: withSentryApiRoute
+  // captures and rethrows, so Vercel answered FUNCTION_INVOCATION_FAILED with no
+  // body and Sentry took an event per request. The route used to fail CLOSED and
+  // CLEANLY with a 401; adding a guard must not turn a clean refusal into a crash.
+  let me;
+  try {
+    me = await verifyStaffForImport(req);
+  } catch (e) {
+    // A missing or malformed service key is OUR misconfiguration, not the
+    // caller's business, and it must not become an unauthenticated 401 either -
+    // that would say "your token is bad" about a server fault.
+    console.error("[asana-import] staff check could not run:", e.message);
+    return res.status(500).json({ error: "staff check unavailable" });
+  }
   if (!me) return res.status(401).json({ error: "unauthorized" });
 
   try {
@@ -417,7 +446,7 @@ async function importHandler(req, res) {
         if (!asana_name) return res.status(400).json({ error: "asana_name required" });
         const upsert = await fetch(`${SUPABASE_URL}/rest/v1/academy_mappings`, {
           method: "POST",
-          headers: { ...SB_HEADERS, Prefer: "resolution=merge-duplicates,return=representation" },
+          headers: { ...sbHeaders(), Prefer: "resolution=merge-duplicates,return=representation" },
           body: JSON.stringify({
             asana_name,
             client_id: skip ? null : client_id,
@@ -467,7 +496,7 @@ async function importHandler(req, res) {
 
       const created = await fetch(`${SUPABASE_URL}/rest/v1/tickets`, {
         method: "POST",
-        headers: { ...SB_HEADERS, Prefer: "return=representation" },
+        headers: { ...sbHeaders(), Prefer: "return=representation" },
         body: JSON.stringify(row),
       });
       if (!created.ok) {

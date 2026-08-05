@@ -348,6 +348,14 @@ async function importTemp(name, sourceText) {
 function buildCheckoutModule() {
   return [
     'import { stripeFetch as transportStripeFetch, publishableFor } from "./_stripe-transport.js";',
+    // The shipped isTestMode() and stripeFetch() both read the ONE normalized
+    // ONBOARDING_STRIPE_SECRET_KEY, so the extraction has to bring that module
+    // along or the cut functions throw ReferenceError.
+    'import { isOnboardingTestMode, onboardingKeyOverride } from "./_stripe-onboarding-key.js";',
+    // sb() guards the service key before it becomes a header, so the extraction
+    // needs the guard too - without it sb() throws ReferenceError, the origin
+    // check fails closed, and every leg below 403s instead of comparing bytes.
+    'import { assertHeaderSafeCredential, safeFetch } from "./_header-safe-credential.js";',
     'import { applyDiscountToCents, normCode, couponFromPromo, couponCoversKey } from "./_coupon-guardrails.js";',
     "",
     cutLine(CHECKOUT_SRC, 'const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();', "website/checkout.js"),
@@ -362,6 +370,7 @@ function buildCheckoutModule() {
     cut(CHECKOUT_SRC, "function nowIso() {", "website/checkout.js"),
     cut(CHECKOUT_SRC, "function norm(s) {", "website/checkout.js"),
     cut(CHECKOUT_SRC, "function clampStartDate(raw) {", "website/checkout.js"),
+    cut(CHECKOUT_SRC, "function sbKey() {", "website/checkout.js"),
     cut(CHECKOUT_SRC, "async function sb(path, init = {}) {", "website/checkout.js"),
     cut(CHECKOUT_SRC, "async function getAllowedOrigins() {", "website/checkout.js"),
     cut(CHECKOUT_SRC, "function stripeKey() {", "website/checkout.js"),

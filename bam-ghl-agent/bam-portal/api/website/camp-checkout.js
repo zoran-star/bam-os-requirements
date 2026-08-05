@@ -22,6 +22,8 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 import { stripeFetch as transportStripeFetch, publishableFor } from "../_stripe-transport.js";
+import { isOnboardingTestMode, onboardingKeyOverride } from "../_stripe-onboarding-key.js";
+import { assertHeaderSafeCredential, safeFetch } from "../_header-safe-credential.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -35,14 +37,23 @@ const ORIGINS_TTL_MS = 60_000;
 function nowIso() { return new Date().toISOString(); }
 function norm(s) { return (s || "").toString().trim().toLowerCase(); }
 
+// The service key is guarded and the fetch is sanitised for the SAME reason the
+// Stripe half of this file is: this handler's catch echoes e.message into the
+// response body. A service-role key with a leading break makes undici throw a
+// TypeError quoting the whole Authorization header, and that key bypasses RLS.
+function sbKey() {
+  return assertHeaderSafeCredential(SB_KEY, "the Supabase service key (SUPABASE_SERVICE_ROLE_KEY)");
+}
+
 async function sb(path, init = {}) {
-  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+  const key = sbKey();
+  const res = await safeFetch(`${SB_URL}/rest/v1/${path}`, {
     ...init,
     headers: {
-      apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+      apikey: key, Authorization: `Bearer ${key}`,
       "Content-Type": "application/json", ...(init.headers || {}),
     },
-  });
+  }, "Supabase");
   if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
   const txt = await res.text();
   return txt ? JSON.parse(txt) : null;
@@ -62,14 +73,20 @@ async function getAllowedOrigins() {
 function stripeKey() {
   return process.env.ONBOARDING_STRIPE_SECRET_KEY || process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
 }
-function isTestMode() { return String(process.env.ONBOARDING_STRIPE_SECRET_KEY || "").startsWith("sk_test"); }
+// ONE reading of the env var decides the mode AND supplies the credential (see
+// api/_stripe-onboarding-key.js). Judging the raw value here while the transport
+// authenticated with the trimmed one meant a leading space made this return
+// false on an sk_test key: live branches, test money.
+function isTestMode() { return isOnboardingTestMode(); }
 
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
   // Delegates to THE seam (api/_stripe-transport.js). ONBOARDING_STRIPE_SECRET_KEY
   // keeps today's precedence exactly (test sandbox override), as stripeKey() did.
+  // The override is the SAME normalized string isTestMode() judged, so the mode
+  // the route believes it is in and the key it authenticates with cannot disagree.
   return transportStripeFetch(path, {
     method, body, stripeAccount, idempotencyKey,
-    keyOverride: process.env.ONBOARDING_STRIPE_SECRET_KEY || undefined,
+    keyOverride: onboardingKeyOverride(),
   });
 }
 

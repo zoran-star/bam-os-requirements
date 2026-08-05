@@ -23,9 +23,41 @@
 //   4. The error is the SUPERSET of both existing shapes - message, stripeStatus,
 //      stripeResponse, responseBody (alias), transportLabel - so every current
 //      consumer reads what it already reads.
-//   5. THE KEY NEVER LEAKS. The decrypted academy key appears in no thrown error
-//      property and no console output. This is the property that makes storing
-//      other people's payment credentials tolerable at all.
+//   5. THE KEY NEVER LEAKS, in EITHER kind of error. Not in one this module
+//      constructs, and not in one the RUNTIME throws - the second half is where
+//      the leak actually lived. A key pasted with a line break in the middle of
+//      it survives .trim(), passes every rk_live_ check, and makes undici throw
+//      a TypeError quoting the whole key with no .status, which a route echoes
+//      to the browser. The probe drives \n, \r and \x00 through the real code
+//      path and asserts on a TWO-PART canary, so a "fix" that scrubs the
+//      message for rk_live_[A-Za-z0-9]* - which stops at the break and leaves
+//      the tail on screen - fails here instead of shipping. It also covers the
+//      RETURN path: readAccountHealth must not hand an unusable key to
+//      _requirements.js, whose reason string ends up in a JSON response body.
+//      This is the property that makes storing other people's payment
+//      credentials tolerable at all.
+//   5b. TRIM FIRST, THEN REFUSE. Leading/trailing whitespace is a cosmetic
+//      artifact of how a value was stored or pasted (`echo` instead of `printf`
+//      into a secret store leaves a \n on the end - production's
+//      SUPABASE_SERVICE_KEY carries exactly that today). It is trimmed and USED,
+//      and the trimmed value is the one that reaches the header. Only a
+//      non-printable character REMAINING INSIDE the value after the trim is the
+//      leak vector, and that is still refused. The first version of this guard
+//      refused both, which turned an env-storage artifact into a live academy
+//      reading "unreachable". Asserted at EVERY call site that normalizes - the
+//      pasted keyOverride, the Supabase service key, the stored academy key AND
+//      the platform key inside readAccountHealth - because a normalization with
+//      no assertion on it is a line, not a guarantee.
+//
+// HOW THESE ASSERTIONS ARE WRITTEN, and why it is not incidental:
+//   - PINNED INDEX, never `CALLS[CALLS.length - 1]`. A tail read answers with
+//     an earlier section's captured request when the call under test never
+//     happens, so it goes on passing after the code stops doing the thing.
+//   - EXACT equality on the outgoing header, never `contains` or `startsWith`.
+//     A header built from the untrimmed value still contains the key, which is
+//     precisely the check-one-value-send-another bug.
+//   - A per-test key where the expected value would otherwise be the suite's
+//     own ambient env global, so no unrelated call can satisfy the assertion.
 //   6. publishableFor / getCapabilities answer per-transport facts so no caller
 //      ever needs to know the transport.
 //   7. readAccountHealth: three outcomes over the right transport, with the two
@@ -49,6 +81,39 @@
 //   MUTATE=keyleak    node api/_stripe-transport.test.mjs
 //       the decrypted key is appended to the thrown error message - the leak
 //       assertions must notice.
+//   MUTATE=noshapecheck  node api/_stripe-transport.test.mjs
+//       the printable-ASCII refusal is deleted, so a key with a line break in
+//       it reaches the runtime again. The belt (the sanitiser around fetch)
+//       still holds the canary out of the error, so what catches this is the
+//       REFUSAL half of section 7 - the 400 and the re-copy sentence - not the
+//       canary half. Said plainly because a control whose report is vague is
+//       how a decorative check survives.
+//   MUTATE=notrim     node api/_stripe-transport.test.mjs
+//       the trim is removed, so the shape check judges the RAW value again and
+//       a key whose only sin is a trailing newline is refused - the regression
+//       this fix repairs. Section 8's trailing/leading-whitespace assertions
+//       must catch it, or the trim is decorative. NOTE it patches FOUR call
+//       sites at once, so "caught" says nothing about any single one; the two
+//       controls below exist because of exactly that.
+//   MUTATE=platformnotrim  node api/_stripe-transport.test.mjs
+//       ONLY readAccountHealth's platform-key normalization is removed. That
+//       line was untested: it could be deleted outright and this suite still
+//       printed 91 passed, 0 failed, with MUTATE=notrim still reporting caught
+//       off the other three lines it patches.
+//   MUTATE=platformraw     node api/_stripe-transport.test.mjs
+//       the platform key is CHECKED normalized and SENT raw - the original bug
+//       wearing the fix as a costume. Only an exact-equality assertion on the
+//       header that actually went out can see this; `contains the key` cannot.
+//   MUTATE=bearernotrim / sbnotrim / storednotrim / earlyreturnnotrim
+//       the remaining four normalizations, one line each, for the same reason:
+//       a four-line control reports one bit of information about four claims.
+//       assertHeaderSafeKey's bearer, sb()'s service key, readAccountHealth's
+//       stored academy key, and readAccountHealth's missing-client early return.
+//   MUTATE=rawruntime    node api/_stripe-transport.test.mjs
+//       BOTH layers deleted - the refusal and the fetch sanitiser - so the
+//       runtime's own TypeError, quoting the entire Authorization header,
+//       propagates exactly as it does in production today. This is the control
+//       that proves the two-part canary assertions are alive.
 //
 // A control run exits ZERO when the mutation IS caught (the suite is reporting
 // "the control worked"). CI greps for the banner, not the exit code.
@@ -117,7 +182,116 @@ const NULLROUTE = [[
 const KEYLEAK = [[
   "    const err = new Error((json && json.error && json.error.message) || `Stripe ${res.status}`);",
   "    const err = new Error(((json && json.error && json.error.message) || `Stripe ${res.status}`) + ` via key ${t.bearer}`);"]];
-const EDITS = { nullroute: NULLROUTE, keyleak: KEYLEAK };
+
+// Removes the printable-ASCII refusal, so a pasted key with a line break in it
+// reaches the runtime again.
+//
+// BE PRECISE ABOUT WHAT THIS PROVES. The fetch sanitiser (the belt) is still in
+// place in this mutant, so it still keeps the canary out of the error - the
+// leak assertions stay green and it is the REFUSAL assertions (status 400, the
+// re-copy sentence, nothing hitting the wire) that catch it. That is the honest
+// result: this control shows the refusal is load-bearing, not decorative.
+// MUTATE=rawruntime is the control that proves the canary assertions themselves
+// are alive.
+const NOSHAPECHECK = [[
+  "  const bearer = assertHeaderSafeKey(t.bearer);",
+  "  const bearer = t.bearer; // (control noshapecheck) the printable-ASCII refusal was removed"]];
+
+// Puts back the pre-fix behaviour: check the RAW value instead of the trimmed
+// one, so a key whose only sin is a trailing newline is refused all over again.
+// That is the regression this fix exists for - production's SUPABASE_SERVICE_KEY
+// carries exactly that newline, and refusing it turned a cosmetic env artifact
+// into "unreachable" for a live academy. The trailing/leading-whitespace
+// assertions must catch this; if they do not, the trim is decorative.
+const NOTRIM = [
+  ["  const normalized = normalizeKey(key);", "  const normalized = String(key); // (control notrim) trim removed"],
+  ["  const serviceKey = rawServiceKey ? normalizeKey(rawServiceKey) : rawServiceKey;",
+   "  const serviceKey = rawServiceKey; // (control notrim) trim removed"],
+  ["  const storedKey = normalizeKey(decryptSecret(direct.secret_key_enc));",
+   "  const storedKey = String(decryptSecret(direct.secret_key_enc) || \"\"); // (control notrim) trim removed"],
+  ["    const pk = rawPk ? normalizeKey(rawPk) : rawPk;", "    const pk = rawPk; // (control notrim) trim removed"],
+];
+
+// Removes BOTH layers - the refusal AND the sanitiser wrapped around fetch - so
+// the runtime's own TypeError propagates to the caller exactly as it does in
+// production today: a message quoting the entire Authorization header, no
+// .status, and a route that echoes it. This is the control that makes the
+// two-part canary assertions earn their keep. If they were decorative, or if
+// someone "fixed" the leak by regex-scrubbing rk_live_[A-Za-z0-9]* (which stops
+// at the line break and leaves the tail on screen), this control would pass.
+const RAWRUNTIME = [
+  ["  const bearer = assertHeaderSafeKey(t.bearer);", "  const bearer = t.bearer; // (control rawruntime) the refusal was removed"],
+  [`async function safeFetch(url, init, what) {
+  try {
+    return await fetch(url, init);
+  } catch (e) {
+    throw sanitizeFetchError(e, what);
+  }
+}`,
+   `async function safeFetch(url, init, what) {
+  return await fetch(url, init); // (control rawruntime) sanitiser removed
+}`],
+];
+// ── the two controls MUTATE=notrim could not give an honest answer about ─────
+//
+// notrim patches FOUR lines at once. Three of them are covered by assertions,
+// so it reported "caught" whatever happened to the fourth - the platform-key
+// normalization inside readAccountHealth. That line could be deleted outright
+// and the suite still read 91 passed, 0 failed. A control that fires for the
+// wrong reason is worse than no control: it is a green light with nothing
+// behind it.
+//
+// These two break the platform branch ALONE, one shape each, so each one has to
+// be caught by an assertion that is actually about the platform key.
+const PLATFORMNOTRIM = [[
+  "    const pk = rawPk ? normalizeKey(rawPk) : rawPk;\n    if (pk && HEADER_UNSAFE.test(pk)) {\n      // OUR configuration is broken",
+  "    const pk = rawPk; // (control platformnotrim) the platform-key trim was removed\n    if (pk && HEADER_UNSAFE.test(pk)) {\n      // OUR configuration is broken"]];
+
+// CHECK ONE VALUE, SEND ANOTHER. The trim stays, the guard stays, and the guard
+// is applied to the normalized value - but the RAW one is what travels into
+// readStripeAccount's Authorization header. This is the original bug wearing the
+// fix as a costume, and it is the shape an assertion written as `contains the
+// key` or `startsWith("Bearer ")` cannot see. Only exact equality on the header
+// that actually went out catches it.
+const PLATFORMRAW = [[
+  "    return readStripeAccount(client.stripe_connect_account_id, pk);",
+  "    return readStripeAccount(client.stripe_connect_account_id, rawPk); // (control platformraw) the unchecked value is the one sent"]];
+
+// ── one control per normalization, because notrim cannot answer for any ──────
+//
+// There are FIVE places a key is normalized, and MUTATE=notrim patches four of
+// them in one go. "Caught" from a four-line patch is a single bit of
+// information spread across four claims: it cannot say which line earned it,
+// and it demonstrably did not notice when the platform-key line was deleted
+// outright. Every normalization gets its own control, so each one has to be
+// caught by an assertion that is actually about IT.
+const BEARERNOTRIM = [[
+  "  const normalized = normalizeKey(key);",
+  "  const normalized = String(key); // (control bearernotrim) the bearer trim was removed"]];
+
+const SBNOTRIM = [[
+  "  const serviceKey = rawServiceKey ? normalizeKey(rawServiceKey) : rawServiceKey;",
+  "  const serviceKey = rawServiceKey; // (control sbnotrim) the service-key trim was removed"]];
+
+const STOREDNOTRIM = [[
+  "  const storedKey = normalizeKey(decryptSecret(direct.secret_key_enc));",
+  "  const storedKey = String(decryptSecret(direct.secret_key_enc) || \"\"); // (control storednotrim) the stored-key trim was removed"]];
+
+// The fifth: readAccountHealth's missing-client early return. Pinned through
+// the comment that follows it, because the Connect branch two returns down
+// carries a byte-identical normalization line and a control that silently hits
+// both is the four-lines-at-once problem in miniature.
+const EARLYRETURNNOTRIM = [[
+  "    const pk = rawPk ? normalizeKey(rawPk) : rawPk;\n    if (pk && HEADER_UNSAFE.test(pk)) {\n      // OUR configuration, not an academy's credential",
+  "    const pk = rawPk; // (control earlyreturnnotrim) the early-return trim was removed\n    if (pk && HEADER_UNSAFE.test(pk)) {\n      // OUR configuration, not an academy's credential"]];
+
+const EDITS = {
+  nullroute: NULLROUTE, keyleak: KEYLEAK, noshapecheck: NOSHAPECHECK,
+  rawruntime: RAWRUNTIME, notrim: NOTRIM,
+  platformnotrim: PLATFORMNOTRIM, platformraw: PLATFORMRAW,
+  bearernotrim: BEARERNOTRIM, sbnotrim: SBNOTRIM, storednotrim: STOREDNOTRIM,
+  earlyreturnnotrim: EARLYRETURNNOTRIM,
+};
 
 const modulePath = MUTATE
   ? mutatedCopy(EDITS[MUTATE] || (() => { controlBroken = `unknown control MUTATE=${MUTATE}`; throw new Error(controlBroken); })())
@@ -125,6 +299,15 @@ const modulePath = MUTATE
 
 // ── the in-memory world ──────────────────────────────────────────────────────
 const DIRECT_KEY = "rk_live_supersecret_academy_key_9Xq7";
+
+// TWO-PART CANARY, split the way a real paste is. The break lands in the MIDDLE
+// of the key, so a "fix" that scrubs an error message for rk_live_[A-Za-z0-9]*
+// stops dead at the break and leaves CANARY_TAIL - a recoverable piece of a
+// LIVE credential - on screen. Every leak assertion below checks BOTH halves,
+// which is what makes truncation fail here rather than pass here and leak in
+// production. Neither half may appear in any label printed by this suite.
+const CANARY_HEAD = "rk_live_FAKE_CANARY";
+const CANARY_TAIL = "SECOND_LINE_TAIL";
 const { encryptSecret, decryptSecret } = await import(pathToFileURL(path.join(HERE, "_stripe-direct-crypto.js")).href);
 
 const DB = {
@@ -154,6 +337,7 @@ function runQuery(table, qs) {
 }
 
 const SB_GETS = [];       // supabase GET paths
+const SB_CALLS = [];      // { method, url, headers } - section 8 reads the service-key header off these
 const SB_PATCHES = [];    // { table, qs, body }
 const STRIPE_CALLS = [];  // { method, url, headers, body }
 // (status, jsonOrThrow) per-call override for stripe responses
@@ -162,6 +346,15 @@ let stripeResponder = null;
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
   const method = String(init.method || "GET").toUpperCase();
+  // THE STUB VALIDATES HEADERS LIKE THE RUNTIME DOES, or the leak this suite
+  // exists to catch cannot happen inside it. Real fetch builds a Headers object
+  // out of init.headers, and undici's validator throws a TypeError QUOTING the
+  // whole offending header value - live key and all. This is that same
+  // validator, called at the same point in the sequence, so section 7 drives
+  // the actual production failure instead of a story about it. Without this
+  // line a stub simply accepts a key with a line break in it and every leak
+  // assertion below passes for the wrong reason.
+  new Headers(init.headers || {});
   const json = (v, status = 200) => new Response(JSON.stringify(v), { status, headers: { "content-type": "application/json" } });
 
   if (u.startsWith("https://api.stripe.com/")) {
@@ -174,6 +367,7 @@ globalThis.fetch = async (url, init = {}) => {
     return json({ ok_stub: true });
   }
   if (u.startsWith("https://stub.supabase.test/rest/v1/")) {
+    SB_CALLS.push({ method, url: u, headers: init.headers || {} });
     const [table, qs = ""] = u.slice("https://stub.supabase.test/rest/v1/".length).split("?");
     if (method === "GET") { SB_GETS.push(`${table}?${qs}`); return json(runQuery(table, qs)); }
     if (method === "PATCH") {
@@ -189,36 +383,56 @@ globalThis.fetch = async (url, init = {}) => {
 };
 
 const T = await import(pathToFileURL(modulePath).href);
-const authOf = (call) => String((call.headers || {}).Authorization || "");
-const acctHeaderOf = (call) => (call.headers || {})["Stripe-Account"];
-const lastStripe = () => STRIPE_CALLS[STRIPE_CALLS.length - 1];
+const authOf = (call) => String(((call || {}).headers || {}).Authorization || "");
+const acctHeaderOf = (call) => ((call || {}).headers || {})["Stripe-Account"];
+
+// ── PIN THE INDEX. NEVER READ THE TAIL OF THE LIST. ──────────────────────────
+//
+// `STRIPE_CALLS[STRIPE_CALLS.length - 1]` answers "whatever went out most
+// recently" - and it answers with the SAME captured call whether the call under
+// test happened or not. That is not a shortcut, it is a hole: delete the code
+// that makes the call and the assertion goes on inspecting an EARLIER section's
+// request and goes on passing. An assertion that cannot notice its own subject
+// disappearing is decoration.
+//
+// So every read below is pinned to an index taken BEFORE the call. A call that
+// never happened reads as undefined, authOf() gives "", and the assertion
+// fails and prints - which is the entire point of having it.
+const stripeAt = (i) => STRIPE_CALLS[i];
+const sbAt = (i) => SB_CALLS[i];
+// Returns THE call this fetch produced, by index, not the tail of the list.
+async function sendStripe(path, opts) {
+  const at = STRIPE_CALLS.length;
+  await T.stripeFetch(path, opts);
+  return stripeAt(at);
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 console.log("\n── 1. envelope selection: the resolver, and only the resolver, knows ──");
 {
   // null -> platform. Asserted WHILE an active direct row exists in the table,
   // because that is the exact situation the null-semantics rule exists for.
-  await T.stripeFetch("/customers?limit=1");
-  ok(authOf(lastStripe()) === "Bearer sk_live_platform_stub_key",
+  let call = await sendStripe("/customers?limit=1");
+  ok(authOf(call) === "Bearer sk_live_platform_stub_key",
     "stripeAccount null uses the PLATFORM key even while an active direct row exists");
-  ok(acctHeaderOf(lastStripe()) === undefined, "and sends no Stripe-Account header");
+  ok(!!call && acctHeaderOf(call) === undefined, "and sends no Stripe-Account header");
 
-  await T.stripeFetch("/customers?limit=1", { stripeAccount: "acct_direct" });
-  ok(authOf(lastStripe()) === `Bearer ${DIRECT_KEY}`,
+  call = await sendStripe("/customers?limit=1", { stripeAccount: "acct_direct" });
+  ok(authOf(call) === `Bearer ${DIRECT_KEY}`,
     "a direct account's call carries the academy's own decrypted key");
-  ok(acctHeaderOf(lastStripe()) === undefined,
+  ok(!!call && acctHeaderOf(call) === undefined,
     "with NO Stripe-Account header - the key IS the account");
 
-  await T.stripeFetch("/customers?limit=1", { stripeAccount: "acct_connect" });
-  ok(authOf(lastStripe()) === "Bearer sk_live_platform_stub_key",
+  call = await sendStripe("/customers?limit=1", { stripeAccount: "acct_connect" });
+  ok(authOf(call) === "Bearer sk_live_platform_stub_key",
     "an account with no direct row keeps today's platform key");
-  ok(acctHeaderOf(lastStripe()) === "acct_connect", "plus the Stripe-Account header, unchanged");
+  ok(acctHeaderOf(call) === "acct_connect", "plus the Stripe-Account header, unchanged");
 
-  await T.stripeFetch("/account", { keyOverride: "rk_live_probe_override" });
-  ok(authOf(lastStripe()) === "Bearer rk_live_probe_override" && acctHeaderOf(lastStripe()) === undefined,
+  call = await sendStripe("/account", { keyOverride: "rk_live_probe_override" });
+  ok(authOf(call) === "Bearer rk_live_probe_override" && !!call && acctHeaderOf(call) === undefined,
     "keyOverride short-circuits the resolver; no stripeAccount means no header");
-  await T.stripeFetch("/account", { keyOverride: "sk_test_onboarding", stripeAccount: "acct_x" });
-  ok(authOf(lastStripe()) === "Bearer sk_test_onboarding" && acctHeaderOf(lastStripe()) === "acct_x",
+  call = await sendStripe("/account", { keyOverride: "sk_test_onboarding", stripeAccount: "acct_x" });
+  ok(authOf(call) === "Bearer sk_test_onboarding" && acctHeaderOf(call) === "acct_x",
     "keyOverride + stripeAccount keeps the header exactly as the caller intended");
 }
 
@@ -244,27 +458,27 @@ console.log("\n── 2. the cache: one lookup per account per minute, bustable,
 
 console.log("\n── 3. body encoding, byte for byte the helpers this replaces ──");
 {
-  await T.stripeFetch("/subscription_items", {
+  const enc = await sendStripe("/subscription_items", {
     method: "POST",
     body: { "items[0][price]": "price_abc", quantity: 2, drop_me: null, and_me: undefined },
   });
-  const sent = new URLSearchParams(String(lastStripe().body));
+  const sent = new URLSearchParams(String((enc || {}).body));
   ok(sent.get("items[0][price]") === "price_abc" && sent.get("quantity") === "2",
     "object bodies urlencode with flat nested-string keys, values stringified");
   ok(!sent.has("drop_me") && !sent.has("and_me"), "null and undefined values are dropped");
-  ok((lastStripe().headers["Content-Type"] || "") === "application/x-www-form-urlencoded",
+  ok(!!enc && (enc.headers["Content-Type"] || "") === "application/x-www-form-urlencoded",
     "with the urlencoded Content-Type");
 
   const pre = "enabled_events[0]=invoice.paid&url=https%3A%2F%2Fx.test";
-  await T.stripeFetch("/webhook_endpoints", { method: "POST", body: pre });
-  ok(lastStripe().body === pre, "a pre-encoded STRING body passes through untouched (members.js quirk)");
+  const preCall = await sendStripe("/webhook_endpoints", { method: "POST", body: pre });
+  ok(!!preCall && preCall.body === pre, "a pre-encoded STRING body passes through untouched (members.js quirk)");
 
-  await T.stripeFetch("/customers?limit=1");
-  ok(lastStripe().body === undefined && lastStripe().headers["Content-Type"] === undefined,
+  const bare = await sendStripe("/customers?limit=1");
+  ok(!!bare && bare.body === undefined && bare.headers["Content-Type"] === undefined,
     "no body means no body and no Content-Type");
 
-  await T.stripeFetch("/refunds", { method: "POST", body: { charge: "ch_1" }, idempotencyKey: "idem-123" });
-  ok(lastStripe().headers["Idempotency-Key"] === "idem-123", "Idempotency-Key is sent when given");
+  const idem = await sendStripe("/refunds", { method: "POST", body: { charge: "ch_1" }, idempotencyKey: "idem-123" });
+  ok(!!idem && idem.headers["Idempotency-Key"] === "idem-123", "Idempotency-Key is sent when given");
 }
 
 console.log("\n── 4. the error shape: a superset of BOTH existing shapes ──");
@@ -316,10 +530,11 @@ console.log("\n── 6. readAccountHealth: three outcomes, right transport, rig
   // ready, via the KEY (GET /v1/account, not /v1/accounts/{id})
   stripeResponder = (m, u) => u === "https://api.stripe.com/v1/account"
     ? { status: 200, body: { id: "acct_direct", charges_enabled: true, details_submitted: true, requirements: {} } } : null;
+  let readAt = STRIPE_CALLS.length;
   let h = await T.readAccountHealth("client-direct");
   ok(h.outcome === "ready", "a chargeable direct account reads as ready");
-  const keyRead = STRIPE_CALLS[STRIPE_CALLS.length - 1];
-  ok(keyRead.url === "https://api.stripe.com/v1/account" && authOf(keyRead) === `Bearer ${DIRECT_KEY}` && acctHeaderOf(keyRead) === undefined,
+  const keyRead = stripeAt(readAt);
+  ok(!!keyRead && keyRead.url === "https://api.stripe.com/v1/account" && authOf(keyRead) === `Bearer ${DIRECT_KEY}` && acctHeaderOf(keyRead) === undefined,
     "read via GET /v1/account with the academy key and no Stripe-Account header");
   ok(patches().some(p => p.body.key_last_verified_at), "and key_last_verified_at is stamped");
 
@@ -344,6 +559,9 @@ console.log("\n── 6. readAccountHealth: three outcomes, right transport, rig
     "a 401 is unreachable PLUS credential_problem - the key is dead, not the network");
   ok(/cannot answer/.test(String(h.error)), "and the reason says the KEY cannot answer");
   ok(DB.client_stripe_direct[0].status === "invalid", "side effect: the row is flipped to 'invalid'");
+  // Captured for the drift pin further down: this is the REAL shape
+  // api/stripe/_requirements.js hands back for a credential problem.
+  const CRED_PROBLEM_SHAPE = Object.keys(h).sort().join(",");
 
   // network failure: unreachable, NO credential_problem, row untouched
   DB.client_stripe_direct[0].status = "active";
@@ -380,24 +598,357 @@ console.log("\n── 6. readAccountHealth: three outcomes, right transport, rig
   ok(patches().every(p => p.qs.includes("status=in.(active,invalid)")),
     "every health-read patch carries the status filter, so 'disabled' is out of reach by construction");
   DB.client_stripe_direct[0].status = "active";
+  stripeResponder = null;
+
+  // ── THE OTHER MOUTH OF THE LEAK: the RETURN path, not the throw path ───────
+  // readAccountHealth hands its key to api/stripe/_requirements.js, whose catch
+  // folds a fetch failure into `could not reach Stripe: ${e.message}` and
+  // RETURNS it - and api/stripe/direct-key.js's status action puts that string
+  // straight into the JSON it sends the browser. So a key that cannot be a
+  // header value would arrive in a response body without ever being thrown, and
+  // no amount of care in a catch block would catch it. Both keys are checked
+  // before they are handed over.
+  {
+    const realEnc = DB.client_stripe_direct[0].secret_key_enc;
+    DB.client_stripe_direct[0].secret_key_enc = encryptSecret(`${CANARY_HEAD}\n${CANARY_TAIL}`);
+    DB.client_stripe_direct[0].status = "active";
+    T.bustTransportCache();
+    const wireBefore = STRIPE_CALLS.length;
+    const broken = await T.readAccountHealth("client-direct");
+    const dump = JSON.stringify(broken);
+    ok(broken.outcome === "unreachable" && broken.credential_problem === true,
+      "a STORED key with an embedded break reads unreachable + credential_problem");
+    ok(!dump.includes(CANARY_HEAD) && !dump.includes(CANARY_TAIL),
+      "and NEITHER canary half is anywhere in the health object the status action returns");
+    ok(STRIPE_CALLS.length === wireBefore, "it never reached the wire");
+    ok(DB.client_stripe_direct[0].status === "invalid",
+      "and the row flips to 'invalid' - a key that cannot be sent must stop routing");
+    // DRIFT PIN. That unreachable object is BUILT in _stripe-transport.js
+    // rather than imported, because _requirements.js keeps its builder private.
+    // If the two shapes ever diverge, callers reading .needs / .problems break
+    // on a path nobody exercises by hand - so the shapes are compared, here,
+    // against a real credential-problem result from the real function.
+    ok(Object.keys(broken).sort().join(",") === CRED_PROBLEM_SHAPE,
+      `the built unreachable object matches the shape _requirements.js returns (saw ${Object.keys(broken).sort().join(",")})`);
+
+    // Our OWN key, same failure: a platform secret with a trailing newline (the
+    // `echo` instead of `printf` classic when setting a secret) would be quoted
+    // by the runtime and returned in the health object of every CONNECT academy.
+    DB.client_stripe_direct[0].secret_key_enc = realEnc;
+    DB.client_stripe_direct[0].status = "active";
+    T.bustTransportCache();
+    const realPlatform = process.env.STRIPE_CONNECT_SECRET_KEY;
+    process.env.STRIPE_CONNECT_SECRET_KEY = `sk_live_${CANARY_HEAD}\n${CANARY_TAIL}`;
+    const bp = await T.readAccountHealth("client-connect");
+    process.env.STRIPE_CONNECT_SECRET_KEY = realPlatform;
+    const bpDump = JSON.stringify(bp);
+    ok(bp.outcome === "unreachable" && !bpDump.includes(CANARY_HEAD) && !bpDump.includes(CANARY_TAIL),
+      "a PLATFORM key with an embedded break is unreachable with neither canary half in the result");
+    ok(!("credential_problem" in bp),
+      "and carries NO credential_problem - our misconfiguration must never flip an academy's key to invalid");
+  }
 
   // connect academy: read via /v1/accounts/{id} with the platform key
   stripeResponder = (m, u) => u.startsWith("https://api.stripe.com/v1/accounts/acct_connect")
     ? { status: 200, body: { id: "acct_connect", charges_enabled: true, requirements: {} } } : null;
+  readAt = STRIPE_CALLS.length;
   h = await T.readAccountHealth("client-connect");
-  const acctRead = STRIPE_CALLS[STRIPE_CALLS.length - 1];
-  ok(h.outcome === "ready" && acctRead.url.includes("/v1/accounts/acct_connect") && authOf(acctRead) === "Bearer sk_live_platform_stub_key",
+  const acctRead = stripeAt(readAt);
+  ok(h.outcome === "ready" && !!acctRead && acctRead.url.includes("/v1/accounts/acct_connect") && authOf(acctRead) === "Bearer sk_live_platform_stub_key",
     "a connect academy is read via /v1/accounts/{id} with the platform key, exactly as today");
   stripeResponder = null;
 }
 
-console.log("\n── 7. THE KEY NEVER LEAKS ──");
+console.log("\n── 7. THE KEY NEVER LEAKS - constructed errors AND runtime throws ──");
 {
   const propDump = JSON.stringify(caughtDirectError, Object.getOwnPropertyNames(caughtDirectError || {}));
   ok(!!caughtDirectError && !propDump.includes(DIRECT_KEY),
     "the decrypted key appears in NO property of a thrown transport error");
   ok(!consoleBuffer.includes(DIRECT_KEY),
     "and in NO console output produced by the whole suite");
+
+  // ── the half this probe used to miss ──────────────────────────────────────
+  // Everything above inspects errors this module CONSTRUCTS, and the module
+  // header used to claim that was the whole guarantee. It was not. The errors
+  // that actually leaked are the ones the RUNTIME throws: a restricted key
+  // copied out of a wrapped email, a Slack code block or a PDF arrives with a
+  // line break IN THE MIDDLE, .trim() cannot see it (trim only touches the
+  // ends), every rk_live_ shape check passes, and undici refuses the header
+  // with a TypeError quoting the entire key - no .status, so a route's
+  // `e.status || 500` + `e.message` hands a live credential to the browser.
+  //
+  // A leak probe that only reads errors we wrote is assurance with nothing
+  // behind it: it cannot fail on the case it was written for.
+  for (const [label, sep] of [["a line break", "\\n"], ["a carriage return", "\\r"], ["a NUL", "\\x00"]]) {
+    const raw = { "\\n": "\n", "\\r": "\r", "\\x00": "\x00" }[sep];
+    const pasted = `${CANARY_HEAD}${raw}${CANARY_TAIL}`;
+    const wireBefore = STRIPE_CALLS.length;
+    let e = null;
+    try { await T.stripeFetch("/account", { keyOverride: pasted }); } catch (err) { e = err; }
+
+    ok(!!e, `a key containing ${label} is refused rather than sent`);
+    // message + EVERY enumerable property + the STACK. The stack matters on its
+    // own: Node builds err.stack out of the message, so an error whose message
+    // was cleaned after construction still carries the original in its stack.
+    const dump = e
+      ? [String(e.message), String(e.stack || ""), JSON.stringify(e, Object.getOwnPropertyNames(e)), JSON.stringify(e)].join("\n")
+      : "";
+    ok(!!e && !dump.includes(CANARY_HEAD) && !dump.includes(CANARY_TAIL),
+      `and NEITHER half of the canary is in its message, its properties or its stack (${label})`);
+    ok(!!e && e.status === 400,
+      `refused as bad INPUT rather than a server fault (${label}) - saw status ${JSON.stringify(e && e.status)}`);
+    ok(!!e && /re-copy it without the break/.test(String(e.message)),
+      `with the sentence that tells the operator what to actually do (${label})`);
+    ok(STRIPE_CALLS.length === wireBefore,
+      `and the malformed key never reached the wire (${label})`);
+  }
+
+  ok(!consoleBuffer.includes(CANARY_HEAD) && !consoleBuffer.includes(CANARY_TAIL),
+    "and neither canary half was printed to the console by anything in this suite");
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── 8. TRIM FIRST, THEN REFUSE - a paste artifact is not a broken key ──");
+{
+  // THE REGRESSION THIS SECTION EXISTS FOR. The refusal above shipped as a flat
+  // printable-ASCII test on the RAW value, which also refused the whitespace
+  // every secret store leaves behind (`echo` instead of `printf` into
+  // `vercel env add` puts a \n on the end - production's SUPABASE_SERVICE_KEY
+  // has one right now). The result in production was a live academy's key-health
+  // read coming back "unreachable / the Supabase service key contains a line
+  // break", with the key stored fine and the webhook registered fine. A cosmetic
+  // storage artifact had been promoted to a hard failure.
+  //
+  // The line is WHERE the character is. At the ends it is how the value was
+  // stored; in the middle it is a key that cannot be a header. Trim, then judge.
+  const CLEAN = "rk_live_trim_me_9Xq7";
+
+  for (const [label, dirty] of [
+    ["a trailing newline", `${CLEAN}\n`],
+    ["trailing whitespace and a CRLF", `${CLEAN}  \r\n`],
+    ["a leading space", ` ${CLEAN}`],
+    ["whitespace at BOTH ends", `\n\t ${CLEAN} \r\n`],
+  ]) {
+    const wireBefore = STRIPE_CALLS.length;
+    let threw = null;
+    try { await T.stripeFetch("/account", { keyOverride: dirty }); } catch (e) { threw = e; }
+    ok(!threw, `a key with ${label} is ACCEPTED, not refused (saw ${threw ? String(threw.message) : "no error"})`);
+    ok(STRIPE_CALLS.length === wireBefore + 1, `and it actually reached the wire (${label})`);
+    // EXACT equality on the call PINNED at wireBefore, not a startsWith /
+    // includes and not the tail of the list. A header built from the untrimmed
+    // value would still "contain" the key, and that is precisely the bug where
+    // the trimmed value is checked and the raw one is sent; a tail read would
+    // still find an earlier section's call if this one never happened at all.
+    ok(authOf(stripeAt(wireBefore)) === `Bearer ${CLEAN}`,
+      `the Authorization header is exactly "Bearer <trimmed>" - no whitespace rides along (${label})`);
+  }
+
+  // An EMBEDDED break still refused, side by side with the accepted case, so the
+  // distinction is asserted rather than assumed. (Section 7 proves the leak
+  // property; this proves the two cases are told apart.)
+  {
+    let threw = null;
+    try { await T.stripeFetch("/account", { keyOverride: `${CANARY_HEAD}\n${CANARY_TAIL}` }); } catch (e) { threw = e; }
+    ok(!!threw && threw.status === 400,
+      "while a break in the MIDDLE is still refused with 400 - trimming did not soften the guard");
+  }
+
+  // ── OUR OWN PLATFORM KEY, on the branch that had no assertion at all ───────
+  //
+  // readAccountHealth's Connect branch normalizes STRIPE_CONNECT_SECRET_KEY and
+  // hands the result to readStripeAccount, which builds its OWN Authorization
+  // header out of it. Nothing here checked that. The whole line could be
+  // deleted and the suite still read 91 passed, 0 failed, because the only
+  // thing exercising it was the four-line MUTATE=notrim control - and the other
+  // three lines that control patches were enough to make it report caught. A
+  // control that catches for the wrong reason is how an untested line survives
+  // inside a suite that looks thorough.
+  //
+  // So: drive the branch with a dirtied platform key and assert THE HEADER THAT
+  // WENT OUT, pinned by index and by exact equality. That fails if the trim is
+  // removed (a trailing newline is refused outright, so no call happens; a
+  // leading space is printable, so the call happens with the space still on it)
+  // AND it fails if the normalized value is checked while the raw one is handed
+  // over - the check-one-value-send-another shape, which is the original bug
+  // wearing the fix as a costume.
+  {
+    const CLEAN_PK = "sk_live_platform_" + "trim_me_Kp3";
+    const realPk = process.env.STRIPE_CONNECT_SECRET_KEY;
+    stripeResponder = (m, u) => u.startsWith("https://api.stripe.com/v1/accounts/acct_connect")
+      ? { status: 200, body: { id: "acct_connect", charges_enabled: true, requirements: {} } } : null;
+    // THE THREE SHAPES BEHAVE DIFFERENTLY AT THE RUNTIME, which is why all
+    // three are here rather than one standing in for the rest. The header value
+    // is `Bearer ${key}`, and the WHATWG algorithm normalizes a value by
+    // stripping leading/trailing HTTP whitespace BEFORE validating it:
+    //   trailing \n   stripped off the END of the whole value -> legal, so an
+    //                 untrimmed key travels attached and only exact equality
+    //                 on the header can see it.
+    //   leading space becomes an interior double space after "Bearer " ->
+    //                 legal, travels attached, again only exact equality sees it.
+    //   leading \n    also interior after "Bearer " -> NOT legal, so this is the
+    //                 one shape that actually makes the runtime throw.
+    // "Leading and trailing are both harmless artifacts" is therefore wrong:
+    // trailing is the only genuinely safe end.
+    for (const [label, dirty] of [
+      ["a trailing newline", `${CLEAN_PK}\n`],
+      ["a leading space", ` ${CLEAN_PK}`],
+      ["a leading newline", `\n${CLEAN_PK}`],
+    ]) {
+      process.env.STRIPE_CONNECT_SECRET_KEY = dirty;
+      const wireAt = STRIPE_CALLS.length;
+      const h = await T.readAccountHealth("client-connect");
+      // The outcome is deliberately reported WITHOUT h.error: on the
+      // send-the-raw-one failure that string is the runtime's TypeError, which
+      // quotes the header verbatim, and a suite must not print what it exists
+      // to keep off screens.
+      ok(h.outcome === "ready",
+        `a platform key with ${label} still reads a Connect academy normally (saw ${h.outcome})`);
+      ok(STRIPE_CALLS.length === wireAt + 1,
+        `and the Connect account read actually reached the wire (${label})`);
+      ok(authOf(stripeAt(wireAt)) === `Bearer ${CLEAN_PK}`,
+        `and the header readStripeAccount built is exactly "Bearer <trimmed>" (${label})`);
+    }
+    process.env.STRIPE_CONNECT_SECRET_KEY = realPk;
+    stripeResponder = null;
+  }
+
+  // ── the Supabase service key: the one that actually broke in production ─────
+  //
+  // ITS OWN SERVICE KEY, deliberately NOT the suite's ambient
+  // SUPABASE_SERVICE_ROLE_KEY. These two assertions used to expect the ambient
+  // value and read SB_CALLS[SB_CALLS.length - 1], which meant they were
+  // satisfied by ANY Supabase call any earlier section had made: delete the
+  // normalization in sb() so this call never goes out, and both of them
+  // happily inspected section 6's request and passed. A distinct key plus a
+  // pinned index makes that impossible - only THIS call can satisfy them, and
+  // if it does not happen there is nothing at that index to inspect.
+  {
+    const OWN_SERVICE_KEY = "section8-only-service-" + "key-Kp3";
+    const realSk = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = `${OWN_SERVICE_KEY}\n`;
+    T.bustTransportCache();
+    const sbBefore = SB_CALLS.length;   // pinned BEFORE the call, not read off the tail after
+    let threw = null;
+    try { await T.stripeFetch("/x", { stripeAccount: "acct_direct" }); } catch (e) { threw = e; }
+    ok(!threw, `a service key with a trailing newline no longer throws (saw ${threw ? String(threw.message) : "no error"})`);
+    ok(SB_CALLS.length > sbBefore, "and the Supabase read actually went out");
+    const sbCall = sbAt(sbBefore) || { headers: {} };
+    ok(String(sbCall.headers.Authorization || "") === `Bearer ${OWN_SERVICE_KEY}`,
+      "with the TRIMMED service key in Authorization, exactly, no trailing newline");
+    ok(String(sbCall.headers.apikey || "") === OWN_SERVICE_KEY,
+      "and in the apikey header too");
+    process.env.SUPABASE_SERVICE_ROLE_KEY = realSk;
+    T.bustTransportCache();
+  }
+
+  // A service key broken IN THE MIDDLE is still refused, and still statelessly:
+  // sb() runs both before and after writes, so a .status here would one day tell
+  // a caller "nothing happened" after a write had landed.
+  {
+    const realSk = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = `stub-service\nkey`;
+    T.bustTransportCache();
+    let threw = null;
+    try { await T.stripeFetch("/x", { stripeAccount: "acct_direct" }); } catch (e) { threw = e; }
+    ok(!!threw && /re-set it without the break/.test(String(threw.message)),
+      "a service key with an EMBEDDED break is still refused");
+    ok(!!threw && threw.status === undefined,
+      "and that refusal is still STATUSLESS - sb() runs after writes too");
+    process.env.SUPABASE_SERVICE_ROLE_KEY = realSk;
+    T.bustTransportCache();
+  }
+
+  // ── a stored row that only needs trimming reads HEALTHY ────────────────────
+  // The failure mode being blocked: a health read judges the raw stored value,
+  // calls it credential_problem, and flips a WORKING academy's row to 'invalid'
+  // over a stray byte - which stops routing and falls the academy back to
+  // Connect. The key is fine. It just has a newline on the end.
+  {
+    const realEnc = DB.client_stripe_direct[0].secret_key_enc;
+    DB.client_stripe_direct[0].secret_key_enc = encryptSecret(`${DIRECT_KEY}\n`);
+    DB.client_stripe_direct[0].status = "active";
+    T.bustTransportCache();
+    stripeResponder = (m, u) => u === "https://api.stripe.com/v1/account"
+      ? { status: 200, body: { id: "acct_direct", charges_enabled: true, details_submitted: true, requirements: {} } } : null;
+    const wireAt = STRIPE_CALLS.length;
+    const h = await T.readAccountHealth("client-direct");
+    ok(h.outcome === "ready", `a stored key that only needs trimming reads as a normal outcome (saw ${h.outcome})`);
+    ok(!("credential_problem" in h),
+      "with NO credential_problem - a paste artifact must never invalidate a working key");
+    ok(DB.client_stripe_direct[0].status === "active",
+      "and the row stays 'active' rather than being flipped to 'invalid'");
+    ok(authOf(stripeAt(wireAt)) === `Bearer ${DIRECT_KEY}`,
+      "and the key that answered Stripe was the trimmed one, exactly");
+    stripeResponder = null;
+    DB.client_stripe_direct[0].secret_key_enc = realEnc;
+    DB.client_stripe_direct[0].status = "active";
+    T.bustTransportCache();
+  }
+
+  // ── the EARLY RETURN, which used to be the one branch that guarded nothing ─
+  //
+  // `readAccountHealth(<id that matches no row>)` returns readStripeAccount(null,
+  // key). That path leaked nothing, but only because readStripeAccount checks
+  // its acctId before it touches the secret and the acctId here is a literal
+  // null - safety borrowed from the order of two statements in another file,
+  // for a caller that cannot see them. Reorder them there and this branch hands
+  // an unusable key to fetch, whose TypeError quotes the whole header into
+  // `could not reach Stripe: ${e.message}`, which is RETURNED, not thrown, and
+  // which direct-key.js's status action serializes straight into a response
+  // body. So the branch now normalizes and refuses for itself.
+  //
+  // ── WHAT CAN AND CANNOT BE ASSERTED ON THIS BRANCH, said plainly ──────────
+  //
+  // Only ONE property here is load-bearing: that the refusal happens IN THIS
+  // BRANCH. Everything else - no canary in the result, nothing reaching fetch,
+  // no credential_problem - is true with the guard AND without it, because
+  // readStripeAccount returns at `if (!acctId)` before it reads the secret.
+  // That borrowed safety is the very thing the guard exists to stop depending
+  // on, so an assertion resting on it is a green tick that survives its own
+  // subject being deleted. Three of these started life exactly that way.
+  //
+  // They are NOT deleted, because the properties themselves are worth checking:
+  // they are ANCHORED to `refusedHere`, so each one now fails when the guard is
+  // removed and each still reports its own distinct property when it does. A
+  // conjunction whose weak half is free is fine; a weak half standing alone,
+  // wearing a tick, is not.
+  //
+  // And the hand-over half is not asserted at all, in either direction: with
+  // acctId hardcoded null, `readStripeAccount(null, pk)` and
+  // `readStripeAccount(null, rawPk)` are indistinguishable to every test that
+  // can be written. The comment on that branch says so rather than claiming a
+  // guarantee this suite does not deliver.
+  {
+    const realPk = process.env.STRIPE_CONNECT_SECRET_KEY;
+
+    // A paste artifact on this path is still just a paste artifact: the answer
+    // must be the ordinary missing-account one, not a refusal. This one is
+    // deliberately NOT anchored - it must keep passing when the guard is gone,
+    // because without the guard that is still the right answer. What it catches
+    // is the trim being removed from this branch (MUTATE=earlyreturnnotrim),
+    // which turns a stray newline into a refusal.
+    process.env.STRIPE_CONNECT_SECRET_KEY = "sk_live_platform_stub_key\n";
+    let h = await T.readAccountHealth("no-such-client");
+    ok(h.outcome === "unreachable" && /no connected account id/.test(String(h.error)),
+      `a missing client with a whitespace-dirtied platform key still answers "no connected account id" (saw ${h.outcome})`);
+
+    // An EMBEDDED break is refused HERE, by this branch, rather than being
+    // handed over and refused by luck somewhere downstream.
+    process.env.STRIPE_CONNECT_SECRET_KEY = `sk_live_${CANARY_HEAD}\n${CANARY_TAIL}`;
+    const wireAt = STRIPE_CALLS.length;
+    h = await T.readAccountHealth("no-such-client");
+    process.env.STRIPE_CONNECT_SECRET_KEY = realPk;
+    const dump = JSON.stringify(h);
+    const refusedHere = h.outcome === "unreachable" && /line break or non-printable/.test(String(h.error));
+    ok(refusedHere,
+      "a platform key with an embedded break is refused BY THIS BRANCH, not by another file's statement order");
+    ok(refusedHere && !dump.includes(CANARY_HEAD) && !dump.includes(CANARY_TAIL),
+      "and that refusal carries NEITHER canary half in the health object this path returns");
+    ok(refusedHere && STRIPE_CALLS.length === wireAt,
+      "and it fires before anything is handed to fetch on this path at all");
+    ok(refusedHere && !("credential_problem" in h),
+      "and carries NO credential_problem - our misconfiguration is not an academy's dead credential");
+  }
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────

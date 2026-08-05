@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { assertHeaderSafeCredential, safeFetch } from "../_header-safe-credential.js";
 // Vercel Serverless Function — Unified Notion Query Endpoint
 // POST: accepts { type, clientName?, pageId?, category? }
 
@@ -33,15 +34,19 @@ const WAREHOUSE_PAGES = {
 };
 
 async function notionFetch(path, options = {}) {
-  const res = await fetch(`${NOTION_API}${path}`, {
+  // The handler's catch is `res.status(500).json({ error: err.message })`, and a
+  // dozen .catch(err => console.warn(... err.message)) sites log it besides. Both
+  // are sinks for a runtime TypeError that quotes the whole header.
+  const token = assertHeaderSafeCredential(process.env.NOTION_API_KEY, "the Notion key (NOTION_API_KEY)");
+  const res = await safeFetch(`${NOTION_API}${path}`, {
     ...options,
     headers: {
-      "Authorization": `Bearer ${process.env.NOTION_API_KEY}`,
+      "Authorization": `Bearer ${token}`,
       "Notion-Version": "2022-06-28",
       "Content-Type": "application/json",
       ...options.headers,
     },
-  });
+  }, "Notion");
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Notion API ${res.status}: ${err}`);
@@ -601,18 +606,21 @@ async function requireStaff(req) {
   }
 
   // Verify the token resolves to a real auth user
-  const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { apikey: anon, Authorization: `Bearer ${token}` },
-  });
+  const anonKey = assertHeaderSafeCredential(anon, "the Supabase anon key");
+  const userRes = await safeFetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
+  }, "Supabase");
   if (!userRes.ok) return { ok: false, status: 401, error: "invalid token" };
   const user = await userRes.json();
   if (!user?.email) return { ok: false, status: 401, error: "invalid token" };
 
   // Confirm the user is a staff member (otherwise client portal users could
   // hit this and read SOPs / action items / client profiles they shouldn't)
-  const staffRes = await fetch(
+  const svc = assertHeaderSafeCredential(serviceKey, "the Supabase service key (SUPABASE_SERVICE_ROLE_KEY)");
+  const staffRes = await safeFetch(
     `${supabaseUrl}/rest/v1/staff?email=eq.${encodeURIComponent(user.email)}&select=id,name,role`,
-    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+    { headers: { apikey: svc, Authorization: `Bearer ${svc}` } },
+    "Supabase"
   );
   if (!staffRes.ok) return { ok: false, status: 500, error: "staff lookup failed" };
   const staffRows = await staffRes.json();
@@ -641,7 +649,19 @@ async function handler(req, res) {
   }
 
   // Auth: staff-only. Closes SEC-3.
-  const gate = await requireStaff(req);
+  // WRAPPED, because requireStaff now guards the anon and service keys and those
+  // guards THROW. This call sits above the handler's only try, so an absent or
+  // broken key escaped the handler completely - FUNCTION_INVOCATION_FAILED, no
+  // body, a Sentry event per request - including on the embedded-break input
+  // this change exists to handle. A guard that converts a clean 401 into a crash
+  // has moved the failure, not fixed it.
+  let gate;
+  try {
+    gate = await requireStaff(req);
+  } catch (e) {
+    console.error("[notion] staff check could not run:", e.message);
+    return res.status(500).json({ error: "staff check unavailable" });
+  }
   if (!gate.ok) return res.status(gate.status).json({ error: gate.error });
 
   const { type, clientName, pageId, category, problem, solution } = req.body || {};
