@@ -235,3 +235,24 @@ It was missed because the match only adopted prices with LIVE SUBSCRIBERS. **But
 ### Correction: the "new" badge made a false claim about his own Stripe
 The badge read *"Options marked new are proposed by BAM and are not in your Stripe yet."* That is untrue of every rung it was applied to: Elementary $499/$999 and 1x/week $425/$875 all EXIST in his Stripe and have simply never sold. The flag is derived from `current_value` being null, which means *the portal has never stored this* - a different and narrower fact than the sentence claimed. Copy corrected to "ones we are proposing to sell for you", which is true whatever his Stripe holds. Same shape as the tax chip and the dead Send button: a claim wider than the thing that produced it.
 
+
+### Correction 2026-08-05: NOSETUP never existed. We invented it.
+Zoran asked what the NOSETUP discount code does. Read his live Stripe through the direct-key transport to answer:
+
+| Read from his account | Result |
+|---|---|
+| Coupons | **1** - `club`, $100 off, duration **forever**, created 2025-06-27, **times_redeemed 0** |
+| Promotion codes (the thing a customer types) | **0** |
+| Anything named NOSETUP | **none** |
+| Active subscriptions carrying any discount | **0 of 20** |
+
+The string "NOSETUP" appears in **no source file** - not the catalog, roster or customer list. It appears exactly once in our entire record, as part of a field name **we wrote**: `waived_via_NOSETUP_coupon_or_credit` in the fee scan. The scan hedged honestly between coupon and credit; we took the coupon half, gave it a name, and then put that name in front of the client as a fact.
+
+**What is actually true:** the $40 fee was waived 3 times, and **we do not know how**. That is now an open question for Lij rather than an answer we assert.
+
+**Ruling (Zoran, 2026-08-05): put `club` in.** The codes card now carries his one real coupon - `club`, Dollar off, $100, Every payment - with `current_value` NULL because our side has never stored it.
+
+Two things to carry:
+- **`club` is $100 off FOREVER, not once.** On a $250 plan that is $150/month for the life of the membership. It has never been used and there is no promotion code, so nobody can self-apply it - but a new system that starts honouring coupons automatically would inherit it silently.
+- **The failure shape, for skill 1:** a field NAME we chose became evidence. Nothing lied; nobody checked. The rule is that a value shown to a client must trace to THEIR data, not to a label in our own notes. Grep the client's own export for any identifier before putting it on a page they will read.
+
